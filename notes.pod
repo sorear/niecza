@@ -1,0 +1,143 @@
+=head1 Notes on P6/CLR mapping
+
+=head2 Classes and methods
+
+Perl6 has pervasive duck typing.  C<my Str $x> actually means
+C<< my $x where .^does(Str) >>; and can be overriden.  Thus, our methods have to
+be able to, in principle, handle any representation type.  This is compouned
+by the notion of per-object representational polymorphism in Perl 6.
+
+Three representations will be used often.  The null representation provides for
+protoobjects, and fails any attempt to access attributes.  A special dynamic
+representation can have its shape modified at any time, and is thus needed for
+pre-CHECK code.  Finally, the CLR native representation is used for normal
+run-time objects.  CLR native representation is postponed for now.
+
+There is also a CLR external representation.  More on why it's needed later.
+
+Representations define the essential Perl 6 object operations - calling methods,
+interrogative pronouns, and slot access.  Since all objects are handled as CLR
+objects, the natural way to implement representation operations is as special
+methods.  In the interests of allomorphic and polymorphic operation, the
+representation interface is exposed to the CLR as an IPerl6Object interface.
+
+Every Perl6 class creates a CLR class and a CLR interface for the CLR native
+representation.  The interface makes efficient-ish multiple inheritance and
+representation polymorphism possible.  Note that code has to use IPerl6Object,
+not the specific interface, prior to specialization.  Specialization can go all
+the way to the class form.
+
+Methods present as one or more CLR methods.  Role methods (and non-method subs)
+are static.  Every method has multiple supported calling conventions,
+especially if old code can't be thrown out after a model change.  Capture
+conversion is handled in the generic IPerl6Object; specialized representation
+interfaces can offer more specific calling conventions.
+
+=head2 Pessimizers
+
+We have objects called "pessimizers".  They encapsulate optimizations that need
+to be delayed, changes to the program that could happen.  For instance, a
+pessimizer could represent the possibility that SomeClass could be augmented.
+Pessimizers watch the program model; they also have a "cancel" operation that
+allows the optimizations to be performed.  Pessimizers can be linked, such that
+cancelling the outer pessimizer cancels the inner.  When a use statement is
+compiled, or any other recursive compiler invocation, the used code's
+pessimizer is linked to the user.  After the outermost call to the compiler
+returns, the main program CHECK time in the first such case but also after
+requires and evals, the resulting pessimizer is automatically cancelled.  Since
+we change our model so much, we like to generate IL lazily if we can.
+
+=head2 Multiple dispatch
+
+In all multiple dispatch situations, the full set of candidates is known at
+some places.  Lexical multiple dispatch has a fixed set in any lexical scope;
+method multiple dispatch has a fixed set in any class; package multiple
+dispatch in namespaces.  So we just need to compile a dispatcher right there.
+Generation of decision trees for pattern matching is well studied; see
+'Compiling pattern matching' by Lennart 'augustss' Augustsson.
+
+=head2 CLR imports
+
+Namespaces from other CLR assemblies manifest as sealed packages.  Classes so
+obtained will be unsuitable for usage in multiple inheritance.  Individual
+objects cannot be directly used, so they will be wrapped up in an object with
+the "CLR external" representation; this, conveniently, provides IPerl6Object
+and any mapped role classes.  This is invisible to the user, as WHICH and WHERE
+are delegated to the repr and work correctly.
+
+=head2 CLR exports
+
+A set of Perl6 modules could be compiled to an assembly.  Since CLR has no
+pessimizers, any module so compiled would need immediate optimization.  Many
+questions remain.
+
+=head2 gather/take and CPS
+
+C<gather> and C<take> require the ability to stop a sub in mid-execution and
+continue it later.  Since any unknown function can call C<take>, all functions
+(until we have pessimizers working) need to be encoded with explicit stack
+frame objects; and we need to B<support> the transformation in all cases.
+
+For CLR compatibility all exposed functions which use CPS internally need to
+provide a recursive-runloop-starting face...
+
+=head2 Control exceptions
+
+Control flow in Perl 6 is logically handled using exceptions.  However, there
+is a beautifully simple implementation of this (from pmichaud I think?); just
+store the frame to return to in a closed-over lexical variable, and rely on
+outward continuation semantics to implement the lexotic control exception.
+
+=head2 Resumable exceptions
+
+In Perl 6, throwing exceptions doesn't unwind the stack; it just calls a
+handler, which can unwind the stack itself using lexotic control flow if it
+wants.  (Yes, this is circular with the last paragraph.  Deal.)  For normal
+exceptions, the handler is not allowed to return normally, which makes the
+distinction moot; warnings and take work differently.
+
+=head2 Lexical continuation
+
+Perl 6 eval requires the ability to access outer lexicals.  That's just
+introspection on the caller's frame.  The setting is a special case of this;
+there's a function in the compiler (probably written in C# or something) which
+defines a bunch of primitives, then evals the user code.  Or maybe it uses an
+internal API directly.
+
+=head2 SPECIALIZE
+
+SPECIALIZE (or SPECIALISE) is parsed as a phaser; in it is a list of type
+objects.  The enclosing function gets extra multis (or not quite; it shouldn't
+affect dispatch) for the cases.  Will probably be involved in the
+implementation of CLR object usage; functions being specialized on IRealAny.
+Specialization, and lazy code generation, are the crux of optimization in
+Sprixel.
+
+=head2 BEGIN
+
+C<BEGIN> must take special care to not deal with classes being defined, as once
+a type has been submitted to ref emit, it cannot be changed.  This will result
+in some slowdown.  I'm OK with that; most C++ template engines don't compile
+to native code either.
+
+=head2 Three kinds of pad
+
+Normal run-time pads are CLR objects of some dedicated class, based loosely on
+Perlesque frame objects.  Compile time pads are hashes, so they can be extended
+as things are declared.  This is very similar to the hash/clr representation
+dichotomy with objects; unification could be worthwhile.  Package pads will be
+hashes like any uncloned pad, but need special handling in CLR export.
+
+=head1 Brief overview of the compiler
+
+User runs C<sprixel.exe>.  Entry point is in C<Sprixel::Compiler>, the driver.
+C<Sprixel::Compiler> parses arguments, decides the user wants to run some Perl
+6 code (gasp!), passes it off to C<STD>.  C<STD> calls action methods in
+C<Sprixel::Actions>, which construct a bunch of objects and metaobjects; mostly
+specced things like C<Hash> and C<Block> and C<ClassHOW>, but a few compiler
+things too, like C<Sprixel::Meta::Op>.  The top level code, as a C<Block>, is
+passed back to C<Sprixel::Compiler>.  C<Sprixel::Compiler>, seeing that it was
+told to B<run> the code, calls C<< postcircumfix:<( )> >>.
+C<< postcircumfix:<( )> >> sees that the C<$!Method> property is null and
+constructs a CLR method.  The method is run.  (Eventually, pessimizers and
+modules will enter this picture)
