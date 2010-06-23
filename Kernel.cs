@@ -92,4 +92,50 @@ namespace Sprixel {
             }
         }
     }
+
+    // This is quite similar to DynFrame and I wonder if I can unify them.
+    public class DynObject: IPerl6Object {
+        public Dictionary<string, IPerl6Object> slots;
+        public Dictionary<string, IPerl6Object> methods;
+        public IPerl6Object how;
+
+        public FrameBase InvokeMethod(FrameBase caller, string name,
+                IPerl6Object argParcel) {
+            IPerl6Object m = methods[name];
+            if (m != null) {
+                // XXX this breaks the static call nesting rule; does it need
+                // to be rewritten or can the rule be safely loosened?
+                // TODO: methods need arguments, too.
+                return m.Invoke(caller, this);
+            } else {
+                return Sprixel.Callout.InvokeFailed(caller, argParcel);
+            }
+        }
+
+        public FrameBase Invoke(FrameBase caller, IPerl6Object argParcel) {
+            IPerl6Object d = slots["clr-delegate"];
+            if (d != null) {
+                return (Sprixel.CallableDelegate)(((CLRImportObject)d).val)
+                    (caller, argParcel);
+            } else {
+                // TODO needs to be CPS
+                // $.clr-delegate //= self.codegen
+                // run it
+            }
+        }
+
+        public FrameBase GetAttribute(FrameBase caller, string name) {
+            caller.resultSlot = slots[name];
+            return caller;
+        }
+
+        public FrameBase HOW(FrameBase caller) {
+            caller.resultSlot = how;
+            return caller;
+        }
+
+        public FrameBase WHICH(FrameBase caller) {
+            /* return a proxy for the Object which uses referential equality */
+        }
+    }
 }
