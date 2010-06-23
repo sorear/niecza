@@ -1,6 +1,6 @@
-#| The main driver for the Sprixel system.  The guts of eval live here, as does
-#| the command line processor and the REPL.
-class Sprixel::Compiler;
+#| The main driver for the P1 polymorph of VICIL.  This is a static compiler
+#| which ties knots by statically generating metaobject tree initializers.
+class Sprixel::CompilerP1;
 
 use Sprixel::Meta::Op;
 
