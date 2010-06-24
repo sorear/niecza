@@ -8,14 +8,17 @@ namespace Sprixel {
     // Only call other functions in Continue, not in the CallableDelegate or
     // equivalent!
     public delegate FrameBase CallableDelegate(FrameBase caller,
-            IPerl6Object argParcel);
+            IPerl6Object pos[], Dictionary<string, IPerl6Object> named);
     // Used by DynFrame to plug in code
     public delegate void DynBlockDelegate(DynamicFrame frame);
 
     public interface IPerl6Object {
-        public FrameBase Invoke(FrameBase caller, IPerl6Object argParcel);
+        public FrameBase Invoke(FrameBase caller, IPerl6Object pos[],
+                Dictionary<string, IPerl6Object> named);
+        // include the invocant in the positionals!  it will not usually be
+        // this, rather a container of this
         public FrameBase InvokeMethod(FrameBase caller, string name,
-                IPerl6Object argParcel);
+                IPerl6Object pos[], Dictionary<string, IPerl6Object> named);
         public FrameBase GetAttribute(FrameBase caller, string name);
         public FrameBase WHERE(FrameBase caller);
         public FrameBase HOW(FrameBase caller);
@@ -53,14 +56,17 @@ namespace Sprixel {
 
     public class ExceptionHelper: FrameBase {
         private FrameBase cursor;
-        private IPerl6Object toThrow;
+        private IPerl6Object toThrowPos[];
+        private Dictionary<string, IPerl6Object> toThrowNamed;
 
         private ExceptionHelper(FrameBase caller_) { caller = caller_; }
 
-        public static FrameBase Throw(FrameBase caller, IPerl6Object exn) {
+        public static FrameBase Throw(FrameBase caller, IPerl6Object pos[],
+                Dictionary<string, IPerl6Object> named) {
             var n = new ExceptionHelper();
             n.cursor = caller;
-            n.toThrow = exn;
+            n.toThrowPos = pos;
+            n.toThrowNamed = named;
             return n;
         }
 
@@ -85,7 +91,8 @@ namespace Sprixel {
                     return cursor.GetAttribute(this, "!exn_handler");
                 case 2:
                     if (resultSlot != null) {
-                        return resultSlot.invoke(caller, toThrow);
+                        return resultSlot.invoke(caller, toThrowPos,
+                                toThrowNamed);
                     }
                     cursor = cursor.caller;
                     goto case 0;
@@ -100,23 +107,23 @@ namespace Sprixel {
         public IPerl6Object how;
 
         public FrameBase InvokeMethod(FrameBase caller, string name,
-                IPerl6Object argParcel) {
+                IPerl6Object pos[], Dictionary<string, IPerl6Object> named) {
             IPerl6Object m = methods[name];
             if (m != null) {
                 // XXX this breaks the static call nesting rule; does it need
                 // to be rewritten or can the rule be safely loosened?
-                // TODO: methods need arguments, too.
-                return m.Invoke(caller, this);
+                return m.Invoke(caller, pos, named);
             } else {
-                return Sprixel.Callout.InvokeFailed(caller, argParcel);
+                return Sprixel.Callout.InvokeFailed(caller, pos, named);
             }
         }
 
-        public FrameBase Invoke(FrameBase caller, IPerl6Object argParcel) {
+        public FrameBase Invoke(FrameBase caller, IPerl6Object pos[],
+                Dictionary<string, IPerl6Object> named) {
             IPerl6Object d = slots["clr-delegate"];
             if (d != null) {
                 return (Sprixel.CallableDelegate)(((CLRImportObject)d).val)
-                    (caller, argParcel);
+                    (caller, pos, named);
             } else {
                 // TODO needs to be CPS
                 // $.clr-delegate //= self.codegen
