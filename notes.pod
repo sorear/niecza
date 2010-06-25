@@ -128,6 +128,21 @@ as things are declared.  This is very similar to the hash/clr representation
 dichotomy with objects; unification could be worthwhile.  Package pads will be
 hashes like any uncloned pad, but need special handling in CLR export.
 
+=head2 Variables
+
+When C<my $foo> is executed, two objects are created, a C<Variable> and a
+C<ScalarContainer>.  The C<Variable> is a native type; it is B<not> a Perl 6
+object, although it can be reified as one.  The symbol table points to the
+variable, which points to the container, which points to the value.  The
+variable keeps its identity through binds; the container doesn't.  A variable
+is a boxed object, representing the runtime manifestation of a bvalue.
+Functions return variables, in order that postcircumfixes can be bound;
+however, functions do not take variables.  C<< &infix:<:=> >> and
+C<< prefix:<VAR> >> are macros, not functions.  Since variables are not bound
+to functions, the variable object for a lexical often need not be generated;
+the container pointer itself is what's passed to functions and it can be stored
+in the frame.
+
 =head1 Brief overview of the compiler
 
 User runs C<sprixel.exe>.  Entry point is in C<Sprixel::Compiler>, the driver.

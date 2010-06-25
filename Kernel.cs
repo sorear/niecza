@@ -8,26 +8,36 @@ namespace Sprixel {
     // Only call other functions in Continue, not in the CallableDelegate or
     // equivalent!
     public delegate FrameBase CallableDelegate(FrameBase caller,
-            IPerl6Object pos[], Dictionary<string, IPerl6Object> named);
+            LValue pos[], Dictionary<string, LValue> named);
     // Used by DynFrame to plug in code
     public delegate void DynBlockDelegate(DynamicFrame frame);
 
     public interface IPerl6Object {
-        public FrameBase Invoke(FrameBase caller, IPerl6Object pos[],
-                Dictionary<string, IPerl6Object> named);
+        public FrameBase Invoke(FrameBase caller, LValue pos[],
+                Dictionary<string, LValue> named);
         // include the invocant in the positionals!  it will not usually be
         // this, rather a container of this
         public FrameBase InvokeMethod(FrameBase caller, string name,
-                IPerl6Object pos[], Dictionary<string, IPerl6Object> named);
+                LValue pos[], Dictionary<string, LValue> named);
         public FrameBase GetAttribute(FrameBase caller, string name);
         public FrameBase WHERE(FrameBase caller);
         public FrameBase HOW(FrameBase caller);
     }
 
+    public struct LValue {
+        public IPerl6Object container;
+        public bool rw;
+    }
+
+    public class Variable {
+        public LValue lv;
+        public bool bvalue;
+    }
+
     public abstract class FrameBase: IPerl6Object {
         public readonly FrameBase caller;
         public readonly FrameBase outer;
-        public IPerl6Object resultSlot = null;
+        public object resultSlot = null;
         public int ip = 0;
 
         public abstract FrameBase Continue();
@@ -35,8 +45,8 @@ namespace Sprixel {
 
     public class DynFrame: FrameBase {
         public readonly DynBlockDelegate code;
-        public readonly Dictionary<string, IPerl6Object> lex
-            = new Dictionary<string, IPerl6Object>;
+        public readonly Dictionary<string, Variable> lex
+            = new Dictionary<string, Variable>;
 
         public DynFrame(FrameBase caller_, FrameBase outer_,
                 DynBlockDelegate code_) {
@@ -49,20 +59,20 @@ namespace Sprixel {
             return code(this);
         }
 
-        public FrameBase GetAttribute(FrameBase c, string name) {
+        public FrameBase GetSlot(FrameBase c, string name) {
             c.resultSlot = lex[name];
         }
     }
 
     public class ExceptionHelper: FrameBase {
         private FrameBase cursor;
-        private IPerl6Object toThrowPos[];
-        private Dictionary<string, IPerl6Object> toThrowNamed;
+        private LValue toThrowPos[];
+        private Dictionary<string, LValue> toThrowNamed;
 
         private ExceptionHelper(FrameBase caller_) { caller = caller_; }
 
-        public static FrameBase Throw(FrameBase caller, IPerl6Object pos[],
-                Dictionary<string, IPerl6Object> named) {
+        public static FrameBase Throw(FrameBase caller, LValue pos[],
+                Dictionary<string, LValue> named) {
             var n = new ExceptionHelper();
             n.cursor = caller;
             n.toThrowPos = pos;
@@ -91,8 +101,8 @@ namespace Sprixel {
                     return cursor.GetAttribute(this, "!exn_handler");
                 case 2:
                     if (resultSlot != null) {
-                        return resultSlot.invoke(caller, toThrowPos,
-                                toThrowNamed);
+                        return ((IPerl6Object)resultSlot).invoke(caller,
+                                toThrowPos, toThrowNamed);
                     }
                     cursor = cursor.caller;
                     goto case 0;
@@ -102,12 +112,12 @@ namespace Sprixel {
 
     // This is quite similar to DynFrame and I wonder if I can unify them.
     public class DynObject: IPerl6Object {
-        public Dictionary<string, IPerl6Object> slots;
+        public Dictionary<string, Variable> slots;
         public Dictionary<string, IPerl6Object> methods;
         public IPerl6Object how;
 
         public FrameBase InvokeMethod(FrameBase caller, string name,
-                IPerl6Object pos[], Dictionary<string, IPerl6Object> named) {
+                LValue pos[], Dictionary<string, LValue> named) {
             IPerl6Object m = methods[name];
             if (m != null) {
                 // XXX this breaks the static call nesting rule; does it need
@@ -118,8 +128,8 @@ namespace Sprixel {
             }
         }
 
-        public FrameBase Invoke(FrameBase caller, IPerl6Object pos[],
-                Dictionary<string, IPerl6Object> named) {
+        public FrameBase Invoke(FrameBase caller, LValue pos[],
+                Dictionary<string, LValue> named) {
             IPerl6Object d = slots["clr-delegate"];
             if (d != null) {
                 return (Sprixel.CallableDelegate)(((CLRImportObject)d).val)
