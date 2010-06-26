@@ -143,6 +143,23 @@ to functions, the variable object for a lexical often need not be generated;
 the container pointer itself is what's passed to functions and it can be stored
 in the frame.
 
+=head1 Notes on the compiler
+
+These are in chronological order.  If two conflict, the later is right.
+
+=head2 Finitary bodies and scopes
+
+We need to keep the C<Scope> and C<Body> objects, which are constructed by
+the parser, typologically distinct from C<CallFrame> and C<Code>.  By avoiding
+issues of cloning, it is possible to track all such objects created during a
+compilation.  The compiler is not reentrant in a conventional sense; any call
+to C<eval> or any C<use> statement adds code to the I<current> compilation.
+At C<CHECK> time (or maybe sooner if C<BEGIN> time user code needs to run?),
+C<Scope> and C<Body> objects are I<completed>.  This means that the compiler
+determines exactly what they need to contain and provides gifts of code.  The
+objects themselves do not control the compilation; this is necessary to keep
+the compiler out of the kernel.
+
 =head1 Brief overview of the compiler
 
 User runs C<sprixel.exe>.  Entry point is in C<Sprixel::Compiler>, the driver.

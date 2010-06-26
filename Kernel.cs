@@ -45,8 +45,9 @@ namespace Sprixel {
 
     public class DynFrame: FrameBase {
         public readonly DynBlockDelegate code;
-        public readonly Dictionary<string, Variable> lex
-            = new Dictionary<string, Variable>;
+        // very generic because it also has to hold spills.
+        public readonly Dictionary<string, object> lex
+            = new Dictionary<string, object>;
 
         public DynFrame(FrameBase caller_, FrameBase outer_,
                 DynBlockDelegate code_) {
