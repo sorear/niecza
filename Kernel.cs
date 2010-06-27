@@ -170,7 +170,8 @@ namespace Sprixel {
 
     public class MainClass {
         public static void Main() {
-            Frame root_f = new Frame(null, null, new DynBlockDelegate(R.Continue));
+            Frame root_f = new Frame(null, null,
+                    new DynBlockDelegate(BootC));
             Frame current = root_f;
             while (current) {
                 current = current.Continue();
@@ -179,52 +180,76 @@ namespace Sprixel {
 
         // bootstrap function for the compilation unit.  runs phasers, sets up
         // runtime meta objects at BEGIN, then calls the mainline
-        private class R {
-            public static Frame Continue(Frame th) {
-                switch (th.ip) {
-                    case 0:
-                        // BEGIN
-                        Frame main_f = new Frame(KernelSetting.KernelFrame);
-                        IPerl6Object main_s = KernelSetting.MakeSub(
-                            new DynBlockDelegate(B.Continue), main_f,
-                            KernelSetting.KernelFrame);
-                        // CHECK
-                        // INIT
-                        // DO
-                        // could optimize this quite a bit since the mainline
-                        // and setting both only run once.  For later.
-                        IPerl6Object main_c = KernelSetting.CloneSub(
-                            main_s, KernelSetting.KernelFrame);
-                        th.ip = 1;
-                        return main_c.Invoke(th, new LValue[0], null);
-                    case 1:
-                        return th.caller;
-                }
-                return null;
+        public static Frame BootC(Frame th) {
+            switch (th.ip) {
+                case 0:
+                    // BEGIN
+                    Frame main_f = new Frame(KernelSetting.KernelFrame);
+                    Frame say_f = new Frame(main_f);
+                    IP6 say_s = KernelSetting.MakeSub(
+                        new DynBlockDelegate(SayC), say_f, main_f);
+                    main_f.slots["&say"] = KernelSetting.MakeConstVar(say_s);
+                    IP6 main_s = KernelSetting.MakeSub(
+                        new DynBlockDelegate(MainC), main_f,
+                        KernelSetting.KernelFrame);
+                    // CHECK
+                    // INIT
+                    // DO
+                    // could optimize this quite a bit since the mainline
+                    // and setting both only run once.  For later.
+                    IP6 main_c = KernelSetting.CloneSub(
+                        main_s, KernelSetting.KernelFrame);
+                    th.ip = 1;
+                    return main_c.Invoke(th, new LValue[0], null);
+                case 1:
+                    return th.caller;
+            }
+            return null;
+        }
+
+        public static Frame MainC(Frame th) {
+            LValue c;
+            IP6 d;
+            switch (th.ip) {
+                case 0:
+                    th.ip = 1;
+                    c = th.proto.slots["&say"].lv;
+                    return c.container.InvokeMethod("FETCH",
+                            new LValue[1] { c }, null);
+                case 1:
+                    d = th.resultSlot;
+                    th.slots["&say"] = KernelSetting.MakeConstVar(
+                            KernelSetting.CloneSub(d, th));
+                    th.ip = 2;
+                    th.resultSlot = null;
+                    c = th.slots["&say"].lv;
+                    return c.container.InvokeMethod("FETCH",
+                            new LValue[1] { c }, null);
+                case 2:
+                    c = KernelSetting.MakeConstLV(new CLRImportObject("Hello, World"));
+                    d = th.resultSlot;
+                    th.ip = 3;
+                    th.resultSlot = null;
+                    return d.Invoke(new LValue[1] { c }, null);
+                case 3:
+                    return th.caller;
             }
         }
 
-        private class B {
-            public static Frame Continue(Frame th) {
-                LValue c;
-                IP6 d;
-                switch (th.ip) {
-                    case 0:
-                        th.ip = 1;
-                        th.resultSlot = null;
-                        c = th.outer.slots["&say"].lv;
-                        return c.container.InvokeMethod("FETCH",
-                                new LValue[1] { c }, null);
-                    case 1:
-                        c = KernelSetting.MakeStrObject("Hello, World");
-                        d = th.resultSlot;
-                        th.ip = 2;
-                        th.resultSlot = null;
-                        return d.Invoke(new LValue[1] { c }, null);
-                    case 2:
-                        return th.caller;
-                }
+        public static Frame SayC(Frame th) {
+            IP6 a;
+            switch (th.ip) {
+                case 0:
+                    a = th.pos[0];
+                    th.ip = 1;
+                    return a.container.InvokeMethod("FETCH",
+                            new LValue[1] { a }, null);
+                case 1:
+                    a = resultSlot;
+                    System.Console.WriteLine((string)(((CLRImportObject)a).val));
+                    return th.caller;
             }
+            return null;
         }
     }
 }
