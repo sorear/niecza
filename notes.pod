@@ -143,6 +143,15 @@ to functions, the variable object for a lexical often need not be generated;
 the container pointer itself is what's passed to functions and it can be stored
 in the frame.
 
+=head2 RIP lexotic continuations
+
+Because of C<CONTROL>, all control exceptions which pass through a statically
+unknown set of frames need to use the handler-chain mechanism, except for
+C<CONTROL>/C<CATCH>'s own unwinding.  A set of handlers is used to relay
+exceptions when the CLR wants to start a recursive runloop.  Since we're now
+only using CPS for C<gather>/C<take>, using Mono's native delimited
+continuations is back on the table.
+
 =head1 Notes on the compiler
 
 These are in chronological order.  If two conflict, the later is right.
@@ -159,6 +168,25 @@ C<Scope> and C<Body> objects are I<completed>.  This means that the compiler
 determines exactly what they need to contain and provides gifts of code.  The
 objects themselves do not control the compilation; this is necessary to keep
 the compiler out of the kernel.
+
+=head2 The two metamodels
+
+C<StaticClassHOW> is used for most compiling tasks, and is available much
+earlier in the setting.  A single instance of it can manage many classes, since
+it corresponds to a class I<declaration>, which may be in a clonable context.
+The business here is in the compiler; a CIL class is generated and used to
+instantiate the metaobject.
+
+C<ClassHOW> is able to actually generate unrelated classes at run time.
+
+=head2 Weird eval rules
+
+In order for precompilation to work, we need to fix the code which the compiler
+sees.  Therefore, C<BEGIN> blocks are not allowed to use C<&CORE::eval> when
+the precompiler is activated.
+
+We may go further and ban all I/O from C<BEGIN> blocks under these
+circumstances.  If this is done, the compiler rule becomes unneeded.
 
 =head1 Brief overview of the compiler
 
