@@ -179,6 +179,9 @@ instantiate the metaobject.
 
 C<ClassHOW> is able to actually generate unrelated classes at run time.
 
+[Edit: StaticClassHOW is not going to be used in the setting due to augment
+Mu concerns.  Mu will be defined using ClassHOW, stripped down.]
+
 =head2 Weird eval rules
 
 In order for precompilation to work, we need to fix the code which the compiler
@@ -187,6 +190,17 @@ the precompiler is activated.
 
 We may go further and ban all I/O from C<BEGIN> blocks under these
 circumstances.  If this is done, the compiler rule becomes unneeded.
+
+=head2 New interface model
+
+Interfaces represent duck typing; they are somewhat inferred, like Go, and need
+not share referential identity, like COM.  If a role or class Foo exists, IFoo
+exists; an object can create an IFoo presentation if and only if C<.^does(Foo)>.
+A C<Foo $a> argument is optimized to directly involve IFoo, so gradual typing
+actually eliminates most late binding in this model.  Difficulties exist with
+monkey typing; the simple solution is to say IFoo is the original version of
+Foo, and any added methods must be late bound.  We could also version things,
+with subtyping (IFoo3 implies IFoo2).
 
 =head1 Brief overview of the compiler
 
