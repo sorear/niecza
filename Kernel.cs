@@ -12,7 +12,7 @@ namespace Sprixel {
     // Used by DynFrame to plug in code
     public delegate void DynBlockDelegate(DynamicFrame frame);
 
-    public interface IPerl6Object {
+    public interface IP6 {
         public Frame Invoke(Frame caller, LValue pos[],
                 Dictionary<string, LValue> named);
         // include the invocant in the positionals!  it will not usually be
@@ -20,7 +20,7 @@ namespace Sprixel {
         public Frame InvokeMethod(Frame caller, string name,
                 LValue pos[], Dictionary<string, LValue> named);
         public Frame GetAttribute(Frame caller, string name);
-        public Frame WHERE(Frame caller);
+        //public Frame WHERE(Frame caller);
         public Frame HOW(Frame caller);
     }
 
@@ -36,15 +36,14 @@ namespace Sprixel {
 
     // We need hashy frames available to properly handle BEGIN; for the time
     // being, all frames will be hashy for simplicity
-    public class Frame: IPerl6Object {
+    public class Frame: IP6 {
         public readonly Frame caller;
         public readonly Frame outer;
-        public object resultSlot = null;
+        public IP6 resultSlot = null;
         public int ip = 0;
         public readonly DynBlockDelegate code;
-        // very generic because it also has to hold spills.
-        public readonly Dictionary<string, object> lex
-            = new Dictionary<string, object>;
+        public readonly Dictionary<string, IP6> lex
+            = new Dictionary<string, IP6>;
 
         public Frame(Frame outer_) : this(null, outer_, null) {}
 
@@ -112,14 +111,14 @@ namespace Sprixel {
 
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
-    public class DynObject: IPerl6Object {
-        public Dictionary<string, object> slots;
-        public Dictionary<string, IPerl6Object> methods;
-        public IPerl6Object how;
+    public class DynObject: IP6 {
+        public Dictionary<string, IP6> slots;
+        public Dictionary<string, IP6> methods;
+        public IP6 how;
 
         public Frame InvokeMethod(Frame caller, string name,
                 LValue pos[], Dictionary<string, LValue> named) {
-            IPerl6Object m = methods[name];
+            IP6 m = methods[name];
             if (m != null) {
                 // XXX this breaks the static call nesting rule; does it need
                 // to be rewritten or can the rule be safely loosened?
@@ -131,14 +130,12 @@ namespace Sprixel {
 
         public Frame Invoke(Frame caller, LValue pos[],
                 Dictionary<string, LValue> named) {
-            IPerl6Object d = slots["clr-delegate"];
+            IP6 d = slots["clr-delegate"];
             if (d != null) {
                 return (Sprixel.CallableDelegate)(((CLRImportObject)d).val)
                     (caller, pos, named);
             } else {
-                // TODO needs to be CPS
-                // $.clr-delegate //= self.codegen
-                // run it
+                // TODO: throw exception
             }
         }
 
@@ -151,10 +148,13 @@ namespace Sprixel {
             caller.resultSlot = how;
             return caller;
         }
+    }
 
-        public Frame WHICH(Frame caller) {
-            /* return a proxy for the Object which uses referential equality */
-        }
+    // Allows native CLR objects to be treated as Perl 6 data.  They don't
+    // currently support any operations; you'll need to use CLR code to work
+    // with them.
+    public class CLRImportObject : IP6 {
+        public readonly object val;
     }
 
     // A bunch of stuff which raises big circularity issues if done in the
@@ -164,8 +164,8 @@ namespace Sprixel {
     // ...
     // This should be enough to implement the rest of ClassHOW :)
     public class KernelSetting {
-        public static readonly IPerl6Object KernelFrame;
-        public static readonly IPerl6Object KernelScope;
+        public static readonly IP6 KernelFrame;
+        public static readonly IP6 KernelScope;
     }
 
     public class MainClass {
@@ -207,7 +207,7 @@ namespace Sprixel {
         private class B {
             public static Frame Continue(Frame th) {
                 LValue c;
-                IPerl6Object d;
+                IP6 d;
                 switch (th.ip) {
                     case 0:
                         th.ip = 1;
@@ -217,7 +217,7 @@ namespace Sprixel {
                                 new LValue[1] { c }, null);
                     case 1:
                         c = KernelSetting.MakeStrObject("Hello, World");
-                        d = (IPerl6Object)th.resultSlot;
+                        d = th.resultSlot;
                         th.ip = 2;
                         th.resultSlot = null;
                         return d.Invoke(new LValue[1] { c }, null);
