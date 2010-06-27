@@ -36,7 +36,7 @@ namespace Sprixel {
 
     // We need hashy frames available to properly handle BEGIN; for the time
     // being, all frames will be hashy for simplicity
-    public abstract class Frame: IPerl6Object {
+    public class Frame: IPerl6Object {
         public readonly Frame caller;
         public readonly Frame outer;
         public object resultSlot = null;
@@ -46,7 +46,9 @@ namespace Sprixel {
         public readonly Dictionary<string, object> lex
             = new Dictionary<string, object>;
 
-        public DynFrame(Frame caller_, Frame outer_,
+        public Frame(Frame outer_) : this(null, outer_, null) {}
+
+        public Frame(Frame caller_, Frame outer_,
                 DynBlockDelegate code_) {
             caller = caller_;
             outer = outer_;
@@ -164,5 +166,65 @@ namespace Sprixel {
     public class KernelSetting {
         public static readonly IPerl6Object KernelFrame;
         public static readonly IPerl6Object KernelScope;
+    }
+
+    public class MainClass {
+        public static void Main() {
+            Frame root_f = new Frame(null, null, new DynBlockDelegate(R.Continue));
+            Frame current = root_f;
+            while (current) {
+                current = current.Continue();
+            }
+        }
+
+        // bootstrap function for the compilation unit.  runs phasers, sets up
+        // runtime meta objects at BEGIN, then calls the mainline
+        private class R {
+            public static Frame Continue(Frame th) {
+                switch (th.ip) {
+                    case 0:
+                        // BEGIN
+                        Frame main_f = new Frame(KernelSetting.KernelFrame);
+                        IPerl6Object main_s = KernelSetting.MakeSub(
+                            new DynBlockDelegate(B.Continue), main_f,
+                            KernelSetting.KernelFrame);
+                        // CHECK
+                        // INIT
+                        // DO
+                        // could optimize this quite a bit since the mainline
+                        // and setting both only run once.  For later.
+                        IPerl6Object main_c = KernelSetting.CloneSub(
+                            main_s, KernelSetting.KernelFrame);
+                        th.ip = 1;
+                        return main_c.Invoke(th, new LValue[0], null);
+                    case 1:
+                        return th.caller;
+                }
+                return null;
+            }
+        }
+
+        private class B {
+            public static Frame Continue(Frame th) {
+                LValue c;
+                IPerl6Object d;
+                switch (th.ip) {
+                    case 0:
+                        th.ip = 1;
+                        th.resultSlot = null;
+                        c = th.outer.slots["&say"].lv;
+                        return c.container.InvokeMethod("FETCH",
+                                new LValue[1] { c }, null);
+                    case 1:
+                        c = KernelSetting.MakeStrObject("Hello, World");
+                        d = (IPerl6Object)th.resultSlot;
+                        th.ip = 2;
+                        th.resultSlot = null;
+                        return d.Invoke(new LValue[1] { c }, null);
+                    case 2:
+                        return th.caller;
+                }
+            }
+        }
     }
 }
