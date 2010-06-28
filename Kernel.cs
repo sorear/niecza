@@ -49,6 +49,9 @@ namespace Sprixel {
         public readonly Dictionary<string, Variable> lex
             = new Dictionary<string, Variable>;
 
+        public LValue pos[];
+        public Dictionary<string, LValue> named;
+
         public Frame(Frame outer_) : this(null, outer_, null) {}
 
         public Frame(Frame caller_, Frame outer_,
@@ -159,11 +162,15 @@ namespace Sprixel {
     // with them.
     public class CLRImportObject : IP6 {
         public readonly object val;
+
+        public CLRImportObject(object val_) { val = val_ }
     }
 
     // This should be a real class eventualy
     public class ScalarContainer : IP6 {
-        public IPerl6Object val;
+        public IP6 val;
+
+        public ScalarContainer(IP6 val_) { val = val_ }
 
         public Frame Fetch(Frame caller) {
             caller.resultSlot = val;
@@ -176,6 +183,29 @@ namespace Sprixel {
         }
     }
 
+    // This, too
+    public class Sub : IP6 {
+        public DynBlockDelegate body;
+        public Frame proto;
+        public Frame outer;
+
+        public Sub(DynBlockDelegate body_, Frame proto_, Frame outer_) {
+            body = body_; proto = proto_; outer = outer_;
+        }
+
+        public Frame Invoke(Frame caller, LValue pos[],
+                Dictionary<string,LValue> named) {
+            Frame n = new Frame(caller, outer, body);
+            foreach (KeyValuePair<string,Variable> kv in proto.lex) {
+                n.lex[kv.Key] = kv.Value; // TODO: Copy into a fresh variable
+            }
+            n.pos = pos;
+            n.named = named;
+
+            return n;
+        }
+    }
+
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     // Provides: ClassHOW, ClassHOW.HOW, ClassHOW.add_method, ScalarContainer,
@@ -183,8 +213,7 @@ namespace Sprixel {
     // ...
     // This should be enough to implement the rest of ClassHOW :)
     public class KernelSetting {
-        public static readonly IP6 KernelFrame;
-        public static readonly IP6 KernelScope;
+        public static readonly IP6 KernelFrame = new Frame(null, null, null);
     }
 
     public class MainClass {
@@ -205,10 +234,10 @@ namespace Sprixel {
                     // BEGIN
                     Frame main_f = new Frame(KernelSetting.KernelFrame);
                     Frame say_f = new Frame(main_f);
-                    IP6 say_s = KernelSetting.MakeSub(
+                    IP6 say_s = new Sub(
                         new DynBlockDelegate(SayC), say_f, main_f);
-                    main_f.slots["&say"] = KernelSetting.MakeConstVar(say_s);
-                    IP6 main_s = KernelSetting.MakeSub(
+                    main_f.slots["&say"] = new Variable(false, say_s);
+                    IP6 main_s = new Sub(
                         new DynBlockDelegate(MainC), main_f,
                         KernelSetting.KernelFrame);
                     // CHECK
@@ -216,8 +245,7 @@ namespace Sprixel {
                     // DO
                     // could optimize this quite a bit since the mainline
                     // and setting both only run once.  For later.
-                    IP6 main_c = KernelSetting.CloneSub(
-                        main_s, KernelSetting.KernelFrame);
+                    IP6 main_c = ((Sub)main_s).clone(KernelSetting.KernelFrame);
                     th.ip = 1;
                     return main_c.Invoke(th, new LValue[0], null);
                 case 1:
@@ -232,18 +260,17 @@ namespace Sprixel {
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
-                    c = th.proto.slots["&say"].lv;
+                    c = th.slots["&say"].lv;
                     return c.container.Fetch(th);
                 case 1:
                     d = th.resultSlot;
-                    th.slots["&say"] = KernelSetting.MakeConstVar(
-                            KernelSetting.CloneSub(d, th));
+                    th.slots["&say"] = new Variable(false, ((Sub)d).clone(th));
                     th.ip = 2;
                     th.resultSlot = null;
                     c = th.slots["&say"].lv;
                     return c.container.Fetch(th);
                 case 2:
-                    c = KernelSetting.MakeConstLV(new CLRImportObject("Hello, World"));
+                    c = new LValue(new CLRImportObject("Hello, World"));
                     d = th.resultSlot;
                     th.ip = 3;
                     th.resultSlot = null;
