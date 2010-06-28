@@ -22,10 +22,14 @@ namespace Sprixel {
         public Frame GetAttribute(Frame caller, string name);
         //public Frame WHERE(Frame caller);
         public Frame HOW(Frame caller);
+        // These exist as a concession to circularity - FETCH as a completely
+        // ordinary method could not work under the current calling convention.
+        public Frame Fetch(Frame caller);
+        public Frame Store(Frame caller, IP6 thing);
     }
 
     public struct LValue {
-        public IPerl6Object container;
+        public IP6 container;
         public bool rw;
     }
 
@@ -39,11 +43,11 @@ namespace Sprixel {
     public class Frame: IP6 {
         public readonly Frame caller;
         public readonly Frame outer;
-        public IP6 resultSlot = null;
+        public object resultSlot = null;
         public int ip = 0;
         public readonly DynBlockDelegate code;
-        public readonly Dictionary<string, IP6> lex
-            = new Dictionary<string, IP6>;
+        public readonly Dictionary<string, Variable> lex
+            = new Dictionary<string, Variable>;
 
         public Frame(Frame outer_) : this(null, outer_, null) {}
 
@@ -112,7 +116,7 @@ namespace Sprixel {
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
     public class DynObject: IP6 {
-        public Dictionary<string, IP6> slots;
+        public Dictionary<string, Variable> slots;
         public Dictionary<string, IP6> methods;
         public IP6 how;
 
@@ -155,6 +159,21 @@ namespace Sprixel {
     // with them.
     public class CLRImportObject : IP6 {
         public readonly object val;
+    }
+
+    // This should be a real class eventualy
+    public class ScalarContainer : IP6 {
+        public IPerl6Object val;
+
+        public Frame Fetch(Frame caller) {
+            caller.resultSlot = val;
+            return caller;
+        }
+
+        public Frame Store(Frame caller, IP6 thing) {
+            val = thing;
+            return caller;
+        }
     }
 
     // A bunch of stuff which raises big circularity issues if done in the
@@ -214,8 +233,7 @@ namespace Sprixel {
                 case 0:
                     th.ip = 1;
                     c = th.proto.slots["&say"].lv;
-                    return c.container.InvokeMethod("FETCH",
-                            new LValue[1] { c }, null);
+                    return c.container.Fetch(th);
                 case 1:
                     d = th.resultSlot;
                     th.slots["&say"] = KernelSetting.MakeConstVar(
@@ -223,14 +241,13 @@ namespace Sprixel {
                     th.ip = 2;
                     th.resultSlot = null;
                     c = th.slots["&say"].lv;
-                    return c.container.InvokeMethod("FETCH",
-                            new LValue[1] { c }, null);
+                    return c.container.Fetch(th);
                 case 2:
                     c = KernelSetting.MakeConstLV(new CLRImportObject("Hello, World"));
                     d = th.resultSlot;
                     th.ip = 3;
                     th.resultSlot = null;
-                    return d.Invoke(new LValue[1] { c }, null);
+                    return d.Invoke(th, new LValue[1] { c }, null);
                 case 3:
                     return th.caller;
             }
@@ -242,8 +259,7 @@ namespace Sprixel {
                 case 0:
                     a = th.pos[0];
                     th.ip = 1;
-                    return a.container.InvokeMethod("FETCH",
-                            new LValue[1] { a }, null);
+                    return a.container.Fetch(th);
                 case 1:
                     a = resultSlot;
                     System.Console.WriteLine((string)(((CLRImportObject)a).val));
