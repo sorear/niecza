@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 namespace Sprixel {
     // We like to reuse continuation objects for speed - every function only
     // creates one kind of continuation, but tweaks a field for exact return
@@ -8,24 +10,24 @@ namespace Sprixel {
     // Only call other functions in Continue, not in the CallableDelegate or
     // equivalent!
     public delegate Frame CallableDelegate(Frame caller,
-            LValue pos[], Dictionary<string, LValue> named);
+            LValue[] pos, Dictionary<string, LValue> named);
     // Used by DynFrame to plug in code
-    public delegate void DynBlockDelegate(DynamicFrame frame);
+    public delegate Frame DynBlockDelegate(Frame frame);
 
     public interface IP6 {
-        public Frame Invoke(Frame caller, LValue pos[],
+        Frame Invoke(Frame caller, LValue[] pos,
                 Dictionary<string, LValue> named);
         // include the invocant in the positionals!  it will not usually be
         // this, rather a container of this
-        public Frame InvokeMethod(Frame caller, string name,
-                LValue pos[], Dictionary<string, LValue> named);
-        public Frame GetAttribute(Frame caller, string name);
+        Frame InvokeMethod(Frame caller, string name,
+                LValue[] pos, Dictionary<string, LValue> named);
+        Frame GetAttribute(Frame caller, string name);
         //public Frame WHERE(Frame caller);
-        public Frame HOW(Frame caller);
+        Frame HOW(Frame caller);
         // These exist as a concession to circularity - FETCH as a completely
         // ordinary method could not work under the current calling convention.
-        public Frame Fetch(Frame caller);
-        public Frame Store(Frame caller, IP6 thing);
+        Frame Fetch(Frame caller);
+        Frame Store(Frame caller, IP6 thing);
     }
 
     public struct LValue {
@@ -47,9 +49,9 @@ namespace Sprixel {
         public int ip = 0;
         public readonly DynBlockDelegate code;
         public readonly Dictionary<string, Variable> lex
-            = new Dictionary<string, Variable>;
+            = new Dictionary<string, Variable>();
 
-        public LValue pos[];
+        public LValue[] pos;
         public Dictionary<string, LValue> named;
 
         public Frame(Frame outer_) : this(null, outer_, null) {}
@@ -70,61 +72,16 @@ namespace Sprixel {
         }
     }
 
-    public class ExceptionHelper: Frame {
-        private Frame cursor;
-        private LValue toThrowPos[];
-        private Dictionary<string, LValue> toThrowNamed;
-
-        private ExceptionHelper(Frame caller_) { caller = caller_; }
-
-        public static Frame Throw(Frame caller, LValue pos[],
-                Dictionary<string, LValue> named) {
-            var n = new ExceptionHelper();
-            n.cursor = caller;
-            n.toThrowPos = pos;
-            n.toThrowNamed = named;
-            return n;
-        }
-
-        public Frame Continue() {
-            switch (ip) {
-                case 0:
-                    if (cursor == null) {
-                        throw new Exception("Unhandled Perl 6 exception");
-                    }
-                    ip = 1;
-                    resultSlot = null;
-                    return cursor.GetAttribute(this, "!exn_skipto");
-                case 1:
-                    // if skipto, skip some frames.  Used to implement CATCH
-                    // invisibility
-                    if (resultSlot != null) {
-                        cursor = (Frame)resultSlot;
-                        goto case 0;
-                    }
-                    ip = 2;
-                    resultSlot = null;
-                    return cursor.GetAttribute(this, "!exn_handler");
-                case 2:
-                    if (resultSlot != null) {
-                        return ((IPerl6Object)resultSlot).invoke(caller,
-                                toThrowPos, toThrowNamed);
-                    }
-                    cursor = cursor.caller;
-                    goto case 0;
-            }
-        }
-    }
-
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
     public class DynObject: IP6 {
-        public Dictionary<string, Variable> slots;
+        public Dictionary<string, Variable> slots
+            = new Dictionary<string, Variable>();
         public Dictionary<string, IP6> methods;
         public IP6 how;
 
         public Frame InvokeMethod(Frame caller, string name,
-                LValue pos[], Dictionary<string, LValue> named) {
+                LValue[] pos, Dictionary<string, LValue> named) {
             IP6 m = methods[name];
             if (m != null) {
                 // XXX this breaks the static call nesting rule; does it need
@@ -135,7 +92,7 @@ namespace Sprixel {
             }
         }
 
-        public Frame Invoke(Frame caller, LValue pos[],
+        public Frame Invoke(Frame caller, LValue[] pos,
                 Dictionary<string, LValue> named) {
             IP6 d = slots["clr-delegate"];
             if (d != null) {
@@ -163,14 +120,14 @@ namespace Sprixel {
     public class CLRImportObject : IP6 {
         public readonly object val;
 
-        public CLRImportObject(object val_) { val = val_ }
+        public CLRImportObject(object val_) { val = val_; }
     }
 
     // This should be a real class eventualy
     public class ScalarContainer : IP6 {
         public IP6 val;
 
-        public ScalarContainer(IP6 val_) { val = val_ }
+        public ScalarContainer(IP6 val_) { val = val_; }
 
         public Frame Fetch(Frame caller) {
             caller.resultSlot = val;
@@ -193,7 +150,7 @@ namespace Sprixel {
             body = body_; proto = proto_; outer = outer_;
         }
 
-        public Frame Invoke(Frame caller, LValue pos[],
+        public Frame Invoke(Frame caller, LValue[] pos,
                 Dictionary<string,LValue> named) {
             Frame n = new Frame(caller, outer, body);
             foreach (KeyValuePair<string,Variable> kv in proto.lex) {
@@ -214,6 +171,66 @@ namespace Sprixel {
     // This should be enough to implement the rest of ClassHOW :)
     public class KernelSetting {
         public static readonly IP6 KernelFrame = new Frame(null, null, null);
+
+        public static Frame Die(Frame caller, string msg) {
+            Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
+            f.pos = new LValue[1] { new LValue(true, new CLRImportObject(msg)); };
+            f.named = null;
+            return f;
+        }
+
+        // Needs more special handling for control exceptions.
+        private static Frame ThrowC(Frame th) {
+            IP6 a;
+            switch (th.ip) {
+                case 0:
+                    th.lex["$cursor"] = new Variable(true, th.caller);
+                case 1:
+                    th.ip = 2;
+                    th.resultSlot = null;
+                    return th.lex["$cursor"].lv.Fetch(th);
+                case 2:
+                    a = th.resultSlot;
+                    if (cursor == null) {
+                        throw new Exception("Unhandled Perl 6 exception");
+                    }
+                    th.ip = 3;
+                    th.resultSlot = null;
+                    return a.GetAttribute(th, "!exn_skipto");
+                case 3:
+                    // if skipto, skip some frames.  Used to implement CATCH
+                    // invisibility
+                    if (th.resultSlot != null) {
+                        th.ip = 1;
+                        a = th.resultSlot;
+                        th.resultSlot = null;
+                        return th.lex["$cursor"].lv.Store(th, a);
+                    }
+                    th.ip = 4;
+                    th.resultSlot = null;
+                    return th.lex["$cursor"].lv.Fetch(th);
+                case 4:
+                    a = th.resultSlot;
+                    th.ip = 5;
+                    th.resultSlot = null;
+                    return a.GetAttribute(th, "!exn_handler");
+                case 5:
+                    if (resultSlot != null) {
+                        // tailcall
+                        return th.resultSlot.Invoke(th.caller,
+                                th.pos, th.named);
+                    }
+                    th.ip = 6;
+                    th.resultSlot = null;
+                    return th.lex["$cursor"].lv.Fetch(th);
+                case 6:
+                    a = ((Frame)th.resultSlot).caller;
+                    th.ip = 1;
+                    th.resultSlot = null;
+                    return th.lex["$cursor"].lv.Store(th, a);
+            }
+            throw new Exception("IP invalid");
+        }
     }
 
     public class MainClass {
