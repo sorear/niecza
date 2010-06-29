@@ -34,16 +34,9 @@ namespace Sprixel {
         public IP6 container;
         public bool rw;
 
-        public LValue(bool rw_, IP6 val) {
+        public LValue(bool rw_, IP6 container_) {
             rw = rw_;
-            container = new ScalarContainer(val);
-        }
-
-        public static LValue Bind(bool rw, IP6 c) {
-            LValue l;
-            l.rw = rw;
-            l.container = c;
-            return l;
+            container = container_;
         }
     }
 
@@ -52,9 +45,9 @@ namespace Sprixel {
         public bool bvalue;
 
         public Variable() { }
-        public Variable(bool rw, IP6 val) {
-            bvalue = true;
-            lv = new LValue(rw, val);
+        public Variable(bool bv, LValue lv_) {
+            bvalue = bv;
+            lv = lv_;
         }
     }
 
@@ -63,11 +56,12 @@ namespace Sprixel {
     public class Frame: IP6 {
         public readonly Frame caller;
         public readonly Frame outer;
+        public Frame proto;
         public object resultSlot = null;
         public int ip = 0;
         public readonly DynBlockDelegate code;
-        public readonly Dictionary<string, Variable> lex
-            = new Dictionary<string, Variable>();
+        public readonly Dictionary<string, object> lex
+            = new Dictionary<string, object>();
 
         public LValue[] pos;
         public Dictionary<string, LValue> named;
@@ -91,33 +85,33 @@ namespace Sprixel {
         }
 
         public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Tried to invoke a Frame");
+            return Kernel.Die(c, "Tried to invoke a Frame");
         }
 
         public Frame InvokeMethod(Frame c, string nm, LValue[] p,
                 Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Method " + nm +
+            return Kernel.Die(c, "Method " + nm +
                     " not defined on Frame");
         }
 
         public Frame Fetch(Frame c) {
-            return KernelSetting.Die(c, "Method FETCH not defined on Frame");
+            return Kernel.Die(c, "Method FETCH not defined on Frame");
         }
 
         public Frame Store(Frame c, IP6 o) {
-            return KernelSetting.Die(c, "Method STORE not defined on Frame");
+            return Kernel.Die(c, "Method STORE not defined on Frame");
         }
 
         public Frame HOW(Frame c) {
             //TODO
-            return KernelSetting.Die(c, "No metaobject available for Frame");
+            return Kernel.Die(c, "No metaobject available for Frame");
         }
     }
 
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
-        public Dictionary<string, IP6> methods;
+        public Dictionary<string, IP6> methods = new Dictionary<string, IP6>();
         public IP6 how;
         public string name;
 
@@ -134,12 +128,14 @@ namespace Sprixel {
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
     public class DynObject: IP6 {
-        public Dictionary<string, Variable> slots
-            = new Dictionary<string, Variable>();
+        // the slots have to support non-containerized values, because
+        // containers are objects now
+        public Dictionary<string, object> slots
+            = new Dictionary<string, object>();
         public DynMetaObject klass;
 
         private Frame Fail(Frame caller, string msg) {
-            return KernelSetting.Die(caller, msg + " in class " + klass.name);
+            return Kernel.Die(caller, msg + " in class " + klass.name);
         }
 
         public Frame InvokeMethod(Frame caller, string name,
@@ -198,119 +194,31 @@ namespace Sprixel {
         public CLRImportObject(object val_) { val = val_; }
 
         public Frame GetAttribute(Frame c, string nm) {
-            return KernelSetting.Die(c, "Attribute " + nm +
+            return Kernel.Die(c, "Attribute " + nm +
                     " not available on CLRImportObject");
         }
 
         public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Tried to invoke a CLRImportObject");
+            return Kernel.Die(c, "Tried to invoke a CLRImportObject");
         }
 
         public Frame InvokeMethod(Frame c, string nm, LValue[] p,
                 Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Method " + nm +
+            return Kernel.Die(c, "Method " + nm +
                     " not defined on CLRImportObject");
         }
 
         public Frame Fetch(Frame c) {
-            return KernelSetting.Die(c, "Method FETCH not defined on CLRImportObject");
+            return Kernel.Die(c, "Method FETCH not defined on CLRImportObject");
         }
 
         public Frame Store(Frame c, IP6 o) {
-            return KernelSetting.Die(c, "Method STORE not defined on CLRImportObject");
+            return Kernel.Die(c, "Method STORE not defined on CLRImportObject");
         }
 
         public Frame HOW(Frame c) {
             //TODO
-            return KernelSetting.Die(c, "No metaobject available for CLRImportObject");
-        }
-    }
-
-    // This should be a real class eventualy
-    public class ScalarContainer : IP6 {
-        public IP6 val;
-
-        public ScalarContainer(IP6 val_) { val = val_; }
-
-        public Frame Fetch(Frame caller) {
-            caller.resultSlot = val;
-            return caller;
-        }
-
-        public Frame Store(Frame caller, IP6 thing) {
-            val = thing;
-            return caller;
-        }
-
-        public Frame GetAttribute(Frame c, string nm) {
-            return KernelSetting.Die(c, "Attribute " + nm +
-                    " not available on ScalarContainer");
-        }
-
-        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Tried to invoke a ScalarContainer");
-        }
-
-        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
-                Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Method " + nm +
-                    " not defined on ScalarContainer");
-        }
-
-        public Frame HOW(Frame c) {
-            //TODO
-            return KernelSetting.Die(c, "No metaobject available for ScalarContainer");
-        }
-    }
-
-    // This, too
-    public class Sub : IP6 {
-        public DynBlockDelegate body;
-        public Frame proto;
-        public Frame outer;
-
-        public Sub(DynBlockDelegate body_, Frame proto_, Frame outer_) {
-            body = body_; proto = proto_; outer = outer_;
-        }
-
-        public Sub Clone(Frame instOuter) {
-            return new Sub(body, proto, instOuter);
-        }
-
-        public Frame Invoke(Frame caller, LValue[] pos,
-                Dictionary<string,LValue> named) {
-            Frame n = new Frame(caller, outer, body);
-            foreach (KeyValuePair<string,Variable> kv in proto.lex) {
-                n.lex[kv.Key] = kv.Value; // TODO: Copy into a fresh variable
-            }
-            n.pos = pos;
-            n.named = named;
-
-            return n;
-        }
-
-        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
-                Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Method " + nm +
-                    " not defined on Sub");
-        }
-
-        public Frame GetAttribute(Frame c, string nm) {
-            return KernelSetting.Die(c, "Attribute " + nm +
-                    " not available on Sub");
-        }
-
-        public Frame Fetch(Frame c) {
-            return KernelSetting.Die(c, "Method FETCH not defined on Sub");
-        }
-
-        public Frame Store(Frame c, IP6 o) {
-            return KernelSetting.Die(c, "Method STORE not defined on Sub");
-        }
-
-        public Frame HOW(Frame c) {
-            //TODO
-            return KernelSetting.Die(c, "No metaobject available for Sub");
+            return Kernel.Die(c, "No metaobject available for CLRImportObject");
         }
     }
 
@@ -320,8 +228,57 @@ namespace Sprixel {
     // ScalarContainer.HOW, Code, Code.HOW, Body, Body.HOW, Scope, Scope.HOW,
     // ...
     // This should be enough to implement the rest of ClassHOW :)
-    public class KernelSetting {
+    public class Kernel {
         public static readonly Frame KernelFrame = new Frame(null, null, null);
+
+        private static Frame SCFetch(DynObject th, Frame caller) {
+            caller.resultSlot = th.slots["!value"];
+            return caller;
+        }
+
+        private static Frame SCStore(DynObject th, Frame caller, IP6 nv) {
+            th.slots["!value"] = nv;
+            return caller;
+        }
+
+        private static Frame SubCloneC(Frame th) {
+            DynObject a, b;
+            Frame c;
+            switch (th.ip) {
+                case 0:
+                    th.ip = 1;
+                    return th.pos[0].container.Fetch(th);
+                case 1:
+                    th.lex["s0"] = th.resultSlot;
+                    th.ip = 2;
+                    return th.pos[1].container.Fetch(th);
+                case 2:
+                    a = (DynObject) th.lex["s0"];
+                    c = (Frame) th.resultSlot;
+                    b = new DynObject();
+                    b.klass = a.klass;
+                    b.slots = new Dictionary<string,object>(a.slots);
+                    b.slots["!outer"] = c;
+                    th.caller.resultSlot = NewROVar(b);
+                    return th.caller;
+                default:
+                    return Kernel.Die(th, "invalid IP");
+            }
+        }
+
+        private static Frame SubInvoke(DynObject th, Frame caller,
+                LValue[] pos, Dictionary<string,LValue> named) {
+            Frame proto = (Frame) th.slots["!proto"];
+            Frame outer = (Frame) th.slots["!outer"];
+            DynBlockDelegate code = (DynBlockDelegate) th.slots["!code"];
+
+            Frame n = new Frame(caller, outer, code);
+            n.proto = proto;
+            n.pos = pos;
+            n.named = named;
+
+            return n;
+        }
 
         public static Frame Die(Frame caller, string msg) {
             Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
@@ -335,12 +292,13 @@ namespace Sprixel {
             IP6 a;
             switch (th.ip) {
                 case 0:
-                    th.lex["$cursor"] = new Variable(true, th.caller);
+                    th.lex["$cursor"] = NewRWVar(th.caller);
                     goto case 1;
                 case 1:
                     th.ip = 2;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.container.Fetch(th);
+                    return ((Variable)th.lex["$cursor"])
+                        .lv.container.Fetch(th);
                 case 2:
                     a = (IP6)th.resultSlot;
                     if (a == null) {
@@ -356,11 +314,13 @@ namespace Sprixel {
                         th.ip = 1;
                         a = (IP6)th.resultSlot;
                         th.resultSlot = null;
-                        return th.lex["$cursor"].lv.container.Store(th, a);
+                        return ((Variable)th.lex["$cursor"])
+                            .lv.container.Store(th, a);
                     }
                     th.ip = 4;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.container.Fetch(th);
+                    return ((Variable)th.lex["$cursor"])
+                        .lv.container.Fetch(th);
                 case 4:
                     a = (IP6)th.resultSlot;
                     th.ip = 5;
@@ -374,15 +334,69 @@ namespace Sprixel {
                     }
                     th.ip = 6;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.container.Fetch(th);
+                    return ((Variable)th.lex["$cursor"])
+                        .lv.container.Fetch(th);
                 case 6:
                     a = ((Frame)th.resultSlot).caller;
                     th.ip = 1;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.container.Store(th, a);
+                    return ((Variable)th.lex["$cursor"])
+                        .lv.container.Store(th, a);
                 default:
                     throw new Exception("IP invalid");
             }
+        }
+
+        public static readonly DynMetaObject SubMO;
+        public static readonly DynMetaObject ScalarContainerMO;
+        public static readonly IP6 DieSub;
+
+        public static IP6 MakeSub(DynBlockDelegate code, Frame proto,
+                Frame outer) {
+            DynObject n = new DynObject();
+            n.klass = SubMO;
+            n.slots["!outer"] = outer;
+            n.slots["!code"] = code;
+            n.slots["!proto"] = proto;
+            return n;
+        }
+
+        public static IP6 MakeSC(IP6 inside) {
+            DynObject n = new DynObject();
+            n.klass = ScalarContainerMO;
+            n.slots["!value"] = inside;
+            return n;
+        }
+
+        public static LValue NewROLValue(IP6 inside) {
+            return new LValue(false, MakeSC(inside));
+        }
+
+        public static LValue NewRWLValue(IP6 inside) {
+            return new LValue(true, MakeSC(inside));
+        }
+
+        public static Variable NewROVar(IP6 inside) {
+            return new Variable(true, NewROLValue(inside));
+        }
+
+        public static Variable NewRWVar(IP6 inside) {
+            return new Variable(true, NewRWLValue(inside));
+        }
+
+        static Kernel() {
+            SubMO = new DynMetaObject();
+            SubMO.name = "Sub";
+            SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
+            SubMO.methods["clone"] = MakeSub(new DynBlockDelegate(SubCloneC),
+                    null, null);
+
+            ScalarContainerMO = new DynMetaObject();
+            ScalarContainerMO.name = "ScalarContainer";
+            ScalarContainerMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
+            ScalarContainerMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
+
+            DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }
     }
 
@@ -399,26 +413,34 @@ namespace Sprixel {
         // bootstrap function for the compilation unit.  runs phasers, sets up
         // runtime meta objects at BEGIN, then calls the mainline
         public static Frame BootC(Frame th) {
+            Frame main_f, say_f;
+            IP6 say_s, main_s;
             switch (th.ip) {
                 case 0:
                     // BEGIN
-                    Frame main_f = new Frame(KernelSetting.KernelFrame);
-                    Frame say_f = new Frame(main_f);
-                    IP6 say_s = new Sub(
-                        new DynBlockDelegate(SayC), say_f, main_f);
-                    main_f.lex["&say"] = new Variable(false, say_s);
-                    IP6 main_s = new Sub(
-                        new DynBlockDelegate(MainC), main_f,
-                        KernelSetting.KernelFrame);
+                    main_f = new Frame(Kernel.KernelFrame);
+                    say_f  = new Frame(main_f);
+                    say_s = Kernel.MakeSub(new DynBlockDelegate(SayC),
+                            say_f, main_f);
+                    main_f.lex["&say"] = Kernel.NewROVar(say_s);
+                    main_s = Kernel.MakeSub(new DynBlockDelegate(MainC),
+                            main_f, Kernel.KernelFrame);
                     // CHECK
                     // INIT
                     // DO
                     // could optimize this quite a bit since the mainline
                     // and setting both only run once.  For later.
-                    IP6 main_c = ((Sub)main_s).Clone(KernelSetting.KernelFrame);
                     th.ip = 1;
-                    return main_c.Invoke(th, new LValue[0], null);
+                    return main_s.InvokeMethod(th, "clone", new LValue[2] {
+                            Kernel.NewROLValue(main_s),
+                            Kernel.NewROLValue(Kernel.KernelFrame) }, null);
                 case 1:
+                    th.ip = 2;
+                    return ((Variable)th.resultSlot).lv.container.Fetch(th);
+                case 2:
+                    th.ip = 3;
+                    return ((IP6)th.resultSlot).Invoke(th, new LValue[0], null);
+                case 3:
                     return th.caller;
                 default:
                     throw new Exception("IP invalid");
@@ -431,22 +453,28 @@ namespace Sprixel {
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
-                    c = th.lex["&say"].lv;
+                    c = ((Variable)th.proto.lex["&say"]).lv;
                     return c.container.Fetch(th);
                 case 1:
+                    c = ((Variable)th.proto.lex["&say"]).lv;
                     d = (IP6)th.resultSlot;
-                    th.lex["&say"] = new Variable(false, ((Sub)d).Clone(th));
                     th.ip = 2;
                     th.resultSlot = null;
-                    c = th.lex["&say"].lv;
-                    return c.container.Fetch(th);
+                    return d.InvokeMethod(th, "clone", new LValue[2] {
+                            c, Kernel.NewROLValue(th) }, null);
                 case 2:
-                    c = new LValue(false, new CLRImportObject("Hello, World"));
-                    d = (IP6)th.resultSlot;
+                    th.lex["&say"] = th.resultSlot;
+                    th.resultSlot = null;
+                    c = ((Variable)th.lex["&say"]).lv;
                     th.ip = 3;
+                    return c.container.Fetch(th);
+                case 3:
+                    c = Kernel.NewROLValue(new CLRImportObject("Hello, World"));
+                    d = (IP6)th.resultSlot;
+                    th.ip = 4;
                     th.resultSlot = null;
                     return d.Invoke(th, new LValue[1] { c }, null);
-                case 3:
+                case 4:
                     return th.caller;
                 default:
                     throw new Exception("IP invalid");
