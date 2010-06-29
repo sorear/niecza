@@ -67,8 +67,32 @@ namespace Sprixel {
             return code(this);
         }
 
-        public Frame GetSlot(Frame c, string name) {
+        public Frame GetAttribute(Frame c, string name) {
             c.resultSlot = lex[name];
+            return c;
+        }
+
+        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Tried to invoke a Frame");
+        }
+
+        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
+                Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Method " + nm +
+                    " not defined on Frame");
+        }
+
+        public Frame Fetch(Frame c) {
+            return KernelSetting.Die(c, "Method FETCH not defined on Frame");
+        }
+
+        public Frame Store(Frame c, IP6 o) {
+            return KernelSetting.Die(c, "Method STORE not defined on Frame");
+        }
+
+        public Frame HOW(Frame c) {
+            //TODO
+            return KernelSetting.Die(c, "No metaobject available for Frame");
         }
     }
 
@@ -88,18 +112,8 @@ namespace Sprixel {
                 // to be rewritten or can the rule be safely loosened?
                 return m.Invoke(caller, pos, named);
             } else {
-                return Sprixel.Callout.InvokeFailed(caller, pos, named);
-            }
-        }
-
-        public Frame Invoke(Frame caller, LValue[] pos,
-                Dictionary<string, LValue> named) {
-            IP6 d = slots["clr-delegate"];
-            if (d != null) {
-                return (Sprixel.CallableDelegate)(((CLRImportObject)d).val)
-                    (caller, pos, named);
-            } else {
-                // TODO: throw exception
+                return KernelSetting.Die(caller,
+                        "Unable to resolve method " + name);
             }
         }
 
@@ -112,6 +126,18 @@ namespace Sprixel {
             caller.resultSlot = how;
             return caller;
         }
+
+        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Tried to invoke a DynObject");
+        }
+
+        public Frame Fetch(Frame c) {
+            return KernelSetting.Die(c, "Method FETCH not defined on DynObject");
+        }
+
+        public Frame Store(Frame c, IP6 o) {
+            return KernelSetting.Die(c, "Method STORE not defined on DynObject");
+        }
     }
 
     // Allows native CLR objects to be treated as Perl 6 data.  They don't
@@ -121,6 +147,34 @@ namespace Sprixel {
         public readonly object val;
 
         public CLRImportObject(object val_) { val = val_; }
+
+        public Frame GetAttribute(Frame c, string nm) {
+            return KernelSetting.Die(c, "Attribute " + nm +
+                    " not available on CLRImportObject");
+        }
+
+        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Tried to invoke a CLRImportObject");
+        }
+
+        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
+                Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Method " + nm +
+                    " not defined on CLRImportObject");
+        }
+
+        public Frame Fetch(Frame c) {
+            return KernelSetting.Die(c, "Method FETCH not defined on CLRImportObject");
+        }
+
+        public Frame Store(Frame c, IP6 o) {
+            return KernelSetting.Die(c, "Method STORE not defined on CLRImportObject");
+        }
+
+        public Frame HOW(Frame c) {
+            //TODO
+            return KernelSetting.Die(c, "No metaobject available for CLRImportObject");
+        }
     }
 
     // This should be a real class eventualy
@@ -137,6 +191,26 @@ namespace Sprixel {
         public Frame Store(Frame caller, IP6 thing) {
             val = thing;
             return caller;
+        }
+
+        public Frame GetAttribute(Frame c, string nm) {
+            return KernelSetting.Die(c, "Attribute " + nm +
+                    " not available on ScalarContainer");
+        }
+
+        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Tried to invoke a ScalarContainer");
+        }
+
+        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
+                Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Method " + nm +
+                    " not defined on ScalarContainer");
+        }
+
+        public Frame HOW(Frame c) {
+            //TODO
+            return KernelSetting.Die(c, "No metaobject available for ScalarContainer");
         }
     }
 
@@ -161,6 +235,30 @@ namespace Sprixel {
 
             return n;
         }
+
+        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
+                Dictionary<string, LValue> n) {
+            return KernelSetting.Die(c, "Method " + nm +
+                    " not defined on Sub");
+        }
+
+        public Frame GetAttribute(Frame c, string nm) {
+            return KernelSetting.Die(c, "Attribute " + nm +
+                    " not available on Sub");
+        }
+
+        public Frame Fetch(Frame c) {
+            return KernelSetting.Die(c, "Method FETCH not defined on Sub");
+        }
+
+        public Frame Store(Frame c, IP6 o) {
+            return KernelSetting.Die(c, "Method STORE not defined on Sub");
+        }
+
+        public Frame HOW(Frame c) {
+            //TODO
+            return KernelSetting.Die(c, "No metaobject available for Sub");
+        }
     }
 
     // A bunch of stuff which raises big circularity issues if done in the
@@ -174,7 +272,7 @@ namespace Sprixel {
 
         public static Frame Die(Frame caller, string msg) {
             Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
-            f.pos = new LValue[1] { new LValue(true, new CLRImportObject(msg)); };
+            f.pos = new LValue[1] { new LValue(true, new CLRImportObject(msg)) };
             f.named = null;
             return f;
         }
