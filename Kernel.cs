@@ -33,11 +33,29 @@ namespace Sprixel {
     public struct LValue {
         public IP6 container;
         public bool rw;
+
+        public LValue(bool rw_, IP6 val) {
+            rw = rw_;
+            container = new ScalarContainer(val);
+        }
+
+        public static LValue Bind(bool rw, IP6 c) {
+            LValue l;
+            l.rw = rw;
+            l.container = c;
+            return l;
+        }
     }
 
     public class Variable {
         public LValue lv;
         public bool bvalue;
+
+        public Variable() { }
+        public Variable(bool rw, IP6 val) {
+            bvalue = true;
+            lv = new LValue(rw, val);
+        }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -224,6 +242,10 @@ namespace Sprixel {
             body = body_; proto = proto_; outer = outer_;
         }
 
+        public Sub Clone(Frame instOuter) {
+            return new Sub(body, proto, instOuter);
+        }
+
         public Frame Invoke(Frame caller, LValue[] pos,
                 Dictionary<string,LValue> named) {
             Frame n = new Frame(caller, outer, body);
@@ -268,7 +290,7 @@ namespace Sprixel {
     // ...
     // This should be enough to implement the rest of ClassHOW :)
     public class KernelSetting {
-        public static readonly IP6 KernelFrame = new Frame(null, null, null);
+        public static readonly Frame KernelFrame = new Frame(null, null, null);
 
         public static Frame Die(Frame caller, string msg) {
             Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
@@ -283,13 +305,14 @@ namespace Sprixel {
             switch (th.ip) {
                 case 0:
                     th.lex["$cursor"] = new Variable(true, th.caller);
+                    goto case 1;
                 case 1:
                     th.ip = 2;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.Fetch(th);
+                    return th.lex["$cursor"].lv.container.Fetch(th);
                 case 2:
-                    a = th.resultSlot;
-                    if (cursor == null) {
+                    a = (IP6)th.resultSlot;
+                    if (a == null) {
                         throw new Exception("Unhandled Perl 6 exception");
                     }
                     th.ip = 3;
@@ -300,34 +323,35 @@ namespace Sprixel {
                     // invisibility
                     if (th.resultSlot != null) {
                         th.ip = 1;
-                        a = th.resultSlot;
+                        a = (IP6)th.resultSlot;
                         th.resultSlot = null;
-                        return th.lex["$cursor"].lv.Store(th, a);
+                        return th.lex["$cursor"].lv.container.Store(th, a);
                     }
                     th.ip = 4;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.Fetch(th);
+                    return th.lex["$cursor"].lv.container.Fetch(th);
                 case 4:
-                    a = th.resultSlot;
+                    a = (IP6)th.resultSlot;
                     th.ip = 5;
                     th.resultSlot = null;
                     return a.GetAttribute(th, "!exn_handler");
                 case 5:
-                    if (resultSlot != null) {
+                    if (th.resultSlot != null) {
                         // tailcall
-                        return th.resultSlot.Invoke(th.caller,
+                        return ((IP6)th.resultSlot).Invoke(th.caller,
                                 th.pos, th.named);
                     }
                     th.ip = 6;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.Fetch(th);
+                    return th.lex["$cursor"].lv.container.Fetch(th);
                 case 6:
                     a = ((Frame)th.resultSlot).caller;
                     th.ip = 1;
                     th.resultSlot = null;
-                    return th.lex["$cursor"].lv.Store(th, a);
+                    return th.lex["$cursor"].lv.container.Store(th, a);
+                default:
+                    throw new Exception("IP invalid");
             }
-            throw new Exception("IP invalid");
         }
     }
 
@@ -336,7 +360,7 @@ namespace Sprixel {
             Frame root_f = new Frame(null, null,
                     new DynBlockDelegate(BootC));
             Frame current = root_f;
-            while (current) {
+            while (current != null) {
                 current = current.Continue();
             }
         }
@@ -351,7 +375,7 @@ namespace Sprixel {
                     Frame say_f = new Frame(main_f);
                     IP6 say_s = new Sub(
                         new DynBlockDelegate(SayC), say_f, main_f);
-                    main_f.slots["&say"] = new Variable(false, say_s);
+                    main_f.lex["&say"] = new Variable(false, say_s);
                     IP6 main_s = new Sub(
                         new DynBlockDelegate(MainC), main_f,
                         KernelSetting.KernelFrame);
@@ -360,13 +384,14 @@ namespace Sprixel {
                     // DO
                     // could optimize this quite a bit since the mainline
                     // and setting both only run once.  For later.
-                    IP6 main_c = ((Sub)main_s).clone(KernelSetting.KernelFrame);
+                    IP6 main_c = ((Sub)main_s).Clone(KernelSetting.KernelFrame);
                     th.ip = 1;
                     return main_c.Invoke(th, new LValue[0], null);
                 case 1:
                     return th.caller;
+                default:
+                    throw new Exception("IP invalid");
             }
-            return null;
         }
 
         public static Frame MainC(Frame th) {
@@ -375,23 +400,25 @@ namespace Sprixel {
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
-                    c = th.slots["&say"].lv;
+                    c = th.lex["&say"].lv;
                     return c.container.Fetch(th);
                 case 1:
-                    d = th.resultSlot;
-                    th.slots["&say"] = new Variable(false, ((Sub)d).clone(th));
+                    d = (IP6)th.resultSlot;
+                    th.lex["&say"] = new Variable(false, ((Sub)d).Clone(th));
                     th.ip = 2;
                     th.resultSlot = null;
-                    c = th.slots["&say"].lv;
+                    c = th.lex["&say"].lv;
                     return c.container.Fetch(th);
                 case 2:
-                    c = new LValue(new CLRImportObject("Hello, World"));
-                    d = th.resultSlot;
+                    c = new LValue(false, new CLRImportObject("Hello, World"));
+                    d = (IP6)th.resultSlot;
                     th.ip = 3;
                     th.resultSlot = null;
                     return d.Invoke(th, new LValue[1] { c }, null);
                 case 3:
                     return th.caller;
+                default:
+                    throw new Exception("IP invalid");
             }
         }
 
@@ -399,15 +426,15 @@ namespace Sprixel {
             IP6 a;
             switch (th.ip) {
                 case 0:
-                    a = th.pos[0];
                     th.ip = 1;
-                    return a.container.Fetch(th);
+                    return th.pos[0].container.Fetch(th);
                 case 1:
-                    a = resultSlot;
+                    a = (IP6)th.resultSlot;
                     System.Console.WriteLine((string)(((CLRImportObject)a).val));
                     return th.caller;
+                default:
+                    throw new Exception("IP invalid");
             }
-            return null;
         }
     }
 }
