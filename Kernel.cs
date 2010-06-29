@@ -114,24 +114,43 @@ namespace Sprixel {
         }
     }
 
+    // NOT IP6; these things should only be exposed through a ClassHOW-like
+    // façade
+    public class DynMetaObject {
+        public Dictionary<string, IP6> methods;
+        public IP6 how;
+        public string name;
+
+        public InvokeHandler OnInvoke;
+        public FetchHandler OnFetch;
+        public StoreHandler OnStore;
+
+        public delegate Frame InvokeHandler(DynObject th, Frame c,
+                LValue[] pos, Dictionary<string, LValue> named);
+        public delegate Frame FetchHandler(DynObject th, Frame c);
+        public delegate Frame StoreHandler(DynObject th, Frame c, IP6 n);
+    }
+
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
     public class DynObject: IP6 {
         public Dictionary<string, Variable> slots
             = new Dictionary<string, Variable>();
-        public Dictionary<string, IP6> methods;
-        public IP6 how;
+        public DynMetaObject klass;
+
+        private Frame Fail(Frame caller, string msg) {
+            return KernelSetting.Die(caller, msg + " in class " + klass.name);
+        }
 
         public Frame InvokeMethod(Frame caller, string name,
                 LValue[] pos, Dictionary<string, LValue> named) {
-            IP6 m = methods[name];
+            IP6 m = klass.methods[name];
             if (m != null) {
                 // XXX this breaks the static call nesting rule; does it need
                 // to be rewritten or can the rule be safely loosened?
                 return m.Invoke(caller, pos, named);
             } else {
-                return KernelSetting.Die(caller,
-                        "Unable to resolve method " + name);
+                return Fail(caller, "Unable to resolve method " + name);
             }
         }
 
@@ -141,20 +160,32 @@ namespace Sprixel {
         }
 
         public Frame HOW(Frame caller) {
-            caller.resultSlot = how;
+            caller.resultSlot = klass.how;
             return caller;
         }
 
         public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
-            return KernelSetting.Die(c, "Tried to invoke a DynObject");
+            if (klass.OnInvoke != null) {
+                return klass.OnInvoke(this, c, p, n);
+            } else {
+                return Fail(c, "No invoke handler set");
+            }
         }
 
         public Frame Fetch(Frame c) {
-            return KernelSetting.Die(c, "Method FETCH not defined on DynObject");
+            if (klass.OnFetch != null) {
+                return klass.OnFetch(this, c);
+            } else {
+                return Fail(c, "No fetch handler set");
+            }
         }
 
         public Frame Store(Frame c, IP6 o) {
-            return KernelSetting.Die(c, "Method STORE not defined on DynObject");
+            if (klass.OnStore != null) {
+                return klass.OnStore(this, c, o);
+            } else {
+                return Fail(c, "No store handler set");
+            }
         }
     }
 
