@@ -202,6 +202,25 @@ monkey typing; the simple solution is to say IFoo is the original version of
 Foo, and any added methods must be late bound.  We could also version things,
 with subtyping (IFoo3 implies IFoo2).
 
+=head2 Units only
+
+We don't need to deeply track every single Body and ClassTemplate in use.
+Merely tracking compilation units is enough.
+
+=head2 A new IL
+
+(Very conjectural) For glue code, we provide SIR, an externalized form of the
+CodeGen API.  It has a surface syntax based on Forth and provides a stack model
+with built-in CPS but mapping near injectively to CIL.
+
+=head2 PRELUDE and PRE-INIT
+
+Two special phasers are provided by the Alpha metacompiler (Beta uses the
+standard Perl 6 phasers).  PRE-INIT runs while runtime structures are being
+constructed.  It can inject things into the nascent protolexpad.  PRELUDE runs
+before the structures are constructed at all; the definitions of Frame stuff
+needs to go here.
+
 =head1 Brief overview of the compiler
 
 User runs C<sprixel.exe>.  Entry point is in C<Sprixel::Compiler>, the driver.
