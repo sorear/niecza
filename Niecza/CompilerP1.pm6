@@ -1,8 +1,8 @@
 #| The main driver for the P1 polymorph of VICIL.  This is a static compiler
 #| which ties knots by statically generating metaobject tree initializers.
-class Sprixel::CompilerP1;
+class Niecza::CompilerP1;
 
-use Sprixel::Meta::Op;
+use Niecza::Meta::Op;
 
 method test() {
     #1. Make a lexical alias of System::Console:from<clr>
@@ -14,7 +14,7 @@ method test() {
     #5. Set up a callout for string literals
     #6. "Hello world".say
     Block.new(
-        :do(Sprixel::Meta::Op::FunCall.new(
-            :callee( Sprixel::Meta::Op::Var.new(:name('&say')) ),
-            :arguments( Sprixel::Meta::Op::StringLiteral.new( :text("Hello, world") ) )))).codegen;
+        :do(Niecza::Meta::Op::FunCall.new(
+            :callee( Niecza::Meta::Op::Var.new(:name('&say')) ),
+            :arguments( Niecza::Meta::Op::StringLiteral.new( :text("Hello, world") ) )))).codegen;
 }

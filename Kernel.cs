@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-namespace Sprixel {
+namespace Niecza {
     // We like to reuse continuation objects for speed - every function only
     // creates one kind of continuation, but tweaks a field for exact return
     // point.  As such, call frames and continuations are in 1:1 correspondence

@@ -111,7 +111,7 @@ objects.  The enclosing function gets extra multis (or not quite; it shouldn't
 affect dispatch) for the cases.  Will probably be involved in the
 implementation of CLR object usage; functions being specialized on IRealAny.
 Specialization, and lazy code generation, are the crux of optimization in
-Sprixel.
+Niecza.
 
 =head2 BEGIN
 
@@ -223,13 +223,13 @@ needs to go here.
 
 =head1 Brief overview of the compiler
 
-User runs C<sprixel.exe>.  Entry point is in C<Sprixel::Compiler>, the driver.
-C<Sprixel::Compiler> parses arguments, decides the user wants to run some Perl
+User runs C<niecza.exe>.  Entry point is in C<Niecza::Compiler>, the driver.
+C<Niecza::Compiler> parses arguments, decides the user wants to run some Perl
 6 code (gasp!), passes it off to C<STD>.  C<STD> calls action methods in
-C<Sprixel::Actions>, which construct a bunch of objects and metaobjects; mostly
+C<Niecza::Actions>, which construct a bunch of objects and metaobjects; mostly
 specced things like C<Hash> and C<Block> and C<ClassHOW>, but a few compiler
-things too, like C<Sprixel::Meta::Op>.  The top level code, as a C<Block>, is
-passed back to C<Sprixel::Compiler>.  C<Sprixel::Compiler>, seeing that it was
+things too, like C<Niecza::Meta::Op>.  The top level code, as a C<Block>, is
+passed back to C<Niecza::Compiler>.  C<Niecza::Compiler>, seeing that it was
 told to B<run> the code, calls C<< postcircumfix:<( )> >>.
 C<< postcircumfix:<( )> >> sees that the C<$!Method> property is null and
 constructs a CLR method.  The method is run.  (Eventually, pessimizers and

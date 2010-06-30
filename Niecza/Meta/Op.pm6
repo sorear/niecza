@@ -2,14 +2,14 @@
 #| between the compiler and the optimizer; they are somewhat lower level than
 #| Perl 6 syntax and have very little context sensitivity, but also embody
 #| little knowledge of the execution context.
-class Sprixel::Meta::Op;
+class Niecza::Meta::Op;
 
 method compile() { ... }
 
 #| Variable fetch op.  Returns the container, or something like that.  Can be
 #| applied to any simple variable?
 class Var is Op {
-    has Str $.name; #= Name as suitable for L<Sprixel::Meta::Scope#lookup>
+    has Str $.name; #= Name as suitable for L<Niecza::Meta::Scope#lookup>
 }
 
 #| Simple function call.  The circularity saw forces us to have an op for this,

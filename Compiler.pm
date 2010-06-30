@@ -335,7 +335,7 @@ $boot->tail_call_sub(0);
 print <<EOH;
 using System;
 using System.Collections.Generic;
-namespace Sprixel {
+namespace Niecza {
     public class MainClass {
         public static void Main() {
             Frame root_f = new Frame(null, null,
