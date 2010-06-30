@@ -242,6 +242,9 @@ use 5.010;
         print " " x 12, "}\n";
         print " " x 8, "}\n";
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
 {
@@ -261,7 +264,19 @@ use 5.010;
         if ($self->codegen) { return $self->codegen }
         $self->codegen(CodeGen->new(name => $self->name));
         my $cg = $self->codegen;
-        ...
+        $self->do->item_cg($cg);
+        $cg->return;
+        return $cg;
+    }
+
+    sub write {
+        my ($self) = @_;
+        $self->code->write;
+        for my $pi (@{ $self->protos }) {
+            if (ref($pi) eq 'ARRAY' && $pi->[1]->isa('Body')) {
+                $pi->[1]->write;
+            }
+        }
     }
 
     sub preinit {
@@ -281,6 +296,9 @@ use 5.010;
             }
         }
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
 {
@@ -289,11 +307,42 @@ use 5.010;
 
     has names => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has outer => (isa => 'Scope', is => 'rw');
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
 {
     package Expression;
     use Moose;
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package NIL;
+    use Moose;
+    extends 'Expression';
+
+    has code => (isa => 'ArrayRef', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg) = @_;
+        for my $insn (@{ $self->code }) {
+            my ($op, @args) = @$insn;
+            $cg->$op(@args);
+        }
+    }
+
+    sub void_cg {
+        my ($self, $cg) = @_;
+        $self->item_cg($cg);
+        $cg->drop;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
 {
@@ -302,51 +351,78 @@ use 5.010;
     extends 'Expression';
 
     has children => (isa => 'ArrayRef[Statement]', is => 'ro', default => sub { +{} });
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-my $boot = CodeGen->new(name => 'boot');
+{
+    package Unit;
+    use Moose;
+    has mainline => (isa => 'Body', is => 'ro', required => 1);
 
-$boot->push_null;
+    has codegen => (isa => 'CodeGen', is => 'rw');
 
-$boot->open_protopad;
-my $main = CodeGen->new(name => 'main');
+    sub code {
+        my ($self) = @_;
+        my $cg = $self->codegen;
+        if ($cg) {
+            return $cg;
+        } else {
+            $self->codegen($cg = CodeGen->new(name => 'boot'));
+            $cg->push_null;
+            $cg->open_protopad;
+            $self->mainline->preinit($cg);
+            $cg->close_sub($self->mainline->code);
+            $cg->tail_call_sub(0);
+            return $cg;
+        }
+    }
 
-$boot->open_protopad;
-my $say = CodeGen->new(name => '&say');
-$say->pos(0);
-$say->fetchlv;
-$say->clr_unwrap;
-$say->clr_call_direct(0, "System.Console.WriteLine", "System.String");
-$say->return;
-
-$boot->close_sub($say);
-$boot->proto_var('&say');
-
-$main->clone_lex('&say');
-$main->lex_lv('&say');
-$main->fetchlv;
-$main->string_lv('Hello World');
-$main->call_sub(0, 1);
-$main->return;
-
-$boot->close_sub($main);
-$boot->tail_call_sub(0);
-
-print <<EOH;
+    sub write {
+        my ($self) = @_;
+        print <<EOH;
 using System;
 using System.Collections.Generic;
 namespace Niecza {
     public class MainClass {
         public static void Main() {
             Frame root_f = new Frame(null, null,
-                    new DynBlockDelegate(@{[ $boot->csname ]}));
+                    new DynBlockDelegate(@{[ $self->code->csname ]}));
             Frame current = root_f;
             while (current != null) {
                 current = current.Continue();
             }
         }
 EOH
-$boot->write;
-$main->write;
-$say->write;
-print "    }\n}\n"
+        $self->code->write;
+        $self->mainline->write;
+        print "    }\n}\n"
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+my $unit = Unit->new(
+    mainline => Body->new(
+        name   => 'body',
+        protos => [
+            [ '&say' => Body->new(
+                    do => NIL->new(
+                        code => [
+                            ['pos', 0],
+                            ['fetchlv'],
+                            ['clr_unwrap'],
+                            ['clr_call_direct', 0, "System.Console.WriteLine",
+                                "System.String"],
+                            ['push_null']])) ]],
+        do     => NIL->new(
+            code => [
+                ['clone_lex', '&say'],
+                ['lex_lv', '&say'],
+                ['fetchlv'],
+                ['string_lv', 'Hello World'],
+                ['call_sub', 1, 1]])));
+
+$unit->write;
