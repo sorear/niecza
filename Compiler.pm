@@ -248,8 +248,39 @@ use 5.010;
     package Body;
     use Moose;
 
+    has name    => (isa => 'Str', is => 'rw', default => "anon");
     has do      => (isa => 'Expression', is => 'rw');
     has lexical => (isa => 'Scope', is => 'rw');
+    # various things which need PRE-INIT time initialization -
+    # phasers (Expr), subblocks [str, Body], variables [str, Expr]
+    has protos  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has codegen => (isa => 'CodeGen', is => 'rw');
+
+    sub code {
+        my ($self) = @_;
+        if ($self->codegen) { return $self->codegen }
+        $self->codegen(CodeGen->new(name => $self->name));
+        my $cg = $self->codegen;
+        ...
+    }
+
+    sub preinit {
+        my ($self, $cg) = @_;
+        for my $pi (@{ $self->protos }) {
+            if (ref($pi) ne 'ARRAY') {
+                $pi->void_cg($cg);
+            } elsif ($pi->[1]->isa('Body')) {
+                $pi->[1]->name($pi->[0]);
+                $cg->open_protopad;
+                $pi->[1]->preinit($cg);
+                $cg->close_sub($pi->[1]->code);
+                $cg->proto_var($pi->[0]);
+            } else {
+                $pi->[1]->item_cg($cg);
+                $cg->proto_var($pi->[0]);
+            }
+        }
+    }
 }
 
 {
