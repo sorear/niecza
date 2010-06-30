@@ -151,6 +151,10 @@ namespace Sprixel {
         }
 
         public Frame GetAttribute(Frame caller, string name) {
+            if (slots == null) {
+                return Fail(caller, "Attempted to access slot " + name +
+                        " via a protoobject");
+            }
             caller.resultSlot = slots[name];
             return caller;
         }
