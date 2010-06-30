@@ -193,9 +193,9 @@ use 5.010;
         push @{ $self->buffer }, "    return th.caller;\n";
     }
 
-    sub push_root_frame {
+    sub push_null {
         my ($self) = @_;
-        $self->_push("Kernel.KernelFrame");
+        $self->_push("null");
     }
 
     sub open_protopad {
@@ -275,7 +275,7 @@ use 5.010;
 
 my $boot = CodeGen->new(name => 'boot');
 
-$boot->push_root_frame;
+$boot->push_null;
 
 $boot->open_protopad;
 my $main = CodeGen->new(name => 'main');

@@ -228,13 +228,7 @@ namespace Sprixel {
 
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
-    // Provides: ClassHOW, ClassHOW.HOW, ClassHOW.add_method, ScalarContainer,
-    // ScalarContainer.HOW, Code, Code.HOW, Body, Body.HOW, Scope, Scope.HOW,
-    // ...
-    // This should be enough to implement the rest of ClassHOW :)
     public class Kernel {
-        public static readonly Frame KernelFrame = new Frame(null, null, null);
-
         private static Frame SCFetch(DynObject th, Frame caller) {
             caller.resultSlot = th.slots["!value"];
             return caller;
