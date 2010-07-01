@@ -112,8 +112,8 @@ use 5.010;
     }
 
     sub lex_lv {
-        my ($self, $name) = @_;
-        $self->_push("((Variable)th.lex[" . qm($name) . "]).lv");
+        my ($self, $order, $name) = @_;
+        $self->_push("((Variable)th." . ("outer." x $order) . "lex[" . qm($name) . "]).lv");
     }
 
     sub string_lv {
@@ -390,6 +390,31 @@ use 5.010;
 }
 
 {
+    package Lexical;
+    use Moose;
+    extends 'Expression';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        my ($order, $scope) = (0, $body);
+        while ($scope && !$scope->lexical->{$self->name}) {
+            $scope = $scope->outer;
+            $order++;
+        }
+        if (!$scope) {
+            die "Failed to resolve lexical " . $self->name . " in " .
+                $body->name;
+        }
+        $cg->lex_lv($order, $self->name);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package CloneSub;
     use Moose;
     extends 'Expression';
@@ -467,8 +492,9 @@ my $unit = Unit->new(
                                 "System.String"],
                             ['push_null']])) ]],
         enter  => [CloneSub->new(name => '&say')],
+        lexical=> { '&say', 1 },
         do     => CallSub->new(
-            invocant    => NIL->new(code => [['lex_lv', '&say']]),
+            invocant    => Lexical->new(name => '&say'),
             positionals => [StringLiteral->new(text => 'Hello, World')])));
 
 $unit->write;
