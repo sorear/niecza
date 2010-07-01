@@ -311,6 +311,7 @@ use 5.010;
         my ($self) = @_;
         my $name = $self->csname;
         print " " x 8, "private static Frame $name(Frame th) {\n";
+        print " " x 12, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n";
         if ($self->maxdepth) {
             print " " x 12, "object " . join(", ", map { "s$_" }
                 0 .. ($self->maxdepth - 1)) . ";\n";
