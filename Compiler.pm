@@ -15,6 +15,7 @@ use 5.010;
     has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has unreach   => (isa => 'Bool', is => 'rw', default => 0);
 
     sub qm { "\"" . $_[0] . "\"" }
 
@@ -27,6 +28,7 @@ use 5.010;
 
     sub _undercheck {
         my ($self, $margin) = @_;
+        die "Stack underflow" if $margin > $self->depth;
         if ($self->depth - $margin < $self->savedepth) {
             for my $n ($self->depth - $margin .. $self->savedepth - 1) {
                 $self->_emit("s$n = th.lex[\"s$n\"]");
@@ -97,14 +99,16 @@ use 5.010;
     sub labelhere {
         my ($self, $n) = @_;
         $self->_saveall;
-        push @{ $self->buffer }, "    goto case $n;\n";
+        push @{ $self->buffer }, "    goto case $n;\n" unless $self->unreach;
         push @{ $self->buffer }, "case $n:\n";
+        $self->unreach(0);
     }
 
     sub goto {
         my ($self, $n) = @_;
         $self->_saveall;
         push @{ $self->buffer }, "    goto case $n;\n";
+        $self->unreach(1);
     }
 
     sub _cpscall {
@@ -198,6 +202,7 @@ use 5.010;
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
         $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->unreach(1);
     }
 
     sub clr_unwrap {
@@ -272,6 +277,7 @@ use 5.010;
             $self->_emit("th.caller.resultSlot = " . $self->_pop);
         }
         $self->_emit("return th.caller");
+        $self->unreach(1);
     }
 
     sub push_null {
@@ -351,7 +357,7 @@ use 5.010;
         my $cg = $self->codegen;
         $_->void_cg($cg, $self) for @{ $self->enter };
         $self->do->item_cg($cg, $self);
-        $cg->return;
+        $cg->return(1) unless $cg->unreach;
         return $cg;
     }
 
@@ -641,6 +647,7 @@ my $unit = Unit->new(
                             ['pos',1],
                             ['tail_call_sub',2]]))],
                         [ 0, '&add-method', Body->new(do => NIL->new(code => [
+                            ['push_null','Variable'],
                             ]))]],
                     do => NIL->new(code => [
                         ['copy_lex','&new-metaclass'],
