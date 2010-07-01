@@ -14,6 +14,7 @@ use 5.010;
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
     has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has lex2type  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
 
@@ -124,77 +125,84 @@ use 5.010;
 
     sub lex_lv {
         my ($self, $order, $name) = @_;
-        $self->_push("Niecza.LValue", "((Variable)th." . ("outer." x $order) . "lex[" . qm($name) . "]).lv");
+        $self->_push("LValue", "((Variable)th." . ("outer." x $order) . "lex[" . qm($name) . "]).lv");
+    }
+
+    sub lextypes {
+        my ($self, @args) = @_;
+        %{ $self->lex2type } = (%{ $self->lex2type }, @args);
     }
 
     sub rawlexget {
-        my ($self, $ty, $name) = @_;
-        $self->_push($ty, "th.lex[" . qm($name) . "]");
+        my ($self, $name) = @_;
+        $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
     }
 
     sub rawlexput {
-        my ($self, $ty, $name) = @_;
+        my ($self, $name) = @_;
         $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
     }
 
     sub string_lv {
         my ($self, $text) = @_;
-        $self->_push("Niecza.LValue", "Kernel.NewROLValue(new CLRImportObject(" . qm($text) . "))");
+        $self->_push("LValue", "Kernel.NewROLValue(new CLRImportObject(" . qm($text) . "))");
     }
 
     sub how {
         my ($self) = @_;
         my $v = $self->_pop;
-        $self->_cpscall("Niecza.IP6", "$v.HOW(th)");
+        $self->_cpscall("IP6", "$v.HOW(th)");
     }
 
     sub fetchlv {
         my ($self) = @_;
         my $lv = $self->_pop;
-        $self->_cpscall("Niecza.IP6", "$lv.container.Fetch(th)");
+        $self->_cpscall("IP6", "$lv.container.Fetch(th)");
     }
 
     sub dup_fetchlv {
         my ($self) = @_;
         my $lv = $self->_peek;
-        $self->_cpscall('Niecza.IP6', "$lv.container.Fetch(th)");
+        $self->_cpscall('IP6', "$lv.container.Fetch(th)");
         $self->_swap;
     }
 
     sub pos {
         my ($self, $num) = @_;
-        $self->_push('Niecza.LValue', "th.pos[$num]");
+        $self->_push('LValue', "th.pos[$num]");
     }
 
     sub clone_lex {
         my ($self, $name) = @_;
-        $self->_push('Niecza.LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
+        $self->_push('LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
         $self->dup_fetchlv;
-        $self->_push('Niecza.LValue', "Kernel.NewROLValue(th)");
+        $self->_push('LValue', "Kernel.NewROLValue(th)");
         $self->call_method(1, "clone", 1);
-        $self->rawlexput('Niecza.Variable', $name);
+        $self->lextypes($name, 'Variable');
+        $self->rawlexput($name);
     }
 
     sub copy_lex {
         my ($self, $name) = @_;
-        $self->_push('Niecza.LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
+        $self->_push('LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
         $self->fetchlv;
-        $self->_push('Niecza.Variable', "Kernel.NewRWVar(" . $self->_pop . ")");
-        $self->rawlexput('Niecza.Variable', $name);
+        $self->_push('Variable', "Kernel.NewRWVar(" . $self->_pop . ")");
+        $self->lextypes($name, 'Variable');
+        $self->rawlexput($name);
     }
 
     sub call_method {
         my ($self, $nv, $name, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV
         my $inv = $self->_pop;
-        $self->_cpscall(($nv ? 'Niecza.Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
     }
 
     sub call_sub {
         my ($self, $nv, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
-        $self->_cpscall(($nv ? 'Niecza.Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
     }
 
     sub tail_call_sub {
@@ -288,14 +296,14 @@ use 5.010;
     sub open_protopad {
         my ($self) = @_;
         my $p = $self->_peek;
-        $self->_push('Niecza.Frame', "new Frame($p)");
+        $self->_push('Frame', "new Frame($p)");
     }
 
     sub close_sub {
         my ($self, $bodycg) = @_;
         my $pp = $self->_pop;
         my $op = $self->_peek;
-        $self->_push('Niecza.IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
+        $self->_push('IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
             $bodycg->csname . "), $pp, $op)");
     }
 
@@ -529,7 +537,7 @@ use 5.010;
             return $cg;
         } else {
             $self->codegen($cg = CodeGen->new(name => 'boot'));
-            $cg->push_null('Niecza.Frame');
+            $cg->push_null('Frame');
             $cg->open_protopad;
             $self->mainline->preinit($cg);
             $cg->close_sub($self->mainline->code);
@@ -583,47 +591,50 @@ my $unit = Unit->new(
                         [ 0, '&wrap-metaclass', Body->new(do => NIL->new(code => [
                             # Args: 0: metaclass metaobject 1: metaobject
                             # returns: protoobject
+                            ['lextypes', 'mci', 'DynObject', 'p', 'DynObject',
+                                'mo', 'DynMetaObject'],
                             ['clr_new', 'DynObject', 0],
-                            ['rawlexput', 'DynObject', 'mci'],
+                            ['rawlexput', 'mci'],
                             ['pos',1],
                             ['fetchlv'],
                             ['clr_unwrap', 'DynMetaObject'],
-                            ['rawlexput', 'DynMetaObject', 'mo'],
+                            ['rawlexput', 'mo'],
                             ['clr_new', 'DynObject', 0],
-                            ['rawlexput', 'DynObject', 'p'],
+                            ['rawlexput', 'p'],
 
-                            ['rawlexget', 'DynObject', 'p'],
-                            ['rawlexget', 'DynMetaObject', 'mo'],
+                            ['rawlexget', 'p'],
+                            ['rawlexget', 'mo'],
                             ['clr_field_set', 'klass'],
 
-                            ['rawlexget', 'DynMetaObject', 'mo'],
-                            ['rawlexget', 'DynObject', 'mci'],
+                            ['rawlexget', 'mo'],
+                            ['rawlexget', 'mci'],
                             ['clr_field_set', 'how'],
 
-                            ['rawlexget', 'DynObject', 'mci'],
+                            ['rawlexget', 'mci'],
                             ['clr_field_get', 'Dictionary<string,object>', 'slots'],
-                            ['rawlexget', 'DynMetaObject', 'mo'],
+                            ['rawlexget', 'mo'],
                             ['clr_index_set', 'meta-object'],
 
-                            ['rawlexget', 'DynObject', 'mci'],
+                            ['rawlexget', 'mci'],
                             ['clr_field_get', 'Dictionary<string,object>', 'slots'],
-                            ['rawlexget', 'DynObject', 'p'],
+                            ['rawlexget', 'p'],
                             ['clr_index_set', 'prototype'],
 
-                            ['rawlexget', 'DynObject', 'mci'],
+                            ['rawlexget', 'mci'],
                             ['pos',0],
                             ['fetchlv'],
                             ['clr_unwrap', 'DynMetaObject'],
                             ['clr_field_set', 'klass'],
 
-                            ['rawlexget', 'DynObject', 'p'],
+                            ['rawlexget', 'p'],
                             ['clr_call_direct', 'Variable', 'Kernel.NewROVar', 1]]))],
                         [ 0, '&new-metaclass', Body->new(do => NIL->new(code => [
                             # Args: 0: metaclass metaobject, 1: name
+                            ['lextypes','mo','DynMetaObject'],
                             ['clr_new','DynMetaObject',0],
-                            ['rawlexput','DynMetaObject','mo'],
+                            ['rawlexput','mo'],
 
-                            ['rawlexget','DynMetaObject','mo'],
+                            ['rawlexget','mo'],
                             ['pos',1],
                             ['fetchlv'],
                             ['clr_unwrap','String'],
@@ -632,7 +643,7 @@ my $unit = Unit->new(
                             ['lex_lv',1,'&wrap-metaclass'],
                             ['fetchlv'],
                             ['pos',0],
-                            ['rawlexget','DynMetaObject','mo'],
+                            ['rawlexget','mo'],
                             ['clr_new','CLRImportObject',1],
                             ['clr_call_direct','LValue','Kernel.NewROLValue',1],
                             ['tail_call_sub', 2]]))],
@@ -651,6 +662,7 @@ my $unit = Unit->new(
                             ['push_null','Variable'],
                             ]))]],
                     do => NIL->new(code => [
+                        ['lextypes','$p','Variable'],
                         ['copy_lex','&new-metaclass'],
                         ['lex_lv',0,'&new-metaclass'],
                         ['fetchlv'],
@@ -659,7 +671,7 @@ my $unit = Unit->new(
                         ['clr_call_direct','LValue','Kernel.NewROLValue',1],
                         ['string_lv','ClassHOW'],
                         ['call_sub',1,2],
-                        ['rawlexput','Variable','$p'],
+                        ['rawlexput','$p'],
 
                         ['lex_lv',0,'$p'],
                         ['fetchlv'],
@@ -671,7 +683,7 @@ my $unit = Unit->new(
                         ['clr_field_get','DynMetaObject','klass'],
                         ['clr_field_set','klass'],
 
-                        ['rawlexget','Variable','$p']]))],
+                        ['rawlexget','$p']]))],
             [ 0, '&say' => Body->new(
                     do => NIL->new(
                         code => [
