@@ -533,7 +533,8 @@ use 5.010;
             $cg->open_protopad;
             $self->mainline->preinit($cg);
             $cg->close_sub($self->mainline->code);
-            $cg->tail_call_sub(0);
+            $cg->call_sub(0,0);
+            $cg->return;
             return $cg;
         }
     }
