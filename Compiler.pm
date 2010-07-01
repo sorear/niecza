@@ -267,8 +267,8 @@ use 5.010;
         if ($self->codegen) { return $self->codegen }
         $self->codegen(CodeGen->new(name => $self->name));
         my $cg = $self->codegen;
-        $_->void_cg($cg) for @{ $self->enter };
-        $self->do->item_cg($cg);
+        $_->void_cg($cg, $self) for @{ $self->enter };
+        $self->do->item_cg($cg, $self);
         $cg->return;
         return $cg;
     }
@@ -289,7 +289,7 @@ use 5.010;
         my ($self, $cg) = @_;
         for my $pi (@{ $self->protos }) {
             if (ref($pi) ne 'ARRAY') {
-                $pi->void_cg($cg);
+                $pi->void_cg($cg); # TODO: scoping
             } elsif ($pi->[1]->isa('Body')) {
                 $pi->[1]->name($pi->[0]);
                 $pi->[1]->outer($self);
@@ -298,7 +298,7 @@ use 5.010;
                 $cg->close_sub($pi->[1]->code);
                 $cg->proto_var($pi->[0]);
             } else {
-                $pi->[1]->item_cg($cg);
+                $pi->[1]->item_cg($cg);  # TODO: set up scoping for this
                 $cg->proto_var($pi->[0]);
             }
         }
@@ -324,7 +324,7 @@ use 5.010;
     has code => (isa => 'ArrayRef', is => 'ro', required => 1);
 
     sub item_cg {
-        my ($self, $cg) = @_;
+        my ($self, $cg, $body) = @_;
         for my $insn (@{ $self->code }) {
             my ($op, @args) = @$insn;
             $cg->$op(@args);
@@ -332,8 +332,8 @@ use 5.010;
     }
 
     sub void_cg {
-        my ($self, $cg) = @_;
-        $self->item_cg($cg);
+        my ($self, $cg, $body) = @_;
+        $self->item_cg($cg, $body);
         $cg->drop;
     }
 
@@ -347,6 +347,43 @@ use 5.010;
     extends 'Expression';
 
     has children => (isa => 'ArrayRef[Statement]', is => 'ro', default => sub { +{} });
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package CallSub;
+    use Moose;
+    extends 'Expression';
+
+    has invocant    => (isa => 'Expression', is => 'ro', required => 1);
+    has positionals => (isa => 'ArrayRef[Expression]', is => 'ro',
+        default => sub { [] });
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $self->invocant->item_cg($cg, $body);
+        $cg->fetchlv;
+        $_->item_cg($cg, $body) for @{ $self->positionals };
+        $cg->call_sub(1, scalar(@{ $self->positionals }));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package StringLiteral;
+    use Moose;
+    extends 'Expression';
+
+    has text => (isa => 'Str', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $cg->string_lv($self->text);
+    }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -430,11 +467,8 @@ my $unit = Unit->new(
                                 "System.String"],
                             ['push_null']])) ]],
         enter  => [CloneSub->new(name => '&say')],
-        do     => NIL->new(
-            code => [
-                ['lex_lv', '&say'],
-                ['fetchlv'],
-                ['string_lv', 'Hello World'],
-                ['call_sub', 1, 1]])));
+        do     => CallSub->new(
+            invocant    => NIL->new(code => [['lex_lv', '&say']]),
+            positionals => [StringLiteral->new(text => 'Hello, World')])));
 
 $unit->write;
