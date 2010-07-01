@@ -277,40 +277,23 @@ use 5.010;
         my ($self) = @_;
         $self->code->write;
         for my $pi (@{ $self->protos }) {
-            if (ref($pi) eq 'ARRAY' && $pi->[1]->isa('Body')) {
-                $pi->[1]->outer($self);
-                $pi->[1]->name($pi->[0]);
-                $pi->[1]->write;
-            }
+            $pi->[2]->outer($self);
+            $pi->[2]->name($pi->[1] // 'PREINIT');
+            $pi->[2]->write;
         }
     }
 
     sub preinit {
         my ($self, $cg) = @_;
         for my $pi (@{ $self->protos }) {
-            if (ref($pi) ne 'ARRAY') {
-                $pi->name("PREINT");
-                $pi->outer($self);
-                $cg->open_protopad;
-                $pi->preinit($cg);
-                $cg->close_sub($pi->code);
-                $cg->call_sub(0, 0);
-            } elsif ($pi->[1]->isa('Body')) {
-                $pi->[1]->name($pi->[0]);
-                $pi->[1]->outer($self);
-                $cg->open_protopad;
-                $pi->[1]->preinit($cg);
-                $cg->close_sub($pi->[1]->code);
-                $cg->proto_var($pi->[0]);
-            } else {
-                $pi->[1]->name("PREINT");
-                $pi->[1]->outer($self);
-                $cg->open_protopad;
-                $pi->[1]->preinit($cg);
-                $cg->close_sub($pi->[1]->code);
-                $cg->call_sub(1, 0);
-                $cg->proto_var($pi->[0]);
-            }
+            my ($k,$a,$b) = @$pi;
+            $b->name($a // "PREINIT");
+            $b->outer($self);
+            $cg->open_protopad;
+            $b->preinit($cg);
+            $cg->close_sub($b->code);
+            $cg->call_sub(($a ? 1 : 0), 0) if $k;
+            $cg->proto_var($a) if $a;
         }
     }
 
@@ -492,7 +475,7 @@ my $unit = Unit->new(
     mainline => Body->new(
         name   => 'body',
         protos => [
-            [ '&say' => Body->new(
+            [ 0, '&say' => Body->new(
                     do => NIL->new(
                         code => [
                             ['pos', 0],
