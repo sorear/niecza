@@ -1,0 +1,5 @@
+This is 'Niecza', which will eventually be a Perl 6 implementation focusing
+on optimization research.  It targets the Common Language Runtime (ECMA-335;
+implementations are "Mono" and ".NET").
+
+It's currently very primitive; Hello, World is close to its limits.
