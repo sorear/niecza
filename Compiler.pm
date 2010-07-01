@@ -255,7 +255,8 @@ use 5.010;
     has do      => (isa => 'Expression', is => 'rw');
     has enter   => (isa => 'ArrayRef[Expression]', is => 'ro',
         default => sub { [] });
-    has lexical => (isa => 'Scope', is => 'rw');
+    has lexical => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has outer   => (isa => 'Body', is => 'rw', init_arg => undef);
     # various things which need PRE-INIT time initialization -
     # phasers (Expr), subblocks [str, Body], variables [str, Expr]
     has protos  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
@@ -277,6 +278,8 @@ use 5.010;
         $self->code->write;
         for my $pi (@{ $self->protos }) {
             if (ref($pi) eq 'ARRAY' && $pi->[1]->isa('Body')) {
+                $pi->[1]->outer($self);
+                $pi->[1]->name($pi->[0]);
                 $pi->[1]->write;
             }
         }
@@ -289,6 +292,7 @@ use 5.010;
                 $pi->void_cg($cg);
             } elsif ($pi->[1]->isa('Body')) {
                 $pi->[1]->name($pi->[0]);
+                $pi->[1]->outer($self);
                 $cg->open_protopad;
                 $pi->[1]->preinit($cg);
                 $cg->close_sub($pi->[1]->code);
@@ -299,17 +303,6 @@ use 5.010;
             }
         }
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Scope;
-    use Moose;
-
-    has names => (isa => 'HashRef', is => 'ro', default => sub { +{} });
-    has outer => (isa => 'Scope', is => 'rw');
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
