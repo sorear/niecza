@@ -253,6 +253,8 @@ use 5.010;
 
     has name    => (isa => 'Str', is => 'rw', default => "anon");
     has do      => (isa => 'Expression', is => 'rw');
+    has enter   => (isa => 'ArrayRef[Expression]', is => 'ro',
+        default => sub { [] });
     has lexical => (isa => 'Scope', is => 'rw');
     # various things which need PRE-INIT time initialization -
     # phasers (Expr), subblocks [str, Body], variables [str, Expr]
@@ -264,6 +266,7 @@ use 5.010;
         if ($self->codegen) { return $self->codegen }
         $self->codegen(CodeGen->new(name => $self->name));
         my $cg = $self->codegen;
+        $_->void_cg($cg) for @{ $self->enter };
         $self->do->item_cg($cg);
         $cg->return;
         return $cg;
@@ -357,6 +360,22 @@ use 5.010;
 }
 
 {
+    package CloneSub;
+    use Moose;
+    extends 'Expression';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub void_cg {
+        my ($self, $cg) = @_;
+        $cg->clone_lex($self->name);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Unit;
     use Moose;
     has mainline => (isa => 'Body', is => 'ro', required => 1);
@@ -417,9 +436,9 @@ my $unit = Unit->new(
                             ['clr_call_direct', 0, "System.Console.WriteLine",
                                 "System.String"],
                             ['push_null']])) ]],
+        enter  => [CloneSub->new(name => '&say')],
         do     => NIL->new(
             code => [
-                ['clone_lex', '&say'],
                 ['lex_lv', '&say'],
                 ['fetchlv'],
                 ['string_lv', 'Hello World'],
