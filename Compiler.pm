@@ -12,6 +12,8 @@ use 5.010;
     has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
+    has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
     sub qm { "\"" . $_[0] . "\"" }
@@ -49,27 +51,31 @@ use 5.010;
         $self->_emit(sprintf "s%d = s%d", $n, $n-2);
         $self->_emit(sprintf "s%d = s%d", $n-2, $n-1);
         $self->_emit(sprintf "s%d = s%d", $n-1, $n);
+        @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
     }
 
     sub _peek {
         my ($self) = @_;
         $self->_undercheck(1);
-        return "s" . ($self->depth - 1);
+        my $ty = @{ $self->stacktype }[-1];
+        return "(($ty)s" . ($self->depth - 1) . ")";
     }
 
     sub _pop {
         my ($self) = @_;
         $self->_undercheck(1);
+        my $ty = pop @{ $self->stacktype };
         $self->depth($self->depth - 1);
-        return "s" . ($self->depth);
+        return "(($ty)s" . ($self->depth) . ")";
     }
 
     sub _push {
-        my ($self, $expr) = @_;
+        my ($self, $ty, $expr) = @_;
         $self->_overcheck(1);
         my $n = $self->depth;
         $self->_emit("s$n = $expr");
         $self->depth($n + 1);
+        push @{ $self->stacktype }, $ty;
     }
 
     sub _saveall {
@@ -101,122 +107,156 @@ use 5.010;
     }
 
     sub _cpscall {
-        my ($self, $nv, $expr) = @_;
+        my ($self, $rt, $expr) = @_;
         $self->_saveall;
         my $n = $self->label;
         $self->_emit("th.resultSlot = null");
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
         push @{ $self->buffer }, "case $n:\n";
-        $self->_push('th.resultSlot') if $nv;
+        $self->_push($rt, 'th.resultSlot') if defined $rt;
     }
 
     sub lex_lv {
         my ($self, $order, $name) = @_;
-        $self->_push("((Variable)th." . ("outer." x $order) . "lex[" . qm($name) . "]).lv");
+        $self->_push("Niecza.LValue", "((Variable)th." . ("outer." x $order) . "lex[" . qm($name) . "]).lv");
+    }
+
+    sub rawlexget {
+        my ($self, $ty, $name) = @_;
+        $self->_push($ty, "th.lex[" . qm($name) . "]");
+    }
+
+    sub rawlexput {
+        my ($self, $ty, $name) = @_;
+        $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
     }
 
     sub string_lv {
         my ($self, $text) = @_;
-        $self->_push("Kernel.NewROLValue(new CLRImportObject(" . qm($text) . "))");
+        $self->_push("Niecza.LValue", "Kernel.NewROLValue(new CLRImportObject(" . qm($text) . "))");
     }
 
     sub fetchlv {
         my ($self) = @_;
         my $lv = $self->_pop;
-        $self->_cpscall(1, "((LValue)$lv).container.Fetch(th)");
+        $self->_cpscall("Niecza.IP6", "$lv.container.Fetch(th)");
     }
 
     sub dup_fetchlv {
         my ($self) = @_;
         my $lv = $self->_peek;
-        $self->_cpscall(1, "((LValue)$lv).container.Fetch(th)");
+        $self->_cpscall('Niecza.IP6', "$lv.container.Fetch(th)");
         $self->_swap;
     }
 
     sub pos {
         my ($self, $num) = @_;
-        $self->_push("th.pos[$num]");
+        $self->_push('Niecza.LValue', "th.pos[$num]");
     }
 
     sub clone_lex {
         my ($self, $name) = @_;
-        $self->_push("((Variable)th.proto.lex[" . qm($name) . "]).lv");
+        $self->_push('Niecza.LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
         $self->dup_fetchlv;
-        $self->_push("Kernel.NewROLValue(th)");
-        $self->call_method(0, "clone", 1);
-        $self->_emit("th.lex[" . qm($name) . "] = th.resultSlot");
+        $self->_push('Niecza.LValue', "Kernel.NewROLValue(th)");
+        $self->call_method(1, "clone", 1);
+        $self->rawlexput('Niecza.Variable', $name);
     }
 
     sub call_method {
         my ($self, $nv, $name, $numargs) = @_;
-        my @args = reverse map { "((LValue)" . $self->_pop . ")" } (1 .. $numargs + 1);  # invocant LV
+        my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV
         my $inv = $self->_pop;
-        $self->_cpscall($nv, "((IP6)$inv).InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_cpscall(($nv ? 'Niecza.Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
     }
 
     sub call_sub {
         my ($self, $nv, $numargs) = @_;
-        my @args = reverse map { "((LValue)" . $self->_pop . ")" } (1 .. $numargs);
+        my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
-        $self->_cpscall($nv, "((IP6)$inv).Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_cpscall(($nv ? 'Niecza.Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
     }
 
     sub tail_call_sub {
         my ($self, $numargs) = @_;
-        my @args = reverse map { "((LValue)" . $self->_pop . ")" } (1 .. $numargs);
+        my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
-        $self->_emit("return ((IP6)$inv).Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
     }
 
     sub clr_unwrap {
-        my ($self) = @_;
+        my ($self, $ty) = @_;
         my $v = $self->_pop;
-        $self->_push("((CLRImportObject)$v).val");
+        $self->_push($ty, "((CLRImportObject)$v).val");
+    }
+
+    sub clr_new {
+        my ($self, $class, $nargs) = @_;
+        my @args = reverse map { $self->_pop } 1 .. $nargs;
+        $self->_push($class, "new $class(" . join(", ", @args) . ")");
+    }
+
+    sub clr_string {
+        my ($self, $text) = @_;
+        $self->_push('System.String', qm($text));
+    }
+
+    sub clr_field_get {
+        my ($self, $ty, $f) = @_;
+        my $obj = $self->_pop;
+        $self->_push($ty, "$obj.$f");
+    }
+
+    sub clr_field_set {
+        my ($self, $f) = @_;
+        my $val = $self->_pop;
+        my $obj = $self->_pop;
+        $self->_emit("$obj.$f = $val");
     }
 
     sub clr_call_direct {
-        my ($self, $nv, $name, @argtypes) = @_;
-        my @args = reverse map { "(($_)" . $self->_pop . ")" } reverse @argtypes;
-        if ($nv) {
-            $self->_push("$name(" . join(", ", @args) . ")");
+        my ($self, $rt, $name, $nargs) = @_;
+        my @args = reverse map { $self->_pop } 1 .. $nargs;
+        if (defined $rt) {
+            $self->_push($rt, "$name(" . join(", ", @args) . ")");
         } else {
-            push @{ $self->buffer }, "    $name(" . join(", ", @args) . ");\n";
+            $self->_emit("$name(" . join(", ", @args) . ")");
         }
     }
 
     sub return {
         my ($self, $nv) = @_;
         if ($nv) {
-            push @{ $self->buffer }, "    th.caller.resultSlot = " . $self->_pop . ";\n";
+            $self->_emit("th.caller.resultSlot = " . $self->_pop);
         }
-        push @{ $self->buffer }, "    return th.caller;\n";
+        $self->_emit("return th.caller");
     }
 
     sub push_null {
-        my ($self) = @_;
-        $self->_push("null");
+        my ($self, $ty) = @_;
+        $self->_push($ty, "null");
     }
 
     sub open_protopad {
         my ($self) = @_;
         my $p = $self->_peek;
-        $self->_push("new Frame((Frame)$p)");
+        $self->_push('Niecza.Frame', "new Frame($p)");
     }
 
     sub close_sub {
         my ($self, $bodycg) = @_;
         my $pp = $self->_pop;
         my $op = $self->_peek;
-        $self->_push("Kernel.MakeSub(new DynBlockDelegate(" . $bodycg->csname .
-            "), ((Frame)$pp), ((Frame)$op))");
+        $self->_push('Niecza.IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
+            $bodycg->csname . "), $pp, $op)");
     }
 
     sub proto_var {
         my ($self, $name) = @_;
         my $pv = $self->_pop;
         my $pp = $self->_peek;
-        $self->_emit("((Frame)$pp).lex[" . qm($name) . "] = Kernel.NewROVar((IP6)$pv)");
+        $self->_emit("$pp.lex[" . qm($name) . "] = $pv");
     }
 
     sub csname {
@@ -292,7 +332,11 @@ use 5.010;
             $cg->open_protopad;
             $b->preinit($cg);
             $cg->close_sub($b->code);
-            $cg->call_sub(($a ? 1 : 0), 0) if $k;
+            if ($k) {
+                $cg->call_sub(($a ? 1 : 0), 0);
+            } else {
+                $cg->clr_call_direct('Variable', 'Kernel.NewROVar', 1);
+            }
             $cg->proto_var($a) if $a;
         }
     }
@@ -437,7 +481,7 @@ use 5.010;
             return $cg;
         } else {
             $self->codegen($cg = CodeGen->new(name => 'boot'));
-            $cg->push_null;
+            $cg->push_null('Niecza.Frame');
             $cg->open_protopad;
             $self->mainline->preinit($cg);
             $cg->close_sub($self->mainline->code);
@@ -475,15 +519,68 @@ my $unit = Unit->new(
     mainline => Body->new(
         name   => 'body',
         protos => [
+            # we have to do this directly due to the circularity saw.  same
+            # reason forces uncontainerized .NET values
+            # class ClassHOW {
+            #     has Array[ClassHOW] $.parents;
+            #     has Dictionary[string,Sub] $.local-methods;
+            #     has DynMetaObject $.meta;
+            #     has DynObject $.proto;
+            #
+            #     sub 
+            # }
+            [ 1, 'ClassHOW' => Body->new(
+                    protos => [],
+#                       [ 0, '&new', Body->new() ],
+#                       [ 0, '&compose', Body->new() ],
+#                       [ 0, '&add-method', Body->new() ]],
+                    do => NIL->new(code => [
+                        ['clr_new', 'Niecza.DynMetaObject', 0],
+                        ['rawlexput', 'Niecza.DynMetaObject', 'chm'],
+
+                        ['rawlexget', 'Niecza.DynMetaObject', 'chm'],
+                        ['clr_string', 'ClassHOW'],
+                        ['clr_field_set', 'name'],
+
+#                        ['rawlexget', 'Niecza.DynMetaObject', 'chm'],
+#                        ['clr_field_get', 'Dictionary<string,IP6>', 'methods'],
+#                        ['clr_string', 'new'],
+#                        ['lex_lv', '&new'],
+#                        ['fetchlv'],
+#                        ['clr_index_set']
+#
+#                        ['rawlexget', 'Niecza.DynMetaObject', 'chm'],
+#                        ['clr_field_get', 'Dictionary<string,IP6>', 'methods'],
+#                        ['clr_string', 'compose'],
+#                        ['lex_lv', '&compose'],
+#                        ['fetchlv'],
+#                        ['clr_index_set']
+#
+#                        ['rawlexget', 'Niecza.DynMetaObject', 'chm'],
+#                        ['clr_field_get', 'Dictionary<string,IP6>', 'methods'],
+#                        ['clr_string', 'add-method'],
+#                        ['lex_lv', '&add-method'],
+#                        ['fetchlv'],
+#                        ['clr_index_set']
+
+                        ['clr_new', 'Niecza.DynObject', 0],
+                        ['rawlexput', 'Niecza.DynObject', 'chp'],
+
+                        ['rawlexget', 'Niecza.DynObject', 'chp'],
+                        ['rawlexget', 'Niecza.DynMetaObject', 'chm'],
+                        ['clr_field_set', 'klass'],
+
+                        ['rawlexget', 'Niecza.DynObject', 'chp'],
+                        ]))],
             [ 0, '&say' => Body->new(
                     do => NIL->new(
                         code => [
                             ['pos', 0],
                             ['fetchlv'],
-                            ['clr_unwrap'],
-                            ['clr_call_direct', 0, "System.Console.WriteLine",
-                                "System.String"],
-                            ['push_null']])) ]],
+                            ['clr_unwrap', 'System.String'],
+                            ['clr_call_direct', undef,
+                                "System.Console.WriteLine", 1],
+                            ['push_null', 'Variable']])) ]],
         enter  => [CloneSub->new(name => '&say')],
         lexical=> { '&say', 1 },
         do     => CallSub->new(
