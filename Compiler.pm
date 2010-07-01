@@ -289,7 +289,12 @@ use 5.010;
         my ($self, $cg) = @_;
         for my $pi (@{ $self->protos }) {
             if (ref($pi) ne 'ARRAY') {
-                $pi->void_cg($cg); # TODO: scoping
+                $pi->name("PREINT");
+                $pi->outer($self);
+                $cg->open_protopad;
+                $pi->preinit($cg);
+                $cg->close_sub($pi->code);
+                $cg->call_sub(0, 0);
             } elsif ($pi->[1]->isa('Body')) {
                 $pi->[1]->name($pi->[0]);
                 $pi->[1]->outer($self);
@@ -298,7 +303,12 @@ use 5.010;
                 $cg->close_sub($pi->[1]->code);
                 $cg->proto_var($pi->[0]);
             } else {
-                $pi->[1]->item_cg($cg);  # TODO: set up scoping for this
+                $pi->[1]->name("PREINT");
+                $pi->[1]->outer($self);
+                $cg->open_protopad;
+                $pi->[1]->preinit($cg);
+                $cg->close_sub($pi->[1]->code);
+                $cg->call_sub(1, 0);
                 $cg->proto_var($pi->[0]);
             }
         }
