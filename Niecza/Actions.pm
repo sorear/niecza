@@ -50,7 +50,7 @@ sub value__S_number { my ($cl, $M) = @_;
 }
 
 sub value__S_quote { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StringLiteral->new(text => $M->{quote}{_ast});
+    $M->{_ast} = $M->{quote}{_ast};
 }
 
 sub ident { my ($cl, $M) = @_;
@@ -81,18 +81,43 @@ sub stopper { }
 sub quote {}
 
 sub quote__S_Double_Double { my ($cl, $M) = @_;
-    my $str = "";
-    for my $n (@{ $M->{nibble}{nibbles} }) {
-        if ($n->isa('Str')) {
-            $str .= $n->{TEXT};
-        } else {
-            $M->sorry("Non-literal contents of strings NYI");
-        }
-    }
-    $M->{_ast} = $str;
+    $M->{_ast} = $M->{nibble}{_ast};
 }
 
-sub nibbler { }
+sub quote__S_Single_Single { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{nibble}{_ast};
+}
+
+sub quote__S_qq { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{quibble}{_ast};
+}
+
+sub quote__S_q { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{quibble}{_ast};
+}
+
+sub quote__S_Q { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{quibble}{nibble}{_ast};
+}
+
+sub nibbler { my ($cl, $M) = @_;
+    if ($M->isa('STD::Regex')) {
+        $M->{_ast} = $M->{EXPR}{_ast};
+    } elsif ($M->isa('Niecza::Grammar::NIL')) {
+        $M->{_ast} = Op::NIL->new(code => [map { @{$_->{_ast}} } @{$M->{insn}}]);
+    } else {
+        # garden variety nibbler
+        my $str = "";
+        for my $n (@{ $M->{nibbles} }) {
+            if ($n->isa('Str')) {
+                $str .= $n->{TEXT};
+            } else {
+                $M->sorry("Non-literal contents of strings NYI");
+            }
+        }
+        $M->{_ast} = Op::StringLiteral->new(text => $str);
+    }
+}
 
 # term :: Op
 sub term { }
