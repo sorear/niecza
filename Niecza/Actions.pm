@@ -338,6 +338,7 @@ sub apostrophe {}
 sub quibble {}
 sub tribble {}
 sub babble {}
+sub quotepair {}
 
 sub sigil {}
 sub sigil__S_Amp {}
