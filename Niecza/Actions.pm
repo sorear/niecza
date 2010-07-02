@@ -185,6 +185,76 @@ sub up { my ($cl, $M) = @_;
     $M->{_ast} = length ($M->Str);
 }
 
+# :: [row of NIL op]
+sub insn {}
+sub insn__S_lextypes { my ($cl, $M) = @_;
+    say(YAML::XS::Dump($M));
+}
+
+sub insn__S_string_lv { my ($cl, $M) = @_;
+    if (!$M->{quote}{_ast}->isa('Op::StringLiteral')) {
+        $M->sorry("Strings used in NIL code must be compile time constants");
+    }
+    $M->{_ast} = [[ string_lv => $M->{quote}{_ast}->text ]];
+}
+
+sub insn__S_clr_string { my ($cl, $M) = @_;
+    if (!$M->{quote}{_ast}->isa('Op::StringLiteral')) {
+        $M->sorry("Strings used in NIL code must be compile time constants");
+    }
+    $M->{_ast} = [[ clr_string => $M->{quote}{_ast}->text ]];
+}
+
+# the negatives here are somewhat of a cheat.
+sub insn__S_label { my ($cl, $M) = @_;
+    $M->{_ast} = [[ labelhere => -$M->{decint}{_ast} ]];
+}
+
+sub insn__S_goto { my ($cl, $M) = @_;
+    $M->{_ast} = [[ goto => -$M->{decint}{_ast} ]];
+}
+
+sub insn__S_lex_lv { my ($cl, $M) = @_;
+    $M->{_ast} = [[ lex_lv => $M->{up}{_ast}, $M->{varid}->Str ]];
+}
+
+sub insn__S_rawlexget { my ($cl, $M) = @_;
+    $M->{_ast} = [[ rawlexget => $M->{up}{_ast}, $M->{varid}->Str ]];
+}
+
+sub insn__S_rawlexput { my ($cl, $M) = @_;
+    $M->{_ast} = [[ rawlexput => $M->{up}{_ast}, $M->{varid}->Str ]];
+}
+
+sub insn__S_how { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'how' ]];
+}
+
+sub insn__S_fetchlv { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'fetchlv' ]];
+}
+
+sub insn__S_dup_fetchlv { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'dup_fetchlv' ]];
+}
+
+sub insn__S_pos { my ($cl, $M) = @_;
+    $M->{_ast} = [[ pos => $M->{decint}{_ast} ]];
+}
+
+sub insn__S_call_method { my ($cl, $M) = @_;
+    $M->{_ast} = [[ call_method => !$M->{voidmark}, $M->{identifier}->Str,
+            $M->{decint}{_ast} ]];
+}
+
+sub insn__S_call_sub { my ($cl, $M) = @_;
+    $M->{_ast} = [[ call_sub => !$M->{voidmark}, $M->{decint}{_ast} ]];
+}
+
+sub insn__S_tail_call_sub { my ($cl, $M) = @_;
+    $M->{_ast} = [[ tail_call_sub => $M->{decint}{_ast} ]];
+}
+
 sub sigil {}
 sub sigil__S_Amp {}
 sub sigil__S_Dollar {}

@@ -100,6 +100,7 @@ use 5.010;
     sub labelhere {
         my ($self, $n) = @_;
         $self->_saveall;
+        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         push @{ $self->buffer }, "    goto case $n;\n" unless $self->unreach;
         push @{ $self->buffer }, "case $n:\n";
         $self->unreach(0);
@@ -107,6 +108,7 @@ use 5.010;
 
     sub goto {
         my ($self, $n) = @_;
+        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_saveall;
         push @{ $self->buffer }, "    goto case $n;\n";
         $self->unreach(1);
@@ -134,13 +136,13 @@ use 5.010;
     }
 
     sub rawlexget {
-        my ($self, $name) = @_;
-        $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
+        my ($self, $order, $name) = @_;
+        $self->_push($self->lex2type->{$name}, "th." . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 
     sub rawlexput {
-        my ($self, $name) = @_;
-        $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
+        my ($self, $order, $name) = @_;
+        $self->_emit("th." . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
     }
 
     sub string_lv {
