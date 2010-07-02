@@ -3,7 +3,7 @@ STDENV=PERL5LIB=$(STDBASE) PERL6LIB=$(STDBASE):$(STDBASE)/lib \
        STD5PREFIX=$(STDBASE)/
 
 all:
-	perl Compiler.pm > Program.cs
+	perl CompilerDriver.pm > Program.cs
 	gmcs /target:exe Kernel.cs Program.cs
 
 Niecza/Grammar.pmc: Niecza/Grammar.pm6
