@@ -477,8 +477,32 @@ sub routine_declarator__S_sub { my ($cl, $M) = @_;
     $M->{_ast} = $M->{routine_def}{_ast};
 }
 
-# always a sub, though sometimes it's an implied sub after multi/proto/only
 my $next_anon_id = 0;
+sub block_to_closure { my ($cl, $ast, %args) = @_;
+    my $outer = $args{toplevel} ? 0 : $STD::ALL->{ $::CURLEX->{'OUTER::'}[0] };
+    my $outer_key = $args{outer_key} // ('anon_' . ($next_anon_id++));
+    my $subname = $args{subname} // 'ANON';
+
+    $outer->{'!slots'}{$outer_key} = 1 if $outer;
+
+    unless ($args{stub}) {
+        my $body = Body->new(
+            name    => $subname,
+            protos  => ($::CURLEX->{'!preinit'} // []),
+            enter   => ($::CURLEX->{'!enter'} // []),
+            lexical => ($::CURLEX->{'!slots'} // {}),
+            do      => $ast);
+
+        push @{ $outer->{'!preinit'} //= [] },
+            [ 0, $outer_key, $body ];
+        push @{ $outer->{'!enter'} //= [] },
+            Op::CloneSub->new(name => $outer_key);
+    }
+
+    Op::Lexical->new(name => $outer_key);
+}
+
+# always a sub, though sometimes it's an implied sub after multi/proto/only
 sub routine_def { my ($cl, $M) = @_;
     if ($M->{sigil}[0] && $M->{sigil}[0]->Str eq '&*') {
         $M->sorry("Contextuals NYI");
@@ -507,39 +531,19 @@ sub routine_def { my ($cl, $M) = @_;
         $M->sorry('Package subs NYI');
         return;
     }
-    my $outer = $STD::ALL->{ $::CURLEX->{'OUTER::'}[0] };
-    my $outer_key = ($scope eq 'my') ? ('&' . $dln->Str) :
-        ('anon_' . ($next_anon_id++));
-    my $subname = $dln ? $dln->Str : 'ANON';
 
-    $outer->{'!slots'}{$outer_key} = 1;
-
-    unless ($dln && $M->{decl}{stub}) {
-        # TODO: Factor out
-        my $body = Body->new(
-            name    => $subname,
-            protos  => ($::CURLEX->{'!preinit'} // []),
-            enter   => ($::CURLEX->{'!enter'} // []),
-            lexical => ($::CURLEX->{'!slots'} // {}),
-            do      => $M->{blockoid}{_ast});
-
-        push @{ $outer->{'!preinit'} //= [] },
-            [ 0, $outer_key, $body ];
-        push @{ $outer->{'!enter'} //= [] },
-            Op::CloneSub->new(name => $outer_key);
-    }
-
-    $M->{_ast} = Op::Lexical->new(name => $outer_key);
+    $M->{_ast} = $cl->block_to_closure($M->{blockoid}{_ast},
+        stub => $dln && $M->{decl}{stub},
+        subname => ($dln ? $dln->Str : undef),
+        outer_key => (($scope eq 'my') ? ('&' . $dln->Str) : undef));
 }
 
+#sub block { my ($cl, $M) = @_;
+
 sub comp_unit { my ($cl, $M) = @_;
-    # TODO: Factor out
-    my $body = Body->new(
-        name    => 'mainline',
-        protos  => ($::CURLEX->{'!preinit'} // []),
-        enter   => ($::CURLEX->{'!enter'} // []),
-        lexical => ($::CURLEX->{'!slots'} // {}),
-        do      => $M->{statementlist}{_ast});
+    my $body = $cl->block_to_closure($M->{statementlist}{_ast},
+        toplevel => 1,
+        subname => 'mainline');
 
     $M->{_ast} = Unit->new(mainline => $body);
 }

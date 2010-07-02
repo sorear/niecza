@@ -10,9 +10,10 @@
 #
 #     sub ...
 # }
-#my class ClassHOW { ... }
-#
-#PRE-INIT {
+my class ClassHOW { ... }
+
+PRE-INIT {
+    ""
 #    sub wrap-metaclass { # $metaclass-mo, $mo
 #        Q:NIL {
 #            LEXICALS: mci, p: DynObject, mo: DynMetaObject
@@ -63,7 +64,7 @@
 #        L@$p L!^ClassHOW
 #        null:Variable
 #    }
-#}
+}
 
 sub say { Q:NIL {
     =[0] @ unwrap:String .plaincall/1:Console.WriteLine null:Variable
