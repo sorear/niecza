@@ -40,7 +40,29 @@ use 5.010;
     use Moose;
     extends 'Op';
 
-    has children => (isa => 'ArrayRef[Statement]', is => 'ro', default => sub { +{} });
+    has children => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        if (!@{ $self->children }) {
+            # XXX scoping
+            Op::Lexical->new(name => '&Nil')->item_cg($cg, $body);
+        } else {
+            my @kids = @{ $self->children };
+            my $end = pop @kids;
+            for (@kids) {
+                $_->void_cg($cg, $body);
+            }
+            $end->item_cg($cg, $body);
+        }
+    }
+
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+        for (@{ $self->children }) {
+            $_->void_cg($cg, $body);
+        }
+    }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

@@ -4,6 +4,8 @@ use strict;
 use warnings;
 
 use Op;
+use Body;
+use Unit;
 
 our $AUTOLOAD;
 sub AUTOLOAD {
@@ -135,6 +137,17 @@ sub statement { my ($cl, $M) = @_;
     }
 
     $M->{_ast} = $M->{EXPR} ? $M->{EXPR}{_ast} : undef;
+}
+
+sub statementlist { my ($cl, $M) = @_;
+    $M->{_ast} = Op::StatementList->new(children => 
+        [ map { $_->{_ast} } @{ $M->{statement} } ]);
+}
+
+sub comp_unit { my ($cl, $M) = @_;
+    $M->{_ast} = Unit->new(mainline => Body->new(
+        name => 'body',
+        do => $M->{statementlist}{_ast}));
 }
 
 1;
