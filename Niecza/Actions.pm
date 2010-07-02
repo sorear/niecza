@@ -294,6 +294,10 @@ sub insn__S_tail_call_sub { my ($cl, $M) = @_;
 
 sub clrid {}
 sub varid {}
+sub apostrophe {}
+sub quibble {}
+sub tribble {}
+sub babble {}
 
 sub sigil {}
 sub sigil__S_Amp {}

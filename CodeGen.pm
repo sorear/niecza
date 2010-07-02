@@ -6,6 +6,20 @@ use 5.010;
     package CodeGen;
     use Moose;
 
+    # Beta will do this using reflection
+    my %typedata = (
+        DynObject     => { klass        => 'DynMetaObject',
+                           slots        => 'Dictionary<string,Object>' },
+        Console       => { WriteLine    => 'Void' },
+        DynMetaObject => { how          => 'IP6',
+                           methods      => 'Dictionary<String,IP6>',
+                           name         => 'String' },
+        'Kernel.MakeROVar'    => 'Variable',
+        'Kernel.MakeRWVar'    => 'Variable',
+        'Kernel.MakeROLValue' => 'LValue',
+        'Kernel.MakeRWLValue' => 'LValue'
+    );
+
     has name      => (isa => 'Str', is => 'ro');
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has depth     => (isa => 'Int', is => 'rw', default => 0);
@@ -233,7 +247,8 @@ use 5.010;
     }
 
     sub clr_field_get {
-        my ($self, $ty, $f) = @_;
+        my ($self, $f) = @_;
+        my $ty = $typedata{$self->stacktype->[-1]}{$f};
         my $obj = $self->_pop;
         $self->_push($ty, "$obj.$f");
     }
@@ -246,11 +261,14 @@ use 5.010;
     }
 
     sub clr_index_get {
-        my ($self, $ty, $f) = @_;
+        my ($self, $f) = @_;
         if ($f) {
             $self->clr_string($f);
         }
         my $ix  = $self->_pop;
+        $self->stacktype->[-1] =~ /Dictionary<.*,(.*)>/
+            or die "Type inference needs more hacks";
+        my $ty = $1;
         my $obj = $self->_pop;
         $self->_push($ty, "$obj" . "[$ix]");
     }
@@ -272,9 +290,10 @@ use 5.010;
     }
 
     sub clr_call_direct {
-        my ($self, $rt, $name, $nargs) = @_;
+        my ($self, $name, $nargs) = @_;
+        my $rt = $typedata{$name};
         my @args = reverse map { $self->_pop } 1 .. $nargs;
-        if (defined $rt) {
+        if ($rt ne 'Void') {
             $self->_push($rt, "$name(" . join(", ", @args) . ")");
         } else {
             $self->_emit("$name(" . join(", ", @args) . ")");
