@@ -292,6 +292,46 @@ sub insn__S_tail_call_sub { my ($cl, $M) = @_;
     $M->{_ast} = [[ tail_call_sub => $M->{decint}{_ast} ]];
 }
 
+sub insn__S_clr_call_direct { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_call_direct => $M->{clrid}->Str, $M->{decint}{_ast} ]];
+}
+
+sub insn__S_unwrap { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_unwrap => $M->{clrid}->Str ]];
+}
+
+sub insn__S_new { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_new => $M->{clrid}->Str, $M->{decint}{_ast} ]];
+}
+
+sub insn__S_clr_field_get { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_field_get => $M->{varid}->Str ]];
+}
+
+sub insn__S_clr_field_set { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_field_set => $M->{varid}->Str ]];
+}
+
+sub insn__S_clr_index_get { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_index_get => ($M->{varid}[0] ? ($M->{varid}[0]->Str) : ()) ]];
+}
+
+sub insn__S_clr_index_set { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_index_set => ($M->{varid}[0] ? ($M->{varid}[0]->Str) : ()) ]];
+}
+
+sub insn__S_cast { my ($cl, $M) = @_;
+    $M->{_ast} = [[ cast => $M->{clrid}->Str ]];
+}
+
+sub insn__S_return { my ($cl, $M) = @_;
+    $M->{_ast} = [[ return => $M->{0} ]];
+}
+
+sub insn__S_push_null { my ($cl, $M) = @_;
+    $M->{_ast} = [[ push_null => $M->{clrid}->Str ]];
+}
+
 sub clrid {}
 sub varid {}
 sub apostrophe {}

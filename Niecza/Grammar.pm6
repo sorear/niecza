@@ -68,8 +68,8 @@ grammar NIL is STD {
     token insn:clr_index_get { '@[' {} <varid>? ']' }
     token insn:clr_index_set { '![' {} <varid>? ']' }
     token insn:cast { <sym> ':' {} <clrid> }
-    token insn:clr_call_direct { '.plaincall/' {} <decint> ':' <clrid> <voidmark>? }
-    token insn:return { <sym> '/' <[ 0 1 ]> }
+    token insn:clr_call_direct { '.plaincall/' {} <decint> ':' <clrid> }
+    token insn:return { <sym> '/' (<[ 0 1 ]>) }
     token insn:push_null { 'null:' {} <clrid> }
 }
 

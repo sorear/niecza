@@ -66,7 +66,7 @@ PRE-INIT {
 }
 
 sub say() { Q:NIL {
-    =[0] @ unwrap:String .plaincall/2:Console.WriteLine:v null:Variable
+    =[0] @ unwrap:String .plaincall/2:Console.WriteLine null:Variable
 } }
 
 say("Hello, World");
