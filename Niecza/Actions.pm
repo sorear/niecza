@@ -74,6 +74,7 @@ sub name { my ($cl, $M) = @_;
 }
 
 sub longname {} # look at the children yourself
+sub deflongname {}
 
 sub stopper { }
 
@@ -340,6 +341,12 @@ sub tribble {}
 sub babble {}
 sub quotepair {}
 
+# We can't do much at blockoid reduce time because the context is unknown.
+# Roles and subs need somewhat different code gen
+sub blockoid { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{statementlist}{_ast};
+}
+
 sub sigil {}
 sub sigil__S_Amp {}
 sub sigil__S_Dollar {}
@@ -364,6 +371,51 @@ sub terminator__S_Ly {}
 sub stdstopper {}
 sub unitstopper {}
 sub eat_terminator {}
+
+sub scoped { my ($cl, $M) = @_;
+    $M->{_ast} = ($M->{declarator} // $M->{regex_declarator} //
+        $M->{package_declarator} // $M->{multi_declarator})->{_ast};
+}
+
+sub scope_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{scoped}{_ast};
+}
+sub scope_declarator__S_my {}
+sub scope_declarator__S_our {}
+sub scope_declarator__S_augment {}
+sub scope_declarator__S_supercede {}
+sub scope_declarator__S_has {}
+sub scope_declarator__S_state {}
+sub scope_declarator__S_anon {}
+
+sub package_declarator {}
+sub package_declarator__S_class { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
+
+sub package_declarator__S_grammar { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
+
+sub package_declarator__S_package { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
+
+sub package_declarator__S_module { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
+
+sub package_declarator__S_knowhow { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
+
+sub package_declarator__S_role { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
+
+sub package_declarator__S_slang { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_def}{_ast};
+}
 
 sub termish {}
 sub EXPR {}
@@ -405,6 +457,19 @@ sub statement { my ($cl, $M) = @_;
 sub statementlist { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children => 
         [ grep { defined $_ } map { $_->{_ast} } @{ $M->{statement} } ]);
+}
+
+sub package_def { my ($cl, $M) = @_;
+    if ($M->{longname}[0] && $::SCOPE ne 'my') {
+        $M->sorry('Non-lexical class definitions are not yet supported');
+        return;
+    }
+    if (!$M->{decl}{stub}) {
+        $M->sorry('Non-stub class definitions are not yet supported');
+        return;
+    }
+    # allocate a slot
+    $::CURPAD->{'!slots'}{$M->{decl}{name}} = 1;
 }
 
 sub comp_unit { my ($cl, $M) = @_;
