@@ -538,7 +538,9 @@ sub routine_def { my ($cl, $M) = @_;
         outer_key => (($scope eq 'my') ? ('&' . $dln->Str) : undef));
 }
 
-#sub block { my ($cl, $M) = @_;
+sub block { my ($cl, $M) = @_;
+    $M->{_ast} = $cl->block_to_closure($M->{blockoid}{_ast});
+}
 
 sub comp_unit { my ($cl, $M) = @_;
     my $body = $cl->block_to_closure($M->{statementlist}{_ast},
