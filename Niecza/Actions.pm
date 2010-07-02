@@ -542,6 +542,24 @@ sub block { my ($cl, $M) = @_;
     $M->{_ast} = $cl->block_to_closure($M->{blockoid}{_ast});
 }
 
+sub blast { my ($cl, $M) = @_;
+    if ($M->{block}) {
+        $M->{_ast} = $M->{block}{_ast};
+    } else {
+        my $body = Body->new(
+            name => 'ANON',
+            do   => $M->{statement}{_ast});
+        my $outer_key = 'anon_' . ($next_anon_id++);
+        push @{ $::CURLEX->{'!preinit'} //= [] },
+            [ 0, $outer_key, $body ];
+        push @{ $::CURLEX->{'!enter'} //= [] },
+            Op::CloneSub->new(name => $outer_key);
+        $::CURLEX->{'!slots'}{$outer_key} = 1;
+
+        $M->{_ast} = Op::Lexical->new(name => $outer_key);
+    }
+}
+
 sub comp_unit { my ($cl, $M) = @_;
     my $body = $cl->block_to_closure($M->{statementlist}{_ast},
         toplevel => 1,
