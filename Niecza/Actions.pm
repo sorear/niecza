@@ -469,13 +469,79 @@ sub package_def { my ($cl, $M) = @_;
         return;
     }
     # allocate a slot
-    $::CURPAD->{'!slots'}{$M->{decl}{name}} = 1;
+    $::CURLEX->{'!slots'}{$M->{decl}{name}} = 1;
+}
+
+sub routine_declarator {}
+sub routine_declarator__S_sub { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{routine_def}{_ast};
+}
+
+# always a sub, though sometimes it's an implied sub after multi/proto/only
+my $next_anon_id = 0;
+sub routine_def { my ($cl, $M) = @_;
+    if ($M->{sigil}[0] && $M->{sigil}[0]->Str eq '&*') {
+        $M->sorry("Contextuals NYI");
+        return;
+    }
+    my $dln = $M->{deflongname}[0];
+    if ($dln && ($dln->{colonpair}[0] || $dln->{name}{_ast}{dc} ||
+            @{$dln->{name}{_ast}{names}} > 1)) {
+        $M->sorry("Fancy names NYI");
+        return;
+    }
+    if ($M->{multisig}[0]) {
+        $M->sorry("Signatures NYI");
+        return;
+    }
+    if ($M->{trait}[0]) {
+        $M->sorry("Sub traits NYI");
+        return;
+    }
+    my $scope = !$dln ? 'anon' : $::SCOPE || 'my';
+    if ($scope ne 'my' && $scope ne 'our' && $scope ne 'anon') {
+        $M->sorry("Illegal scope $scope for subroutine");
+        return;
+    }
+    if ($scope eq 'our') {
+        $M->sorry('Package subs NYI');
+        return;
+    }
+    my $outer = $STD::ALL->{ $::CURLEX->{'OUTER::'}[0] };
+    my $outer_key = ($scope eq 'my') ? ('&' . $dln->Str) :
+        ('anon_' . ($next_anon_id++));
+    my $subname = $dln ? $dln->Str : 'ANON';
+
+    $outer->{'!slots'}{$outer_key} = 1;
+
+    unless ($dln && $M->{decl}{stub}) {
+        # TODO: Factor out
+        my $body = Body->new(
+            name    => $subname,
+            protos  => ($::CURLEX->{'!preinit'} // []),
+            enter   => ($::CURLEX->{'!enter'} // []),
+            lexical => ($::CURLEX->{'!slots'} // {}),
+            do      => $M->{blockoid}{_ast});
+
+        push @{ $outer->{'!preinit'} //= [] },
+            [ 0, $outer_key, $body ];
+        push @{ $outer->{'!enter'} //= [] },
+            Op::CloneSub->new(name => $outer_key);
+    }
+
+    $M->{_ast} = Op::Lexical->new(name => $outer_key);
 }
 
 sub comp_unit { my ($cl, $M) = @_;
-    $M->{_ast} = Unit->new(mainline => Body->new(
-        name => 'body',
-        do => $M->{statementlist}{_ast}));
+    # TODO: Factor out
+    my $body = Body->new(
+        name    => 'mainline',
+        protos  => ($::CURLEX->{'!preinit'} // []),
+        enter   => ($::CURLEX->{'!enter'} // []),
+        lexical => ($::CURLEX->{'!slots'} // {}),
+        do      => $M->{statementlist}{_ast});
+
+    $M->{_ast} = Unit->new(mainline => $body);
 }
 
 1;

@@ -137,6 +137,10 @@ use 5.010;
         $cg->lex_lv($order, $self->name);
     }
 
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }

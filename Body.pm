@@ -34,7 +34,6 @@ use CodeGen ();
         $self->code->write;
         for my $pi (@{ $self->protos }) {
             $pi->[2]->outer($self);
-            $pi->[2]->name($pi->[1] // 'PREINIT');
             $pi->[2]->write;
         }
     }
@@ -43,7 +42,6 @@ use CodeGen ();
         my ($self, $cg) = @_;
         for my $pi (@{ $self->protos }) {
             my ($k,$a,$b) = @$pi;
-            $b->name($a // "PREINIT");
             $b->outer($self);
             $cg->open_protopad;
             $b->preinit($cg);
@@ -51,7 +49,7 @@ use CodeGen ();
             if ($k) {
                 $cg->call_sub(($a ? 1 : 0), 0);
             } else {
-                $cg->clr_call_direct('Variable', 'Kernel.NewROVar', 1);
+                $cg->clr_call_direct('Kernel.NewROVar', 1);
             }
             $cg->proto_var($a) if $a;
         }

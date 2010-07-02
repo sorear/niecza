@@ -10,63 +10,63 @@
 #
 #     sub ...
 # }
-my class ClassHOW { ... }
-
-PRE-INIT {
-    sub wrap-metaclass { # $metaclass-mo, $mo
-        Q:NIL {
-            LEXICALS: mci, p: DynObject, mo: DynMetaObject
-
-            new/0:DynObject L!mci
-            =[1] @ unwrap:DynMetaObject L!mo
-            new/0:DynObject L!p
-
-            L@p L@mo !.klass
-
-            L@mo L@mci !.how
-
-            L@mci @.slots L@mo ![meta-object]
-            L@mci @.slots L@p  ![prototype]
-
-            L@mci  =[0] @ unwrap:DynMetaObject  !.klass
-
-            L@p .plaincall/1:Kernel.NewROVar
-        }
-    }
-
-    sub new-metaclass { Q:NIL {
-        LEXICALS: mo: DynMetaObject
-        new/0:DynMetaObject L!mo
-        L@mo =[1] @ unwrap:String !.name
-        l=^&wrap-metaclass @  =[0]
-            L@mo new/1:CLRImportObject .plaincall/1:Kernel.NewROLvalue
-            .tailcall/2
-    } }
-
-    sub new { Q:NIL {
-        l=^&new-metaclass @
-            =[0] @ cast:DynObject @.klass new/1:CLRImportObject
-                .plaincall/1:Kernel.NewROLValue
-            =[1] .tailcall/2
-    } }
-
-    sub add-method { Q:NIL { null:Variable } }
-
-    Q:NIL {
-        LEXICALS: $p: Variable
-        COPY: &new-metaclass
-        l=&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
-            .plaincall/1:Kernel.NewROLValue ="ClassHOW" .call/2 L!$p
-
-        l=$p @ how cast:DynObject  l=$p @ cast:DynObject @.klass  !.klass
-
-        L@$p L!^ClassHOW
-        null:Variable
-    }
-}
+#my class ClassHOW { ... }
+#
+#PRE-INIT {
+#    sub wrap-metaclass { # $metaclass-mo, $mo
+#        Q:NIL {
+#            LEXICALS: mci, p: DynObject, mo: DynMetaObject
+#
+#            new/0:DynObject L!mci
+#            =[1] @ unwrap:DynMetaObject L!mo
+#            new/0:DynObject L!p
+#
+#            L@p L@mo !.klass
+#
+#            L@mo L@mci !.how
+#
+#            L@mci @.slots L@mo ![meta-object]
+#            L@mci @.slots L@p  ![prototype]
+#
+#            L@mci  =[0] @ unwrap:DynMetaObject  !.klass
+#
+#            L@p .plaincall/1:Kernel.NewROVar
+#        }
+#    }
+#
+#    sub new-metaclass { Q:NIL {
+#        LEXICALS: mo: DynMetaObject
+#        new/0:DynMetaObject L!mo
+#        L@mo =[1] @ unwrap:String !.name
+#        l=^&wrap-metaclass @  =[0]
+#            L@mo new/1:CLRImportObject .plaincall/1:Kernel.NewROLvalue
+#            .tailcall/2
+#    } }
+#
+#    sub new { Q:NIL {
+#        l=^&new-metaclass @
+#            =[0] @ cast:DynObject @.klass new/1:CLRImportObject
+#                .plaincall/1:Kernel.NewROLValue
+#            =[1] .tailcall/2
+#    } }
+#
+#    sub add-method { Q:NIL { null:Variable } }
+#
+#    Q:NIL {
+#        LEXICALS: $p: Variable
+#        COPY: &new-metaclass
+#        l=&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
+#            .plaincall/1:Kernel.NewROLValue ="ClassHOW" .call/2 L!$p
+#
+#        l=$p @ how cast:DynObject  l=$p @ cast:DynObject @.klass  !.klass
+#
+#        L@$p L!^ClassHOW
+#        null:Variable
+#    }
+#}
 
 sub say { Q:NIL {
-    =[0] @ unwrap:String .plaincall/2:Console.WriteLine null:Variable
+    =[0] @ unwrap:String .plaincall/1:Console.WriteLine null:Variable
 } }
 
 say("Hello, World");

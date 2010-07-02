@@ -10,14 +10,14 @@ use 5.010;
     my %typedata = (
         DynObject     => { klass        => 'DynMetaObject',
                            slots        => 'Dictionary<string,Object>' },
-        Console       => { WriteLine    => 'Void' },
         DynMetaObject => { how          => 'IP6',
                            methods      => 'Dictionary<String,IP6>',
                            name         => 'String' },
-        'Kernel.MakeROVar'    => 'Variable',
-        'Kernel.MakeRWVar'    => 'Variable',
-        'Kernel.MakeROLValue' => 'LValue',
-        'Kernel.MakeRWLValue' => 'LValue'
+        'Kernel.NewROVar'    => 'Variable',
+        'Kernel.NewRWVar'    => 'Variable',
+        'Kernel.NewROLValue' => 'LValue',
+        'Kernel.NewRWLValue' => 'LValue',
+        'Console.WriteLine'   => 'Void',
     );
 
     has name      => (isa => 'Str', is => 'ro');
@@ -195,7 +195,7 @@ use 5.010;
         $self->_push('LValue', "Kernel.NewROLValue(th)");
         $self->call_method(1, "clone", 1);
         $self->lextypes($name, 'Variable');
-        $self->rawlexput($name);
+        $self->rawlexput(0, $name);
     }
 
     sub copy_lex {
@@ -204,7 +204,7 @@ use 5.010;
         $self->fetchlv;
         $self->_push('Variable', "Kernel.NewRWVar(" . $self->_pop . ")");
         $self->lextypes($name, 'Variable');
-        $self->rawlexput($name);
+        $self->rawlexput(0, $name);
     }
 
     sub call_method {
