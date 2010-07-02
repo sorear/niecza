@@ -47,8 +47,8 @@ grammar NIL is STD {
         'LEXICALS:' [ [ \h* <varid> \h* ] ** ',' ':' \h* <clrid> \h* ] ** ',' \h* \n
     }
 
-    token insn:string_lv { "=" <?before "'"> [ :lang(%*LANG<MAIN>) <quote> ] }
-    token insn:clr_string { <?before "'"> [ :lang(%*LANG<MAIN>) <quote> ] }
+    token insn:string_lv { "=" <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
+    token insn:clr_string { <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
     token insn:label { ':'  {} <num> }
     token insn:goto  { '->' {} <num> }
 
