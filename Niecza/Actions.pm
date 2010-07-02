@@ -16,7 +16,7 @@ sub AUTOLOAD {
         my $m = "$1__S_$2";
         return $cl->$m($M);
     }
-    say "reduce $AUTOLOAD" unless $carped{$AUTOLOAD}++;
+    $M->sorry("Action method $AUTOLOAD not yet implemented") unless $carped{$AUTOLOAD}++;
 }
 
 sub ws { }
@@ -26,6 +26,7 @@ sub comment { }
 sub comment__S_Sharp { }
 sub spacey { }
 sub nofun { }
+sub curlycheck { }
 
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
@@ -114,6 +115,66 @@ sub term__S_identifier { my ($cl, $M) = @_;
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => '&' . $id),
         positionals => $args);
+}
+
+sub term__S_circumfix { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{circumfix}{_ast};
+}
+
+sub term__S_scope_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{scope_declarator}{_ast};
+}
+
+sub term__S_multi_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{multi_declarator}{_ast};
+}
+
+sub term__S_package_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{package_declarator}{_ast};
+}
+
+sub term__S_routine_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{routine_declarator}{_ast};
+}
+
+sub term__S_regex_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{regex_declarator}{_ast};
+}
+
+sub term__S_type_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{type_declarator}{_ast};
+}
+
+sub term__S_dotty { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{dotty}{_ast};
+}
+
+sub term__S_capterm { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{capterm}{_ast};
+}
+
+sub term__S_sigterm { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{sigterm}{_ast};
+}
+
+sub term__S_statement_prefix { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{statement_prefix}{_ast};
+}
+
+sub term__S_variable { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{variable}{_ast};
+}
+
+sub term__S_DotDotDot { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Yada->new(kind => '...');
+}
+
+sub term__S_BangBangBang { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Yada->new(kind => '!!!');
+}
+
+sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Yada->new(kind => '???');
 }
 
 sub voidmark { my ($cl, $M) = @_;

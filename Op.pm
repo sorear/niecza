@@ -93,6 +93,14 @@ use 5.010;
 }
 
 {
+    package Op::Yada;
+    use Moose;
+    extends 'Op';
+
+    has kind => (isa => 'Str', is => 'ro', required => 1);
+}
+
+{
     package Op::StringLiteral;
     use Moose;
     extends 'Op';
