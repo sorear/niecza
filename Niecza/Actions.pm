@@ -8,6 +8,7 @@ use Body;
 use Unit;
 
 our $AUTOLOAD;
+my %carped;
 sub AUTOLOAD {
     my ($cl, $M) = @_;
     if ($AUTOLOAD =~ /^Niecza::Actions::(.*)__S_\d\d\d(.*)$/) {
@@ -15,7 +16,7 @@ sub AUTOLOAD {
         my $m = "$1__S_$2";
         return $cl->$m($M);
     }
-    say "reduce $AUTOLOAD";
+    say "reduce $AUTOLOAD" unless $carped{$AUTOLOAD}++;
 }
 
 sub ws { }
