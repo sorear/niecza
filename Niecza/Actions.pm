@@ -141,7 +141,7 @@ sub statement { my ($cl, $M) = @_;
 
 sub statementlist { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children => 
-        [ map { $_->{_ast} } @{ $M->{statement} } ]);
+        [ grep { defined $_ } map { $_->{_ast} } @{ $M->{statement} } ]);
 }
 
 sub comp_unit { my ($cl, $M) = @_;

@@ -34,8 +34,8 @@ grammar NIL is STD {
 
     token varid { [ <sigil> <twigil>? ]? <identifier> }
 
-    token clrid { <ident> ** '.' <clrgeneric>? <clrqual>* }
-    token clrgeneric { '<' <clrid> ** ',' '>' }
+    token clrid { <ident>**'.' <clrgeneric>? <clrqual>* }
+    token clrgeneric { '<' <clrid>**',' '>' }
     token clrqual { '[]' }
 
     token num { \d+ }
@@ -44,7 +44,7 @@ grammar NIL is STD {
     token voidmark { ':v' }
 
     token insn:lextypes {
-        'LEXICALS:' :s [ [ <varid> ] ** ',' ':' <clrid> ] ** ',' \n
+        'LEXICALS:' [ [ \h* <varid> \h* ] ** ',' ':' \h* <clrid> \h* ] ** ',' \h* \n
     }
 
     token insn:string_lv { "=" <?before "'"> [ :lang(%*LANG<MAIN>) <quote> ] }
@@ -59,8 +59,8 @@ grammar NIL is STD {
     token insn:fetchlv { '@' }
     token insn:dup_fetchlv { 'dup@' }
     token insn:pos { '=[' <?> ~ ']' <num> }
-    token insn:clone_lex { 'CLONE:' :s [ <varid> ] ** ',' \n }
-    token insn:copy_lex { 'COPY:' :s [ <varid> ] ** ',' \n }
+    token insn:clone_lex { 'CLONE:' [ \h* <varid> \h* ] ** ',' \h* \n }
+    token insn:copy_lex { 'COPY:' [ \h* <varid> \h* ] ** ',' \h* \n }
     token insn:call_method { '.method/' {} <num> <voidmark>? }
     token insn:call_sub { '.call/' {} <num> <voidmark>? }
     token insn:tail_call_sub { '.tailcall/' {} <num> }
