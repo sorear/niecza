@@ -34,7 +34,7 @@ grammar NIL is STD {
 
     token varid { [ <sigil> <twigil>? ]? <identifier> }
 
-    token clrid { [ \w+ ] ** '.' <clrgeneric>? <clrqual>* }
+    token clrid { <ident> ** '.' <clrgeneric>? <clrqual>* }
     token clrgeneric { '<' <clrid> ** ',' '>' }
     token clrqual { '[]' }
 

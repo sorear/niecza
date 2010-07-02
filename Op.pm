@@ -54,6 +54,9 @@ use 5.010;
     has invocant    => (isa => 'Op', is => 'ro', required => 1);
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
+    # non-parenthesized constructor
+    has splittable_pair => (isa => 'Bool', is => 'rw', default => 0);
+    has splittable_parcel => (isa => 'Bool', is => 'rw', default => 0);
 
     sub item_cg {
         my ($self, $cg, $body) = @_;
