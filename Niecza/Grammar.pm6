@@ -41,9 +41,8 @@ grammar NIL is STD {
     token up { '^' * }
     token voidmark { ':v' }
 
-    token insn:lextypes {
-        'LEXICALS:' [ [ \h* <varid> \h* ] ** ',' ':' \h* <clrid> \h* ] ** ',' \h* \n
-    }
+    token lexdecl { [ \h* <varid> \h* ] ** ',' ':' \h* <clrid> \h* }
+    token insn:lextypes { 'LEXICALS:' <lexdecl> ** ',' \h* \n }
 
     token insn:string_lv { "=" <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
     token insn:clr_string { <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }

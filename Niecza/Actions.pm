@@ -185,10 +185,22 @@ sub up { my ($cl, $M) = @_;
     $M->{_ast} = length ($M->Str);
 }
 
+sub lexdecl { my ($cl, $M) = @_;
+    $M->{_ast} = [ map { $_, $M->{clrid}->Str } @{ $M->{varid} } ];
+}
+
 # :: [row of NIL op]
 sub insn {}
 sub insn__S_lextypes { my ($cl, $M) = @_;
-    say(YAML::XS::Dump($M));
+    $M->{_ast} = [[ lextypes => [ map { @{ $_->{_ast} } } @{ $M->{lexdecl} } ] ]];
+}
+
+sub insn__S_clone_lex { my ($cl, $M) = @_;
+    $M->{_ast} = [ map { [ clone_lex => $_->Str ] } @{ $M->{varid} } ];
+}
+
+sub insn__S_copy_lex { my ($cl, $M) = @_;
+    $M->{_ast} = [ map { [ copy_lex => $_->Str ] } @{ $M->{varid} } ];
 }
 
 sub insn__S_string_lv { my ($cl, $M) = @_;
@@ -254,6 +266,9 @@ sub insn__S_call_sub { my ($cl, $M) = @_;
 sub insn__S_tail_call_sub { my ($cl, $M) = @_;
     $M->{_ast} = [[ tail_call_sub => $M->{decint}{_ast} ]];
 }
+
+sub clrid {}
+sub varid {}
 
 sub sigil {}
 sub sigil__S_Amp {}
