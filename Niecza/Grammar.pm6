@@ -38,8 +38,6 @@ grammar NIL is STD {
     token clrgeneric { '<' <clrid>**',' '>' }
     token clrqual { '[]' }
 
-    token num { \d+ }
-
     token up { '^' * }
     token voidmark { ':v' }
 
@@ -49,8 +47,8 @@ grammar NIL is STD {
 
     token insn:string_lv { "=" <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
     token insn:clr_string { <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
-    token insn:label { ':'  {} <num> }
-    token insn:goto  { '->' {} <num> }
+    token insn:label { ':'  {} <decint> }
+    token insn:goto  { '->' {} <decint> }
 
     token insn:lex_lv { 'l=' {} <up> <varid> }
     token insn:rawlexget { 'L@' {} <up> <varid> }
@@ -58,20 +56,20 @@ grammar NIL is STD {
     token insn:how { <sym> }
     token insn:fetchlv { '@' }
     token insn:dup_fetchlv { 'dup@' }
-    token insn:pos { '=[' <?> ~ ']' <num> }
+    token insn:pos { '=[' <?> ~ ']' <decint> }
     token insn:clone_lex { 'CLONE:' [ \h* <varid> \h* ] ** ',' \h* \n }
     token insn:copy_lex { 'COPY:' [ \h* <varid> \h* ] ** ',' \h* \n }
-    token insn:call_method { '.method/' {} <num> <voidmark>? }
-    token insn:call_sub { '.call/' {} <num> <voidmark>? }
-    token insn:tail_call_sub { '.tailcall/' {} <num> }
+    token insn:call_method { '.method/' {} <decint> <voidmark>? }
+    token insn:call_sub { '.call/' {} <decint> <voidmark>? }
+    token insn:tail_call_sub { '.tailcall/' {} <decint> }
     token insn:unwrap { <sym> ':' {} <clrid> }
-    token insn:new { <sym> '/' {} <num> ':' <clrid> }
+    token insn:new { <sym> '/' {} <decint> ':' <clrid> }
     token insn:clr_field_get { '@.' {} <varid> }
     token insn:clr_field_set { '!.' {} <varid> }
     token insn:clr_index_get { '@[' {} <varid>? ']' }
     token insn:clr_index_set { '![' {} <varid>? ']' }
     token insn:cast { <sym> ':' {} <clrid> }
-    token insn:clr_call_direct { '.plaincall/' {} <num> ':' <clrid> <voidmark>? }
+    token insn:clr_call_direct { '.plaincall/' {} <decint> ':' <clrid> <voidmark>? }
     token insn:return { <sym> '/' <[ 0 1 ]> }
     token insn:push_null { 'null:' {} <clrid> }
 }

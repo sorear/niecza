@@ -21,6 +21,11 @@ sub AUTOLOAD {
 
 sub ws { }
 sub vws { }
+sub unv { }
+sub comment { }
+sub comment__S_Sharp { }
+sub spacey { }
+sub nofun { }
 
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
@@ -54,6 +59,20 @@ sub ident { my ($cl, $M) = @_;
 sub identifier { my ($cl, $M) = @_;
     $M->{_ast} = $M->Str;
 }
+
+# Either String Op
+sub morename { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{identifier} ? $M->{identifier}{_ast} : $M->{EXPR}{_ast};
+}
+
+# { dc: Bool, names: [Either String Op] }
+sub name { my ($cl, $M) = @_;
+    my @names = map { $_->{_ast} } @{ $M->{morename} };
+    unshift @names, $M->{identifier}{_ast} if $M->{identifier};
+    $M->{_ast} = { dc => !($M->{identifier}), names => \@names };
+}
+
+sub longname {} # look at the children yourself
 
 sub stopper { }
 
@@ -97,8 +116,35 @@ sub term__S_identifier { my ($cl, $M) = @_;
         positionals => $args);
 }
 
+sub voidmark { my ($cl, $M) = @_;
+    $M->{_ast} = 1;
+}
+
+sub up { my ($cl, $M) = @_;
+    $M->{_ast} = length ($M->Str);
+}
+
+sub sigil {}
+sub sigil__S_Amp {}
+sub sigil__S_Dollar {}
+sub sigil__S_At {}
+sub sigil__S_Percent {}
+
+sub twigil {}
+sub twigil__S_Equal {}
+sub twigil__S_Bang {}
+sub twigil__S_Dot {}
+sub twigil__S_Tilde {}
+sub twigil__S_Star {}
+sub twigil__S_Question {}
+sub twigil__S_Caret {}
+sub twigil__S_Colon {}
+
 sub terminator {}
 sub terminator__S_Thesis {}
+sub terminator__S_Semi {}
+sub terminator__S_Ket {}
+sub terminator__S_Ly {}
 sub stdstopper {}
 sub unitstopper {}
 sub eat_terminator {}
