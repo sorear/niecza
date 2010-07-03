@@ -44,17 +44,16 @@ grammar NIL is STD {
     token lexdecl { [ \h* <varid> \h* ] ** ',' ':' \h* <clrid> \h* }
     token insn:lextypes { 'LEXICALS:' <lexdecl> ** ',' \h* \n }
 
-    token insn:string_lv { "=" <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
+    token insn:string_var { "=" <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
     token insn:clr_string { <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
     token insn:label { ':'  {} <decint> }
     token insn:goto  { '->' {} <decint> }
 
-    token insn:lex_lv { 'l=' {} <up> <varid> }
-    token insn:rawlexget { 'L@' {} <up> <varid> }
-    token insn:rawlexput { 'L!' {} <up> <varid> }
+    token insn:lexget { 'L@' {} <up> <varid> }
+    token insn:lexput { 'L!' {} <up> <varid> }
     token insn:how { <sym> }
-    token insn:fetchlv { '@' }
-    token insn:dup_fetchlv { 'dup@' }
+    token insn:fetch { '@' }
+    token insn:dup_fetch { 'dup@' }
     token insn:pos { '=[' <?> ~ ']' <decint> }
     token insn:clone_lex { 'CLONE:' [ \h* <varid> \h* ] ** ',' \h* \n }
     token insn:copy_lex { 'COPY:' [ \h* <varid> \h* ] ** ',' \h* \n }

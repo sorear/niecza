@@ -25,6 +25,7 @@ use CodeGen ();
         my $cg = $self->codegen;
         $_->void_cg($cg, $self) for @{ $self->enter };
         $self->do->item_cg($cg, $self);
+        # TODO: Bind a return value here to catch non-ro sub use
         $cg->return(1) unless $cg->unreach;
         return $cg;
     }

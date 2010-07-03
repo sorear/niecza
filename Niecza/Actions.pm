@@ -229,11 +229,11 @@ sub insn__S_copy_lex { my ($cl, $M) = @_;
     $M->{_ast} = [ map { [ copy_lex => $_->Str ] } @{ $M->{varid} } ];
 }
 
-sub insn__S_string_lv { my ($cl, $M) = @_;
+sub insn__S_string_var { my ($cl, $M) = @_;
     if (!$M->{quote}{_ast}->isa('Op::StringLiteral')) {
         $M->sorry("Strings used in NIL code must be compile time constants");
     }
-    $M->{_ast} = [[ string_lv => $M->{quote}{_ast}->text ]];
+    $M->{_ast} = [[ string_var => $M->{quote}{_ast}->text ]];
 }
 
 sub insn__S_clr_string { my ($cl, $M) = @_;
@@ -252,28 +252,28 @@ sub insn__S_goto { my ($cl, $M) = @_;
     $M->{_ast} = [[ goto => -$M->{decint}{_ast} ]];
 }
 
-sub insn__S_lex_lv { my ($cl, $M) = @_;
-    $M->{_ast} = [[ lex_lv => $M->{up}{_ast}, $M->{varid}->Str ]];
+sub insn__S_lex { my ($cl, $M) = @_;
+    $M->{_ast} = [[ lex => $M->{up}{_ast}, $M->{varid}->Str ]];
 }
 
-sub insn__S_rawlexget { my ($cl, $M) = @_;
-    $M->{_ast} = [[ rawlexget => $M->{up}{_ast}, $M->{varid}->Str ]];
+sub insn__S_lexget { my ($cl, $M) = @_;
+    $M->{_ast} = [[ lexget => $M->{up}{_ast}, $M->{varid}->Str ]];
 }
 
-sub insn__S_rawlexput { my ($cl, $M) = @_;
-    $M->{_ast} = [[ rawlexput => $M->{up}{_ast}, $M->{varid}->Str ]];
+sub insn__S_lexput { my ($cl, $M) = @_;
+    $M->{_ast} = [[ lexput => $M->{up}{_ast}, $M->{varid}->Str ]];
 }
 
 sub insn__S_how { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'how' ]];
 }
 
-sub insn__S_fetchlv { my ($cl, $M) = @_;
-    $M->{_ast} = [[ 'fetchlv' ]];
+sub insn__S_fetch { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'fetch' ]];
 }
 
 sub insn__S_dup_fetchlv { my ($cl, $M) = @_;
-    $M->{_ast} = [[ 'dup_fetchlv' ]];
+    $M->{_ast} = [[ 'dup_fetch' ]];
 }
 
 sub insn__S_pos { my ($cl, $M) = @_;

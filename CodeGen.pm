@@ -139,29 +139,24 @@ use 5.010;
         $self->_push($rt, 'th.resultSlot') if defined $rt;
     }
 
-    sub lex_lv {
-        my ($self, $order, $name) = @_;
-        $self->_push("LValue", "((Variable)th." . ("outer." x $order) . "lex[" . qm($name) . "]).lv");
-    }
-
     sub lextypes {
         my ($self, @args) = @_;
         %{ $self->lex2type } = (%{ $self->lex2type }, @args);
     }
 
-    sub rawlexget {
+    sub lexget {
         my ($self, $order, $name) = @_;
         $self->_push($self->lex2type->{$name}, "th." . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 
-    sub rawlexput {
+    sub lexput {
         my ($self, $order, $name) = @_;
         $self->_emit("th." . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
     }
 
-    sub string_lv {
+    sub string_var {
         my ($self, $text) = @_;
-        $self->_push("LValue", "Kernel.NewROLValue(new CLRImportObject(" . qm($text) . "))");
+        $self->_push("Variable", "Kernel.NewROVar(new CLRImportObject(" . qm($text) . "))");
     }
 
     sub how {
@@ -170,69 +165,69 @@ use 5.010;
         $self->_cpscall("IP6", "$v.HOW(th)");
     }
 
-    sub fetchlv {
+    sub fetch {
         my ($self) = @_;
-        my $lv = $self->_pop;
-        $self->_cpscall("IP6", "$lv.container.Fetch(th)");
+        my $c = $self->_pop;
+        $self->_cpscall("IP6", "$c.lv.container.Fetch(th)");
     }
 
-    sub dup_fetchlv {
+    sub dup_fetch {
         my ($self) = @_;
-        my $lv = $self->_peek;
-        $self->_cpscall('IP6', "$lv.container.Fetch(th)");
+        my $c = $self->_peek;
+        $self->_cpscall('IP6', "$c.lv.container.Fetch(th)");
         $self->_swap;
     }
 
     sub pos {
         my ($self, $num) = @_;
-        $self->_push('LValue', "th.pos[$num]");
+        $self->_push('Variable', "new Variable(false, th.pos[$num])");
     }
 
     sub clone_lex {
         my ($self, $name) = @_;
-        $self->_push('LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
-        $self->dup_fetchlv;
-        $self->_push('LValue', "Kernel.NewROLValue(th)");
+        $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
+        $self->dup_fetch;
+        $self->_push('Variable', "Kernel.NewROVar(th)");
         $self->call_method(1, "clone", 1);
         $self->lextypes($name, 'Variable');
-        $self->rawlexput(0, $name);
+        $self->lexput(0, $name);
     }
 
     sub copy_lex {
         my ($self, $name) = @_;
-        $self->_push('LValue', "((Variable)th.proto.lex[" . qm($name) . "]).lv");
-        $self->fetchlv;
+        $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
+        $self->fetch;
         $self->_push('Variable', "Kernel.NewRWVar(" . $self->_pop . ")");
         $self->lextypes($name, 'Variable');
-        $self->rawlexput(0, $name);
+        $self->lexput(0, $name);
     }
 
     sub share_lex {
         my ($self, $name) = @_;
         $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
         $self->lextypes($name, 'Variable');
-        $self->rawlexput(0, $name);
+        $self->lexput(0, $name);
     }
 
     sub call_method {
         my ($self, $nv, $name, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV
         my $inv = $self->_pop;
-        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
     sub call_sub {
         my ($self, $nv, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
-        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
     sub tail_call_sub {
         my ($self, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
-        $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", @args) . " }, null)");
+        $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
         $self->unreach(1);
     }
 

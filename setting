@@ -39,15 +39,15 @@ PRE-INIT {
 #        LEXICALS: mo: DynMetaObject
 #        new/0:DynMetaObject L!mo
 #        L@mo =[1] @ unwrap:String !.name
-#        l=^&wrap-metaclass @  =[0]
-#            L@mo new/1:CLRImportObject .plaincall/1:Kernel.NewROLvalue
+#        L@^&wrap-metaclass @  =[0]
+#            L@mo new/1:CLRImportObject .plaincall/1:Kernel.NewROVar
 #            .tailcall/2
 #    } }
 #
 #    sub new { Q:NIL {
-#        l=^&new-metaclass @
+#        L@^&new-metaclass @
 #            =[0] @ cast:DynObject @.klass new/1:CLRImportObject
-#                .plaincall/1:Kernel.NewROLValue
+#                .plaincall/1:Kernel.NewROVar
 #            =[1] .tailcall/2
 #    } }
 #
@@ -55,11 +55,10 @@ PRE-INIT {
 #
 #    Q:NIL {
 #        LEXICALS: $p: Variable
-#        COPY: &new-metaclass
-#        l=&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
-#            .plaincall/1:Kernel.NewROLValue ="ClassHOW" .call/2 L!$p
+#        L@&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
+#            .plaincall/1:Kernel.NewROVar ="ClassHOW" .call/2 L!$p
 #
-#        l=$p @ how cast:DynObject  l=$p @ cast:DynObject @.klass  !.klass
+#        L@$p @ how cast:DynObject  L@$p @ cast:DynObject @.klass  !.klass
 #
 #        L@$p L!^ClassHOW
 #        null:Variable

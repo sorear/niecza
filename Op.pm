@@ -46,7 +46,7 @@ use 5.010;
         my ($self, $cg, $body) = @_;
         if (!@{ $self->children }) {
             # XXX scoping
-            Op::Lexical->new(name => '&Nil')->item_cg($cg, $body);
+            Op::Lexical->new(name => 'Nil')->item_cg($cg, $body);
         } else {
             my @kids = @{ $self->children };
             my $end = pop @kids;
@@ -83,7 +83,7 @@ use 5.010;
     sub item_cg {
         my ($self, $cg, $body) = @_;
         $self->invocant->item_cg($cg, $body);
-        $cg->fetchlv;
+        $cg->fetch;
         $_->item_cg($cg, $body) for @{ $self->positionals };
         $cg->call_sub(1, scalar(@{ $self->positionals }));
     }
@@ -109,7 +109,7 @@ use 5.010;
 
     sub item_cg {
         my ($self, $cg, $body) = @_;
-        $cg->string_lv($self->text);
+        $cg->string_var($self->text);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -134,7 +134,7 @@ use 5.010;
             die "Failed to resolve lexical " . $self->name . " in " .
                 $body->name;
         }
-        $cg->lex_lv($order, $self->name);
+        $cg->lexget($order, $self->name);
     }
 
     sub void_cg {
