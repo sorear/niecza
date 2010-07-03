@@ -146,7 +146,8 @@ use 5.010;
 
     sub lexget {
         my ($self, $order, $name) = @_;
-        $self->_push($self->lex2type->{$name}, "th." . ("outer." x $order) . "lex[" . qm($name) . "]");
+        $self->_push(($order ? 'Variable' : $self->lex2type->{$name}),
+            "th." . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 
     sub lexput {
