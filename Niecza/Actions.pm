@@ -212,13 +212,13 @@ sub up { my ($cl, $M) = @_;
 }
 
 sub lexdecl { my ($cl, $M) = @_;
-    $M->{_ast} = [ map { $_, $M->{clrid}->Str } @{ $M->{varid} } ];
+    $M->{_ast} = [ map { $_->Str, $M->{clrid}->Str } @{ $M->{varid} } ];
 }
 
 # :: [row of NIL op]
 sub insn {}
 sub insn__S_lextypes { my ($cl, $M) = @_;
-    $M->{_ast} = [[ lextypes => [ map { @{ $_->{_ast} } } @{ $M->{lexdecl} } ] ]];
+    $M->{_ast} = [[ lextypes => map { @{ $_->{_ast} } } @{ $M->{lexdecl} } ]];
 }
 
 sub insn__S_clone_lex { my ($cl, $M) = @_;
