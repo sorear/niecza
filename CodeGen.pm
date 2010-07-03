@@ -207,6 +207,13 @@ use 5.010;
         $self->rawlexput(0, $name);
     }
 
+    sub share_lex {
+        my ($self, $name) = @_;
+        $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
+        $self->lextypes($name, 'Variable');
+        $self->rawlexput(0, $name);
+    }
+
     sub call_method {
         my ($self, $nv, $name, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV

@@ -160,4 +160,36 @@ use 5.010;
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
+
+{
+    package Op::CopyLex;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub void_cg {
+        my ($self, $cg) = @_;
+        $cg->copy_lex($self->name);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::ShareLex;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub void_cg {
+        my ($self, $cg) = @_;
+        $cg->share_lex($self->name);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
 1;

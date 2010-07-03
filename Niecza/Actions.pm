@@ -478,25 +478,30 @@ sub routine_declarator__S_sub { my ($cl, $M) = @_;
 }
 
 my $next_anon_id = 0;
-sub block_to_closure { my ($cl, $ast, %args) = @_;
-    my $outer = $args{toplevel} ? 0 : $STD::ALL->{ $::CURLEX->{'OUTER::'}[0] };
-    my $outer_key = $args{outer_key} // ('anon_' . ($next_anon_id++));
+sub gensym { 'anon_' . ($next_anon_id++) }
+
+sub sl_to_block { my ($cl, $ast, %args) = @_;
     my $subname = $args{subname} // 'ANON';
+    Body->new(
+        name    => $subname,
+        $args{bare} ? () : (
+            protos  => ($::CURLEX->{'!preinit'} // []),
+            enter   => ($::CURLEX->{'!enter'} // []),
+            lexical => ($::CURLEX->{'!slots'} // {})),
+        do      => $ast);
+}
+
+sub block_to_closure { my ($cl, $blk, %args) = @_;
+    my $outer = $STD::ALL->{ $::CURLEX->{'OUTER::'}[0] };
+    my $outer_key = $args{outer_key} // $cl->gensym;
 
     $outer->{'!slots'}{$outer_key} = 1 if $outer;
 
     unless ($args{stub}) {
-        my $body = Body->new(
-            name    => $subname,
-            protos  => ($::CURLEX->{'!preinit'} // []),
-            enter   => ($::CURLEX->{'!enter'} // []),
-            lexical => ($::CURLEX->{'!slots'} // {}),
-            do      => $ast);
-
         push @{ $outer->{'!preinit'} //= [] },
-            [ 0, $outer_key, $body ];
+            [ 0, $outer_key, $blk ] if $outer;
         push @{ $outer->{'!enter'} //= [] },
-            Op::CloneSub->new(name => $outer_key);
+            Op::CloneSub->new(name => $outer_key) if $outer;
     }
 
     Op::Lexical->new(name => $outer_key);
@@ -532,37 +537,42 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
 
-    $M->{_ast} = $cl->block_to_closure($M->{blockoid}{_ast},
+    $M->{_ast} = $cl->block_to_closure(
+            $cl->sl_to_block($M->{blockoid}{_ast},
+                subname => ($dln ? $dln->Str : undef)),
         stub => $dln && $M->{decl}{stub},
-        subname => ($dln ? $dln->Str : undef),
         outer_key => (($scope eq 'my') ? ('&' . $dln->Str) : undef));
 }
 
 sub block { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->block_to_closure($M->{blockoid}{_ast});
+    $M->{_ast} = $cl->sl_to_block($M->{blockoid}{_ast});
 }
 
+# returns Body of 0 args
 sub blast { my ($cl, $M) = @_;
     if ($M->{block}) {
         $M->{_ast} = $M->{block}{_ast};
     } else {
-        my $body = Body->new(
+        $M->{_ast} = Body->new(
             name => 'ANON',
             do   => $M->{statement}{_ast});
-        my $outer_key = 'anon_' . ($next_anon_id++);
-        push @{ $::CURLEX->{'!preinit'} //= [] },
-            [ 0, $outer_key, $body ];
-        push @{ $::CURLEX->{'!enter'} //= [] },
-            Op::CloneSub->new(name => $outer_key);
-        $::CURLEX->{'!slots'}{$outer_key} = 1;
-
-        $M->{_ast} = Op::Lexical->new(name => $outer_key);
     }
 }
 
+sub statement_prefix {}
+sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
+    my $var = $cl->gensym;
+
+    push @{ $::CURLEX->{'!preinit'} //= [] },
+        [ 1, $var, $M->{blast}{_ast} ];
+    push @{ $::CURLEX->{'!enter'} //= [] },
+        Op::ShareLex->new(name => $var);
+
+    $M->{_ast} = Op::Lexical->new(name => $var);
+}
+
 sub comp_unit { my ($cl, $M) = @_;
-    my $body = $cl->block_to_closure($M->{statementlist}{_ast},
-        toplevel => 1,
+    my $body = $cl->sl_to_block($M->{statementlist}{_ast},
         subname => 'mainline');
 
     $M->{_ast} = Unit->new(mainline => $body);
