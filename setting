@@ -49,19 +49,19 @@ PRE-INIT {
                 .plaincall/1:Kernel.NewROVar
             =[1] .tailcall/2
     } }
-#
-#    sub add-method { Q:NIL { null:Variable } }
-#
-#    Q:NIL {
-#        LEXICALS: $p: Variable
-#        L@&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
-#            .plaincall/1:Kernel.NewROVar ="ClassHOW" .call/2 L!$p
-#
-#        L@$p @ how cast:DynObject  L@$p @ cast:DynObject @.klass  !.klass
-#
-#        L@$p L!^ClassHOW
-#        null:Variable
-#    }
+
+    sub add-method { Q:NIL { null:Variable } }
+
+    Q:NIL {
+        LEXICALS: $p: Variable
+        L@&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
+            .plaincall/1:Kernel.NewROVar ="ClassHOW" .call/2 L!$p
+
+        L@$p @ how cast:DynObject  L@$p @ cast:DynObject @.klass  !.klass
+
+        L@$p L!^ClassHOW
+        null:Variable
+    }
 }
 
 sub say { Q:NIL {

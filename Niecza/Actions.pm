@@ -286,7 +286,7 @@ sub insn__S_call_method { my ($cl, $M) = @_;
 }
 
 sub insn__S_call_sub { my ($cl, $M) = @_;
-    $M->{_ast} = [[ call_sub => !$M->{voidmark}, $M->{decint}{_ast} ]];
+    $M->{_ast} = [[ call_sub => !$M->{voidmark}[0], $M->{decint}{_ast} ]];
 }
 
 sub insn__S_tail_call_sub { my ($cl, $M) = @_;
