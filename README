@@ -1,5 +1,18 @@
+=head1 ABOUT
+
 This is 'Niecza', which will eventually be a Perl 6 implementation focusing
 on optimization research.  It targets the Common Language Runtime (ECMA-335;
 implementations are "Mono" and ".NET").
 
 It's currently very primitive; Hello, World is close to its limits.
+
+=head1 COPYRIGHT AND LICENSE
+
+Niecza is Copyright 2010 Stefan O'Rear et al.  It may be used and distributed
+under the Artistic License 2.0 (included under LICENSE).
+
+=head1 CREDITS AND PRIOR ART
+
+This project is a spin-off of experiments done for Matthew "diakopter" Wilson's
+csmeta / Sprixel project, and is heavily inspired by many of its lower-level
+details.
