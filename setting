@@ -64,8 +64,13 @@ PRE-INIT {
     }
 }
 
+sub infix:<~> { Q:NIL {
+    =[0] @ unwrap:String  =[1] @ unwrap:String  .plaincall/2:String.Concat
+        new/1:CLRImportObject .plaincall/1:Kernel.NewROVar
+} }
+
 sub say { Q:NIL {
     =[0] @ unwrap:String .plaincall/1:Console.WriteLine null:Variable
 } }
 
-say("Hello, World");
+say("Hello, " ~ "World");

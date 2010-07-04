@@ -17,7 +17,8 @@ use 5.010;
         'Kernel.NewRWVar'    => 'Variable',
         'Kernel.NewROLValue' => 'LValue',
         'Kernel.NewRWLValue' => 'LValue',
-        'Console.WriteLine'   => 'Void',
+        'Console.WriteLine'  => 'Void',
+        'String.Concat'      => 'String',
     );
 
     has name      => (isa => 'Str', is => 'ro');

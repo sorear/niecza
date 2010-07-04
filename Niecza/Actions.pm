@@ -12,9 +12,14 @@ my %carped;
 sub AUTOLOAD {
     my ($cl, $M) = @_;
     if ($AUTOLOAD =~ /^Niecza::Actions::(.*)__S_\d\d\d(.*)$/) {
-        # TODO: Change CursorBase so this doesn't happen.
-        my $m = "$1__S_$2";
-        return $cl->$m($M);
+        my ($cat, $spec) = ($1, $2);
+        my $m = "${cat}__S_$spec";
+        my $a = "${cat}__S_ANY";
+        if ($cl->can($m) || !$cl->can($a)) {
+            return $cl->$m($M);
+        } else {
+            return $cl->$a($M, $spec);
+        }
     }
     $M->sorry("Action method $AUTOLOAD not yet implemented") unless $carped{$AUTOLOAD}++;
 }
@@ -76,6 +81,32 @@ sub name { my ($cl, $M) = @_;
 sub longname {} # look at the children yourself
 sub deflongname {}
 
+sub mangle_longname { my ($cl, $M) = @_;
+    if ($M->{name}{_ast}{dc} || @{ $M->{name}{_ast}{names} } > 1) {
+        $M->sorry("Multipart names not yet supported");
+        return "";
+    }
+
+    my ($n) = @{ $M->{name}{_ast}{names} };
+
+    for my $cp (@{ $M->{colonpair} }) {
+        my $k = $cp->{k};
+        if (ref $cp->{v}) {
+            $n .= ":" . $cp->{k};
+            $n .= $cp->{v}{qpvalue} // do {
+                $M->sorry("Invalid colonpair used as name extension");
+                "";
+            }
+        } else {
+            # STD seems to think term:name is term:sym<name>.  Needs speccy
+            # clarification.
+            $M->sorry("Boolean colonpairs as name extensions NYI");
+        }
+    }
+
+    $n;
+}
+
 sub stopper { }
 
 # quote :: Op
@@ -119,6 +150,46 @@ sub nibbler { my ($cl, $M) = @_;
         $M->{_ast} = Op::StringLiteral->new(text => $str);
     }
 }
+
+sub circumfix { }
+sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
+    my $sl = $M->{nibble}{_ast};
+
+    if (!$sl->isa('Op::StringLiteral') || ($sl->text =~ /\s/)) {
+        $M->sorry("Word splitting NYI");
+        return;
+    }
+
+    $M->{_ast} = $sl;
+    $M->{qpvalue} = '<' . $sl->text . '>';
+}
+
+sub infixish { my ($cl, $M) = @_;
+    $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];
+    $M->sorry("Adverbs NYI") if $M->{colonpair};
+}
+sub INFIX { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&infix:<' . $M->{infix}{sym} . '>'),
+        positionals => [ $M->{left}{_ast}, $M->{right}{_ast} ]);
+}
+
+# infix et al just parse the operator itself
+sub infix { }
+sub infix__S_ANY { }
+
+sub prefix { }
+sub prefix__S_ANY { }
+
+sub postfix { }
+sub postfix__S_ANY { }
+
+sub coloncircumfix { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{circumfix}{_ast};
+    $M->{qpvalue} = $M->{circumfix}{qpvalue};
+}
+
+sub colonpair { }
 
 # term :: Op
 sub term { }
@@ -424,7 +495,7 @@ sub arglist { my ($cl, $M) = @_;
     $M->sorry("Invocant handling is NYI") if $::INVOCANT_IS;
     my $x = $M->{EXPR}{_ast};
 
-    if ($x && $x->isa('Op::SubCall') && $x->splittable_parcel) {
+    if ($x && $x->isa('Op::CallSub') && $x->splittable_parcel) {
         $M->{_ast} = $x->positionals;
     } else {
         $M->{_ast} = [$x];
@@ -514,11 +585,6 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
     my $dln = $M->{deflongname}[0];
-    if ($dln && ($dln->{colonpair}[0] || $dln->{name}{_ast}{dc} ||
-            @{$dln->{name}{_ast}{names}} > 1)) {
-        $M->sorry("Fancy names NYI");
-        return;
-    }
     if ($M->{multisig}[0]) {
         $M->sorry("Signatures NYI");
         return;
@@ -537,11 +603,12 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
 
+    my $m = $dln ? $cl->mangle_longname($dln) : undef;
+
     $M->{_ast} = $cl->block_to_closure(
-            $cl->sl_to_block($M->{blockoid}{_ast},
-                subname => ($dln ? $dln->Str : undef)),
+            $cl->sl_to_block($M->{blockoid}{_ast}, subname => $m),
         stub => $dln && $M->{decl}{stub},
-        outer_key => (($scope eq 'my') ? ('&' . $dln->Str) : undef));
+        outer_key => (($scope eq 'my') ? "&$m" : undef));
 }
 
 sub block { my ($cl, $M) = @_;
