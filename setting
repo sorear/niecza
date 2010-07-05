@@ -2,14 +2,61 @@
 
 # We have to do this directly due to the circularity saw.  Same
 # reason forces uncontainerized .NET values.
+#
+# Class metaobjects come in two flavors - protoclasses, which carry methods
+# bound into protopads, and instantiated classes, which carry methods bound
+# into real pads.  In standard fashion protoclasses are used as instantiated
+# classes from BEGIN code.  Protoclasses are subject to closure and will
+# (eventually) often have CLR classes generated for them.
+#
 # class ClassHOW {
+#     # non-null for instantiated classes
+#     has ClassHOW $.protoclass;
+#     # these will be protopads in the protoclass; may be shorter than the
+#     # protoclass' version in some augment cases
+#     has Array[Frame] $.outers;
+#
+#     # 0-arg subs which get bound into scope 0 to fetch the parents
+#     has Array[Sub] $.scoped-parents;
+#     # the real found subs - set by .bind
 #     has Array[ClassHOW] $.parents;
-#     has Dictionary[string,Sub] $.local-methods;
-#     has DynMetaObject $.meta;
+#
+#     has Array[Sub] $.scoped-roles;
+#     has Array[RoleHOW] $.roles;
+#
+#     has Dictionary[str,int] $.method-scopes;
+#     has Dictionary[str,Sub] $.scoped-methods;
+#     has Dictionary[str,Sub] $.methods;
+#
+#     has DynMetaObject $.metaobject;
 #     has DynObject $.proto;
 #
-#     sub ...
+#     has DependentSet<ClassHOW> $.dependents;
+#
+#     # clears valid bit on metaobject of all dependents
+#     method invalidate { ... }
+#     # called automatically if valid bit clear???
+#     method revalidate { ... }
 # }
+#
+# Due to concerns of screwing up composition, adding new superclasses, roles,
+# or attributes in an augment is not allowed at this time.  Methods only.
+#
+# to create a class:
+#     BEGIN my ::Foo ::= ClassHOW.new("Foo").protoobject;
+#     BEGIN {
+#         Foo.^push-scope(callframe);
+#         Foo.^add-super(...);
+#         Foo.^add-role(...);
+#         Foo.^add-scoped-method("bar", 0, sub { ... });
+#         Foo.^compose;
+#     }
+#     ENTER ::Foo ::= Foo.^clone; ENTER Foo.^bind-outer(0, callframe);
+#
+# to augment:
+#     BEGIN my $scopenum = Foo.^push-scope(callframe);
+#     BEGIN { Foo.^add-scoped-method("baz", $scopenum, sub { ... }); }
+#     Foo.^bind-outer($scopenum, callframe);
 my class ClassHOW { ... }
 
 PRE-INIT {
