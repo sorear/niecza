@@ -221,6 +221,16 @@ constructed.  It can inject things into the nascent protolexpad.  PRELUDE runs
 before the structures are constructed at all; the definitions of Frame stuff
 needs to go here.
 
+=head2 Protoclasses
+
+A special kind of class-like object exists in protopads.  It is the protoclass,
+and it functions much like a protopad.  Protoclasses carry unbound methods;
+they exist in a static scope.  A protoclass can be cloned into a full class by
+associating it with an OUTER:: scope.  A protoclass defined in more than one
+place (using augment or supercede) will require more than one OUTER::; the main
+clone sets up the first OUTER, subsequent ones set up by the runtime
+manifestation of augments.
+
 =head1 Brief overview of the compiler
 
 User runs C<niecza.exe>.  Entry point is in C<Niecza::Compiler>, the driver.
