@@ -111,7 +111,23 @@ namespace Niecza {
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
-        public Dictionary<string, IP6> methods = new Dictionary<string, IP6>();
+        public struct Method {
+            public Method(DynBlockDelegate code, Frame proto, int outer_index) {
+                this.code  = code;
+                this.proto = proto;
+                this.outer_index = outer_index;
+            }
+            public DynBlockDelegate code;
+            public Frame proto;
+            public int outer_index;
+        }
+
+        public DynMetaObject[] mro = new DynMetaObject[0] {};
+        public Dictionary<string, Method> local
+            = new Dictionary<string, Method>();
+
+        public Frame[] outers;
+
         public IP6 how;
         public string name;
 
@@ -140,11 +156,15 @@ namespace Niecza {
 
         public Frame InvokeMethod(Frame caller, string name,
                 LValue[] pos, Dictionary<string, LValue> named) {
-            IP6 m = klass.methods[name];
-            if (m != null) {
-                // XXX this breaks the static call nesting rule; does it need
-                // to be rewritten or can the rule be safely loosened?
-                return m.Invoke(caller, pos, named);
+            DynMetaObject.Method m;
+            // TODO MRO
+            if (klass.local.TryGetValue(name, out m)) {
+                Frame n = new Frame(caller, klass.outers[m.outer_index],
+                        m.code);
+                n.proto = m.proto;
+                n.pos = pos;
+                n.named = named;
+                return n;
             } else {
                 return Fail(caller, "Unable to resolve method " + name);
             }
@@ -386,13 +406,16 @@ namespace Niecza {
             SubMO = new DynMetaObject();
             SubMO.name = "Sub";
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
-            SubMO.methods["clone"] = MakeSub(new DynBlockDelegate(SubCloneC),
-                    null, null);
+            SubMO.local["clone"] = new DynMetaObject.Method(
+                    new DynBlockDelegate(SubCloneC),
+                    null, 0);
+            SubMO.outers = new Frame[1] { null };
 
             ScalarContainerMO = new DynMetaObject();
             ScalarContainerMO.name = "ScalarContainer";
             ScalarContainerMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
             ScalarContainerMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
+            ScalarContainerMO.outers = new Frame[0] { };
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }
