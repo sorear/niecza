@@ -97,7 +97,21 @@ PRE-INIT {
             =[1] .tailcall/2
     } }
 
-    sub add-method { Q:NIL { null:Variable } }
+    sub push-scope { Q:NIL {
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynMetaObject @.outers
+          =[1] @ unwrap:Frame .virtcall/1:Add
+        null:Variable
+    } }
+
+    sub add-scoped-method { Q:NIL {
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynMetaObject @.local
+          =[1] @ unwrap:String
+            =[3] @ cast:DynObject @.slots @[code] cast:DynBlockDelegate
+              =[3] @ cast:DynObject @.slots @[proto] cast:Frame
+                =[1] @ unwrap:Int32 new/3:DynMetaObject.Method
+              ![]
+        null:Variable
+    } }
 
     Q:NIL {
         LEXICALS: $p: Variable

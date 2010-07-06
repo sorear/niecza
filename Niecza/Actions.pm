@@ -368,6 +368,10 @@ sub insn__S_clr_call_direct { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_call_direct => $M->{clrid}->Str, $M->{decint}{_ast} ]];
 }
 
+sub insn__S_clr_call_virt { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_call_virt => $M->{clrid}->Str, $M->{decint}{_ast} ]];
+}
+
 sub insn__S_unwrap { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_unwrap => $M->{clrid}->Str ]];
 }

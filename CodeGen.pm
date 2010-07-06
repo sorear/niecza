@@ -11,8 +11,10 @@ use 5.010;
         DynObject     => { klass        => 'DynMetaObject',
                            slots        => 'Dictionary<string,Object>' },
         DynMetaObject => { how          => 'IP6',
-                           methods      => 'Dictionary<String,IP6>',
+                           local        => 'Dictionary<String,DynMetaObject.Method>',
+                           outers       => 'List<Frame>',
                            name         => 'String' },
+        'List<Frame>' => { Add          => 'Void' },
         'Kernel.NewROVar'    => 'Variable',
         'Kernel.NewRWVar'    => 'Variable',
         'Kernel.NewROLValue' => 'LValue',
@@ -279,13 +281,10 @@ use 5.010;
 
     sub clr_index_set {
         my ($self, $f) = @_;
-        if ($f) {
-            $self->clr_string($f);
-        }
-        my $ix  = $self->_pop;
         my $val = $self->_pop;
+        my $ix  = $self->_pop unless $f;
         my $obj = $self->_pop;
-        $self->_emit("$obj" . "[$ix] = $val");
+        $self->_emit("$obj" . "[" . ($f ? qm($f) : $ix) . "] = $val");
     }
 
     sub cast {
@@ -301,6 +300,18 @@ use 5.010;
             $self->_push($rt, "$name(" . join(", ", @args) . ")");
         } else {
             $self->_emit("$name(" . join(", ", @args) . ")");
+        }
+    }
+
+    sub clr_call_virt {
+        my ($self, $name, $nargs) = @_;
+        my @args = reverse map { $self->_pop } 1 .. $nargs;
+        my $rt = $typedata{$self->stacktype->[-1]}{$name};
+        my $inv = $self->_pop;
+        if ($rt ne 'Void') {
+            $self->_push($rt, "$inv.$name(" . join(", ", @args) . ")");
+        } else {
+            $self->_emit("$inv.$name(" . join(", ", @args) . ")");
         }
     }
 

@@ -126,7 +126,7 @@ namespace Niecza {
         public Dictionary<string, Method> local
             = new Dictionary<string, Method>();
 
-        public Frame[] outers;
+        public List<Frame> outers = new List<Frame>();
 
         public IP6 how;
         public string name;
@@ -250,12 +250,12 @@ namespace Niecza {
     // setting itself.
     public class Kernel {
         private static Frame SCFetch(DynObject th, Frame caller) {
-            caller.resultSlot = th.slots["!value"];
+            caller.resultSlot = th.slots["value"];
             return caller;
         }
 
         private static Frame SCStore(DynObject th, Frame caller, IP6 nv) {
-            th.slots["!value"] = nv;
+            th.slots["value"] = nv;
             return caller;
         }
 
@@ -276,7 +276,7 @@ namespace Niecza {
                     b = new DynObject();
                     b.klass = a.klass;
                     b.slots = new Dictionary<string,object>(a.slots);
-                    b.slots["!outer"] = c;
+                    b.slots["outer"] = c;
                     th.caller.resultSlot = NewROVar(b);
                     return th.caller;
                 default:
@@ -286,9 +286,9 @@ namespace Niecza {
 
         private static Frame SubInvoke(DynObject th, Frame caller,
                 LValue[] pos, Dictionary<string,LValue> named) {
-            Frame proto = (Frame) th.slots["!proto"];
-            Frame outer = (Frame) th.slots["!outer"];
-            DynBlockDelegate code = (DynBlockDelegate) th.slots["!code"];
+            Frame proto = (Frame) th.slots["proto"];
+            Frame outer = (Frame) th.slots["outer"];
+            DynBlockDelegate code = (DynBlockDelegate) th.slots["code"];
 
             Frame n = new Frame(caller, outer, code);
             n.proto = proto;
@@ -324,7 +324,7 @@ namespace Niecza {
                     }
                     th.ip = 3;
                     th.resultSlot = null;
-                    return a.GetAttribute(th, "!exn_skipto");
+                    return a.GetAttribute(th, "exn_skipto");
                 case 3:
                     // if skipto, skip some frames.  Used to implement CATCH
                     // invisibility
@@ -343,7 +343,7 @@ namespace Niecza {
                     a = (IP6)th.resultSlot;
                     th.ip = 5;
                     th.resultSlot = null;
-                    return a.GetAttribute(th, "!exn_handler");
+                    return a.GetAttribute(th, "exn_handler");
                 case 5:
                     if (th.resultSlot != null) {
                         // tailcall
@@ -373,16 +373,16 @@ namespace Niecza {
                 Frame outer) {
             DynObject n = new DynObject();
             n.klass = SubMO;
-            n.slots["!outer"] = outer;
-            n.slots["!code"] = code;
-            n.slots["!proto"] = proto;
+            n.slots["outer"] = outer;
+            n.slots["code"] = code;
+            n.slots["proto"] = proto;
             return n;
         }
 
         public static IP6 MakeSC(IP6 inside) {
             DynObject n = new DynObject();
             n.klass = ScalarContainerMO;
-            n.slots["!value"] = inside;
+            n.slots["value"] = inside;
             return n;
         }
 
@@ -409,13 +409,12 @@ namespace Niecza {
             SubMO.local["clone"] = new DynMetaObject.Method(
                     new DynBlockDelegate(SubCloneC),
                     null, 0);
-            SubMO.outers = new Frame[1] { null };
+            SubMO.outers.Add(null);
 
             ScalarContainerMO = new DynMetaObject();
             ScalarContainerMO.name = "ScalarContainer";
             ScalarContainerMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
             ScalarContainerMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
-            ScalarContainerMO.outers = new Frame[0] { };
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }
