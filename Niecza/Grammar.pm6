@@ -56,6 +56,8 @@ grammar NIL is STD {
     token insn:lexput { 'L!' {} <up> <varid> }
     token insn:how { <sym> }
     token insn:callframe { <sym> }
+    token insn:wrap { <sym> }
+    token insn:wrapobj { <sym> }
     token insn:fetch { '@' }
     token insn:dup_fetch { 'dup@' }
     token insn:pos { '=[' <?> ~ ']' <decint> }

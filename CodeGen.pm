@@ -250,6 +250,12 @@ use 5.010;
         $self->unreach(1);
     }
 
+    sub clr_wrap {
+        my ($self) = @_;
+        my $v = $self->_pop;
+        $self->_push('Variable', "Kernel.NewROVar(new CLRImportObject($v))");
+    }
+
     sub clr_unwrap {
         my ($self, $ty) = @_;
         my $v = $self->_pop;

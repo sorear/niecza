@@ -53,7 +53,7 @@ PRE-INIT {
         L@$self @.slots L@$pmo ![meta-object]
         L@$self =[0] @ cast:DynObject @.klass !.klass
 
-        L@$self .plaincall/1:Kernel.NewROVar
+        L@$self wrapobj
     } }
 
     # $how.push-scope($outer)
@@ -94,7 +94,7 @@ PRE-INIT {
         L@$p null:Dictionary<string,object> !.slots
         L@$p L@$mo !.klass
 
-        L@$p .plaincall/1:Kernel.NewROVar
+        L@$p wrapobj
     } }
 
     sub compose { Q:NIL { null:Variable } }
@@ -108,9 +108,7 @@ PRE-INIT {
         L@$chpmo "ClassHOW" !.name
         L@$ch @.slots L@$chpmo ![meta-object]
 
-        L@&create-protoobject @
-            L@$ch .plaincall/1:Kernel.NewROVar
-            callframe new/1:CLRImportObject .plaincall/1:Kernel.NewROVar
+        L@&create-protoobject @  L@$ch wrapobj  callframe wrap
             .call/2 L!^ClassHOW
 
         L@$ch  L@^ClassHOW @ cast:DynObject @.klass  !.klass
@@ -124,15 +122,13 @@ PRE-INIT {
 my class Mu { ... }
 PRE-INIT { Q:NIL {
     L@^ClassHOW dup@  ="Mu"  .method/1:new  L!^'Mu!HOW'
-    L@^'Mu!HOW' dup@  callframe new/1:CLRImportObject
-        .plaincall/1:Kernel.NewROVar
-        .method/1:create-protoobject  L!^Mu
+    L@^'Mu!HOW' dup@  callframe wrap  .method/1:create-protoobject  L!^Mu
     null:Variable
 } }
 
 sub infix:<~> { Q:NIL {
     =[0] @ unwrap:String  =[1] @ unwrap:String  .plaincall/2:String.Concat
-        new/1:CLRImportObject .plaincall/1:Kernel.NewROVar
+        wrap
 } }
 
 sub say { Q:NIL {

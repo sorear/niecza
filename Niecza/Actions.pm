@@ -352,6 +352,14 @@ sub insn__S_dup_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'dup_fetch' ]];
 }
 
+sub insn__S_wrap { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'clr_wrap' ]];
+}
+
+sub insn__S_wrapobj { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'clr_call_direct', 'Kernel.NewROVar', 1 ]];
+}
+
 sub insn__S_pos { my ($cl, $M) = @_;
     $M->{_ast} = [[ pos => $M->{decint}{_ast} ]];
 }
