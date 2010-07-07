@@ -110,7 +110,7 @@ namespace Niecza {
 
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
-    public class DynMetaObject {
+    public class DynProtoMetaObject {
         public struct Method {
             public Method(DynBlockDelegate code, Frame proto, int outer_index) {
                 this.code  = code;
@@ -122,12 +122,6 @@ namespace Niecza {
             public int outer_index;
         }
 
-        public DynMetaObject[] mro = new DynMetaObject[0] {};
-        public Dictionary<string, Method> local
-            = new Dictionary<string, Method>();
-
-        public List<Frame> outers = new List<Frame>();
-
         public IP6 how;
         public string name;
 
@@ -135,10 +129,25 @@ namespace Niecza {
         public FetchHandler OnFetch;
         public StoreHandler OnStore;
 
+        //public List<DynMetaObject> mro = new List<DynMetaObject>();
+        public Dictionary<string, Method> local
+            = new Dictionary<string, Method>();
+
+        public List<Frame> def_outers = new List<Frame>();
+
         public delegate Frame InvokeHandler(DynObject th, Frame c,
                 LValue[] pos, Dictionary<string, LValue> named);
         public delegate Frame FetchHandler(DynObject th, Frame c);
         public delegate Frame StoreHandler(DynObject th, Frame c, IP6 n);
+    }
+
+    public class DynMetaObject {
+        public DynProtoMetaObject proto;
+        public List<Frame> outers = new List<Frame>();
+
+        public DynMetaObject(DynProtoMetaObject proto) {
+            this.proto = proto;
+        }
     }
 
     // This is quite similar to DynFrame and I wonder if I can unify them.
@@ -151,14 +160,17 @@ namespace Niecza {
         public DynMetaObject klass;
 
         private Frame Fail(Frame caller, string msg) {
-            return Kernel.Die(caller, msg + " in class " + klass.name);
+            return Kernel.Die(caller, msg + " in class " + klass.proto.name);
         }
 
         public Frame InvokeMethod(Frame caller, string name,
                 LValue[] pos, Dictionary<string, LValue> named) {
-            DynMetaObject.Method m;
+            DynProtoMetaObject.Method m;
+            while (klass.outers.Count < klass.proto.def_outers.Count) {
+                klass.outers.Add(klass.proto.def_outers[klass.outers.Count]);
+            }
             // TODO MRO
-            if (klass.local.TryGetValue(name, out m)) {
+            if (klass.proto.local.TryGetValue(name, out m)) {
                 Frame n = new Frame(caller, klass.outers[m.outer_index],
                         m.code);
                 n.proto = m.proto;
@@ -180,29 +192,29 @@ namespace Niecza {
         }
 
         public Frame HOW(Frame caller) {
-            caller.resultSlot = klass.how;
+            caller.resultSlot = klass.proto.how;
             return caller;
         }
 
         public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
-            if (klass.OnInvoke != null) {
-                return klass.OnInvoke(this, c, p, n);
+            if (klass.proto.OnInvoke != null) {
+                return klass.proto.OnInvoke(this, c, p, n);
             } else {
                 return Fail(c, "No invoke handler set");
             }
         }
 
         public Frame Fetch(Frame c) {
-            if (klass.OnFetch != null) {
-                return klass.OnFetch(this, c);
+            if (klass.proto.OnFetch != null) {
+                return klass.proto.OnFetch(this, c);
             } else {
                 return Fail(c, "No fetch handler set");
             }
         }
 
         public Frame Store(Frame c, IP6 o) {
-            if (klass.OnStore != null) {
-                return klass.OnStore(this, c, o);
+            if (klass.proto.OnStore != null) {
+                return klass.proto.OnStore(this, c, o);
             } else {
                 return Fail(c, "No store handler set");
             }
@@ -403,18 +415,22 @@ namespace Niecza {
         }
 
         static Kernel() {
-            SubMO = new DynMetaObject();
-            SubMO.name = "Sub";
-            SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
-            SubMO.local["clone"] = new DynMetaObject.Method(
+            DynProtoMetaObject SubPMO = new DynProtoMetaObject();
+            SubPMO.name = "Sub";
+            SubPMO.OnInvoke = new DynProtoMetaObject.InvokeHandler(SubInvoke);
+            SubPMO.local["clone"] = new DynProtoMetaObject.Method(
                     new DynBlockDelegate(SubCloneC),
                     null, 0);
-            SubMO.outers.Add(null);
+            SubPMO.def_outers.Add(null);
 
-            ScalarContainerMO = new DynMetaObject();
-            ScalarContainerMO.name = "ScalarContainer";
-            ScalarContainerMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
-            ScalarContainerMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
+            SubMO = new DynMetaObject(SubPMO);
+
+            DynProtoMetaObject ScalarContainerPMO = new DynProtoMetaObject();
+            ScalarContainerPMO.name = "ScalarContainer";
+            ScalarContainerPMO.OnFetch = new DynProtoMetaObject.FetchHandler(SCFetch);
+            ScalarContainerPMO.OnStore = new DynProtoMetaObject.StoreHandler(SCStore);
+
+            ScalarContainerMO = new DynMetaObject(ScalarContainerPMO);
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }

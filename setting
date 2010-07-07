@@ -59,6 +59,7 @@
 #     Foo.^bind-outer($scopenum, callframe);
 my class ClassHOW { ... }
 
+=begin comment
 PRE-INIT {
     sub wrap-metaclass { # $metaclass-mo, $mo
         Q:NIL {
@@ -124,6 +125,7 @@ PRE-INIT {
         null:Variable
     }
 }
+=end comment
 
 sub infix:<~> { Q:NIL {
     =[0] @ unwrap:String  =[1] @ unwrap:String  .plaincall/2:String.Concat

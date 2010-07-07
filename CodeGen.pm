@@ -8,13 +8,23 @@ use 5.010;
 
     # Beta will do this using reflection
     my %typedata = (
-        DynObject     => { klass        => 'DynMetaObject',
-                           slots        => 'Dictionary<string,Object>' },
-        DynMetaObject => { how          => 'IP6',
-                           local        => 'Dictionary<String,DynMetaObject.Method>',
-                           outers       => 'List<Frame>',
-                           name         => 'String' },
-        'List<Frame>' => { Add          => 'Void' },
+        DynObject =>
+            { klass        => 'DynMetaObject',
+              slots        => 'Dictionary<string,Object>' },
+
+        DynMetaObject =>
+            { proto        => 'DynProtoMetaObject',
+              outers       => 'List<Frame>' },
+
+        DynProtoMetaObject =>
+            { how          => 'IP6',
+              local        => 'Dictionary<String,DynMetaObject.Method>',
+              def_outers   => 'List<Frame>',
+              name         => 'String' },
+
+        'List<Frame>' =>
+            { Add          => 'Void' },
+
         'Kernel.NewROVar'    => 'Variable',
         'Kernel.NewRWVar'    => 'Variable',
         'Kernel.NewROLValue' => 'LValue',

@@ -32,6 +32,7 @@ sub comment__S_Sharp { }
 sub spacey { }
 sub nofun { }
 sub curlycheck { }
+sub pod_comment { }
 
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
