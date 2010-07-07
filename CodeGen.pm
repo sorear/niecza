@@ -179,6 +179,11 @@ use 5.010;
         $self->_cpscall("IP6", "$v.HOW(th)");
     }
 
+    sub callframe {
+        my ($self) = @_;
+        $self->_push("Frame", "th");
+    }
+
     sub fetch {
         my ($self) = @_;
         my $c = $self->_pop;

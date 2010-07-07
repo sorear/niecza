@@ -16,7 +16,7 @@
 #     has Dictionary[str,int] $.method-scopes;
 #     has Dictionary[str,Sub] $.methods;
 #
-#     has DynProtoMetaObject $.metaobject;
+#     has DynProtoMetaObject $.meta-object;
 # }
 #
 # Due to concerns of screwing up composition, adding new superclasses, roles,
@@ -49,7 +49,9 @@ PRE-INIT {
 
         L@$pmo L@$self !.how
         L@$pmo =[1] @ unwrap:String !.name
-        L@$self @.slots L@$pmo ![metaobject]
+
+        L@$self @.slots L@$pmo ![meta-object]
+        L@$self =[0] @ cast:DynObject @.klass !.klass
 
         L@$self .plaincall/1:Kernel.NewROVar
     } }
@@ -98,6 +100,22 @@ PRE-INIT {
     sub compose { Q:NIL { null:Variable } }
 
     Q:NIL {
+        LEXICALS: $chpmo : DynProtoMetaObject, $ch : DynObject
+        new/0:DynProtoMetaObject L!$chpmo
+        new/0:DynObject L!$ch
+
+        L@$chpmo L@$ch !.how
+        L@$chpmo "ClassHOW" !.name
+        L@$ch @.slots L@$chpmo ![meta-object]
+
+        L@&create-protoobject @
+            L@$ch .plaincall/1:Kernel.NewROVar
+            callframe new/1:CLRImportObject .plaincall/1:Kernel.NewROVar
+            .call/2 L!^ClassHOW
+
+        L@$ch  L@^ClassHOW @ cast:DynObject @.klass  !.klass
+        L@$ch  L!^'ClassHOW!HOW'
+
         null:Variable
     }
 }

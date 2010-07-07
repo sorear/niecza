@@ -34,7 +34,7 @@ grammar NIL is STD {
 
     token varid {
         [ <sigil> <twigil>? ]? <identifier> |
-            <?before "'"> [ :lang(%*LANG<main>) <quote> ]
+            <?before "'"> [ :lang(%*LANG<MAIN>) <quote> ]
     }
 
     token clrid { <ident>**'.' <clrgeneric>? <clrqual>* }
@@ -55,6 +55,7 @@ grammar NIL is STD {
     token insn:lexget { 'L@' {} <up> <varid> }
     token insn:lexput { 'L!' {} <up> <varid> }
     token insn:how { <sym> }
+    token insn:callframe { <sym> }
     token insn:fetch { '@' }
     token insn:dup_fetch { 'dup@' }
     token insn:pos { '=[' <?> ~ ']' <decint> }

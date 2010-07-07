@@ -340,6 +340,10 @@ sub insn__S_how { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'how' ]];
 }
 
+sub insn__S_callframe { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'callframe' ]];
+}
+
 sub insn__S_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'fetch' ]];
 }
