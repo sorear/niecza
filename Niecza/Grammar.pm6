@@ -61,7 +61,7 @@ grammar NIL is STD {
     token insn:pos { '=[' <?> ~ ']' <decint> }
     token insn:clone_lex { 'CLONE:' [ \h* <varid> \h* ] ** ',' \h* \n }
     token insn:copy_lex { 'COPY:' [ \h* <varid> \h* ] ** ',' \h* \n }
-    token insn:call_method { '.method:' {} <identifier> '/' <decint> <voidmark>? }
+    token insn:call_method { '.method/' {} <decint> ':' <identifier> <voidmark>? }
     token insn:call_sub { '.call/' {} <decint> <voidmark>? }
     token insn:tail_call_sub { '.tailcall/' {} <decint> }
     token insn:unwrap { <sym> ':' {} <clrid> }

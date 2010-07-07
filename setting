@@ -120,6 +120,16 @@ PRE-INIT {
     }
 }
 
+# cannot be a normal class - it has no parents (and must not be cloned)
+my class Mu { ... }
+PRE-INIT { Q:NIL {
+    L@^ClassHOW dup@  ="Mu"  .method/1:new  L!^'Mu!HOW'
+    L@^'Mu!HOW' dup@  callframe new/1:CLRImportObject
+        .plaincall/1:Kernel.NewROVar
+        .method/1:create-protoobject  L!^Mu
+    null:Variable
+} }
+
 sub infix:<~> { Q:NIL {
     =[0] @ unwrap:String  =[1] @ unwrap:String  .plaincall/2:String.Concat
         new/1:CLRImportObject .plaincall/1:Kernel.NewROVar

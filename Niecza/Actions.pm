@@ -348,7 +348,7 @@ sub insn__S_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'fetch' ]];
 }
 
-sub insn__S_dup_fetchlv { my ($cl, $M) = @_;
+sub insn__S_dup_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'dup_fetch' ]];
 }
 
@@ -357,7 +357,7 @@ sub insn__S_pos { my ($cl, $M) = @_;
 }
 
 sub insn__S_call_method { my ($cl, $M) = @_;
-    $M->{_ast} = [[ call_method => !$M->{voidmark}, $M->{identifier}->Str,
+    $M->{_ast} = [[ call_method => !$M->{voidmark}[0], $M->{identifier}->Str,
             $M->{decint}{_ast} ]];
 }
 
