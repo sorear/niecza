@@ -3,71 +3,53 @@
 # We have to do this directly due to the circularity saw.  Same
 # reason forces uncontainerized .NET values.
 #
-# Class metaobjects come in two flavors - protoclasses, which carry methods
-# bound into protopads, and instantiated classes, which carry methods bound
-# into real pads.  In standard fashion protoclasses are used as instantiated
-# classes from BEGIN code.  Protoclasses are subject to closure and will
-# (eventually) often have CLR classes generated for them.
+# ClassHOW instances are shared between lexical instantiations of a class.
 #
 # class ClassHOW {
-#     # non-null for instantiated classes
-#     has ClassHOW $.protoclass;
-#     # these will be protopads in the protoclass; may be shorter than the
-#     # protoclass' version in some augment cases
 #     has Array[Frame] $.outers;
 #
-#     # 0-arg subs which get bound into scope 0 to fetch the parents
+#     # TODO
 #     has Array[Sub] $.scoped-parents;
-#     # the real found subs - set by .bind
-#     has Array[ClassHOW] $.parents;
-#
 #     has Array[Sub] $.scoped-roles;
-#     has Array[RoleHOW] $.roles;
 #
+#     # used to stage for composition - not yet
 #     has Dictionary[str,int] $.method-scopes;
-#     has Dictionary[str,Sub] $.scoped-methods;
 #     has Dictionary[str,Sub] $.methods;
 #
-#     has DynMetaObject $.metaobject;
-#     has DynObject $.proto;
-#
-#     has DependentSet<ClassHOW> $.dependents;
-#
-#     # clears valid bit on metaobject of all dependents
-#     method invalidate { ... }
-#     # called automatically if valid bit clear???
-#     method revalidate { ... }
+#     has DynProtoMetaObject $.metaobject;
 # }
 #
 # Due to concerns of screwing up composition, adding new superclasses, roles,
 # or attributes in an augment is not allowed at this time.  Methods only.
 #
 # to create a class:
-#     BEGIN my ::Foo ::= ClassHOW.new("Foo").protoobject;
+#     BEGIN my $Foo_HOW ::= ClassHOW.new("Foo");
 #     BEGIN {
-#         Foo.^push-scope(callframe);
-#         Foo.^add-super(...);
-#         Foo.^add-role(...);
-#         Foo.^add-scoped-method("bar", 0, sub { ... });
-#         Foo.^compose;
+#         $Foo_HOW.push-scope(callframe);
+#         $Foo_HOW.add-super(...);
+#         $Foo_HOW.add-role(...);
+#         $Foo_HOW.add-scoped-method("bar", 0, sub { ... });
+#         $Foo_HOW.compose;
 #     }
-#     ENTER ::Foo ::= Foo.^clone; ENTER Foo.^bind-outer(0, callframe);
+#     my ::Foo will begin { $Foo_HOW.create-protoobject(callframe) }
+#              will enter { $Foo_HOW.create-protoobject(callframe) };
 #
 # to augment:
-#     BEGIN my $scopenum = Foo.^push-scope(callframe);
-#     BEGIN { Foo.^add-scoped-method("baz", $scopenum, sub { ... }); }
+#     BEGIN my $scopenum = $Foo_HOW.push-scope(callframe);
+#     BEGIN { $Foo_HOW.add-scoped-method("baz", $scopenum, sub { ... }); }
 #     Foo.^bind-outer($scopenum, callframe);
 my class ClassHOW { ... }
 
-=begin comment
 PRE-INIT {
-    sub wrap-metaclass { # $metaclass-mo, $mo
+    # Constructs a ClassHOW object for an existing DynProtoMetaObject
+    # Takes the metaclass' DynMetaObject as a dependency injection
+    sub wrap-metaclass { # $metaclass-mo, $mpo
         Q:NIL {
-            LEXICALS: mci, p: DynObject, mo: DynMetaObject
+            LEXICALS: mci, p: DynObject, mpo: DynProtoMetaObject
 
             new/0:DynObject L!mci
-            =[1] @ unwrap:DynMetaObject L!mo
-            new/0:DynObject L!p
+            =[1] @ unwrap:DynProtoMetaObject L!mpo
+            new/0:DynObject L!p2
 
             L@p L@mo !.klass
 
@@ -82,6 +64,7 @@ PRE-INIT {
         }
     }
 
+=begin comment
     sub new-metaclass { Q:NIL {
         LEXICALS: mo: DynMetaObject
         new/0:DynMetaObject L!mo
@@ -124,8 +107,8 @@ PRE-INIT {
         L@$p L!^ClassHOW
         null:Variable
     }
-}
 =end comment
+}
 
 sub infix:<~> { Q:NIL {
     =[0] @ unwrap:String  =[1] @ unwrap:String  .plaincall/2:String.Concat
