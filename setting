@@ -67,7 +67,7 @@ PRE-INIT {
     sub add-scoped-method { Q:NIL {
         LEXICALS: $name : String, $index : Int32, $sub : DynObject
         LEXICALS: $mo : DynProtoMetaObject
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynMetaObject L!$mo
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject L!$mo
         =[1] @ unwrap:String L!$name
         =[2] @ unwrap:Int32 L!$index
         =[3] @ cast:DynObject L!$sub
@@ -108,11 +108,22 @@ PRE-INIT {
         L@$chpmo "ClassHOW" !.name
         L@$ch @.slots L@$chpmo ![meta-object]
 
+        L@&push-scope @  L@$ch wrapobj  callframe wrap  .call/2:v
+        L@&add-scoped-method @  L@$ch wrapobj  ="new"  0 wrap  L@&new  .call/4:v
+        L@&add-scoped-method @  L@$ch wrapobj  ="push-scope"  0 wrap
+            L@&push-scope  .call/4:v
+        L@&add-scoped-method @  L@$ch wrapobj  ="add-scoped-method"  0 wrap
+            L@&add-scoped-method  .call/4:v
+        L@&add-scoped-method @  L@$ch wrapobj  ="compose"  0 wrap
+            L@&compose  .call/4:v
+        L@&add-scoped-method @  L@$ch wrapobj  ="create-protoobject"  0 wrap
+            L@&create-protoobject  .call/4:v
+
         L@&create-protoobject @  L@$ch wrapobj  callframe wrap
             .call/2 L!^ClassHOW
 
         L@$ch  L@^ClassHOW @ cast:DynObject @.klass  !.klass
-        L@$ch  L!^'ClassHOW!HOW'
+        L@$ch wrapobj  L!^'ClassHOW!HOW'
 
         null:Variable
     }

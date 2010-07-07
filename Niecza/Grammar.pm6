@@ -49,6 +49,7 @@ grammar NIL is STD {
 
     token insn:string_var { "=" <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
     token insn:clr_string { <?before <[ ' " ]>> [ :lang(%*LANG<MAIN>) <quote> ] }
+    token insn:clr_int { $<sign>=[<[ - + ]>?] <decint> }
     token insn:label { ':'  {} <decint> }
     token insn:goto  { '->' {} <decint> }
 

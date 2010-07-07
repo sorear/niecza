@@ -315,6 +315,11 @@ sub insn__S_clr_string { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_string => $M->{quote}{_ast}->text ]];
 }
 
+sub insn__S_clr_int { my ($cl, $M) = @_;
+    my $s = ($M->{sign}->Str eq '-') ? -1 : +1;
+    $M->{_ast} = [[ clr_int => $s * $M->{decint}{_ast} ]];
+}
+
 # the negatives here are somewhat of a cheat.
 sub insn__S_label { my ($cl, $M) = @_;
     $M->{_ast} = [[ labelhere => -$M->{decint}{_ast} ]];
