@@ -284,7 +284,7 @@ sub up { my ($cl, $M) = @_;
 }
 
 sub lexdecl { my ($cl, $M) = @_;
-    $M->{_ast} = [ map { $_->Str, $M->{clrid}->Str } @{ $M->{varid} } ];
+    $M->{_ast} = [ map { $_->{_ast}, $M->{clrid}->Str } @{ $M->{varid} } ];
 }
 
 # :: [row of NIL op]
@@ -294,11 +294,11 @@ sub insn__S_lextypes { my ($cl, $M) = @_;
 }
 
 sub insn__S_clone_lex { my ($cl, $M) = @_;
-    $M->{_ast} = [ map { [ clone_lex => $_->Str ] } @{ $M->{varid} } ];
+    $M->{_ast} = [ map { [ clone_lex => $_->{_ast} ] } @{ $M->{varid} } ];
 }
 
 sub insn__S_copy_lex { my ($cl, $M) = @_;
-    $M->{_ast} = [ map { [ copy_lex => $_->Str ] } @{ $M->{varid} } ];
+    $M->{_ast} = [ map { [ copy_lex => $_->{_ast} ] } @{ $M->{varid} } ];
 }
 
 sub insn__S_string_var { my ($cl, $M) = @_;
@@ -325,15 +325,15 @@ sub insn__S_goto { my ($cl, $M) = @_;
 }
 
 sub insn__S_lex { my ($cl, $M) = @_;
-    $M->{_ast} = [[ lex => $M->{up}{_ast}, $M->{varid}->Str ]];
+    $M->{_ast} = [[ lex => $M->{up}{_ast}, $M->{varid}{_ast} ]];
 }
 
 sub insn__S_lexget { my ($cl, $M) = @_;
-    $M->{_ast} = [[ lexget => $M->{up}{_ast}, $M->{varid}->Str ]];
+    $M->{_ast} = [[ lexget => $M->{up}{_ast}, $M->{varid}{_ast} ]];
 }
 
 sub insn__S_lexput { my ($cl, $M) = @_;
-    $M->{_ast} = [[ lexput => $M->{up}{_ast}, $M->{varid}->Str ]];
+    $M->{_ast} = [[ lexput => $M->{up}{_ast}, $M->{varid}{_ast} ]];
 }
 
 sub insn__S_how { my ($cl, $M) = @_;
@@ -382,19 +382,19 @@ sub insn__S_new { my ($cl, $M) = @_;
 }
 
 sub insn__S_clr_field_get { my ($cl, $M) = @_;
-    $M->{_ast} = [[ clr_field_get => $M->{varid}->Str ]];
+    $M->{_ast} = [[ clr_field_get => $M->{varid}{_ast} ]];
 }
 
 sub insn__S_clr_field_set { my ($cl, $M) = @_;
-    $M->{_ast} = [[ clr_field_set => $M->{varid}->Str ]];
+    $M->{_ast} = [[ clr_field_set => $M->{varid}{_ast} ]];
 }
 
 sub insn__S_clr_index_get { my ($cl, $M) = @_;
-    $M->{_ast} = [[ clr_index_get => ($M->{varid}[0] ? ($M->{varid}[0]->Str) : ()) ]];
+    $M->{_ast} = [[ clr_index_get => ($M->{varid}[0] ? ($M->{varid}[0]{_ast}) : ()) ]];
 }
 
 sub insn__S_clr_index_set { my ($cl, $M) = @_;
-    $M->{_ast} = [[ clr_index_set => ($M->{varid}[0] ? ($M->{varid}[0]->Str) : ()) ]];
+    $M->{_ast} = [[ clr_index_set => ($M->{varid}[0] ? ($M->{varid}[0]{_ast}) : ()) ]];
 }
 
 sub insn__S_cast { my ($cl, $M) = @_;
@@ -410,7 +410,18 @@ sub insn__S_push_null { my ($cl, $M) = @_;
 }
 
 sub clrid {}
-sub varid {}
+sub clrqual {}
+sub clrgeneric {}
+sub varid { my ($cl, $M) = @_;
+    if ($M->{quote}) {
+        if (!$M->{quote}{_ast}->isa('Op::StringLiteral')) {
+            $M->sorry("Strings used in NIL code must be compile time constants");
+        }
+        $M->{_ast} = $M->{quote}{_ast}->text;
+    } else {
+        $M->{_ast} = $M->Str;
+    }
+}
 sub apostrophe {}
 sub quibble {}
 sub tribble {}
@@ -546,6 +557,7 @@ sub package_def { my ($cl, $M) = @_;
     }
     # allocate a slot
     $::CURLEX->{'!slots'}{$M->{decl}{name}} = 1;
+    $::CURLEX->{'!slots'}{$M->{decl}{name} . "!HOW"} = 1;
 }
 
 sub routine_declarator {}

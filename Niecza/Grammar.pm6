@@ -32,7 +32,10 @@ grammar NIL is STD {
     token category:insn { <sym> }
     proto token insn { <...> }
 
-    token varid { [ <sigil> <twigil>? ]? <identifier> }
+    token varid {
+        [ <sigil> <twigil>? ]? <identifier> |
+            <?before "'"> [ :lang(%*LANG<main>) <quote> ]
+    }
 
     token clrid { <ident>**'.' <clrgeneric>? <clrqual>* }
     token clrgeneric { '<' <clrid>**',' '>' }

@@ -18,7 +18,7 @@ use 5.010;
 
         DynProtoMetaObject =>
             { how          => 'IP6',
-              local        => 'Dictionary<String,DynMetaObject.Method>',
+              local        => 'Dictionary<String,DynProtoMetaObject.Method>',
               def_outers   => 'List<Frame>',
               name         => 'String' },
 

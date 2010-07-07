@@ -41,73 +41,65 @@
 my class ClassHOW { ... }
 
 PRE-INIT {
-    # Constructs a ClassHOW object for an existing DynProtoMetaObject
-    # Takes the metaclass' DynMetaObject as a dependency injection
-    sub wrap-metaclass { # $metaclass-mo, $mpo
-        Q:NIL {
-            LEXICALS: mci, p: DynObject, mpo: DynProtoMetaObject
-
-            new/0:DynObject L!mci
-            =[1] @ unwrap:DynProtoMetaObject L!mpo
-            new/0:DynObject L!p2
-
-            L@p L@mo !.klass
-
-            L@mo L@mci !.how
-
-            L@mci @.slots L@mo ![meta-object]
-            L@mci @.slots L@p  ![prototype]
-
-            L@mci  =[0] @ unwrap:DynMetaObject  !.klass
-
-            L@p .plaincall/1:Kernel.NewROVar
-        }
-    }
-
-=begin comment
-    sub new-metaclass { Q:NIL {
-        LEXICALS: mo: DynMetaObject
-        new/0:DynMetaObject L!mo
-        L@mo =[1] @ unwrap:String !.name
-        L@^&wrap-metaclass @  =[0]
-            L@mo new/1:CLRImportObject .plaincall/1:Kernel.NewROVar
-            .tailcall/2
-    } }
-
+    # ClassHOW.new($name) --> meta class instance
     sub new { Q:NIL {
-        L@^&new-metaclass @
-            =[0] @ cast:DynObject @.klass new/1:CLRImportObject
-                .plaincall/1:Kernel.NewROVar
-            =[1] .tailcall/2
+        LEXICALS: $pmo : DynProtoMetaObject, $self : DynObject
+        new/0:DynProtoMetaObject L!$pmo
+        new/0:DynObject L!$self
+
+        L@$pmo L@$self !.how
+        L@$pmo =[1] @ unwrap:String !.name
+        L@$self @.slots L@$pmo ![metaobject]
+
+        L@$self .plaincall/1:Kernel.NewROVar
     } }
 
+    # $how.push-scope($outer)
     sub push-scope { Q:NIL {
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynMetaObject @.outers
-          =[1] @ unwrap:Frame .virtcall/1:Add
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject
+          @.def_outers  =[1] @ unwrap:Frame .virtcall/1:Add
         null:Variable
     } }
 
+    # $how.add-scoped-method($name, $index, $sub)
     sub add-scoped-method { Q:NIL {
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynMetaObject @.local
-          =[1] @ unwrap:String
-            =[3] @ cast:DynObject @.slots @[code] cast:DynBlockDelegate
-              =[3] @ cast:DynObject @.slots @[proto] cast:Frame
-                =[1] @ unwrap:Int32 new/3:DynMetaObject.Method
-              ![]
+        LEXICALS: $name : String, $index : Int32, $sub : DynObject
+        LEXICALS: $mo : DynProtoMetaObject
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynMetaObject L!$mo
+        =[1] @ unwrap:String L!$name
+        =[2] @ unwrap:Int32 L!$index
+        =[3] @ cast:DynObject L!$sub
+
+        LEXICALS: $proto : Frame, $code : DynBlockDelegate
+        L@$sub @.slots @[code]  cast:DynBlockDelegate L!$code
+        L@$sub @.slots @[proto] cast:Frame L!$proto
+
+        LEXICALS: $m : DynProtoMetaObject.Method
+        L@$code L@$proto L@$index new/3:DynProtoMetaObject.Method L!$m
+
+        L@$mo @.local  L@$name  L@$m ![]
         null:Variable
     } }
+
+    # $how.create-protoobject($callframe)
+    sub create-protoobject { Q:NIL {
+        LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
+        new/0:DynObject L!$p
+        =[0] @ cast:DynObject @.slots @[meta-object] L!$pmo
+        L@$pmo new/1:DynMetaObject L!$mo
+        L@$mo @.outers  =[1] @ unwrap:Frame  .virtcall/1:Add
+
+        L@$p null:Dictionary<string,object> !.slots
+        L@$p L@$mo !.klass
+
+        L@$p .plaincall/1:Kernel.NewROVar
+    } }
+
+    sub compose { Q:NIL { null:Variable } }
 
     Q:NIL {
-        LEXICALS: $p: Variable
-        L@&new-metaclass @  null:DynMetaObject new/1:CLRImportObject
-            .plaincall/1:Kernel.NewROVar ="ClassHOW" .call/2 L!$p
-
-        L@$p @ how cast:DynObject  L@$p @ cast:DynObject @.klass  !.klass
-
-        L@$p L!^ClassHOW
         null:Variable
     }
-=end comment
 }
 
 sub infix:<~> { Q:NIL {
