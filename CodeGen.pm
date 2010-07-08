@@ -37,6 +37,10 @@ use 5.010;
         'Kernel.NewRWLValue' => 'LValue',
         'Console.WriteLine'  => 'Void',
         'String.Concat'      => 'String',
+        'Kernel.SubPMO'      => 'DynProtoMetaObject',
+        'Kernel.SubMO'       => 'DynMetaObject',
+        'Kernel.ScalarContainerPMO' => 'DynProtoMetaObject',
+        'Kernel.ScalarContainerMO' => 'DynMetaObject',
     );
 
     has name      => (isa => 'Str', is => 'ro');
@@ -296,6 +300,18 @@ use 5.010;
         my $val = $self->_pop;
         my $obj = $self->_pop;
         $self->_emit("$obj.$f = $val");
+    }
+
+    sub clr_sfield_get {
+        my ($self, $f) = @_;
+        my $ty = $typedata{$f};
+        $self->_push($ty, "$f");
+    }
+
+    sub clr_sfield_set {
+        my ($self, $f) = @_;
+        my $val = $self->_pop;
+        $self->_emit("$f = $val");
     }
 
     sub clr_index_get {

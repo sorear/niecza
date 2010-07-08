@@ -145,14 +145,17 @@ namespace Niecza {
     public class DynMetaObject {
         public DynProtoMetaObject proto;
         public List<Frame> outers = new List<Frame>();
-        public List<DynMetaObject> mro = new List<DynMetaObject>();
+        public List<DynMetaObject> mro;
 
         public DynMetaObject(DynProtoMetaObject proto) {
             this.proto = proto;
+            this.mro = new List<DynMetaObject>();
+            mro.Add(this);
         }
 
         public void BuildC3MRO(List<DynMetaObject> supers) {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
+            mro = new List<DynMetaObject>();
             toMerge.Add(new List<DynMetaObject>());
             toMerge[0].Add(this);
 
@@ -429,6 +432,8 @@ blocked:
 
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject ScalarContainerMO;
+        public static readonly DynProtoMetaObject SubPMO;
+        public static readonly DynProtoMetaObject ScalarContainerPMO;
         public static readonly IP6 DieSub;
 
         public static IP6 MakeSub(DynBlockDelegate code, Frame proto,
@@ -465,7 +470,7 @@ blocked:
         }
 
         static Kernel() {
-            DynProtoMetaObject SubPMO = new DynProtoMetaObject();
+            SubPMO = new DynProtoMetaObject();
             SubPMO.name = "Sub";
             SubPMO.OnInvoke = new DynProtoMetaObject.InvokeHandler(SubInvoke);
             SubPMO.local["clone"] = new DynProtoMetaObject.Method(
@@ -475,7 +480,7 @@ blocked:
 
             SubMO = new DynMetaObject(SubPMO);
 
-            DynProtoMetaObject ScalarContainerPMO = new DynProtoMetaObject();
+            ScalarContainerPMO = new DynProtoMetaObject();
             ScalarContainerPMO.name = "ScalarContainer";
             ScalarContainerPMO.OnFetch = new DynProtoMetaObject.FetchHandler(SCFetch);
             ScalarContainerPMO.OnStore = new DynProtoMetaObject.StoreHandler(SCStore);

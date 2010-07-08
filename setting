@@ -145,7 +145,40 @@ PRE-INIT {
 my class Mu { ... }
 my class Any { ... }
 my class Cool { ... }
-PRE-INIT { Q:NIL {
+# these are really defined in the kernel
+my class Scalar { ... }
+my class Sub { ... }
+PRE-INIT {
+    # (DynProtoMetaObject $dpmo, ClassHOW $super --> ClassHOW)
+    sub wrap-dpmo { Q:NIL {
+        LEXICALS: $ch : Variable, $dp : DynProtoMetaObject
+        L@^^ClassHOW dup@  ="" .method/1:new  L!$ch
+        =[0] @ unwrap:DynProtoMetaObject L!$dp
+        L@$ch @ cast:DynObject @.slots L@$dp ![meta-object]
+        L@$ch dup@  =[1]  .method/1:add-super:v
+        L@$ch
+    } }
+    # (ClassHOW $me, DynMetaObject $use, DynMetaObject $p --> Variable)
+    sub wrapped-protoobj { Q:NIL {
+        LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
+        LEXICALS: $s : List<DynMetaObject>
+        new/0:DynObject L!$p
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject L!$pmo
+        =[1] @ unwrap:DynMetaObject L!$mo
+
+        new/0:List<DynMetaObject> L!$s
+        L@$s  =[2] @ unwrap:DynMetaObject  .virtcall/1:Add
+        L@$mo  L@$s  .virtcall/1:BuildC3MRO
+
+        L@$pmo  =[0] @ !.how
+
+        L@$p null:Dictionary<string,object> !.slots
+        L@$p L@$mo !.klass
+
+        L@$p wrapobj
+    } }
+
+Q:NIL {
     LEXICALS: $plist : List<DynMetaObject>
     L@^ClassHOW dup@  ="Mu"  .method/1:new  L!^'Mu!HOW'
     new/0:List<DynMetaObject> L!$plist
@@ -165,6 +198,16 @@ PRE-INIT { Q:NIL {
     L@$plist  L@^Any @ cast:DynObject @.klass  .virtcall/1:Add
     L@^'Cool!HOW' dup@  callframe wrap  L@$plist wrap
         .method/2:create-protoobject  L!^Cool
+
+    L@&wrap-dpmo @  F@Kernel.SubPMO wrap  L@^'Any!HOW'
+        .call/2 L!^'Sub!HOW'
+    L@&wrapped-protoobj @  L@^'Sub!HOW'  F@Kernel.SubMO wrap
+        L@^Any @ cast:DynObject @.klass wrap  .call/3 L!^Sub
+
+    L@&wrap-dpmo @  F@Kernel.ScalarContainerPMO wrap  L@^'Any!HOW'
+        .call/2 L!^'Scalar!HOW'
+    L@&wrapped-protoobj @  L@^'Scalar!HOW'  F@Kernel.ScalarContainerMO wrap
+        L@^Any @ cast:DynObject @.klass wrap  .call/3 L!^Scalar
 
     null:Variable
 } }

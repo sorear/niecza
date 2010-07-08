@@ -394,6 +394,14 @@ sub insn__S_unwrap { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_unwrap => $M->{clrid}->Str ]];
 }
 
+sub insn__S_clr_sfield_get { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_sfield_get => $M->{clrid}->Str ]];
+}
+
+sub insn__S_clr_sfield_set { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_sfield_set => $M->{clrid}->Str ]];
+}
+
 sub insn__S_new { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_new => $M->{clrid}->Str, $M->{decint}{_ast} ]];
 }
