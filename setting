@@ -83,13 +83,14 @@ PRE-INIT {
         null:Variable
     } }
 
-    # $how.create-protoobject($callframe)
+    # $how.create-protoobject($callframe, $superlist)
     sub create-protoobject { Q:NIL {
         LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
         new/0:DynObject L!$p
         =[0] @ cast:DynObject @.slots @[meta-object] L!$pmo
         L@$pmo new/1:DynMetaObject L!$mo
         L@$mo @.outers  =[1] @ unwrap:Frame  .virtcall/1:Add
+        L@$mo =[2] @ unwrap:List<DynMetaObject>  .virtcall/1:BuildC3MRO
 
         L@$p null:Dictionary<string,object> !.slots
         L@$p L@$mo !.klass
@@ -120,7 +121,7 @@ PRE-INIT {
             L@&create-protoobject  .call/4:v
 
         L@&create-protoobject @  L@$ch wrapobj  callframe wrap
-            .call/2 L!^ClassHOW
+            new/0:List<DynMetaObject> wrap  .call/3 L!^ClassHOW
 
         L@$ch  L@^ClassHOW @ cast:DynObject @.klass  !.klass
         L@$ch wrapobj  L!^'ClassHOW!HOW'
@@ -133,7 +134,8 @@ PRE-INIT {
 my class Mu { ... }
 PRE-INIT { Q:NIL {
     L@^ClassHOW dup@  ="Mu"  .method/1:new  L!^'Mu!HOW'
-    L@^'Mu!HOW' dup@  callframe wrap  .method/1:create-protoobject  L!^Mu
+    L@^'Mu!HOW' dup@  callframe wrap  new/0:List<DynMetaObject> wrap
+        .method/2:create-protoobject  L!^Mu
     null:Variable
 } }
 

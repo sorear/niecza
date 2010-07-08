@@ -14,6 +14,7 @@ use 5.010;
 
         DynMetaObject =>
             { proto        => 'DynProtoMetaObject',
+              BuildC3MRO   => 'Void',
               outers       => 'List<Frame>' },
 
         DynProtoMetaObject =>
@@ -23,6 +24,8 @@ use 5.010;
               name         => 'String' },
 
         'List<Frame>' =>
+            { Add          => 'Void' },
+        'List<DynMetaObject>' =>
             { Add          => 'Void' },
 
         'Kernel.NewROVar'    => 'Variable',

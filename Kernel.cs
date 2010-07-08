@@ -129,7 +129,8 @@ namespace Niecza {
         public FetchHandler OnFetch;
         public StoreHandler OnStore;
 
-        //public List<DynMetaObject> mro = new List<DynMetaObject>();
+        public List<DynProtoMetaObject> superclasses
+            = new List<DynProtoMetaObject>();
         public Dictionary<string, Method> local
             = new Dictionary<string, Method>();
 
@@ -144,9 +145,58 @@ namespace Niecza {
     public class DynMetaObject {
         public DynProtoMetaObject proto;
         public List<Frame> outers = new List<Frame>();
+        public List<DynMetaObject> mro = new List<DynMetaObject>();
 
         public DynMetaObject(DynProtoMetaObject proto) {
             this.proto = proto;
+        }
+
+        public void BuildC3MRO(List<DynMetaObject> supers) {
+            List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
+            toMerge.Add(new List<DynMetaObject>());
+            toMerge[0].Add(this);
+
+            foreach (DynMetaObject dmo in supers) {
+                toMerge[0].Add(dmo);
+                toMerge.Add(new List<DynMetaObject>(dmo.mro));
+            }
+
+            while (true) {
+top:
+                foreach (List<DynMetaObject> h in toMerge) {
+                    if (h.Count == 0) {
+                        continue; // next CANDIDATE
+                    }
+                    DynMetaObject cand = h[0];
+                    foreach (List<DynMetaObject> bs in toMerge) {
+                        if (bs.Count == 0) {
+                            continue; // next BLOCKER
+                        }
+                        if (bs[0] == cand) {
+                            continue;
+                        }
+                        if (bs.Contains(cand)) {
+                            goto blocked;
+                        }
+                    }
+                    // no reason not to immediately put this, and by loop
+                    // order the C3 condition is kept
+                    mro.Add(cand);
+                    foreach (List<DynMetaObject> l in toMerge) {
+                        l.Remove(cand);
+                    }
+                    goto top;
+blocked:
+                    ;
+                }
+                foreach (List<DynMetaObject> l in toMerge) {
+                    if (l.Count != 0) {
+                        // should refactor this to use a real p6exception
+                        throw new Exception("C3 MRO inconsistency detected");
+                    }
+                }
+                return;
+            }
         }
     }
 
