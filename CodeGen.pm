@@ -200,6 +200,13 @@ use 5.010;
         $self->_cpscall("IP6", "$c.lv.container.Fetch(th)");
     }
 
+    sub store {
+        my ($self) = @_;
+        my $v = $self->_pop;
+        my $c = $self->_pop;
+        $self->_cpscall(undef, "$c.lv.container.Store(th, $v)");
+    }
+
     sub dup_fetch {
         my ($self) = @_;
         my $c = $self->_peek;
@@ -312,6 +319,26 @@ use 5.010;
         my ($self, $f) = @_;
         my $val = $self->_pop;
         $self->_emit("$f = $val");
+    }
+
+    sub attr_var {
+        my ($self, $f) = @_;
+        my $obj = $self->_pop;
+        $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
+    }
+
+    sub attr_get {
+        my ($self, $f) = @_;
+        $self->attr_var($f);
+        $self->fetch;
+    }
+
+    sub attr_set {
+        my ($self, $f) = @_;
+        $self->_swap;
+        $self->attr_var($f);
+        $self->_swap;
+        $self->store;
     }
 
     sub clr_index_get {

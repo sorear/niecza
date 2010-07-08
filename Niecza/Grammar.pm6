@@ -73,6 +73,9 @@ grammar NIL is STD {
     token insn:clr_field_set { '!.' {} <varid> }
     token insn:clr_index_get { '@[' {} <varid>? ']' }
     token insn:clr_index_set { '![' {} <varid>? ']' }
+    token insn:attr_get { '@!' {} <varid> }
+    token insn:attr_set { '!!' {} <varid> }
+    token insn:attr_raw { '=!' {} <varid> }
     token insn:cast { <sym> ':' {} <clrid> }
     token insn:clr_call_direct { '.plaincall/' {} <decint> ':' <clrid> }
     token insn:clr_call_virt { '.virtcall/' {} <decint> ':' <clrid> }

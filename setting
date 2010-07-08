@@ -50,7 +50,7 @@ PRE-INIT {
         L@$pmo L@$self !.how
         L@$pmo =[1] @ unwrap:String !.name
 
-        L@$self @.slots L@$pmo ![meta-object]
+        L@$self @.slots  L@$pmo wrap  ![meta-object]
         L@$self =[0] @ cast:DynObject @.klass !.klass
 
         L@$self wrapobj
@@ -58,17 +58,15 @@ PRE-INIT {
 
     # $how.push-scope($outer)
     sub push-scope { Q:NIL {
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject
-          @.def_outers  =[1] @ unwrap:Frame .virtcall/1:Add
+        =[0] @ @!meta-object unwrap:DynProtoMetaObject @.def_outers
+            =[1] @ unwrap:Frame .virtcall/1:Add
         null:Variable
     } }
 
     # $how.add-super($how)
     sub add-super { Q:NIL {
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject
-            @.superclasses
-            =[1] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject
-            .virtcall/1:Add
+        =[0] @ @!meta-object unwrap:DynProtoMetaObject @.superclasses
+            =[1] @ @!meta-object unwrap:DynProtoMetaObject  .virtcall/1:Add
         null:Variable
     } }
 
@@ -76,7 +74,7 @@ PRE-INIT {
     sub add-scoped-method { Q:NIL {
         LEXICALS: $name : String, $index : Int32, $sub : DynObject
         LEXICALS: $mo : DynProtoMetaObject
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject L!$mo
+        =[0] @ @!meta-object unwrap:DynProtoMetaObject L!$mo
         =[1] @ unwrap:String L!$name
         =[2] @ unwrap:Int32 L!$index
         =[3] @ cast:DynObject L!$sub
@@ -96,7 +94,7 @@ PRE-INIT {
     sub create-protoobject { Q:NIL {
         LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
         new/0:DynObject L!$p
-        =[0] @ cast:DynObject @.slots @[meta-object] L!$pmo
+        =[0] @ @!meta-object unwrap:DynProtoMetaObject L!$pmo
         L@$pmo new/1:DynMetaObject L!$mo
         L@$mo @.outers  =[1] @ unwrap:Frame  .virtcall/1:Add
         L@$mo =[2] @ unwrap:List<DynMetaObject>  .virtcall/1:BuildC3MRO
@@ -116,7 +114,7 @@ PRE-INIT {
 
         L@$chpmo L@$ch !.how
         L@$chpmo "ClassHOW" !.name
-        L@$ch @.slots L@$chpmo ![meta-object]
+        L@$ch @.slots L@$chpmo wrap ![meta-object]
 
         L@&push-scope @  L@$ch wrapobj  callframe wrap  .call/2:v
         L@&add-scoped-method @  L@$ch wrapobj  ="new"  0 wrap  L@&new  .call/4:v
@@ -154,7 +152,7 @@ PRE-INIT {
         LEXICALS: $ch : Variable, $dp : DynProtoMetaObject
         L@^^ClassHOW dup@  ="" .method/1:new  L!$ch
         =[0] @ unwrap:DynProtoMetaObject L!$dp
-        L@$ch @ cast:DynObject @.slots L@$dp ![meta-object]
+        L@$ch @  L@$dp wrap @  !!meta-object
         L@$ch dup@  =[1]  .method/1:add-super:v
         L@$ch
     } }
@@ -163,7 +161,7 @@ PRE-INIT {
         LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
         LEXICALS: $s : List<DynMetaObject>
         new/0:DynObject L!$p
-        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject L!$pmo
+        =[0] @ @!meta-object unwrap:DynProtoMetaObject L!$pmo
         =[1] @ unwrap:DynMetaObject L!$mo
 
         new/0:List<DynMetaObject> L!$s

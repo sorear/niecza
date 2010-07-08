@@ -422,6 +422,18 @@ sub insn__S_clr_index_set { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_index_set => ($M->{varid}[0] ? ($M->{varid}[0]{_ast}) : ()) ]];
 }
 
+sub insn__S_attr_get { my ($cl, $M) = @_;
+    $M->{_ast} = [[ attr_get => $M->{varid}{_ast} ]];
+}
+
+sub insn__S_attr_set { my ($cl, $M) = @_;
+    $M->{_ast} = [[ attr_set => $M->{varid}{_ast} ]];
+}
+
+sub insn__S_attr_var { my ($cl, $M) = @_;
+    $M->{_ast} = [[ attr_var => $M->{varid}{_ast} ]];
+}
+
 sub insn__S_cast { my ($cl, $M) = @_;
     $M->{_ast} = [[ cast => $M->{clrid}->Str ]];
 }
