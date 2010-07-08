@@ -63,6 +63,15 @@ PRE-INIT {
         null:Variable
     } }
 
+    # $how.add-super($how)
+    sub add-super { Q:NIL {
+        =[0] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject
+            @.superclasses
+            =[1] @ cast:DynObject @.slots @[meta-object] cast:DynProtoMetaObject
+            .virtcall/1:Add
+        null:Variable
+    } }
+
     # $how.add-scoped-method($name, $index, $sub)
     sub add-scoped-method { Q:NIL {
         LEXICALS: $name : String, $index : Int32, $sub : DynObject
@@ -115,6 +124,8 @@ PRE-INIT {
             L@&push-scope  .call/4:v
         L@&add-scoped-method @  L@$ch wrapobj  ="add-scoped-method"  0 wrap
             L@&add-scoped-method  .call/4:v
+        L@&add-scoped-method @  L@$ch wrapobj  ="add-super"  0 wrap
+            L@&add-super  .call/4:v
         L@&add-scoped-method @  L@$ch wrapobj  ="compose"  0 wrap
             L@&compose  .call/4:v
         L@&add-scoped-method @  L@$ch wrapobj  ="create-protoobject"  0 wrap
@@ -132,10 +143,29 @@ PRE-INIT {
 
 # cannot be a normal class - it has no parents (and must not be cloned)
 my class Mu { ... }
+my class Any { ... }
+my class Cool { ... }
 PRE-INIT { Q:NIL {
+    LEXICALS: $plist : List<DynMetaObject>
     L@^ClassHOW dup@  ="Mu"  .method/1:new  L!^'Mu!HOW'
-    L@^'Mu!HOW' dup@  callframe wrap  new/0:List<DynMetaObject> wrap
+    new/0:List<DynMetaObject> L!$plist
+    L@^'Mu!HOW' dup@  callframe wrap  L@$plist wrap
         .method/2:create-protoobject  L!^Mu
+
+    L@^ClassHOW dup@  ="Any"  .method/1:new  L!^'Any!HOW'
+    L@^'Any!HOW' dup@  L@^'Mu!HOW'  .method/1:add-super:v
+    new/0:List<DynMetaObject> L!$plist
+    L@$plist  L@^Mu @ cast:DynObject @.klass  .virtcall/1:Add
+    L@^'Any!HOW' dup@  callframe wrap  L@$plist wrap
+        .method/2:create-protoobject  L!^Any
+
+    L@^ClassHOW dup@  ="Any"  .method/1:new  L!^'Cool!HOW'
+    L@^'Cool!HOW' dup@  L@^'Any!HOW'  .method/1:add-super:v
+    new/0:List<DynMetaObject> L!$plist
+    L@$plist  L@^Any @ cast:DynObject @.klass  .virtcall/1:Add
+    L@^'Cool!HOW' dup@  callframe wrap  L@$plist wrap
+        .method/2:create-protoobject  L!^Cool
+
     null:Variable
 } }
 

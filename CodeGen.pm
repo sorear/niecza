@@ -21,11 +21,14 @@ use 5.010;
             { how          => 'IP6',
               local        => 'Dictionary<String,DynProtoMetaObject.Method>',
               def_outers   => 'List<Frame>',
+              superclasses => 'List<DynProtoMetaObject>',
               name         => 'String' },
 
         'List<Frame>' =>
             { Add          => 'Void' },
         'List<DynMetaObject>' =>
+            { Add          => 'Void' },
+        'List<DynProtoMetaObject>' =>
             { Add          => 'Void' },
 
         'Kernel.NewROVar'    => 'Variable',
