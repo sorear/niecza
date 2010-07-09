@@ -3,6 +3,7 @@ use warnings;
 use 5.010;
 
 use Body ();
+use Decl ();
 use Unit ();
 use Op ();
 

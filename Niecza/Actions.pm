@@ -610,7 +610,7 @@ sub sl_to_block { my ($cl, $ast, %args) = @_;
     Body->new(
         name    => $subname,
         $args{bare} ? () : (
-            protos  => ($::CURLEX->{'!preinit'} // []),
+            decls   => ($::CURLEX->{'!decls'} // []),
             enter   => ($::CURLEX->{'!enter'} // []),
             lexical => ($::CURLEX->{'!slots'} // {})),
         do      => $ast);
@@ -623,10 +623,8 @@ sub block_to_closure { my ($cl, $blk, %args) = @_;
     $outer->{'!slots'}{$outer_key} = 1 if $outer;
 
     unless ($args{stub}) {
-        push @{ $outer->{'!preinit'} //= [] },
-            [ 0, $outer_key, $blk ] if $outer;
-        push @{ $outer->{'!enter'} //= [] },
-            Op::CloneSub->new(name => $outer_key) if $outer;
+        push @{ $outer->{'!decls'} //= [] },
+            Decl::Sub->new(var => $outer_key, code => $blk) if $outer;
     }
 
     Op::Lexical->new(name => $outer_key);
@@ -684,10 +682,8 @@ sub statement_prefix {}
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 
-    push @{ $::CURLEX->{'!preinit'} //= [] },
-        [ 1, $var, $M->{blast}{_ast} ];
-    push @{ $::CURLEX->{'!enter'} //= [] },
-        Op::ShareLex->new(name => $var);
+    push @{ $::CURLEX->{'!decls'} //= [] },
+        Decl::PreInit->new(var => $var, code => $M->{blast}{_ast}, shared => 1);
 
     $M->{_ast} = Op::Lexical->new(name => $var);
 }
