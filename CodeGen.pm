@@ -167,6 +167,20 @@ use 5.010;
         %{ $self->lex2type } = (%{ $self->lex2type }, @args);
     }
 
+    sub scopelexget {
+        my ($self, $name, $body) = @_;
+        my ($order, $scope) = (0, $body);
+        while ($scope && !$scope->lexical->{$name}) {
+            $scope = $scope->outer;
+            $order++;
+        }
+        if (!$scope) {
+            die "Failed to resolve lexical $name in " .
+                $body->name;
+        }
+        $self->lexget($order, $name);
+    }
+
     sub lexget {
         my ($self, $order, $name) = @_;
         $self->_push(($order ? 'Variable' : $self->lex2type->{$name}),

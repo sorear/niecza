@@ -86,4 +86,69 @@ use 5.010;
     no Moose;
 }
 
+{
+    package Decl::Class;
+    use Moose;
+
+    has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
+    has var  => (is => 'ro', isa => 'Str', required => 1);
+    has stub => (is => 'ro', isa => 'Bool', default => 1);
+    has parents => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
+
+    # the body is a very sublike thing; it has a preinit existance, and a
+    # lexical scope.  but instead of just a Sub, it constructs a ClassHOW at
+    # preinit
+    has body => (is => 'ro', isa => 'Body::Class', required => 1);
+
+    sub preinit {
+        my ($self, $cg, $body) = @_;
+        $cg->scopelexget("ClassHOW", $body);
+        $cg->dup_fetch;
+        $cg->string_var($self->name // 'ANON');
+        $cg->call_method(1, "new", 1);
+        $cg->dup;
+        $cg->push_aux('how');
+        $cg->proto_var($self->var . '!HOW');
+
+        # TODO: Initialize the protoobject to a failure here so an awesome error
+        # is produced if someone tries to use an incomplete class in a BEGIN.
+        $cg->push_null('Variable');
+        $cg->proto_var($self->var);
+
+        $self->body->outer($body);
+        $self->body->var($self->var);
+
+        $cg->open_protopad;
+
+        $cg->peek_aux('how');
+        $cg->dup_fetch;
+        $cg->peek_aux('protopad');
+        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->call_method(0, "push-scope", 1);
+
+        $self->body->preinit($cg);
+        $cg->close_sub($self->body->code);
+        $cg->proto_var($self->var . '!BODY');
+    }
+
+    sub enter   {
+        my ($self, $cg, $body) = @_;
+        $cg->share_lex($self->var . '!HOW');
+        $cg->clone_lex($self->var . '!BODY');
+        $cg->lexget($self->var . '!BODY');
+        $cg->fetch;
+        $cg->call_sub(0, 0);
+        # the body will set $self->var at ENTER time
+    }
+    sub write   {
+        my ($self, $body) = @_;
+        $self->body->var($self->var);
+        $self->body->outer($body);
+        $self->body->write;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;

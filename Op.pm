@@ -125,16 +125,7 @@ use 5.010;
 
     sub item_cg {
         my ($self, $cg, $body) = @_;
-        my ($order, $scope) = (0, $body);
-        while ($scope && !$scope->lexical->{$self->name}) {
-            $scope = $scope->outer;
-            $order++;
-        }
-        if (!$scope) {
-            die "Failed to resolve lexical " . $self->name . " in " .
-                $body->name;
-        }
-        $cg->lexget($order, $self->name);
+        $cg->scopelexget($self->name, $cg);
     }
 
     sub void_cg {
