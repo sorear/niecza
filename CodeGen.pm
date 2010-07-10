@@ -55,6 +55,9 @@ use 5.010;
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
 
+    has auxdepths => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has auxtypes  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+
     sub qm { "\"" . $_[0] . "\"" }
 
     sub _emit {
@@ -125,6 +128,31 @@ use 5.010;
             $self->_emit("th.lex[\"s$i\"] = s$i");
         }
         $self->savedepth($self->depth);
+    }
+
+    sub new_aux {
+        my ($self, $name, $type) = @_;
+        $self->auxdepths->{$name} = 0;
+        $self->auxtypes->{$name} = $type;
+    }
+
+    sub push_aux {
+        my ($self, $which) = @_;
+        my $var = "aux!${which}!" . ($self->auxdepths->{$which}++);
+        $self->lextypes($var, $self->auxtypes->{$which});
+        $self->lexput(0, $var);
+    }
+
+    sub pop_aux {
+        my ($self, $which) = @_;
+        my $var = "aux!${which}!" . (--$self->auxdepths->{$which});
+        $self->lexget(0, $var);
+    }
+
+    sub peek_aux {
+        my ($self, $which) = @_;
+        my $var = "aux!${which}!" . ($self->auxdepths->{$which} - 1);
+        $self->lexget(0, $var);
     }
 
     sub label {
@@ -420,22 +448,26 @@ use 5.010;
 
     sub open_protopad {
         my ($self) = @_;
-        my $p = $self->_peek;
-        $self->_push('Frame', "new Frame($p)");
+        $self->peek_aux('protopad');
+        $self->clr_new('Frame', 1);
+        $self->push_aux('protopad');
     }
 
     sub close_sub {
         my ($self, $bodycg) = @_;
+        $self->pop_aux('protopad');
+        $self->peek_aux('protopad');
+        my $op = $self->_pop;
         my $pp = $self->_pop;
-        my $op = $self->_peek;
         $self->_push('IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
             $bodycg->csname . "), $pp, $op)");
     }
 
     sub proto_var {
         my ($self, $name) = @_;
+        $self->peek_aux('protopad');
+        my $pp = $self->_pop;
         my $pv = $self->_pop;
-        my $pp = $self->_peek;
         $self->_emit("$pp.lex[" . qm($name) . "] = $pv");
     }
 

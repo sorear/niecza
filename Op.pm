@@ -125,7 +125,7 @@ use 5.010;
 
     sub item_cg {
         my ($self, $cg, $body) = @_;
-        $cg->scopelexget($self->name, $cg);
+        $cg->scopelexget($self->name, $body);
     }
 
     sub void_cg {

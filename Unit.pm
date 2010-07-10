@@ -16,7 +16,9 @@ use 5.010;
             return $cg;
         } else {
             $self->codegen($cg = CodeGen->new(name => 'boot'));
+            $cg->new_aux('protopad', 'Frame');
             $cg->push_null('Frame');
+            $cg->push_aux('protopad');
             $cg->open_protopad;
             $self->mainline->preinit($cg);
             $cg->close_sub($self->mainline->code);
