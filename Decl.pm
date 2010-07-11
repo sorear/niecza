@@ -98,10 +98,17 @@ use 5.010;
     # the body is a very sublike thing; it has a preinit existance, and a
     # lexical scope.  but instead of just a Sub, it constructs a ClassHOW at
     # preinit
-    has body => (is => 'ro', isa => 'Body::Class', required => 1);
+    has body => (is => 'ro', isa => 'Body::Class');
 
     sub do_preinit {
         my ($self, $cg, $body) = @_;
+        if ($self->stub) {
+            $cg->push_null('Variable');
+            $cg->proto_var($self->var);
+            $cg->push_null('Variable');
+            $cg->proto_var($self->var . '!HOW');
+            return;
+        }
         $cg->scopelexget("ClassHOW", $body);
         $cg->dup_fetch;
         $cg->string_var($self->name // 'ANON');
@@ -135,13 +142,43 @@ use 5.010;
     sub do_enter   {
         my ($self, $cg, $body) = @_;
         $cg->share_lex($self->var . '!HOW');
-        $cg->clone_lex($self->var . '!BODY');
+        if ($self->stub) {
+            $cg->share_lex($self->var);
+        } else {
+            $cg->clone_lex($self->var . '!BODY');
+        }
     }
     sub write   {
         my ($self, $body) = @_;
+        return unless $self->body;
         $self->body->var($self->var);
         $self->body->outer($body);
         $self->body->write;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::Super;
+    use Moose;
+    extends 'Decl';
+
+    has name => (is => 'ro', isa => 'Str', required => 1);
+
+    sub do_preinit {
+        my ($self, $cg, $body) = @_;
+        if (!$body->isa('Body::Class')) {
+            #TODO: Make this a sorry.
+            die "Tried to set a superclass outside a class!";
+        }
+        push @{ $body->super }, $self->name;
+
+        $cg->peek_aux('how');
+        $cg->dup_fetch;
+        $cg->scopelexget($self->name . "!HOW", $body);
+        $cg->call_method(0, "add-super", 1);
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -56,14 +56,23 @@ use CodeGen ();
     use Moose;
     extends 'Body';
 
-    has 'var' => (is => 'rw', isa => 'Str');
+    has 'var'   => (is => 'rw', isa => 'Str');
+    has 'super' => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
 
     sub makeproto {
         my ($self, $cg) = @_;
         $cg->lextypes('!plist', 'List<DynMetaObject>');
         $cg->clr_new('List<DynMetaObject>', 0);
         $cg->lexput(0, '!plist');
-        # TODO handle superclasses here!
+
+        for my $super (@{ $self->super }) {
+            $cg->lexget(0, '!plist');
+            $cg->scopelexget($super, $self);
+            $cg->fetch;
+            $cg->cast('DynObject');
+            $cg->clr_field_get('klass');
+            $cg->clr_call_virt('Add', 1);
+        }
         $cg->lexget(1, $self->var . '!HOW');
         $cg->dup_fetch;
         $cg->callframe;

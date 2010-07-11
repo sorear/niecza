@@ -605,12 +605,11 @@ sub package_def { my ($cl, $M) = @_;
         $cl->mangle_longname($M->{longname}[0]) : 'ANON';
     my $outer = $cl->get_outer($::CURLEX);
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
-    # allocate a slot
-    $outer->{'!slots'}{$outervar} = 1;
-    $outer->{'!slots'}{"$outervar!HOW"} = 1;
-    $outer->{'!slots'}{"$outervar!BODY"} = 1;
-    # TODO: there should probably be a decl used for stubs, too
     if (!$M->{decl}{stub}) {
+        $outer->{'!slots'}{$outervar} = 1;
+        $outer->{'!slots'}{"$outervar!HOW"} = 1;
+        $outer->{'!slots'}{"$outervar!BODY"} = 1;
+
         my $stmts = $M->{statementlist} // $M->{blockoid};
         my $cbody = Body::Class->new(
             name    => $name,
@@ -628,6 +627,16 @@ sub package_def { my ($cl, $M) = @_;
                 Op::CallSub->new(
                     invocant => Op::Lexical->new(name => $outervar . '!BODY')),
                 Op::Lexical->new(name => $outervar)]);
+    } else {
+        $outer->{'!slots'}{$outervar} = 1;
+        $outer->{'!slots'}{"$outervar!HOW"} = 1;
+
+        push @{ $outer->{'!decls'} //= [] }, Decl::Class->new(
+            name    => $name,
+            var     => $outervar,
+            stub    => 1);
+
+        #XXX: What should this return?
     }
 }
 
