@@ -221,5 +221,24 @@ sub say { Q:NIL {
 
 my class Junction is Mu { }
 my class Num { }
+#my class Str { }
+my class Blob { }
+my class Char { }
+my class CharLingua { }
+my class AnyChar { }
+my class Codepoint { }
+my class Grapheme { }
+my class StrPos { }
+my class StrLen { }
+my class Rat { }
+my class FatRat { }
+my class Complex { }
+my class Int { }
+my class UInt { }
+my class Bit { }
+my class Instant { }
+my class Duration { }
+my class Enum { }
+my class Bool is Enum { }
 
 say("Hello, " ~ "World");
