@@ -2,12 +2,17 @@ use strict;
 use warnings;
 use 5.010;
 
+# A Unit generates a CLR class with a BOOT member
+# All used Units except for the setting go into Niecza.Kernel.Units
+# The main program generates a main class, which sets up Units and runs the
+# setting
+# BOOT subs take one argument, the outer protopad
 {
     package Unit;
     use Moose;
     has mainline => (isa => 'Body', is => 'ro', required => 1);
-
-    has codegen => (isa => 'CodeGen', is => 'rw');
+    has name     => (isa => 'Str', is => 'ro', required => 1);
+    has codegen  => (isa => 'CodeGen', is => 'rw');
 
     sub code {
         my ($self) = @_;
@@ -15,16 +20,17 @@ use 5.010;
         if ($cg) {
             return $cg;
         } else {
-            $self->codegen($cg = CodeGen->new(name => 'boot'));
+            $self->codegen($cg = CodeGen->new(name => 'BOOT', entry => 1));
             $cg->new_aux('protopad', 'Frame');
             $cg->new_aux('how', 'Variable');
-            $cg->push_null('Frame');
+            $cg->pos(0);
+            $cg->fetch;
+            $cg->cast('Frame');
             $cg->push_aux('protopad');
             $cg->open_protopad;
             $self->mainline->do_preinit($cg);
             $cg->close_sub($self->mainline->code);
-            $cg->call_sub(0,0);
-            $cg->return;
+            $cg->return(1);
             return $cg;
         }
     }
@@ -35,20 +41,12 @@ use 5.010;
         print <<EOH;
 using System;
 using System.Collections.Generic;
-namespace Niecza {
-    public class MainClass {
-        public static void Main() {
-            Frame root_f = new Frame(null, null,
-                    new DynBlockDelegate(@{[ $self->code->csname ]}));
-            Frame current = root_f;
-            while (current != null) {
-                current = current.Continue();
-            }
-        }
+using Niecza;
+public class @{[ $self->name ]} {
 EOH
         $self->code->write;
         $self->mainline->write;
-        print "    }\n}\n"
+        print "}\n"
     }
 
     __PACKAGE__->meta->make_immutable;

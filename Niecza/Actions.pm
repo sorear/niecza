@@ -778,7 +778,7 @@ sub comp_unit { my ($cl, $M) = @_;
     my $body = $cl->sl_to_block($M->{statementlist}{_ast},
         subname => 'mainline');
 
-    $M->{_ast} = Unit->new(mainline => $body);
+    $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME);
 }
 
 1;

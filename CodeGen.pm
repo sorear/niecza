@@ -45,6 +45,7 @@ use 5.010;
 
     has name      => (isa => 'Str', is => 'ro');
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
+    has entry     => (isa => 'Bool', is => 'ro', default => 0);
     has depth     => (isa => 'Int', is => 'rw', default => 0);
     has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
@@ -503,6 +504,7 @@ use 5.010;
 
     sub csname {
         my ($self) = @_;
+        return $self->name if $self->entry;
         my @name = split /\W+/, $self->name;
         shift @name if @name && $name[0] eq '';
         join("", (map { ucfirst $_ } @name), "_", $self->uid, "C");
@@ -511,19 +513,20 @@ use 5.010;
     sub write {
         my ($self) = @_;
         my $name = $self->csname;
-        print " " x 8, "private static Frame $name(Frame th) {\n";
-        print " " x 12, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n";
+        my $vis  = ($self->entry ? 'public' : 'private');
+        print " " x 4, "$vis static Frame $name(Frame th) {\n";
+        print " " x 8, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n";
         if ($self->maxdepth) {
-            print " " x 12, "object " . join(", ", map { "s$_" }
+            print " " x 8, "object " . join(", ", map { "s$_" }
                 0 .. ($self->maxdepth - 1)) . ";\n";
         }
-        print " " x 12, "switch (th.ip) {\n";
-        print " " x 16, "case 0:\n";
-        print " " x 16, $_ for @{ $self->buffer };
-        print " " x 16, "default:\n";
-        print " " x 20, "throw new Exception(\"Invalid IP\");\n";
-        print " " x 12, "}\n";
+        print " " x 8, "switch (th.ip) {\n";
+        print " " x 12, "case 0:\n";
+        print " " x 12, $_ for @{ $self->buffer };
+        print " " x 12, "default:\n";
+        print " " x 16, "throw new Exception(\"Invalid IP\");\n";
         print " " x 8, "}\n";
+        print " " x 4, "}\n";
     }
 
     __PACKAGE__->meta->make_immutable;
