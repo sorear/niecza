@@ -220,5 +220,6 @@ sub say { Q:NIL {
 } }
 
 my class Junction is Mu { }
+my class Num { }
 
 say("Hello, " ~ "World");

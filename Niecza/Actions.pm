@@ -613,6 +613,17 @@ sub package_def { my ($cl, $M) = @_;
         my $stmts = $M->{statementlist} // $M->{blockoid};
         unshift @{ $::CURLEX->{'!decls'} //= [] },
             map { $_->{_ast} } @{ $M->{trait} };
+
+        AUTOANY: {
+            for my $d (@{ $::CURLEX->{'!decls'} //= [] }) {
+                next unless $d->isa('Decl::Super');
+                last AUTOANY;
+            }
+
+            push @{ $::CURLEX->{'!decls'} //= [] },
+                Decl::Super->new(name => 'Any');
+        }
+
         my $cbody = Body::Class->new(
             name    => $name,
             decls   => ($::CURLEX->{'!decls'} // []),
