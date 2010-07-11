@@ -611,6 +611,8 @@ sub package_def { my ($cl, $M) = @_;
         $outer->{'!slots'}{"$outervar!BODY"} = 1;
 
         my $stmts = $M->{statementlist} // $M->{blockoid};
+        unshift @{ $::CURLEX->{'!decls'} //= [] },
+            map { $_->{_ast} } @{ $M->{trait} };
         my $cbody = Body::Class->new(
             name    => $name,
             decls   => ($::CURLEX->{'!decls'} // []),

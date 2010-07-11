@@ -219,6 +219,6 @@ sub say { Q:NIL {
     =[0] @ unwrap:String .plaincall/1:Console.WriteLine null:Variable
 } }
 
-my class Junction { also is Mu }
+my class Junction is Mu { }
 
 say("Hello, " ~ "World");
