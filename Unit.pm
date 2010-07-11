@@ -20,7 +20,7 @@ use 5.010;
             $cg->push_null('Frame');
             $cg->push_aux('protopad');
             $cg->open_protopad;
-            $self->mainline->preinit($cg);
+            $self->mainline->do_preinit($cg);
             $cg->close_sub($self->mainline->code);
             $cg->call_sub(0,0);
             $cg->return;
@@ -30,6 +30,7 @@ use 5.010;
 
     sub write {
         my ($self) = @_;
+        #say STDERR (YAML::XS::Dump($self));
         print <<EOH;
 using System;
 using System.Collections.Generic;

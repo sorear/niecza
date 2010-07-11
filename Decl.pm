@@ -6,9 +6,9 @@ use 5.010;
     package Decl;
     use Moose;
 
-    sub preinit {}
-    sub enter   {}
-    sub write   {}
+    sub do_preinit {}
+    sub do_enter   {}
+    sub write     {}
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -23,17 +23,17 @@ use 5.010;
     has code   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub preinit {
+    sub do_preinit {
         my ($self, $cg, $body) = @_;
         $self->code->outer($body);
         $cg->open_protopad;
-        $self->code->preinit($cg);
+        $self->code->do_preinit($cg);
         $cg->close_sub($self->code->code);
         $cg->call_sub($self->has_var, 0);
         $cg->proto_var($self->var) if $self->has_var;
     }
 
-    sub enter {
+    sub do_enter {
         my ($self, $cg, $body) = @_;
         return unless $self->has_var;
         if ($self->shared) {
@@ -61,17 +61,17 @@ use 5.010;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
-    sub preinit {
+    sub do_preinit {
         my ($self, $cg, $body) = @_;
         $self->code->outer($body);
         $cg->open_protopad;
-        $self->code->preinit($cg);
+        $self->code->do_preinit($cg);
         $cg->close_sub($self->code->code);
         $cg->clr_call_direct('Kernel.NewROVar', 1);
         $cg->proto_var($self->var);
     }
 
-    sub enter {
+    sub do_enter {
         my ($self, $cg, $body) = @_;
         $cg->clone_lex($self->var);
     }
@@ -100,7 +100,7 @@ use 5.010;
     # preinit
     has body => (is => 'ro', isa => 'Body::Class', required => 1);
 
-    sub preinit {
+    sub do_preinit {
         my ($self, $cg, $body) = @_;
         $cg->scopelexget("ClassHOW", $body);
         $cg->dup_fetch;
@@ -126,19 +126,15 @@ use 5.010;
         $cg->clr_call_direct('Kernel.NewROVar', 1);
         $cg->call_method(0, "push-scope", 1);
 
-        $self->body->preinit($cg);
+        $self->body->do_preinit($cg);
         $cg->close_sub($self->body->code);
         $cg->proto_var($self->var . '!BODY');
     }
 
-    sub enter   {
+    sub do_enter   {
         my ($self, $cg, $body) = @_;
         $cg->share_lex($self->var . '!HOW');
         $cg->clone_lex($self->var . '!BODY');
-        $cg->lexget($self->var . '!BODY');
-        $cg->fetch;
-        $cg->call_sub(0, 0);
-        # the body will set $self->var at ENTER time
     }
     sub write   {
         my ($self, $body) = @_;

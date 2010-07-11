@@ -140,19 +140,19 @@ use 5.010;
         my ($self, $which) = @_;
         my $var = "aux!${which}!" . ($self->auxdepths->{$which}++);
         $self->lextypes($var, $self->auxtypes->{$which});
-        $self->lexput(0, $var);
+        $self->rawlexput($var);
     }
 
     sub pop_aux {
         my ($self, $which) = @_;
         my $var = "aux!${which}!" . (--$self->auxdepths->{$which});
-        $self->lexget(0, $var);
+        $self->rawlexget($var);
     }
 
     sub peek_aux {
         my ($self, $which) = @_;
         my $var = "aux!${which}!" . ($self->auxdepths->{$which} - 1);
-        $self->lexget(0, $var);
+        $self->rawlexget($var);
     }
 
     sub label {
@@ -192,6 +192,7 @@ use 5.010;
 
     sub lextypes {
         my ($self, @args) = @_;
+        #say STDERR "lextypes: @args";
         %{ $self->lex2type } = (%{ $self->lex2type }, @args);
     }
 
@@ -209,15 +210,37 @@ use 5.010;
         $self->lexget($order, $name);
     }
 
+    sub rawlexget {
+        my ($self, $name) = @_;
+        $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
+    }
+
+    sub rawlexput {
+        my ($self, $name) = @_;
+        $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
+    }
+
     sub lexget {
         my ($self, $order, $name) = @_;
+        my $frame = 'th.';
+        if ($self->auxdepths->{'protopad'}) {
+            $frame = '((Frame)th.lex[' .
+                qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
+                ']).';
+        }
         $self->_push(($order ? 'Variable' : $self->lex2type->{$name}),
-            "th." . ("outer." x $order) . "lex[" . qm($name) . "]");
+            $frame . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 
     sub lexput {
         my ($self, $order, $name) = @_;
-        $self->_emit("th." . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
+        my $frame = 'th.';
+        if ($self->auxdepths->{'protopad'}) {
+            $frame = '((Frame)th.lex[' .
+                qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
+                ']).';
+        }
+        $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
     }
 
     sub string_var {
@@ -233,7 +256,13 @@ use 5.010;
 
     sub callframe {
         my ($self) = @_;
-        $self->_push("Frame", "th");
+        my $frame = 'th';
+        if ($self->auxdepths->{'protopad'}) {
+            $frame = '((Frame)th.lex[' .
+                qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
+                '])';
+        }
+        $self->_push("Frame", $frame);
     }
 
     sub fetch {
