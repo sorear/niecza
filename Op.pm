@@ -45,8 +45,9 @@ use 5.010;
     sub item_cg {
         my ($self, $cg, $body) = @_;
         if (!@{ $self->children }) {
-            # XXX scoping
-            Op::Lexical->new(name => 'Nil')->item_cg($cg, $body);
+            # XXX should be Nil or something
+            $cg->push_null('object');
+            $cg->clr_wrap;
         } else {
             my @kids = @{ $self->children };
             my $end = pop @kids;
@@ -86,6 +87,14 @@ use 5.010;
         $cg->fetch;
         $_->item_cg($cg, $body) for @{ $self->positionals };
         $cg->call_sub(1, scalar(@{ $self->positionals }));
+    }
+
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+        $self->invocant->item_cg($cg, $body);
+        $cg->fetch;
+        $_->item_cg($cg, $body) for @{ $self->positionals };
+        $cg->call_sub(0, scalar(@{ $self->positionals }));
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -584,17 +584,46 @@ sub statementlist { my ($cl, $M) = @_;
 }
 
 sub package_def { my ($cl, $M) = @_;
-    if ($M->{longname}[0] && $::SCOPE ne 'my') {
+    if ($::PKGDECL ne 'class') {
+        $M->sorry('Non-class package definitions are not yet supported');
+        return;
+    }
+    my $scope = $::SCOPE;
+    if (!$M->{longname}[0]) {
+        $scope = 'anon';
+    }
+    if ($::SCOPE ne 'anon' && $::SCOPE ne 'my') {
         $M->sorry('Non-lexical class definitions are not yet supported');
         return;
     }
-    if (!$M->{decl}{stub}) {
-        $M->sorry('Non-stub class definitions are not yet supported');
-        return;
-    }
+    my $name = $M->{longname}[0] ?
+        $cl->mangle_longname($M->{longname}[0]) : 'ANON';
+    my $outer = $cl->get_outer($::CURLEX);
+    my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
     # allocate a slot
-    $::CURLEX->{'!slots'}{$M->{decl}{name}} = 1;
-    $::CURLEX->{'!slots'}{$M->{decl}{name} . "!HOW"} = 1;
+    $outer->{'!slots'}{$outervar} = 1;
+    $outer->{'!slots'}{"$outervar!HOW"} = 1;
+    $outer->{'!slots'}{"$outervar!BODY"} = 1;
+    # TODO: there should probably be a decl used for stubs, too
+    if (!$M->{decl}{stub}) {
+        my $stmts = $M->{statementlist} // $M->{blockoid};
+        my $cbody = Body::Class->new(
+            name    => $name,
+            decls   => ($::CURLEX->{'!decls'} // []),
+            enter   => ($::CURLEX->{'!enter'} // []),
+            lexical => ($::CURLEX->{'!slots'} // {}),
+            do      => $stmts->{_ast});
+        my $cdecl = Decl::Class->new(
+            name    => $name,
+            var     => $outervar,
+            body    => $cbody);
+        push @{ $outer->{'!decls'} //= [] }, $cdecl;
+        $M->{_ast} = Op::StatementList->new(
+            children => [
+                Op::CallSub->new(
+                    invocant => Op::Lexical->new(name => $outervar . '!BODY')),
+                Op::Lexical->new(name => $outervar)]);
+    }
 }
 
 sub routine_declarator {}
@@ -616,8 +645,12 @@ sub sl_to_block { my ($cl, $ast, %args) = @_;
         do      => $ast);
 }
 
+sub get_outer { my ($cl, $pad) = @_;
+    $STD::ALL->{ $pad->{'OUTER::'}[0] };
+}
+
 sub block_to_closure { my ($cl, $blk, %args) = @_;
-    my $outer = $STD::ALL->{ $::CURLEX->{'OUTER::'}[0] };
+    my $outer = $cl->get_outer($::CURLEX);
     my $outer_key = $args{outer_key} // $cl->gensym;
 
     $outer->{'!slots'}{$outer_key} = 1 if $outer;

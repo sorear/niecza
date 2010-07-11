@@ -30,6 +30,7 @@ use CodeGen ();
 
     sub do_enter {
         my ($self, $cg) = @_;
+        $cg->lextypes($_, 'Variable') for keys %{ $self->lexical };
         $_->do_enter($cg, $self) for @{ $self->decls };
         $_->void_cg($cg, $self) for @{ $self->enter };
     }
@@ -66,7 +67,7 @@ use CodeGen ();
         $cg->lexget(1, $self->var . '!HOW');
         $cg->dup_fetch;
         $cg->callframe;
-        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->clr_wrap;
         $cg->lexget(0, '!plist');
         $cg->clr_wrap;
         $cg->call_method(1, "create-protoobject", 2);

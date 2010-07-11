@@ -228,7 +228,8 @@ use 5.010;
                 qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
                 ']).';
         }
-        $self->_push(($order ? 'Variable' : $self->lex2type->{$name}),
+        # XXX need a better type tracking system
+        $self->_push(($order ? 'Variable' : ($self->lex2type->{$name} // 'Variable')),
             $frame . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 

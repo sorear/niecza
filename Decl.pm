@@ -92,7 +92,7 @@ use 5.010;
 
     has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
     has var  => (is => 'ro', isa => 'Str', required => 1);
-    has stub => (is => 'ro', isa => 'Bool', default => 1);
+    has stub => (is => 'ro', isa => 'Bool', default => 0);
     has parents => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
 
     # the body is a very sublike thing; it has a preinit existance, and a
@@ -106,8 +106,8 @@ use 5.010;
         $cg->dup_fetch;
         $cg->string_var($self->name // 'ANON');
         $cg->call_method(1, "new", 1);
-        $cg->dup;
         $cg->push_aux('how');
+        $cg->peek_aux('how');
         $cg->proto_var($self->var . '!HOW');
 
         # TODO: Initialize the protoobject to a failure here so an awesome error
@@ -122,12 +122,13 @@ use 5.010;
 
         $cg->peek_aux('how');
         $cg->dup_fetch;
-        $cg->peek_aux('protopad');
-        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->callframe;
+        $cg->clr_wrap;
         $cg->call_method(0, "push-scope", 1);
 
         $self->body->do_preinit($cg);
         $cg->close_sub($self->body->code);
+        $cg->clr_call_direct('Kernel.NewROVar', 1);
         $cg->proto_var($self->var . '!BODY');
     }
 
