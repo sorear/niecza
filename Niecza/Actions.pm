@@ -541,6 +541,11 @@ sub package_declarator__S_slang { my ($cl, $M) = @_;
     $M->{_ast} = $M->{package_def}{_ast};
 }
 
+sub package_declarator__S_also { my ($cl, $M) = @_;
+    push @{ $::CURLEX->{'!decls'} //= [] },
+        map { $_->{_ast} } @{ $M->{trait} };
+}
+
 sub termish {}
 sub EXPR {}
 
@@ -624,6 +629,32 @@ sub package_def { my ($cl, $M) = @_;
                     invocant => Op::Lexical->new(name => $outervar . '!BODY')),
                 Op::Lexical->new(name => $outervar)]);
     }
+}
+
+sub trait_mod {}
+sub trait_mod__S_is { my ($cl, $M) = @_;
+    my $trait = $M->{longname}->Str;
+
+    if (!$M->is_name($trait)) {
+        $M->sorry('Non-superclass is traits NYI');
+        return;
+    }
+
+    if ($M->{circumfix}[0]) {
+        $M->sorry('Superclasses cannot have parameters');
+        return;
+    }
+
+    $M->{_ast} = Decl::Super->new(name => $trait);
+}
+
+sub trait { my ($cl, $M) = @_;
+    if ($M->{colonpair}) {
+        $M->sorry('Colonpair traits NYI');
+        return;
+    }
+
+    $M->{_ast} = $M->{trait_mod}{_ast};
 }
 
 sub routine_declarator {}
