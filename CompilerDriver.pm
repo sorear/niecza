@@ -1,39 +1,66 @@
+package CompilerDriver;
 use strict;
 use warnings;
 use 5.010;
+
+use Sub::Exporter -setup => {
+    exports => [ qw(header trailer setting mainline) ]
+};
+
+BEGIN {
+    use File::Slurp;
+    GETBASE: {
+        for (read_file 'Makefile') {
+            if (/^STDBASE=(.*)/) {
+                unshift @INC, $1;
+                $ENV{PERL6LIB} = "$1:$1/lib";
+                last GETBASE;
+            }
+        }
+        die "Cannot scrape STDBASE from Makefile";
+    }
+}
 
 use Body ();
 use Decl ();
 use Unit ();
 use Op ();
+use Storable;
 
 use Niecza::Grammar ();
 use Niecza::Actions ();
 
-print <<EOH;
+sub header {
+    print <<EOH;
 using System;
 using System.Collections.Generic;
 using Niecza;
 
 EOH
+}
 
-local $::SETTING_RESUME;
-
-{
+sub setting {
+    local $::SETTING_RESUME;
     local $::YOU_WERE_HERE;
     local $::UNITNAME = 'Setting';
+    $STD::ALL = {};
     my $setting_ast = Niecza::Grammar->parsefile("setting", setting => 'NULL',
         actions => 'Niecza::Actions')->{_ast};
 
     $setting_ast->write;
+    store $::SETTING_RESUME, 'setting_ast.store';
 }
 
-{
+sub mainline {
+    my $code = shift;
     local $::UNITNAME = 'Mainline';
-    Niecza::Grammar->parse("say('Hello, world')", actions => 'Niecza::Actions')->{_ast}->write;
+    local $::SETTING_RESUME = retrieve 'setting_ast.store';
+    $STD::ALL = {};
+    Niecza::Grammar->parse($code, actions => 'Niecza::Actions')->{_ast}->write;
 }
 
-print <<EOF;
+sub trailer {
+    print <<EOF;
 public class EntryPoint {
     public static Frame START(Frame th) {
         Frame t;
@@ -67,3 +94,6 @@ public class EntryPoint {
     }
 }
 EOF
+}
+
+1;
