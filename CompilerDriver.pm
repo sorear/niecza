@@ -4,7 +4,7 @@ use warnings;
 use 5.010;
 
 use Sub::Exporter -setup => {
-    exports => [ qw(header trailer setting mainline) ]
+    exports => [ qw(header bootstrap setting mainline) ]
 };
 
 BEGIN {
@@ -59,7 +59,7 @@ sub mainline {
     Niecza::Grammar->parse($code, actions => 'Niecza::Actions')->{_ast}->write;
 }
 
-sub trailer {
+sub bootstrap {
     print <<EOF;
 public class EntryPoint {
     public static Frame START(Frame th) {

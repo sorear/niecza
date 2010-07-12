@@ -1,5 +1,8 @@
-Kernel.exe
+Program.exe
 Program.cs
+Setting.dll
+Setting.cs
+setting_ast.store
 *.swp
 *.pmc
 syml
