@@ -19,7 +19,7 @@ use CodeGen ();
     sub code {
         my ($self) = @_;
         if ($self->codegen) { return $self->codegen }
-        $self->codegen(CodeGen->new(name => $self->name));
+        $self->codegen(CodeGen->new(name => $self->name, body => $self));
         my $cg = $self->codegen;
         $self->do_enter($cg);
         $self->do->item_cg($cg, $self);

@@ -26,7 +26,7 @@ use 5.010;
     sub do_preinit {
         my ($self, $cg, $body) = @_;
         $self->code->outer($body);
-        $cg->open_protopad;
+        $cg->open_protopad($self->code);
         $self->code->do_preinit($cg);
         $cg->close_sub($self->code->code);
         $cg->call_sub($self->has_var, 0);
@@ -64,7 +64,7 @@ use 5.010;
     sub do_preinit {
         my ($self, $cg, $body) = @_;
         $self->code->outer($body);
-        $cg->open_protopad;
+        $cg->open_protopad($self->code);
         $self->code->do_preinit($cg);
         $cg->close_sub($self->code->code);
         $cg->clr_call_direct('Kernel.NewROVar', 1);
@@ -154,7 +154,7 @@ use 5.010;
         $self->body->outer($body);
         $self->body->var($self->var);
 
-        $cg->open_protopad;
+        $cg->open_protopad($self->body);
 
         $cg->peek_aux('how');
         $cg->dup_fetch;

@@ -28,7 +28,7 @@ use 5.010;
             $cg->fetch;
             $cg->cast('Frame');
             $cg->push_aux('protopad');
-            $cg->open_protopad;
+            $cg->open_protopad($self->mainline);
             $self->mainline->outer($self->setting) if $self->setting;
             $self->mainline->do_preinit($cg);
             $cg->close_sub($self->mainline->code);

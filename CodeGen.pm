@@ -43,6 +43,8 @@ use 5.010;
         'Kernel.ScalarContainerMO' => 'DynMetaObject',
         'Kernel.MainlineContinuation' => 'DynBlockDelegate',
         'Kernel.MakeSub'     => 'IP6',
+        'Kernel.BoxAny'      => 'Variable',
+        'Kernel.UnboxAny'    => 'object',
     );
 
     has name      => (isa => 'Str', is => 'ro');
@@ -60,6 +62,8 @@ use 5.010;
 
     has auxdepths => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has auxtypes  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has body      => (isa => 'Body', is => 'ro');
+    has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
     sub qm { "\"" . $_[0] . "\"" }
 
@@ -200,15 +204,15 @@ use 5.010;
     }
 
     sub scopelexget {
-        my ($self, $name, $body) = @_;
+        my ($self, $name) = @_;
+        my $body = $self->body // $self->bodies->[-1];
         my ($order, $scope) = (0, $body);
         while ($scope && !$scope->lexical->{$name}) {
             $scope = $scope->outer;
             $order++;
         }
         if (!$scope) {
-            die "Failed to resolve lexical $name in " .
-                $body->name;
+            die "Failed to resolve lexical $name in " . $body->name;
         }
         $self->lexget($order, $name);
     }
@@ -354,6 +358,20 @@ use 5.010;
         $self->_push($ty, "((CLRImportObject)$v).val");
     }
 
+    sub box {
+        my ($self, $ty) = @_;
+        $self->scopelexget($ty);
+        $self->fetch;
+        $self->clr_call_direct('Kernel.BoxAny', 2);
+    }
+
+    sub unbox {
+        my ($self, $ty) = @_;
+        $self->fetch;
+        $self->clr_call_direct('Kernel.UnboxAny', 1);
+        $self->cast($ty);
+    }
+
     sub clr_new {
         my ($self, $class, $nargs) = @_;
         my @args = reverse map { $self->_pop } 1 .. $nargs;
@@ -480,15 +498,17 @@ use 5.010;
     }
 
     sub open_protopad {
-        my ($self) = @_;
+        my ($self, $body) = @_;
         $self->peek_aux('protopad');
         $self->clr_new('Frame', 1);
         $self->push_aux('protopad');
+        push @{ $self->bodies }, $body;
     }
 
     sub close_sub {
         my ($self, $bodycg) = @_;
         $self->pop_aux('protopad');
+        pop @{ $self->bodies };
         $self->peek_aux('protopad');
         my $op = $self->_pop;
         my $pp = $self->_pop;

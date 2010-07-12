@@ -448,6 +448,18 @@ blocked:
             return n;
         }
 
+        public static Variable BoxAny(object v, IP6 proto) {
+            DynObject n = new DynObject();
+            n.klass = ((DynObject)proto).klass;
+            n.slots["value"] = v;
+            return NewROVar(n);
+        }
+
+        public static object UnboxAny(IP6 o) {
+            // TODO: Check for compatibility?
+            return ((DynObject)o).slots["value"];
+        }
+
         public static IP6 MakeSC(IP6 inside) {
             DynObject n = new DynObject();
             n.klass = ScalarContainerMO;
