@@ -253,7 +253,8 @@ use 5.010;
 
     sub string_var {
         my ($self, $text) = @_;
-        $self->_push("Variable", "Kernel.NewROVar(new CLRImportObject(" . qm($text) . "))");
+        $self->clr_string($text);
+        $self->box('Str');
     }
 
     sub how {
@@ -367,7 +368,6 @@ use 5.010;
 
     sub unbox {
         my ($self, $ty) = @_;
-        $self->fetch;
         $self->clr_call_direct('Kernel.UnboxAny', 1);
         $self->cast($ty);
     }

@@ -121,16 +121,17 @@ PRE-INIT {
         L@$ch @.slots L@$chpmo wrap ![meta-object]
 
         L@&push-scope @  L@$ch wrapobj  callframe wrap  .call/2:v
-        L@&add-scoped-method @  L@$ch wrapobj  ="new"  0 wrap  L@&new  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  ="push-scope"  0 wrap
+        L@&add-scoped-method @  L@$ch wrapobj  "new" wrap  0 wrap
+            L@&new  .call/4:v
+        L@&add-scoped-method @  L@$ch wrapobj  "push-scope" wrap  0 wrap
             L@&push-scope  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  ="add-scoped-method"  0 wrap
+        L@&add-scoped-method @  L@$ch wrapobj  "add-scoped-method" wrap  0 wrap
             L@&add-scoped-method  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  ="add-super"  0 wrap
+        L@&add-scoped-method @  L@$ch wrapobj  "add-super" wrap  0 wrap
             L@&add-super  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  ="compose"  0 wrap
+        L@&add-scoped-method @  L@$ch wrapobj  "compose" wrap  0 wrap
             L@&compose  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  ="create-protoobject"  0 wrap
+        L@&add-scoped-method @  L@$ch wrapobj  "create-protoobject" wrap  0 wrap
             L@&create-protoobject  .call/4:v
 
         L@&create-protoobject @  L@$ch wrapobj  callframe wrap
@@ -154,7 +155,7 @@ PRE-INIT {
     # (DynProtoMetaObject $dpmo, ClassHOW $super --> ClassHOW)
     sub wrap-dpmo { Q:NIL {
         LEXICALS: $ch : Variable, $dp : DynProtoMetaObject
-        L@^^ClassHOW dup@  ="" .method/1:new  L!$ch
+        L@^^ClassHOW dup@  "" wrap .method/1:new  L!$ch
         =[0] @ unwrap:DynProtoMetaObject L!$dp
         L@$ch @  L@$dp wrap @  !!meta-object
         L@$ch dup@  =[1]  .method/1:add-super:v
@@ -182,19 +183,19 @@ PRE-INIT {
 
 Q:NIL {
     LEXICALS: $plist : List<DynMetaObject>
-    L@^ClassHOW dup@  ="Mu"  .method/1:new  L!^'Mu!HOW'
+    L@^ClassHOW dup@  "Mu" wrap  .method/1:new  L!^'Mu!HOW'
     new/0:List<DynMetaObject> L!$plist
     L@^'Mu!HOW' dup@  callframe wrap  L@$plist wrap
         .method/2:create-protoobject  L!^Mu
 
-    L@^ClassHOW dup@  ="Any"  .method/1:new  L!^'Any!HOW'
+    L@^ClassHOW dup@  "Any" wrap  .method/1:new  L!^'Any!HOW'
     L@^'Any!HOW' dup@  L@^'Mu!HOW'  .method/1:add-super:v
     new/0:List<DynMetaObject> L!$plist
     L@$plist  L@^Mu @ cast:DynObject @.klass  .virtcall/1:Add
     L@^'Any!HOW' dup@  callframe wrap  L@$plist wrap
         .method/2:create-protoobject  L!^Any
 
-    L@^ClassHOW dup@  ="Any"  .method/1:new  L!^'Cool!HOW'
+    L@^ClassHOW dup@  "Cool" wrap  .method/1:new  L!^'Cool!HOW'
     L@^'Cool!HOW' dup@  L@^'Any!HOW'  .method/1:add-super:v
     new/0:List<DynMetaObject> L!$plist
     L@$plist  L@^Any @ cast:DynObject @.klass  .virtcall/1:Add
@@ -215,17 +216,17 @@ Q:NIL {
 } }
 
 sub infix:<~> { Q:NIL {
-    =[0] @ unwrap:String  =[1] @ unwrap:String  .plaincall/2:String.Concat
-        wrap
+    =[0] @ unbox:String  =[1] @ unbox:String  .plaincall/2:String.Concat
+        box:Str
 } }
 
 sub say { Q:NIL {
-    =[0] @ unwrap:String .plaincall/1:Console.WriteLine null:Variable
+    =[0] @ unbox:String .plaincall/1:Console.WriteLine null:Variable
 } }
 
 my class Junction is Mu { }
 my class Num { }
-#my class Str { }
+my class Str { }
 my class Blob { }
 my class Char { }
 my class CharLingua { }

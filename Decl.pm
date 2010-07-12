@@ -140,7 +140,8 @@ use 5.010;
         }
         $cg->scopelexget("ClassHOW", $body);
         $cg->dup_fetch;
-        $cg->string_var($self->name // 'ANON');
+        $cg->clr_string($self->name // 'ANON');
+        $cg->clr_wrap;
         $cg->call_method(1, "new", 1);
         $cg->push_aux('how');
         $cg->peek_aux('how');

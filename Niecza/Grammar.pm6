@@ -69,6 +69,8 @@ grammar NIL is STD {
     token insn:tail_call_sub { '.tailcall/' {} <decint> }
     token insn:unwrap { <sym> ':' {} <clrid> }
     token insn:new { <sym> '/' {} <decint> ':' <clrid> }
+    token insn:box { <sym> ':' {} <varid> }
+    token insn:unbox { <sym> ':' {} <clrid> }
     token insn:clr_field_get { '@.' {} <varid> }
     token insn:clr_field_set { '!.' {} <varid> }
     token insn:clr_index_get { '@[' {} <varid>? ']' }
@@ -86,3 +88,5 @@ grammar NIL is STD {
 }
 
 }
+
+# vim: ft=

@@ -402,6 +402,14 @@ sub insn__S_unwrap { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_unwrap => $M->{clrid}->Str ]];
 }
 
+sub insn__S_box { my ($cl, $M) = @_;
+    $M->{_ast} = [[ box => $M->{varid}->Str ]];
+}
+
+sub insn__S_unbox { my ($cl, $M) = @_;
+    $M->{_ast} = [[ unbox => $M->{clrid}->Str ]];
+}
+
 sub insn__S_clr_sfield_get { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_sfield_get => $M->{clrid}->Str ]];
 }
