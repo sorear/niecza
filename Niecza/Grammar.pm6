@@ -69,6 +69,7 @@ grammar NIL is STD {
     token insn:tail_call_sub { '.tailcall/' {} <decint> }
     token insn:unwrap { <sym> ':' {} <clrid> }
     token insn:new { <sym> '/' {} <decint> ':' <clrid> }
+    token insn:arith { <[ + \- * / ^ & | ]> }
     token insn:box { <sym> ':' {} <varid> }
     token insn:unbox { <sym> ':' {} <clrid> }
     token insn:clr_field_get { '@.' {} <varid> }

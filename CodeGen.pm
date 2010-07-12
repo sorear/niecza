@@ -395,6 +395,17 @@ use 5.010;
         $self->_push('System.Double', "((Double)$val)");
     }
 
+    sub clr_arith {
+        my ($self, $op) = @_;
+        my $ty = $self->stacktype->[-1];
+        if ($ty ne $self->stacktype->[-2]) {
+            die "Overloaded operations not yet supported";
+        }
+        my $a2 = $self->_pop;
+        my $a1 = $self->_pop;
+        $self->_push($ty, "$a1 $op $a2");
+    }
+
     sub clr_field_get {
         my ($self, $f) = @_;
         my $ty = $typedata{$self->stacktype->[-1]}{$f};
