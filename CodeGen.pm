@@ -517,7 +517,8 @@ use 5.010;
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print " " x 4, "$vis static Frame $name(Frame th) {\n";
-        print " " x 8, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n";
+        print " " x 8, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n"
+            if $ENV{NIECZA_TRACE};
         if ($self->maxdepth) {
             print " " x 8, "object " . join(", ", map { "s$_" }
                 0 .. ($self->maxdepth - 1)) . ";\n";
