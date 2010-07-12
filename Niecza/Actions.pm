@@ -699,6 +699,9 @@ sub routine_declarator {}
 sub routine_declarator__S_sub { my ($cl, $M) = @_;
     $M->{_ast} = $M->{routine_def}{_ast};
 }
+sub routine_declarator__S_method { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{method_def}{_ast};
+}
 
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
@@ -763,6 +766,38 @@ sub routine_def { my ($cl, $M) = @_;
             $cl->sl_to_block($M->{blockoid}{_ast}, subname => $m),
         stub => $dln && $M->{decl}{stub},
         outer_key => (($scope eq 'my') ? "&$m" : undef));
+}
+
+sub method_def { my ($cl, $M) = @_;
+    my $scope = $::SCOPE // 'has';
+    $scope = 'anon' if !$M->{longname};
+    my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}) : undef;
+
+    if ($M->{trait}[0] || $M->{multisig}[0] || $M->{sigil}) {
+        $M->sorry("Method traits NYI");
+        return;
+    }
+
+    my $sym = ($scope eq 'my') ? ('&' . $name) : $cl->gensym;
+
+    if ($scope eq 'augment' || $scope eq 'supercede' || $scope eq 'state') {
+        $M->sorry("Illogical scope $scope for method");
+        return;
+    }
+
+    if ($scope eq 'our') {
+        $M->sorry("Packages NYI");
+        return;
+    }
+
+    my $bl = $cl->sl_to_block($M->{blockoid}{_ast}, subname => $name);
+    $cl->block_to_closure($bl, outer_key => $sym);
+
+    push @{ $cl->get_outer($::CURLEX)->{'!decls'} },
+        Decl::HasMethod->new(name => $name, var => $sym)
+            unless $scope eq 'anon';
+
+    $M->{_ast} = Op::Lexical->new(name => $sym);
 }
 
 sub block { my ($cl, $M) = @_;

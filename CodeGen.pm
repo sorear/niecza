@@ -30,6 +30,8 @@ use 5.010;
             { Add          => 'Void' },
         'List<DynProtoMetaObject>' =>
             { Add          => 'Void' },
+        'Double' =>
+            { ToString     => 'String' },
 
         'Kernel.NewROVar'    => 'Variable',
         'Kernel.NewRWVar'    => 'Variable',

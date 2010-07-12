@@ -191,6 +191,34 @@ use 5.010;
 }
 
 {
+    package Decl::HasMethod;
+    use Moose;
+    extends 'Decl';
+
+    has name => (is => 'ro', isa => 'Str', required => 1);
+    has var  => (is => 'ro', isa => 'Str', required => 1);
+
+    sub do_preinit {
+        my ($self, $cg, $body) = @_;
+        if (!$body->isa('Body::Class')) {
+            #TODO: Make this a sorry.
+            die "Tried to set a method outside a class!";
+        }
+        $cg->peek_aux('how');
+        $cg->dup_fetch;
+        $cg->clr_string($self->name);
+        $cg->clr_wrap;
+        $cg->clr_int(0);
+        $cg->clr_wrap;
+        $cg->scopelexget($self->var);
+        $cg->call_method(0, "add-scoped-method", 3);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::Super;
     use Moose;
     extends 'Decl';
