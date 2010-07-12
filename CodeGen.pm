@@ -390,6 +390,11 @@ use 5.010;
         $self->_push('System.Int32', $val);
     }
 
+    sub clr_double {
+        my ($self, $val) = @_;
+        $self->_push('System.Double', "((Double)$val)");
+    }
+
     sub clr_field_get {
         my ($self, $f) = @_;
         my $ty = $typedata{$self->stacktype->[-1]}{$f};

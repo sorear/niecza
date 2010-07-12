@@ -126,6 +126,23 @@ use 5.010;
 }
 
 {
+    package Op::Num;
+    use Moose;
+    extends 'Op';
+
+    has value => (isa => 'Num', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $cg->clr_double($self->value);
+        $cg->box('Num');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Lexical;
     use Moose;
     extends 'Op';

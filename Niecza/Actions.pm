@@ -52,7 +52,8 @@ sub number { my ($cl, $M) = @_;
 # Value :: Op
 sub value { }
 sub value__S_number { my ($cl, $M) = @_;
-    $M->sorry("Num is NYI");
+    # TODO: Implement the rest of the numeric hierarchy once MMD exists
+    $M->{_ast} = Op::Num->new(value => $M->{number}{_ast});
 }
 
 sub value__S_quote { my ($cl, $M) = @_;
