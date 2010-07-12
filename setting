@@ -221,12 +221,17 @@ sub infix:<~> { Q:NIL {
 } }
 
 sub say { Q:NIL {
-    =[0] @ unbox:String .plaincall/1:Console.WriteLine null:Variable
+    =[0] dup@ .method/0:Str @ unbox:String
+        .plaincall/1:Console.WriteLine null:Variable
 } }
 
 my class Junction is Mu { }
-my class Num { }
-my class Str { }
+my class Num {
+    method Str { Q:NIL { =[0] @ unbox:Double .virtcall/0:ToString box:Str } }
+}
+my class Str {
+    method Str { Q:NIL { =[0] } }
+}
 my class Blob { }
 my class Char { }
 my class CharLingua { }
