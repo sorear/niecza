@@ -275,6 +275,14 @@ sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
     $M->{_ast} = Op::Yada->new(kind => '???');
 }
 
+sub term__S_YOU_ARE_HERE { my ($cl, $M) = @_;
+    push @{ $::CURLEX->{'!decls'} //= [] },
+        Decl::RunMainline->new;
+    $::CURLEX->{'!slots'}{'!mainline'} = 1;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '!mainline'));
+}
+
 sub voidmark { my ($cl, $M) = @_;
     $M->{_ast} = 1;
 }
@@ -778,7 +786,8 @@ sub comp_unit { my ($cl, $M) = @_;
     my $body = $cl->sl_to_block($M->{statementlist}{_ast},
         subname => 'mainline');
 
-    $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME);
+    $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME,
+        $::SETTING_RESUME ? (setting => $::SETTING_RESUME) : ());
 }
 
 1;

@@ -13,6 +13,7 @@ use 5.010;
     has mainline => (isa => 'Body', is => 'ro', required => 1);
     has name     => (isa => 'Str', is => 'ro', required => 1);
     has codegen  => (isa => 'CodeGen', is => 'rw');
+    has setting  => (isa => 'Body', is => 'ro');
 
     sub code {
         my ($self) = @_;
@@ -28,8 +29,10 @@ use 5.010;
             $cg->cast('Frame');
             $cg->push_aux('protopad');
             $cg->open_protopad;
+            $self->mainline->outer($self->setting) if $self->setting;
             $self->mainline->do_preinit($cg);
             $cg->close_sub($self->mainline->code);
+            $cg->clr_call_direct('Kernel.NewROVar', 1);
             $cg->return(1);
             return $cg;
         }
@@ -39,9 +42,6 @@ use 5.010;
         my ($self) = @_;
         #say STDERR (YAML::XS::Dump($self));
         print <<EOH;
-using System;
-using System.Collections.Generic;
-using Niecza;
 public class @{[ $self->name ]} {
 EOH
         $self->code->write;

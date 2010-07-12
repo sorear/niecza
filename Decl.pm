@@ -87,6 +87,35 @@ use 5.010;
 }
 
 {
+    package Decl::RunMainline;
+    use Moose;
+    extends 'Decl';
+
+    sub do_preinit {
+        my ($self, $cg, $body) = @_;
+        $cg->clr_sfield_get('Kernel.MainlineContinuation');
+        $cg->push_null('Frame');
+        $cg->push_null('Frame');
+        $cg->clr_call_direct('Kernel.MakeSub', 3);
+
+        $cg->peek_aux('protopad');
+        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->call_sub(1, 1);
+        $cg->proto_var('!mainline');
+
+        $::SETTING_RESUME = $body;
+    }
+
+    sub do_enter {
+        my ($self, $cg, $body) = @_;
+        $cg->clone_lex('!mainline');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::Class;
     use Moose;
 

@@ -314,6 +314,8 @@ blocked:
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
+        public static DynBlockDelegate MainlineContinuation;
+
         private static Frame SCFetch(DynObject th, Frame caller) {
             caller.resultSlot = th.slots["value"];
             return caller;

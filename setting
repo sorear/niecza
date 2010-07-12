@@ -1,5 +1,9 @@
 # vim: ft=perl6
 
+# XXX fakes out STD.pm6 into doing more or less the right thing
+# need to understand this better
+my class CORE { ... }
+
 # We have to do this directly due to the circularity saw.  Same
 # reason forces uncontainerized .NET values.
 #
@@ -241,4 +245,4 @@ my class Duration { }
 my class Enum { }
 my class Bool is Enum { }
 
-say("Hello, " ~ "World");
+YOU_ARE_HERE;

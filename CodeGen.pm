@@ -41,6 +41,8 @@ use 5.010;
         'Kernel.SubMO'       => 'DynMetaObject',
         'Kernel.ScalarContainerPMO' => 'DynProtoMetaObject',
         'Kernel.ScalarContainerMO' => 'DynMetaObject',
+        'Kernel.MainlineContinuation' => 'DynBlockDelegate',
+        'Kernel.MakeSub'     => 'IP6',
     );
 
     has name      => (isa => 'Str', is => 'ro');
