@@ -516,20 +516,20 @@ use 5.010;
         my ($self) = @_;
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
-        print " " x 4, "$vis static Frame $name(Frame th) {\n";
-        print " " x 8, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n"
+        print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
+        print ::NIECZA_OUT " " x 8, "Console.WriteLine(\"Entering $name @ \" + th.ip);\n"
             if $ENV{NIECZA_TRACE};
         if ($self->maxdepth) {
-            print " " x 8, "object " . join(", ", map { "s$_" }
+            print ::NIECZA_OUT " " x 8, "object " . join(", ", map { "s$_" }
                 0 .. ($self->maxdepth - 1)) . ";\n";
         }
-        print " " x 8, "switch (th.ip) {\n";
-        print " " x 12, "case 0:\n";
-        print " " x 12, $_ for @{ $self->buffer };
-        print " " x 12, "default:\n";
-        print " " x 16, "throw new Exception(\"Invalid IP\");\n";
-        print " " x 8, "}\n";
-        print " " x 4, "}\n";
+        print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
+        print ::NIECZA_OUT " " x 12, "case 0:\n";
+        print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
+        print ::NIECZA_OUT " " x 12, "default:\n";
+        print ::NIECZA_OUT " " x 16, "throw new Exception(\"Invalid IP\");\n";
+        print ::NIECZA_OUT " " x 8, "}\n";
+        print ::NIECZA_OUT " " x 4, "}\n";
     }
 
     __PACKAGE__->meta->make_immutable;

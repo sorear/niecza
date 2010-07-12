@@ -41,12 +41,12 @@ use 5.010;
     sub write {
         my ($self) = @_;
         #say STDERR (YAML::XS::Dump($self));
-        print <<EOH;
+        print ::NIECZA_OUT <<EOH;
 public class @{[ $self->name ]} {
 EOH
         $self->code->write;
         $self->mainline->write;
-        print "}\n"
+        print ::NIECZA_OUT "}\n"
     }
 
     __PACKAGE__->meta->make_immutable;

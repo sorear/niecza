@@ -1,0 +1,51 @@
+#! /usr/bin/env perl
+use warnings;
+use strict;
+use 5.010_001;
+
+use CompilerDriver ':all';
+use Getopt::Long;
+use Term::ReadLine;
+use autodie ':all';
+
+my @evaluate;
+
+sub usage {
+    my ($fh, $ex) = @_;
+    print $fh <<EOM;
+niecza -- a command line wrapper for Niecza
+
+usage: niecza [-e 'code']
+EOM
+    exit $ex;
+}
+
+GetOptions('evaluate|e=s' => \@evaluate) or usage(\*STDERR, 1);
+
+close ::NIECZA_OUT;
+
+sub run {
+    open ::NIECZA_OUT, ">", "Program.cs";
+    header;
+    mainline(shift);
+    bootstrap;
+    close ::NIECZA_OUT;
+
+    system 'gmcs /r:Setting.dll Program.cs';
+    system 'mono --debug=casts Program.exe';
+}
+
+if (@evaluate) {
+    for (@evaluate) {
+        run($_);
+    }
+} else {
+    my $term = Term::ReadLine->new('niecza');
+    while (defined ($_ = $term->readline("> ")) ) {
+        eval {
+            run($_);
+        };
+        say $@ if $@;
+        $term->addhistory($_) if /\S/;
+    }
+}

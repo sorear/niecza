@@ -7,6 +7,8 @@ use Sub::Exporter -setup => {
     exports => [ qw(header bootstrap setting mainline) ]
 };
 
+open ::NIECZA_OUT, ">&", \*STDOUT;
+
 BEGIN {
     use File::Slurp;
     GETBASE: {
@@ -31,7 +33,7 @@ use Niecza::Grammar ();
 use Niecza::Actions ();
 
 sub header {
-    print <<EOH;
+    print ::NIECZA_OUT <<EOH;
 using System;
 using System.Collections.Generic;
 using Niecza;
@@ -60,7 +62,7 @@ sub mainline {
 }
 
 sub bootstrap {
-    print <<EOF;
+    print ::NIECZA_OUT <<EOF;
 public class EntryPoint {
     public static Frame START(Frame th) {
         Frame t;
