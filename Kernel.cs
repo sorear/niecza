@@ -33,9 +33,12 @@ namespace Niecza {
     public struct LValue {
         public IP6 container;
         public bool rw;
+        // if true, list contexts will try to unpack the value; otherwise it's
+        // always treated as a scalar
+        public bool pl;
 
-        public LValue(bool rw_, IP6 container_) {
-            rw = rw_;
+        public LValue(bool rw_, bool pl_, IP6 container_) {
+            rw = rw_; pl = pl_;
             container = container_;
         }
     }
@@ -367,7 +370,7 @@ blocked:
 
         public static Frame Die(Frame caller, string msg) {
             Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
-            f.pos = new LValue[1] { new LValue(true, new CLRImportObject(msg)) };
+            f.pos = new LValue[1] { new LValue(true, false, new CLRImportObject(msg)) };
             f.named = null;
             return f;
         }
@@ -468,11 +471,11 @@ blocked:
         }
 
         public static LValue NewROLValue(IP6 inside) {
-            return new LValue(false, MakeSC(inside));
+            return new LValue(false, false, MakeSC(inside));
         }
 
         public static LValue NewRWLValue(IP6 inside) {
-            return new LValue(true, MakeSC(inside));
+            return new LValue(true, false, MakeSC(inside));
         }
 
         public static Variable NewROVar(IP6 inside) {
