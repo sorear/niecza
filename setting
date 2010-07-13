@@ -295,6 +295,13 @@ sub say($str) { Q:NIL {
         .plaincall/1:Console.WriteLine null:Variable
 } }
 
-sub infix:<=>($l,$r) { Q:NIL { {$l} {$r} @ !  {$l} @ } }
+sub infix:<=>($l,$r) { Q:NIL { {$l} {$r} @ !  {$l} } }
+
+# Buglet in STD: standard infix operators look custom inside the setting, and
+# forget their precedence.
+sub prefix:<-->($v) { $v = ($v - 1); $v }
+sub prefix:<++>($v) { $v = ($v + 1); $v }
+sub postfix:<-->($v) { my $old = $v; $v = ($v - 1); $v }
+sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $v }
 
 YOU_ARE_HERE;
