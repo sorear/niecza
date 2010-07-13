@@ -184,6 +184,12 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
         [ grep { defined $_ } @{ $M->{semilist}{_ast} } ]);
 }
 
+sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => $cl->block_to_closure(0, $M->{pblock}{_ast}),
+        positionals => []);
+}
+
 sub infixish { my ($cl, $M) = @_;
     $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];
     $M->sorry("Adverbs NYI") if $M->{colonpair};
@@ -992,8 +998,8 @@ sub get_outer { my ($cl, $pad) = @_;
     $STD::ALL->{ $pad->{'OUTER::'}[0] };
 }
 
-sub block_to_closure { my ($cl, $blk, %args) = @_;
-    my $outer = $cl->get_outer($::CURLEX);
+sub block_to_closure { my ($cl, $uplevel, $blk, %args) = @_;
+    my $outer = $uplevel ? $cl->get_outer($::CURLEX) : $::CURLEX;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
     $outer->{'!slots'}{$outer_key} = 1 if $outer;
@@ -1033,7 +1039,7 @@ sub routine_def { my ($cl, $M) = @_;
 
     my $m = $dln ? $cl->mangle_longname($dln) : undef;
 
-    $M->{_ast} = $cl->block_to_closure(
+    $M->{_ast} = $cl->block_to_closure(1,
             $cl->sl_to_block(
                 $M->{blockoid}{_ast},
                 subname => $m,
@@ -1065,7 +1071,7 @@ sub method_def { my ($cl, $M) = @_;
     }
 
     my $bl = $cl->sl_to_block($M->{blockoid}{_ast}, subname => $name);
-    $cl->block_to_closure($bl, outer_key => $sym);
+    $cl->block_to_closure(1, $bl, outer_key => $sym);
 
     push @{ $cl->get_outer($::CURLEX)->{'!decls'} },
         Decl::HasMethod->new(name => $name, var => $sym)
@@ -1076,6 +1082,13 @@ sub method_def { my ($cl, $M) = @_;
 
 sub block { my ($cl, $M) = @_;
     $M->{_ast} = $cl->sl_to_block($M->{blockoid}{_ast});
+}
+
+# :: Body
+sub pblock { my ($cl, $M) = @_;
+    my $rw = $M->{lambda} && $M->{lambda}->Str eq '<->';
+    $M->{_ast} = $cl->sl_to_block($M->{blockoid}{_ast},
+        signature => ($M->{signature} ? $M->{signature}{_ast} : undef));
 }
 
 # returns Body of 0 args
