@@ -109,6 +109,7 @@ grammar NIL is STD {
     token insn:clr_sfield_set { 'F!' {} <clrid> }
     token insn:return { <sym> '/' (<[ 0 1 ]>) }
     token insn:push_null { 'null:' {} <clrid> }
+    token insn:hll { '{' ~ '}' [ :lang(%*LANG<MAIN>) <EXPR> ] }
 }
 
 }

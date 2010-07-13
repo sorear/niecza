@@ -528,6 +528,10 @@ sub insn__S_push_null { my ($cl, $M) = @_;
     $M->{_ast} = [[ push_null => $M->{clrid}->Str ]];
 }
 
+sub insn__S_hll { my ($cl, $M) = @_;
+    $M->{_ast} = [ $M->{EXPR}{_ast} ];
+}
+
 sub clrid {}
 sub clrqual {}
 sub clrgeneric {}

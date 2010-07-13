@@ -20,8 +20,12 @@ use 5.010;
     sub item_cg {
         my ($self, $cg, $body) = @_;
         for my $insn (@{ $self->code }) {
-            my ($op, @args) = @$insn;
-            $cg->$op(@args);
+            if (blessed $insn) {
+                $insn->item_cg($cg, $body);
+            } else {
+                my ($op, @args) = @$insn;
+                $cg->$op(@args);
+            }
         }
     }
 
