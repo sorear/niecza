@@ -944,13 +944,21 @@ sub gensym { 'anon_' . ($next_anon_id++) }
 
 sub sl_to_block { my ($cl, $ast, %args) = @_;
     my $subname = $args{subname} // 'ANON';
+    if ($args{signature}) {
+        for ($args{signature}->used_slots) {
+            push @{ $::CURLEX->{'!decls'} //= [] },
+                Decl::SimpleVar->new(slot => $_);
+            $::CURLEX->{'!slots'}{$_} = 1;
+        }
+    }
     Body->new(
-        name    => $subname,
+        name      => $subname,
         $args{bare} ? () : (
             decls   => ($::CURLEX->{'!decls'} // []),
             enter   => ($::CURLEX->{'!enter'} // []),
             lexical => ($::CURLEX->{'!slots'} // {})),
-        do      => $ast);
+        signature => $args{signature},
+        do        => $ast);
 }
 
 sub get_outer { my ($cl, $pad) = @_;
@@ -978,8 +986,8 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
     my $dln = $M->{deflongname}[0];
-    if ($M->{multisig}[0]) {
-        $M->sorry("Signatures NYI");
+    if (@{ $M->{multisig} } > 1) {
+        $M->sorry("Multiple multisigs (what?) NYI");
         return;
     }
     if ($M->{trait}[0]) {
@@ -999,7 +1007,10 @@ sub routine_def { my ($cl, $M) = @_;
     my $m = $dln ? $cl->mangle_longname($dln) : undef;
 
     $M->{_ast} = $cl->block_to_closure(
-            $cl->sl_to_block($M->{blockoid}{_ast}, subname => $m),
+            $cl->sl_to_block(
+                $M->{blockoid}{_ast},
+                subname => $m,
+                signature => ($M->{multisig}[0] ? $M->{multisig}[0]{_ast} : undef)),
         stub => $dln && $M->{decl}{stub},
         outer_key => (($scope eq 'my') ? "&$m" : undef));
 }

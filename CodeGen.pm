@@ -32,6 +32,8 @@ use 5.010;
             { Add          => 'Void' },
         'Double' =>
             { ToString     => 'String' },
+        'Variable' =>
+            { lv           => 'LValue' },
 
         'Kernel.NewROVar'    => 'Variable',
         'Kernel.NewRWVar'    => 'Variable',

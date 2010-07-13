@@ -7,14 +7,15 @@ use CodeGen ();
     package Body;
     use Moose;
 
-    has name    => (isa => 'Str', is => 'rw', default => "anon");
-    has do      => (isa => 'Op', is => 'rw');
-    has enter   => (isa => 'ArrayRef[Op]', is => 'ro',
+    has name      => (isa => 'Str', is => 'rw', default => "anon");
+    has do        => (isa => 'Op', is => 'rw');
+    has enter     => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
-    has lexical => (isa => 'HashRef', is => 'ro', default => sub { +{} });
-    has outer   => (isa => 'Body', is => 'rw', init_arg => undef);
-    has decls   => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has codegen => (isa => 'CodeGen', is => 'rw');
+    has lexical   => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
+    has decls     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has codegen   => (isa => 'CodeGen', is => 'rw');
+    has signature => (isa => 'Maybe[Sig]', is => 'ro');
 
     sub code {
         my ($self) = @_;
@@ -32,6 +33,7 @@ use CodeGen ();
         my ($self, $cg) = @_;
         $cg->lextypes($_, 'Variable') for keys %{ $self->lexical };
         $_->do_enter($cg, $self) for @{ $self->decls };
+        $self->signature->gen_binder($cg) if $self->signature;
         $_->void_cg($cg, $self) for @{ $self->enter };
     }
 
