@@ -218,6 +218,7 @@ Q:NIL {
 my class Junction is Mu { }
 my class Num {
     method Str { Q:NIL { =[0] @ unbox:Double .virtcall/0:ToString box:Str } }
+    method Bool { Q:NIL { =[0] @ unbox:Double  0 !=  box:Bool } }
 }
 my class Str {
     method Str { Q:NIL { =[0] } }
@@ -241,6 +242,7 @@ my class Duration { }
 my class Enum { }
 my class Bool is Enum {
     method Str { if Q:NIL { =[0] } { "Bool::True" } else { "Bool::False" } }
+    method Bool { Q:NIL { =[0] } }
 }
 
 sub infix:<~>($l,$r) { Q:NIL {
