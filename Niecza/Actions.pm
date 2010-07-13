@@ -179,6 +179,11 @@ sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
 }
 sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
 
+sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
+    $M->{_ast} = Op::StatementList->new(children => 
+        [ grep { defined $_ } @{ $M->{semilist}{_ast} } ]);
+}
+
 sub infixish { my ($cl, $M) = @_;
     $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];
     $M->sorry("Adverbs NYI") if $M->{colonpair};
@@ -856,6 +861,10 @@ sub statement { my ($cl, $M) = @_;
 sub statementlist { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children => 
         [ grep { defined $_ } map { $_->{_ast} } @{ $M->{statement} } ]);
+}
+
+sub semilist { my ($cl, $M) = @_;
+    $M->{_ast} = [  map { $_->{_ast} } @{ $M->{statement} } ];
 }
 
 sub package_def { my ($cl, $M) = @_;
