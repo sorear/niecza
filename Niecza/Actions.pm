@@ -157,14 +157,17 @@ sub circumfix { }
 sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
     my $sl = $M->{nibble}{_ast};
 
-    if (!$sl->isa('Op::StringLiteral') || ($sl->text =~ /\s/)) {
+    if (!$sl->isa('Op::StringLiteral') || ($sl->text =~ /\S\s\S/)) {
         $M->sorry("Word splitting NYI");
         return;
     }
 
-    $M->{_ast} = $sl;
-    $M->{qpvalue} = '<' . $sl->text . '>';
+    my ($t) = $sl->text =~ /^\s*(.*?)\s*$/;
+
+    $M->{_ast} = Op::StringLiteral->new(text => $t);
+    $M->{qpvalue} = '<' . $t . '>';
 }
+sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
 
 sub infixish { my ($cl, $M) = @_;
     $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];

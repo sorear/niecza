@@ -236,6 +236,30 @@ sub infix:</> { Q:NIL {
     =[0] @ unbox:Double  =[1] @ unbox:Double  /  box:Num
 } }
 
+sub infix:<< < >> { Q:NIL {
+    =[0] @ unbox:Double  =[1] @ unbox:Double  <  box:Bool
+} }
+
+sub infix:<< > >> { Q:NIL {
+    =[0] @ unbox:Double  =[1] @ unbox:Double  >  box:Bool
+} }
+
+sub infix:<< <= >> { Q:NIL {
+    =[0] @ unbox:Double  =[1] @ unbox:Double  <=  box:Bool
+} }
+
+sub infix:<< >= >> { Q:NIL {
+    =[0] @ unbox:Double  =[1] @ unbox:Double  >=  box:Bool
+} }
+
+sub infix:<< == >> { Q:NIL {
+    =[0] @ unbox:Double  =[1] @ unbox:Double  ==  box:Bool
+} }
+
+sub infix:<< != >> { Q:NIL {
+    =[0] @ unbox:Double  =[1] @ unbox:Double  !=  box:Bool
+} }
+
 sub say { Q:NIL {
     =[0] dup@ .method/0:Str @ unbox:String
         .plaincall/1:Console.WriteLine null:Variable
