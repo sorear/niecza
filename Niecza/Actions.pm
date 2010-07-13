@@ -445,6 +445,10 @@ sub insn__S_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'fetch' ]];
 }
 
+sub insn__S_store { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'store' ]];
+}
+
 sub insn__S_dup_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'dup_fetch' ]];
 }

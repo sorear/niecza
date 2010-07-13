@@ -295,4 +295,6 @@ sub say { Q:NIL {
         .plaincall/1:Console.WriteLine null:Variable
 } }
 
+sub infix:<=> { Q:NIL { =[0] =[1] @ !  =[0] @ } }
+
 YOU_ARE_HERE;
