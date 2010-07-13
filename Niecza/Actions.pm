@@ -200,6 +200,12 @@ sub CHAIN { my ($cl, $M) = @_;
         positionals => [ $M->{chain}[0]{_ast}, $M->{chain}[2]{_ast} ]);
 }
 
+sub POSTFIX { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&postfix:<' . $M->{sym} . '>'),
+        positionals => [ $M->{arg}{_ast} ]);
+}
+
 # infix et al just parse the operator itself
 sub infix { }
 sub infix__S_ANY { }
@@ -209,6 +215,11 @@ sub prefix__S_ANY { }
 
 sub postfix { }
 sub postfix__S_ANY { }
+
+sub postcircumfix { }
+
+sub postop { }
+sub POST { }
 
 sub coloncircumfix { my ($cl, $M) = @_;
     $M->{_ast} = $M->{circumfix}{_ast};
