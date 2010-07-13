@@ -300,7 +300,7 @@ sub infix:<=>($l,$r) { Q:NIL { {$l} {$r} @ !  {$l} } }
 # forget their precedence.
 sub prefix:<-->($v) { $v = ($v - 1); $v }
 sub prefix:<++>($v) { $v = ($v + 1); $v }
-sub postfix:<-->($v) { my $old = $v; $v = ($v - 1); $v }
-sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $v }
+sub postfix:<-->($v) { my $old = $v; $v = ($v - 1); $old }
+sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $old }
 
 YOU_ARE_HERE;
