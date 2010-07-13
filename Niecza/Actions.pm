@@ -6,6 +6,7 @@ use warnings;
 use Op;
 use Body;
 use Unit;
+use Sig;
 
 our $AUTOLOAD;
 my %carped;
@@ -322,6 +323,88 @@ sub variable { my ($cl, $M) = @_;
         term => Op::Lexical->new(name => $sl),
         decl_slot => $sl,
     };
+}
+
+sub param_sep {}
+
+# :: Sig::Target
+sub param_var { my ($cl, $M) = @_;
+    if ($M->{signature}) {
+        $M->sorry('Sub-signatures NYI');
+        return;
+    }
+    if ($M->{twigil}[0] || ($M->{sigil}->Str ne '$')) {
+        $M->sorry('Non bare scalar targets NYI');
+        return;
+    }
+    $M->{_ast} = Sig::Target->new(slot =>
+        $M->{name}[0] ? ('$' . $M->{name}[0]->Str) : undef);
+}
+
+# :: Sig::Parameter
+sub parameter { my ($cl, $M) = @_;
+    if (@{ $M->{type_constraint} } > 0) {
+        $M->sorry('Parameter type constraints NYI');
+        return;
+    }
+
+    if (@{ $M->{trait} } > 0) {
+        $M->sorry('Parameter traits NYI');
+        return;
+    }
+
+    if (@{ $M->{post_constraint} } > 0) {
+        $M->sorry('Parameter post constraints NYI');
+        return;
+    }
+
+    if ($M->{default_value}[0]) {
+        $M->sorry('Default values NYI');
+        return;
+    }
+
+    if ($M->{named_param}) {
+        $M->sorry('Named parameters NYI');
+        return;
+    }
+
+    if ($M->{quant} ne '' || $M->{kind} ne '!') {
+        $M->sorry('Exotic parameters NYI');
+        return;
+    }
+
+    $M->{_ast} = Sig::Parameter->new(target => $M->{param_var}{_ast});
+}
+
+# signatures exist in several syntactic contexts so just make an object for now
+sub signature { my ($cl, $M) = @_;
+    if ($M->{type_constraint}[0]) {
+        $M->sorry("Return type constraints NYI");
+        return;
+    }
+
+    if ($M->{param_var}) {
+        $M->sorry('\| signatures NYI');
+        return;
+    }
+
+    for (@{ $M->{param_sep} }) {
+        if ($_->Str !~ /,/) {
+            $M->sorry('Parameter separator ' . $_->Str . ' NYI');
+            return;
+        }
+    }
+
+    $M->{_ast} = Sig->new(params =>
+        [map { $_->{_ast} } @{ $M->{parameter} }]);
+}
+
+sub multisig { my ($cl, $M) = @_;
+    if (@{ $M->{signature} } != 1) {
+        $M->sorry("Multiple signatures NYI");
+        return;
+    }
+    $M->{_ast} = $M->{signature}[0]{_ast};
 }
 
 sub voidmark { my ($cl, $M) = @_;
