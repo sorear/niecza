@@ -215,6 +215,36 @@ Q:NIL {
     null:Variable
 } }
 
+my class Junction is Mu { }
+my class Num {
+    method Str { Q:NIL { =[0] @ unbox:Double .virtcall/0:ToString box:Str } }
+}
+my class Str {
+    method Str { Q:NIL { =[0] } }
+}
+my class Blob { }
+my class Char { }
+my class CharLingua { }
+my class AnyChar { }
+my class Codepoint { }
+my class Grapheme { }
+my class StrPos { }
+my class StrLen { }
+my class Rat { }
+my class FatRat { }
+my class Complex { }
+my class Int { }
+my class UInt { }
+my class Bit { }
+my class Instant { }
+my class Duration { }
+my class Enum { }
+my class Bool is Enum {
+    method Str { Q:NIL {
+        =[0] @ unbox:Boolean  if ="Bool::True" else ="Bool::False" then
+    } }
+}
+
 sub infix:<~> { Q:NIL {
     =[0] @ unbox:String  =[1] @ unbox:String  .plaincall/2:String.Concat
         box:Str
@@ -264,31 +294,5 @@ sub say { Q:NIL {
     =[0] dup@ .method/0:Str @ unbox:String
         .plaincall/1:Console.WriteLine null:Variable
 } }
-
-my class Junction is Mu { }
-my class Num {
-    method Str { Q:NIL { =[0] @ unbox:Double .virtcall/0:ToString box:Str } }
-}
-my class Str {
-    method Str { Q:NIL { =[0] } }
-}
-my class Blob { }
-my class Char { }
-my class CharLingua { }
-my class AnyChar { }
-my class Codepoint { }
-my class Grapheme { }
-my class StrPos { }
-my class StrLen { }
-my class Rat { }
-my class FatRat { }
-my class Complex { }
-my class Int { }
-my class UInt { }
-my class Bit { }
-my class Instant { }
-my class Duration { }
-my class Enum { }
-my class Bool is Enum { }
 
 YOU_ARE_HERE;
