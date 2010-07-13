@@ -172,6 +172,8 @@ use 5.010;
         my ($self, $nv, $cg, $body) = @_;
 
         $self->check->item_cg($cg, $body);
+        $cg->dup_fetch;
+        $cg->call_method(1, "Bool", 0);
         $cg->fetch;
         $cg->unbox('Boolean');
 
@@ -228,6 +230,8 @@ use 5.010;
         $self->body->void_cg($cg, $body);
         $cg->labelhere($l2) unless $self->once;
         $self->check->item_cg($cg, $body);
+        $cg->dup_fetch;
+        $cg->call_method(1, "Bool", 0);
         $cg->fetch;
         $cg->unbox('Boolean');
         my $m = $self->until ? 'ncgoto' : 'cgoto';
