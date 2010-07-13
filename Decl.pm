@@ -87,6 +87,34 @@ use 5.010;
 }
 
 {
+    package Decl::SimpleVar;
+    use Moose;
+    extends 'Decl';
+
+    has slot => (isa => 'Str', is => 'ro', required => 1);
+
+    sub do_preinit {
+        my ($self, $cg, $body) = @_;
+        $cg->scopelexget('Any');
+        $cg->fetch;
+        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->proto_var($self->slot);
+    }
+
+    sub do_enter {
+        my ($self, $cg, $body) = @_;
+        $cg->copy_lex($self->slot);
+    }
+
+    sub write {
+        my ($self, $body) = @_;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::RunMainline;
     use Moose;
     extends 'Decl';

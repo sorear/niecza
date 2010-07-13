@@ -284,7 +284,7 @@ sub term__S_statement_prefix { my ($cl, $M) = @_;
 }
 
 sub term__S_variable { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{variable}{_ast};
+    $M->{_ast} = $M->{variable}{_ast}{term};
 }
 
 sub term__S_DotDotDot { my ($cl, $M) = @_;
@@ -317,7 +317,11 @@ sub variable { my ($cl, $M) = @_;
         $M->sorry("Non-simple variables NYI");
         return;
     }
-    $M->{_ast} = { term => Op::Lexical->new(name => $sigil . $M->{desigilname}{_ast}) };
+    my $sl = $sigil . $M->{desigilname}{_ast};
+    $M->{_ast} = {
+        term => Op::Lexical->new(name => $sl),
+        decl_slot => $sl,
+    };
 }
 
 sub voidmark { my ($cl, $M) = @_;
@@ -614,6 +618,18 @@ sub scoped { my ($cl, $M) = @_;
         $M->{package_declarator} // $M->{multi_declarator})->{_ast};
 }
 
+# :: Op (but adds decls)
+sub declarator { my ($cl, $M) = @_;
+    if ($M->{signature}) {
+        $M->sorry("Signature declarations NYI");
+        return;
+    }
+    $M->{_ast} = $M->{variable_declarator} ? $M->{variable_declarator}{_ast} :
+                 $M->{routine_declarator}  ? $M->{routine_declarator}{_ast} :
+                 $M->{regex_declarator}    ? $M->{regex_declarator}{_ast} :
+                 $M->{type_declarator}{_ast};
+}
+
 sub scope_declarator { my ($cl, $M) = @_;
     $M->{_ast} = $M->{scoped}{_ast};
 }
@@ -624,6 +640,42 @@ sub scope_declarator__S_supercede {}
 sub scope_declarator__S_has {}
 sub scope_declarator__S_state {}
 sub scope_declarator__S_anon {}
+
+sub variable_declarator { my ($cl, $M) = @_;
+    if ($M->{trait}[0] || $M->{post_constraint}[0] || $M->{shape}[0]) {
+        $M->sorry("Traits, postconstraints, and shapes on variable declarators NYI");
+        return;
+    }
+
+    my $slot = $M->{variable}{_ast}{decl_slot};
+
+    if (!$slot) {
+        $M->sorry("Cannot apply a declarator to a non-simple variable");
+        return;
+    }
+
+    my $scope = $::SCOPE // 'my';
+
+    if ($scope eq 'augment' || $scope eq 'supercede') {
+        $M->sorry("Illogical scope $scope for simple variable");
+        return;
+    }
+
+    if ($scope eq 'has' || $scope eq 'our' || $scope eq 'state') {
+        $M->sorry("Unsupported scope $scope for simple variable");
+        return;
+    }
+
+    if ($scope eq 'anon') {
+        $slot = $cl->gensym;
+    }
+
+    $::CURLEX->{'!slots'}{$slot} = 1;
+    push @{ $::CURLEX->{'!decls'} //= [] },
+        Decl::SimpleVar->new(slot => $slot);
+
+    $M->{_ast} = Op::Lexical->new(name => $slot);
+}
 
 sub package_declarator {}
 sub package_declarator__S_class { my ($cl, $M) = @_;
