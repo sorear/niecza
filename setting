@@ -303,4 +303,10 @@ sub prefix:<++>($v) { $v = ($v + 1); $v }
 sub postfix:<-->($v) { my $old = $v; $v = ($v - 1); $old }
 sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $old }
 
+# actually a macro
+# sub infix:<:=>($l,$r) { ... }
+
+sub prefix:<~>($v) { $v.Str } # should be Stringy
+sub prefix:<?>($v) { $v.Bool }
+
 YOU_ARE_HERE;
