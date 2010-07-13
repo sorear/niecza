@@ -106,6 +106,36 @@ use 5.010;
 }
 
 {
+    package Op::CallMethod;
+    use Moose;
+    extends 'Op';
+
+    has receiver    => (isa => 'Op', is => 'ro', required => 1);
+    has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
+        default => sub { [] });
+    has name        => (isa => 'Str', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $self->receiver->item_cg($cg, $body);
+        $cg->dup_fetch;
+        $_->item_cg($cg, $body) for @{ $self->positionals };
+        $cg->call_method(1, $self->name, scalar(@{ $self->positionals }));
+    }
+
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+        $self->receiver->item_cg($cg, $body);
+        $cg->dup_fetch;
+        $_->item_cg($cg, $body) for @{ $self->positionals };
+        $cg->call_method(0, $self->name, scalar(@{ $self->positionals }));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Yada;
     use Moose;
     extends 'Op';

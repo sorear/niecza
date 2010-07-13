@@ -31,6 +31,7 @@ sub unv { }
 sub comment { }
 sub comment__S_Sharp { }
 sub spacey { }
+sub unspacey { }
 sub nofun { }
 sub curlycheck { }
 sub pod_comment { }
@@ -211,9 +212,19 @@ sub CHAIN { my ($cl, $M) = @_;
 }
 
 sub POSTFIX { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&postfix:<' . $M->{sym} . '>'),
-        positionals => [ $M->{arg}{_ast} ]);
+    my $op = $M->{_ast};
+    if ($op->{postfix}) {
+        $M->{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => "&postfix:<" . $op->{postfix} . ">"),
+            positionals => [ $M->{arg}{_ast} ]);
+    } elsif ($op->{name}) {
+        $M->{_ast} = Op::CallMethod->new(
+            receiver => $M->{arg}{_ast},
+            name => $op->{name},
+            positionals => $op->{args} // []);
+    } else {
+        $M->sorry("Unhandled postop type");
+    }
 }
 
 sub PREFIX { my ($cl, $M) = @_;
@@ -234,9 +245,47 @@ sub postfix__S_ANY { }
 
 sub postcircumfix { }
 
-sub postop { }
-sub POST { }
+sub postop { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{sym};
+}
+sub POST { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{dotty}{_ast} if $M->{dotty};
+    $M->{_ast} = $M->{privop}{_ast} if $M->{privop};
+    $M->{_ast} = { postfix => $M->{postop}{_ast} } if $M->{postop};
+}
+
 sub PRE { }
+
+sub methodop { my ($cl, $M) = @_;
+    my %r;
+    $r{name}  = $cl->mangle_longname($M->{longname}) if $M->{longname};
+    $r{quote} = $M->{quote}{_ast} if $M->{quote};
+    $r{ref}   = $M->{variable}{_ast}{term} if $M->{variable};
+
+    $r{args}  = $M->{args}[0]{_ast} if $M->{args}[0];
+    $r{args}  = $M->{arglist}[0]{_ast} if $M->{arglist}[0];
+
+    $M->{_ast} = \%r;
+}
+
+sub dottyop { my ($cl, $M) = @_;
+    if ($M->{colonpair}) {
+        $M->sorry("Colonpair dotties NYI");
+        return;
+    }
+
+    $M->{_ast} = $M->{methodop}{_ast} if $M->{methodop};
+    $M->{_ast} = { postfix => $M->{postop}{_ast} } if $M->{postop};
+}
+
+sub privop { my ($cl, $M) = @_;
+    $M->{_ast} = { %{ $M->{methodop}{_ast} }, private => 1 };
+}
+
+sub dotty { }
+sub dotty__S_Dot { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{dottyop}{_ast};
+}
 
 sub coloncircumfix { my ($cl, $M) = @_;
     $M->{_ast} = $M->{circumfix}{_ast};

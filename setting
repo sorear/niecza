@@ -244,7 +244,7 @@ my class Bool is Enum {
 }
 
 sub infix:<~>($l,$r) { Q:NIL {
-    {$l} @ unbox:String  {$r} @ unbox:String  .plaincall/2:String.Concat
+    {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  .plaincall/2:String.Concat
         box:Str
 } }
 
@@ -289,8 +289,7 @@ sub infix:<< != >>($l,$r) { Q:NIL {
 } }
 
 sub say($str) { Q:NIL {
-    {$str} dup@ .method/0:Str @ unbox:String
-        .plaincall/1:Console.WriteLine null:Variable
+    {$str.Str} @ unbox:String .plaincall/1:Console.WriteLine null:Variable
 } }
 
 sub infix:<=>($l,$r) { Q:NIL { {$l} {$r} @ !  {$l} } }
