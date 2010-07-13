@@ -117,7 +117,7 @@ use 5.010;
         }
     }
 
-    sub _swap {
+    sub swap {
         my ($self) = @_;
         $self->_undercheck(2);
         $self->_overcheck(1);
@@ -332,11 +332,22 @@ use 5.010;
         $self->_cpscall(undef, "$c.lv.container.Store(th, $v)");
     }
 
+    sub dup {
+        my ($self) = @_;
+        my $c = $self->_peek;
+        $self->_push($self->stacktype->[-1], $c);
+    }
+
+    sub drop {
+        my ($self) = @_;
+        $self->_pop;
+    }
+
     sub dup_fetch {
         my ($self) = @_;
         my $c = $self->_peek;
         $self->_cpscall('IP6', "$c.lv.container.Fetch(th)");
-        $self->_swap;
+        $self->swap;
     }
 
     sub pos {
@@ -496,9 +507,9 @@ use 5.010;
 
     sub attr_set {
         my ($self, $f) = @_;
-        $self->_swap;
+        $self->swap;
         $self->attr_var($f);
-        $self->_swap;
+        $self->swap;
         $self->store;
     }
 

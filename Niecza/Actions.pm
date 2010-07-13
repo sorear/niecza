@@ -195,6 +195,12 @@ sub infixish { my ($cl, $M) = @_;
     $M->sorry("Adverbs NYI") if $M->{colonpair};
 }
 sub INFIX { my ($cl, $M) = @_;
+    if ($M->{infix}{sym} eq ':=') { #XXX macro
+        $M->{_ast} = Op::Bind->new(
+            lhs => $M->{left}{_ast}, rhs => $M->{right}{_ast},
+            readonly => 0);
+        return;
+    }
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => '&infix:<' . $M->{infix}{sym} . '>'),
         positionals => [ $M->{left}{_ast}, $M->{right}{_ast} ]);

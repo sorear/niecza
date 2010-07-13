@@ -266,6 +266,36 @@ use 5.010;
 }
 
 {
+    package Op::Bind;
+    use Moose;
+    extends 'Op';
+
+    has lhs => (isa => 'Op', is => 'ro', required => 1);
+    has rhs => (isa => 'Op', is => 'ro', required => 1);
+    has readonly => (isa => 'Bool', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $self->lhs->item_cg($cg, $body);
+        $cg->dup;
+        $self->rhs->item_cg($cg, $body);
+        $cg->clr_field_get('lv');
+        $cg->clr_field_set('lv');
+    }
+
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+        $self->lhs->item_cg($cg, $body);
+        $self->rhs->item_cg($cg, $body);
+        $cg->clr_field_get('lv');
+        $cg->clr_field_set('lv');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Lexical;
     use Moose;
     extends 'Op';
