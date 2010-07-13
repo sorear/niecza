@@ -5,7 +5,6 @@ use 5.010_001;
 
 use CompilerDriver ':all';
 use Getopt::Long;
-use Term::ReadLine;
 use autodie ':all';
 
 my @evaluate;
@@ -16,11 +15,16 @@ sub usage {
 niecza -- a command line wrapper for Niecza
 
 usage: niecza [-e 'code']
+   OR: niecza file
 EOM
     exit $ex;
 }
 
 GetOptions('evaluate|e=s' => \@evaluate) or usage(\*STDERR, 1);
+
+if ((scalar @evaluate) && (scalar @ARGV)) {
+    usage(\*STDERR, 1);
+}
 
 close ::NIECZA_OUT;
 
@@ -35,11 +39,18 @@ sub run {
     system 'mono --debug=casts Program.exe';
 }
 
-if (@evaluate) {
+if (@ARGV) {
+    require File::Slurp;
+    for (@ARGV) {
+        my $x = File::Slurp::slurp($_);
+        run($x);
+    }
+} elsif (@evaluate) {
     for (@evaluate) {
         run($_);
     }
 } else {
+    require Term::ReadLine;
     my $term = Term::ReadLine->new('niecza');
     while (defined ($_ = $term->readline("> ")) ) {
         eval {
