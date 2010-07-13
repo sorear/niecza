@@ -245,56 +245,56 @@ my class Bool is Enum {
     } }
 }
 
-sub infix:<~> { Q:NIL {
-    =[0] @ unbox:String  =[1] @ unbox:String  .plaincall/2:String.Concat
+sub infix:<~>($l,$r) { Q:NIL {
+    {$l} @ unbox:String  {$r} @ unbox:String  .plaincall/2:String.Concat
         box:Str
 } }
 
-sub infix:<+> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  +  box:Num
+sub infix:<+>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  +  box:Num
 } }
 
-sub infix:<-> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  -  box:Num
+sub infix:<->($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  -  box:Num
 } }
 
-sub infix:<*> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  *  box:Num
+sub infix:<*>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  *  box:Num
 } }
 
-sub infix:</> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  /  box:Num
+sub infix:</>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  /  box:Num
 } }
 
-sub infix:<< < >> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  <  box:Bool
+sub infix:<< < >>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  <  box:Bool
 } }
 
-sub infix:<< > >> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  >  box:Bool
+sub infix:<< > >>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  >  box:Bool
 } }
 
-sub infix:<< <= >> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  <=  box:Bool
+sub infix:<< <= >>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  <=  box:Bool
 } }
 
-sub infix:<< >= >> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  >=  box:Bool
+sub infix:<< >= >>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  >=  box:Bool
 } }
 
-sub infix:<< == >> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  ==  box:Bool
+sub infix:<< == >>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  ==  box:Bool
 } }
 
-sub infix:<< != >> { Q:NIL {
-    =[0] @ unbox:Double  =[1] @ unbox:Double  !=  box:Bool
+sub infix:<< != >>($l,$r) { Q:NIL {
+    {$l} @ unbox:Double  {$r} @ unbox:Double  !=  box:Bool
 } }
 
-sub say { Q:NIL {
-    =[0] dup@ .method/0:Str @ unbox:String
+sub say($str) { Q:NIL {
+    {$str} dup@ .method/0:Str @ unbox:String
         .plaincall/1:Console.WriteLine null:Variable
 } }
 
-sub infix:<=> { Q:NIL { =[0] =[1] @ !  =[0] @ } }
+sub infix:<=>($l,$r) { Q:NIL { {$l} {$r} @ !  {$l} @ } }
 
 YOU_ARE_HERE;
