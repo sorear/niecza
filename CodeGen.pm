@@ -67,7 +67,28 @@ use 5.010;
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
+    has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+
     sub qm { "\"" . $_[0] . "\"" }
+
+    # always called after _saveall
+    sub _savestackstate {
+        my ($self, $lbl) = @_;
+        my %save;
+        $save{depth} = $self->depth;
+        $save{stacktype} = [ @{ $self->stacktype } ];
+        $save{auxdepths} = { %{ $self->auxdepths } };
+        $self->savedstks->{$lbl} = \%save;
+    }
+
+    sub _restorestackstate {
+        my ($self, $lbl) = @_;
+        my $save = $self->savedstks->{$lbl};
+        $self->depth($save->{depth});
+        $self->savedepth($save->{depth});
+        @{ $self->stacktype } = @{ $save->{stacktype} };
+        %{ $self->auxdepths } = %{ $save->{auxdepths} };
+    }
 
     sub _emit {
         my ($self, $line) = @_;
@@ -175,6 +196,7 @@ use 5.010;
         my ($self, $n) = @_;
         $self->_saveall;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
+        $self->_restorestackstate($n) if $self->savedstks->{$n};
         push @{ $self->buffer }, "    goto case $n;\n" unless $self->unreach;
         push @{ $self->buffer }, "case $n:\n";
         $self->unreach(0);
@@ -184,6 +206,7 @@ use 5.010;
         my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_saveall;
+        $self->_savestackstate($n);
         push @{ $self->buffer }, "    goto case $n;\n";
         $self->unreach(1);
     }
@@ -193,6 +216,7 @@ use 5.010;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
         $self->_saveall;
+        $self->_savestackstate($n);
         push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
     }
 
@@ -201,6 +225,7 @@ use 5.010;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
         $self->_saveall;
+        $self->_savestackstate($n);
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
 
