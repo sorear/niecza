@@ -486,6 +486,10 @@ sub insn__S_arith { my ($cl, $M) = @_;
     $M->{_ast} = [[ clr_arith => $M->Str ]];
 }
 
+sub insn__S_compare { my ($cl, $M) = @_;
+    $M->{_ast} = [[ clr_compare => $M->Str ]];
+}
+
 sub insn__S_attr_get { my ($cl, $M) = @_;
     $M->{_ast} = [[ attr_get => $M->{varid}{_ast} ]];
 }
@@ -556,6 +560,11 @@ sub terminator__S_Thesis {}
 sub terminator__S_Semi {}
 sub terminator__S_Ket {}
 sub terminator__S_Ly {}
+sub terminator__S_then {}
+sub terminator__S_again {}
+sub terminator__S_repeat {}
+sub terminator__S_while {}
+sub terminator__S_else {}
 sub stdstopper {}
 sub unitstopper {}
 sub eat_terminator {}

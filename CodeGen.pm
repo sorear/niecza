@@ -196,6 +196,14 @@ use 5.010;
         push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
     }
 
+    sub ncgoto {
+        my ($self, $n) = @_;
+        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
+        my $top = $self->_pop;
+        $self->_saveall;
+        push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
+    }
+
     sub _cpscall {
         my ($self, $rt, $expr) = @_;
         $self->_saveall;
@@ -418,7 +426,7 @@ use 5.010;
         my ($self, $op) = @_;
         my $a2 = $self->_pop;
         my $a1 = $self->_pop;
-        $self->_push('Bool', "$a1 $op $a2");
+        $self->_push('Boolean', "$a1 $op $a2");
     }
 
     sub clr_field_get {

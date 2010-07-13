@@ -30,10 +30,16 @@ grammar NIL is STD {
     rule nibbler {
         [
         || <insn>
-        || <?stopper>
+        || <?stdstopper>
         || <.panic: "Malformed NIL instruction">
         ]*
     }
+
+    token terminator:then   { <sym> }
+    token terminator:else   { <sym> }
+    token terminator:again  { <sym> }
+    token terminator:while  { <sym> }
+    token terminator:repeat { <sym> }
 
     token category:insn { <sym> }
     proto token insn { <...> }
