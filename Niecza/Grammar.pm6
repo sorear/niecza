@@ -27,7 +27,13 @@ grammar Q is STD::Q {
 # mnemonic characters: (@, !, =) fetch, store, lvalue.
 # (l) lexical (L) raw lexical
 grammar NIL is STD {
-    rule nibbler { [ <insn> ]* }
+    rule nibbler {
+        [
+        || <insn>
+        || <?stopper>
+        || <.panic: "Malformed NIL instruction">
+        ]*
+    }
 
     token category:insn { <sym> }
     proto token insn { <...> }
