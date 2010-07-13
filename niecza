@@ -8,6 +8,7 @@ use Getopt::Long;
 use autodie ':all';
 
 my @evaluate;
+my $ast;
 
 sub usage {
     my ($fh, $ex) = @_;
@@ -20,7 +21,8 @@ EOM
     exit $ex;
 }
 
-GetOptions('evaluate|e=s' => \@evaluate) or usage(\*STDERR, 1);
+GetOptions('ast' => \$ast, 'evaluate|e=s' => \@evaluate)
+    or usage(\*STDERR, 1);
 
 if ((scalar @evaluate) && (scalar @ARGV)) {
     usage(\*STDERR, 1);
@@ -29,6 +31,10 @@ if ((scalar @evaluate) && (scalar @ARGV)) {
 close ::NIECZA_OUT;
 
 sub run {
+    if ($ast) {
+        ast(shift);
+        return;
+    }
     open ::NIECZA_OUT, ">", "Program.cs";
     header;
     mainline(shift);

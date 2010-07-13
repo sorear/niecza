@@ -4,7 +4,7 @@ use warnings;
 use 5.010;
 
 use Sub::Exporter -setup => {
-    exports => [ qw(header bootstrap setting mainline) ]
+    exports => [ qw(header bootstrap setting mainline ast) ]
 };
 
 open ::NIECZA_OUT, ">&", \*STDOUT;
@@ -59,6 +59,16 @@ sub mainline {
     local $::SETTING_RESUME = retrieve 'setting_ast.store';
     $STD::ALL = {};
     Niecza::Grammar->parse($code, actions => 'Niecza::Actions')->{_ast}->write;
+}
+
+sub ast {
+    my $code = shift;
+    local $::UNITNAME = 'Mainline';
+    $STD::ALL = {};
+    my $a = Niecza::Grammar->parse($code, actions => 'Niecza::Actions')->{_ast};
+    delete $a->mainline->{outer};
+    delete $a->{setting};
+    print YAML::XS::Dump($a);
 }
 
 sub bootstrap {
