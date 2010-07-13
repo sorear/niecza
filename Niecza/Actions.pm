@@ -219,9 +219,10 @@ sub CHAIN { my ($cl, $M) = @_;
 
 sub LIST { my ($cl, $M) = @_;
     # STD guarantees that all elements of delims have the same sym
+    # the last item may have an ast of undef due to nulltermish
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => '&infix:<' . $M->{delims}[0]{sym} . '>'),
-        positionals => [ map { $_->{_ast} } @{ $M->{list} } ]);
+        positionals => [ grep { defined } map { $_->{_ast} } @{ $M->{list} } ]);
 }
 
 sub POSTFIX { my ($cl, $M) = @_;
@@ -889,6 +890,9 @@ sub package_declarator__S_also { my ($cl, $M) = @_;
 }
 
 sub termish {}
+sub nulltermish { my ($cl, $M) = @_; # for 1,2,3,
+    $M->{_ast} = $M->{term}{_ast} if $M->{term};
+}
 sub EXPR {}
 
 sub arglist { my ($cl, $M) = @_;
