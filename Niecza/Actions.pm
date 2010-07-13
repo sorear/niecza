@@ -109,6 +109,15 @@ sub mangle_longname { my ($cl, $M) = @_;
     $n;
 }
 
+sub desigilname { my ($cl, $M) = @_;
+    if ($M->{variable}) {
+        $M->sorry("Truncated contextualizer syntax NYI");
+        return;
+    }
+
+    $M->{_ast} = $cl->mangle_longname($M->{longname});
+}
+
 sub stopper { }
 
 # quote :: Op
@@ -296,6 +305,19 @@ sub term__S_YOU_ARE_HERE { my ($cl, $M) = @_;
     $::CURLEX->{'!slots'}{'!mainline'} = 1;
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => '!mainline'));
+}
+
+sub variable { my ($cl, $M) = @_;
+    my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
+    if ($M->{twigil}[0]) {
+        $M->sorry("Twigils NYI");
+        return;
+    }
+    if (!$M->{desigilname}) {
+        $M->sorry("Non-simple variables NYI");
+        return;
+    }
+    $M->{_ast} = { term => Op::Lexical->new(name => $sigil . $M->{desigilname}{_ast}) };
 }
 
 sub voidmark { my ($cl, $M) = @_;
