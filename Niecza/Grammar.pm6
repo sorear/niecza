@@ -52,6 +52,16 @@ grammar NIL is STD {
     token insn:clr_int { $<sign>=[<[ - + ]>?] <decint> }
     token insn:label { ':'  {} <decint> }
     token insn:goto  { '->' {} <decint> }
+    token insn:cgoto { '?->' {} <decint> }
+    token insn:ncgoto { '!->' {} <decint> }
+    token insn:if { <sym>:s <nibbler> [ 'else' <nibbler> ]? 'then' }
+    token insn:begin {
+        <sym>:s <nibbler> [
+            | $<while>='while' <nibbler> 'repeat'
+            | $<again>='again'
+            | $<until>'until'
+        ]
+    }
 
     token insn:lexget { 'L@' {} <up> <varid> }
     token insn:lexput { 'L!' {} <up> <varid> }
@@ -70,6 +80,7 @@ grammar NIL is STD {
     token insn:unwrap { <sym> ':' {} <clrid> }
     token insn:new { <sym> '/' {} <decint> ':' <clrid> }
     token insn:arith { <[ + \- * / ^ & | ]> }
+    token insn:compare { '<' | '>' | '>=' | '<=' | '!=' | '==' }
     token insn:box { <sym> ':' {} <varid> }
     token insn:unbox { <sym> ':' {} <clrid> }
     token insn:clr_field_get { '@.' {} <varid> }

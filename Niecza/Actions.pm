@@ -338,6 +338,49 @@ sub insn__S_goto { my ($cl, $M) = @_;
     $M->{_ast} = [[ goto => -$M->{decint}{_ast} ]];
 }
 
+sub insn__S_cgoto { my ($cl, $M) = @_;
+    $M->{_ast} = [[ cgoto => -$M->{decint}{_ast} ]];
+}
+
+sub insn__S_ncgoto { my ($cl, $M) = @_;
+    $M->{_ast} = [[ ncgoto => -$M->{decint}{_ast} ]];
+}
+
+my $labelid = 1000;
+sub insn__S_if { my ($cl, $M) = @_;
+    my @r;
+    my $end1 = $labelid++;
+    my $end2 = $labelid++;
+    push @r, [ 'ncgoto', -$end1 ];
+    push @r, @{ $M->{nibbler}[0]{_ast}->code };
+    if ($M->{nibbler}[1]) {
+        push @r, [ 'goto', -$end2 ], [ 'labelhere', -$end1 ];
+        push @r, @{ $M->{nibbler}[1]{_ast}->code };
+        push @r, [ 'labelhere', -$end2 ];
+    } else {
+        push @r, [ 'labelhere', -$end1 ];
+    }
+    $M->{_ast} = \@r;
+}
+
+sub insn__S_begin { my ($cl, $M) = @_;
+    my @r;
+    my $b1 = $labelid++;
+    push @r, [ 'labelhere', -$b1 ];
+    push @r, @{ $M->{nibbler}[0]{_ast}->code };
+    if ($M->{while}) {
+        my $b2 = $labelid++;
+        push @r, [ 'ncgoto', -$b2 ];
+        push @r, @{ $M->{nibbler}[1]{_ast}->code };
+        push @r, [ 'goto', -$b1 ], [ 'labelhere', -$b2 ];
+    } elsif ($M->{until}) {
+        push @r, [ 'ncgoto', -$b1 ];
+    } elsif ($M->{again}) {
+        push @r, [ 'goto', -$b1 ];
+    }
+    $M->{_ast} = \@r;
+}
+
 sub insn__S_lex { my ($cl, $M) = @_;
     $M->{_ast} = [[ lex => $M->{up}{_ast}, $M->{varid}{_ast} ]];
 }
