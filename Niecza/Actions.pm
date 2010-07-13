@@ -217,6 +217,13 @@ sub CHAIN { my ($cl, $M) = @_;
         positionals => [ $M->{chain}[0]{_ast}, $M->{chain}[2]{_ast} ]);
 }
 
+sub LIST { my ($cl, $M) = @_;
+    # STD guarantees that all elements of delims have the same sym
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&infix:<' . $M->{delims}[0]{sym} . '>'),
+        positionals => [ map { $_->{_ast} } @{ $M->{list} } ]);
+}
+
 sub POSTFIX { my ($cl, $M) = @_;
     my $op = $M->{_ast};
     if ($op->{postfix}) {

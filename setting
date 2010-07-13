@@ -245,6 +245,7 @@ my class Bool is Enum {
     method Bool { Q:NIL { =[0] } }
 }
 
+# ought to take a slurpy
 sub infix:<~>($l,$r) { Q:NIL {
     {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  .plaincall/2:String.Concat
         box:Str
