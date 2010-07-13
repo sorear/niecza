@@ -240,9 +240,7 @@ my class Instant { }
 my class Duration { }
 my class Enum { }
 my class Bool is Enum {
-    method Str { Q:NIL {
-        =[0] @ unbox:Boolean  if ="Bool::True" else ="Bool::False" then
-    } }
+    method Str { if Q:NIL { =[0] } { "Bool::True" } else { "Bool::False" } }
 }
 
 sub infix:<~>($l,$r) { Q:NIL {
