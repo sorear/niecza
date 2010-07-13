@@ -178,6 +178,43 @@ use 5.010;
 }
 
 {
+    package Op::WhileLoop;
+    use Moose;
+    extends 'Op';
+
+    has check => (isa => 'Op', is => 'ro', required => 1);
+    has body  => (isa => 'Op', is => 'ro', required => 1);
+    has once  => (isa => 'Bool', is => 'ro', required => 1);
+    has until => (isa => 'Bool', is => 'ro', required => 1);
+
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+
+        my $l1 = $cg->label;
+        my $l2 = $self->once ? 0 : $cg->label;
+
+        $cg->goto($l2) unless $self->once;
+        $cg->labelhere($l1);
+        $self->body->void_cg($cg, $body);
+        $cg->labelhere($l2) unless $self->once;
+        $self->check->item_cg($cg, $body);
+        $cg->fetch;
+        $cg->unbox('Boolean');
+        my $m = $self->until ? 'ncgoto' : 'cgoto';
+        $cg->$m($l1);
+    }
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $self->void_cg($cg, $body);
+        $cg->push_null('Variable');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Num;
     use Moose;
     extends 'Op';

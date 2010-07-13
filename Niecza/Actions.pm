@@ -888,6 +888,18 @@ sub statement_control__S_if { my ($cl, $M) = @_;
         false => $else);
 }
 
+sub statement_control__S_while { my ($cl, $M) = @_;
+    $M->{_ast} = Op::WhileLoop->new(check => $M->{xblock}{_ast}[0],
+        body => $cl->block_to_immediate($M->{xblock}{_ast}[1]),
+        until => 0, once => 0);
+}
+
+sub statement_control__S_until { my ($cl, $M) = @_;
+    $M->{_ast} = Op::WhileLoop->new(check => $M->{xblock}{_ast}[0],
+        body => $cl->block_to_immediate($M->{xblock}{_ast}[1]),
+        until => 1, once => 0);
+}
+
 sub package_def { my ($cl, $M) = @_;
     if ($::PKGDECL ne 'class') {
         $M->sorry('Non-class package definitions are not yet supported');
