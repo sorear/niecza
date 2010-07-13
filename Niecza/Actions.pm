@@ -179,6 +179,17 @@ sub INFIX { my ($cl, $M) = @_;
         positionals => [ $M->{left}{_ast}, $M->{right}{_ast} ]);
 }
 
+sub CHAIN { my ($cl, $M) = @_;
+    if (@{ $M->{chain} } != 3) {
+        $M->sorry('Chaining not yet implemented');
+        return;
+    }
+
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&infix:<' . $M->{chain}[1]{sym} . '>'),
+        positionals => [ $M->{chain}[0]{_ast}, $M->{chain}[2]{_ast} ]);
+}
+
 # infix et al just parse the operator itself
 sub infix { }
 sub infix__S_ANY { }
