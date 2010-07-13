@@ -130,6 +130,54 @@ use 5.010;
 }
 
 {
+    package Op::Conditional;
+    use Moose;
+    extends 'Op';
+
+    has check => (isa => 'Op', is => 'ro', required => 1);
+    has true  => (isa => 'Maybe[Op]', is => 'ro', required => 1);
+    has false => (isa => 'Maybe[Op]', is => 'ro', required => 1);
+
+    sub cg {
+        my ($self, $nv, $cg, $body) = @_;
+
+        $self->check->item_cg($cg, $body);
+        $cg->fetch;
+        $cg->unbox('Boolean');
+
+        my $t = $self->true;
+        my $f = $self->false;
+
+        # XXX use Nil
+        $t //= Op::NIL->new(code => [[ push_null => 'Variable' ]]);
+        $f //= Op::NIL->new(code => [[ push_null => 'Variable' ]]);
+
+        my $l1 = $cg->label;
+        my $l2 = $cg->label;
+        $cg->ncgoto($l1);
+        my $m = $nv ? 'item_cg' : 'void_cg';
+        $t->$m($cg, $body);
+        $cg->goto($l2);
+        $cg->labelhere($l1);
+        $f->$m($cg, $body);
+        $cg->labelhere($l2);
+    }
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $self->cg(1, $cg, $body);
+    }
+
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+        $self->cg(0, $cg, $body);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Num;
     use Moose;
     extends 'Op';

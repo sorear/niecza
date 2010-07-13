@@ -34,6 +34,7 @@ sub spacey { }
 sub nofun { }
 sub curlycheck { }
 sub pod_comment { }
+sub infixstopper { }
 
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
@@ -185,9 +186,7 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => $cl->block_to_closure(0, $M->{pblock}{_ast}),
-        positionals => []);
+    $M->{_ast} = $cl->block_to_immediate($M->{pblock}{_ast});
 }
 
 sub infixish { my ($cl, $M) = @_;
@@ -861,7 +860,8 @@ sub statement { my ($cl, $M) = @_;
         return;
     }
 
-    $M->{_ast} = $M->{EXPR} ? $M->{EXPR}{_ast} : undef;
+    $M->{_ast} = $M->{statement_control} ? $M->{statement_control}{_ast} :
+                 $M->{EXPR} ? $M->{EXPR}{_ast} : undef;
 }
 
 sub statementlist { my ($cl, $M) = @_;
@@ -871,6 +871,21 @@ sub statementlist { my ($cl, $M) = @_;
 
 sub semilist { my ($cl, $M) = @_;
     $M->{_ast} = [  map { $_->{_ast} } @{ $M->{statement} } ];
+}
+
+sub statement_control { }
+sub statement_control__S_if { my ($cl, $M) = @_;
+    my $else = $M->{else}[0] ?
+        $cl->block_to_immediate($M->{else}[0]{_ast}) : undef;
+    my @elsif;
+    for (reverse @{ $M->{elsif} }) {
+        $else = Op::Conditional->new(check => $_->{_ast}[0],
+            true => $cl->block_to_immediate($_->{_ast}[1]),
+            false => $else);
+    }
+    $M->{_ast} = Op::Conditional->new(check => $M->{xblock}{_ast}[0],
+        true => $cl->block_to_immediate($M->{xblock}{_ast}[1]),
+        false => $else);
 }
 
 sub package_def { my ($cl, $M) = @_;
@@ -998,6 +1013,12 @@ sub get_outer { my ($cl, $pad) = @_;
     $STD::ALL->{ $pad->{'OUTER::'}[0] };
 }
 
+sub block_to_immediate { my ($cl, $blk) = @_;
+    Op::CallSub->new(
+        invocant => $cl->block_to_closure(0, $blk),
+        positionals => []);
+}
+
 sub block_to_closure { my ($cl, $uplevel, $blk, %args) = @_;
     my $outer = $uplevel ? $cl->get_outer($::CURLEX) : $::CURLEX;
     my $outer_key = $args{outer_key} // $cl->gensym;
@@ -1089,6 +1110,10 @@ sub pblock { my ($cl, $M) = @_;
     my $rw = $M->{lambda} && $M->{lambda}->Str eq '<->';
     $M->{_ast} = $cl->sl_to_block($M->{blockoid}{_ast},
         signature => ($M->{signature} ? $M->{signature}{_ast} : undef));
+}
+
+sub xblock { my ($cl, $M) = @_;
+    $M->{_ast} = [ $M->{EXPR}{_ast}, $M->{pblock}{_ast} ];
 }
 
 # returns Body of 0 args
