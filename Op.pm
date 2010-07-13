@@ -6,6 +6,8 @@ use 5.010;
     package Op;
     use Moose;
 
+    sub paren { shift }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -84,6 +86,12 @@ use 5.010;
     # non-parenthesized constructor
     has splittable_pair => (isa => 'Bool', is => 'rw', default => 0);
     has splittable_parcel => (isa => 'Bool', is => 'rw', default => 0);
+
+    sub paren {
+        my ($self) = @_;
+        Op::CallSub->new(invocant => $self->invocant,
+            positionals => $self->positionals);
+    }
 
     sub item_cg {
         my ($self, $cg, $body) = @_;

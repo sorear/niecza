@@ -183,7 +183,7 @@ sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
 
 sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children => 
-        [ grep { defined $_ } @{ $M->{semilist}{_ast} } ]);
+        [ map { $_ ? ($_->paren) : () } @{ $M->{semilist}{_ast} } ]);
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
@@ -195,15 +195,26 @@ sub infixish { my ($cl, $M) = @_;
     $M->sorry("Adverbs NYI") if $M->{colonpair};
 }
 sub INFIX { my ($cl, $M) = @_;
-    if ($M->{infix}{sym} eq ':=') { #XXX macro
-        $M->{_ast} = Op::Bind->new(
-            lhs => $M->{left}{_ast}, rhs => $M->{right}{_ast},
-            readonly => 0);
+    my ($l,$s,$r) = ($M->{left}{_ast}, $M->{infix}{sym}, $M->{right}{_ast});
+    if ($s eq ':=') { #XXX macro
+        $M->{_ast} = Op::Bind->new(lhs => $l, rhs => $r, readonly => 0);
+        return;
+    }
+    if ($s eq ',') {
+        #XXX STD bug causes , in setting to be parsed as left assoc
+        my @r;
+        push @r, ($l->isa('Op::CallSub') && $l->splittable_parcel) ?
+            @{ $l->positionals } : ($l);
+        push @r, ($r->isa('Op::CallSub') && $r->splittable_parcel) ?
+            @{ $r->positionals } : ($r);
+        $M->{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&infix:<,>'),
+            positionals => \@r, splittable_parcel => 1);
         return;
     }
     $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&infix:<' . $M->{infix}{sym} . '>'),
-        positionals => [ $M->{left}{_ast}, $M->{right}{_ast} ]);
+        invocant => Op::Lexical->new(name => "&infix:<$s>"),
+        positionals => [ $l, $r ]);
 }
 
 sub CHAIN { my ($cl, $M) = @_;
@@ -222,7 +233,8 @@ sub LIST { my ($cl, $M) = @_;
     # the last item may have an ast of undef due to nulltermish
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => '&infix:<' . $M->{delims}[0]{sym} . '>'),
-        positionals => [ grep { defined } map { $_->{_ast} } @{ $M->{list} } ]);
+        positionals => [ grep { defined } map { $_->{_ast} } @{ $M->{list} } ],
+        splittable_parcel => ($M->{delims}[0]{sym} eq ','));
 }
 
 sub POSTFIX { my ($cl, $M) = @_;
@@ -891,7 +903,8 @@ sub package_declarator__S_also { my ($cl, $M) = @_;
 
 sub termish {}
 sub nulltermish { my ($cl, $M) = @_; # for 1,2,3,
-    $M->{_ast} = $M->{term}{_ast} if $M->{term};
+    # XXX this is insane
+    $M->{term}{_ast} = $M->{term}{term}{_ast} if $M->{term};
 }
 sub EXPR {}
 
