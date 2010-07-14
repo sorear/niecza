@@ -15,6 +15,7 @@ use 5.010;
         DynMetaObject =>
             { proto        => 'DynProtoMetaObject',
               BuildC3MRO   => 'Void',
+              typeObject   => 'IP6',
               outers       => 'List<Frame>' },
 
         DynProtoMetaObject =>

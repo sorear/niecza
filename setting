@@ -106,6 +106,7 @@ PRE-INIT {
 
         L@$p null:Dictionary<string,object> !.slots
         L@$p L@$mo !.klass
+        L@$mo L@$p !.typeObject
 
         L@$p wrapobj
     } }
@@ -177,6 +178,7 @@ PRE-INIT {
         L@$pmo  =[0] @ !.how
 
         L@$p null:Dictionary<string,object> !.slots
+        L@$mo L@$p !.typeObject
         L@$p L@$mo !.klass
 
         L@$p wrapobj

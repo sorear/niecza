@@ -149,6 +149,7 @@ namespace Niecza {
         public DynProtoMetaObject proto;
         public List<Frame> outers = new List<Frame>();
         public List<DynMetaObject> mro;
+        public IP6 typeObject;
 
         public DynMetaObject(DynProtoMetaObject proto) {
             this.proto = proto;

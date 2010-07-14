@@ -243,7 +243,7 @@ sub POSTFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::CallSub->new(
             invocant => Op::Lexical->new(name => "&postfix:<" . $op->{postfix} . ">"),
             positionals => [ $M->{arg}{_ast} ]);
-    } elsif ($op->{name} && $op->{name} =~ /^(?:HOW)$/) {
+    } elsif ($op->{name} && $op->{name} =~ /^(?:HOW|WHAT)$/) {
         if ($op->{args}) {
             $M->sorry("Interrogative operator " . $op->{name} .
                 " does not take arguments");

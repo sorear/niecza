@@ -165,6 +165,11 @@ use 5.010;
             when ("HOW") {
                 $cg->how;
             }
+            when ("WHAT") {
+                $cg->cast('DynObject');
+                $cg->clr_field_get('klass');
+                $cg->clr_field_get('typeObject');
+            }
             default {
                 die "Invalid interrogative $_";
             }

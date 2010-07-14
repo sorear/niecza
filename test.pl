@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 34;
+plan 38;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -104,3 +104,8 @@ ok (?1) eq "Bool::True", "True strings to Bool::True";
 ok (?0) eq "Bool::False", "False strings to Bool::False";
 
 ok ~Any eq "Any()", "~Any is Any()";
+
+ok (2.WHAT === 3.WHAT), "different objects get the same WHAT";
+ok !(2.WHAT.defined), "WHATs are undefined type objects";
+ok (sub foo() {}).WHAT eq 'Sub()', 'WHAT of a Sub is Sub()';
+ok "Foo".WHAT === Str, 'WHAT of a Str *is* Str';
