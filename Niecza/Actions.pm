@@ -336,6 +336,11 @@ sub term__S_identifier { my ($cl, $M) = @_;
         return;
     }
 
+    if ($M->is_name($M->{identifier}->Str)) {
+        $M->{_ast} = Op::Lexical->new(name => $id);
+        return;
+    }
+
     my $args = $sal->[0] // [];
 
     $M->{_ast} = Op::CallSub->new(
