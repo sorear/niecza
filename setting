@@ -205,6 +205,10 @@ Q:NIL {
     L@^'Cool!HOW' dup@  callframe wrap  L@$plist wrap
         .method/2:create-protoobject  L!^Cool
 
+    new/0:List<DynMetaObject> L!$plist
+    L@$plist  L@^Any @ cast:DynObject @.klass  .virtcall/1:Add
+    L@^ClassHOW @ cast:DynObject @.klass  L@$plist  .virtcall/1:BuildC3MRO
+
     L@&wrap-dpmo @  F@Kernel.SubPMO wrap  L@^'Any!HOW'
         .call/2 L!^'Sub!HOW'
     L@&wrapped-protoobj @  L@^'Sub!HOW'  F@Kernel.SubMO wrap

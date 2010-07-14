@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 38;
+plan 41;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -109,3 +109,7 @@ ok (2.WHAT === 3.WHAT), "different objects get the same WHAT";
 ok !(2.WHAT.defined), "WHATs are undefined type objects";
 ok (sub foo() {}).WHAT eq 'Sub()', 'WHAT of a Sub is Sub()';
 ok "Foo".WHAT === Str, 'WHAT of a Str *is* Str';
+
+ok "Foo".HOW.WHAT eq 'ClassHOW()', 'anything.HOW is a ClassHOW';
+ok "Foo".HOW === "Cow".HOW, 'objects of the same class have the same HOW';
+ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
