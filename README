@@ -29,7 +29,8 @@ Perl 5.10.1 (or 5.10.0 with autodie installed from CPAN) in /usr/local/bin
 
 =item *
 
-Moose, Sub::Exporter, File::Slurp, Term::ReadLine and YAML::XS from CPAN
+Moose, Sub::Exporter, File::Slurp, Term::ReadLine, IPC::System::Simple,
+and YAML::XS from CPAN
 
 =back
 
