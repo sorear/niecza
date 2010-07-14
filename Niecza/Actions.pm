@@ -1222,6 +1222,7 @@ sub statement_prefix {}
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 
+    $::CURLEX->{'!slots'}{$var} = 1;
     push @{ $::CURLEX->{'!decls'} //= [] },
         Decl::PreInit->new(var => $var, code => $M->{blast}{_ast}, shared => 1);
 

@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 18;
+plan 19;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -71,8 +71,12 @@ ok 42 / 3 == 14, "division comes out in the right order";
     ok $a == 55, "looping works";
 }
 
-my $x;
-PRE-INIT {
-    $x = 1;
+{
+    my $x;
+    PRE-INIT {
+        $x = 1;
+    }
+    ok $x, "changes made in the protolexpad are visible at runtime";
 }
-ok $x, "changes made in the protolexpad are visible at runtime";
+
+ok PRE-INIT { 1 }, "preinit blocks can return values";
