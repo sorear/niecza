@@ -297,7 +297,7 @@ sub methodop { my ($cl, $M) = @_;
     $r{quote} = $M->{quote}{_ast} if $M->{quote};
     $r{ref}   = $M->{variable}{_ast}{term} if $M->{variable};
 
-    $r{args}  = $M->{args}[0]{_ast} if $M->{args}[0];
+    $r{args}  = $M->{args}[0]{_ast}[0] if $M->{args}[0];
     $r{args}  = $M->{arglist}[0]{_ast} if $M->{arglist}[0];
 
     $M->{_ast} = \%r;
