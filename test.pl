@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 19;
+plan 20;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -80,3 +80,8 @@ ok 42 / 3 == 14, "division comes out in the right order";
 }
 
 ok PRE-INIT { 1 }, "preinit blocks can return values";
+
+{
+    sub foo() { 42 }
+    ok (foo) == 42, "can call argless function without parens";
+}

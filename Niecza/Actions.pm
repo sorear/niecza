@@ -329,7 +329,7 @@ sub term__S_value { my ($cl, $M) = @_;
 
 sub term__S_identifier { my ($cl, $M) = @_;
     my $id  = $M->{identifier}{_ast};
-    my $sal = $M->{args}{_ast};
+    my $sal = $M->{args}{_ast} // [];  # TODO: support zero-D slicels
 
     if (@$sal > 1) {
         $M->sorry("Slicel lists are NYI");
@@ -924,7 +924,7 @@ sub semiarglist { my ($cl, $M) = @_;
 }
 
 sub args { my ($cl, $M) = @_;
-    if ($M->{semiarglist} && $M->{arglist}[0]) {
+    if ($M->{moreargs} || $M->{semiarglist} && $M->{arglist}[0]) {
         $M->sorry("Interaction between semiargs and args is not understood");
         return;
     }
