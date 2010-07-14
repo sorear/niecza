@@ -357,6 +357,10 @@ sub term__S_identifier { my ($cl, $M) = @_;
         positionals => $args);
 }
 
+sub term__S_self { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Lexical->new(name => 'self');
+}
+
 sub term__S_circumfix { my ($cl, $M) = @_;
     $M->{_ast} = $M->{circumfix}{_ast};
 }
@@ -1179,8 +1183,12 @@ sub method_def { my ($cl, $M) = @_;
     $scope = 'anon' if !$M->{longname};
     my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}) : undef;
 
-    if ($M->{trait}[0] || $M->{multisig}[0] || $M->{sigil}) {
+    if ($M->{trait}[0] || $M->{sigil}) {
         $M->sorry("Method traits NYI");
+        return;
+    }
+    if (@{ $M->{multisig} } > 1) {
+        $M->sorry("Multiple multisigs (what?) NYI");
         return;
     }
 
@@ -1196,7 +1204,11 @@ sub method_def { my ($cl, $M) = @_;
         return;
     }
 
-    my $bl = $cl->sl_to_block($M->{blockoid}{_ast}, subname => $name);
+    my $bl = $cl->sl_to_block($M->{blockoid}{_ast},
+        subname => $name,
+        signature => ($M->{multisig}[0] ?
+            $M->{multisig}[0]{_ast}->for_method : undef));
+
     $cl->block_to_closure(1, $bl, outer_key => $sym);
 
     push @{ $cl->get_outer($::CURLEX)->{'!decls'} },

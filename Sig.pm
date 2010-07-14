@@ -52,6 +52,13 @@ use 5.010;
 
     has params => (isa => 'ArrayRef[Sig::Parameter]', is => 'ro', required => 1);
 
+    sub for_method {
+        my $self = shift;
+        my $sp = Sig::Parameter->new(target =>
+            Sig::Target->new(slot => 'self'));
+        Sig->new(params => [ $sp, @{ $self->params } ]);
+    }
+
     sub used_slots {
         my $self = shift;
         map { $_->used_slots } @{ $self->params };

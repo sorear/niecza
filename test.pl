@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 41;
+plan 49;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -113,3 +113,38 @@ ok "Foo".WHAT === Str, 'WHAT of a Str *is* Str';
 ok "Foo".HOW.WHAT eq 'ClassHOW()', 'anything.HOW is a ClassHOW';
 ok "Foo".HOW === "Cow".HOW, 'objects of the same class have the same HOW';
 ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
+
+{
+    my class Foo {
+        method zow() {
+            "A";
+        }
+
+        method zilch() {
+            "B";
+        }
+
+        method crow($x) {
+            $x * $x;
+        }
+
+        method pie() {
+            self.zow
+        }
+    }
+
+    my class Bar is Foo {
+        method zow() {
+            "C";
+        }
+    }
+
+    ok !Foo.defined, "class type objects are undefined";
+    ok !Bar.defined, "even derived ones";
+    ok Foo.zow eq 'A', "can call defined methods";
+    ok Bar.zow eq 'C', "subclasses can override methods";
+    ok Bar.zilch eq 'B', "not overriden methods are inherited";
+    ok Foo.crow(13) == 169, "can call methods with arguments";
+    ok Foo.pie eq 'A', "can call methods through self";
+    ok Bar.pie eq 'C', "calls through self are virtual";
+}
