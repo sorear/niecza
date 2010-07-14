@@ -58,11 +58,13 @@ namespace Niecza {
     // also tend to contextualize stuff put into them.
     //
     // Coercions are not used on binding unless necessary.
+    //
+    // Variables also have type constraints, that's how %foo and @foo differ...
     public class Variable {
         public enum Context {
             // @foo: binds listy lvalues; calls .list on other stuff and uses
             // the result
-            Array,
+            List,
             // $foo: binds scalary lvalues; calls .item on other stuff and
             // wraps it in a container
             Scalar,
@@ -378,7 +380,7 @@ blocked:
                     b.klass = a.klass;
                     b.slots = new Dictionary<string,object>(a.slots);
                     b.slots["outer"] = c;
-                    th.caller.resultSlot = NewROVar(b);
+                    th.caller.resultSlot = NewROScalar(b);
                     return th.caller;
                 default:
                     return Kernel.Die(th, "invalid IP");
@@ -411,7 +413,7 @@ blocked:
             IP6 a;
             switch (th.ip) {
                 case 0:
-                    th.lex["$cursor"] = NewRWVar(th.caller);
+                    th.lex["$cursor"] = NewRWScalar(th.caller);
                     goto case 1;
                 case 1:
                     th.ip = 2;
@@ -467,9 +469,9 @@ blocked:
         }
 
         public static readonly DynMetaObject SubMO;
-        public static readonly DynMetaObject ScalarContainerMO;
+        public static readonly DynMetaObject ScalarMO;
         public static readonly DynProtoMetaObject SubPMO;
-        public static readonly DynProtoMetaObject ScalarContainerPMO;
+        public static readonly DynProtoMetaObject ScalarPMO;
         public static readonly IP6 DieSub;
 
         public static IP6 MakeSub(DynBlockDelegate code, Frame proto,
@@ -486,7 +488,7 @@ blocked:
             DynObject n = new DynObject();
             n.klass = ((DynObject)proto).klass;
             n.slots["value"] = v;
-            return NewROVar(n);
+            return NewROScalar(n);
         }
 
         public static object UnboxAny(IP6 o) {
@@ -496,25 +498,125 @@ blocked:
 
         public static IP6 MakeSC(IP6 inside) {
             DynObject n = new DynObject();
-            n.klass = ScalarContainerMO;
+            n.klass = ScalarMO;
             n.slots["value"] = inside;
             return n;
         }
 
-        public static LValue NewROLValue(IP6 inside) {
-            return new LValue(false, false, MakeSC(inside));
+        private static Frame BindScalarizeC(Frame th) {
+            LValue rhs;
+            switch (th.ip) {
+                case 0:
+                    rhs = (LValue) th.lex["o"];
+                    th.ip = 1;
+                    return rhs.container.InvokeMethod(th, "item",
+                            new LValue[1] { rhs }, null);
+                case 1:
+                    rhs = ((Variable) th.resultSlot).lv;
+                    if (rhs.islist) {
+                        throw new Exception(".item didn't do its job and returned a list!");
+                    }
+                    ((Variable)th.lex["c"]).lv = rhs;
+                    return th.caller;
+                default:
+                    throw new Exception("IP invalid");
+            }
         }
 
-        public static LValue NewRWLValue(IP6 inside) {
-            return new LValue(true, false, MakeSC(inside));
+        private static Frame BindListizeC(Frame th) {
+            LValue rhs;
+            switch (th.ip) {
+                case 0:
+                    rhs = (LValue) th.lex["o"];
+                    th.ip = 1;
+                    return rhs.container.InvokeMethod(th, "list",
+                            new LValue[1] { rhs }, null);
+                case 1:
+                    rhs = ((Variable) th.resultSlot).lv;
+                    if (!rhs.islist) {
+                        throw new Exception(".list didn't do its job and returned a scalar!");
+                    }
+                    ((Variable)th.lex["c"]).lv = rhs;
+                    return th.caller;
+                default:
+                    throw new Exception("IP invalid");
+            }
         }
 
-        public static Variable NewROVar(IP6 inside) {
-            return new Variable(true, NewROLValue(inside));
+        public static Frame Bind(Frame th, Variable lhs, LValue rhs,
+                bool ro, bool forcerw) {
+            // TODO: need exceptions for forcerw to be used
+            Frame n;
+            switch (lhs.context) {
+                case Variable.Context.Scalar:
+                    if (rhs.islist) {
+                        n = new Frame(th, null,
+                                new DynBlockDelegate(BindScalarizeC));
+                        n.lex["o"] = rhs;
+                        n.lex["c"] = lhs;
+                        return n;
+                    } else {
+                        lhs.lv = rhs;
+                        if (ro) { lhs.lv.rw = false; }
+                        return th;
+                    }
+                case Variable.Context.WeakScalar:
+                    if (rhs.islist) {
+                        lhs.lv.rw = false;
+                        lhs.lv.islist = false;
+                        lhs.lv.container = MakeSC(rhs.container);
+                        return th;
+                    } else {
+                        lhs.lv = rhs;
+                        if (ro) { lhs.lv.rw = false; }
+                        return th;
+                    }
+                case Variable.Context.List:
+                    if (rhs.islist) {
+                        lhs.lv = rhs;
+                        if (ro) { lhs.lv.rw = false; }
+                        return th;
+                    } else {
+                        n = new Frame(th, null,
+                                new DynBlockDelegate(BindListizeC));
+                        n.lex["o"] = rhs;
+                        n.lex["c"] = lhs;
+                        return n;
+                    }
+                case Variable.Context.Capture:
+                    lhs.lv = rhs;
+                    return th;
+                default:
+                    throw new Exception("invalid context?");
+            }
         }
 
-        public static Variable NewRWVar(IP6 inside) {
-            return new Variable(true, NewRWLValue(inside));
+        // ro, not rebindable
+        public static Variable NewROScalar(IP6 obj) {
+            return new Variable(false, Variable.Context.Scalar,
+                    new LValue(false, false, MakeSC(obj)));
+        }
+
+        // TODO: Find out from #perl6 more about whether we actually want
+        // to be cloning anything.  this one /is/ rebindable
+        public static Variable NewRWScalar(IP6 obj) {
+            return new Variable(true, Variable.Context.Scalar,
+                    new LValue(true, false, MakeSC(obj)));
+        }
+
+        public static Variable NewRWListVar(IP6 container) {
+            return new Variable(true, Variable.Context.List,
+                    new LValue(true, true, container));
+        }
+
+        public static Variable NewCaptureVar() {
+            return new Variable(true, Variable.Context.Capture,
+                    new LValue(false, false, MakeSC(null)));
+        }
+
+        public static Variable NewWeakScalar() {
+            return new Variable(true, Variable.Context.WeakScalar,
+                    new LValue(false, false, MakeSC(null)));
         }
 
         static Kernel() {
@@ -528,12 +630,12 @@ blocked:
 
             SubMO = new DynMetaObject(SubPMO);
 
-            ScalarContainerPMO = new DynProtoMetaObject();
-            ScalarContainerPMO.name = "ScalarContainer";
-            ScalarContainerPMO.OnFetch = new DynProtoMetaObject.FetchHandler(SCFetch);
-            ScalarContainerPMO.OnStore = new DynProtoMetaObject.StoreHandler(SCStore);
+            ScalarPMO = new DynProtoMetaObject();
+            ScalarPMO.name = "Scalar";
+            ScalarPMO.OnFetch = new DynProtoMetaObject.FetchHandler(SCFetch);
+            ScalarPMO.OnStore = new DynProtoMetaObject.StoreHandler(SCStore);
 
-            ScalarContainerMO = new DynMetaObject(ScalarContainerPMO);
+            ScalarMO = new DynMetaObject(ScalarPMO);
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }
