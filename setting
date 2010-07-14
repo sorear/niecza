@@ -62,9 +62,10 @@ PRE-INIT {
 
     # $how.push-scope($outer)
     sub push-scope { Q:NIL {
-        =[0] @ @!meta-object unwrap:DynProtoMetaObject @.def_outers
-            =[1] @ unwrap:Frame .virtcall/1:Add
-        null:Variable
+        LEXICALS: $df : List<Frame>
+        =[0] @ @!meta-object unwrap:DynProtoMetaObject @.def_outers L!$df
+        L@$df =[1] @ unwrap:Frame .virtcall/1:Add
+        L@$df @.Count 1 - wrap
     } }
 
     # $how.add-super($how)

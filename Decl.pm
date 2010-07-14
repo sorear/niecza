@@ -189,7 +189,8 @@ use 5.010;
         $cg->dup_fetch;
         $cg->callframe;
         $cg->clr_wrap;
-        $cg->call_method(0, "push-scope", 1);
+        $cg->call_method(1, "push-scope", 1);
+        $cg->proto_var('!scopenum');
 
         $self->body->do_preinit($cg);
         $cg->close_sub($self->body->code);
@@ -236,8 +237,7 @@ use 5.010;
         $cg->dup_fetch;
         $cg->clr_string($self->name);
         $cg->clr_wrap;
-        $cg->clr_int(0);
-        $cg->clr_wrap;
+        $cg->scopelexget('!scopenum');
         $cg->scopelexget($self->var);
         $cg->call_method(0, "add-scoped-method", 3);
     }
@@ -258,6 +258,9 @@ use 5.010;
         if (!$body->isa('Body::Class')) {
             #TODO: Make this a sorry.
             die "Tried to set a superclass outside a class!";
+        }
+        if ($body->augmenting) {
+            die "Cannot add superclasses in an augment";
         }
         push @{ $body->super }, $self->name;
 

@@ -58,8 +58,9 @@ use CodeGen ();
     use Moose;
     extends 'Body';
 
-    has 'var'   => (is => 'rw', isa => 'Str');
-    has 'super' => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
+    has 'var'        => (is => 'rw', isa => 'Str');
+    has 'super'      => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
+    has 'augmenting' => (is => 'ro', isa => 'Bool', default => 0);
 
     sub makeproto {
         my ($self, $cg) = @_;
@@ -87,11 +88,14 @@ use CodeGen ();
 
     before do_enter => sub {
         my ($self, $cg) = @_;
+        $cg->share_lex('!scopenum');
         $self->makeproto($cg);
     };
 
-    after do_preinit => sub {
-        my ($self, $cg) = @_;
+    around do_preinit => sub {
+        my ($o, $self, $cg) = @_;
+        $self->lexical->{'!scopenum'} = 1;
+        $o->($self, $cg);
         $self->makeproto($cg);
     };
 

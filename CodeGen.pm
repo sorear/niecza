@@ -25,7 +25,8 @@ use 5.010;
               name         => 'String' },
 
         'List<Frame>' =>
-            { Add          => 'Void' },
+            { Add          => 'Void',
+              Count        => 'System.Int32' },
         'List<DynMetaObject>' =>
             { Add          => 'Void' },
         'List<DynProtoMetaObject>' =>
