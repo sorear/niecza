@@ -10,17 +10,8 @@ use Sub::Exporter -setup => {
 open ::NIECZA_OUT, ">&", \*STDOUT;
 
 BEGIN {
-    use File::Slurp;
-    GETBASE: {
-        for (read_file 'Makefile') {
-            if (/^STDBASE=(.*)/) {
-                unshift @INC, $1;
-                $ENV{PERL6LIB} = "$1:$1/lib";
-                last GETBASE;
-            }
-        }
-        die "Cannot scrape STDBASE from Makefile";
-    }
+    unshift @INC, 'STD_checkout';
+    $ENV{PERL6LIB} = "STD_checkout:STD_checkout/lib";
 }
 
 use Body ();

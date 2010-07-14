@@ -4,7 +4,44 @@ This is 'Niecza', which will eventually be a Perl 6 implementation focusing
 on optimization research.  It targets the Common Language Runtime (ECMA-335;
 implementations are "Mono" and ".NET").
 
-It's currently very primitive; Hello, World is close to its limits.
+To see the current state of the art, the best documentation is the testsuite,
+C<test.pl>.
+
+=head1 DEPENDENCIES
+
+=over 4
+
+=item *
+
+Mono (2.6.4 recommended)
+
+=item *
+
+GNU make
+
+=item *
+
+Subversion
+
+=item *
+
+Perl 5.10.1 (or 5.10.0 with autodie installed from CPAN) in /usr/local/bin
+
+=item *
+
+Moose, Sub::Exporter, File::Slurp, Term::ReadLine and YAML::XS from CPAN
+
+=back
+
+=head1 USING
+
+    $ ./niecza
+    > say 2 + 2
+    4
+    > ^D
+    $ ./niecza -e 'say 2 + 2'
+    4
+    $
 
 =head1 COPYRIGHT AND LICENSE
 
