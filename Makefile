@@ -9,6 +9,7 @@ test: all
 all: Niecza/Grammar.pmc
 	perl -MCompilerDriver=:all -e 'header; setting' > Setting.cs
 	gmcs /target:library /out:Setting.dll Kernel.cs Setting.cs
+	mono --aot Setting.dll
 
 Niecza/Grammar.pmc: Niecza/Grammar.pm6
 	STD5PREFIX=$(STDBASE)/ $(STDENV) $(STDBASE)/viv -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6

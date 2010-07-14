@@ -1,6 +1,7 @@
 Program.exe
 Program.cs
 Setting.dll
+Setting.dll.so
 Setting.cs
 setting_ast.store
 *.swp
