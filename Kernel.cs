@@ -30,27 +30,57 @@ namespace Niecza {
         Frame Store(Frame caller, IP6 thing);
     }
 
+    // A LValue is the meaning of function arguments, of any subexpression
+    // except the targets of := and .VAR.
+    //
+    // They come in two flavors.  Scalary lvalues hold a container, which
+    // can do FETCH and STORE.  Listy lvalues FETCH as the container itself,
+    // and STORE as a method to the container.
+    //
+    // List->scalar context: create a simple container holding the list's
+    // object, but .item.  Read only.
+    //
+    // Scalar->list: call .list or something to get a suitable list object.
+    // Bind it same rwness.
     public struct LValue {
         public IP6 container;
         public bool rw;
-        // if true, list contexts will try to unpack the value; otherwise it's
-        // always treated as a scalar
-        public bool pl;
+        public bool islist;
 
-        public LValue(bool rw_, bool pl_, IP6 container_) {
-            rw = rw_; pl = pl_;
+        public LValue(bool rw_, bool islist_, IP6 container_) {
+            rw = rw_; islist = islist_;
             container = container_;
         }
     }
 
+    // Variables are things which can produce LValues, and can also bind
+    // LValues.  They hold LValues and may or may not be bindable.  Variables
+    // also tend to contextualize stuff put into them.
+    //
+    // Coercions are not used on binding unless necessary.
     public class Variable {
+        public enum Context {
+            // @foo: binds listy lvalues; calls .list on other stuff and uses
+            // the result
+            Array,
+            // $foo: binds scalary lvalues; calls .item on other stuff and
+            // wraps it in a container
+            Scalar,
+            // self: binds scalary lvalues, but doesn't call .item; could wind
+            // up bound to a Parcel
+            WeakScalar,
+            // ¢foo: binds any lvalue, no munging, needed for = rhs etc
+            Capture
+        }
         public LValue lv;
         public bool bvalue;
 
-        public Variable() { }
-        public Variable(bool bv, LValue lv_) {
+        public Context context;
+
+        public Variable(bool bv, Context cx, LValue lv_) {
             bvalue = bv;
             lv = lv_;
+            context = cx;
         }
     }
 
