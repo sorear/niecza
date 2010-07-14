@@ -310,4 +310,6 @@ sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $old }
 sub prefix:<~>($v) { $v.Str } # should be Stringy
 sub prefix:<?>($v) { $v.Bool }
 
+sub prefix:<!>($v) { if $v { ?0 } else { ?1 } }
+
 YOU_ARE_HERE;
