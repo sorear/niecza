@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 29;
+plan 34;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -97,3 +97,10 @@ ok "foo" ne "bar", "unequal strings are unequal";
 
 ok Mu === Mu, "identical objects are identical";
 ok !(Mu === Any), "unidentical objects are unidentical";
+
+ok 12 eq "12", "eq stringifies";
+ok ("a" ~ "b") eq "ab", "a + b = ab";
+ok (?1) eq "Bool::True", "True strings to Bool::True";
+ok (?0) eq "Bool::False", "False strings to Bool::False";
+
+ok ~Any eq "Any()", "~Any is Any()";
