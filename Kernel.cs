@@ -225,17 +225,17 @@ blocked:
             while (klass.outers.Count < klass.proto.def_outers.Count) {
                 klass.outers.Add(klass.proto.def_outers[klass.outers.Count]);
             }
-            // TODO MRO
-            if (klass.proto.local.TryGetValue(name, out m)) {
-                Frame n = new Frame(caller, klass.outers[m.outer_index],
-                        m.code);
-                n.proto = m.proto;
-                n.pos = pos;
-                n.named = named;
-                return n;
-            } else {
-                return Fail(caller, "Unable to resolve method " + name);
+            foreach (DynMetaObject k in klass.mro) {
+                if (k.proto.local.TryGetValue(name, out m)) {
+                    Frame n = new Frame(caller, k.outers[m.outer_index],
+                            m.code);
+                    n.proto = m.proto;
+                    n.pos = pos;
+                    n.named = named;
+                    return n;
+                }
             }
+            return Fail(caller, "Unable to resolve method " + name);
         }
 
         public Frame GetAttribute(Frame caller, string name) {

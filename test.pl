@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 20;
+plan 24;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -85,3 +85,8 @@ ok PRE-INIT { 1 }, "preinit blocks can return values";
     sub foo() { 42 }
     ok (foo) == 42, "can call argless function without parens";
 }
+
+ok !Mu, "undefined type objects are false";
+ok !Mu.defined, "type objects are undefined";
+ok "Foo".defined, "strings are defined";
+ok !Str.defined, "derived type objects are still undefined";
