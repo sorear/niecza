@@ -8,6 +8,12 @@ use 5.010;
 
     sub paren { shift }
 
+    sub void_cg {
+        my ($self, $cg, $body) = @_;
+        $self->item_cg($cg, $body);
+        $cg->drop;
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -137,6 +143,33 @@ use 5.010;
         $cg->dup_fetch;
         $_->item_cg($cg, $body) for @{ $self->positionals };
         $cg->call_method(0, $self->name, scalar(@{ $self->positionals }));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::Interrogative;
+    use Moose;
+    extends 'Op';
+
+    has receiver    => (isa => 'Op', is => 'ro', required => 1);
+    has name        => (isa => 'Str', is => 'ro', required => 1);
+
+    sub item_cg {
+        my ($self, $cg, $body) = @_;
+        $self->receiver->item_cg($cg, $body);
+        $cg->fetch;
+        given ($self->name) {
+            when ("HOW") {
+                $cg->how;
+            }
+            default {
+                die "Invalid interrogative $_";
+            }
+        }
+        $cg->newvar;
     }
 
     __PACKAGE__->meta->make_immutable;
