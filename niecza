@@ -1,7 +1,7 @@
 #! /usr/bin/env perl
 use warnings;
 use strict;
-use 5.010_001;
+use 5.010;
 
 use CompilerDriver ':all';
 use Getopt::Long;

@@ -4,12 +4,12 @@ STDENV=PERL5LIB=$(STDBASE) PERL6LIB=$(STDBASE):$(STDBASE)/lib
 COMPILER=Body.pm CodeGen.pm CompilerDriver.pm Decl.pm Op.pm Sig.pm Unit.pm\
 	 Niecza/Actions.pm Niecza/Grammar.pmc .STD_build_stamp
 
+all: Setting.dll
+
 test: $(COMPILER) test.pl Setting.dll
 	perl -MFile::Slurp -MCompilerDriver=:all -e 'header; mainline(scalar read_file("test.pl")); bootstrap' > Program.cs
 	gmcs /r:Setting.dll Program.cs
 	prove -e 'mono --debug=casts' Program.exe
-
-all: Setting.dll
 
 Setting.cs: $(COMPILER) setting
 	perl -MCompilerDriver=:all -e 'header; setting' > Setting.cs
