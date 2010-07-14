@@ -18,7 +18,7 @@ Setting.dll: Kernel.cs Setting.cs
 	gmcs /target:library /out:Setting.dll Kernel.cs Setting.cs
 	mono --aot Setting.dll
 
-Niecza/Grammar.pmc: Niecza/Grammar.pm6
+Niecza/Grammar.pmc: Niecza/Grammar.pm6 .STD_build_stamp
 	STD5PREFIX=$(STDBASE)/ $(STDENV) $(STDBASE)/viv -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6
 
 .STD_checkout_stamp: STD_REVISION
