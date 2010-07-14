@@ -224,11 +224,11 @@ Q:NIL {
 
 my class Junction is Mu { }
 my class Num {
-    method Str { Q:NIL { =[0] @ unbox:Double .virtcall/0:ToString box:Str } }
-    method Bool { Q:NIL { =[0] @ unbox:Double  0 !=  box:Bool } }
+    method Str () { Q:NIL { {self} @ unbox:Double .virtcall/0:ToString box:Str } }
+    method Bool() { Q:NIL { {self} @ unbox:Double  0 !=  box:Bool } }
 }
 my class Str {
-    method Str { Q:NIL { =[0] } }
+    method Str () { self }
 }
 my class Blob { }
 my class Char { }
@@ -248,8 +248,8 @@ my class Instant { }
 my class Duration { }
 my class Enum { }
 my class Bool is Enum {
-    method Str { if Q:NIL { =[0] } { "Bool::True" } else { "Bool::False" } }
-    method Bool { Q:NIL { =[0] } }
+    method Str() { if self { "Bool::True" } else { "Bool::False" } }
+    method Bool() { self }
 }
 
 # ought to take a slurpy
@@ -332,18 +332,18 @@ sub infix:<===>($l,$r) { Q:NIL { {$l} @  {$r} @  == box:Bool } }
 PRE-INIT {
     my $i := Mu.HOW.push-scope(Q:NIL { callframe wrap });
     Mu.HOW.add-scoped-method(Q:NIL { "defined" wrap }, $i,
-        anon method defined {
-            Q:NIL { =[0] @ cast:DynObject @.slots
+        anon method defined() {
+            Q:NIL { {self} @ cast:DynObject @.slots
                     null:Dictionary<string,object> != box:Bool }
         });
     Mu.HOW.add-scoped-method(Q:NIL { "Bool" wrap }, $i,
-        anon method Bool { (Q:NIL { =[0] }).defined });
+        anon method Bool() { self.defined });
     Mu.HOW.add-scoped-method(Q:NIL { "Str" wrap }, $i,
-        anon method Str {
+        anon method Str() {
             my $tn := Q:NIL {
-                =[0] @ cast:DynObject @.klass @.proto @.name box:Str
+                {self} @ cast:DynObject @.klass @.proto @.name box:Str
             };
-            if (Q:NIL { =[0] }).defined {
+            if self.defined {
                 $tn ~ "()<instance>"
             } else {
                 $tn ~ "()"
