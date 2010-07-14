@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 24;
+plan 29;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -90,3 +90,10 @@ ok !Mu, "undefined type objects are false";
 ok !Mu.defined, "type objects are undefined";
 ok "Foo".defined, "strings are defined";
 ok !Str.defined, "derived type objects are still undefined";
+
+ok "foo" eq "foo", "equal strings are equal";
+ok !("foo" ne "foo"), "equal strings are not not equal";
+ok "foo" ne "bar", "unequal strings are unequal";
+
+ok Mu === Mu, "identical objects are identical";
+ok !(Mu === Any), "unidentical objects are unidentical";

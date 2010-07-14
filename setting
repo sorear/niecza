@@ -313,6 +313,13 @@ sub prefix:<?>($v) { $v.Bool }
 
 sub prefix:<!>($v) { if $v { ?0 } else { ?1 } }
 
+sub infix:<eq>($l,$r) { Q:NIL {
+    {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  == box:Bool } }
+sub infix:<ne>($l,$r) { Q:NIL {
+    {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  != box:Bool } }
+# this one is horribly wrong and only handles the ref eq case.
+sub infix:<===>($l,$r) { Q:NIL { {$l} @  {$r} @  == box:Bool } }
+
 # XXX: We can't use augment syntax because we don't have use working, so
 # no MONKEY_TYPING.
 
