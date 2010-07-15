@@ -418,6 +418,11 @@ use 5.010;
         $self->clr_call_direct('Kernel.NewROScalar', 1);
     }
 
+    sub newrwscalar {
+        my ($self) = @_;
+        $self->clr_call_direct('Kernel.NewRWScalar', 1);
+    }
+
     sub clr_unwrap {
         my ($self, $ty) = @_;
         $self->cast('CLRImportObject');

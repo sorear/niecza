@@ -97,7 +97,7 @@ use 5.010;
         my ($self, $cg, $body) = @_;
         $cg->scopelexget('Any');
         $cg->fetch;
-        $cg->newscalar;
+        $cg->newrwscalar;
         $cg->proto_var($self->slot);
     }
 
