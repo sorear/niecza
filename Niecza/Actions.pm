@@ -149,6 +149,8 @@ sub quote__S_Q { my ($cl, $M) = @_;
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         $M->{_ast} = $M->{EXPR}{_ast};
+    } elsif ($M->isa('Niecza::Grammar::CgOp')) {
+        $M->{_ast} = Op::CgOp->new(op => $M->{cgexp}{_ast});
     } elsif ($M->isa('Niecza::Grammar::NIL')) {
         $M->{_ast} = Op::NIL->new(ops => [map { @{$_->{_ast}} } @{$M->{insn}}]);
     } else {
@@ -526,6 +528,32 @@ sub multisig { my ($cl, $M) = @_;
         return;
     }
     $M->{_ast} = $M->{signature}[0]{_ast};
+}
+
+sub cgopname { my ($cl, $M) = @_;
+    $M->{_ast} = $M->Str;
+}
+
+sub cgexp { }
+sub cgexp__S_name { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{cgopname}{_ast};
+}
+
+sub cgexp__S_decint { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{decint}{_ast};
+}
+
+sub cgexp__S_quote { my ($cl, $M) = @_;
+    if (!$M->{quote}{_ast}->isa('Op::StringLiteral')) {
+        $M->sorry("Strings used in CgOp code must be compile time constants");
+    }
+    $M->{_ast} = $M->{quote}{_ast}->text;
+}
+
+sub cgexp__S_op { my ($cl, $M) = @_;
+    no strict 'refs';
+    $M->{_ast} = &{'CgOp::' . $M->{cgopname}{_ast}}(
+        map { $_->{_ast} } @{ $M->{cgexp} });
 }
 
 sub voidmark { my ($cl, $M) = @_;

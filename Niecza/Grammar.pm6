@@ -22,6 +22,23 @@ grammar Q is STD::Q {
     #}
 
     multi method tweak(:$NIL!) { self.cursor_fresh( ::Niecza::Grammar::NIL ) }
+    multi method tweak(:$CgOp!) { self.cursor_fresh( ::Niecza::Grammar::CgOp)}
+}
+
+# an OPP is planned, but I need a better way to write action methods first,
+# since the OPP would necessarily use the same rule names as STD::P6
+grammar CgOp is STD {
+    rule nibbler { <cgexp> }
+
+    token category:cgexp { <sym> }
+    proto token cgexp { <...> }
+
+    token cgopname { \w+ }
+
+    token cgexp:op { '(':s {} <cgopname> [ <cgexp> ]* ')' }
+    token cgexp:name { <cgopname> }
+    token cgexp:quote { <?before <[ ' " ]>> {} [ :lang(%*LANG<MAIN>) <quote> ] }
+    token cgexp:decint { <decint> }
 }
 
 # mnemonic characters: (@, !, =) fetch, store, lvalue.

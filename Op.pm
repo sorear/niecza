@@ -31,6 +31,19 @@ use CgOp;
 }
 
 {
+    package Op::CgOp;
+    use Moose;
+    extends 'Op';
+
+    has op => (is => 'ro', required => 1);
+
+    sub code { $_[0]->op }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::StatementList;
     use Moose;
     extends 'Op';
