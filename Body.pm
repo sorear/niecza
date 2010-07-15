@@ -23,7 +23,7 @@ use CodeGen ();
         $self->codegen(CodeGen->new(name => $self->name, body => $self));
         my $cg = $self->codegen;
         $self->do_enter($cg);
-        $self->do->item_cg($cg, $self);
+        $self->do->cg($cg, $self);
         # TODO: Bind a return value here to catch non-ro sub use
         $cg->return(1) unless $cg->unreach;
         return $cg;
@@ -34,7 +34,10 @@ use CodeGen ();
         $cg->lextypes($_, 'Variable') for keys %{ $self->lexical };
         $_->do_enter($cg, $self) for @{ $self->decls };
         $self->signature->gen_binder($cg) if $self->signature;
-        $_->void_cg($cg, $self) for @{ $self->enter };
+        for (@{ $self->enter }) {
+            $_->cg($cg, $self);
+            $cg->drop;
+        }
     }
 
     sub write {
