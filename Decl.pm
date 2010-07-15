@@ -2,13 +2,15 @@ use strict;
 use warnings;
 use 5.010;
 
+use CgOp;
+
 {
     package Decl;
     use Moose;
 
-    sub do_preinit {}
-    sub do_enter   {}
-    sub write     {}
+    sub preinit_code { CgOp::noop }
+    sub enter_code   { CgOp::noop }
+    sub write        {}
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -23,24 +25,18 @@ use 5.010;
     has code   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
+    sub preinit_code {
+        my ($self, $body) = @_;
         $self->code->outer($body);
-        $cg->open_protopad($self->code);
-        $self->code->do_preinit($cg);
-        $cg->close_sub($self->code->code);
-        $cg->call_sub($self->has_var, 0);
-        $cg->proto_var($self->var) if $self->has_var;
+        my $c = CgOp::subcall(CgOp::protosub($self->code));
+        $self->has_var ? CgOp::proto_var($self->var, $c) : CgOp::sink($c);
     }
 
-    sub do_enter {
-        my ($self, $cg, $body) = @_;
-        return unless $self->has_var;
-        if ($self->shared) {
-            $cg->share_lex($self->var);
-        } else {
-            $cg->copy_lex($self->var);
-        }
+    sub enter_code {
+        my ($self, $body) = @_;
+        !$self->has_var ? CgOp::noop :
+            $self->shared ? CgOp::share_lex($self->var) :
+            CgOp::copy_lex($self->var);
     }
 
     sub write {
@@ -61,19 +57,17 @@ use 5.010;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
+    sub preinit_code {
+        my ($self, $body) = @_;
         $self->code->outer($body);
-        $cg->open_protopad($self->code);
-        $self->code->do_preinit($cg);
-        $cg->close_sub($self->code->code);
-        $cg->newscalar;
-        $cg->proto_var($self->var);
+
+        CgOp::proto_var($self->var, CgOp::newscalar(
+                CgOp::protosub($self->code)));
     }
 
-    sub do_enter {
+    sub enter_code {
         my ($self, $cg, $body) = @_;
-        $cg->clone_lex($self->var);
+        CgOp::clone_lex($self->var);
     }
 
     sub write {
@@ -93,17 +87,17 @@ use 5.010;
 
     has slot => (isa => 'Str', is => 'ro', required => 1);
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
-        $cg->scopelexget('Any');
-        $cg->fetch;
-        $cg->newrwscalar;
-        $cg->proto_var($self->slot);
+    sub preinit_code {
+        my ($self, $body) = @_;
+
+        CgOp::proto_var($self->slot,
+            CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
     }
 
-    sub do_enter {
-        my ($self, $cg, $body) = @_;
-        $cg->copy_lex($self->slot);
+    sub enter_code {
+        my ($self, $body) = @_;
+
+        CgOp::copy_lex($self->slot);
     }
 
     sub write {
@@ -119,32 +113,29 @@ use 5.010;
     use Moose;
     extends 'Decl';
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
-        $cg->clr_sfield_get('Kernel.MainlineContinuation');
-        $cg->push_null('Frame');
-        $cg->push_null('Frame');
-        $cg->clr_call_direct('Kernel.MakeSub', 3);
+    sub preinit_code {
+        my ($self, $body) = @_;
 
-        $cg->peek_aux('protopad');
-        $cg->newscalar;
-        $cg->call_sub(1, 1);
-        $cg->proto_var('!mainline');
-
+        # XXX ought not to have side effects here.
         $::SETTING_RESUME = $body;
+
+        CgOp::proto_var('!mainline',
+            CgOp::subcall(
+                CgOp::rawscall('Kernel.MakeSub',
+                    CgOp::rawsget('Kernel.MainlineContinuation'),
+                    CgOp::null('Frame'), CgOp::null('Frame')),
+                CgOp::newscalar(CgOp::aux('protopad'))));
     }
 
-    sub do_enter {
+    sub enter_code {
         my ($self, $cg, $body) = @_;
-        $cg->clone_lex('!mainline');
+        CgOp::clone_lex('!mainline');
     }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
 
-# XXX I hate this code.  It's seriously ugly.  Maybe decls should generate ops,
-# instead of needing to use the codegen directly.
 {
     package Decl::Class;
     use Moose;
@@ -159,56 +150,47 @@ use 5.010;
     # preinit
     has body => (is => 'ro', isa => 'Body::Class');
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
-        if ($self->stub) {
-            $cg->push_null('Variable');
-            $cg->proto_var($self->var);
-            $cg->push_null('Variable');
-            $cg->proto_var($self->var . '!HOW');
-            return;
-        }
-        $cg->scopelexget("ClassHOW", $body);
-        $cg->dup_fetch;
-        $cg->clr_string($self->name // 'ANON');
-        $cg->clr_wrap;
-        $cg->call_method(1, "new", 1);
-        $cg->push_aux('how');
-        $cg->peek_aux('how');
-        $cg->proto_var($self->var . '!HOW');
+    sub preinit_code {
+        my ($self, $body) = @_;
 
-        # TODO: Initialize the protoobject to a failure here so an awesome error
-        # is produced if someone tries to use an incomplete class in a BEGIN.
-        $cg->push_null('Variable');
-        $cg->proto_var($self->var);
+        if ($self->stub) {
+            return CgOp::prog(
+                CgOp::proto_var($self->var . '!HOW', CgOp::null('Variable')),
+                CgOp::proto_var($self->var, CgOp::null('Variable')));
+        }
 
         $self->body->outer($body);
         $self->body->var($self->var);
 
-        $cg->open_protopad($self->body);
+        CgOp::with_aux("how",
+            CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
+                CgOp::wrap(CgOp::clr_string($self->name // 'ANON'))),
 
-        $cg->peek_aux('how');
-        $cg->dup_fetch;
-        $cg->callframe;
-        $cg->clr_wrap;
-        $cg->call_method(1, "push-scope", 1);
-        $cg->proto_var('!scopenum');
+            CgOp::proto_var($self->var . '!HOW', CgOp::aux("how")),
 
-        $self->body->do_preinit($cg);
-        $cg->close_sub($self->body->code);
-        $cg->newscalar;
-        $cg->proto_var($self->var . '!BODY');
+            # TODO: Initialize the protoobject to a failure here so an awesome
+            # error is produced if someone tries to use an incomplete class in
+            # a BEGIN.
+            CgOp::proto_var($self->var, CgOp::null('Variable')),
+
+            CgOp::proto_var($self->var . '!BODY',
+                CgOp::newscalar(
+                    CgOp::protosub($self->body,
+                        CgOp::proto_var('!scopenum',
+                            CgOp::methodcall(CgOp::aux('how'),
+                                "push-scope",
+                                CgOp::wrap(CgOp::callframe)))))));
     }
 
-    sub do_enter   {
-        my ($self, $cg, $body) = @_;
-        $cg->share_lex($self->var . '!HOW');
-        if ($self->stub) {
-            $cg->share_lex($self->var);
-        } else {
-            $cg->clone_lex($self->var . '!BODY');
-        }
+    sub enter_code {
+        my ($self, $body) = @_;
+        CgOp::prog(
+            CgOp::share_lex($self->var . '!HOW'),
+            ($self->stub ?
+                CgOp::share_lex($self->var) :
+                CgOp::clone_lex($self->var . '!BODY')));
     }
+
     sub write   {
         my ($self, $body) = @_;
         return unless $self->body;
@@ -229,19 +211,17 @@ use 5.010;
     has name => (is => 'ro', isa => 'Str', required => 1);
     has var  => (is => 'ro', isa => 'Str', required => 1);
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
+    sub preinit_code {
+        my ($self, $body) = @_;
         if (!$body->isa('Body::Class')) {
             #TODO: Make this a sorry.
             die "Tried to set a method outside a class!";
         }
-        $cg->peek_aux('how');
-        $cg->dup_fetch;
-        $cg->clr_string($self->name);
-        $cg->clr_wrap;
-        $cg->scopelexget('!scopenum');
-        $cg->scopelexget($self->var);
-        $cg->call_method(0, "add-scoped-method", 3);
+        CgOp::sink(
+            CgOp::methodcall(CgOp::aux("how"), "add-scoped-method",
+                CgOp::wrap(CgOp::clr_string($self->name)),
+                CgOp::scopedlex('!scopenum'),
+                CgOp::scopedlex($self->var)));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -255,8 +235,8 @@ use 5.010;
 
     has name => (is => 'ro', isa => 'Str', required => 1);
 
-    sub do_preinit {
-        my ($self, $cg, $body) = @_;
+    sub preinit_code {
+        my ($self, $body) = @_;
         if (!$body->isa('Body::Class')) {
             #TODO: Make this a sorry.
             die "Tried to set a superclass outside a class!";
@@ -266,10 +246,9 @@ use 5.010;
         }
         push @{ $body->super }, $self->name;
 
-        $cg->peek_aux('how');
-        $cg->dup_fetch;
-        $cg->scopelexget($self->name . "!HOW", $body);
-        $cg->call_method(0, "add-super", 1);
+        CgOp::sink(
+            CgOp::methodcall(CgOp::aux('how'), "add-super",
+                CgOp::scopedlex($self->name . "!HOW", $body)));
     }
 
     __PACKAGE__->meta->make_immutable;

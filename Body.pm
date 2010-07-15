@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use 5.010;
 use CodeGen ();
+use CgOp ();
 
 {
     package Body;
@@ -32,7 +33,7 @@ use CodeGen ();
     sub do_enter {
         my ($self, $cg) = @_;
         $cg->lextypes($_, 'Variable') for keys %{ $self->lexical };
-        $_->do_enter($cg, $self) for @{ $self->decls };
+        $_->enter_code($self)->var_cg($cg) for @{ $self->decls };
         $self->signature->gen_binder($cg) if $self->signature;
         for (@{ $self->enter }) {
             CgOp::sink($_->code($self))->var_cg($cg);
@@ -45,9 +46,9 @@ use CodeGen ();
         $_->write($self) for (@{ $self->decls });
     }
 
-    sub do_preinit {
-        my ($self, $cg) = @_;
-        $_->do_preinit($cg, $self) for @{ $self->decls };
+    sub preinit_code {
+        my ($self) = @_;
+        CgOp::prog(map { $_->preinit_code($self) } @{ $self->decls });
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -65,40 +66,38 @@ use CodeGen ();
     has 'augmenting' => (is => 'ro', isa => 'Bool', default => 0);
 
     sub makeproto {
-        my ($self, $cg) = @_;
-        $cg->lextypes('!plist', 'List<DynMetaObject>');
-        $cg->clr_new('List<DynMetaObject>', 0);
-        $cg->lexput(0, '!plist');
+        my ($self) = @_;
+        my @p;
+        push @p, CgOp::lextypes('!plist', 'List<DynMetaObject>');
+        push @p, CgOp::lexput(0, '!plist',
+            CgOp::rawnew('List<DynMetaObject>'));
 
         for my $super (@{ $self->super }) {
-            $cg->lexget(0, '!plist');
-            $cg->scopelexget($super, $self);
-            $cg->fetch;
-            $cg->cast('DynObject');
-            $cg->clr_field_get('klass');
-            $cg->clr_call_virt('Add', 1);
+            push @p, CgOp::rawcall(CgOp::lexget(0, '!plist'), 'Add',
+                CgOp::getfield('klass',
+                    CgOp::cast('DynObject',
+                        CgOp::fetch(CgOp::scopedlex($super)))));
         }
-        $cg->lexget(1, $self->var . '!HOW');
-        $cg->dup_fetch;
-        $cg->callframe;
-        $cg->clr_wrap;
-        $cg->lexget(0, '!plist');
-        $cg->clr_wrap;
-        $cg->call_method(1, "create-protoobject", 2);
-        $cg->lexput(1, $self->var);
+        push @p, CgOp::lexput(1, $self->var,
+            CgOp::methodcall(
+                CgOp::lexget(1, $self->var . '!HOW'), 'create-protoobject',
+                CgOp::wrap(CgOp::callframe),
+                CgOp::wrap(CgOp::lexget(0, '!plist'))));
+        CgOp::prog(@p);
     }
 
     before do_enter => sub {
         my ($self, $cg) = @_;
         $cg->share_lex('!scopenum');
-        $self->makeproto($cg);
+        $self->makeproto->var_cg($cg);
     };
 
-    around do_preinit => sub {
-        my ($o, $self, $cg) = @_;
+    around preinit_code => sub {
+        my ($o, $self) = @_;
         $self->lexical->{'!scopenum'} = 1;
-        $o->($self, $cg);
-        $self->makeproto($cg);
+        CgOp::prog(
+            $o->($self),
+            $self->makeproto);
     };
 
     __PACKAGE__->meta->make_immutable;

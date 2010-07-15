@@ -92,6 +92,10 @@ use warnings;
         CgOp::NIL->new(ops => [ @_ ]);
     }
 
+    sub noop {
+        CgOp::NIL->new(ops => []);
+    }
+
     sub null {
         CgOp::NIL->new(ops => [[ push_null => $_[0] ]]);
     }
@@ -128,6 +132,10 @@ use warnings;
         CgOp::NIL->new(ops => [ $_[0], [ 'newscalar' ] ]);
     }
 
+    sub newrwscalar {
+        CgOp::NIL->new(ops => [ $_[0], [ 'newrwscalar' ] ]);
+    }
+
     sub string_var {
         CgOp::NIL->new(ops => [ [ 'string_var', $_[0] ] ]);
     }
@@ -152,6 +160,14 @@ use warnings;
         CgOp::NIL->new(ops => [[ scopelexget => $_[0] ]]);
     }
 
+    sub lexput {
+        CgOp::NIL->new(ops => [ $_[2], [ lexput => $_[0], $_[1] ]]);
+    }
+
+    sub lexget {
+        CgOp::NIL->new(ops => [[ lexget => $_[0], $_[1] ]]);
+    }
+
     sub subcall {
         my ($sub, @args) = @_;
         CgOp::NIL->new(ops => [ $sub, @args, [ 'call_sub', 1, scalar @args ] ]);
@@ -161,6 +177,69 @@ use warnings;
         my ($obj, $name, @args) = @_;
         CgOp::NIL->new(ops => [ $obj, [ 'dup_fetch' ], @args,
                 [ 'call_method', 1, $name, scalar @args ] ]);
+    }
+
+    sub callframe {
+        CgOp::NIL->new(ops => [[ 'callframe' ]]);
+    }
+
+    sub aux {
+        CgOp::NIL->new(ops => [[ 'peek_aux', $_[0] ]]);
+    }
+
+    sub clr_string {
+        CgOp::NIL->new(ops => [[ 'clr_string', $_[0] ]]);
+    }
+
+    sub lextypes {
+        CgOp::NIL->new(ops => [[ 'lextypes', @_ ]]);
+    }
+
+    sub share_lex {
+        CgOp::NIL->new(ops => [[ 'share_lex', $_[0] ]]);
+    }
+
+    sub copy_lex {
+        CgOp::NIL->new(ops => [[ 'copy_lex', $_[0] ]]);
+    }
+
+    sub clone_lex {
+        CgOp::NIL->new(ops => [[ 'clone_lex', $_[0] ]]);
+    }
+
+    sub proto_var {
+        CgOp::NIL->new(ops => [ $_[1], [ 'proto_var', $_[0] ]]);
+    }
+
+    sub rawscall {
+        my ($name, @args) = @_;
+        CgOp::NIL->new(ops => [ @args, [ 'clr_call_direct', $name, scalar @args ] ]);
+    }
+
+    sub rawcall {
+        my ($inv, $name, @args) = @_;
+        CgOp::NIL->new(ops => [ $inv, @args, [ 'clr_call_virt', $name, scalar @args ] ]);
+    }
+
+    sub rawsget {
+        CgOp::NIL->new(ops => [[ 'clr_sfield_get', $_[0] ]]);
+    }
+
+    sub rawnew {
+        my ($name, @args) = @_;
+        CgOp::NIL->new(ops => [ @args, [ 'clr_new', $name, scalar @args ] ]);
+    }
+
+    sub protosub {
+        my ($body, @extra) = @_;
+        CgOp::NIL->new(ops => [ [ 'open_protopad', $body ], @extra,
+                $body->preinit_code, [ 'close_sub', $body->code ] ]);
+    }
+
+    sub with_aux {
+        my ($name, $value, @stuff) = @_;
+        CgOp::NIL->new(ops => [ $value, [ 'push_aux', $name ], @stuff,
+                [ 'pop_aux', $name ], [ 'drop' ] ]);
     }
 
     sub ternary {
