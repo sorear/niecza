@@ -65,14 +65,8 @@ namespace Niecza {
             // @foo: binds listy lvalues; calls .list on other stuff and uses
             // the result
             List,
-            // $foo: binds scalary lvalues; calls .item on other stuff and
-            // wraps it in a container
+            // $foo: binds scalary lvalues; wraps other stuff in a container
             Scalar,
-            // self: binds scalary lvalues, but doesn't call .item; could wind
-            // up bound to a Parcel
-            WeakScalar,
-            // ¢foo: binds any lvalue, no munging, needed for = rhs etc
-            Capture
         }
         public LValue lv;
         public bool bvalue;
@@ -503,26 +497,6 @@ blocked:
             return n;
         }
 
-        private static Frame BindScalarizeC(Frame th) {
-            LValue rhs;
-            switch (th.ip) {
-                case 0:
-                    rhs = (LValue) th.lex["o"];
-                    th.ip = 1;
-                    return rhs.container.InvokeMethod(th, "item",
-                            new LValue[1] { rhs }, null);
-                case 1:
-                    rhs = ((Variable) th.resultSlot).lv;
-                    if (rhs.islist) {
-                        throw new Exception(".item didn't do its job and returned a list!");
-                    }
-                    ((Variable)th.lex["c"]).lv = rhs;
-                    return th.caller;
-                default:
-                    throw new Exception("IP invalid");
-            }
-        }
-
         private static Frame BindListizeC(Frame th) {
             LValue rhs;
             switch (th.ip) {
@@ -550,18 +524,6 @@ blocked:
             switch (lhs.context) {
                 case Variable.Context.Scalar:
                     if (rhs.islist) {
-                        n = new Frame(th, null,
-                                new DynBlockDelegate(BindScalarizeC));
-                        n.lex["o"] = rhs;
-                        n.lex["c"] = lhs;
-                        return n;
-                    } else {
-                        lhs.lv = rhs;
-                        if (ro) { lhs.lv.rw = false; }
-                        return th;
-                    }
-                case Variable.Context.WeakScalar:
-                    if (rhs.islist) {
                         lhs.lv.rw = false;
                         lhs.lv.islist = false;
                         lhs.lv.container = MakeSC(rhs.container);
@@ -583,9 +545,6 @@ blocked:
                         n.lex["c"] = lhs;
                         return n;
                     }
-                case Variable.Context.Capture:
-                    lhs.lv = rhs;
-                    return th;
                 default:
                     throw new Exception("invalid context?");
             }
@@ -607,16 +566,6 @@ blocked:
         public static Variable NewRWListVar(IP6 container) {
             return new Variable(true, Variable.Context.List,
                     new LValue(true, true, container));
-        }
-
-        public static Variable NewCaptureVar() {
-            return new Variable(true, Variable.Context.Capture,
-                    new LValue(false, false, MakeSC(null)));
-        }
-
-        public static Variable NewWeakScalar() {
-            return new Variable(true, Variable.Context.WeakScalar,
-                    new LValue(false, false, MakeSC(null)));
         }
 
         static Kernel() {
