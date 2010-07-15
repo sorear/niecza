@@ -111,6 +111,10 @@ use warnings;
         CgOp::NIL->new(ops => [ $_[0], [ 'clr_wrap' ] ]);
     }
 
+    sub unwrap {
+        CgOp::NIL->new(ops => [ $_[1], [ 'clr_unwrap', $_[0] ] ]);
+    }
+
     sub sink {
         CgOp::NIL->new(ops => [ $_[0], [ 'drop' ] ]);
     }
@@ -125,6 +129,10 @@ use warnings;
 
     sub getfield {
         CgOp::NIL->new(ops => [ $_[1], [ 'clr_field_get', $_[0] ] ]);
+    }
+
+    sub getattr {
+        CgOp::NIL->new(ops => [ $_[1], [ 'attr_get', $_[0] ] ]);
     }
 
     sub cast {
@@ -157,6 +165,14 @@ use warnings;
 
     sub bind {
         CgOp::NIL->new(ops => [ $_[1], $_[2], [ 'bind', $_[0] ] ]);
+    }
+
+    sub compare {
+        CgOp::NIL->new(ops => [$_[1], $_[2], [ 'clr_compare', $_[0] ]]);
+    }
+
+    sub arith {
+        CgOp::NIL->new(ops => [$_[1], $_[2], [ 'clr_arith', $_[0] ]]);
     }
 
     sub scopedlex {

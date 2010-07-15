@@ -39,6 +39,10 @@ grammar CgOp is STD {
     token cgexp:name { <cgopname> }
     token cgexp:quote { <?before <[ ' " ]>> {} [ :lang(%*LANG<MAIN>) <quote> ] }
     token cgexp:decint { <decint> }
+    token cgexp:bad { <!before ')'> {}
+        [ <?stdstopper> <.panic "Missing cgop"> ]
+        <.panic: "Unparsable cgop">
+    }
 }
 
 # mnemonic characters: (@, !, =) fetch, store, lvalue.

@@ -70,10 +70,12 @@ PRE-INIT {
     } }
 
     # $how.add-super($how)
-    sub add-super { Q:NIL {
-        =[0] @ @!meta-object unwrap:DynProtoMetaObject @.superclasses
-            =[1] @ @!meta-object unwrap:DynProtoMetaObject  .virtcall/1:Add
-        null:Variable
+    sub add-super { Q:CgOp { (prog
+        (rawcall
+          (getfield superclasses (unwrap DynProtoMetaObject
+            (getattr 'meta-object' (fetch (pos 0))))) Add
+          (unwrap DynProtoMetaObject (getattr 'meta-object' (fetch (pos 1)))))
+        (null Variable))
     } }
 
     # $how.add-scoped-method($name, $index, $sub)
@@ -112,7 +114,7 @@ PRE-INIT {
         L@$p wrapobj
     } }
 
-    sub compose { Q:NIL { null:Variable } }
+    sub compose { Q:CgOp { (null Variable) } }
 
     Q:NIL {
         LEXICALS: $chpmo : DynProtoMetaObject, $ch : DynObject
@@ -225,8 +227,13 @@ Q:NIL {
 
 my class Junction is Mu { }
 my class Num {
-    method Str () { Q:NIL { {self} @ unbox:Double .virtcall/0:ToString box:Str } }
-    method Bool() { Q:NIL { {self} @ unbox:Double  0 !=  box:Bool } }
+    method Str () { Q:CgOp {
+        (box Str (rawcall (unbox Double (fetch (scopedlex self))) ToString))
+    } }
+    method Bool() { Q:CgOp {
+        (box Bool (compare '!=' (double 0)
+                    (unbox Double (fetch (scopedlex self)))))
+    } }
 }
 my class Str {
     method Str () { self }
@@ -259,20 +266,24 @@ sub infix:<~>($l,$r) { Q:NIL {
         box:Str
 } }
 
-sub infix:<+>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  +  box:Num
+sub infix:<+>($l,$r) { Q:CgOp {
+    (box Num (arith '+' (unbox Double (fetch (scopedlex '$l')))
+                        (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<->($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  -  box:Num
+sub infix:<->($l,$r) { Q:CgOp {
+    (box Num (arith '-' (unbox Double (fetch (scopedlex '$l')))
+                        (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<*>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  *  box:Num
+sub infix:<*>($l,$r) { Q:CgOp {
+    (box Num (arith '*' (unbox Double (fetch (scopedlex '$l')))
+                        (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:</>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  /  box:Num
+sub infix:</>($l,$r) { Q:CgOp {
+    (box Num (arith '/' (unbox Double (fetch (scopedlex '$l')))
+                        (unbox Double (fetch (scopedlex '$r')))))
 } }
 
 sub infix:<< < >>($l,$r) { Q:NIL {
@@ -331,8 +342,8 @@ sub infix:<===>($l,$r) { Q:NIL { {$l} @  {$r} @  == box:Bool } }
 # no MONKEY_TYPING.
 
 PRE-INIT {
-    my $i := Mu.HOW.push-scope(Q:NIL { callframe wrap });
-    Mu.HOW.add-scoped-method(Q:NIL { "defined" wrap }, $i,
+    my $i := Mu.HOW.push-scope(Q:CgOp { (wrap (callframe)) });
+    Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "defined")) }, $i,
         anon method defined() {
             Q:NIL { {self} @ cast:DynObject @.slots
                     null:Dictionary<string,object> != box:Bool }
@@ -341,8 +352,9 @@ PRE-INIT {
         anon method Bool() { self.defined });
     Mu.HOW.add-scoped-method(Q:NIL { "Str" wrap }, $i,
         anon method Str() {
-            my $tn := Q:NIL {
-                {self} @ cast:DynObject @.klass @.proto @.name box:Str
+            my $tn := Q:CgOp {
+                (box Str (getfield name (getfield proto (getfield klass
+                    (cast DynObject (fetch (scopedlex self)))))))
             };
             if self.defined {
                 $tn ~ "()<instance>"
