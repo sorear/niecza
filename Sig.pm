@@ -13,13 +13,13 @@ use 5.010;
         if ($self->slot) { ($self->slot) } else { () }
     }
 
-    sub gen_binder {
-        my ($self, $cg, $get) = @_;
+    sub binder {
+        my ($self, $get) = @_;
         if ($self->slot) {
             # TODO: implement ro, etc
-            $cg->scopelexget($self->slot);
-            $get->();
-            $cg->bind(0,0);
+            CgOp::bind(0, CgOp::scopedlex($self->slot), $get);
+        } else {
+            CgOp::noop;
         }
     }
 
@@ -34,11 +34,10 @@ use 5.010;
     has target => (is => 'ro', isa => 'Sig::Target', required => 1,
         handles => [ 'used_slots' ]);
 
-    sub gen_binder {
-        my ($self, $cg, $ixp) = @_;
+    sub binder {
+        my ($self, $ixp) = @_;
 
-        $self->target->gen_binder($cg, sub { $cg->pos($$ixp) });
-        $$ixp++;
+        $self->target->binder(CgOp::pos($$ixp++));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -63,14 +62,16 @@ use 5.010;
         map { $_->used_slots } @{ $self->params };
     }
 
-    sub gen_binder {
-        my ($self, $cg) = @_;
+    sub binder {
+        my ($self) = @_;
 
         # TODO: Error checking.
         my $ix = 0;
+        my @p;
         for (@{ $self->params }) {
-            $_->gen_binder($cg, \$ix);
+            push @p, $_->binder(\$ix);
         }
+        CgOp::prog(@p);
     }
 
     __PACKAGE__->meta->make_immutable;

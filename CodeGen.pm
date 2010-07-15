@@ -76,6 +76,8 @@ use 5.010;
 
     has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
 
+    has ops => (is => 'ro', required => 1);
+
     # These are the sub-primitives.  Their very inteface exposes volatile
     # details of the codegen.
 
@@ -536,6 +538,7 @@ use 5.010;
 
     sub return {
         my ($self, $nv) = @_;
+        return if $self->unreach;
         if ($nv) {
             $self->_emit("th.caller.resultSlot = " . $self->_pop);
         }
@@ -669,6 +672,12 @@ use 5.010;
         print ::NIECZA_OUT " " x 16, "throw new Exception(\"Invalid IP\");\n";
         print ::NIECZA_OUT " " x 8, "}\n";
         print ::NIECZA_OUT " " x 4, "}\n";
+    }
+
+    sub BUILD {
+        my $self = shift;
+        #say STDERR YAML::XS::Dump($self->ops);
+        $self->ops->var_cg($self);
     }
 
     __PACKAGE__->meta->make_immutable;

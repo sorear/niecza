@@ -17,6 +17,9 @@ use warnings;
                 $_->var_cg($cg);
             } else {
                 my ($c, @o) = @$_;
+                if ($cg->unreach && $c ne 'labelhere') {
+                    next;
+                }
                 $cg->$c(@o);
             }
         }
@@ -211,6 +214,12 @@ use warnings;
         CgOp::NIL->new(ops => [ $_[1], [ 'proto_var', $_[0] ]]);
     }
 
+    sub return {
+        $_[0] ?
+            CgOp::NIL->new(ops => [ $_[0], [ 'return', 1 ] ]) :
+            CgOp::NIL->new(ops => [[return => 0]]);
+    }
+
     sub rawscall {
         my ($name, @args) = @_;
         CgOp::NIL->new(ops => [ @args, [ 'clr_call_direct', $name, scalar @args ] ]);
@@ -236,10 +245,18 @@ use warnings;
                 $body->preinit_code, [ 'close_sub', $body->code ] ]);
     }
 
+    sub new_aux {
+        CgOp::NIL->new(ops => [[ 'new_aux', $_[0], $_[1] ]]);
+    }
+
     sub with_aux {
         my ($name, $value, @stuff) = @_;
         CgOp::NIL->new(ops => [ $value, [ 'push_aux', $name ], @stuff,
                 [ 'pop_aux', $name ], [ 'drop' ] ]);
+    }
+
+    sub pos {
+        CgOp::NIL->new(ops => [[ 'pos', $_[0] ]]);
     }
 
     sub ternary {

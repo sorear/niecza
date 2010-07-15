@@ -15,29 +15,27 @@ use CgOp ();
     has lexical   => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
     has decls     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has codegen   => (isa => 'CodeGen', is => 'rw');
+    has code      => (isa => 'CodeGen', is => 'ro', init_arg => undef,
+        lazy => 1, builder => 'gen_code');
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
 
-    sub code {
+    sub gen_code {
         my ($self) = @_;
-        if ($self->codegen) { return $self->codegen }
-        $self->codegen(CodeGen->new(name => $self->name, body => $self));
-        my $cg = $self->codegen;
-        $self->do_enter($cg);
-        $self->do->code($self)->var_cg($cg);
         # TODO: Bind a return value here to catch non-ro sub use
-        $cg->return(1) unless $cg->unreach;
-        return $cg;
+        CodeGen->new(name => $self->name, body => $self,
+            ops => CgOp::prog($self->enter_code,
+                CgOp::return($self->do->code($self))));
     }
 
-    sub do_enter {
-        my ($self, $cg) = @_;
-        $cg->lextypes($_, 'Variable') for keys %{ $self->lexical };
-        $_->enter_code($self)->var_cg($cg) for @{ $self->decls };
-        $self->signature->gen_binder($cg) if $self->signature;
-        for (@{ $self->enter }) {
-            CgOp::sink($_->code($self))->var_cg($cg);
-        }
+    sub enter_code {
+        my ($self) = @_;
+        my @p;
+        push @p, CgOp::lextypes(map { $_, 'Variable' }
+            keys %{ $self->lexical });
+        push @p, map { $_->enter_code($self) } @{ $self->decls };
+        push @p, $self->signature->binder if $self->signature;
+        push @p, map { CgOp::sink($_->code($self)) } @{ $self->enter };
+        CgOp::prog(@p);
     }
 
     sub write {
@@ -86,10 +84,12 @@ use CgOp ();
         CgOp::prog(@p);
     }
 
-    before do_enter => sub {
-        my ($self, $cg) = @_;
-        $cg->share_lex('!scopenum');
-        $self->makeproto->var_cg($cg);
+    around enter_code => sub {
+        my ($o, $self) = @_;
+        CgOp::prog(
+            CgOp::share_lex('!scopenum'),
+            $self->makeproto,
+            $o->($self));
     };
 
     around preinit_code => sub {

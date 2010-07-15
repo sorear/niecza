@@ -12,32 +12,22 @@ use 5.010;
     use Moose;
     has mainline => (isa => 'Body', is => 'ro', required => 1);
     has name     => (isa => 'Str', is => 'ro', required => 1);
-    has codegen  => (isa => 'CodeGen', is => 'rw');
+    has code     => (isa => 'CodeGen', is => 'ro', init_arg => undef, lazy => 1,
+        builder => 'gen_code');
     has setting  => (isa => 'Body', is => 'ro');
 
-    sub code {
+    sub gen_code {
         my ($self) = @_;
-        my $cg = $self->codegen;
-        if ($cg) {
-            return $cg;
-        } else {
-            $self->codegen($cg = CodeGen->new(name => 'BOOT', entry => 1));
-            $cg->new_aux('protopad', 'Frame');
-            $cg->new_aux('how', 'Variable');
-            $cg->pos(0);
-            $cg->fetch;
-            $cg->cast('Frame');
-            $cg->push_aux('protopad');
-            $cg->open_protopad($self->mainline);
-            $self->mainline->outer($self->setting) if $self->setting;
-            my $c = $self->mainline->preinit_code;
-            #say STDERR YAML::XS::Dump($c);
-            $c->var_cg($cg);
-            $cg->close_sub($self->mainline->code);
-            $cg->newscalar;
-            $cg->return(1);
-            return $cg;
-        }
+        $self->mainline->outer($self->setting) if $self->setting;
+        CodeGen->new(name => 'BOOT', entry => 1,
+            ops => CgOp::prog(
+                CgOp::new_aux('protopad', 'Frame'),
+                CgOp::new_aux('how', 'Variable'),
+                CgOp::with_aux('protopad',
+                    CgOp::cast('Frame', CgOp::fetch(CgOp::pos(0))),
+                    CgOp::return(
+                        CgOp::newscalar(
+                            CgOp::protosub($self->mainline))))));
     }
 
     sub write {
