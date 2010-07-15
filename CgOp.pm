@@ -167,6 +167,10 @@ use warnings;
         CgOp::NIL->new(ops => [ $_[1], $_[2], [ 'bind', $_[0] ] ]);
     }
 
+    sub assign {
+        CgOp::NIL->new(ops => [ $_[0], $_[1], [ 'assign' ] ]);
+    }
+
     sub compare {
         CgOp::NIL->new(ops => [$_[1], $_[2], [ 'clr_compare', $_[0] ]]);
     }

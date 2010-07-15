@@ -261,9 +261,10 @@ my class Bool is Enum {
 }
 
 # ought to take a slurpy
-sub infix:<~>($l,$r) { Q:NIL {
-    {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  .plaincall/2:String.Concat
-        box:Str
+sub infix:<~>($l,$r) { Q:CgOp {
+    (box Str (rawscall 'String.Concat'
+        (unbox String (fetch (methodcall (scopedlex '$l') Str)))
+        (unbox String (fetch (methodcall (scopedlex '$r') Str)))))
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
@@ -286,35 +287,43 @@ sub infix:</>($l,$r) { Q:CgOp {
                         (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<< < >>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  <  box:Bool
+sub infix:<< < >>($l,$r) { Q:CgOp {
+    (box Bool (compare '<' (unbox Double (fetch (scopedlex '$l')))
+                           (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<< > >>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  >  box:Bool
+sub infix:<< > >>($l,$r) { Q:CgOp {
+    (box Bool (compare '>' (unbox Double (fetch (scopedlex '$l')))
+                           (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<< <= >>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  <=  box:Bool
+sub infix:<< <= >>($l,$r) { Q:CgOp {
+    (box Bool (compare '<=' (unbox Double (fetch (scopedlex '$l')))
+                            (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<< >= >>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  >=  box:Bool
+sub infix:<< >= >>($l,$r) { Q:CgOp {
+    (box Bool (compare '>=' (unbox Double (fetch (scopedlex '$l')))
+                            (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<< == >>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  ==  box:Bool
+sub infix:<< == >>($l,$r) { Q:CgOp {
+    (box Bool (compare '==' (unbox Double (fetch (scopedlex '$l')))
+                            (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub infix:<< != >>($l,$r) { Q:NIL {
-    {$l} @ unbox:Double  {$r} @ unbox:Double  !=  box:Bool
+sub infix:<< != >>($l,$r) { Q:CgOp {
+    (box Bool (compare '!=' (unbox Double (fetch (scopedlex '$l')))
+                            (unbox Double (fetch (scopedlex '$r')))))
 } }
 
-sub say($str) { Q:NIL {
-    {$str.Str} @ unbox:String .plaincall/1:Console.WriteLine null:Variable
+sub say($str) { Q:CgOp {
+    (prog (rawscall 'Console.WriteLine'
+            (unbox String (fetch (methodcall (scopedlex '$str') Str))))
+          (null Variable))
 } }
 
-sub infix:<=> { Q:NIL { =[0] =[1] =  =[0] } }
+sub infix:<=> { Q:CgOp { (prog (assign (pos 0) (pos 1)) (pos 0)) } }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
@@ -331,12 +340,20 @@ sub prefix:<?>($v) { $v.Bool }
 
 sub prefix:<!>($v) { if $v { ?0 } else { ?1 } }
 
-sub infix:<eq>($l,$r) { Q:NIL {
-    {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  == box:Bool } }
-sub infix:<ne>($l,$r) { Q:NIL {
-    {$l.Str} @ unbox:String  {$r.Str} @ unbox:String  != box:Bool } }
+sub infix:<eq>($l,$r) { Q:CgOp {
+    (box Bool (compare '=='
+        (unbox String (fetch (methodcall (scopedlex '$l') Str)))
+        (unbox String (fetch (methodcall (scopedlex '$r') Str)))))
+} }
+sub infix:<ne>($l,$r) { Q:CgOp {
+    (box Bool (compare '!='
+        (unbox String (fetch (methodcall (scopedlex '$l') Str)))
+        (unbox String (fetch (methodcall (scopedlex '$r') Str)))))
+} }
 # this one is horribly wrong and only handles the ref eq case.
-sub infix:<===>($l,$r) { Q:NIL { {$l} @  {$r} @  == box:Bool } }
+sub infix:<===>($l,$r) { Q:CgOp {
+    (box Bool (compare '==' (fetch (scopedlex '$l')) (fetch (scopedlex '$r'))))
+} }
 
 # XXX: We can't use augment syntax because we don't have use working, so
 # no MONKEY_TYPING.
@@ -345,12 +362,12 @@ PRE-INIT {
     my $i := Mu.HOW.push-scope(Q:CgOp { (wrap (callframe)) });
     Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "defined")) }, $i,
         anon method defined() {
-            Q:NIL { {self} @ cast:DynObject @.slots
-                    null:Dictionary<string,object> != box:Bool }
+            Q:CgOp { (box Bool (compare '!=' (null 'Dictionary<string,object>')
+                (getfield slots (cast DynObject (fetch (scopedlex self)))))) }
         });
-    Mu.HOW.add-scoped-method(Q:NIL { "Bool" wrap }, $i,
+    Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "Bool")) }, $i,
         anon method Bool() { self.defined });
-    Mu.HOW.add-scoped-method(Q:NIL { "Str" wrap }, $i,
+    Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "Str")) }, $i,
         anon method Str() {
             my $tn := Q:CgOp {
                 (box Str (getfield name (getfield proto (getfield klass
