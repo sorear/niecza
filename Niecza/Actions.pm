@@ -150,7 +150,7 @@ sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         $M->{_ast} = $M->{EXPR}{_ast};
     } elsif ($M->isa('Niecza::Grammar::NIL')) {
-        $M->{_ast} = Op::NIL->new(code => [map { @{$_->{_ast}} } @{$M->{insn}}]);
+        $M->{_ast} = Op::NIL->new(ops => [map { @{$_->{_ast}} } @{$M->{insn}}]);
     } else {
         # garden variety nibbler
         my $str = "";

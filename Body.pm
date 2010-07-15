@@ -23,7 +23,7 @@ use CodeGen ();
         $self->codegen(CodeGen->new(name => $self->name, body => $self));
         my $cg = $self->codegen;
         $self->do_enter($cg);
-        $self->do->cg($cg, $self);
+        $self->do->code($self)->var_cg($cg);
         # TODO: Bind a return value here to catch non-ro sub use
         $cg->return(1) unless $cg->unreach;
         return $cg;
@@ -35,8 +35,7 @@ use CodeGen ();
         $_->do_enter($cg, $self) for @{ $self->decls };
         $self->signature->gen_binder($cg) if $self->signature;
         for (@{ $self->enter }) {
-            $_->cg($cg, $self);
-            $cg->drop;
+            CgOp::sink($_->code($self))->var_cg($cg);
         }
     }
 

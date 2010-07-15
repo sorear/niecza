@@ -11,6 +11,8 @@ test: $(COMPILER) test.pl Setting.dll
 	gmcs /r:Setting.dll Program.cs
 	prove -e 'mono --debug=casts' Program.exe
 
+.DELETE_ON_ERROR:
+
 Setting.cs: $(COMPILER) setting
 	perl -MCompilerDriver=:all -e 'header; setting' > Setting.cs
 

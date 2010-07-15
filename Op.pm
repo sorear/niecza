@@ -2,6 +2,8 @@ use strict;
 use warnings;
 use 5.010;
 
+use CgOp;
+
 {
     package Op;
     use Moose;
@@ -17,18 +19,11 @@ use 5.010;
     use Moose;
     extends 'Op';
 
-    has code => (isa => 'ArrayRef', is => 'ro', required => 1);
+    has ops => (isa => 'ArrayRef', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        for my $insn (@{ $self->code }) {
-            if (blessed $insn) {
-                $insn->cg($cg, $body);
-            } else {
-                my ($op, @args) = @$insn;
-                $cg->$op(@args);
-            }
-        }
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::nil(map { blessed $_ ? $_->code($body) : $_ } @{ $self->ops });
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -42,21 +37,13 @@ use 5.010;
 
     has children => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        if (!@{ $self->children }) {
-            # XXX should be Nil or something
-            $cg->push_null('object');
-            $cg->clr_wrap;
-        } else {
-            my @kids = @{ $self->children };
-            my $end = pop @kids;
-            for (@kids) {
-                $_->cg($cg, $body);
-                $cg->drop;
-            }
-            $end->cg($cg, $body);
-        }
+    sub code {
+        my ($self, $body) = @_;
+        my @ch = map { $_->code($body) } @{ $self->children };
+        # XXX should be Nil or something
+        my $end = @ch ? pop(@ch) : CgOp::wrap(CgOp::null('object'));
+
+        CgOp::prog((map { CgOp::sink($_) } @ch), $end);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -81,12 +68,10 @@ use 5.010;
             positionals => $self->positionals);
     }
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $self->invocant->cg($cg, $body);
-        $cg->fetch;
-        $_->cg($cg, $body) for @{ $self->positionals };
-        $cg->call_sub(1, scalar(@{ $self->positionals }));
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::subcall(CgOp::fetch($self->invocant->code($body)),
+            map { $_->code($body) } @{ $self->positionals });
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -103,12 +88,10 @@ use 5.010;
         default => sub { [] });
     has name        => (isa => 'Str', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $self->receiver->cg($cg, $body);
-        $cg->dup_fetch;
-        $_->cg($cg, $body) for @{ $self->positionals };
-        $cg->call_method(1, $self->name, scalar(@{ $self->positionals }));
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::methodcall($self->receiver->code($body),
+            $self->name, map { $_->code($body) } @{ $self->positionals });
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -123,24 +106,22 @@ use 5.010;
     has receiver    => (isa => 'Op', is => 'ro', required => 1);
     has name        => (isa => 'Str', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $self->receiver->cg($cg, $body);
-        $cg->fetch;
+    sub code {
+        my ($self, $body) = @_;
+        my $c = CgOp::fetch($self->receiver->code($body));
         given ($self->name) {
             when ("HOW") {
-                $cg->how;
+                $c = CgOp::how($c);
             }
             when ("WHAT") {
-                $cg->cast('DynObject');
-                $cg->clr_field_get('klass');
-                $cg->clr_field_get('typeObject');
+                $c = CgOp::getfield('typeObject',
+                    CgOp::getfield('klass', CgOp::cast('DynObject', $c)));
             }
             default {
                 die "Invalid interrogative $_";
             }
         }
-        $cg->newscalar;
+        CgOp::newscalar($c);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -162,9 +143,9 @@ use 5.010;
 
     has text => (isa => 'Str', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $cg->string_var($self->text);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::string_var($self->text);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -180,30 +161,18 @@ use 5.010;
     has true  => (isa => 'Maybe[Op]', is => 'ro', required => 1);
     has false => (isa => 'Maybe[Op]', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
+    sub code {
+        my ($self, $body) = @_;
 
-        $self->check->cg($cg, $body);
-        $cg->dup_fetch;
-        $cg->call_method(1, "Bool", 0);
-        $cg->fetch;
-        $cg->unbox('Boolean');
-
-        my $t = $self->true;
-        my $f = $self->false;
-
-        # XXX use Nil
-        $t //= Op::NIL->new(code => [[ push_null => 'Variable' ]]);
-        $f //= Op::NIL->new(code => [[ push_null => 'Variable' ]]);
-
-        my $l1 = $cg->label;
-        my $l2 = $cg->label;
-        $cg->ncgoto($l1);
-        $t->cg($cg, $body);
-        $cg->goto($l2);
-        $cg->labelhere($l1);
-        $f->cg($cg, $body);
-        $cg->labelhere($l2);
+        CgOp::ternary(
+            CgOp::unbox('Boolean',
+                CgOp::fetch(
+                    CgOp::methodcall($self->check->code($body), "Bool"))),
+            # XXX use Nil
+            ($self->true ? $self->true->code($body) :
+                CgOp::null('Variable')),
+            ($self->false ? $self->false->code($body) :
+                CgOp::null('Variable')));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -220,25 +189,16 @@ use 5.010;
     has once  => (isa => 'Bool', is => 'ro', required => 1);
     has until => (isa => 'Bool', is => 'ro', required => 1);
 
-    sub cg {
+    sub code {
         my ($self, $cg, $body) = @_;
 
-        my $l1 = $cg->label;
-        my $l2 = $self->once ? 0 : $cg->label;
-
-        $cg->goto($l2) unless $self->once;
-        $cg->labelhere($l1);
-        $self->body->cg($cg, $body);
-        $cg->drop;
-        $cg->labelhere($l2) unless $self->once;
-        $self->check->cg($cg, $body);
-        $cg->dup_fetch;
-        $cg->call_method(1, "Bool", 0);
-        $cg->fetch;
-        $cg->unbox('Boolean');
-        my $m = $self->until ? 'ncgoto' : 'cgoto';
-        $cg->$m($l1);
-        $cg->push_null('Variable');
+        CgOp::prog(
+            CgOp::whileloop($self->until, $self->once,
+                CgOp::unbox('Boolean',
+                    CgOp::fetch(
+                        CgOp::methodcall($self->check->code($body), "Bool"))),
+                CgOp::sink($self->body->code($body))),
+            CgOp::null('Variable'));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -252,10 +212,9 @@ use 5.010;
 
     has value => (isa => 'Num', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $cg->clr_double($self->value);
-        $cg->box('Num');
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::box('Num', CgOp::double($self->value));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -271,12 +230,12 @@ use 5.010;
     has rhs => (isa => 'Op', is => 'ro', required => 1);
     has readonly => (isa => 'Bool', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $self->lhs->cg($cg, $body);
-        $cg->dup;
-        $self->rhs->cg($cg, $body);
-        $cg->bind;
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::prog(
+            CgOp::bind($self->readonly, $self->lhs->code($body),
+                $self->rhs->code($body)),
+            CgOp::null('Variable'));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -290,9 +249,9 @@ use 5.010;
 
     has name => (isa => 'Str', is => 'ro', required => 1);
 
-    sub cg {
-        my ($self, $cg, $body) = @_;
-        $cg->scopelexget($self->name, $body);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::scopedlex($self->name);
     }
 
     __PACKAGE__->meta->make_immutable;
