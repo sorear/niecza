@@ -36,11 +36,11 @@ and YAML::XS from CPAN
 
 =head1 USING
 
-    $ ./niecza
+    $ ./niecza_eval
     > say 2 + 2
     4
     > ^D
-    $ ./niecza -e 'say 2 + 2'
+    $ ./niecza_eval -e 'say 2 + 2'
     4
     $
 
