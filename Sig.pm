@@ -19,8 +19,7 @@ use 5.010;
             # TODO: implement ro, etc
             $cg->scopelexget($self->slot);
             $get->();
-            $cg->clr_field_get('lv');
-            $cg->clr_field_set('lv');
+            $cg->bind(0,0);
         }
     }
 

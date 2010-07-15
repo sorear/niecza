@@ -82,7 +82,7 @@ grammar NIL is STD {
     token insn:wrap { <sym> }
     token insn:wrapobj { <sym> }
     token insn:fetch { '@' }
-    token insn:store { '!' }
+    token insn:assign { '=' }
     token insn:dup_fetch { 'dup@' }
     token insn:pos { '=[' <?> ~ ']' <decint> }
     token insn:clone_lex { 'CLONE:' [ \h* <varid> \h* ] ** ',' \h* \n }

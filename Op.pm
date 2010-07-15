@@ -174,7 +174,7 @@ use 5.010;
                 die "Invalid interrogative $_";
             }
         }
-        $cg->newvar;
+        $cg->newscalar;
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -325,16 +325,14 @@ use 5.010;
         $self->lhs->item_cg($cg, $body);
         $cg->dup;
         $self->rhs->item_cg($cg, $body);
-        $cg->clr_field_get('lv');
-        $cg->clr_field_set('lv');
+        $cg->bind;
     }
 
     sub void_cg {
         my ($self, $cg, $body) = @_;
         $self->lhs->item_cg($cg, $body);
         $self->rhs->item_cg($cg, $body);
-        $cg->clr_field_get('lv');
-        $cg->clr_field_set('lv');
+        $cg->bind;
     }
 
     __PACKAGE__->meta->make_immutable;

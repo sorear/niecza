@@ -649,8 +649,8 @@ sub insn__S_fetch { my ($cl, $M) = @_;
     $M->{_ast} = [[ 'fetch' ]];
 }
 
-sub insn__S_store { my ($cl, $M) = @_;
-    $M->{_ast} = [[ 'store' ]];
+sub insn__S_assign { my ($cl, $M) = @_;
+    $M->{_ast} = [[ 'assign' ]];
 }
 
 sub insn__S_dup_fetch { my ($cl, $M) = @_;
@@ -662,7 +662,7 @@ sub insn__S_wrap { my ($cl, $M) = @_;
 }
 
 sub insn__S_wrapobj { my ($cl, $M) = @_;
-    $M->{_ast} = [[ 'clr_call_direct', 'Kernel.NewROVar', 1 ]];
+    $M->{_ast} = [[ 'newscalar' ]];
 }
 
 sub insn__S_pos { my ($cl, $M) = @_;

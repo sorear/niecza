@@ -70,7 +70,7 @@ public class EntryPoint {
         switch (th.ip) {
             case 0:
                 t = new Frame(th, th, new DynBlockDelegate(Setting.BOOT));
-                t.pos = new LValue[1] { Kernel.NewROLValue(th) };
+                t.pos = new LValue[1] { Kernel.NewROScalar(th).lv };
                 th.ip = 1;
                 return t;
             case 1:

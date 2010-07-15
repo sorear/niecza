@@ -550,6 +550,66 @@ blocked:
             }
         }
 
+        // This isn't just a fetch and a store...
+        private static Frame AssignC(Frame th) {
+            switch (th.ip) {
+                case 0:
+                    if (!th.pos[0].rw) {
+                        throw new Exception("assigning to readonly value");
+                    }
+                    if (th.pos[0].islist) {
+                        // list assignments apply listy context to the RHS
+                        // then delegate
+                        if (th.pos[1].islist) {
+                            return th.pos[0].container.Store(th.caller,
+                                    th.pos[1].container);
+                        } else {
+                            th.ip = 1;
+                            return th.pos[1].container.Fetch(th);
+                        }
+                    } else {
+                        if (th.pos[1].islist) {
+                            return th.pos[0].container.Store(th.caller,
+                                    th.pos[1].container);
+                        } else {
+                            th.ip = 3;
+                            return th.pos[1].container.Fetch(th);
+                        }
+                    }
+                case 1:
+                    th.ip = 2;
+                    return ((IP6)th.resultSlot).InvokeMethod(th, "list",
+                            new LValue[1] { th.pos[1] }, null);
+                case 2:
+                    if (!((Variable)th.resultSlot).lv.islist) {
+                        throw new Exception(".list didn't return one!");
+                    }
+                    return th.pos[0].container.Store(th.caller,
+                            ((Variable)th.resultSlot).lv.container);
+                case 3:
+                    return th.pos[0].container.Store(th.caller,
+                            (IP6)th.resultSlot);
+                default:
+                    throw new Exception("invalid IP");
+            }
+        }
+
+        public static Frame Assign(Frame th, LValue lhs, LValue rhs) {
+            Frame n = new Frame(th, null,
+                    new DynBlockDelegate(AssignC));
+            n.pos = new LValue[2] { lhs, rhs };
+            return n;
+        }
+
+        public static Frame Fetch(Frame th, Variable vr) {
+            if (vr.lv.islist) {
+                th.resultSlot = vr.lv.container;
+                return th;
+            } else {
+                return vr.lv.container.Fetch(th);
+            }
+        }
+
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
             return new Variable(false, Variable.Context.Scalar,

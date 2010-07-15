@@ -54,7 +54,8 @@ PRE-INIT {
         L@$pmo L@$self !.how
         L@$pmo =[1] @ unwrap:String !.name
 
-        L@$self @.slots  L@$pmo wrap  ![meta-object]
+        L@$self @.slots  L@$pmo new/1:CLRImportObject
+            .plaincall/1:Kernel.NewRWScalar  ![meta-object]
         L@$self =[0] @ cast:DynObject @.klass !.klass
 
         L@$self wrapobj
@@ -159,7 +160,7 @@ PRE-INIT {
         LEXICALS: $ch : Variable, $dp : DynProtoMetaObject
         L@^^ClassHOW dup@  "" wrap .method/1:new  L!$ch
         =[0] @ unwrap:DynProtoMetaObject L!$dp
-        L@$ch @  L@$dp wrap @  !!meta-object
+        L@$ch @  L@$dp wrap  !!meta-object
         L@$ch dup@  =[1]  .method/1:add-super:v
         L@$ch
     } }
@@ -214,9 +215,9 @@ Q:NIL {
     L@&wrapped-protoobj @  L@^'Sub!HOW'  F@Kernel.SubMO wrap
         L@^Any @ cast:DynObject @.klass wrap  .call/3 L!^Sub
 
-    L@&wrap-dpmo @  F@Kernel.ScalarContainerPMO wrap  L@^'Any!HOW'
+    L@&wrap-dpmo @  F@Kernel.ScalarPMO wrap  L@^'Any!HOW'
         .call/2 L!^'Scalar!HOW'
-    L@&wrapped-protoobj @  L@^'Scalar!HOW'  F@Kernel.ScalarContainerMO wrap
+    L@&wrapped-protoobj @  L@^'Scalar!HOW'  F@Kernel.ScalarMO wrap
         L@^Any @ cast:DynObject @.klass wrap  .call/3 L!^Scalar
 
     null:Variable
@@ -302,7 +303,7 @@ sub say($str) { Q:NIL {
     {$str.Str} @ unbox:String .plaincall/1:Console.WriteLine null:Variable
 } }
 
-sub infix:<=>($l,$r) { Q:NIL { {$l} {$r} @ !  {$l} } }
+sub infix:<=> { Q:NIL { =[0] =[1] =  =[0] } }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.

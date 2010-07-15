@@ -32,7 +32,7 @@ use 5.010;
             $self->mainline->outer($self->setting) if $self->setting;
             $self->mainline->do_preinit($cg);
             $cg->close_sub($self->mainline->code);
-            $cg->clr_call_direct('Kernel.NewROVar', 1);
+            $cg->newscalar;
             $cg->return(1);
             return $cg;
         }

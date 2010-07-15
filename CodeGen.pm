@@ -36,21 +36,24 @@ use 5.010;
             { ToString     => 'String' },
         'Variable' =>
             { lv           => 'LValue' },
+        'CLRImportObject' =>
+            { val          => 'Object' },
 
-        'Kernel.NewROVar'    => 'Variable',
-        'Kernel.NewRWVar'    => 'Variable',
-        'Kernel.NewROLValue' => 'LValue',
-        'Kernel.NewRWLValue' => 'LValue',
-        'Console.WriteLine'  => 'Void',
-        'String.Concat'      => 'String',
-        'Kernel.SubPMO'      => 'DynProtoMetaObject',
-        'Kernel.SubMO'       => 'DynMetaObject',
-        'Kernel.ScalarContainerPMO' => 'DynProtoMetaObject',
-        'Kernel.ScalarContainerMO' => 'DynMetaObject',
+        'Kernel.NewROScalar'   => 'Variable',
+        'Kernel.NewRWScalar'   => 'Variable',
+        'Kernel.NewRWListVar'  => 'Variable',
+        'Kernel.NewWeakScalar' => 'Variable',
+        'Kernel.NewCaptureVar' => 'Variable',
+        'Console.WriteLine'    => 'Void',
+        'String.Concat'        => 'String',
+        'Kernel.SubPMO'        => 'DynProtoMetaObject',
+        'Kernel.SubMO'         => 'DynMetaObject',
+        'Kernel.ScalarPMO'     => 'DynProtoMetaObject',
+        'Kernel.ScalarMO'      => 'DynMetaObject',
         'Kernel.MainlineContinuation' => 'DynBlockDelegate',
-        'Kernel.MakeSub'     => 'IP6',
-        'Kernel.BoxAny'      => 'Variable',
-        'Kernel.UnboxAny'    => 'object',
+        'Kernel.MakeSub'       => 'IP6',
+        'Kernel.BoxAny'        => 'Variable',
+        'Kernel.UnboxAny'      => 'object',
     );
 
     has name      => (isa => 'Str', is => 'ro');
@@ -103,7 +106,7 @@ use 5.010;
 
     sub _undercheck {
         my ($self, $margin) = @_;
-        die "Stack underflow" if $margin > $self->depth;
+        Carp::confess "Stack underflow" if $margin > $self->depth;
         if ($self->depth - $margin < $self->savedepth) {
             for my $n ($self->depth - $margin .. $self->savedepth - 1) {
                 $self->_emit("s$n = th.lex[\"s$n\"]");
@@ -152,7 +155,7 @@ use 5.010;
         my $n = $self->depth;
         $self->_emit("s$n = $expr");
         $self->depth($n + 1);
-        warn unless defined $ty;
+        Carp::confess('Untyped push') unless defined $ty;
         push @{ $self->stacktype }, $ty;
     }
 
@@ -324,14 +327,7 @@ use 5.010;
     sub fetch {
         my ($self) = @_;
         my $c = $self->_pop;
-        $self->_cpscall("IP6", "$c.lv.container.Fetch(th)");
-    }
-
-    sub store {
-        my ($self) = @_;
-        my $v = $self->_pop;
-        my $c = $self->_pop;
-        $self->_cpscall(undef, "$c.lv.container.Store(th, $v)");
+        $self->_cpscall("IP6", "Kernel.Fetch(th, $c)");
     }
 
     sub dup {
@@ -348,30 +344,36 @@ use 5.010;
     sub dup_fetch {
         my ($self) = @_;
         my $c = $self->_peek;
-        $self->_cpscall('IP6', "$c.lv.container.Fetch(th)");
+        $self->_cpscall('IP6', "Kernel.Fetch(th, $c)");
         $self->swap;
     }
 
+    # the use of scalar here is a little bit wrong; semantically it's closer
+    # to the old notion of ¢foo.  doesn't matter much since it's not exposed
+    # at the Perl 6 level.
     sub pos {
         my ($self, $num) = @_;
-        $self->_push('Variable', "new Variable(false, th.pos[$num])");
+        $self->_push('Variable',
+            "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
     }
 
     sub clone_lex {
         my ($self, $name) = @_;
         $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
         $self->dup_fetch;
-        $self->_push('Variable', "Kernel.NewROVar(th)");
+        $self->_push('Variable', "Kernel.NewROScalar(th)");
         $self->call_method(1, "clone", 1);
         $self->lextypes($name, 'Variable');
         $self->lexput(0, $name);
     }
 
+    # this will need changing once @vars are implemented... or maybe something
+    # entirely different, I think cloning at all may be wrong
     sub copy_lex {
         my ($self, $name) = @_;
         $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
         $self->fetch;
-        $self->_push('Variable', "Kernel.NewRWVar(" . $self->_pop . ")");
+        $self->_push('Variable', "Kernel.NewRWScalar(" . $self->_pop . ")");
         $self->lextypes($name, 'Variable');
         $self->lexput(0, $name);
     }
@@ -408,19 +410,35 @@ use 5.010;
     sub clr_wrap {
         my ($self) = @_;
         my $v = $self->_pop;
-        $self->_push('Variable', "Kernel.NewROVar(new CLRImportObject($v))");
+        $self->_push('Variable', "Kernel.NewROScalar(new CLRImportObject($v))");
     }
 
-    sub newvar {
+    sub newscalar {
         my ($self) = @_;
-        my $v = $self->_pop;
-        $self->_push('Variable', "Kernel.NewROVar($v)");
+        $self->clr_call_direct('Kernel.NewROScalar', 1);
     }
 
     sub clr_unwrap {
         my ($self, $ty) = @_;
-        my $v = $self->_pop;
-        $self->_push($ty, "((CLRImportObject)$v).val");
+        $self->cast('CLRImportObject');
+        $self->clr_field_get('val');
+        $self->cast($ty);
+    }
+
+    sub bind {
+        my $self = shift;
+        my $ro   = shift() ? "true" : "false";
+        my $rw   = shift() ? "true" : "false";
+        my $rhs = $self->_pop;
+        my $lhs = $self->_pop;
+        $self->_cpscall(undef, "Kernel.Bind(th, $lhs, $rhs.lv, $ro, $rw)");
+    }
+
+    sub assign {
+        my $self = shift;
+        my $rhs = $self->_pop;
+        my $lhs = $self->_pop;
+        $self->_cpscall(undef, "Kernel.Assign(th, $lhs.lv, $rhs.lv)");
     }
 
     sub box {
@@ -518,7 +536,7 @@ use 5.010;
         $self->swap;
         $self->attr_var($f);
         $self->swap;
-        $self->store;
+        $self->assign;
     }
 
     sub clr_index_get {

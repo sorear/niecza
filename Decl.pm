@@ -67,7 +67,7 @@ use 5.010;
         $cg->open_protopad($self->code);
         $self->code->do_preinit($cg);
         $cg->close_sub($self->code->code);
-        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->newscalar;
         $cg->proto_var($self->var);
     }
 
@@ -97,7 +97,7 @@ use 5.010;
         my ($self, $cg, $body) = @_;
         $cg->scopelexget('Any');
         $cg->fetch;
-        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->newscalar;
         $cg->proto_var($self->slot);
     }
 
@@ -127,7 +127,7 @@ use 5.010;
         $cg->clr_call_direct('Kernel.MakeSub', 3);
 
         $cg->peek_aux('protopad');
-        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->newscalar;
         $cg->call_sub(1, 1);
         $cg->proto_var('!mainline');
 
@@ -143,6 +143,8 @@ use 5.010;
     no Moose;
 }
 
+# XXX I hate this code.  It's seriously ugly.  Maybe decls should generate ops,
+# instead of needing to use the codegen directly.
 {
     package Decl::Class;
     use Moose;
@@ -194,7 +196,7 @@ use 5.010;
 
         $self->body->do_preinit($cg);
         $cg->close_sub($self->body->code);
-        $cg->clr_call_direct('Kernel.NewROVar', 1);
+        $cg->newscalar;
         $cg->proto_var($self->var . '!BODY');
     }
 
