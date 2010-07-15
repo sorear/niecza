@@ -76,6 +76,9 @@ use 5.010;
 
     has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
 
+    # These are the sub-primitives.  Their very inteface exposes volatile
+    # details of the codegen.
+
     sub qm { "\"" . $_[0] . "\"" }
 
     # always called after _saveall
@@ -122,18 +125,6 @@ use 5.010;
         }
     }
 
-    sub swap {
-        my ($self) = @_;
-        $self->_undercheck(2);
-        $self->_overcheck(1);
-        my $n = $self->depth;
-
-        $self->_emit(sprintf "s%d = s%d", $n, $n-2);
-        $self->_emit(sprintf "s%d = s%d", $n-2, $n-1);
-        $self->_emit(sprintf "s%d = s%d", $n-1, $n);
-        @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
-    }
-
     sub _peek {
         my ($self) = @_;
         $self->_undercheck(1);
@@ -165,6 +156,31 @@ use 5.010;
             $self->_emit("th.lex[\"s$i\"] = s$i");
         }
         $self->savedepth($self->depth);
+    }
+
+    sub _cpscall {
+        my ($self, $rt, $expr) = @_;
+        $self->_saveall;
+        my $n = $self->label;
+        $self->_emit("th.resultSlot = null");
+        $self->_emit("th.ip = $n");
+        $self->_emit("return $expr");
+        push @{ $self->buffer }, "case $n:\n";
+        $self->_push($rt, 'th.resultSlot') if defined $rt;
+    }
+
+    # These functions are usable from user code, but still depend on volatiles.
+
+    sub swap {
+        my ($self) = @_;
+        $self->_undercheck(2);
+        $self->_overcheck(1);
+        my $n = $self->depth;
+
+        $self->_emit(sprintf "s%d = s%d", $n, $n-2);
+        $self->_emit(sprintf "s%d = s%d", $n-2, $n-1);
+        $self->_emit(sprintf "s%d = s%d", $n-1, $n);
+        @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
     }
 
     sub new_aux {
@@ -236,35 +252,10 @@ use 5.010;
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
 
-    sub _cpscall {
-        my ($self, $rt, $expr) = @_;
-        $self->_saveall;
-        my $n = $self->label;
-        $self->_emit("th.resultSlot = null");
-        $self->_emit("th.ip = $n");
-        $self->_emit("return $expr");
-        push @{ $self->buffer }, "case $n:\n";
-        $self->_push($rt, 'th.resultSlot') if defined $rt;
-    }
-
     sub lextypes {
         my ($self, @args) = @_;
         #say STDERR "lextypes: @args";
         %{ $self->lex2type } = (%{ $self->lex2type }, @args);
-    }
-
-    sub scopelexget {
-        my ($self, $name) = @_;
-        my $body = $self->body // $self->bodies->[-1];
-        my ($order, $scope) = (0, $body);
-        while ($scope && !$scope->lexical->{$name}) {
-            $scope = $scope->outer;
-            $order++;
-        }
-        if (!$scope) {
-            die "Failed to resolve lexical $name in " . $body->name;
-        }
-        $self->lexget($order, $name);
     }
 
     sub rawlexget {
@@ -299,12 +290,6 @@ use 5.010;
                 ']).';
         }
         $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
-    }
-
-    sub string_var {
-        my ($self, $text) = @_;
-        $self->clr_string($text);
-        $self->box('Str');
     }
 
     sub how {
@@ -413,23 +398,6 @@ use 5.010;
         $self->_push('Variable', "Kernel.NewROScalar(new CLRImportObject($v))");
     }
 
-    sub newscalar {
-        my ($self) = @_;
-        $self->clr_call_direct('Kernel.NewROScalar', 1);
-    }
-
-    sub newrwscalar {
-        my ($self) = @_;
-        $self->clr_call_direct('Kernel.NewRWScalar', 1);
-    }
-
-    sub clr_unwrap {
-        my ($self, $ty) = @_;
-        $self->cast('CLRImportObject');
-        $self->clr_field_get('val');
-        $self->cast($ty);
-    }
-
     sub bind {
         my $self = shift;
         my $ro   = shift() ? "true" : "false";
@@ -444,19 +412,6 @@ use 5.010;
         my $rhs = $self->_pop;
         my $lhs = $self->_pop;
         $self->_cpscall(undef, "Kernel.Assign(th, $lhs.lv, $rhs.lv)");
-    }
-
-    sub box {
-        my ($self, $ty) = @_;
-        $self->scopelexget($ty);
-        $self->fetch;
-        $self->clr_call_direct('Kernel.BoxAny', 2);
-    }
-
-    sub unbox {
-        my ($self, $ty) = @_;
-        $self->clr_call_direct('Kernel.UnboxAny', 1);
-        $self->cast($ty);
     }
 
     sub clr_new {
@@ -530,20 +485,6 @@ use 5.010;
         $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
     }
 
-    sub attr_get {
-        my ($self, $f) = @_;
-        $self->attr_var($f);
-        $self->fetch;
-    }
-
-    sub attr_set {
-        my ($self, $f) = @_;
-        $self->swap;
-        $self->attr_var($f);
-        $self->swap;
-        $self->assign;
-    }
-
     sub clr_index_get {
         my ($self, $f) = @_;
         if ($f) {
@@ -607,14 +548,6 @@ use 5.010;
         $self->_push($ty, "null");
     }
 
-    sub open_protopad {
-        my ($self, $body) = @_;
-        $self->peek_aux('protopad');
-        $self->clr_new('Frame', 1);
-        $self->push_aux('protopad');
-        push @{ $self->bodies }, $body;
-    }
-
     sub close_sub {
         my ($self, $bodycg) = @_;
         $self->pop_aux('protopad');
@@ -633,6 +566,82 @@ use 5.010;
         my $pv = $self->_pop;
         $self->_emit("$pp.lex[" . qm($name) . "] = $pv");
     }
+
+    # These are completely derived.
+
+    sub scopelexget {
+        my ($self, $name) = @_;
+        my $body = $self->body // $self->bodies->[-1];
+        my ($order, $scope) = (0, $body);
+        while ($scope && !$scope->lexical->{$name}) {
+            $scope = $scope->outer;
+            $order++;
+        }
+        if (!$scope) {
+            die "Failed to resolve lexical $name in " . $body->name;
+        }
+        $self->lexget($order, $name);
+    }
+
+    sub string_var {
+        my ($self, $text) = @_;
+        $self->clr_string($text);
+        $self->box('Str');
+    }
+
+    sub newscalar {
+        my ($self) = @_;
+        $self->clr_call_direct('Kernel.NewROScalar', 1);
+    }
+
+    sub newrwscalar {
+        my ($self) = @_;
+        $self->clr_call_direct('Kernel.NewRWScalar', 1);
+    }
+
+    sub clr_unwrap {
+        my ($self, $ty) = @_;
+        $self->cast('CLRImportObject');
+        $self->clr_field_get('val');
+        $self->cast($ty);
+    }
+
+    sub box {
+        my ($self, $ty) = @_;
+        $self->scopelexget($ty);
+        $self->fetch;
+        $self->clr_call_direct('Kernel.BoxAny', 2);
+    }
+
+    sub unbox {
+        my ($self, $ty) = @_;
+        $self->clr_call_direct('Kernel.UnboxAny', 1);
+        $self->cast($ty);
+    }
+
+    sub attr_get {
+        my ($self, $f) = @_;
+        $self->attr_var($f);
+        $self->fetch;
+    }
+
+    sub attr_set {
+        my ($self, $f) = @_;
+        $self->swap;
+        $self->attr_var($f);
+        $self->swap;
+        $self->assign;
+    }
+
+    sub open_protopad {
+        my ($self, $body) = @_;
+        $self->peek_aux('protopad');
+        $self->clr_new('Frame', 1);
+        $self->push_aux('protopad');
+        push @{ $self->bodies }, $body;
+    }
+
+    ###
 
     sub csname {
         my ($self) = @_;
