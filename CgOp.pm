@@ -125,7 +125,7 @@ use warnings;
     }
 
     sub how {
-        CgOp::NIL->new(ops => [ $_[0], [ 'how' ] ]);
+        rawcall($_[0], "HOW");
     }
 
     sub getfield {

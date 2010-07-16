@@ -8,52 +8,54 @@ use 5.010;
 
     # Beta will do this using reflection
     my %typedata = (
+        IP6 =>
+            { HOW          => [c => 'IP6'] },
         DynObject =>
-            { klass        => 'DynMetaObject',
-              slots        => 'Dictionary<string,Object>' },
+            { klass        => [f => 'DynMetaObject'],
+              slots        => [f => 'Dictionary<string,Object>'] },
 
         DynMetaObject =>
-            { proto        => 'DynProtoMetaObject',
-              BuildC3MRO   => 'Void',
-              typeObject   => 'IP6',
-              outers       => 'List<Frame>' },
+            { proto        => [f => 'DynProtoMetaObject'],
+              BuildC3MRO   => [m => 'Void'],
+              typeObject   => [f => 'IP6'],
+              outers       => [f => 'List<Frame>'] },
 
         DynProtoMetaObject =>
-            { how          => 'IP6',
-              local        => 'Dictionary<String,DynProtoMetaObject.Method>',
-              def_outers   => 'List<Frame>',
-              superclasses => 'List<DynProtoMetaObject>',
-              name         => 'String' },
+            { how          => [f => 'IP6'],
+              local        => [f => 'Dictionary<String,DynProtoMetaObject.Method>'],
+              def_outers   => [f => 'List<Frame>'],
+              superclasses => [f => 'List<DynProtoMetaObject>'],
+              name         => [f => 'String'] },
 
         'List<Frame>' =>
-            { Add          => 'Void',
-              Count        => 'System.Int32' },
+            { Add          => [m => 'Void'],
+              Count        => [p => 'System.Int32'] },
         'List<DynMetaObject>' =>
-            { Add          => 'Void' },
+            { Add          => [m => 'Void'] },
         'List<DynProtoMetaObject>' =>
-            { Add          => 'Void' },
+            { Add          => [m => 'Void'] },
         'Double' =>
-            { ToString     => 'String' },
+            { ToString     => [m => 'String'] },
         'Variable' =>
-            { lv           => 'LValue' },
+            { lv           => [f => 'LValue'] },
         'CLRImportObject' =>
-            { val          => 'Object' },
+            { val          => [f => 'Object'] },
 
-        'Kernel.NewROScalar'   => 'Variable',
-        'Kernel.NewRWScalar'   => 'Variable',
-        'Kernel.NewRWListVar'  => 'Variable',
-        'Kernel.NewWeakScalar' => 'Variable',
-        'Kernel.NewCaptureVar' => 'Variable',
-        'Console.WriteLine'    => 'Void',
-        'String.Concat'        => 'String',
-        'Kernel.SubPMO'        => 'DynProtoMetaObject',
-        'Kernel.SubMO'         => 'DynMetaObject',
-        'Kernel.ScalarPMO'     => 'DynProtoMetaObject',
-        'Kernel.ScalarMO'      => 'DynMetaObject',
-        'Kernel.MainlineContinuation' => 'DynBlockDelegate',
-        'Kernel.MakeSub'       => 'IP6',
-        'Kernel.BoxAny'        => 'Variable',
-        'Kernel.UnboxAny'      => 'object',
+        'Kernel.NewROScalar'   => [m => 'Variable'],
+        'Kernel.NewRWScalar'   => [m => 'Variable'],
+        'Kernel.NewRWListVar'  => [m => 'Variable'],
+        'Kernel.NewWeakScalar' => [m => 'Variable'],
+        'Kernel.NewCaptureVar' => [m => 'Variable'],
+        'Console.WriteLine'    => [m => 'Void'],
+        'String.Concat'        => [m => 'String'],
+        'Kernel.SubPMO'        => [f => 'DynProtoMetaObject'],
+        'Kernel.SubMO'         => [f => 'DynMetaObject'],
+        'Kernel.ScalarPMO'     => [f => 'DynProtoMetaObject'],
+        'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
+        'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],
+        'Kernel.MakeSub'       => [m => 'IP6'],
+        'Kernel.BoxAny'        => [m => 'Variable'],
+        'Kernel.UnboxAny'      => [m => 'object'],
     );
 
     has name      => (isa => 'Str', is => 'ro');
@@ -461,7 +463,7 @@ use 5.010;
 
     sub clr_field_get {
         my ($self, $f) = @_;
-        my $ty = $typedata{$self->stacktype->[-1]}{$f};
+        my $ty = $typedata{$self->stacktype->[-1]}{$f}[1];
         my $obj = $self->_pop;
         $self->_push($ty, "$obj.$f");
     }
@@ -475,7 +477,7 @@ use 5.010;
 
     sub clr_sfield_get {
         my ($self, $f) = @_;
-        my $ty = $typedata{$f};
+        my $ty = $typedata{$f}[1];
         $self->_push($ty, "$f");
     }
 
@@ -521,8 +523,11 @@ use 5.010;
         my ($self, $name, $nargs) = @_;
         my $rt = $typedata{$name};
         my @args = reverse map { $self->_pop } 1 .. $nargs;
-        if ($rt ne 'Void') {
-            $self->_push($rt, "$name(" . join(", ", @args) . ")");
+        if ($rt->[0] eq 'c') {
+            $self->_cpscall(($rt->[1] eq 'Void' ? undef : $rt->[1]),
+                "$name(" . join(", ", "th", @args) . ")");
+        } elsif ($rt->[1] ne 'Void') {
+            $self->_push($rt->[1], "$name(" . join(", ", @args) . ")");
         } else {
             $self->_emit("$name(" . join(", ", @args) . ")");
         }
@@ -533,8 +538,11 @@ use 5.010;
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         my $rt = $typedata{$self->stacktype->[-1]}{$name};
         my $inv = $self->_pop;
-        if ($rt ne 'Void') {
-            $self->_push($rt, "$inv.$name(" . join(", ", @args) . ")");
+        if ($rt->[0] eq 'c') {
+            $self->_cpscall(($rt->[1] eq 'Void' ? undef : $rt->[1]),
+                "$inv.$name(" . join(", ", "th", @args) . ")");
+        } elsif ($rt->[1] ne 'Void') {
+            $self->_push($rt->[1], "$inv.$name(" . join(", ", @args) . ")");
         } else {
             $self->_emit("$inv.$name(" . join(", ", @args) . ")");
         }
