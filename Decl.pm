@@ -248,7 +248,7 @@ use CgOp;
 
         CgOp::sink(
             CgOp::methodcall(CgOp::aux('how'), "add-super",
-                CgOp::scopedlex($self->name . "!HOW", $body)));
+                CgOp::scopedlex($self->name . "!HOW")));
     }
 
     __PACKAGE__->meta->make_immutable;

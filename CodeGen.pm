@@ -572,8 +572,8 @@ use 5.010;
 
     # These are completely derived.
 
-    sub scopelexget {
-        my ($self, $name) = @_;
+    sub scopelex {
+        my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
         my ($order, $scope) = (0, $body);
         while ($scope && !$scope->lexical->{$name}) {
@@ -583,7 +583,11 @@ use 5.010;
         if (!$scope) {
             die "Failed to resolve lexical $name in " . $body->name;
         }
-        $self->lexget($order, $name);
+        if ($set) {
+            $self->lexput($order, $name);
+        } else {
+            $self->lexget($order, $name);
+        }
     }
 
     sub string_var {
@@ -611,7 +615,7 @@ use 5.010;
 
     sub box {
         my ($self, $ty) = @_;
-        $self->scopelexget($ty);
+        $self->scopelex($ty);
         $self->fetch;
         $self->clr_call_direct('Kernel.BoxAny', 2);
     }

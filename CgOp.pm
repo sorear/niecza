@@ -203,7 +203,8 @@ use warnings;
     }
 
     sub scopedlex {
-        CgOp::NIL->new(ops => [[ scopelexget => $_[0] ]]);
+        my $n = shift;
+        CgOp::NIL->new(ops => [ @_, [ scopelex => $n, scalar @_ ]]);
     }
 
     sub lexput {
