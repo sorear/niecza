@@ -90,6 +90,7 @@ use warnings;
 # just a bunch of smart constructors
 {
     package CgOp;
+    use Scalar::Util 'blessed';
 
     sub nil {
         CgOp::NIL->new(ops => [ @_ ]);
@@ -131,8 +132,26 @@ use warnings;
         CgOp::NIL->new(ops => [ $_[1], [ 'clr_field_get', $_[0] ] ]);
     }
 
+    sub setfield {
+        CgOp::NIL->new(ops => [ $_[1], $_[2], [ 'clr_field_set', $_[0] ] ]);
+    }
+
+    sub getindex {
+        CgOp::NIL->new(ops => [ $_[1], (blessed($_[0]) ? $_[0] : ()),
+                [ 'clr_index_get', (blessed($_[0]) ? () : $_[0])]]);
+    }
+
+    sub setindex {
+        CgOp::NIL->new(ops => [ $_[1], (blessed($_[0]) ? $_[0] : ()),
+                $_[2], [ 'clr_index_set', (blessed($_[0]) ? () : $_[0])]]);
+    }
+
     sub getattr {
         CgOp::NIL->new(ops => [ $_[1], [ 'attr_get', $_[0] ] ]);
+    }
+
+    sub varattr {
+        CgOp::NIL->new(ops => [ $_[1], [ 'attr_var', $_[0] ] ]);
     }
 
     sub cast {
@@ -153,6 +172,10 @@ use warnings;
 
     sub double {
         CgOp::NIL->new(ops => [ [ 'clr_double', $_[0] ] ]);
+    }
+
+    sub int {
+        CgOp::NIL->new(ops => [ [ 'clr_int', $_[0] ] ]);
     }
 
     sub unbox {

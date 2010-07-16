@@ -46,27 +46,30 @@ my class ClassHOW { ... }
 
 PRE-INIT {
     # ClassHOW.new($name) --> meta class instance
-    sub new { Q:NIL {
-        LEXICALS: $pmo : DynProtoMetaObject, $self : DynObject
-        new/0:DynProtoMetaObject L!$pmo
-        new/0:DynObject L!$self
+    sub new { Q:CgOp {
+        (prog
+          (lextypes '$pmo' DynProtoMetaObject '$self' DynObject)
+          (lexput 0 '$pmo' (rawnew DynProtoMetaObject))
+          (lexput 0 '$self' (rawnew DynObject))
 
-        L@$pmo L@$self !.how
-        L@$pmo =[1] @ unwrap:String !.name
+          (setfield how  (lexget 0 '$pmo') (lexget 0 '$self'))
+          (setfield name (lexget 0 '$pmo') (unwrap String (fetch (pos 1))))
 
-        L@$self @.slots  L@$pmo new/1:CLRImportObject
-            .plaincall/1:Kernel.NewRWScalar  ![meta-object]
-        L@$self =[0] @ cast:DynObject @.klass !.klass
+          (setindex 'meta-object' (getfield slots (lexget 0 '$self'))
+            (newrwscalar (rawnew CLRImportObject (lexget 0 '$pmo'))))
+          (setfield klass (lexget 0 '$self')
+            (getfield klass (cast DynObject (fetch (pos 0)))))
 
-        L@$self wrapobj
+          (newscalar (lexget 0 '$self')))
     } }
 
     # $how.push-scope($outer)
-    sub push-scope { Q:NIL {
-        LEXICALS: $df : List<Frame>
-        =[0] @ @!meta-object unwrap:DynProtoMetaObject @.def_outers L!$df
-        L@$df =[1] @ unwrap:Frame .virtcall/1:Add
-        L@$df @.Count 1 - wrap
+    sub push-scope { Q:CgOp {
+        (prog (lextypes '$df' 'List<Frame>')
+              (lexput 0 '$df' (getfield def_outers (unwrap DynProtoMetaObject
+                (getattr 'meta-object' (fetch (pos 0))))))
+              (rawcall (lexget 0 '$df') Add (unwrap Frame (fetch (pos 1))))
+              (wrap (arith '-' (int 1) (getfield Count (lexget 0 '$df')))))
     } }
 
     # $how.add-super($how)
@@ -116,36 +119,47 @@ PRE-INIT {
 
     sub compose { Q:CgOp { (null Variable) } }
 
-    Q:NIL {
-        LEXICALS: $chpmo : DynProtoMetaObject, $ch : DynObject
-        new/0:DynProtoMetaObject L!$chpmo
-        new/0:DynObject L!$ch
+    Q:CgOp {
+        (prog
+          (lextypes '$chpmo' DynProtoMetaObject '$ch' DynObject)
+          (lexput 0 '$chpmo' (rawnew DynProtoMetaObject))
+          (lexput 0 '$ch' (rawnew DynObject))
 
-        L@$chpmo L@$ch !.how
-        L@$chpmo "ClassHOW" !.name
-        L@$ch @.slots L@$chpmo wrap ![meta-object]
+          (setfield how (lexget 0 '$chpmo') (lexget 0 '$ch'))
+          (setfield name (lexget 0 '$chpmo') (clr_string "ClassHOW"))
+          (setindex 'meta-object' (getfield slots (lexget 0 '$ch'))
+                                  (wrap (lexget 0 '$chpmo')))
 
-        L@&push-scope @  L@$ch wrapobj  callframe wrap  .call/2:v
-        L@&add-scoped-method @  L@$ch wrapobj  "new" wrap  0 wrap
-            L@&new  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  "push-scope" wrap  0 wrap
-            L@&push-scope  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  "add-scoped-method" wrap  0 wrap
-            L@&add-scoped-method  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  "add-super" wrap  0 wrap
-            L@&add-super  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  "compose" wrap  0 wrap
-            L@&compose  .call/4:v
-        L@&add-scoped-method @  L@$ch wrapobj  "create-protoobject" wrap  0 wrap
-            L@&create-protoobject  .call/4:v
+          (sink (subcall (fetch (lexget 0 '&push-scope'))
+                         (newscalar (lexget 0 '$ch')) (wrap (callframe))))
+          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
+                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "new")) (wrap (int 0))
+                  (lexget 0 '&new')))
+          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
+                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "push-scope")) (wrap (int 0))
+                  (lexget 0 '&push-scope')))
+          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
+                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "add-scoped-method")) (wrap (int 0))
+                  (lexget 0 '&add-scoped-method')))
+          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
+                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "add-super")) (wrap (int 0))
+                  (lexget 0 '&add-super')))
+          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
+                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "compose")) (wrap (int 0))
+                  (lexget 0 '&compose')))
+          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
+                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "create-protoobject")) (wrap (int 0))
+                  (lexget 0 '&create-protoobject')))
 
-        L@&create-protoobject @  L@$ch wrapobj  callframe wrap
-            new/0:List<DynMetaObject> wrap  .call/3 L!^ClassHOW
+          (lexput 1 ClassHOW (subcall (fetch (lexget 0 '&create-protoobject'))
+            (newscalar (lexget 0 '$ch')) (wrap (callframe))
+            (wrap (rawnew 'List<DynMetaObject>'))))
 
-        L@$ch  L@^ClassHOW @ cast:DynObject @.klass  !.klass
-        L@$ch wrapobj  L!^'ClassHOW!HOW'
+          (setfield klass (lexget 0 '$ch')
+            (getfield klass (cast DynObject (fetch (lexget 1 ClassHOW)))))
+          (lexput 1 'ClassHOW!HOW' (newscalar (lexget 0 '$ch')))
 
-        null:Variable
+          (null Variable))
     }
 }
 
@@ -158,13 +172,17 @@ my class Scalar { ... }
 my class Sub { ... }
 PRE-INIT {
     # (DynProtoMetaObject $dpmo, ClassHOW $super --> ClassHOW)
-    sub wrap-dpmo { Q:NIL {
-        LEXICALS: $ch : Variable, $dp : DynProtoMetaObject
-        L@^^ClassHOW dup@  "" wrap .method/1:new  L!$ch
-        =[0] @ unwrap:DynProtoMetaObject L!$dp
-        L@$ch @  L@$dp wrap  !!meta-object
-        L@$ch dup@  =[1]  .method/1:add-super:v
-        L@$ch
+    sub wrap-dpmo { Q:CgOp {
+        (prog
+          (lextypes '$ch' Variable '$dp' DynProtoMetaObject)
+          (lexput 0 '$ch' (methodcall (scopedlex ClassHOW) new
+            (wrap (clr_string ""))))
+          (lexput 0 '$dp' (unwrap DynProtoMetaObject (fetch (pos 0))))
+
+          (assign (varattr 'meta-object' (fetch (lexget 0 '$ch')))
+                  (wrap (lexget 0 '$dp')))
+          (sink (methodcall (lexget 0 '$ch') 'add-super' (pos 1)))
+          (lexget 0 '$ch'))
     } }
     # (ClassHOW $me, DynMetaObject $use, DynMetaObject $p --> Variable)
     sub wrapped-protoobj { Q:NIL {
