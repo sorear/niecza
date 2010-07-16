@@ -594,56 +594,6 @@ use 5.010;
         }
     }
 
-    sub string_var {
-        my ($self, $text) = @_;
-        $self->clr_string($text);
-        $self->box('Str');
-    }
-
-    sub newscalar {
-        my ($self) = @_;
-        $self->clr_call_direct('Kernel.NewROScalar', 1);
-    }
-
-    sub newrwscalar {
-        my ($self) = @_;
-        $self->clr_call_direct('Kernel.NewRWScalar', 1);
-    }
-
-    sub clr_unwrap {
-        my ($self, $ty) = @_;
-        $self->cast('CLRImportObject');
-        $self->clr_field_get('val');
-        $self->cast($ty);
-    }
-
-    sub box {
-        my ($self, $ty) = @_;
-        $self->scopelex($ty);
-        $self->fetch;
-        $self->clr_call_direct('Kernel.BoxAny', 2);
-    }
-
-    sub unbox {
-        my ($self, $ty) = @_;
-        $self->clr_call_direct('Kernel.UnboxAny', 1);
-        $self->cast($ty);
-    }
-
-    sub attr_get {
-        my ($self, $f) = @_;
-        $self->attr_var($f);
-        $self->fetch;
-    }
-
-    sub attr_set {
-        my ($self, $f) = @_;
-        $self->swap;
-        $self->attr_var($f);
-        $self->swap;
-        $self->assign;
-    }
-
     sub open_protopad {
         my ($self, $body) = @_;
         $self->peek_aux('protopad');

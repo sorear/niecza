@@ -113,7 +113,7 @@ use warnings;
     }
 
     sub unwrap {
-        CgOp::NIL->new(ops => [ $_[1], [ 'clr_unwrap', $_[0] ] ]);
+        cast($_[0], getfield('val', cast('CLRImportObject', $_[1])));
     }
 
     sub sink {
@@ -147,7 +147,7 @@ use warnings;
     }
 
     sub getattr {
-        CgOp::NIL->new(ops => [ $_[1], [ 'attr_get', $_[0] ] ]);
+        fetch(varattr($_[0], $_[1]));
     }
 
     sub varattr {
@@ -159,15 +159,15 @@ use warnings;
     }
 
     sub newscalar {
-        CgOp::NIL->new(ops => [ $_[0], [ 'newscalar' ] ]);
+        rawscall('Kernel.NewROScalar', $_[0]);
     }
 
     sub newrwscalar {
-        CgOp::NIL->new(ops => [ $_[0], [ 'newrwscalar' ] ]);
+        rawscall('Kernel.NewRWScalar', $_[0]);
     }
 
     sub string_var {
-        CgOp::NIL->new(ops => [ [ 'string_var', $_[0] ] ]);
+        box('Str', clr_string($_[0]));
     }
 
     sub double {
@@ -179,11 +179,11 @@ use warnings;
     }
 
     sub unbox {
-        CgOp::NIL->new(ops => [ $_[1], [ 'unbox', $_[0] ] ]);
+        cast($_[0], rawscall('Kernel.UnboxAny', $_[1]));
     }
 
     sub box {
-        CgOp::NIL->new(ops => [ $_[1], [ 'box', $_[0] ] ]);
+        rawscall('Kernel.BoxAny', $_[1], fetch(scopedlex($_[0])));
     }
 
     sub bind {
