@@ -41,6 +41,9 @@ use 5.010;
         'CLRImportObject' =>
             { val          => [f => 'Object'] },
 
+        'Kernel.Bind'          => [c => 'Void'],
+        'Kernel.Assign'        => [c => 'Void'],
+        'Kernel.Fetch'         => [c => 'IP6'],
         'Kernel.NewROScalar'   => [m => 'Variable'],
         'Kernel.NewRWScalar'   => [m => 'Variable'],
         'Kernel.NewRWListVar'  => [m => 'Variable'],
@@ -300,12 +303,6 @@ use 5.010;
         $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
     }
 
-    sub how {
-        my ($self) = @_;
-        my $v = $self->_pop;
-        $self->_cpscall("IP6", "$v.HOW(th)");
-    }
-
     sub callframe {
         my ($self) = @_;
         my $frame = 'th';
@@ -315,12 +312,6 @@ use 5.010;
                 '])';
         }
         $self->_push("Frame", $frame);
-    }
-
-    sub fetch {
-        my ($self) = @_;
-        my $c = $self->_pop;
-        $self->_cpscall("IP6", "Kernel.Fetch(th, $c)");
     }
 
     sub dup {
@@ -334,13 +325,6 @@ use 5.010;
         $self->_pop;
     }
 
-    sub dup_fetch {
-        my ($self) = @_;
-        my $c = $self->_peek;
-        $self->_cpscall('IP6', "Kernel.Fetch(th, $c)");
-        $self->swap;
-    }
-
     # the use of scalar here is a little bit wrong; semantically it's closer
     # to the old notion of ¢foo.  doesn't matter much since it's not exposed
     # at the Perl 6 level.
@@ -350,32 +334,9 @@ use 5.010;
             "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
     }
 
-    sub clone_lex {
+    sub protolget {
         my ($self, $name) = @_;
         $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
-        $self->dup_fetch;
-        $self->_push('Variable', "Kernel.NewROScalar(th)");
-        $self->call_method(1, "clone", 1);
-        $self->lextypes($name, 'Variable');
-        $self->lexput(0, $name);
-    }
-
-    # this will need changing once @vars are implemented... or maybe something
-    # entirely different, I think cloning at all may be wrong
-    sub copy_lex {
-        my ($self, $name) = @_;
-        $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
-        $self->fetch;
-        $self->_push('Variable', "Kernel.NewRWScalar(" . $self->_pop . ")");
-        $self->lextypes($name, 'Variable');
-        $self->lexput(0, $name);
-    }
-
-    sub share_lex {
-        my ($self, $name) = @_;
-        $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
-        $self->lextypes($name, 'Variable');
-        $self->lexput(0, $name);
     }
 
     sub call_method {
@@ -400,26 +361,9 @@ use 5.010;
         $self->unreach(1);
     }
 
-    sub clr_wrap {
-        my ($self) = @_;
-        my $v = $self->_pop;
-        $self->_push('Variable', "Kernel.NewROScalar(new CLRImportObject($v))");
-    }
-
-    sub bind {
-        my $self = shift;
-        my $ro   = shift() ? "true" : "false";
-        my $rw   = shift() ? "true" : "false";
-        my $rhs = $self->_pop;
-        my $lhs = $self->_pop;
-        $self->_cpscall(undef, "Kernel.Bind(th, $lhs, $rhs.lv, $ro, $rw)");
-    }
-
-    sub assign {
-        my $self = shift;
-        my $rhs = $self->_pop;
-        my $lhs = $self->_pop;
-        $self->_cpscall(undef, "Kernel.Assign(th, $lhs.lv, $rhs.lv)");
+    sub clr_bool {
+        my ($self, $v) = @_;
+        $self->_push('System.Boolean', $v ? 'true' : 'false');
     }
 
     sub clr_new {

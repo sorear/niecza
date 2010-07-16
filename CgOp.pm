@@ -109,7 +109,7 @@ use warnings;
     }
 
     sub wrap {
-        CgOp::NIL->new(ops => [ $_[0], [ 'clr_wrap' ] ]);
+        newscalar(rawnew('CLRImportObject', $_[0]));
     }
 
     sub unwrap {
@@ -121,7 +121,7 @@ use warnings;
     }
 
     sub fetch {
-        CgOp::NIL->new(ops => [ $_[0], [ 'fetch' ] ]);
+        rawscall("Kernel.Fetch", $_[0]);
     }
 
     sub how {
@@ -178,6 +178,10 @@ use warnings;
         CgOp::NIL->new(ops => [ [ 'clr_int', $_[0] ] ]);
     }
 
+    sub bool {
+        CgOp::NIL->new(ops => [ [ 'clr_bool', $_[0] ] ]);
+    }
+
     sub unbox {
         cast($_[0], rawscall('Kernel.UnboxAny', $_[1]));
     }
@@ -187,11 +191,13 @@ use warnings;
     }
 
     sub bind {
-        CgOp::NIL->new(ops => [ $_[1], $_[2], [ 'bind', $_[0] ] ]);
+        rawscall('Kernel.Bind', $_[1], getfield('lv', $_[2]),
+            bool($_[0]), bool(0));
     }
 
     sub assign {
-        CgOp::NIL->new(ops => [ $_[0], $_[1], [ 'assign' ] ]);
+        rawscall('Kernel.Assign', getfield('lv', $_[0]),
+            getfield('lv', $_[1]));
     }
 
     sub compare {
@@ -222,7 +228,8 @@ use warnings;
 
     sub methodcall {
         my ($obj, $name, @args) = @_;
-        CgOp::NIL->new(ops => [ $obj, [ 'dup_fetch' ], @args,
+        CgOp::NIL->new(ops => [ $obj, [ 'dup' ],
+                [ 'clr_call_direct', 'Kernel.Fetch', 1 ], [ 'swap' ], @args,
                 [ 'call_method', 1, $name, scalar @args ] ]);
     }
 
@@ -243,19 +250,32 @@ use warnings;
     }
 
     sub share_lex {
-        CgOp::NIL->new(ops => [[ 'share_lex', $_[0] ]]);
+        prog(
+          lextypes($_[0], 'Variable'),
+          lexput(0, $_[0], protolget($_[0])));
     }
 
+    # this will need changing once @vars are implemented... or maybe something
+    # entirely different, I think cloning at all may be wrong
     sub copy_lex {
-        CgOp::NIL->new(ops => [[ 'copy_lex', $_[0] ]]);
+        prog(
+          lextypes($_[0], 'Variable'),
+          lexput(0, $_[0], newrwscalar(fetch(protolget($_[0])))));
     }
 
     sub clone_lex {
-        CgOp::NIL->new(ops => [[ 'clone_lex', $_[0] ]]);
+        prog(
+          lextypes($_[0], 'Variable'),
+          lexput(0, $_[0], methodcall(protolget($_[0]), "clone",
+            newscalar(callframe))));
     }
 
     sub proto_var {
         CgOp::NIL->new(ops => [ $_[1], [ 'proto_var', $_[0] ]]);
+    }
+
+    sub protolget {
+        CgOp::NIL->new(ops => [[ 'protolget', $_[0] ]]);
     }
 
     sub return {
