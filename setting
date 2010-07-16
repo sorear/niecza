@@ -48,36 +48,36 @@ PRE-INIT {
     # ClassHOW.new($name) --> meta class instance
     sub new { Q:CgOp {
         (prog
-          (lextypes '$pmo' DynProtoMetaObject '$self' DynObject)
-          (lexput 0 '$pmo' (rawnew DynProtoMetaObject))
-          (lexput 0 '$self' (rawnew DynObject))
+          (lextypes $pmo DynProtoMetaObject $self DynObject)
+          (lexput 0 $pmo (rawnew DynProtoMetaObject))
+          (lexput 0 $self (rawnew DynObject))
 
-          (setfield how  (lexget 0 '$pmo') (lexget 0 '$self'))
-          (setfield name (lexget 0 '$pmo') (unwrap String (fetch (pos 1))))
+          (setfield how  (lexget 0 $pmo) (lexget 0 $self))
+          (setfield name (lexget 0 $pmo) (unwrap String (fetch (pos 1))))
 
-          (setindex 'meta-object' (getfield slots (lexget 0 '$self'))
-            (newrwscalar (rawnew CLRImportObject (lexget 0 '$pmo'))))
-          (setfield klass (lexget 0 '$self')
+          (setindex meta-object (getfield slots (lexget 0 $self))
+            (newrwscalar (rawnew CLRImportObject (lexget 0 $pmo))))
+          (setfield klass (lexget 0 $self)
             (getfield klass (cast DynObject (fetch (pos 0)))))
 
-          (newscalar (lexget 0 '$self')))
+          (newscalar (lexget 0 $self)))
     } }
 
     # $how.push-scope($outer)
     sub push-scope { Q:CgOp {
-        (prog (lextypes '$df' 'List<Frame>')
-              (lexput 0 '$df' (getfield def_outers (unwrap DynProtoMetaObject
-                (getattr 'meta-object' (fetch (pos 0))))))
-              (rawcall (lexget 0 '$df') Add (unwrap Frame (fetch (pos 1))))
-              (wrap (arith '-' (int 1) (getfield Count (lexget 0 '$df')))))
+        (prog (lextypes $df List<Frame>)
+              (lexput 0 $df (getfield def_outers (unwrap DynProtoMetaObject
+                (getattr meta-object (fetch (pos 0))))))
+              (rawcall (lexget 0 $df) Add (unwrap Frame (fetch (pos 1))))
+              (wrap (arith - (int 1) (getfield Count (lexget 0 $df)))))
     } }
 
     # $how.add-super($how)
     sub add-super { Q:CgOp { (prog
         (rawcall
           (getfield superclasses (unwrap DynProtoMetaObject
-            (getattr 'meta-object' (fetch (pos 0))))) Add
-          (unwrap DynProtoMetaObject (getattr 'meta-object' (fetch (pos 1)))))
+            (getattr meta-object (fetch (pos 0))))) Add
+          (unwrap DynProtoMetaObject (getattr meta-object (fetch (pos 1)))))
         (null Variable))
     } }
 
@@ -121,43 +121,43 @@ PRE-INIT {
 
     Q:CgOp {
         (prog
-          (lextypes '$chpmo' DynProtoMetaObject '$ch' DynObject)
-          (lexput 0 '$chpmo' (rawnew DynProtoMetaObject))
-          (lexput 0 '$ch' (rawnew DynObject))
+          (lextypes $chpmo DynProtoMetaObject $ch DynObject)
+          (lexput 0 $chpmo (rawnew DynProtoMetaObject))
+          (lexput 0 $ch (rawnew DynObject))
 
-          (setfield how (lexget 0 '$chpmo') (lexget 0 '$ch'))
-          (setfield name (lexget 0 '$chpmo') (clr_string "ClassHOW"))
-          (setindex 'meta-object' (getfield slots (lexget 0 '$ch'))
-                                  (wrap (lexget 0 '$chpmo')))
+          (setfield how (lexget 0 $chpmo) (lexget 0 $ch))
+          (setfield name (lexget 0 $chpmo) (clr_string "ClassHOW"))
+          (setindex meta-object (getfield slots (lexget 0 '$ch'))
+                                (wrap (lexget 0 '$chpmo')))
 
-          (sink (subcall (fetch (lexget 0 '&push-scope'))
-                         (newscalar (lexget 0 '$ch')) (wrap (callframe))))
-          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
-                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "new")) (wrap (int 0))
-                  (lexget 0 '&new')))
-          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
-                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "push-scope")) (wrap (int 0))
-                  (lexget 0 '&push-scope')))
-          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
-                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "add-scoped-method")) (wrap (int 0))
-                  (lexget 0 '&add-scoped-method')))
-          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
-                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "add-super")) (wrap (int 0))
-                  (lexget 0 '&add-super')))
-          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
-                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "compose")) (wrap (int 0))
-                  (lexget 0 '&compose')))
-          (sink (subcall (fetch (lexget 0 '&add-scoped-method'))
-                  (newscalar (lexget 0 '$ch')) (wrap (clr_string "create-protoobject")) (wrap (int 0))
-                  (lexget 0 '&create-protoobject')))
+          (sink (subcall (fetch (lexget 0 &push-scope))
+                         (newscalar (lexget 0 $ch)) (wrap (callframe))))
+          (sink (subcall (fetch (lexget 0 &add-scoped-method))
+                  (newscalar (lexget 0 $ch)) (wrap (clr_string "new")) (wrap (int 0))
+                  (lexget 0 &new)))
+          (sink (subcall (fetch (lexget 0 &add-scoped-method))
+                  (newscalar (lexget 0 $ch)) (wrap (clr_string "push-scope")) (wrap (int 0))
+                  (lexget 0 &push-scope)))
+          (sink (subcall (fetch (lexget 0 &add-scoped-method))
+                  (newscalar (lexget 0 $ch)) (wrap (clr_string "add-scoped-method")) (wrap (int 0))
+                  (lexget 0 &add-scoped-method)))
+          (sink (subcall (fetch (lexget 0 &add-scoped-method))
+                  (newscalar (lexget 0 $ch)) (wrap (clr_string "add-super")) (wrap (int 0))
+                  (lexget 0 &add-super)))
+          (sink (subcall (fetch (lexget 0 &add-scoped-method))
+                  (newscalar (lexget 0 $ch)) (wrap (clr_string "compose")) (wrap (int 0))
+                  (lexget 0 &compose)))
+          (sink (subcall (fetch (lexget 0 &add-scoped-method))
+                  (newscalar (lexget 0 $ch)) (wrap (clr_string "create-protoobject")) (wrap (int 0))
+                  (lexget 0 &create-protoobject)))
 
-          (lexput 1 ClassHOW (subcall (fetch (lexget 0 '&create-protoobject'))
-            (newscalar (lexget 0 '$ch')) (wrap (callframe))
-            (wrap (rawnew 'List<DynMetaObject>'))))
+          (lexput 1 ClassHOW (subcall (fetch (lexget 0 &create-protoobject))
+            (newscalar (lexget 0 $ch)) (wrap (callframe))
+            (wrap (rawnew List<DynMetaObject>))))
 
-          (setfield klass (lexget 0 '$ch')
+          (setfield klass (lexget 0 $ch)
             (getfield klass (cast DynObject (fetch (lexget 1 ClassHOW)))))
-          (lexput 1 'ClassHOW!HOW' (newscalar (lexget 0 '$ch')))
+          (lexput 1 ClassHOW!HOW (newscalar (lexget 0 $ch)))
 
           (null Variable))
     }
@@ -174,15 +174,15 @@ PRE-INIT {
     # (DynProtoMetaObject $dpmo, ClassHOW $super --> ClassHOW)
     sub wrap-dpmo { Q:CgOp {
         (prog
-          (lextypes '$ch' Variable '$dp' DynProtoMetaObject)
-          (lexput 0 '$ch' (methodcall (scopedlex ClassHOW) new
+          (lextypes $ch Variable $dp DynProtoMetaObject)
+          (lexput 0 $ch (methodcall (scopedlex ClassHOW) new
             (wrap (clr_string ""))))
-          (lexput 0 '$dp' (unwrap DynProtoMetaObject (fetch (pos 0))))
+          (lexput 0 $dp (unwrap DynProtoMetaObject (fetch (pos 0))))
 
-          (assign (varattr 'meta-object' (fetch (lexget 0 '$ch')))
-                  (wrap (lexget 0 '$dp')))
-          (sink (methodcall (lexget 0 '$ch') 'add-super' (pos 1)))
-          (lexget 0 '$ch'))
+          (assign (varattr meta-object (fetch (lexget 0 $ch)))
+                  (wrap (lexget 0 $dp)))
+          (sink (methodcall (lexget 0 $ch) add-super (pos 1)))
+          (lexget 0 $ch))
     } }
     # (ClassHOW $me, DynMetaObject $use, DynMetaObject $p --> Variable)
     sub wrapped-protoobj { Q:NIL {
@@ -249,7 +249,7 @@ my class Num {
         (box Str (rawcall (unbox Double (fetch (scopedlex self))) ToString))
     } }
     method Bool() { Q:CgOp {
-        (box Bool (compare '!=' (double 0)
+        (box Bool (compare != (double 0)
                     (unbox Double (fetch (scopedlex self)))))
     } }
 }
@@ -280,64 +280,64 @@ my class Bool is Enum {
 
 # ought to take a slurpy
 sub infix:<~>($l,$r) { Q:CgOp {
-    (box Str (rawscall 'String.Concat'
-        (unbox String (fetch (methodcall (scopedlex '$l') Str)))
-        (unbox String (fetch (methodcall (scopedlex '$r') Str)))))
+    (box Str (rawscall String.Concat
+        (unbox String (fetch (methodcall (scopedlex $l) Str)))
+        (unbox String (fetch (methodcall (scopedlex $r) Str)))))
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
-    (box Num (arith '+' (unbox Double (fetch (scopedlex '$l')))
-                        (unbox Double (fetch (scopedlex '$r')))))
+    (box Num (arith + (unbox Double (fetch (scopedlex $l)))
+                      (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<->($l,$r) { Q:CgOp {
-    (box Num (arith '-' (unbox Double (fetch (scopedlex '$l')))
-                        (unbox Double (fetch (scopedlex '$r')))))
+    (box Num (arith - (unbox Double (fetch (scopedlex $l)))
+                      (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<*>($l,$r) { Q:CgOp {
-    (box Num (arith '*' (unbox Double (fetch (scopedlex '$l')))
-                        (unbox Double (fetch (scopedlex '$r')))))
+    (box Num (arith * (unbox Double (fetch (scopedlex $l)))
+                      (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:</>($l,$r) { Q:CgOp {
-    (box Num (arith '/' (unbox Double (fetch (scopedlex '$l')))
-                        (unbox Double (fetch (scopedlex '$r')))))
+    (box Num (arith / (unbox Double (fetch (scopedlex $l)))
+                      (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<< < >>($l,$r) { Q:CgOp {
-    (box Bool (compare '<' (unbox Double (fetch (scopedlex '$l')))
-                           (unbox Double (fetch (scopedlex '$r')))))
+    (box Bool (compare < (unbox Double (fetch (scopedlex $l)))
+                         (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<< > >>($l,$r) { Q:CgOp {
-    (box Bool (compare '>' (unbox Double (fetch (scopedlex '$l')))
-                           (unbox Double (fetch (scopedlex '$r')))))
+    (box Bool (compare > (unbox Double (fetch (scopedlex $l)))
+                         (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<< <= >>($l,$r) { Q:CgOp {
-    (box Bool (compare '<=' (unbox Double (fetch (scopedlex '$l')))
-                            (unbox Double (fetch (scopedlex '$r')))))
+    (box Bool (compare <= (unbox Double (fetch (scopedlex $l)))
+                          (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<< >= >>($l,$r) { Q:CgOp {
-    (box Bool (compare '>=' (unbox Double (fetch (scopedlex '$l')))
-                            (unbox Double (fetch (scopedlex '$r')))))
+    (box Bool (compare >= (unbox Double (fetch (scopedlex $l)))
+                          (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<< == >>($l,$r) { Q:CgOp {
-    (box Bool (compare '==' (unbox Double (fetch (scopedlex '$l')))
-                            (unbox Double (fetch (scopedlex '$r')))))
+    (box Bool (compare == (unbox Double (fetch (scopedlex $l)))
+                          (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub infix:<< != >>($l,$r) { Q:CgOp {
-    (box Bool (compare '!=' (unbox Double (fetch (scopedlex '$l')))
-                            (unbox Double (fetch (scopedlex '$r')))))
+    (box Bool (compare != (unbox Double (fetch (scopedlex $l)))
+                          (unbox Double (fetch (scopedlex $r)))))
 } }
 
 sub say($str) { Q:CgOp {
-    (prog (rawscall 'Console.WriteLine'
-            (unbox String (fetch (methodcall (scopedlex '$str') Str))))
+    (prog (rawscall Console.WriteLine
+            (unbox String (fetch (methodcall (scopedlex $str) Str))))
           (null Variable))
 } }
 
@@ -359,18 +359,18 @@ sub prefix:<?>($v) { $v.Bool }
 sub prefix:<!>($v) { if $v { ?0 } else { ?1 } }
 
 sub infix:<eq>($l,$r) { Q:CgOp {
-    (box Bool (compare '=='
-        (unbox String (fetch (methodcall (scopedlex '$l') Str)))
-        (unbox String (fetch (methodcall (scopedlex '$r') Str)))))
+    (box Bool (compare ==
+        (unbox String (fetch (methodcall (scopedlex $l) Str)))
+        (unbox String (fetch (methodcall (scopedlex $r) Str)))))
 } }
 sub infix:<ne>($l,$r) { Q:CgOp {
-    (box Bool (compare '!='
-        (unbox String (fetch (methodcall (scopedlex '$l') Str)))
-        (unbox String (fetch (methodcall (scopedlex '$r') Str)))))
+    (box Bool (compare !=
+        (unbox String (fetch (methodcall (scopedlex $l) Str)))
+        (unbox String (fetch (methodcall (scopedlex $r) Str)))))
 } }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
-    (box Bool (compare '==' (fetch (scopedlex '$l')) (fetch (scopedlex '$r'))))
+    (box Bool (compare == (fetch (scopedlex $l)) (fetch (scopedlex $r))))
 } }
 
 # XXX: We can't use augment syntax because we don't have use working, so
@@ -380,7 +380,7 @@ PRE-INIT {
     my $i := Mu.HOW.push-scope(Q:CgOp { (wrap (callframe)) });
     Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "defined")) }, $i,
         anon method defined() {
-            Q:CgOp { (box Bool (compare '!=' (null 'Dictionary<string,object>')
+            Q:CgOp { (box Bool (compare != (null Dictionary<string,object>)
                 (getfield slots (cast DynObject (fetch (scopedlex self)))))) }
         });
     Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "Bool")) }, $i,

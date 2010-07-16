@@ -33,7 +33,7 @@ grammar CgOp is STD {
     token category:cgexp { <sym> }
     proto token cgexp { <...> }
 
-    token cgopname { \w+ }
+    token cgopname { <-[ ' " ( ) \s ]> + }
 
     token cgexp:op { '(':s {} <cgopname> [ <cgexp> ]* ')' }
     token cgexp:name { <cgopname> }
