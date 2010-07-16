@@ -82,39 +82,42 @@ PRE-INIT {
     } }
 
     # $how.add-scoped-method($name, $index, $sub)
-    sub add-scoped-method { Q:NIL {
-        LEXICALS: $name : String, $index : Int32, $sub : DynObject
-        LEXICALS: $mo : DynProtoMetaObject
-        =[0] @ @!meta-object unwrap:DynProtoMetaObject L!$mo
-        =[1] @ unwrap:String L!$name
-        =[2] @ unwrap:Int32 L!$index
-        =[3] @ cast:DynObject L!$sub
+    sub add-scoped-method { Q:CgOp {
+        (prog
+          (lextypes $name String $index Int32 $sub DynObject
+            $mo DynProtoMetaObject)
+          (l $mo (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 0)))))
+          (l $name (unwrap String (@ (pos 1))))
+          (l $index (unwrap Int32 (@ (pos 2))))
+          (l $sub (cast DynObject (@ (pos 3))))
 
-        LEXICALS: $proto : Frame, $code : DynBlockDelegate
-        L@$sub @.slots @[code]  cast:DynBlockDelegate L!$code
-        L@$sub @.slots @[proto] cast:Frame L!$proto
+          (lextypes $proto Frame $code DynBlockDelegate)
+          (l $code (cast DynBlockDelegate (getindex code
+            (getfield slots (l $sub)))))
+          (l $proto (cast Frame (getindex proto (getfield slots (l $sub)))))
 
-        LEXICALS: $m : DynProtoMetaObject.Method
-        L@$code L@$proto L@$index new/3:DynProtoMetaObject.Method L!$m
+          (setindex (l $name) (getfield local (l $mo))
+            (rawnew DynProtoMetaObject.Method (l $code) (l $proto) (l $index)))
 
-        L@$mo @.local  L@$name  L@$m ![]
-        null:Variable
+          (null Variable))
     } }
 
     # $how.create-protoobject($callframe, $superlist)
-    sub create-protoobject { Q:NIL {
-        LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
-        new/0:DynObject L!$p
-        =[0] @ @!meta-object unwrap:DynProtoMetaObject L!$pmo
-        L@$pmo new/1:DynMetaObject L!$mo
-        L@$mo @.outers  =[1] @ unwrap:Frame  .virtcall/1:Add
-        L@$mo =[2] @ unwrap:List<DynMetaObject>  .virtcall/1:BuildC3MRO
+    sub create-protoobject { Q:CgOp {
+        (prog
+          (lextypes $p DynObject $pmo DynProtoMetaObject $mo DynMetaObject)
+          (l $p (rawnew DynObject))
+          (l $pmo (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 0)))))
+          (l $mo (rawnew DynMetaObject (l $pmo)))
 
-        L@$p null:Dictionary<string,object> !.slots
-        L@$p L@$mo !.klass
-        L@$mo L@$p !.typeObject
+          (rawcall (getfield outers (l $mo)) Add (unwrap Frame (@ (pos 1))))
+          (rawcall (l $mo) BuildC3MRO (unwrap List<DynMetaObject> (@ (pos 2))))
 
-        L@$p wrapobj
+          (setfield slots (l $p) (null Dictionary<string,object>))
+          (setfield klass (l $p) (l $mo))
+          (setfield typeObject (l $mo) (l $p))
+
+          (newscalar (l $p)))
     } }
 
     sub compose { Q:CgOp { (null Variable) } }
@@ -185,62 +188,68 @@ PRE-INIT {
           (lexget 0 $ch))
     } }
     # (ClassHOW $me, DynMetaObject $use, DynMetaObject $p --> Variable)
-    sub wrapped-protoobj { Q:NIL {
-        LEXICALS: $p : DynObject, $pmo : DynProtoMetaObject, $mo : DynMetaObject
-        LEXICALS: $s : List<DynMetaObject>
-        new/0:DynObject L!$p
-        =[0] @ @!meta-object unwrap:DynProtoMetaObject L!$pmo
-        =[1] @ unwrap:DynMetaObject L!$mo
+    sub wrapped-protoobj { Q:CgOp {
+        (prog
+          (lextypes $p DynObject $pmo DynProtoMetaObject $mo DynMetaObject
+            $s List<DynMetaObject>)
+          (l $p (rawnew DynObject))
+          (l $pmo (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 0)))))
+          (l $mo (unwrap DynMetaObject (@ (pos 1))))
 
-        new/0:List<DynMetaObject> L!$s
-        L@$s  =[2] @ unwrap:DynMetaObject  .virtcall/1:Add
-        L@$mo  L@$s  .virtcall/1:BuildC3MRO
+          (l $s (rawnew List<DynMetaObject>))
+          (rawcall (l $s) Add (unwrap DynMetaObject (@ (pos 2))))
+          (rawcall (l $mo) BuildC3MRO (l $s))
 
-        L@$pmo  =[0] @ !.how
+          (setfield how (l $pmo) (@ (pos 0)))
 
-        L@$p null:Dictionary<string,object> !.slots
-        L@$mo L@$p !.typeObject
-        L@$p L@$mo !.klass
+          (setfield slots (l $p) (null Dictionary<string,object>))
+          (setfield typeObject (l $mo) (l $p))
+          (setfield klass (l $p) (l $mo))
 
-        L@$p wrapobj
+          (newscalar (l $p)))
     } }
 
-Q:NIL {
-    LEXICALS: $plist : List<DynMetaObject>
-    L@^ClassHOW dup@  "Mu" wrap  .method/1:new  L!^'Mu!HOW'
-    new/0:List<DynMetaObject> L!$plist
-    L@^'Mu!HOW' dup@  callframe wrap  L@$plist wrap
-        .method/2:create-protoobject  L!^Mu
+Q:CgOp {
+    (prog
+      (lextypes !plist List<DynMetaObject>)
 
-    L@^ClassHOW dup@  "Any" wrap  .method/1:new  L!^'Any!HOW'
-    L@^'Any!HOW' dup@  L@^'Mu!HOW'  .method/1:add-super:v
-    new/0:List<DynMetaObject> L!$plist
-    L@$plist  L@^Mu @ cast:DynObject @.klass  .virtcall/1:Add
-    L@^'Any!HOW' dup@  callframe wrap  L@$plist wrap
-        .method/2:create-protoobject  L!^Any
+      (l Mu!HOW (methodcall (l ClassHOW) new (w (clr_string Mu))))
+      (l !plist (rawnew List<DynMetaObject>))
+      (l Mu (methodcall (l Mu!HOW) create-protoobject (w (callframe))
+          (w (l !plist))))
 
-    L@^ClassHOW dup@  "Cool" wrap  .method/1:new  L!^'Cool!HOW'
-    L@^'Cool!HOW' dup@  L@^'Any!HOW'  .method/1:add-super:v
-    new/0:List<DynMetaObject> L!$plist
-    L@$plist  L@^Any @ cast:DynObject @.klass  .virtcall/1:Add
-    L@^'Cool!HOW' dup@  callframe wrap  L@$plist wrap
-        .method/2:create-protoobject  L!^Cool
+      (l Any!HOW (methodcall (l ClassHOW) new (w (clr_string Any))))
+      (sink (methodcall (l Any!HOW) add-super (l Mu!HOW)))
+      (l !plist (rawnew List<DynMetaObject>))
+      (rawcall (l !plist) Add (getfield klass (cast DynObject (@ (l Mu)))))
+      (l Any (methodcall (l Any!HOW) create-protoobject (w (callframe))
+         (w (l !plist))))
 
-    new/0:List<DynMetaObject> L!$plist
-    L@$plist  L@^Any @ cast:DynObject @.klass  .virtcall/1:Add
-    L@^ClassHOW @ cast:DynObject @.klass  L@$plist  .virtcall/1:BuildC3MRO
+      (l Cool!HOW (methodcall (l ClassHOW) new (w (clr_string Cool))))
+      (sink (methodcall (l Cool!HOW) add-super (l Any!HOW)))
+      (l !plist (rawnew List<DynMetaObject>))
+      (rawcall (l !plist) Add (getfield klass (cast DynObject (@ (l Any)))))
+      (l Cool (methodcall (l Cool!HOW) create-protoobject (w (callframe))
+         (w (l !plist))))
 
-    L@&wrap-dpmo @  F@Kernel.SubPMO wrap  L@^'Any!HOW'
-        .call/2 L!^'Sub!HOW'
-    L@&wrapped-protoobj @  L@^'Sub!HOW'  F@Kernel.SubMO wrap
-        L@^Any @ cast:DynObject @.klass wrap  .call/3 L!^Sub
+      (l !plist (rawnew List<DynMetaObject>))
+      (rawcall (l !plist) Add (getfield klass (cast DynObject (@ (l Any)))))
+      (rawcall (getfield klass (cast DynObject (@ (l ClassHOW))))
+               BuildC3MRO (l !plist))
 
-    L@&wrap-dpmo @  F@Kernel.ScalarPMO wrap  L@^'Any!HOW'
-        .call/2 L!^'Scalar!HOW'
-    L@&wrapped-protoobj @  L@^'Scalar!HOW'  F@Kernel.ScalarMO wrap
-        L@^Any @ cast:DynObject @.klass wrap  .call/3 L!^Scalar
+      (l Sub!HOW (subcall (@ (l &wrap-dpmo))
+        (w (rawsget Kernel.SubPMO)) (l Any!HOW)))
+      (l Sub (subcall (@ (l &wrapped-protoobj)) (l Sub!HOW)
+        (w (rawsget Kernel.SubMO))
+        (w (getfield klass (cast DynObject (@ (l Any)))))))
 
-    null:Variable
+      (l Scalar!HOW (subcall (@ (l &wrap-dpmo))
+        (w (rawsget Kernel.ScalarPMO)) (l Any!HOW)))
+      (l Scalar (subcall (@ (l &wrapped-protoobj)) (l Scalar!HOW)
+        (w (rawsget Kernel.ScalarMO))
+        (w (getfield klass (cast DynObject (@ (l Any)))))))
+
+      (null Variable))
 } }
 
 my class Junction is Mu { }
