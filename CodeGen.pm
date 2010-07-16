@@ -255,9 +255,13 @@ use 5.010;
     }
 
     sub lextypes {
-        my ($self, @args) = @_;
+        my ($self, %args) = @_;
         #say STDERR "lextypes: @args";
-        %{ $self->lex2type } = (%{ $self->lex2type }, @args);
+        my $body = $self->body // $self->bodies->[-1];
+        if ($body) {
+            for (keys %args) { $body->lexical->{$_} = 1 }
+        }
+        %{ $self->lex2type } = (%{ $self->lex2type }, %args);
     }
 
     sub rawlexget {

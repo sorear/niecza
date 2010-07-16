@@ -49,35 +49,35 @@ PRE-INIT {
     sub new { Q:CgOp {
         (prog
           (lextypes $pmo DynProtoMetaObject $self DynObject)
-          (lexput 0 $pmo (rawnew DynProtoMetaObject))
-          (lexput 0 $self (rawnew DynObject))
+          (l $pmo  (rawnew DynProtoMetaObject))
+          (l $self (rawnew DynObject))
 
-          (setfield how  (lexget 0 $pmo) (lexget 0 $self))
-          (setfield name (lexget 0 $pmo) (unwrap String (fetch (pos 1))))
+          (setfield how  (l $pmo) (l $self))
+          (setfield name (l $pmo) (unwrap String (@ (pos 1))))
 
-          (setindex meta-object (getfield slots (lexget 0 $self))
-            (newrwscalar (rawnew CLRImportObject (lexget 0 $pmo))))
-          (setfield klass (lexget 0 $self)
-            (getfield klass (cast DynObject (fetch (pos 0)))))
+          (setindex meta-object (getfield slots (l $self))
+            (nsw (rawnew CLRImportObject (l $pmo))))
+          (setfield klass (l $self) (getfield klass
+            (cast DynObject (@ (pos 0)))))
 
-          (newscalar (lexget 0 $self)))
+          (ns (l $self)))
     } }
 
     # $how.push-scope($outer)
     sub push-scope { Q:CgOp {
         (prog (lextypes $df List<Frame>)
-              (lexput 0 $df (getfield def_outers (unwrap DynProtoMetaObject
-                (getattr meta-object (fetch (pos 0))))))
-              (rawcall (lexget 0 $df) Add (unwrap Frame (fetch (pos 1))))
-              (wrap (arith - (int 1) (getfield Count (lexget 0 $df)))))
+              (l $df (getfield def_outers (unwrap DynProtoMetaObject
+                (getattr meta-object (@ (pos 0))))))
+              (rawcall (l $df) Add (unwrap Frame (@ (pos 1))))
+              (w (- (int 1) (getfield Count (l $df)))))
     } }
 
     # $how.add-super($how)
     sub add-super { Q:CgOp { (prog
         (rawcall
           (getfield superclasses (unwrap DynProtoMetaObject
-            (getattr meta-object (fetch (pos 0))))) Add
-          (unwrap DynProtoMetaObject (getattr meta-object (fetch (pos 1)))))
+            (getattr meta-object (@ (pos 0))))) Add
+          (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 1)))))
         (null Variable))
     } }
 
@@ -175,7 +175,7 @@ PRE-INIT {
     sub wrap-dpmo { Q:CgOp {
         (prog
           (lextypes $ch Variable $dp DynProtoMetaObject)
-          (lexput 0 $ch (methodcall (scopedlex ClassHOW) new
+          (lexput 0 $ch (methodcall (l ClassHOW) new
             (wrap (clr_string ""))))
           (lexput 0 $dp (unwrap DynProtoMetaObject (fetch (pos 0))))
 

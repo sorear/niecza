@@ -550,10 +550,24 @@ sub cgexp__S_quote { my ($cl, $M) = @_;
     $M->{_ast} = $M->{quote}{_ast}->text;
 }
 
+my %opshortcut = (
+    '@',   [ 'fetch' ],
+    'l',   [ 'scopedlex' ],
+    'w',   [ 'wrap' ],
+    'ns',  [ 'newscalar' ],
+    'nsw', [ 'newrwscalar' ],
+    '==',  [ 'compare', '==' ], '!=',  [ 'compare', '!=' ],
+    '>=',  [ 'compare', '>=' ], '<=',  [ 'compare', '<=' ],
+    '<',   [ 'compare', '<' ],  '>',   [ 'compare', '>' ],
+    '+',   [ 'arith', '+' ],    '-',   [ 'arith', '-' ],
+    '*',   [ 'arith', '*' ],    '/',   [ 'arith', '/' ],
+);
+
 sub cgexp__S_op { my ($cl, $M) = @_;
     no strict 'refs';
-    $M->{_ast} = &{'CgOp::' . $M->{cgopname}{_ast}}(
-        map { $_->{_ast} } @{ $M->{cgexp} });
+    my $l = $M->{cgopname}{_ast};
+    my ($op, @p) = @{ $opshortcut{$l} // [ $l ] };
+    $M->{_ast} = &{"CgOp::$op"}(@p, map { $_->{_ast} } @{ $M->{cgexp} });
 }
 
 sub voidmark { my ($cl, $M) = @_;
