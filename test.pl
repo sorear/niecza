@@ -213,8 +213,7 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
 {
     sub accum() {
         anon sub go() {
-            state $x;
-            START { $x = 0; }
+            state $x = 0;
             $x++;
         }
     }

@@ -290,6 +290,11 @@ use CgOp;
     extends 'Op';
 
     has name => (isa => 'Str', is => 'ro', required => 1);
+    has state_decl => (isa => 'Bool', is => 'ro', default => 0);
+
+    sub paren {
+        Op::Lexical->new(name => shift()->name);
+    }
 
     sub code {
         my ($self, $body) = @_;

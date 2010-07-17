@@ -212,9 +212,19 @@ sub INFIX { my ($cl, $M) = @_;
             positionals => \@r, splittable_parcel => 1);
         return;
     }
+
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => "&infix:<$s>"),
         positionals => [ $l, $r ]);
+
+    if ($s eq '=' && $l->isa('Op::Lexical') && $l->state_decl) {
+        # Assignments (and assign metaops, but we don't do that yet) to has
+        # and state declarators are rewritten into an appropriate phaser
+        my $assigned = $cl->statevar;
+        $M->{_ast} = Op::StatementList->new(children => [
+            Op::Start->new(condvar => $assigned, body => $M->{_ast}),
+            Op::Lexical->new(name => $l->name)]);
+    }
 }
 
 sub CHAIN { my ($cl, $M) = @_;
