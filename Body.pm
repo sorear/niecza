@@ -109,10 +109,14 @@ use CgOp ();
 
     around enter_code => sub {
         my ($o, $self) = @_;
-        CgOp::prog(
-            CgOp::share_lex('!scopenum'),
-            $self->makeproto,
-            $o->($self));
+        if ($self->mainline) {
+            $o->($self);
+        } else {
+            CgOp::prog(
+                CgOp::share_lex('!scopenum'),
+                $self->makeproto,
+                $o->($self));
+        }
     };
 
     around preinit_code => sub {

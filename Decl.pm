@@ -41,7 +41,7 @@ use CgOp;
     sub enter_code {
         my ($self, $body) = @_;
         !$self->has_var ? CgOp::noop :
-            $self->shared ? CgOp::share_lex($self->var) :
+            ($self->shared || $body->mainline) ? CgOp::share_lex($self->var) :
             CgOp::copy_lex($self->var);
     }
 
@@ -76,8 +76,10 @@ use CgOp;
     }
 
     sub enter_code {
-        my ($self, $cg, $body) = @_;
-        CgOp::clone_lex($self->var);
+        my ($self, $body) = @_;
+        $body->mainline ?
+            CgOp::share_lex($self->var) :
+            CgOp::clone_lex($self->var);
     }
 
     sub write {
@@ -111,7 +113,9 @@ use CgOp;
     sub enter_code {
         my ($self, $body) = @_;
 
-        CgOp::copy_lex($self->slot);
+        $body->mainline ?
+            CgOp::share_lex($self->slot) :
+            CgOp::copy_lex($self->slot);
     }
 
     sub write {
@@ -170,8 +174,10 @@ use CgOp;
     }
 
     sub enter_code {
-        my ($self, $cg, $body) = @_;
-        CgOp::clone_lex('!mainline');
+        my ($self, $body) = @_;
+        $body->mainline ?
+            CgOp::share_lex('!mainline') :
+            CgOp::clone_lex('!mainline');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -239,7 +245,11 @@ use CgOp;
             CgOp::share_lex($self->var . '!HOW'),
             ($self->stub ?
                 CgOp::share_lex($self->var) :
-                CgOp::clone_lex($self->var . '!BODY')));
+                ($body->mainline ?
+                    CgOp::prog(
+                        CgOp::share_lex($self->var . '!BODY'),
+                        CgOp::share_lex($self->var)) :
+                    CgOp::clone_lex($self->var . '!BODY'))));
     }
 
     sub write   {

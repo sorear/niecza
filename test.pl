@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 62;
+plan 63;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -224,4 +224,11 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
     ok $f() == 0, "state variables can be initialized";
     ok $f() == 1, "state variables preserve values";
     ok $g() == 0, "different clones have different state vars";
+}
+
+{
+    my $x;
+    my $unclonable-sub = PRE-INIT { sub () { $x } };
+    $x = 42;
+    ok $unclonable-sub() == 42, "mainlines are not cloned";
 }
