@@ -257,6 +257,14 @@ sub POSTFIX { my ($cl, $M) = @_;
             receiver => $M->{arg}{_ast},
             name => $op->{name},
             positionals => $op->{args} // []);
+    } elsif ($op->{postcall}) {
+        if (@{ $op->{postcall} } > 1) {
+            $M->sorry("Slicels NYI");
+            return;
+        }
+        $M->{_ast} = Op::CallSub->new(
+            invocant => $M->{arg}{_ast},
+            positionals => ($op->{postcall}[0] // []));
     } else {
         $M->sorry("Unhandled postop type");
     }
@@ -279,14 +287,18 @@ sub postfix { }
 sub postfix__S_ANY { }
 
 sub postcircumfix { }
+sub postcircumfix__S_Paren_Thesis { my ($cl, $M) = @_;
+    $M->{_ast} = { postcall => $M->{semiarglist}{_ast} };
+}
 
 sub postop { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{sym};
+    $M->{_ast} = $M->{postcircumfix} ? $M->{postcircumfix}{_ast} :
+        { postfix => $M->{sym} };
 }
 sub POST { my ($cl, $M) = @_;
     $M->{_ast} = $M->{dotty}{_ast} if $M->{dotty};
     $M->{_ast} = $M->{privop}{_ast} if $M->{privop};
-    $M->{_ast} = { postfix => $M->{postop}{_ast} } if $M->{postop};
+    $M->{_ast} = $M->{postop}{_ast} if $M->{postop};
 }
 
 sub PRE { }
@@ -717,7 +729,9 @@ sub arglist { my ($cl, $M) = @_;
     $M->sorry("Invocant handling is NYI") if $::INVOCANT_IS;
     my $x = $M->{EXPR}{_ast};
 
-    if ($x && $x->isa('Op::CallSub') && $x->splittable_parcel) {
+    if (!defined $x) {
+        $M->{_ast} = [];
+    } elsif ($x && $x->isa('Op::CallSub') && $x->splittable_parcel) {
         $M->{_ast} = $x->positionals;
     } else {
         $M->{_ast} = [$x];

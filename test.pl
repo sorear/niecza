@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 53;
+plan 59;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -193,5 +193,20 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
         $z++;
     }
     ok $x eq '12313131231313', "START blocks reset on clone";
+}
+
+{
+    my $x = sub () { 5 };
+    ok $x() == 5, 'Anonymous functions can be called';
+
+    sub const($y) { sub { $y } }
+
+    my $z = const(42);
+    ok $z, "subs are true";
+    ok $z() == 42, "subs close over lexicals";
+    my $w = const(81);
+    ok !($w === $z), "sub returns different values in different clonings";
+    ok $w() == 81, "new sub captures new values";
+    ok $z() == 42, "old sub keeps old value";
 }
 
