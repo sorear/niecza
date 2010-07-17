@@ -408,4 +408,4 @@ PRE-INIT {
         });
 }
 
-YOU_ARE_HERE;
+{YOU_ARE_HERE}

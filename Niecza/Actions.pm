@@ -443,13 +443,6 @@ sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
     $M->{_ast} = Op::Yada->new(kind => '???');
 }
 
-sub term__S_YOU_ARE_HERE { my ($cl, $M) = @_;
-    push @{ $::CURLEX->{'!decls'} //= [] },
-        Decl::RunMainline->new;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '!mainline'));
-}
-
 sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
     if ($M->{twigil}[0]) {
@@ -598,7 +591,16 @@ sub quotepair {}
 # We can't do much at blockoid reduce time because the context is unknown.
 # Roles and subs need somewhat different code gen
 sub blockoid { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{statementlist}{_ast};
+    # XXX horrible cheat, but my data structures aren't up to the task of
+    # $::UNIT being a class body &c.
+    if ($M->Str eq '{YOU_ARE_HERE}') {
+        push @{ $::CURLEX->{'!decls'} //= [] },
+            Decl::RunMainline->new;
+        $M->{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '!mainline'));
+    } else {
+        $M->{_ast} = $M->{statementlist}{_ast};
+    }
 }
 
 sub sigil {}
