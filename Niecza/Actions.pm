@@ -187,7 +187,7 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->block_to_immediate($M->{pblock}{_ast});
+    $M->{_ast} = $cl->block_to_immediate('bare', $M->{pblock}{_ast});
 }
 
 sub infixish { my ($cl, $M) = @_;
@@ -793,27 +793,27 @@ sub semilist { my ($cl, $M) = @_;
 sub statement_control { }
 sub statement_control__S_if { my ($cl, $M) = @_;
     my $else = $M->{else}[0] ?
-        $cl->block_to_immediate($M->{else}[0]{_ast}) : undef;
+        $cl->block_to_immediate('cond', $M->{else}[0]{_ast}) : undef;
     my @elsif;
     for (reverse @{ $M->{elsif} }) {
         $else = Op::Conditional->new(check => $_->{_ast}[0],
-            true => $cl->block_to_immediate($_->{_ast}[1]),
+            true => $cl->block_to_immediate('cond', $_->{_ast}[1]),
             false => $else);
     }
     $M->{_ast} = Op::Conditional->new(check => $M->{xblock}{_ast}[0],
-        true => $cl->block_to_immediate($M->{xblock}{_ast}[1]),
+        true => $cl->block_to_immediate('cond', $M->{xblock}{_ast}[1]),
         false => $else);
 }
 
 sub statement_control__S_while { my ($cl, $M) = @_;
     $M->{_ast} = Op::WhileLoop->new(check => $M->{xblock}{_ast}[0],
-        body => $cl->block_to_immediate($M->{xblock}{_ast}[1]),
+        body => $cl->block_to_immediate('loop',$M->{xblock}{_ast}[1]),
         until => 0, once => 0);
 }
 
 sub statement_control__S_until { my ($cl, $M) = @_;
     $M->{_ast} = Op::WhileLoop->new(check => $M->{xblock}{_ast}[0],
-        body => $cl->block_to_immediate($M->{xblock}{_ast}[1]),
+        body => $cl->block_to_immediate('loop', $M->{xblock}{_ast}[1]),
         until => 1, once => 0);
 }
 
@@ -853,6 +853,7 @@ sub package_def { my ($cl, $M) = @_;
         $cl->blockcheck;
         my $cbody = Body::Class->new(
             name    => $name,
+            type    => 'class',
             decls   => ($::CURLEX->{'!decls'} // []),
             enter   => ($::CURLEX->{'!enter'} // []),
             lexical => ($::CURLEX->{'!slots'} // {}),
@@ -938,7 +939,7 @@ sub blockcheck { my ($cl) = @_;
     }
 }
 
-sub sl_to_block { my ($cl, $ast, %args) = @_;
+sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     my $subname = $args{subname} // 'ANON';
     if ($args{signature}) {
         for ($args{signature}->used_slots) {
@@ -949,6 +950,7 @@ sub sl_to_block { my ($cl, $ast, %args) = @_;
     $cl->blockcheck;
     Body->new(
         name      => $subname,
+        type      => $type,
         $args{bare} ? () : (
             decls   => ($::CURLEX->{'!decls'} // []),
             enter   => ($::CURLEX->{'!enter'} // []),
@@ -961,7 +963,8 @@ sub get_outer { my ($cl, $pad) = @_;
     $STD::ALL->{ $pad->{'OUTER::'}[0] };
 }
 
-sub block_to_immediate { my ($cl, $blk) = @_;
+sub block_to_immediate { my ($cl, $type, $blk) = @_;
+    $blk->type($type);
     Op::CallSub->new(
         invocant => $cl->block_to_closure(0, $blk),
         positionals => []);
@@ -1007,7 +1010,7 @@ sub routine_def { my ($cl, $M) = @_;
     my $m = $dln ? $cl->mangle_longname($dln) : undef;
 
     $M->{_ast} = $cl->block_to_closure(1,
-            $cl->sl_to_block(
+            $cl->sl_to_block('sub',
                 $M->{blockoid}{_ast},
                 subname => $m,
                 signature => ($M->{multisig}[0] ? $M->{multisig}[0]{_ast} : undef)),
@@ -1041,7 +1044,7 @@ sub method_def { my ($cl, $M) = @_;
         return;
     }
 
-    my $bl = $cl->sl_to_block($M->{blockoid}{_ast},
+    my $bl = $cl->sl_to_block('sub', $M->{blockoid}{_ast},
         subname => $name,
         signature => ($M->{multisig}[0] ?
             $M->{multisig}[0]{_ast}->for_method : undef));
@@ -1056,13 +1059,13 @@ sub method_def { my ($cl, $M) = @_;
 }
 
 sub block { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->sl_to_block($M->{blockoid}{_ast});
+    $M->{_ast} = $cl->sl_to_block('', $M->{blockoid}{_ast});
 }
 
 # :: Body
 sub pblock { my ($cl, $M) = @_;
     my $rw = $M->{lambda} && $M->{lambda}->Str eq '<->';
-    $M->{_ast} = $cl->sl_to_block($M->{blockoid}{_ast},
+    $M->{_ast} = $cl->sl_to_block('', $M->{blockoid}{_ast},
         signature => ($M->{signature} ? $M->{signature}{_ast} : undef));
 }
 
@@ -1085,6 +1088,7 @@ sub statement_prefix {}
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 
+    $M->{blast}{_ast}->type('phaser');
     push @{ $::CURLEX->{'!decls'} //= [] },
         Decl::PreInit->new(var => $var, code => $M->{blast}{_ast}, shared => 1);
 
@@ -1095,11 +1099,11 @@ sub statement_prefix__S_START { my ($cl, $M) = @_;
     my $var = $cl->statevar;
 
     $M->{_ast} = Op::Start->new(condvar => $var, body =>
-        $cl->block_to_immediate($M->{blast}{_ast}));
+        $cl->block_to_immediate('phaser', $M->{blast}{_ast}));
 }
 
 sub comp_unit { my ($cl, $M) = @_;
-    my $body = $cl->sl_to_block($M->{statementlist}{_ast},
+    my $body = $cl->sl_to_block('mainline', $M->{statementlist}{_ast},
         subname => 'mainline');
 
     $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME,

@@ -18,6 +18,29 @@ use CgOp ();
     has code      => (isa => 'CodeGen', is => 'ro', init_arg => undef,
         lazy => 1, builder => 'gen_code');
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
+    has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
+        builder => 'is_mainline');
+    # currently used types are phaser, loop, cond, class, mainline, bare, sub
+    # also '' for incorrectly contextualized {p,x,}block, blast
+    has type      => (isa => 'Str', is => 'rw');
+
+    sub is_mainline {
+        my $self = shift;
+
+        if ($self->type && $self->type eq 'mainline') {
+            return 1;
+        }
+
+        if (!($self->type) || !($self->outer)) {
+            die "Critical phase error";
+        }
+
+        if ($self->type eq 'bare' || $self->type eq 'class') {
+            return $self->outer->mainline;
+        } else {
+            return 0;
+        }
+    }
 
     sub gen_code {
         my ($self) = @_;
