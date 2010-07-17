@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 49;
+plan 53;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -148,3 +148,50 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
     ok Foo.pie eq 'A', "can call methods through self";
     ok Bar.pie eq 'C', "calls through self are virtual";
 }
+
+{
+    my $x = 0;
+    {
+        START { $x = 1 };
+        ok $x, "START blocks are run";
+    }
+}
+
+{
+    my $x = '';
+    {
+        $x = $x ~ '1';
+        START { $x = $x ~ '2'; }
+        $x = $x ~ '3';
+    }
+    ok $x eq '123', "START blocks are run in order with other code";
+}
+
+{
+    my $x = '';
+    my $y = 0;
+    while $y < 3 {
+        $x = $x ~ '1';
+        START { $x = $x ~ '2'; }
+        $x = $x ~ '3';
+        $y++;
+    }
+    ok $x eq '1231313', "START blocks are only run once";
+}
+
+{
+    my $x = '';
+    my $z = 0;
+    while $z < 2 {
+        my $y = 0;
+        while $y < 3 {
+            $x = $x ~ '1';
+            START { $x = $x ~ '2'; }
+            $x = $x ~ '3';
+            $y++;
+        }
+        $z++;
+    }
+    ok $x eq '12313131231313', "START blocks reset on clone";
+}
+

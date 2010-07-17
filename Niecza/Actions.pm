@@ -882,6 +882,21 @@ sub routine_declarator__S_method { my ($cl, $M) = @_;
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
 
+sub statevar { my ($cl) = @_;
+    my $var = $cl->gensym;
+    my $blk = $::CURLEX;
+
+    # the top block only runs once, and in any case we can't hack $*SETTING
+    if ($blk != $::UNIT) {
+        $blk = $cl->get_outer($blk);
+    }
+
+    push @{ $blk->{'!decls'} //= [] },
+        Decl::SimpleVar->new(slot => $var);
+
+    $var;
+}
+
 sub blockcheck { my ($cl) = @_;
     for my $d (@{ $::CURLEX->{'!decls'} // [] }) {
         for my $sl ($d->used_slots) {
@@ -1041,6 +1056,13 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
         Decl::PreInit->new(var => $var, code => $M->{blast}{_ast}, shared => 1);
 
     $M->{_ast} = Op::Lexical->new(name => $var);
+}
+
+sub statement_prefix__S_START { my ($cl, $M) = @_;
+    my $var = $cl->statevar;
+
+    $M->{_ast} = Op::Start->new(condvar => $var, body =>
+        $cl->block_to_immediate($M->{blast}{_ast}));
 }
 
 sub comp_unit { my ($cl, $M) = @_;

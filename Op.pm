@@ -218,6 +218,35 @@ use CgOp;
     no Moose;
 }
 
+# only for state $x will start and START{} in void context, yet
+{
+    package Op::Start;
+    use Moose;
+    extends 'Op';
+
+    # possibly should use a raw boolean somehow
+    has condvar => (isa => 'Str', is => 'ro', required => 1);
+    has body => (isa => 'Op', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+
+        CgOp::ternary(
+            CgOp::unbox('Boolean',
+                CgOp::fetch(
+                    CgOp::methodcall(CgOp::scopedlex($self->condvar), "Bool"))),
+            CgOp::wrap(CgOp::null('object')),
+            CgOp::prog(
+                CgOp::assign(CgOp::scopedlex($self->condvar),
+                    CgOp::box('Bool', CgOp::bool(1))),
+                $self->body->code($body)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+
 {
     package Op::Num;
     use Moose;
