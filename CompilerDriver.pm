@@ -88,6 +88,7 @@ public class EntryPoint {
 
     public static void Main() {
         Kernel.MainlineContinuation = new DynBlockDelegate(Mainline.BOOT);
+        Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
         Frame root_f = new Frame(null, null,
                 new DynBlockDelegate(START));
         Frame current = root_f;

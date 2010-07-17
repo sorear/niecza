@@ -468,6 +468,8 @@ blocked:
         public static readonly DynProtoMetaObject ScalarPMO;
         public static readonly IP6 DieSub;
 
+        public static bool TraceCont;
+
         public static IP6 MakeSub(DynBlockDelegate code, Frame proto,
                 Frame outer) {
             DynObject n = new DynObject();
