@@ -8,6 +8,7 @@ use CgOp;
     package Decl;
     use Moose;
 
+    sub used_slots   { }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
     sub write        {}
@@ -24,6 +25,11 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', predicate => 'has_var');
     has code   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
+
+    sub used_slots {
+        my ($self) = @_;
+        return $self->has_var ? ($self->var) : ();
+    }
 
     sub preinit_code {
         my ($self, $body) = @_;
@@ -57,6 +63,10 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
+    sub used_slots {
+        return $_[0]->var;
+    }
+
     sub preinit_code {
         my ($self, $body) = @_;
         $self->code->outer($body);
@@ -87,6 +97,10 @@ use CgOp;
 
     has slot => (isa => 'Str', is => 'ro', required => 1);
 
+    sub used_slots {
+        return $_[0]->slot;
+    }
+
     sub preinit_code {
         my ($self, $body) = @_;
 
@@ -112,6 +126,8 @@ use CgOp;
     package Decl::RunMainline;
     use Moose;
     extends 'Decl';
+
+    sub used_slots { '!mainline' }
 
     sub preinit_code {
         my ($self, $body) = @_;
@@ -149,6 +165,15 @@ use CgOp;
     # lexical scope.  but instead of just a Sub, it constructs a ClassHOW at
     # preinit
     has body => (is => 'ro', isa => 'Body::Class');
+
+    sub used_slots {
+        my ($self) = @_;
+        if ($self->stub) {
+            ($self->var, $self->var . '!HOW');
+        } else {
+            ($self->var, $self->var . '!HOW', $self->var . '!BODY');
+        }
+    }
 
     sub preinit_code {
         my ($self, $body) = @_;

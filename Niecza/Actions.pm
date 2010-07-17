@@ -424,7 +424,6 @@ sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
 sub term__S_YOU_ARE_HERE { my ($cl, $M) = @_;
     push @{ $::CURLEX->{'!decls'} //= [] },
         Decl::RunMainline->new;
-    $::CURLEX->{'!slots'}{'!mainline'} = 1;
     $M->{_ast} = Op::CallSub->new(
         invocant => Op::Lexical->new(name => '!mainline'));
 }
@@ -667,7 +666,6 @@ sub variable_declarator { my ($cl, $M) = @_;
         $slot = $cl->gensym;
     }
 
-    $::CURLEX->{'!slots'}{$slot} = 1;
     push @{ $::CURLEX->{'!decls'} //= [] },
         Decl::SimpleVar->new(slot => $slot);
 
@@ -804,9 +802,6 @@ sub package_def { my ($cl, $M) = @_;
     my $outer = $cl->get_outer($::CURLEX);
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
     if (!$M->{decl}{stub}) {
-        $outer->{'!slots'}{$outervar} = 1;
-        $outer->{'!slots'}{"$outervar!HOW"} = 1;
-        $outer->{'!slots'}{"$outervar!BODY"} = 1;
 
         my $stmts = $M->{statementlist} // $M->{blockoid};
         unshift @{ $::CURLEX->{'!decls'} //= [] },
@@ -822,6 +817,7 @@ sub package_def { my ($cl, $M) = @_;
                 Decl::Super->new(name => 'Any');
         }
 
+        $cl->blockcheck;
         my $cbody = Body::Class->new(
             name    => $name,
             decls   => ($::CURLEX->{'!decls'} // []),
@@ -839,8 +835,6 @@ sub package_def { my ($cl, $M) = @_;
                     invocant => Op::Lexical->new(name => $outervar . '!BODY')),
                 Op::Lexical->new(name => $outervar)]);
     } else {
-        $outer->{'!slots'}{$outervar} = 1;
-        $outer->{'!slots'}{"$outervar!HOW"} = 1;
 
         push @{ $outer->{'!decls'} //= [] }, Decl::Class->new(
             name    => $name,
@@ -888,15 +882,23 @@ sub routine_declarator__S_method { my ($cl, $M) = @_;
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
 
+sub blockcheck { my ($cl) = @_;
+    for my $d (@{ $::CURLEX->{'!decls'} // [] }) {
+        for my $sl ($d->used_slots) {
+            $::CURLEX->{'!slots'}{$sl} = 1;
+        }
+    }
+}
+
 sub sl_to_block { my ($cl, $ast, %args) = @_;
     my $subname = $args{subname} // 'ANON';
     if ($args{signature}) {
         for ($args{signature}->used_slots) {
             push @{ $::CURLEX->{'!decls'} //= [] },
                 Decl::SimpleVar->new(slot => $_);
-            $::CURLEX->{'!slots'}{$_} = 1;
         }
     }
+    $cl->blockcheck;
     Body->new(
         name      => $subname,
         $args{bare} ? () : (
@@ -920,8 +922,6 @@ sub block_to_immediate { my ($cl, $blk) = @_;
 sub block_to_closure { my ($cl, $uplevel, $blk, %args) = @_;
     my $outer = $uplevel ? $cl->get_outer($::CURLEX) : $::CURLEX;
     my $outer_key = $args{outer_key} // $cl->gensym;
-
-    $outer->{'!slots'}{$outer_key} = 1 if $outer;
 
     unless ($args{stub}) {
         push @{ $outer->{'!decls'} //= [] },
@@ -1037,7 +1037,6 @@ sub statement_prefix {}
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 
-    $::CURLEX->{'!slots'}{$var} = 1;
     push @{ $::CURLEX->{'!decls'} //= [] },
         Decl::PreInit->new(var => $var, code => $M->{blast}{_ast}, shared => 1);
 
