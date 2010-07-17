@@ -123,6 +123,32 @@ use CgOp;
 }
 
 {
+    package Decl::StateVar;
+    use Moose;
+    extends 'Decl';
+
+    has slot    => (isa => 'Str', is => 'ro', required => 1);
+    has backing => (isa => 'Str', is => 'ro', required => 1);
+
+    sub used_slots {
+        return $_[0]->slot;
+    }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+        CgOp::proto_var($self->slot, CgOp::scopedlex($self->backing));
+    }
+
+    sub enter_code {
+        my ($self, $body) = @_;
+        CgOp::scopedlex($self->slot, CgOp::scopedlex($self->backing));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::RunMainline;
     use Moose;
     extends 'Decl';

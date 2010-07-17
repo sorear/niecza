@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 59;
+plan 62;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -210,3 +210,19 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
     ok $z() == 42, "old sub keeps old value";
 }
 
+{
+    sub accum() {
+        anon sub go() {
+            state $x;
+            START { $x = 0; }
+            $x++;
+        }
+    }
+
+    my $f = accum;
+    my $g = accum;
+
+    ok $f() == 0, "state variables can be initialized";
+    ok $f() == 1, "state variables preserve values";
+    ok $g() == 0, "different clones have different state vars";
+}

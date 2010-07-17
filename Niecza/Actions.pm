@@ -655,7 +655,8 @@ sub variable_declarator { my ($cl, $M) = @_;
         return;
     }
 
-    my $slot = $M->{variable}{_ast}{decl_slot};
+    my $name = $M->{variable}{_ast}{decl_slot};
+    my $slot = $name;
 
     if (!$slot) {
         $M->sorry("Cannot apply a declarator to a non-simple variable");
@@ -669,7 +670,7 @@ sub variable_declarator { my ($cl, $M) = @_;
         return;
     }
 
-    if ($scope eq 'has' || $scope eq 'our' || $scope eq 'state') {
+    if ($scope eq 'has' || $scope eq 'our') {
         $M->sorry("Unsupported scope $scope for simple variable");
         return;
     }
@@ -678,10 +679,18 @@ sub variable_declarator { my ($cl, $M) = @_;
         $slot = $cl->gensym;
     }
 
-    push @{ $::CURLEX->{'!decls'} //= [] },
-        Decl::SimpleVar->new(slot => $slot);
+    if ($scope eq 'state') {
+        my $ts = $cl->statevar;
+        push @{ $::CURLEX->{'!decls'} //= [] },
+            Decl::StateVar->new(backing => $ts, slot => $slot);
 
-    $M->{_ast} = Op::Lexical->new(name => $slot);
+        $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1);
+    } else {
+        push @{ $::CURLEX->{'!decls'} //= [] },
+            Decl::SimpleVar->new(slot => $slot);
+
+        $M->{_ast} = Op::Lexical->new(name => $slot);
+    }
 }
 
 sub package_declarator {}
