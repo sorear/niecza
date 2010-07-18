@@ -192,11 +192,7 @@ use CgOp;
     has var  => (is => 'ro', isa => 'Str', required => 1);
     has stub => (is => 'ro', isa => 'Bool', default => 0);
     has parents => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
-
-    # the body is a very sublike thing; it has a preinit existance, and a
-    # lexical scope.  but instead of just a Sub, it constructs a ClassHOW at
-    # preinit
-    has body => (is => 'ro', isa => 'Body::Class');
+    has body => (is => 'ro', isa => 'Body');
 
     sub used_slots {
         my ($self) = @_;
@@ -217,7 +213,6 @@ use CgOp;
         }
 
         $self->body->outer($body);
-        $self->body->var($self->var);
 
         CgOp::with_aux("how",
             CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
@@ -232,30 +227,25 @@ use CgOp;
 
             CgOp::proto_var($self->var . '!BODY',
                 CgOp::newscalar(
-                    CgOp::protosub($self->body,
-                        CgOp::proto_var('!scopenum',
-                            CgOp::methodcall(CgOp::aux('how'),
-                                "push-scope",
-                                CgOp::wrap(CgOp::callframe)))))));
+                    CgOp::protosub($self->body))),
+            CgOp::scopedlex($self->var,
+                CgOp::methodcall(CgOp::aux("how"), "create-protoobject")));
     }
 
     sub enter_code {
         my ($self, $body) = @_;
         CgOp::prog(
             CgOp::share_lex($self->var . '!HOW'),
-            ($self->stub ?
-                CgOp::share_lex($self->var) :
+            CgOp::share_lex($self->var),
+            ($self->stub ? () :
                 ($body->mainline ?
-                    CgOp::prog(
-                        CgOp::share_lex($self->var . '!BODY'),
-                        CgOp::share_lex($self->var)) :
+                    CgOp::share_lex($self->var . '!BODY') :
                     CgOp::clone_lex($self->var . '!BODY'))));
     }
 
     sub write   {
         my ($self, $body) = @_;
         return unless $self->body;
-        $self->body->var($self->var);
         $self->body->outer($body);
         $self->body->write;
     }
@@ -274,14 +264,13 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        if (!$body->isa('Body::Class')) {
+        if ($body->type ne 'class') {
             #TODO: Make this a sorry.
             die "Tried to set a method outside a class!";
         }
         CgOp::sink(
-            CgOp::methodcall(CgOp::aux("how"), "add-scoped-method",
+            CgOp::methodcall(CgOp::aux("how"), "add-method",
                 CgOp::wrap(CgOp::clr_string($self->name)),
-                CgOp::scopedlex('!scopenum'),
                 CgOp::scopedlex($self->var)));
     }
 
@@ -298,14 +287,10 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        if (!$body->isa('Body::Class')) {
+        if ($body->type ne 'class') {
             #TODO: Make this a sorry.
-            die "Tried to set a superclass outside a class!";
+            die "Tried to set a superclass outside an initial class!";
         }
-        if ($body->augmenting) {
-            die "Cannot add superclasses in an augment";
-        }
-        push @{ $body->super }, $self->name;
 
         CgOp::sink(
             CgOp::methodcall(CgOp::aux('how'), "add-super",

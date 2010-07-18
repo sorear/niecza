@@ -231,6 +231,11 @@ place (using augment or supercede) will require more than one OUTER::; the main
 clone sets up the first OUTER, subsequent ones set up by the runtime
 manifestation of augments.
 
+=head2 Death of NIL
+
+Due to persistant stack issues, NIL is no more.  Instead, use CgOp, which is
+a Lisp-like presentation of the low level optree.
+
 =head1 Brief overview of the compiler
 
 User runs C<niecza.exe>.  Entry point is in C<Niecza::Compiler>, the driver.

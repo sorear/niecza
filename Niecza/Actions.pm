@@ -852,14 +852,8 @@ sub package_def { my ($cl, $M) = @_;
                 Decl::Super->new(name => 'Any');
         }
 
-        $cl->blockcheck;
-        my $cbody = Body::Class->new(
-            name    => $name,
-            type    => 'class',
-            decls   => ($::CURLEX->{'!decls'} // []),
-            enter   => ($::CURLEX->{'!enter'} // []),
-            lexical => ($::CURLEX->{'!slots'} // {}),
-            do      => $stmts->{_ast});
+        my $cbody = $cl->sl_to_block('class', $stmts->{_ast},
+            name => $name);
         my $cdecl = Decl::Class->new(
             name    => $name,
             var     => $outervar,

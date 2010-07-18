@@ -139,57 +139,40 @@ namespace Niecza {
 
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
-    public class DynProtoMetaObject {
-        public struct Method {
-            public Method(DynBlockDelegate code, Frame proto, int outer_index) {
-                this.code  = code;
-                this.proto = proto;
-                this.outer_index = outer_index;
-            }
-            public DynBlockDelegate code;
-            public Frame proto;
-            public int outer_index;
-        }
-
+    public class DynMetaObject {
         public IP6 how;
+        public IP6 typeObject;
         public string name;
-
-        public InvokeHandler OnInvoke;
-        public FetchHandler OnFetch;
-        public StoreHandler OnStore;
-
-        public List<DynProtoMetaObject> superclasses
-            = new List<DynProtoMetaObject>();
-        public Dictionary<string, Method> local
-            = new Dictionary<string, Method>();
-
-        public List<Frame> def_outers = new List<Frame>();
 
         public delegate Frame InvokeHandler(DynObject th, Frame c,
                 LValue[] pos, Dictionary<string, LValue> named);
         public delegate Frame FetchHandler(DynObject th, Frame c);
         public delegate Frame StoreHandler(DynObject th, Frame c, IP6 n);
-    }
 
-    public class DynMetaObject {
-        public DynProtoMetaObject proto;
-        public List<Frame> outers = new List<Frame>();
+        public InvokeHandler OnInvoke;
+        public FetchHandler OnFetch;
+        public StoreHandler OnStore;
+
+        public List<DynMetaObject> superclasses
+            = new List<DynMetaObject>();
+        public Dictionary<string, IP6> local
+            = new Dictionary<string, IP6>();
+
         public List<DynMetaObject> mro;
-        public IP6 typeObject;
 
-        public DynMetaObject(DynProtoMetaObject proto) {
-            this.proto = proto;
+        public DynMetaObject(string name) {
+            this.name = name;
             this.mro = new List<DynMetaObject>();
             mro.Add(this);
         }
 
-        public void BuildC3MRO(List<DynMetaObject> supers) {
+        public void BuildC3MRO() {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
             mro = new List<DynMetaObject>();
             toMerge.Add(new List<DynMetaObject>());
             toMerge[0].Add(this);
 
-            foreach (DynMetaObject dmo in supers) {
+            foreach (DynMetaObject dmo in superclasses) {
                 toMerge[0].Add(dmo);
                 toMerge.Add(new List<DynMetaObject>(dmo.mro));
             }
@@ -242,24 +225,20 @@ blocked:
             = new Dictionary<string, object>();
         public DynMetaObject klass;
 
+        public DynObject(DynMetaObject klass) {
+            this.klass = klass;
+        }
+
         private Frame Fail(Frame caller, string msg) {
-            return Kernel.Die(caller, msg + " in class " + klass.proto.name);
+            return Kernel.Die(caller, msg + " in class " + klass.name);
         }
 
         public Frame InvokeMethod(Frame caller, string name,
                 LValue[] pos, Dictionary<string, LValue> named) {
-            DynProtoMetaObject.Method m;
-            while (klass.outers.Count < klass.proto.def_outers.Count) {
-                klass.outers.Add(klass.proto.def_outers[klass.outers.Count]);
-            }
+            IP6 m;
             foreach (DynMetaObject k in klass.mro) {
-                if (k.proto.local.TryGetValue(name, out m)) {
-                    Frame n = new Frame(caller, k.outers[m.outer_index],
-                            m.code);
-                    n.proto = m.proto;
-                    n.pos = pos;
-                    n.named = named;
-                    return n;
+                if (k.local.TryGetValue(name, out m)) {
+                    return m.Invoke(caller, pos, named);
                 }
             }
             return Fail(caller, "Unable to resolve method " + name);
@@ -275,29 +254,29 @@ blocked:
         }
 
         public Frame HOW(Frame caller) {
-            caller.resultSlot = klass.proto.how;
+            caller.resultSlot = klass.how;
             return caller;
         }
 
         public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
-            if (klass.proto.OnInvoke != null) {
-                return klass.proto.OnInvoke(this, c, p, n);
+            if (klass.OnInvoke != null) {
+                return klass.OnInvoke(this, c, p, n);
             } else {
                 return Fail(c, "No invoke handler set");
             }
         }
 
         public Frame Fetch(Frame c) {
-            if (klass.proto.OnFetch != null) {
-                return klass.proto.OnFetch(this, c);
+            if (klass.OnFetch != null) {
+                return klass.OnFetch(this, c);
             } else {
                 return Fail(c, "No fetch handler set");
             }
         }
 
         public Frame Store(Frame c, IP6 o) {
-            if (klass.proto.OnStore != null) {
-                return klass.proto.OnStore(this, c, o);
+            if (klass.OnStore != null) {
+                return klass.OnStore(this, c, o);
             } else {
                 return Fail(c, "No store handler set");
             }
@@ -370,8 +349,7 @@ blocked:
                 case 2:
                     a = (DynObject) th.lex["s0"];
                     c = (Frame) th.resultSlot;
-                    b = new DynObject();
-                    b.klass = a.klass;
+                    b = new DynObject(a.klass);
                     b.slots = new Dictionary<string,object>(a.slots);
                     b.slots["outer"] = c;
                     th.caller.resultSlot = NewROScalar(b);
@@ -464,16 +442,13 @@ blocked:
 
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject ScalarMO;
-        public static readonly DynProtoMetaObject SubPMO;
-        public static readonly DynProtoMetaObject ScalarPMO;
         public static readonly IP6 DieSub;
 
         public static bool TraceCont;
 
         public static IP6 MakeSub(DynBlockDelegate code, Frame proto,
                 Frame outer) {
-            DynObject n = new DynObject();
-            n.klass = SubMO;
+            DynObject n = new DynObject(SubMO);
             n.slots["outer"] = outer;
             n.slots["code"] = code;
             n.slots["proto"] = proto;
@@ -481,8 +456,7 @@ blocked:
         }
 
         public static Variable BoxAny(object v, IP6 proto) {
-            DynObject n = new DynObject();
-            n.klass = ((DynObject)proto).klass;
+            DynObject n = new DynObject(((DynObject)proto).klass);
             n.slots["value"] = v;
             return NewROScalar(n);
         }
@@ -493,8 +467,7 @@ blocked:
         }
 
         public static IP6 MakeSC(IP6 inside) {
-            DynObject n = new DynObject();
-            n.klass = ScalarMO;
+            DynObject n = new DynObject(ScalarMO);
             n.slots["value"] = inside;
             return n;
         }
@@ -631,22 +604,14 @@ blocked:
         }
 
         static Kernel() {
-            SubPMO = new DynProtoMetaObject();
-            SubPMO.name = "Sub";
-            SubPMO.OnInvoke = new DynProtoMetaObject.InvokeHandler(SubInvoke);
-            SubPMO.local["clone"] = new DynProtoMetaObject.Method(
-                    new DynBlockDelegate(SubCloneC),
-                    null, 0);
-            SubPMO.def_outers.Add(null);
+            SubMO = new DynMetaObject("Sub");
+            SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
+            SubMO.local["clone"] = MakeSub(new DynBlockDelegate(SubCloneC),
+                    null, null);
 
-            SubMO = new DynMetaObject(SubPMO);
-
-            ScalarPMO = new DynProtoMetaObject();
-            ScalarPMO.name = "Scalar";
-            ScalarPMO.OnFetch = new DynProtoMetaObject.FetchHandler(SCFetch);
-            ScalarPMO.OnStore = new DynProtoMetaObject.StoreHandler(SCStore);
-
-            ScalarMO = new DynMetaObject(ScalarPMO);
+            ScalarMO = new DynMetaObject("Scalar");
+            ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
+            ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }

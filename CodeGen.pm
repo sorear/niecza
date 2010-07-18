@@ -15,24 +15,14 @@ use 5.010;
               slots        => [f => 'Dictionary<string,Object>'] },
 
         DynMetaObject =>
-            { proto        => [f => 'DynProtoMetaObject'],
-              BuildC3MRO   => [m => 'Void'],
+            { BuildC3MRO   => [m => 'Void'],
               typeObject   => [f => 'IP6'],
-              outers       => [f => 'List<Frame>'] },
-
-        DynProtoMetaObject =>
-            { how          => [f => 'IP6'],
-              local        => [f => 'Dictionary<String,DynProtoMetaObject.Method>'],
-              def_outers   => [f => 'List<Frame>'],
-              superclasses => [f => 'List<DynProtoMetaObject>'],
+              how          => [f => 'IP6'],
+              local        => [f => 'Dictionary<string,IP6>'],
+              superclasses => [f => 'List<DynMetaObject>'],
               name         => [f => 'String'] },
 
-        'List<Frame>' =>
-            { Add          => [m => 'Void'],
-              Count        => [p => 'System.Int32'] },
         'List<DynMetaObject>' =>
-            { Add          => [m => 'Void'] },
-        'List<DynProtoMetaObject>' =>
             { Add          => [m => 'Void'] },
         'Double' =>
             { ToString     => [m => 'String'] },
@@ -51,9 +41,7 @@ use 5.010;
         'Kernel.NewCaptureVar' => [m => 'Variable'],
         'Console.WriteLine'    => [m => 'Void'],
         'String.Concat'        => [m => 'String'],
-        'Kernel.SubPMO'        => [f => 'DynProtoMetaObject'],
         'Kernel.SubMO'         => [f => 'DynMetaObject'],
-        'Kernel.ScalarPMO'     => [f => 'DynProtoMetaObject'],
         'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
         'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],
         'Kernel.MakeSub'       => [m => 'IP6'],

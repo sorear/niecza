@@ -7,20 +7,8 @@ my class CORE { ... }
 # We have to do this directly due to the circularity saw.  Same
 # reason forces uncontainerized .NET values.
 #
-# ClassHOW instances are shared between lexical instantiations of a class.
-#
 # class ClassHOW {
-#     has Array[Frame] $.outers;
-#
-#     # TODO
-#     has Array[Sub] $.scoped-parents;
-#     has Array[Sub] $.scoped-roles;
-#
-#     # used to stage for composition - not yet
-#     has Dictionary[str,int] $.method-scopes;
-#     has Dictionary[str,Sub] $.methods;
-#
-#     has DynProtoMetaObject $.meta-object;
+#     has DynMetaObject $.meta-object;
 # }
 #
 # Due to concerns of screwing up composition, adding new superclasses, roles,
@@ -28,93 +16,65 @@ my class CORE { ... }
 #
 # to create a class:
 #     BEGIN my $Foo_HOW ::= ClassHOW.new("Foo");
+#     BEGIN my $Foo;
 #     BEGIN {
-#         $Foo_HOW.push-scope(callframe);
 #         $Foo_HOW.add-super(...);
 #         $Foo_HOW.add-role(...);
-#         $Foo_HOW.add-scoped-method("bar", 0, sub { ... });
+#         $Foo_HOW.add-method("bar", anon method bar { ... });
 #         $Foo_HOW.compose;
+#         $Foo ::= $Foo_HOW.create-protoobject;
 #     }
-#     my ::Foo will begin { $Foo_HOW.create-protoobject(callframe) }
-#              will enter { $Foo_HOW.create-protoobject(callframe) };
 #
 # to augment:
-#     BEGIN my $scopenum = $Foo_HOW.push-scope(callframe);
-#     BEGIN { $Foo_HOW.add-scoped-method("baz", $scopenum, sub { ... }); }
-#     Foo.^bind-outer($scopenum, callframe);
+#     BEGIN { $Foo_HOW.add-method("baz", anon method baz { ... }); }
 my class ClassHOW { ... }
 
 PRE-INIT {
     # ClassHOW.new($name) --> meta class instance
     sub new { Q:CgOp {
         (prog
-          (lextypes $pmo DynProtoMetaObject $self DynObject)
-          (l $pmo  (rawnew DynProtoMetaObject))
-          (l $self (rawnew DynObject))
+          (lextypes $mo DynMetaObject $self DynObject)
+          (l $mo   (rawnew DynMetaObject (unwrap String (@ (pos 1)))))
+          (l $self (rawnew DynObject (getfield klass
+            (cast DynObject (@ (pos 0))))))
 
-          (setfield how  (l $pmo) (l $self))
-          (setfield name (l $pmo) (unwrap String (@ (pos 1))))
-
+          (setfield how (l $mo) (l $self))
           (setindex meta-object (getfield slots (l $self))
-            (nsw (rawnew CLRImportObject (l $pmo))))
-          (setfield klass (l $self) (getfield klass
-            (cast DynObject (@ (pos 0)))))
+            (nsw (rawnew CLRImportObject (l $mo))))
 
           (ns (l $self)))
-    } }
-
-    # $how.push-scope($outer)
-    sub push-scope { Q:CgOp {
-        (prog (lextypes $df List<Frame>)
-              (l $df (getfield def_outers (unwrap DynProtoMetaObject
-                (getattr meta-object (@ (pos 0))))))
-              (rawcall (l $df) Add (unwrap Frame (@ (pos 1))))
-              (w (- (int 1) (getfield Count (l $df)))))
     } }
 
     # $how.add-super($how)
     sub add-super { Q:CgOp { (prog
         (rawcall
-          (getfield superclasses (unwrap DynProtoMetaObject
+          (getfield superclasses (unwrap DynMetaObject
             (getattr meta-object (@ (pos 0))))) Add
-          (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 1)))))
+          (unwrap DynMetaObject (getattr meta-object (@ (pos 1)))))
         (null Variable))
     } }
 
-    # $how.add-scoped-method($name, $index, $sub)
-    sub add-scoped-method { Q:CgOp {
+    # $how.add-method($name, $sub)
+    sub add-method { Q:CgOp {
         (prog
-          (lextypes $name String $index Int32 $sub DynObject
-            $mo DynProtoMetaObject)
-          (l $mo (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 0)))))
-          (l $name (unwrap String (@ (pos 1))))
-          (l $index (unwrap Int32 (@ (pos 2))))
-          (l $sub (cast DynObject (@ (pos 3))))
-
-          (lextypes $proto Frame $code DynBlockDelegate)
-          (l $code (cast DynBlockDelegate (getindex code
-            (getfield slots (l $sub)))))
-          (l $proto (cast Frame (getindex proto (getfield slots (l $sub)))))
-
-          (setindex (l $name) (getfield local (l $mo))
-            (rawnew DynProtoMetaObject.Method (l $code) (l $proto) (l $index)))
+          (setindex (unwrap String (@ (pos 1)))
+            (getfield local (unwrap DynMetaObject (getattr meta-object
+              (@ (pos 0)))))
+            (@ (pos 2)))
 
           (null Variable))
     } }
 
-    # $how.create-protoobject($callframe, $superlist)
+    # $how.create-protoobject()
     sub create-protoobject { Q:CgOp {
         (prog
-          (lextypes $p DynObject $pmo DynProtoMetaObject $mo DynMetaObject)
-          (l $p (rawnew DynObject))
-          (l $pmo (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 0)))))
-          (l $mo (rawnew DynMetaObject (l $pmo)))
+          (lextypes $p DynObject $mo DynMetaObject)
+          (l $mo (unwrap DynMetaObject (getattr meta-object (@ (pos 0)))))
+          (l $p (rawnew DynObject (l $mo)))
 
-          (rawcall (getfield outers (l $mo)) Add (unwrap Frame (@ (pos 1))))
-          (rawcall (l $mo) BuildC3MRO (unwrap List<DynMetaObject> (@ (pos 2))))
+          (rawcall (l $mo) BuildC3MRO)
 
           (setfield slots (l $p) (null Dictionary<string,object>))
-          (setfield klass (l $p) (l $mo))
           (setfield typeObject (l $mo) (l $p))
 
           (newscalar (l $p)))
@@ -124,49 +84,33 @@ PRE-INIT {
 
     Q:CgOp {
         (prog
-          (lextypes $chpmo DynProtoMetaObject $ch DynObject)
-          (lexput 0 $chpmo (rawnew DynProtoMetaObject))
-          (lexput 0 $ch (rawnew DynObject))
+          (lextypes $chmo DynMetaObject $chch Variable)
+          (l $chmo (rawnew DynMetaObject (clr_string "ClassHOW")))
+          (l $chch (ns (rawnew DynObject (l $chmo))))
 
-          (setfield how (lexget 0 $chpmo) (lexget 0 $ch))
-          (setfield name (lexget 0 $chpmo) (clr_string "ClassHOW"))
-          (setindex meta-object (getfield slots (lexget 0 '$ch'))
-                                (wrap (lexget 0 '$chpmo')))
+          (setfield how (l $chmo) (@ (l $chch)))
+          (setindex meta-object (getfield slots (cast DynObject (@ (l $chch))))
+            (w (l $chmo)))
 
-          (sink (subcall (fetch (lexget 0 &push-scope))
-                         (newscalar (lexget 0 $ch)) (wrap (callframe))))
-          (sink (subcall (fetch (lexget 0 &add-scoped-method))
-                  (newscalar (lexget 0 $ch)) (wrap (clr_string "new")) (wrap (int 0))
-                  (lexget 0 &new)))
-          (sink (subcall (fetch (lexget 0 &add-scoped-method))
-                  (newscalar (lexget 0 $ch)) (wrap (clr_string "push-scope")) (wrap (int 0))
-                  (lexget 0 &push-scope)))
-          (sink (subcall (fetch (lexget 0 &add-scoped-method))
-                  (newscalar (lexget 0 $ch)) (wrap (clr_string "add-scoped-method")) (wrap (int 0))
-                  (lexget 0 &add-scoped-method)))
-          (sink (subcall (fetch (lexget 0 &add-scoped-method))
-                  (newscalar (lexget 0 $ch)) (wrap (clr_string "add-super")) (wrap (int 0))
-                  (lexget 0 &add-super)))
-          (sink (subcall (fetch (lexget 0 &add-scoped-method))
-                  (newscalar (lexget 0 $ch)) (wrap (clr_string "compose")) (wrap (int 0))
-                  (lexget 0 &compose)))
-          (sink (subcall (fetch (lexget 0 &add-scoped-method))
-                  (newscalar (lexget 0 $ch)) (wrap (clr_string "create-protoobject")) (wrap (int 0))
-                  (lexget 0 &create-protoobject)))
+          (sink (subcall (@ (l &add-method)) (l $chch)
+            (wrap (clr_string "new")) (l &new)))
+          (sink (subcall (@ (l &add-method)) (l $chch)
+            (wrap (clr_string "add-method")) (l &add-method)))
+          (sink (subcall (@ (l &add-method)) (l $chch)
+            (wrap (clr_string "add-super")) (l &add-super)))
+          (sink (subcall (@ (l &add-method)) (l $chch)
+            (wrap (clr_string "compose")) (l &compose)))
+          (sink (subcall (@ (l &add-method)) (l $chch)
+            (wrap (clr_string "create-protoobject")) (l &create-protoobject)))
 
-          (lexput 1 ClassHOW (subcall (fetch (lexget 0 &create-protoobject))
-            (newscalar (lexget 0 $ch)) (wrap (callframe))
-            (wrap (rawnew List<DynMetaObject>))))
-
-          (setfield klass (lexget 0 $ch)
-            (getfield klass (cast DynObject (fetch (lexget 1 ClassHOW)))))
-          (lexput 1 ClassHOW!HOW (newscalar (lexget 0 $ch)))
+          (l ClassHOW (subcall (@ (l &create-protoobject)) (l $chch)))
+          (l ClassHOW!HOW (l $chch))
 
           (null Variable))
     }
 }
 
-# cannot be a normal class - it has no parents (and must not be cloned)
+# cannot be a normal class - it has no parents
 my class Mu { ... }
 my class Any { ... }
 my class Cool { ... }
@@ -174,39 +118,16 @@ my class Cool { ... }
 my class Scalar { ... }
 my class Sub { ... }
 PRE-INIT {
-    # (DynProtoMetaObject $dpmo, ClassHOW $super --> ClassHOW)
+    # (DynMetaObject $dmo, ClassHOW $super --> ClassHOW)
     sub wrap-dpmo { Q:CgOp {
         (prog
-          (lextypes $ch Variable $dp DynProtoMetaObject)
-          (lexput 0 $ch (methodcall (l ClassHOW) new
-            (wrap (clr_string ""))))
-          (lexput 0 $dp (unwrap DynProtoMetaObject (fetch (pos 0))))
+          (lextypes $ch Variable $dm DynMetaObject)
+          (l $ch (methodcall (l ClassHOW) new (w (clr_string ""))))
+          (l $dm (unwrap DynMetaObject (@ (pos 0))))
 
-          (assign (varattr meta-object (fetch (lexget 0 $ch)))
-                  (wrap (lexget 0 $dp)))
-          (sink (methodcall (lexget 0 $ch) add-super (pos 1)))
-          (lexget 0 $ch))
-    } }
-    # (ClassHOW $me, DynMetaObject $use, DynMetaObject $p --> Variable)
-    sub wrapped-protoobj { Q:CgOp {
-        (prog
-          (lextypes $p DynObject $pmo DynProtoMetaObject $mo DynMetaObject
-            $s List<DynMetaObject>)
-          (l $p (rawnew DynObject))
-          (l $pmo (unwrap DynProtoMetaObject (getattr meta-object (@ (pos 0)))))
-          (l $mo (unwrap DynMetaObject (@ (pos 1))))
-
-          (l $s (rawnew List<DynMetaObject>))
-          (rawcall (l $s) Add (unwrap DynMetaObject (@ (pos 2))))
-          (rawcall (l $mo) BuildC3MRO (l $s))
-
-          (setfield how (l $pmo) (@ (pos 0)))
-
-          (setfield slots (l $p) (null Dictionary<string,object>))
-          (setfield typeObject (l $mo) (l $p))
-          (setfield klass (l $p) (l $mo))
-
-          (newscalar (l $p)))
+          (assign (varattr meta-object (@ (l $ch))) (w (l $dm)))
+          (sink (methodcall (l $ch) add-super (pos 1)))
+          (l $ch))
     } }
 
 Q:CgOp {
@@ -214,40 +135,26 @@ Q:CgOp {
       (lextypes !plist List<DynMetaObject>)
 
       (l Mu!HOW (methodcall (l ClassHOW) new (w (clr_string Mu))))
-      (l !plist (rawnew List<DynMetaObject>))
-      (l Mu (methodcall (l Mu!HOW) create-protoobject (w (callframe))
-          (w (l !plist))))
+      (l Mu (methodcall (l Mu!HOW) create-protoobject))
 
       (l Any!HOW (methodcall (l ClassHOW) new (w (clr_string Any))))
       (sink (methodcall (l Any!HOW) add-super (l Mu!HOW)))
-      (l !plist (rawnew List<DynMetaObject>))
-      (rawcall (l !plist) Add (getfield klass (cast DynObject (@ (l Mu)))))
-      (l Any (methodcall (l Any!HOW) create-protoobject (w (callframe))
-         (w (l !plist))))
+      (l Any (methodcall (l Any!HOW) create-protoobject))
 
       (l Cool!HOW (methodcall (l ClassHOW) new (w (clr_string Cool))))
       (sink (methodcall (l Cool!HOW) add-super (l Any!HOW)))
-      (l !plist (rawnew List<DynMetaObject>))
-      (rawcall (l !plist) Add (getfield klass (cast DynObject (@ (l Any)))))
-      (l Cool (methodcall (l Cool!HOW) create-protoobject (w (callframe))
-         (w (l !plist))))
+      (l Cool (methodcall (l Cool!HOW) create-protoobject))
 
-      (l !plist (rawnew List<DynMetaObject>))
-      (rawcall (l !plist) Add (getfield klass (cast DynObject (@ (l Any)))))
-      (rawcall (getfield klass (cast DynObject (@ (l ClassHOW))))
-               BuildC3MRO (l !plist))
+      (sink (methodcall (l ClassHOW!HOW) add-super (l Any!HOW)))
+      (rawcall (getfield klass (cast DynObject (@ (l ClassHOW)))) BuildC3MRO)
 
       (l Sub!HOW (subcall (@ (l &wrap-dpmo))
-        (w (rawsget Kernel.SubPMO)) (l Any!HOW)))
-      (l Sub (subcall (@ (l &wrapped-protoobj)) (l Sub!HOW)
-        (w (rawsget Kernel.SubMO))
-        (w (getfield klass (cast DynObject (@ (l Any)))))))
+        (w (rawsget Kernel.SubMO)) (l Any!HOW)))
+      (l Sub (methodcall (l Sub!HOW) create-protoobject))
 
       (l Scalar!HOW (subcall (@ (l &wrap-dpmo))
-        (w (rawsget Kernel.ScalarPMO)) (l Any!HOW)))
-      (l Scalar (subcall (@ (l &wrapped-protoobj)) (l Scalar!HOW)
-        (w (rawsget Kernel.ScalarMO))
-        (w (getfield klass (cast DynObject (@ (l Any)))))))
+        (w (rawsget Kernel.ScalarMO)) (l Any!HOW)))
+      (l Scalar (methodcall (l Scalar!HOW) create-protoobject))
 
       (null Variable))
 } }
@@ -386,19 +293,18 @@ sub infix:<===>($l,$r) { Q:CgOp {
 # no MONKEY_TYPING.
 
 PRE-INIT {
-    my $i := Mu.HOW.push-scope(Q:CgOp { (wrap (callframe)) });
-    Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "defined")) }, $i,
+    Mu.HOW.add-method(Q:CgOp { (wrap (clr_string "defined")) },
         anon method defined() {
-            Q:CgOp { (box Bool (compare != (null Dictionary<string,object>)
-                (getfield slots (cast DynObject (fetch (scopedlex self)))))) }
+            Q:CgOp { (box Bool (!= (null Dictionary<string,object>)
+                (getfield slots (cast DynObject (@ (l self)))))) }
         });
-    Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "Bool")) }, $i,
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "Bool")) },
         anon method Bool() { self.defined });
-    Mu.HOW.add-scoped-method(Q:CgOp { (wrap (clr_string "Str")) }, $i,
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "Str")) },
         anon method Str() {
             my $tn := Q:CgOp {
-                (box Str (getfield name (getfield proto (getfield klass
-                    (cast DynObject (fetch (scopedlex self)))))))
+                (box Str (getfield name (getfield klass
+                    (cast DynObject (fetch (scopedlex self))))))
             };
             if self.defined {
                 $tn ~ "()<instance>"
