@@ -150,6 +150,11 @@ sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         $M->{_ast} = $M->{EXPR}{_ast};
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
+        # XXX We don't interpret the code, so we can't tell if it's actually
+        # using variables, but still, it probably is.
+        for my $k (keys %$::CURLEX) {
+            $::CURLEX->{$k}{used} = 1 if $k =~ /^[\@\%\&\$]\w/;
+        }
         $M->{_ast} = Op::CgOp->new(op => $M->{cgexp}{_ast});
     } else {
         # garden variety nibbler
