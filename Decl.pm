@@ -190,6 +190,7 @@ use CgOp;
 
     has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
     has var  => (is => 'ro', isa => 'Str', required => 1);
+    has bodyvar => (is => 'ro', isa => 'Str');
     has stub => (is => 'ro', isa => 'Bool', default => 0);
     has parents => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
     has body => (is => 'ro', isa => 'Body');
@@ -199,7 +200,7 @@ use CgOp;
         if ($self->stub) {
             ($self->var, $self->var . '!HOW');
         } else {
-            ($self->var, $self->var . '!HOW', $self->var . '!BODY');
+            ($self->var, $self->var . '!HOW', $self->bodyvar);
         }
     }
 
@@ -225,7 +226,7 @@ use CgOp;
             # a BEGIN.
             CgOp::proto_var($self->var, CgOp::null('Variable')),
 
-            CgOp::proto_var($self->var . '!BODY',
+            CgOp::proto_var($self->bodyvar,
                 CgOp::newscalar(
                     CgOp::protosub($self->body))),
             CgOp::scopedlex($self->var,
@@ -239,8 +240,8 @@ use CgOp;
             CgOp::share_lex($self->var),
             ($self->stub ? () :
                 ($body->mainline ?
-                    CgOp::share_lex($self->var . '!BODY') :
-                    CgOp::clone_lex($self->var . '!BODY'))));
+                    CgOp::share_lex($self->bodyvar) :
+                    CgOp::clone_lex($self->bodyvar))));
     }
 
     sub write   {

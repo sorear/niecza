@@ -819,26 +819,28 @@ sub statement_control__S_until { my ($cl, $M) = @_;
         until => 1, once => 0);
 }
 
+# All package defs have a couple things in common - a special-ish block,
+# with a special decl, and some nice runtimey code
 sub package_def { my ($cl, $M) = @_;
-    if ($::PKGDECL ne 'class') {
-        $M->sorry('Non-class package definitions are not yet supported');
-        return;
-    }
     my $scope = $::SCOPE;
     if (!$M->{longname}[0]) {
         $scope = 'anon';
     }
     if ($::SCOPE ne 'anon' && $::SCOPE ne 'my') {
-        $M->sorry('Non-lexical class definitions are not yet supported');
+        $M->sorry('Non-lexical package definitions are not yet supported');
         return;
     }
     my $name = $M->{longname}[0] ?
         $cl->mangle_longname($M->{longname}[0]) : 'ANON';
     my $outer = $cl->get_outer($::CURLEX);
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
-    if (!$M->{decl}{stub}) {
 
-        my $stmts = $M->{statementlist} // $M->{blockoid};
+    my $decltype = 'Decl::' . ucfirst $::PKGDECL;
+    my $blocktype = $::PKGDECL;
+    my $bodyvar = $cl->gensym;
+
+    if (($blocktype eq 'class' || $blocktype eq 'grammar')
+            && !$M->{decl}{stub}) {
         unshift @{ $::CURLEX->{'!decls'} //= [] },
             map { $_->{_ast} } @{ $M->{trait} };
 
@@ -849,29 +851,33 @@ sub package_def { my ($cl, $M) = @_;
             }
 
             push @{ $::CURLEX->{'!decls'} //= [] },
-                Decl::Super->new(name => 'Any');
+                Decl::Super->new(name => ($blocktype eq 'grammar' ?
+                        'Cursor' : 'Any'));
         }
+    }
 
-        my $cbody = $cl->sl_to_block('class', $stmts->{_ast},
+    if (!$M->{decl}{stub}) {
+        my $stmts = $M->{statementlist} // $M->{blockoid};
+
+        my $cbody = $cl->sl_to_block($blocktype, $stmts->{_ast},
             name => $name);
-        my $cdecl = Decl::Class->new(
+        my $cdecl = $decltype->new(
             name    => $name,
             var     => $outervar,
+            bodyvar => $bodyvar,
             body    => $cbody);
         push @{ $outer->{'!decls'} //= [] }, $cdecl;
         $M->{_ast} = Op::StatementList->new(
             children => [
                 Op::CallSub->new(
-                    invocant => Op::Lexical->new(name => $outervar . '!BODY')),
+                    invocant => Op::Lexical->new(name => $bodyvar)),
                 Op::Lexical->new(name => $outervar)]);
     } else {
-
-        push @{ $outer->{'!decls'} //= [] }, Decl::Class->new(
+        push @{ $outer->{'!decls'} //= [] }, $decltype->new(
             name    => $name,
             var     => $outervar,
             stub    => 1);
-
-        #XXX: What should this return?
+        # XXX return what?
     }
 }
 
