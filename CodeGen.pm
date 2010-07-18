@@ -16,6 +16,7 @@ use 5.010;
 
         DynMetaObject =>
             { BuildC3MRO   => [m => 'Void'],
+              HasMRO       => [m => 'Boolean'],
               typeObject   => [f => 'IP6'],
               how          => [f => 'IP6'],
               local        => [f => 'Dictionary<string,IP6>'],

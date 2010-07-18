@@ -312,6 +312,14 @@ PRE-INIT {
                 $tn ~ "()"
             }
         });
+
+    ClassHOW.HOW.add-method(Q:CgOp { (w (clr_string "isa")) },
+        anon method isa($obj, $type) { Q:CgOp {
+            (box Bool (rawcall (getfield klass (cast DynObject (@ (l $obj))))
+              HasMRO (getfield klass (cast DynObject (@ (l $type))))))
+        } });
+    ClassHOW.HOW.add-method(Q:CgOp { (w (clr_string "does")) },
+        anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
 }
 
 {YOU_ARE_HERE}

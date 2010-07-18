@@ -159,16 +159,25 @@ namespace Niecza {
             = new Dictionary<string, IP6>();
 
         public List<DynMetaObject> mro;
+        public HashSet<DynMetaObject> isa;
 
         public DynMetaObject(string name) {
             this.name = name;
             this.mro = new List<DynMetaObject>();
             mro.Add(this);
+
+            isa = new HashSet<DynMetaObject>();
+            isa.Add(this);
+        }
+
+        public bool HasMRO(DynMetaObject m) {
+            return isa.Contains(m);
         }
 
         public void BuildC3MRO() {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
             mro = new List<DynMetaObject>();
+            isa = new HashSet<DynMetaObject>();
             toMerge.Add(new List<DynMetaObject>());
             toMerge[0].Add(this);
 
@@ -198,6 +207,7 @@ top:
                     // no reason not to immediately put this, and by loop
                     // order the C3 condition is kept
                     mro.Add(cand);
+                    isa.Add(cand);
                     foreach (List<DynMetaObject> l in toMerge) {
                         l.Remove(cand);
                     }

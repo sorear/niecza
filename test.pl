@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 63;
+plan 72;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -232,3 +232,21 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
     $x = 42;
     ok $unclonable-sub() == 42, "mainlines are not cloned";
 }
+
+{
+    my class A { }
+    my class B is A { }
+    my class C is B { }
+
+    ok A.^isa(Any), "a new class is Any";
+    ok B.^isa(A), "a subclass is the superclass";
+    ok C.^isa(A), "isa is transitive";
+    ok !(A.^isa(B)), "a superclass is not the subclass";
+
+    ok B.^does(A), "a subclass does the superclass";
+    ok !(A.^does(B)), "a superclass not-does the subclass";
+}
+
+ok "Foo".^isa(Str), "strings are Str";
+ok (?1).^isa(Bool), "booleans are Bool";
+ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
