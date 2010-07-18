@@ -111,6 +111,29 @@ use CgOp;
     no Moose;
 }
 
+# or maybe we should provide Op::Let and let Actions do the desugaring?
+{
+    package Op::CallMetaMethod;
+    use Moose;
+    extends 'Op';
+
+    has receiver    => (isa => 'Op', is => 'ro', required => 1);
+    has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
+        default => sub { [] });
+    has name        => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::let($self->receiver->code($body), 'Variable', sub {
+            CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
+                $self->name, $_[0], map { $_->code($body) }
+                    @{ $self->positionals })});
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 {
     package Op::Interrogative;
     use Moose;

@@ -267,6 +267,11 @@ sub POSTFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::Interrogative->new(
             receiver => $M->{arg}{_ast},
             name => $op->{name});
+    } elsif ($op->{metamethod}) {
+        $M->{_ast} = Op::CallMetaMethod->new(
+            receiver => $M->{arg}{_ast},
+            name => $op->{metamethod},
+            positionals => $op->{args} // []);
     } elsif ($op->{name}) {
         $M->{_ast} = Op::CallMethod->new(
             receiver => $M->{arg}{_ast},
@@ -347,6 +352,15 @@ sub privop { my ($cl, $M) = @_;
 sub dotty { }
 sub dotty__S_Dot { my ($cl, $M) = @_;
     $M->{_ast} = $M->{dottyop}{_ast};
+}
+
+sub dotty__S_DotStar { my ($cl, $M) = @_;
+    if ($M->{sym} eq '.^' && $M->{dottyop}{_ast}{name}) {
+        $M->{_ast} = { metamethod => $M->{dottyop}{_ast}{name},
+                       args => $M->{dottyop}{_ast}{args} };
+    } else {
+        $M->sorry('NYI dottyop form ' . $M->{sym});
+    }
 }
 
 sub coloncircumfix { my ($cl, $M) = @_;

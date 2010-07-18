@@ -337,6 +337,16 @@ use warnings;
             check => $_[2],
             body  => $_[3]);
     }
+
+    my $nextlet = 0;
+    sub let {
+        my ($head, $type, $bodyf) = @_;
+        my $v = 'let!' . ($nextlet++);
+        my $body = $bodyf->(nil([rawlexget => $v, 0 ]));
+
+        nil(lextypes($v,$type), $head, [ rawlexput => $v, 0 ], $body,
+            null($type), [ rawlexput => $v, 0 ]);
+    }
 }
 
 1;
