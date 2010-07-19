@@ -38,10 +38,9 @@ namespace Niecza {
     // and STORE as a method to the container.
     //
     // List->scalar context: create a simple container holding the list's
-    // object, but .item.  Read only.
+    // object, but !islist.  Read only.
     //
-    // Scalar->list: call .list or something to get a suitable list object.
-    // Bind it same rwness.
+    // Scalar->list: bind islist, must be Iterable. Bind it same rwness.
     public struct LValue {
         public IP6 container;
         public bool rw;
@@ -62,8 +61,7 @@ namespace Niecza {
     // Variables also have type constraints, that's how %foo and @foo differ...
     public class Variable {
         public enum Context {
-            // @foo: binds listy lvalues; calls .list on other stuff and uses
-            // the result
+            // @foo: binds listy lvalues
             List,
             // $foo: binds scalary lvalues; wraps other stuff in a container
             Scalar,
@@ -483,19 +481,14 @@ blocked:
         }
 
         private static Frame BindListizeC(Frame th) {
-            LValue rhs;
             switch (th.ip) {
                 case 0:
-                    rhs = (LValue) th.lex["o"];
                     th.ip = 1;
-                    return rhs.container.InvokeMethod(th, "list",
-                            new LValue[1] { rhs }, null);
+                    return Fetch(th, new Variable(false,
+                                Variable.Context.Scalar, (LValue) th.lex["o"]));
                 case 1:
-                    rhs = ((Variable) th.resultSlot).lv;
-                    if (!rhs.islist) {
-                        throw new Exception(".list didn't do its job and returned a scalar!");
-                    }
-                    ((Variable)th.lex["c"]).lv = rhs;
+                    ((Variable)th.lex["c"]).lv.container = (IP6) th.resultSlot;
+                    ((Variable)th.lex["c"]).lv.islist = true;
                     return th.caller;
                 default:
                     throw new Exception("IP invalid");
