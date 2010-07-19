@@ -1133,7 +1133,7 @@ sub blast { my ($cl, $M) = @_;
 
 sub statement_prefix {}
 sub statement_prefix__S_do { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{blast}{_ast}{do};
+    $M->{_ast} = $cl->block_to_immediate('do', $M->{blast}{_ast});
 }
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
