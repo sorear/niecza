@@ -254,7 +254,9 @@ sub infix:<< != >>($l,$r) { Q:CgOp {
 sub say($str) { Q:CgOp {
     (prog (rawscall Console.WriteLine
             (unbox String (fetch (methodcall (scopedlex $str) Str))))
-          (null Variable))
+          (null Variable)
+          (box Bool (bool 1))
+    )
 } }
 
 sub infix:<=> { Q:CgOp { (prog (assign (pos 0) (pos 1)) (pos 0)) } }
