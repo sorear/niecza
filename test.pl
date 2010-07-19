@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 82;
+plan 85;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -264,4 +264,11 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok (2 andthen "three") eq "three", '2 andthen three -> three';
     ok (12 || 34) == 12, '12 || 34 -> 34';
     ok (0 || 34) == 34, '0 || 34 -> 34';
+}
+
+{
+    my $x = 42;
+    ok (do $x) == 42, "do <statement> sees a lexical";
+    ok (do { $x }) == 42, "do <block> sees a lexical";
+    ok (do { my $x = 42; $x }) == 42, "do <block> sees a new lexical";
 }
