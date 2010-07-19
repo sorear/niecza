@@ -323,9 +323,6 @@ PRE-INIT {
         anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
 }
 
-# I think this really wants to be a macro
-sub infix:<&&>($, $) { }
-
 # boxes a List<Variable>
 my class LLArray {
     method push($x) { $x }

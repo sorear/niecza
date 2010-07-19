@@ -244,13 +244,25 @@ sub CHAIN { my ($cl, $M) = @_;
         positionals => [ $M->{chain}[0]{_ast}, $M->{chain}[2]{_ast} ]);
 }
 
+my %loose2tight = (
+    '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
+    'orelse' => '//', 'and' => '&&', 'or' => '||',
+);
 sub LIST { my ($cl, $M) = @_;
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&infix:<' . $M->{delims}[0]{sym} . '>'),
-        positionals => [ grep { defined } map { $_->{_ast} } @{ $M->{list} } ],
-        splittable_parcel => ($M->{delims}[0]{sym} eq ','));
+    my $op  = $M->{delims}[0]{sym};
+    my @pos = grep { defined } map { $_->{_ast} } @{ $M->{list} };
+
+    if ($loose2tight{$op}) {
+        $M->{_ast} = Op::ShortCircuit->new(kind => $loose2tight{$op},
+            args => \@pos);
+    } else {
+        $M->{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => "&infix:<$op>"),
+            positionals => \@pos,
+            splittable_parcel => ($op eq ','));
+    }
 }
 
 sub POSTFIX { my ($cl, $M) = @_;

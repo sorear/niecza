@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 72;
+plan 82;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -250,3 +250,18 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
 ok "Foo".^isa(Str), "strings are Str";
 ok (?1).^isa(Bool), "booleans are Bool";
 ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
+
+{
+    my $canary = 1;
+
+    ok 1 || ($canary = 0), "1 || ? returns true";
+    ok $canary, "without touching the rhs";
+    ok !(0 && ($canary = 0)), "0 && ? returns false";
+    ok $canary, "without touching the rhs";
+    ok (0 // ($canary = 0)) eq '0', "0 // ? returns 0";
+    ok $canary, "without touching the rhs";
+    ok (12 && 34) == 34, "12 && 34 -> 34";
+    ok (2 andthen "three") eq "three", '2 andthen three -> three';
+    ok (12 || 34) == 12, '12 || 34 -> 34';
+    ok (0 || 34) == 34, '0 || 34 -> 34';
+}

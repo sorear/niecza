@@ -190,6 +190,54 @@ use CgOp;
 }
 
 {
+    package Op::ShortCircuit;
+    use Moose;
+    extends 'Op';
+
+    has kind => (isa => 'Str', is => 'ro', required => 1);
+    has args => (isa => 'ArrayRef', is => 'ro', required => 1);
+
+    sub red2 {
+        my ($self, $sym, $o2) = @_;
+        given ($self->kind) {
+            when ("&&") {
+                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                        CgOp::methodcall($sym, 'Bool'))), $o2, $sym);
+            }
+            when ("||") {
+                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                        CgOp::methodcall($sym, 'Bool'))), $sym, $o2);
+            }
+            when ("andthen") {
+                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                        CgOp::methodcall($sym, 'defined'))), $o2, $sym);
+            }
+            when ("//") {
+                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                        CgOp::methodcall($sym, 'defined'))), $sym, $o2);
+            }
+            default {
+                die "That's not a sensible short circuit, now is it?";
+            }
+        }
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        my @r = reverse @{ $self->args };
+        my $acc = (shift @r)->code($body);
+
+        for (@r) {
+            $acc = CgOp::let($_->code($body), 'Variable',
+                sub { $self->red2($_[0], $acc) });
+        }
+
+        $acc;
+    }
+}
+
+{
     package Op::StringLiteral;
     use Moose;
     extends 'Op';
