@@ -323,4 +323,58 @@ PRE-INIT {
         anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
 }
 
+# I think this really wants to be a macro
+sub infix:<&&>($, $) { }
+
+# boxes a List<Variable>
+my class LLArray {
+    method push($x) { $x }
+    method shift() { }
+    method unshift($x) { $x }
+    method first-flattens() { }
+}
+
+my class Iterator {
+    # has $.valid
+    # has $.value
+    # has $.next
+
+    # subclasses must provide .validate
+    method valid() { $!valid }
+    method value() { $!value }
+    method next()  { $!next  }
+}
+
+my class EMPTY { }
+
+my class List is Cool {
+    # low level, so not declared yet
+    # @!items @!rest $!flat
+    method fill($nr) {
+        my $i = $!items;
+        my $r = $!rest;
+        while $i.elems < $nr && $r {
+            if $!flat && $r.first-flattens {
+                $r.unshift($r.shift.iterator);
+            } else {
+                my $v := $r.shift;
+
+                if $v.^isa(EMPTY) {
+                    # Discard summarily
+                } elsif $v.^isa(Iterator) {
+                    if ! $v.valid {
+                        $v.validate;
+                    }
+                    # we can't push anything onto items because it might be
+                    # EMPTY
+                    $r.unshift($v.value);
+                    $r.unshift($v.next);
+                } else {
+                    $i.push($v);
+                }
+            }
+        }
+    }
+}
+
 {YOU_ARE_HERE}
