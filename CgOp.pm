@@ -166,6 +166,10 @@ use warnings;
         rawscall('Kernel.NewRWScalar', $_[0]);
     }
 
+    sub newrwlistvar {
+        rawscall('Kernel.NewRWListVar', $_[0]);
+    }
+
     sub string_var {
         box('Str', clr_string($_[0]));
     }

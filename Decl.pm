@@ -98,6 +98,7 @@ use CgOp;
     extends 'Decl';
 
     has slot => (isa => 'Str', is => 'ro', required => 1);
+    has list => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
         return $_[0]->slot;
@@ -106,8 +107,13 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::proto_var($self->slot,
-            CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
+        if ($self->list) {
+            CgOp::proto_var($self->slot,
+                CgOp::newrwlistvar(CgOp::fetch(CgOp::scopedlex('Any'))));
+        } else {
+            CgOp::proto_var($self->slot,
+                CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
+        }
     }
 
     sub enter_code {

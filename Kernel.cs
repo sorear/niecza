@@ -606,6 +606,16 @@ blocked:
                     new LValue(true, true, container));
         }
 
+        public static Frame SlurpyHelper(Frame th, int from) {
+            List<Variable> lv = new List<Variable>();
+            for (int i = from; i < th.pos.Length; i++) {
+                lv.Add(new Variable(false, Variable.Context.Scalar,
+                            th.pos[i]));
+            }
+            th.resultSlot = lv;
+            return th;
+        }
+
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);

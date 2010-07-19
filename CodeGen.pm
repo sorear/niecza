@@ -39,14 +39,13 @@ use 5.010;
         'CLRImportObject' =>
             { val          => [f => 'Object'] },
 
+        'Kernel.SlurpyHelper'  => [c => 'List<Variable>'],
         'Kernel.Bind'          => [c => 'Void'],
         'Kernel.Assign'        => [c => 'Void'],
         'Kernel.Fetch'         => [c => 'IP6'],
         'Kernel.NewROScalar'   => [m => 'Variable'],
         'Kernel.NewRWScalar'   => [m => 'Variable'],
         'Kernel.NewRWListVar'  => [m => 'Variable'],
-        'Kernel.NewWeakScalar' => [m => 'Variable'],
-        'Kernel.NewCaptureVar' => [m => 'Variable'],
         'Console.WriteLine'    => [m => 'Void'],
         'String.Concat'        => [m => 'String'],
         'Kernel.SubMO'         => [f => 'DynMetaObject'],

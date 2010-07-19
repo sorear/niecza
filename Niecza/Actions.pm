@@ -513,12 +513,14 @@ sub param_var { my ($cl, $M) = @_;
         $M->sorry('Sub-signatures NYI');
         return;
     }
-    if ($M->{twigil}[0] || ($M->{sigil}->Str ne '$')) {
+    my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]->Str : '';
+    my $sigil = $M->{sigil}->Str;
+    if ($twigil || ($sigil ne '$' && $sigil ne '@')) {
         $M->sorry('Non bare scalar targets NYI');
         return;
     }
-    $M->{_ast} = Sig::Target->new(slot =>
-        $M->{name}[0] ? ('$' . $M->{name}[0]->Str) : undef);
+    $M->{_ast} = Sig::Target->new(list => ($sigil eq '@'), slot =>
+        $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef);
 }
 
 # :: Sig::Parameter
@@ -548,12 +550,13 @@ sub parameter { my ($cl, $M) = @_;
         return;
     }
 
-    if ($M->{quant} ne '' || $M->{kind} ne '!') {
+    if ($M->{quant} ne '*' && ($M->{quant} ne '' || $M->{kind} ne '!')) {
         $M->sorry('Exotic parameters NYI');
         return;
     }
 
-    $M->{_ast} = Sig::Parameter->new(target => $M->{param_var}{_ast});
+    $M->{_ast} = Sig::Parameter->new(target => $M->{param_var}{_ast},
+        slurpy => ($M->{quant} eq '*'));
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -991,7 +994,7 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     if ($args{signature}) {
         for ($args{signature}->used_slots) {
             push @{ $::CURLEX->{'!decls'} //= [] },
-                Decl::SimpleVar->new(slot => $_);
+                Decl::SimpleVar->new(slot => $_->[0], list => $_->[1]);
         }
     }
     $cl->blockcheck;

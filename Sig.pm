@@ -7,10 +7,11 @@ use 5.010;
     use Moose;
 
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
+    has list => (is => 'ro', isa => 'Bool', default => 0);
 
     sub used_slots {
         my $self = shift;
-        if ($self->slot) { ($self->slot) } else { () }
+        if ($self->slot) { [ $self->slot, $self->list ] } else { () }
     }
 
     sub binder {
@@ -33,11 +34,30 @@ use 5.010;
 
     has target => (is => 'ro', isa => 'Sig::Target', required => 1,
         handles => [ 'used_slots' ]);
+    has slurpy => (is => 'ro', isa => 'Bool', default => 0);
 
     sub binder {
         my ($self, $ixp) = @_;
 
-        $self->target->binder(CgOp::pos($$ixp++));
+        if ($self->slurpy) {
+            $self->target->binder(
+                CgOp::let(CgOp::rawnew('DynObject', CgOp::getfield('klass',
+                            CgOp::cast('DynObject', CgOp::fetch(CgOp::scopedlex('List'))))),
+                    'DynObject', sub {
+                    my $do = shift;
+                    CgOp::prog(
+                        CgOp::setindex('flat', CgOp::getfield('slots', $do),
+                            CgOp::box('Bool', CgOp::bool(1))),
+                        CgOp::setindex('items', CgOp::getfield('slots', $do),
+                            CgOp::box('LLArray', CgOp::rawnew('List<Variable>'))),
+                        CgOp::setindex('rest', CgOp::getfield('slots', $do),
+                            CgOp::box('LLArray',
+                                CgOp::rawscall('Kernel.SlurpyHelper',
+                                    CgOp::int($$ixp)))),
+                        CgOp::newscalar($do))}));
+        } else {
+            $self->target->binder(CgOp::pos($$ixp++));
+        }
     }
 
     __PACKAGE__->meta->make_immutable;
