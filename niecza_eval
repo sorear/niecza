@@ -60,7 +60,7 @@ if (@ARGV) {
     my $term = Term::ReadLine->new('niecza');
     while (defined ($_ = $term->readline("> ")) ) {
         eval {
-            run("say do { $_ }");
+            run("say do $_");
         };
         say $@ if $@;
         $term->addhistory($_) if /\S/;
