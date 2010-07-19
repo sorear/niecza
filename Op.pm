@@ -111,6 +111,23 @@ use CgOp;
     no Moose;
 }
 
+{
+    package Op::GetSlot;
+    use Moose;
+    extends 'Op';
+
+    has object => (isa => 'Op', is => 'ro', required => 1);
+    has name   => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::varattr($self->name, CgOp::fetch($self->object->code($body)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 # or maybe we should provide Op::Let and let Actions do the desugaring?
 {
     package Op::CallMetaMethod;

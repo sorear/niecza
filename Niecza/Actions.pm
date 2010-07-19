@@ -28,6 +28,7 @@ sub AUTOLOAD {
 sub ws { }
 sub vws { }
 sub unv { }
+sub begid { }
 sub comment { }
 sub comment__S_Sharp { }
 sub spacey { }
@@ -464,19 +465,32 @@ sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
 
 sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
-    if ($M->{twigil}[0]) {
-        $M->sorry("Twigils NYI");
-        return;
-    }
+    my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
+
     if (!$M->{desigilname}) {
         $M->sorry("Non-simple variables NYI");
         return;
     }
-    my $sl = $sigil . $M->{desigilname}{_ast};
-    $M->{_ast} = {
-        term => Op::Lexical->new(name => $sl),
-        decl_slot => $sl,
-    };
+
+    my $sl = $sigil . $twigil . $M->{desigilname}{_ast};
+
+    given ($twigil) {
+        when ('!') {
+            $M->{_ast} = {
+                term => Op::GetSlot->new(name => $M->{desigilname}{_ast},
+                    object => Op::Lexical->new(name => 'self')),
+            };
+        }
+        when ('') {
+            $M->{_ast} = {
+                term => Op::Lexical->new(name => $sl),
+                decl_slot => $sl,
+            };
+        }
+        default {
+            $M->sorry("Unhandled twigil $twigil");
+        }
+    }
 }
 
 sub param_sep {}
