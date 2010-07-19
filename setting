@@ -385,7 +385,16 @@ my class List is Cool {
                 }
             }
         }
+
+        $i.elems >= $nr;
     }
+
+    method Bool() { self.fill(1) }
+    method shift() {
+        self.fill(1);
+        $!items.shift;
+    }
+    method elems() { self.fill(1000_000_000); $!items.elems; }
 }
 
 {YOU_ARE_HERE}
