@@ -323,12 +323,26 @@ PRE-INIT {
         anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
 }
 
-# boxes a List<Variable>
+# boxes a List<Variable>. SCHLIEMEL WAS HERE
 my class LLArray {
-    method push($x) { $x }
-    method shift() { }
-    method unshift($x) { $x }
-    method first-flattens() { }
+    method push($x) { Q:CgOp { (prog
+      (rawcall (unbox List<Variable> (@ (l self))) Add (l $x)) (l self)) } }
+    method shift() { Q:CgOp { (prog
+      (lextypes $f Variable $lv List<Variable>)
+      (l $lv (unbox List<Variable> (@ (l self))))
+      (l $f (getindex (int 0) (l $lv)))
+      (rawcall (l $lv) RemoveAt (int 0))
+      (l $f)) } }
+    method unshift($x) { Q:CgOp { (prog
+      (rawcall (unbox List<Variable> (@ (l self))) Insert (int 0) (l $x))
+      (l self)) } }
+    method first-flattens() { Q:CgOp {
+      (box Bool (getfield islist (getfield lv (getindex (int 0)
+        (unbox List<Variable> (@ (l self))))))) } }
+    method elems() { Q:CgOp {
+      (box Num (cast Double (getfield Count (unbox List<Variable>
+        (@ (l self)))))) } }
+    method Bool() { ?( self.elems ) }
 }
 
 my class Iterator {
