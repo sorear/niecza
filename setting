@@ -126,6 +126,7 @@ PRE-INIT {
           (l $dm (unwrap DynMetaObject (@ (pos 0))))
 
           (assign (varattr meta-object (@ (l $ch))) (w (l $dm)))
+          (setfield how (l $dm) (@ (l $ch)))
           (sink (methodcall (l $ch) add-super (pos 1)))
           (l $ch))
     } }
@@ -168,9 +169,11 @@ my class Num {
         (box Bool (compare != (double 0)
                     (unbox Double (fetch (scopedlex self)))))
     } }
+    method ACCEPTS($t) { self == $t }
 }
 my class Str {
     method Str () { self }
+    method ACCEPTS($t) { self eq $t }
 }
 my class Blob { }
 my class Char { }
@@ -192,6 +195,7 @@ my class Enum { }
 my class Bool is Enum {
     method Str() { if self { "Bool::True" } else { "Bool::False" } }
     method Bool() { self }
+    method ACCEPTS($) { self }
 }
 
 # ought to take a slurpy
@@ -290,6 +294,14 @@ sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (fetch (scopedlex $l)) (fetch (scopedlex $r))))
 } }
 
+sub infix:<~~>($t,$m) {
+    if $m.defined {
+        $m.ACCEPTS($t)
+    } else {
+        $t.^does($m)
+    }
+}
+
 # XXX: We can't use augment syntax because we don't have use working, so
 # no MONKEY_TYPING.
 
@@ -313,6 +325,19 @@ PRE-INIT {
                 $tn ~ "()"
             }
         });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "notdef")) },
+        anon method notdef() { ! self.defined });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "so")) },
+        anon method notdef() { self.Bool });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "not")) },
+        anon method notdef() { ! self.Bool });
+
+    Any.HOW.add-method(Q:CgOp { (w (clr_string "ACCEPTS")) },
+        anon method ACCEPTS($t) { self === $t });
+
+    # Should be for Block, not Sub
+    Sub.HOW.add-method(Q:CgOp { (w (clr_string "ACCEPTS")) },
+        anon method ACCEPTS($t) { (self)($t) });
 
     ClassHOW.HOW.add-method(Q:CgOp { (w (clr_string "isa")) },
         anon method isa($obj, $type) { Q:CgOp {

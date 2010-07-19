@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 85;
+plan 89;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -271,4 +271,11 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok (do $x) == 42, "do <statement> sees a lexical";
     ok (do { $x }) == 42, "do <block> sees a lexical";
     ok (do { my $x = 42; $x }) == 42, "do <block> sees a new lexical";
+}
+
+{
+    ok 42.ACCEPTS(42), "accepts can match stuff";
+    ok 12 ~~ "12", "strings match string value";
+    ok "Hi" ~~ Str, "types match identity";
+    ok (?0) ~~ (?1), "bools are a constant";
 }
