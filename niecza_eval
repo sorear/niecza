@@ -59,6 +59,7 @@ if (@ARGV) {
     require Term::ReadLine;
     my $term = Term::ReadLine->new('niecza');
     while (defined ($_ = $term->readline("> ")) ) {
+        /^\s*[^\s#]/ or next;
         eval {
             run("say do $_");
         };
