@@ -25,10 +25,17 @@ use 5.010;
 
         'List<DynMetaObject>' =>
             { Add          => [m => 'Void'] },
+        'List<Variable>' =>
+            { Add          => [m => 'Void'],
+              Insert       => [m => 'Void'],
+              RemoveAt     => [m => 'Void'],
+              Count        => [f => 'Int32'] },
         'Double' =>
             { ToString     => [m => 'String'] },
         'Variable' =>
             { lv           => [f => 'LValue'] },
+        'LValue' =>
+            { islist       => [f => 'Boolean'] },
         'CLRImportObject' =>
             { val          => [f => 'Object'] },
 
@@ -49,6 +56,24 @@ use 5.010;
         'Kernel.BoxAny'        => [m => 'Variable'],
         'Kernel.UnboxAny'      => [m => 'object'],
     );
+
+    sub _typedata {
+        my ($self, $types, @path) = @_;
+        my $cursor = \%typedata;
+        for (@path) { $cursor = $cursor->{$_}; }
+        if (!defined $cursor) {
+            die "No type data for " . join(":", @path);
+        }
+        if (index($types, $cursor->[0]) < 0) {
+            die "Expected [$types] for " . join(":", @path) . " but got " .
+                $cursor->[0];
+        }
+        if (length($types) > 1) {
+            return @$cursor;
+        } else {
+            return $cursor->[1];
+        }
+    }
 
     has name      => (isa => 'Str', is => 'ro');
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
@@ -396,7 +421,7 @@ use 5.010;
 
     sub clr_field_get {
         my ($self, $f) = @_;
-        my $ty = $typedata{$self->stacktype->[-1]}{$f}[1];
+        my $ty = $self->_typedata('f', $self->stacktype->[-1], $f);
         my $obj = $self->_pop;
         $self->_push($ty, "$obj.$f");
     }
@@ -410,7 +435,7 @@ use 5.010;
 
     sub clr_sfield_get {
         my ($self, $f) = @_;
-        my $ty = $typedata{$f}[1];
+        my $ty = $self->_typedata('f', $f);
         $self->_push($ty, "$f");
     }
 
@@ -432,9 +457,11 @@ use 5.010;
             $self->clr_string($f);
         }
         my $ix  = $self->_pop;
-        $self->stacktype->[-1] =~ /Dictionary<.*,(.*)>/
-            or die "Type inference needs more hacks";
-        my $ty = $1;
+        my $oty = $self->stacktype->[-1];
+        my $ty  = ($oty =~ /^Dictionary<.*,(.*)>$/) ? $1 :
+                  ($oty =~ /^(.*)\[\]$/) ? $1 :
+                  ($oty =~ /^List<(.*)>$/) ? $1 :
+                  die "type inference needs more hacks";
         my $obj = $self->_pop;
         $self->_push($ty, "$obj" . "[$ix]");
     }
@@ -449,18 +476,18 @@ use 5.010;
 
     sub cast {
         my ($self, $type) = @_;
-        $self->stacktype->[-1] = $type;
+        $self->_push($type, "(($type)" . $self->_pop . ")");
     }
 
     sub clr_call_direct {
         my ($self, $name, $nargs) = @_;
-        my $rt = $typedata{$name};
+        my ($cl, $rt) = $self->_typedata('cm', $name);
         my @args = reverse map { $self->_pop } 1 .. $nargs;
-        if ($rt->[0] eq 'c') {
-            $self->_cpscall(($rt->[1] eq 'Void' ? undef : $rt->[1]),
+        if ($cl eq 'c') {
+            $self->_cpscall(($rt eq 'Void' ? undef : $rt),
                 "$name(" . join(", ", "th", @args) . ")");
-        } elsif ($rt->[1] ne 'Void') {
-            $self->_push($rt->[1], "$name(" . join(", ", @args) . ")");
+        } elsif ($rt ne 'Void') {
+            $self->_push($rt, "$name(" . join(", ", @args) . ")");
         } else {
             $self->_emit("$name(" . join(", ", @args) . ")");
         }
@@ -469,13 +496,13 @@ use 5.010;
     sub clr_call_virt {
         my ($self, $name, $nargs) = @_;
         my @args = reverse map { $self->_pop } 1 .. $nargs;
-        my $rt = $typedata{$self->stacktype->[-1]}{$name};
+        my ($cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1], $name);
         my $inv = $self->_pop;
-        if ($rt->[0] eq 'c') {
-            $self->_cpscall(($rt->[1] eq 'Void' ? undef : $rt->[1]),
+        if ($cl eq 'c') {
+            $self->_cpscall(($rt eq 'Void' ? undef : $rt),
                 "$inv.$name(" . join(", ", "th", @args) . ")");
-        } elsif ($rt->[1] ne 'Void') {
-            $self->_push($rt->[1], "$inv.$name(" . join(", ", @args) . ")");
+        } elsif ($rt ne 'Void') {
+            $self->_push($rt, "$inv.$name(" . join(", ", @args) . ")");
         } else {
             $self->_emit("$inv.$name(" . join(", ", @args) . ")");
         }
