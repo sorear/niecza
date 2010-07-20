@@ -429,6 +429,25 @@ my class Iterator {
 
 my class EMPTY { }
 
+my class Parcel {
+    # $!ll
+}
+
+sub infix:<,>(*@bits) {
+    my @r := Parcel.RAWCREATE("ll", Q:CgOp { (varattr rest (@ (l @v))) });
+    @r;
+}
+
+# Maybe this should be a constant, but constants are currently forced to
+# scalar-nature (TODO)
+sub Nil {
+    state @n;
+    START {
+        @n := Parcel.RAWCREATE("ll", LLArray.new);
+    }
+    @n;
+}
+
 my class List is Cool {
     # low level, so not declared yet
     # @!items @!rest $!flat
