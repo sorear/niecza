@@ -801,11 +801,12 @@ sub variable_declarator { my ($cl, $M) = @_;
     }
 
     if ($scope eq 'state') {
-        my $ts = $cl->statevar;
+        my $ts = $cl->statevar(list => scalar ($M->{variable}->Str =~ /^\@/));
         $cl->add_decl(Decl::StateVar->new(backing => $ts, slot => $slot));
         $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1);
     } else {
-        $cl->add_decl(Decl::SimpleVar->new(slot => $slot));
+        $cl->add_decl(Decl::SimpleVar->new(slot => $slot,
+            list => scalar ($M->{variable}->Str =~ /^\@/)));
 
         $M->{_ast} = Op::Lexical->new(name => $slot);
     }
@@ -1039,7 +1040,7 @@ sub routine_declarator__S_method { my ($cl, $M) = @_;
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
 
-sub statevar { my ($cl) = @_;
+sub statevar { my ($cl, %ex) = @_;
     my $var = $cl->gensym;
     my $blk = $::CURLEX;
 
@@ -1049,7 +1050,7 @@ sub statevar { my ($cl) = @_;
     }
 
     push @{ $blk->{'!decls'} //= [] },
-        Decl::SimpleVar->new(slot => $var);
+        Decl::SimpleVar->new(slot => $var, %ex);
 
     $var;
 }
