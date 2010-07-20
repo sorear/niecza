@@ -195,6 +195,7 @@ use CgOp;
 {
     package Decl::Class;
     use Moose;
+    extends 'Decl';
 
     has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
     has var  => (is => 'ro', isa => 'Str', required => 1);
