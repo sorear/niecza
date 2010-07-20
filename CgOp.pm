@@ -1,43 +1,22 @@
 use 5.010;
-use strict;
-use warnings;
+use MooseX::Declare;
 
-
-{
-    package CgOp;
-    use Moose;
-
+class CgOp {
     has zyg => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
 
-{
-    package CgOp::Seq;
-    use Moose;
-    extends 'CgOp';
-
-    sub var_cg {
-        my ($self, $cg) = @_;
+class CgOp::Seq extends CgOp {
+    method var_cg ($cg) {
         for (@{ $self->zyg }) {
             $_->var_cg($cg);
         }
     }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
 
-{
-    package CgOp::Primitive;
-    use Moose;
-    extends 'CgOp';
-
+class CgOp::Primitive extends CgOp {
     has op  => (isa => 'ArrayRef', is => 'ro', required => 1);
 
-    sub var_cg {
-        my ($self, $cg) = @_;
+    method var_cg ($cg) {
         for (@{ $self->zyg }) {
             $_->var_cg($cg);
         }
@@ -47,18 +26,10 @@ use warnings;
         }
         $cg->$c(@o);
     }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
 
-{
-    package CgOp::Ternary;
-    use Moose;
-    extends 'CgOp';
-
-    sub var_cg {
-        my ($self, $cg) = @_;
+class CgOp::Ternary extends CgOp {
+    method var_cg ($cg) {
         my ($check, $true, $false) = @{ $self->zyg };
         my $l1 = $cg->label;
         my $l2 = $cg->label;
@@ -71,21 +42,13 @@ use warnings;
         $false->var_cg($cg);
         $cg->labelhere($l2);
     }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
 
-{
-    package CgOp::While;
-    use Moose;
-    extends 'CgOp';
-
+class CgOp::While extends CgOp {
     has once  => (is => 'ro', isa => 'Bool');
     has until => (is => 'ro', isa => 'Bool');
 
-    sub var_cg {
-        my ($self, $cg) = @_;
+    method var_cg ($cg) {
         my ($check, $body) = @{ $self->zyg };
         my $lagain = $cg->label;
         my $lcheck = $self->once ? 0 : $cg->label;
@@ -103,21 +66,13 @@ use warnings;
             $cg->cgoto($lagain);
         }
     }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
 
-{
-    package CgOp::Let;
-    use Moose;
-    extends 'CgOp';
-
+class CgOp::Let extends CgOp {
     has var  => (is => 'ro', isa => 'Str', required => 1);
     has type => (is => 'ro', isa => 'Str', required => 1);
 
-    sub var_cg {
-        my ($self, $cg) = @_;
+    method var_cg ($cg) {
 
         $cg->lextypes($self->var, $self->type);
         $self->zyg->[0]->var_cg($cg);
@@ -126,9 +81,6 @@ use warnings;
         $cg->push_null($self->type);
         $cg->rawlexput($self->var, 0);
     }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
 
 # just a bunch of smart constructors

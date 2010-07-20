@@ -1,13 +1,9 @@
-use strict;
-use warnings;
 use 5.010;
+use MooseX::Declare;
 use CodeGen ();
 use CgOp ();
 
-{
-    package Body;
-    use Moose;
-
+class Body {
     has name      => (isa => 'Str', is => 'rw', default => "anon");
     has do        => (isa => 'Op', is => 'rw');
     has enter     => (isa => 'ArrayRef[Op]', is => 'ro',
@@ -24,9 +20,7 @@ use CgOp ();
     # also '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
 
-    sub is_mainline {
-        my $self = shift;
-
+    method is_mainline () {
         if ($self->type && $self->type eq 'mainline') {
             return 1;
         }
@@ -42,16 +36,14 @@ use CgOp ();
         }
     }
 
-    sub gen_code {
-        my ($self) = @_;
+    method gen_code () {
         # TODO: Bind a return value here to catch non-ro sub use
         CodeGen->new(name => $self->name, body => $self,
             ops => CgOp::prog($self->enter_code,
                 CgOp::return($self->do->code($self))));
     }
 
-    sub enter_code {
-        my ($self) = @_;
+    method enter_code () {
         my @p;
         push @p, CgOp::lextypes(map { $_, 'Variable' }
             keys %{ $self->lexical });
@@ -61,19 +53,14 @@ use CgOp ();
         CgOp::prog(@p);
     }
 
-    sub write {
-        my ($self) = @_;
+    method write () {
         $self->code->write;
         $_->write($self) for (@{ $self->decls });
     }
 
-    sub preinit_code {
-        my ($self) = @_;
+    method preinit_code () {
         CgOp::prog(map { $_->preinit_code($self) } @{ $self->decls });
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 1;
