@@ -5,9 +5,6 @@ my class Cursor {
     method from() { $!from }
 }
 
-sub _rxstar($¢, $sub) {
-}
-
 sub _rxlazymap($cs, $sub) {
     my class LazyIterator is Iterator {
         # $!valid $!value $!next  $!fun $!back
@@ -23,7 +20,7 @@ sub _rxlazymap($cs, $sub) {
             Q:CgOp {
                 (prog
                   (setindex value (getfield slots (cast DynObject (@ (l self))))
-                    (callsub (@ (l $f)) (l $bv)))
+                    (subcall (@ (l $f)) (l $bv)))
                   (null Variable))
             };
             $!next = LazyIterator.RAWCREATE("valid", 0, "next", Any,
@@ -31,12 +28,24 @@ sub _rxlazymap($cs, $sub) {
         }
     }
 
-    List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest",
+    my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest",
         LLArray.new(LazyIterator.new("valid", 0, "value", Any, "next", Any,
             "back", $cs.iterator, "fun", $fun)));
+    @l.fill(1);
+    @l;
+}
+
+sub _rxstar($¢, $sub) {
+    _lazymap($sub($¢), sub ($¢) { _rxstar($¢, $sub) }), $¢
 }
 
 sub _rxstr($¢, $str) {
+    if $¢.from + $str.chars <= $¢.str.chars &&
+            $¢.str.substr($¢.from, $str.chars) eq $str {
+        Cursor.RAWCREATE("str", $¢.str, "from", $¢.from + $str.chars);
+    } else {
+        Nil;
+    }
 }
 
 # regex { a b* c }
