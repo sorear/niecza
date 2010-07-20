@@ -187,6 +187,20 @@ use CgOp;
     extends 'Op';
 
     has kind => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $cg, $body) = @_;
+
+        CgOp::prog(
+            CgOp::subcall(
+                CgOp::fetch(CgOp::scopedlex("&warn")),
+                CgOp::string_var(">>>Stub code executed<<<")
+            ),
+            CgOp::subcall(
+                CgOp::fetch(CgOp::scopedlex("&exit")),
+            ),
+        );
+    }
 }
 
 {

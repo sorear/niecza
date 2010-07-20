@@ -263,10 +263,23 @@ sub infix:<< != >>($l,$r) { Q:CgOp {
                           (unbox Double (fetch (scopedlex $r)))))
 } }
 
+sub warn($str) { Q:CgOp {
+    (prog [rawscall Console.Error.WriteLine
+            (unbox String (fetch (methodcall (scopedlex $str) Str))])
+          [box Bool (bool 1)]
+    )
+} }
+
 sub say($str) { Q:CgOp {
     (prog [rawscall Console.WriteLine
             (unbox String (fetch (methodcall (scopedlex $str) Str))])
           [box Bool (bool 1)]
+    )
+} }
+
+sub exit() { Q:CgOp {
+    (prog [rawscall Environment.Exit (int 0) ]
+          [null Variable]
     )
 } }
 

@@ -50,6 +50,8 @@ use 5.010;
         'Kernel.NewRWScalar'   => [m => 'Variable'],
         'Kernel.NewRWListVar'  => [m => 'Variable'],
         'Console.WriteLine'    => [m => 'Void'],
+        'Console.Error.WriteLine'    => [m => 'Void'],
+        'Environment.Exit'     => [m => 'Void'],
         'String.Concat'        => [m => 'String'],
         'Kernel.SubMO'         => [f => 'DynMetaObject'],
         'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
