@@ -313,12 +313,13 @@ use warnings;
           lexput(0, $_[0], protolget($_[0])));
     }
 
-    # this will need changing once @vars are implemented... or maybe something
-    # entirely different, I think cloning at all may be wrong
+    # the handling of @var here is quite wrong, but works for now
     sub copy_lex {
+        my ($n, $l) = @_;
         prog(
-          lextypes($_[0], 'Variable'),
-          lexput(0, $_[0], newrwscalar(fetch(protolget($_[0])))));
+          lextypes($n, 'Variable'),
+          lexput(0, $n, $l ? newrwlistvar(fetch(protolget($_[0])))
+                           : newrwscalar(fetch(protolget($_[0])))));
     }
 
     sub clone_lex {

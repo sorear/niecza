@@ -123,7 +123,7 @@ use CgOp;
 
         $body->mainline ?
             CgOp::share_lex($self->slot) :
-            CgOp::copy_lex($self->slot);
+            CgOp::copy_lex($self->slot, $self->list);
     }
 
     sub write {
