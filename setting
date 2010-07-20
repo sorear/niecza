@@ -331,6 +331,26 @@ PRE-INIT {
         anon method notdef() { self.Bool });
     Mu.HOW.add-method(Q:CgOp { (w (clr_string "not")) },
         anon method notdef() { ! self.Bool });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "RAWCREATE")) },
+        anon method RAWCREATE(*@fields) {
+            my $obj = Q:CgOp {
+                (ns (rawnew DynObject (getfield klass
+                    (cast DynObject (@ (l self))))))
+            };
+            while @fields {
+                my $name  = @fields.shift;
+                my $value = @fields.shift;
+
+                Q:CgOp {
+                    (prog
+                      (setindex (unbox String (@ (l $name)))
+                        (getfield slots (cast DynObject (@ (l $obj))))
+                        (l $value))
+                      (null Variable))
+                };
+            }
+            $obj;
+        });
 
     Any.HOW.add-method(Q:CgOp { (w (clr_string "ACCEPTS")) },
         anon method ACCEPTS($t) { self === $t });

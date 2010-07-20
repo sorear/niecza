@@ -8,6 +8,8 @@ use CgOp;
     package Decl;
     use Moose;
 
+    has zyg => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
+
     sub used_slots   { }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
@@ -302,6 +304,21 @@ use CgOp;
         CgOp::sink(
             CgOp::methodcall(CgOp::aux('how'), "add-super",
                 CgOp::scopedlex($self->name . "!HOW")));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::Regex;
+    use Moose;
+    extends 'Decl';
+
+    has slot => (is => 'ro', isa => 'Str', required => 1);
+
+    sub preinit_code {
+        my ($self, $body) = @_;
     }
 
     __PACKAGE__->meta->make_immutable;
