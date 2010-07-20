@@ -204,7 +204,9 @@ sub quant_atom_list { my ($cl, $M) = @_;
 
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
-        $M->{_ast} = RxOp::to_ops($M->{EXPR}{_ast});
+        my $slot = $cl->gensym;
+        $cl->add_decl(Decl::Regex->new(zyg => [$M->{EXPR}{_ast}], slot => $slot));
+        $M->{_ast} = Op::Lexical->new(name => $slot);
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
         # XXX We don't interpret the code, so we can't tell if it's actually
         # using variables, but still, it probably is.
@@ -691,14 +693,18 @@ sub tribble {}
 sub babble {}
 sub quotepair {}
 
+sub add_decl {
+    my ($cl, @decls) = @_;
+    push @{ $::CURLEX->{'!decls'} //= [] }, @decls;
+}
+
 # We can't do much at blockoid reduce time because the context is unknown.
 # Roles and subs need somewhat different code gen
 sub blockoid { my ($cl, $M) = @_;
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
     if ($M->Str eq '{YOU_ARE_HERE}') {
-        push @{ $::CURLEX->{'!decls'} //= [] },
-            Decl::RunMainline->new;
+        $cl->add_decl(Decl::RunMainline->new);
         $M->{_ast} = Op::CallSub->new(
             invocant => Op::Lexical->new(name => '!mainline'));
     } else {
@@ -796,13 +802,10 @@ sub variable_declarator { my ($cl, $M) = @_;
 
     if ($scope eq 'state') {
         my $ts = $cl->statevar;
-        push @{ $::CURLEX->{'!decls'} //= [] },
-            Decl::StateVar->new(backing => $ts, slot => $slot);
-
+        $cl->add_decl(Decl::StateVar->new(backing => $ts, slot => $slot));
         $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1);
     } else {
-        push @{ $::CURLEX->{'!decls'} //= [] },
-            Decl::SimpleVar->new(slot => $slot);
+        $cl->add_decl(Decl::SimpleVar->new(slot => $slot));
 
         $M->{_ast} = Op::Lexical->new(name => $slot);
     }
@@ -820,8 +823,7 @@ sub type_declarator__S_constant { my ($cl, $M) = @_;
     # This is a cheat.  Constants should be, well, constant, and we should be
     # using the phaser rewrite mechanism to get the initializer here.  XXX
     # terms need to use a context hash.
-    push @{ $::CURLEX->{'!decls'} //= [] },
-        Decl::SimpleVar->new(slot => $slot);
+    $cl->add_decl(Decl::SimpleVar->new(slot => $slot));
 
     $M->{_ast} = Op::Lexical->new(name => $slot);
 }
@@ -856,8 +858,7 @@ sub package_declarator__S_slang { my ($cl, $M) = @_;
 }
 
 sub package_declarator__S_also { my ($cl, $M) = @_;
-    push @{ $::CURLEX->{'!decls'} //= [] },
-        map { $_->{_ast} } @{ $M->{trait} };
+    $cl->add_decl(map { $_->{_ast} } @{ $M->{trait} });
 }
 
 sub termish {}
@@ -971,9 +972,8 @@ sub package_def { my ($cl, $M) = @_;
                 last AUTOANY;
             }
 
-            push @{ $::CURLEX->{'!decls'} //= [] },
-                Decl::Super->new(name => ($blocktype eq 'grammar' ?
-                        'Cursor' : 'Any'));
+            $cl->add_decl(Decl::Super->new(name => ($blocktype eq 'grammar' ?
+                    'Cursor' : 'Any')));
         }
     }
 
@@ -1066,8 +1066,8 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     my $subname = $args{subname} // 'ANON';
     if ($args{signature}) {
         for ($args{signature}->used_slots) {
-            push @{ $::CURLEX->{'!decls'} //= [] },
-                Decl::SimpleVar->new(slot => $_->[0], list => $_->[1]);
+            $cl->add_decl(Decl::SimpleVar->new(slot => $_->[0],
+                    list => $_->[1]));
         }
     }
     $cl->blockcheck;
@@ -1215,8 +1215,8 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 
     $M->{blast}{_ast}->type('phaser');
-    push @{ $::CURLEX->{'!decls'} //= [] },
-        Decl::PreInit->new(var => $var, code => $M->{blast}{_ast}, shared => 1);
+    $cl->add_decl(Decl::PreInit->new(var => $var, code => $M->{blast}{_ast},
+            shared => 1));
 
     $M->{_ast} = Op::Lexical->new(name => $var);
 }
