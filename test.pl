@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 91;
+plan 93;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -285,4 +285,9 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     constant $bar = 51;
     ok foo == 42, "constants without sigils work";
     ok $bar == 51, "constants with sigils work";
+}
+
+{
+    ok "Hello".substr(1,3) eq "ell", "substr works";
+    ok "Hello".chars == 5, ".chars works";
 }

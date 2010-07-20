@@ -38,6 +38,9 @@ use 5.010;
             { islist       => [f => 'Boolean'] },
         'CLRImportObject' =>
             { val          => [f => 'Object'] },
+        'String' =>
+            { Length       => [f => 'Int32'],
+              Substring    => [m => 'String'] },
 
         'Kernel.SlurpyHelper'  => [c => 'List<Variable>'],
         'Kernel.Bind'          => [c => 'Void'],
