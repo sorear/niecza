@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 89;
+plan 91;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -278,4 +278,11 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok 12 ~~ "12", "strings match string value";
     ok "Hi" ~~ Str, "types match identity";
     ok (?0) ~~ (?1), "bools are a constant";
+}
+
+{
+    constant foo = 42;
+    constant $bar = 51;
+    ok foo == 42, "constants without sigils work";
+    ok $bar == 51, "constants with sigils work";
 }

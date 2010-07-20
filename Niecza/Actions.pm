@@ -753,6 +753,24 @@ sub variable_declarator { my ($cl, $M) = @_;
     }
 }
 
+sub type_declarator {}
+sub type_declarator__S_constant { my ($cl, $M) = @_;
+    my $scope = $::SCOPE // 'my';
+    if (!$M->{identifier} && !$M->{variable}) {
+        $M->sorry("Anonymous constants NYI"); #wtf?
+        return;
+    }
+    my $slot  = ($M->{identifier} // $M->{variable})->Str;
+
+    # This is a cheat.  Constants should be, well, constant, and we should be
+    # using the phaser rewrite mechanism to get the initializer here.  XXX
+    # terms need to use a context hash.
+    push @{ $::CURLEX->{'!decls'} //= [] },
+        Decl::SimpleVar->new(slot => $slot);
+
+    $M->{_ast} = Op::Lexical->new(name => $slot);
+}
+
 sub package_declarator {}
 sub package_declarator__S_class { my ($cl, $M) = @_;
     $M->{_ast} = $M->{package_def}{_ast};
