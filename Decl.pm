@@ -1,80 +1,113 @@
+use strict;
+use warnings;
 use 5.010;
-use MooseX::Declare;
 
 use CgOp;
 
-class Decl {
+{
+    package Decl;
+    use Moose;
+
     has zyg => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
 
-    sub used_slots   () { }
+    sub used_slots   { }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
     sub write        {}
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::PreInit extends Decl {
+{
+    package Decl::PreInit;
+    use Moose;
+    extends 'Decl';
+
     has var    => (isa => 'Str', is => 'ro', predicate => 'has_var');
     has code   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
-    method used_slots () {
+    sub used_slots {
+        my ($self) = @_;
         return $self->has_var ? ($self->var) : ();
     }
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
         $self->code->outer($body);
         my $c = CgOp::subcall(CgOp::protosub($self->code));
         $self->has_var ? CgOp::proto_var($self->var, $c) : CgOp::sink($c);
     }
 
-    method enter_code ($body) {
+    sub enter_code {
+        my ($self, $body) = @_;
         !$self->has_var ? CgOp::noop :
             ($self->shared || $body->mainline) ? CgOp::share_lex($self->var) :
             CgOp::copy_lex($self->var);
     }
 
-    method write ($body) {
+    sub write {
+        my ($self, $body) = @_;
         $self->code->outer($body);
         $self->code->write;
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::Sub extends Decl {
+{
+    package Decl::Sub;
+    use Moose;
+    extends 'Decl';
+
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
-    method used_slots () {
-        return $self->var;
+    sub used_slots {
+        return $_[0]->var;
     }
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
         $self->code->outer($body);
 
         CgOp::proto_var($self->var, CgOp::newscalar(
                 CgOp::protosub($self->code)));
     }
 
-    method enter_code ($body) {
+    sub enter_code {
+        my ($self, $body) = @_;
         $body->mainline ?
             CgOp::share_lex($self->var) :
             CgOp::clone_lex($self->var);
     }
 
-    method write ($body) {
+    sub write {
+        my ($self, $body) = @_;
         $self->code->outer($body);
         $self->code->write;
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::SimpleVar extends Decl {
+{
+    package Decl::SimpleVar;
+    use Moose;
+    extends 'Decl';
+
     has slot => (isa => 'Str', is => 'ro', required => 1);
     has list => (isa => 'Bool', is => 'ro', default => 0);
 
-    method used_slots {
-        return $self->slot;
+    sub used_slots {
+        return $_[0]->slot;
     }
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
 
         if ($self->list) {
             CgOp::proto_var($self->slot,
@@ -85,38 +118,57 @@ class Decl::SimpleVar extends Decl {
         }
     }
 
-    method enter_code ($body) {
+    sub enter_code {
+        my ($self, $body) = @_;
 
         $body->mainline ?
             CgOp::share_lex($self->slot) :
             CgOp::copy_lex($self->slot);
     }
 
-    method write ($body) {
+    sub write {
+        my ($self, $body) = @_;
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::StateVar extends Decl {
+{
+    package Decl::StateVar;
+    use Moose;
+    extends 'Decl';
+
     has slot    => (isa => 'Str', is => 'ro', required => 1);
     has backing => (isa => 'Str', is => 'ro', required => 1);
 
-    method used_slots {
-        return $self->slot;
+    sub used_slots {
+        return $_[0]->slot;
     }
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
         CgOp::proto_var($self->slot, CgOp::scopedlex($self->backing));
     }
 
-    method enter_code ($body) {
+    sub enter_code {
+        my ($self, $body) = @_;
         CgOp::scopedlex($self->slot, CgOp::scopedlex($self->backing));
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::RunMainline extends Decl {
-    method used_slots { '!mainline' }
+{
+    package Decl::RunMainline;
+    use Moose;
+    extends 'Decl';
 
-    method preinit_code ($body) {
+    sub used_slots { '!mainline' }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
 
         # XXX ought not to have side effects here.
         $::SETTING_RESUME = $body;
@@ -129,14 +181,21 @@ class Decl::RunMainline extends Decl {
                 CgOp::newscalar(CgOp::aux('protopad'))));
     }
 
-    method enter_code ($body) {
+    sub enter_code {
+        my ($self, $body) = @_;
         $body->mainline ?
             CgOp::share_lex('!mainline') :
             CgOp::clone_lex('!mainline');
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::Class extends Decl {
+{
+    package Decl::Class;
+    use Moose;
+
     has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
     has var  => (is => 'ro', isa => 'Str', required => 1);
     has bodyvar => (is => 'ro', isa => 'Str');
@@ -144,7 +203,8 @@ class Decl::Class extends Decl {
     has parents => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
     has body => (is => 'ro', isa => 'Body');
 
-    method used_slots () {
+    sub used_slots {
+        my ($self) = @_;
         if ($self->stub) {
             ($self->var, $self->var . '!HOW');
         } else {
@@ -152,7 +212,9 @@ class Decl::Class extends Decl {
         }
     }
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
+
         if ($self->stub) {
             return CgOp::prog(
                 CgOp::proto_var($self->var . '!HOW', CgOp::null('Variable')),
@@ -179,7 +241,8 @@ class Decl::Class extends Decl {
                 CgOp::methodcall(CgOp::aux("how"), "create-protoobject")));
     }
 
-    method enter_code ($body) {
+    sub enter_code {
+        my ($self, $body) = @_;
         CgOp::prog(
             CgOp::share_lex($self->var . '!HOW'),
             CgOp::share_lex($self->var),
@@ -189,18 +252,27 @@ class Decl::Class extends Decl {
                     CgOp::clone_lex($self->bodyvar))));
     }
 
-    method write ($body) {
+    sub write   {
+        my ($self, $body) = @_;
         return unless $self->body;
         $self->body->outer($body);
         $self->body->write;
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::HasMethod extends Decl {
+{
+    package Decl::HasMethod;
+    use Moose;
+    extends 'Decl';
+
     has name => (is => 'ro', isa => 'Str', required => 1);
     has var  => (is => 'ro', isa => 'Str', required => 1);
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
         if ($body->type ne 'class') {
             #TODO: Make this a sorry.
             die "Tried to set a method outside a class!";
@@ -210,12 +282,20 @@ class Decl::HasMethod extends Decl {
                 CgOp::wrap(CgOp::clr_string($self->name)),
                 CgOp::scopedlex($self->var)));
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::Super extends Decl {
+{
+    package Decl::Super;
+    use Moose;
+    extends 'Decl';
+
     has name => (is => 'ro', isa => 'Str', required => 1);
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
         if ($body->type ne 'class') {
             #TODO: Make this a sorry.
             die "Tried to set a superclass outside an initial class!";
@@ -225,13 +305,24 @@ class Decl::Super extends Decl {
             CgOp::methodcall(CgOp::aux('how'), "add-super",
                 CgOp::scopedlex($self->name . "!HOW")));
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Decl::Regex extends Decl {
+{
+    package Decl::Regex;
+    use Moose;
+    extends 'Decl';
+
     has slot => (is => 'ro', isa => 'Str', required => 1);
 
-    method preinit_code ($body) {
+    sub preinit_code {
+        my ($self, $body) = @_;
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
 1;
