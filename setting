@@ -390,18 +390,19 @@ PRE-INIT {
 }
 
 # boxes a List<Variable>. SCHLIEMEL WAS HERE
+# we can't use sigs on push and unshift because $x loses the flat bit
 my class LLArray {
-    method push($x) { Q:CgOp { (prog
-      [rawcall (unbox List<Variable> (@ (l self))) Add (l $x)] [l self]) } }
+    method push { Q:CgOp { (prog
+      [rawcall (unbox List<Variable> (@ (pos 0))) Add (pos 1)] [pos 0]) } }
     method shift() { Q:CgOp { (prog
       [lextypes $f Variable $lv List<Variable>]
       [l $lv (unbox List<Variable> (@ (l self)))]
       [l $f (getindex (int 0) (l $lv))]
       [rawcall (l $lv) RemoveAt (int 0)]
       [l $f]) } }
-    method unshift($x) { Q:CgOp { (prog
-      [rawcall (unbox List<Variable> (@ (l self))) Insert (int 0) (l $x)]
-      [l self]) } }
+    method unshift { Q:CgOp { (prog
+      [rawcall (unbox List<Variable> (@ (pos 0))) Insert (int 0) (pos 1)]
+      [pos 0]) } }
     method first-flattens() { Q:CgOp {
       (box Bool (getfield islist (getfield lv (getindex (int 0)
         (unbox List<Variable> (@ (l self))))))) } }
