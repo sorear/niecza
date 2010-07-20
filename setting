@@ -431,9 +431,29 @@ my class EMPTY { }
 
 my class Parcel {
     # $!ll
+
+    method iterator() {
+        my $ll = $!ll;
+        my $it = Iterator.RAWCREATE("valid", 1, "value", EMPTY, "next", Any);
+        my $ix = $ll.elems - 1;
+
+        while $ix >= 0 {
+            $it = Iterator.RAWCREATE("valid", 1, "next", $it);
+            Q:CgOp {
+                (prog
+                  [setindex value (getfield slots
+                      (cast DynObject (@ (l $it))))
+                    (methodcall (l $ll) at-pos (l $ix))]
+                  [null Variable])
+            };
+            $ix--;
+        }
+
+        $it;
+    }
 }
 
-sub infix:<,>(*@bits) {
+sub infix:<,>(*@v) {
     my @r := Parcel.RAWCREATE("ll", Q:CgOp { (varattr rest (@ (l @v))) });
     @r;
 }
