@@ -343,10 +343,10 @@ PRE-INIT {
 
                 Q:CgOp {
                     (prog
-                      (setindex (unbox String (@ (l $name)))
+                      [setindex (unbox String (@ (l $name)))
                         (getfield slots (cast DynObject (@ (l $obj))))
-                        (l $value))
-                      (null Variable))
+                        (l $value)]
+                      [null Variable])
                 };
             }
             $obj;
