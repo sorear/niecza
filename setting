@@ -439,7 +439,9 @@ my class Parcel {
         my $ix = ($ll.elems - 1);
 
         while $ix >= 0 {
-            $it = Iterator.RAWCREATE("valid", 1, "next", $it);
+            my $nit = Iterator.RAWCREATE("valid", 1, "next", Any);
+            $nit.next = $it;
+            $it = $nit;
             Q:CgOp {
                 (prog
                   [setindex value (getfield slots
@@ -489,8 +491,10 @@ my class List is Cool {
                     }
                     # we can't push anything onto items because it might be
                     # EMPTY
-                    $r.unshift($v.value);
-                    $r.unshift($v.next);
+                    if ! $v.value.^isa(EMPTY) {
+                        $r.unshift($v.value);
+                        $r.unshift($v.next);
+                    }
                 } else {
                     $i.push($v);
                 }
