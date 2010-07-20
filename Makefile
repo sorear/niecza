@@ -5,6 +5,7 @@ COMPILER=Body.pm CgOp.pm CodeGen.pm CompilerDriver.pm Decl.pm Op.pm RxOp.pm\
 	 Sig.pm Unit.pm Niecza/Actions.pm Niecza/Grammar.pmc .STD_build_stamp
 
 all: Setting.dll
+	git rev-parse HEAD | cut -c1-7 > VERSION
 
 test: $(COMPILER) test.pl Setting.dll
 	perl -MFile::Slurp -MCompilerDriver=:all -e 'header; mainline(scalar read_file("test.pl")); bootstrap' > Program.cs
