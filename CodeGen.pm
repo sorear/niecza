@@ -1,7 +1,11 @@
+use strict;
+use warnings;
 use 5.010;
-use MooseX::Declare;
 
-class CodeGen {
+{
+    package CodeGen;
+    use Moose;
+
     # Beta will do this using reflection
     my %typedata = (
         IP6 =>
@@ -57,7 +61,8 @@ class CodeGen {
         'Kernel.UnboxAny'      => [m => 'object'],
     );
 
-    method _typedata ($types, @path) {
+    sub _typedata {
+        my ($self, $types, @path) = @_;
         my $cursor = \%typedata;
         for (@path) { $cursor = $cursor->{$_}; }
         if (!defined $cursor) {
@@ -102,7 +107,8 @@ class CodeGen {
     sub qm { "\"" . $_[0] . "\"" }
 
     # always called after _saveall
-    method _savestackstate ($lbl) {
+    sub _savestackstate {
+        my ($self, $lbl) = @_;
         my %save;
         $save{depth} = $self->depth;
         $save{stacktype} = [ @{ $self->stacktype } ];
@@ -110,7 +116,8 @@ class CodeGen {
         $self->savedstks->{$lbl} = \%save;
     }
 
-    method _restorestackstate ($lbl) {
+    sub _restorestackstate {
+        my ($self, $lbl) = @_;
         my $save = $self->savedstks->{$lbl};
         $self->depth($save->{depth});
         $self->savedepth($save->{depth});
@@ -118,13 +125,15 @@ class CodeGen {
         %{ $self->auxdepths } = %{ $save->{auxdepths} };
     }
 
-    method _emit ($line) {
+    sub _emit {
+        my ($self, $line) = @_;
         #push @{ $self->buffer }, sprintf "    // d=%d md=%d sd=%d nl=%d\n",
         #    $self->depth, $self->maxdepth, $self->savedepth, $self->numlabels;
         push @{ $self->buffer }, "    $line;\n";
     }
 
-    method _undercheck ($margin) {
+    sub _undercheck {
+        my ($self, $margin) = @_;
         Carp::confess "Stack underflow" if $margin > $self->depth;
         if ($self->depth - $margin < $self->savedepth) {
             for my $n ($self->depth - $margin .. $self->savedepth - 1) {
@@ -134,26 +143,30 @@ class CodeGen {
         }
     }
 
-    method _overcheck ($margin) {
+    sub _overcheck {
+        my ($self, $margin) = @_;
         if ($self->depth + $margin > $self->maxdepth) {
             $self->maxdepth($self->depth + $margin);
         }
     }
 
-    method _peek () {
+    sub _peek {
+        my ($self) = @_;
         $self->_undercheck(1);
         my $ty = @{ $self->stacktype }[-1];
         return "(($ty)s" . ($self->depth - 1) . ")";
     }
 
-    method _pop () {
+    sub _pop {
+        my ($self) = @_;
         $self->_undercheck(1);
         my $ty = pop @{ $self->stacktype };
         $self->depth($self->depth - 1);
         return "(($ty)s" . ($self->depth) . ")";
     }
 
-    method _push ($ty, $expr) {
+    sub _push {
+        my ($self, $ty, $expr) = @_;
         $self->_overcheck(1);
         my $n = $self->depth;
         $self->_emit("s$n = $expr");
@@ -162,14 +175,16 @@ class CodeGen {
         push @{ $self->stacktype }, $ty;
     }
 
-    method _saveall () {
+    sub _saveall {
+        my ($self) = @_;
         for my $i ($self->savedepth .. $self->depth - 1) {
             $self->_emit("th.lex[\"s$i\"] = s$i");
         }
         $self->savedepth($self->depth);
     }
 
-    method _cpscall ($rt, $expr) {
+    sub _cpscall {
+        my ($self, $rt, $expr) = @_;
         $self->_saveall;
         my $n = $self->label;
         $self->_emit("th.resultSlot = null");
@@ -181,7 +196,8 @@ class CodeGen {
 
     # These functions are usable from user code, but still depend on volatiles.
 
-    method swap () {
+    sub swap {
+        my ($self) = @_;
         $self->_undercheck(2);
         $self->_overcheck(1);
         my $n = $self->depth;
@@ -192,34 +208,40 @@ class CodeGen {
         @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
     }
 
-    method new_aux ($name, $type) {
+    sub new_aux {
+        my ($self, $name, $type) = @_;
         $self->auxdepths->{$name} = 0;
         $self->auxtypes->{$name} = $type;
     }
 
-    method push_aux ($which) {
+    sub push_aux {
+        my ($self, $which) = @_;
         my $var = "aux!${which}!" . ($self->auxdepths->{$which}++);
         $self->lextypes($var, $self->auxtypes->{$which});
         $self->rawlexput($var);
     }
 
-    method pop_aux ($which) {
+    sub pop_aux {
+        my ($self, $which) = @_;
         my $var = "aux!${which}!" . (--$self->auxdepths->{$which});
         $self->rawlexget($var);
     }
 
-    method peek_aux ($which) {
+    sub peek_aux {
+        my ($self, $which) = @_;
         my $var = "aux!${which}!" . ($self->auxdepths->{$which} - 1);
         $self->rawlexget($var);
     }
 
-    method label () {
+    sub label {
+        my ($self) = @_;
         my $n = $self->numlabels;
         $self->numlabels($n + 1);
         return $n;
     }
 
-    method labelhere ($n) {
+    sub labelhere {
+        my ($self, $n) = @_;
         $self->_saveall;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_restorestackstate($n) if $self->savedstks->{$n};
@@ -228,7 +250,8 @@ class CodeGen {
         $self->unreach(0);
     }
 
-    method goto ($n) {
+    sub goto {
+        my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_saveall;
         $self->_savestackstate($n);
@@ -236,7 +259,8 @@ class CodeGen {
         $self->unreach(1);
     }
 
-    method cgoto ($n) {
+    sub cgoto {
+        my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
         $self->_saveall;
@@ -244,7 +268,8 @@ class CodeGen {
         push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
     }
 
-    method ncgoto ($n) {
+    sub ncgoto {
+        my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
         $self->_saveall;
@@ -252,7 +277,8 @@ class CodeGen {
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
 
-    method lextypes (%args) {
+    sub lextypes {
+        my ($self, %args) = @_;
         #say STDERR "lextypes: @args";
         my $body = $self->body // $self->bodies->[-1];
         if ($body) {
@@ -261,15 +287,18 @@ class CodeGen {
         %{ $self->lex2type } = (%{ $self->lex2type }, %args);
     }
 
-    method rawlexget ($name, @) {
+    sub rawlexget {
+        my ($self, $name) = @_;
         $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
     }
 
-    method rawlexput ($name, @) {
+    sub rawlexput {
+        my ($self, $name) = @_;
         $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
     }
 
-    method lexget ($order, $name) {
+    sub lexget {
+        my ($self, $order, $name) = @_;
         my $frame = 'th.';
         if ($self->auxdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -281,7 +310,8 @@ class CodeGen {
             $frame . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 
-    method lexput ($order, $name) {
+    sub lexput {
+        my ($self, $order, $name) = @_;
         my $frame = 'th.';
         if ($self->auxdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -291,7 +321,8 @@ class CodeGen {
         $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
     }
 
-    method callframe () {
+    sub callframe {
+        my ($self) = @_;
         my $frame = 'th';
         if ($self->auxdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -301,68 +332,81 @@ class CodeGen {
         $self->_push("Frame", $frame);
     }
 
-    method dup () {
+    sub dup {
+        my ($self) = @_;
         my $c = $self->_peek;
         $self->_push($self->stacktype->[-1], $c);
     }
 
-    method drop () {
+    sub drop {
+        my ($self) = @_;
         $self->_pop;
     }
 
     # the use of scalar here is a little bit wrong; semantically it's closer
     # to the old notion of ¢foo.  doesn't matter much since it's not exposed
     # at the Perl 6 level.
-    method pos ($num) {
+    sub pos {
+        my ($self, $num) = @_;
         $self->_push('Variable',
             "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
     }
 
-    method protolget ($name) {
+    sub protolget {
+        my ($self, $name) = @_;
         $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
     }
 
-    method call_method ($nv, $name, $numargs) {
+    sub call_method {
+        my ($self, $nv, $name, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV
         my $inv = $self->_pop;
         $self->_cpscall(($nv ? 'Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
-    method call_sub ($nv, $numargs) {
+    sub call_sub {
+        my ($self, $nv, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
         $self->_cpscall(($nv ? 'Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
-    method tail_call_sub ($numargs) {
+    sub tail_call_sub {
+        my ($self, $numargs) = @_;
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
         $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
         $self->unreach(1);
     }
 
-    method clr_bool ($v) {
+    sub clr_bool {
+        my ($self, $v) = @_;
         $self->_push('System.Boolean', $v ? 'true' : 'false');
     }
 
-    method clr_new ($class, $nargs) {
+    sub clr_new {
+        my ($self, $class, $nargs) = @_;
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         $self->_push($class, "new $class(" . join(", ", @args) . ")");
     }
 
-    method clr_string ($text) {
+    sub clr_string {
+        my ($self, $text) = @_;
         $self->_push('System.String', qm($text));
     }
 
-    method clr_int ($val) {
+    sub clr_int {
+        my ($self, $val) = @_;
         $self->_push('System.Int32', $val);
     }
 
-    method clr_double ($val) {
+    sub clr_double {
+        my ($self, $val) = @_;
         $self->_push('System.Double', "((Double)$val)");
     }
 
-    method clr_arith ($op) {
+    sub clr_arith {
+        my ($self, $op) = @_;
         my $ty = $self->stacktype->[-1];
         if ($ty ne $self->stacktype->[-2]) {
             die "Overloaded operations not yet supported";
@@ -372,40 +416,47 @@ class CodeGen {
         $self->_push($ty, "$a1 $op $a2");
     }
 
-    method clr_compare ($op) {
+    sub clr_compare {
+        my ($self, $op) = @_;
         my $a2 = $self->_pop;
         my $a1 = $self->_pop;
         $self->_push('Boolean', "$a1 $op $a2");
     }
 
-    method clr_field_get ($f) {
+    sub clr_field_get {
+        my ($self, $f) = @_;
         my $ty = $self->_typedata('f', $self->stacktype->[-1], $f);
         my $obj = $self->_pop;
         $self->_push($ty, "$obj.$f");
     }
 
-    method clr_field_set ($f) {
+    sub clr_field_set {
+        my ($self, $f) = @_;
         my $val = $self->_pop;
         my $obj = $self->_pop;
         $self->_emit("$obj.$f = $val");
     }
 
-    method clr_sfield_get ($f) {
+    sub clr_sfield_get {
+        my ($self, $f) = @_;
         my $ty = $self->_typedata('f', $f);
         $self->_push($ty, "$f");
     }
 
-    method clr_sfield_set ($f) {
+    sub clr_sfield_set {
+        my ($self, $f) = @_;
         my $val = $self->_pop;
         $self->_emit("$f = $val");
     }
 
-    method attr_var ($f) {
+    sub attr_var {
+        my ($self, $f) = @_;
         my $obj = $self->_pop;
         $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
     }
 
-    method clr_index_get ($f?) {
+    sub clr_index_get {
+        my ($self, $f) = @_;
         if ($f) {
             $self->clr_string($f);
         }
@@ -419,18 +470,21 @@ class CodeGen {
         $self->_push($ty, "$obj" . "[$ix]");
     }
 
-    method clr_index_set ($f?) {
+    sub clr_index_set {
+        my ($self, $f) = @_;
         my $val = $self->_pop;
         my $ix  = $self->_pop unless $f;
         my $obj = $self->_pop;
         $self->_emit("$obj" . "[" . ($f ? qm($f) : $ix) . "] = $val");
     }
 
-    method cast ($type) {
+    sub cast {
+        my ($self, $type) = @_;
         $self->_push($type, "(($type)" . $self->_pop . ")");
     }
 
-    method clr_call_direct ($name, $nargs) {
+    sub clr_call_direct {
+        my ($self, $name, $nargs) = @_;
         my ($cl, $rt) = $self->_typedata('cm', $name);
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         if ($cl eq 'c') {
@@ -443,7 +497,8 @@ class CodeGen {
         }
     }
 
-    method clr_call_virt ($name, $nargs) {
+    sub clr_call_virt {
+        my ($self, $name, $nargs) = @_;
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         my ($cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1], $name);
         my $inv = $self->_pop;
@@ -457,7 +512,8 @@ class CodeGen {
         }
     }
 
-    method return ($nv) {
+    sub return {
+        my ($self, $nv) = @_;
         return if $self->unreach;
         if ($nv) {
             $self->_emit("th.caller.resultSlot = " . $self->_pop);
@@ -466,11 +522,13 @@ class CodeGen {
         $self->unreach(1);
     }
 
-    method push_null ($ty) {
+    sub push_null {
+        my ($self, $ty) = @_;
         $self->_push($ty, "null");
     }
 
-    method close_sub ($bodycg) {
+    sub close_sub {
+        my ($self, $bodycg) = @_;
         $self->pop_aux('protopad');
         pop @{ $self->bodies };
         $self->peek_aux('protopad');
@@ -480,7 +538,8 @@ class CodeGen {
             $bodycg->csname . "), $pp, $op)");
     }
 
-    method proto_var ($name) {
+    sub proto_var {
+        my ($self, $name) = @_;
         $self->peek_aux('protopad');
         my $pp = $self->_pop;
         my $pv = $self->_pop;
@@ -489,7 +548,8 @@ class CodeGen {
 
     # These are completely derived.
 
-    method scopelex ($name, $set) {
+    sub scopelex {
+        my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
         my ($order, $scope) = (0, $body);
         while ($scope && !$scope->lexical->{$name}) {
@@ -506,7 +566,8 @@ class CodeGen {
         }
     }
 
-    method open_protopad ($body) {
+    sub open_protopad {
+        my ($self, $body) = @_;
         $self->peek_aux('protopad');
         $self->clr_new('Frame', 1);
         $self->push_aux('protopad');
@@ -515,14 +576,16 @@ class CodeGen {
 
     ###
 
-    method csname () {
+    sub csname {
+        my ($self) = @_;
         return $self->name if $self->entry;
         my @name = split /\W+/, $self->name;
         shift @name if @name && $name[0] eq '';
         join("", (map { ucfirst $_ } @name), "_", $self->uid, "C");
     }
 
-    method write () {
+    sub write {
+        my ($self) = @_;
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
@@ -540,10 +603,13 @@ class CodeGen {
         print ::NIECZA_OUT " " x 4, "}\n";
     }
 
-    method BUILD {
+    sub BUILD {
+        my $self = shift;
         #say STDERR YAML::XS::Dump($self->ops);
         $self->ops->var_cg($self);
     }
-}
 
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
 1;
