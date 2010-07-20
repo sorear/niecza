@@ -3,26 +3,49 @@ use strict;
 use warnings;
 
 
-# for transition only!
 {
-    package CgOp::NIL;
+    package CgOp;
     use Moose;
 
-    has ops => (isa => 'ArrayRef', is => 'ro');
+    has zyg => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package CgOp::Seq;
+    use Moose;
+    extends 'CgOp';
 
     sub var_cg {
         my ($self, $cg) = @_;
-        for (@{ $self->ops }) {
-            if (blessed $_) {
-                $_->var_cg($cg);
-            } else {
-                my ($c, @o) = @$_;
-                if ($cg->unreach && $c ne 'labelhere') {
-                    next;
-                }
-                $cg->$c(@o);
-            }
+        for (@{ $self->zyg }) {
+            $_->var_cg($cg);
         }
+    }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package CgOp::Primitive;
+    use Moose;
+    extends 'CgOp';
+
+    has op  => (isa => 'ArrayRef', is => 'ro', required => 1);
+
+    sub var_cg {
+        my ($self, $cg) = @_;
+        for (@{ $self->zyg }) {
+            $_->var_cg($cg);
+        }
+        my ($c, @o) = @{ $self->op };
+        if ($cg->unreach && $c ne 'labelhere') {
+            return;
+        }
+        $cg->$c(@o);
     }
 
     no Moose;
@@ -32,22 +55,20 @@ use warnings;
 {
     package CgOp::Ternary;
     use Moose;
-
-    has check => (is => 'ro');
-    has true  => (is => 'ro');
-    has false => (is => 'ro');
+    extends 'CgOp';
 
     sub var_cg {
         my ($self, $cg) = @_;
+        my ($check, $true, $false) = @{ $self->zyg };
         my $l1 = $cg->label;
         my $l2 = $cg->label;
 
-        $self->check->var_cg($cg);
+        $check->var_cg($cg);
         $cg->ncgoto($l1);
-        $self->true->var_cg($cg);
+        $true->var_cg($cg);
         $cg->goto($l2);
         $cg->labelhere($l1);
-        $self->false->var_cg($cg);
+        $false->var_cg($cg);
         $cg->labelhere($l2);
     }
 
@@ -58,24 +79,24 @@ use warnings;
 {
     package CgOp::While;
     use Moose;
+    extends 'CgOp';
 
-    has check => (is => 'ro');
-    has body  => (is => 'ro');
     has once  => (is => 'ro', isa => 'Bool');
     has until => (is => 'ro', isa => 'Bool');
 
     sub var_cg {
         my ($self, $cg) = @_;
+        my ($check, $body) = @{ $self->zyg };
         my $lagain = $cg->label;
         my $lcheck = $self->once ? 0 : $cg->label;
 
         $cg->goto($lcheck) unless $self->once;
 
         $cg->labelhere($lagain);
-        $self->body->var_cg($cg);
+        $body->var_cg($cg);
 
         $cg->labelhere($lcheck) unless $self->once;
-        $self->check->var_cg($cg);
+        $check->var_cg($cg);
         if ($self->until) {
             $cg->ncgoto($lagain);
         } else {
@@ -87,25 +108,44 @@ use warnings;
     __PACKAGE__->meta->make_immutable;
 }
 
+{
+    package CgOp::Let;
+    use Moose;
+    extends 'CgOp';
+
+    has var  => (is => 'ro', isa => 'Str', required => 1);
+    has type => (is => 'ro', isa => 'Str', required => 1);
+
+    sub var_cg {
+        my ($self, $cg) = @_;
+
+        $cg->lextypes($self->var, $self->type);
+        $self->zyg->[0]->var_cg($cg);
+        $cg->rawlexput($self->var, 0);
+        $self->zyg->[1]->var_cg($cg);
+        $cg->push_null($self->type);
+        $cg->rawlexput($self->var, 0);
+    }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
 # just a bunch of smart constructors
 {
     package CgOp;
     use Scalar::Util 'blessed';
 
-    sub nil {
-        CgOp::NIL->new(ops => [ @_ ]);
-    }
-
     sub noop {
-        CgOp::NIL->new(ops => []);
+        CgOp::Seq->new;
     }
 
     sub null {
-        CgOp::NIL->new(ops => [[ push_null => $_[0] ]]);
+        CgOp::Primitive->new(op => [ push_null => $_[0] ]);
     }
 
     sub prog {
-        CgOp::NIL->new(ops => [ @_ ]);
+        CgOp::Seq->new(zyg => [ @_ ]);
     }
 
     sub wrap {
@@ -117,7 +157,7 @@ use warnings;
     }
 
     sub sink {
-        CgOp::NIL->new(ops => [ $_[0], [ 'drop' ] ]);
+        CgOp::Primitive->new(op => ['drop'], zyg => [ $_[0] ]);
     }
 
     sub fetch {
@@ -129,21 +169,25 @@ use warnings;
     }
 
     sub getfield {
-        CgOp::NIL->new(ops => [ $_[1], [ 'clr_field_get', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'clr_field_get', $_[0] ],
+            zyg => [ $_[1] ]);
     }
 
     sub setfield {
-        CgOp::NIL->new(ops => [ $_[1], $_[2], [ 'clr_field_set', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'clr_field_set', $_[0] ],
+            zyg => [ $_[1], $_[2] ]);
     }
 
     sub getindex {
-        CgOp::NIL->new(ops => [ $_[1], (blessed($_[0]) ? $_[0] : ()),
-                [ 'clr_index_get', (blessed($_[0]) ? () : $_[0])]]);
+        CgOp::Primitive->new(
+            op  => [ 'clr_index_get', (blessed($_[0])) ? () : $_[0] ],
+            zyg => [ $_[1], (blessed($_[0]) ? $_[0] : ()) ]);
     }
 
     sub setindex {
-        CgOp::NIL->new(ops => [ $_[1], (blessed($_[0]) ? $_[0] : ()),
-                $_[2], [ 'clr_index_set', (blessed($_[0]) ? () : $_[0])]]);
+        CgOp::Primitive->new(
+            op  => [ 'clr_index_set', (blessed($_[0])) ? () : $_[0] ],
+            zyg => [ $_[1], (blessed($_[0]) ? $_[0] : ()), $_[2] ]);
     }
 
     sub getattr {
@@ -151,11 +195,11 @@ use warnings;
     }
 
     sub varattr {
-        CgOp::NIL->new(ops => [ $_[1], [ 'attr_var', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'attr_var', $_[0] ], zyg => [ $_[1] ]);
     }
 
     sub cast {
-        CgOp::NIL->new(ops => [ $_[1], [ 'cast', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'cast', $_[0] ], zyg => [ $_[1] ]);
     }
 
     sub newscalar {
@@ -175,15 +219,15 @@ use warnings;
     }
 
     sub double {
-        CgOp::NIL->new(ops => [ [ 'clr_double', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'clr_double', $_[0] ]);
     }
 
     sub int {
-        CgOp::NIL->new(ops => [ [ 'clr_int', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'clr_int', $_[0] ]);
     }
 
     sub bool {
-        CgOp::NIL->new(ops => [ [ 'clr_bool', $_[0] ] ]);
+        CgOp::Primitive->new(op => [ 'clr_bool', $_[0] ]);
     }
 
     sub unbox {
@@ -205,52 +249,62 @@ use warnings;
     }
 
     sub compare {
-        CgOp::NIL->new(ops => [$_[1], $_[2], [ 'clr_compare', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'clr_compare', $_[0] ],
+            zyg => [ $_[1], $_[2] ]);
     }
 
     sub arith {
-        CgOp::NIL->new(ops => [$_[1], $_[2], [ 'clr_arith', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'clr_arith', $_[0] ],
+            zyg => [ $_[1], $_[2] ]);
     }
 
     sub scopedlex {
         my $n = shift;
-        CgOp::NIL->new(ops => [ @_, [ scopelex => $n, scalar @_ ]]);
+        CgOp::Primitive->new(op => [ scopelex => $n, scalar @_ ],
+            zyg => [ @_ ]);
     }
 
     sub lexput {
-        CgOp::NIL->new(ops => [ $_[2], [ lexput => $_[0], $_[1] ]]);
+        CgOp::Primitive->new(op => [ lexput => $_[0], $_[1] ],
+            zyg => [ $_[2] ]);
     }
 
     sub lexget {
-        CgOp::NIL->new(ops => [[ lexget => $_[0], $_[1] ]]);
+        CgOp::Primitive->new(op => [ lexget => $_[0], $_[1] ]);
     }
 
     sub subcall {
         my ($sub, @args) = @_;
-        CgOp::NIL->new(ops => [ $sub, @args, [ 'call_sub', 1, scalar @args ] ]);
+        CgOp::Primitive->new(op => [ 'call_sub', 1, scalar @args ],
+            zyg => [ $sub, @args ]);
     }
 
     sub methodcall {
         my ($obj, $name, @args) = @_;
-        CgOp::NIL->new(ops => [ $obj, [ 'dup' ],
-                [ 'clr_call_direct', 'Kernel.Fetch', 1 ], [ 'swap' ], @args,
-                [ 'call_method', 1, $name, scalar @args ] ]);
+        let($obj, 'Variable', sub {
+            CgOp::Primitive->new(op => [ 'call_method', 1, $name, scalar @args ],
+                zyg => [ fetch($_[0]), $_[0], @args ])});
     }
 
     sub callframe {
-        CgOp::NIL->new(ops => [[ 'callframe' ]]);
+        CgOp::Primitive->new(op => [ 'callframe' ]);
     }
 
     sub aux {
-        CgOp::NIL->new(ops => [[ 'peek_aux', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'peek_aux', $_[0] ]);
     }
 
     sub clr_string {
-        CgOp::NIL->new(ops => [[ 'clr_string', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'clr_string', $_[0] ]);
     }
 
+    # XXX This being treated as a function is completely wrong.
     sub lextypes {
-        CgOp::NIL->new(ops => [[ 'lextypes', @_ ]]);
+        CgOp::Primitive->new(op => [ 'lextypes', @_ ]);
+    }
+
+    sub new_aux {
+        CgOp::Primitive->new(op => [ 'new_aux', $_[0], $_[1] ]);
     }
 
     sub share_lex {
@@ -275,81 +329,82 @@ use warnings;
     }
 
     sub proto_var {
-        CgOp::NIL->new(ops => [ $_[1], [ 'proto_var', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'proto_var', $_[0] ], zyg => [ $_[1] ]);
     }
 
     sub protolget {
-        CgOp::NIL->new(ops => [[ 'protolget', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'protolget', $_[0] ]);
     }
 
     sub return {
         $_[0] ?
-            CgOp::NIL->new(ops => [ $_[0], [ 'return', 1 ] ]) :
-            CgOp::NIL->new(ops => [[return => 0]]);
+            CgOp::Primitive->new(op => [ 'return', 1 ], zyg => [ $_[0] ]) :
+            CgOp::Primitive->new(op => [ return => 0]);
     }
 
     sub rawscall {
         my ($name, @args) = @_;
-        CgOp::NIL->new(ops => [ @args, [ 'clr_call_direct', $name, scalar @args ] ]);
+        CgOp::Primitive->new(op => [ 'clr_call_direct', $name, scalar @args ],
+            zyg => [ @args ]);
     }
 
     sub rawcall {
         my ($inv, $name, @args) = @_;
-        CgOp::NIL->new(ops => [ $inv, @args, [ 'clr_call_virt', $name, scalar @args ] ]);
+        CgOp::Primitive->new(op => [ 'clr_call_virt', $name, scalar @args ],
+            zyg => [ $inv, @args ]);
     }
 
     sub rawsget {
-        CgOp::NIL->new(ops => [[ 'clr_sfield_get', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'clr_sfield_get', $_[0] ]);
     }
 
     sub rawnew {
         my ($name, @args) = @_;
-        CgOp::NIL->new(ops => [ @args, [ 'clr_new', $name, scalar @args ] ]);
+        CgOp::Primitive->new(op => [ 'clr_new', $name, scalar @args ],
+            zyg => \@args);
     }
 
+    # the aux stacks probably ought to die.
     sub protosub {
         my ($body, @extra) = @_;
-        CgOp::NIL->new(ops => [ [ 'open_protopad', $body ], @extra,
-                $body->preinit_code, [ 'close_sub', $body->code ] ]);
-    }
-
-    sub new_aux {
-        CgOp::NIL->new(ops => [[ 'new_aux', $_[0], $_[1] ]]);
+        prog(
+            CgOp::Primitive->new(op => [ 'open_protopad', $body ]),
+            $body->preinit_code,
+            CgOp::Primitive->new(op => [ 'close_sub', $body->code ]));
     }
 
     sub with_aux {
         my ($name, $value, @stuff) = @_;
-        CgOp::NIL->new(ops => [ $value, [ 'push_aux', $name ], @stuff,
-                [ 'pop_aux', $name ], [ 'drop' ] ]);
+        prog(
+            CgOp::Primitive->new(op => [ 'push_aux', $name ],
+                zyg => [ $value ]),
+            @stuff,
+            sink(CgOp::Primitive->new(op => [ 'pop_aux', $name ])));
     }
 
     sub pos {
-        CgOp::NIL->new(ops => [[ 'pos', $_[0] ]]);
+        CgOp::Primitive->new(op => [ 'pos', $_[0] ]);
     }
 
     sub ternary {
-        CgOp::Ternary->new(
-            check => $_[0],
-            true  => $_[1],
-            false => $_[2]);
+        CgOp::Ternary->new(zyg => [ $_[0], $_[1], $_[2] ]);
     }
 
     sub whileloop {
         CgOp::While->new(
             until => $_[0],
             once  => $_[1],
-            check => $_[2],
-            body  => $_[3]);
+            zyg => [ $_[2], $_[3] ]);
     }
 
     my $nextlet = 0;
     sub let {
         my ($head, $type, $bodyf) = @_;
         my $v = 'let!' . ($nextlet++);
-        my $body = $bodyf->(nil([rawlexget => $v, 0 ]));
+        my $body = $bodyf->(CgOp::Primitive->new(
+                op => [ rawlexget => $v, 0 ]));
 
-        nil(lextypes($v,$type), $head, [ rawlexput => $v, 0 ], $body,
-            null($type), [ rawlexput => $v, 0 ]);
+        CgOp::Let->new(var => $v, type => $type, zyg => [ $head, $body ]);
     }
 }
 
