@@ -6,6 +6,23 @@ my class Cursor {
     method from() { $!from }
 }
 
+PRE-INIT {
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
+        anon method flat() { self, });
+    Parcel.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
+        anon method flat() {
+            my @x := self;
+            List.RAWCREATE("flat", 1, "items", LLArray.new(),
+                "rest", LLArray.new(@x));
+        });
+    List.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
+        anon method flat() {
+            my @x := self;
+            List.RAWCREATE("flat", 1, "items", LLArray.new(),
+                "rest", LLArray.new(@x));
+        });
+}
+
 sub _rxlazymap($cs, $sub) {
     my class LazyIterator is Iterator {
         method back() { $!back }
@@ -17,9 +34,11 @@ sub _rxlazymap($cs, $sub) {
             }
             my $bv = $!back.value;
             my $bn = $!back.next;
+            #say "In lazy map iterator";
             if $bv.^isa(EMPTY) {
                 $!value = EMPTY;
             } else {
+                #say "Going to pass " ~ $bv;
                 my $f = $!fun;
                 # XXX horrible. we're making the value act @-ish, maybe
                 Q:CgOp {
@@ -37,7 +56,7 @@ sub _rxlazymap($cs, $sub) {
 
     my $lit = LazyIterator.RAWCREATE("valid", 0, "value", Any,
         "next", Any, "back", Any, "fun", $sub);
-    $lit.back = $cs.iterator;
+    $lit.back = $cs.flat.iterator;
 
     my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest",
         LLArray.new($lit));
@@ -50,6 +69,7 @@ sub _rxstar($C, $sub) {
 }
 
 sub _rxstr($C, $str) {
+    #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
     if $C.from + $str.chars <= $C.str.chars &&
             $C.str.substr($C.from, $str.chars) eq $str {
         Cursor.RAWCREATE("str", $C.str, "from", $C.from + $str.chars);
@@ -71,6 +91,7 @@ sub test($str) {
         if rxtest($C) {
             $win = 1;
         }
+        $i++;
     }
     say $str ~ (" ... " ~ $win);
 }
