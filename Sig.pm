@@ -1,21 +1,15 @@
-use strict;
-use warnings;
 use 5.010;
+use MooseX::Declare;
 
-{
-    package Sig::Target;
-    use Moose;
-
+class Sig::Target {
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has list => (is => 'ro', isa => 'Bool', default => 0);
 
-    sub used_slots {
-        my $self = shift;
+    method used_slots () {
         if ($self->slot) { [ $self->slot, $self->list ] } else { () }
     }
 
-    sub binder {
-        my ($self, $get) = @_;
+    method binder ($get) {
         if ($self->slot) {
             # TODO: implement ro, etc
             CgOp::bind(0, CgOp::scopedlex($self->slot), $get);
@@ -23,22 +17,14 @@ use 5.010;
             CgOp::noop;
         }
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Sig::Parameter;
-    use Moose;
-
+class Sig::Parameter {
     has target => (is => 'ro', isa => 'Sig::Target', required => 1,
         handles => [ 'used_slots' ]);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
 
-    sub binder {
-        my ($self, $ixp) = @_;
-
+    method binder ($ixp) {
         if ($self->slurpy) {
             $self->target->binder(
                 CgOp::let(CgOp::rawnew('DynObject', CgOp::getfield('klass',
@@ -59,32 +45,22 @@ use 5.010;
             $self->target->binder(CgOp::pos($$ixp++));
         }
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Sig;
-    use Moose;
-
+class Sig {
     has params => (isa => 'ArrayRef[Sig::Parameter]', is => 'ro', required => 1);
 
-    sub for_method {
-        my $self = shift;
+    method for_method () {
         my $sp = Sig::Parameter->new(target =>
             Sig::Target->new(slot => 'self'));
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
-    sub used_slots {
-        my $self = shift;
+    method used_slots () {
         map { $_->used_slots } @{ $self->params };
     }
 
-    sub binder {
-        my ($self) = @_;
-
+    method binder () {
         # TODO: Error checking.
         my $ix = 0;
         my @p;
@@ -93,9 +69,6 @@ use 5.010;
         }
         CgOp::prog(@p);
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 1;

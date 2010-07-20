@@ -1,52 +1,24 @@
-use strict;
-use warnings;
 use 5.010;
+use MooseX::Declare;
 
 use CgOp;
 
-{
-    package RxOp;
-    use Moose;
-
+class RxOp {
     has zyg => (isa => 'ArrayRef[RxOp]', is => 'ro');
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package RxOp::String;
-    use Moose;
-    extends 'RxOp';
-
+class RxOp::String extends RxOp {
     has text => (isa => 'Str', is => 'ro', required => 1);
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package RxOp::Quantifier;
-    use Moose;
-    extends 'RxOp';
-
+class RxOp::Quantifier extends RxOp {
     has type => (isa => 'Str', is => 'ro', required => 1);
     # ? + * only
     # zyg * 1
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package RxOp::Sequence;
-    use Moose;
-    extends 'RxOp';
-
+class RxOp::Sequence extends RxOp {
     # zyg * N
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 1;
