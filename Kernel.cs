@@ -388,10 +388,12 @@ blocked:
         }
 
         public static Frame Die(Frame caller, string msg) {
-            Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
-            f.pos = new LValue[1] { new LValue(true, false, new CLRImportObject(msg)) };
-            f.named = null;
-            return f;
+            // TODO: Unbreak p6exceptions
+            throw new Exception(msg);
+            //Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
+            //f.pos = new LValue[1] { new LValue(true, false, new CLRImportObject(msg)) };
+            //f.named = null;
+            //return f;
         }
 
         // Needs more special handling for control exceptions.
