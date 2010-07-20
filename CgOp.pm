@@ -408,4 +408,60 @@ use warnings;
     }
 }
 
+{
+    package CgOp::CpsConverter;
+
+    # CPS calls don't preserve the evaluation stack, so we need to rewrite
+    # exptrees such that calls don't appear in positions with evaluations in
+    # progress; currently, that means Primitive cannot contain CPS calls.
+    our $_recurse;
+
+    sub _okarg {
+        my ($op) = @_;
+        $op->isa('CgOp::Primitive') && !$op->cps;
+    }
+
+    sub _okdelay {
+        my ($op) = @_;
+        $op->isa('CgOp::Primitive') && $op->constant;
+    }
+
+    sub cpsconvert {
+        my ($op) = @_;
+
+        if ($op->isa('CgOp::Primitive')) {
+            # need to ensure all arguments are Primitive and not CPS calls.
+            my ($lastbad) = ((reverse grep { !_okarg($op->zyg->[$_]) }
+                0 .. $#{ $op->zyg }), -1);
+
+            local $_recurse = sub {
+                my (@sofar) = @_;
+
+                if (scalar(@sofar) > $lastbad) {
+                    while (scalar(@sofar) < scalar(@{ $op->zyg })) {
+                        push @sofar, $op->zyg->[scalar @sofar];
+                    }
+                    return CgOp::Primitive->new(op => $op->op,
+                        zyg => \@sofar);
+                }
+
+                if (_okdelay($op->zyg->[scalar @sofar])) {
+                    $_recurse->(@sofar, $op->zyg->[scalar @sofar]);
+                } else {
+                    let($op->zyg->[scalar @sofar], 'XXX',
+                        sub { $_recurse->(@sofar, $_[0]) });
+                }
+            };
+
+            return $_recurse->();
+        } elsif ($op->isa('CgOp::While') || $op->isa('CgOp::Let') ||
+                $op->isa('CgOp::Ternary') || $op->isa('CgOp::Seq')) {
+            # these can hold anything
+            return $op;
+        } else {
+            die "Unhandled op type in cpsconvert";
+        }
+    }
+}
+
 1;
