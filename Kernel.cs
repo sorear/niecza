@@ -270,7 +270,10 @@ blocked:
             if (klass.OnInvoke != null) {
                 return klass.OnInvoke(this, c, p, n);
             } else {
-                return Fail(c, "No invoke handler set");
+                LValue[] np = new LValue[p.Length + 1];
+                Array.Copy(p, 0, np, 1, p.Length);
+                np[0] = new LValue(false, false, Kernel.MakeSC(this));
+                return InvokeMethod(c, "INVOKE", np, n);
             }
         }
 
@@ -278,7 +281,8 @@ blocked:
             if (klass.OnFetch != null) {
                 return klass.OnFetch(this, c);
             } else {
-                return Fail(c, "No fetch handler set");
+                return InvokeMethod(c, "FETCH", new LValue[1] {
+                        new LValue(false, false, Kernel.MakeSC(this)) }, null);
             }
         }
 
@@ -286,7 +290,9 @@ blocked:
             if (klass.OnStore != null) {
                 return klass.OnStore(this, c, o);
             } else {
-                return Fail(c, "No store handler set");
+                return InvokeMethod(c, "STORE", new LValue[2] {
+                        new LValue(false, false, Kernel.MakeSC(this)),
+                        new LValue(false, false, Kernel.MakeSC(o)) }, null);
             }
         }
     }
@@ -536,8 +542,9 @@ blocked:
                         throw new Exception("assigning to readonly value");
                     }
                     if (th.pos[0].islist) {
-                        // list assignments apply listy context to the RHS
-                        // then delegate
+                        return th.pos[0].container.InvokeMethod(th.caller,
+                                "LISTSTORE", th.pos, null);
+                    } else {
                         if (th.pos[1].islist) {
                             return th.pos[0].container.Store(th.caller,
                                     th.pos[1].container);
@@ -545,26 +552,8 @@ blocked:
                             th.ip = 1;
                             return th.pos[1].container.Fetch(th);
                         }
-                    } else {
-                        if (th.pos[1].islist) {
-                            return th.pos[0].container.Store(th.caller,
-                                    th.pos[1].container);
-                        } else {
-                            th.ip = 3;
-                            return th.pos[1].container.Fetch(th);
-                        }
                     }
                 case 1:
-                    th.ip = 2;
-                    return ((IP6)th.resultSlot).InvokeMethod(th, "list",
-                            new LValue[1] { th.pos[1] }, null);
-                case 2:
-                    if (!((Variable)th.resultSlot).lv.islist) {
-                        throw new Exception(".list didn't return one!");
-                    }
-                    return th.pos[0].container.Store(th.caller,
-                            ((Variable)th.resultSlot).lv.container);
-                case 3:
                     return th.pos[0].container.Store(th.caller,
                             (IP6)th.resultSlot);
                 default:
