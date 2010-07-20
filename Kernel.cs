@@ -386,6 +386,19 @@ blocked:
 
             return n;
         }
+        private static Frame SubInvokeSubC(Frame th) {
+            LValue[] post;
+            switch (th.ip) {
+                case 0:
+                    th.ip = 1;
+                    return th.pos[0].container.Fetch(th);
+                default:
+                    post = new LValue[th.pos.Length - 1];
+                    Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
+                    return SubInvoke((DynObject)th.resultSlot, th.caller,
+                            post, th.named);
+            }
+        }
 
         public static Frame Die(Frame caller, string msg) {
             // TODO: Unbreak p6exceptions
@@ -611,6 +624,8 @@ blocked:
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
             SubMO.local["clone"] = MakeSub(new DynBlockDelegate(SubCloneC),
+                    null, null);
+            SubMO.local["INVOKE"] = MakeSub(new DynBlockDelegate(SubInvokeSubC),
                     null, null);
 
             ScalarMO = new DynMetaObject("Scalar");
