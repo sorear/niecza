@@ -492,8 +492,8 @@ my class List is Cool {
                     # we can't push anything onto items because it might be
                     # EMPTY
                     if ! $v.value.^isa(EMPTY) {
-                        $r.unshift($v.value);
                         $r.unshift($v.next);
+                        $r.unshift($v.value);
                     }
                 } else {
                     $i.push($v);
