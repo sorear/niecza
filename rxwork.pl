@@ -1,3 +1,4 @@
+# vim: ft=perl6
 my class Cursor {
     # has $!str
     # has $!from
@@ -7,6 +8,7 @@ my class Cursor {
 
 sub _rxlazymap($cs, $sub) {
     my class LazyIterator is Iterator {
+        method back() { $!back }
         # $!valid $!value $!next  $!fun $!back
         method validate() {
             $!valid = 1;
@@ -24,31 +26,51 @@ sub _rxlazymap($cs, $sub) {
                   [null Variable])
             };
             $!next = LazyIterator.RAWCREATE("valid", 0, "next", Any,
-                "value", Any, "back", $nb, "fun", $!fun);
+                "value", Any, "back", Any, "fun", $!fun);
+            $!next.back = $bn;
         }
     }
 
     my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest",
-        LLArray.new(LazyIterator.new("valid", 0, "value", Any, "next", Any,
-            "back", $cs.iterator, "fun", $fun)));
+        LLArray.new(LazyIterator.RAWCREATE("valid", 0, "value", Any,
+            "next", Any, "back", $cs.iterator, "fun", $sub)));
     @l.fill(1);
     @l;
 }
 
-sub _rxstar($¢, $sub) {
-    _lazymap($sub($¢), sub ($¢) { _rxstar($¢, $sub) }), $¢
+sub _rxstar($C, $sub) {
+    _rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) }), $C
 }
 
-sub _rxstr($¢, $str) {
-    if $¢.from + $str.chars <= $¢.str.chars &&
-            $¢.str.substr($¢.from, $str.chars) eq $str {
-        Cursor.RAWCREATE("str", $¢.str, "from", $¢.from + $str.chars);
+sub _rxstr($C, $str) {
+    if $C.from + $str.chars <= $C.str.chars &&
+            $C.str.substr($C.from, $str.chars) eq $str {
+        Cursor.RAWCREATE("str", $C.str, "from", $C.from + $str.chars);
     } else {
         Nil;
     }
 }
 
 # regex { a b* c }
-sub rxtest($¢) {
-    _rxlazymap(_rxstr($¢, 'a'), sub ($¢) { _rxlazymap(_rxstar($¢, sub ($¢) { _rxstr($¢, 'b') }), sub ($¢) { _rxstr($¢, 'c') }) })
+sub rxtest($C) {
+    _rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) })
 }
+
+sub test($str) {
+    my $i = 0;
+    my $win = 0;
+    while !$win && $i <= $str.chars {
+        my $C = Cursor.RAWCREATE("str", $str, "from", $i);
+        if rxtest($C) {
+            $win = 1;
+        }
+    }
+    say $str ~ (" ... " ~ $win);
+}
+
+test "xaaabc";
+test "xbc";
+test "abbbc";
+test "ac";
+test "aabb";
+test "abx";
