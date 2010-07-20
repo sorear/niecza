@@ -4,9 +4,12 @@ use strict;
 use warnings;
 
 use Op;
+use RxOp;
 use Body;
 use Unit;
 use Sig;
+
+use Try::Tiny;
 
 our $AUTOLOAD;
 my %carped;
@@ -147,9 +150,61 @@ sub quote__S_Q { my ($cl, $M) = @_;
     $M->{_ast} = $M->{quibble}{nibble}{_ast};
 }
 
+sub quote__S_Slash_Slash { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{nibble}{_ast};
+}
+
+# :: RxOp
+sub atom { my ($cl, $M) = @_;
+    if ($M->{metachar}) {
+        $M->{_ast} = $M->{metachar}{_ast};
+    } else {
+        $M->{_ast} = RxOp::String->new(text => $M->Str);
+    }
+}
+
+sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
+    my $atom = $M->{atom}{_ast};
+    my $ns   = $M->{normspace}[0];
+    my $q    = $M->{quantifier}[0] ? $M->{quantifier}[0]{_ast} : undef;
+
+    if (!$q) {
+        $M->{_ast} = $atom;
+    } elsif ($q->{simple}) {
+        $M->{_ast} = RxOp::Quantifier->new(type => $q->{simple},
+            zyg => [$atom]);
+    } else {
+        $M->sorry("Unhandled quantifier " . $M->{quantifier}[0]->Str);
+    }
+}
+
+# :: Context hash interpreted by quantified_atom
+sub quantifier {}
+sub quantifier__S_Star { my ($cl, $M) = @_;
+    $M->{_ast} = { simple => '*' };
+}
+sub quantifier__S_Plus { my ($cl, $M) = @_;
+    $M->{_ast} = { simple => '+' };
+}
+sub quantifier__S_Question { my ($cl, $M) = @_;
+    $M->{_ast} = { simple => '?' };
+}
+
+sub quantmod { my ($cl, $M) = @_;
+    if ($M->Str ne '') {
+        $M->sorry('Quantmods NYI');
+        return;
+    }
+}
+
+sub quant_atom_list { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::Sequence->new(zyg =>
+        [ map { $_->{_ast} } @{ $M->{quantified_atom} } ]);
+}
+
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
-        $M->{_ast} = $M->{EXPR}{_ast};
+        $M->{_ast} = RxOp::to_ops($M->{EXPR}{_ast});
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
         # XXX We don't interpret the code, so we can't tell if it's actually
         # using variables, but still, it probably is.

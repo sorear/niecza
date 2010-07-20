@@ -1,8 +1,8 @@
 STDBASE:=$(shell pwd)/STD_checkout
 STDENV=PERL5LIB=$(STDBASE) PERL6LIB=$(STDBASE):$(STDBASE)/lib
 
-COMPILER=Body.pm CgOp.pm CodeGen.pm CompilerDriver.pm Decl.pm Op.pm Sig.pm\
-	 Unit.pm Niecza/Actions.pm Niecza/Grammar.pmc .STD_build_stamp
+COMPILER=Body.pm CgOp.pm CodeGen.pm CompilerDriver.pm Decl.pm Op.pm RxOp.pm\
+	 Sig.pm Unit.pm Niecza/Actions.pm Niecza/Grammar.pmc .STD_build_stamp
 
 all: Setting.dll
 
