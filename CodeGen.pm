@@ -1,11 +1,7 @@
-use strict;
-use warnings;
 use 5.010;
+use MooseX::Declare;
 
-{
-    package CodeGen;
-    use Moose;
-
+class CodeGen {
     # Beta will do this using reflection
     my %typedata = (
         IP6 =>
@@ -61,8 +57,7 @@ use 5.010;
         'Kernel.UnboxAny'      => [m => 'object'],
     );
 
-    sub _typedata {
-        my ($self, $types, @path) = @_;
+    method _typedata ($types, @path) {
         my $cursor = \%typedata;
         for (@path) { $cursor = $cursor->{$_}; }
         if (!defined $cursor) {
@@ -107,8 +102,7 @@ use 5.010;
     sub qm { "\"" . $_[0] . "\"" }
 
     # always called after _saveall
-    sub _savestackstate {
-        my ($self, $lbl) = @_;
+    method _savestackstate ($lbl) {
         my %save;
         $save{depth} = $self->depth;
         $save{stacktype} = [ @{ $self->stacktype } ];
@@ -116,8 +110,7 @@ use 5.010;
         $self->savedstks->{$lbl} = \%save;
     }
 
-    sub _restorestackstate {
-        my ($self, $lbl) = @_;
+    method _restorestackstate ($lbl) {
         my $save = $self->savedstks->{$lbl};
         $self->depth($save->{depth});
         $self->savedepth($save->{depth});
@@ -125,15 +118,13 @@ use 5.010;
         %{ $self->auxdepths } = %{ $save->{auxdepths} };
     }
 
-    sub _emit {
-        my ($self, $line) = @_;
+    method _emit ($line) {
         #push @{ $self->buffer }, sprintf "    // d=%d md=%d sd=%d nl=%d\n",
         #    $self->depth, $self->maxdepth, $self->savedepth, $self->numlabels;
         push @{ $self->buffer }, "    $line;\n";
     }
 
-    sub _undercheck {
-        my ($self, $margin) = @_;
+    method _undercheck ($margin) {
         Carp::confess "Stack underflow" if $margin > $self->depth;
         if ($self->depth - $margin < $self->savedepth) {
             for my $n ($self->depth - $margin .. $self->savedepth - 1) {
@@ -143,30 +134,26 @@ use 5.010;
         }
     }
 
-    sub _overcheck {
-        my ($self, $margin) = @_;
+    method _overcheck ($margin) {
         if ($self->depth + $margin > $self->maxdepth) {
             $self->maxdepth($self->depth + $margin);
         }
     }
 
-    sub _peek {
-        my ($self) = @_;
+    method _peek () {
         $self->_undercheck(1);
         my $ty = @{ $self->stacktype }[-1];
         return "(($ty)s" . ($self->depth - 1) . ")";
     }
 
-    sub _pop {
-        my ($self) = @_;
+    method _pop () {
         $self->_undercheck(1);
         my $ty = pop @{ $self->stacktype };
         $self->depth($self->depth - 1);
         return "(($ty)s" . ($self->depth) . ")";
     }
 
-    sub _push {
-        my ($self, $ty, $expr) = @_;
+    method _push ($ty, $expr) {
         $self->_overcheck(1);
         my $n = $self->depth;
         $self->_emit("s$n = $expr");
@@ -175,16 +162,14 @@ use 5.010;
         push @{ $self->stacktype }, $ty;
     }
 
-    sub _saveall {
-        my ($self) = @_;
+    method _saveall () {
         for my $i ($self->savedepth .. $self->depth - 1) {
             $self->_emit("th.lex[\"s$i\"] = s$i");
         }
         $self->savedepth($self->depth);
     }
 
-    sub _cpscall {
-        my ($self, $rt, $expr) = @_;
+    method _cpscall ($rt, $expr) {
         $self->_saveall;
         my $n = $self->label;
         $self->_emit("th.resultSlot = null");
@@ -196,8 +181,7 @@ use 5.010;
 
     # These functions are usable from user code, but still depend on volatiles.
 
-    sub swap {
-        my ($self) = @_;
+    method swap () {
         $self->_undercheck(2);
         $self->_overcheck(1);
         my $n = $self->depth;
@@ -208,40 +192,34 @@ use 5.010;
         @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
     }
 
-    sub new_aux {
-        my ($self, $name, $type) = @_;
+    method new_aux ($name, $type) {
         $self->auxdepths->{$name} = 0;
         $self->auxtypes->{$name} = $type;
     }
 
-    sub push_aux {
-        my ($self, $which) = @_;
+    method push_aux ($which) {
         my $var = "aux!${which}!" . ($self->auxdepths->{$which}++);
         $self->lextypes($var, $self->auxtypes->{$which});
         $self->rawlexput($var);
     }
 
-    sub pop_aux {
-        my ($self, $which) = @_;
+    method pop_aux ($which) {
         my $var = "aux!${which}!" . (--$self->auxdepths->{$which});
         $self->rawlexget($var);
     }
 
-    sub peek_aux {
-        my ($self, $which) = @_;
+    method peek_aux ($which) {
         my $var = "aux!${which}!" . ($self->auxdepths->{$which} - 1);
         $self->rawlexget($var);
     }
 
-    sub label {
-        my ($self) = @_;
+    method label () {
         my $n = $self->numlabels;
         $self->numlabels($n + 1);
         return $n;
     }
 
-    sub labelhere {
-        my ($self, $n) = @_;
+    method labelhere ($n) {
         $self->_saveall;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_restorestackstate($n) if $self->savedstks->{$n};
@@ -250,8 +228,7 @@ use 5.010;
         $self->unreach(0);
     }
 
-    sub goto {
-        my ($self, $n) = @_;
+    method goto ($n) {
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_saveall;
         $self->_savestackstate($n);
@@ -259,8 +236,7 @@ use 5.010;
         $self->unreach(1);
     }
 
-    sub cgoto {
-        my ($self, $n) = @_;
+    method cgoto ($n) {
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
         $self->_saveall;
@@ -268,8 +244,7 @@ use 5.010;
         push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
     }
 
-    sub ncgoto {
-        my ($self, $n) = @_;
+    method ncgoto ($n) {
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
         $self->_saveall;
@@ -277,8 +252,7 @@ use 5.010;
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
 
-    sub lextypes {
-        my ($self, %args) = @_;
+    method lextypes (%args) {
         #say STDERR "lextypes: @args";
         my $body = $self->body // $self->bodies->[-1];
         if ($body) {
@@ -287,18 +261,15 @@ use 5.010;
         %{ $self->lex2type } = (%{ $self->lex2type }, %args);
     }
 
-    sub rawlexget {
-        my ($self, $name) = @_;
+    method rawlexget ($name, @) {
         $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
     }
 
-    sub rawlexput {
-        my ($self, $name) = @_;
+    method rawlexput ($name, @) {
         $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
     }
 
-    sub lexget {
-        my ($self, $order, $name) = @_;
+    method lexget ($order, $name) {
         my $frame = 'th.';
         if ($self->auxdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -310,8 +281,7 @@ use 5.010;
             $frame . ("outer." x $order) . "lex[" . qm($name) . "]");
     }
 
-    sub lexput {
-        my ($self, $order, $name) = @_;
+    method lexput ($order, $name) {
         my $frame = 'th.';
         if ($self->auxdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -321,8 +291,7 @@ use 5.010;
         $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
     }
 
-    sub callframe {
-        my ($self) = @_;
+    method callframe () {
         my $frame = 'th';
         if ($self->auxdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -332,81 +301,68 @@ use 5.010;
         $self->_push("Frame", $frame);
     }
 
-    sub dup {
-        my ($self) = @_;
+    method dup () {
         my $c = $self->_peek;
         $self->_push($self->stacktype->[-1], $c);
     }
 
-    sub drop {
-        my ($self) = @_;
+    method drop () {
         $self->_pop;
     }
 
     # the use of scalar here is a little bit wrong; semantically it's closer
     # to the old notion of ¢foo.  doesn't matter much since it's not exposed
     # at the Perl 6 level.
-    sub pos {
-        my ($self, $num) = @_;
+    method pos ($num) {
         $self->_push('Variable',
             "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
     }
 
-    sub protolget {
-        my ($self, $name) = @_;
+    method protolget ($name) {
         $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
     }
 
-    sub call_method {
-        my ($self, $nv, $name, $numargs) = @_;
+    method call_method ($nv, $name, $numargs) {
         my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV
         my $inv = $self->_pop;
         $self->_cpscall(($nv ? 'Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
-    sub call_sub {
-        my ($self, $nv, $numargs) = @_;
+    method call_sub ($nv, $numargs) {
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
         $self->_cpscall(($nv ? 'Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
-    sub tail_call_sub {
-        my ($self, $numargs) = @_;
+    method tail_call_sub ($numargs) {
         my @args = reverse map { $self->_pop } (1 .. $numargs);
         my $inv = $self->_pop;
         $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
         $self->unreach(1);
     }
 
-    sub clr_bool {
-        my ($self, $v) = @_;
+    method clr_bool ($v) {
         $self->_push('System.Boolean', $v ? 'true' : 'false');
     }
 
-    sub clr_new {
-        my ($self, $class, $nargs) = @_;
+    method clr_new ($class, $nargs) {
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         $self->_push($class, "new $class(" . join(", ", @args) . ")");
     }
 
-    sub clr_string {
-        my ($self, $text) = @_;
+    method clr_string ($text) {
         $self->_push('System.String', qm($text));
     }
 
-    sub clr_int {
-        my ($self, $val) = @_;
+    method clr_int ($val) {
         $self->_push('System.Int32', $val);
     }
 
-    sub clr_double {
-        my ($self, $val) = @_;
+    method clr_double ($val) {
         $self->_push('System.Double', "((Double)$val)");
     }
 
-    sub clr_arith {
-        my ($self, $op) = @_;
+    method clr_arith ($op) {
         my $ty = $self->stacktype->[-1];
         if ($ty ne $self->stacktype->[-2]) {
             die "Overloaded operations not yet supported";
@@ -416,47 +372,40 @@ use 5.010;
         $self->_push($ty, "$a1 $op $a2");
     }
 
-    sub clr_compare {
-        my ($self, $op) = @_;
+    method clr_compare ($op) {
         my $a2 = $self->_pop;
         my $a1 = $self->_pop;
         $self->_push('Boolean', "$a1 $op $a2");
     }
 
-    sub clr_field_get {
-        my ($self, $f) = @_;
+    method clr_field_get ($f) {
         my $ty = $self->_typedata('f', $self->stacktype->[-1], $f);
         my $obj = $self->_pop;
         $self->_push($ty, "$obj.$f");
     }
 
-    sub clr_field_set {
-        my ($self, $f) = @_;
+    method clr_field_set ($f) {
         my $val = $self->_pop;
         my $obj = $self->_pop;
         $self->_emit("$obj.$f = $val");
     }
 
-    sub clr_sfield_get {
-        my ($self, $f) = @_;
+    method clr_sfield_get ($f) {
         my $ty = $self->_typedata('f', $f);
         $self->_push($ty, "$f");
     }
 
-    sub clr_sfield_set {
-        my ($self, $f) = @_;
+    method clr_sfield_set ($f) {
         my $val = $self->_pop;
         $self->_emit("$f = $val");
     }
 
-    sub attr_var {
-        my ($self, $f) = @_;
+    method attr_var ($f) {
         my $obj = $self->_pop;
         $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
     }
 
-    sub clr_index_get {
-        my ($self, $f) = @_;
+    method clr_index_get ($f?) {
         if ($f) {
             $self->clr_string($f);
         }
@@ -470,21 +419,18 @@ use 5.010;
         $self->_push($ty, "$obj" . "[$ix]");
     }
 
-    sub clr_index_set {
-        my ($self, $f) = @_;
+    method clr_index_set ($f?) {
         my $val = $self->_pop;
         my $ix  = $self->_pop unless $f;
         my $obj = $self->_pop;
         $self->_emit("$obj" . "[" . ($f ? qm($f) : $ix) . "] = $val");
     }
 
-    sub cast {
-        my ($self, $type) = @_;
+    method cast ($type) {
         $self->_push($type, "(($type)" . $self->_pop . ")");
     }
 
-    sub clr_call_direct {
-        my ($self, $name, $nargs) = @_;
+    method clr_call_direct ($name, $nargs) {
         my ($cl, $rt) = $self->_typedata('cm', $name);
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         if ($cl eq 'c') {
@@ -497,8 +443,7 @@ use 5.010;
         }
     }
 
-    sub clr_call_virt {
-        my ($self, $name, $nargs) = @_;
+    method clr_call_virt ($name, $nargs) {
         my @args = reverse map { $self->_pop } 1 .. $nargs;
         my ($cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1], $name);
         my $inv = $self->_pop;
@@ -512,8 +457,7 @@ use 5.010;
         }
     }
 
-    sub return {
-        my ($self, $nv) = @_;
+    method return ($nv) {
         return if $self->unreach;
         if ($nv) {
             $self->_emit("th.caller.resultSlot = " . $self->_pop);
@@ -522,13 +466,11 @@ use 5.010;
         $self->unreach(1);
     }
 
-    sub push_null {
-        my ($self, $ty) = @_;
+    method push_null ($ty) {
         $self->_push($ty, "null");
     }
 
-    sub close_sub {
-        my ($self, $bodycg) = @_;
+    method close_sub ($bodycg) {
         $self->pop_aux('protopad');
         pop @{ $self->bodies };
         $self->peek_aux('protopad');
@@ -538,8 +480,7 @@ use 5.010;
             $bodycg->csname . "), $pp, $op)");
     }
 
-    sub proto_var {
-        my ($self, $name) = @_;
+    method proto_var ($name) {
         $self->peek_aux('protopad');
         my $pp = $self->_pop;
         my $pv = $self->_pop;
@@ -548,8 +489,7 @@ use 5.010;
 
     # These are completely derived.
 
-    sub scopelex {
-        my ($self, $name, $set) = @_;
+    method scopelex ($name, $set) {
         my $body = $self->body // $self->bodies->[-1];
         my ($order, $scope) = (0, $body);
         while ($scope && !$scope->lexical->{$name}) {
@@ -566,8 +506,7 @@ use 5.010;
         }
     }
 
-    sub open_protopad {
-        my ($self, $body) = @_;
+    method open_protopad ($body) {
         $self->peek_aux('protopad');
         $self->clr_new('Frame', 1);
         $self->push_aux('protopad');
@@ -576,16 +515,14 @@ use 5.010;
 
     ###
 
-    sub csname {
-        my ($self) = @_;
+    method csname () {
         return $self->name if $self->entry;
         my @name = split /\W+/, $self->name;
         shift @name if @name && $name[0] eq '';
         join("", (map { ucfirst $_ } @name), "_", $self->uid, "C");
     }
 
-    sub write {
-        my ($self) = @_;
+    method write () {
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
@@ -603,13 +540,10 @@ use 5.010;
         print ::NIECZA_OUT " " x 4, "}\n";
     }
 
-    sub BUILD {
-        my $self = shift;
+    method BUILD {
         #say STDERR YAML::XS::Dump($self->ops);
         $self->ops->var_cg($self);
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
+
 1;
