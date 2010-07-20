@@ -388,6 +388,11 @@ my class LLArray {
       (box Num (cast Double (getfield Count (unbox List<Variable>
         (@ (l self)))))) } }
     method Bool() { ?( self.elems ) }
+    method new(*@v) { Q:CgOp { (varattr rest (@ (l @v))) } }
+    method at-pos($i) {
+        Q:CgOp { (getindex (cast Int32 (unbox Double (@ (l $i))))
+                   (unbox List<Variable> (@ (l self)))) }
+    }
 }
 
 my class Iterator {
@@ -440,6 +445,40 @@ my class List is Cool {
         $!items.shift;
     }
     method elems() { self.fill(1000_000_000); $!items.elems; }
+
+    method at-pos($i) {
+        self.fill($i + 1);
+        $!items.at-pos($i);
+    }
+
+    # XXX this is wrong, it holds on to the entire list -> memory leaks
+    my class ListIterator is Iterator {
+        # $!valid $!value $!next  $!list $!index
+        method validate() {
+            $!valid = 1;
+            # needed to copy flatness bit if not $!flat ?
+            my $l = $!list;
+            my $i = $!index;
+            if $l.fill($i+1) {
+                Q:CgOp {
+                    (prog
+                      (setindex value (getfield slots
+                          (cast DynObject (@ (l self))))
+                        (methodcall (l $l) at-pos (l $i)))
+                      (null Variable))
+                };
+            } else {
+                $!value = EMPTY;
+            }
+            $!next = ListIterator.RAWCREATE("valid", 0, "next", Any,
+                "value", Any, "list", $!list, "index", $i+1);
+        }
+    }
+
+    method iterator() {
+        ListIterator.RAWCREATE("valid", 0, "next", Any, "value", Any,
+            "list", self, "index", 0);
+    }
 }
 
 {YOU_ARE_HERE}
