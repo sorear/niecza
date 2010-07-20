@@ -434,8 +434,9 @@ my class Parcel {
 
     method iterator() {
         my $ll = $!ll;
-        my $it = Iterator.RAWCREATE("valid", 1, "value", EMPTY, "next", Any);
-        my $ix = $ll.elems - 1;
+        my $it = Iterator.RAWCREATE("valid", 1, "value", Any, "next", Any);
+        $it.value = EMPTY;
+        my $ix = ($ll.elems - 1);
 
         while $ix >= 0 {
             $it = Iterator.RAWCREATE("valid", 1, "next", $it);
