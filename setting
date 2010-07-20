@@ -483,10 +483,10 @@ my class List is Cool {
             if $l.fill($i+1) {
                 Q:CgOp {
                     (prog
-                      (setindex value (getfield slots
+                      [setindex value (getfield slots
                           (cast DynObject (@ (l self))))
-                        (methodcall (l $l) at-pos (l $i)))
-                      (null Variable))
+                        (methodcall (l $l) at-pos (l $i))]
+                      [null Variable])
                 };
             } else {
                 $!value = EMPTY;

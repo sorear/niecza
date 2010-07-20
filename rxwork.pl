@@ -19,9 +19,9 @@ sub _rxlazymap($cs, $sub) {
             # XXX horrible. we're making the value act @-ish, maybe
             Q:CgOp {
                 (prog
-                  (setindex value (getfield slots (cast DynObject (@ (l self))))
-                    (subcall (@ (l $f)) (l $bv)))
-                  (null Variable))
+                  [setindex value (getfield slots (cast DynObject (@ (l self))))
+                    (subcall (@ (l $f)) (l $bv))]
+                  [null Variable])
             };
             $!next = LazyIterator.RAWCREATE("valid", 0, "next", Any,
                 "value", Any, "back", $nb, "fun", $!fun);
