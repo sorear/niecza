@@ -1,15 +1,21 @@
+use strict;
+use warnings;
 use 5.010;
-use MooseX::Declare;
 
-class Sig::Target {
+{
+    package Sig::Target;
+    use Moose;
+
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has list => (is => 'ro', isa => 'Bool', default => 0);
 
-    method used_slots () {
+    sub used_slots {
+        my $self = shift;
         if ($self->slot) { [ $self->slot, $self->list ] } else { () }
     }
 
-    method binder ($get) {
+    sub binder {
+        my ($self, $get) = @_;
         if ($self->slot) {
             # TODO: implement ro, etc
             CgOp::bind(0, CgOp::scopedlex($self->slot), $get);
@@ -17,14 +23,22 @@ class Sig::Target {
             CgOp::noop;
         }
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Sig::Parameter {
+{
+    package Sig::Parameter;
+    use Moose;
+
     has target => (is => 'ro', isa => 'Sig::Target', required => 1,
         handles => [ 'used_slots' ]);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
 
-    method binder ($ixp) {
+    sub binder {
+        my ($self, $ixp) = @_;
+
         if ($self->slurpy) {
             $self->target->binder(
                 CgOp::let(CgOp::rawnew('DynObject', CgOp::getfield('klass',
@@ -45,22 +59,32 @@ class Sig::Parameter {
             $self->target->binder(CgOp::pos($$ixp++));
         }
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
-class Sig {
+{
+    package Sig;
+    use Moose;
+
     has params => (isa => 'ArrayRef[Sig::Parameter]', is => 'ro', required => 1);
 
-    method for_method () {
+    sub for_method {
+        my $self = shift;
         my $sp = Sig::Parameter->new(target =>
             Sig::Target->new(slot => 'self'));
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
-    method used_slots () {
+    sub used_slots {
+        my $self = shift;
         map { $_->used_slots } @{ $self->params };
     }
 
-    method binder () {
+    sub binder {
+        my ($self) = @_;
+
         # TODO: Error checking.
         my $ix = 0;
         my @p;
@@ -69,6 +93,9 @@ class Sig {
         }
         CgOp::prog(@p);
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
 }
 
 1;
