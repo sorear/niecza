@@ -7,6 +7,13 @@ my class Cursor {
 }
 
 PRE-INIT {
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "bless")) },
+        anon method bless($obj) { Q:CgOp {
+            (prog
+              [setfield klass (cast DynObject (@ (l $obj)))
+                (getfield klass (cast DynObject (@ (l self))))]
+              [l $obj])
+        } });
     Mu.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
         anon method flat() { self, });
     Parcel.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
@@ -78,27 +85,27 @@ sub _rxstr($C, $str) {
     }
 }
 
-# regex { a b* c }
-sub rxtest($C) {
-    _rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) })
-}
-
-sub test($str) {
-    my $i = 0;
-    my $win = 0;
-    while !$win && $i <= $str.chars {
-        my $C = Cursor.RAWCREATE("str", $str, "from", $i);
-        if rxtest($C) {
-            $win = 1;
+my class Regex is Sub {
+    method ACCEPTS($str) {
+        my $i = 0;
+        my $win = 0;
+        while !$win && $i <= $str.chars {
+            my $C = Cursor.RAWCREATE("str", $str, "from", $i);
+            if (self)($C) {
+                $win = 1;
+            }
+            $i++;
         }
-        $i++;
+        $win;
     }
-    say $str ~ (" ... " ~ $win);
 }
 
-test "xaaabc";
-test "xbc";
-test "abbbc";
-test "ac";
-test "aabb";
-test "abx";
+# regex { a b* c }
+my $rx = Regex.bless(sub ($C) { _rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) }) });
+
+say "xaaabc" ~ ("xaaabc" ~~ $rx);
+say "xbc"    ~ ("xbc" ~~ $rx);
+say "abbbc"  ~ ("abbbc" ~~ $rx);
+say "ac"     ~ ("ac" ~~ $rx);
+say "aabb"   ~ ("aabb" ~~ $rx);
+say "abx"    ~ ("abx" ~~ $rx);
