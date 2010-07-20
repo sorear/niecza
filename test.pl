@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 93;
+plan 94;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -290,4 +290,15 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 {
     ok "Hello".substr(1,3) eq "ell", "substr works";
     ok "Hello".chars == 5, ".chars works";
+}
+
+{
+    my $buf = '';
+    sub cat(*@x) {
+        while @x {
+            $buf = $buf ~ @x.shift;
+        }
+        $buf;
+    }
+    ok cat(1, (2, 3), ((4, 5), (Nil, 7))) eq "123457", "parcels flatten";
 }
