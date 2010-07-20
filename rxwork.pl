@@ -12,28 +12,35 @@ sub _rxlazymap($cs, $sub) {
         # $!valid $!value $!next  $!fun $!back
         method validate() {
             $!valid = 1;
-            my $f = $!fun;
             if ! $!back.valid {
                 $!back.validate;
             }
             my $bv = $!back.value;
             my $bn = $!back.next;
-            # XXX horrible. we're making the value act @-ish, maybe
-            Q:CgOp {
-                (prog
-                  [setindex value (getfield slots (cast DynObject (@ (l self))))
-                    (subcall (@ (l $f)) (l $bv))]
-                  [null Variable])
-            };
-            $!next = LazyIterator.RAWCREATE("valid", 0, "next", Any,
-                "value", Any, "back", Any, "fun", $!fun);
-            $!next.back = $bn;
+            if $bv.^isa(EMPTY) {
+                $!value = EMPTY;
+            } else {
+                my $f = $!fun;
+                # XXX horrible. we're making the value act @-ish, maybe
+                Q:CgOp {
+                    (prog
+                      [setindex value (getfield slots (cast DynObject
+                            (@ (l self)))) (subcall (@ (l $f)) (l $bv))]
+                      [null Variable])
+                };
+                $!next = LazyIterator.RAWCREATE("valid", 0, "next", Any,
+                    "value", Any, "back", Any, "fun", $!fun);
+                $!next.back = $bn;
+            }
         }
     }
 
+    my $lit = LazyIterator.RAWCREATE("valid", 0, "value", Any,
+        "next", Any, "back", Any, "fun", $sub);
+    $lit.back = $cs.iterator;
+
     my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest",
-        LLArray.new(LazyIterator.RAWCREATE("valid", 0, "value", Any,
-            "next", Any, "back", $cs.iterator, "fun", $sub)));
+        LLArray.new($lit));
     @l.fill(1);
     @l;
 }
