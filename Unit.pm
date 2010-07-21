@@ -20,14 +20,11 @@ use 5.010;
         my ($self) = @_;
         $self->mainline->outer($self->setting) if $self->setting;
         CodeGen->new(name => 'BOOT', entry => 1,
-            ops => CgOp::prog(
-                CgOp::new_aux('protopad', 'Frame'),
-                CgOp::new_aux('how', 'Variable'),
-                CgOp::with_aux('protopad',
-                    CgOp::cast('Frame', CgOp::fetch(CgOp::pos(0))),
-                    CgOp::return(
-                        CgOp::newscalar(
-                            CgOp::protosub($self->mainline))))));
+            ops => CgOp::with_aux('protopad', 'Frame',
+                CgOp::cast('Frame', CgOp::fetch(CgOp::pos(0))),
+                CgOp::return(
+                    CgOp::newscalar(
+                        CgOp::protosub($self->mainline)))));
     }
 
     sub write {

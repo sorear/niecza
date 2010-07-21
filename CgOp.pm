@@ -294,10 +294,6 @@ use warnings;
         CgOp::Primitive->new(op => [ 'lextypes', @_ ]);
     }
 
-    sub new_aux {
-        CgOp::Primitive->new(op => [ 'new_aux', $_[0], $_[1] ]);
-    }
-
     sub share_lex {
         scopedlex($_[0], protolget($_[0]));
     }
@@ -350,7 +346,6 @@ use warnings;
             zyg => \@args);
     }
 
-    # the aux stacks probably ought to die.
     sub protosub {
         my ($body, @extra) = @_;
         prog(
@@ -360,9 +355,9 @@ use warnings;
     }
 
     sub with_aux {
-        my ($name, $value, @stuff) = @_;
+        my ($name, $type, $value, @stuff) = @_;
         prog(
-            CgOp::Primitive->new(op => [ 'push_aux', $name ],
+            CgOp::Primitive->new(op => [ 'push_aux', $name, $type ],
                 zyg => [ $value ]),
             @stuff,
             sink(CgOp::Primitive->new(op => [ 'pop_aux', $name ])));

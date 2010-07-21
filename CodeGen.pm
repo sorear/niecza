@@ -93,7 +93,6 @@ use 5.010;
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
 
     has auxdepths => (isa => 'HashRef', is => 'ro', default => sub { +{} });
-    has auxtypes  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
@@ -208,16 +207,10 @@ use 5.010;
         @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
     }
 
-    sub new_aux {
-        my ($self, $name, $type) = @_;
-        $self->auxdepths->{$name} = 0;
-        $self->auxtypes->{$name} = $type;
-    }
-
     sub push_aux {
-        my ($self, $which) = @_;
+        my ($self, $which, $ty) = @_;
         my $var = "aux!${which}!" . ($self->auxdepths->{$which}++);
-        $self->lextypes($var, $self->auxtypes->{$which});
+        $self->lex2type->{$var} = $ty;
         $self->rawlexput($var);
     }
 
@@ -568,7 +561,7 @@ use 5.010;
         my ($self, $body) = @_;
         $self->peek_aux('protopad');
         $self->clr_new('Frame', 1);
-        $self->push_aux('protopad');
+        $self->push_aux('protopad', 'Frame');
         push @{ $self->bodies }, $body;
     }
 

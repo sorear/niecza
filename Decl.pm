@@ -221,7 +221,7 @@ use CgOp;
 
         $self->body->outer($body);
 
-        CgOp::with_aux("how",
+        CgOp::with_aux("how", "Variable",
             CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
                 CgOp::wrap(CgOp::clr_string($self->name // 'ANON'))),
 
