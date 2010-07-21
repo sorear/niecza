@@ -408,7 +408,8 @@ use warnings;
     }
 
     sub pos {
-        CgOp::Primitive->new(op => [ 'pos', $_[0] ]);
+        CgOp::Primitive->new(op => [ 'pos', blessed($_[0]) ? () : $_[0] ],
+            zyg => [blessed($_[0]) ? ($_[0]) : ()]);
     }
 
     sub ternary {

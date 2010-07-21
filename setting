@@ -348,25 +348,20 @@ PRE-INIT {
     Mu.HOW.add-method(Q:CgOp { (w (clr_string "not")) },
         anon method notdef() { ! self.Bool });
     Mu.HOW.add-method(Q:CgOp { (w (clr_string "RAWCREATE")) },
-        anon method RAWCREATE(*@fields) {
-            my $obj = Q:CgOp {
-                (ns (rawnew DynObject (getfield klass
-                    (cast DynObject (@ (l self))))))
-            };
-            while @fields {
-                my $name  = @fields.shift;
-                my $value = @fields.shift;
-
-                Q:CgOp {
-                    (prog
-                      [setindex (unbox String (@ (l $name)))
-                        (getfield slots (cast DynObject (@ (l $obj))))
-                        (l $value)]
-                      [null Variable])
-                };
-            }
-            $obj;
-        });
+        anon method RAWCREATE { Q:CgOp {
+            (withtypes i Int32 max Int32 obj DynObject
+              [l max (getfield Length (getfield pos (callframe)))]
+              [l i (int 1)]
+              [l obj (rawnew DynObject (getfield klass (cast DynObject
+                      (@ (pos 0)))))]
+              [whileloop 0 0 (< (l i) (l max)) (prog
+                  [setindex
+                    (unbox String (@ (pos (l i))))
+                    (getfield slots (l obj))
+                    (nsw (@ (pos (+ (l i) (int 1)))))]
+                  [l i (+ (l i) (int 2))])]
+              [ns (l obj)])
+        } });
     Mu.HOW.add-method(Q:CgOp { (w (clr_string "bless")) },
         anon method bless($obj) { Q:CgOp {
             (prog

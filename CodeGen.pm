@@ -30,6 +30,8 @@ use 5.010;
               Insert       => [m => 'Void'],
               RemoveAt     => [m => 'Void'],
               Count        => [f => 'Int32'] },
+        'LValue[]' =>
+            { Length       => [f => 'Int32'] },
         'Double' =>
             { ToString     => [m => 'String'] },
         'Variable' =>
@@ -41,6 +43,8 @@ use 5.010;
         'String' =>
             { Length       => [f => 'Int32'],
               Substring    => [m => 'String'] },
+        'Frame' =>
+            { pos          => [f => 'LValue[]'] },
 
         'Kernel.SlurpyHelper'  => [c => 'List<Variable>'],
         'Kernel.Bind'          => [c => 'Void'],
@@ -314,6 +318,9 @@ use 5.010;
     # at the Perl 6 level.
     sub pos {
         my ($self, $num) = @_;
+        if (! defined($num)) {
+            $num = $self->_pop;
+        }
         $self->_push('Variable',
             "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
     }
@@ -363,7 +370,7 @@ use 5.010;
 
     sub clr_int {
         my ($self, $val) = @_;
-        $self->_push('System.Int32', $val);
+        $self->_push('Int32', $val);
     }
 
     sub clr_double {
@@ -490,7 +497,8 @@ use 5.010;
 
     sub push_null {
         my ($self, $ty) = @_;
-        $self->_push($ty, "null");
+        # (Int32)null isn't liked much
+        $self->_push($ty, $ty eq 'Int32' ? "0" : "null");
     }
 
     sub close_sub {
