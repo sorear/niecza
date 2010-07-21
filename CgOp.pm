@@ -249,7 +249,7 @@ use warnings;
 
     sub methodcall {
         my ($obj, $name, @args) = @_;
-        let($obj, 'Variable', sub {
+        let($obj, sub {
             CgOp::Primitive->new(op => [ 'call_method', 1, $name, scalar @args ],
                 zyg => [ fetch($_[0]), $_[0], @args ])});
     }
@@ -272,7 +272,7 @@ use warnings;
         } else {
             my $n = shift;
             my $t = shift;
-            letn($n, $t, null($t), withtypes(@_));
+            letn($n, null($t), withtypes(@_));
         }
     }
 
@@ -337,9 +337,9 @@ use warnings;
     }
 
     sub letn {
-        my ($name, $type, $value, @stuff) = @_;
+        my ($name, $value, @stuff) = @_;
         prog(
-            CgOp::Primitive->new(op => [ 'push_let', $name, $type ],
+            CgOp::Primitive->new(op => [ 'push_let', $name ],
                 zyg => [ $value ]),
             @stuff,
             sink(CgOp::Primitive->new(op => [ 'pop_let', $name ])));
@@ -362,9 +362,9 @@ use warnings;
 
     my $nextlet = 0;
     sub let {
-        my ($head, $type, $bodyf) = @_;
+        my ($head, $bodyf) = @_;
         my $v = ($nextlet++);
-        letn($v, $type, $head, $bodyf->(letvar($v)));
+        letn($v, $head, $bodyf->(letvar($v)));
     }
 }
 
@@ -408,7 +408,7 @@ use warnings;
                 if (_okdelay($op->zyg->[scalar @sofar])) {
                     $_recurse->(@sofar, $op->zyg->[scalar @sofar]);
                 } else {
-                    let($op->zyg->[scalar @sofar], 'XXX',
+                    let($op->zyg->[scalar @sofar],
                         sub { $_recurse->(@sofar, $_[0]) });
                 }
             };

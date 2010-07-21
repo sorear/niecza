@@ -42,8 +42,7 @@ use 5.010;
         if ($self->slurpy) {
             $self->target->binder(
                 CgOp::let(CgOp::rawnew('DynObject', CgOp::getfield('klass',
-                            CgOp::cast('DynObject', CgOp::fetch(CgOp::scopedlex('List'))))),
-                    'DynObject', sub {
+                            CgOp::cast('DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
                     my $do = shift;
                     CgOp::prog(
                         CgOp::setindex('flat', CgOp::getfield('slots', $do),

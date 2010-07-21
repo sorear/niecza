@@ -141,7 +141,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::let($self->receiver->code($body), 'Variable', sub {
+        CgOp::let($self->receiver->code($body), sub {
             CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
                 $self->name, $_[0], map { $_->code($body) }
                     @{ $self->positionals })});
@@ -243,8 +243,7 @@ use CgOp;
         my $acc = (shift @r)->code($body);
 
         for (@r) {
-            $acc = CgOp::let($_->code($body), 'Variable',
-                sub { $self->red2($_[0], $acc) });
+            $acc = CgOp::let($_->code($body), sub { $self->red2($_[0], $acc) });
         }
 
         $acc;

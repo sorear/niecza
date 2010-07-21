@@ -20,7 +20,7 @@ use 5.010;
         my ($self) = @_;
         $self->mainline->outer($self->setting) if $self->setting;
         CodeGen->new(name => 'BOOT', entry => 1,
-            ops => CgOp::letn('protopad', 'Frame',
+            ops => CgOp::letn('protopad',
                 CgOp::cast('Frame', CgOp::fetch(CgOp::pos(0))),
                 CgOp::return(
                     CgOp::newscalar(

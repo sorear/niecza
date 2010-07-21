@@ -208,9 +208,9 @@ use 5.010;
     }
 
     sub push_let {
-        my ($self, $which, $ty) = @_;
+        my ($self, $which) = @_;
         my $var = "let!${which}!" . ($self->letdepths->{$which}++);
-        $self->lex2type->{$var} = $ty;
+        $self->lex2type->{$var} = $self->stacktype->[-1];
         $self->rawlexput($var);
     }
 
@@ -558,7 +558,7 @@ use 5.010;
         my ($self, $body) = @_;
         $self->peek_let('protopad');
         $self->clr_new('Frame', 1);
-        $self->push_let('protopad', 'Frame');
+        $self->push_let('protopad');
         push @{ $self->bodies }, $body;
     }
 
