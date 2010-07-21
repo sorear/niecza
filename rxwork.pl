@@ -6,30 +6,6 @@ my class Cursor {
     method from() { $!from }
 }
 
-PRE-INIT {
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "bless")) },
-        anon method bless($obj) { Q:CgOp {
-            (prog
-              [setfield klass (cast DynObject (@ (l $obj)))
-                (getfield klass (cast DynObject (@ (l self))))]
-              [l $obj])
-        } });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
-        anon method flat() { self, });
-    Parcel.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
-        anon method flat() {
-            my @x := self;
-            List.RAWCREATE("flat", 1, "items", LLArray.new(),
-                "rest", LLArray.new(@x));
-        });
-    List.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
-        anon method flat() {
-            my @x := self;
-            List.RAWCREATE("flat", 1, "items", LLArray.new(),
-                "rest", LLArray.new(@x));
-        });
-}
-
 # Outside a regex, a result is a lazy list.
 # Inside a regex, a result is a bare iterator, or a double return (if
 # ratcheting).

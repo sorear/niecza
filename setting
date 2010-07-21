@@ -372,6 +372,16 @@ PRE-INIT {
             }
             $obj;
         });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "bless")) },
+        anon method bless($obj) { Q:CgOp {
+            (prog
+              [setfield klass (cast DynObject (@ (l $obj)))
+                (getfield klass (cast DynObject (@ (l self))))]
+              [l $obj])
+        } });
+
+    Any.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
+        anon method flat() { self, });
 
     Any.HOW.add-method(Q:CgOp { (w (clr_string "ACCEPTS")) },
         anon method ACCEPTS($t) { self === $t });
@@ -430,8 +440,16 @@ my class Iterator {
 
 my class EMPTY { }
 
+my class List { ... }
+
 my class Parcel {
     # $!ll
+
+    method flat() {
+        my @x := self;
+        List.RAWCREATE("flat", 1, "items", LLArray.new(),
+            "rest", LLArray.new(@x));
+    }
 
     method iterator() {
         my $ll = $!ll;
@@ -475,6 +493,12 @@ sub Nil {
 my class List is Cool {
     # low level, so not declared yet
     # @!items @!rest $!flat
+    method flat() {
+        my @x := self;
+        List.RAWCREATE("flat", 1, "items", LLArray.new(),
+            "rest", LLArray.new(@x));
+    }
+
     method fill($nr) {
         my $i = $!items;
         my $r = $!rest;
