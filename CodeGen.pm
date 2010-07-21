@@ -185,6 +185,7 @@ use 5.010;
     sub _cpscall {
         my ($self, $rt, $expr) = @_;
         $self->_saveall;
+        die "Invalid operation of CPS converter" if $self->depth;
         my $n = $self->label;
         $self->_emit("th.resultSlot = null");
         $self->_emit("th.ip = $n");
@@ -576,7 +577,9 @@ use 5.010;
     sub BUILD {
         my $self = shift;
         #say STDERR YAML::XS::Dump($self->ops);
-        $self->ops->var_cg($self);
+        my $cps = $self->ops->cps_convert;
+        #say STDERR YAML::XS::Dump($cps);
+        $cps->var_cg($self);
     }
 
     __PACKAGE__->meta->make_immutable;

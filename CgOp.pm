@@ -2,12 +2,29 @@ use 5.010;
 use strict;
 use warnings;
 
+# The invariant of cps_convert is that, in the output, a primitive which does
+# a CPS call cannot appear inside the argument list of another primitive.
 
 {
     package CgOp;
     use Moose;
 
     has zyg => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    # filled in by cps_convert
+    has does_cps => (isa => 'Bool', is => 'rw');
+
+    sub cps_convert {
+        my ($self) = @_;
+        my $doescps = 0;
+        for (@{ $self->zyg }) {
+            $_ = $_->cps_convert;
+            $doescps ||= $_->does_cps;
+        }
+        $self->does_cps($doescps);
+        $self;
+    }
+
+    sub delayable { 0 }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -35,6 +52,48 @@ use warnings;
     extends 'CgOp';
 
     has op  => (isa => 'ArrayRef', is => 'ro', required => 1);
+    has is_cps_call => (isa => 'Bool', is => 'ro', default => 0);
+
+    my $tsn = 0;
+    sub cps_convert {
+        my ($self) = @_;
+        my @zyg = map { $_->cps_convert } @{ $self->zyg };
+        my @need_lift = map { $_->does_cps } @zyg;
+
+        # All temporaries generated before a lifted operation need to be
+        my $seen1;
+        for (reverse @need_lift) {
+            $seen1 ||= $_;
+            $_ ||= $seen1;
+        }
+
+        # Except for simple literals
+        for (0 .. $#zyg) {
+            $need_lift[$_] = 0 if $zyg[0]->delayable;
+        }
+
+        my @lifted;
+        my $cps = 0;
+        for (0 .. $#zyg) {
+            if ($need_lift[$_]) {
+                push @lifted, [ $tsn, $zyg[$_] ];
+                $zyg[$_] = CgOp::letvar("temp!$tsn");
+                $tsn++;
+                $cps = 1;
+            }
+        }
+        @{ $self->zyg } = @zyg;
+
+        $cps ||= $self->is_cps_call;
+        $self->does_cps($cps);
+
+        for (reverse @lifted) {
+            $self = CgOp::letn("temp!" . $_->[0], $_->[1], $self);
+            $self->does_cps($cps);
+        }
+
+        $self;
+    }
 
     sub var_cg {
         my ($self, $cg) = @_;
@@ -244,14 +303,14 @@ use warnings;
     sub subcall {
         my ($sub, @args) = @_;
         CgOp::Primitive->new(op => [ 'call_sub', 1, scalar @args ],
-            zyg => [ $sub, @args ]);
+            zyg => [ $sub, @args ], is_cps_call => 1);
     }
 
     sub methodcall {
         my ($obj, $name, @args) = @_;
         let($obj, sub {
             CgOp::Primitive->new(op => [ 'call_method', 1, $name, scalar @args ],
-                zyg => [ fetch($_[0]), $_[0], @args ])});
+                zyg => [ fetch($_[0]), $_[0], @args ], is_cps_call => 1)});
     }
 
     sub callframe {
@@ -309,13 +368,13 @@ use warnings;
     sub rawscall {
         my ($name, @args) = @_;
         CgOp::Primitive->new(op => [ 'clr_call_direct', $name, scalar @args ],
-            zyg => [ @args ]);
+            zyg => [ @args ], is_cps_call => 1); #XXX
     }
 
     sub rawcall {
         my ($inv, $name, @args) = @_;
         CgOp::Primitive->new(op => [ 'clr_call_virt', $name, scalar @args ],
-            zyg => [ $inv, @args ]);
+            zyg => [ $inv, @args ], is_cps_call => 1); #XXX
     }
 
     sub rawsget {
@@ -338,6 +397,9 @@ use warnings;
 
     sub letn {
         my ($name, $value, @stuff) = @_;
+        # XXX This violates the cardinal rule of prog (the item, if any, must
+        # be at the end) but in a safe (I think) way - pop_let can never cause
+        # a CPS call.
         prog(
             CgOp::Primitive->new(op => [ 'push_let', $name ],
                 zyg => [ $value ]),
@@ -365,62 +427,6 @@ use warnings;
         my ($head, $bodyf) = @_;
         my $v = ($nextlet++);
         letn($v, $head, $bodyf->(letvar($v)));
-    }
-}
-
-{
-    package CgOp::CpsConverter;
-
-    # CPS calls don't preserve the evaluation stack, so we need to rewrite
-    # exptrees such that calls don't appear in positions with evaluations in
-    # progress; currently, that means Primitive cannot contain CPS calls.
-    our $_recurse;
-
-    sub _okarg {
-        my ($op) = @_;
-        $op->isa('CgOp::Primitive') && !$op->cps;
-    }
-
-    sub _okdelay {
-        my ($op) = @_;
-        $op->isa('CgOp::Primitive') && $op->constant;
-    }
-
-    sub cpsconvert {
-        my ($op) = @_;
-
-        if ($op->isa('CgOp::Primitive')) {
-            # need to ensure all arguments are Primitive and not CPS calls.
-            my ($lastbad) = ((reverse grep { !_okarg($op->zyg->[$_]) }
-                0 .. $#{ $op->zyg }), -1);
-
-            local $_recurse = sub {
-                my (@sofar) = @_;
-
-                if (scalar(@sofar) > $lastbad) {
-                    while (scalar(@sofar) < scalar(@{ $op->zyg })) {
-                        push @sofar, $op->zyg->[scalar @sofar];
-                    }
-                    return CgOp::Primitive->new(op => $op->op,
-                        zyg => \@sofar);
-                }
-
-                if (_okdelay($op->zyg->[scalar @sofar])) {
-                    $_recurse->(@sofar, $op->zyg->[scalar @sofar]);
-                } else {
-                    let($op->zyg->[scalar @sofar],
-                        sub { $_recurse->(@sofar, $_[0]) });
-                }
-            };
-
-            return $_recurse->();
-        } elsif ($op->isa('CgOp::While') || $op->isa('CgOp::Let') ||
-                $op->isa('CgOp::Ternary') || $op->isa('CgOp::Seq')) {
-            # these can hold anything
-            return $op;
-        } else {
-            die "Unhandled op type in cpsconvert";
-        }
     }
 }
 
