@@ -266,9 +266,14 @@ use warnings;
         CgOp::Primitive->new(op => [ 'clr_string', $_[0] ]);
     }
 
-    # XXX This being treated as a function is completely wrong.
-    sub lextypes {
-        CgOp::Primitive->new(op => [ 'lextypes', @_ ]);
+    sub withtypes {
+        if (blessed($_[0])) {
+            prog(@_);
+        } else {
+            my $n = shift;
+            my $t = shift;
+            letn($n, $t, null($t), withtypes(@_));
+        }
     }
 
     sub share_lex {

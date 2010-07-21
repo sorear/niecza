@@ -32,8 +32,7 @@ my class ClassHOW { ... }
 PRE-INIT {
     # ClassHOW.new($name) --> meta class instance
     sub new { Q:CgOp {
-        (prog
-          [lextypes $mo DynMetaObject $self DynObject]
+        (withtypes $mo DynMetaObject $self DynObject
           [l $mo   (rawnew DynMetaObject (unwrap String (@ (pos 1))))]
           [l $self (rawnew DynObject (getfield klass
             (cast DynObject (@ (pos 0)))))]
@@ -67,8 +66,7 @@ PRE-INIT {
 
     # $how.create-protoobject()
     sub create-protoobject { Q:CgOp {
-        (prog
-          [lextypes $p DynObject $mo DynMetaObject]
+        (withtypes $p DynObject $mo DynMetaObject
           [l $mo (unwrap DynMetaObject (getattr meta-object (@ (pos 0))))]
           [l $p (rawnew DynObject (l $mo))]
 
@@ -83,8 +81,7 @@ PRE-INIT {
     sub compose { Q:CgOp { (null Variable) } }
 
     Q:CgOp {
-        (prog
-          [lextypes $chmo DynMetaObject $chch Variable]
+        (withtypes $chmo DynMetaObject $chch Variable
           [l $chmo (rawnew DynMetaObject (clr_string "ClassHOW"))]
           [l $chch (ns (rawnew DynObject (l $chmo)))]
 
@@ -120,8 +117,7 @@ my class Sub { ... }
 PRE-INIT {
     # (DynMetaObject $dmo, ClassHOW $super --> ClassHOW)
     sub wrap-dpmo { Q:CgOp {
-        (prog
-          [lextypes $ch Variable $dm DynMetaObject]
+        (withtypes $ch Variable $dm DynMetaObject
           [l $ch (methodcall (l ClassHOW) new (w (clr_string "")))]
           [l $dm (unwrap DynMetaObject (@ (pos 0)))]
 
@@ -132,8 +128,7 @@ PRE-INIT {
     } }
 
 Q:CgOp {
-    (prog
-      [lextypes !plist List<DynMetaObject>]
+    (withtypes !plist List<DynMetaObject>
 
       [l Mu!HOW (methodcall (l ClassHOW) new (w (clr_string Mu)))]
       [l Mu (methodcall (l Mu!HOW) create-protoobject)]
@@ -404,8 +399,7 @@ PRE-INIT {
 my class LLArray {
     method push { Q:CgOp { (prog
       [rawcall (unbox List<Variable> (@ (pos 0))) Add (pos 1)] [pos 0]) } }
-    method shift() { Q:CgOp { (prog
-      [lextypes $f Variable $lv List<Variable>]
+    method shift() { Q:CgOp { (withtypes $f Variable $lv List<Variable>
       [l $lv (unbox List<Variable> (@ (l self)))]
       [l $f (getindex (int 0) (l $lv))]
       [rawcall (l $lv) RemoveAt (int 0)]

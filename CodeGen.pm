@@ -270,12 +270,6 @@ use 5.010;
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
 
-    sub lextypes {
-        my ($self, %args) = @_;
-        #say STDERR "lextypes: @args";
-        %{ $self->lex2type } = (%{ $self->lex2type }, %args);
-    }
-
     sub rawlexget {
         my ($self, $name) = @_;
         $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
@@ -540,6 +534,9 @@ use 5.010;
     sub scopelex {
         my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
+        if ($self->letdepths->{$name}) {
+            $name = "let!${name}!" . ($self->letdepths->{$name} - 1);
+        }
         my ($order, $scope) = (0, $body);
         if (! $self->lex2type->{$name}) {
             while ($scope && !$scope->lexical->{$name}) {
