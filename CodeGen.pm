@@ -280,10 +280,6 @@ use 5.010;
     sub lextypes {
         my ($self, %args) = @_;
         #say STDERR "lextypes: @args";
-        my $body = $self->body // $self->bodies->[-1];
-        if ($body) {
-            for (keys %args) { $body->lexical->{$_} = 1 }
-        }
         %{ $self->lex2type } = (%{ $self->lex2type }, %args);
     }
 
@@ -552,9 +548,11 @@ use 5.010;
         my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
         my ($order, $scope) = (0, $body);
-        while ($scope && !$scope->lexical->{$name}) {
-            $scope = $scope->outer;
-            $order++;
+        if (! $self->lex2type->{$name}) {
+            while ($scope && !$scope->lexical->{$name}) {
+                $scope = $scope->outer;
+                $order++;
+            }
         }
         if (!$scope) {
             die "Failed to resolve lexical $name in " . $body->name;

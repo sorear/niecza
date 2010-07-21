@@ -1056,11 +1056,6 @@ sub statevar { my ($cl, %ex) = @_;
 }
 
 sub blockcheck { my ($cl) = @_;
-    for my $d (@{ $::CURLEX->{'!decls'} // [] }) {
-        for my $sl ($d->used_slots) {
-            $::CURLEX->{'!slots'}{$sl} = 1;
-        }
-    }
 }
 
 sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
@@ -1077,8 +1072,7 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
         type      => $type,
         $args{bare} ? () : (
             decls   => ($::CURLEX->{'!decls'} // []),
-            enter   => ($::CURLEX->{'!enter'} // []),
-            lexical => ($::CURLEX->{'!slots'} // {})),
+            enter   => ($::CURLEX->{'!enter'} // [])),
         signature => $args{signature},
         do        => $ast);
 }

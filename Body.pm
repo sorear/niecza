@@ -12,7 +12,6 @@ use CgOp ();
     has do        => (isa => 'Op', is => 'rw');
     has enter     => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
-    has lexical   => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
     has decls     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has code      => (isa => 'CodeGen', is => 'ro', init_arg => undef,
@@ -23,6 +22,12 @@ use CgOp ();
     # currently used types are phaser, loop, cond, class, mainline, bare, sub
     # also '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
+
+    sub lexical {
+        my ($self) = @_;
+
+        +{ map { $_, 1 } map { $_->used_slots } @{ $self->decls } };
+    }
 
     sub is_mainline {
         my $self = shift;
