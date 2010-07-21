@@ -195,18 +195,6 @@ use 5.010;
 
     # These functions are usable from user code, but still depend on volatiles.
 
-    sub swap {
-        my ($self) = @_;
-        $self->_undercheck(2);
-        $self->_overcheck(1);
-        my $n = $self->depth;
-
-        $self->_emit(sprintf "s%d = s%d", $n, $n-2);
-        $self->_emit(sprintf "s%d = s%d", $n-2, $n-1);
-        $self->_emit(sprintf "s%d = s%d", $n-1, $n);
-        @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
-    }
-
     sub push_let {
         my ($self, $which) = @_;
         my $var = "let!${which}!" . ($self->letdepths->{$which}++);
@@ -313,12 +301,6 @@ use 5.010;
                 '])';
         }
         $self->_push("Frame", $frame);
-    }
-
-    sub dup {
-        my ($self) = @_;
-        my $c = $self->_peek;
-        $self->_push($self->stacktype->[-1], $c);
     }
 
     sub drop {
