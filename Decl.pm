@@ -10,7 +10,7 @@ use CgOp;
 
     has zyg => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
 
-    sub used_slots   { }
+    sub used_slots   { () }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
     sub write        {}
@@ -30,7 +30,7 @@ use CgOp;
 
     sub used_slots {
         my ($self) = @_;
-        return $self->has_var ? ($self->var) : ();
+        $self->has_var ? ($self->var, 'Variable') : ();
     }
 
     sub preinit_code {
@@ -66,7 +66,7 @@ use CgOp;
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
     sub used_slots {
-        return $_[0]->var;
+        $_[0]->var, 'Variable';
     }
 
     sub preinit_code {
@@ -103,7 +103,7 @@ use CgOp;
     has list => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
-        return $_[0]->slot;
+        $_[0]->slot, 'Variable';
     }
 
     sub preinit_code {
@@ -143,7 +143,7 @@ use CgOp;
     has backing => (isa => 'Str', is => 'ro', required => 1);
 
     sub used_slots {
-        return $_[0]->slot;
+        $_[0]->slot, 'Variable';
     }
 
     sub preinit_code {
@@ -165,7 +165,7 @@ use CgOp;
     use Moose;
     extends 'Decl';
 
-    sub used_slots { '!mainline' }
+    sub used_slots { '!mainline', 'Variable' }
 
     sub preinit_code {
         my ($self, $body) = @_;
@@ -206,11 +206,8 @@ use CgOp;
 
     sub used_slots {
         my ($self) = @_;
-        if ($self->stub) {
-            ($self->var, $self->var . '!HOW');
-        } else {
-            ($self->var, $self->var . '!HOW', $self->bodyvar);
-        }
+        $self->var, 'Variable', ($self->var . '!HOW'), 'Variable',
+            (!$self->stub ? ($self->bodyvar, 'Variable') : ());
     }
 
     sub preinit_code {

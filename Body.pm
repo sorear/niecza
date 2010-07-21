@@ -23,10 +23,12 @@ use CgOp ();
     # also '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
 
-    sub lexical {
+    has lexical   => (isa => 'HashRef[Str]', is => 'ro', lazy_build => 1);
+
+    sub _build_lexical {
         my ($self) = @_;
 
-        +{ map { $_, 1 } map { $_->used_slots } @{ $self->decls } };
+        +{ map { $_->used_slots } @{ $self->decls } };
     }
 
     sub is_mainline {
@@ -51,6 +53,7 @@ use CgOp ();
         my ($self) = @_;
         # TODO: Bind a return value here to catch non-ro sub use
         CodeGen->new(name => $self->name, body => $self,
+            lex2type => +{ %{ $self->lexical } },
             ops => CgOp::prog($self->enter_code,
                 CgOp::return($self->do->code($self))));
     }
@@ -58,8 +61,6 @@ use CgOp ();
     sub enter_code {
         my ($self) = @_;
         my @p;
-        push @p, CgOp::lextypes(map { $_, 'Variable' }
-            keys %{ $self->lexical });
         push @p, map { $_->enter_code($self) } @{ $self->decls };
         push @p, $self->signature->binder if $self->signature;
         push @p, map { CgOp::sink($_->code($self)) } @{ $self->enter };
