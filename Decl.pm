@@ -178,7 +178,7 @@ use CgOp;
                 CgOp::rawscall('Kernel.MakeSub',
                     CgOp::rawsget('Kernel.MainlineContinuation'),
                     CgOp::null('Frame'), CgOp::null('Frame')),
-                CgOp::newscalar(CgOp::aux('protopad'))));
+                CgOp::newscalar(CgOp::letvar('protopad'))));
     }
 
     sub enter_code {
@@ -221,11 +221,11 @@ use CgOp;
 
         $self->body->outer($body);
 
-        CgOp::with_aux("how", "Variable",
+        CgOp::letn("how", "Variable",
             CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
                 CgOp::wrap(CgOp::clr_string($self->name // 'ANON'))),
 
-            CgOp::proto_var($self->var . '!HOW', CgOp::aux("how")),
+            CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
 
             # TODO: Initialize the protoobject to a failure here so an awesome
             # error is produced if someone tries to use an incomplete class in
@@ -236,7 +236,7 @@ use CgOp;
                 CgOp::newscalar(
                     CgOp::protosub($self->body))),
             CgOp::scopedlex($self->var,
-                CgOp::methodcall(CgOp::aux("how"), "create-protoobject")));
+                CgOp::methodcall(CgOp::letvar("how"), "create-protoobject")));
     }
 
     sub enter_code {
@@ -276,7 +276,7 @@ use CgOp;
             die "Tried to set a method outside a class!";
         }
         CgOp::sink(
-            CgOp::methodcall(CgOp::aux("how"), "add-method",
+            CgOp::methodcall(CgOp::letvar("how"), "add-method",
                 CgOp::wrap(CgOp::clr_string($self->name)),
                 CgOp::scopedlex($self->var)));
     }
@@ -300,7 +300,7 @@ use CgOp;
         }
 
         CgOp::sink(
-            CgOp::methodcall(CgOp::aux('how'), "add-super",
+            CgOp::methodcall(CgOp::letvar('how'), "add-super",
                 CgOp::scopedlex($self->name . "!HOW")));
     }
 

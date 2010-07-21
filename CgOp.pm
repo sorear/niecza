@@ -108,29 +108,6 @@ use warnings;
     __PACKAGE__->meta->make_immutable;
 }
 
-{
-    package CgOp::Let;
-    use Moose;
-    extends 'CgOp';
-
-    has var  => (is => 'ro', isa => 'Str', required => 1);
-    has type => (is => 'ro', isa => 'Str', required => 1);
-
-    sub var_cg {
-        my ($self, $cg) = @_;
-
-        $cg->lextypes($self->var, $self->type);
-        $self->zyg->[0]->var_cg($cg);
-        $cg->rawlexput($self->var, 0);
-        $self->zyg->[1]->var_cg($cg);
-        $cg->push_null($self->type);
-        $cg->rawlexput($self->var, 0);
-    }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
-}
-
 # just a bunch of smart constructors
 {
     package CgOp;
@@ -281,8 +258,8 @@ use warnings;
         CgOp::Primitive->new(op => [ 'callframe' ]);
     }
 
-    sub aux {
-        CgOp::Primitive->new(op => [ 'peek_aux', $_[0] ]);
+    sub letvar {
+        CgOp::Primitive->new(op => [ 'peek_let', $_[0] ]);
     }
 
     sub clr_string {
@@ -354,13 +331,13 @@ use warnings;
             CgOp::Primitive->new(op => [ 'close_sub', $body->code ]));
     }
 
-    sub with_aux {
+    sub letn {
         my ($name, $type, $value, @stuff) = @_;
         prog(
-            CgOp::Primitive->new(op => [ 'push_aux', $name, $type ],
+            CgOp::Primitive->new(op => [ 'push_let', $name, $type ],
                 zyg => [ $value ]),
             @stuff,
-            sink(CgOp::Primitive->new(op => [ 'pop_aux', $name ])));
+            sink(CgOp::Primitive->new(op => [ 'pop_let', $name ])));
     }
 
     sub pos {
@@ -381,11 +358,8 @@ use warnings;
     my $nextlet = 0;
     sub let {
         my ($head, $type, $bodyf) = @_;
-        my $v = 'let!' . ($nextlet++);
-        my $body = $bodyf->(CgOp::Primitive->new(
-                op => [ rawlexget => $v, 0 ]));
-
-        CgOp::Let->new(var => $v, type => $type, zyg => [ $head, $body ]);
+        my $v = ($nextlet++);
+        letn($v, $type, $head, $bodyf->(letvar($v)));
     }
 }
 

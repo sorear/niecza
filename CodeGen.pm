@@ -92,7 +92,7 @@ use 5.010;
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
 
-    has auxdepths => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has letdepths => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
@@ -111,7 +111,7 @@ use 5.010;
         my %save;
         $save{depth} = $self->depth;
         $save{stacktype} = [ @{ $self->stacktype } ];
-        $save{auxdepths} = { %{ $self->auxdepths } };
+        $save{letdepths} = { %{ $self->letdepths } };
         $self->savedstks->{$lbl} = \%save;
     }
 
@@ -121,7 +121,7 @@ use 5.010;
         $self->depth($save->{depth});
         $self->savedepth($save->{depth});
         @{ $self->stacktype } = @{ $save->{stacktype} };
-        %{ $self->auxdepths } = %{ $save->{auxdepths} };
+        %{ $self->letdepths } = %{ $save->{letdepths} };
     }
 
     sub _emit {
@@ -207,22 +207,22 @@ use 5.010;
         @{ $self->stacktype }[-1,-2] = @{ $self->stacktype }[-2,-1];
     }
 
-    sub push_aux {
+    sub push_let {
         my ($self, $which, $ty) = @_;
-        my $var = "aux!${which}!" . ($self->auxdepths->{$which}++);
+        my $var = "let!${which}!" . ($self->letdepths->{$which}++);
         $self->lex2type->{$var} = $ty;
         $self->rawlexput($var);
     }
 
-    sub pop_aux {
+    sub pop_let {
         my ($self, $which) = @_;
-        my $var = "aux!${which}!" . (--$self->auxdepths->{$which});
+        my $var = "let!${which}!" . (--$self->letdepths->{$which});
         $self->rawlexget($var);
     }
 
-    sub peek_aux {
+    sub peek_let {
         my ($self, $which) = @_;
-        my $var = "aux!${which}!" . ($self->auxdepths->{$which} - 1);
+        my $var = "let!${which}!" . ($self->letdepths->{$which} - 1);
         $self->rawlexget($var);
     }
 
@@ -289,9 +289,9 @@ use 5.010;
     sub lexget {
         my ($self, $order, $name) = @_;
         my $frame = 'th.';
-        if ($self->auxdepths->{'protopad'}) {
+        if ($self->letdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
-                qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
+                qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
                 ']).';
         }
         # XXX need a better type tracking system
@@ -302,9 +302,9 @@ use 5.010;
     sub lexput {
         my ($self, $order, $name) = @_;
         my $frame = 'th.';
-        if ($self->auxdepths->{'protopad'}) {
+        if ($self->letdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
-                qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
+                qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
                 ']).';
         }
         $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
@@ -313,9 +313,9 @@ use 5.010;
     sub callframe {
         my ($self) = @_;
         my $frame = 'th';
-        if ($self->auxdepths->{'protopad'}) {
+        if ($self->letdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
-                qm('aux!protopad!' . ($self->auxdepths->{'protopad'} - 1)) .
+                qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
                 '])';
         }
         $self->_push("Frame", $frame);
@@ -518,9 +518,9 @@ use 5.010;
 
     sub close_sub {
         my ($self, $bodycg) = @_;
-        $self->pop_aux('protopad');
+        $self->pop_let('protopad');
         pop @{ $self->bodies };
-        $self->peek_aux('protopad');
+        $self->peek_let('protopad');
         my $op = $self->_pop;
         my $pp = $self->_pop;
         $self->_push('IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
@@ -529,7 +529,7 @@ use 5.010;
 
     sub proto_var {
         my ($self, $name) = @_;
-        $self->peek_aux('protopad');
+        $self->peek_let('protopad');
         my $pp = $self->_pop;
         my $pv = $self->_pop;
         $self->_emit("$pp.lex[" . qm($name) . "] = $pv");
@@ -559,9 +559,9 @@ use 5.010;
 
     sub open_protopad {
         my ($self, $body) = @_;
-        $self->peek_aux('protopad');
+        $self->peek_let('protopad');
         $self->clr_new('Frame', 1);
-        $self->push_aux('protopad', 'Frame');
+        $self->push_let('protopad', 'Frame');
         push @{ $self->bodies }, $body;
     }
 
