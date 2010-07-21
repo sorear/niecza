@@ -30,58 +30,94 @@ PRE-INIT {
         });
 }
 
-sub _rxlazymap($cs, $sub) {
-    my class LazyIterator is Iterator {
-        method back() { $!back }
-        # $!valid $!value $!next  $!fun $!back
+# Outside a regex, a result is a lazy list.
+# Inside a regex, a result is a bare iterator, or a double return (if
+# ratcheting).
+
+sub _rxexport($cs) {
+    my class ExportIterator is Iterator {
+        # $!valid $!value $!next  $!fun
         method validate() {
             $!valid = 1;
-            if ! $!back.valid {
-                $!back.validate;
-            }
-            my $bv = $!back.value;
-            my $bn = $!back.next;
-            #say "In lazy map iterator";
-            if $bv.^isa(EMPTY) {
-                $!value = EMPTY;
-            } else {
-                #say "Going to pass " ~ $bv;
-                my $f = $!fun;
-                # XXX horrible. we're making the value act @-ish, maybe
-                Q:CgOp {
-                    (prog
-                      [setindex value (getfield slots (cast DynObject
-                            (@ (l self)))) (subcall (@ (l $f)) (l $bv))]
-                      [null Variable])
-                };
-                $!next = LazyIterator.RAWCREATE("valid", 0, "next", Any,
-                    "value", Any, "back", Any, "fun", $!fun);
-                $!next.back = $bn;
-            }
+            $!value = ($!fun)() || EMPTY;
+            $!next = ExportIterator.RAWCREATE("valid", 0, "next", Any,
+                "value", Any, "fun", $!fun);
         }
     }
 
-    my $lit = LazyIterator.RAWCREATE("valid", 0, "value", Any,
-        "next", Any, "back", Any, "fun", $sub);
-    $lit.back = $cs.flat.iterator;
-
+    my $lit = ExportIterator.RAWCREATE("valid", 0, "value", Any,
+        "next", Any, "fun", $cs);
     my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest",
         LLArray.new($lit));
     @l.fill(1);
     @l;
 }
 
+sub _rxlazymap($cs, $sub) {
+    my $k = sub { Any };
+    #say "in rxlazymap (1)";
+    sub get() {
+        #say "in rxlazymap (2)";
+        $k && ($k() || do {
+            #say "in rxlazymap (3)";
+            $k = $cs();
+            $k = ($k && $sub($k));
+            #say "in rxlazymap (4)";
+            get();
+        })
+    }
+}
+
+sub _rxdisj($cs1, $cs2) {
+    my $k1 = $cs1;
+    my $k2 = $cs2;
+    sub {
+        #say "in rxdisj (1)";
+        $k1() || ($k2 && do {
+            $k1 = $k2;
+            $k2 = Any;
+            #say "in rxdisj (2)";
+            $k1();
+        })
+    }
+}
+
+sub _rxone($C) {
+    my $k = $C;
+    sub {
+        my $x = $k;
+        $k = Any;
+        #say "in rxone" ~ $x;
+        $x;
+    }
+}
+
+sub _rxupgrade($sub) {
+    my $k = $sub;
+    sub {
+        $k && do {
+            my $x = $k();
+            $k = Any;
+            $x;
+        }
+    }
+}
+
+my $rxnone = sub { Any };
+
 sub _rxstar($C, $sub) {
-    _rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) }), $C
+    #say "in rxstar recursion";
+    _rxdisj(_rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) }),
+            _rxone($C));
 }
 
 sub _rxstr($C, $str) {
     #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
     if $C.from + $str.chars <= $C.str.chars &&
             $C.str.substr($C.from, $str.chars) eq $str {
-        Cursor.RAWCREATE("str", $C.str, "from", $C.from + $str.chars);
+        _rxone(Cursor.RAWCREATE("str", $C.str, "from", $C.from + $str.chars));
     } else {
-        Nil;
+        $rxnone;
     }
 }
 
@@ -101,7 +137,7 @@ my class Regex is Sub {
 }
 
 # regex { a b* c }
-my $rx = Regex.bless(sub ($C) { _rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) }) });
+my $rx = Regex.bless(sub ($C) { _rxexport(_rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) })) });
 
 say "xaaabc" ~ ("xaaabc" ~~ $rx);
 say "xbc"    ~ ("xbc" ~~ $rx);
