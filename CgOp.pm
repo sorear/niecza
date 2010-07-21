@@ -264,15 +264,6 @@ use warnings;
             zyg => [ @_ ]);
     }
 
-    sub lexput {
-        CgOp::Primitive->new(op => [ lexput => $_[0], $_[1] ],
-            zyg => [ $_[2] ]);
-    }
-
-    sub lexget {
-        CgOp::Primitive->new(op => [ lexget => $_[0], $_[1] ]);
-    }
-
     sub subcall {
         my ($sub, @args) = @_;
         CgOp::Primitive->new(op => [ 'call_sub', 1, scalar @args ],
@@ -308,18 +299,18 @@ use warnings;
     }
 
     sub share_lex {
-        lexput(0, $_[0], protolget($_[0]));
+        scopedlex($_[0], protolget($_[0]));
     }
 
     # the handling of @var here is quite wrong, but works for now
     sub copy_lex {
         my ($n, $l) = @_;
-        lexput(0, $n, $l ? newrwlistvar(fetch(protolget($_[0])))
+        scopedlex($n, $l ? newrwlistvar(fetch(protolget($_[0])))
                          : newrwscalar(fetch(protolget($_[0]))));
     }
 
     sub clone_lex {
-        lexput(0, $_[0], methodcall(protolget($_[0]), "clone",
+        scopedlex($_[0], methodcall(protolget($_[0]), "clone",
           newscalar(callframe)));
     }
 
