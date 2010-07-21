@@ -41,7 +41,7 @@ sub run {
     bootstrap;
     close ::NIECZA_OUT;
 
-    system 'gmcs /r:Setting.dll Program.cs';
+    system 'gmcs /r:Kernel.dll /r:Setting.dll Program.cs';
     system 'mono --debug=casts Program.exe';
 }
 

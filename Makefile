@@ -9,7 +9,7 @@ all: Setting.dll
 
 test: $(COMPILER) test.pl Setting.dll
 	perl -MFile::Slurp -MCompilerDriver=:all -e 'header; mainline(scalar read_file("test.pl")); bootstrap' > Program.cs
-	gmcs /r:Setting.dll Program.cs
+	gmcs /r:Kernel.dll /r:Setting.dll Program.cs
 	prove -e 'mono --debug=casts' Program.exe
 
 .DELETE_ON_ERROR:
@@ -17,8 +17,12 @@ test: $(COMPILER) test.pl Setting.dll
 Setting.cs: $(COMPILER) setting
 	perl -MCompilerDriver=:all -e 'header; setting' > Setting.cs
 
-Setting.dll: Kernel.cs Setting.cs
-	gmcs /target:library /out:Setting.dll Kernel.cs Setting.cs
+Kernel.dll: Kernel.cs
+	gmcs /target:library /out:Kernel.dll Kernel.cs
+	mono --aot Kernel.dll
+
+Setting.dll: Kernel.dll Setting.cs
+	gmcs /target:library /out:Setting.dll /r:Kernel.dll Setting.cs
 	mono --aot Setting.dll
 
 Niecza/Grammar.pmc: Niecza/Grammar.pm6 .STD_build_stamp
