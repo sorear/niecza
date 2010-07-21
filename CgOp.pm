@@ -308,25 +308,19 @@ use warnings;
     }
 
     sub share_lex {
-        prog(
-          lextypes($_[0], 'Variable'),
-          lexput(0, $_[0], protolget($_[0])));
+        lexput(0, $_[0], protolget($_[0]));
     }
 
     # the handling of @var here is quite wrong, but works for now
     sub copy_lex {
         my ($n, $l) = @_;
-        prog(
-          lextypes($n, 'Variable'),
-          lexput(0, $n, $l ? newrwlistvar(fetch(protolget($_[0])))
-                           : newrwscalar(fetch(protolget($_[0])))));
+        lexput(0, $n, $l ? newrwlistvar(fetch(protolget($_[0])))
+                         : newrwscalar(fetch(protolget($_[0]))));
     }
 
     sub clone_lex {
-        prog(
-          lextypes($_[0], 'Variable'),
-          lexput(0, $_[0], methodcall(protolget($_[0]), "clone",
-            newscalar(callframe))));
+        lexput(0, $_[0], methodcall(protolget($_[0]), "clone",
+          newscalar(callframe)));
     }
 
     sub proto_var {
