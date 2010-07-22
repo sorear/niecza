@@ -205,8 +205,7 @@ sub quant_atom_list { my ($cl, $M) = @_;
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         my $slot = $cl->gensym;
-        $cl->add_decl(Decl::Regex->new(zyg => [$M->{EXPR}{_ast}], slot => $slot));
-        $M->{_ast} = Op::Lexical->new(name => $slot);
+        $M->{_ast} = Op::Regex->new(name => $cl->gensym, rxop => $M->{EXPR}{_ast});
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
         # XXX We don't interpret the code, so we can't tell if it's actually
         # using variables, but still, it probably is.
@@ -822,9 +821,7 @@ sub type_declarator__S_constant { my ($cl, $M) = @_;
     # This is a cheat.  Constants should be, well, constant, and we should be
     # using the phaser rewrite mechanism to get the initializer here.  XXX
     # terms need to use a context hash.
-    $cl->add_decl(Decl::SimpleVar->new(slot => $slot));
-
-    $M->{_ast} = Op::Lexical->new(name => $slot);
+    $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1);
 }
 
 sub package_declarator {}
@@ -1058,12 +1055,6 @@ sub blockcheck { my ($cl) = @_;
 
 sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     my $subname = $args{subname} // 'ANON';
-    if ($args{signature}) {
-        for ($args{signature}->used_slots) {
-            $cl->add_decl(Decl::SimpleVar->new(slot => $_->[0],
-                    list => $_->[1]));
-        }
-    }
     $cl->blockcheck;
     Body->new(
         name      => $subname,

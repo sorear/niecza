@@ -9,9 +9,13 @@ use 5.010;
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has list => (is => 'ro', isa => 'Bool', default => 0);
 
-    sub used_slots {
+    sub local_decls {
         my $self = shift;
-        if ($self->slot) { [ $self->slot, $self->list ] } else { () }
+        if ($self->slot) {
+            Decl::SimpleVar->new(slot => $self->slot, list => $self->list)
+        } else {
+            ()
+        }
     }
 
     sub binder {
@@ -33,7 +37,7 @@ use 5.010;
     use Moose;
 
     has target => (is => 'ro', isa => 'Sig::Target', required => 1,
-        handles => [ 'used_slots' ]);
+        handles => [ 'local_decls' ]);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
 
     sub binder {
@@ -76,9 +80,9 @@ use 5.010;
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
-    sub used_slots {
+    sub local_decls {
         my $self = shift;
-        map { $_->used_slots } @{ $self->params };
+        map { $_->local_decls } @{ $self->params };
     }
 
     sub binder {

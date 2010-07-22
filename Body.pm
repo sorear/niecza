@@ -66,6 +66,7 @@ use CgOp ();
         my @x = @{ $self->decls };
         unshift @x, $self->do->local_decls if !$self->transparent;
         unshift @x, map { $_->extra_decls } @x;
+        unshift @x, $self->signature->local_decls if $self->signature;
         \@x;
     }
 
