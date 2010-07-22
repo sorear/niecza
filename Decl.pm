@@ -146,12 +146,12 @@ use CgOp;
     use Moose;
     extends 'Decl';
 
-    has slot    => (isa => 'Str', is => 'ro', required => 1);
+    has slot    => (isa => 'Str', is => 'ro', required => 0);
     has backing => (isa => 'Str', is => 'ro', required => 1);
     has list    => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
-        $_[0]->slot, 'Variable';
+        $_[0]->slot ? ($_[0]->slot, 'Variable') : ();
     }
 
     sub outer_decls {
@@ -161,12 +161,16 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        CgOp::proto_var($self->slot, CgOp::scopedlex($self->backing));
+        $self->slot ?
+            CgOp::proto_var($self->slot, CgOp::scopedlex($self->backing)) :
+            CgOp::noop;
     }
 
     sub enter_code {
         my ($self, $body) = @_;
-        CgOp::scopedlex($self->slot, CgOp::scopedlex($self->backing));
+        $self->slot ?
+            CgOp::scopedlex($self->slot, CgOp::scopedlex($self->backing)) :
+            CgOp::noop;
     }
 
     __PACKAGE__->meta->make_immutable;

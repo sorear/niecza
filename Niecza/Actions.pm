@@ -283,7 +283,6 @@ sub INFIX { my ($cl, $M) = @_;
         # Assignments (and assign metaops, but we don't do that yet) to has
         # and state declarators are rewritten into an appropriate phaser
         my $cv = $cl->gensym;
-        $cl->add_decl(Decl::StateVar->new(backing => $cl->gensym, slot => $cv));
         $M->{_ast} = Op::StatementList->new(children => [
             Op::Start->new(condvar => $cv, body => $M->{_ast}),
             Op::Lexical->new(name => $l->name)]);
@@ -801,9 +800,9 @@ sub variable_declarator { my ($cl, $M) = @_;
     }
 
     if ($scope eq 'state') {
-        $cl->add_decl(Decl::StateVar->new(backing => $cl->gensym,
-                slot => $slot, list => scalar ($M->{variable}->Str =~ /^\@/)));
-        $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1);
+        $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1,
+            state_backing => $cl->gensym, declaring => 1,
+            list => scalar ($M->{variable}->Str =~ /^\@/));
     } else {
         $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1,
             list => scalar ($M->{variable}->Str =~ /^\@/));
@@ -1164,8 +1163,6 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;
     my $cv = $cl->gensym;
-    $cl->add_decl(Decl::StateVar->new(backing => $cl->gensym, slot => $cv));
-
     $M->{_ast} = Op::Start->new(condvar => $cv, body =>
         $cl->block_to_immediate('phaser', $M->{blast}{_ast}));
 }

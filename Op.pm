@@ -331,6 +331,12 @@ use CgOp;
     has body => (isa => 'Op', is => 'ro', required => 1);
     sub zyg { $_[0]->body }
 
+    sub local_decls {
+        my ($self) = @_;
+        Decl::StateVar->new(backing => $self->condvar),
+            $self->SUPER::local_decls(@_);
+    }
+
     sub code {
         my ($self, $body) = @_;
 
@@ -480,15 +486,23 @@ use CgOp;
     has declaring => (isa => 'Bool', is => 'ro');
     has list => (isa => 'Bool', is => 'ro');
 
+    has state_backing => (isa => 'Str', is => 'ro');
+
     sub local_decls {
         my ($self) = @_;
         $self->declaring ?
-            (Decl::SimpleVar->new(slot => $self->name, list => $self->list)) :
+            ($self->state_backing ?
+                (Decl::StateVar->new(slot => $self->name,
+                        backing => $self->state_backing, list => $self->list)) :
+                (Decl::SimpleVar->new(slot => $self->name,
+                        list => $self->list))) :
             ();
     }
 
     sub paren {
-        Op::Lexical->new(name => shift()->name);
+        my %p = %{ $_[0] };
+        $p{state_decl} = 0;
+        Op::Lexical->new(%p);
     }
 
     sub code {
