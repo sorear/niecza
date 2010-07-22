@@ -205,7 +205,11 @@ sub quant_atom_list { my ($cl, $M) = @_;
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         my $slot = $cl->gensym;
-        $M->{_ast} = Op::Regex->new(name => $cl->gensym, rxop => $M->{EXPR}{_ast});
+        # TODO should be a real pass.
+        $M->{_ast} = Op::CallMethod->new(name => 'bless',
+            receiver => Op::Lexical->new(name => 'Regex'),
+            positionals => [
+                RxOp::Export->new(zyg => [$M->{EXPR}{_ast}])->closure ]);
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
         # XXX We don't interpret the code, so we can't tell if it's actually
         # using variables, but still, it probably is.

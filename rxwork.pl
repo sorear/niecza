@@ -113,7 +113,8 @@ my class Regex is Sub {
 }
 
 # regex { a b* c }
-my $rx = Regex.bless(sub ($C) { _rxexport(_rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) })) });
+#my $rx = Regex.bless(sub ($C) { _rxexport(_rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) })) });
+my $rx = /ab*c/;
 
 say "xaaabc" ~ ("xaaabc" ~~ $rx);
 say "xbc"    ~ ("xbc" ~~ $rx);
