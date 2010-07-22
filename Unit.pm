@@ -22,9 +22,11 @@ use 5.010;
         CodeGen->new(name => 'BOOT', entry => 1,
             ops => CgOp::letn('protopad',
                 CgOp::cast('Frame', CgOp::fetch(CgOp::pos(0))),
-                CgOp::return(
-                    CgOp::newscalar(
-                        CgOp::protosub($self->mainline)))));
+                CgOp::letn('pkg',
+                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')),
+                    CgOp::return(
+                        CgOp::newscalar(
+                            CgOp::protosub($self->mainline))))));
     }
 
     sub write {

@@ -411,6 +411,39 @@ use CgOp;
 }
 
 {
+    package Op::PackageDef;
+    use Moose;
+    extends 'Op';
+
+    has var  => (is => 'ro', isa => 'Str', required => 1);
+    has bodyvar => (is => 'ro', isa => 'Str');
+    has stub => (is => 'ro', isa => 'Bool', default => 0);
+    has body => (is => 'ro', isa => 'Body');
+
+    sub local_decls {
+        my ($self) = @_;
+        Decl::Package->new(stub => $self->stub, var => $self->var,
+            ($self->stub ? () : (body => $self->body,
+                    bodyvar => $self->bodyvar)));
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        if ($self->stub) {
+            CgOp::scopedlex($self->var);
+        } else {
+            CgOp::prog(
+                CgOp::sink(CgOp::subcall(CgOp::fetch(
+                            CgOp::scopedlex($self->bodyvar)))),
+                CgOp::scopedlex($self->var));
+        }
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::ClassDef;
     use Moose;
     extends 'Op';

@@ -210,6 +210,64 @@ use CgOp;
 }
 
 {
+    package Decl::Package;
+    use Moose;
+    extends 'Decl';
+
+    has var     => (is => 'ro', isa => 'Str', required => 1);
+    has body    => (is => 'ro', isa => 'Body');
+    has bodyvar => (is => 'ro', isa => 'Str');
+    has stub    => (is => 'ro', isa => 'Bool', default => 0);
+
+    sub extra_decls { $_[0]->body ? ($_[0]->body->floated_decls) : () }
+
+    sub used_slots {
+        my ($self) = @_;
+        $self->var, 'Variable',
+            (!$self->stub ? ($self->bodyvar, 'Variable') : ());
+    }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+
+        if ($self->stub) {
+            return CgOp::proto_var($self->var, CgOp::null('Variable'));
+        }
+
+        $self->body->outer($body);
+
+        CgOp::letn("pkg",
+            CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')),
+
+            CgOp::proto_var($self->var, CgOp::letvar("pkg")),
+
+            CgOp::proto_var($self->bodyvar,
+                CgOp::newscalar(
+                    CgOp::protosub($self->body))));
+    }
+
+    sub enter_code {
+        my ($self, $body) = @_;
+        CgOp::prog(
+            CgOp::share_lex($self->var),
+            ($self->stub ? () :
+                ($body->mainline ?
+                    CgOp::share_lex($self->bodyvar) :
+                    CgOp::clone_lex($self->bodyvar))));
+    }
+
+    sub write   {
+        my ($self, $body) = @_;
+        return unless $self->body;
+        $self->body->outer($body);
+        $self->body->write;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::Class;
     use Moose;
     extends 'Decl';
