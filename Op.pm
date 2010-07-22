@@ -438,6 +438,27 @@ use CgOp;
 }
 
 {
+    package Op::SubDef;
+    use Moose;
+    extends 'Op';
+
+    has decl => (isa => 'Decl', is => 'ro', required => 1);
+
+    sub local_decls {
+        my ($self) = @_;
+        $self->decl;
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::scopedlex($self->decl->var);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Lexical;
     use Moose;
     extends 'Op';

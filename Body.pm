@@ -53,11 +53,11 @@ use CgOp ();
 
     sub floated_decls {
         my ($self) = @_;
-        if ($self->transparent) {
-            $self->do->local_decls;
-        } else {
-            ();
-        }
+        my @r;
+        push @r, $self->do->local_decls if $self->transparent;
+        push @r, map { $_->outer_decls } @{ $self->_alldecls }
+            if $self->type ne 'mainline';
+        @r;
     }
 
     has _alldecls => (isa => 'ArrayRef[Decl]', is => 'ro', lazy_build => 1);
@@ -67,6 +67,7 @@ use CgOp ();
         unshift @x, $self->do->local_decls if !$self->transparent;
         unshift @x, $self->signature->local_decls if $self->signature;
         @x = map { $_->extra_decls, $_ } @x;
+        @x = map { $_->outer_decls, $_ } @x if $self->type eq 'mainline';
         \@x;
     }
 

@@ -282,9 +282,10 @@ sub INFIX { my ($cl, $M) = @_;
     if ($s eq '=' && $l->isa('Op::Lexical') && $l->state_decl) {
         # Assignments (and assign metaops, but we don't do that yet) to has
         # and state declarators are rewritten into an appropriate phaser
-        my $assigned = $cl->statevar;
+        my $cv = $cl->gensym;
+        $cl->add_decl(Decl::StateVar->new(backing => $cl->gensym, slot => $cv));
         $M->{_ast} = Op::StatementList->new(children => [
-            Op::Start->new(condvar => $assigned, body => $M->{_ast}),
+            Op::Start->new(condvar => $cv, body => $M->{_ast}),
             Op::Lexical->new(name => $l->name)]);
     }
 }
@@ -800,8 +801,8 @@ sub variable_declarator { my ($cl, $M) = @_;
     }
 
     if ($scope eq 'state') {
-        my $ts = $cl->statevar(list => scalar ($M->{variable}->Str =~ /^\@/));
-        $cl->add_decl(Decl::StateVar->new(backing => $ts, slot => $slot));
+        $cl->add_decl(Decl::StateVar->new(backing => $cl->gensym,
+                slot => $slot, list => scalar ($M->{variable}->Str =~ /^\@/)));
         $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1);
     } else {
         $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1,
@@ -1030,21 +1031,6 @@ sub routine_declarator__S_method { my ($cl, $M) = @_;
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
 
-sub statevar { my ($cl, %ex) = @_;
-    my $var = $cl->gensym;
-    my $blk = $::CURLEX;
-
-    # the top block only runs once, and in any case we can't hack $*SETTING
-    if ($blk != $::UNIT) {
-        $blk = $cl->get_outer($blk);
-    }
-
-    push @{ $blk->{'!decls'} //= [] },
-        Decl::SimpleVar->new(slot => $var, %ex);
-
-    $var;
-}
-
 sub blockcheck { my ($cl) = @_;
 }
 
@@ -1068,20 +1054,14 @@ sub get_outer { my ($cl, $pad) = @_;
 sub block_to_immediate { my ($cl, $type, $blk) = @_;
     $blk->type($type);
     Op::CallSub->new(
-        invocant => $cl->block_to_closure(0, $blk),
+        invocant => $cl->block_to_closure($blk),
         positionals => []);
 }
 
-sub block_to_closure { my ($cl, $uplevel, $blk, %args) = @_;
-    my $outer = $uplevel ? $cl->get_outer($::CURLEX) : $::CURLEX;
+sub block_to_closure { my ($cl, $blk, %args) = @_;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
-    unless ($args{stub}) {
-        push @{ $outer->{'!decls'} //= [] },
-            Decl::Sub->new(var => $outer_key, code => $blk) if $outer;
-    }
-
-    Op::Lexical->new(name => $outer_key);
+    Op::SubDef->new(decl => Decl::Sub->new(var => $outer_key, code => $blk));
 }
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
@@ -1111,12 +1091,11 @@ sub routine_def { my ($cl, $M) = @_;
 
     my $m = $dln ? $cl->mangle_longname($dln) : undef;
 
-    $M->{_ast} = $cl->block_to_closure(1,
+    $M->{_ast} = $cl->block_to_closure(
             $cl->sl_to_block('sub',
                 $M->{blockoid}{_ast},
                 subname => $m,
                 signature => ($M->{multisig}[0] ? $M->{multisig}[0]{_ast} : undef)),
-        stub => $dln && $M->{decl}{stub},
         outer_key => (($scope eq 'my') ? "&$m" : undef));
 }
 
@@ -1151,13 +1130,11 @@ sub method_def { my ($cl, $M) = @_;
         signature => ($M->{multisig}[0] ?
             $M->{multisig}[0]{_ast}->for_method : undef));
 
-    $cl->block_to_closure(1, $bl, outer_key => $sym);
-
     push @{ $cl->get_outer($::CURLEX)->{'!decls'} },
         Decl::HasMethod->new(name => $name, var => $sym)
             unless $scope eq 'anon';
 
-    $M->{_ast} = Op::Lexical->new(name => $sym);
+    $M->{_ast} = $cl->block_to_closure($bl, outer_key => $sym);
 }
 
 sub block { my ($cl, $M) = @_;
@@ -1201,9 +1178,10 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
 }
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;
-    my $var = $cl->statevar;
+    my $cv = $cl->gensym;
+    $cl->add_decl(Decl::StateVar->new(backing => $cl->gensym, slot => $cv));
 
-    $M->{_ast} = Op::Start->new(condvar => $var, body =>
+    $M->{_ast} = Op::Start->new(condvar => $cv, body =>
         $cl->block_to_immediate('phaser', $M->{blast}{_ast}));
 }
 

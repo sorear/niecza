@@ -16,6 +16,7 @@ use CgOp;
     sub write        {}
 
     sub extra_decls  {}
+    sub outer_decls  {}
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -147,9 +148,15 @@ use CgOp;
 
     has slot    => (isa => 'Str', is => 'ro', required => 1);
     has backing => (isa => 'Str', is => 'ro', required => 1);
+    has list    => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
         $_[0]->slot, 'Variable';
+    }
+
+    sub outer_decls {
+        my $self = shift;
+        Decl::SimpleVar->new(slot => $self->backing, list => $self->list);
     }
 
     sub preinit_code {
