@@ -953,7 +953,8 @@ sub package_def { my ($cl, $M) = @_;
     my $outer = $cl->get_outer($::CURLEX);
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
 
-    my $decltype = 'Decl::' . ucfirst $::PKGDECL;
+    my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
+    my $decltype = 'Decl::' . ucfirst($::PKGDECL);
     my $blocktype = $::PKGDECL;
     my $bodyvar = $cl->gensym;
 
@@ -983,18 +984,12 @@ sub package_def { my ($cl, $M) = @_;
             var     => $outervar,
             bodyvar => $bodyvar,
             body    => $cbody);
-        push @{ $outer->{'!decls'} //= [] }, $cdecl;
-        $M->{_ast} = Op::StatementList->new(
-            children => [
-                Op::CallSub->new(
-                    invocant => Op::Lexical->new(name => $bodyvar)),
-                Op::Lexical->new(name => $outervar)]);
+        $M->{_ast} = $optype->new(decl => $cdecl);
     } else {
-        push @{ $outer->{'!decls'} //= [] }, $decltype->new(
+        $M->{_ast} = $optype->new(decl => $decltype->new(
             name    => $name,
             var     => $outervar,
-            stub    => 1);
-        # XXX return what?
+            stub    => 1));
     }
 }
 
@@ -1186,6 +1181,7 @@ sub blast { my ($cl, $M) = @_;
         $M->{_ast} = $M->{block}{_ast};
     } else {
         $M->{_ast} = Body->new(
+            transparent => 1,
             name => 'ANON',
             do   => $M->{statement}{_ast});
     }
@@ -1199,10 +1195,9 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 
     $M->{blast}{_ast}->type('phaser');
-    $cl->add_decl(Decl::PreInit->new(var => $var, code => $M->{blast}{_ast},
-            shared => 1));
 
-    $M->{_ast} = Op::Lexical->new(name => $var);
+    $M->{_ast} = Op::PreInit->new(decl => Decl::PreInit->new(var => $var,
+            code => $M->{blast}{_ast}, shared => 1));
 }
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;

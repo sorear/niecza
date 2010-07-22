@@ -207,7 +207,6 @@ use CgOp;
     has var  => (is => 'ro', isa => 'Str', required => 1);
     has bodyvar => (is => 'ro', isa => 'Str');
     has stub => (is => 'ro', isa => 'Bool', default => 0);
-    has parents => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
     has body => (is => 'ro', isa => 'Body');
 
     sub extra_decls { $_[0]->body ? ($_[0]->body->floated_decls) : () }

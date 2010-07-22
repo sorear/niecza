@@ -389,6 +389,55 @@ use CgOp;
 }
 
 {
+    package Op::ClassDef;
+    use Moose;
+    extends 'Op';
+
+    has decl => (isa => 'Decl', is => 'ro', required => 1);
+
+    sub local_decls {
+        my ($self) = @_;
+        $self->decl;
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        if ($self->decl->stub) {
+            CgOp::scopedlex($self->decl->var);
+        } else {
+            CgOp::prog(
+                CgOp::sink(CgOp::subcall(CgOp::fetch(
+                            CgOp::scopedlex($self->decl->bodyvar)))),
+                CgOp::scopedlex($self->decl->var));
+        }
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::PreInit;
+    use Moose;
+    extends 'Op';
+
+    has decl => (isa => 'Decl', is => 'ro', required => 1);
+
+    sub local_decls {
+        my ($self) = @_;
+        $self->decl;
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::scopedlex($self->decl->var);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Lexical;
     use Moose;
     extends 'Op';
