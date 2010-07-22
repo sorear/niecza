@@ -454,6 +454,27 @@ use CgOp;
 }
 
 {
+    package Op::Super;
+    use Moose;
+    extends 'Op';
+
+    has name    => (isa => 'Str', is => 'ro');
+
+    sub local_decls {
+        my ($self) = @_;
+        Decl::Super->new(name => $self->name);
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::null('Variable');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::SubDef;
     use Moose;
     extends 'Op';

@@ -244,7 +244,7 @@ use CgOp;
                 CgOp::wrap(CgOp::clr_string($self->name // 'ANON'))),
 
             CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
-            ((grep { $_->isa('Decl::Super') } @{ $self->body->decls }) ? () :
+            ((grep { $_->isa('Decl::Super') } $self->body->do->local_decls) ? () :
                 CgOp::sink(CgOp::methodcall(CgOp::letvar("how"), "add-super",
                         CgOp::scopedlex("Any!HOW")))),
 

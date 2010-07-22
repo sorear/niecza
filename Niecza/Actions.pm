@@ -854,7 +854,8 @@ sub package_declarator__S_slang { my ($cl, $M) = @_;
 }
 
 sub package_declarator__S_also { my ($cl, $M) = @_;
-    $cl->add_decl(map { $_->{_ast} } @{ $M->{trait} });
+    $M->{_ast} = Op::StatementList->new(children =>
+        [ map { $_->{_ast}{mop} } @{ $M->{trait} }]);
 }
 
 sub termish {}
@@ -957,13 +958,13 @@ sub package_def { my ($cl, $M) = @_;
     my $blocktype = $::PKGDECL;
     my $bodyvar = $cl->gensym;
 
-    unshift @{ $::CURLEX->{'!decls'} //= [] },
-        map { $_->{_ast} } @{ $M->{trait} };
-
     if (!$M->{decl}{stub}) {
         my $stmts = $M->{statementlist} // $M->{blockoid};
 
-        my $cbody = $cl->sl_to_block($blocktype, $stmts->{_ast},
+        $stmts = Op::StatementList->new(children =>
+            [ (map { $_->{_ast}{mop} } @{ $M->{trait} }), $stmts->{_ast} ]);
+
+        my $cbody = $cl->sl_to_block($blocktype, $stmts,
             name => $name);
         $M->{_ast} = $optype->new(
             name    => $name,
@@ -992,7 +993,7 @@ sub trait_mod__S_is { my ($cl, $M) = @_;
         return;
     }
 
-    $M->{_ast} = Decl::Super->new(name => $trait);
+    $M->{_ast}{mop} = Op::Super->new(name => $trait);
 }
 
 sub trait { my ($cl, $M) = @_;
