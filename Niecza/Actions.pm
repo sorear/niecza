@@ -1046,7 +1046,8 @@ sub block_to_immediate { my ($cl, $type, $blk) = @_;
 sub block_to_closure { my ($cl, $blk, %args) = @_;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
-    Op::SubDef->new(var => $outer_key, body => $blk);
+    Op::SubDef->new(var => $outer_key, body => $blk,
+        method_too => $args{method_too});
 }
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
@@ -1115,11 +1116,8 @@ sub method_def { my ($cl, $M) = @_;
         signature => ($M->{multisig}[0] ?
             $M->{multisig}[0]{_ast}->for_method : undef));
 
-    push @{ $cl->get_outer($::CURLEX)->{'!decls'} },
-        Decl::HasMethod->new(name => $name, var => $sym)
-            unless $scope eq 'anon';
-
-    $M->{_ast} = $cl->block_to_closure($bl, outer_key => $sym);
+    $M->{_ast} = $cl->block_to_closure($bl, outer_key => $sym,
+        method_too => ($scope ne 'anon' ? $name : undef));
 }
 
 sub block { my ($cl, $M) = @_;

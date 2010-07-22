@@ -481,10 +481,15 @@ use CgOp;
 
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has body   => (isa => 'Body', is => 'ro', required => 1);
+    has method_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
 
     sub local_decls {
         my ($self) = @_;
-        Decl::Sub->new(var => $self->var, code => $self->body);
+        my @r;
+        push @r, Decl::Sub->new(var => $self->var, code => $self->body);
+        push @r, Decl::HasMethod->new(name => $self->method_too,
+            var => $self->var) if defined($self->method_too);
+        @r;
     }
 
     sub code {
