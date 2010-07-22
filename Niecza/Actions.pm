@@ -77,7 +77,8 @@ sub identifier { my ($cl, $M) = @_;
 
 # Either String Op
 sub morename { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{identifier} ? $M->{identifier}{_ast} : $M->{EXPR}{_ast};
+    $M->{_ast} = $M->{identifier}[0] ? $M->{identifier}[0]{_ast} :
+        $M->{EXPR}[0]{_ast};
 }
 
 # { dc: Bool, names: [Either String Op] }
@@ -90,13 +91,19 @@ sub name { my ($cl, $M) = @_;
 sub longname {} # look at the children yourself
 sub deflongname {}
 
-sub mangle_longname { my ($cl, $M) = @_;
-    if ($M->{name}{_ast}{dc} || @{ $M->{name}{_ast}{names} } > 1) {
-        $M->sorry("Multipart names not yet supported");
+sub mangle_longname { my ($cl, $M, $single) = @_;
+    if ($M->{name}{_ast}{dc}) {
+       $M->sorry('Leading double colons not yet supported');
+       return "";
+    }
+
+    if ($single && @{ $M->{name}{_ast}{names} } > 1) {
+        $M->sorry("Multipart names not yet supported for $single");
         return "";
     }
 
-    my ($n) = @{ $M->{name}{_ast}{names} };
+    my @ns = @{ $M->{name}{_ast}{names} };
+    my $n = pop @ns;
 
     for my $cp (@{ $M->{colonpair} }) {
         my $k = $cp->{k};
@@ -113,7 +120,7 @@ sub mangle_longname { my ($cl, $M) = @_;
         }
     }
 
-    $n;
+    $single ? $n : ($n, @ns);
 }
 
 sub desigilname { my ($cl, $M) = @_;
@@ -122,7 +129,7 @@ sub desigilname { my ($cl, $M) = @_;
         return;
     }
 
-    $M->{_ast} = $cl->mangle_longname($M->{longname});
+    $M->{_ast} = [ $cl->mangle_longname($M->{longname}) ];
 }
 
 sub stopper { }
@@ -398,7 +405,7 @@ sub PRE { }
 
 sub methodop { my ($cl, $M) = @_;
     my %r;
-    $r{name}  = $cl->mangle_longname($M->{longname}) if $M->{longname};
+    $r{name}  = $cl->mangle_longname($M->{longname}, "method call") if $M->{longname};
     $r{quote} = $M->{quote}{_ast} if $M->{quote};
     $r{ref}   = $M->{variable}{_ast}{term} if $M->{variable};
 
@@ -544,20 +551,36 @@ sub variable { my ($cl, $M) = @_;
         return;
     }
 
-    my $sl = $sigil . $twigil . $M->{desigilname}{_ast};
+    my ($name, @rest) = @{ $M->{desigilname}{_ast} };
+
+    my $sl = $sigil . $twigil . $name;
+
+    if ($twigil && @rest) {
+        $M->sorry("Cannot use a twigil on a qualified name");
+        return;
+    }
 
     given ($twigil) {
         when ('!') {
             $M->{_ast} = {
-                term => Op::GetSlot->new(name => $M->{desigilname}{_ast},
+                term => Op::GetSlot->new(name => $name,
                     object => Op::Lexical->new(name => 'self')),
             };
         }
         when ('') {
-            $M->{_ast} = {
-                term => Op::Lexical->new(name => $sl),
-                decl_slot => $sl,
-            };
+            if (@rest) {
+                my $lexpkg = $M->lex_can_find_name($::CURLEX, $rest[0] . "::",
+                        { truename => '???' });
+                $M->{_ast} = {
+                    term => Op::PackageVar->new(lexical_pkg => $lexpkg,
+                        path => [ map { $_ . "::" } @rest ], name => $sl),
+                };
+            } else {
+                $M->{_ast} = {
+                    term => Op::Lexical->new(name => $sl),
+                    decl_slot => $sl,
+                };
+            }
         }
         default {
             $M->sorry("Unhandled twigil $twigil");
@@ -948,7 +971,7 @@ sub package_def { my ($cl, $M) = @_;
         return;
     }
     my $name = $M->{longname}[0] ?
-        $cl->mangle_longname($M->{longname}[0]) : 'ANON';
+        $cl->mangle_longname($M->{longname}[0], "package definition") : 'ANON';
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
@@ -1069,7 +1092,7 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
 
-    my $m = $dln ? $cl->mangle_longname($dln) : undef;
+    my $m = $dln ? $cl->mangle_longname($dln, "subroutine definition") : undef;
 
     $M->{_ast} = $cl->block_to_closure(
             $cl->sl_to_block('sub',
@@ -1082,7 +1105,7 @@ sub routine_def { my ($cl, $M) = @_;
 sub method_def { my ($cl, $M) = @_;
     my $scope = $::SCOPE // 'has';
     $scope = 'anon' if !$M->{longname};
-    my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}) : undef;
+    my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}, "method definition") : undef;
 
     if ($M->{trait}[0] || $M->{sigil}) {
         $M->sorry("Method traits NYI");

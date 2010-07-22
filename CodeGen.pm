@@ -438,7 +438,7 @@ use 5.010;
         my $ty  = ($oty =~ /^Dictionary<.*,(.*)>$/) ? $1 :
                   ($oty =~ /^(.*)\[\]$/) ? $1 :
                   ($oty =~ /^List<(.*)>$/) ? $1 :
-                  die "type inference needs more hacks";
+                  die "type inference needs more hacks $oty";
         my $obj = $self->_pop;
         $self->_push($ty, "$obj" . "[$ix]");
     }

@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 94;
+plan 95;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -301,4 +301,9 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
         $buf;
     }
     ok cat(1, (2, 3), ((4, 5), (Nil, 7))) eq "123457", "parcels flatten";
+}
+
+{
+    my package Foo { our $x = 42; }
+    ok $Foo::x == 42, "can access our vars";
 }

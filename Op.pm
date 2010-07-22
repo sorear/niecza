@@ -422,7 +422,7 @@ use CgOp;
 
     sub local_decls {
         my ($self) = @_;
-        Decl::Package->new(stub => $self->stub, var => $self->var,
+        Decl::Package->new(stub => $self->stub, var => $self->var . "::",
             ($self->stub ? () : (body => $self->body,
                     bodyvar => $self->bodyvar)));
     }
@@ -430,12 +430,12 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         if ($self->stub) {
-            CgOp::scopedlex($self->var);
+            CgOp::scopedlex($self->var . "::");
         } else {
             CgOp::prog(
                 CgOp::sink(CgOp::subcall(CgOp::fetch(
                             CgOp::scopedlex($self->bodyvar)))),
-                CgOp::scopedlex($self->var));
+                CgOp::scopedlex($self->var . "::"));
         }
     }
 
@@ -590,6 +590,32 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::scopedlex($self->name);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::PackageVar;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+    has lexical_pkg => (isa => 'Bool', is => 'ro', required => 1);
+    has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        my @path = @{ $self->path };
+        my $p = $self->lexical_pkg ? CgOp::scopedlex(shift(@path)) :
+            CgOp::letvar('pkg');
+        for (@path) {
+            $p = CgOp::getindex($_, CgOp::unwrap('Dictionary<string,Variable>',
+                    CgOp::fetch($p)));
+        }
+        CgOp::getindex($self->name, CgOp::unwrap('Dictionary<string,Variable>',
+                    CgOp::fetch($p)));
     }
 
     __PACKAGE__->meta->make_immutable;
