@@ -85,6 +85,22 @@ use CgOp;
 }
 
 {
+    package Op::YouAreHere;
+    use Moose;
+    extends 'Op';
+
+    sub local_decls { Decl::RunMainline->new }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('!mainline')));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::CallMethod;
     use Moose;
     extends 'Op';

@@ -692,20 +692,13 @@ sub tribble {}
 sub babble {}
 sub quotepair {}
 
-sub add_decl {
-    my ($cl, @decls) = @_;
-    push @{ $::CURLEX->{'!decls'} //= [] }, @decls;
-}
-
 # We can't do much at blockoid reduce time because the context is unknown.
 # Roles and subs need somewhat different code gen
 sub blockoid { my ($cl, $M) = @_;
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
     if ($M->Str eq '{YOU_ARE_HERE}') {
-        $cl->add_decl(Decl::RunMainline->new);
-        $M->{_ast} = Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '!mainline'));
+        $M->{_ast} = Op::YouAreHere->new;
     } else {
         $M->{_ast} = $M->{statementlist}{_ast};
     }
@@ -951,7 +944,6 @@ sub package_def { my ($cl, $M) = @_;
     }
     my $name = $M->{longname}[0] ?
         $cl->mangle_longname($M->{longname}[0]) : 'ANON';
-    my $outer = $cl->get_outer($::CURLEX);
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
@@ -1025,9 +1017,6 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     Body->new(
         name      => $subname,
         type      => $type,
-        $args{bare} ? () : (
-            decls   => ($::CURLEX->{'!decls'} // []),
-            enter   => ($::CURLEX->{'!enter'} // [])),
         signature => $args{signature},
         do        => $ast);
 }
