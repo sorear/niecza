@@ -10,21 +10,7 @@ use CgOp;
 
     sub paren { shift }
 
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Op::NIL;
-    use Moose;
-    extends 'Op';
-
-    has ops => (isa => 'ArrayRef', is => 'ro', required => 1);
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::nil(map { blessed $_ ? $_->code($body) : $_ } @{ $self->ops });
-    }
+    sub zyg { }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
