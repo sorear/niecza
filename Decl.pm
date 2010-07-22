@@ -106,8 +106,9 @@ use CgOp;
     use Moose;
     extends 'Decl';
 
-    has slot => (isa => 'Str', is => 'ro', required => 1);
-    has list => (isa => 'Bool', is => 'ro', default => 0);
+    has slot   => (isa => 'Str', is => 'ro', required => 1);
+    has list   => (isa => 'Bool', is => 'ro', default => 0);
+    has shared => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
         $_[0]->slot, 'Variable';
@@ -128,10 +129,38 @@ use CgOp;
     sub enter_code {
         my ($self, $body) = @_;
 
-        $body->mainline ?
+        ($body->mainline || $self->shared) ?
             CgOp::share_lex($self->slot) :
             CgOp::copy_lex($self->slot, $self->list);
     }
+
+    sub write {
+        my ($self, $body) = @_;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::PackageAlias;
+    use Moose;
+    extends 'Decl';
+
+    has slot   => (isa => 'Str', is => 'ro', required => 1);
+
+    sub used_slots { }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+
+        CgOp::setindex($self->slot,
+            CgOp::unwrap('Dictionary<string,Variable>',
+                CgOp::fetch(CgOp::letvar('pkg'))),
+            CgOp::scopedlex($self->slot));
+    }
+
+    sub enter_code { }
 
     sub write {
         my ($self, $body) = @_;

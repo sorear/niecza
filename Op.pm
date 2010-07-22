@@ -562,16 +562,23 @@ use CgOp;
     has list => (isa => 'Bool', is => 'ro');
 
     has state_backing => (isa => 'Str', is => 'ro');
+    has package_too => (isa => 'Bool', is => 'ro', default => 1);
 
     sub local_decls {
         my ($self) = @_;
-        $self->declaring ?
-            ($self->state_backing ?
-                (Decl::StateVar->new(slot => $self->name,
-                        backing => $self->state_backing, list => $self->list)) :
-                (Decl::SimpleVar->new(slot => $self->name,
-                        list => $self->list))) :
-            ();
+        return () unless $self->declaring;
+
+        if ($self->state_backing) {
+            return Decl::StateVar->new(slot => $self->name,
+                    backing => $self->state_backing, list => $self->list);
+        } elsif ($self->package_too) {
+            return Decl::SimpleVar->new(slot => $self->name,
+                    list => $self->list, shared => 1),
+                Decl::PackageAlias->new(slot => $self->name);
+        } else {
+            return Decl::SimpleVar->new(slot => $self->name,
+                    list => $self->list);
+        }
     }
 
     sub paren {

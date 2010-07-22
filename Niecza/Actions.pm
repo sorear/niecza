@@ -787,7 +787,7 @@ sub variable_declarator { my ($cl, $M) = @_;
         return;
     }
 
-    if ($scope eq 'has' || $scope eq 'our') {
+    if ($scope eq 'has') {
         $M->sorry("Unsupported scope $scope for simple variable");
         return;
     }
@@ -802,7 +802,8 @@ sub variable_declarator { my ($cl, $M) = @_;
             list => scalar ($M->{variable}->Str =~ /^\@/));
     } else {
         $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1,
-            list => scalar ($M->{variable}->Str =~ /^\@/));
+            list => scalar ($M->{variable}->Str =~ /^\@/),
+            package_too => ($scope eq 'our'));
     }
 }
 
