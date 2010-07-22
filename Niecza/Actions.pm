@@ -959,21 +959,8 @@ sub package_def { my ($cl, $M) = @_;
     my $blocktype = $::PKGDECL;
     my $bodyvar = $cl->gensym;
 
-    if (($blocktype eq 'class' || $blocktype eq 'grammar')
-            && !$M->{decl}{stub}) {
-        unshift @{ $::CURLEX->{'!decls'} //= [] },
-            map { $_->{_ast} } @{ $M->{trait} };
-
-        AUTOANY: {
-            for my $d (@{ $::CURLEX->{'!decls'} //= [] }) {
-                next unless $d->isa('Decl::Super');
-                last AUTOANY;
-            }
-
-            $cl->add_decl(Decl::Super->new(name => ($blocktype eq 'grammar' ?
-                    'Cursor' : 'Any')));
-        }
-    }
+    unshift @{ $::CURLEX->{'!decls'} //= [] },
+        map { $_->{_ast} } @{ $M->{trait} };
 
     if (!$M->{decl}{stub}) {
         my $stmts = $M->{statementlist} // $M->{blockoid};

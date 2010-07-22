@@ -240,6 +240,9 @@ use CgOp;
                 CgOp::wrap(CgOp::clr_string($self->name // 'ANON'))),
 
             CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
+            ((grep { $_->isa('Decl::Super') } @{ $self->body->decls }) ? () :
+                CgOp::sink(CgOp::methodcall(CgOp::letvar("how"), "add-super",
+                        CgOp::scopedlex("Any!HOW")))),
 
             # TODO: Initialize the protoobject to a failure here so an awesome
             # error is produced if someone tries to use an incomplete class in
