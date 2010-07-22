@@ -24,11 +24,13 @@ use CgOp ();
     has type      => (isa => 'Str', is => 'rw');
 
     has lexical   => (isa => 'HashRef[Str]', is => 'ro', lazy_build => 1);
+    # my $x inside, floats out; mostly for blasts; set by context so must be rw
+    has transparent => (isa => 'Bool', is => 'rw', default => 0);
 
     sub _build_lexical {
         my ($self) = @_;
 
-        +{ map { $_->used_slots } @{ $self->decls } };
+        +{ map { $_->used_slots } @{ $self->_alldecls } };
     }
 
     sub is_mainline {
@@ -49,6 +51,24 @@ use CgOp ();
         }
     }
 
+    sub floated_decls {
+        my ($self) = @_;
+        if ($self->transparent) {
+            $self->do->local_decls;
+        } else {
+            ();
+        }
+    }
+
+    has _alldecls => (isa => 'ArrayRef[Decl]', is => 'ro', lazy_build => 1);
+    sub _build__alldecls {
+        my ($self) = @_;
+        my @x = @{ $self->decls };
+        unshift @x, $self->do->local_decls if !$self->transparent;
+        unshift @x, map { $_->extra_decls } @x;
+        \@x;
+    }
+
     sub gen_code {
         my ($self) = @_;
         # TODO: Bind a return value here to catch non-ro sub use
@@ -61,7 +81,7 @@ use CgOp ();
     sub enter_code {
         my ($self) = @_;
         my @p;
-        push @p, map { $_->enter_code($self) } @{ $self->decls };
+        push @p, map { $_->enter_code($self) } @{ $self->_alldecls };
         push @p, $self->signature->binder if $self->signature;
         push @p, map { CgOp::sink($_->code($self)) } @{ $self->enter };
         CgOp::prog(@p);
@@ -70,12 +90,12 @@ use CgOp ();
     sub write {
         my ($self) = @_;
         $self->code->write;
-        $_->write($self) for (@{ $self->decls });
+        $_->write($self) for (@{ $self->_alldecls });
     }
 
     sub preinit_code {
         my ($self) = @_;
-        CgOp::prog(map { $_->preinit_code($self) } @{ $self->decls });
+        CgOp::prog(map { $_->preinit_code($self) } @{ $self->_alldecls });
     }
 
     __PACKAGE__->meta->make_immutable;

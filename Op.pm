@@ -12,6 +12,11 @@ use CgOp;
 
     sub zyg { }
 
+    sub local_decls {
+        my ($self) = shift;
+        map { $_->local_decls } $self->zyg;
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -35,6 +40,7 @@ use CgOp;
     extends 'Op';
 
     has children => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+    sub zyg { @{ shift()->children } }
 
     sub code {
         my ($self, $body) = @_;
@@ -60,6 +66,7 @@ use CgOp;
     # non-parenthesized constructor
     has splittable_pair => (isa => 'Bool', is => 'rw', default => 0);
     has splittable_parcel => (isa => 'Bool', is => 'rw', default => 0);
+    sub zyg { $_[0]->invocant, @{ $_[0]->positionals } }
 
     sub paren {
         my ($self) = @_;
@@ -86,6 +93,7 @@ use CgOp;
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
     has name        => (isa => 'Str', is => 'ro', required => 1);
+    sub zyg { $_[0]->receiver, @{ $_[0]->positionals } }
 
     sub code {
         my ($self, $body) = @_;
@@ -104,6 +112,7 @@ use CgOp;
 
     has object => (isa => 'Op', is => 'ro', required => 1);
     has name   => (isa => 'Str', is => 'ro', required => 1);
+    sub zyg { $_[0]->object }
 
     sub code {
         my ($self, $body) = @_;
@@ -124,6 +133,7 @@ use CgOp;
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
     has name        => (isa => 'Str', is => 'ro', required => 1);
+    sub zyg { $_[0]->receiver, @{ $_[0]->positionals } }
 
     sub code {
         my ($self, $body) = @_;
@@ -144,6 +154,7 @@ use CgOp;
 
     has receiver    => (isa => 'Op', is => 'ro', required => 1);
     has name        => (isa => 'Str', is => 'ro', required => 1);
+    sub zyg { $_[0]->receiver }
 
     sub code {
         my ($self, $body) = @_;
@@ -195,7 +206,8 @@ use CgOp;
     extends 'Op';
 
     has kind => (isa => 'Str', is => 'ro', required => 1);
-    has args => (isa => 'ArrayRef', is => 'ro', required => 1);
+    has args => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+    sub zyg { @{ $_[0]->args } }
 
     sub red2 {
         my ($self, $sym, $o2) = @_;
@@ -261,6 +273,8 @@ use CgOp;
     has true  => (isa => 'Maybe[Op]', is => 'ro', required => 1);
     has false => (isa => 'Maybe[Op]', is => 'ro', required => 1);
 
+    sub zyg { grep { defined } $_[0]->check, $_[0]->true, $_[0]->false }
+
     sub code {
         my ($self, $body) = @_;
 
@@ -288,6 +302,7 @@ use CgOp;
     has body  => (isa => 'Op', is => 'ro', required => 1);
     has once  => (isa => 'Bool', is => 'ro', required => 1);
     has until => (isa => 'Bool', is => 'ro', required => 1);
+    sub zyg { $_[0]->check, $_[0]->body }
 
     sub code {
         my ($self, $cg, $body) = @_;
@@ -314,6 +329,7 @@ use CgOp;
     # possibly should use a raw boolean somehow
     has condvar => (isa => 'Str', is => 'ro', required => 1);
     has body => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->body }
 
     sub code {
         my ($self, $body) = @_;
@@ -358,6 +374,7 @@ use CgOp;
     has lhs => (isa => 'Op', is => 'ro', required => 1);
     has rhs => (isa => 'Op', is => 'ro', required => 1);
     has readonly => (isa => 'Bool', is => 'ro', required => 1);
+    sub zyg { $_[0]->lhs, $_[0]->rhs }
 
     sub code {
         my ($self, $body) = @_;
@@ -378,6 +395,16 @@ use CgOp;
 
     has name => (isa => 'Str', is => 'ro', required => 1);
     has state_decl => (isa => 'Bool', is => 'ro', default => 0);
+
+    has declaring => (isa => 'Bool', is => 'ro');
+    has list => (isa => 'Bool', is => 'ro');
+
+    sub local_decls {
+        my ($self) = @_;
+        $self->declaring ?
+            (Decl::SimpleVar->new(slot => $self->name, list => $self->list)) :
+            ();
+    }
 
     sub paren {
         Op::Lexical->new(name => shift()->name);

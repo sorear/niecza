@@ -805,10 +805,8 @@ sub variable_declarator { my ($cl, $M) = @_;
         $cl->add_decl(Decl::StateVar->new(backing => $ts, slot => $slot));
         $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1);
     } else {
-        $cl->add_decl(Decl::SimpleVar->new(slot => $slot,
-            list => scalar ($M->{variable}->Str =~ /^\@/)));
-
-        $M->{_ast} = Op::Lexical->new(name => $slot);
+        $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1,
+            list => scalar ($M->{variable}->Str =~ /^\@/));
     }
 }
 
