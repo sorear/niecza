@@ -955,7 +955,6 @@ sub package_def { my ($cl, $M) = @_;
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
-    my $decltype = 'Decl::' . ucfirst($::PKGDECL);
     my $blocktype = $::PKGDECL;
     my $bodyvar = $cl->gensym;
 
@@ -967,17 +966,16 @@ sub package_def { my ($cl, $M) = @_;
 
         my $cbody = $cl->sl_to_block($blocktype, $stmts->{_ast},
             name => $name);
-        my $cdecl = $decltype->new(
+        $M->{_ast} = $optype->new(
             name    => $name,
             var     => $outervar,
             bodyvar => $bodyvar,
             body    => $cbody);
-        $M->{_ast} = $optype->new(decl => $cdecl);
     } else {
-        $M->{_ast} = $optype->new(decl => $decltype->new(
+        $M->{_ast} = $optype->new(
             name    => $name,
             var     => $outervar,
-            stub    => 1));
+            stub    => 1);
     }
 }
 
@@ -1048,7 +1046,7 @@ sub block_to_immediate { my ($cl, $type, $blk) = @_;
 sub block_to_closure { my ($cl, $blk, %args) = @_;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
-    Op::SubDef->new(decl => Decl::Sub->new(var => $outer_key, code => $blk));
+    Op::SubDef->new(var => $outer_key, body => $blk);
 }
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
@@ -1160,8 +1158,8 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
 
     $M->{blast}{_ast}->type('phaser');
 
-    $M->{_ast} = Op::PreInit->new(decl => Decl::PreInit->new(var => $var,
-            code => $M->{blast}{_ast}, shared => 1));
+    $M->{_ast} = Op::PreInit->new(var => $var, body => $M->{blast}{_ast},
+        shared => 1);
 }
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;

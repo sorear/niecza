@@ -393,22 +393,29 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has decl => (isa => 'Decl', is => 'ro', required => 1);
+    has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
+    has var  => (is => 'ro', isa => 'Str', required => 1);
+    has bodyvar => (is => 'ro', isa => 'Str');
+    has stub => (is => 'ro', isa => 'Bool', default => 0);
+    has body => (is => 'ro', isa => 'Body');
 
     sub local_decls {
         my ($self) = @_;
-        $self->decl;
+        Decl::Class->new(stub => $self->stub, var => $self->var,
+            ($self->has_name ? (name => $self->name) : ()),
+            ($self->stub ? () : (body => $self->body,
+                    bodyvar => $self->bodyvar)));
     }
 
     sub code {
         my ($self, $body) = @_;
-        if ($self->decl->stub) {
-            CgOp::scopedlex($self->decl->var);
+        if ($self->stub) {
+            CgOp::scopedlex($self->var);
         } else {
             CgOp::prog(
                 CgOp::sink(CgOp::subcall(CgOp::fetch(
-                            CgOp::scopedlex($self->decl->bodyvar)))),
-                CgOp::scopedlex($self->decl->var));
+                            CgOp::scopedlex($self->bodyvar)))),
+                CgOp::scopedlex($self->var));
         }
     }
 
@@ -421,16 +428,19 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has decl => (isa => 'Decl', is => 'ro', required => 1);
+    has var    => (isa => 'Str', is => 'ro', predicate => 'has_var');
+    has body   => (isa => 'Body', is => 'ro', required => 1);
+    has shared => (isa => 'Bool', is => 'ro', default => 0);
 
     sub local_decls {
         my ($self) = @_;
-        $self->decl;
+        Decl::PreInit->new(var => $self->var, code => $self->body,
+            shared => $self->shared);
     }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::scopedlex($self->decl->var);
+        CgOp::scopedlex($self->var);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -442,16 +452,17 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has decl => (isa => 'Decl', is => 'ro', required => 1);
+    has var    => (isa => 'Str', is => 'ro', required => 1);
+    has body   => (isa => 'Body', is => 'ro', required => 1);
 
     sub local_decls {
         my ($self) = @_;
-        $self->decl;
+        Decl::Sub->new(var => $self->var, code => $self->body);
     }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::scopedlex($self->decl->var);
+        CgOp::scopedlex($self->var);
     }
 
     __PACKAGE__->meta->make_immutable;
