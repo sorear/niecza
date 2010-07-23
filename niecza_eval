@@ -9,49 +9,54 @@ use autodie ':all';
 
 my @evaluate;
 my $ast;
+my $module;
+my $csonly;
+my $lang = 'CORE';
 
 sub usage {
     my ($fh, $ex) = @_;
     print $fh <<EOM;
 niecza -- a command line wrapper for Niecza
 
-usage: niecza [-e 'code']
-   OR: niecza file
+usage: niecza -e 'code'      # run a one-liner
+   OR: niecza file.pl        # run a program
+   OR: niecza -c File.pm     # precompile a module
+   OR: niecza                # interactive shell
+
+general options:
+   --cs-only                 # stop after .cs generation
+   --ast                     # stop after AST generation
+   --language=NAME           # select your setting
 EOM
     exit $ex;
 }
 
-GetOptions('ast' => \$ast, 'evaluate|e=s' => \@evaluate)
+GetOptions('ast' => \$ast, 'evaluate|e=s' => \@evaluate,
+        'compile|c' => \$module, 'cs-only' => \$csonly,
+        'language|L=s' => \$lang)
     or usage(\*STDERR, 1);
 
-if ((scalar @evaluate) && (scalar @ARGV)) {
+my $excl = 0;
+$excl++ if @evaluate;
+$excl++ if @ARGV;
+if ($excl > 1 || $module && !@ARGV) {
     usage(\*STDERR, 1);
 }
 
-close ::NIECZA_OUT;
-
 sub run {
-    if ($ast) {
-        ast(shift);
-        return;
-    }
-    open ::NIECZA_OUT, ">", "Program.cs";
-    compile(main => 1, code => shift(), ast => $ast);
-    close ::NIECZA_OUT;
-
-    system 'gmcs /r:Kernel.dll /r:CORE.dll Program.cs';
-    system 'mono --debug=casts Program.exe';
+    compile(main => !$module, csonly => $csonly, ast => $ast,
+        lang => $lang, @_);
+    system 'mono --debug=casts MAIN.exe' if !$module && !$csonly;
 }
 
 if (@ARGV) {
     require File::Slurp;
     for (@ARGV) {
-        my $x = File::Slurp::slurp($_);
-        run($x);
+        run(file => $_);
     }
 } elsif (@evaluate) {
     for (@evaluate) {
-        run($_);
+        run(code => $_);
     }
 } else {
     require Term::ReadLine;
@@ -59,7 +64,7 @@ if (@ARGV) {
     while (defined ($_ = $term->readline("> ")) ) {
         /^\s*[^\s#]/ or next;
         eval {
-            run("say do $_");
+            run(code => "say do $_");
         };
         say $@ if $@;
         $term->addhistory($_) if /\S/;

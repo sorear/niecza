@@ -7,6 +7,8 @@ use Sub::Exporter -setup => {
     exports => [ qw(compile) ]
 };
 
+use autodie ':all';
+
 open ::NIECZA_OUT, ">&", \*STDOUT;
 
 BEGIN {
@@ -23,17 +25,11 @@ use Storable;
 use Niecza::Grammar ();
 use Niecza::Actions ();
 
-    print ::NIECZA_OUT <<EOH;
-using System;
-using System.Collections.Generic;
-using Niecza;
-
-EOH
-
 sub compile {
     my %args = @_;
     $args{lang} //= 'CORE';
 
+    local @::UNITDEPS;
     local $::SETTING_RESUME;
     local $::YOU_WERE_HERE;
     local $::UNITNAME = $args{main} ? '' : $args{file};
@@ -43,6 +39,7 @@ sub compile {
 
     $::SETTING_RESUME = retrieve($args{lang} . '_ast.store')
         unless $args{lang} eq 'NULL';
+    push @::UNITDEPS, $args{lang} if $args{lang} ne 'NULL';
 
     my ($m, $a) = $args{file} ? ('parsefile', $args{file}) :
         ('parse', $args{code});
@@ -57,9 +54,28 @@ sub compile {
     }
 
     $::SETTING_RESUME = undef;
+
+    my $basename = $::UNITNAME;
+    $basename =~ s/::/\//g;
+    $basename ||= 'MAIN';
+
+    open ::NIECZA_OUT, ">", $basename . ".cs";
+    print ::NIECZA_OUT <<EOH;
+using System;
+using System.Collections.Generic;
+using Niecza;
+
+EOH
     $ast->write;
-    store $::SETTING_RESUME, ($::UNITNAME . '_ast.store')
+    close ::NIECZA_OUT;
+    store $::SETTING_RESUME, ($basename . '_ast.store')
         if $::SETTING_RESUME;
+
+    return if $args{csonly};
+
+    system "gmcs", ($args{main} ? () : ("/target:library")), "/r:Kernel.dll",
+        (map { "/r:$_.dll" } @::UNITDEPS),
+        "/out:${basename}." . ($args{main} ? 'exe' : 'dll'), "${basename}.cs";
 }
 
 1;
