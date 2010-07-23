@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 95;
+plan 96;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -306,4 +306,6 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 {
     my package Foo { our $x = 42; }
     ok $Foo::x == 42, "can access our vars";
+    my module Bar { our $x = 42; }
+    ok $Bar::x == 42, "module accepted too";
 }

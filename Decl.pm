@@ -333,6 +333,15 @@ use CgOp;
 }
 
 {
+    package Decl::Module;
+    use Moose;
+    extends 'Decl::Package';
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::Class;
     use Moose;
     extends 'Decl';

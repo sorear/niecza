@@ -420,9 +420,10 @@ use CgOp;
     has stub => (is => 'ro', isa => 'Bool', default => 0);
     has body => (is => 'ro', isa => 'Body');
 
+    sub decl_class { 'Decl::Package' }
     sub local_decls {
         my ($self) = @_;
-        Decl::Package->new(stub => $self->stub, var => $self->var . "::",
+        $self->decl_class->new(stub => $self->stub, var => $self->var . "::",
             ($self->stub ? () : (body => $self->body,
                     bodyvar => $self->bodyvar)));
     }
@@ -438,6 +439,17 @@ use CgOp;
                 CgOp::scopedlex($self->var . "::"));
         }
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::ModuleDef;
+    use Moose;
+    extends 'Op::PackageDef';
+
+    sub decl_class { 'Decl::Module' }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
