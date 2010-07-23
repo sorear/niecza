@@ -22,24 +22,24 @@ use 5.010;
     sub gen_code {
         my ($self) = @_;
         $self->mainline->outer($self->setting) if $self->setting;
-        CodeGen->know_module($self->setting_name);
+        CodeGen->know_module($self->csname($self->setting_name));
         CodeGen->know_module($self->csname);
         CodeGen->new(name => 'BOOT', entry => 1,
             ops => CgOp::letn('pkg', CgOp::rawsget('Kernel.Global'),
-                CgOp::rawscall($self->setting_name . '.Initialize'),
+                CgOp::rawscall($self->csname($self->setting_name) . '.Initialize'),
                 CgOp::letn('protopad',
-                    CgOp::cast('Frame', CgOp::rawsget($self->setting_name .
+                    CgOp::cast('Frame', CgOp::rawsget($self->csname($self->setting_name) .
                             '.Environment')),
                     ($self->is_setting ?
                         CgOp::rawsset($self->csname . '.Installer',
                             CgOp::protosub($self->mainline)) :
-                        CgOp::subcall(CgOp::rawsget($self->setting_name . '.Installer'),
+                        CgOp::subcall(CgOp::rawsget($self->csname($self->setting_name) . '.Installer'),
                             CgOp::newscalar(CgOp::protosub($self->mainline)))),
                     CgOp::return())));
     }
 
     sub csname {
-        my $x = $_[0]->name;
+        my $x = $_[1] // $_[0]->name;
         $x =~ s/::/./g;
         $x ||= 'MAIN';
         $x;

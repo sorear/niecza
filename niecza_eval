@@ -36,8 +36,7 @@ sub run {
         return;
     }
     open ::NIECZA_OUT, ">", "Program.cs";
-    header;
-    mainline(shift);
+    compile(main => 1, code => shift(), ast => $ast);
     close ::NIECZA_OUT;
 
     system 'gmcs /r:Kernel.dll /r:CORE.dll Program.cs';

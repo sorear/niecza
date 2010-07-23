@@ -8,14 +8,14 @@ all: CORE.dll
 	git rev-parse HEAD | cut -c1-7 > VERSION
 
 test: $(COMPILER) test.pl CORE.dll
-	perl -MFile::Slurp -MCompilerDriver=:all -e 'header; mainline(scalar read_file("test.pl"))' > Program.cs
+	perl -MFile::Slurp -MCompilerDriver=:all -e 'compile(main => 1, file => "test.pl")' > Program.cs
 	gmcs /r:Kernel.dll /r:CORE.dll Program.cs
 	prove -e 'mono --debug=casts' Program.exe
 
 .DELETE_ON_ERROR:
 
 CORE.cs: $(COMPILER) CORE.setting
-	perl -MCompilerDriver=:all -e 'header; setting' > CORE.cs
+	perl -MCompilerDriver=:all -e 'compile(lang => "NULL", file => "CORE.setting")' > CORE.cs
 
 Kernel.dll: Kernel.cs
 	gmcs /target:library /out:Kernel.dll Kernel.cs
