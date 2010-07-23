@@ -569,11 +569,9 @@ sub variable { my ($cl, $M) = @_;
         }
         when ('') {
             if (@rest) {
-                my $lexpkg = $M->lex_can_find_name($::CURLEX, $rest[0] . "::",
-                        { truename => '???' });
                 $M->{_ast} = {
-                    term => Op::PackageVar->new(lexical_pkg => $lexpkg,
-                        path => [ map { $_ . "::" } @rest ], name => $sl),
+                    term => Op::PackageVar->new(
+                        path => \@rest, name => $sl, slot => $cl->gensym),
                 };
             } else {
                 $M->{_ast} = {
@@ -823,10 +821,12 @@ sub variable_declarator { my ($cl, $M) = @_;
         $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1,
             state_backing => $cl->gensym, declaring => 1,
             list => scalar ($M->{variable}->Str =~ /^\@/));
+    } elsif ($scope eq 'our') {
+        $M->{_ast} = Op::PackageVar->new(name => $slot, slot => $slot,
+            path => [ 'OUR' ]);
     } else {
         $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1,
-            list => scalar ($M->{variable}->Str =~ /^\@/),
-            package_too => ($scope eq 'our'));
+            list => scalar ($M->{variable}->Str =~ /^\@/));
     }
 }
 

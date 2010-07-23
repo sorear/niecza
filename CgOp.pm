@@ -381,6 +381,11 @@ use warnings;
         CgOp::Primitive->new(op => [ 'clr_sfield_get', $_[0] ]);
     }
 
+    sub rawsset {
+        CgOp::Primitive->new(op => [ 'clr_sfield_set', $_[0] ],
+            zyg => [ $_[1] ]);
+    }
+
     sub rawnew {
         my ($name, @args) = @_;
         CgOp::Primitive->new(op => [ 'clr_new', $name, scalar @args ],

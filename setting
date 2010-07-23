@@ -137,6 +137,8 @@ Q:CgOp {
       [sink (methodcall (l Any!HOW) add-super (l Mu!HOW))]
       [l Any (methodcall (l Any!HOW) create-protoobject)]
 
+      [rawsset Kernel.AnyP (@ (l Any))]
+
       [l Cool!HOW (methodcall (l ClassHOW) new (w (clr_string Cool)))]
       [sink (methodcall (l Cool!HOW) add-super (l Any!HOW))]
       [l Cool (methodcall (l Cool!HOW) create-protoobject)]

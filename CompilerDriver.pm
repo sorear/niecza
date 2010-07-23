@@ -67,10 +67,12 @@ sub bootstrap {
 public class EntryPoint {
     public static Frame START(Frame th) {
         Frame t;
+        Dictionary<string,Variable> global = new Dictionary<string,Variable>();
         switch (th.ip) {
             case 0:
                 t = new Frame(th, th, new DynBlockDelegate(Setting.BOOT));
-                t.pos = new LValue[1] { Kernel.NewROScalar(th).lv };
+                t.pos = new LValue[2] { Kernel.NewROScalar(th).lv,
+                    Kernel.NewROScalar(new CLRImportObject(global)).lv };
                 th.ip = 1;
                 return t;
             case 1:

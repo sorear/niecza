@@ -142,25 +142,60 @@ use CgOp;
     no Moose;
 }
 
+# only use this for classes &c which have no meaningful commoning behavior
 {
     package Decl::PackageAlias;
     use Moose;
     extends 'Decl';
 
     has slot   => (isa => 'Str', is => 'ro', required => 1);
+    has path   => (isa => 'ArrayRef[Str]', is => 'ro',
+        default => sub { ['OUR'] });
+    has name   => (isa => 'Str', is => 'ro', required => 1);
 
     sub used_slots { }
 
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::setindex($self->slot,
-            CgOp::unwrap('Dictionary<string,Variable>',
-                CgOp::fetch(CgOp::letvar('pkg'))),
+        CgOp::bind($body->lookup_var($self->name, @{ $self->path }),
             CgOp::scopedlex($self->slot));
     }
 
     sub enter_code { }
+
+    sub write {
+        my ($self, $body) = @_;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::OurAlias;
+    use Moose;
+    extends 'Decl';
+
+    has slot   => (isa => 'Str', is => 'ro', required => 1);
+    has path   => (isa => 'ArrayRef[Str]', is => 'ro',
+        default => sub { ['OUR'] });
+    has name   => (isa => 'Str', is => 'ro', required => 1);
+
+    sub used_slots { $_[0]->slot, 'Variable' }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+
+        CgOp::proto_var($self->slot,
+            $body->lookup_var($self->name, @{ $self->path }));
+    }
+
+    sub enter_code {
+        my ($self, $body) = @_;
+
+        CgOp::share_lex($self->slot);
+    }
 
     sub write {
         my ($self, $body) = @_;
@@ -224,7 +259,8 @@ use CgOp;
                 CgOp::rawscall('Kernel.MakeSub',
                     CgOp::rawsget('Kernel.MainlineContinuation'),
                     CgOp::null('Frame'), CgOp::null('Frame')),
-                CgOp::newscalar(CgOp::letvar('protopad'))));
+                CgOp::newscalar(CgOp::letvar('protopad')),
+                CgOp::letvar('pkg')));
     }
 
     sub enter_code {
@@ -416,15 +452,23 @@ use CgOp;
     no Moose;
 }
 
+# XXX this is yucky
 {
-    package Decl::Regex;
+    package Decl::PackageLink;
     use Moose;
     extends 'Decl';
 
-    has slot => (is => 'ro', isa => 'Str', required => 1);
+    has name => (is => 'ro', isa => 'Str', required => 1);
 
+    sub used_slots { $_[0]->name, 'Variable' }
     sub preinit_code {
         my ($self, $body) = @_;
+        CgOp::proto_var($self->name, CgOp::letvar('pkg'));
+    }
+
+    sub enter_code {
+        my ($self, $body) = @_;
+        CgOp::share_lex($self->name);
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -68,6 +68,10 @@ use CgOp ();
         unshift @x, $self->signature->local_decls if $self->signature;
         @x = map { $_->extra_decls, $_ } @x;
         @x = map { $_->outer_decls, $_ } @x if $self->type eq 'mainline';
+        unshift @x, Decl::PackageLink->new(name => '$?GLOBAL')
+            if $self->type eq 'mainline';
+        unshift @x, Decl::PackageLink->new(name => '$?CURPKG')
+            if $self->type =~ /mainline|class|package|grammar|module|role|slang|knowhow/;
         \@x;
     }
 
@@ -98,6 +102,61 @@ use CgOp ();
     sub preinit_code {
         my ($self) = @_;
         CgOp::prog(map { $_->preinit_code($self) } @{ $self->_alldecls });
+    }
+
+    sub lex_level {
+        my ($self, $var) = @_;
+
+        if ($self->lexical->{$var}) {
+            return 0;
+        } elsif ($self->outer) {
+            return 1 + $self->outer->lex_level($var);
+        } else {
+            return -1;
+        }
+    }
+
+    # In order to support proper COMMON semantics on package variables
+    # we have only one operation here - autovivifying lookup.
+    #
+    # This should be used for all accesses like $a::b, $::b.  $a is a simple
+    # lexical.
+    sub lookup_var {
+        my ($self, $name, @path) = @_;
+
+        if (@path) {
+            return $self->lookup_pkg((map { $_ . "::" } @path),
+                (defined $name) ? ($name) : ());
+        } else {
+            # This is supposed to dwimmily do MY:: or OUR::, neither of which
+            # is implemented.  So...
+            die "\$::x is not yet implemented";
+        }
+    }
+
+    sub lookup_pkg {
+        my ($self, @components) = @_;
+
+        my $pkgcg;
+        if ($components[0] eq 'GLOBAL::') {
+            $pkgcg = CgOp::scopedlex('$?GLOBAL');
+            shift @components;
+        } elsif ($components[0] eq 'OUR::') {
+            $pkgcg = CgOp::scopedlex('$?CURPKG');
+            shift @components;
+        } elsif ($self->lex_level($components[0]) >= 0) {
+            $pkgcg = CgOp::scopedlex($components[0]);
+            shift @components;
+        } else {
+            $pkgcg = CgOp::scopedlex('$?GLOBAL');
+        }
+
+        for my $c (@components) {
+            $pkgcg = CgOp::rawscall('Kernel.PackageLookup', CgOp::fetch($pkgcg),
+                CgOp::clr_string($c));
+        }
+
+        $pkgcg;
     }
 
     __PACKAGE__->meta->make_immutable;

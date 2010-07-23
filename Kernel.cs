@@ -620,6 +620,29 @@ blocked:
             return th;
         }
 
+        public static IP6 AnyP;
+
+        public static Frame PackageLookup(Frame th, IP6 parent,
+                string name) {
+            Dictionary<string,Variable> stash = (Dictionary<string,Variable>)
+                (((CLRImportObject)parent).val);
+            Variable v;
+
+            if (stash.TryGetValue(name, out v)) {
+                th.resultSlot = v;
+            } else if (name.EndsWith("::")) {
+                Dictionary<string,Variable> newstash =
+                    new Dictionary<string,Variable>();
+                newstash["PARENT::"] = NewROScalar(parent);
+                th.resultSlot = stash[name] =
+                    NewROScalar(new CLRImportObject(newstash));
+            } else {
+                // TODO: @foo, %foo
+                th.resultSlot = stash[name] = NewRWScalar(AnyP);
+            }
+            return th;
+        }
+
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);

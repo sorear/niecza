@@ -562,7 +562,6 @@ use CgOp;
     has list => (isa => 'Bool', is => 'ro');
 
     has state_backing => (isa => 'Str', is => 'ro');
-    has package_too => (isa => 'Bool', is => 'ro', default => 1);
 
     sub local_decls {
         my ($self) = @_;
@@ -571,10 +570,6 @@ use CgOp;
         if ($self->state_backing) {
             return Decl::StateVar->new(slot => $self->name,
                     backing => $self->state_backing, list => $self->list);
-        } elsif ($self->package_too) {
-            return Decl::SimpleVar->new(slot => $self->name,
-                    list => $self->list, shared => 1),
-                Decl::PackageAlias->new(slot => $self->name);
         } else {
             return Decl::SimpleVar->new(slot => $self->name,
                     list => $self->list);
@@ -602,20 +597,20 @@ use CgOp;
     extends 'Op';
 
     has name => (isa => 'Str', is => 'ro', required => 1);
-    has lexical_pkg => (isa => 'Bool', is => 'ro', required => 1);
+    has slot => (isa => 'Str', is => 'ro', required => 1);
     has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
+
+    sub local_decls {
+        my ($self) = @_;
+        # TODO Skip this part if the thing-being-bound references MY,
+        # CALLER, OUTER, etc
+        Decl::OurAlias->new(name => $self->name, slot => $self->slot,
+            path => $self->path);
+    }
 
     sub code {
         my ($self, $body) = @_;
-        my @path = @{ $self->path };
-        my $p = $self->lexical_pkg ? CgOp::scopedlex(shift(@path)) :
-            CgOp::letvar('pkg');
-        for (@path) {
-            $p = CgOp::getindex($_, CgOp::unwrap('Dictionary<string,Variable>',
-                    CgOp::fetch($p)));
-        }
-        CgOp::getindex($self->name, CgOp::unwrap('Dictionary<string,Variable>',
-                    CgOp::fetch($p)));
+        CgOp::scopedlex($self->slot);
     }
 
     __PACKAGE__->meta->make_immutable;

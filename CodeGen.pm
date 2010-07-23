@@ -46,6 +46,7 @@ use 5.010;
         'Frame' =>
             { pos          => [f => 'LValue[]'] },
 
+        'Kernel.PackageLookup' => [c => 'Variable'],
         'Kernel.SlurpyHelper'  => [c => 'List<Variable>'],
         'Kernel.Bind'          => [c => 'Void'],
         'Kernel.Assign'        => [c => 'Void'],
@@ -57,6 +58,7 @@ use 5.010;
         'Console.Error.WriteLine'    => [m => 'Void'],
         'Environment.Exit'     => [m => 'Void'],
         'String.Concat'        => [m => 'String'],
+        'Kernel.AnyP'          => [f => 'IP6'],
         'Kernel.SubMO'         => [f => 'DynMetaObject'],
         'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
         'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],
