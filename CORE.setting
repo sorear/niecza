@@ -1,8 +1,6 @@
 # vim: ft=perl6
 
-# XXX fakes out STD.pm6 into doing more or less the right thing
-# need to understand this better
-my class CORE { ... }
+my module CORE;
 
 # We have to do this directly due to the circularity saw.  Same
 # reason forces uncontainerized .NET values.
@@ -275,7 +273,7 @@ sub say($str) { Q:CgOp {
 } }
 
 sub exit() { Q:CgOp {
-    (prog [rawscall Environment.Exit (int 0) ]
+    (prog [rawscall System.Environment.Exit (int 0) ]
           [null Variable]
     )
 } }

@@ -16,27 +16,66 @@ use 5.010;
         builder => 'gen_code');
     has setting  => (isa => 'Body', is => 'ro');
 
+    has is_setting => (isa => 'Bool', is => 'ro');
+    has setting_name => (isa => 'Str', is => 'ro');
+
     sub gen_code {
         my ($self) = @_;
         $self->mainline->outer($self->setting) if $self->setting;
+        CodeGen->know_module($self->setting_name);
+        CodeGen->know_module($self->csname);
         CodeGen->new(name => 'BOOT', entry => 1,
-            ops => CgOp::letn('protopad',
-                CgOp::cast('Frame', CgOp::fetch(CgOp::pos(0))),
-                CgOp::letn('pkg', CgOp::pos(1),
-                    CgOp::return(
-                        CgOp::newscalar(
-                            CgOp::protosub($self->mainline))))));
+            ops => CgOp::letn('pkg', CgOp::rawsget('Kernel.Global'),
+                CgOp::rawscall($self->setting_name . '.Initialize'),
+                CgOp::letn('protopad',
+                    CgOp::cast('Frame', CgOp::rawsget($self->setting_name .
+                            '.Environment')),
+                    ($self->is_setting ?
+                        CgOp::rawsset($self->csname . '.Installer',
+                            CgOp::protosub($self->mainline)) :
+                        CgOp::subcall(CgOp::rawsget($self->setting_name . '.Installer'),
+                            CgOp::newscalar(CgOp::protosub($self->mainline)))),
+                    CgOp::return())));
+    }
+
+    sub csname {
+        my $x = $_[0]->name;
+        $x =~ s/::/./g;
+        $x ||= 'MAIN';
+        $x;
     }
 
     sub write {
         my ($self) = @_;
         #say STDERR (YAML::XS::Dump($self));
         print ::NIECZA_OUT <<EOH;
-public class @{[ $self->name ]} {
+public class @{[ $self->csname ]} {
 EOH
         $self->code->write;
         $self->mainline->write;
-        print ::NIECZA_OUT "}\n"
+        if ($self->is_setting) {
+            print ::NIECZA_OUT <<EOSB ;
+    public static IP6 Installer;
+EOSB
+        }
+        if (!$self->name) { # || has_MAIN
+            print ::NIECZA_OUT <<EOMAIN ;
+    public static void Main() {
+        Initialize();
+    }
+EOMAIN
+        }
+        print ::NIECZA_OUT <<EOGB ;
+    private static bool Initialized;
+    public static Frame Environment;
+    public static void Initialize() {
+        if (!Initialized) {
+            Initialized = true;
+            Kernel.RunLoop(new DynBlockDelegate(BOOT));
+        }
+    }
+}
+EOGB
     }
 
     __PACKAGE__->meta->make_immutable;

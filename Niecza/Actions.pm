@@ -723,7 +723,7 @@ sub blockoid { my ($cl, $M) = @_;
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
     if ($M->Str eq '{YOU_ARE_HERE}') {
-        $M->{_ast} = Op::YouAreHere->new;
+        $M->{_ast} = Op::YouAreHere->new(unitname => $::UNITNAME);
     } else {
         $M->{_ast} = $M->{statementlist}{_ast};
     }
@@ -1184,11 +1184,33 @@ sub statement_prefix__S_START { my ($cl, $M) = @_;
 }
 
 sub comp_unit { my ($cl, $M) = @_;
-    my $body = $cl->sl_to_block('mainline', $M->{statementlist}{_ast},
-        subname => 'mainline');
+    my $body;
+    my $sl = $M->{statementlist}{_ast};
+
+    if (!$::YOU_WERE_HERE && $::UNITNAME) {
+        $sl = Op::StatementList->new(children => [ $sl,
+                Op::YouAreHere->new(save_only => 1, unitname => $::UNITNAME)]);
+    }
+
+    $body = $cl->sl_to_block('mainline', $sl, subname => 'mainline');
+    if ($::YOU_WERE_HERE) {
+        $body = Body->new(
+            type => 'mainline',
+            name => 'install',
+            signature => Sig->new(params => [
+                    Sig::Parameter->new(target => Sig::Target->new(
+                            slot => '!mainline', zeroinit => 1))]),
+            do => Op::CallSub->new(
+                invocant => Op::CgOp->new(op => CgOp::newscalar(
+                        CgOp::rawsget($::SETTINGNAME . ".Installer"))),
+                positionals => [Op::SubDef->new(
+                    var => $cl->gensym, body => $body)]));
+    }
 
     $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME,
-        $::SETTING_RESUME ? (setting => $::SETTING_RESUME) : ());
+        ($::SETTING_RESUME ? (setting => $::SETTING_RESUME) : ()),
+        is_setting => (!!$::YOU_WERE_HERE),
+        setting_name => $::SETTINGNAME);
 }
 
 1;

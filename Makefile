@@ -4,26 +4,26 @@ STDENV=PERL5LIB=$(STDBASE) PERL6LIB=$(STDBASE):$(STDBASE)/lib
 COMPILER=Body.pm CgOp.pm CodeGen.pm CompilerDriver.pm Decl.pm Op.pm RxOp.pm\
 	 Sig.pm Unit.pm Niecza/Actions.pm Niecza/Grammar.pmc .STD_build_stamp
 
-all: Setting.dll
+all: CORE.dll
 	git rev-parse HEAD | cut -c1-7 > VERSION
 
-test: $(COMPILER) test.pl Setting.dll
-	perl -MFile::Slurp -MCompilerDriver=:all -e 'header; mainline(scalar read_file("test.pl")); bootstrap' > Program.cs
-	gmcs /r:Kernel.dll /r:Setting.dll Program.cs
+test: $(COMPILER) test.pl CORE.dll
+	perl -MFile::Slurp -MCompilerDriver=:all -e 'header; mainline(scalar read_file("test.pl"))' > Program.cs
+	gmcs /r:Kernel.dll /r:CORE.dll Program.cs
 	prove -e 'mono --debug=casts' Program.exe
 
 .DELETE_ON_ERROR:
 
-Setting.cs: $(COMPILER) setting
-	perl -MCompilerDriver=:all -e 'header; setting' > Setting.cs
+CORE.cs: $(COMPILER) CORE.setting
+	perl -MCompilerDriver=:all -e 'header; setting' > CORE.cs
 
 Kernel.dll: Kernel.cs
 	gmcs /target:library /out:Kernel.dll Kernel.cs
 	mono --aot Kernel.dll
 
-Setting.dll: Kernel.dll Setting.cs
-	gmcs /target:library /out:Setting.dll /r:Kernel.dll Setting.cs
-	mono --aot Setting.dll
+CORE.dll: Kernel.dll CORE.cs
+	gmcs /target:library /out:CORE.dll /r:Kernel.dll CORE.cs
+	mono --aot CORE.dll
 
 Niecza/Grammar.pmc: Niecza/Grammar.pm6 .STD_build_stamp
 	STD5PREFIX=$(STDBASE)/ $(STDENV) $(STDBASE)/viv -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6

@@ -643,6 +643,19 @@ blocked:
             return th;
         }
 
+        public static void RunLoop(DynBlockDelegate boot) {
+            Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
+            Frame root_f = new Frame(null, null, boot);
+            Frame current = root_f;
+            while (current != null) {
+                current = current.Continue();
+            }
+        }
+
+        // XXX should be per-unit
+        public static Variable Global =
+            NewROScalar(new CLRImportObject(new Dictionary<string,Variable>()));
+
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
@@ -658,4 +671,24 @@ blocked:
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
         }
     }
+}
+
+// The root setting
+public class NULL {
+    public static Niecza.Frame Environment = null;
+    public static Niecza.IP6 Installer = Niecza.Kernel.MakeSub(
+            new Niecza.DynBlockDelegate(MAIN), null, null);
+
+    private static Niecza.Frame MAIN(Niecza.Frame th) {
+        switch (th.ip) {
+            case 0:
+                th.ip = 1;
+                return Niecza.Kernel.Fetch(th, new Niecza.Variable(false,
+                            Niecza.Variable.Context.Scalar, th.pos[0]));
+            default:
+                return ((Niecza.IP6)th.resultSlot).Invoke(th.caller,
+                        new Niecza.LValue[0] {}, null);
+        }
+    }
+    public static void Initialize() {}
 }

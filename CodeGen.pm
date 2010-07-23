@@ -46,6 +46,7 @@ use 5.010;
         'Frame' =>
             { pos          => [f => 'LValue[]'] },
 
+        'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [c => 'Variable'],
         'Kernel.SlurpyHelper'  => [c => 'List<Variable>'],
         'Kernel.Bind'          => [c => 'Void'],
@@ -56,7 +57,7 @@ use 5.010;
         'Kernel.NewRWListVar'  => [m => 'Variable'],
         'Console.WriteLine'    => [m => 'Void'],
         'Console.Error.WriteLine'    => [m => 'Void'],
-        'Environment.Exit'     => [m => 'Void'],
+        'System.Environment.Exit'     => [m => 'Void'],
         'String.Concat'        => [m => 'String'],
         'Kernel.AnyP'          => [f => 'IP6'],
         'Kernel.SubMO'         => [f => 'DynMetaObject'],
@@ -66,6 +67,19 @@ use 5.010;
         'Kernel.BoxAny'        => [m => 'Variable'],
         'Kernel.UnboxAny'      => [m => 'object'],
     );
+
+    sub know_module {
+        my ($class, $mname) = @_;
+        # for settings
+        $typedata{ $mname . '.Environment' } = [ f => 'Frame' ];
+        $typedata{ $mname . '.Installer' } = [ f => 'IP6' ];
+        # for importable modules
+        $typedata{ $mname . '.Type' } = [ f => 'Variable' ];
+        $typedata{ $mname . '.Stash' } = [ f => 'Variable' ];
+        # for all
+        $typedata{ $mname . '.Initialize' } = [ m => 'Void' ];
+    }
+    __PACKAGE__->know_module('NULL');
 
     sub _typedata {
         my ($self, $types, @path) = @_;
@@ -570,7 +584,7 @@ use 5.010;
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
-        print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(\"Entering $name @ \" + th.ip); }\n";
+        print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(\"Entering $::UNITNAME : $name @ \" + th.ip); }\n";
         if ($self->maxdepth) {
             print ::NIECZA_OUT " " x 8, "object " . join(", ", map { "s$_" }
                 0 .. ($self->maxdepth - 1)) . ";\n";

@@ -38,10 +38,9 @@ sub run {
     open ::NIECZA_OUT, ">", "Program.cs";
     header;
     mainline(shift);
-    bootstrap;
     close ::NIECZA_OUT;
 
-    system 'gmcs /r:Kernel.dll /r:Setting.dll Program.cs';
+    system 'gmcs /r:Kernel.dll /r:CORE.dll Program.cs';
     system 'mono --debug=casts Program.exe';
 }
 

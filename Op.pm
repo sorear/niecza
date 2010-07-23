@@ -89,11 +89,15 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    sub local_decls { Decl::RunMainline->new }
+    has unitname  => (isa => 'Str', is => 'ro', required => 1);
+    has save_only => (isa => 'Bool', is => 'ro', default => 0);
+
+    sub local_decls { Decl::SaveEnv->new(unitname => $_[0]->unitname) }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('!mainline')));
+        $self->save_only ? CgOp::null('Variable') :
+            CgOp::subcall(CgOp::fetch(CgOp::scopedlex('!mainline')));
     }
 
     __PACKAGE__->meta->make_immutable;

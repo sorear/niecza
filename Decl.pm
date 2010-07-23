@@ -106,9 +106,10 @@ use CgOp;
     use Moose;
     extends 'Decl';
 
-    has slot   => (isa => 'Str', is => 'ro', required => 1);
-    has list   => (isa => 'Bool', is => 'ro', default => 0);
-    has shared => (isa => 'Bool', is => 'ro', default => 0);
+    has slot     => (isa => 'Str', is => 'ro', required => 1);
+    has list     => (isa => 'Bool', is => 'ro', default => 0);
+    has shared   => (isa => 'Bool', is => 'ro', default => 0);
+    has zeroinit => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
         $_[0]->slot, 'Variable';
@@ -117,7 +118,9 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        if ($self->list) {
+        if ($self->zeroinit) {
+            CgOp::proto_var($self->slot, CgOp::newrwscalar(CgOp::null('IP6')));
+        } elsif ($self->list) {
             CgOp::proto_var($self->slot,
                 CgOp::newrwlistvar(CgOp::fetch(CgOp::scopedlex('Any'))));
         } else {
@@ -242,32 +245,21 @@ use CgOp;
 }
 
 {
-    package Decl::RunMainline;
+    package Decl::SaveEnv;
     use Moose;
     extends 'Decl';
 
-    sub used_slots { '!mainline', 'Variable' }
+    has unitname => (isa => 'Str', is => 'ro', required => 1);
 
     sub preinit_code {
         my ($self, $body) = @_;
 
         # XXX ought not to have side effects here.
         $::SETTING_RESUME = $body;
+        my $n = $self->unitname;
+        $n =~ s/::/./g;
 
-        CgOp::proto_var('!mainline',
-            CgOp::subcall(
-                CgOp::rawscall('Kernel.MakeSub',
-                    CgOp::rawsget('Kernel.MainlineContinuation'),
-                    CgOp::null('Frame'), CgOp::null('Frame')),
-                CgOp::newscalar(CgOp::letvar('protopad')),
-                CgOp::letvar('pkg')));
-    }
-
-    sub enter_code {
-        my ($self, $body) = @_;
-        $body->mainline ?
-            CgOp::share_lex('!mainline') :
-            CgOp::clone_lex('!mainline');
+        CgOp::rawsset($n . '.Environment', CgOp::letvar('protopad'));
     }
 
     __PACKAGE__->meta->make_immutable;

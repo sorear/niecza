@@ -8,11 +8,13 @@ use 5.010;
 
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has list => (is => 'ro', isa => 'Bool', default => 0);
+    has zeroinit => (is => 'ro', isa => 'Bool', default => 0);
 
     sub local_decls {
         my $self = shift;
         if ($self->slot) {
-            Decl::SimpleVar->new(slot => $self->slot, list => $self->list)
+            Decl::SimpleVar->new(slot => $self->slot, list => $self->list,
+                zeroinit => $self->zeroinit)
         } else {
             ()
         }

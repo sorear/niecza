@@ -2,10 +2,10 @@ Program.exe
 Program.cs
 Kernel.dll
 Kernel.dll.so
-Setting.dll
-Setting.dll.so
-Setting.cs
-setting_ast.store
+CORE.dll
+CORE.dll.so
+CORE.cs
+CORE_ast.store
 *.swp
 *.pmc
 syml

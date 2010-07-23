@@ -4,7 +4,7 @@ use warnings;
 use 5.010;
 
 use Sub::Exporter -setup => {
-    exports => [ qw(header bootstrap setting mainline ast) ]
+    exports => [ qw(header setting mainline ast) ]
 };
 
 open ::NIECZA_OUT, ">&", \*STDOUT;
@@ -35,19 +35,19 @@ EOH
 sub setting {
     local $::SETTING_RESUME;
     local $::YOU_WERE_HERE;
-    local $::UNITNAME = 'Setting';
+    local $::UNITNAME = 'CORE';
     $STD::ALL = {};
-    my $setting_ast = Niecza::Grammar->parsefile("setting", setting => 'NULL',
-        actions => 'Niecza::Actions')->{_ast};
+    my $setting_ast = Niecza::Grammar->parsefile("CORE.setting",
+        setting => 'NULL', actions => 'Niecza::Actions')->{_ast};
 
     $setting_ast->write;
-    store $::SETTING_RESUME, 'setting_ast.store';
+    store $::SETTING_RESUME, 'CORE_ast.store';
 }
 
 sub mainline {
     my $code = shift;
-    local $::UNITNAME = 'Mainline';
-    local $::SETTING_RESUME = retrieve 'setting_ast.store';
+    local $::UNITNAME = '';
+    local $::SETTING_RESUME = retrieve 'CORE_ast.store';
     $STD::ALL = {};
     Niecza::Grammar->parse($code, actions => 'Niecza::Actions')->{_ast}->write;
 }
@@ -60,46 +60,6 @@ sub ast {
     delete $a->mainline->{outer};
     delete $a->{setting};
     print YAML::XS::Dump($a);
-}
-
-sub bootstrap {
-    print ::NIECZA_OUT <<EOF;
-public class EntryPoint {
-    public static Frame START(Frame th) {
-        Frame t;
-        Dictionary<string,Variable> global = new Dictionary<string,Variable>();
-        switch (th.ip) {
-            case 0:
-                t = new Frame(th, th, new DynBlockDelegate(Setting.BOOT));
-                t.pos = new LValue[2] { Kernel.NewROScalar(th).lv,
-                    Kernel.NewROScalar(new CLRImportObject(global)).lv };
-                th.ip = 1;
-                return t;
-            case 1:
-                th.ip = 2;
-                return ((Variable)th.resultSlot).lv.container.Fetch(th);
-            case 2:
-                th.ip = 3;
-                return ((IP6)th.resultSlot).Invoke(th, new LValue[0] {}, null);
-            case 3:
-                return null;
-            default:
-                throw new Exception("IP corruption");
-        }
-    }
-
-    public static void Main() {
-        Kernel.MainlineContinuation = new DynBlockDelegate(Mainline.BOOT);
-        Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
-        Frame root_f = new Frame(null, null,
-                new DynBlockDelegate(START));
-        Frame current = root_f;
-        while (current != null) {
-            current = current.Continue();
-        }
-    }
-}
-EOF
 }
 
 1;
