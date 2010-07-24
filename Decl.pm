@@ -360,16 +360,29 @@ use CgOp;
             CgOp::wrap(CgOp::clr_string($self->name // 'ANON')));
     }
 
+    sub defsuper { 'Any!HOW' }
+
     sub finish_obj {
         my ($self) = @_;
         my @r;
         if (!grep { $_->isa('Decl::Super') } $self->body->do->local_decls) {
             push @r, CgOp::sink(CgOp::methodcall(CgOp::letvar("how"),
-                    "add-super", CgOp::scopedlex("Any!HOW")));
+                    "add-super", CgOp::scopedlex($self->defsuper)));
         }
         @r, CgOp::scopedlex($self->var,
                 CgOp::methodcall(CgOp::letvar("how"), "create-protoobject"));
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::Grammar;
+    use Moose;
+    extends 'Decl::Class';
+
+    sub defsuper { 'Grammar!HOW' }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

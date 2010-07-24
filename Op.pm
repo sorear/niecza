@@ -473,6 +473,17 @@ use CgOp;
 }
 
 {
+    package Op::GrammarDef;
+    use Moose;
+    extends 'Op::ClassDef';
+
+    sub decl_class { 'Decl::Grammar' }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::PreInit;
     use Moose;
     extends 'Op';
