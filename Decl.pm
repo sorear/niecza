@@ -287,7 +287,7 @@ use CgOp;
             'Variable', (!$self->stub ? ($self->bodyvar, 'Variable') : ());
     }
 
-    sub make_how { CgOp::null('Variable'); }
+    sub make_how { CgOp::newscalar(CgOp::null('IP6')); }
     sub finish_obj { CgOp::noop; }
 
     sub preinit_code {
@@ -295,8 +295,8 @@ use CgOp;
 
         if ($self->stub) {
             return CgOp::prog(
-                CgOp::proto_var($self->var, CgOp::null('Variable')),
-                CgOp::proto_var($self->metavar, CgOp::null('Variable')),
+                CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
+                CgOp::proto_var($self->metavar, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->stashvar,
                     CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))));
         }
@@ -307,7 +307,7 @@ use CgOp;
             CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
-                CgOp::proto_var($self->var, CgOp::null('Variable')),
+                CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
                 CgOp::proto_var($self->var . "::", CgOp::letvar("pkg")),
 
@@ -452,6 +452,54 @@ use CgOp;
     sub enter_code {
         my ($self, $body) = @_;
         CgOp::share_lex($self->name);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::Use;
+    use Moose;
+    extends 'Decl';
+
+    has unit => (is => 'ro', isa => 'Str', required => 1);
+    has symbols => (isa => 'HashRef[ArrayRef[Str]]', is => 'ro', required => 1);
+
+    sub used_slots {
+        my ($self) = @_;
+        map { $_, 'Variable' } sort keys %{ $self->symbols };
+    }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+        CodeGen->know_module($self->unit);
+        CgOp::let(CgOp::prog(
+                CgOp::rawscall($self->unit . '.Initialize'),
+                CgOp::getfield('lex',
+                    CgOp::rawsget($self->unit . '.Environment'))),
+            sub {
+                my $lex = shift;
+                CgOp::prog(map {
+                    my @path = @{ $self->symbols->{$_} };
+                    my $first = CgOp::cast('Variable',
+                        CgOp::getindex(shift(@path), $lex));
+                    for (@path) {
+                        $first = CgOp::rawscall('Kernel.PackageLookup',
+                            CgOp::fetch($first), CgOp::clr_string($_));
+                    }
+
+                    CgOp::prog(
+                        CgOp::proto_var($_, CgOp::newrwscalar(CgOp::fetch(
+                            CgOp::scopedlex('Any')))),
+                        CgOp::bind(0, CgOp::scopedlex($_), $first));
+                } sort keys %{ $self->symbols });
+            });
+    }
+
+    sub enter_code {
+        my ($self) = @_;
+        CgOp::prog(map { CgOp::share_lex($_) } sort keys %{ $self->symbols });
     }
 
     __PACKAGE__->meta->make_immutable;

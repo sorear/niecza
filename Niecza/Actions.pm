@@ -946,6 +946,14 @@ sub semilist { my ($cl, $M) = @_;
     $M->{_ast} = [  map { $_->{_ast} } @{ $M->{statement} } ];
 }
 
+sub module_name { }
+sub module_name__S_normal { my ($cl, $M) = @_;
+    # name-extension stuff is just ignored on module names for now
+    $M->{_ast} = {
+        name => $M->{longname}{name}->Str,
+        args => $M->{arglist}[0] ? $M->{arglist}[0]{_ast} : undef };
+}
+
 sub statement_control { }
 sub statement_control__S_if { my ($cl, $M) = @_;
     my $else = $M->{else}[0] ?
@@ -973,6 +981,43 @@ sub statement_control__S_until { my ($cl, $M) = @_;
         until => 1, once => 0);
 }
 
+sub statement_control__S_use { my ($cl, $M) = @_;
+    my $name = $M->{module_name}{_ast}{name};
+    my $args = $M->{arglist} ? $M->{arglist}{_ast} : [];
+
+    if ($M->{module_name}{_ast}{args}) {
+        $M->sorry("'use' of an instantiated role not yet understood");
+        return;
+    }
+
+    if (@$args) {
+        $M->sorry("'use' with arguments NYI");
+        return;
+    }
+
+    push @::UNITDEPS, $name;
+    my %symbols;
+    $symbols{$name} = [ $name ];
+    $symbols{$name . '::'} = [ $name . '::' ];
+    $symbols{$name . '!HOW'} = [ $name . '!HOW' ];
+
+    my $pkg = $M->find_stash($name);
+    if ($pkg->{really}) {
+        $pkg = $pkg->{really}->{UNIT};
+    }
+    else {
+        $pkg = $M->find_stash($name . '::');
+    }
+
+    # XXX This code is wrong.  It either needs to be more integrated with STD,
+    # or less.
+    for my $exp (keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }) {
+        $symbols{$exp} = [ $name . '::', 'EXPORT::', 'DEFAULT::', $exp ];
+    }
+
+    $M->{_ast} = Op::Use->new(unit => $name, symbols => \%symbols);
+}
+
 # All package defs have a couple things in common - a special-ish block,
 # with a special decl, and some nice runtimey code
 sub package_def { my ($cl, $M) = @_;
@@ -984,6 +1029,7 @@ sub package_def { my ($cl, $M) = @_;
         $M->sorry('Non-lexical package definitions are not yet supported');
         return;
     }
+    # XXX shouldn't fully mangle here, c.f. STD:auth<http://perl.org>
     my $name = $M->{longname}[0] ?
         $cl->mangle_longname($M->{longname}[0], "package definition") : 'ANON';
     my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;

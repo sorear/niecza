@@ -626,4 +626,23 @@ use CgOp;
     no Moose;
 }
 
+{
+    package Op::Use;
+    use Moose;
+    extends 'Op';
+
+    has unit => (isa => 'Str', is => 'ro', required => 1);
+    has symbols => (isa => 'HashRef[ArrayRef[Str]]', is => 'ro', required => 1);
+
+    sub local_decls {
+        my ($self) = @_;
+        Decl::Use->new(unit => $self->unit, symbols => $self->symbols);
+    }
+
+    sub code { CgOp::null('Variable') }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;

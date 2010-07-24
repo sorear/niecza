@@ -44,7 +44,7 @@ use CgOp ();
             die "Critical phase error";
         }
 
-        if ($self->type eq 'bare' || $self->type eq 'class') {
+        if ($self->type =~ /^(?:bare|package|module|class|grammar|role|slang|knowhow)$/) {
             return $self->outer->mainline;
         } else {
             return 0;

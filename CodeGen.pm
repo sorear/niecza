@@ -44,7 +44,8 @@ use 5.010;
             { Length       => [f => 'Int32'],
               Substring    => [m => 'String'] },
         'Frame' =>
-            { pos          => [f => 'LValue[]'] },
+            { pos          => [f => 'LValue[]'],
+              lex          => [f => 'Dictionary<string,object>'] },
 
         'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [c => 'Variable'],
