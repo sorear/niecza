@@ -1078,7 +1078,7 @@ sub package_def { my ($cl, $M) = @_;
         $M->{_ast} = $optype->new(
             name    => $name,
             var     => $outervar,
-            export  => \@export,
+            exports => \@export,
             bodyvar => $bodyvar,
             body    => $cbody);
     } else {
