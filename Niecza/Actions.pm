@@ -897,15 +897,21 @@ sub package_declarator__S_slang { my ($cl, $M) = @_;
 
 sub package_declarator__S_also { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children =>
-        $cl->process_package_traits($M, @{ $M->{trait} }));
+        $cl->process_package_traits($M, undef, @{ $M->{trait} }));
 }
 
-sub process_package_traits { my ($cl, $M, @tr) = @_;
+sub process_package_traits { my ($cl, $M, $export, @tr) = @_;
     my @r;
 
     for (@tr) {
         if (exists $_->{_ast}{name}) {
             push @r, Op::Super->new(name => $_->{_ast}{name});
+        } elsif ($_->{_ast}{export}) {
+            if ($export) {
+                push @$export, @{ $_->{_ast}{export} };
+            } else {
+                $M->sorry('Cannot mark a class as exported outside the declarator');
+            }
         } else {
             $M->sorry("Non-superclass traits for packageoids NYI");
         }
@@ -1061,9 +1067,10 @@ sub package_def { my ($cl, $M) = @_;
 
     if (!$M->{decl}{stub}) {
         my $stmts = $M->{statementlist} // $M->{blockoid};
+        my @export;
 
         $stmts = Op::StatementList->new(children =>
-            [ $cl->process_package_traits($M, @{ $M->{trait} }),
+            [ $cl->process_package_traits($M, \@export, @{ $M->{trait} }),
                 $stmts->{_ast} ]);
 
         my $cbody = $cl->sl_to_block($blocktype, $stmts,
@@ -1071,6 +1078,7 @@ sub package_def { my ($cl, $M) = @_;
         $M->{_ast} = $optype->new(
             name    => $name,
             var     => $outervar,
+            export  => \@export,
             bodyvar => $bodyvar,
             body    => $cbody);
     } else {

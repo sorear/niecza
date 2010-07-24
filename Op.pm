@@ -424,14 +424,24 @@ use CgOp;
     has bodyvar => (is => 'ro', isa => 'Str');
     has stub => (is => 'ro', isa => 'Bool', default => 0);
     has body => (is => 'ro', isa => 'Body');
+    has exports => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
 
     sub decl_class { 'Decl::Package' }
     sub local_decls {
         my ($self) = @_;
-        $self->decl_class->new(stub => $self->stub, var => $self->var,
+        my @r = $self->decl_class->new(stub => $self->stub, var => $self->var,
             ($self->has_name ? (name => $self->name) : ()),
             ($self->stub ? () : (body => $self->body,
                     bodyvar => $self->bodyvar)));
+
+        for my $tag (@{ $self->exports }) {
+            for my $sym ($self->var, $self->var . '::', $self->var . '!HOW') {
+                push @r, Decl::PackageAlias->new(slot => $sym,
+                    name => $sym, path => [ 'OUR', 'EXPORT', $tag ]);
+            }
+        }
+
+        @r;
     }
 
     sub code {
