@@ -77,6 +77,14 @@ sub _rxstar($C, $sub) is export {
             _rxone($C));
 }
 
+sub _rxopt($C, $sub) is export {
+    _rxdisj($sub($C), _rxone($C))
+}
+
+sub _rxplus($C, $sub) is export {
+    _rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) })
+}
+
 sub _rxstr($C, $str) is export {
     #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
     if $C.from + $str.chars <= $C.str.chars &&
