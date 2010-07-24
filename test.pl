@@ -1,14 +1,6 @@
 # vim: ft=perl6
 
-my $testnum = 1;
-sub ok($bool, $tag) {
-    my $not = (if $bool { "" } else { "not " });
-    say ($not ~ ("ok " ~ ($testnum++ ~ (" - " ~ $tag))));
-}
-
-sub plan($num) {
-    say ("1.." ~ $num);
-}
+use Test;
 
 plan 99;
 
