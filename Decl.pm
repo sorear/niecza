@@ -275,38 +275,54 @@ use CgOp;
     has body    => (is => 'ro', isa => 'Body');
     has bodyvar => (is => 'ro', isa => 'Str');
     has stub    => (is => 'ro', isa => 'Bool', default => 0);
+    has name    => (is => 'ro', isa => 'Str', predicate => 'has_name');
 
     sub extra_decls { $_[0]->body ? ($_[0]->body->floated_decls) : () }
+    sub stashvar { $_[0]->var . '::' }
+    sub metavar { $_[0]->var . '!HOW' }
 
     sub used_slots {
         my ($self) = @_;
-        $self->var, 'Variable',
-            (!$self->stub ? ($self->bodyvar, 'Variable') : ());
+        $self->var, 'Variable', $self->stashvar, 'Variable', $self->metavar,
+            'Variable', (!$self->stub ? ($self->bodyvar, 'Variable') : ());
     }
+
+    sub make_how { CgOp::null('Variable'); }
+    sub finish_obj { CgOp::noop; }
 
     sub preinit_code {
         my ($self, $body) = @_;
 
         if ($self->stub) {
-            return CgOp::proto_var($self->var, CgOp::null('Variable'));
+            return CgOp::prog(
+                CgOp::proto_var($self->var, CgOp::null('Variable')),
+                CgOp::proto_var($self->metavar, CgOp::null('Variable')),
+                CgOp::proto_var($self->stashvar,
+                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))));
         }
 
         $self->body->outer($body);
 
         CgOp::letn("pkg",
             CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')),
+            CgOp::letn("how", $self->make_how,
+                # catch usages before the closing brace
+                CgOp::proto_var($self->var, CgOp::null('Variable')),
+                CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
+                CgOp::proto_var($self->var . "::", CgOp::letvar("pkg")),
 
-            CgOp::proto_var($self->var, CgOp::letvar("pkg")),
-
-            CgOp::proto_var($self->bodyvar,
-                CgOp::newscalar(
-                    CgOp::protosub($self->body))));
+                CgOp::proto_var($self->bodyvar,
+                    CgOp::newscalar(
+                        CgOp::protosub($self->body))),
+                $self->finish_obj));
     }
 
     sub enter_code {
         my ($self, $body) = @_;
         CgOp::prog(
             CgOp::share_lex($self->var),
+            CgOp::share_lex($self->var . "::"),
+            CgOp::share_lex($self->var . "!HOW"),
             ($self->stub ? () :
                 ($body->mainline ?
                     CgOp::share_lex($self->bodyvar) :
@@ -336,70 +352,23 @@ use CgOp;
 {
     package Decl::Class;
     use Moose;
-    extends 'Decl';
+    extends 'Decl::Module';
 
-    has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
-    has var  => (is => 'ro', isa => 'Str', required => 1);
-    has bodyvar => (is => 'ro', isa => 'Str');
-    has stub => (is => 'ro', isa => 'Bool', default => 0);
-    has body => (is => 'ro', isa => 'Body');
-
-    sub extra_decls { $_[0]->body ? ($_[0]->body->floated_decls) : () }
-
-    sub used_slots {
+    sub make_how {
         my ($self) = @_;
-        $self->var, 'Variable', ($self->var . '!HOW'), 'Variable',
-            (!$self->stub ? ($self->bodyvar, 'Variable') : ());
+        CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
+            CgOp::wrap(CgOp::clr_string($self->name // 'ANON')));
     }
 
-    sub preinit_code {
-        my ($self, $body) = @_;
-
-        if ($self->stub) {
-            return CgOp::prog(
-                CgOp::proto_var($self->var . '!HOW', CgOp::null('Variable')),
-                CgOp::proto_var($self->var, CgOp::null('Variable')));
+    sub finish_obj {
+        my ($self) = @_;
+        my @r;
+        if (!grep { $_->isa('Decl::Super') } $self->body->do->local_decls) {
+            push @r, CgOp::sink(CgOp::methodcall(CgOp::letvar("how"),
+                    "add-super", CgOp::scopedlex("Any!HOW")));
         }
-
-        $self->body->outer($body);
-
-        CgOp::letn("how",
-            CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
-                CgOp::wrap(CgOp::clr_string($self->name // 'ANON'))),
-
-            CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
-            ((grep { $_->isa('Decl::Super') } $self->body->do->local_decls) ? () :
-                CgOp::sink(CgOp::methodcall(CgOp::letvar("how"), "add-super",
-                        CgOp::scopedlex("Any!HOW")))),
-
-            # TODO: Initialize the protoobject to a failure here so an awesome
-            # error is produced if someone tries to use an incomplete class in
-            # a BEGIN.
-            CgOp::proto_var($self->var, CgOp::null('Variable')),
-
-            CgOp::proto_var($self->bodyvar,
-                CgOp::newscalar(
-                    CgOp::protosub($self->body))),
-            CgOp::scopedlex($self->var,
-                CgOp::methodcall(CgOp::letvar("how"), "create-protoobject")));
-    }
-
-    sub enter_code {
-        my ($self, $body) = @_;
-        CgOp::prog(
-            CgOp::share_lex($self->var . '!HOW'),
-            CgOp::share_lex($self->var),
-            ($self->stub ? () :
-                ($body->mainline ?
-                    CgOp::share_lex($self->bodyvar) :
-                    CgOp::clone_lex($self->bodyvar))));
-    }
-
-    sub write   {
-        my ($self, $body) = @_;
-        return unless $self->body;
-        $self->body->outer($body);
-        $self->body->write;
+        @r, CgOp::scopedlex($self->var,
+                CgOp::methodcall(CgOp::letvar("how"), "create-protoobject"));
     }
 
     __PACKAGE__->meta->make_immutable;

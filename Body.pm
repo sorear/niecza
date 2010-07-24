@@ -112,7 +112,7 @@ use CgOp ();
         } elsif ($self->outer) {
             return 1 + $self->outer->lex_level($var);
         } else {
-            return -1;
+            return -1e99999;
         }
     }
 

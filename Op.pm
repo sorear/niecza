@@ -419,6 +419,7 @@ use CgOp;
     use Moose;
     extends 'Op';
 
+    has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
     has var  => (is => 'ro', isa => 'Str', required => 1);
     has bodyvar => (is => 'ro', isa => 'Str');
     has stub => (is => 'ro', isa => 'Bool', default => 0);
@@ -427,7 +428,8 @@ use CgOp;
     sub decl_class { 'Decl::Package' }
     sub local_decls {
         my ($self) = @_;
-        $self->decl_class->new(stub => $self->stub, var => $self->var . "::",
+        $self->decl_class->new(stub => $self->stub, var => $self->var,
+            ($self->has_name ? (name => $self->name) : ()),
             ($self->stub ? () : (body => $self->body,
                     bodyvar => $self->bodyvar)));
     }
@@ -435,12 +437,12 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         if ($self->stub) {
-            CgOp::scopedlex($self->var . "::");
+            CgOp::scopedlex($self->var);
         } else {
             CgOp::prog(
                 CgOp::sink(CgOp::subcall(CgOp::fetch(
                             CgOp::scopedlex($self->bodyvar)))),
-                CgOp::scopedlex($self->var . "::"));
+                CgOp::scopedlex($self->var));
         }
     }
 
@@ -462,33 +464,9 @@ use CgOp;
 {
     package Op::ClassDef;
     use Moose;
-    extends 'Op';
+    extends 'Op::ModuleDef';
 
-    has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
-    has var  => (is => 'ro', isa => 'Str', required => 1);
-    has bodyvar => (is => 'ro', isa => 'Str');
-    has stub => (is => 'ro', isa => 'Bool', default => 0);
-    has body => (is => 'ro', isa => 'Body');
-
-    sub local_decls {
-        my ($self) = @_;
-        Decl::Class->new(stub => $self->stub, var => $self->var,
-            ($self->has_name ? (name => $self->name) : ()),
-            ($self->stub ? () : (body => $self->body,
-                    bodyvar => $self->bodyvar)));
-    }
-
-    sub code {
-        my ($self, $body) = @_;
-        if ($self->stub) {
-            CgOp::scopedlex($self->var);
-        } else {
-            CgOp::prog(
-                CgOp::sink(CgOp::subcall(CgOp::fetch(
-                            CgOp::scopedlex($self->bodyvar)))),
-                CgOp::scopedlex($self->var));
-        }
-    }
+    sub decl_class { 'Decl::Class' }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

@@ -10,7 +10,7 @@ sub plan($num) {
     say ("1.." ~ $num);
 }
 
-plan 96;
+plan 97;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -308,4 +308,10 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok $Foo::x == 42, "can access our vars";
     my module Bar { our $x = 42; }
     ok $Bar::x == 42, "module accepted too";
+    my class Baz { our $x = 42; }
+    ok $Baz::x == 42, "and class";
+
+    #ok $Cow::x.notdef, "package variables autoviv to undef";
+    #$Cow::x = 51;
+    #ok $Cow::x == 51, "but can still hold values";
 }
