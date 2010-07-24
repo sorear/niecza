@@ -653,8 +653,7 @@ blocked:
         }
 
         // XXX should be per-unit
-        public static Variable Global =
-            NewROScalar(new CLRImportObject(new Dictionary<string,Variable>()));
+        public static Variable Global;
 
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
@@ -669,6 +668,9 @@ blocked:
             ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
+
+            Global = NewROScalar(new CLRImportObject(
+                        new Dictionary<string,Variable>()));
         }
     }
 }
