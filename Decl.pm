@@ -161,7 +161,7 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::bind($body->lookup_var($self->name, @{ $self->path }),
+        CgOp::bind(1, $body->lookup_var($self->name, @{ $self->path }),
             CgOp::scopedlex($self->slot));
     }
 

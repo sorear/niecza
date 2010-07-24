@@ -876,7 +876,21 @@ sub package_declarator__S_slang { my ($cl, $M) = @_;
 
 sub package_declarator__S_also { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children =>
-        [ map { $_->{_ast}{mop} } @{ $M->{trait} }]);
+        $cl->process_package_traits($M, @{ $M->{trait} }));
+}
+
+sub process_package_traits { my ($cl, $M, @tr) = @_;
+    my @r;
+
+    for (@tr) {
+        if (exists $_->{_ast}{name}) {
+            push @r, Op::Super->new(name => $_->{_ast}{name});
+        } else {
+            $M->sorry("Non-superclass traits for packageoids NYI");
+        }
+    }
+
+    @r;
 }
 
 sub termish {}
@@ -982,7 +996,8 @@ sub package_def { my ($cl, $M) = @_;
         my $stmts = $M->{statementlist} // $M->{blockoid};
 
         $stmts = Op::StatementList->new(children =>
-            [ (map { $_->{_ast}{mop} } @{ $M->{trait} }), $stmts->{_ast} ]);
+            [ $cl->process_package_traits($M, @{ $M->{trait} }),
+                $stmts->{_ast} ]);
 
         my $cbody = $cl->sl_to_block($blocktype, $stmts,
             name => $name);
@@ -1002,18 +1017,22 @@ sub package_def { my ($cl, $M) = @_;
 sub trait_mod {}
 sub trait_mod__S_is { my ($cl, $M) = @_;
     my $trait = $M->{longname}->Str;
+    my $noparm;
 
-    if (!$M->is_name($trait)) {
-        $M->sorry('Non-superclass is traits NYI');
-        return;
+    if ($M->is_name($trait)) {
+        $M->{_ast} = { name => $trait };
+        $noparm = 'Superclasses cannot have parameters';
+    } elsif ($trait eq 'export') {
+        $M->{_ast} = { export => [ 'DEFAULT', 'ALL' ] };
+        $noparm = 'Export tags NYI';
+    } else {
+        $M->sorry('Unhandled trait ' . $trait);
     }
 
-    if ($M->{circumfix}[0]) {
-        $M->sorry('Superclasses cannot have parameters');
+    if ($noparm && $M->{circumfix}[0]) {
+        $M->sorry($noparm);
         return;
     }
-
-    $M->{_ast}{mop} = Op::Super->new(name => $trait);
 }
 
 sub trait { my ($cl, $M) = @_;
@@ -1064,7 +1083,7 @@ sub block_to_closure { my ($cl, $blk, %args) = @_;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
     Op::SubDef->new(var => $outer_key, body => $blk,
-        method_too => $args{method_too});
+        method_too => $args{method_too}, exports => ($args{exports} // []));
 }
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
@@ -1078,9 +1097,13 @@ sub routine_def { my ($cl, $M) = @_;
         $M->sorry("Multiple multisigs (what?) NYI");
         return;
     }
-    if ($M->{trait}[0]) {
-        $M->sorry("Sub traits NYI");
-        return;
+    my @export;
+    for my $t (@{ $M->{trait} }) {
+        if ($t->{_ast}{export}) {
+            push @export, @{ $t->{_ast}{export} };
+        } else {
+            $M->sorry('Non-export sub traits NYI');
+        }
     }
     my $scope = !$dln ? 'anon' : $::SCOPE || 'my';
     if ($scope ne 'my' && $scope ne 'our' && $scope ne 'anon') {
@@ -1099,7 +1122,8 @@ sub routine_def { my ($cl, $M) = @_;
                 $M->{blockoid}{_ast},
                 subname => $m,
                 signature => ($M->{multisig}[0] ? $M->{multisig}[0]{_ast} : undef)),
-        outer_key => (($scope eq 'my') ? "&$m" : undef));
+        outer_key => (($scope eq 'my') ? "&$m" : undef),
+        exports => \@export);
 }
 
 sub method_def { my ($cl, $M) = @_;
