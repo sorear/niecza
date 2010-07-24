@@ -10,6 +10,10 @@ Test.dll
 Test.dll.so
 Test.cs
 Test_ast.store
+RegexEngine.dll
+RegexEngine.so
+RegexEngine.cs
+RegexEngine_ast.store
 *.swp
 *.pmc
 syml

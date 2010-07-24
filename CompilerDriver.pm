@@ -13,7 +13,7 @@ open ::NIECZA_OUT, ">&", \*STDOUT;
 
 BEGIN {
     unshift @INC, 'STD_checkout';
-    $ENV{PERL6LIB} = "STD_checkout:STD_checkout/lib";
+    $ENV{PERL6LIB} = ".:STD_checkout:STD_checkout/lib";
 }
 
 use Body ();

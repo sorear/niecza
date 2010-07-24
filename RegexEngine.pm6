@@ -1,5 +1,6 @@
+my module RegexEngine;
 # vim: ft=perl6
-my class Cursor {
+my class Cursor is export {
     # has $!str
     # has $!from
     method str() { $!str }
@@ -10,7 +11,7 @@ my class Cursor {
 # Inside a regex, a result is a bare iterator, or a double return (if
 # ratcheting).
 
-sub _rxexport($cs) {
+sub _rxexport($cs) is export {
     my class ExportIterator is Iterator {
         # $!valid $!value $!next  $!fun
         method validate() {
@@ -29,7 +30,7 @@ sub _rxexport($cs) {
     @l;
 }
 
-sub _rxlazymap($cs, $sub) {
+sub _rxlazymap($cs, $sub) is export {
     my $k = sub { Any };
     #say "in rxlazymap (1)";
     sub get() {
@@ -44,7 +45,7 @@ sub _rxlazymap($cs, $sub) {
     }
 }
 
-sub _rxdisj($cs1, $cs2) {
+sub _rxdisj($cs1, $cs2) is export {
     my $k1 = $cs1;
     my $k2 = $cs2;
     sub {
@@ -58,7 +59,7 @@ sub _rxdisj($cs1, $cs2) {
     }
 }
 
-sub _rxone($C) {
+sub _rxone($C) is export {
     my $k = $C;
     sub {
         my $x = $k;
@@ -68,36 +69,25 @@ sub _rxone($C) {
     }
 }
 
-sub _rxupgrade($sub) {
-    my $k = $sub;
-    sub {
-        $k && do {
-            my $x = $k();
-            $k = Any;
-            $x;
-        }
-    }
-}
+sub _rxnone is export { Any };
 
-my $rxnone = sub { Any };
-
-sub _rxstar($C, $sub) {
+sub _rxstar($C, $sub) is export {
     #say "in rxstar recursion";
     _rxdisj(_rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) }),
             _rxone($C));
 }
 
-sub _rxstr($C, $str) {
+sub _rxstr($C, $str) is export {
     #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
     if $C.from + $str.chars <= $C.str.chars &&
             $C.str.substr($C.from, $str.chars) eq $str {
         _rxone(Cursor.RAWCREATE("str", $C.str, "from", $C.from + $str.chars));
     } else {
-        $rxnone;
+        &_rxnone;
     }
 }
 
-my class Regex is Sub {
+my class Regex is Sub is export {
     method ACCEPTS($str) {
         my $i = 0;
         my $win = 0;
@@ -111,14 +101,3 @@ my class Regex is Sub {
         $win;
     }
 }
-
-# regex { a b* c }
-#my $rx = Regex.bless(sub ($C) { _rxexport(_rxlazymap(_rxstr($C, 'a'), sub ($C) { _rxlazymap(_rxstar($C, sub ($C) { _rxstr($C, 'b') }), sub ($C) { _rxstr($C, 'c') }) })) });
-my $rx = /ab*c/;
-
-say "xaaabc" ~ ("xaaabc" ~~ $rx);
-say "xbc"    ~ ("xbc" ~~ $rx);
-say "abbbc"  ~ ("abbbc" ~~ $rx);
-say "ac"     ~ ("ac" ~~ $rx);
-say "aabb"   ~ ("aabb" ~~ $rx);
-say "abx"    ~ ("abx" ~~ $rx);
