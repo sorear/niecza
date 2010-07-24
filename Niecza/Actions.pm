@@ -123,6 +123,24 @@ sub mangle_longname { my ($cl, $M, $single) = @_;
     $single ? $n : ($n, @ns);
 }
 
+sub subshortname { my ($cl, $M) = @_;
+    if (@{ $M->{colonpair} }) {
+        $M->sorry("Colonpair subshortnames NYI");
+        return;
+    }
+
+    $M->{_ast} = $M->{desigilname}{_ast};
+}
+
+sub sublongname { my ($cl, $M) = @_;
+    if (@{ $M->{sigterm} }) {
+        $M->sorry("Sigterm sublongnames NYI");
+        return;
+    }
+
+    $M->{_ast} = $M->{subshortname}{_ast};
+}
+
 sub desigilname { my ($cl, $M) = @_;
     if ($M->{variable}) {
         $M->sorry("Truncated contextualizer syntax NYI");
@@ -546,12 +564,15 @@ sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
 
-    if (!$M->{desigilname}) {
+    my ($name, @rest);
+    if ($M->{desigilname}) {
+        ($name, @rest) = @{ $M->{desigilname}{_ast} };
+    } elsif ($M->{sublongname}) {
+        ($name, @rest) = @{ $M->{sublongname}{_ast} };
+    } else {
         $M->sorry("Non-simple variables NYI");
         return;
     }
-
-    my ($name, @rest) = @{ $M->{desigilname}{_ast} };
 
     my $sl = $sigil . $twigil . $name;
 
