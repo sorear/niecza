@@ -6,6 +6,10 @@ CORE.dll
 CORE.dll.so
 CORE.cs
 CORE_ast.store
+Test.dll
+Test.dll.so
+Test.cs
+Test_ast.store
 *.swp
 *.pmc
 syml
