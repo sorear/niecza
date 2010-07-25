@@ -29,6 +29,7 @@ sub AUTOLOAD {
 }
 
 sub ws { }
+sub normspace { }
 sub vws { }
 sub unv { }
 sub begid { }
@@ -189,7 +190,8 @@ sub atom { my ($cl, $M) = @_;
     if ($M->{metachar}) {
         $M->{_ast} = $M->{metachar}{_ast};
     } else {
-        $M->{_ast} = RxOp::String->new(text => $M->Str);
+        $M->{_ast} = RxOp::String->new(text => $M->Str,
+            igcase => $::RX{i}, igmark => $::RX{a});
     }
 }
 
@@ -328,7 +330,8 @@ sub metachar__S_Single_Single { my ($cl, $M) = @_;
         $M->sorry("Interpolating strings in regexes NYI");
         return;
     }
-    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text);
+    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
+        igcase => $::RX{i}, igmark => $::RX{a});
 }
 
 sub metachar__S_Double_Double { my ($cl, $M) = @_;
@@ -336,8 +339,29 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
         $M->sorry("Interpolating strings in regexes NYI");
         return;
     }
-    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text);
+    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
+        igcase => $::RX{i}, igmark => $::RX{a});
 }
+
+# These have effects only in the parser, so undef ast is correct.
+sub mod_value {}
+sub mod_internal {}
+sub mod_internal__S_Coloni {}
+sub mod_internal__S_ColonBangi {}
+sub mod_internal__S_ColoniParen_Thesis {}
+sub mod_internal__S_Colon0i {}
+sub mod_internal__S_Colons {}
+sub mod_internal__S_ColonBangs {}
+sub mod_internal__S_ColonsParen_Thesis {}
+sub mod_internal__S_Colon0s {}
+sub mod_internal__S_Colonr {}
+sub mod_internal__S_ColonBangr {}
+sub mod_internal__S_ColonrParen_Thesis {}
+sub mod_internal__S_Colon0r {}
+sub mod_internal__S_Colona {}
+sub mod_internal__S_ColonBanga {}
+sub mod_internal__S_ColonaParen_Thesis {}
+sub mod_internal__S_Colon0a {}
 
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {

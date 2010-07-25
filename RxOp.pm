@@ -8,7 +8,7 @@ use CgOp;
     package RxOp;
     use Moose;
 
-    has zyg => (isa => 'ArrayRef[RxOp]', is => 'ro');
+    has zyg => (isa => 'ArrayRef[RxOp]', is => 'ro', default => sub { [] });
 
     my $i = 0;
     sub _closurize {
@@ -110,7 +110,9 @@ use CgOp;
                 positionals => [ $l, $self->_closurize($r) ]);
         }
 
-        $zyg[0] || Op::Lexical->new(name => '$¢');
+        $zyg[0] || Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxone'),
+            positionals => [ Op::Lexical->new(name => '$¢') ]);
     }
 
     __PACKAGE__->meta->make_immutable;
