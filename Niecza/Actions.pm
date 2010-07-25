@@ -279,7 +279,9 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->block_to_immediate('bare', $M->{pblock}{_ast});
+    $M->{pblock}{_ast}->type('bare');
+    $M->{_ast} = Op::BareBlock->new(var => $cl->gensym,
+        body => $M->{pblock}{_ast});
 }
 
 sub infixish { my ($cl, $M) = @_;
@@ -970,7 +972,8 @@ sub statement { my ($cl, $M) = @_;
 
 sub statementlist { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children => 
-        [ grep { defined $_ } map { $_->{_ast} } @{ $M->{statement} } ]);
+        [ map { $_->statement_level } grep { defined }
+            map { $_->{_ast} } @{ $M->{statement} } ]);
 }
 
 sub semilist { my ($cl, $M) = @_;

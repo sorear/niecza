@@ -21,6 +21,8 @@ use CgOp;
             $self->invocant->name eq '&infix:<,>';
     }
 
+    sub statement_level { shift }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -544,6 +546,32 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::null('Variable');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::BareBlock;
+    use Moose;
+    extends 'Op';
+
+    has var    => (isa => 'Str', is => 'ro', required => 1);
+    has body   => (isa => 'Body', is => 'ro', required => 1);
+
+    sub local_decls {
+        my ($self) = @_;
+        Decl::Sub->new(var => $self->var, code => $self->body);
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::scopedlex($self->var);
+    }
+
+    sub statement_level {
+        Op::CallSub->new(invocant => $_[0]);
     }
 
     __PACKAGE__->meta->make_immutable;
