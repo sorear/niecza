@@ -156,7 +156,7 @@ Q:CgOp {
 } }
 
 my class Junction is Mu { }
-my class Num {
+my class Num is Cool {
     method Str () { Q:CgOp {
         (box Str (rawcall (unbox Double (fetch (scopedlex self))) ToString))
     } }
@@ -166,7 +166,7 @@ my class Num {
     } }
     method ACCEPTS($t) { self == $t }
 }
-my class Str {
+my class Str is Cool {
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
     method chars() { Q:CgOp {
@@ -200,7 +200,7 @@ my class UInt { }
 my class Bit { }
 my class Instant { }
 my class Duration { }
-my class Enum { }
+my class Enum is Cool { }
 my class Bool is Enum {
     method Str() { if self { "Bool::True" } else { "Bool::False" } }
     method Bool() { self }

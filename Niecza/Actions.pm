@@ -565,6 +565,11 @@ sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
     $M->{_ast} = Op::Yada->new(kind => '???');
 }
 
+sub term__S_lambda { my ($cl, $M) = @_;
+    $M->{pblock}{_ast}->type('pointy');
+    $M->{_ast} = $cl->block_to_closure($M->{pblock}{_ast});
+}
+
 sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
@@ -754,6 +759,7 @@ sub blockoid { my ($cl, $M) = @_;
         $M->{_ast} = $M->{statementlist}{_ast};
     }
 }
+sub lambda {}
 
 sub sigil {}
 sub sigil__S_Amp {}
