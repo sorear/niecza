@@ -455,7 +455,7 @@ sub unfold($fn) {
     @l;
 }
 
-my class Parcel {
+my class Parcel is Cool {
     # $!ll
 
     method flat() {
@@ -582,6 +582,43 @@ my class List is Cool {
         ListIterator.RAWCREATE("valid", 0, "next", Any, "value", Any,
             "list", self, "index", 0);
     }
+}
+
+sub _it_shift($it) {
+    $it.validate;
+    my $oit = $it;
+    $it = $it.next;
+    $oit.value;
+}
+
+PRE-INIT {
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "grep")) },
+        anon method grep($sm) {
+            my $it = self.flat.iterator;
+
+            unfold(sub () {
+                my $item = _it_shift($it);
+                ($item === EMPTY) ?? EMPTY !!
+                    ($item ~~ $sm) ?? $item !! Nil;
+            });
+        });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "map")) },
+        anon method map($func) {
+            my $it = self.flat.iterator;
+
+            unfold(sub () {
+                my $item = _it_shift($it);
+                ($item === EMPTY) ?? EMPTY !! $func($item);
+            });
+        });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "for")) },
+        anon method for($func) {
+            my $it = self.flat.iterator;
+            while $it {
+                my $item = _it_shift($it);
+                ($item === EMPTY) ?? ($it = Any) !! ($func($item));
+            }
+        });
 }
 
 {YOU_ARE_HERE}
