@@ -152,7 +152,7 @@ use CgOp ();
         }
 
         for my $c (@components) {
-            $pkgcg = CgOp::rawscall('Kernel.PackageLookup', CgOp::fetch($pkgcg),
+            $pkgcg = CgOp::rawsccall('Kernel.PackageLookup', CgOp::fetch($pkgcg),
                 CgOp::clr_string($c));
         }
 

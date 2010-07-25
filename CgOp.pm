@@ -197,11 +197,11 @@ use warnings;
     }
 
     sub fetch {
-        rawscall("Kernel.Fetch", $_[0]);
+        rawsccall("Kernel.Fetch", $_[0]);
     }
 
     sub how {
-        rawcall($_[0], "HOW");
+        rawccall($_[0], "HOW");
     }
 
     sub getfield {
@@ -275,12 +275,12 @@ use warnings;
     }
 
     sub bind {
-        rawscall('Kernel.Bind', $_[1], getfield('lv', $_[2]),
+        rawsccall('Kernel.Bind', $_[1], getfield('lv', $_[2]),
             bool($_[0]), bool(0));
     }
 
     sub assign {
-        rawscall('Kernel.Assign', getfield('lv', $_[0]),
+        rawsccall('Kernel.Assign', getfield('lv', $_[0]),
             getfield('lv', $_[1]));
     }
 
@@ -368,13 +368,25 @@ use warnings;
     sub rawscall {
         my ($name, @args) = @_;
         CgOp::Primitive->new(op => [ 'clr_call_direct', $name, scalar @args ],
-            zyg => [ @args ], is_cps_call => 1); #XXX
+            zyg => [ @args ]);
     }
 
     sub rawcall {
         my ($inv, $name, @args) = @_;
         CgOp::Primitive->new(op => [ 'clr_call_virt', $name, scalar @args ],
-            zyg => [ $inv, @args ], is_cps_call => 1); #XXX
+            zyg => [ $inv, @args ]);
+    }
+
+    sub rawsccall {
+        my ($name, @args) = @_;
+        CgOp::Primitive->new(op => [ 'clr_call_direct', $name, scalar @args ],
+            zyg => [ @args ], is_cps_call => 1);
+    }
+
+    sub rawccall {
+        my ($inv, $name, @args) = @_;
+        CgOp::Primitive->new(op => [ 'clr_call_virt', $name, scalar @args ],
+            zyg => [ $inv, @args ], is_cps_call => 1);
     }
 
     sub rawsget {

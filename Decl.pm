@@ -481,7 +481,7 @@ use CgOp;
                     my $first = CgOp::cast('Variable',
                         CgOp::getindex(shift(@path), $lex));
                     for (@path) {
-                        $first = CgOp::rawscall('Kernel.PackageLookup',
+                        $first = CgOp::rawsccall('Kernel.PackageLookup',
                             CgOp::fetch($first), CgOp::clr_string($_));
                     }
 
