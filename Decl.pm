@@ -255,7 +255,7 @@ use CgOp;
         my ($self, $body) = @_;
 
         # XXX ought not to have side effects here.
-        $::SETTING_RESUME = $body;
+        $::SETTING_RESUME = $body->gen_setting;
         my $n = $self->unitname;
         $n =~ s/::/./g;
 

@@ -13,6 +13,7 @@ use CgOp ();
     has enter     => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
+    has setting   => (is => 'rw');
     has decls     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has code      => (isa => 'CodeGen', is => 'ro', init_arg => undef,
         lazy => 1, builder => 'gen_code');
@@ -112,8 +113,23 @@ use CgOp ();
         } elsif ($self->outer) {
             return 1 + $self->outer->lex_level($var);
         } else {
+            my $i = 1;
+            my $st = $self->setting;
+            while ($st) {
+                return $i if ($st->{$var});
+                $i++;
+                $st = $st->{'OUTER::'};
+            }
             return -1e99999;
         }
+    }
+
+    sub gen_setting {
+        my ($self) = @_;
+        my %h = %{ $self->lexical };
+        $h{'OUTER::'} = $self->outer ? $self->outer->gen_setting :
+            $self->setting;
+        \%h;
     }
 
     # In order to support proper COMMON semantics on package variables

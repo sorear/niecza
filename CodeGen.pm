@@ -517,18 +517,14 @@ use 5.010;
     sub scopelex {
         my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
+        my $order = 0;
         if ($self->letdepths->{$name}) {
             $name = "let!${name}!" . ($self->letdepths->{$name} - 1);
-        }
-        my ($order, $scope) = (0, $body);
-        if (! $self->lex2type->{$name}) {
-            while ($scope && !$scope->lexical->{$name}) {
-                $scope = $scope->outer;
-                $order++;
+        } else {
+            $order = $body->lex_level($name);
+            if ($order < 0) {
+                die "Failed to resolve lexical $name in " . $body->name;
             }
-        }
-        if (!$scope) {
-            die "Failed to resolve lexical $name in " . $body->name;
         }
         if ($set) {
             $self->lexput($order, $name);

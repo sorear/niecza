@@ -14,14 +14,14 @@ use 5.010;
     has name     => (isa => 'Str', is => 'ro', required => 1);
     has code     => (isa => 'CodeGen', is => 'ro', init_arg => undef, lazy => 1,
         builder => 'gen_code');
-    has setting  => (isa => 'Body', is => 'ro');
+    has setting  => (is => 'ro');
 
     has is_setting => (isa => 'Bool', is => 'ro');
     has setting_name => (isa => 'Str', is => 'ro');
 
     sub gen_code {
         my ($self) = @_;
-        $self->mainline->outer($self->setting) if $self->setting;
+        $self->mainline->setting($self->setting) if $self->setting;
         CodeGen->know_module($self->csname($self->setting_name));
         CodeGen->know_module($self->csname);
         CodeGen->new(name => 'BOOT', entry => 1,
