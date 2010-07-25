@@ -20,6 +20,7 @@ use 5.010;
               typeObject   => [f => 'IP6'],
               how          => [f => 'IP6'],
               local        => [f => 'Dictionary<string,IP6>'],
+              local_attr   => [f => 'Dictionary<string,IP6>'],
               superclasses => [f => 'List<DynMetaObject>'],
               name         => [f => 'String'] },
 

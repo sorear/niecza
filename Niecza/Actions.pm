@@ -561,7 +561,7 @@ sub methodop { my ($cl, $M) = @_;
     my %r;
     $r{name}  = $cl->mangle_longname($M->{longname}, "method call") if $M->{longname};
     $r{quote} = $M->{quote}{_ast} if $M->{quote};
-    $r{ref}   = $cl->do_variable_reference($M->{variable}{_ast})
+    $r{ref}   = $cl->do_variable_reference($M, $M->{variable}{_ast})
         if $M->{variable};
 
     $r{args}  = $M->{args}[0]{_ast}[0] if $M->{args}[0];
@@ -682,7 +682,7 @@ sub term__S_statement_prefix { my ($cl, $M) = @_;
 }
 
 sub term__S_variable { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->do_variable_reference($M->{variable}{_ast});
+    $M->{_ast} = $cl->do_variable_reference($M, $M->{variable}{_ast});
 }
 
 sub term__S_DotDotDot { my ($cl, $M) = @_;

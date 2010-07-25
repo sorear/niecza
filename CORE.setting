@@ -62,6 +62,17 @@ PRE-INIT {
           [null Variable])
     } }
 
+    # $how.add-attribute($name)
+    sub add-attribute { Q:CgOp {
+        (prog
+          [setindex (unwrap String (@ (pos 1)))
+            (getfield local_attr (unwrap DynMetaObject (getattr meta-object
+              (@ (pos 0)))))
+            (null IP6)]
+
+          [null Variable])
+    } }
+
     # $how.create-protoobject()
     sub create-protoobject { Q:CgOp {
         (withtypes $p DynObject $mo DynMetaObject
@@ -91,6 +102,8 @@ PRE-INIT {
             (wrap (clr_string "new")) (l &new))]
           [sink (subcall (@ (l &add-method)) (l $chch)
             (wrap (clr_string "add-method")) (l &add-method))]
+          [sink (subcall (@ (l &add-method)) (l $chch)
+            (wrap (clr_string "add-attribute")) (l &add-attribute))]
           [sink (subcall (@ (l &add-method)) (l $chch)
             (wrap (clr_string "add-super")) (l &add-super))]
           [sink (subcall (@ (l &add-method)) (l $chch)

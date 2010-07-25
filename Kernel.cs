@@ -155,6 +155,8 @@ namespace Niecza {
             = new List<DynMetaObject>();
         public Dictionary<string, IP6> local
             = new Dictionary<string, IP6>();
+        public Dictionary<string, IP6> local_attr
+            = new Dictionary<string, IP6>();
 
         public List<DynMetaObject> mro;
         public HashSet<DynMetaObject> isa;
