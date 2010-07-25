@@ -172,6 +172,12 @@ my class Str {
     method chars() { Q:CgOp {
         (box Num (cast Double (getfield Length (unbox String (@ (l self))))))
     } }
+    method say() { Q:CgOp {
+        (prog [rawscall Console.WriteLine
+                (unbox String (fetch (l self)))]
+              [box Bool (bool 1)]
+        )
+    } }
     method substr($from, $len) { Q:CgOp {
         (box Str (rawcall [unbox String (@ (l self))] Substring
                     [cast Int32 (unbox Double (@ (l $from)))]
@@ -265,12 +271,7 @@ sub warn($str) { Q:CgOp {
     )
 } }
 
-sub say($str) { Q:CgOp {
-    (prog [rawscall Console.WriteLine
-            (unbox String (fetch (methodcall (scopedlex $str) Str))])
-          [box Bool (bool 1)]
-    )
-} }
+sub say($obj) { $obj.say }
 
 sub exit() { Q:CgOp {
     (prog [rawscall System.Environment.Exit (int 0) ]
@@ -619,6 +620,19 @@ PRE-INIT {
                 ($item === EMPTY) ?? ($it = Any) !! ($func($item));
             }
         });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "say")) },
+        anon method say() { self.Str.say });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "chars")) },
+        anon method chars() { self.Str.chars });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "substr")) },
+        anon method substr($x,$y) { self.Str.substr($x,$y) });
+
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "at-pos")) },
+        anon method at-pos($i) { self.flat.at-pos($i) });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "elems")) },
+        anon method elems() { self.flat.elems });
+    Cool.HOW.add-method(Q:CgOp { (w (clr_string "iterator")) },
+        anon method iterator() { self.flat.iterator });
 }
 
 {YOU_ARE_HERE}
