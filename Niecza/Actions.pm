@@ -291,6 +291,11 @@ sub INFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::Bind->new(lhs => $l, rhs => $r, readonly => 0);
         return;
     }
+    if ($s eq '?? !!') { # XXX macro
+        $M->{_ast} = Op::Conditional->new(check => $l,
+            true => $M->{middle}{_ast}, false => $r);
+        return;
+    }
     if ($s eq ',') {
         #XXX STD bug causes , in setting to be parsed as left assoc
         my @r;
@@ -776,6 +781,7 @@ sub terminator__S_again {}
 sub terminator__S_repeat {}
 sub terminator__S_while {}
 sub terminator__S_else {}
+sub terminator__S_BangBang {}
 sub stdstopper {}
 sub unitstopper {}
 sub eat_terminator {}
