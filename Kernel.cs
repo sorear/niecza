@@ -622,6 +622,19 @@ blocked:
             return th;
         }
 
+        public static Variable DefaultNew(IP6 proto) {
+            DynObject n = new DynObject(((DynObject)proto).klass);
+            List<DynMetaObject> mro = n.klass.mro;
+
+            for (int i = mro.Count - 1; i >= 0; i--) {
+                foreach (string s in mro[i].local_attr.Keys) {
+                    n.slots[s] = NewRWScalar(AnyP);
+                }
+            }
+
+            return NewROScalar(n);
+        }
+
         public static IP6 AnyP;
 
         public static Frame PackageLookup(Frame th, IP6 parent,

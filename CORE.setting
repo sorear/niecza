@@ -383,6 +383,12 @@ PRE-INIT {
                 (getfield klass (cast DynObject (@ (l self))))]
               [l $obj])
         } });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "CREATE")) },
+        anon method CREATE() { Q:CgOp {
+            (rawscall Kernel.DefaultNew (@ (l self))) } });
+    Mu.HOW.add-method(Q:CgOp { (w (clr_string "new")) },
+        anon method new() { Q:CgOp {
+            (rawscall Kernel.DefaultNew (@ (l self))) } });
 
     Any.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
         anon method flat() { self, });

@@ -54,6 +54,7 @@ use 5.010;
         'Kernel.Bind'          => [c => 'Void'],
         'Kernel.Assign'        => [c => 'Void'],
         'Kernel.Fetch'         => [c => 'IP6'],
+        'Kernel.DefaultNew'    => [m => 'Variable'],
         'Kernel.NewROScalar'   => [m => 'Variable'],
         'Kernel.NewRWScalar'   => [m => 'Variable'],
         'Kernel.NewRWListVar'  => [m => 'Variable'],
