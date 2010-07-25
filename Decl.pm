@@ -417,7 +417,8 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        if ($body->type ne 'class') {
+        if ($body->type ne 'class' && $body->type ne 'grammar' &&
+                $body->type ne 'role') {
             #TODO: Make this a sorry.
             die "Tried to set a superclass outside an initial class!";
         }
@@ -425,6 +426,30 @@ use CgOp;
         CgOp::sink(
             CgOp::methodcall(CgOp::letvar('how'), "add-super",
                 CgOp::scopedlex($self->name)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Decl::Attribute;
+    use Moose;
+    extends 'Decl';
+
+    has name => (is => 'ro', isa => 'Str', required => 1);
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+        if ($body->type ne 'class' && $body->type ne 'grammar' &&
+                $body->type ne 'role') {
+            #TODO: Make this a sorry.
+            die "Tried to set an attribute outside a class!";
+        }
+
+        CgOp::sink(
+            CgOp::methodcall(CgOp::letvar('how'), "add-attribute",
+                CgOp::wrap(CgOp::clr_string($self->name))));
     }
 
     __PACKAGE__->meta->make_immutable;

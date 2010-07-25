@@ -561,7 +561,8 @@ sub methodop { my ($cl, $M) = @_;
     my %r;
     $r{name}  = $cl->mangle_longname($M->{longname}, "method call") if $M->{longname};
     $r{quote} = $M->{quote}{_ast} if $M->{quote};
-    $r{ref}   = $M->{variable}{_ast}{term} if $M->{variable};
+    $r{ref}   = $cl->do_variable_reference($M->{variable}{_ast})
+        if $M->{variable};
 
     $r{args}  = $M->{args}[0]{_ast}[0] if $M->{args}[0];
     $r{args}  = $M->{arglist}[0]{_ast} if $M->{arglist}[0];
@@ -681,7 +682,7 @@ sub term__S_statement_prefix { my ($cl, $M) = @_;
 }
 
 sub term__S_variable { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{variable}{_ast}{term};
+    $M->{_ast} = $cl->do_variable_reference($M->{variable}{_ast});
 }
 
 sub term__S_DotDotDot { my ($cl, $M) = @_;
@@ -701,6 +702,33 @@ sub term__S_lambda { my ($cl, $M) = @_;
     $M->{_ast} = $cl->block_to_closure($M->{pblock}{_ast});
 }
 
+sub do_variable_reference { my ($cl, $M, $v) = @_;
+    my $sl = $v->{sigil} . $v->{twigil} . $v->{name};
+
+    given ($v->{twigil}) {
+        when ('!') {
+            if (@{ $v->{rest} }) {
+                $M->sorry('$!Foo::bar syntax NYI');
+                return;
+            }
+
+            return Op::GetSlot->new(name => $v->{name},
+                object => Op::Lexical->new(name => 'self'));
+        }
+        when ('') {
+            if (@{ $v->{rest} }) {
+                return Op::PackageVar->new(path => $v->{rest}, name => $sl,
+                    slot => $cl->gensym);
+            } else {
+                return Op::Lexical->new(name => $sl);
+            }
+        }
+        default {
+            $M->sorry("Unhandled reference twigil " . $v->{twigil});
+        }
+    }
+}
+
 sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
@@ -715,37 +743,9 @@ sub variable { my ($cl, $M) = @_;
         return;
     }
 
-    my $sl = $sigil . $twigil . $name;
-
-    if ($twigil && @rest) {
-        $M->sorry("Cannot use a twigil on a qualified name");
-        return;
-    }
-
-    given ($twigil) {
-        when ('!') {
-            $M->{_ast} = {
-                term => Op::GetSlot->new(name => $name,
-                    object => Op::Lexical->new(name => 'self')),
-            };
-        }
-        when ('') {
-            if (@rest) {
-                $M->{_ast} = {
-                    term => Op::PackageVar->new(
-                        path => \@rest, name => $sl, slot => $cl->gensym),
-                };
-            } else {
-                $M->{_ast} = {
-                    term => Op::Lexical->new(name => $sl),
-                    decl_slot => $sl,
-                };
-            }
-        }
-        default {
-            $M->sorry("Unhandled twigil $twigil");
-        }
-    }
+    $M->{_ast} = {
+        sigil => $sigil, twigil => $twigil, name => $name, rest => \@rest
+    };
 }
 
 sub param_sep {}
@@ -957,14 +957,6 @@ sub variable_declarator { my ($cl, $M) = @_;
         return;
     }
 
-    my $name = $M->{variable}{_ast}{decl_slot};
-    my $slot = $name;
-
-    if (!$slot) {
-        $M->sorry("Cannot apply a declarator to a non-simple variable");
-        return;
-    }
-
     my $scope = $::SCOPE // 'my';
 
     if ($scope eq 'augment' || $scope eq 'supercede') {
@@ -972,16 +964,36 @@ sub variable_declarator { my ($cl, $M) = @_;
         return;
     }
 
-    if ($scope eq 'has') {
-        $M->sorry("Unsupported scope $scope for simple variable");
+    my $v = $M->{variable}{_ast};
+    my $t = $v->{twigil};
+    if ($t =~ /[?=~^:]/) {
+        $M->sorry("Variables with the $t twigil cannot be declared using " .
+            "$scope; they are created " .
+            ($t eq '?' ? "using 'constant'." :
+             $t eq '=' ? "by parsing POD blocks." :
+             $t eq '~' ? "by 'slang' definitions." :
+             "automatically as parameters to the current block."));
         return;
     }
 
-    if ($scope eq 'anon') {
-        $slot = $cl->gensym;
+    if ($scope ne 'has' && $t =~ /[.!]/) {
+        $M->sorry("Twigil $t is only valid on attribute definitions ('has').");
+        return;
     }
 
-    if ($scope eq 'state') {
+    if (@{ $v->{rest} }) {
+        $M->sorry(":: syntax is only valid when referencing variables, not when defining them.");
+        return;
+    }
+
+    my $name = $v->{sigil} . $v->{twigil} . $v->{name};
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon') ? $cl->gensym : $name;
+
+    if ($scope eq 'has') {
+        $M->{_ast} = Op::Attribute->new(name => $v->{name},
+            accessor => ($v->{twigil} eq '.'));
+    } elsif ($scope eq 'state') {
         $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1,
             state_backing => $cl->gensym, declaring => 1,
             list => scalar ($M->{variable}->Str =~ /^\@/));

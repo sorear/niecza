@@ -583,6 +583,42 @@ use CgOp;
 }
 
 {
+    package Op::Attribute;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro');
+    has accessor => (isa => 'Bool', is => 'ro');
+
+    sub local_decls {
+        my ($self) = @_;
+        my @r;
+        push @r, Decl::Attribute->new(name => $self->name);
+        if ($self->accessor) {
+            push @r, Decl::Sub->new(var => $self->name . '!a',
+                code => Body->new(
+                    name => $self->name,
+                    signature => Sig->new(params => [])->for_method,
+                    type => 'sub',
+                    do => Op::GetSlot->new(
+                        object => Op::Lexical->new(name => "self"),
+                        slot => $self->name)));
+            push @r, Decl::HasMethod->new(name => $self->name,
+                var => $self->name . '!a');
+        }
+        @r;
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::null('Variable');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::BareBlock;
     use Moose;
     extends 'Op';
