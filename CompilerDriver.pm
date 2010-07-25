@@ -47,9 +47,9 @@ sub compile {
         actions => 'Niecza::Actions')->{_ast};
 
     if ($args{ast}) {
-        delete $a->mainline->{outer};
-        delete $a->{setting};
-        print STDOUT YAML::XS::Dump($a);
+        delete $ast->mainline->{outer};
+        delete $ast->{setting};
+        print STDOUT YAML::XS::Dump($ast);
         return;
     }
 

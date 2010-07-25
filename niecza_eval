@@ -46,7 +46,7 @@ if ($excl > 1 || $module && !@ARGV) {
 sub run {
     compile(main => !$module, csonly => $csonly, ast => $ast,
         lang => $lang, @_);
-    system 'mono --debug=casts MAIN.exe' if !$module && !$csonly;
+    system 'mono --debug=casts MAIN.exe' if !$module && !$csonly && !$ast;
 }
 
 if (@ARGV) {
