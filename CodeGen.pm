@@ -129,12 +129,10 @@ use 5.010;
 
     sub qm { "\"" . $_[0] . "\"" }
 
-    # always called after _saveall
     sub _savestackstate {
         my ($self, $lbl) = @_;
         my %save;
-        $save{depth} = $self->depth;
-        $save{stacktype} = [ @{ $self->stacktype } ];
+        die "Invalid operation of CPS converter" if $self->depth;
         $save{letdepths} = { %{ $self->letdepths } };
         $self->savedstks->{$lbl} = \%save;
     }
@@ -142,9 +140,6 @@ use 5.010;
     sub _restorestackstate {
         my ($self, $lbl) = @_;
         my $save = $self->savedstks->{$lbl};
-        $self->depth($save->{depth});
-        $self->savedepth($save->{depth});
-        @{ $self->stacktype } = @{ $save->{stacktype} };
         %{ $self->letdepths } = %{ $save->{letdepths} };
     }
 
@@ -198,17 +193,8 @@ use 5.010;
         push @{ $self->stacktype }, $ty;
     }
 
-    sub _saveall {
-        my ($self) = @_;
-        for my $i ($self->savedepth .. $self->depth - 1) {
-            $self->_emit("th.lex[\"s$i\"] = s$i");
-        }
-        $self->savedepth($self->depth);
-    }
-
     sub _cpscall {
         my ($self, $rt, $expr) = @_;
-        $self->_saveall;
         die "Invalid operation of CPS converter" if $self->depth;
         my $n = $self->label;
         $self->_emit("th.resultSlot = null");
@@ -259,7 +245,6 @@ use 5.010;
 
     sub labelhere {
         my ($self, $n) = @_;
-        $self->_saveall;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_restorestackstate($n) if $self->savedstks->{$n};
         push @{ $self->buffer }, "    goto case $n;\n" unless $self->unreach;
@@ -270,7 +255,6 @@ use 5.010;
     sub goto {
         my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
-        $self->_saveall;
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    goto case $n;\n";
         $self->unreach(1);
@@ -280,7 +264,6 @@ use 5.010;
         my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
-        $self->_saveall;
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
     }
@@ -289,7 +272,6 @@ use 5.010;
         my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my $top = $self->_pop;
-        $self->_saveall;
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
