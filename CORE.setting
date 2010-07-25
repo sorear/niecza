@@ -431,6 +431,30 @@ my class EMPTY { }
 
 my class List { ... }
 
+sub unfold($fn) {
+    my class UnfoldIterator is Iterator {
+        # has $!fun
+        method validate() {
+            $!valid = 1;
+            my $f = $!fun;
+            $!next = UnfoldIterator.RAWCREATE("valid", 0, "value", Any, "next",
+                Any, "fun", $f);
+            Q:CgOp {
+                (prog
+                  [setindex value (getfield slots
+                      (cast DynObject (@ (l self))))
+                    (subcall (@ (l $f)))]
+                  [null Variable])
+            };
+        }
+    }
+    my $it = UnfoldIterator.RAWCREATE("valid", 0, "value", Any, "next",
+        Any, "fun", $fn);
+    my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(),
+        "rest", LLArray.new($it));
+    @l;
+}
+
 my class Parcel {
     # $!ll
 
