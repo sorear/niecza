@@ -110,6 +110,7 @@ use 5.010;
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
     has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has resulttype =>(isa => 'Maybe[Str]', is => 'rw', default => '');
     has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has lex2type  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
@@ -214,10 +215,21 @@ use 5.010;
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
         push @{ $self->buffer }, "case $n:\n";
-        $self->_push($rt, 'th.resultSlot') if defined $rt;
+        $self->resulttype($rt);
     }
 
     # These functions are usable from user code, but still depend on volatiles.
+
+    sub result {
+        my ($self) = @_;
+        $self->_push($self->resulttype, "th.resultSlot");
+    }
+
+    sub set_result {
+        my ($self) = @_;
+        $self->resulttype($self->stacktype->[-1]);
+        $self->_emit("th.resultSlot = " . $self->_pop);
+    }
 
     sub push_let {
         my ($self, $which) = @_;

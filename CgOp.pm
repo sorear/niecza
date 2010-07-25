@@ -11,20 +11,49 @@ use warnings;
 
     has zyg => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     # filled in by cps_convert
-    has does_cps => (isa => 'Bool', is => 'rw');
+    # 0: returns on eval stack, can appear w/ non-empty
+    # 1: returns in resultSlot, cannot appear w/ non-empty
+    # 2: returns on eval stack, cannot appear w/ non-empty
+    has cps_type => (isa => 'Int', is => 'rw');
+
+    sub delayable { 0 }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package CgOp::Let;
+    use Moose;
+    extends 'CgOp';
+
+    has name => (isa => 'Str', is => 'ro');
 
     sub cps_convert {
-        my ($self) = @_;
-        my $doescps = 0;
-        for (@{ $self->zyg }) {
-            $_ = $_->cps_convert;
-            $doescps ||= $_->does_cps;
+        my ($self, $nv) = @_;
+        my ($head, @kids) = @{ $self->zyg };
+        $head = $head->cps_convert(1);
+        for my $i (0 .. $#kids) {
+            $kids[$i] = $kids[$i]->cps_convert($i == $#kids ? $nv : 0);
         }
-        $self->does_cps($doescps);
+        $head = CgOp::Primitive->new(op => ['result'], zyg => [$head])
+            if $head->cps_type == 1;
+        $self->cps_type($kids[-1]->cps_type || 2);
+        @{ $self->zyg } = ($head, @kids);
         $self;
     }
 
-    sub delayable { 0 }
+    sub var_cg {
+        my ($self, $cg) = @_;
+        my ($head, @kids) = @{ $self->zyg };
+        $head->var_cg($cg);
+        $cg->push_let($self->name);
+        for (@kids) {
+            $_->var_cg($cg);
+        }
+        $cg->pop_let($self->name);
+        $cg->drop;
+    }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -34,6 +63,18 @@ use warnings;
     package CgOp::Seq;
     use Moose;
     extends 'CgOp';
+
+    sub cps_convert {
+        my ($self, $nv) = @_;
+        my $zyg = $self->zyg;
+        for (my $i = 0; $i < @$zyg; $i++) {
+            $zyg->[$i] = $zyg->[$i]->cps_convert($i == $#$zyg);
+        }
+        $self->cps_type(2);
+        $self->cps_type($zyg->[-1]->cps_type) if @$zyg;
+        $self->cps_type(2) if @$zyg > 1 && $self->cps_type == 0;
+        $self;
+    }
 
     sub var_cg {
         my ($self, $cg) = @_;
@@ -56,41 +97,59 @@ use warnings;
 
     my $tsn = 0;
     sub cps_convert {
-        my ($self) = @_;
-        my @zyg = map { $_->cps_convert } @{ $self->zyg };
-        my @need_lift = map { $_->does_cps } @zyg;
-
-        # All temporaries generated before a lifted operation need to be
-        my $seen1;
-        for (reverse @need_lift) {
-            $seen1 ||= $_;
-            $_ ||= $seen1;
-        }
-
-        # Except for simple literals
-        for (0 .. $#zyg) {
-            $need_lift[$_] = 0 if $zyg[0]->delayable;
-        }
+        my ($self, $nv) = @_;
+        my @zyg = map { $_->cps_convert(1) } @{ $self->zyg };
+        my @zty = map { $_->cps_type } @zyg;
 
         my @lifted;
         my $cps = 0;
-        for (0 .. $#zyg) {
-            if ($need_lift[$_]) {
-                push @lifted, [ $tsn, $zyg[$_] ];
-                $zyg[$_] = CgOp::letvar("temp!$tsn");
+
+        for my $n (0 .. $#zyg) {
+            my $last_lift = 1;
+            for ($n + 1 .. $#zyg) {
+                if ($zty[$_]) {
+                    $last_lift = 0;
+                }
+            }
+
+            if ((!$zty[$n] || $n == 0) && $last_lift) {
+                # This can be calculated on, and stay on, the stack
+                if ($zty[$n] == 1) {
+                    $zyg[$n] = CgOp::Primitive->new(op => ['result'],
+                        zyg => [$zyg[$n]]);
+                }
+                $cps = 1 if $zty[$n];
+            } elsif ($last_lift) {
+                # This must be calculated in a spill, but can stay in resultSlot
+                if ($zty[$n] != 1) {
+                    $zyg[$n] = CgOp::Primitive->new(op => ['set_result'],
+                        zyg => [$zyg[$n]]);
+                }
+                push @lifted, [ undef, $zyg[$n] ];
+                $zyg[$n] = CgOp::Primitive->new(op => ['result']);
+            } else { # !last_lift, so resultSlot is useless as is the stack
+                # must have a let-spill
+                if ($zty[$n] == 1) {
+                    $zyg[$n] = CgOp::Primitive->new(op => ['result'],
+                        zyg => [$zyg[$n]]);
+                }
+                push @lifted, [ $tsn, $zyg[$n] ];
+                $zyg[$n] = CgOp::letvar("temp!$tsn");
                 $tsn++;
-                $cps = 1;
             }
         }
         @{ $self->zyg } = @zyg;
-
-        $cps ||= $self->is_cps_call;
-        $self->does_cps($cps);
+        my $cc = $self->is_cps_call;
 
         for (reverse @lifted) {
-            $self = CgOp::letn("temp!" . $_->[0], $_->[1], $self);
-            $self->does_cps($cps);
+            if (defined $_->[0]) {
+                $self = CgOp::letn("temp!" . $_->[0], $_->[1], $self);
+            } else {
+                $self = CgOp::prog($_->[1], $self);
+            }
         }
+
+        $self->cps_type($cc ? 1 : (!@lifted && !$cps) ? 0 : 2);
 
         $self;
     }
@@ -115,6 +174,21 @@ use warnings;
     package CgOp::Ternary;
     use Moose;
     extends 'CgOp';
+
+    sub cps_convert {
+        my ($self, $nv) = @_;
+        $self->zyg->[0] = $self->zyg->[0]->cps_convert(1);
+        $self->zyg->[$_] = $self->zyg->[$_]->cps_convert($nv) for (1,2);
+
+        if ($nv) {
+            $self->zyg->[$_] = ($self->zyg->[$_]->cps_type == 1) ?
+                $self->zyg->[$_] : CgOp::Primitive->new(op => ['set_result'],
+                    zyg => [$self->zyg->[$_]]) for (1,2);
+        }
+
+        $self->cps_type(1);
+        $self;
+    }
 
     sub var_cg {
         my ($self, $cg) = @_;
@@ -142,6 +216,15 @@ use warnings;
 
     has once  => (is => 'ro', isa => 'Bool');
     has until => (is => 'ro', isa => 'Bool');
+
+    sub cps_convert {
+        my ($self, $nv) = @_;
+        $self->zyg->[0] = $self->zyg->[0]->cps_convert(1);
+        $self->zyg->[1] = $self->zyg->[1]->cps_convert(0);
+
+        $self->cps_type(1);
+        $self;
+    }
 
     sub var_cg {
         my ($self, $cg) = @_;
@@ -231,7 +314,8 @@ use warnings;
     }
 
     sub varattr {
-        CgOp::Primitive->new(op => [ 'attr_var', $_[0] ], zyg => [ $_[1] ]);
+        CgOp::Primitive->new(op => [ 'attr_var', $_[0] ], zyg => [ $_[1] ],
+            is_cps_call => 1);
     }
 
     sub cast {
@@ -414,14 +498,7 @@ use warnings;
 
     sub letn {
         my ($name, $value, @stuff) = @_;
-        # XXX This violates the cardinal rule of prog (the item, if any, must
-        # be at the end) but in a safe (I think) way - pop_let can never cause
-        # a CPS call.
-        prog(
-            CgOp::Primitive->new(op => [ 'push_let', $name ],
-                zyg => [ $value ]),
-            @stuff,
-            sink(CgOp::Primitive->new(op => [ 'pop_let', $name ])));
+        CgOp::Let->new(name => $name, zyg => [ $value, @stuff ]);
     }
 
     sub pos {
