@@ -48,11 +48,16 @@ use warnings;
         my ($head, @kids) = @{ $self->zyg };
         $head->var_cg($cg);
         $cg->push_let($self->name);
-        for (@kids) {
-            $_->var_cg($cg);
+        for my $i (0 .. $#kids) {
+            $kids[$i]->var_cg($cg);
         }
-        $cg->pop_let($self->name);
-        $cg->drop;
+        $cg->drop_let($self->name);
+    }
+
+    sub drop_end {
+        my ($self) = @_;
+        $self->zyg->[-1] = CgOp::sink($self->zyg->[-1]);
+        $self;
     }
 
     no Moose;
@@ -78,9 +83,13 @@ use warnings;
 
     sub var_cg {
         my ($self, $cg) = @_;
-        for (@{ $self->zyg }) {
-            $_->var_cg($cg);
-        }
+        for (@{ $self->zyg }) { $_->var_cg($cg) }
+    }
+
+    sub drop_end {
+        my ($self) = @_;
+        $self->zyg->[-1] = CgOp::sink($self->zyg->[-1]);
+        $self;
     }
 
     no Moose;
@@ -156,6 +165,30 @@ use warnings;
 
     sub var_cg {
         my ($self, $cg) = @_;
+
+        if ($self->op->[0] eq 'drop') {
+            # XXX C# has some fairly fiddly rules concerning what's legal to
+            # use in void context.
+            my $z = $self->zyg->[0];
+            if ($z->isa('CgOp::Primitive')) {
+                given ($z->op->[0]) {
+                    when ("result") {
+                        $z->zyg->[0]->var_cg($cg);
+                        return;
+                    }
+                    when ("scopelex") {
+                        return;
+                    }
+                    when ("push_null") {
+                        return;
+                    }
+                }
+            } elsif ($z->isa('CgOp::Let') || $z->isa('CgOp::Seq')) {
+                $z->drop_end->var_cg($cg);
+                return;
+            }
+        }
+
         for (@{ $self->zyg }) {
             $_->var_cg($cg);
         }

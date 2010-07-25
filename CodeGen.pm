@@ -110,6 +110,7 @@ use 5.010;
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
     has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has stackterm => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has resulttype =>(isa => 'Maybe[Str]', is => 'rw', default => '');
     has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has lex2type  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
@@ -132,7 +133,7 @@ use 5.010;
     sub _savestackstate {
         my ($self, $lbl) = @_;
         my %save;
-        die "Invalid operation of CPS converter" if $self->depth;
+        die "Invalid operation of CPS converter" if @{ $self->stacktype };
         $save{letdepths} = { %{ $self->letdepths } };
         $self->savedstks->{$lbl} = \%save;
     }
@@ -145,59 +146,27 @@ use 5.010;
 
     sub _emit {
         my ($self, $line) = @_;
-        #push @{ $self->buffer }, sprintf "    // d=%d md=%d sd=%d nl=%d\n",
-        #    $self->depth, $self->maxdepth, $self->savedepth, $self->numlabels;
         push @{ $self->buffer }, "    $line;\n";
-    }
-
-    sub _undercheck {
-        my ($self, $margin) = @_;
-        Carp::confess "Stack underflow" if $margin > $self->depth;
-        if ($self->depth - $margin < $self->savedepth) {
-            for my $n ($self->depth - $margin .. $self->savedepth - 1) {
-                $self->_emit("s$n = th.lex[\"s$n\"]");
-            }
-            $self->savedepth($self->depth - $margin);
-        }
-    }
-
-    sub _overcheck {
-        my ($self, $margin) = @_;
-        if ($self->depth + $margin > $self->maxdepth) {
-            $self->maxdepth($self->depth + $margin);
-        }
-    }
-
-    sub _peek {
-        my ($self) = @_;
-        $self->_undercheck(1);
-        my $ty = @{ $self->stacktype }[-1];
-        return "(($ty)s" . ($self->depth - 1) . ")";
-    }
-
-    sub _pop {
-        my ($self) = @_;
-        $self->_undercheck(1);
-        my $ty = pop @{ $self->stacktype };
-        $self->depth($self->depth - 1);
-        return "(($ty)s" . ($self->depth) . ")";
     }
 
     sub _push {
         my ($self, $ty, $expr) = @_;
-        $self->_overcheck(1);
-        my $n = $self->depth;
-        $self->_emit("s$n = $expr");
-        $self->depth($n + 1);
         Carp::confess('Untyped push') unless defined $ty;
         push @{ $self->stacktype }, $ty;
+        push @{ $self->stackterm }, $expr;
+    }
+
+    sub _popn {
+        my ($self, $nr) = @_;
+        Carp::confess "Stack underflow" if $nr > @{ $self->stacktype };
+        (splice @{ $self->stackterm }, -$nr, $nr),
+            (splice @{ $self->stacktype }, -$nr, $nr);
     }
 
     sub _cpscall {
         my ($self, $rt, $expr) = @_;
         die "Invalid operation of CPS converter" if $self->depth;
         my $n = $self->label;
-        $self->_emit("th.resultSlot = null");
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
         push @{ $self->buffer }, "case $n:\n";
@@ -208,13 +177,14 @@ use 5.010;
 
     sub result {
         my ($self) = @_;
-        $self->_push($self->resulttype, "th.resultSlot");
+        $self->_push("object", "th.resultSlot");
+        $self->cast($self->resulttype);
     }
 
     sub set_result {
         my ($self) = @_;
         $self->resulttype($self->stacktype->[-1]);
-        $self->_emit("th.resultSlot = " . $self->_pop);
+        $self->_emit("th.resultSlot = " . ($self->_popn(1))[0]);
     }
 
     sub push_let {
@@ -228,6 +198,11 @@ use 5.010;
         my ($self, $which) = @_;
         my $var = "let!${which}!" . (--$self->letdepths->{$which});
         $self->rawlexget($var);
+    }
+
+    sub drop_let {
+        my ($self, $which) = @_;
+        --$self->letdepths->{$which};
     }
 
     sub peek_let {
@@ -263,7 +238,7 @@ use 5.010;
     sub cgoto {
         my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
-        my $top = $self->_pop;
+        my ($top) = $self->_popn(1);
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
     }
@@ -271,19 +246,20 @@ use 5.010;
     sub ncgoto {
         my ($self, $n) = @_;
         $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
-        my $top = $self->_pop;
+        my ($top) = $self->_popn(1);
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
     }
 
     sub rawlexget {
         my ($self, $name) = @_;
-        $self->_push($self->lex2type->{$name}, "th.lex[" . qm($name) . "]");
+        $self->_push("object", "th.lex[" . qm($name) . "]");
+        $self->cast($self->lex2type->{$name});
     }
 
     sub rawlexput {
         my ($self, $name) = @_;
-        $self->_emit("th.lex[" . qm($name) . "] = " . $self->_pop);
+        $self->_emit("th.lex[" . qm($name) . "] = " . ($self->_popn(1))[0]);
     }
 
     sub lexget {
@@ -295,8 +271,10 @@ use 5.010;
                 ']).';
         }
         # XXX need a better type tracking system
-        $self->_push(($order ? 'Variable' : ($self->lex2type->{$name} // 'Variable')),
-            $frame . ("outer." x $order) . "lex[" . qm($name) . "]");
+        $self->_push("object", $frame . ("outer." x $order) .
+            "lex[" . qm($name) . "]");
+        $self->cast(($order ? 'Variable' : ($self->lex2type->{$name}
+                    // 'Variable')));
     }
 
     sub lexput {
@@ -307,7 +285,7 @@ use 5.010;
                 qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
                 ']).';
         }
-        $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . $self->_pop);
+        $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . ($self->_popn(1))[0]);
     }
 
     sub callframe {
@@ -323,7 +301,7 @@ use 5.010;
 
     sub drop {
         my ($self) = @_;
-        $self->_pop;
+        $self->_emit(($self->_popn(1))[0]);
     }
 
     # the use of scalar here is a little bit wrong; semantically it's closer
@@ -332,7 +310,7 @@ use 5.010;
     sub pos {
         my ($self, $num) = @_;
         if (! defined($num)) {
-            $num = $self->_pop;
+            $num = ($self->_popn(1))[0];
         }
         $self->_push('Variable',
             "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
@@ -340,28 +318,37 @@ use 5.010;
 
     sub protolget {
         my ($self, $name) = @_;
-        $self->_push('Variable', "th.proto.lex[" . qm($name) . "]");
+        $self->_push('object', "th.proto.lex[" . qm($name) . "]");
+        $self->cast('Variable');
     }
 
     sub call_method {
         my ($self, $nv, $name, $numargs) = @_;
-        my @args = reverse map { $self->_pop } (1 .. $numargs + 1);  # invocant LV
-        my $inv = $self->_pop;
-        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
+        my @args = reverse map { ($self->_popn(1))[0] }
+                (1 .. $numargs + 1);  # invocant LV
+        my ($inv) = $self->_popn(1);
+        $self->_cpscall(($nv ? 'Variable' : undef),
+            "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" .
+            scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) .
+            " }, null)");
     }
 
     sub call_sub {
         my ($self, $nv, $numargs) = @_;
-        my @args = reverse map { $self->_pop } (1 .. $numargs);
-        my $inv = $self->_pop;
-        $self->_cpscall(($nv ? 'Variable' : undef), "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
+        my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
+        my ($inv) = $self->_popn(1);
+        $self->_cpscall(($nv ? 'Variable' : undef),
+            "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " .
+            join(", ", map { "$_.lv" } @args) . " }, null)");
     }
 
     sub tail_call_sub {
         my ($self, $numargs) = @_;
-        my @args = reverse map { $self->_pop } (1 .. $numargs);
-        my $inv = $self->_pop;
-        $self->_emit("return $inv.Invoke(th.caller, new LValue[" . scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) . " }, null)");
+        my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
+        my ($inv) = $self->_popn(1);
+        $self->_emit("return $inv.Invoke(th.caller, new LValue[" .
+            scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) .
+            " }, null)");
         $self->unreach(1);
     }
 
@@ -372,7 +359,7 @@ use 5.010;
 
     sub clr_new {
         my ($self, $class, $nargs) = @_;
-        my @args = reverse map { $self->_pop } 1 .. $nargs;
+        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         $self->_push($class, "new $class(" . join(", ", @args) . ")");
     }
 
@@ -393,33 +380,29 @@ use 5.010;
 
     sub clr_arith {
         my ($self, $op) = @_;
-        my $ty = $self->stacktype->[-1];
-        if ($ty ne $self->stacktype->[-2]) {
+        my ($a1, $a2, $ty1, $ty2) = $self->_popn(2);
+        if ($ty1 ne $ty2) {
             die "Overloaded operations not yet supported";
         }
-        my $a2 = $self->_pop;
-        my $a1 = $self->_pop;
-        $self->_push($ty, "$a1 $op $a2");
+        $self->_push($ty1, "($a1 $op $a2)");
     }
 
     sub clr_compare {
         my ($self, $op) = @_;
-        my $a2 = $self->_pop;
-        my $a1 = $self->_pop;
-        $self->_push('Boolean', "$a1 $op $a2");
+        my ($a1, $a2) = $self->_popn(2);
+        $self->_push('Boolean', "($a1 $op $a2)");
     }
 
     sub clr_field_get {
         my ($self, $f) = @_;
-        my $ty = $self->_typedata('f', $self->stacktype->[-1], $f);
-        my $obj = $self->_pop;
-        $self->_push($ty, "$obj.$f");
+        my ($obj, $oty) = $self->_popn(1);
+        my $ty = $self->_typedata('f', $oty, $f);
+        $self->_push($ty, "($obj.$f)");
     }
 
     sub clr_field_set {
         my ($self, $f) = @_;
-        my $val = $self->_pop;
-        my $obj = $self->_pop;
+        my ($obj, $val) = $self->_popn(2);
         $self->_emit("$obj.$f = $val");
     }
 
@@ -431,13 +414,13 @@ use 5.010;
 
     sub clr_sfield_set {
         my ($self, $f) = @_;
-        my $val = $self->_pop;
+        my ($val) = $self->_popn(1);
         $self->_emit("$f = $val");
     }
 
     sub attr_var {
         my ($self, $f) = @_;
-        my $obj = $self->_pop;
+        my ($obj) = $self->_popn(1);
         $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
     }
 
@@ -446,33 +429,31 @@ use 5.010;
         if ($f) {
             $self->clr_string($f);
         }
-        my $ix  = $self->_pop;
-        my $oty = $self->stacktype->[-1];
+        my ($obj, $ix, $oty, $ixty)  = $self->_popn(2);
         my $ty  = ($oty =~ /^Dictionary<.*,(.*)>$/) ? $1 :
                   ($oty =~ /^(.*)\[\]$/) ? $1 :
                   ($oty =~ /^List<(.*)>$/) ? $1 :
                   die "type inference needs more hacks $oty";
-        my $obj = $self->_pop;
-        $self->_push($ty, "$obj" . "[$ix]");
+        $self->_push($ty, "($obj" . "[$ix])");
     }
 
     sub clr_index_set {
         my ($self, $f) = @_;
-        my $val = $self->_pop;
-        my $ix  = $self->_pop unless $f;
-        my $obj = $self->_pop;
-        $self->_emit("$obj" . "[" . ($f ? qm($f) : $ix) . "] = $val");
+        my ($val) = $self->_popn(1);
+        my ($ix)  = $self->_popn(1) unless $f;
+        my ($obj) = $self->_popn(1);
+        $self->_emit("$obj" . "[" . ($f ? qm($f) : $ix) . "] = ($val)");
     }
 
     sub cast {
         my ($self, $type) = @_;
-        $self->_push($type, "(($type)" . $self->_pop . ")");
+        $self->_push($type, "(($type)" . ($self->_popn(1))[0] . ")");
     }
 
     sub clr_call_direct {
         my ($self, $name, $nargs) = @_;
         my ($cl, $rt) = $self->_typedata('cm', $name);
-        my @args = reverse map { $self->_pop } 1 .. $nargs;
+        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         if ($cl eq 'c') {
             $self->_cpscall(($rt eq 'Void' ? undef : $rt),
                 "$name(" . join(", ", "th", @args) . ")");
@@ -485,9 +466,9 @@ use 5.010;
 
     sub clr_call_virt {
         my ($self, $name, $nargs) = @_;
-        my @args = reverse map { $self->_pop } 1 .. $nargs;
+        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         my ($cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1], $name);
-        my $inv = $self->_pop;
+        my ($inv) = $self->_popn(1);
         if ($cl eq 'c') {
             $self->_cpscall(($rt eq 'Void' ? undef : $rt),
                 "$inv.$name(" . join(", ", "th", @args) . ")");
@@ -502,7 +483,7 @@ use 5.010;
         my ($self, $nv) = @_;
         return if $self->unreach;
         if ($nv) {
-            $self->_emit("th.caller.resultSlot = " . $self->_pop);
+            $self->_emit("th.caller.resultSlot = " . ($self->_popn(1))[0]);
         }
         $self->_emit("return th.caller");
         $self->unreach(1);
@@ -519,8 +500,7 @@ use 5.010;
         $self->pop_let('protopad');
         pop @{ $self->bodies };
         $self->peek_let('protopad');
-        my $op = $self->_pop;
-        my $pp = $self->_pop;
+        my ($pp, $op) = $self->_popn(2);
         $self->_push('IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
             $bodycg->csname . "), $pp, $op)");
     }
@@ -528,9 +508,8 @@ use 5.010;
     sub proto_var {
         my ($self, $name) = @_;
         $self->peek_let('protopad');
-        my $pp = $self->_pop;
-        my $pv = $self->_pop;
-        $self->_emit("$pp.lex[" . qm($name) . "] = $pv");
+        my ($pv, $pp) = $self->_popn(2);
+        $self->_emit("$pp.lex[" . qm($name) . "] = ($pv)");
     }
 
     # These are completely derived.
@@ -582,10 +561,6 @@ use 5.010;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
         print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(\"Entering $::UNITNAME : $name @ \" + th.ip); }\n";
-        if ($self->maxdepth) {
-            print ::NIECZA_OUT " " x 8, "object " . join(", ", map { "s$_" }
-                0 .. ($self->maxdepth - 1)) . ";\n";
-        }
         print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
         print ::NIECZA_OUT " " x 12, "case 0:\n";
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
