@@ -24,7 +24,7 @@ my module CORE;
 #     }
 #
 # to augment:
-#     BEGIN { $Foo_HOW.add-method("baz", anon method baz { ... }); }
+#     BEGIN { Foo.HOW.add-method("baz", anon method baz { ... }); }
 my class ClassHOW { ... }
 
 PRE-INIT {
@@ -42,12 +42,12 @@ PRE-INIT {
           [ns (l $self)])
     } }
 
-    # $how.add-super($how)
+    # $how.add-super($p)
     sub add-super { Q:CgOp { (prog
         [rawcall
           (getfield superclasses (unwrap DynMetaObject
             (getattr meta-object (@ (pos 0))))) Add
-          (unwrap DynMetaObject (getattr meta-object (@ (pos 1))))]
+          (unwrap DynMetaObject (getattr meta-object (how (@ (pos 1)))))]
         [null Variable])
     } }
 
@@ -99,7 +99,6 @@ PRE-INIT {
             (wrap (clr_string "create-protoobject")) (l &create-protoobject))]
 
           [l ClassHOW (subcall (@ (l &create-protoobject)) (l $chch))]
-          [l ClassHOW!HOW (l $chch)]
 
           [null Variable])
     }
@@ -126,30 +125,31 @@ PRE-INIT {
     } }
 
 Q:CgOp {
-    (withtypes !plist List<DynMetaObject>
+    (withtypes !plist List<DynMetaObject> Mu!HOW Variable Any!HOW Variable
+        Cool!HOW Variable Scalar!HOW Variable Sub!HOW Variable
 
       [l Mu!HOW (methodcall (l ClassHOW) new (w (clr_string Mu)))]
       [l Mu (methodcall (l Mu!HOW) create-protoobject)]
 
       [l Any!HOW (methodcall (l ClassHOW) new (w (clr_string Any)))]
-      [sink (methodcall (l Any!HOW) add-super (l Mu!HOW))]
+      [sink (methodcall (l Any!HOW) add-super (l Mu))]
       [l Any (methodcall (l Any!HOW) create-protoobject)]
 
       [rawsset Kernel.AnyP (@ (l Any))]
 
       [l Cool!HOW (methodcall (l ClassHOW) new (w (clr_string Cool)))]
-      [sink (methodcall (l Cool!HOW) add-super (l Any!HOW))]
+      [sink (methodcall (l Cool!HOW) add-super (l Any))]
       [l Cool (methodcall (l Cool!HOW) create-protoobject)]
 
-      [sink (methodcall (l ClassHOW!HOW) add-super (l Any!HOW))]
+      [sink (methodcall (ns (how (@ (l ClassHOW)))) add-super (l Any))]
       [rawcall (getfield klass (cast DynObject (@ (l ClassHOW)))) BuildC3MRO]
 
       [l Sub!HOW (subcall (@ (l &wrap-dpmo))
-        (w (rawsget Kernel.SubMO)) (l Any!HOW))]
+        (w (rawsget Kernel.SubMO)) (l Any))]
       [l Sub (methodcall (l Sub!HOW) create-protoobject)]
 
       [l Scalar!HOW (subcall (@ (l &wrap-dpmo))
-        (w (rawsget Kernel.ScalarMO)) (l Any!HOW))]
+        (w (rawsget Kernel.ScalarMO)) (l Any))]
       [l Scalar (methodcall (l Scalar!HOW) create-protoobject)]
 
       [null Variable])

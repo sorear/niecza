@@ -279,11 +279,10 @@ use CgOp;
 
     sub extra_decls { $_[0]->body ? ($_[0]->body->floated_decls) : () }
     sub stashvar { $_[0]->var . '::' }
-    sub metavar { $_[0]->var . '!HOW' }
 
     sub used_slots {
         my ($self) = @_;
-        $self->var, 'Variable', $self->stashvar, 'Variable', $self->metavar,
+        $self->var, 'Variable', $self->stashvar,
             'Variable', (!$self->stub ? ($self->bodyvar, 'Variable') : ());
     }
 
@@ -296,7 +295,6 @@ use CgOp;
         if ($self->stub) {
             return CgOp::prog(
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
-                CgOp::proto_var($self->metavar, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->stashvar,
                     CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))));
         }
@@ -308,7 +306,6 @@ use CgOp;
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
-                CgOp::proto_var($self->var . '!HOW', CgOp::letvar("how")),
                 CgOp::proto_var($self->var . "::", CgOp::letvar("pkg")),
 
                 CgOp::proto_var($self->bodyvar,
@@ -322,7 +319,6 @@ use CgOp;
         CgOp::prog(
             CgOp::share_lex($self->var),
             CgOp::share_lex($self->var . "::"),
-            CgOp::share_lex($self->var . "!HOW"),
             ($self->stub ? () :
                 ($body->mainline ?
                     CgOp::share_lex($self->bodyvar) :
@@ -360,7 +356,7 @@ use CgOp;
             CgOp::wrap(CgOp::clr_string($self->name // 'ANON')));
     }
 
-    sub defsuper { 'Any!HOW' }
+    sub defsuper { 'Any' }
 
     sub finish_obj {
         my ($self) = @_;
@@ -382,7 +378,7 @@ use CgOp;
     use Moose;
     extends 'Decl::Class';
 
-    sub defsuper { 'Grammar!HOW' }
+    sub defsuper { 'Grammar' }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -428,7 +424,7 @@ use CgOp;
 
         CgOp::sink(
             CgOp::methodcall(CgOp::letvar('how'), "add-super",
-                CgOp::scopedlex($self->name . "!HOW")));
+                CgOp::scopedlex($self->name)));
     }
 
     __PACKAGE__->meta->make_immutable;

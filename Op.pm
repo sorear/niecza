@@ -435,7 +435,7 @@ use CgOp;
                     bodyvar => $self->bodyvar)));
 
         for my $tag (@{ $self->exports }) {
-            for my $sym ($self->var, $self->var . '::', $self->var . '!HOW') {
+            for my $sym ($self->var, $self->var . '::') {
                 push @r, Decl::PackageAlias->new(slot => $sym,
                     name => $sym, path => [ 'OUR', 'EXPORT', $tag ]);
             }

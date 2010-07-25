@@ -1026,7 +1026,6 @@ sub statement_control__S_use { my ($cl, $M) = @_;
     my %symbols;
     $symbols{$name} = [ $name ];
     $symbols{$name . '::'} = [ $name . '::' ];
-    $symbols{$name . '!HOW'} = [ $name . '!HOW' ];
 
     my $pkg = $M->find_stash($name);
     if ($pkg->{really}) {
