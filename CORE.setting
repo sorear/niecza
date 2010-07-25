@@ -437,14 +437,10 @@ my class LLArray {
 }
 
 my class Iterator {
-    # has $.valid
-    # has $.value
-    # has $.next
-
+    has $.valid;
+    has $.value;
+    has $.next;
     # subclasses must provide .validate
-    method valid() { $!valid }
-    method value() { $!value }
-    method next()  { $!next  }
 }
 
 my class EMPTY { }
@@ -453,7 +449,7 @@ my class List { ... }
 
 sub unfold-iter($fn) {
     my class UnfoldIterator is Iterator {
-        # has $!fun
+        has $.fun;
         method validate() {
             $!valid = 1;
             my $f = $!fun;
@@ -529,8 +525,9 @@ sub Nil {
 }
 
 my class List is Cool {
-    # low level, so not declared yet
-    # @!items @!rest $!flat
+    has @!items;
+    has @!rest;
+    has $!flat;
     method flat() {
         my @x := self;
         my @y := List.RAWCREATE("flat", 1, "items", LLArray.new(),
