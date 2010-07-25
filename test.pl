@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 99;
+plan 108;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -306,4 +306,38 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok $Cow::x.notdef, "package variables autoviv to undef";
     $Cow::x = 51;
     ok $Cow::x == 51, "but can still hold values";
+}
+
+{
+    our $kluw = 99;
+    ok $GLOBAL::kluw == 99, "GLOBAL:: works";
+    ok $OUR::kluw == 99, "OUR:: works";
+}
+
+{
+    my class Foo {
+        has $.a;
+        has $!b;
+
+        method test() {
+            ok self.a == 33, "values accessible as self.a";
+            $!b = 44;
+            ok $!b == 44, 'private values accessible as $!b';
+            ok $!a == 33, 'public values so accessible too';
+        }
+    }
+
+    my class Bar is Foo {
+        has $.c;
+    }
+
+    my $x = Foo.new;
+    my $y = Bar.new;
+
+    $x.a = 33;
+    $x.test;
+    $y.a = 33;
+    $y.test;
+    $y.c = 55;
+    ok $y.c == 55, "subclass attributes work";
 }
