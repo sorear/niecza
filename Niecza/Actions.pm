@@ -176,7 +176,12 @@ sub quote__S_Q { my ($cl, $M) = @_;
 }
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{nibble}{_ast};
+    my $slot = $cl->gensym;
+    # TODO should be a real pass.
+    $M->{_ast} = Op::CallMethod->new(name => 'bless',
+        receiver => Op::Lexical->new(name => 'Regex'),
+        positionals => [
+            RxOp::Export->new(zyg => [$M->{nibble}{_ast}])->closure ]);
 }
 
 # :: RxOp
@@ -227,14 +232,116 @@ sub quant_atom_list { my ($cl, $M) = @_;
         [ map { $_->{_ast} } @{ $M->{quantified_atom} } ]);
 }
 
+sub metachar {}
+sub metachar__S_sigwhite { my ($cl, $M) = @_;
+    $M->{_ast} = $::RX{s} ? RxOp::Sigspace->new : RxOp::Sequence->new;
+}
+
+sub metachar__S_unsp { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::Sequence->new;
+}
+
+sub metachar__S_Cur_Ly { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::VoidBlock->new(block => $M->{embeddedblock}{_ast});
+}
+
+sub metachar__S_mod { my ($cl, $M) = @_;
+    # most of these have only parse-time effects
+    $M->{_ast} = $M->{mod_internal}{_ast} // RxOp::Sequence->new;
+}
+
+sub metachar__S_ColonColon { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::CutLTM->new;
+}
+
+sub metachar__S_ColonColonColon { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::CutRule->new;
+}
+
+sub metachar__S_Bra_Ket { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::ConfineLang->new(zyg => [$M->{nibbler}{_ast}]);
+}
+
+sub metachar__S_Paren_Thesis { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::Capture->new(zyg => [
+            RxOp::ConfineLang->new(zyg => [$M->{nibbler}{_ast}])]);
+}
+
+sub metachar__S_LtParen { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::MarkFrom->new;
+}
+
+sub metachar__S_ThesisGt { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::MarkTo->new;
+}
+
+sub metachar__S_LtLt { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::LWB->new;
+}
+
+sub metachar__S_GtGt { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::RWB->new;
+}
+
+sub metachar__S_Fre { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::LWB->new;
+}
+
+sub metachar__S_Nch { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::RWB->new;
+}
+
+sub metachar__S_qw { my ($cl, $M) = @_;
+    $M->sorry("< > splitting NYI");
+}
+
+sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{assertion}{_ast};
+}
+
+sub metachar__S_Back { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{backslash}{_ast};
+}
+
+sub metachar__S_Dot { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::Any->new;
+}
+
+sub metachar__S_Caret { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::StrStart->new;
+}
+
+sub metachar__S_CaretCaret { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::LineStart->new;
+}
+
+sub metachar__S_Dollar { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::StrEnd->new;
+}
+
+sub metachar__S_DollarDollar { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::LineEnd->new;
+}
+
+sub metachar__S_Single_Single { my ($cl, $M) = @_;
+    if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
+        $M->sorry("Interpolating strings in regexes NYI");
+        return;
+    }
+    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text);
+}
+
+sub metachar__S_Double_Double { my ($cl, $M) = @_;
+    if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
+        $M->sorry("Interpolating strings in regexes NYI");
+        return;
+    }
+    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text);
+}
+
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
-        my $slot = $cl->gensym;
-        # TODO should be a real pass.
-        $M->{_ast} = Op::CallMethod->new(name => 'bless',
-            receiver => Op::Lexical->new(name => 'Regex'),
-            positionals => [
-                RxOp::Export->new(zyg => [$M->{EXPR}{_ast}])->closure ]);
+        $M->{_ast} = $M->{EXPR}{_ast};
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
         # XXX We don't interpret the code, so we can't tell if it's actually
         # using variables, but still, it probably is.
