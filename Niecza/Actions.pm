@@ -1021,6 +1021,12 @@ sub statement_control__S_until { my ($cl, $M) = @_;
         until => 1, once => 0);
 }
 
+sub statement_control__S_for { my ($cl, $M) = @_;
+    $M->{xblock}{_ast}[1]->type('loop');
+    $M->{_ast} = Op::ForLoop->new(source => $M->{xblock}{_ast}[0],
+        sink => $cl->block_to_closure($M->{xblock}{_ast}[1]));
+}
+
 sub statement_control__S_use { my ($cl, $M) = @_;
     my $name = $M->{module_name}{_ast}{name};
     my $args = $M->{arglist} ? $M->{arglist}{_ast} : [];

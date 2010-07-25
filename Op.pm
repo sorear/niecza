@@ -339,7 +339,7 @@ use CgOp;
     sub zyg { $_[0]->check, $_[0]->body }
 
     sub code {
-        my ($self, $cg, $body) = @_;
+        my ($self, $body) = @_;
 
         CgOp::prog(
             CgOp::whileloop($self->until, $self->once,
@@ -348,6 +348,36 @@ use CgOp;
                         CgOp::methodcall($self->check->code($body), "Bool"))),
                 CgOp::sink($self->body->code($body))),
             CgOp::null('Variable'));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::ForLoop;
+    use Moose;
+    extends 'Op';
+
+    has source => (isa => 'Op', is => 'ro', required => 1);
+    has sink   => (isa => 'Op', is => 'ro', required => 1);
+    has immed  => (isa => 'Bool', is => 'ro', default => 0);
+    sub zyg { $_[0]->source, $_[0]->sink }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        CgOp::methodcall(
+            CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&flat')),
+                $self->source->code($body)),
+            ($self->immed ? 'for' : 'map'),
+            $self->sink->code($body));
+    }
+
+    sub statement_level {
+        my ($self) = @_;
+        Op::ForLoop->new(source => $self->source, sink => $self->sink,
+            immed => 1);
     }
 
     __PACKAGE__->meta->make_immutable;
