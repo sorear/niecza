@@ -274,7 +274,8 @@ sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
 
 sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(children => 
-        [ map { $_ ? ($_->paren) : () } @{ $M->{semilist}{_ast} } ]);
+        [ map { $_ ? Op::Paren->new(inside => $_) : () }
+            @{ $M->{semilist}{_ast} } ]);
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
@@ -299,13 +300,11 @@ sub INFIX { my ($cl, $M) = @_;
     if ($s eq ',') {
         #XXX STD bug causes , in setting to be parsed as left assoc
         my @r;
-        push @r, ($l->isa('Op::CallSub') && $l->splittable_parcel) ?
-            @{ $l->positionals } : ($l);
-        push @r, ($r->isa('Op::CallSub') && $r->splittable_parcel) ?
-            @{ $r->positionals } : ($r);
+        push @r, $l->splittable_parcel ? @{ $l->positionals } : ($l);
+        push @r, $r->splittable_parcel ? @{ $r->positionals } : ($r);
         $M->{_ast} = Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&infix:<,>'),
-            positionals => \@r, splittable_parcel => 1);
+            positionals => \@r);
         return;
     }
 
@@ -350,8 +349,7 @@ sub LIST { my ($cl, $M) = @_;
     } else {
         $M->{_ast} = Op::CallSub->new(
             invocant => Op::Lexical->new(name => "&infix:<$op>"),
-            positionals => \@pos,
-            splittable_parcel => ($op eq ','));
+            positionals => \@pos);
     }
 }
 
@@ -939,7 +937,7 @@ sub arglist { my ($cl, $M) = @_;
 
     if (!defined $x) {
         $M->{_ast} = [];
-    } elsif ($x && $x->isa('Op::CallSub') && $x->splittable_parcel) {
+    } elsif ($x && $x->splittable_parcel) {
         $M->{_ast} = $x->positionals;
     } else {
         $M->{_ast} = [$x];

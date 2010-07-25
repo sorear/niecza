@@ -8,13 +8,17 @@ use CgOp;
     package Op;
     use Moose;
 
-    sub paren { shift }
-
     sub zyg { }
 
     sub local_decls {
         my ($self) = shift;
         map { $_->local_decls } $self->zyg;
+    }
+
+    sub splittable_parcel {
+        my ($self) = @_;
+        $self->isa('Op::CallSub') && $self->invocant->isa('Op::Lexical') &&
+            $self->invocant->name eq '&infix:<,>';
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -63,16 +67,7 @@ use CgOp;
     has invocant    => (isa => 'Op', is => 'ro', required => 1);
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
-    # non-parenthesized constructor
-    has splittable_pair => (isa => 'Bool', is => 'rw', default => 0);
-    has splittable_parcel => (isa => 'Bool', is => 'rw', default => 0);
     sub zyg { $_[0]->invocant, @{ $_[0]->positionals } }
-
-    sub paren {
-        my ($self) = @_;
-        Op::CallSub->new(invocant => $self->invocant,
-            positionals => $self->positionals);
-    }
 
     sub code {
         my ($self, $body) = @_;
@@ -161,6 +156,23 @@ use CgOp;
             CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
                 $self->name, $_[0], map { $_->code($body) }
                     @{ $self->positionals })});
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::Paren;
+    use Moose;
+    extends 'Op';
+
+    has inside => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->inside }
+
+    sub code {
+        my ($self, $body) = @_;
+        $self->inside->code($body);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -593,12 +605,6 @@ use CgOp;
             return Decl::SimpleVar->new(slot => $self->name,
                     list => $self->list);
         }
-    }
-
-    sub paren {
-        my %p = %{ $_[0] };
-        $p{state_decl} = 0;
-        Op::Lexical->new(%p);
     }
 
     sub code {
