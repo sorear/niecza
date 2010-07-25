@@ -595,14 +595,14 @@ use CgOp;
         my @r;
         push @r, Decl::Attribute->new(name => $self->name);
         if ($self->accessor) {
-            push @r, Decl::Sub->new(var => $self->name . '!a',
+            push @r, Decl::Sub->new(var => ($self->name . '!a'),
                 code => Body->new(
                     name => $self->name,
                     signature => Sig->new(params => [])->for_method,
                     type => 'sub',
                     do => Op::GetSlot->new(
                         object => Op::Lexical->new(name => "self"),
-                        slot => $self->name)));
+                        name => $self->name)));
             push @r, Decl::HasMethod->new(name => $self->name,
                 var => $self->name . '!a');
         }
