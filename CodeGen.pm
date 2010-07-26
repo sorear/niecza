@@ -48,6 +48,7 @@ use 5.010;
             { pos          => [f => 'LValue[]'],
               lex          => [f => 'Dictionary<string,object>'] },
 
+        'Kernel.StrP'          => [f => 'IP6'],
         'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [c => 'Variable'],
         'Kernel.SlurpyHelper'  => [c => 'List<Variable>'],

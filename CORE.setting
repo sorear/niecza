@@ -31,7 +31,7 @@ PRE-INIT {
     # ClassHOW.new($name) --> meta class instance
     sub new { Q:CgOp {
         (withtypes $mo DynMetaObject $self DynObject
-          [l $mo   (rawnew DynMetaObject (unwrap String (@ (pos 1))))]
+          [l $mo   (rawnew DynMetaObject (unbox String (@ (pos 1))))]
           [l $self (rawnew DynObject (getfield klass
             (cast DynObject (@ (pos 0)))))]
 
@@ -54,7 +54,7 @@ PRE-INIT {
     # $how.add-method($name, $sub)
     sub add-method { Q:CgOp {
         (prog
-          [setindex (unwrap String (@ (pos 1)))
+          [setindex (unbox String (@ (pos 1)))
             (getfield local (unwrap DynMetaObject (getattr meta-object
               (@ (pos 0)))))
             (@ (pos 2))]
@@ -65,7 +65,7 @@ PRE-INIT {
     # $how.add-attribute($name)
     sub add-attribute { Q:CgOp {
         (prog
-          [setindex (unwrap String (@ (pos 1)))
+          [setindex (unbox String (@ (pos 1)))
             (getfield local_attr (unwrap DynMetaObject (getattr meta-object
               (@ (pos 0)))))
             (null IP6)]
@@ -99,17 +99,17 @@ PRE-INIT {
             (w (l $chmo))]
 
           [sink (subcall (@ (l &add-method)) (l $chch)
-            (wrap (clr_string "new")) (l &new))]
+            (string_var "new") (l &new))]
+          [sink (subcall (@ (l &add-method)) (l $chch) 
+            (string_var "add-method") (l &add-method))]
           [sink (subcall (@ (l &add-method)) (l $chch)
-            (wrap (clr_string "add-method")) (l &add-method))]
+            (string_var "add-attribute") (l &add-attribute))]
           [sink (subcall (@ (l &add-method)) (l $chch)
-            (wrap (clr_string "add-attribute")) (l &add-attribute))]
+            (string_var "add-super") (l &add-super))]
           [sink (subcall (@ (l &add-method)) (l $chch)
-            (wrap (clr_string "add-super")) (l &add-super))]
+            (string_var "compose") (l &compose))]
           [sink (subcall (@ (l &add-method)) (l $chch)
-            (wrap (clr_string "compose")) (l &compose))]
-          [sink (subcall (@ (l &add-method)) (l $chch)
-            (wrap (clr_string "create-protoobject")) (l &create-protoobject))]
+            (string_var "create-protoobject") (l &create-protoobject))]
 
           [l ClassHOW (subcall (@ (l &create-protoobject)) (l $chch))]
 
@@ -128,7 +128,7 @@ PRE-INIT {
     # (DynMetaObject $dmo, ClassHOW $super --> ClassHOW)
     sub wrap-dpmo { Q:CgOp {
         (withtypes $ch Variable $dm DynMetaObject
-          [l $ch (methodcall (l ClassHOW) new (w (clr_string "")))]
+          [l $ch (methodcall (l ClassHOW) new (string_var ""))]
           [l $dm (unwrap DynMetaObject (@ (pos 0)))]
 
           [assign (varattr meta-object (@ (l $ch))) (w (l $dm))]
@@ -141,16 +141,16 @@ Q:CgOp {
     (withtypes !plist List<DynMetaObject> Mu!HOW Variable Any!HOW Variable
         Cool!HOW Variable Scalar!HOW Variable Sub!HOW Variable
 
-      [l Mu!HOW (methodcall (l ClassHOW) new (w (clr_string Mu)))]
+      [l Mu!HOW (methodcall (l ClassHOW) new (string_var Mu))]
       [l Mu (methodcall (l Mu!HOW) create-protoobject)]
 
-      [l Any!HOW (methodcall (l ClassHOW) new (w (clr_string Any)))]
+      [l Any!HOW (methodcall (l ClassHOW) new (string_var Any))]
       [sink (methodcall (l Any!HOW) add-super (l Mu))]
       [l Any (methodcall (l Any!HOW) create-protoobject)]
 
       [rawsset Kernel.AnyP (@ (l Any))]
 
-      [l Cool!HOW (methodcall (l ClassHOW) new (w (clr_string Cool)))]
+      [l Cool!HOW (methodcall (l ClassHOW) new (string_var Cool))]
       [sink (methodcall (l Cool!HOW) add-super (l Any))]
       [l Cool (methodcall (l Cool!HOW) create-protoobject)]
 
@@ -197,6 +197,7 @@ my class Str is Cool {
                     [cast Int32 (unbox Double (@ (l $len)))]))
     } }
 }
+PRE-INIT { Q:CgOp { (prog [rawsset Kernel.StrP (@ (l Str))] [null Variable]) } }
 my class Blob { }
 my class Char { }
 my class CharLingua { }
@@ -336,15 +337,12 @@ sub infix:<~~>($t,$m) {
 # no MONKEY_TYPING.
 
 PRE-INIT {
-    Mu.HOW.add-method(Q:CgOp { (wrap (clr_string "defined")) },
-        anon method defined() {
+    Mu.HOW.add-method("defined", anon method defined() {
             Q:CgOp { (box Bool (!= (null Dictionary<string,object>)
                 (getfield slots (cast DynObject (@ (l self)))))) }
         });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "Bool")) },
-        anon method Bool() { self.defined });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "Str")) },
-        anon method Str() {
+    Mu.HOW.add-method("Bool", anon method Bool() { self.defined });
+    Mu.HOW.add-method("Str", anon method Str() {
             my $tn := Q:CgOp {
                 (box Str (getfield name (getfield klass
                     (cast DynObject (fetch (scopedlex self))))))
@@ -355,14 +353,10 @@ PRE-INIT {
                 $tn ~ "()"
             }
         });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "notdef")) },
-        anon method notdef() { ! self.defined });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "so")) },
-        anon method notdef() { self.Bool });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "not")) },
-        anon method notdef() { ! self.Bool });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "RAWCREATE")) },
-        anon method RAWCREATE { Q:CgOp {
+    Mu.HOW.add-method("notdef", anon method notdef() { ! self.defined });
+    Mu.HOW.add-method("so", anon method so() { self.Bool });
+    Mu.HOW.add-method("not", anon method not() { ! self.Bool });
+    Mu.HOW.add-method("RAWCREATE", anon method RAWCREATE { Q:CgOp {
             (withtypes i Int32 max Int32 obj DynObject
               [l max (getfield Length (getfield pos (callframe)))]
               [l i (int 1)]
@@ -376,36 +370,29 @@ PRE-INIT {
                   [l i (+ (l i) (int 2))])]
               [ns (l obj)])
         } });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "bless")) },
-        anon method bless($obj) { Q:CgOp {
+    Mu.HOW.add-method("bless", anon method bless($obj) { Q:CgOp {
             (prog
               [setfield klass (cast DynObject (@ (l $obj)))
                 (getfield klass (cast DynObject (@ (l self))))]
               [l $obj])
         } });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "CREATE")) },
-        anon method CREATE() { Q:CgOp {
+    Mu.HOW.add-method("CREATE", anon method CREATE() { Q:CgOp {
             (rawscall Kernel.DefaultNew (@ (l self))) } });
-    Mu.HOW.add-method(Q:CgOp { (w (clr_string "new")) },
-        anon method new() { Q:CgOp {
+    Mu.HOW.add-method("new", anon method new() { Q:CgOp {
             (rawscall Kernel.DefaultNew (@ (l self))) } });
 
-    Any.HOW.add-method(Q:CgOp { (w (clr_string "flat")) },
-        anon method flat() { self, });
+    Any.HOW.add-method("flat", anon method flat() { self, });
 
-    Any.HOW.add-method(Q:CgOp { (w (clr_string "ACCEPTS")) },
-        anon method ACCEPTS($t) { self === $t });
+    Any.HOW.add-method("ACCEPTS", anon method ACCEPTS($t) { self === $t });
 
     # Should be for Block, not Sub
-    Sub.HOW.add-method(Q:CgOp { (w (clr_string "ACCEPTS")) },
-        anon method ACCEPTS($t) { (self)($t) });
+    Sub.HOW.add-method("ACCEPTS", anon method ACCEPTS($t) { (self)($t) });
 
-    ClassHOW.HOW.add-method(Q:CgOp { (w (clr_string "isa")) },
-        anon method isa($obj, $type) { Q:CgOp {
+    ClassHOW.HOW.add-method("isa", anon method isa($obj, $type) { Q:CgOp {
             (box Bool (rawcall (getfield klass (cast DynObject (@ (l $obj))))
               HasMRO (getfield klass (cast DynObject (@ (l $type))))))
         } });
-    ClassHOW.HOW.add-method(Q:CgOp { (w (clr_string "does")) },
+    ClassHOW.HOW.add-method("does",
         anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
 }
 
@@ -607,8 +594,7 @@ sub _it_shift($it) {
 }
 
 PRE-INIT {
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "grep")) },
-        anon method grep($sm) {
+    Cool.HOW.add-method("grep", anon method grep($sm) {
             my $it = self.flat.iterator;
 
             unfold(sub () {
@@ -617,7 +603,7 @@ PRE-INIT {
                     ($item ~~ $sm) ?? $item !! Nil;
             });
         });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "map")) },
+    Cool.HOW.add-method("map",
         anon method map($func) {
             my $it = self.flat.iterator;
 
@@ -626,7 +612,7 @@ PRE-INIT {
                 ($item === EMPTY) ?? EMPTY !! $func($item);
             });
         });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "for")) },
+    Cool.HOW.add-method("for",
         anon method for($func) {
             my $it = self.flat.iterator;
             while $it {
@@ -634,20 +620,17 @@ PRE-INIT {
                 ($item === EMPTY) ?? ($it = Any) !! ($func($item));
             }
         });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "say")) },
-        anon method say() { self.Str.say });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "chars")) },
-        anon method chars() { self.Str.chars });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "substr")) },
+    Cool.HOW.add-method("say", anon method say() { self.Str.say });
+    Cool.HOW.add-method("chars", anon method chars() { self.Str.chars });
+    Cool.HOW.add-method("substr",
         anon method substr($x,$y) { self.Str.substr($x,$y) });
 
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "at-pos")) },
+    Cool.HOW.add-method("at-pos",
         anon method at-pos($i) { self.flat.at-pos($i) });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "elems")) },
-        anon method elems() { self.flat.elems });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "iterator")) },
+    Cool.HOW.add-method("elems", anon method elems() { self.flat.elems });
+    Cool.HOW.add-method("iterator",
         anon method iterator() { self.flat.iterator });
-    Cool.HOW.add-method(Q:CgOp { (w (clr_string "join")) },
+    Cool.HOW.add-method("join",
         anon method join($sep) { self.flat.join($sep) });
 }
 

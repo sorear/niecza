@@ -353,7 +353,7 @@ use CgOp;
     sub make_how {
         my ($self) = @_;
         CgOp::methodcall(CgOp::scopedlex("ClassHOW"), "new",
-            CgOp::wrap(CgOp::clr_string($self->name // 'ANON')));
+            CgOp::string_var($self->name // 'ANON'));
     }
 
     sub defsuper { 'Any' }
@@ -400,8 +400,7 @@ use CgOp;
         }
         CgOp::sink(
             CgOp::methodcall(CgOp::letvar("how"), "add-method",
-                CgOp::wrap(CgOp::clr_string($self->name)),
-                CgOp::scopedlex($self->var)));
+                CgOp::string_var($self->name), CgOp::scopedlex($self->var)));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -449,7 +448,7 @@ use CgOp;
 
         CgOp::sink(
             CgOp::methodcall(CgOp::letvar('how'), "add-attribute",
-                CgOp::wrap(CgOp::clr_string($self->name))));
+                CgOp::string_var($self->name)));
     }
 
     __PACKAGE__->meta->make_immutable;

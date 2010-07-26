@@ -388,7 +388,9 @@ use warnings;
     }
 
     sub box {
-        rawscall('Kernel.BoxAny', $_[1], fetch(scopedlex($_[0])));
+        rawscall('Kernel.BoxAny', $_[1],
+            $_[0] eq 'Str' ? rawsget('Kernel.StrP') :
+                fetch(scopedlex($_[0])));
     }
 
     sub bind {

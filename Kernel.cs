@@ -636,6 +636,7 @@ blocked:
         }
 
         public static IP6 AnyP;
+        public static IP6 StrP = new DynObject(null);
 
         public static Frame PackageLookup(Frame th, IP6 parent,
                 string name) {
