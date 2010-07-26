@@ -46,3 +46,16 @@ Niecza/Grammar.pmc: Niecza/Grammar.pm6 .STD_build_stamp
 .STD_build_stamp: .STD_checkout_stamp
 	cd STD_checkout && make && ./tryfile STD.pm6
 	touch .STD_build_stamp
+
+.PHONY: t/spec
+t/spec:
+	if [ ! -d t/spec ]; then \
+	    svn checkout http://svn.pugscode.org/pugs/t/spec t/spec; \
+	else \
+	    svn update t/spec; \
+	fi
+
+t/*.t t/*/*.t t/*/*/*.t: all Test.dll t/spec
+	prove --exec t/fudgeandrun --verbosity=1 $@
+spectest: testable t/spectest.data
+	prove --exec t/fudgeandrun - < t/spectest.data

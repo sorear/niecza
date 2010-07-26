@@ -21,3 +21,4 @@ syml
 .STD_checkout_stamp
 STD_checkout
 VERSION
+t/spec

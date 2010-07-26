@@ -1,0 +1,8 @@
+#! /usr/bin/env perl
+use strict;
+use warnings;
+
+my @OPTS = ('--keep-exit-code', 'niecza');
+
+my $nt = `t/spec/fudge @OPTS $ARGV[0]`
+system("./niecza_eval", $nt);
