@@ -13,9 +13,7 @@ use CgOp;
     sub used_slots   { () }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
-    sub write        {}
 
-    sub extra_decls  {}
     sub outer_decls  {}
     sub bodies       {}
 
@@ -32,7 +30,6 @@ use CgOp;
     has code   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub extra_decls { $_[0]->code->lift_decls }
     sub bodies { $_[0]->code }
 
     sub used_slots {
@@ -42,7 +39,6 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        $self->code->outer($body);
         my $c = CgOp::subcall(CgOp::protosub($self->code));
         $self->has_var ? CgOp::proto_var($self->var, $c) : CgOp::sink($c);
     }
@@ -52,12 +48,6 @@ use CgOp;
         !$self->has_var ? CgOp::noop :
             ($self->shared || $body->mainline) ? CgOp::share_lex($self->var) :
             CgOp::copy_lex($self->var);
-    }
-
-    sub write {
-        my ($self, $body) = @_;
-        $self->code->outer($body);
-        $self->code->write;
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -72,7 +62,6 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
-    sub extra_decls { $_[0]->code->lift_decls }
     sub bodies { $_[0]->code }
 
     sub used_slots {
@@ -81,7 +70,6 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        $self->code->outer($body);
 
         CgOp::proto_var($self->var, CgOp::newscalar(
                 CgOp::protosub($self->code)));
@@ -92,12 +80,6 @@ use CgOp;
         $body->mainline ?
             CgOp::share_lex($self->var) :
             CgOp::clone_lex($self->var);
-    }
-
-    sub write {
-        my ($self, $body) = @_;
-        $self->code->outer($body);
-        $self->code->write;
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -140,10 +122,6 @@ use CgOp;
             CgOp::copy_lex($self->slot, $self->list);
     }
 
-    sub write {
-        my ($self, $body) = @_;
-    }
-
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -169,10 +147,6 @@ use CgOp;
     }
 
     sub enter_code { }
-
-    sub write {
-        my ($self, $body) = @_;
-    }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -201,10 +175,6 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::share_lex($self->slot);
-    }
-
-    sub write {
-        my ($self, $body) = @_;
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -280,7 +250,6 @@ use CgOp;
     has stub    => (is => 'ro', isa => 'Bool', default => 0);
     has name    => (is => 'ro', isa => 'Str', predicate => 'has_name');
 
-    sub extra_decls { $_[0]->body ? ($_[0]->body->lift_decls) : () }
     sub bodies { $_[0]->body ? $_[0]->body : () }
     sub stashvar { $_[0]->var . '::' }
 
@@ -302,8 +271,6 @@ use CgOp;
                 CgOp::proto_var($self->stashvar,
                     CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))));
         }
-
-        $self->body->outer($body);
 
         CgOp::letn("pkg",
             CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')),
@@ -327,13 +294,6 @@ use CgOp;
                 ($body->mainline ?
                     CgOp::share_lex($self->bodyvar) :
                     CgOp::clone_lex($self->bodyvar))));
-    }
-
-    sub write   {
-        my ($self, $body) = @_;
-        return unless $self->body;
-        $self->body->outer($body);
-        $self->body->write;
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -11,7 +11,6 @@ use CgOp ();
     has name      => (isa => 'Str', is => 'rw', default => "anon");
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has do        => (isa => 'Op', is => 'rw');
-    has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
     has scopetree => (is => 'rw');
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
@@ -53,7 +52,7 @@ use CgOp ();
         unshift @{ $self->transparent ? \@y : \@x },
             $self->do->lift_decls;
         unshift @x, $self->signature->local_decls if $self->signature;
-        @x = map { $_->extra_decls, $_ } @x;
+        @x = map { (map { $_->lift_decls } $_->bodies), $_ } @x;
         @x = map { $_->outer_decls, $_ } @x if $self->type eq 'mainline';
         unshift @x, Decl::PackageLink->new(name => '$?GLOBAL')
             if $self->type eq 'mainline';
@@ -81,7 +80,7 @@ use CgOp ();
         my ($self) = @_;
         CodeGen->new(lex2types => $self->lexical, csname => $self->csname,
             body => $self, ops => $self->cgoptree)->write;
-        $_->write($self) for (@{ $self->decls });
+        $_->write for (map { $_->bodies } @{ $self->decls });
     }
 
     sub lex_level {
