@@ -17,6 +17,7 @@ use CgOp;
 
     sub extra_decls  {}
     sub outer_decls  {}
+    sub bodies       {}
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -32,6 +33,7 @@ use CgOp;
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
     sub extra_decls { $_[0]->code->lift_decls }
+    sub bodies { $_[0]->code }
 
     sub used_slots {
         my ($self) = @_;
@@ -71,6 +73,7 @@ use CgOp;
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
     sub extra_decls { $_[0]->code->lift_decls }
+    sub bodies { $_[0]->code }
 
     sub used_slots {
         $_[0]->var, 'Variable';
@@ -255,7 +258,7 @@ use CgOp;
         my ($self, $body) = @_;
 
         # XXX ought not to have side effects here.
-        $::SETTING_RESUME = $body->gen_setting;
+        $::SETTING_RESUME = $body->scopetree;
         my $n = $self->unitname;
         $n =~ s/::/./g;
 
@@ -278,6 +281,7 @@ use CgOp;
     has name    => (is => 'ro', isa => 'Str', predicate => 'has_name');
 
     sub extra_decls { $_[0]->body ? ($_[0]->body->lift_decls) : () }
+    sub bodies { $_[0]->body ? $_[0]->body : () }
     sub stashvar { $_[0]->var . '::' }
 
     sub used_slots {

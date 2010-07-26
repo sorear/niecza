@@ -26,9 +26,12 @@ use 5.010;
         $_[0]->mainboot($_[0]->mainline->to_cgop);
     }
 
+    sub extract_scopes {
+        $_[0]->mainline->extract_scopes($_[0]->setting);
+    }
+
     sub gen_code {
         my ($self) = @_;
-        $self->mainline->setting($self->setting) if $self->setting;
         CodeGen->know_module($self->csname($self->setting_name));
         CodeGen->know_module($self->csname);
         CodeGen->new(csname => 'BOOT',

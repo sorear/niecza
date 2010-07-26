@@ -12,7 +12,7 @@ use CgOp ();
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has do        => (isa => 'Op', is => 'rw');
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
-    has setting   => (is => 'rw');
+    has scopetree => (is => 'rw');
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
             builder => 'is_mainline');
@@ -26,22 +26,25 @@ use CgOp ();
     has decls => (isa => 'ArrayRef[Decl]', is => 'rw');
     has cgoptree => (isa => 'CgOp', is => 'rw');
 
-    sub is_mainline {
-        my $self = shift;
+    sub is_mainline { $_[0]->scopetree->{'?is_mainline'} }
 
-        if ($self->type && $self->type eq 'mainline') {
-            return 1;
-        }
+    sub extract_scopes {
+        my ($self, $outer) = @_;
 
-        if (!($self->type) || !($self->outer)) {
-            die "Critical phase error";
-        }
+        $self->lexical(+{ map { $_->used_slots } @{ $self->decls } });
+        my %h = %{ $self->lexical };
 
-        if ($self->type =~ /^(?:bare|package|module|class|grammar|role|slang|knowhow)$/) {
-            return $self->outer->mainline;
+        if ($self->type eq 'mainline') {
+            $h{'?is_mainline'} = 1;
+        } elsif ($self->type =~ /^(?:bare|package|module|class|grammar|role|slang|knowhow)$/) {
+            $h{'?is_mainline'} = $outer->{'?is_mainline'};
         } else {
-            return 0;
+            $h{'?is_mainline'} = 0;
         }
+
+        $h{'OUTER::'} = $outer;
+        $_->extract_scopes(\%h) for (map { $_->bodies } @{ $self->decls });
+        $self->scopetree(\%h);
     }
 
     sub lift_decls {
@@ -59,7 +62,6 @@ use CgOp ();
         push @y, map { $_->outer_decls } @x
             if $self->type ne 'mainline';
         $self->decls(\@x);
-        $self->lexical(+{ map { $_->used_slots } @{ $self->decls } });
 
         @y;
     }
@@ -85,28 +87,14 @@ use CgOp ();
     sub lex_level {
         my ($self, $var) = @_;
 
-        if ($self->lexical->{$var}) {
-            return 0;
-        } elsif ($self->outer) {
-            return 1 + $self->outer->lex_level($var);
-        } else {
-            my $i = 1;
-            my $st = $self->setting;
-            while ($st) {
-                return $i if ($st->{$var});
-                $i++;
-                $st = $st->{'OUTER::'};
-            }
-            return -1e99999;
+        my $i = 0;
+        my $st = $self->scopetree;
+        while ($st) {
+            return $i if ($st->{$var});
+            $i++;
+            $st = $st->{'OUTER::'};
         }
-    }
-
-    sub gen_setting {
-        my ($self) = @_;
-        my %h = %{ $self->lexical };
-        $h{'OUTER::'} = $self->outer ? $self->outer->gen_setting :
-            $self->setting;
-        \%h;
+        return -1;
     }
 
     sub csname {
