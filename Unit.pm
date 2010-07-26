@@ -11,9 +11,8 @@ use 5.010;
     package Unit;
     use Moose;
     has mainline => (isa => 'Body', is => 'ro', required => 1);
+    has mainboot => (isa => 'CgOp', is => 'rw');
     has name     => (isa => 'Str', is => 'ro', required => 1);
-    has code     => (isa => 'CodeGen', is => 'ro', init_arg => undef, lazy => 1,
-        builder => 'gen_code');
     has setting  => (is => 'ro');
 
     has is_setting => (isa => 'Bool', is => 'ro');
@@ -23,12 +22,16 @@ use 5.010;
         $_[0]->mainline->lift_decls;
     }
 
+    sub to_cgop {
+        $_[0]->mainboot($_[0]->mainline->to_cgop);
+    }
+
     sub gen_code {
         my ($self) = @_;
         $self->mainline->setting($self->setting) if $self->setting;
         CodeGen->know_module($self->csname($self->setting_name));
         CodeGen->know_module($self->csname);
-        CodeGen->new(name => 'BOOT', entry => 1,
+        CodeGen->new(csname => 'BOOT',
             ops => CgOp::letn('pkg', CgOp::rawsget('Kernel.Global'),
                 CgOp::rawscall($self->csname($self->setting_name) . '.Initialize'),
                 CgOp::letn('protopad',
@@ -55,7 +58,7 @@ use 5.010;
         print ::NIECZA_OUT <<EOH;
 public class @{[ $self->csname ]} {
 EOH
-        $self->code->write;
+        $self->gen_code->write;
         $self->mainline->write;
         if ($self->is_setting) {
             print ::NIECZA_OUT <<EOSB ;

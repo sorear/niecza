@@ -56,6 +56,7 @@ sub compile {
     $::SETTING_RESUME = undef;
 
     $ast->lift_decls;
+    $ast->to_cgop;
 
     my $basename = $::UNITNAME;
     $basename =~ s/::/\//g;

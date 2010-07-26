@@ -523,12 +523,13 @@ use warnings;
             zyg => \@args);
     }
 
+    # must only be called during to_cgop phase!
     sub protosub {
         my ($body, @extra) = @_;
         prog(
             CgOp::Primitive->new(op => [ 'open_protopad', $body ]),
-            $body->preinit_code,
-            CgOp::Primitive->new(op => [ 'close_sub', $body->code ]));
+            $body->to_cgop,
+            CgOp::Primitive->new(op => [ 'close_sub', $body ]));
     }
 
     sub letn {

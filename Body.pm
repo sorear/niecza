@@ -9,14 +9,13 @@ use CgOp ();
     use Moose;
 
     has name      => (isa => 'Str', is => 'rw', default => "anon");
+    has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has do        => (isa => 'Op', is => 'rw');
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
     has setting   => (is => 'rw');
-    has code      => (isa => 'CodeGen', is => 'ro', init_arg => undef,
-        lazy => 1, builder => 'gen_code');
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
-        builder => 'is_mainline');
+            builder => 'is_mainline');
     # currently used types are phaser, loop, cond, class, mainline, bare, sub
     # also '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
@@ -25,6 +24,7 @@ use CgOp ();
     # my $x inside, floats out; mostly for blasts; set by context so must be rw
     has transparent => (isa => 'Bool', is => 'rw', default => 0);
     has decls => (isa => 'ArrayRef[Decl]', is => 'rw');
+    has cgoptree => (isa => 'CgOp', is => 'rw');
 
     sub is_mainline {
         my $self = shift;
@@ -56,7 +56,6 @@ use CgOp ();
             if $self->type eq 'mainline';
         unshift @x, Decl::PackageLink->new(name => '$?CURPKG')
             if $self->type =~ /mainline|class|package|grammar|module|role|slang|knowhow/;
-        #print STDERR YAML::XS::Dump(\@x);
         push @y, map { $_->outer_decls } @x
             if $self->type ne 'mainline';
         $self->decls(\@x);
@@ -65,32 +64,22 @@ use CgOp ();
         @y;
     }
 
-    sub gen_code {
+    sub to_cgop {
         my ($self) = @_;
+        my @enter;
+        push @enter, map { $_->enter_code($self) } @{ $self->decls };
+        push @enter, $self->signature->binder if $self->signature;
         # TODO: Bind a return value here to catch non-ro sub use
-        CodeGen->new(name => $self->name, body => $self,
-            lex2type => +{ %{ $self->lexical } },
-            ops => CgOp::prog($self->enter_code,
+        $self->cgoptree(CgOp::prog(@enter,
                 CgOp::return($self->do->code($self))));
-    }
-
-    sub enter_code {
-        my ($self) = @_;
-        my @p;
-        push @p, map { $_->enter_code($self) } @{ $self->decls };
-        push @p, $self->signature->binder if $self->signature;
-        CgOp::prog(@p);
+        map { $_->preinit_code($self) } @{ $self->decls };
     }
 
     sub write {
         my ($self) = @_;
-        $self->code->write;
+        CodeGen->new(lex2types => $self->lexical, csname => $self->csname,
+            body => $self, ops => $self->cgoptree)->write;
         $_->write($self) for (@{ $self->decls });
-    }
-
-    sub preinit_code {
-        my ($self) = @_;
-        CgOp::prog(map { $_->preinit_code($self) } @{ $self->decls });
     }
 
     sub lex_level {
@@ -118,6 +107,13 @@ use CgOp ();
         $h{'OUTER::'} = $self->outer ? $self->outer->gen_setting :
             $self->setting;
         \%h;
+    }
+
+    sub csname {
+        my ($self) = @_;
+        my @name = split /\W+/, $self->name;
+        shift @name if @name && $name[0] eq '';
+        join("", (map { ucfirst $_ } @name), "_", $self->uid, "C");
     }
 
     # In order to support proper COMMON semantics on package variables

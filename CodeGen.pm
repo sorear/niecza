@@ -105,8 +105,7 @@ use 5.010;
         }
     }
 
-    has name      => (isa => 'Str', is => 'ro');
-    has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
+    has csname    => (isa => 'Str', is => 'ro');
     has entry     => (isa => 'Bool', is => 'ro', default => 0);
     has depth     => (isa => 'Int', is => 'rw', default => 0);
     has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
@@ -499,13 +498,13 @@ use 5.010;
     }
 
     sub close_sub {
-        my ($self, $bodycg) = @_;
+        my ($self, $body) = @_;
         $self->pop_let('protopad');
         pop @{ $self->bodies };
         $self->peek_let('protopad');
         my ($pp, $op) = $self->_popn(2);
         $self->_push('IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
-            $bodycg->csname . "), $pp, $op)");
+            $body->csname . "), $pp, $op)");
     }
 
     sub proto_var {
@@ -545,14 +544,6 @@ use 5.010;
     }
 
     ###
-
-    sub csname {
-        my ($self) = @_;
-        return $self->name if $self->entry;
-        my @name = split /\W+/, $self->name;
-        shift @name if @name && $name[0] eq '';
-        join("", (map { ucfirst $_ } @name), "_", $self->uid, "C");
-    }
 
     sub write {
         my ($self) = @_;
