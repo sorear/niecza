@@ -612,14 +612,24 @@ blocked:
                     new LValue(true, true, container));
         }
 
-        public static Frame SlurpyHelper(Frame th, int from) {
+        public static List<Variable> SlurpyHelper(Frame th, int from) {
             List<Variable> lv = new List<Variable>();
             for (int i = from; i < th.pos.Length; i++) {
                 lv.Add(new Variable(false, Variable.Context.Scalar,
                             th.pos[i]));
             }
-            th.resultSlot = lv;
-            return th;
+            return lv;
+        }
+
+        public static Variable ContextHelper(Frame th, string name) {
+            object rt;
+            while (th != null) {
+                if (th.lex.TryGetValue(name, out rt)) {
+                    return (Variable)rt;
+                }
+                th = th.caller;
+            }
+            return PackageLookup(GlobalO, name.Remove(1,1));
         }
 
         public static Variable DefaultNew(IP6 proto) {
@@ -638,25 +648,23 @@ blocked:
         public static IP6 AnyP;
         public static IP6 StrP = new DynObject(null);
 
-        public static Frame PackageLookup(Frame th, IP6 parent,
-                string name) {
+        public static Variable PackageLookup(IP6 parent, string name) {
             Dictionary<string,Variable> stash = (Dictionary<string,Variable>)
                 (((CLRImportObject)parent).val);
             Variable v;
 
             if (stash.TryGetValue(name, out v)) {
-                th.resultSlot = v;
+                return v;
             } else if (name.EndsWith("::")) {
                 Dictionary<string,Variable> newstash =
                     new Dictionary<string,Variable>();
                 newstash["PARENT::"] = NewROScalar(parent);
-                th.resultSlot = stash[name] =
-                    NewROScalar(new CLRImportObject(newstash));
+                return (stash[name] = NewROScalar(
+                            new CLRImportObject(newstash)));
             } else {
                 // TODO: @foo, %foo
-                th.resultSlot = stash[name] = NewRWScalar(AnyP);
+                return (stash[name] = NewRWScalar(AnyP));
             }
-            return th;
         }
 
         public static void RunLoop(DynBlockDelegate boot) {
@@ -670,6 +678,7 @@ blocked:
 
         // XXX should be per-unit
         public static Variable Global;
+        public static IP6 GlobalO;
 
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
@@ -685,8 +694,8 @@ blocked:
 
             DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
 
-            Global = NewROScalar(new CLRImportObject(
-                        new Dictionary<string,Variable>()));
+            GlobalO = new CLRImportObject(new Dictionary<string,Variable>());
+            Global = NewROScalar(GlobalO);
         }
     }
 }

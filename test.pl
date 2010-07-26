@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 108;
+plan 115;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -321,6 +321,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 
         method test() {
             ok self.a == 33, "values accessible as self.a";
+            ok $.a == 33, 'values accessible as $.a';
             $!b = 44;
             ok $!b == 44, 'private values accessible as $!b';
             ok $!a == 33, 'public values so accessible too';
@@ -340,4 +341,22 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     $y.test;
     $y.c = 55;
     ok $y.c == 55, "subclass attributes work";
+}
+
+{
+    sub foo($v) {
+        ok $*FOO == $v, "contextuals accessible";
+    }
+
+    my $*FOO = 99;
+    foo(99);
+    ok !$*BAR.defined, "contextuals undefined are undef";
+
+    $GLOBAL::quux = 111;
+    ok $*quux == 111, "contextuals default to GLOBAL";
+    {
+        my $*quux = 222;
+        ok $*quux == 222, "but can be overriden";
+    }
+    ok $*quux == 111, "but only in the one scope";
 }

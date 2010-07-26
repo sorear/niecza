@@ -719,7 +719,8 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawscall('Kernel.ContextHelper', CgOp::clr_string($self->name));
+        CgOp::rawscall('Kernel.ContextHelper', CgOp::callframe,
+            CgOp::clr_string($self->name));
     }
 
     __PACKAGE__->meta->make_immutable;

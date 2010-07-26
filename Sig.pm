@@ -57,8 +57,8 @@ use 5.010;
                             CgOp::box('LLArray', CgOp::rawnew('List<Variable>'))),
                         CgOp::setindex('rest', CgOp::getfield('slots', $do),
                             CgOp::box('LLArray',
-                                CgOp::rawsccall('Kernel.SlurpyHelper',
-                                    CgOp::int($$ixp)))),
+                                CgOp::rawscall('Kernel.SlurpyHelper',
+                                    CgOp::callframe, CgOp::int($$ixp)))),
                         CgOp::newscalar($do))}));
         } else {
             $self->target->binder(CgOp::pos($$ixp++));
