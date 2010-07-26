@@ -11,7 +11,7 @@ use 5.010;
     package Unit;
     use Moose;
     has mainline => (isa => 'Body', is => 'ro', required => 1);
-    has mainboot => (isa => 'CgOp', is => 'rw');
+    has bootcgop => (isa => 'CgOp', is => 'rw');
     has name     => (isa => 'Str', is => 'ro', required => 1);
     has setting  => (is => 'ro');
 
@@ -23,19 +23,9 @@ use 5.010;
     }
 
     sub to_cgop {
-        $_[0]->mainboot($_[0]->mainline->to_cgop);
-    }
-
-    sub extract_scopes {
-        $_[0]->mainline->extract_scopes($_[0]->setting);
-    }
-
-    sub gen_code {
-        my ($self) = @_;
-        CodeGen->know_module($self->csname($self->setting_name));
-        CodeGen->know_module($self->csname);
-        CodeGen->new(csname => 'BOOT',
-            ops => CgOp::letn('pkg', CgOp::rawsget('Kernel.Global'),
+        my $self = shift;
+        $self->mainline->to_cgop;
+        $self->bootcgop(CgOp::letn('pkg', CgOp::rawsget('Kernel.Global'),
                 CgOp::rawscall($self->csname($self->setting_name) . '.Initialize'),
                 CgOp::letn('protopad',
                     CgOp::cast('Frame', CgOp::rawsget($self->csname($self->setting_name) .
@@ -48,6 +38,15 @@ use 5.010;
                     CgOp::return())));
     }
 
+    sub to_anf {
+        $_[0]->mainline->to_anf;
+        $_[0]->bootcgop($_[0]->bootcgop->cps_convert(0));
+    }
+
+    sub extract_scopes {
+        $_[0]->mainline->extract_scopes($_[0]->setting);
+    }
+
     sub csname {
         my $x = $_[1] // $_[0]->name;
         $x =~ s/::/./g;
@@ -57,11 +56,13 @@ use 5.010;
 
     sub write {
         my ($self) = @_;
-        #say STDERR (YAML::XS::Dump($self));
+        CodeGen->know_module($self->csname($self->setting_name));
+        CodeGen->know_module($self->csname);
+
         print ::NIECZA_OUT <<EOH;
 public class @{[ $self->csname ]} {
 EOH
-        $self->gen_code->write;
+        CodeGen->new(csname => 'BOOT', ops => $self->bootcgop)->write;
         $self->mainline->write;
         if ($self->is_setting) {
             print ::NIECZA_OUT <<EOSB ;

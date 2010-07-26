@@ -563,10 +563,7 @@ use 5.010;
 
     sub BUILD {
         my $self = shift;
-        #say STDERR YAML::XS::Dump($self->ops);
-        my $cps = $self->ops->cps_convert;
-        #say STDERR YAML::XS::Dump($cps);
-        $cps->var_cg($self);
+        $self->ops->var_cg($self);
     }
 
     __PACKAGE__->meta->make_immutable;

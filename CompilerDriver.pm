@@ -58,6 +58,7 @@ sub compile {
     $ast->lift_decls;
     $ast->extract_scopes;
     $ast->to_cgop;
+    $ast->to_anf;
 
     my $basename = $::UNITNAME;
     $basename =~ s/::/\//g;

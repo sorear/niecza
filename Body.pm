@@ -76,6 +76,12 @@ use CgOp ();
         map { $_->preinit_code($self) } @{ $self->decls };
     }
 
+    sub to_anf {
+        my ($self) = @_;
+        $self->cgoptree($self->cgoptree->cps_convert(1));
+        $_->to_anf for (map { $_->bodies } @{ $self->decls });
+    }
+
     sub write {
         my ($self) = @_;
         CodeGen->new(lex2types => $self->lexical, csname => $self->csname,
