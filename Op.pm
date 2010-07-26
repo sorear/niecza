@@ -711,6 +711,22 @@ use CgOp;
 }
 
 {
+    package Op::ContextVar;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rawscall('Kernel.ContextHelper', CgOp::clr_string($self->name));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::PackageVar;
     use Moose;
     extends 'Op';

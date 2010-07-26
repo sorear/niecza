@@ -705,6 +705,12 @@ sub term__S_lambda { my ($cl, $M) = @_;
 sub do_variable_reference { my ($cl, $M, $v) = @_;
     my $sl = $v->{sigil} . $v->{twigil} . $v->{name};
 
+    if (@{ $v->{rest} } && $v->{twigil} =~ /[*=~?^:]/) {
+        $M->sorry("Twigil " . $v->{twigil} . " cannot be used with " .
+            "qualified names");
+        return;
+    }
+
     given ($v->{twigil}) {
         when ('!') {
             if (@{ $v->{rest} }) {
@@ -714,6 +720,22 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
 
             return Op::GetSlot->new(name => $v->{name},
                 object => Op::Lexical->new(name => 'self'));
+        }
+        when ('.') {
+            if (@{ $v->{rest} }) {
+                $M->sorry('$.Foo::bar syntax NYI');
+                return;
+            }
+
+            return Op::CallMethod->new(name => $v->{name},
+                receiver => Op::Lexical->new(name => 'self'));
+        }
+        # These are just ordinary lexicals at run time
+        when ({ '^' => 1, ":" => 1, "?" => 1}) {
+            return Op::Lexical->new(name => $sl);
+        }
+        when ('*') {
+            return Op::ContextVar->new(name => $sl);
         }
         when ('') {
             if (@{ $v->{rest} }) {
