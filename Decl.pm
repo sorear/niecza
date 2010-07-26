@@ -361,7 +361,7 @@ use CgOp;
     sub finish_obj {
         my ($self) = @_;
         my @r;
-        if (!grep { $_->isa('Decl::Super') } @{ $self->body->_alldecls }) {
+        if (!grep { $_->isa('Decl::Super') } @{ $self->body->decls }) {
             push @r, CgOp::sink(CgOp::methodcall(CgOp::letvar("how"),
                     "add-super", CgOp::scopedlex($self->defsuper)));
         }

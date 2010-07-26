@@ -12,7 +12,6 @@ use CgOp ();
     has do        => (isa => 'Op', is => 'rw');
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
     has setting   => (is => 'rw');
-    has decls     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has code      => (isa => 'CodeGen', is => 'ro', init_arg => undef,
         lazy => 1, builder => 'gen_code');
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
@@ -25,6 +24,7 @@ use CgOp ();
     has lexical   => (isa => 'HashRef[Str]', is => 'rw');
     # my $x inside, floats out; mostly for blasts; set by context so must be rw
     has transparent => (isa => 'Bool', is => 'rw', default => 0);
+    has decls => (isa => 'ArrayRef[Decl]', is => 'rw');
 
     sub is_mainline {
         my $self = shift;
@@ -44,12 +44,9 @@ use CgOp ();
         }
     }
 
-    has _alldecls => (isa => 'ArrayRef[Decl]', is => 'rw');
-
     sub lift_decls {
         my ($self) = @_;
-        my @x = @{ $self->decls };
-        my @y;
+        my (@x, @y);
         unshift @{ $self->transparent ? \@y : \@x },
             $self->do->lift_decls;
         unshift @x, $self->signature->local_decls if $self->signature;
@@ -62,8 +59,8 @@ use CgOp ();
         #print STDERR YAML::XS::Dump(\@x);
         push @y, map { $_->outer_decls } @x
             if $self->type ne 'mainline';
-        $self->_alldecls(\@x);
-        $self->lexical(+{ map { $_->used_slots } @{ $self->_alldecls } });
+        $self->decls(\@x);
+        $self->lexical(+{ map { $_->used_slots } @{ $self->decls } });
 
         @y;
     }
@@ -80,7 +77,7 @@ use CgOp ();
     sub enter_code {
         my ($self) = @_;
         my @p;
-        push @p, map { $_->enter_code($self) } @{ $self->_alldecls };
+        push @p, map { $_->enter_code($self) } @{ $self->decls };
         push @p, $self->signature->binder if $self->signature;
         CgOp::prog(@p);
     }
@@ -88,12 +85,12 @@ use CgOp ();
     sub write {
         my ($self) = @_;
         $self->code->write;
-        $_->write($self) for (@{ $self->_alldecls });
+        $_->write($self) for (@{ $self->decls });
     }
 
     sub preinit_code {
         my ($self) = @_;
-        CgOp::prog(map { $_->preinit_code($self) } @{ $self->_alldecls });
+        CgOp::prog(map { $_->preinit_code($self) } @{ $self->decls });
     }
 
     sub lex_level {
