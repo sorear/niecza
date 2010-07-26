@@ -10,8 +10,6 @@ use CgOp ();
 
     has name      => (isa => 'Str', is => 'rw', default => "anon");
     has do        => (isa => 'Op', is => 'rw');
-    has enter     => (isa => 'ArrayRef[Op]', is => 'ro',
-        default => sub { [] });
     has outer     => (isa => 'Body', is => 'rw', init_arg => undef);
     has setting   => (is => 'rw');
     has decls     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
@@ -24,15 +22,9 @@ use CgOp ();
     # also '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
 
-    has lexical   => (isa => 'HashRef[Str]', is => 'ro', lazy_build => 1);
+    has lexical   => (isa => 'HashRef[Str]', is => 'rw');
     # my $x inside, floats out; mostly for blasts; set by context so must be rw
     has transparent => (isa => 'Bool', is => 'rw', default => 0);
-
-    sub _build_lexical {
-        my ($self) = @_;
-
-        +{ map { $_->used_slots } @{ $self->_alldecls } };
-    }
 
     sub is_mainline {
         my $self = shift;
@@ -52,20 +44,14 @@ use CgOp ();
         }
     }
 
-    sub floated_decls {
-        my ($self) = @_;
-        my @r;
-        push @r, $self->do->local_decls if $self->transparent;
-        push @r, map { $_->outer_decls } @{ $self->_alldecls }
-            if $self->type ne 'mainline';
-        @r;
-    }
+    has _alldecls => (isa => 'ArrayRef[Decl]', is => 'rw');
 
-    has _alldecls => (isa => 'ArrayRef[Decl]', is => 'ro', lazy_build => 1);
-    sub _build__alldecls {
+    sub lift_decls {
         my ($self) = @_;
         my @x = @{ $self->decls };
-        unshift @x, $self->do->local_decls if !$self->transparent;
+        my @y;
+        unshift @{ $self->transparent ? \@y : \@x },
+            $self->do->lift_decls;
         unshift @x, $self->signature->local_decls if $self->signature;
         @x = map { $_->extra_decls, $_ } @x;
         @x = map { $_->outer_decls, $_ } @x if $self->type eq 'mainline';
@@ -73,7 +59,13 @@ use CgOp ();
             if $self->type eq 'mainline';
         unshift @x, Decl::PackageLink->new(name => '$?CURPKG')
             if $self->type =~ /mainline|class|package|grammar|module|role|slang|knowhow/;
-        \@x;
+        #print STDERR YAML::XS::Dump(\@x);
+        push @y, map { $_->outer_decls } @x
+            if $self->type ne 'mainline';
+        $self->_alldecls(\@x);
+        $self->lexical(+{ map { $_->used_slots } @{ $self->_alldecls } });
+
+        @y;
     }
 
     sub gen_code {
@@ -90,7 +82,6 @@ use CgOp ();
         my @p;
         push @p, map { $_->enter_code($self) } @{ $self->_alldecls };
         push @p, $self->signature->binder if $self->signature;
-        push @p, map { CgOp::sink($_->code($self)) } @{ $self->enter };
         CgOp::prog(@p);
     }
 

@@ -31,7 +31,7 @@ use CgOp;
     has code   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub extra_decls { $_[0]->code->floated_decls }
+    sub extra_decls { $_[0]->code->lift_decls }
 
     sub used_slots {
         my ($self) = @_;
@@ -70,7 +70,7 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
-    sub extra_decls { $_[0]->code->floated_decls }
+    sub extra_decls { $_[0]->code->lift_decls }
 
     sub used_slots {
         $_[0]->var, 'Variable';
@@ -277,7 +277,7 @@ use CgOp;
     has stub    => (is => 'ro', isa => 'Bool', default => 0);
     has name    => (is => 'ro', isa => 'Str', predicate => 'has_name');
 
-    sub extra_decls { $_[0]->body ? ($_[0]->body->floated_decls) : () }
+    sub extra_decls { $_[0]->body ? ($_[0]->body->lift_decls) : () }
     sub stashvar { $_[0]->var . '::' }
 
     sub used_slots {
@@ -361,7 +361,7 @@ use CgOp;
     sub finish_obj {
         my ($self) = @_;
         my @r;
-        if (!grep { $_->isa('Decl::Super') } $self->body->do->local_decls) {
+        if (!grep { $_->isa('Decl::Super') } @{ $self->body->_alldecls }) {
             push @r, CgOp::sink(CgOp::methodcall(CgOp::letvar("how"),
                     "add-super", CgOp::scopedlex($self->defsuper)));
         }

@@ -19,6 +19,10 @@ use 5.010;
     has is_setting => (isa => 'Bool', is => 'ro');
     has setting_name => (isa => 'Str', is => 'ro');
 
+    sub lift_decls {
+        $_[0]->mainline->lift_decls;
+    }
+
     sub gen_code {
         my ($self) = @_;
         $self->mainline->setting($self->setting) if $self->setting;

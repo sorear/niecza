@@ -10,9 +10,9 @@ use CgOp;
 
     sub zyg { }
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = shift;
-        map { $_->local_decls } $self->zyg;
+        map { $_->lift_decls } $self->zyg;
     }
 
     sub splittable_parcel {
@@ -86,10 +86,13 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has unitname  => (isa => 'Str', is => 'ro', required => 1);
+    has unitname  => (isa => 'Str', is => 'ro', clearer => 'drop_unitname');
     has save_only => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub local_decls { Decl::SaveEnv->new(unitname => $_[0]->unitname) }
+    sub lift_decls {
+        my $un = $_[0]->unitname; $_[0]->drop_unitname;
+        Decl::SaveEnv->new(unitname => $un)
+    }
 
     sub code {
         my ($self, $body) = @_;
@@ -395,10 +398,10 @@ use CgOp;
     has body => (isa => 'Op', is => 'ro', required => 1);
     sub zyg { $_[0]->body }
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         Decl::StateVar->new(backing => $self->condvar),
-            $self->SUPER::local_decls(@_);
+            $self->SUPER::lift_decls(@_);
     }
 
     sub code {
@@ -471,7 +474,7 @@ use CgOp;
     has exports => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
 
     sub decl_class { 'Decl::Package' }
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         my @r = $self->decl_class->new(stub => $self->stub, var => $self->var,
             ($self->has_name ? (name => $self->name) : ()),
@@ -546,7 +549,7 @@ use CgOp;
     has body   => (isa => 'Body', is => 'ro', required => 1);
     has shared => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         Decl::PreInit->new(var => $self->var, code => $self->body,
             shared => $self->shared);
@@ -568,7 +571,7 @@ use CgOp;
 
     has name    => (isa => 'Str', is => 'ro');
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         Decl::Super->new(name => $self->name);
     }
@@ -590,7 +593,7 @@ use CgOp;
     has name => (isa => 'Str', is => 'ro');
     has accessor => (isa => 'Bool', is => 'ro');
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         my @r;
         push @r, Decl::Attribute->new(name => $self->name);
@@ -626,7 +629,7 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has body   => (isa => 'Body', is => 'ro', required => 1);
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         Decl::Sub->new(var => $self->var, code => $self->body);
     }
@@ -654,7 +657,7 @@ use CgOp;
     has method_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         my @r;
         push @r, Decl::Sub->new(var => $self->var, code => $self->body);
@@ -688,7 +691,7 @@ use CgOp;
 
     has state_backing => (isa => 'Str', is => 'ro');
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         return () unless $self->declaring;
 
@@ -736,7 +739,7 @@ use CgOp;
     has slot => (isa => 'Str', is => 'ro', required => 1);
     has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         # TODO Skip this part if the thing-being-bound references MY,
         # CALLER, OUTER, etc
@@ -761,7 +764,7 @@ use CgOp;
     has unit => (isa => 'Str', is => 'ro', required => 1);
     has symbols => (isa => 'HashRef[ArrayRef[Str]]', is => 'ro', required => 1);
 
-    sub local_decls {
+    sub lift_decls {
         my ($self) = @_;
         Decl::Use->new(unit => $self->unit, symbols => $self->symbols);
     }
