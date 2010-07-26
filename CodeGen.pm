@@ -50,6 +50,7 @@ use 5.010;
 
         'Kernel.ContextHelper' => [m => 'Variable'],
         'Kernel.StrP'          => [f => 'IP6'],
+        'Kernel.Process'       => [f => 'Variable'],
         'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [m => 'Variable'],
         'Kernel.SlurpyHelper'  => [m => 'List<Variable>'],

@@ -629,7 +629,16 @@ blocked:
                 }
                 th = th.caller;
             }
-            return PackageLookup(GlobalO, name.Remove(1,1));
+            name = name.Remove(1,1);
+            Dictionary<string,Variable> gstash = (Dictionary<string,Variable>)
+                (((CLRImportObject)GlobalO).val);
+            Variable v;
+
+            if (gstash.TryGetValue(name, out v)) {
+                return v;
+            } else {
+                return PackageLookup(ProcessO, name);
+            }
         }
 
         public static Variable DefaultNew(IP6 proto) {
@@ -679,6 +688,8 @@ blocked:
         // XXX should be per-unit
         public static Variable Global;
         public static IP6 GlobalO;
+        public static Variable Process;
+        public static IP6 ProcessO;
 
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
@@ -696,6 +707,8 @@ blocked:
 
             GlobalO = new CLRImportObject(new Dictionary<string,Variable>());
             Global = NewROScalar(GlobalO);
+            ProcessO = new CLRImportObject(new Dictionary<string,Variable>());
+            Process = NewROScalar(ProcessO);
         }
     }
 }

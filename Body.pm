@@ -154,7 +154,12 @@ use CgOp ();
         my ($self, @components) = @_;
 
         my $pkgcg;
-        if ($components[0] eq 'GLOBAL::') {
+        # TODO: S02 says PROCESS:: and GLOBAL:: are also accessible as lexical
+        # packages in UNIT::.
+        if ($components[0] eq 'PROCESS::') {
+            $pkgcg = CgOp::rawsget('Kernel.Process');
+            shift @components;
+        } elsif ($components[0] eq 'GLOBAL::') {
             $pkgcg = CgOp::scopedlex('$?GLOBAL');
             shift @components;
         } elsif ($components[0] eq 'OUR::') {

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 115;
+plan 117;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -352,8 +352,13 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     foo(99);
     ok !$*BAR.defined, "contextuals undefined are undef";
 
+    $PROCESS::qaax = 555;
+    ok $*qaax == 555, "contextuals default to PROCESS";
+    $GLOBAL::qeex = 5;
+    $PROCESS::qeex = 3;
+    ok $*qeex == 5, "GLOBAL takes precedence";
     $GLOBAL::quux = 111;
-    ok $*quux == 111, "contextuals default to GLOBAL";
+    ok $*quux == 111, "contextuals default to GLOBAL too";
     {
         my $*quux = 222;
         ok $*quux == 222, "but can be overriden";
