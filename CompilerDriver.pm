@@ -86,7 +86,7 @@ EOH
                 ($args{main} ? 'exe' : 'dll'); } ]);
 
     for my $p (@phases) {
-        next if $p->[1] eq 'aot' && !$args{aot};
+        next if $p->[0] eq 'aot' && !$args{aot};
         my $t1 = time if $args{stagetime};
         $p->[1]->();
         my $t2 = time if $args{stagetime};
