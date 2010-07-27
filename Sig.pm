@@ -82,6 +82,12 @@ use 5.010;
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
+    sub simple {
+        my ($class, @names) = @_;
+        Sig->new(params => map { Sig::Parameter->new(target =>
+            Sig::Target->new(slot => $_)) } @names);
+    }
+
     sub local_decls {
         my $self = shift;
         map { $_->local_decls } @{ $self->params };
