@@ -404,9 +404,15 @@ sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
 sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
 
 sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StatementList->new(children => 
-        [ map { $_ ? Op::Paren->new(inside => $_) : () }
-            @{ $M->{semilist}{_ast} } ]);
+    my @kids = grep { defined } @{ $M->{semilist}{_ast} };
+    if (@kids == 1 && $kids[0]->isa('Op::WhateverCode')) {
+        # XXX in cases like * > (2 + *), we *don't* want the parens to disable
+        # syntactic specialization, since they're required for grouping
+        $M->{_ast} = $kids[0];
+    } else {
+        $M->{_ast} = Op::StatementList->new(children => 
+            [ map { Op::Paren->new(inside => $_) } @kids ]);
+    }
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
@@ -420,17 +426,16 @@ sub infixish { my ($cl, $M) = @_;
     $M->sorry("Adverbs NYI") if $M->{colonpair};
 }
 sub INFIX { my ($cl, $M) = @_;
-    my ($l,$s,$r) = ($M->{left}{_ast}, $M->{infix}{sym}, $M->{right}{_ast});
-    if ($s eq ':=') { #XXX macro
+    my $s = '&infix:<' . $M->{infix}{sym} . '>';
+    my ($st,$l,$r) = $cl->whatever_precheck($s, $M->{left}{_ast},
+        $M->{right}{_ast});
+
+    if ($s eq '&infix:<:=>') { #XXX macro
         $M->{_ast} = Op::Bind->new(lhs => $l, rhs => $r, readonly => 0);
-        return;
-    }
-    if ($s eq '?? !!') { # XXX macro
+    } elsif ($s eq '&infix:<?? !!>') { # XXX macro
         $M->{_ast} = Op::Conditional->new(check => $l,
             true => $M->{middle}{_ast}, false => $r);
-        return;
-    }
-    if ($s eq ',') {
+    } elsif ($s eq '&infix:<,>') {
         #XXX STD bug causes , in setting to be parsed as left assoc
         my @r;
         push @r, $l->splittable_parcel ? @{ $l->positionals } : ($l);
@@ -438,32 +443,35 @@ sub INFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&infix:<,>'),
             positionals => \@r);
-        return;
-    }
+    } else {
+        $M->{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => $s),
+            positionals => [ $l, $r ]);
 
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => "&infix:<$s>"),
-        positionals => [ $l, $r ]);
-
-    if ($s eq '=' && $l->isa('Op::Lexical') && $l->state_decl) {
-        # Assignments (and assign metaops, but we don't do that yet) to has
-        # and state declarators are rewritten into an appropriate phaser
-        my $cv = $cl->gensym;
-        $M->{_ast} = Op::StatementList->new(children => [
-            Op::Start->new(condvar => $cv, body => $M->{_ast}),
-            Op::Lexical->new(name => $l->name)]);
+        if ($s eq '&infix:<=>' && $l->isa('Op::Lexical') && $l->state_decl) {
+            # Assignments (and assign metaops, but we don't do that yet) to has
+            # and state declarators are rewritten into an appropriate phaser
+            my $cv = $cl->gensym;
+            $M->{_ast} = Op::StatementList->new(children => [
+                Op::Start->new(condvar => $cv, body => $M->{_ast}),
+                Op::Lexical->new(name => $l->name)]);
+        }
     }
+    $M->{_ast} = $cl->whatever_postcheck($st, $M->{_ast});
 }
 
 sub CHAIN { my ($cl, $M) = @_;
+    my $op = '&infix:<' . $M->{chain}[1]{sym} . '>';
     if (@{ $M->{chain} } != 3) {
         $M->sorry('Chaining not yet implemented');
         return;
     }
 
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&infix:<' . $M->{chain}[1]{sym} . '>'),
-        positionals => [ $M->{chain}[0]{_ast}, $M->{chain}[2]{_ast} ]);
+    my ($st, @args) = $cl->whatever_precheck($op, $M->{chain}[0]{_ast},
+        $M->{chain}[2]{_ast});
+
+    $M->{_ast} = $cl->whatever_postcheck($st, Op::CallSub->new(
+        invocant => Op::Lexical->new(name => $op), positionals => [ @args ]));
 }
 
 my %loose2tight = (
@@ -474,7 +482,8 @@ sub LIST { my ($cl, $M) = @_;
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
     my $op  = $M->{delims}[0]{sym};
-    my @pos = grep { defined } map { $_->{_ast} } @{ $M->{list} };
+    my ($st, @pos) = $cl->whatever_precheck("&infix:<$op>",
+        grep { defined } map { $_->{_ast} } @{ $M->{list} });
 
     if ($loose2tight{$op}) {
         $M->{_ast} = Op::ShortCircuit->new(kind => $loose2tight{$op},
@@ -484,14 +493,16 @@ sub LIST { my ($cl, $M) = @_;
             invocant => Op::Lexical->new(name => "&infix:<$op>"),
             positionals => \@pos);
     }
+    $M->{_ast} = $cl->whatever_postcheck($st, $M->{_ast});
 }
 
 sub POSTFIX { my ($cl, $M) = @_;
     my $op = $M->{_ast};
+    my ($st, $arg) = $cl->whatever_precheck('', $M->{arg}{_ast});
     if ($op->{postfix}) {
         $M->{_ast} = Op::CallSub->new(
-            invocant => Op::Lexical->new(name => "&postfix:<" . $op->{postfix} . ">"),
-            positionals => [ $M->{arg}{_ast} ]);
+            invocant => Op::Lexical->new(name => '&postfix:<' . $op->{postfix} . '>'),
+            positionals => [ $arg ]);
     } elsif ($op->{name} && $op->{name} =~ /^(?:HOW|WHAT)$/) {
         if ($op->{args}) {
             $M->sorry("Interrogative operator " . $op->{name} .
@@ -499,16 +510,16 @@ sub POSTFIX { my ($cl, $M) = @_;
             return;
         }
         $M->{_ast} = Op::Interrogative->new(
-            receiver => $M->{arg}{_ast},
+            receiver => $arg,
             name => $op->{name});
     } elsif ($op->{metamethod}) {
         $M->{_ast} = Op::CallMetaMethod->new(
-            receiver => $M->{arg}{_ast},
+            receiver => $arg,
             name => $op->{metamethod},
             positionals => $op->{args} // []);
     } elsif ($op->{name}) {
         $M->{_ast} = Op::CallMethod->new(
-            receiver => $M->{arg}{_ast},
+            receiver => $arg,
             name => $op->{name},
             positionals => $op->{args} // []);
     } elsif ($op->{postcall}) {
@@ -517,17 +528,20 @@ sub POSTFIX { my ($cl, $M) = @_;
             return;
         }
         $M->{_ast} = Op::CallSub->new(
-            invocant => $M->{arg}{_ast},
+            invocant => $arg,
             positionals => ($op->{postcall}[0] // []));
     } else {
         $M->sorry("Unhandled postop type");
     }
+    $M->{_ast} = $cl->whatever_postcheck($st, $M->{_ast});
 }
 
 sub PREFIX { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&prefix:<' . $M->{sym} . '>'),
-        positionals => [ $M->{arg}{_ast} ]);
+    my $op = '&prefix:<' . $M->{sym} . '>';
+    my ($st, $arg) = $cl->whatever_precheck($op, $M->{arg}{_ast});
+    $M->{_ast} = $cl->whatever_postcheck($st, Op::CallSub->new(
+        invocant => Op::Lexical->new(name => $op),
+        positionals => [ $M->{arg}{_ast} ]));
 }
 
 # infix et al just parse the operator itself
@@ -604,6 +618,33 @@ sub coloncircumfix { my ($cl, $M) = @_;
 }
 
 sub colonpair { }
+
+my %_nowhatever = (map { $_, 1 } ('&infix:<,>', '&infix:<..>', '&infix:<...>',
+    '&infix:<=>', '&infix:<xx>'));
+sub whatever_precheck { my ($cl, $op, @args) = @_;
+    return ([], @args) if $_nowhatever{$op};
+    my @vars;
+    for (@args) {
+        Carp::confess("invalid undef here") if !$_;
+        if ($_->isa('Op::Whatever')) {
+            push @vars, $_->slot;
+            $_ = Op::Lexical->new(name => $_->slot);
+        } elsif ($_->isa('Op::WhateverCode')) {
+            push @vars, @{ $_->vars };
+            $_ = $_->ops;
+        }
+    }
+    (\@vars, @args);
+}
+
+sub whatever_postcheck { my ($cl, $st, $term) = @_;
+    if (@$st) {
+        return Op::WhateverCode->new(ops => $term, vars => $st,
+            slot => $cl->gensym);
+    } else {
+        return $term;
+    }
+}
 
 # term :: Op
 sub term { }

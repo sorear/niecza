@@ -643,14 +643,14 @@ use CgOp;
     extends 'Op';
 
     has ops  => (isa => 'Op', is => 'ro', required => 1);
-    has vars => (isa => 'ArrayRef[Slot]', is => 'ro', required => 1);
-    has slot => (isa => 'ArrayRef[Slot]', is => 'ro', required => 1);
+    has vars => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
+    has slot => (isa => 'Str', is => 'ro', required => 1);
 
     sub lift_decls {
         my ($self) = @_;
         Decl::Sub->new(var => $self->slot, code => Body->new(
                 name => "whatever-anon", type => 'sub', transparent => 1,
-                signature => Sig->simple(@{ $self->vars })));
+                do => $self->ops, signature => Sig->simple(@{ $self->vars })));
     }
 
     sub code {
