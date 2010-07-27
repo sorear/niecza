@@ -463,6 +463,8 @@ sub unfold($fn) {
 
 sub flat(*@x) { @x }
 
+my class Whatever { }
+
 my class Parcel is Cool {
     # $!ll
 
