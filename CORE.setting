@@ -220,6 +220,8 @@ my class Bool is Enum {
     method Bool() { self }
     method ACCEPTS($) { self }
 }
+constant True  = Q:CgOp { (box Bool (bool 1)) };
+constant False = Q:CgOp { (box Bool (bool 0)) };
 
 # ought to take a slurpy
 sub infix:<~>($l,$r) { Q:CgOp {
