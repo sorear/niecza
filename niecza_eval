@@ -8,9 +8,10 @@ use Getopt::Long;
 use autodie ':all';
 
 my @evaluate;
-my $ast;
 my $module;
-my $csonly;
+my $stagestats;
+my $stopafter;
+my $aot;
 my $lang = 'CORE';
 
 sub usage {
@@ -24,16 +25,17 @@ usage: niecza -e 'code'      # run a one-liner
    OR: niecza                # interactive shell
 
 general options:
-   --cs-only                 # stop after .cs generation
-   --ast                     # stop after AST generation
    --language=NAME           # select your setting
+   --stage-stats             # detailed timing info
+   --stop-after=STAGE        # stop after STAGE and dump AST
+   --aot                     # run ahead-of-time compiler
 EOM
     exit $ex;
 }
 
-GetOptions('ast' => \$ast, 'evaluate|e=s' => \@evaluate,
-        'compile|c' => \$module, 'cs-only' => \$csonly,
-        'language|L=s' => \$lang)
+GetOptions('evaluate|e=s' => \@evaluate, 'aot' => \$aot,
+        'compile|c' => \$module, 'language|L=s' => \$lang,
+        'stage-stats|v' => \$stagestats, 'stop-after=s' => \$stopafter)
     or usage(\*STDERR, 1);
 
 my $excl = 0;
@@ -44,9 +46,9 @@ if ($excl > 1 || $module && !@ARGV) {
 }
 
 sub run {
-    compile(main => !$module, csonly => $csonly, ast => $ast,
-        lang => $lang, @_);
-    system 'mono --debug=casts MAIN.exe' if !$module && !$csonly && !$ast;
+    compile(main => !$module, stopafter => $stopafter, aot => $aot,
+        stagetime => $stagestats, lang => $lang, @_);
+    system 'mono --debug=casts MAIN.exe' if !$module && !$stopafter;
 }
 
 if (@ARGV) {
