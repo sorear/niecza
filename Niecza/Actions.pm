@@ -702,6 +702,10 @@ sub term__S_lambda { my ($cl, $M) = @_;
     $M->{_ast} = $cl->block_to_closure($M->{pblock}{_ast});
 }
 
+sub term__S_Star { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Whatever->new(slot => $cl->gensym);
+}
+
 sub do_variable_reference { my ($cl, $M, $v) = @_;
     my $sl = $v->{sigil} . $v->{twigil} . $v->{name};
 
