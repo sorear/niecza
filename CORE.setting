@@ -632,4 +632,16 @@ PRE-INIT {
         anon method join($sep) { self.flat.join($sep) });
 }
 
+my class CallFrame {
+}
+
+PRE-INIT { Q:CgOp { (prog
+    [rawsset Kernel.CallFrameMO (getfield klass
+        (cast DynObject (@ (l CallFrame))))]
+    [null Variable])
+} }
+
+sub outer { Q:CgOp { (ns (getfield outer (getfield outer (callframe)))) } }
+sub callframe { Q:CgOp { (ns (getfield outer (callframe))) } }
+
 {YOU_ARE_HERE}

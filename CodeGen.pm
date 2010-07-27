@@ -46,10 +46,14 @@ use 5.010;
               Substring    => [m => 'String'] },
         'Frame' =>
             { pos          => [f => 'LValue[]'],
+              caller       => [f => 'Frame'],
+              outer        => [f => 'Frame'],
+              proto        => [f => 'Frame'],
               lex          => [f => 'Dictionary<string,object>'] },
 
         'Kernel.ContextHelper' => [m => 'Variable'],
         'Kernel.StrP'          => [f => 'IP6'],
+        'Kernel.CallFrameMO'   => [f => 'DynMetaObject'],
         'Kernel.Process'       => [f => 'Variable'],
         'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [m => 'Variable'],

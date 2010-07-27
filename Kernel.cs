@@ -115,10 +115,16 @@ namespace Niecza {
             return Kernel.Die(c, "Tried to invoke a Frame");
         }
 
-        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
-                Dictionary<string, LValue> n) {
-            return Kernel.Die(c, "Method " + nm +
-                    " not defined on Frame");
+        // FIXME A horrible hack, code duplication and doesn't support FETCH etc
+        public Frame InvokeMethod(Frame caller, string name,
+                LValue[] pos, Dictionary<string, LValue> named) {
+            IP6 m;
+            foreach (DynMetaObject k in Kernel.CallFrameMO.mro) {
+                if (k.local.TryGetValue(name, out m)) {
+                    return m.Invoke(caller, pos, named);
+                }
+            }
+            return Kernel.Die(caller, "Unable to resolve method " + name);
         }
 
         public Frame Fetch(Frame c) {
@@ -130,8 +136,8 @@ namespace Niecza {
         }
 
         public Frame HOW(Frame c) {
-            //TODO
-            return Kernel.Die(c, "No metaobject available for Frame");
+            c.resultSlot = Kernel.CallFrameMO.how;
+            return c;
         }
     }
 
@@ -656,6 +662,7 @@ blocked:
 
         public static IP6 AnyP;
         public static IP6 StrP = new DynObject(null);
+        public static DynMetaObject CallFrameMO;
 
         public static Variable PackageLookup(IP6 parent, string name) {
             Dictionary<string,Variable> stash = (Dictionary<string,Variable>)
