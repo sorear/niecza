@@ -572,8 +572,13 @@ use warnings;
     }
 
     sub letn {
-        my ($name, $value, @stuff) = @_;
-        CgOp::Let->new(name => $name, zyg => [ $value, @stuff ]);
+        my (@stuff) = @_;
+        if (blessed($stuff[0])) {
+            @stuff;
+        } else {
+            my ($name, $value) = splice @stuff, 0, 2;
+            CgOp::Let->new(name => $name, zyg => [ $value, letn(@stuff) ]);
+        }
     }
 
     sub pos {

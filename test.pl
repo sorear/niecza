@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 135;
+plan 136;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -92,6 +92,7 @@ ok !(Mu === Any), "unidentical objects are unidentical";
 
 ok 12 eq "12", "eq stringifies";
 ok ("a" ~ "b") eq "ab", "a + b = ab";
+ok ("a" ~ "b" ~ "c") eq "abc", "a + b + c = abc";
 ok (?1) eq "Bool::True", "True strings to Bool::True";
 ok (?0) eq "Bool::False", "False strings to Bool::False";
 

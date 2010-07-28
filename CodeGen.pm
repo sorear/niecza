@@ -47,6 +47,9 @@ use 5.010;
         'String' =>
             { Length       => [f => 'Int32'],
               Substring    => [m => 'String'] },
+        'System.Text.StringBuilder' =>
+            { Append       => [m => 'Void'],
+              ToString     => [m => 'String'] },
         'Frame' =>
             { pos          => [f => 'LValue[]'],
               caller       => [f => 'Frame'],

@@ -223,11 +223,17 @@ my class Bool is Enum {
 constant True  = Q:CgOp { (box Bool (bool 1)) };
 constant False = Q:CgOp { (box Bool (bool 0)) };
 
-# ought to take a slurpy
-sub infix:<~>($l,$r) { Q:CgOp {
-    (box Str (rawscall String.Concat
-        (unbox String (fetch (methodcall (scopedlex $l) Str)))
-        (unbox String (fetch (methodcall (scopedlex $r) Str)))))
+# taking a slurpy is wrong for this due to flattening.  I'm not sure what is
+# right, maybe **@foo
+sub infix:<~> { Q:CgOp {
+    (letn buf (rawnew System.Text.StringBuilder)
+          i   (int 0)
+          max (getfield Length (getfield pos (callframe)))
+      [whileloop 0 0 (< (l i) (l max)) (prog
+          [rawcall (l buf) Append
+            (unbox String (@ (methodcall (pos (l i)) Str)))]
+          [l i (+ (l i) (int 1))])]
+      [box Str (rawcall (l buf) ToString)])
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
