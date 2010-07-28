@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 136;
+plan 137;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -113,6 +113,9 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
             "A";
         }
 
+        method !moo() { "Z" }
+        method moop() { self!moo }
+
         method zilch() {
             "B";
         }
@@ -135,6 +138,7 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
     ok !Foo.defined, "class type objects are undefined";
     ok !Bar.defined, "even derived ones";
     ok Foo.zow eq 'A', "can call defined methods";
+    ok Foo.moop eq 'Z', "can call 'private' methods";
     ok Bar.zow eq 'C', "subclasses can override methods";
     ok Bar.zilch eq 'B', "not overriden methods are inherited";
     ok Foo.crow(13) == 169, "can call methods with arguments";
