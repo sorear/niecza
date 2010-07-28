@@ -8,6 +8,10 @@ use CgOp;
     package Op;
     use Moose;
 
+    # XXX Use raw-er StrPos stuff, and track more details
+    has file => (isa => 'Str', is => 'ro');
+    has line => (isa => 'Int', is => 'ro');
+
     sub zyg { }
 
     sub lift_decls {

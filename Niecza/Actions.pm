@@ -28,6 +28,10 @@ sub AUTOLOAD {
     $M->sorry("Action method $AUTOLOAD not yet implemented") unless $carped{$AUTOLOAD}++;
 }
 
+sub node { my ($M) = @_;
+    file => $::FILE->{name}, line => $M->lineof($M->pos)
+}
+
 sub ws { }
 sub normspace { }
 sub vws { }
@@ -61,7 +65,7 @@ sub number { my ($cl, $M) = @_;
 sub value { }
 sub value__S_number { my ($cl, $M) = @_;
     # TODO: Implement the rest of the numeric hierarchy once MMD exists
-    $M->{_ast} = Op::Num->new(value => $M->{number}{_ast});
+    $M->{_ast} = Op::Num->new(node($M), value => $M->{number}{_ast});
 }
 
 sub value__S_quote { my ($cl, $M) = @_;
@@ -179,7 +183,7 @@ sub quote__S_Q { my ($cl, $M) = @_;
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my $slot = $cl->gensym;
     # TODO should be a real pass.
-    $M->{_ast} = Op::CallMethod->new(name => 'bless',
+    $M->{_ast} = Op::CallMethod->new(node($M), name => 'bless',
         receiver => Op::Lexical->new(name => 'Regex'),
         positionals => [
             RxOp::Export->new(zyg => [$M->{nibble}{_ast}])->closure ]);
@@ -372,7 +376,7 @@ sub nibbler { my ($cl, $M) = @_;
         for my $k (keys %$::CURLEX) {
             $::CURLEX->{$k}{used} = 1 if $k =~ /^[\@\%\&\$]\w/;
         }
-        $M->{_ast} = Op::CgOp->new(op => $M->{cgexp}{_ast});
+        $M->{_ast} = Op::CgOp->new(node($M), op => $M->{cgexp}{_ast});
     } else {
         # garden variety nibbler
         my $str = "";
@@ -383,7 +387,7 @@ sub nibbler { my ($cl, $M) = @_;
                 $M->sorry("Non-literal contents of strings NYI");
             }
         }
-        $M->{_ast} = Op::StringLiteral->new(text => $str);
+        $M->{_ast} = Op::StringLiteral->new(node($M), text => $str);
     }
 }
 
@@ -398,7 +402,7 @@ sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
 
     my ($t) = $sl->text =~ /^\s*(.*?)\s*$/;
 
-    $M->{_ast} = Op::StringLiteral->new(text => $t);
+    $M->{_ast} = Op::StringLiteral->new(node($M), text => $t);
     $M->{qpvalue} = '<' . $t . '>';
 }
 sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
@@ -410,14 +414,14 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
         # syntactic specialization, since they're required for grouping
         $M->{_ast} = $kids[0];
     } else {
-        $M->{_ast} = Op::StatementList->new(children => 
+        $M->{_ast} = Op::StatementList->new(node($M), children => 
             [ map { Op::Paren->new(inside => $_) } @kids ]);
     }
 }
 
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{pblock}{_ast}->type('bare');
-    $M->{_ast} = Op::BareBlock->new(var => $cl->gensym,
+    $M->{_ast} = Op::BareBlock->new(node($M), var => $cl->gensym,
         body => $M->{pblock}{_ast});
 }
 
@@ -431,33 +435,34 @@ sub INFIX { my ($cl, $M) = @_;
         $M->{right}{_ast});
 
     if ($s eq '&infix:<:=>') { #XXX macro
-        $M->{_ast} = Op::Bind->new(lhs => $l, rhs => $r, readonly => 0);
+        $M->{_ast} = Op::Bind->new(node($M), lhs => $l, rhs => $r,
+            readonly => 0);
     } elsif ($s eq '&infix:<?? !!>') { # XXX macro
-        $M->{_ast} = Op::Conditional->new(check => $l,
+        $M->{_ast} = Op::Conditional->new(node($M), check => $l,
             true => $M->{middle}{_ast}, false => $r);
     } elsif ($s eq '&infix:<,>') {
         #XXX STD bug causes , in setting to be parsed as left assoc
         my @r;
         push @r, $l->splittable_parcel ? @{ $l->positionals } : ($l);
         push @r, $r->splittable_parcel ? @{ $r->positionals } : ($r);
-        $M->{_ast} = Op::CallSub->new(
+        $M->{_ast} = Op::CallSub->new(node($M),
             invocant => Op::Lexical->new(name => '&infix:<,>'),
             positionals => \@r);
     } else {
-        $M->{_ast} = Op::CallSub->new(
-            invocant => Op::Lexical->new(name => $s),
+        $M->{_ast} = Op::CallSub->new(node($M),
+            invocant => Op::Lexical->new(node($M), name => $s),
             positionals => [ $l, $r ]);
 
         if ($s eq '&infix:<=>' && $l->isa('Op::Lexical') && $l->state_decl) {
             # Assignments (and assign metaops, but we don't do that yet) to has
             # and state declarators are rewritten into an appropriate phaser
             my $cv = $cl->gensym;
-            $M->{_ast} = Op::StatementList->new(children => [
+            $M->{_ast} = Op::StatementList->new(node($M), children => [
                 Op::Start->new(condvar => $cv, body => $M->{_ast}),
                 Op::Lexical->new(name => $l->name)]);
         }
     }
-    $M->{_ast} = $cl->whatever_postcheck($st, $M->{_ast});
+    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
 }
 
 sub CHAIN { my ($cl, $M) = @_;
@@ -470,7 +475,7 @@ sub CHAIN { my ($cl, $M) = @_;
     my ($st, @args) = $cl->whatever_precheck($op, $M->{chain}[0]{_ast},
         $M->{chain}[2]{_ast});
 
-    $M->{_ast} = $cl->whatever_postcheck($st, Op::CallSub->new(
+    $M->{_ast} = $cl->whatever_postcheck($M, $st, Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(name => $op), positionals => [ @args ]));
 }
 
@@ -486,21 +491,21 @@ sub LIST { my ($cl, $M) = @_;
         grep { defined } map { $_->{_ast} } @{ $M->{list} });
 
     if ($loose2tight{$op}) {
-        $M->{_ast} = Op::ShortCircuit->new(kind => $loose2tight{$op},
+        $M->{_ast} = Op::ShortCircuit->new(node($M), kind => $loose2tight{$op},
             args => \@pos);
     } else {
-        $M->{_ast} = Op::CallSub->new(
+        $M->{_ast} = Op::CallSub->new(node($M),
             invocant => Op::Lexical->new(name => "&infix:<$op>"),
             positionals => \@pos);
     }
-    $M->{_ast} = $cl->whatever_postcheck($st, $M->{_ast});
+    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
 }
 
 sub POSTFIX { my ($cl, $M) = @_;
     my $op = $M->{_ast};
     my ($st, $arg) = $cl->whatever_precheck('', $M->{arg}{_ast});
     if ($op->{postfix}) {
-        $M->{_ast} = Op::CallSub->new(
+        $M->{_ast} = Op::CallSub->new(node($M),
             invocant => Op::Lexical->new(name => '&postfix:<' . $op->{postfix} . '>'),
             positionals => [ $arg ]);
     } elsif ($op->{name} && $op->{name} =~ /^(?:HOW|WHAT)$/) {
@@ -509,16 +514,16 @@ sub POSTFIX { my ($cl, $M) = @_;
                 " does not take arguments");
             return;
         }
-        $M->{_ast} = Op::Interrogative->new(
+        $M->{_ast} = Op::Interrogative->new(node($M),
             receiver => $arg,
             name => $op->{name});
     } elsif ($op->{metamethod}) {
-        $M->{_ast} = Op::CallMetaMethod->new(
+        $M->{_ast} = Op::CallMetaMethod->new(node($M),
             receiver => $arg,
             name => $op->{metamethod},
             positionals => $op->{args} // []);
     } elsif ($op->{name}) {
-        $M->{_ast} = Op::CallMethod->new(
+        $M->{_ast} = Op::CallMethod->new(node($M),
             receiver => $arg,
             name => $op->{name},
             positionals => $op->{args} // []);
@@ -527,19 +532,19 @@ sub POSTFIX { my ($cl, $M) = @_;
             $M->sorry("Slicels NYI");
             return;
         }
-        $M->{_ast} = Op::CallSub->new(
+        $M->{_ast} = Op::CallSub->new(node($M),
             invocant => $arg,
             positionals => ($op->{postcall}[0] // []));
     } else {
         $M->sorry("Unhandled postop type");
     }
-    $M->{_ast} = $cl->whatever_postcheck($st, $M->{_ast});
+    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
 }
 
 sub PREFIX { my ($cl, $M) = @_;
     my $op = '&prefix:<' . $M->{sym} . '>';
     my ($st, $arg) = $cl->whatever_precheck($op, $M->{arg}{_ast});
-    $M->{_ast} = $cl->whatever_postcheck($st, Op::CallSub->new(
+    $M->{_ast} = $cl->whatever_postcheck($M, $st, Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(name => $op),
         positionals => [ $M->{arg}{_ast} ]));
 }
@@ -637,10 +642,10 @@ sub whatever_precheck { my ($cl, $op, @args) = @_;
     (\@vars, @args);
 }
 
-sub whatever_postcheck { my ($cl, $st, $term) = @_;
+sub whatever_postcheck { my ($cl, $M, $st, $term) = @_;
     if (@$st) {
         return Op::WhateverCode->new(ops => $term, vars => $st,
-            slot => $cl->gensym);
+            slot => $cl->gensym, node($M));
     } else {
         return $term;
     }
@@ -663,19 +668,19 @@ sub term__S_identifier { my ($cl, $M) = @_;
     }
 
     if ($M->is_name($M->{identifier}->Str)) {
-        $M->{_ast} = Op::Lexical->new(name => $id);
+        $M->{_ast} = Op::Lexical->new(node($M), name => $id);
         return;
     }
 
     my $args = $sal->[0] // [];
 
-    $M->{_ast} = Op::CallSub->new(
+    $M->{_ast} = Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(name => '&' . $id),
         positionals => $args);
 }
 
 sub term__S_self { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Lexical->new(name => 'self');
+    $M->{_ast} = Op::Lexical->new(node($M), name => 'self');
 }
 
 sub term__S_circumfix { my ($cl, $M) = @_;
@@ -727,24 +732,24 @@ sub term__S_variable { my ($cl, $M) = @_;
 }
 
 sub term__S_DotDotDot { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Yada->new(kind => '...');
+    $M->{_ast} = Op::Yada->new(node($M), kind => '...');
 }
 
 sub term__S_BangBangBang { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Yada->new(kind => '!!!');
+    $M->{_ast} = Op::Yada->new(node($M), kind => '!!!');
 }
 
 sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Yada->new(kind => '???');
+    $M->{_ast} = Op::Yada->new(node($M), kind => '???');
 }
 
 sub term__S_lambda { my ($cl, $M) = @_;
     $M->{pblock}{_ast}->type('pointy');
-    $M->{_ast} = $cl->block_to_closure($M->{pblock}{_ast});
+    $M->{_ast} = $cl->block_to_closure($M, $M->{pblock}{_ast});
 }
 
 sub term__S_Star { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Whatever->new(slot => $cl->gensym);
+    $M->{_ast} = Op::Whatever->new(node($M), slot => $cl->gensym);
 }
 
 sub do_variable_reference { my ($cl, $M, $v) = @_;
@@ -763,7 +768,7 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
                 return;
             }
 
-            return Op::GetSlot->new(name => $v->{name},
+            return Op::GetSlot->new(node($M), name => $v->{name},
                 object => Op::Lexical->new(name => 'self'));
         }
         when ('.') {
@@ -772,22 +777,22 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
                 return;
             }
 
-            return Op::CallMethod->new(name => $v->{name},
+            return Op::CallMethod->new(node($M), name => $v->{name},
                 receiver => Op::Lexical->new(name => 'self'));
         }
         # These are just ordinary lexicals at run time
         when ({ '^' => 1, ":" => 1, "?" => 1}) {
-            return Op::Lexical->new(name => $sl);
+            return Op::Lexical->new(node($M), name => $sl);
         }
         when ('*') {
-            return Op::ContextVar->new(name => $sl);
+            return Op::ContextVar->new(node($M), name => $sl);
         }
         when ('') {
             if (@{ $v->{rest} }) {
                 return Op::PackageVar->new(path => $v->{rest}, name => $sl,
-                    slot => $cl->gensym);
+                    slot => $cl->gensym, node($M));
             } else {
-                return Op::Lexical->new(name => $sl);
+                return Op::Lexical->new(node($M), name => $sl);
             }
         }
         default {
@@ -952,7 +957,7 @@ sub blockoid { my ($cl, $M) = @_;
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
     if ($M->Str eq '{YOU_ARE_HERE}') {
-        $M->{_ast} = Op::YouAreHere->new(unitname => $::UNITNAME);
+        $M->{_ast} = Op::YouAreHere->new(node($M), unitname => $::UNITNAME);
     } else {
         $M->{_ast} = $M->{statementlist}{_ast};
     }
@@ -1058,17 +1063,17 @@ sub variable_declarator { my ($cl, $M) = @_;
     my $slot = ($scope eq 'anon') ? $cl->gensym : $name;
 
     if ($scope eq 'has') {
-        $M->{_ast} = Op::Attribute->new(name => $v->{name},
+        $M->{_ast} = Op::Attribute->new(node($M), name => $v->{name},
             accessor => ($v->{twigil} eq '.'));
     } elsif ($scope eq 'state') {
-        $M->{_ast} = Op::Lexical->new(name => $slot, state_decl => 1,
+        $M->{_ast} = Op::Lexical->new(node($M), name => $slot, state_decl => 1,
             state_backing => $cl->gensym, declaring => 1,
             list => scalar ($M->{variable}->Str =~ /^\@/));
     } elsif ($scope eq 'our') {
-        $M->{_ast} = Op::PackageVar->new(name => $slot, slot => $slot,
+        $M->{_ast} = Op::PackageVar->new(node($M), name => $slot, slot => $slot,
             path => [ 'OUR' ]);
     } else {
-        $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1,
+        $M->{_ast} = Op::Lexical->new(node($M), name => $slot, declaring => 1,
             list => scalar ($M->{variable}->Str =~ /^\@/));
     }
 }
@@ -1085,7 +1090,7 @@ sub type_declarator__S_constant { my ($cl, $M) = @_;
     # This is a cheat.  Constants should be, well, constant, and we should be
     # using the phaser rewrite mechanism to get the initializer here.  XXX
     # terms need to use a context hash.
-    $M->{_ast} = Op::Lexical->new(name => $slot, declaring => 1);
+    $M->{_ast} = Op::Lexical->new(node($M), name => $slot, declaring => 1);
 }
 
 sub package_declarator {}
@@ -1118,7 +1123,7 @@ sub package_declarator__S_slang { my ($cl, $M) = @_;
 }
 
 sub package_declarator__S_also { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StatementList->new(children =>
+    $M->{_ast} = Op::StatementList->new(node($M), children =>
         $cl->process_package_traits($M, undef, @{ $M->{trait} }));
 }
 
@@ -1127,7 +1132,7 @@ sub process_package_traits { my ($cl, $M, $export, @tr) = @_;
 
     for (@tr) {
         if (exists $_->{_ast}{name}) {
-            push @r, Op::Super->new(name => $_->{_ast}{name});
+            push @r, Op::Super->new(node($M), name => $_->{_ast}{name});
         } elsif ($_->{_ast}{export}) {
             if ($export) {
                 push @$export, @{ $_->{_ast}{export} };
@@ -1187,7 +1192,7 @@ sub statement { my ($cl, $M) = @_;
 }
 
 sub statementlist { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StatementList->new(children => 
+    $M->{_ast} = Op::StatementList->new(node($M), children => 
         [ map { $_->statement_level } grep { defined }
             map { $_->{_ast} } @{ $M->{statement} } ]);
 }
@@ -1207,34 +1212,34 @@ sub module_name__S_normal { my ($cl, $M) = @_;
 sub statement_control { }
 sub statement_control__S_if { my ($cl, $M) = @_;
     my $else = $M->{else}[0] ?
-        $cl->block_to_immediate('cond', $M->{else}[0]{_ast}) : undef;
+        $cl->block_to_immediate($M, 'cond', $M->{else}[0]{_ast}) : undef;
     my @elsif;
     for (reverse @{ $M->{elsif} }) {
-        $else = Op::Conditional->new(check => $_->{_ast}[0],
-            true => $cl->block_to_immediate('cond', $_->{_ast}[1]),
+        $else = Op::Conditional->new(node($M), check => $_->{_ast}[0],
+            true => $cl->block_to_immediate($M, 'cond', $_->{_ast}[1]),
             false => $else);
     }
-    $M->{_ast} = Op::Conditional->new(check => $M->{xblock}{_ast}[0],
-        true => $cl->block_to_immediate('cond', $M->{xblock}{_ast}[1]),
+    $M->{_ast} = Op::Conditional->new(node($M), check => $M->{xblock}{_ast}[0],
+        true => $cl->block_to_immediate($M, 'cond', $M->{xblock}{_ast}[1]),
         false => $else);
 }
 
 sub statement_control__S_while { my ($cl, $M) = @_;
-    $M->{_ast} = Op::WhileLoop->new(check => $M->{xblock}{_ast}[0],
-        body => $cl->block_to_immediate('loop',$M->{xblock}{_ast}[1]),
+    $M->{_ast} = Op::WhileLoop->new(node($M), check => $M->{xblock}{_ast}[0],
+        body => $cl->block_to_immediate($M, 'loop',$M->{xblock}{_ast}[1]),
         until => 0, once => 0);
 }
 
 sub statement_control__S_until { my ($cl, $M) = @_;
-    $M->{_ast} = Op::WhileLoop->new(check => $M->{xblock}{_ast}[0],
-        body => $cl->block_to_immediate('loop', $M->{xblock}{_ast}[1]),
+    $M->{_ast} = Op::WhileLoop->new(node($M), check => $M->{xblock}{_ast}[0],
+        body => $cl->block_to_immediate($M, 'loop', $M->{xblock}{_ast}[1]),
         until => 1, once => 0);
 }
 
 sub statement_control__S_for { my ($cl, $M) = @_;
     $M->{xblock}{_ast}[1]->type('loop');
-    $M->{_ast} = Op::ForLoop->new(source => $M->{xblock}{_ast}[0],
-        sink => $cl->block_to_closure($M->{xblock}{_ast}[1]));
+    $M->{_ast} = Op::ForLoop->new(node($M), source => $M->{xblock}{_ast}[0],
+        sink => $cl->block_to_closure($M, $M->{xblock}{_ast}[1]));
 }
 
 sub statement_control__S_use { my ($cl, $M) = @_;
@@ -1270,7 +1275,7 @@ sub statement_control__S_use { my ($cl, $M) = @_;
         $symbols{$exp} = [ $name . '::', 'EXPORT::', 'DEFAULT::', $exp ];
     }
 
-    $M->{_ast} = Op::Use->new(unit => $name, symbols => \%symbols);
+    $M->{_ast} = Op::Use->new(node($M), unit => $name, symbols => \%symbols);
 }
 
 # All package defs have a couple things in common - a special-ish block,
@@ -1304,6 +1309,7 @@ sub package_def { my ($cl, $M) = @_;
         my $cbody = $cl->sl_to_block($blocktype, $stmts,
             name => $name);
         $M->{_ast} = $optype->new(
+            node($M),
             name    => $name,
             var     => $outervar,
             exports => \@export,
@@ -1311,6 +1317,7 @@ sub package_def { my ($cl, $M) = @_;
             body    => $cbody);
     } else {
         $M->{_ast} = $optype->new(
+            node($M),
             name    => $name,
             var     => $outervar,
             stub    => 1);
@@ -1375,17 +1382,17 @@ sub get_outer { my ($cl, $pad) = @_;
     $STD::ALL->{ $pad->{'OUTER::'}[0] };
 }
 
-sub block_to_immediate { my ($cl, $type, $blk) = @_;
+sub block_to_immediate { my ($cl, $M, $type, $blk) = @_;
     $blk->type($type);
-    Op::CallSub->new(
-        invocant => $cl->block_to_closure($blk),
+    Op::CallSub->new(node($M),
+        invocant => $cl->block_to_closure($M, $blk),
         positionals => []);
 }
 
-sub block_to_closure { my ($cl, $blk, %args) = @_;
+sub block_to_closure { my ($cl, $M, $blk, %args) = @_;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
-    Op::SubDef->new(var => $outer_key, body => $blk,
+    Op::SubDef->new(var => $outer_key, body => $blk, node($M),
         method_too => $args{method_too}, exports => ($args{exports} // []));
 }
 
@@ -1420,7 +1427,7 @@ sub routine_def { my ($cl, $M) = @_;
 
     my $m = $dln ? $cl->mangle_longname($dln, "subroutine definition") : undef;
 
-    $M->{_ast} = $cl->block_to_closure(
+    $M->{_ast} = $cl->block_to_closure($M,
             $cl->sl_to_block('sub',
                 $M->{blockoid}{_ast},
                 subname => $m,
@@ -1460,7 +1467,7 @@ sub method_def { my ($cl, $M) = @_;
         signature => ($M->{multisig}[0] ?
             $M->{multisig}[0]{_ast}->for_method : undef));
 
-    $M->{_ast} = $cl->block_to_closure($bl, outer_key => $sym,
+    $M->{_ast} = $cl->block_to_closure($M, $bl, outer_key => $sym,
         method_too => ($scope ne 'anon' ? $name : undef));
 }
 
@@ -1493,7 +1500,7 @@ sub blast { my ($cl, $M) = @_;
 
 sub statement_prefix {}
 sub statement_prefix__S_do { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->block_to_immediate('do', $M->{blast}{_ast});
+    $M->{_ast} = $cl->block_to_immediate($M, 'do', $M->{blast}{_ast});
 }
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
@@ -1501,13 +1508,13 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     $M->{blast}{_ast}->type('phaser');
 
     $M->{_ast} = Op::PreInit->new(var => $var, body => $M->{blast}{_ast},
-        shared => 1);
+        shared => 1, node($M));
 }
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;
     my $cv = $cl->gensym;
-    $M->{_ast} = Op::Start->new(condvar => $cv, body =>
-        $cl->block_to_immediate('phaser', $M->{blast}{_ast}));
+    $M->{_ast} = Op::Start->new(node($M), condvar => $cv, body =>
+        $cl->block_to_immediate($M, 'phaser', $M->{blast}{_ast}));
 }
 
 sub comp_unit { my ($cl, $M) = @_;
@@ -1515,7 +1522,7 @@ sub comp_unit { my ($cl, $M) = @_;
     my $sl = $M->{statementlist}{_ast};
 
     if (!$::YOU_WERE_HERE && $::UNITNAME) {
-        $sl = Op::StatementList->new(children => [ $sl,
+        $sl = Op::StatementList->new(node($M), children => [ $sl,
                 Op::YouAreHere->new(save_only => 1, unitname => $::UNITNAME)]);
     }
 
@@ -1527,7 +1534,7 @@ sub comp_unit { my ($cl, $M) = @_;
             signature => Sig->new(params => [
                     Sig::Parameter->new(target => Sig::Target->new(
                             slot => '!mainline', zeroinit => 1))]),
-            do => Op::CallSub->new(
+            do => Op::CallSub->new(node($M),
                 invocant => Op::CgOp->new(op => CgOp::newscalar(
                         CgOp::rawsget($::SETTINGNAME . ".Installer"))),
                 positionals => [Op::SubDef->new(
