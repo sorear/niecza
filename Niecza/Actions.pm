@@ -1463,11 +1463,16 @@ sub routine_def { my ($cl, $M) = @_;
 
 sub method_def { my ($cl, $M) = @_;
     my $scope = $::SCOPE // 'has';
+    my $type = $M->{type} ? $M->{type}->Str : '';
     $scope = 'anon' if !$M->{longname};
     my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}, "method definition") : undef;
 
     if ($M->{trait}[0] || $M->{sigil}) {
         $M->sorry("Method traits NYI");
+        return;
+    }
+    if ($type eq '^') {
+        $M->sorry("Metamethod mixins NYI");
         return;
     }
     if (@{ $M->{multisig} } > 1) {
@@ -1493,7 +1498,7 @@ sub method_def { my ($cl, $M) = @_;
             $M->{multisig}[0]{_ast}->for_method : undef));
 
     $M->{_ast} = $cl->block_to_closure($M, $bl, outer_key => $sym,
-        method_too => ($scope ne 'anon' ? $name : undef));
+        method_too => ($scope ne 'anon' ? "$type$name" : undef));
 }
 
 sub block { my ($cl, $M) = @_;
