@@ -270,13 +270,13 @@ use CgOp;
             return CgOp::prog(
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->stashvar,
-                    ($self->ourpkg ? $body->lookup_pkg(@{ $self->ourpkg }) :
+                    ($self->ourpkg ? $body->lookup_pkg(@{ $self->ourpkg }, $self->name . "::") :
                     CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')))));
         }
 
         CgOp::letn("pkg",
             ($self->ourpkg ?
-                $body->lookup_pkg(@{ $self->ourpkg }) :
+                $body->lookup_pkg(@{ $self->ourpkg }, $self->name . "::") :
                 CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
@@ -286,7 +286,7 @@ use CgOp;
                 CgOp::proto_var($self->bodyvar,
                     CgOp::newscalar(
                         CgOp::protosub($self->body))),
-                $self->finish_obj));
+                $self->finish_obj($body)));
     }
 
     sub enter_code {
@@ -327,14 +327,17 @@ use CgOp;
     sub defsuper { 'Any' }
 
     sub finish_obj {
-        my ($self) = @_;
+        my ($self, $body) = @_;
         my @r;
         if (!grep { $_->isa('Decl::Super') } @{ $self->body->decls }) {
             push @r, CgOp::sink(CgOp::methodcall(CgOp::letvar("how"),
                     "add-super", CgOp::scopedlex($self->defsuper)));
         }
-        @r, CgOp::scopedlex($self->var,
+        push @r, CgOp::scopedlex($self->var,
                 CgOp::methodcall(CgOp::letvar("how"), "create-protoobject"));
+        push @r, CgOp::bind(1, $body->lookup_pkg(@{ $self->ourpkg },
+                $self->name), CgOp::scopedlex($self->var)) if $self->ourpkg;
+        @r;
     }
 
     __PACKAGE__->meta->make_immutable;

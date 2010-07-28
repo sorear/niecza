@@ -658,6 +658,22 @@ sub term__S_value { my ($cl, $M) = @_;
     $M->{_ast} = $M->{value}{_ast};
 }
 
+sub term__S_name { my ($cl, $M) = @_;
+    my ($id, @pkg) = $cl->mangle_longname($M->{longname});
+
+    if ($M->{postcircumfix}[0] || $M->{args}) {
+        $M->sorry("Unsupported form of term:name");
+        return;
+    }
+
+    if (@pkg) {
+        $M->{_ast} = Op::PackageVar->new(node($M), name => $id,
+            slot => $cl->gensym, path => \@pkg);
+    } else {
+        $M->{_ast} = Op::Lexical->new(node($M), name => $id);
+    }
+}
+
 sub term__S_identifier { my ($cl, $M) = @_;
     my $id  = $M->{identifier}{_ast};
     my $sal = $M->{args}{_ast} // [];  # TODO: support zero-D slicels
@@ -1303,7 +1319,7 @@ sub package_def { my ($cl, $M) = @_;
     my $bodyvar = $cl->gensym;
     # We need the OUR because otherwise the name lookup latches on to the
     # nascent lexical alias and crashes.  Possibly a bug.
-    my $ourpkg = ($scope eq 'our') ? [ 'OUR::', "${name}::", ] : undef;
+    my $ourpkg = ($scope eq 'our') ? [ 'OUR::' ] : undef;
 
     if (!$M->{decl}{stub}) {
         my $stmts = $M->{statementlist} // $M->{blockoid};
