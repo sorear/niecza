@@ -23,6 +23,36 @@ use warnings;
 }
 
 {
+    package CgOp::Annotation;
+    use Moose;
+    extends 'CgOp';
+
+    has file => (isa => 'Str', is => 'ro', required => 1);
+    has line => (isa => 'Int', is => 'ro', required => 1);
+
+    sub cps_convert {
+        my ($self, $nv) = @_;
+        $self->zyg->[0] = $self->zyg->[0]->cps_convert($nv);
+        $self->cps_type($self->zyg->[0]->cps_type);
+        $self;
+    }
+
+    sub var_cg {
+        my ($self, $cg) = @_;
+        $self->zyg->[0]->var_cg($cg);
+    }
+
+    sub drop_end {
+        my ($self) = @_;
+        $self->zyg->[0] = CgOp::sink($self->zyg->[0]);
+        $self;
+    }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
     package CgOp::Let;
     use Moose;
     extends 'CgOp';
@@ -183,7 +213,8 @@ use warnings;
                         return;
                     }
                 }
-            } elsif ($z->isa('CgOp::Let') || $z->isa('CgOp::Seq')) {
+            } elsif ($z->isa('CgOp::Let') || $z->isa('CgOp::Seq') ||
+                    $z->isa('CgOp::Annotation')) {
                 $z->drop_end->var_cg($cg);
                 return;
             }
@@ -534,7 +565,8 @@ use warnings;
 
     sub ann {
         my ($file, $line, $stuff) = @_;
-        $stuff;
+        CgOp::Annotation->new(file => $file, line => $line,
+            zyg => [$stuff]);
     }
 
     sub letn {
