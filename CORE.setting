@@ -633,6 +633,33 @@ PRE-INIT {
 }
 
 my class CallFrame {
+    # major fudge until Mu starts treating the RI with respect
+    method Bool    { True }
+    method defined { True }
+    method Str     { "callframe" }
+
+    method caller() { Q:CgOp {
+        (letn c (getfield caller (cast Frame (@ (l self))))
+          (ternary
+            (!= (letvar c) (null Frame))
+            (ns (letvar c))
+            (l Any)))
+    } }
+    method outer() { Q:CgOp {
+        (letn c (getfield outer (cast Frame (@ (l self))))
+          (ternary
+            (!= (letvar c) (null Frame))
+            (ns (letvar c))
+            (l Any)))
+    } }
+
+    method file() { Q:CgOp { (box Str (rawcall
+        (cast Frame (@ (l self))) ExecutingFile)) } }
+    method line() { Q:CgOp { (box Num (cast Double (rawcall
+        (cast Frame (@ (l self))) ExecutingLine))) } }
+
+    method hints($var) { Q:CgOp { (rawcall (cast Frame (@ (l self)))
+        LexicalFind (unbox String (@ (l $var)))) } }
 }
 
 PRE-INIT { Q:CgOp { (prog
@@ -641,7 +668,7 @@ PRE-INIT { Q:CgOp { (prog
     [null Variable])
 } }
 
-sub outer { Q:CgOp { (ns (getfield outer (getfield outer (callframe)))) } }
-sub callframe { Q:CgOp { (ns (getfield outer (callframe))) } }
+sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
+sub callframe { Q:CgOp { (ns (getfield caller (callframe))) } }
 
 {YOU_ARE_HERE}

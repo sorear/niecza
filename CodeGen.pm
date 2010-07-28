@@ -52,7 +52,10 @@ use 5.010;
               caller       => [f => 'Frame'],
               outer        => [f => 'Frame'],
               proto        => [f => 'Frame'],
-              lex          => [f => 'Dictionary<string,object>'] },
+              lex          => [f => 'Dictionary<string,object>'],
+              ExecutingLine=> [m => 'Int32'],
+              ExecutingFile=> [m => 'String'],
+              LexicalFind  => [m => 'Variable'] },
 
         'Kernel.ContextHelper' => [m => 'Variable'],
         'Kernel.StrP'          => [f => 'IP6'],

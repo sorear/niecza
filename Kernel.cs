@@ -139,6 +139,39 @@ namespace Niecza {
             c.resultSlot = Kernel.CallFrameMO.how;
             return c;
         }
+
+        public int ExecutingLine() {
+            object l;
+            if (((proto != null) ? proto.lex : lex).
+                    TryGetValue("?lines", out l)) {
+                int[] rl = (int[])l;
+                return ip >= rl.Length ? 0 : rl[ip];
+            } else {
+                return 0;
+            }
+        }
+
+        public string ExecutingFile() {
+            object l;
+            if (((proto != null) ? proto.lex : lex).
+                    TryGetValue("?files", out l)) {
+                string[] rl = (string[])l;
+                return ip >= rl.Length ? "" : rl[ip];
+            } else {
+                return "";
+            }
+        }
+
+        public Variable LexicalFind(string name) {
+            Frame csr = this;
+            while (csr != null) {
+                object o;
+                if (csr.lex.TryGetValue(name, out o))
+                    return (Variable)o;
+                csr = csr.outer;
+            }
+            return Kernel.NewROScalar(Kernel.AnyP);
+        }
     }
 
     // NOT IP6; these things should only be exposed through a ClassHOW-like
