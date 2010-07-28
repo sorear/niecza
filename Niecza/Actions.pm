@@ -1001,6 +1001,10 @@ sub terminator__S_Thesis {}
 sub terminator__S_Semi {}
 sub terminator__S_Ket {}
 sub terminator__S_Ly {}
+sub terminator__S_if {}
+sub terminator__S_unless {}
+sub terminator__S_for {}
+sub terminator__S_until {}
 sub terminator__S_then {}
 sub terminator__S_again {}
 sub terminator__S_repeat {}
@@ -1169,6 +1173,9 @@ sub nulltermish { my ($cl, $M) = @_; # for 1,2,3,
     $M->{term}{_ast} = $M->{term}{term}{_ast} if $M->{term};
 }
 sub EXPR {}
+sub modifier_expr { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{EXPR}{_ast};
+}
 
 sub arglist { my ($cl, $M) = @_;
     $M->sorry("Invocant handling is NYI") if $::INVOCANT_IS;
@@ -1198,14 +1205,59 @@ sub args { my ($cl, $M) = @_;
 }
 
 sub statement { my ($cl, $M) = @_;
-    if ($M->{label} || $M->{statement_mod_cond}[0] || $M->{statement_mod_loop}[0]) {
-        $M->sorry("Control is NYI");
+    if ($M->{label}) {
+        $M->sorry("Labels are NYI");
         return;
     }
 
     $M->{_ast} = $M->{statement_control} ? $M->{statement_control}{_ast} :
                  $M->{EXPR} ? $M->{EXPR}{_ast} : undef;
+
+    if ($M->{statement_mod_cond}[0]) {
+        my ($sym, $exp) = @{ $M->{statement_mod_cond}[0]{_ast} };
+
+        if ($sym eq 'if') {
+            $M->{_ast} = Op::Conditional->new(node($M), check => $exp,
+                true => $M->{_ast}, false => undef);
+        } elsif ($sym eq 'unless') {
+            $M->{_ast} = Op::Conditional->new(node($M), check => $exp,
+                false => $M->{_ast}, true => undef);
+        } else {
+            $M->sorry("Unhandled statement modifier $sym");
+            return;
+        }
+    }
+
+    if ($M->{statement_mod_loop}[0]) {
+        my ($sym, $exp) = @{ $M->{statement_mod_loop}[0]{_ast} };
+
+        if ($sym eq 'while') {
+            $M->{_ast} = Op::WhileLoop->new(node($M), check => $exp,
+                body => $M->{_ast}, until => 0, once => 0);
+        } elsif ($sym eq 'until') {
+            $M->{_ast} = Op::WhileLoop->new(node($M), check => $exp,
+                body => $M->{_ast}, until => 1, once => 0);
+        } else {
+            $M->sorry("Unhandled statement modifier $sym");
+            return;
+        }
+    }
 }
+
+sub statement_mod_cond { my ($cl, $M) = @_;
+    $M->{_ast} = [ $M->{sym}, $M->{modifier_expr}{_ast} ];
+}
+sub statement_mod_loop { my ($cl, $M) = @_;
+    $M->{_ast} = [ $M->{sym}, $M->{modifier_expr}{_ast} ];
+}
+
+sub statement_mod_cond__S_if {}
+sub statement_mod_cond__S_unless {}
+sub statement_mod_cond__S_when {}
+sub statement_mod_loop__S_while {}
+sub statement_mod_loop__S_until {}
+sub statement_mod_loop__S_for {}
+sub statement_mod_loop__S_given {}
 
 sub statementlist { my ($cl, $M) = @_;
     $M->{_ast} = Op::StatementList->new(node($M), children => 

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 137;
+plan 141;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -402,4 +402,16 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok GLOBAL::Foo eq 'Foo()', "also visible globally";
     ok Foo::Bar.bar == 51, "can call through nested methods";
     ok GLOBAL::Foo::Bar.bar == 51, "can call through GLOBAL nested";
+}
+
+{
+    my $x1; my $x2; my $x3; my $x4;
+    $x1 = 1 if 0;
+    $x2 = 1 if 1;
+    $x3 = 1 unless 0;
+    $x4 = 1 unless 1;
+    ok !$x1, "if 0 doesn't execute";
+    ok $x2, "if 1 does execute";
+    ok $x3, "unless 0 does execute";
+    ok !$x4, "unless 1 doesn't execute";
 }
