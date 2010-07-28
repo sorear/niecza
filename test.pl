@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 126;
+plan 135;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -379,4 +379,22 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok (* + *)(5,12) == 19, "multiple *, multiple args";
     ok ((2 * *) + (3 * *))(13,19) == 83, "even from groups";
     ok (1,*).^isa(Parcel), "infix:<,> doesn't curry";
+}
+
+{
+    class Foo {
+        method foo() { 42 }
+        class Bar {
+            method bar() { 51 }
+        }
+        ok Bar.bar == 51, "within Foo, Bar is directly accessible";
+        ok OUR::Bar.bar == 51, "within Foo, Bar is package accessible";
+        ok Foo::Bar.bar == 51, "within Foo, Bar is longname accessible";
+        ok GLOBAL::Foo::Bar.bar == 51, "within Foo, Bar is GLOBAL accessible";
+    }
+    ok Foo eq 'Foo()', "lexical lookup of our-class works";
+    ok OUR::Foo eq 'Foo()', "also visible in ourpad";
+    ok GLOBAL::Foo eq 'Foo()', "also visible globally";
+    ok Foo::Bar.bar == 51, "can call through nested methods";
+    ok GLOBAL::Foo::Bar.bar == 51, "can call through GLOBAL nested";
 }
