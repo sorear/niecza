@@ -525,7 +525,7 @@ sub POSTFIX { my ($cl, $M) = @_;
     } elsif ($op->{name}) {
         $M->{_ast} = Op::CallMethod->new(node($M),
             receiver => $arg,
-            name => $op->{name},
+            name => ($op->{private} ? '!' . $op->{name} : $op->{name}),
             positionals => $op->{args} // []);
     } elsif ($op->{postcall}) {
         if (@{ $op->{postcall} } > 1) {
