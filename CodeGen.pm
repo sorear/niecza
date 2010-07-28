@@ -6,6 +6,9 @@ use 5.010;
     package CodeGen;
     use Moose;
 
+    our $file = '';
+    our $line = 0;
+
     # Beta will do this using reflection
     my %typedata = (
         IP6 =>
@@ -115,6 +118,8 @@ use 5.010;
     has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
+    has fileinfo  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has lineinfo  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has stackterm => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has resulttype =>(isa => 'Maybe[Str]', is => 'rw', default => '');
@@ -175,6 +180,8 @@ use 5.010;
         my $n = $self->label;
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
+        $self->lineinfo->[$n] = $line;
+        $self->fileinfo->[$n] = $file;
         push @{ $self->buffer }, "case $n:\n";
         $self->resulttype($rt);
     }
@@ -230,6 +237,8 @@ use 5.010;
         $self->_restorestackstate($n) if $self->savedstks->{$n};
         push @{ $self->buffer }, "    goto case $n;\n" unless $self->unreach;
         push @{ $self->buffer }, "case $n:\n";
+        $self->lineinfo->[$n] = $line;
+        $self->fileinfo->[$n] = $file;
         $self->unreach(0);
     }
 
@@ -503,6 +512,12 @@ use 5.010;
 
     sub close_sub {
         my ($self, $body) = @_;
+
+        $self->_push('object', $body->csname . "_lines");
+        $self->proto_var('?lines');
+        $self->_push('object', $body->csname . "_files");
+        $self->proto_var('?files');
+
         $self->pop_let('protopad');
         pop @{ $self->bodies };
         $self->peek_let('protopad');
@@ -563,6 +578,12 @@ use 5.010;
         print ::NIECZA_OUT " " x 16, "throw new Exception(\"Invalid IP\");\n";
         print ::NIECZA_OUT " " x 8, "}\n";
         print ::NIECZA_OUT " " x 4, "}\n";
+        if ($name ne 'BOOT') {
+            print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
+                join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
+            print ::NIECZA_OUT " " x 4, "private static string[] ${name}_files = {",
+                join (", ", map { qm($_ // "") } @{ $self->fileinfo }), "};\n";
+        }
     }
 
     sub BUILD {

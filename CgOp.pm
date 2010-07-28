@@ -39,6 +39,8 @@ use warnings;
 
     sub var_cg {
         my ($self, $cg) = @_;
+        local $CodeGen::file = $self->file;
+        local $CodeGen::line = $self->line;
         $self->zyg->[0]->var_cg($cg);
     }
 
