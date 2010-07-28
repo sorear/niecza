@@ -14,10 +14,10 @@ class Builder {
         while $frame.hints('$?TRANSPARENT') {
             $frame = $frame.caller;
         }
-        $frame.file ~ (" line " ~ $frame.line);
+        $frame.file ~ " line " ~ $frame.line;
     }
 
-    method _output($text) {
+    method !output($text) {
         say $text;
     }
 
@@ -26,18 +26,18 @@ class Builder {
     }
 
     method note($m) {
-        self._output("# " ~ $m);
+        self!output("# " ~ $m);
         0;
     }
 
     method ok($bool, $tag) {
         my $not = $bool ?? "" !! "not ";
-        self._output($not ~ ("ok " ~ ($.current-test++ ~ (" - " ~ $tag))));
+        self!output($not ~ "ok " ~ $.current-test++ ~ " - " ~ $tag);
         if !$bool { self.note(self.blame); }
     }
 
     method expected-tests($num) {
-        self._output("1.." ~ $num);
+        self!output("1.." ~ $num);
     }
 }
 
