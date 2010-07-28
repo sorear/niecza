@@ -1285,14 +1285,20 @@ sub package_def { my ($cl, $M) = @_;
     if (!$M->{longname}[0]) {
         $scope = 'anon';
     }
-    if ($::SCOPE ne 'anon' && $::SCOPE ne 'my') {
-        $M->sorry('Non-lexical package definitions are not yet supported');
+    if ($::SCOPE eq 'augment' || $::SCOPE eq 'supercede') {
+        $M->sorry('Monkey typing is not yet supported');
         return;
     }
+    if ($::SCOPE eq 'has' || $::SCOPE eq 'state') {
+        $M->sorry("Illogical scope $::SCOPE for package block");
+        return;
+    }
+    # XXX we don't actually implement our packages yet but a STD bug forces
+    # us to declare some packages as our
     # XXX shouldn't fully mangle here, c.f. STD:auth<http://perl.org>
     my $name = $M->{longname}[0] ?
         $cl->mangle_longname($M->{longname}[0], "package definition") : 'ANON';
-    my $outervar = $::SCOPE eq 'my' ? $name : $cl->gensym;
+    my $outervar = $::SCOPE ne 'anon' ? $name : $cl->gensym;
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
     my $blocktype = $::PKGDECL;
