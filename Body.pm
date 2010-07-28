@@ -146,7 +146,7 @@ use CgOp ();
             $pkgcg = CgOp::scopedlex($components[0]);
             shift @components;
         } else {
-            $pkgcg = CgOp::scopedlex('$?GLOBAL');
+            $pkgcg = CgOp::scopedlex('$?CURPKG');
         }
 
         for my $c (@components) {

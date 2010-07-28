@@ -1285,24 +1285,25 @@ sub package_def { my ($cl, $M) = @_;
     if (!$M->{longname}[0]) {
         $scope = 'anon';
     }
-    if ($::SCOPE eq 'augment' || $::SCOPE eq 'supercede') {
+    if ($scope eq 'augment' || $scope eq 'supercede') {
         $M->sorry('Monkey typing is not yet supported');
         return;
     }
-    if ($::SCOPE eq 'has' || $::SCOPE eq 'state') {
-        $M->sorry("Illogical scope $::SCOPE for package block");
+    if ($scope eq 'has' || $scope eq 'state') {
+        $M->sorry("Illogical scope $scope for package block");
         return;
     }
-    # XXX we don't actually implement our packages yet but a STD bug forces
-    # us to declare some packages as our
     # XXX shouldn't fully mangle here, c.f. STD:auth<http://perl.org>
     my $name = $M->{longname}[0] ?
         $cl->mangle_longname($M->{longname}[0], "package definition") : 'ANON';
-    my $outervar = $::SCOPE ne 'anon' ? $name : $cl->gensym;
+    my $outervar = $scope ne 'anon' ? $name : $cl->gensym;
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
     my $blocktype = $::PKGDECL;
     my $bodyvar = $cl->gensym;
+    # We need the OUR because otherwise the name lookup latches on to the
+    # nascent lexical alias and crashes.  Possibly a bug.
+    my $ourpkg = ($scope eq 'our') ? [ 'OUR::', "${name}::", ] : undef;
 
     if (!$M->{decl}{stub}) {
         my $stmts = $M->{statementlist} // $M->{blockoid};
@@ -1320,12 +1321,14 @@ sub package_def { my ($cl, $M) = @_;
             var     => $outervar,
             exports => \@export,
             bodyvar => $bodyvar,
+            ourpkg  => $ourpkg,
             body    => $cbody);
     } else {
         $M->{_ast} = $optype->new(
             node($M),
             name    => $name,
             var     => $outervar,
+            ourpkg  => $ourpkg,
             stub    => 1);
     }
 }

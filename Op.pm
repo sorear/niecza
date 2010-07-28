@@ -485,6 +485,7 @@ use CgOp;
     has stub => (is => 'ro', isa => 'Bool', default => 0);
     has body => (is => 'ro', isa => 'Body');
     has exports => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
+    has ourpkg => (is => 'ro', isa => 'Maybe[ArrayRef[Str]]');
 
     sub decl_class { 'Decl::Package' }
     sub lift_decls {
@@ -492,7 +493,8 @@ use CgOp;
         my @r = $self->decl_class->new(stub => $self->stub, var => $self->var,
             ($self->has_name ? (name => $self->name) : ()),
             ($self->stub ? () : (body => $self->body,
-                    bodyvar => $self->bodyvar)));
+                    bodyvar => $self->bodyvar)),
+            ourpkg => $self->ourpkg);
 
         for my $tag (@{ $self->exports }) {
             for my $sym ($self->var, $self->var . '::') {

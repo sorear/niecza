@@ -227,7 +227,6 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        # XXX ought not to have side effects here.
         $::SETTING_RESUME = $body->scopetree;
         my $n = $self->unitname;
         $n =~ s/::/./g;
@@ -249,6 +248,8 @@ use CgOp;
     has bodyvar => (is => 'ro', isa => 'Str');
     has stub    => (is => 'ro', isa => 'Bool', default => 0);
     has name    => (is => 'ro', isa => 'Str', predicate => 'has_name');
+    # my packages always have a unique stash, our ones just alias part of GLOBAL
+    has ourpkg   => (is => 'ro', isa => 'Maybe[ArrayRef[Str]]');
 
     sub bodies { $_[0]->body ? $_[0]->body : () }
     sub stashvar { $_[0]->var . '::' }
@@ -269,11 +270,14 @@ use CgOp;
             return CgOp::prog(
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->stashvar,
-                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))));
+                    ($self->ourpkg ? $body->lookup_pkg(@{ $self->ourpkg }) :
+                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')))));
         }
 
         CgOp::letn("pkg",
-            CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')),
+            ($self->ourpkg ?
+                $body->lookup_pkg(@{ $self->ourpkg }) :
+                CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
