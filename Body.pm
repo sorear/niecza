@@ -72,7 +72,7 @@ use CgOp ();
         push @enter, $self->signature->binder if $self->signature;
         # TODO: Bind a return value here to catch non-ro sub use
         $self->cgoptree(CgOp::prog(@enter,
-                CgOp::return($self->do->code($self))));
+                CgOp::return($self->do->cgop($self))));
         map { $_->preinit_code($self) } @{ $self->decls };
     }
 

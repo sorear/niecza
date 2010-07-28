@@ -25,6 +25,15 @@ use CgOp;
             $self->invocant->name eq '&infix:<,>';
     }
 
+    sub cgop {
+        my ($self, $body) = @_;
+        if (defined $self->file) {
+            CgOp::ann($self->file, $self->line, $self->code($body));
+        } else {
+            $self->code($body);
+        }
+    }
+
     sub statement_level { shift }
 
     __PACKAGE__->meta->make_immutable;
@@ -54,7 +63,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        my @ch = map { $_->code($body) } @{ $self->children };
+        my @ch = map { $_->cgop($body) } @{ $self->children };
         # XXX should be Nil or something
         my $end = @ch ? pop(@ch) : CgOp::wrap(CgOp::null('object'));
 
@@ -77,8 +86,8 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::subcall(CgOp::fetch($self->invocant->code($body)),
-            map { $_->code($body) } @{ $self->positionals });
+        CgOp::subcall(CgOp::fetch($self->invocant->cgop($body)),
+            map { $_->cgop($body) } @{ $self->positionals });
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -121,8 +130,8 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::methodcall($self->receiver->code($body),
-            $self->name, map { $_->code($body) } @{ $self->positionals });
+        CgOp::methodcall($self->receiver->cgop($body),
+            $self->name, map { $_->cgop($body) } @{ $self->positionals });
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -140,7 +149,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::varattr($self->name, CgOp::fetch($self->object->code($body)));
+        CgOp::varattr($self->name, CgOp::fetch($self->object->cgop($body)));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -161,9 +170,9 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::let($self->receiver->code($body), sub {
+        CgOp::let($self->receiver->cgop($body), sub {
             CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
-                $self->name, $_[0], map { $_->code($body) }
+                $self->name, $_[0], map { $_->cgop($body) }
                     @{ $self->positionals })});
     }
 
@@ -181,7 +190,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        $self->inside->code($body);
+        $self->inside->cgop($body);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -199,7 +208,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        my $c = CgOp::fetch($self->receiver->code($body));
+        my $c = CgOp::fetch($self->receiver->cgop($body));
         given ($self->name) {
             when ("HOW") {
                 $c = CgOp::how($c);
@@ -279,10 +288,10 @@ use CgOp;
         my ($self, $body) = @_;
 
         my @r = reverse @{ $self->args };
-        my $acc = (shift @r)->code($body);
+        my $acc = (shift @r)->cgop($body);
 
         for (@r) {
-            $acc = CgOp::let($_->code($body), sub { $self->red2($_[0], $acc) });
+            $acc = CgOp::let($_->cgop($body), sub { $self->red2($_[0], $acc) });
         }
 
         $acc;
@@ -322,11 +331,11 @@ use CgOp;
         CgOp::ternary(
             CgOp::unbox('Boolean',
                 CgOp::fetch(
-                    CgOp::methodcall($self->check->code($body), "Bool"))),
+                    CgOp::methodcall($self->check->cgop($body), "Bool"))),
             # XXX use Nil
-            ($self->true ? $self->true->code($body) :
+            ($self->true ? $self->true->cgop($body) :
                 CgOp::null('Variable')),
-            ($self->false ? $self->false->code($body) :
+            ($self->false ? $self->false->cgop($body) :
                 CgOp::null('Variable')));
     }
 
@@ -352,8 +361,8 @@ use CgOp;
             CgOp::whileloop($self->until, $self->once,
                 CgOp::unbox('Boolean',
                     CgOp::fetch(
-                        CgOp::methodcall($self->check->code($body), "Bool"))),
-                CgOp::sink($self->body->code($body))),
+                        CgOp::methodcall($self->check->cgop($body), "Bool"))),
+                CgOp::sink($self->body->cgop($body))),
             CgOp::null('Variable'));
     }
 
@@ -376,9 +385,9 @@ use CgOp;
 
         CgOp::methodcall(
             CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&flat')),
-                $self->source->code($body)),
+                $self->source->cgop($body)),
             ($self->immed ? 'for' : 'map'),
-            $self->sink->code($body));
+            $self->sink->cgop($body));
     }
 
     sub statement_level {
@@ -419,7 +428,7 @@ use CgOp;
             CgOp::prog(
                 CgOp::assign(CgOp::scopedlex($self->condvar),
                     CgOp::box('Bool', CgOp::bool(1))),
-                $self->body->code($body)));
+                $self->body->cgop($body)));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -456,8 +465,8 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::prog(
-            CgOp::bind($self->readonly, $self->lhs->code($body),
-                $self->rhs->code($body)),
+            CgOp::bind($self->readonly, $self->lhs->cgop($body),
+                $self->rhs->cgop($body)),
             CgOp::null('Variable'));
     }
 

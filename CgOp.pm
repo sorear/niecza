@@ -532,6 +532,11 @@ use warnings;
             CgOp::Primitive->new(op => [ 'close_sub', $body ]));
     }
 
+    sub ann {
+        my ($file, $line, $stuff) = @_;
+        $stuff;
+    }
+
     sub letn {
         my ($name, $value, @stuff) = @_;
         CgOp::Let->new(name => $name, zyg => [ $value, @stuff ]);
