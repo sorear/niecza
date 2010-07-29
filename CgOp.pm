@@ -491,13 +491,6 @@ use warnings;
         scopedlex($_[0], protolget($_[0]));
     }
 
-    # the handling of @var here is quite wrong, but works for now
-    sub copy_lex {
-        my ($n, $l) = @_;
-        scopedlex($n, $l ? newrwlistvar(fetch(protolget($_[0])))
-                         : newrwscalar(fetch(protolget($_[0]))));
-    }
-
     sub clone_lex {
         scopedlex($_[0], methodcall(protolget($_[0]), "clone",
           newscalar(callframe)));

@@ -562,12 +562,10 @@ use CgOp;
 
     has var    => (isa => 'Str', is => 'ro', predicate => 'has_var');
     has body   => (isa => 'Body', is => 'ro', required => 1);
-    has shared => (isa => 'Bool', is => 'ro', default => 0);
 
     sub lift_decls {
         my ($self) = @_;
-        Decl::PreInit->new(var => $self->var, code => $self->body,
-            shared => $self->shared);
+        Decl::PreInit->new(var => $self->var, code => $self->body);
     }
 
     sub code {

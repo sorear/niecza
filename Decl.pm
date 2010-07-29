@@ -28,7 +28,6 @@ use CgOp;
 
     has var    => (isa => 'Str', is => 'ro', predicate => 'has_var');
     has code   => (isa => 'Body', is => 'ro', required => 1);
-    has shared => (isa => 'Bool', is => 'ro', default => 0);
 
     sub bodies { $_[0]->code }
 
@@ -46,8 +45,7 @@ use CgOp;
     sub enter_code {
         my ($self, $body) = @_;
         !$self->has_var ? CgOp::noop :
-            ($self->shared || $body->mainline) ? CgOp::share_lex($self->var) :
-            CgOp::copy_lex($self->var);
+            CgOp::share_lex($self->var);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -119,7 +117,9 @@ use CgOp;
 
         ($body->mainline || $self->shared) ?
             CgOp::share_lex($self->slot) :
-            CgOp::copy_lex($self->slot, $self->list);
+            CgOp::scopedlex($self->slot, $self->list ?
+                CgOp::newrwlistvar(CgOp::fetch(CgOp::scopedlex('Any'))) :
+                CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
     }
 
     __PACKAGE__->meta->make_immutable;

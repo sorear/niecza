@@ -1634,7 +1634,7 @@ sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     $M->{blast}{_ast}->type('phaser');
 
     $M->{_ast} = Op::PreInit->new(var => $var, body => $M->{blast}{_ast},
-        shared => 1, node($M));
+        node($M));
 }
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;
