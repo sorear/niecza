@@ -796,8 +796,11 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
             return Op::CallMethod->new(node($M), name => $v->{name},
                 receiver => Op::Lexical->new(name => 'self'));
         }
-        # These are just ordinary lexicals at run time
-        when ({ '^' => 1, ":" => 1, "?" => 1}) {
+        # no twigil in lex name for these
+        when ({ '^' => 1, ":" => 1}) {
+            return Op::Lexical->new(node($M), name => $v->{sigil} . $v->{name});
+        }
+        when ('?') {
             return Op::Lexical->new(node($M), name => $sl);
         }
         when ('*') {
@@ -1475,8 +1478,29 @@ sub block_to_closure { my ($cl, $M, $blk, %args) = @_;
         method_too => $args{method_too}, exports => ($args{exports} // []));
 }
 
-sub get_placeholder_sig { my ($cl) = @_;
-    return Sig->new(params => []);
+sub get_placeholder_sig { my ($cl, $M) = @_;
+    # for some reason, STD wants to deparse this
+    my @things = split ", ", $::CURLEX->{'$?SIGNATURE'};
+    shift @things if $things[0] eq '';
+    my @parms;
+    for (@things) {
+        if ($_ =~ /^\$_ is ref/) {
+            # This needs to be optional or lots of stuff will break, but we
+            # don't have optionals yet
+            #push @parms, Sig::Parameter->new(optional => 1,
+            #    target => Sig::Target->new(slot => '$_', ref_outer => 1));
+        } elsif ($_ eq '*@_') {
+            push @parms, Sig::Parameter->new(slurpy => 1,
+                target => Sig::Target->new(slot => '@_', list => 1));
+        } elsif ($_ =~ /^([@\$])/) {
+            push @parms, Sig::Parameter->new(
+                target => Sig::Target->new(slot => $_), list => ($1 eq '@'));
+        } else {
+            $M->sorry('Named placeholder parameters NYI');
+            return;
+        }
+    }
+    return Sig->new(params => \@parms);
 }
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
@@ -1554,7 +1578,7 @@ sub method_def { my ($cl, $M) = @_;
         return;
     }
     my $sig = $M->{multisig}[0] ? $M->{multisig}[0]{_ast} :
-        $cl->get_placeholder_sig;
+        $cl->get_placeholder_sig($M);
 
     for my $t (@{ $M->{trait} }) {
         if ($t->{_ast}{nobinder}) {
@@ -1580,7 +1604,8 @@ sub block { my ($cl, $M) = @_;
 sub pblock { my ($cl, $M) = @_;
     my $rw = $M->{lambda} && $M->{lambda}->Str eq '<->';
     $M->{_ast} = $cl->sl_to_block('', $M->{blockoid}{_ast},
-        signature => ($M->{signature} ? $M->{signature}{_ast} : undef));
+        signature => ($M->{signature} ? $M->{signature}{_ast} :
+            $cl->get_placeholder_sig($M)));
 }
 
 sub xblock { my ($cl, $M) = @_;

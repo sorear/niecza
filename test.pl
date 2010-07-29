@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 141;
+plan 143;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -414,4 +414,10 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok $x2, "if 1 does execute";
     ok $x3, "unless 0 does execute";
     ok !$x4, "unless 1 doesn't execute";
+}
+
+{
+    #ok ({ $_ * $_ })(20) == 400, '$_ treated as placeholder';
+    ok ({ $^a - $^b })(5,3) == 2, '$^x treated as such';
+    ok ({ $^b - $^a })(3,5) == 2, '... in the right order';
 }
