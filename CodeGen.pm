@@ -551,7 +551,7 @@ use 5.010;
             $order = $body->lex_level($name);
             if ($order < 0) {
                 #print STDERR YAML::XS::Dump ($body);
-                die "Failed to resolve lexical $name in " . $body->name;
+                die "Internal error: failed to resolve lexical $name in " . $body->name;
             }
         }
         if ($set) {
