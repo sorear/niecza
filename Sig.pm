@@ -41,6 +41,7 @@ use 5.010;
     has target => (is => 'ro', isa => 'Sig::Target', required => 1,
         handles => [ 'local_decls' ]);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
+    has optional => (is => 'ro', isa => 'Bool', default => 0);
 
     sub binder {
         my ($self, $ixp) = @_;
@@ -60,6 +61,13 @@ use 5.010;
                                 CgOp::rawscall('Kernel.SlurpyHelper',
                                     CgOp::callframe, CgOp::int($$ixp)))),
                         CgOp::newscalar($do))}));
+        } elsif ($self->optional) {
+            $self->target->binder(CgOp::ternary(
+                CgOp::compare('>',
+                    CgOp::getfield('Length', CgOp::getfield('pos',
+                            CgOp::callframe)), CgOp::int($$ixp)),
+                CgOp::pos($$ixp++),
+                CgOp::scopedlex('Any')));
         } else {
             $self->target->binder(CgOp::pos($$ixp++));
         }
