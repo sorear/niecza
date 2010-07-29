@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 144;
+plan 148;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -420,4 +420,12 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok ({ $_ * $_ })(20) == 400, '$_ treated as placeholder';
     ok ({ $^a - $^b })(5,3) == 2, '$^x treated as such';
     ok ({ $^b - $^a })(3,5) == 2, '... in the right order';
+}
+
+{
+    my $canary = 1;
+    ok !(1 > 2 > ($canary = 0)), "1 > 2 > ... is false";
+    ok $canary, "short circuitally";
+    ok !(1 < 3 < 2), "1 < 3 < 2 is false";
+    ok (1 < 2 < 3), "1 < 2 < 3 is true";
 }

@@ -467,16 +467,27 @@ sub INFIX { my ($cl, $M) = @_;
 
 sub CHAIN { my ($cl, $M) = @_;
     my $op = '&infix:<' . $M->{chain}[1]{sym} . '>';
-    if (@{ $M->{chain} } != 3) {
-        $M->sorry('Chaining not yet implemented');
-        return;
+    my @args;
+    for my $i (0 .. scalar @{ $M->{chain} }) {
+        if (($i % 2) == 0) {
+            push @args, $M->{chain}[$i]{_ast};
+        }
     }
 
-    my ($st, @args) = $cl->whatever_precheck($op, $M->{chain}[0]{_ast},
-        $M->{chain}[2]{_ast});
+    my ($st, @vargs) = $cl->whatever_precheck($op, @args);
 
-    $M->{_ast} = $cl->whatever_postcheck($M, $st, Op::CallSub->new(node($M),
-        invocant => Op::Lexical->new(name => $op), positionals => [ @args ]));
+    my @pairwise;
+    while (@vargs >= 2) {
+        push @pairwise, Op::CallSub->new(node($M),
+                invocant => Op::Lexical->new(name => $op),
+                positionals => [ $vargs[0], $vargs[1] ]);
+        shift @vargs;
+    }
+
+    $M->{_ast} = (@pairwise > 1) ?  Op::ShortCircuit->new(node($M),
+        kind => '&&', args => \@pairwise) : $pairwise[0];
+
+    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
 }
 
 my %loose2tight = (
