@@ -1485,10 +1485,8 @@ sub get_placeholder_sig { my ($cl, $M) = @_;
     my @parms;
     for (@things) {
         if ($_ =~ /^\$_ is ref/) {
-            # This needs to be optional or lots of stuff will break, but we
-            # don't have optionals yet
-            #push @parms, Sig::Parameter->new(optional => 1,
-            #    target => Sig::Target->new(slot => '$_', ref_outer => 1));
+            push @parms, Sig::Parameter->new(optional => 1,
+                target => Sig::Target->new(slot => '$_'));
         } elsif ($_ eq '*@_') {
             push @parms, Sig::Parameter->new(slurpy => 1,
                 target => Sig::Target->new(slot => '@_', list => 1));

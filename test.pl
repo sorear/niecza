@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 143;
+plan 144;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -417,7 +417,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 }
 
 {
-    #ok ({ $_ * $_ })(20) == 400, '$_ treated as placeholder';
+    ok ({ $_ * $_ })(20) == 400, '$_ treated as placeholder';
     ok ({ $^a - $^b })(5,3) == 2, '$^x treated as such';
     ok ({ $^b - $^a })(3,5) == 2, '... in the right order';
 }
