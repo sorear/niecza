@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 148;
+plan 149;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -429,3 +429,5 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok !(1 < 3 < 2), "1 < 3 < 2 is false";
     ok (1 < 2 < 3), "1 < 2 < 3 is true";
 }
+
+ok (-42) + 42 == 0, "unary minus works";
