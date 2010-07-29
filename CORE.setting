@@ -29,7 +29,7 @@ my class ClassHOW { ... }
 
 PRE-INIT {
     # ClassHOW.new($name) --> meta class instance
-    sub new { Q:CgOp {
+    sub new is rawcall { Q:CgOp {
         (withtypes $mo DynMetaObject $self DynObject
           [l $mo   (rawnew DynMetaObject (unbox String (@ (pos 1))))]
           [l $self (rawnew DynObject (getfield klass
@@ -43,7 +43,7 @@ PRE-INIT {
     } }
 
     # $how.add-super($p)
-    sub add-super { Q:CgOp { (prog
+    sub add-super is rawcall { Q:CgOp { (prog
         [rawcall
           (getfield superclasses (unwrap DynMetaObject
             (getattr meta-object (@ (pos 0))))) Add
@@ -52,7 +52,7 @@ PRE-INIT {
     } }
 
     # $how.add-method($name, $sub)
-    sub add-method { Q:CgOp {
+    sub add-method is rawcall { Q:CgOp {
         (prog
           [setindex (unbox String (@ (pos 1)))
             (getfield local (unwrap DynMetaObject (getattr meta-object
@@ -63,7 +63,7 @@ PRE-INIT {
     } }
 
     # $how.add-attribute($name)
-    sub add-attribute { Q:CgOp {
+    sub add-attribute is rawcall { Q:CgOp {
         (prog
           [setindex (unbox String (@ (pos 1)))
             (getfield local_attr (unwrap DynMetaObject (getattr meta-object
@@ -74,7 +74,7 @@ PRE-INIT {
     } }
 
     # $how.create-protoobject()
-    sub create-protoobject { Q:CgOp {
+    sub create-protoobject is rawcall { Q:CgOp {
         (withtypes $p DynObject $mo DynMetaObject
           [l $mo (unwrap DynMetaObject (getattr meta-object (@ (pos 0))))]
           [l $p (rawnew DynObject (l $mo))]
@@ -87,7 +87,7 @@ PRE-INIT {
           [newscalar (l $p)])
     } }
 
-    sub compose { Q:CgOp { (null Variable) } }
+    sub compose is rawcall { Q:CgOp { (null Variable) } }
 
     Q:CgOp {
         (withtypes $chmo DynMetaObject $chch Variable
@@ -126,7 +126,7 @@ my class Scalar { ... }
 my class Sub { ... }
 PRE-INIT {
     # (DynMetaObject $dmo, ClassHOW $super --> ClassHOW)
-    sub wrap-dpmo { Q:CgOp {
+    sub wrap-dpmo is rawcall { Q:CgOp {
         (withtypes $ch Variable $dm DynMetaObject
           [l $ch (methodcall (l ClassHOW) new (string_var ""))]
           [l $dm (unwrap DynMetaObject (@ (pos 0)))]
@@ -225,7 +225,7 @@ constant False = Q:CgOp { (box Bool (bool 0)) };
 
 # taking a slurpy is wrong for this due to flattening.  I'm not sure what is
 # right, maybe **@foo
-sub infix:<~> { Q:CgOp {
+sub infix:<~> is rawcall { Q:CgOp {
     (letn buf (rawnew System.Text.StringBuilder)
           i   (int 0)
           max (getfield Length (getfield pos (callframe)))
@@ -301,7 +301,7 @@ sub exit() { Q:CgOp {
     )
 } }
 
-sub infix:<=> { Q:CgOp { (prog [assign (pos 0) (pos 1)] (pos 0)) } }
+sub infix:<=> is rawcall { Q:CgOp { (prog [assign (pos 0) (pos 1)] (pos 0)) } }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
@@ -358,7 +358,7 @@ PRE-INIT {
     Mu.HOW.add-method("notdef", anon method notdef() { ! self.defined });
     Mu.HOW.add-method("so", anon method so() { self.Bool });
     Mu.HOW.add-method("not", anon method not() { ! self.Bool });
-    Mu.HOW.add-method("RAWCREATE", anon method RAWCREATE { Q:CgOp {
+    Mu.HOW.add-method("RAWCREATE", anon method RAWCREATE is rawcall { Q:CgOp {
             (withtypes i Int32 max Int32 obj DynObject
               [l max (getfield Length (getfield pos (callframe)))]
               [l i (int 1)]
@@ -401,14 +401,14 @@ PRE-INIT {
 # boxes a List<Variable>. SCHLIEMEL WAS HERE
 # we can't use sigs on push and unshift because $x loses the flat bit
 my class LLArray {
-    method push { Q:CgOp { (prog
+    method push is rawcall { Q:CgOp { (prog
       [rawcall (unbox List<Variable> (@ (pos 0))) Add (pos 1)] [pos 0]) } }
     method shift() { Q:CgOp { (withtypes $f Variable $lv List<Variable>
       [l $lv (unbox List<Variable> (@ (l self)))]
       [l $f (getindex (int 0) (l $lv))]
       [rawcall (l $lv) RemoveAt (int 0)]
       [l $f]) } }
-    method unshift { Q:CgOp { (prog
+    method unshift is rawcall { Q:CgOp { (prog
       [rawcall (unbox List<Variable> (@ (pos 0))) Insert (int 0) (pos 1)]
       [pos 0]) } }
     method first-flattens() { Q:CgOp {

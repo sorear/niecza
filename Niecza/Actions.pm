@@ -1412,6 +1412,8 @@ sub trait_mod__S_is { my ($cl, $M) = @_;
     } elsif ($trait eq 'export') {
         $M->{_ast} = { export => [ 'DEFAULT', 'ALL' ] };
         $noparm = 'Export tags NYI';
+    } elsif ($trait eq 'rawcall') {
+        $M->{_ast} = { nobinder => 1 };
     } else {
         $M->sorry('Unhandled trait ' . $trait);
     }
@@ -1473,6 +1475,10 @@ sub block_to_closure { my ($cl, $M, $blk, %args) = @_;
         method_too => $args{method_too}, exports => ($args{exports} // []));
 }
 
+sub get_placeholder_sig { my ($cl) = @_;
+    return Sig->new(params => []);
+}
+
 # always a sub, though sometimes it's an implied sub after multi/proto/only
 sub routine_def { my ($cl, $M) = @_;
     if ($M->{sigil}[0] && $M->{sigil}[0]->Str eq '&*') {
@@ -1485,9 +1491,13 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
     my @export;
+    my $signature = $M->{multisig}[0] ? $M->{multisig}[0]{_ast} :
+        $cl->get_placeholder_sig($M);
     for my $t (@{ $M->{trait} }) {
         if ($t->{_ast}{export}) {
             push @export, @{ $t->{_ast}{export} };
+        } elsif ($t->{_ast}{nobinder}) {
+            $signature = undef;
         } else {
             $M->sorry('Non-export sub traits NYI');
         }
@@ -1508,7 +1518,7 @@ sub routine_def { my ($cl, $M) = @_;
             $cl->sl_to_block('sub',
                 $M->{blockoid}{_ast},
                 subname => $m,
-                signature => ($M->{multisig}[0] ? $M->{multisig}[0]{_ast} : undef)),
+                signature => $signature),
         outer_key => (($scope eq 'my') ? "&$m" : undef),
         exports => \@export);
 }
@@ -1519,8 +1529,8 @@ sub method_def { my ($cl, $M) = @_;
     $scope = 'anon' if !$M->{longname};
     my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}, "method definition") : undef;
 
-    if ($M->{trait}[0] || $M->{sigil}) {
-        $M->sorry("Method traits NYI");
+    if ($M->{sigil}) {
+        $M->sorry("Method sgils NYI");
         return;
     }
     if ($type eq '^') {
@@ -1543,11 +1553,20 @@ sub method_def { my ($cl, $M) = @_;
         $M->sorry("Packages NYI");
         return;
     }
+    my $sig = $M->{multisig}[0] ? $M->{multisig}[0]{_ast} :
+        $cl->get_placeholder_sig;
+
+    for my $t (@{ $M->{trait} }) {
+        if ($t->{_ast}{nobinder}) {
+            $sig = undef;
+        } else {
+            $M->sorry("NYI method trait " . $M->Str);
+        }
+    }
 
     my $bl = $cl->sl_to_block('sub', $M->{blockoid}{_ast},
         subname => $name,
-        signature => ($M->{multisig}[0] ?
-            $M->{multisig}[0]{_ast}->for_method : undef));
+        signature => $sig ? $sig->for_method : undef);
 
     $M->{_ast} = $cl->block_to_closure($M, $bl, outer_key => $sym,
         method_too => ($scope ne 'anon' ? "$type$name" : undef));
