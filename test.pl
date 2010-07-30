@@ -308,7 +308,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     my class Baz { our $x = 42; }
     ok $Baz::x == 42, "and class";
 
-    ok $Cow::x.notdef, "package variables autoviv to undef";
+    ok !$Cow::x.defined, "package variables autoviv to undef";
     $Cow::x = 51;
     ok $Cow::x == 51, "but can still hold values";
 }

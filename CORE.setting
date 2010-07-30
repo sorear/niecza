@@ -356,7 +356,6 @@ PRE-INIT {
                 $tn ~ "()"
             }
         });
-    Mu.HOW.add-method("notdef", anon method notdef() { ! self.defined });
     Mu.HOW.add-method("so", anon method so() { self.Bool });
     Mu.HOW.add-method("not", anon method not() { ! self.Bool });
     Mu.HOW.add-method("RAWCREATE", anon method RAWCREATE is rawcall { Q:CgOp {
