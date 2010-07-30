@@ -450,69 +450,8 @@ blocked:
             //return f;
         }
 
-        // Needs more special handling for control exceptions.
-        private static Frame ThrowC(Frame th) {
-            IP6 a;
-            switch (th.ip) {
-                case 0:
-                    th.lex["$cursor"] = NewRWScalar(th.caller);
-                    goto case 1;
-                case 1:
-                    th.ip = 2;
-                    th.resultSlot = null;
-                    return ((Variable)th.lex["$cursor"])
-                        .lv.container.Fetch(th);
-                case 2:
-                    a = (IP6)th.resultSlot;
-                    if (a == null) {
-                        throw new Exception("Unhandled Perl 6 exception");
-                    }
-                    th.ip = 3;
-                    th.resultSlot = null;
-                    return a.GetAttribute(th, "exn_skipto");
-                case 3:
-                    // if skipto, skip some frames.  Used to implement CATCH
-                    // invisibility
-                    if (th.resultSlot != null) {
-                        th.ip = 1;
-                        a = (IP6)th.resultSlot;
-                        th.resultSlot = null;
-                        return ((Variable)th.lex["$cursor"])
-                            .lv.container.Store(th, a);
-                    }
-                    th.ip = 4;
-                    th.resultSlot = null;
-                    return ((Variable)th.lex["$cursor"])
-                        .lv.container.Fetch(th);
-                case 4:
-                    a = (IP6)th.resultSlot;
-                    th.ip = 5;
-                    th.resultSlot = null;
-                    return a.GetAttribute(th, "exn_handler");
-                case 5:
-                    if (th.resultSlot != null) {
-                        // tailcall
-                        return ((IP6)th.resultSlot).Invoke(th.caller,
-                                th.pos, th.named);
-                    }
-                    th.ip = 6;
-                    th.resultSlot = null;
-                    return ((Variable)th.lex["$cursor"])
-                        .lv.container.Fetch(th);
-                case 6:
-                    a = ((Frame)th.resultSlot).caller;
-                    th.ip = 1;
-                    th.resultSlot = null;
-                    return ((Variable)th.lex["$cursor"])
-                        .lv.container.Store(th, a);
-                default:
-                    throw new Exception("IP invalid");
-            }
-        }
-
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject ScalarMO;
-        public static readonly IP6 DieSub;
 
         public static bool TraceCont;
 
@@ -743,13 +682,98 @@ blocked:
             ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
             ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
-            DieSub = MakeSub(new DynBlockDelegate(ThrowC), null, null);
-
             GlobalO = new CLRImportObject(new Dictionary<string,Variable>());
             Global = NewROScalar(GlobalO);
             ProcessO = new CLRImportObject(new Dictionary<string,Variable>());
             Process = NewROScalar(ProcessO);
         }
+    }
+
+    public abstract class ExceptionPacket {
+        public Frame throwSite;
+        public Frame cursor;
+
+        public abstract bool Filter(Frame cand);
+        // for setting $!
+        public abstract IP6 Payload();
+        // CATCH vs CONTROL
+        public abstract bool IsFatal();
+        public abstract Frame Process(Frame target);
+
+        public ExceptionPacket(Frame throwSite) {
+            this.throwSite = throwSite;
+            this.cursor = throwSite;
+        }
+
+        public Frame SearchForHandler() {
+            string key = IsFatal() ? "!ehcatch" : "!ehcontrol";
+            while (cursor != null) {
+                Frame test = cursor;
+                if (test.proto != null) { test = test.proto; }
+
+                object o;
+                if (test.lex.TryGetValue(key, out o)) {
+                    Frame fn = new Frame(throwSite, cursor,
+                            (DynBlockDelegate) o);
+                    // the rethrow needs to skip this
+                    cursor = cursor.caller;
+                    fn.proto = (Frame) test.lex[key + "p"];
+                    fn.lex["!rethrow"] = this;
+                    return fn;
+                }
+
+                if (cursor.lex.ContainsKey("!rethrow")) {
+                    // this is an active exception handling frame!  skip
+                    // the corresponding handler
+                    cursor = cursor.outer;
+                }
+                cursor = cursor.caller;
+
+                if (Filter(cursor)) {
+                    return Process(cursor);
+                }
+            }
+
+            throw new Exception("--- Unhandled exception in Perl 6 code ---");
+            // TODO: backtrace, .Str
+        }
+    }
+
+    // no payload; you should have already poked the right value into a
+    // result slot somewhere.  ip = 0 means immediate return (leave)
+    public class LexoticControlException : ExceptionPacket {
+        public Frame target;
+        public int ip;
+
+        public LexoticControlException(Frame from, Frame target, int ip) :
+                base(from) {
+            this.target = target;
+            this.ip = ip;
+        }
+
+        public override bool Filter(Frame cand) { return cand == target; }
+        public override IP6 Payload() { return Kernel.AnyP; } // XXX
+        public override bool IsFatal() { return false; }
+        public override Frame Process(Frame t) {
+            if (ip != 0) {
+                t.ip = ip;
+            }
+            return t;
+        }
+    }
+
+    public class FatalException : ExceptionPacket {
+        public IP6 payload;
+
+        public FatalException(Frame from, IP6 payload) : base(from) {
+            this.payload = payload;
+        }
+
+        // can only be explicitly caught
+        public override bool Filter(Frame cand) { return false; }
+        public override bool IsFatal() { return true; }
+        public override IP6 Payload() { return payload; }
+        public override Frame Process(Frame t) { return t; }
     }
 }
 
