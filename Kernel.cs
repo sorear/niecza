@@ -753,10 +753,33 @@ blocked:
                 }
             }
 
-            Console.Error.WriteLine("--- Unhandled exception in Perl 6 code ---");
-            Environment.Exit(1);
+            Unhandled();
             return null;
-            // TODO: backtrace, .Str
+        }
+
+        // This *probably* ought to be handled in Perl 6 code, using .Str,
+        // but we're now at a very low bootstrap level;
+        private void Unhandled() {
+            IP6 p = Payload();
+            CLRImportObject cp = p as CLRImportObject;
+            DynObject dp = p as DynObject;
+            Exception e = (cp != null) ? (cp.val as Exception) : null;
+            string s = (dp != null && dp.slots.ContainsKey("value")) ?
+                (dp.slots["value"] as string) : null;
+
+            if (e != null) {
+                // Wrapped CLR exception; has a message, and inner frames
+                s = e.ToString();
+            } else if (s == null) {
+                s = "(no message available)";
+            }
+            Console.Error.WriteLine("Unhandled exception: " + s);
+            Frame c;
+            for (c = bot; c != null; c = c.caller) {
+                Console.Error.WriteLine("  at {0} line {1}",
+                        c.ExecutingFile(), c.ExecutingLine());
+            }
+            Environment.Exit(1);
         }
     }
 
