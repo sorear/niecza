@@ -690,8 +690,8 @@ blocked:
     }
 
     public abstract class ExceptionPacket {
-        public Frame throwSite;
-        public Frame cursor;
+        public Frame bot;
+        public Frame top;
 
         public abstract bool Filter(Frame cand);
         // for setting $!
@@ -700,37 +700,50 @@ blocked:
         public abstract bool IsFatal();
         public abstract Frame Process(Frame target);
 
-        public ExceptionPacket(Frame throwSite) {
-            this.throwSite = throwSite;
-            this.cursor = throwSite;
+        // stage 2!
+        public Frame Unwind(Frame caller) {
+            while (top != bot) {
+                Frame pop = bot;
+                bot = bot.caller;
+                object o;
+
+                if (pop.proto.lex.TryGetValue("!unwind", out o)) {
+                    Frame n = new Frame(bot, bot, (DynBlockDelegate) o);
+                    n.proto = (Frame) pop.proto.lex["!unwindp"];
+                    n.lex["!reunwind"] = this;
+                    return n;
+                }
+            }
+
+            return bot;
         }
 
-        public Frame SearchForHandler() {
+        public Frame SearchForHandler(Frame caller) {
+            if (bot == null) { // first call
+                bot = top = caller;
+            }
             string key = IsFatal() ? "!ehcatch" : "!ehcontrol";
-            while (cursor != null) {
-                Frame test = cursor;
+            while (top != null) {
+                Frame test = top;
                 if (test.proto != null) { test = test.proto; }
 
                 object o;
                 if (test.lex.TryGetValue(key, out o)) {
-                    Frame fn = new Frame(throwSite, cursor,
-                            (DynBlockDelegate) o);
-                    // the rethrow needs to skip this
-                    cursor = cursor.caller;
+                    Frame fn = new Frame(bot, top, (DynBlockDelegate) o);
                     fn.proto = (Frame) test.lex[key + "p"];
                     fn.lex["!rethrow"] = this;
                     return fn;
                 }
 
-                if (cursor.lex.ContainsKey("!rethrow")) {
+                if (top.lex.ContainsKey("!rethrow")) {
                     // this is an active exception handling frame!  skip
                     // the corresponding handler
-                    cursor = cursor.outer;
-                }
-                cursor = cursor.caller;
-
-                if (Filter(cursor)) {
-                    return Process(cursor);
+                    top = top.outer.caller;
+                } else {
+                    if (Filter(top)) {
+                        return Process(top);
+                    }
+                    top = top.caller;
                 }
             }
 
@@ -745,8 +758,7 @@ blocked:
         public Frame target;
         public int ip;
 
-        public LexoticControlException(Frame from, Frame target, int ip) :
-                base(from) {
+        public LexoticControlException(Frame target, int ip) {
             this.target = target;
             this.ip = ip;
         }
@@ -765,7 +777,7 @@ blocked:
     public class FatalException : ExceptionPacket {
         public IP6 payload;
 
-        public FatalException(Frame from, IP6 payload) : base(from) {
+        public FatalException(IP6 payload) {
             this.payload = payload;
         }
 
