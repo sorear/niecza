@@ -660,7 +660,13 @@ blocked:
             Frame root_f = new Frame(null, null, boot);
             Frame current = root_f;
             while (current != null) {
-                current = current.Continue();
+                try {
+                    current = current.Continue();
+                } catch (Exception ex) {
+                    ExceptionPacket ep = new FatalException(
+                            new CLRImportObject(ex));
+                    current = ep.SearchForHandler(current);
+                }
             }
         }
 
@@ -747,7 +753,9 @@ blocked:
                 }
             }
 
-            throw new Exception("--- Unhandled exception in Perl 6 code ---");
+            Console.Error.WriteLine("--- Unhandled exception in Perl 6 code ---");
+            Environment.Exit(1);
+            return null;
             // TODO: backtrace, .Str
         }
     }
