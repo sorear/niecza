@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use 5.010;
+use utf8;
 
 use CgOp;
 
@@ -16,8 +17,7 @@ use CgOp;
         Op::SubDef->new(var => 'rx!' . ($i++), body =>
             Body->new(
                 type      => 'regex',
-                signature => Sig->new(params => [ Sig::Parameter->new(
-                    target => Sig::Target->new(slot => '$¢'))]),
+                signature => Sig->simple('$¢'),
                 do        => $op));
     }
 

@@ -380,8 +380,12 @@ blocked:
     public class Kernel {
         public static DynBlockDelegate MainlineContinuation;
 
+        private static object UnboxDO(DynObject o) {
+            return o.slots["value"];
+        }
+
         private static Frame SCFetch(DynObject th, Frame caller) {
-            caller.resultSlot = th.slots["value"];
+            caller.resultSlot = UnboxDO(th);
             return caller;
         }
 
@@ -472,7 +476,7 @@ blocked:
 
         public static object UnboxAny(IP6 o) {
             // TODO: Check for compatibility?
-            return ((DynObject)o).slots["value"];
+            return UnboxDO((DynObject)o);
         }
 
         public static IP6 MakeSC(IP6 inside) {
@@ -493,6 +497,41 @@ blocked:
                     return th.caller;
                 default:
                     throw new Exception("IP invalid");
+            }
+        }
+
+        public static Frame BindNewScalar(Frame th, Variable rhs, bool ro,
+                bool forcerw) {
+            IP6 cont;
+            bool contrw;
+            if (rhs.lv.islist) {
+                cont = MakeSC(rhs.lv.container);
+                contrw = false;
+            } else {
+                cont = rhs.lv.container;
+                contrw = rhs.lv.rw;
+            }
+            th.resultSlot = new Variable(false, Variable.Context.Scalar,
+                    new LValue(!ro && contrw, false, cont)); // TODO forcerw
+            return th;
+        }
+
+        public static Frame BindNewList(Frame th, Variable rhs,
+                bool ro, bool forcerw) {
+            Frame n;
+            Variable lhs = new Variable(false, Variable.Context.List,
+                    new LValue(true, true, null));
+            th.resultSlot = lhs;
+            if (rhs.lv.islist) {
+                lhs.lv = rhs.lv;
+                if (ro) { lhs.lv.rw = false; }
+                return th;
+            } else {
+                n = new Frame(th, null,
+                        new DynBlockDelegate(BindListizeC));
+                n.lex["o"] = rhs.lv;
+                n.lex["c"] = lhs;
+                return n;
             }
         }
 

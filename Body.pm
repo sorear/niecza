@@ -69,7 +69,7 @@ use CgOp ();
         my ($self) = @_;
         my @enter;
         push @enter, map { $_->enter_code($self) } @{ $self->decls };
-        push @enter, $self->signature->binder if $self->signature;
+        push @enter, $self->signature->binder($self->name) if $self->signature;
         # TODO: Bind a return value here to catch non-ro sub use
         $self->cgoptree(CgOp::prog(@enter,
                 CgOp::return($self->do->cgop($self))));

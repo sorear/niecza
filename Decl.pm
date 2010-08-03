@@ -93,6 +93,7 @@ use CgOp;
     has list     => (isa => 'Bool', is => 'ro', default => 0);
     has shared   => (isa => 'Bool', is => 'ro', default => 0);
     has zeroinit => (isa => 'Bool', is => 'ro', default => 0);
+    has noenter  => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
         $_[0]->slot, 'Variable';
@@ -114,6 +115,8 @@ use CgOp;
 
     sub enter_code {
         my ($self, $body) = @_;
+
+        return CgOp::noop if $self->noenter;
 
         ($body->mainline || $self->shared) ?
             CgOp::share_lex($self->slot) :

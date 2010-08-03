@@ -852,7 +852,7 @@ sub variable { my ($cl, $M) = @_;
 
 sub param_sep {}
 
-# :: Sig::Target
+# :: { list : Bool, slot : Maybe[Str] }
 sub param_var { my ($cl, $M) = @_;
     if ($M->{signature}) {
         $M->sorry('Sub-signatures NYI');
@@ -864,8 +864,8 @@ sub param_var { my ($cl, $M) = @_;
         $M->sorry('Non bare scalar targets NYI');
         return;
     }
-    $M->{_ast} = Sig::Target->new(list => ($sigil eq '@'), slot =>
-        $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef);
+    $M->{_ast} = { list => ($sigil eq '@'), slot =>
+        $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef };
 }
 
 # :: Sig::Parameter
@@ -900,8 +900,8 @@ sub parameter { my ($cl, $M) = @_;
         return;
     }
 
-    $M->{_ast} = Sig::Parameter->new(target => $M->{param_var}{_ast},
-        slurpy => ($M->{quant} eq '*'));
+    $M->{_ast} = Sig::Parameter->new(name => $M->Str,
+        slurpy => ($M->{quant} eq '*'), %{ $M->{param_var}{_ast} });
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -1497,13 +1497,13 @@ sub get_placeholder_sig { my ($cl, $M) = @_;
     for (@things) {
         if ($_ =~ /^\$_ is ref/) {
             push @parms, Sig::Parameter->new(optional => 1,
-                target => Sig::Target->new(slot => '$_'));
+                slot => '$_', name => '$_');
         } elsif ($_ eq '*@_') {
-            push @parms, Sig::Parameter->new(slurpy => 1,
-                target => Sig::Target->new(slot => '@_', list => 1));
+            push @parms, Sig::Parameter->new(slurpy => 1, slot => '@_',
+                list => 1, name => '*@_');
         } elsif ($_ =~ /^([@\$])/) {
-            push @parms, Sig::Parameter->new(
-                target => Sig::Target->new(slot => $_), list => ($1 eq '@'));
+            push @parms, Sig::Parameter->new(slot => $_, name => $_,
+                list => ($1 eq '@'));
         } else {
             $M->sorry('Named placeholder parameters NYI');
             return;
@@ -1667,8 +1667,8 @@ sub comp_unit { my ($cl, $M) = @_;
             type => 'mainline',
             name => 'install',
             signature => Sig->new(params => [
-                    Sig::Parameter->new(target => Sig::Target->new(
-                            slot => '!mainline', zeroinit => 1))]),
+                    Sig::Parameter->new(name => '!mainline',
+                        slot => '!mainline', zeroinit => 1)]),
             do => Op::CallSub->new(node($M),
                 invocant => Op::CgOp->new(op => CgOp::newscalar(
                         CgOp::rawsget($::SETTINGNAME . ".Installer"))),

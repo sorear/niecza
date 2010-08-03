@@ -59,6 +59,10 @@ use 5.010;
               ExecutingLine=> [m => 'Int32'],
               ExecutingFile=> [m => 'String'],
               LexicalFind  => [m => 'Variable'] },
+        'Niecza.FatalException' =>
+            { SearchForHandler => [c => 'Void'] },
+        'Niecza.LexoticControlException' =>
+            { SearchForHandler => [c => 'Void'] },
 
         'Kernel.ContextHelper' => [m => 'Variable'],
         'Kernel.StrP'          => [f => 'IP6'],
@@ -68,6 +72,8 @@ use 5.010;
         'Kernel.PackageLookup' => [m => 'Variable'],
         'Kernel.SlurpyHelper'  => [m => 'List<Variable>'],
         'Kernel.Bind'          => [c => 'Void'],
+        'Kernel.BindNewScalar' => [c => 'Variable'],
+        'Kernel.BindNewList'   => [c => 'Variable'],
         'Kernel.Assign'        => [c => 'Void'],
         'Kernel.Fetch'         => [c => 'IP6'],
         'Kernel.DefaultNew'    => [m => 'Variable'],
@@ -189,6 +195,7 @@ use 5.010;
         $self->lineinfo->[$n] = $line;
         $self->fileinfo->[$n] = $file;
         push @{ $self->buffer }, "case $n:\n";
+        die "Broken call $expr" if !defined($rt);
         $self->resulttype($rt);
     }
 
@@ -348,7 +355,7 @@ use 5.010;
         my @args = reverse map { ($self->_popn(1))[0] }
                 (1 .. $numargs + 1);  # invocant LV
         my ($inv) = $self->_popn(1);
-        $self->_cpscall(($nv ? 'Variable' : undef),
+        $self->_cpscall(($nv ? 'Variable' : 'Void'),
             "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" .
             scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) .
             " }, null)");
@@ -358,7 +365,7 @@ use 5.010;
         my ($self, $nv, $numargs) = @_;
         my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
         my ($inv) = $self->_popn(1);
-        $self->_cpscall(($nv ? 'Variable' : undef),
+        $self->_cpscall(($nv ? 'Variable' : 'Void'),
             "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " .
             join(", ", map { "$_.lv" } @args) . " }, null)");
     }
@@ -476,7 +483,7 @@ use 5.010;
         my ($cl, $rt) = $self->_typedata('cm', $name);
         my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         if ($cl eq 'c') {
-            $self->_cpscall(($rt eq 'Void' ? undef : $rt),
+            $self->_cpscall($rt,
                 "$name(" . join(", ", "th", @args) . ")");
         } elsif ($rt ne 'Void') {
             $self->_push($rt, "$name(" . join(", ", @args) . ")");
@@ -491,7 +498,7 @@ use 5.010;
         my ($cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1], $name);
         my ($inv) = $self->_popn(1);
         if ($cl eq 'c') {
-            $self->_cpscall(($rt eq 'Void' ? undef : $rt),
+            $self->_cpscall($rt,
                 "$inv.$name(" . join(", ", "th", @args) . ")");
         } elsif ($rt ne 'Void') {
             $self->_push($rt, "$inv.$name(" . join(", ", @args) . ")");

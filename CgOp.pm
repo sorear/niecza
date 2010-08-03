@@ -564,11 +564,20 @@ use warnings;
             zyg => [$stuff]);
     }
 
+    sub die {
+        my ($msg) = @_;
+        $msg = fetch(string_var($msg)) unless blessed($msg);
+        rawccall(rawnew('Niecza.FatalException', $msg), 'SearchForHandler');
+    }
+
     sub letn {
         my (@stuff) = @_;
         if (blessed($stuff[0])) {
             @stuff;
         } else {
+            if (!@stuff) {
+                Carp::confess "Invalid letn protocol";
+            }
             my ($name, $value) = splice @stuff, 0, 2;
             CgOp::Let->new(name => $name, zyg => [ $value, letn(@stuff) ]);
         }
