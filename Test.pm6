@@ -39,10 +39,27 @@ class Builder {
     method expected-tests($num) {
         self!output("1.." ~ $num);
     }
+
+    # XXX multi!
+    method plan($x) {
+        if $x ~~ Int {
+            self.expected-tests($x);
+        } elsif $x ~~ Whatever {
+            # no effect
+        } else {
+            die "Invalid argument to plan";
+        }
+    }
+
+    method done-testing {
+        self!output("1.." ~ ($.current-test - 1));
+    }
 }
 
 $GLOBAL::TEST-BUILDER = Builder.CREATE;
 $GLOBAL::TEST-BUILDER.reset;
 
 sub ok($bool, $tag) is export { $*TEST-BUILDER.ok($bool, $tag) }
-sub plan($num) is export { $*TEST-BUILDER.expected-tests($num) }
+sub plan($num) is export { $*TEST-BUILDER.plan($num) }
+sub done-testing() is export { $*TEST-BUILDER.done-testing }
+sub done_testing() is export { $*TEST-BUILDER.done-testing }
