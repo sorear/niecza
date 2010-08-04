@@ -42,7 +42,7 @@ class Builder {
 
     # XXX multi!
     method plan($x) {
-        if $x ~~ Int {
+        if $x ~~ Num {
             self.expected-tests($x);
         } elsif $x ~~ Whatever {
             # no effect
