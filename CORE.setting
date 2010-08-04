@@ -677,4 +677,13 @@ PRE-INIT { Q:CgOp { (prog
 sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
 sub callframe { Q:CgOp { (ns (getfield caller (callframe))) } }
 
+sub die($msg) { Q:CgOp { (prog (die (@ (l $msg))) (null Variable)) } }
+
+sub slurp($path) { #OK
+    #?unsafe slurp
+    Q:CgOp { (box Str (rawscall System.IO.File.ReadAllText
+        (unbox System.String (@ (l $path))))) }
+    #?end unsafe
+}
+
 {YOU_ARE_HERE}

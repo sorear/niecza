@@ -2,6 +2,11 @@ MAIN.cs
 MAIN.exe
 Kernel.dll
 Kernel.dll.so
+SAFE.dll
+SAFE.dll.so
+SAFE.cs
+SAFE_ast.store
+SAFE.setting
 CORE.dll
 CORE.dll.so
 CORE.cs

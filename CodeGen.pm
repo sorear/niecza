@@ -64,6 +64,8 @@ use 5.010;
         'Niecza.LexoticControlException' =>
             { SearchForHandler => [c => 'Void'] },
 
+        'System.IO.File.ReadAllText' => [m => 'System.String'],
+
         'Kernel.ContextHelper' => [m => 'Variable'],
         'Kernel.StrP'          => [f => 'IP6'],
         'Kernel.CallFrameMO'   => [f => 'DynMetaObject'],

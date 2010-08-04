@@ -7,6 +7,9 @@ COMPILER=Body.pm CgOp.pm CodeGen.pm CompilerDriver.pm Decl.pm Op.pm RxOp.pm\
 all: CORE.dll
 	git rev-parse HEAD | cut -c1-7 > VERSION
 
+safe: SAFE.dll
+	git rev-parse HEAD | cut -c1-7 > VERSION
+
 test: $(COMPILER) test.pl CORE.dll Test.dll
 	perl niecza_eval --stop-after=gmcs test.pl
 	prove -e mono MAIN.exe
@@ -19,6 +22,10 @@ Kernel.dll: Kernel.cs
 
 CORE.dll: $(COMPILER) Kernel.dll CORE.setting
 	perl niecza_eval --aot -L NULL -c CORE.setting
+
+SAFE.dll: $(COMPILER) Kernel.dll CORE.setting
+	perl -p gen_safe.pl < CORE.setting > SAFE.setting
+	perl niecza_eval --aot -L NULL -c SAFE.setting
 
 Test.dll: $(COMPILER) Kernel.dll CORE.dll Test.pm6
 	perl niecza_eval --aot -c Test.pm6
