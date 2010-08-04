@@ -35,6 +35,7 @@ sub compile {
     local $::SETTING_RESUME;
     local $::YOU_WERE_HERE;
     local $::UNITNAME = $args{main} ? '' : $args{file};
+    local $::SAFEMODE = $args{safe};
     $::UNITNAME =~ s/\.(?:pm6?|setting)//;
     $::UNITNAME =~ s|[\\/]|.|g;
     $STD::ALL = {};

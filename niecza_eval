@@ -13,6 +13,7 @@ my $stagestats;
 my $stopafter;
 my $aot;
 my $lang = 'CORE';
+my $safe;
 
 sub usage {
     my ($fh, $ex) = @_;
@@ -29,25 +30,29 @@ general options:
    --stage-stats             # detailed timing info
    --stop-after=STAGE        # stop after STAGE and dump AST
    --aot                     # run ahead-of-time compiler
+   --safe                    # disable system interaction, implies -L SAFE
 EOM
     exit $ex;
 }
 
 GetOptions('evaluate|e=s' => \@evaluate, 'aot' => \$aot,
         'compile|c' => \$module, 'language|L=s' => \$lang,
-        'stage-stats|v' => \$stagestats, 'stop-after=s' => \$stopafter)
+        'stage-stats|v' => \$stagestats, 'stop-after=s' => \$stopafter,
+        'safe' => \$safe)
     or usage(\*STDERR, 1);
 
 my $excl = 0;
 $excl++ if @evaluate;
 $excl++ if @ARGV;
-if ($excl > 1 || $module && !@ARGV) {
+if ($excl > 1 || $module && !@ARGV || $safe && ($lang ne 'CORE')) {
     usage(\*STDERR, 1);
 }
 
+$lang = 'SAFE' if $safe;
+
 sub run {
     compile(main => !$module, stopafter => $stopafter, aot => $aot,
-        stagetime => $stagestats, lang => $lang, @_);
+        stagetime => $stagestats, lang => $lang, safe => $safe, @_);
     system 'mono --debug=casts MAIN.exe' if !$module && !$stopafter;
 }
 

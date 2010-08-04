@@ -374,6 +374,10 @@ sub nibbler { my ($cl, $M) = @_;
     } elsif ($M->isa('Niecza::Grammar::CgOp')) {
         # XXX We don't interpret the code, so we can't tell if it's actually
         # using variables, but still, it probably is.
+        if ($::SAFEMODE) {
+            $M->sorry('Q:CgOp not allowed in safe mode');
+            return;
+        }
         for my $k (keys %$::CURLEX) {
             $::CURLEX->{$k}{used} = 1 if $k =~ /^[\@\%\&\$]\w/;
         }
