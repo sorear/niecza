@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 149;
+plan 151;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -431,3 +431,15 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 }
 
 ok (-42) + 42 == 0, "unary minus works";
+
+{
+    ok Q:to/EOA/.substr(0,5) eq 'Hello', "heredocs work";
+Hello
+EOA
+
+    ok Q:to/EOB/ eq Q:to/EOC/, "multiple heredocs in a line work";
+Foo
+EOB
+Foo
+EOC
+}
