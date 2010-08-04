@@ -400,6 +400,13 @@ use warnings;
         rawscall('Kernel.NewRWListVar', $_[0]);
     }
 
+    sub newblanklist {
+        newrwlistvar(ternary(
+                compare('==', rawsget('Kernel.ArrayP'), null('IP6')),
+                null('IP6'),
+                fetch(methodcall(newscalar(rawsget('Kernel.ArrayP')), 'new'))));
+    }
+
     sub string_var {
         box('Str', clr_string($_[0]));
     }

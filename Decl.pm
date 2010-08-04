@@ -105,8 +105,7 @@ use CgOp;
         if ($self->zeroinit) {
             CgOp::proto_var($self->slot, CgOp::newrwscalar(CgOp::null('IP6')));
         } elsif ($self->list) {
-            CgOp::proto_var($self->slot,
-                CgOp::newrwlistvar(CgOp::fetch(CgOp::scopedlex('Any'))));
+            CgOp::proto_var($self->slot, CgOp::newblanklist);
         } else {
             CgOp::proto_var($self->slot,
                 CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
@@ -120,8 +119,7 @@ use CgOp;
 
         ($body->mainline || $self->shared) ?
             CgOp::share_lex($self->slot) :
-            CgOp::scopedlex($self->slot, $self->list ?
-                CgOp::newrwlistvar(CgOp::fetch(CgOp::scopedlex('Any'))) :
+            CgOp::scopedlex($self->slot, $self->list ? CgOp::newblanklist :
                 CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
     }
 
