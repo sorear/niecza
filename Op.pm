@@ -229,6 +229,28 @@ use CgOp;
 }
 
 {
+    package Op::HereStub;
+    use Moose;
+    extends 'Op';
+
+    has node => (is => 'ro', required => 1);
+
+    sub zyg {
+        my ($self) = @_;
+        return ($self->node // {})->{doc}{_ast} //
+            die("Here document used before body defined");
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        $self->zyg->cgop($body);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Yada;
     use Moose;
     extends 'Op';
@@ -236,7 +258,7 @@ use CgOp;
     has kind => (isa => 'Str', is => 'ro', required => 1);
 
     sub code {
-        my ($self, $cg, $body) = @_;
+        my ($self, $body) = @_;
 
         CgOp::prog(
             CgOp::subcall(

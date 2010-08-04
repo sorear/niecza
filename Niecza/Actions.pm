@@ -178,7 +178,7 @@ sub quote__S_q { my ($cl, $M) = @_;
 }
 
 sub quote__S_Q { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{quibble}{nibble}{_ast};
+    $M->{_ast} = $M->{quibble}{_ast};
 }
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
@@ -981,7 +981,13 @@ sub cgexp__S_op { my ($cl, $M) = @_;
 }
 
 sub apostrophe {}
-sub quibble {}
+sub quibble { my ($cl, $M) = @_;
+    if ($M->{babble}{B}[0]{_herelang}) { #XXX
+        $M->{_ast} = Op::HereStub->new(node => $M);
+    } else {
+        $M->{_ast} = $M->{nibble}{_ast};
+    }
+}
 sub tribble {}
 sub babble {}
 sub quotepair {}
