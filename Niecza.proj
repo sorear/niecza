@@ -18,15 +18,19 @@
     </ItemGroup>
 
     <!-- Meta targets -->
-    <Target Name="Default" DependsOnTargets="CORE.dll"/>
+    <Target Name="Default" DependsOnTargets="CORE.dll;WriteVersion"/>
 
-    <Target Name="SafeMode" DependsOnTargets="SAFE.dll"/>
+    <Target Name="SafeMode" DependsOnTargets="SAFE.dll;WriteVersion"/>
 
-    <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll">
+    <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion">
         <Exec Command="perl niecza_eval --stop-after=cswrite test.pl"/>
         <Csc Sources="MAIN.cs" TargetType="exe" OutputAssembly="MAIN.exe"
             References="Test.dll;CORE.dll;Kernel.dll"/>
         <Exec Command="prove -e mono MAIN.exe"/>
+    </Target>
+
+    <Target Name="WriteVersion">
+        <Exec Command="git describe --always &gt; VERSION"/>
     </Target>
 
     <!-- Libraries -->
