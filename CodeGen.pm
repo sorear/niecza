@@ -153,7 +153,11 @@ use 5.010;
     # These are the sub-primitives.  Their very inteface exposes volatile
     # details of the codegen.
 
-    sub qm { "\"" . $_[0] . "\"" }
+    sub qm {
+        my $out = $_[0];
+        $out =~ s/"/""/g;
+        "@\"$out\"";
+    }
 
     sub _savestackstate {
         my ($self, $lbl) = @_;
