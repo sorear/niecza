@@ -418,7 +418,16 @@ my class LLArray {
       (box Num (cast Double (getfield Count (unbox List<Variable>
         (@ (l self)))))) } }
     method Bool() { ?( self.elems ) }
-    method new(*@v) { Q:CgOp { (varattr rest (@ (l @v))) } }
+    method new is rawcall { Q:CgOp {
+      (letn list (rawnew List<Variable>)
+            max  (getfield Length (getfield pos (callframe)))
+            i    (int 1)
+        [whileloop 0 0 (< (l i) (l max))
+          (prog
+            [rawcall (l list) Add (pos (l i))]
+            [l i (+ (l i) (int 1))])]
+        [box LLArray (l list)])
+    } }
     method at-pos($i) {
         Q:CgOp { (getindex (cast Int32 (unbox Double (@ (l $i))))
                    (unbox List<Variable> (@ (l self)))) }
