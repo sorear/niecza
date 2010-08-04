@@ -25,12 +25,11 @@
         <Exec Command="STDBASE=`pwd`/STD_checkout; PERL5LIB=$STDBASE PERL6LIB=$STDBASE:$STDBASE/lib STD5PREFIX=$STDBASE/ $STDBASE/viv -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);CORE.setting" Outputs="CORE.cs;CORE_ast.store" DependsOnTargets="BuildSTD;Grammar">
-        <Exec Command="perl niecza_eval --stop-after=writecs -L NULL -c CORE.setting"/>
+    <Target Name="CORE.cs" Inputs="@(CompilerPerl);SAFE_ast.store;CORE.setting" Outputs="CORE.cs;CORE_ast.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar">
+        <Exec Command="perl niecza_eval --stop-after=writecs -L SAFE -c CORE.setting"/>
     </Target>
 
-    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);CORE.setting" Outputs="SAFE.cs;SAFE_ast.store" DependsOnTargets="BuildSTD;Grammar">
-        <Exec Command="perl -p gen_safe.pl &lt; CORE.setting &gt; SAFE.setting"/>
+    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting" Outputs="SAFE.cs;SAFE_ast.store" DependsOnTargets="BuildSTD;Grammar">
         <Exec Command="perl niecza_eval --stop-after=writecs -L NULL -c SAFE.setting"/>
     </Target>
 
@@ -38,9 +37,9 @@
         <Exec Command="perl niecza_eval --stop-after=writecs -c Test.pm6"/>
     </Target>
 
-    <Target Name="CORE.dll" Inputs="CORE.cs;Kernel.dll" Outputs="CORE.dll" DependsOnTargets="CORE.cs;Kernel.dll">
+    <Target Name="CORE.dll" Inputs="CORE.cs;SAFE.dll;Kernel.dll" Outputs="CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
         <Csc Sources="CORE.cs" TargetType="library"
-            OutputAssembly="CORE.dll" References="Kernel.dll"/>
+            OutputAssembly="CORE.dll" References="SAFE.dll;Kernel.dll"/>
         <Exec Command="mono --aot CORE.dll"/>
     </Target>
 
