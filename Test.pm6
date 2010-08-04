@@ -60,6 +60,7 @@ $GLOBAL::TEST-BUILDER = Builder.CREATE;
 $GLOBAL::TEST-BUILDER.reset;
 
 sub ok($bool, $tag) is export { $*TEST-BUILDER.ok($bool, $tag) }
+sub is($a, $b, $tag) is export { $*TEST-BUILDER.ok($a eq $b, $tag) }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done-testing() is export { $*TEST-BUILDER.done-testing }
 sub done_testing() is export { $*TEST-BUILDER.done-testing }
