@@ -2,6 +2,7 @@ MAIN.cs
 MAIN.exe
 Kernel.dll
 Kernel.dll.so
+PerlTask.dll
 SAFE.dll
 SAFE.dll.so
 SAFE.cs
