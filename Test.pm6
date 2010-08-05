@@ -1,4 +1,4 @@
-module Test; # XXX our due to the STD pad bug
+my module Test;
 
 constant $?TRANSPARENT = 1;
 
