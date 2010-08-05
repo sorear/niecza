@@ -17,15 +17,11 @@ Mono (2.6.4 recommended)
 
 =item *
 
-GNU make
-
-=item *
-
 Subversion
 
 =item *
 
-Perl 5.10.1 (or 5.10.0 with autodie installed from CPAN) in /usr/local/bin
+Perl 5.10.1 (or 5.10.0 with autodie installed from CPAN) in your PATH
 
 =item *
 
@@ -36,6 +32,8 @@ and YAML::XS from CPAN
 
 =head1 USING
 
+    $ xbuild
+    ... snip build spam ...
     $ ./niecza_eval
     > say 2 + 2
     4
