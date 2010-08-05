@@ -1135,7 +1135,10 @@ sub type_declarator__S_constant { my ($cl, $M) = @_;
     # This is a cheat.  Constants should be, well, constant, and we should be
     # using the phaser rewrite mechanism to get the initializer here.  XXX
     # terms need to use a context hash.
-    $M->{_ast} = Op::Lexical->new(node($M), name => $slot, declaring => 1);
+    $M->{_ast} = ($::SCOPE eq 'our') ?
+        Op::PackageVar->new(node($M), name => $slot, slot => $slot,
+            path => [ 'OUR' ]) :
+        Op::Lexical->new(node($M), name => $slot, declaring => 1);
 }
 
 sub package_declarator {}
