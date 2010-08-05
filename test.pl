@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 151;
+plan 155;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -95,6 +95,11 @@ ok ("a" ~ "b") eq "ab", "a + b = ab";
 ok ("a" ~ "b" ~ "c") eq "abc", "a + b + c = abc";
 ok (?1) eq "Bool::True", "True strings to Bool::True";
 ok (?0) eq "Bool::False", "False strings to Bool::False";
+
+ok False ~~ Bool && !False, "False is the right constant";
+ok True ~~ Bool && True, "True is the right constant";
+ok Bool::False ~~ Bool && !Bool::False, "Bool::False is the right constant";
+ok Bool::True ~~ Bool && Bool::True, "Bool::True is the right constant";
 
 ok ~Any eq "Any()", "~Any is Any()";
 
