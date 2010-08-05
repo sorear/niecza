@@ -24,7 +24,7 @@
     <Target Name="SafeMode" DependsOnTargets="SAFE.dll;WriteVersion"/>
 
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'cswrite', lang => 'CORE', main => 1, file => 'test.pl');"/>
+        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', main => 1, file => 'test.pl');"/>
         <Csc Sources="MAIN.cs" TargetType="exe" OutputAssembly="MAIN.exe"
             References="Test.dll;CORE.dll;Kernel.dll"/>
         <Exec Command="prove -e mono MAIN.exe"/>
@@ -38,37 +38,37 @@
     <Target Name="Kernel.dll" Inputs="Kernel.cs" Outputs="Kernel.dll">
         <Csc Sources="Kernel.cs" TargetType="library"
             OutputAssembly="Kernel.dll"/>
-        <Exec Command="mono --aot Kernel.dll"/>
+        <Exec Command="mono --aot Kernel.dll" ContinueOnError="true"/>
     </Target>
 
     <Target Name="CORE.cs" Inputs="@(CompilerPerl);SAFE_ast.store;CORE.setting" Outputs="CORE.cs;CORE_ast.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'cswrite', lang => 'SAFE', file => 'CORE.setting');"/>
+        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'SAFE', file => 'CORE.setting');"/>
     </Target>
 
     <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting" Outputs="SAFE.cs;SAFE_ast.store" DependsOnTargets="BuildSTD;Grammar;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'cswrite', lang => 'NULL', file => 'SAFE.setting');"/>
+        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'NULL', file => 'SAFE.setting');"/>
     </Target>
 
     <Target Name="Test.cs" Inputs="@(CompilerPerl);CORE_ast.store;Test.pm6" Outputs="Test.cs;Test_ast.store" DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'cswrite', lang => 'CORE', file => 'Test.pm6');"/>
+        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', file => 'Test.pm6');"/>
     </Target>
 
     <Target Name="CORE.dll" Inputs="CORE.cs;SAFE.dll;Kernel.dll" Outputs="CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
         <Csc Sources="CORE.cs" TargetType="library"
             OutputAssembly="CORE.dll" References="SAFE.dll;Kernel.dll"/>
-        <Exec Command="mono --aot CORE.dll"/>
+        <Exec Command="mono --aot CORE.dll" ContinueOnError="true"/>
     </Target>
 
     <Target Name="SAFE.dll" Inputs="SAFE.cs;Kernel.dll" Outputs="SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
         <Csc Sources="SAFE.cs" TargetType="library"
             OutputAssembly="SAFE.dll" References="Kernel.dll"/>
-        <Exec Command="mono --aot SAFE.dll"/>
+        <Exec Command="mono --aot SAFE.dll" ContinueOnError="true"/>
     </Target>
 
     <Target Name="Test.dll" Inputs="Test.cs;CORE.dll;Kernel.dll" Outputs="Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
         <Csc Sources="Test.cs" TargetType="library"
             OutputAssembly="Test.dll" References="CORE.dll;Kernel.dll"/>
-        <Exec Command="mono --aot Test.dll"/>
+        <Exec Command="mono --aot Test.dll" ContinueOnError="true"/>
     </Target>
 
     <!-- Proper compiler bits -->
@@ -95,7 +95,6 @@
     <Target Name="BuildSTD" Inputs=".STD_checkout_stamp"
         Outputs=".STD_build_stamp" DependsOnTargets="CheckoutSTD">
         <Exec WorkingDirectory="STD_checkout" Command="$(Make)"/>
-        <Exec WorkingDirectory="STD_checkout" Command="$(Perl) tryfile STD.pm6"/>
         <Touch AlwaysCreate="true" Files=".STD_build_stamp"
             ContinueOnError="true"/>
     </Target>

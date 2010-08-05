@@ -53,7 +53,7 @@ $lang = 'SAFE' if $safe;
 sub run {
     compile(main => !$module, stopafter => $stopafter, aot => $aot,
         stagetime => $stagestats, lang => $lang, safe => $safe, @_);
-    system 'mono --debug=casts MAIN.exe' if !$module && !$stopafter;
+    system 'mono MAIN.exe' if !$module && !$stopafter;
 }
 
 if (@ARGV) {
