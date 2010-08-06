@@ -414,6 +414,11 @@ PRE-INIT {
 my class LLArray {
     method push is rawcall { Q:CgOp { (prog
       [rawcall (unbox List<Variable> (@ (pos 0))) Add (pos 1)] [pos 0]) } }
+    method pop() { Q:CgOp { (withtypes $f Variable $lv List<Variable>
+      [l $lv (unbox List<Variable> (@ (l self)))]
+      [l $f (getindex (- (getfield Count (l $lv)) (int 1)) (l $lv))]
+      [rawcall (l $lv) RemoveAt (- (getfield Count (l $lv)) (int 1))]
+      [l $f]) } }
     method shift() { Q:CgOp { (withtypes $f Variable $lv List<Variable>
       [l $lv (unbox List<Variable> (@ (l self)))]
       [l $f (getindex (int 0) (l $lv))]

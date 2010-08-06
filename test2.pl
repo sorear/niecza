@@ -24,6 +24,10 @@ PRE-INIT {
     List.HOW.add-method("push", anon method push(*@items) {
         $!rest.push(@items.Seq.eager.iterator)
     });
+    List.HOW.add-method("pop", anon method pop() {
+        self.eager;
+        $!items.pop;
+    });
 }
 
 sub prefix:<+>($x) { $x.Numeric }
@@ -47,5 +51,10 @@ my $k = 2;
 @x.push($k);
 $k = 3;
 ok @x.shift == 2, "push copies";
+
+@x.push(11,12);
+ok @x.pop == 12, "pop is LIFO (1)";
+ok @x.pop == 11, "pop is LIFO (2)";
+ok +@x == 0, "pop removed all elements";
 
 done-testing;
