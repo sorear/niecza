@@ -339,8 +339,7 @@ sub infix:<===>($l,$r) { Q:CgOp {
 
 sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 
-# XXX: We can't use augment syntax because we don't have use working, so
-# no MONKEY_TYPING.
+# TODO: Implement 'augment'
 
 PRE-INIT {
     Mu.HOW.add-method("defined", anon method defined() {
@@ -403,6 +402,15 @@ PRE-INIT {
 
 # boxes a List<Variable>. SCHLIEMEL WAS HERE
 # we can't use sigs on push and unshift because $x loses the flat bit
+# this underlies Parcel and List.  It looks a lot like RPA.
+
+# Parcel: immutable list of boxes which have no context - may flatten, may
+# autovivify, don't rebind or push/shift/etc
+# List: mutable list of boxes without much context.  accessing off end returns
+# undefined.  lazy.
+# Seq: mutable list of boxes which are taken to be read-only scalars. The .Seq
+# coercion makes the elements of a List read-only and maybe fetches them too.
+# Array: mutable list of read-write scalar boxes
 my class LLArray {
     method push is rawcall { Q:CgOp { (prog
       [rawcall (unbox List<Variable> (@ (pos 0))) Add (pos 1)] [pos 0]) } }
@@ -435,6 +443,10 @@ my class LLArray {
         Q:CgOp { (getindex (cast Int32 (unbox Double (@ (l $i))))
                    (unbox List<Variable> (@ (l self)))) }
     }
+    method clone() { Q:CgOp {
+        (box LLArray (rawnew List<Variable>
+            (unbox List<Variable> (@ (l self)))))
+    } }
 }
 
 my class Iterator {
@@ -469,6 +481,10 @@ sub unfold-iter($fn) {
         Any, "fun", $fn);
 }
 
+sub unfold-list($l) {
+    unfold-iter(sub () { $l ?? $l.shift !! EMPTY; });
+}
+
 sub unfold($fn) {
     my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(),
         "rest", LLArray.new(unfold-iter($fn)));
@@ -483,9 +499,7 @@ my class Parcel is Cool {
     # $!ll
 
     method flat() {
-        my @x := self;
-        List.RAWCREATE("flat", 1, "items", LLArray.new(),
-            "rest", LLArray.new(@x));
+        List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest", $!ll.clone);
     }
 
     method iterator() {
@@ -532,9 +546,19 @@ my class List is Cool {
     has @!rest;
     has $!flat;
     method flat() {
-        my @y := List.RAWCREATE("flat", 1, "items", $!items, "rest", $!rest);
+        my @y := ($!flat ?? self !! self.RAWCREATE("flat", 1,
+            "items", LLArray.new(), "rest", LLArray.new(self.iterator)));
         @y;
     }
+
+    method clone() {
+        self.RAWCREATE("flat", $!flat, "items", $!items.clone, "rest",
+            $!rest.clone);
+    }
+
+    #| Takes an object and applies whatever semantics the List subclass
+    #| needs to apply on stuff out of the iterator stack
+    method !elem is rawcall { Q:CgOp { (pos 1) } }
 
     method !fill($nr) {
         my $i = $!items;
@@ -558,7 +582,7 @@ my class List is Cool {
                         $r.unshift($v.value);
                     }
                 } else {
-                    $i.push($v);
+                    $i.push(self!elem($v));
                 }
             }
         }
@@ -571,6 +595,12 @@ my class List is Cool {
         self!fill(1);
         $!items.shift;
     }
+
+    method eager() {
+        self!fill(1_000_000_000);
+        self;
+    }
+
     method elems() { self!fill(1000_000_000); $!items.elems; }
 
     method at-pos($i) {
@@ -578,14 +608,7 @@ my class List is Cool {
         $!items.at-pos($i);
     }
 
-    # XXX this is wrong, it holds on to the entire list -> memory leaks
-    method iterator() {
-        my $x = 0;
-        unfold-iter(sub () {
-            $x++;
-            (self!fill($x)) ?? (self.at-pos($x - 1)) !! EMPTY;
-        });
-    }
+    method iterator() { unfold-list(self.clone) }
 
     method join($sep) {
         my $t;
