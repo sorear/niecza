@@ -1,18 +1,30 @@
 # vim: ft=perl6
 use Test;
 
+# exactly like List, but flattens, and with "is copy" semantics on stuff
+my class Seq is List {
+    method !elem($x) { my $y = $x; $y }
+    method Seq { self }
+}
+
 my class Array is List {
     method new() {
         Array.RAWCREATE("flat", 1, "items", LLArray.new, "rest", LLArray.new);
     }
-
-    method push(*@x) {
-        $!rest.push(@x);
-    }
-
-    method Numeric { self.elems }
 }
-PRE-INIT { Q:CgOp { (prog (rawsset Kernel.ArrayP (@ (l Array))) (null Variable)) } }
+
+PRE-INIT {
+    Q:CgOp { (prog (rawsset Kernel.ArrayP (@ (l Array))) (null Variable)) };
+
+    List.HOW.add-method("Seq", anon method Seq() {
+        Seq.RAWCREATE("flat", 1, "items", LLArray.new,
+            "rest", LLArray.new(self.iterator));
+    });
+    List.HOW.add-method("Numeric", anon method Numeric () { self.elems });
+    List.HOW.add-method("push", anon method push(*@items) {
+        $!rest.push(@items.Seq.eager.iterator)
+    });
+}
 
 sub prefix:<+>($x) { $x.Numeric }
 
@@ -25,5 +37,15 @@ ok +@x == 0, 'no elements (+)';
 @x.push(5);
 ok @x.elems == 1, 'one element now';
 ok @x.shift == 5, 'element removed is 5';
+@x.push(7,8);
+ok @x.elems == 2, "added two elements";
+ok @x.shift == 7, "removed first correctly";
+ok @x.shift == 8, "removed second correctly";
+ok @x.elems == 0, "no elements again";
+
+my $k = 2;
+@x.push($k);
+$k = 3;
+ok @x.shift == 2, "push copies";
 
 done-testing;
