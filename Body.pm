@@ -24,6 +24,9 @@ use CgOp ();
     has transparent => (isa => 'Bool', is => 'rw', default => 0);
     has decls => (isa => 'ArrayRef[Decl]', is => 'rw');
     has cgoptree => (isa => 'CgOp', is => 'rw');
+    # only used for the top mainline
+    has file => (isa => 'Str', is => 'ro');
+    has text => (isa => 'Str', is => 'ro');
 
     sub is_mainline { $_[0]->scopetree->{'?is_mainline'} }
 
@@ -53,13 +56,21 @@ use CgOp ();
             $self->do->lift_decls;
         unshift @x, $self->signature->local_decls if $self->signature;
         @x = map { (map { $_->lift_decls } $_->bodies), $_ } @x;
-        @x = map { $_->outer_decls, $_ } @x if $self->type eq 'mainline';
-        unshift @x, Decl::PackageLink->new(name => '$?GLOBAL')
-            if $self->type eq 'mainline';
-        unshift @x, Decl::PackageLink->new(name => '$?CURPKG')
-            if $self->type =~ /mainline|class|package|grammar|module|role|slang|knowhow/;
-        push @y, map { $_->outer_decls } @x
-            if $self->type ne 'mainline';
+        unshift @x, Decl::Hint->new(name => '$?CURPKG',
+            value => CgOp::letvar('pkg')) if $self->type =~ /mainline|class|
+            package|grammar|module|role|slang|knowhow/x;
+
+        if ($self->type eq 'mainline') {
+            @x = map { $_->outer_decls, $_ } @x;
+            unshift @x, Decl::Hint->new(name => '$?GLOBAL',
+                value => CgOp::letvar('pkg'));
+            unshift @x, Decl::Hint->new(name => '$?FILE',
+                value => CgOp::string_var($self->file));
+            unshift @x, Decl::Hint->new(name => '$?ORIG',
+                value => CgOp::string_var($self->text));
+        } else {
+            push @y, map { $_->outer_decls } @x;
+        }
         $self->decls(\@x);
 
         @y;

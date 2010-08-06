@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 155;
+plan 157;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -448,3 +448,6 @@ EOB
 Foo
 EOC
 }
+
+is $?FILE, 'test.pl', '$?FILE works';
+is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

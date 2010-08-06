@@ -1480,6 +1480,9 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     $cl->blockcheck;
     Body->new(
         name      => $subname,
+        ($type eq 'mainline' ? (
+                file => $::FILE->{name},
+                text => $::ORIG) : ()),
         type      => $type,
         signature => $args{signature},
         do        => $ast);
@@ -1678,7 +1681,7 @@ sub comp_unit { my ($cl, $M) = @_;
     $body = $cl->sl_to_block('mainline', $sl, subname => 'mainline');
     if ($::YOU_WERE_HERE) {
         $body = Body->new(
-            type => 'mainline',
+            type => 'mainline', file => '(generated)', text => '',
             name => 'install',
             signature => Sig->new(params => [
                     Sig::Parameter->new(name => '!mainline',

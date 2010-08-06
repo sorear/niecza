@@ -427,18 +427,18 @@ use CgOp;
     no Moose;
 }
 
-# XXX this is yucky
 {
-    package Decl::PackageLink;
+    package Decl::Hint;
     use Moose;
     extends 'Decl';
 
-    has name => (is => 'ro', isa => 'Str', required => 1);
+    has name  => (is => 'ro', isa => 'Str', required => 1);
+    has value => (is => 'ro', isa => 'CgOp', required => 1);
 
     sub used_slots { $_[0]->name, 'Variable' }
     sub preinit_code {
         my ($self, $body) = @_;
-        CgOp::proto_var($self->name, CgOp::letvar('pkg'));
+        CgOp::proto_var($self->name, $self->value);
     }
 
     sub enter_code {
