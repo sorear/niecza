@@ -177,6 +177,7 @@ my class Num is Cool {
         (box Bool (compare != (double 0)
                     (unbox Double (fetch (scopedlex self)))))
     } }
+    method Numeric() { self }
     method ACCEPTS($t) { self == $t }
 }
 my class Str is Cool {
@@ -219,6 +220,7 @@ my class Bool is Enum {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Bool() { self }
     method ACCEPTS($) { self }
+    method Numeric() { self ?? 1 !! 0 }
     our constant True  = Q:CgOp { (box Bool (bool 1)) };
     our constant False = Q:CgOp { (box Bool (bool 0)) };
 }
@@ -319,6 +321,8 @@ sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $old }
 sub prefix:<~>($v) { $v.Str } # should be Stringy
 sub prefix:<?>($v) { $v.Bool }
 sub prefix:<->($v) { 0 - $v }
+sub prefix:<+>($x) { $x.Numeric }
+
 
 sub prefix:<!>($v) { $v ?? False !! True }
 
@@ -464,6 +468,8 @@ my class Iterator {
 my class EMPTY { }
 
 my class List { ... }
+my class Seq { ... }
+my class Array { ... }
 
 sub unfold-iter($fn) {
     my class UnfoldIterator is Iterator {
@@ -561,6 +567,11 @@ my class List is Cool {
             $!rest.clone);
     }
 
+    method Seq() {
+        Seq.RAWCREATE("flat", 1, "items", LLArray.new,
+            "rest", LLArray.new(self.iterator));
+    }
+
     #| Takes an object and applies whatever semantics the List subclass
     #| needs to apply on stuff out of the iterator stack
     method !elem is rawcall { Q:CgOp { (pos 1) } }
@@ -607,6 +618,7 @@ my class List is Cool {
     }
 
     method elems() { self!fill(1000_000_000); $!items.elems; }
+    method Numeric () { self.elems }
 
     method at-pos($i) {
         self!fill($i + 1);
@@ -624,6 +636,14 @@ my class List is Cool {
     }
 
     method Str() { self.join(" ") }
+
+    method push(*@items) {
+        $!rest.push(@items.Seq.eager.iterator)
+    }
+    method pop() {
+        self.eager;
+        $!items.pop;
+    }
 }
 
 sub _it_shift($it) {
@@ -716,5 +736,28 @@ sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
 sub callframe { Q:CgOp { (ns (getfield caller (callframe))) } }
 
 sub die($msg) { Q:CgOp { (prog (die (@ (l $msg))) (null Variable)) } }
+# exactly like List, but flattens, and with "is copy" semantics on stuff
+my class Seq is List {
+    method !elem($x) { my $y = $x; $y }
+    method Seq { self }
+}
+
+my class Array is List {
+    method new() {
+        Array.RAWCREATE("flat", 1, "items", LLArray.new, "rest", LLArray.new);
+    }
+
+    method LISTSTORE(*@in) {
+        # fetch everything NOW in case self is mentioned
+        my $inn := @in.Seq.eager;
+
+        $!items = Q:CgOp { (varattr items (@ (l $inn))) };
+        self;
+    }
+}
+
+PRE-INIT {
+    Q:CgOp { (prog (rawsset Kernel.ArrayP (@ (l Array))) (null Variable)) };
+}
 
 {YOU_ARE_HERE}

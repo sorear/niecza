@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 157;
+plan 178;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -451,3 +451,46 @@ EOC
 
 is $?FILE, 'test.pl', '$?FILE works';
 is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
+
+{
+    my @x;
+
+    ok @x ~~ Array, '@x isa Array';
+    ok @x.elems == 0, 'no elements';
+    ok +@x == 0, 'no elements (+)';
+
+    @x.push(5);
+    ok @x.elems == 1, 'one element now';
+    ok @x.shift == 5, 'element removed is 5';
+    @x.push(7,8);
+    ok @x.elems == 2, "added two elements";
+    ok @x.shift == 7, "removed first correctly";
+    ok @x.shift == 8, "removed second correctly";
+    ok @x.elems == 0, "no elements again";
+
+    my $k = 2;
+    @x.push($k);
+    $k = 3;
+    ok @x.shift == 2, "push copies";
+
+    @x.push(11,12);
+    ok @x.pop == 12, "pop is LIFO (1)";
+    ok @x.pop == 11, "pop is LIFO (2)";
+    ok +@x == 0, "pop removed all elements";
+
+    my @y = 15;
+    ok @y.elems == 1, "assigning a single value makes a single-item list";
+    ok @y.shift == 15, "and the value came right!";
+
+    @y = 1, 2, 3;
+    ok @y.elems == 3, "list assignment gets correct item count";
+    is @y.join("|"), '1|2|3', "assignment of multiple values works properly";
+
+    @y = 1, (2, 3), 4;
+    ok @y.elems == 4, "list assignment flattens (1)";
+    is @y.join("|"), '1|2|3|4', "list assignment flattens (2)";
+
+    @y = 5, @y;
+    ok @y.elems == 5, "self assignment works (1)";
+    is @y.join("|"), '5|1|2|3|4', "self assignment works (2)";
+}
