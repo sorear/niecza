@@ -30,6 +30,9 @@ namespace Niecza {
         Frame Store(Frame caller, IP6 thing);
     }
 
+    // I cannot say I am completely happy with the way the following three
+    // types are laid out.
+
     // A LValue is the meaning of function arguments, of any subexpression
     // except the targets of := and .VAR.
     //
@@ -43,13 +46,26 @@ namespace Niecza {
     // Scalar->list: bind islist, must be Iterable. Bind it same rwness.
     public struct LValue {
         public IP6 container;
+        // If non-null, then this lv is, or at one time was, the result of
+        // an autovivifying access, but has not yet committed to becoming
+        // real or becoming undef.  We call these virtual containers; they
+        // exist only in flight (resultSlots) and in parcel contexts.
+        public VivClosure whence;
         public bool rw;
         public bool islist;
 
-        public LValue(bool rw_, bool islist_, IP6 container_) {
-            rw = rw_; islist = islist_;
+        public LValue(bool rw_, bool islist_, VivClosure whence_,
+                IP6 container_) {
+            rw = rw_; islist = islist_; whence = whence_;
             container = container_;
         }
+    }
+
+    // Allows the viv closure to be cleared for all copies of a lv after the
+    // container becomes real, plugging a memory leak.
+    public class VivClosure {
+        public IP6 v;
+        public VivClosure(IP6 v_) { v = v_; }
     }
 
     // Variables are things which can produce LValues, and can also bind
@@ -313,7 +329,7 @@ blocked:
             } else {
                 LValue[] np = new LValue[p.Length + 1];
                 Array.Copy(p, 0, np, 1, p.Length);
-                np[0] = new LValue(false, false, Kernel.MakeSC(this));
+                np[0] = new LValue(false, false, null, Kernel.MakeSC(this));
                 return InvokeMethod(c, "INVOKE", np, n);
             }
         }
@@ -323,7 +339,8 @@ blocked:
                 return klass.OnFetch(this, c);
             } else {
                 return InvokeMethod(c, "FETCH", new LValue[1] {
-                        new LValue(false, false, Kernel.MakeSC(this)) }, null);
+                        new LValue(false, false, null, Kernel.MakeSC(this)) },
+                        null);
             }
         }
 
@@ -332,8 +349,9 @@ blocked:
                 return klass.OnStore(this, c, o);
             } else {
                 return InvokeMethod(c, "STORE", new LValue[2] {
-                        new LValue(false, false, Kernel.MakeSC(this)),
-                        new LValue(false, false, Kernel.MakeSC(o)) }, null);
+                        new LValue(false, false, null, Kernel.MakeSC(this)),
+                        new LValue(false, false, null, Kernel.MakeSC(o)) },
+                        null);
             }
         }
     }
@@ -512,7 +530,7 @@ blocked:
                 contrw = rhs.lv.rw;
             }
             th.resultSlot = new Variable(false, Variable.Context.Scalar,
-                    new LValue(!ro && contrw, false, cont)); // TODO forcerw
+                    new LValue(!ro && contrw, false, null, cont)); // TODO forcerw
             return th;
         }
 
@@ -520,7 +538,7 @@ blocked:
                 bool ro, bool forcerw) {
             Frame n;
             Variable lhs = new Variable(false, Variable.Context.List,
-                    new LValue(true, true, null));
+                    new LValue(true, true, null, null));
             th.resultSlot = lhs;
             if (rhs.lv.islist) {
                 lhs.lv = rhs.lv;
@@ -614,19 +632,19 @@ blocked:
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
             return new Variable(false, Variable.Context.Scalar,
-                    new LValue(false, false, MakeSC(obj)));
+                    new LValue(false, false, null, MakeSC(obj)));
         }
 
         // TODO: Find out from #perl6 more about whether we actually want
         // to be cloning anything.  this one /is/ rebindable
         public static Variable NewRWScalar(IP6 obj) {
             return new Variable(true, Variable.Context.Scalar,
-                    new LValue(true, false, MakeSC(obj)));
+                    new LValue(true, false, null, MakeSC(obj)));
         }
 
         public static Variable NewRWListVar(IP6 container) {
             return new Variable(true, Variable.Context.List,
-                    new LValue(true, true, container));
+                    new LValue(true, true, null, container));
         }
 
         public static List<Variable> SlurpyHelper(Frame th, int from) {

@@ -41,7 +41,10 @@ use 5.010;
         'Variable' =>
             { lv           => [f => 'LValue'] },
         'LValue' =>
-            { islist       => [f => 'Boolean'] },
+            { islist       => [f => 'Boolean'],
+              whence       => [f => 'VivClosure'] },
+        'VivClosure' =>
+            { v            => [f => 'IP6'] },
         'CLRImportObject' =>
             { val          => [f => 'Object'] },
         'String' =>
