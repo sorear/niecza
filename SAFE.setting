@@ -532,13 +532,11 @@ my class List is Cool {
     has @!rest;
     has $!flat;
     method flat() {
-        my @x := self;
-        my @y := List.RAWCREATE("flat", 1, "items", LLArray.new(),
-            "rest", LLArray.new(@x));
+        my @y := List.RAWCREATE("flat", 1, "items", $!items, "rest", $!rest);
         @y;
     }
 
-    method fill($nr) {
+    method !fill($nr) {
         my $i = $!items;
         my $r = $!rest;
         while $i.elems < $nr && $r {
@@ -568,15 +566,15 @@ my class List is Cool {
         $i.elems >= $nr;
     }
 
-    method Bool() { self.fill(1) }
+    method Bool() { self!fill(1) }
     method shift() {
-        self.fill(1);
+        self!fill(1);
         $!items.shift;
     }
-    method elems() { self.fill(1000_000_000); $!items.elems; }
+    method elems() { self!fill(1000_000_000); $!items.elems; }
 
     method at-pos($i) {
-        self.fill($i + 1);
+        self!fill($i + 1);
         $!items.at-pos($i);
     }
 
@@ -585,7 +583,7 @@ my class List is Cool {
         my $x = 0;
         unfold-iter(sub () {
             $x++;
-            (self.fill($x)) ?? (self.at-pos($x - 1)) !! EMPTY;
+            (self!fill($x)) ?? (self.at-pos($x - 1)) !! EMPTY;
         });
     }
 
