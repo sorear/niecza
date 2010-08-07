@@ -375,7 +375,7 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        if ($body->type ne 'class') {
+        if ($body->type !~ /class|grammar|role/) {
             #TODO: Make this a sorry.
             die "Tried to set a method outside a class!";
         }

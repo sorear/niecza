@@ -42,6 +42,7 @@ sub comment { }
 sub comment__S_Sharp { }
 sub spacey { }
 sub unspacey { }
+sub unsp { }
 sub nofun { }
 sub curlycheck { }
 sub pod_comment { }
@@ -220,7 +221,7 @@ sub regex_def { my ($cl, $M) = @_;
     $M->{_ast} = Op::SubDef->new(
         var => $var, class => 'Regex',
         method_too => ($scope eq 'has' ? $name : undef),
-        code => Body->new(
+        body => Body->new(
             type => 'regex',
             signature => $sig,
             do => RxOp::Export->new(zyg => [$M->{regex_block}{_ast}])->op));

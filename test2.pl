@@ -93,6 +93,14 @@ my class Regex is Sub {
     }
 }
 
+my class Grammar is Cursor {
+    method parse($text) {
+        my @results := self.RAWCREATE("str", $text, "from", 0).TOP\
+            .grep({ $_.from == $_.str.chars });
+        @results ?? @results.shift !! Any; # TODO List.at-pos
+    }
+}
+
 ok ("a" ~~ /a/), "letter matches itself";
 ok !("a" ~~ /b/), "letter does not match other";
 ok ("xxa" ~~ /a/), "leading garbage ignored";
@@ -109,5 +117,14 @@ ok ("abc" ~~ /ab+c/), "plus can match one";
 ok ("abbbc" ~~ /ab+c/), "plus can match many";
 ok !("adc" ~~ /ab+c/), "plus cannot match other";
 ok !("ac" ~~ /ab+c/), "plus cannot match none";
+
+grammar Bob {
+    rule TOP {ab*c}
+}
+
+ok Bob.parse("abbc"), "grammars work (1)";
+ok !Bob.parse("adc"), "grammars work (2)";
+ok !Bob.parse("xac"), "grammars anchor (1)";
+ok !Bob.parse("acx"), "grammars anchor (2)";
 
 done-testing;
