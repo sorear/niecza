@@ -54,6 +54,10 @@ use 5.010;
             { SearchForHandler => [c => 'Void'] },
         'Niecza.LexoticControlException' =>
             { SearchForHandler => [c => 'Void'] },
+        'Cursor' =>
+            { At           => [m => 'Cursor'],
+              Exact        => [m => 'Cursor'],
+              pos          => [f => 'Int32'] },
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 

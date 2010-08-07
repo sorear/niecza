@@ -9,7 +9,7 @@ use warnings;
     package CgOp;
     use Moose;
 
-    has zyg => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has zyg => (isa => 'ArrayRef[CgOp]', is => 'ro', default => sub { [] });
     # filled in by cps_convert
     # 0: returns on eval stack, can appear w/ non-empty
     # 1: returns in resultSlot, cannot appear w/ non-empty
@@ -429,7 +429,8 @@ use warnings;
 
     sub box {
         rawscall('Kernel.BoxAny', $_[1],
-            $_[0] eq 'Str' ? rawsget('Kernel.StrP') :
+            blessed($_[0]) ? $_[0] :
+            ($_[0] eq 'Str') ? rawsget('Kernel.StrP') :
                 fetch(scopedlex($_[0])));
     }
 

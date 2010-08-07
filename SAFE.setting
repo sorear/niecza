@@ -852,8 +852,13 @@ sub postcircumfix:<{ }> is rawcall {
 # these are immutable, though we may wind up reusing them in some cases by
 # uniqueness rules (TBD)
 my class Cursor {
-    has $.str;
-    has $.from;
+    method new($str) { Q:CgOp { (box (@ (l self)) (rawnew Cursor (unbox String
+        (@ (l $str))))) } }
+    method pos { Q:CgOp { (box Num (cast Double (getfield pos
+        (unbox Cursor (@ (l self)))))) } }
+    method cursor($np) { Q:CgOp { (box (@ (l self)) (rawcall
+        (unbox Cursor (@ (l self))) At
+          (cast Int32 (unbox Double (@ (l $np)))))) } }
 }
 
 # Outside a regex, a result is a lazy list.
@@ -918,21 +923,23 @@ sub _rxplus($C, $sub) {
 
 sub _rxstr($C, $str) {
     #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
-    if (($C.from + $str.chars) <= $C.str.chars) &&
-            ($C.str.substr($C.from, $str.chars) eq $str) {
-        _rxone(Cursor.RAWCREATE("str", $C.str, "from", ($C.from + $str.chars)));
-    } else {
-        &_rxnone;
-    }
+    Q:CgOp {
+        (letn rt (rawcall (unbox Cursor (@ (l $C))) Exact
+                   (unbox String (@ (l $str))))
+          [ternary
+            (!= (l rt) (null Cursor))
+            (subcall (@ (l &_rxone)) (box (@ (l $C)) (l rt)))
+            (l &_rxnone)])
+    };
 }
 
 my class Regex is Sub {
     method ACCEPTS($str) {
         my $i = 0;
         my $win = 0;
+        my $C = Cursor.new($str);
         while !$win && ($i <= $str.chars) {
-            my $C = Cursor.RAWCREATE("str", $str, "from", $i);
-            if (self)($C) {
+            if (self)($C.cursor($i)) {
                 $win = 1;
             }
             $i++;
@@ -943,8 +950,8 @@ my class Regex is Sub {
 
 my class Grammar is Cursor {
     method parse($text) {
-        my @results := self.RAWCREATE("str", $text, "from", 0).TOP\
-            .grep({ $_.from == $_.str.chars });
+        my @results := self.new($text).TOP\
+            .grep({ $_.pos == $text.chars });
         @results ?? @results.shift !! Any; # TODO List.at-pos
     }
 }

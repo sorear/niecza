@@ -36,8 +36,8 @@
     </Target>
 
     <!-- Libraries -->
-    <Target Name="Kernel.dll" Inputs="Kernel.cs" Outputs="Kernel.dll">
-        <Csc Sources="Kernel.cs" TargetType="library"
+    <Target Name="Kernel.dll" Inputs="Kernel.cs;Cursor.cs" Outputs="Kernel.dll">
+        <Csc Sources="Kernel.cs;Cursor.cs" TargetType="library"
             OutputAssembly="Kernel.dll"/>
         <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot Kernel.dll"/>
     </Target>
