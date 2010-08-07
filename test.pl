@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 178;
+plan 184;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -493,4 +493,27 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
     @y = 5, @y;
     ok @y.elems == 5, "self assignment works (1)";
     is @y.join("|"), '5|1|2|3|4', "self assignment works (2)";
+}
+
+{
+    my $a = 0;
+    my $b = 0;
+    my $c = 0;
+    my $d = 0;
+    my $e = 0;
+    my $f = 0;
+
+    (Any!butWHENCE({ $a = 1 }));
+    my $x := (Any!butWHENCE({ $b = 1 }));  #OK not used
+    my $y ::= (Any!butWHENCE({ $c = 1 })); #OK not used
+    my $z = (Any!butWHENCE({ $d = 1 }));   #OK not used
+    (Any!butWHENCE({ $e = 1 })) = 2;
+    (Any!butWHENCE({ $f = 1 })) := 3;
+
+    ok !$a, "no autovivification in void context";
+    ok $b, "autovivification after rw bind";
+    ok !$c, "no autovivification after ro bind";
+    ok !$d, "no autovivification after rvalue context";
+    ok $e, "autovivification after lvalue context";
+    ok $f, "autovivification after bvalue context";
 }

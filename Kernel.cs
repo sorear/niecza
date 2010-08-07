@@ -548,6 +548,11 @@ blocked:
         private static Frame AssignC(Frame th) {
             switch (th.ip) {
                 case 0:
+                    if (th.pos[0].whence == null)
+                        goto case 1;
+                    th.ip = 1;
+                    return Vivify(th, th.pos[0]);
+                case 1:
                     if (!th.pos[0].rw) {
                         throw new Exception("assigning to readonly value");
                     }
@@ -559,11 +564,11 @@ blocked:
                             return th.pos[0].container.Store(th.caller,
                                     th.pos[1].container);
                         } else {
-                            th.ip = 1;
+                            th.ip = 2;
                             return th.pos[1].container.Fetch(th);
                         }
                     }
-                case 1:
+                case 2:
                     return th.pos[0].container.Store(th.caller,
                             (IP6)th.resultSlot);
                 default:

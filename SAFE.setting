@@ -315,8 +315,10 @@ sub prefix:<++>($v) { $v = ($v + 1); $v }
 sub postfix:<-->($v) { my $old = $v; $v = ($v - 1); $old }
 sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $old }
 
-# actually a macro
-# sub infix:<:=>($l,$r) { ... }
+sub infix:<:=> is rawcall { Q:CgOp {
+    (prog [bind 0 (pos 0) (pos 1)] [pos 0]) } }
+sub infix:<::=> is rawcall { Q:CgOp {
+    (prog [bind 1 (pos 0) (pos 1)] [pos 0]) } }
 
 sub prefix:<~>($v) { $v.Str } # should be Stringy
 sub prefix:<?>($v) { $v.Bool }
@@ -392,6 +394,10 @@ PRE-INIT {
     Any.HOW.add-method("flat", anon method flat() { self, });
 
     Any.HOW.add-method("ACCEPTS", anon method ACCEPTS($t) { self === $t });
+    Any.HOW.add-method('!butWHENCE', anon method !butWHENCE($cr) {
+        Q:CgOp { (rawnew Variable (bool 1) (bool 1) (bool 0) (@ (l $cr))
+                   (rawscall Kernel.MakeSC (@ (l self)))) }
+    });
 
     # Should be for Block, not Sub
     Sub.HOW.add-method("ACCEPTS", anon method ACCEPTS($t) { (self)($t) });

@@ -439,10 +439,7 @@ sub INFIX { my ($cl, $M) = @_;
     my ($st,$l,$r) = $cl->whatever_precheck($s, $M->{left}{_ast},
         $M->{right}{_ast});
 
-    if ($s eq '&infix:<:=>') { #XXX macro
-        $M->{_ast} = Op::Bind->new(node($M), lhs => $l, rhs => $r,
-            readonly => 0);
-    } elsif ($s eq '&infix:<?? !!>') { # XXX macro
+    if ($s eq '&infix:<?? !!>') { # XXX macro
         $M->{_ast} = Op::Conditional->new(node($M), check => $l,
             true => $M->{middle}{_ast}, false => $r);
     } elsif ($s eq '&infix:<,>') {
