@@ -27,15 +27,6 @@ use 5.010;
               superclasses => [f => 'List<DynMetaObject>'],
               name         => [f => 'String'] },
 
-        'List<DynMetaObject>' =>
-            { Add          => [m => 'Void'] },
-        'List<Variable>' =>
-            { Add          => [m => 'Void'],
-              Insert       => [m => 'Void'],
-              RemoveAt     => [m => 'Void'],
-              Count        => [f => 'Int32'] },
-        'Variable[]' =>
-            { Length       => [f => 'Int32'] },
         'Double' =>
             { ToString     => [m => 'String'] },
         'Variable' =>
@@ -110,8 +101,26 @@ use 5.010;
     }
     __PACKAGE__->know_module('NULL');
 
+    sub _generic_infer {
+        /Dictionary<(.*),(.*)>/ && return {
+            ContainsKey         => [ m => 'Boolean' ],
+        };
+        /List<(.*)>/ && return {
+            Add                 => [m => 'Void'],
+            Insert              => [m => 'Void'],
+            RemoveAt            => [m => 'Void'],
+            Count               => [f => 'Int32'],
+        };
+        /(.*)\[\]/ && return {
+            Length              => [f => 'Int32'],
+        };
+    }
+
     sub _typedata {
         my ($self, $types, @path) = @_;
+
+        for ($path[0]) { $typedata{$_} //= _generic_infer; }
+
         my $cursor = \%typedata;
         for (@path) { $cursor = $cursor->{$_}; }
         if (!defined $cursor) {
