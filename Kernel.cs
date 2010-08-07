@@ -482,14 +482,43 @@ blocked:
             return n;
         }
 
-        private static Frame BindListizeC(Frame th) {
+        // check whence before calling
+        public static Frame Vivify(Frame th, Variable v) {
+            IP6 w = v.whence;
+            v.whence = null;
+            return w.Invoke(th, new Variable[1] { v }, null);
+        }
+
+        private static Frame BindC(Frame th) {
             switch (th.ip) {
                 case 0:
+                    // autovivify rhs if needed
+                    if (th.pos[1].whence == null || ((bool)th.lex["ro"]))
+                        goto case 1;
                     th.ip = 1;
-                    return Fetch(th, th.pos[1]);
+                    return Vivify(th, th.pos[1]);
                 case 1:
+                    if (th.pos[0].whence == null)
+                        goto case 2;
+                    th.ip = 2;
+                    return Vivify(th, th.pos[0]);
+                case 2:
+                    if (!th.pos[0].islist || th.pos[1].islist)
+                        goto case 4;
+                    th.ip = 3;
+                    return th.pos[1].container.Fetch(th);
+                case 3:
+                    // having to fetch because of a $ -> @ conversion
                     th.pos[0].container = (IP6) th.resultSlot;
-                    th.pos[0].rw = false;
+                    th.pos[0].rw = true;
+                    return th.caller;
+                case 4:
+                    th.pos[0].container = th.pos[1].container;
+                    th.pos[0].rw = th.pos[1].rw && !((bool)th.lex["ro"]);
+                    if (th.pos[1].islist && !th.pos[0].islist) {
+                        th.pos[0].rw = false;
+                        th.pos[0].container = MakeSC(th.pos[0].container);
+                    }
                     return th.caller;
                 default:
                     throw new Exception("IP invalid");
@@ -500,27 +529,19 @@ blocked:
                 bool ro, bool forcerw) {
             // TODO: need exceptions for forcerw to be used
             Frame n;
-            if (lhs.islist) {
-                if (rhs.islist) {
-                    lhs.container = rhs.container;
-                    lhs.rw = !ro && rhs.rw;
-                    return th;
-                } else {
-                    n = new Frame(th, null, new DynBlockDelegate(BindListizeC));
-                    n.pos = new Variable[2] { lhs, rhs };
-                    return n;
-                }
-            } else {
-                if (rhs.islist) {
-                    lhs.rw = false;
-                    lhs.container = MakeSC(rhs.container);
-                    return th;
-                } else {
-                    lhs.container = rhs.container;
-                    lhs.rw = !ro && rhs.rw;
-                    return th;
-                }
+            // fast path
+            if (lhs.islist == rhs.islist &&
+                    (ro || rhs.whence == null) &&
+                    (lhs.whence == null)) {
+                lhs.container = rhs.container;
+                lhs.rw = !ro && rhs.rw;
+                return th;
             }
+
+            n = new Frame(th, null, new DynBlockDelegate(BindC));
+            n.pos = new Variable[2] { lhs, rhs };
+            n.lex["ro"] = ro;
+            return n;
         }
 
         // This isn't just a fetch and a store...
