@@ -348,9 +348,10 @@ sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 # TODO: Implement 'augment'
 
 PRE-INIT {
-    Mu.HOW.add-method("defined", anon method defined() {
+    # rawcall to avoid putting a rw binding on self... TODO
+    Mu.HOW.add-method("defined", anon method defined is rawcall {
             Q:CgOp { (box Bool (!= (null Dictionary<string,object>)
-                (getfield slots (cast DynObject (@ (l self)))))) }
+                (getfield slots (cast DynObject (@ (pos 0)))))) }
         });
     Mu.HOW.add-method("Bool", anon method Bool() { self.defined });
     Mu.HOW.add-method("Str", anon method Str() {

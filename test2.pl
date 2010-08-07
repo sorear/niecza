@@ -58,4 +58,21 @@ sub postcircumfix:<[ ]> is rawcall {
 my @arr = <a b c>;
 is @arr.join("|"), 'a|b|c', "word splitter works";
 
+my @narr;
+@narr[0];
+ok +@narr == 0, "rvalue reference to out of range value does not add";
+@narr[2] = 5;
+ok +@narr == 3, "assigning to element 2 makes length 3";
+ok !(@narr[0].defined), "first element undefined";
+ok !(@narr[1].defined), "second element undefined";
+ok @narr[2] == 5, "third element properly assigned";
+
+my @darr;
+@darr[1][1];
+ok +@darr == 0, "rvalue nested reference, no effect";
+@darr[2][2] = 'pie';
+ok +@darr == 3, "outer level vivifies elements";
+ok @darr[2] ~~ Array, "inner Array created";
+is @darr[2][2], 'pie', "inner value retained";
+
 done-testing;
