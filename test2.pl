@@ -42,17 +42,23 @@ sub postcircumfix:<{ }> is rawcall {
         });
 }
 
-my $foo;
-ok !($foo{'x'}.defined), "fetch from hash, no value";
-ok !($foo.defined), "no autoviv for rvalue";
-$foo{'x'} = 'foo';
-is $foo{'x'}, 'foo', "values are retained";
-ok !($foo{'y'}.defined), "no cross-slot leakage";
-ok $foo ~~ Hash, "foo isa hash now";
-$foo{'z'}{'a'} = 'pie';
-is $foo{'z'}{'a'}, 'pie', "can autoviv deeply";
-$foo{'y'}[2] = 'zed';
-is $foo{'y'}[2], 'zed', "can mix array and hash viv";
+{
+    sub postcircumfix:<{ }> { @_.join("|") }
+    is 1<2 3>, '1|2|3', "angle bracket postcircumfix works";
+}
 
+my $foo;
+ok !($foo<x>.defined), "fetch from hash, no value";
+ok !($foo.defined), "no autoviv for rvalue";
+$foo<x> = 'foo';
+is $foo<x>, 'foo', "values are retained";
+ok !($foo<y>.defined), "no cross-slot leakage";
+ok $foo ~~ Hash, "foo isa hash now";
+$foo<z><a> = 'pie';
+is $foo<z><a>, 'pie', "can autoviv deeply";
+$foo<y>[2] = 'zed';
+is $foo<y>[2], 'zed', "can mix array and hash viv";
+$foo<12> = 'fry';
+is $foo{12}, 'fry', "keys are strings";
 
 done-testing;

@@ -610,6 +610,12 @@ sub postcircumfix__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{_ast} = { postcircumfix => '{ }',
         args => $cl->semilist_to_args($M->{semilist}) };
 }
+sub postcircumfix__S_Lt_Gt { my ($cl, $M) = @_;
+    $cl->circumfix__S_Lt_Gt($M); #XXX
+    delete $M->{qpvalue};
+    $M->{_ast} = { postcircumfix => '{ }',
+        args => [ $M->{_ast} ] };
+}
 
 sub postop { my ($cl, $M) = @_;
     $M->{_ast} = $M->{postcircumfix} ? $M->{postcircumfix}{_ast} :
