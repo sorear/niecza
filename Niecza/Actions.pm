@@ -525,6 +525,11 @@ sub POSTFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::CallSub->new(node($M),
             invocant => Op::Lexical->new(name => '&postfix:<' . $op->{postfix} . '>'),
             positionals => [ $arg ]);
+    } elsif ($op->{postcircumfix}) {
+        $M->{_ast} = Op::CallSub->new(node($M),
+            invocant => Op::Lexical->new(name => '&postcircumfix:<' .
+                $op->{postcircumfix} . '>'),
+            positionals => [ $arg, @{ $op->{args} } ]);
     } elsif ($op->{name} && $op->{name} =~ /^(?:HOW|WHAT)$/) {
         if ($op->{args}) {
             $M->sorry("Interrogative operator " . $op->{name} .
@@ -579,6 +584,31 @@ sub postfix__S_ANY { }
 sub postcircumfix { }
 sub postcircumfix__S_Paren_Thesis { my ($cl, $M) = @_;
     $M->{_ast} = { postcall => $M->{semiarglist}{_ast} };
+}
+
+sub semilist_to_args { my ($cl, $M) = @_;
+    if (@{ $M->{_ast} } > 1) {
+        $M->sorry('Slice lookups NYI');
+        return;
+    }
+    my ($al) = @{ $M->{_ast} };
+
+    if (!defined $al) {
+        return [];
+    } elsif ($al && $al->splittable_parcel) {
+        return $al->positionals;
+    } else {
+        return [$al];
+    }
+}
+
+sub postcircumfix__S_Bra_Ket { my ($cl, $M) = @_;
+    $M->{_ast} = { postcircumfix => '[ ]',
+        args => $cl->semilist_to_args($M->{semilist}) };
+}
+sub postcircumfix__S_Cur_Ly { my ($cl, $M) = @_;
+    $M->{_ast} = { postcircumfix => '{ }',
+        args => $cl->semilist_to_args($M->{semilist}) };
 }
 
 sub postop { my ($cl, $M) = @_;

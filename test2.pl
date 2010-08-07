@@ -45,6 +45,16 @@ sub postcircumfix:<[ ]> is rawcall {
         });
 }
 
+{
+    sub postcircumfix:<[ ]>($a, $b, $c) { $a ~ "|" ~ $b ~ "|" ~ $c }
+    is 1[2,3], "1|2|3", "can call postcircumfix [ ]";
+}
+
+{
+    sub postcircumfix:<{ }>($a, $b, $c) { $a ~ "|" ~ $b ~ "|" ~ $c }
+    is 1{2,3}, "1|2|3", 'can call postcircumfix { }';
+}
+
 my @arr = <a b c>;
 is @arr.join("|"), 'a|b|c', "word splitter works";
 
