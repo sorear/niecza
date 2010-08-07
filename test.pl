@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 205;
+plan 225;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -569,4 +569,32 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
     is $foo<y>[2], 'zed', "can mix array and hash viv";
     $foo<12> = 'fry';
     is $foo{12}, 'fry', "keys are strings";
+}
+
+{
+    ok ("a" ~~ /a/), "letter matches itself";
+    ok !("a" ~~ /b/), "letter does not match other";
+    ok ("xxa" ~~ /a/), "leading garbage ignored";
+    ok ("axx" ~~ /a/), "trailing garbage ignored";
+    ok ("ab" ~~ /ab/), "sequence matches sequence";
+    ok !("ab" ~~ /ba/), "sequence requires order";
+    ok ("abc" ~~ /ab?c/), "conditional can match";
+    ok ("ac" ~~ /ab?c/), "conditional can match nothing";
+    ok !("adc" ~~ /ab?c/), "conditional cannot match something else";
+    ok ("ac" ~~ /ab*c/), "kleene closure can match none";
+    ok ("abbc" ~~ /ab*c/), "kleene closure can match many";
+    ok !("adc" ~~ /ab*c/), "kleene closure cannot match other";
+    ok ("abc" ~~ /ab+c/), "plus can match one";
+    ok ("abbbc" ~~ /ab+c/), "plus can match many";
+    ok !("adc" ~~ /ab+c/), "plus cannot match other";
+    ok !("ac" ~~ /ab+c/), "plus cannot match none";
+
+    grammar Bob {
+        rule TOP {ab*c}
+    }
+
+    ok Bob.parse("abbc"), "grammars work (1)";
+    ok !Bob.parse("adc"), "grammars work (2)";
+    ok !Bob.parse("xac"), "grammars anchor (1)";
+    ok !Bob.parse("acx"), "grammars anchor (2)";
 }
