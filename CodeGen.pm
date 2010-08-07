@@ -92,6 +92,7 @@ use 5.010;
         'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
         'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],
         'Kernel.MakeSub'       => [m => 'IP6'],
+        'Kernel.MakeSC'        => [m => 'IP6'],
         'Kernel.BoxAny'        => [m => 'Variable'],
         'Kernel.UnboxAny'      => [m => 'object'],
     );
