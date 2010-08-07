@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 184;
+plan 196;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -516,4 +516,36 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
     ok !$d, "no autovivification after rvalue context";
     ok $e, "autovivification after lvalue context";
     ok $f, "autovivification after bvalue context";
+}
+
+{
+    sub postcircumfix:<[ ]>($a, $b, $c) { $a ~ "|" ~ $b ~ "|" ~ $c }
+    is 1[2,3], "1|2|3", "can call postcircumfix [ ]";
+}
+
+{
+    sub postcircumfix:<{ }>($a, $b, $c) { $a ~ "|" ~ $b ~ "|" ~ $c }
+    is 1{2,3}, "1|2|3", 'can call postcircumfix { }';
+}
+
+{
+    my @arr = <a b c>;
+    is @arr.join("|"), 'a|b|c', "word splitter works";
+
+    my @narr;
+    @narr[0];
+    ok +@narr == 0, "rvalue reference to out of range value does not add";
+    @narr[2] = 5;
+    ok +@narr == 3, "assigning to element 2 makes length 3";
+    ok !(@narr[0].defined), "first element undefined";
+    ok !(@narr[1].defined), "second element undefined";
+    ok @narr[2] == 5, "third element properly assigned";
+
+    my @darr;
+    @darr[1][1];
+    ok +@darr == 0, "rvalue nested reference, no effect";
+    @darr[2][2] = 'pie';
+    ok +@darr == 3, "outer level vivifies elements";
+    ok @darr[2] ~~ Array, "inner Array created";
+    is @darr[2][2], 'pie', "inner value retained";
 }
