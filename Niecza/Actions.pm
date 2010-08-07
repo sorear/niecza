@@ -400,15 +400,19 @@ sub circumfix { }
 sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
     my $sl = $M->{nibble}{_ast};
 
-    if (!$sl->isa('Op::StringLiteral') || ($sl->text =~ /\S\s\S/)) {
-        $M->sorry("Word splitting NYI");
+    if (!$sl->isa('Op::StringLiteral')) {
+        $M->sorry("Runtime word splitting NYI");
         return;
     }
 
-    my ($t) = $sl->text =~ /^\s*(.*?)\s*$/;
+    my @tok = split ' ', $sl->text;
+    @tok = map { Op::StringLiteral->new(node($M), text => $_) } @tok;
 
-    $M->{_ast} = Op::StringLiteral->new(node($M), text => $t);
-    $M->{qpvalue} = '<' . $t . '>';
+    $M->{_ast} = (@tok == 1) ? $tok[0] :
+        Op::CallSub->new(node($M),
+            invocant => Op::Lexical->new(name => '&infix:<,>'),
+            positionals => \@tok);
+    $M->{qpvalue} = '<' . join(" ", map { $_->text } @tok) . '>'; # XXX what if there are spaces or >
 }
 sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
 
