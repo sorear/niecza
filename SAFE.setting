@@ -432,8 +432,8 @@ my class LLArray {
       [rawcall (unbox List<Variable> (@ (pos 0))) Insert (int 0) (pos 1)]
       [pos 0]) } }
     method first-flattens() { Q:CgOp {
-      (box Bool (getfield islist (getfield lv (getindex (int 0)
-        (unbox List<Variable> (@ (l self))))))) } }
+      (box Bool (getfield islist (getindex (int 0)
+        (unbox List<Variable> (@ (l self)))))) } }
     method elems() { Q:CgOp {
       (box Num (cast Double (getfield Count (unbox List<Variable>
         (@ (l self)))))) } }

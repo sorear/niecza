@@ -434,13 +434,11 @@ use warnings;
     }
 
     sub bind {
-        rawsccall('Kernel.Bind', $_[1], getfield('lv', $_[2]),
-            bool($_[0]), bool(0));
+        rawsccall('Kernel.Bind', $_[1], $_[2], bool($_[0]), bool(0));
     }
 
     sub assign {
-        rawsccall('Kernel.Assign', getfield('lv', $_[0]),
-            getfield('lv', $_[1]));
+        rawsccall('Kernel.Assign', $_[0], $_[1]);
     }
 
     sub compare {

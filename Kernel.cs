@@ -10,17 +10,17 @@ namespace Niecza {
     // Only call other functions in Continue, not in the CallableDelegate or
     // equivalent!
     public delegate Frame CallableDelegate(Frame caller,
-            LValue[] pos, Dictionary<string, LValue> named);
+            Variable[] pos, Dictionary<string, Variable> named);
     // Used by DynFrame to plug in code
     public delegate Frame DynBlockDelegate(Frame frame);
 
     public interface IP6 {
-        Frame Invoke(Frame caller, LValue[] pos,
-                Dictionary<string, LValue> named);
+        Frame Invoke(Frame caller, Variable[] pos,
+                Dictionary<string, Variable> named);
         // include the invocant in the positionals!  it will not usually be
         // this, rather a container of this
         Frame InvokeMethod(Frame caller, string name,
-                LValue[] pos, Dictionary<string, LValue> named);
+                Variable[] pos, Dictionary<string, Variable> named);
         Frame GetAttribute(Frame caller, string name);
         //public Frame WHERE(Frame caller);
         Frame HOW(Frame caller);
@@ -30,8 +30,15 @@ namespace Niecza {
         Frame Store(Frame caller, IP6 thing);
     }
 
-    // I cannot say I am completely happy with the way the following three
-    // types are laid out.
+    // TODO: update this comment
+
+    // Variables are things which can produce LValues, and can also bind
+    // LValues.  They hold LValues and may or may not be bindable.  Variables
+    // also tend to contextualize stuff put into them.
+    //
+    // Coercions are not used on binding unless necessary.
+    //
+    // Variables also have type constraints, that's how %foo and @foo differ...
 
     // A LValue is the meaning of function arguments, of any subexpression
     // except the targets of := and .VAR.
@@ -44,53 +51,24 @@ namespace Niecza {
     // object, but !islist.  Read only.
     //
     // Scalar->list: bind islist, must be Iterable. Bind it same rwness.
-    public struct LValue {
-        public IP6 container;
+    public class Variable {
+        public bool bvalue;
+        public bool rw;
+        public bool islist;
         // If non-null, then this lv is, or at one time was, the result of
         // an autovivifying access, but has not yet committed to becoming
         // real or becoming undef.  We call these virtual containers; they
         // exist only in flight (resultSlots) and in parcel contexts.
-        public VivClosure whence;
-        public bool rw;
-        public bool islist;
+        public IP6 whence;
+        public IP6 container;
 
-        public LValue(bool rw_, bool islist_, VivClosure whence_,
-                IP6 container_) {
-            rw = rw_; islist = islist_; whence = whence_;
-            container = container_;
-        }
-    }
-
-    // Allows the viv closure to be cleared for all copies of a lv after the
-    // container becomes real, plugging a memory leak.
-    public class VivClosure {
-        public IP6 v;
-        public VivClosure(IP6 v_) { v = v_; }
-    }
-
-    // Variables are things which can produce LValues, and can also bind
-    // LValues.  They hold LValues and may or may not be bindable.  Variables
-    // also tend to contextualize stuff put into them.
-    //
-    // Coercions are not used on binding unless necessary.
-    //
-    // Variables also have type constraints, that's how %foo and @foo differ...
-    public class Variable {
-        public enum Context {
-            // @foo: binds listy lvalues
-            List,
-            // $foo: binds scalary lvalues; wraps other stuff in a container
-            Scalar,
-        }
-        public LValue lv;
-        public bool bvalue;
-
-        public Context context;
-
-        public Variable(bool bv, Context cx, LValue lv_) {
-            bvalue = bv;
-            lv = lv_;
-            context = cx;
+        public Variable(bool bvalue, bool rw, bool islist, IP6 whence,
+                IP6 container) {
+            this.bvalue = bvalue;
+            this.whence = whence;
+            this.container = container;
+            this.rw = rw;
+            this.islist = islist;
         }
     }
 
@@ -106,8 +84,8 @@ namespace Niecza {
         public readonly Dictionary<string, object> lex
             = new Dictionary<string, object>();
 
-        public LValue[] pos;
-        public Dictionary<string, LValue> named;
+        public Variable[] pos;
+        public Dictionary<string, Variable> named;
 
         public Frame(Frame outer_) : this(null, outer_, null) {}
 
@@ -127,13 +105,14 @@ namespace Niecza {
             return c;
         }
 
-        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+        public Frame Invoke(Frame c, Variable[] p,
+                Dictionary<string, Variable> n) {
             return Kernel.Die(c, "Tried to invoke a Frame");
         }
 
         // FIXME A horrible hack, code duplication and doesn't support FETCH etc
         public Frame InvokeMethod(Frame caller, string name,
-                LValue[] pos, Dictionary<string, LValue> named) {
+                Variable[] pos, Dictionary<string, Variable> named) {
             IP6 m;
             foreach (DynMetaObject k in Kernel.CallFrameMO.mro) {
                 if (k.local.TryGetValue(name, out m)) {
@@ -198,7 +177,7 @@ namespace Niecza {
         public string name;
 
         public delegate Frame InvokeHandler(DynObject th, Frame c,
-                LValue[] pos, Dictionary<string, LValue> named);
+                Variable[] pos, Dictionary<string, Variable> named);
         public delegate Frame FetchHandler(DynObject th, Frame c);
         public delegate Frame StoreHandler(DynObject th, Frame c, IP6 n);
 
@@ -299,7 +278,7 @@ blocked:
         }
 
         public Frame InvokeMethod(Frame caller, string name,
-                LValue[] pos, Dictionary<string, LValue> named) {
+                Variable[] pos, Dictionary<string, Variable> named) {
             IP6 m;
             foreach (DynMetaObject k in klass.mro) {
                 if (k.local.TryGetValue(name, out m)) {
@@ -323,13 +302,14 @@ blocked:
             return caller;
         }
 
-        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+        public Frame Invoke(Frame c, Variable[] p,
+                Dictionary<string, Variable> n) {
             if (klass.OnInvoke != null) {
                 return klass.OnInvoke(this, c, p, n);
             } else {
-                LValue[] np = new LValue[p.Length + 1];
+                Variable[] np = new Variable[p.Length + 1];
                 Array.Copy(p, 0, np, 1, p.Length);
-                np[0] = new LValue(false, false, null, Kernel.MakeSC(this));
+                np[0] = Kernel.NewROScalar(this);
                 return InvokeMethod(c, "INVOKE", np, n);
             }
         }
@@ -338,9 +318,8 @@ blocked:
             if (klass.OnFetch != null) {
                 return klass.OnFetch(this, c);
             } else {
-                return InvokeMethod(c, "FETCH", new LValue[1] {
-                        new LValue(false, false, null, Kernel.MakeSC(this)) },
-                        null);
+                return InvokeMethod(c, "FETCH", new Variable[1] {
+                        Kernel.NewROScalar(this) }, null);
             }
         }
 
@@ -348,9 +327,8 @@ blocked:
             if (klass.OnStore != null) {
                 return klass.OnStore(this, c, o);
             } else {
-                return InvokeMethod(c, "STORE", new LValue[2] {
-                        new LValue(false, false, null, Kernel.MakeSC(this)),
-                        new LValue(false, false, null, Kernel.MakeSC(o)) },
+                return InvokeMethod(c, "STORE", new Variable[2] {
+                        Kernel.NewROScalar(this), Kernel.NewROScalar(o) },
                         null);
             }
         }
@@ -369,12 +347,13 @@ blocked:
                     " not available on CLRImportObject");
         }
 
-        public Frame Invoke(Frame c, LValue[] p, Dictionary<string, LValue> n) {
+        public Frame Invoke(Frame c, Variable[] p,
+                Dictionary<string, Variable> n) {
             return Kernel.Die(c, "Tried to invoke a CLRImportObject");
         }
 
-        public Frame InvokeMethod(Frame c, string nm, LValue[] p,
-                Dictionary<string, LValue> n) {
+        public Frame InvokeMethod(Frame c, string nm, Variable[] p,
+                Dictionary<string, Variable> n) {
             return Kernel.Die(c, "Method " + nm +
                     " not defined on CLRImportObject");
         }
@@ -437,7 +416,7 @@ blocked:
         }
 
         private static Frame SubInvoke(DynObject th, Frame caller,
-                LValue[] pos, Dictionary<string,LValue> named) {
+                Variable[] pos, Dictionary<string,Variable> named) {
             Frame proto = (Frame) th.slots["proto"];
             Frame outer = (Frame) th.slots["outer"];
             DynBlockDelegate code = (DynBlockDelegate) th.slots["code"];
@@ -450,13 +429,13 @@ blocked:
             return n;
         }
         private static Frame SubInvokeSubC(Frame th) {
-            LValue[] post;
+            Variable[] post;
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
                     return th.pos[0].container.Fetch(th);
                 default:
-                    post = new LValue[th.pos.Length - 1];
+                    post = new Variable[th.pos.Length - 1];
                     Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
                     return SubInvoke((DynObject)th.resultSlot, th.caller,
                             post, th.named);
@@ -507,82 +486,40 @@ blocked:
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
-                    return Fetch(th, new Variable(false,
-                                Variable.Context.Scalar, (LValue) th.lex["o"]));
+                    return Fetch(th, th.pos[1]);
                 case 1:
-                    ((Variable)th.lex["c"]).lv.container = (IP6) th.resultSlot;
-                    ((Variable)th.lex["c"]).lv.islist = true;
+                    th.pos[0].container = (IP6) th.resultSlot;
+                    th.pos[0].rw = false;
                     return th.caller;
                 default:
                     throw new Exception("IP invalid");
             }
         }
 
-        public static Frame BindNewScalar(Frame th, Variable rhs, bool ro,
-                bool forcerw) {
-            IP6 cont;
-            bool contrw;
-            if (rhs.lv.islist) {
-                cont = MakeSC(rhs.lv.container);
-                contrw = false;
-            } else {
-                cont = rhs.lv.container;
-                contrw = rhs.lv.rw;
-            }
-            th.resultSlot = new Variable(false, Variable.Context.Scalar,
-                    new LValue(!ro && contrw, false, null, cont)); // TODO forcerw
-            return th;
-        }
-
-        public static Frame BindNewList(Frame th, Variable rhs,
-                bool ro, bool forcerw) {
-            Frame n;
-            Variable lhs = new Variable(false, Variable.Context.List,
-                    new LValue(true, true, null, null));
-            th.resultSlot = lhs;
-            if (rhs.lv.islist) {
-                lhs.lv = rhs.lv;
-                if (ro) { lhs.lv.rw = false; }
-                return th;
-            } else {
-                n = new Frame(th, null,
-                        new DynBlockDelegate(BindListizeC));
-                n.lex["o"] = rhs.lv;
-                n.lex["c"] = lhs;
-                return n;
-            }
-        }
-
-        public static Frame Bind(Frame th, Variable lhs, LValue rhs,
+        public static Frame Bind(Frame th, Variable lhs, Variable rhs,
                 bool ro, bool forcerw) {
             // TODO: need exceptions for forcerw to be used
             Frame n;
-            switch (lhs.context) {
-                case Variable.Context.Scalar:
-                    if (rhs.islist) {
-                        lhs.lv.rw = false;
-                        lhs.lv.islist = false;
-                        lhs.lv.container = MakeSC(rhs.container);
-                        return th;
-                    } else {
-                        lhs.lv = rhs;
-                        if (ro) { lhs.lv.rw = false; }
-                        return th;
-                    }
-                case Variable.Context.List:
-                    if (rhs.islist) {
-                        lhs.lv = rhs;
-                        if (ro) { lhs.lv.rw = false; }
-                        return th;
-                    } else {
-                        n = new Frame(th, null,
-                                new DynBlockDelegate(BindListizeC));
-                        n.lex["o"] = rhs;
-                        n.lex["c"] = lhs;
-                        return n;
-                    }
-                default:
-                    throw new Exception("invalid context?");
+            if (lhs.islist) {
+                if (rhs.islist) {
+                    lhs.container = rhs.container;
+                    lhs.rw = !ro && rhs.rw;
+                    return th;
+                } else {
+                    n = new Frame(th, null, new DynBlockDelegate(BindListizeC));
+                    n.pos = new Variable[2] { lhs, rhs };
+                    return n;
+                }
+            } else {
+                if (rhs.islist) {
+                    lhs.rw = false;
+                    lhs.container = MakeSC(rhs.container);
+                    return th;
+                } else {
+                    lhs.container = rhs.container;
+                    lhs.rw = !ro && rhs.rw;
+                    return th;
+                }
             }
         }
 
@@ -613,45 +550,39 @@ blocked:
             }
         }
 
-        public static Frame Assign(Frame th, LValue lhs, LValue rhs) {
+        public static Frame Assign(Frame th, Variable lhs, Variable rhs) {
             Frame n = new Frame(th, null,
                     new DynBlockDelegate(AssignC));
-            n.pos = new LValue[2] { lhs, rhs };
+            n.pos = new Variable[2] { lhs, rhs };
             return n;
         }
 
         public static Frame Fetch(Frame th, Variable vr) {
-            if (vr.lv.islist) {
-                th.resultSlot = vr.lv.container;
+            if (vr.islist) {
+                th.resultSlot = vr.container;
                 return th;
             } else {
-                return vr.lv.container.Fetch(th);
+                return vr.container.Fetch(th);
             }
         }
 
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
-            return new Variable(false, Variable.Context.Scalar,
-                    new LValue(false, false, null, MakeSC(obj)));
+            return new Variable(false, false, false, null, MakeSC(obj));
         }
 
-        // TODO: Find out from #perl6 more about whether we actually want
-        // to be cloning anything.  this one /is/ rebindable
         public static Variable NewRWScalar(IP6 obj) {
-            return new Variable(true, Variable.Context.Scalar,
-                    new LValue(true, false, null, MakeSC(obj)));
+            return new Variable(true, true, false, null, MakeSC(obj));
         }
 
         public static Variable NewRWListVar(IP6 container) {
-            return new Variable(true, Variable.Context.List,
-                    new LValue(true, true, null, container));
+            return new Variable(true, true, true, null, container);
         }
 
         public static List<Variable> SlurpyHelper(Frame th, int from) {
             List<Variable> lv = new List<Variable>();
             for (int i = from; i < th.pos.Length; i++) {
-                lv.Add(new Variable(false, Variable.Context.Scalar,
-                            th.pos[i]));
+                lv.Add(th.pos[i]);
             }
             return lv;
         }
@@ -888,11 +819,10 @@ public class NULL {
         switch (th.ip) {
             case 0:
                 th.ip = 1;
-                return Niecza.Kernel.Fetch(th, new Niecza.Variable(false,
-                            Niecza.Variable.Context.Scalar, th.pos[0]));
+                return Niecza.Kernel.Fetch(th, th.pos[0]);
             default:
                 return ((Niecza.IP6)th.resultSlot).Invoke(th.caller,
-                        new Niecza.LValue[0] {}, null);
+                        new Niecza.Variable[0] {}, null);
         }
     }
     public static void Initialize() {}

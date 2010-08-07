@@ -34,15 +34,12 @@ use 5.010;
               Insert       => [m => 'Void'],
               RemoveAt     => [m => 'Void'],
               Count        => [f => 'Int32'] },
-        'LValue[]' =>
+        'Variable[]' =>
             { Length       => [f => 'Int32'] },
         'Double' =>
             { ToString     => [m => 'String'] },
         'Variable' =>
-            { lv           => [f => 'LValue'] },
-        'LValue' =>
-            { islist       => [f => 'Boolean'],
-              whence       => [f => 'VivClosure'] },
+            { islist       => [f => 'Boolean'] },
         'VivClosure' =>
             { v            => [f => 'IP6'] },
         'CLRImportObject' =>
@@ -54,7 +51,7 @@ use 5.010;
             { Append       => [m => 'Void'],
               ToString     => [m => 'String'] },
         'Frame' =>
-            { pos          => [f => 'LValue[]'],
+            { pos          => [f => 'Variable[]'],
               caller       => [f => 'Frame'],
               outer        => [f => 'Frame'],
               proto        => [f => 'Frame'],
@@ -342,16 +339,12 @@ use 5.010;
         $self->_emit(($self->_popn(1))[0]);
     }
 
-    # the use of scalar here is a little bit wrong; semantically it's closer
-    # to the old notion of ¢foo.  doesn't matter much since it's not exposed
-    # at the Perl 6 level.
     sub pos {
         my ($self, $num) = @_;
         if (! defined($num)) {
             $num = ($self->_popn(1))[0];
         }
-        $self->_push('Variable',
-            "new Variable(false, Variable.Context.Scalar, th.pos[$num])");
+        $self->_push('Variable', "th.pos[$num]");
     }
 
     sub protolget {
@@ -366,8 +359,8 @@ use 5.010;
                 (1 .. $numargs + 1);  # invocant LV
         my ($inv) = $self->_popn(1);
         $self->_cpscall(($nv ? 'Variable' : 'Void'),
-            "$inv.InvokeMethod(th, " . qm($name) . ", new LValue[" .
-            scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) .
+            "$inv.InvokeMethod(th, " . qm($name) . ", new Variable[" .
+            scalar(@args) . "] { " . join(", ", @args) .
             " }, null)");
     }
 
@@ -376,16 +369,16 @@ use 5.010;
         my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
         my ($inv) = $self->_popn(1);
         $self->_cpscall(($nv ? 'Variable' : 'Void'),
-            "$inv.Invoke(th, new LValue[" . scalar(@args) . "] { " .
-            join(", ", map { "$_.lv" } @args) . " }, null)");
+            "$inv.Invoke(th, new Variable[" . scalar(@args) . "] { " .
+            join(", ", @args) . " }, null)");
     }
 
     sub tail_call_sub {
         my ($self, $numargs) = @_;
         my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
         my ($inv) = $self->_popn(1);
-        $self->_emit("return $inv.Invoke(th.caller, new LValue[" .
-            scalar(@args) . "] { " . join(", ", map { "$_.lv" } @args) .
+        $self->_emit("return $inv.Invoke(th.caller, new Variable[" .
+            scalar(@args) . "] { " . join(", ", @args) .
             " }, null)");
         $self->unreach(1);
     }
