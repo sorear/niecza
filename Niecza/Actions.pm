@@ -184,11 +184,54 @@ sub quote__S_Q { my ($cl, $M) = @_;
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my $slot = $cl->gensym;
     # TODO should be a real pass.
-    $M->{_ast} = Op::CallMethod->new(node($M), name => 'bless',
-        receiver => Op::Lexical->new(name => 'Regex'),
-        positionals => [
-            RxOp::Export->new(zyg => [$M->{nibble}{_ast}])->closure ]);
+    $M->{_ast} = RxOp::Export->new(zyg => [$M->{nibble}{_ast}])->closure;
 }
+
+sub regex_block { my ($cl, $M) = @_;
+    if (@{ $M->{quotepair} }) {
+        $M->sorry('Regex adverbs NYI');
+        return;
+    }
+    $M->{_ast} = $M->{nibble}{_ast};
+}
+
+sub regex_def { my ($cl, $M) = @_;
+    my $name = $M->{deflongname}[0] ?
+        $cl->mangle_longname($M->{deflongname}[0], "regex") : undef;
+    my $scope = (!defined($name)) ? "anon" : ($::SCOPE || "has");
+
+    if (@{ $M->{signature} } > 1) {
+        $M->sorry("Multiple signatures on a regex NYI");
+        return;
+    }
+
+    my $sig = $M->{signature}[0] ? $M->{signature}[0]{_ast}
+        : $cl->get_placeholder_sig($M);
+    $sig = $sig->for_regex;
+
+    if ($scope =~ /state|augment|supercede/) {
+        $M->sorry("Nonsensical scope $scope for regex");
+        return;
+    }
+
+    my $var = ($scope eq 'anon' || $scope eq 'has') ? $cl->gensym
+        : '&' . $name;
+
+    $M->{_ast} = Op::SubDef->new(
+        var => $var, class => 'Regex',
+        method_too => ($scope eq 'has' ? $name : undef),
+        code => Body->new(
+            type => 'regex',
+            signature => $sig,
+            do => RxOp::Export->new(zyg => [$M->{regex_block}{_ast}])->op));
+}
+
+sub regex_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{regex_def}{_ast};
+}
+sub regex_declarator__S_regex {}
+sub regex_declarator__S_rule {}
+sub regex_declarator__S_token {}
 
 # :: RxOp
 sub atom { my ($cl, $M) = @_;

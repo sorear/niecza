@@ -14,11 +14,13 @@ use CgOp;
     my $i = 0;
     sub _closurize {
         my ($self, $op) = @_;
-        Op::SubDef->new(var => 'rx!' . ($i++), body =>
+        Op::SubDef->new(var => 'rx!' . ($i++), class => 'Regex', body =>
             Body->new(
-                type      => 'regex',
-                signature => Sig->simple('$¢'),
-                do        => $op));
+                type        => 'regex',
+                signature   => Sig->simple('$¢'),
+# XXX transparent bodies with signatures are not yet handled well
+#                transparent => 1,
+                do          => $op));
     }
 
     sub closure {

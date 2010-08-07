@@ -58,6 +58,7 @@ use CgOp;
     extends 'Decl';
 
     has var    => (isa => 'Str', is => 'ro', required => 1);
+    has class  => (isa => 'Str', is => 'ro', default => 'Sub');
     has code   => (isa => 'Body', is => 'ro', required => 1);
 
     sub bodies { $_[0]->code }
@@ -69,8 +70,16 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::proto_var($self->var, CgOp::newscalar(
-                CgOp::protosub($self->code)));
+        if ($self->class eq 'Sub') {
+            CgOp::proto_var($self->var, CgOp::newscalar(
+                    CgOp::protosub($self->code)));
+        } else {
+            # TODO: More direct support
+            CgOp::proto_var($self->var,
+                CgOp::methodcall(
+                    CgOp::scopedlex($self->class), 'bless',
+                    CgOp::newscalar(CgOp::protosub($self->code))));
+        }
     }
 
     sub enter_code {

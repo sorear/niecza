@@ -730,13 +730,15 @@ use CgOp;
 
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has body   => (isa => 'Body', is => 'ro', required => 1);
+    has class  => (isa => 'Str', is => 'ro', default => 'Sub');
     has method_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
 
     sub lift_decls {
         my ($self) = @_;
         my @r;
-        push @r, Decl::Sub->new(var => $self->var, code => $self->body);
+        push @r, Decl::Sub->new(var => $self->var, class => $self->class,
+            code => $self->body);
         push @r, Decl::HasMethod->new(name => $self->method_too,
             var => $self->var) if defined($self->method_too);
         push @r, Decl::PackageAlias->new(slot => $self->var,

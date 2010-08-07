@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use utf8;
 use 5.010;
 
 {
@@ -127,6 +128,12 @@ use 5.010;
     sub for_method {
         my $self = shift;
         my $sp = Sig::Parameter->new(slot => 'self', name => 'self');
+        Sig->new(params => [ $sp, @{ $self->params } ]);
+    }
+
+    sub for_regex {
+        my $self = shift;
+        my $sp = Sig::Parameter->new(slot => '$¢', name => '$¢');
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
