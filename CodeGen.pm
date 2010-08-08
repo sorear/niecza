@@ -57,7 +57,11 @@ use 5.010;
         'Cursor' =>
             { At           => [m => 'Cursor'],
               Exact        => [m => 'Cursor'],
-              pos          => [f => 'Int32'] },
+              pos          => [f => 'Int32'],
+              backing      => [f => 'String'],
+              captures     => [f => 'Matched'],
+              SetCaps      => [m => 'Cursor'],
+              Bind         => [m => 'Cursor'] },
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
