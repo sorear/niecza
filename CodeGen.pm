@@ -604,7 +604,7 @@ use 5.010;
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
-        print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(\"Entering $::UNITNAME : $name @ \" + th.ip); }\n";
+        print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(th.DepthMark() + \"$::UNITNAME : $name @ \" + th.ip); }\n";
         print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
         print ::NIECZA_OUT " " x 12, "case 0:\n";
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };

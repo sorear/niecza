@@ -128,6 +128,26 @@ use CgOp;
 
     has names => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', required => 1);
 
+    sub op {
+        my ($self) = @_;
+        my @n = @{ $self->names };
+        for (@n) {
+            $::parennum = $_ if defined($_) && $_ =~ /^[0-9]+$/;
+            $_ = $::parennum++ if !defined($_);
+        }
+        Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxbind'),
+            positionals => [
+                Op::Lexical->new(name => '$¢'),
+                Op::CallSub->new(
+                    invocant => Op::Lexical->new(name => '&infix:<,>'),
+                    positionals => [
+                        map { Op::StringLiteral->new(text => $_) }
+                            @{ $self->names }
+                    ]),
+                $self->zyg->[0]->closure]);
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -138,6 +158,20 @@ use CgOp;
     extends 'RxOp';
 
     has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub op {
+        my ($self) = @_;
+        Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxcall'),
+            positionals => [
+                Op::Lexical->new(name => '$¢'),
+                Op::SubDef->new(var => Niecza::Actions->gensym, body =>
+                    Body->new(
+                        type        => 'sub',
+                        signature   => Sig->simple('$¢'),
+                        do          => Op::CallMethod->new(name => $self->name,
+                            receiver => Op::Lexical->new(name => '$¢'))))]);
+    }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

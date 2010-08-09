@@ -185,6 +185,7 @@ sub quote__S_Q { my ($cl, $M) = @_;
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my $slot = $cl->gensym;
     # TODO should be a real pass.
+    local $::parenid = 0;
     $M->{_ast} = RxOp::Export->new(zyg => [$M->{nibble}{_ast}])->closure;
 }
 
@@ -218,6 +219,7 @@ sub regex_def { my ($cl, $M) = @_;
     my $var = ($scope eq 'anon' || $scope eq 'has') ? $cl->gensym
         : '&' . $name;
 
+    local $::parenid = 0;
     $M->{_ast} = Op::SubDef->new(
         var => $var, class => 'Regex',
         method_too => ($scope eq 'has' ? $name : undef),

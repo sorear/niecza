@@ -9,14 +9,21 @@ sub _rxcall($C, $fun) {
 
 # A call to a subrule could return a cursor of a different type, or with
 # unwanted subcaptures that need to be cleared for <.foo>
-sub _rxunbind($C, $fun) {
+sub _rxbind($C, @names, $fun) {
     my $it = $fun($C);
     sub {
         if my $v = $it() { #OK
-            Q:CgOp {
+            my $nC = Q:CgOp {
                 (box (@ (l $C)) (rawcall (unbox Cursor (@ (l $v)))
                     SetCaps (getfield captures (unbox Cursor (@ (l $C))))))
+            };
+            for @names -> $n { #OK
+                $nC = Q:CgOp {
+                    (box (@ (l $nC)) (rawcall (unbox Cursor (@ (l $nC)))
+                        Bind (unbox String (@ (l $n))) (l $v)))
+                };
             }
+            $nC;
         } else {
             Any
         }
@@ -38,5 +45,13 @@ my grammar G2 {
 
 ok G2.parse("yxxy"), "subrule position tracking works";
 ok !G2.parse("yxy"), "subrule position tracking works (2)";
+
+my grammar G3 {
+    regex TOP { <moo> }
+    regex moo { x }
+}
+
+ok G3.parse("x"), "capturing subrules work (positive)";
+ok !G3.parse("y"), "capturing subrules work (negative)";
 
 done-testing;

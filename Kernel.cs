@@ -167,6 +167,15 @@ namespace Niecza {
             }
             return Kernel.NewROScalar(Kernel.AnyP);
         }
+
+        private static List<string> spacey = new List<string>();
+        public string DepthMark() {
+            Frame f = this;
+            int ix = 0;
+            while (f != null) { ix++; f = f.caller; }
+            while (spacey.Count <= ix) { spacey.Add(new String(' ', spacey.Count * 2)); }
+            return spacey[ix];
+        }
     }
 
     // NOT IP6; these things should only be exposed through a ClassHOW-like
