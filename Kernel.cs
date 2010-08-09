@@ -424,6 +424,32 @@ blocked:
             }
         }
 
+        public static Frame TakeReturnFrame;
+
+        public static Frame Take(Frame th, Variable payload) {
+            Frame r = TakeReturnFrame;
+            TakeReturnFrame = null;
+            r.lex["$nextframe"] = NewROScalar(th);
+            r.resultSlot = payload;
+            th.resultSlot = payload;
+            return r;
+        }
+
+        public static Frame CoTake(Frame th, Frame from) {
+            TakeReturnFrame = th;
+            return from;
+        }
+
+        public static Frame GatherHelper(Frame th, IP6 sub) {
+            DynObject dyo = (DynObject) sub;
+            Frame n = new Frame(th,
+                                (Frame) dyo.slots["outer"],
+                                (DynBlockDelegate) dyo.slots["code"]);
+            n.proto = (Frame) dyo.slots["proto"];
+            th.resultSlot = n;
+            return th;
+        }
+
         private static Frame SubInvoke(DynObject th, Frame caller,
                 Variable[] pos, Dictionary<string,Variable> named) {
             Frame proto = (Frame) th.slots["proto"];

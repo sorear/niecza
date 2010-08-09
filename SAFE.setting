@@ -849,6 +849,32 @@ sub postcircumfix:<{ }> is rawcall {
         });
 }
 
+my class GatherIterator is Iterator {
+    has $!frame;
+
+    method validate() {
+        my $nextframe;
+        $!value = Q:CgOp {
+            (rawsccall Kernel.CoTake (cast Frame (getattr frame (@ (l self)))))
+        };
+        $!valid = True;
+        $!frame = Any;
+        $!next  = GatherIterator.RAWCREATE("frame", $nextframe, "valid", False,
+            "value", Any, "next", Any);
+    }
+}
+
+sub _gather($fr) {
+    my @l := List.RAWCREATE("flat", True, "items", LLArray.new, "rest",
+        LLArray.new(GatherIterator.RAWCREATE("frame", $fr, "valid", False,
+            "value", Any, "next", Any)));
+    @l;
+}
+
+sub take($p) { # should be \|$p
+    Q:CgOp { (rawsccall Kernel.Take (l $p)) }
+}
+
 # these are immutable, though we may wind up reusing them in some cases by
 # uniqueness rules (TBD)
 my class Cursor {

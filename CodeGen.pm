@@ -65,6 +65,9 @@ use 5.010;
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
+        'Kernel.CoTake'        => [c => 'Variable'],
+        'Kernel.Take'          => [c => 'Variable'],
+        'Kernel.GatherHelper'  => [c => 'Frame'],
         'Kernel.ContextHelper' => [m => 'Variable'],
         'Kernel.StrP'          => [f => 'IP6'],
         'Kernel.CallFrameMO'   => [f => 'DynMetaObject'],
@@ -497,6 +500,11 @@ use 5.010;
     sub cast {
         my ($self, $type) = @_;
         $self->_push($type, "(($type)" . ($self->_popn(1))[0] . ")");
+    }
+
+    sub fgoto {
+        my ($nv, $self) = @_;
+        $self->_cpscall(($nv ? 'Variable' : 'Void'), ($self->_popn(1))[0]);
     }
 
     sub clr_call_direct {

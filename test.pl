@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 225;
+plan 231;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -597,4 +597,16 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
     ok !Bob.parse("adc"), "grammars work (2)";
     ok !Bob.parse("xac"), "grammars anchor (1)";
     ok !Bob.parse("acx"), "grammars anchor (2)";
+}
+
+{
+    my $x = False;
+    my $y = False;
+    my @l1 := gather do { $x = True; take 1; $y = True };
+    ok !$x, "gather does not run block immediately";
+    ok @l1.shift == 1, "first value pulled";
+    ok $x, "pull started block";
+    ok !$y, "but did not finish it";
+    ok !@l1, "no more values";
+    ok $y, "querying that fact finished the block";
 }

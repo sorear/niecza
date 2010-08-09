@@ -853,4 +853,51 @@ use CgOp;
     no Moose;
 }
 
+{
+    package Op::Take;
+    use Moose;
+    extends 'Op';
+
+    has value => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->value }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rawsccall('Kernel.Take', $self->value->cgop($body));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::Gather;
+    use Moose;
+    extends 'Op';
+
+    has body => (isa => 'Body', is => 'ro', required => 1);
+    has var  => (isa => 'Str',  is => 'ro', required => 1);
+
+    sub lift_decls {
+        my ($self) = @_;
+        Decl::Sub->new(var => $self->var, code => $self->body);
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        # construct a frame for our sub ip=0
+        # construct a GatherIterator with said frame
+        # construct a List from the iterator
+
+        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&_gather')),
+            CgOp::newscalar(CgOp::rawsccall('Kernel.GatherHelper',
+                    CgOp::fetch(CgOp::scopedlex($self->var)))));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+
 1;

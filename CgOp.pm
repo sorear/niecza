@@ -540,6 +540,12 @@ use warnings;
             zyg => [ $inv, @args ], is_cps_call => 1);
     }
 
+    sub fgoto {
+        my ($tgt) = @_;
+        CgOp::Primitive->new(op => [ 'goto', $_[0] ], zyg => [ $_[1] ],
+            is_cps_call => 1);
+    }
+
     sub rawsget {
         CgOp::Primitive->new(op => [ 'clr_sfield_get', $_[0] ]);
     }

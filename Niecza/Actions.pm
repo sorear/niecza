@@ -1783,6 +1783,11 @@ sub statement_prefix {}
 sub statement_prefix__S_do { my ($cl, $M) = @_;
     $M->{_ast} = $cl->block_to_immediate($M, 'do', $M->{blast}{_ast});
 }
+sub statement_prefix__S_gather { my ($cl, $M) = @_;
+    $M->{blast}{_ast}->type('gather');
+    $M->{_ast} = Op::Gather->new(node($M), var => $cl->gensym,
+        body => $M->{blast}{_ast});
+}
 sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
     my $var = $cl->gensym;
 

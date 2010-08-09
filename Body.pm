@@ -51,29 +51,48 @@ use CgOp ();
 
     sub lift_decls {
         my ($self) = @_;
-        my (@x, @y);
-        unshift @{ $self->transparent ? \@y : \@x },
-            $self->do->lift_decls;
-        unshift @x, $self->signature->local_decls if $self->signature;
-        @x = map { (map { $_->lift_decls } $_->bodies), $_ } @x;
-        unshift @x, Decl::Hint->new(name => '$?CURPKG',
-            value => CgOp::letvar('pkg')) if $self->type =~ /mainline|class|
+        my (@self_q, @outer_q);
+
+        # it is the caller's responsibility to process returned decls
+        local $::process = sub {
+            my (@decls) = @_;
+            for my $decl (@decls) {
+                push @outer_q, $decl->outer_decls;
+                for my $b ($decl->bodies) {
+                    my @o = $b->lift_decls;
+                    if ($self->transparent) {
+                        push @outer_q, @o;
+                    } else {
+                        for (@o) { $::process->($_); }
+                    }
+                }
+                push @self_q, $decl;
+            }
+        };
+
+        $::process->(Decl::Hint->new(name => '$?CURPKG',
+            value => CgOp::letvar('pkg'))) if $self->type =~ /mainline|class|
             package|grammar|module|role|slang|knowhow/x;
 
         if ($self->type eq 'mainline') {
-            @x = map { $_->outer_decls, $_ } @x;
-            unshift @x, Decl::Hint->new(name => '$?GLOBAL',
-                value => CgOp::letvar('pkg'));
-            unshift @x, Decl::Hint->new(name => '$?FILE',
-                value => CgOp::string_var($self->file));
-            unshift @x, Decl::Hint->new(name => '$?ORIG',
-                value => CgOp::string_var($self->text));
-        } else {
-            push @y, map { $_->outer_decls } @x;
+            $::process->(
+                Decl::Hint->new(name => '$?GLOBAL',
+                    value => CgOp::letvar('pkg')),
+                Decl::Hint->new(name => '$?FILE',
+                    value => CgOp::string_var($self->file)),
+                Decl::Hint->new(name => '$?ORIG',
+                    value => CgOp::string_var($self->text)));
         }
-        $self->decls(\@x);
+        $::process->($self->signature->local_decls) if $self->signature;
+        if ($self->transparent) {
+            push @outer_q, $self->do->lift_decls;
+        } else {
+            $::process->($self->do->lift_decls);
+        }
 
-        @y;
+        $self->decls(\@self_q);
+
+        @outer_q;
     }
 
     sub to_cgop {
@@ -82,8 +101,15 @@ use CgOp ();
         push @enter, map { $_->enter_code($self) } @{ $self->decls };
         push @enter, $self->signature->binder($self->name) if $self->signature;
         # TODO: Bind a return value here to catch non-ro sub use
-        $self->cgoptree(CgOp::prog(@enter,
-                CgOp::return($self->do->cgop($self))));
+        if ($self->type eq 'gather') {
+            $self->cgoptree(CgOp::prog(@enter,
+                    CgOp::sink($self->do->cgop($self)),
+                    CgOp::rawsccall('Kernel.Take',
+                        CgOp::scopedlex('EMPTY'))));
+        } else {
+            $self->cgoptree(CgOp::prog(@enter,
+                    CgOp::return($self->do->cgop($self))));
+        }
         map { $_->preinit_code($self) } @{ $self->decls };
     }
 
