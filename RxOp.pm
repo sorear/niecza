@@ -121,4 +121,26 @@ use CgOp;
     no Moose;
 }
 
+{
+    package RxOp::Capture;
+    use Moose;
+    extends 'RxOp';
+
+    has names => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', required => 1);
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::CallMethod;
+    use Moose;
+    extends 'RxOp';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;

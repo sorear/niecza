@@ -314,7 +314,7 @@ sub metachar__S_Bra_Ket { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Paren_Thesis { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::Capture->new(zyg => [
+    $M->{_ast} = RxOp::Capture->new(names => [undef], zyg => [
             RxOp::ConfineLang->new(zyg => [$M->{nibbler}{_ast}])]);
 }
 
@@ -390,6 +390,52 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
     }
     $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
         igcase => $::RX{i}, igmark => $::RX{a});
+}
+
+sub rxcapturize { my ($cl, $name, $rxop) = @_;
+    if (!$rxop->isa('RxOp::Capture')) {
+        # $<foo>=[ ] or ( ) or <foo>
+        return RxOp::Capture->new(names => [$name], zyg => [$rxop]);
+    }
+
+    # $<foo>=(...)
+    if (@{ $rxop->names } == 1 && !defined($rxop->names->[0])) {
+        return RxOp::Capture->new(names => [$name], zyg => $rxop->zyg);
+    }
+
+    return RxOp::Capture->new(names => [ $name, @{ $rxop->names } ],
+        zyg => $rxop->zyg);
+}
+
+sub assertion {}
+# This needs to be deconstructed by :method, so it needs a regular structure
+sub assertion__S_name { my ($cl, $M) = @_;
+    my $name = $cl->mangle_longname($M->{longname}, "regex call");
+    if ($M->{assertion}[0]) {
+        $M->{_ast} = $M->{assertion}[0]{_ast};
+    } else {
+        $M->{_ast} = RxOp::CallMethod->new(arglist =>
+            ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} :
+            $M->{nibbler}[0] ? [$M->{nibbler}[0]{_ast}] : []), name => $name);
+    }
+    $M->{_ast} = $cl->rxcapturize($name, $M->{_ast});
+}
+
+sub assertion__S_method { my ($cl, $M) = @_;
+    if ($M->{dottyop}) {
+        $M->sorry("Dottyop assertions NYI");
+        return;
+    }
+    if ($M->{assertion}{assertion}[0]) {
+        $M->sorry("Binding to a method doesn't work like that");
+        return;
+    }
+    if (!$M->{assertion}{_ast}->isa('RxOp::Capture')) {
+        $M->sorry("Internal error in assertion:method parse");
+        return;
+    }
+    $M->{_ast} = RxOp::Capture->new(names => [],
+        zyg => $M->{assertion}{_ast}->zyg);
 }
 
 # These have effects only in the parser, so undef ast is correct.

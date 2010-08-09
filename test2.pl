@@ -23,4 +23,20 @@ sub _rxunbind($C, $fun) {
     }
 }
 
+my grammar G1 {
+    regex TOP { <.foo> }
+    regex foo { x }
+}
+
+ok G1.parse("x"), "subrules work (positive)";
+ok !G1.parse("y"), "subrules work (negative)";
+
+my grammar G2 {
+    regex TOP { y <.foo> <.foo> y }
+    regex foo { x }
+}
+
+ok G2.parse("yxxy"), "subrule position tracking works";
+ok !G2.parse("yxy"), "subrule position tracking works (2)";
+
 done-testing;
