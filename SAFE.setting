@@ -936,4 +936,26 @@ my class Grammar is Cursor {
     }
 }
 
+sub _rxcall(@list, $k) {
+    $k(@list.shift) while @list;
+}
+
+# A call to a subrule could return a cursor of a different type, or with
+# unwanted subcaptures that need to be cleared for <.foo>
+sub _rxbind($C, @names, $fun, $k) {
+    $fun($C, -> $C2 {
+        my $C3 = Q:CgOp {
+            (box (@ (l $C)) (rawcall (unbox Cursor (@ (l $C2)))
+                SetCaps (getfield captures (unbox Cursor (@ (l $C))))))
+        };
+        for @names -> $n { #OK
+            $C3 = Q:CgOp {
+                (box (@ (l $C3)) (rawcall (unbox Cursor (@ (l $C3)))
+                    Bind (unbox String (@ (l $n))) (l $C3)))
+            };
+        }
+        $k($C3);
+    });
+}
+
 {YOU_ARE_HERE}

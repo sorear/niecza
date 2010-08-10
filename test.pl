@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 231;
+plan 237;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -609,4 +609,30 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
     ok !$y, "but did not finish it";
     ok !@l1, "no more values";
     ok $y, "querying that fact finished the block";
+}
+
+{
+    my grammar G1 {
+        regex TOP { <.foo> }
+        regex foo { x }
+    }
+
+    ok G1.parse("x"), "subrules work (positive)";
+    ok !G1.parse("y"), "subrules work (negative)";
+
+    my grammar G2 {
+        regex TOP { y <.foo> <.foo> y }
+        regex foo { x }
+    }
+
+    ok G2.parse("yxxy"), "subrule position tracking works";
+    ok !G2.parse("yxy"), "subrule position tracking works (2)";
+
+    my grammar G3 {
+        regex TOP { <moo> }
+        regex moo { x }
+    }
+
+    ok G3.parse("x"), "capturing subrules work (positive)";
+    ok !G3.parse("y"), "capturing subrules work (negative)";
 }

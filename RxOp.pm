@@ -137,23 +137,25 @@ use CgOp;
     has names => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', required => 1);
 
     sub op {
-        my ($self) = @_;
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
         my @n = @{ $self->names };
         for (@n) {
             $::parennum = $_ if defined($_) && $_ =~ /^[0-9]+$/;
             $_ = $::parennum++ if !defined($_);
         }
-        Op::CallSub->new(
+        $icn, Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&_rxbind'),
             positionals => [
-                Op::Lexical->new(name => '$¢'),
+                Op::Lexical->new(name => $icn),
                 Op::CallSub->new(
                     invocant => Op::Lexical->new(name => '&infix:<,>'),
                     positionals => [
                         map { Op::StringLiteral->new(text => $_) }
                             @{ $self->names }
                     ]),
-                $self->zyg->[0]->closure]);
+                $self->_close_op($self->zyg->[0]),
+                $self->_close_k($cn, $cont)]);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -168,17 +170,14 @@ use CgOp;
     has name => (isa => 'Str', is => 'ro', required => 1);
 
     sub op {
-        my ($self) = @_;
-        Op::CallSub->new(
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&_rxcall'),
             positionals => [
-                Op::Lexical->new(name => '$¢'),
-                Op::SubDef->new(var => Niecza::Actions->gensym, body =>
-                    Body->new(
-                        type        => 'sub',
-                        signature   => Sig->simple('$¢'),
-                        do          => Op::CallMethod->new(name => $self->name,
-                            receiver => Op::Lexical->new(name => '$¢'))))]);
+                Op::CallMethod->new(name => $self->name,
+                    receiver => Op::Lexical->new(name => $icn)),
+                $self->_close_k($cn, $cont)]);
     }
 
     __PACKAGE__->meta->make_immutable;
