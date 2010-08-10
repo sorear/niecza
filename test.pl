@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 243;
+plan 255;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -663,4 +663,27 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 {
     ok (&infix:<+>)(2,2) == 4, '&infix:<+> syntax works';
+}
+
+{
+    sub foo($x = 5) { $x }
+    ok foo() == 5, "defaults operate";
+    ok foo(19) == 19, "can override defaults";
+    ok !foo(Any).defined, "defaults do not misfire";
+    my $y = 0;
+    sub bar($x = $y++) { $x }
+    ok bar() == 0, "expressional defaults operate";
+    ok bar() == 1, "expressional defaults are called each time";
+    ok bar(3) == 3, "expressional defaults can be overridden";
+    ok bar() == 2, "when not used, expressional defaults are not called";
+}
+
+{
+    sub foo($x?) { $x }
+    ok !foo().defined, "defaults to undef";
+    ok foo(19) == 19, "can override optionals";
+    sub bar($x?, $y?) { ($x // 5), ($y // 9) }
+    is bar().join("|"), "5|9", "2x defaulting works";
+    is bar(10,20).join("|"), "10|20", "2x overriding works";
+    is bar(10).join("|"), "10|9", "one value hits the right parameter";
 }

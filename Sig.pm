@@ -10,7 +10,7 @@ use 5.010;
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
     has optional => (is => 'ro', isa => 'Bool', default => 0);
-    has default => (is => 'ro', isa => 'Maybe[Body]', default => undef);
+    has default => (is => 'ro', isa => 'Maybe[Op]', default => undef);
     has positional => (is => 'ro', isa => 'Bool', default => 1);
     has readonly => (is => 'ro', isa => 'Bool', default => 0);
     has names => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
@@ -21,12 +21,12 @@ use 5.010;
 
     sub local_decls {
         my ($self) = @_;
-        if (defined $self->slot) {
-            return (Decl::SimpleVar->new(slot => $self->slot,
-                    list => $self->list, zeroinit => $self->zeroinit));
-        } else {
-            return ();
-        }
+        my @r;
+        push @r, Decl::SimpleVar->new(slot => $self->slot,
+                list => $self->list, zeroinit => $self->zeroinit)
+            if defined $self->slot;
+        push @r, $self->default->lift_decls if $self->default;
+        @r;
     }
 
     sub slurpy_get {
@@ -47,14 +47,11 @@ use 5.010;
     }
 
     sub _default_get {
-        my ($self, $subname) = @_;
+        my ($self, $body) = @_;
 
         if (defined $self->default) {
             # the default code itself was generated in decls
-            return CgOp::prog(
-                CgOp::clone_lex($self->default_sym),
-                CgOp::subcall(CgOp::fetch(
-                        CgOp::scopedlex($self->default_sym))));
+            return $self->default->code($body);
         } elsif ($self->optional) {
             if ($self->type eq 'Any') {
                 return CgOp::newscalar(CgOp::rawsget('Kernel.AnyP'));
@@ -63,8 +60,8 @@ use 5.010;
             }
         } else {
             return CgOp::prog(
-                CgOp::die("No value in $subname available for parameter " .
-                    $self->name),
+                CgOp::die("No value in " . $body->name .
+                    "available for parameter " . $self->name),
                 CgOp::null('Variable'));
         }
     }
@@ -91,9 +88,9 @@ use 5.010;
     }
 
     sub single_get {
-        my ($self, $subname) = @_;
+        my ($self, $body) = @_;
 
-        my $cg = $self->_default_get($subname);
+        my $cg = $self->_default_get($body);
         $cg = $self->_positional_get($cg) if $self->positional;
         for (reverse @{ $self->names }) {
             $cg = $self->_named_get($_, $cg);
@@ -102,10 +99,10 @@ use 5.010;
     }
 
     sub binder {
-        my ($self, $subname) = @_;
+        my ($self, $body) = @_;
 
         my $get = $self->slurpy ? $self->slurpy_get :
-            $self->single_get($subname);
+            $self->single_get($body);
 
         if (defined $self->slot) {
             return CgOp::bind($self->readonly, CgOp::scopedlex($self->slot),
@@ -149,11 +146,11 @@ use 5.010;
     }
 
     sub binder {
-        my ($self, $subname) = @_;
+        my ($self, $body) = @_;
 
         my @p;
         for (@{ $self->params }) {
-            push @p, $_->binder($subname);
+            push @p, $_->binder($body);
         }
         CgOp::letn('!ix', CgOp::int(0), CgOp::prog(@p));
     }

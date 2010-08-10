@@ -1104,23 +1104,35 @@ sub parameter { my ($cl, $M) = @_;
         return;
     }
 
-    if ($M->{default_value}[0]) {
-        $M->sorry('Default values NYI');
-        return;
-    }
+    my $default = $M->{default_value}[0] ? $M->{default_value}[0]{_ast} : undef;
 
     if ($M->{named_param}) {
         $M->sorry('Named parameters NYI');
         return;
     }
 
-    if ($M->{quant} ne '*' && ($M->{quant} ne '' || $M->{kind} ne '!')) {
-        $M->sorry('Exotic parameters NYI');
-        return;
+    my $sorry;
+    my $slurpy;
+    my $optional;
+    given ($M->{quant} . ':' . $M->{kind}) {
+        when ('**:*') { $sorry = "Slice parameters NYI" }
+        when ('*:*')  { $slurpy = 1 }
+        when ('|:*')  { $sorry = "Captures NYI" }
+        when ('\\:!') { $sorry = "Simple parcel parameters NYI" }
+        when ('\\:?') { $sorry = "Simple parcel parameters NYI" }
+        when (':!')   { }
+        when (':*')   { $optional = 1 }
+        when (':?')   { $optional = 1 }
+        when ('?:?')  { $optional = 1 }
+        when ('!:!')  { }
+        when ('!:?')  { $optional = 1 }
+        when ('!:*')  { }
+        default       { $sorry = "Confusing parameters ($_)" }
     }
+    if ($sorry) { $M->sorry($sorry); return }
 
-    $M->{_ast} = Sig::Parameter->new(name => $M->Str,
-        slurpy => ($M->{quant} eq '*'), %{ $M->{param_var}{_ast} });
+    $M->{_ast} = Sig::Parameter->new(name => $M->Str, default => $default,
+        optional => $optional, slurpy => $slurpy, %{ $M->{param_var}{_ast} });
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -1416,6 +1428,9 @@ sub nulltermish { my ($cl, $M) = @_; # for 1,2,3,
 }
 sub EXPR {}
 sub modifier_expr { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{EXPR}{_ast};
+}
+sub default_value { my ($cl, $M) = @_;
     $M->{_ast} = $M->{EXPR}{_ast};
 }
 
