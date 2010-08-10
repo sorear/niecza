@@ -11,21 +11,49 @@ use CgOp;
 
     has zyg => (isa => 'ArrayRef[RxOp]', is => 'ro', default => sub { [] });
 
-    my $i = 0;
-    sub _closurize {
-        my ($self, $op) = @_;
-        Op::SubDef->new(var => 'rx!' . ($i++), class => 'Regex', body =>
-            Body->new(
-                type        => 'regex',
-                signature   => Sig->simple('$¢'),
-# XXX transparent bodies with signatures are not yet handled well
-#                transparent => 1,
+    # op(cn, cont): provides cn in environment, calls cont per result, then
+    # returns; -> (cn, cont)
+    # closure: like op but just returns a function, takes cn/cont though
+
+    sub _close {
+        my ($self, $type, $parms, $op) = @_;
+        Op::SubDef->new(var => Niecza::Actions->gensym, class => ucfirst($type),
+            body => Body->new(
+                type        => $type,
+                signature   => Sig->simple(@$parms),
                 do          => $op));
     }
 
-    sub closure {
+    sub _close_k {
+        my ($self, $cn, $cont) = @_;
+        $self->_close('sub', [$cn], $cont);
+    }
+
+    sub _close_op {
+        my ($self, $op) = @_;
+        my $icn   = Niecza::Actions->gensym;
+        my $icv   = Niecza::Actions->gensym;
+        my $icont = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => $icv),
+            positionals => [ Op::Lexical->new(name => $icn) ]);
+        my ($cn, $cont) = $op->op($icn, $icont);
+        $self->_close('sub', [$cn, $icv], $cont);
+    }
+
+    sub term_rx {
         my ($self) = @_;
-        $self->_closurize($self->op);
+        my $icn   = Niecza::Actions->gensym;
+        my $icont = Op::Take->new(value => Op::Lexical->new(name => $icn));
+        my ($cn, $cont) = $self->op($icn, $icont);
+        $cn, Op::Gather->new(
+            var => Niecza::Actions->gensym,
+            body => Body->new(type => 'gather', do => $cont));
+    }
+
+    sub close_rx {
+        my ($self) = @_;
+        my ($cn, $op) = $self->term_rx;
+        $self->_close('regex', [$cn], $op);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -40,30 +68,15 @@ use CgOp;
     has text => (isa => 'Str', is => 'ro', required => 1);
 
     sub op {
-        my ($self) = @_;
-        Op::CallSub->new(
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&_rxstr'),
             positionals => [
-                Op::Lexical->new(name => '$¢'),
-                Op::StringLiteral->new(text => $self->text)]);
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package RxOp::Export;
-    use Moose;
-    extends 'RxOp';
-
-    # zyg * 1
-
-    sub op {
-        my ($self) = @_;
-        Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxexport'),
-            positionals => [$self->zyg->[0]->op]);
+                Op::Lexical->new(name => $icn),
+                Op::StringLiteral->new(text => $self->text),
+                $self->_close_k($cn, $cont)
+            ]);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -81,12 +94,14 @@ use CgOp;
 
     my %qf = ( '+', 'plus', '*', 'star', '?', 'opt' );
     sub op {
-        my ($self) = @_;
-        Op::CallSub->new(
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&_rx' . $qf{$self->type}),
             positionals => [
-                Op::Lexical->new(name => '$¢'),
-                $self->zyg->[0]->closure]);
+                Op::Lexical->new(name => $icn),
+                $self->_close_op($self->zyg->[0]),
+                $self->_close_k($cn, $cont)]);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -101,20 +116,13 @@ use CgOp;
     # zyg * N
 
     sub op {
-        my ($self) = @_;
-        my @zyg = map { $_->op } @{ $self->zyg };
+        my ($self, $cn, $cont) = @_;
 
-        while (@zyg >= 2) {
-            my $r = pop @zyg;
-            my $l = pop @zyg;
-            push @zyg, Op::CallSub->new(
-                invocant    => Op::Lexical->new(name => '&_rxlazymap'),
-                positionals => [ $l, $self->_closurize($r) ]);
+        for (reverse @{ $self->zyg }) {
+            ($cn, $cont) = $_->op($cn, $cont);
         }
 
-        $zyg[0] || Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxone'),
-            positionals => [ Op::Lexical->new(name => '$¢') ]);
+        $cn, $cont;
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -887,75 +887,29 @@ my class Cursor {
           (cast Int32 (unbox Double (@ (l $np)))))) } }
 }
 
-# Outside a regex, a result is a lazy list.
-# Inside a regex, a result is a coroutiney thing (details will change)
-
-sub _rxexport($cs) { unfold({ $cs() // EMPTY }) }
-
-sub _rxlazymap($cs, $sub) {
-    my $k = sub { Any };
-    #say "in rxlazymap (1)";
-    sub get() {
-        #say "in rxlazymap (2)";
-        $k && ($k() || do {
-            #say "in rxlazymap (3)";
-            $k = $cs();
-            $k = ($k && $sub($k));
-            #say "in rxlazymap (4)";
-            get();
-        })
-    }
+sub _rxstar($C, $f, $k) {
+    $f($C, -> $nC { _rxstar($nC, $f, $k) });
+    $k($C);
 }
 
-sub _rxdisj($cs1, $cs2) {
-    my $k1 = $cs1;
-    my $k2 = $cs2;
-    sub {
-        #say "in rxdisj (1)";
-        $k1() || ($k2 && do {
-            $k1 = $k2;
-            $k2 = Any;
-            #say "in rxdisj (2)";
-            $k1();
-        })
-    }
+sub _rxopt($C, $f, $k) {
+    $f($C, $k);
+    $k($C);
 }
 
-sub _rxone($C) {
-    my $k = $C;
-    sub {
-        my $x = $k;
-        $k = Any;
-        #say "in rxone" ~ $x;
-        $x;
-    }
+sub _rxplus($C, $f, $k) {
+    $f($C, -> $nC { _rxstar($nC, $f, $k) });
 }
 
-sub _rxnone { Any };
-
-sub _rxstar($C, $sub) {
-    #say "in rxstar recursion";
-    _rxdisj(_rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) }),
-            _rxone($C));
-}
-
-sub _rxopt($C, $sub) {
-    _rxdisj($sub($C), _rxone($C))
-}
-
-sub _rxplus($C, $sub) {
-    _rxlazymap($sub($C), sub ($C) { _rxstar($C, $sub) })
-}
-
-sub _rxstr($C, $str) {
+sub _rxstr($C, $str, $k) {
     #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
     Q:CgOp {
         (letn rt (rawcall (unbox Cursor (@ (l $C))) Exact
                    (unbox String (@ (l $str))))
           [ternary
             (!= (l rt) (null Cursor))
-            (subcall (@ (l &_rxone)) (box (@ (l $C)) (l rt)))
-            (l &_rxnone)])
+            (subcall (@ (l $k)) (box (@ (l $C)) (l rt)))
+            (null Variable)])
     };
 }
 

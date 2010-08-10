@@ -186,7 +186,7 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my $slot = $cl->gensym;
     # TODO should be a real pass.
     local $::parenid = 0;
-    $M->{_ast} = RxOp::Export->new(zyg => [$M->{nibble}{_ast}])->closure;
+    $M->{_ast} = $M->{nibble}{_ast}->close_rx;
 }
 
 sub regex_block { my ($cl, $M) = @_;
@@ -209,7 +209,6 @@ sub regex_def { my ($cl, $M) = @_;
 
     my $sig = $M->{signature}[0] ? $M->{signature}[0]{_ast}
         : $cl->get_placeholder_sig($M);
-    $sig = $sig->for_regex;
 
     if ($scope =~ /state|augment|supercede/) {
         $M->sorry("Nonsensical scope $scope for regex");
@@ -220,13 +219,14 @@ sub regex_def { my ($cl, $M) = @_;
         : '&' . $name;
 
     local $::parenid = 0;
+    my ($cn, $op) = $M->{regex_block}{_ast}->term_rx;
     $M->{_ast} = Op::SubDef->new(
         var => $var, class => 'Regex',
         method_too => ($scope eq 'has' ? $name : undef),
         body => Body->new(
             type => 'regex',
-            signature => $sig,
-            do => RxOp::Export->new(zyg => [$M->{regex_block}{_ast}])->op));
+            signature => $sig->for_regex($cn),
+            do => $op));
 }
 
 sub regex_declarator { my ($cl, $M) = @_;

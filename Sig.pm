@@ -132,8 +132,8 @@ use 5.010;
     }
 
     sub for_regex {
-        my $self = shift;
-        my $sp = Sig::Parameter->new(slot => '$¢', name => '$¢');
+        my ($self, $cn) = @_;
+        my $sp = Sig::Parameter->new(slot => $cn, name => '$¢');
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
