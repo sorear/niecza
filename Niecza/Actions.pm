@@ -798,7 +798,7 @@ sub dottyop { my ($cl, $M) = @_;
     }
 
     $M->{_ast} = $M->{methodop}{_ast} if $M->{methodop};
-    $M->{_ast} = { postfix => $M->{postop}{_ast} } if $M->{postop};
+    $M->{_ast} = $M->{postop}{_ast} if $M->{postop};
 }
 
 sub privop { my ($cl, $M) = @_;
