@@ -48,6 +48,49 @@ sub curlycheck { }
 sub pod_comment { }
 sub infixstopper { }
 
+sub category { }
+sub category__S_category { }
+sub category__S_sigil { }
+sub category__S_twigil { }
+sub category__S_special_variable { }
+sub category__S_comment { }
+sub category__S_version { }
+sub category__S_module_name { }
+sub category__S_value { }
+sub category__S_term { }
+sub category__S_strtonum { }
+sub category__S_quote { }
+sub category__S_prefix { }
+sub category__S_infix { }
+sub category__S_postfix { }
+sub category__S_dotty { }
+sub category__S_circumfix { }
+sub category__S_postcircumfix { }
+sub category__S_quote_mod { }
+sub category__S_trait_mod { }
+sub category__S_type_declarator { }
+sub category__S_scope_declarator { }
+sub category__S_package_declarator { }
+sub category__S_multi_declarator { }
+sub category__S_routine_declarator { }
+sub category__S_regex_declarator { }
+sub category__S_statement_prefix { }
+sub category__S_statement_control { }
+sub category__S_statement_mod_cond { }
+sub category__S_statement_mod_loop { }
+sub category__S_infix_prefix_meta_operator { }
+sub category__S_infix_postfix_meta_operator { }
+sub category__S_infix_circumfix_meta_operator { }
+sub category__S_postfix_prefix_meta_operator { }
+sub category__S_prefix_postfix_meta_operator { }
+sub category__S_prefix_circumfix_meta_operator { }
+sub category__S_terminator { }
+sub category__S_metachar { }
+sub category__S_backslash { }
+sub category__S_assertion { }
+sub category__S_quantifier { }
+sub category__S_mod_internal { }
+
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
 }
@@ -98,45 +141,46 @@ sub name { my ($cl, $M) = @_;
 sub longname {} # look at the children yourself
 sub deflongname {}
 
-sub mangle_longname { my ($cl, $M, $single) = @_;
-    if ($M->{name}{_ast}{dc}) {
-       $M->sorry('Leading double colons not yet supported');
-       return "";
+# Turns a name like ::Foo::Bar:sym[ 'x' ] into
+# { name => 'Bar:sym<x>', path => [ 'Foo '] }
+# path can be undefined for a simple name like $x, which goes straight to pad
+# pass $clean if you want to ignore adverbs entirely - currently needed for
+# package names
+sub unqual_longname { my ($cl, $M, $what, $clean) = @_;
+    my $h = $cl->mangle_longname($M, $clean);
+    if ($h->{path}) {
+        $M->sorry($what);
+        return;
     }
+    return $h->{name};
+}
 
-    if ($single && @{ $M->{name}{_ast}{names} } > 1) {
-        $M->sorry("Multipart names not yet supported for $single");
-        return "";
-    }
-
+sub mangle_longname { my ($cl, $M, $clean) = @_;
     my @ns = @{ $M->{name}{_ast}{names} };
     my $n = pop @ns;
 
-    for my $cp (@{ $M->{colonpair} }) {
-        my $k = $cp->{k};
-        if (ref $cp->{v}) {
-            $n .= ":" . $cp->{k};
-            $n .= $cp->{v}{qpvalue} // do {
-                $M->sorry("Invalid colonpair used as name extension");
-                "";
-            }
-        } else {
-            # STD seems to think term:name is term:sym<name>.  Needs speccy
-            # clarification.
-            $M->sorry("Boolean colonpairs as name extensions NYI");
-        }
+    unless ($clean) {
+        $n .= $_->{_ast}{ext} // do {
+            $M->sorry("Invalid colonpair for name extension");
+            "";
+        } for @{ $M->{colonpair} };
     }
 
-    $single ? $n : ($n, @ns);
+    my @path = ($M->{name}{_ast}{dc} || @ns) ? (path => \@ns) : ();
+    return { name => $n, @path };
 }
 
 sub subshortname { my ($cl, $M) = @_;
     if (@{ $M->{colonpair} }) {
-        $M->sorry("Colonpair subshortnames NYI");
-        return;
+        my $n = $M->{category}->Str;
+        $n .= $_->{_ast}{ext} // do {
+            $M->sorry("Invalid colonpair for name extension");
+            "";
+        } for @{ $M->{colonpair} };
+        $M->{_ast} = { name => $n };
+    } else {
+        $M->{_ast} = $M->{desigilname}{_ast};
     }
-
-    $M->{_ast} = $M->{desigilname}{_ast};
 }
 
 sub sublongname { my ($cl, $M) = @_;
@@ -154,7 +198,7 @@ sub desigilname { my ($cl, $M) = @_;
         return;
     }
 
-    $M->{_ast} = [ $cl->mangle_longname($M->{longname}) ];
+    $M->{_ast} = $cl->mangle_longname($M->{longname});
 }
 
 sub stopper { }
@@ -198,12 +242,17 @@ sub regex_block { my ($cl, $M) = @_;
 }
 
 sub regex_def { my ($cl, $M) = @_;
-    my $name = $M->{deflongname}[0] ?
-        $cl->mangle_longname($M->{deflongname}[0], "regex") : undef;
+    my ($name, $path) = $M->{deflongname}[0] ?
+        @{ $cl->mangle_longname($M->{deflongname}[0]) }{'name', 'path'} : ();
     my $scope = (!defined($name)) ? "anon" : ($::SCOPE || "has");
 
     if (@{ $M->{signature} } > 1) {
         $M->sorry("Multiple signatures on a regex NYI");
+        return;
+    }
+
+    if ($path && $scope ne 'our') {
+        $M->sorry("Putting a regex in a package requires using the our scope.");
         return;
     }
 
@@ -212,6 +261,11 @@ sub regex_def { my ($cl, $M) = @_;
 
     if ($scope =~ /state|augment|supercede/) {
         $M->sorry("Nonsensical scope $scope for regex");
+        return;
+    }
+
+    if ($scope eq 'our') {
+        $M->sorry("our regexes NYI");
         return;
     }
 
@@ -412,7 +466,8 @@ sub rxcapturize { my ($cl, $name, $rxop) = @_;
 sub assertion {}
 # This needs to be deconstructed by :method, so it needs a regular structure
 sub assertion__S_name { my ($cl, $M) = @_;
-    my $name = $cl->mangle_longname($M->{longname}, "regex call");
+    my $name = $cl->unqual_longname($M->{longname},
+        "Qualified method calls NYI");
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
     } else {
@@ -530,6 +585,7 @@ sub infixish { my ($cl, $M) = @_;
     $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];
     $M->sorry("Adverbs NYI") if $M->{colonpair};
 }
+
 sub INFIX { my ($cl, $M) = @_;
     my $s = '&infix:<' . $M->{infix}{sym} . '>';
     my ($st,$l,$r) = $cl->whatever_precheck($s, $M->{left}{_ast},
@@ -723,7 +779,8 @@ sub PRE { }
 
 sub methodop { my ($cl, $M) = @_;
     my %r;
-    $r{name}  = $cl->mangle_longname($M->{longname}, "method call") if $M->{longname};
+    $r{name}  = $cl->unqual_longname($M->{longname},
+        "Qualified method calls NYI") if $M->{longname};
     $r{quote} = $M->{quote}{_ast} if $M->{quote};
     $r{ref}   = $cl->do_variable_reference($M, $M->{variable}{_ast})
         if $M->{variable};
@@ -767,7 +824,18 @@ sub coloncircumfix { my ($cl, $M) = @_;
     $M->{qpvalue} = $M->{circumfix}{qpvalue};
 }
 
-sub colonpair { }
+sub colonpair { my ($cl, $M) = @_;
+    my $k = $M->{k};
+    # STD seems to think term:name is term:sym<name>.  Needs speccy
+    # clarification.  XXX
+    my $n;
+    if (!ref $M->{v}) {
+        $n = ":" . ($M->{v} ? '' : '!') . $M->{k};
+    } elsif (defined $M->{v}{qpvalue}) {
+        $n = ":" . $M->{k} . $M->{v}{qpvalue};
+    }
+    $M->{_ast} = { ext => $n };
+}
 
 my %_nowhatever = (map { $_, 1 } ('&infix:<,>', '&infix:<..>', '&infix:<...>',
     '&infix:<=>', '&infix:<xx>'));
@@ -804,16 +872,16 @@ sub term__S_value { my ($cl, $M) = @_;
 }
 
 sub term__S_name { my ($cl, $M) = @_;
-    my ($id, @pkg) = $cl->mangle_longname($M->{longname});
+    my ($id, $path) = @{ $cl->mangle_longname($M->{longname}) }{'name','path'};
 
     if ($M->{postcircumfix}[0] || $M->{args}) {
         $M->sorry("Unsupported form of term:name");
         return;
     }
 
-    if (@pkg) {
+    if ($path) {
         $M->{_ast} = Op::PackageVar->new(node($M), name => $id,
-            slot => $cl->gensym, path => \@pkg);
+            slot => $cl->gensym, path => $path);
     } else {
         $M->{_ast} = Op::Lexical->new(node($M), name => $id);
     }
@@ -916,7 +984,7 @@ sub term__S_Star { my ($cl, $M) = @_;
 sub do_variable_reference { my ($cl, $M, $v) = @_;
     my $sl = $v->{sigil} . $v->{twigil} . $v->{name};
 
-    if (@{ $v->{rest} } && $v->{twigil} =~ /[*=~?^:]/) {
+    if ($v->{rest} && $v->{twigil} =~ /[*=~?^:]/) {
         $M->sorry("Twigil " . $v->{twigil} . " cannot be used with " .
             "qualified names");
         return;
@@ -924,7 +992,7 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
 
     given ($v->{twigil}) {
         when ('!') {
-            if (@{ $v->{rest} }) {
+            if ($v->{rest}) {
                 $M->sorry('$!Foo::bar syntax NYI');
                 return;
             }
@@ -933,7 +1001,7 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
                 object => Op::Lexical->new(name => 'self'));
         }
         when ('.') {
-            if (@{ $v->{rest} }) {
+            if ($v->{rest}) {
                 $M->sorry('$.Foo::bar syntax NYI');
                 return;
             }
@@ -952,7 +1020,7 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
             return Op::ContextVar->new(node($M), name => $sl);
         }
         when ('') {
-            if (@{ $v->{rest} }) {
+            if ($v->{rest}) {
                 return Op::PackageVar->new(path => $v->{rest}, name => $sl,
                     slot => $cl->gensym, node($M));
             } else {
@@ -969,18 +1037,35 @@ sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
 
-    my ($name, @rest);
+    my ($name, $rest);
     if ($M->{desigilname}) {
-        ($name, @rest) = @{ $M->{desigilname}{_ast} };
+        ($name, $rest) = @{ $M->{desigilname}{_ast} }{'name', 'path'};
     } elsif ($M->{sublongname}) {
-        ($name, @rest) = @{ $M->{sublongname}{_ast} };
+        ($name, $rest) = @{ $M->{sublongname}{_ast} }{'name', 'path'};
+    } elsif ($M->{name}[0]) {
+        # Both these cases are marked XXX in STD.  I agree.  What are they for?
+        if ($M->{name}[0]{dc}) {
+            $M->sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
+            return;
+        }
+        if ($M->Str =~ /^\$::/) {
+            $rest = $M->{name}[0]{_ast}{names};
+            $name = pop @$rest;
+        } else {
+            if (@{ $M->{name}[0]{_ast}{names} } > 1) {
+                $M->sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
+                return;
+            }
+            $name = $M->{name}[0]{_ast}{names}[0];
+            $twigil = ':';
+        }
     } else {
         $M->sorry("Non-simple variables NYI");
         return;
     }
 
     $M->{_ast} = {
-        sigil => $sigil, twigil => $twigil, name => $name, rest => \@rest
+        sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
     };
 }
 
@@ -1227,7 +1312,7 @@ sub variable_declarator { my ($cl, $M) = @_;
         return;
     }
 
-    if (@{ $v->{rest} }) {
+    if ($v->{rest}) {
         $M->sorry(":: syntax is only valid when referencing variables, not when defining them.");
         return;
     }
@@ -1518,16 +1603,15 @@ sub package_def { my ($cl, $M) = @_;
         $M->sorry("Illogical scope $scope for package block");
         return;
     }
-    # XXX shouldn't fully mangle here, c.f. STD:auth<http://perl.org>
     my $name = $M->{longname}[0] ?
-        $cl->mangle_longname($M->{longname}[0], "package definition") : 'ANON';
+        $cl->unqual_longname($M->{longname}[0],
+            "Qualified package definitions NYI", 1) : 'ANON';
     my $outervar = $scope ne 'anon' ? $name : $cl->gensym;
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
     my $blocktype = $::PKGDECL;
     my $bodyvar = $cl->gensym;
-    # We need the OUR because otherwise the name lookup latches on to the
-    # nascent lexical alias and crashes.  Possibly a bug.
+    # currently always install into the local stash
     my $ourpkg = ($scope eq 'our') ? [ 'OUR::' ] : undef;
 
     if (!$M->{decl}{stub}) {
@@ -1682,6 +1766,8 @@ sub routine_def { my ($cl, $M) = @_;
         }
     }
     my $scope = !$dln ? 'anon' : $::SCOPE || 'my';
+    my ($m,$p) = $dln ? @{$cl->mangle_longname($dln)}{'name','path' } : ();
+
     if ($scope ne 'my' && $scope ne 'our' && $scope ne 'anon') {
         $M->sorry("Illegal scope $scope for subroutine");
         return;
@@ -1689,9 +1775,10 @@ sub routine_def { my ($cl, $M) = @_;
     if ($scope eq 'our') {
         $M->sorry('Package subs NYI');
         return;
+    } elsif ($p) {
+        $M->sorry('Defining a non-our sub with a package-qualified name makes no sense');
+        return;
     }
-
-    my $m = $dln ? $cl->mangle_longname($dln, "subroutine definition") : undef;
 
     $M->{_ast} = $cl->block_to_closure($M,
             $cl->sl_to_block('sub',
@@ -1706,7 +1793,8 @@ sub method_def { my ($cl, $M) = @_;
     my $scope = $::SCOPE // 'has';
     my $type = $M->{type} ? $M->{type}->Str : '';
     $scope = 'anon' if !$M->{longname};
-    my $name = $M->{longname} ? $cl->mangle_longname($M->{longname}, "method definition") : undef;
+    my $name = $M->{longname} ? $cl->unqual_longname($M->{longname},
+        "Qualified method definitions not understood") : undef; #XXX
 
     if ($M->{sigil}) {
         $M->sorry("Method sgils NYI");

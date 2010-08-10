@@ -817,17 +817,29 @@ use CgOp;
     has slot => (isa => 'Str', is => 'ro', required => 1);
     has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
 
+    sub looks_static {
+        my ($self) = @_;
+        my $v = $self->path->[0];
+        if (!defined($v) || $v eq 'MY' || $v eq 'CALLER' || $v eq 'OUTER'
+                || $v eq 'DYNAMIC') {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+
     sub lift_decls {
         my ($self) = @_;
-        # TODO Skip this part if the thing-being-bound references MY,
-        # CALLER, OUTER, etc
-        Decl::OurAlias->new(name => $self->name, slot => $self->slot,
-            path => $self->path);
+        $self->looks_static ?
+            Decl::OurAlias->new(name => $self->name, slot => $self->slot,
+                path => $self->path) :
+            ();
     }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::scopedlex($self->slot);
+        $self->looks_static ? CgOp::scopedlex($self->slot) :
+            ($body->lookup_var($self->name, @{ $self->path }))[1];
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -152,7 +152,7 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::bind(1, $body->lookup_var($self->name, @{ $self->path }),
+        CgOp::bind(1, ($body->lookup_var($self->name, @{ $self->path }))[1],
             CgOp::scopedlex($self->slot));
     }
 
@@ -176,9 +176,9 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-
-        CgOp::proto_var($self->slot,
-            $body->lookup_var($self->name, @{ $self->path }));
+        my ($st, $cg) = $body->lookup_var($self->name, @{ $self->path });
+        Carp::confess("bad use of OurAlias") if $st;
+        CgOp::proto_var($self->slot, $cg);
     }
 
     sub enter_code {
@@ -264,6 +264,11 @@ use CgOp;
     sub bodies { $_[0]->body ? $_[0]->body : () }
     sub stashvar { $_[0]->var . '::' }
 
+    sub stash {
+        my ($self, $body, $suf) = @_;
+        ($body->lookup_pkg(@{ $self->ourpkg }, $self->name . $suf))[1];
+    }
+
     sub used_slots {
         my ($self) = @_;
         $self->var, 'Variable', $self->stashvar,
@@ -280,13 +285,12 @@ use CgOp;
             return CgOp::prog(
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->stashvar,
-                    ($self->ourpkg ? $body->lookup_pkg(@{ $self->ourpkg }, $self->name . "::") :
+                    ($self->ourpkg ? $self->stash($body, '::') :
                     CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')))));
         }
 
         CgOp::letn("pkg",
-            ($self->ourpkg ?
-                $body->lookup_pkg(@{ $self->ourpkg }, $self->name . "::") :
+            ($self->ourpkg ? $self->stash($body, '::') :
                 CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
@@ -345,8 +349,8 @@ use CgOp;
         }
         push @r, CgOp::scopedlex($self->var,
                 CgOp::methodcall(CgOp::letvar("how"), "create-protoobject"));
-        push @r, CgOp::bind(1, $body->lookup_pkg(@{ $self->ourpkg },
-                $self->name), CgOp::scopedlex($self->var)) if $self->ourpkg;
+        push @r, CgOp::bind(1, $self->stash($body, ''),
+                CgOp::scopedlex($self->var)) if $self->ourpkg;
         @r;
     }
 

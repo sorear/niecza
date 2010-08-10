@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 237;
+plan 243;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -635,4 +635,32 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
     ok G3.parse("x"), "capturing subrules work (positive)";
     ok !G3.parse("y"), "capturing subrules work (negative)";
+}
+
+{
+    {
+        our $x = 5; #OK
+    }
+    ok $::x == 5, '$::x finds our variable';
+
+    package Fao { our $y = 6; } #OK
+    ok $::Fao::y == 6, '$::Fao::y works as $Fao::y';
+
+    { class Mao { } }
+    ok ::Mao.new.defined, 'can use classes via ::Mao';
+}
+
+{
+    my $x = 7; #OK
+    ok $::x == 7, '$::x can find lexicals';
+    class A3 {
+        method moo { 42 }
+        class B4 {
+            ok ::A3.moo, '::A3 can find outer classes';
+        }
+    }
+}
+
+{
+    ok (&infix:<+>)(2,2) == 4, '&infix:<+> syntax works';
 }

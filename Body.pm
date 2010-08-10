@@ -15,8 +15,7 @@ use CgOp ();
     has signature => (isa => 'Maybe[Sig]', is => 'ro');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
             builder => 'is_mainline');
-    # currently used types are phaser, loop, cond, class, mainline, bare, sub
-    # also '' for incorrectly contextualized {p,x,}block, blast
+    # '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
 
     has lexical   => (isa => 'HashRef[Str]', is => 'rw');
@@ -154,20 +153,15 @@ use CgOp ();
     sub lookup_var {
         my ($self, $name, @path) = @_;
 
-        if (@path) {
-            return $self->lookup_pkg((map { $_ . "::" } @path),
-                (defined $name) ? ($name) : ());
-        } else {
-            # This is supposed to dwimmily do MY:: or OUR::, neither of which
-            # is implemented.  So...
-            die "\$::x is not yet implemented";
-        }
+        return $self->lookup_pkg((map { $_ . "::" } @path),
+            (defined $name) ? ($name) : ());
     }
 
     sub lookup_pkg {
         my ($self, @components) = @_;
 
         my $pkgcg;
+        my $usedstate = 0;
         # TODO: S02 says PROCESS:: and GLOBAL:: are also accessible as lexical
         # packages in UNIT::.
         if ($components[0] eq 'PROCESS::') {
@@ -181,6 +175,7 @@ use CgOp ();
             shift @components;
         } elsif ($self->lex_level($components[0]) >= 0) {
             $pkgcg = CgOp::scopedlex($components[0]);
+            $usedstate = 1 unless $components[0] =~ /::$/;
             shift @components;
         } else {
             $pkgcg = CgOp::scopedlex('$?CURPKG');
@@ -191,7 +186,7 @@ use CgOp ();
                 CgOp::clr_string($c));
         }
 
-        $pkgcg;
+        $usedstate, $pkgcg;
     }
 
     __PACKAGE__->meta->make_immutable;
