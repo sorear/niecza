@@ -424,11 +424,10 @@ blocked:
             }
         }
 
-        public static Frame TakeReturnFrame;
+        public static Stack<Frame> TakeReturnStack = new Stack<Frame>();
 
         public static Frame Take(Frame th, Variable payload) {
-            Frame r = TakeReturnFrame;
-            TakeReturnFrame = null;
+            Frame r = TakeReturnStack.Pop();
             r.lex["$nextframe"] = NewROScalar(th);
             r.resultSlot = payload;
             th.resultSlot = payload;
@@ -436,7 +435,7 @@ blocked:
         }
 
         public static Frame CoTake(Frame th, Frame from) {
-            TakeReturnFrame = th;
+            TakeReturnStack.Push(th);
             return from;
         }
 
