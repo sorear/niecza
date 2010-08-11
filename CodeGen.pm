@@ -61,6 +61,7 @@ use 5.010;
               backing      => [f => 'String'],
               captures     => [f => 'Matched'],
               SetCaps      => [m => 'Cursor'],
+              SimpleWS     => [m => 'Cursor'],
               Bind         => [m => 'Cursor'] },
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],

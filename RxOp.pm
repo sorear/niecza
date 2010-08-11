@@ -209,4 +209,24 @@ use CgOp;
     no Moose;
 }
 
+{
+    package RxOp::Sigspace;
+    use Moose;
+    extends 'RxOp';
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxcall'),
+            positionals => [
+                Op::CallMethod->new(name => 'ws',
+                    receiver => Op::Lexical->new(name => $icn)),
+                $self->_close_k($cn, $cont)]);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;

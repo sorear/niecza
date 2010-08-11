@@ -1,4 +1,5 @@
 using Niecza;
+using System;
 // this exists to allow O(1) addition, since additions (esp. in the presence
 // of backtracking) dominate lookups
 
@@ -58,5 +59,18 @@ public class Cursor {
 
     public Cursor Bind(string name, Variable what) {
         return SetCaps(new Matched(captures, name, what));
+    }
+
+    public Cursor SimpleWS() {
+        int l = backing.Length;
+        int p = pos;
+        if (p != 0 && p != l && !Char.IsWhiteSpace(backing, p) &&
+                !Char.IsWhiteSpace(backing, p-1)) {
+            return null;
+        }
+
+        while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
+
+        return At(p);
     }
 }
