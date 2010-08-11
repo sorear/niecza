@@ -25,6 +25,12 @@ use CgOp;
             $self->invocant->name eq '&infix:<,>';
     }
 
+    sub splittable_pair {
+        my ($self) = @_;
+        $self->isa('Op::CallSub') && $self->invocant->isa('Op::Lexical') &&
+            $self->invocant->name eq '&_pair';
+    }
+
     sub cgop {
         my ($self, $body) = @_;
         if (defined $self->file) {

@@ -834,7 +834,12 @@ sub colonpair { my ($cl, $M) = @_;
     } elsif (defined $M->{v}{qpvalue}) {
         $n = ":" . $M->{k} . $M->{v}{qpvalue};
     }
-    $M->{_ast} = { ext => $n };
+    my $tk = Op::StringLiteral->new(text => $M->{k});
+    my $tv = ref($M->{v}) ? $M->{v}{_ast} :
+        Op::Lexical->new(name => $M->{v} ? 'True' : 'False');
+    $M->{_ast} = { ext => $n, term => Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&_pair'),
+        positionals => [ $tk, $tv ]) };
 }
 
 my %_nowhatever = (map { $_, 1 } ('&infix:<,>', '&infix:<..>', '&infix:<...>',
@@ -979,6 +984,14 @@ sub term__S_lambda { my ($cl, $M) = @_;
 
 sub term__S_Star { my ($cl, $M) = @_;
     $M->{_ast} = Op::Whatever->new(node($M), slot => $cl->gensym);
+}
+
+sub term__S_colonpair { my ($cl, $M) = @_;
+    if (@{ $M->{colonpair} } > 1) {
+        $M->sorry("Multi colonpair syntax not yet understood"); #XXX
+        return;
+    }
+    $M->{_ast} = $M->{colonpair}[0]{_ast}{term};
 }
 
 sub do_variable_reference { my ($cl, $M, $v) = @_;
