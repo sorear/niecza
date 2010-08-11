@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 255;
+plan 264;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -686,4 +686,19 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
     is bar().join("|"), "5|9", "2x defaulting works";
     is bar(10,20).join("|"), "10|20", "2x overriding works";
     is bar(10).join("|"), "10|9", "one value hits the right parameter";
+}
+
+{
+    is :foo.value, 'Bool::True', ":foo is true";
+    is :!foo.value, 'Bool::False', ":!foo is false";
+    is :foo<12>.value, '12', ":foo<12> is 12";
+    is :foo.key, 'foo', ":foo is foo";
+
+    is (foo => 1).key, 'foo', "foo => 1 keeps key";
+    is (foo => 1).value, '1', "foo => 1 keeps value";
+    is ("foo" => 1).key, 'foo', '"foo" => 1 keeps key';
+    is ("foo" => 1).value, '1', '"foo" => 1 keeps value';
+
+    my %hash;
+    ok %hash ~~ Hash, '%-vars are Hash';
 }

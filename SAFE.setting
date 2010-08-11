@@ -215,8 +215,8 @@ my class UInt { }
 my class Bit { }
 my class Instant { }
 my class Duration { }
-my class Enum is Cool { }
-my class Bool is Enum {
+my class EnumType is Cool { }
+my class Bool is EnumType {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Bool() { self }
     method ACCEPTS($) { self }
@@ -787,13 +787,6 @@ my class Array is List {
     }
 }
 
-PRE-INIT {
-    Q:CgOp { (prog (rawsset Kernel.ArrayP (@ (l Array))) (null Variable)) };
-    Any.HOW.add-method("at-pos", anon method at-pos($ix) {
-        ($ix == 0) ?? self !! die("Invalid index on non-list")
-    });
-}
-
 sub postcircumfix:<[ ]> is rawcall {
     my $index ::= Q:CgOp { (pos 1) };
 
@@ -833,6 +826,16 @@ my class Hash {
                   [unbox Dictionary<string,Variable> (@ (l self))])
             } !! Any!butWHENCE({ self!extend($key, Q:CgOp { (pos 0) }) });
     }
+}
+
+PRE-INIT {
+    Q:CgOp { (prog (rawsset Kernel.ArrayP (@ (l Array)))
+                (rawsset Kernel.HashP (@ (l Hash)))
+                (null Variable)) };
+
+    Any.HOW.add-method("at-pos", anon method at-pos($ix) {
+        ($ix == 0) ?? self !! die("Invalid index on non-list")
+    });
 }
 
 sub postcircumfix:<{ }> is rawcall {
@@ -957,5 +960,23 @@ sub _rxbind($C, @names, $fun, $k) {
         $k($C3);
     });
 }
+
+my class Enum is Cool {
+    has $.key;
+    has $.value;
+
+    method kv() {
+        ($.key, $.value);
+    }
+
+    method pairs() {
+        self.flat;
+    }
+}
+
+my class Pair is Enum {
+}
+
+sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
 
 {YOU_ARE_HERE}
