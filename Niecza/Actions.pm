@@ -305,33 +305,49 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
     my $ns   = $M->{normspace}[0];
     my $q    = $M->{quantifier}[0] ? $M->{quantifier}[0]{_ast} : undef;
 
-    if (!$q) {
-        $M->{_ast} = $atom;
-    } elsif ($q->{simple}) {
-        $M->{_ast} = RxOp::Quantifier->new(type => $q->{simple},
-            zyg => [$atom]);
-    } else {
-        $M->sorry("Unhandled quantifier " . $M->{quantifier}[0]->Str);
+    if ($::RX{r}) {
+        # no quantifier at all?  treat it as :
+        $q //= { mod => '' };
+        # quantifier without explicit :? / :! gets :
+        $q->{mod} //= '';
     }
+
+    if ($q->{simple}) {
+        $atom = RxOp::Quantifier->new(type => $q->{simple}, zyg => [$atom],
+            minimal => ($q->{mod} && $q->{mod} eq '?'));
+    }
+
+    if (defined $q->{mod} && $q->{mod} eq '') {
+        $atom = RxOp::Cut->new(zyg => [$atom]);
+    }
+
+    $M->{_ast} = $atom;
 }
 
 # :: Context hash interpreted by quantified_atom
 sub quantifier {}
 sub quantifier__S_Star { my ($cl, $M) = @_;
-    $M->{_ast} = { simple => '*' };
+    $M->{_ast} = { simple => '*', mod => $M->{quantmod}{_ast} };
 }
 sub quantifier__S_Plus { my ($cl, $M) = @_;
-    $M->{_ast} = { simple => '+' };
+    $M->{_ast} = { simple => '+', mod => $M->{quantmod}{_ast} };
 }
 sub quantifier__S_Question { my ($cl, $M) = @_;
-    $M->{_ast} = { simple => '?' };
+    $M->{_ast} = { simple => '?', mod => $M->{quantmod}{_ast} };
+}
+sub quantifier__S_Colon { my ($cl, $M) = @_;
+    $M->{_ast} = { mod => '' };
 }
 
 sub quantmod { my ($cl, $M) = @_;
-    if ($M->Str ne '') {
-        $M->sorry('Quantmods NYI');
+    my $t = $M->Str;
+    return if ($t eq '');
+    $t =~ s/://;
+    if ($t eq '+') {
+        $M->sorry('STD parses + as a quantmod but there is nothing at all in S05 to explain what it should _do_'); #XXX
         return;
     }
+    $M->{_ast} = $t;
 }
 
 sub quant_atom_list { my ($cl, $M) = @_;

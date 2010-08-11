@@ -89,6 +89,7 @@ use CgOp;
     extends 'RxOp';
 
     has type => (isa => 'Str', is => 'ro', required => 1);
+    has minimal => (isa => 'Bool', is => 'ro', required => 1);
     # ? + * only
     # zyg * 1
 
@@ -97,7 +98,8 @@ use CgOp;
         my ($self, $cn, $cont) = @_;
         my $icn = Niecza::Actions->gensym;
         $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rx' . $qf{$self->type}),
+            invocant => Op::Lexical->new(name => '&_rx' . $qf{$self->type} .
+                ($self->minimal ? 'g' : '')),
             positionals => [
                 Op::Lexical->new(name => $icn),
                 $self->_close_op($self->zyg->[0]),
@@ -123,6 +125,29 @@ use CgOp;
         }
 
         $cn, $cont;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::Cut;
+    use Moose;
+    extends 'RxOp';
+
+    # zyg * N
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxcut'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                $self->_close_op($self->zyg->[0]),
+                $self->_close_k($cn, $cont)]);
     }
 
     __PACKAGE__->meta->make_immutable;
