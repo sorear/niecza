@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 264;
+plan 276;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -701,4 +701,23 @@ is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
     my %hash;
     ok %hash ~~ Hash, '%-vars are Hash';
+}
+
+{
+    ok ("aab" ~~ /a* ab/), "a*ab backtracks";
+    ok !("aab" ~~ /a*: ab/), "a*: ab doesn't";
+    ok ("aab" ~~ /a*! ab/), "a*! ab backtracks";
+    ok !("aab" ~~ /:r a* ab/), "ratcheting a* ab does not";
+    ok !("aab" ~~ /:r a*: ab/), "ratcheting a*: ab does not";
+    ok ("aab" ~~ /:r a*! ab/), "ratcheting a*! ab does";
+    ok !("aab" ~~ token { a* ab }), "a* ab in a token does not";
+
+    ok ("ab ab" ~~ / ab <.ws> ab /), "ws matches a space";
+    ok (q:to/end/ ~~ / ab <.ws> ab /), "ws matches a newline";
+ab
+ab
+end
+    ok ("ab   ab" ~~ / ab <.ws> ab /), "ws matches several spaces";
+    ok !("abab" ~~ / ab <.ws> ab /), "ws does not match nothing";
+    ok ("ab   ab" ~~ rule { ab ab }), "rule gives space";
 }

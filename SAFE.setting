@@ -888,6 +888,18 @@ my class Cursor {
     method cursor($np) { Q:CgOp { (box (@ (l self)) (rawcall
         (unbox Cursor (@ (l self))) At
           (cast Int32 (unbox Double (@ (l $np)))))) } }
+    method orig { Q:CgOp {
+        (box Str (getfield backing (unbox Cursor (@ (l self))))) } }
+    method ws() {
+        gather
+            Q:CgOp {
+                (letn rt (rawcall (unbox Cursor (@ (l self))) SimpleWS)
+                  [ternary
+                    (!= (l rt) (null Cursor))
+                    (subcall (@ (l &take)) (box (@ (l self)) (l rt)))
+                    (null Variable)])
+            };
+    }
 }
 
 sub _rxstar($C, $f, $k) {
@@ -916,27 +928,9 @@ sub _rxstr($C, $str, $k) {
     };
 }
 
-my class Regex is Sub {
-    method ACCEPTS($str) {
-        my $i = 0;
-        my $win = 0;
-        my $C = Cursor.new($str);
-        while !$win && ($i <= $str.chars) {
-            if (self)($C.cursor($i)) {
-                $win = 1;
-            }
-            $i++;
-        }
-        $win;
-    }
-}
-
-my class Grammar is Cursor {
-    method parse($text) {
-        my @results := self.new($text).TOP\
-            .grep({ $_.pos == $text.chars });
-        @results ?? @results.shift !! Any; # TODO List.at-pos
-    }
+sub _rxcut($C, $f, $k) {
+    my @l := gather $f($C, &take);
+    @l && $k(@l.shift);
 }
 
 sub _rxcall(@list, $k) {
@@ -959,6 +953,29 @@ sub _rxbind($C, @names, $fun, $k) {
         }
         $k($C3);
     });
+}
+
+my class Regex is Sub {
+    method ACCEPTS($str) {
+        my $i = 0;
+        my $win = 0;
+        my $C = Cursor.new($str);
+        while !$win && ($i <= $str.chars) {
+            if (self)($C.cursor($i)) {
+                $win = 1;
+            }
+            $i++;
+        }
+        $win;
+    }
+}
+
+my class Grammar is Cursor {
+    method parse($text) {
+        my @results := self.new($text).TOP\
+            .grep({ $_.pos == $text.chars });
+        @results ?? @results.shift !! Any; # TODO List.at-pos
+    }
 }
 
 my class Enum is Cool {
