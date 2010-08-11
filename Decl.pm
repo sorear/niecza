@@ -100,6 +100,7 @@ use CgOp;
 
     has slot     => (isa => 'Str', is => 'ro', required => 1);
     has list     => (isa => 'Bool', is => 'ro', default => 0);
+    has hash     => (isa => 'Bool', is => 'ro', default => 0);
     has shared   => (isa => 'Bool', is => 'ro', default => 0);
     has zeroinit => (isa => 'Bool', is => 'ro', default => 0);
     has noenter  => (isa => 'Bool', is => 'ro', default => 0);
@@ -115,6 +116,8 @@ use CgOp;
             CgOp::proto_var($self->slot, CgOp::newrwscalar(CgOp::null('IP6')));
         } elsif ($self->list) {
             CgOp::proto_var($self->slot, CgOp::newblanklist);
+        } elsif ($self->hash) {
+            CgOp::proto_var($self->slot, CgOp::newblankhash);
         } else {
             CgOp::proto_var($self->slot,
                 CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
@@ -129,6 +132,7 @@ use CgOp;
         ($body->mainline || $self->shared) ?
             CgOp::share_lex($self->slot) :
             CgOp::scopedlex($self->slot, $self->list ? CgOp::newblanklist :
+                $self->hash ? CgOp::newblankhash :
                 CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
     }
 

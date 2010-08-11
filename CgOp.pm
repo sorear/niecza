@@ -407,6 +407,11 @@ use warnings;
                 fetch(methodcall(newscalar(rawsget('Kernel.ArrayP')), 'new'))));
     }
 
+    sub newblankhash {
+        newrwlistvar(
+                fetch(methodcall(newscalar(rawsget('Kernel.HashP')), 'new')));
+    }
+
     sub string_var {
         box('Str', clr_string($_[0]));
     }

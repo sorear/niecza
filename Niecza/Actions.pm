@@ -1101,11 +1101,11 @@ sub param_var { my ($cl, $M) = @_;
     }
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]->Str : '';
     my $sigil = $M->{sigil}->Str;
-    if ($twigil || ($sigil ne '$' && $sigil ne '@')) {
+    if ($twigil || ($sigil ne '$' && $sigil ne '@' && $sigil ne '%')) {
         $M->sorry('Non bare scalar targets NYI');
         return;
     }
-    $M->{_ast} = { list => ($sigil eq '@'), slot =>
+    $M->{_ast} = { list => ($sigil eq '@'), hash => ($sigil eq '%'), slot =>
         $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef };
 }
 
@@ -1361,13 +1361,13 @@ sub variable_declarator { my ($cl, $M) = @_;
     } elsif ($scope eq 'state') {
         $M->{_ast} = Op::Lexical->new(node($M), name => $slot, state_decl => 1,
             state_backing => $cl->gensym, declaring => 1,
-            list => scalar ($M->{variable}->Str =~ /^\@/));
+            list => ($v->{sigil} eq '@'), hash => ($v->{sigil} eq '%'));
     } elsif ($scope eq 'our') {
         $M->{_ast} = Op::PackageVar->new(node($M), name => $slot, slot => $slot,
             path => [ 'OUR' ]);
     } else {
         $M->{_ast} = Op::Lexical->new(node($M), name => $slot, declaring => 1,
-            list => scalar ($M->{variable}->Str =~ /^\@/));
+            list => ($v->{sigil} eq '@'), hash => ($v->{sigil} eq '%'));
     }
 }
 

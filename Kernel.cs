@@ -682,6 +682,7 @@ blocked:
 
         public static IP6 AnyP;
         public static IP6 ArrayP;
+        public static IP6 HashP;
         public static IP6 StrP = new DynObject(null);
         public static DynMetaObject CallFrameMO;
 

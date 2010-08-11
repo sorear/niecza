@@ -1,6 +1,8 @@
 # vim: ft=perl6
 use Test;
 
+PRE-INIT { Q:CgOp { (prog (rawsset Kernel.HashP (@ (l Hash))) (null Variable)) } }
+
 my class Enum is Cool {
     has $.key;
     has $.value;
@@ -28,5 +30,8 @@ is (foo => 1).key, 'foo', "foo => 1 keeps key";
 is (foo => 1).value, '1', "foo => 1 keeps value";
 is ("foo" => 1).key, 'foo', '"foo" => 1 keeps key';
 is ("foo" => 1).value, '1', '"foo" => 1 keeps value';
+
+my %hash;
+ok %hash ~~ Hash, '%-vars are Hash';
 
 done-testing;

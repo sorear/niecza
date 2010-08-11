@@ -90,6 +90,7 @@ use 5.010;
         'String.Concat'        => [m => 'String'],
         'Kernel.AnyP'          => [f => 'IP6'],
         'Kernel.ArrayP'        => [f => 'IP6'],
+        'Kernel.HashP'         => [f => 'IP6'],
         'Kernel.SubMO'         => [f => 'DynMetaObject'],
         'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
         'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],

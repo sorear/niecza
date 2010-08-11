@@ -797,6 +797,7 @@ use CgOp;
 
     has declaring => (isa => 'Bool', is => 'ro');
     has list => (isa => 'Bool', is => 'ro');
+    has hash => (isa => 'Bool', is => 'ro');
 
     has state_backing => (isa => 'Str', is => 'ro');
 
@@ -806,10 +807,11 @@ use CgOp;
 
         if ($self->state_backing) {
             return Decl::StateVar->new(slot => $self->name,
-                    backing => $self->state_backing, list => $self->list);
+                    backing => $self->state_backing, list => $self->list,
+                    hash => $self->hash);
         } else {
             return Decl::SimpleVar->new(slot => $self->name,
-                    list => $self->list);
+                    list => $self->list, hash => $self->hash);
         }
     }
 
