@@ -597,11 +597,9 @@ sub INFIX { my ($cl, $M) = @_;
     } elsif ($s eq '&infix:<,>') {
         #XXX STD bug causes , in setting to be parsed as left assoc
         my @r;
-        push @r, $l->splittable_parcel ? @{ $l->positionals } : ($l);
-        push @r, $r->splittable_parcel ? @{ $r->positionals } : ($r);
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(name => '&infix:<,>'),
-            positionals => \@r);
+        push @r, $l->isa('Op::SimpleParcel') ? @{ $l->items } : ($l);
+        push @r, $r->isa('Op::SimpleParcel') ? @{ $r->items } : ($r);
+        $M->{_ast} = Op::SimpleParcel->new(items => \@r);
     } else {
         $M->{_ast} = Op::CallSub->new(node($M),
             invocant => Op::Lexical->new(node($M), name => $s),
@@ -655,7 +653,9 @@ sub LIST { my ($cl, $M) = @_;
     my ($st, @pos) = $cl->whatever_precheck("&infix:<$op>",
         grep { defined } map { $_->{_ast} } @{ $M->{list} });
 
-    if ($loose2tight{$op}) {
+    if ($op eq ',') {
+        $M->{_ast} = Op::SimpleParcel->new(node($M), items => \@pos);
+    } elsif ($loose2tight{$op}) {
         $M->{_ast} = Op::ShortCircuit->new(node($M), kind => $loose2tight{$op},
             args => \@pos);
     } else {
@@ -743,8 +743,8 @@ sub semilist_to_args { my ($cl, $M) = @_;
 
     if (!defined $al) {
         return [];
-    } elsif ($al && $al->splittable_parcel) {
-        return $al->positionals;
+    } elsif ($al && $al->isa('Op::SimpleParcel')) {
+        return $al->items;
     } else {
         return [$al];
     }
@@ -837,9 +837,14 @@ sub colonpair { my ($cl, $M) = @_;
     my $tk = Op::StringLiteral->new(text => $M->{k});
     my $tv = ref($M->{v}) ? $M->{v}{_ast} :
         Op::Lexical->new(name => $M->{v} ? 'True' : 'False');
-    $M->{_ast} = { ext => $n, term => Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&_pair'),
-        positionals => [ $tk, $tv ]) };
+    $M->{_ast} = { ext => $n, term => Op::SimplePair->new(
+            key => $tk, value => $tv) };
+}
+
+sub fatarrow { my ($cl, $M) = @_;
+    $M->{_ast} = Op::SimplePair->new(
+        key => Op::StringLiteral->new(text => $M->{key}->Str),
+        value => $M->{val}{_ast});
 }
 
 my %_nowhatever = (map { $_, 1 } ('&infix:<,>', '&infix:<..>', '&infix:<...>',
@@ -992,6 +997,10 @@ sub term__S_colonpair { my ($cl, $M) = @_;
         return;
     }
     $M->{_ast} = $M->{colonpair}[0]{_ast}{term};
+}
+
+sub term__S_fatarrow { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{fatarrow}{_ast};
 }
 
 sub do_variable_reference { my ($cl, $M, $v) = @_;
@@ -1453,8 +1462,8 @@ sub arglist { my ($cl, $M) = @_;
 
     if (!defined $x) {
         $M->{_ast} = [];
-    } elsif ($x && $x->splittable_parcel) {
-        $M->{_ast} = $x->positionals;
+    } elsif ($x && $x->isa('Op::SimpleParcel')) {
+        $M->{_ast} = $x->items;
     } else {
         $M->{_ast} = [$x];
     }

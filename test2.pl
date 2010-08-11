@@ -17,11 +17,16 @@ my class Enum is Cool {
 my class Pair is Enum {
 }
 
-sub _pair($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
+sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
 
 is :foo.value, 'Bool::True', ":foo is true";
 is :!foo.value, 'Bool::False', ":!foo is false";
 is :foo<12>.value, '12', ":foo<12> is 12";
 is :foo.key, 'foo', ":foo is foo";
+
+is (foo => 1).key, 'foo', "foo => 1 keeps key";
+is (foo => 1).value, '1', "foo => 1 keeps value";
+is ("foo" => 1).key, 'foo', '"foo" => 1 keeps key';
+is ("foo" => 1).value, '1', '"foo" => 1 keeps value';
 
 done-testing;

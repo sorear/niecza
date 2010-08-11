@@ -19,18 +19,6 @@ use CgOp;
         map { $_->lift_decls } $self->zyg;
     }
 
-    sub splittable_parcel {
-        my ($self) = @_;
-        $self->isa('Op::CallSub') && $self->invocant->isa('Op::Lexical') &&
-            $self->invocant->name eq '&infix:<,>';
-    }
-
-    sub splittable_pair {
-        my ($self) = @_;
-        $self->isa('Op::CallSub') && $self->invocant->isa('Op::Lexical') &&
-            $self->invocant->name eq '&_pair';
-    }
-
     sub cgop {
         my ($self, $body) = @_;
         if (defined $self->file) {
@@ -197,6 +185,43 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         $self->inside->cgop($body);
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::SimplePair;
+    use Moose;
+    extends 'Op';
+
+    has key   => (isa => 'Op', is => 'ro', required => 1);
+    has value => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->key, $_[0]->value }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&infix:<=>>')),
+            $self->key->cgop($body), $self->value->cgop($body));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::SimpleParcel;
+    use Moose;
+    extends 'Op';
+
+    has items => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+    sub zyg { @{ $_[0]->items } }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&infix:<,>')),
+            map { $_->cgop($body) } @{ $self->items });
     }
 
     __PACKAGE__->meta->make_immutable;
