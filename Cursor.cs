@@ -77,54 +77,58 @@ public class Cursor {
 }
 
 public sealed class CCTerm {
-    public readonly int category; // OR
-    public readonly char speclow;
-    public readonly char spechigh;
+    public readonly int catmask;
+    // these should probably be inversion lists
+    public readonly char[] butyes;
+    public readonly char[] butno;
 
-    public readonly int denycatmask;
-    public readonly char[] denyranges;
-
-    public CCTerm(int category, char speclow, char spechigh, int denycatmask,
-            char[] denyranges) {
-        this.category = category; this.speclow = speclow;
-        this.spechigh = spechigh;
-        this.denycatmask = denycatmask; this.denyranges = denyranges;
+    public CCTerm(int catmask, char[] butyes, char[] butno) {
+        this.catmask = catmask; this.butyes = butyes; this.butno = butno;
     }
 
+    public CCTerm(char[] butyes) : this(0, butyes, new char[0]{}) { }
+    public CCTerm(char butyes) : this(0, new char[1] { butyes },
+            new char[0] {}) { }
+    public CCTerm(int catmask) : this(catmask, new char[0] {}, new char[0]{}) {}
+
+    public const int Alpha   =       0x1F;
+    public const int Mark    =       0xE0;
+    public const int Num     =      0x700;
+    public const int Space   =     0x3800;
+    public const int Control =    0x3C000;
+    public const int Punct   =  0x1FC0000;
+    public const int Symbol  = 0x1E000000;
+    public const int Other   = 0x20000000;
+
+    public const int AlNum   = Alpha | Num;
+
     private static readonly string[] categories = new string[] {
-        "Lu", "Ll", "Lt", "Lm", "Lo", "Mn", "Mc", "Me", "Nd", "Nl", "No",
-        "Zs", "Zl", "Zp", "Cc", "Cf", "Cs", "Co", "Pc", "Pd", "Ps", "Pe",
-        "Pi", "Pf", "Po", "Sm", "Sc", "Sk", "So", "Cn"
+        "Lu", "Ll", "Lt", "Lm",  "Lo", "Mn", "Mc", "Me",
+        "Nd", "Nl", "No", "Zs",  "Zl", "Zp", "Cc", "Cf",
+        "Cs", "Co", "Pc", "Pd",  "Ps", "Pe", "Pi", "Pf",
+        "Po", "Sm", "Sc", "Sk",  "So", "Cn"
     };
 
     public override string ToString() {
         string o = "";
-        if (category >= 0) {
-            o = "is" + categories[category];
-        } else if (speclow == '\u0000' && spechigh == '\uFFFF') {
-        } else if (speclow == spechigh) {
-            o = new string(speclow, 1);
+        if (catmask == 0x3FFFFFFF) {
+            o = "+any";
         } else {
-            o = "[" + speclow + ".." + spechigh + "]";
-        }
-        if (denycatmask != 0) {
             for (int c = 0; c <= 29; c++) {
-                if ((denycatmask & (1 << c)) != 0) {
-                    o += "-is" + categories[c];
+                if ((catmask & (1 << c)) != 0) {
+                    o += "+is" + categories[c];
                 }
             }
         }
-        if (denyranges != null) {
-            for (int ix = 0; ix < denyranges.Length; ix += 2) {
-                char low  = denyranges[ix];
-                char high = denyranges[ix+1];
-                if (low == high) {
-                    o += "-" + low;
-                } else {
-                    o += "[" + low + ".." + high + "]";
-                }
-            }
+
+        foreach (char c in butyes) {
+            o += "+[" + c + "]";
         }
+
+        foreach (char c in butno) {
+            o += "-[" + c + "]";
+        }
+
         return o;
     }
 }
@@ -201,8 +205,7 @@ public class LADStr : LAD {
             int len = text.Length;
             for (int c = 0; c < len; c++) {
                 int fromp = (c == len - 1) ? to : pad.AddNode();
-                pad.AddEdge(from, fromp,
-                        new CCTerm(-1, text[c], text[c], 0, null));
+                pad.AddEdge(from, fromp, new CCTerm(text[c]));
                 from = fromp;
             }
         }
@@ -210,6 +213,21 @@ public class LADStr : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "str: " + text);
+    }
+}
+
+public class LADCC : LAD {
+    public readonly CCTerm[] cc;
+    public LADCC(CCTerm[] cc) { this.cc = cc; }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        foreach (CCTerm t in cc) {
+            pad.AddEdge(from, to, t);
+        }
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "cc: " + cc.ToString());
     }
 }
 
@@ -342,6 +360,7 @@ public class Lexer {
         new Lexer("[for|forall]", new LAD[] {
                 new LADStr("for"),
                 new LADStr("forall"),
+                new LADPlus(new LADCC(new CCTerm[] { new CCTerm(CCTerm.AlNum) }))
             });
     }
 }
