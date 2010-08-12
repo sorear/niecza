@@ -78,20 +78,54 @@ public class Cursor {
 
 public sealed class CCTerm {
     public readonly int category; // OR
-    public readonly char specific;
+    public readonly char speclow;
+    public readonly char spechigh;
 
     public readonly int denycatmask;
-    public readonly char[] denyspecific;
-    // todo: range stuff.
+    public readonly char[] denyranges;
 
-    public CCTerm(int category, char specific, int denycatmask,
-            char[] denyspecific) {
-        this.category = category; this.specific = specific;
-        this.denycatmask = denycatmask; this.denyspecific = denyspecific;
+    public CCTerm(int category, char speclow, char spechigh, int denycatmask,
+            char[] denyranges) {
+        this.category = category; this.speclow = speclow;
+        this.spechigh = spechigh;
+        this.denycatmask = denycatmask; this.denyranges = denyranges;
     }
 
+    private static readonly string[] categories = new string[] {
+        "Lu", "Ll", "Lt", "Lm", "Lo", "Mn", "Mc", "Me", "Nd", "Nl", "No",
+        "Zs", "Zl", "Zp", "Cc", "Cf", "Cs", "Co", "Pc", "Pd", "Ps", "Pe",
+        "Pi", "Pf", "Po", "Sm", "Sc", "Sk", "So", "Cn"
+    };
+
     public override string ToString() {
-        return new string(specific, 1); // TODO
+        string o = "";
+        if (category >= 0) {
+            o = "is" + categories[category];
+        } else if (speclow == '\u0000' && spechigh == '\uFFFF') {
+        } else if (speclow == spechigh) {
+            o = new string(speclow, 1);
+        } else {
+            o = "[" + speclow + ".." + spechigh + "]";
+        }
+        if (denycatmask != 0) {
+            for (int c = 0; c <= 29; c++) {
+                if ((denycatmask & (1 << c)) != 0) {
+                    o += "-is" + categories[c];
+                }
+            }
+        }
+        if (denyranges != null) {
+            for (int ix = 0; ix < denyranges.Length; ix += 2) {
+                char low  = denyranges[ix];
+                char high = denyranges[ix+1];
+                if (low == high) {
+                    o += "-" + low;
+                } else {
+                    o += "[" + low + ".." + high + "]";
+                }
+            }
+        }
+        return o;
     }
 }
 
@@ -167,7 +201,8 @@ public class LADStr : LAD {
             int len = text.Length;
             for (int c = 0; c < len; c++) {
                 int fromp = (c == len - 1) ? to : pad.AddNode();
-                pad.AddEdge(from, fromp, new CCTerm(-1, text[c], 0, null));
+                pad.AddEdge(from, fromp,
+                        new CCTerm(-1, text[c], text[c], 0, null));
                 from = fromp;
             }
         }
