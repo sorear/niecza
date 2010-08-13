@@ -336,6 +336,8 @@ public class LexerState {
         this.nstates = new int[parent.pad.nodes.Count];
     }
 
+    public bool alive;
+
     // But these cachey fields are fair game
     // note there will be no epsilons here
     public List<NFA.Edge> alledges = new List<NFA.Edge>();
@@ -350,6 +352,7 @@ public class LexerState {
     public void AddNFAState(int num) {
         Stack<int> grey = new Stack<int>();
         grey.Push(num);
+        alive = true;
         while (grey.Count != 0) {
             int val = grey.Pop();
             int vm  = 1 << (val & 31);
@@ -449,7 +452,7 @@ public class Lexer {
         while (true) {
             state.CollectFates(fate);
 
-            if (pos == from.Length) break;
+            if (pos == from.Length || !state.alive) break;
             char ch = from[pos++];
 
             if (LtmTrace)
