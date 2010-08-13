@@ -176,6 +176,9 @@ public sealed class NFA {
     public List<Node> nodes = new List<Node>();
     public int curfate;
 
+    public DynMetaObject cursor_class;
+    public HashSet<string> method_stack = new HashSet<string>();
+
     public int AddNode() {
         nodes.Add(new Node(curfate));
         return nodes.Count - 1;
@@ -326,6 +329,22 @@ public class LADSequence : LAD {
     }
 }
 
+public class LADAny : LAD {
+    public readonly LAD[] zyg;
+    public LADAny(LAD[] zyg) { this.zyg = zyg; }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        foreach (LAD k in zyg)
+            k.ToNFA(pad, from, to);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "any:");
+        foreach (LAD k in zyg)
+            k.Dump(indent + 4);
+    }
+}
+
 public class LADImp : LAD {
     public override void ToNFA(NFA pad, int from, int to) {
         int knot = pad.AddNode();
@@ -351,10 +370,57 @@ public class LADNull : LAD {
 public class LADMethod : LAD {
     public readonly string name;
 
+    //XXX need to handle literal prefix *soon*
+
     public LADMethod(string name) { this.name = name; }
 
     public override void ToNFA(NFA pad, int from, int to) {
-        throw new NotImplementedException();
+        if (Lexer.LtmTrace)
+            Console.WriteLine("+ Processing subrule {0}", name);
+
+        if (pad.method_stack.Contains(name)) {
+            // NFAs cannot be recursive, so treat this as the end of the
+            // declarative prefix.
+            if (Lexer.LtmTrace)
+                Console.WriteLine("+ Pruning to avoid recursion");
+            int knot = pad.AddNode();
+            pad.AddEdge(from, knot, null);
+            pad.nodes[knot].final = true;
+            return;
+        }
+
+        pad.method_stack.Add(name);
+
+        IP6 method = null;
+        foreach (DynMetaObject dmo in pad.cursor_class.mro)
+            if (dmo.local.TryGetValue(name, out method))
+                break;
+
+        if (Lexer.LtmTrace && method != null)
+            Console.WriteLine("+ Found method");
+
+        LAD sub = null;
+        DynObject dom = method as DynObject;
+        if (dom != null) {
+            object o;
+            if (dom.slots.TryGetValue("ltm-prefix", out o)) {
+                sub = o as LAD;
+            }
+        }
+
+        if (Lexer.LtmTrace)
+            Console.WriteLine("+ {0} to sub-automaton",
+                    (sub != null ? "Resolved" : "Failed to resolve"));
+
+        if (sub == null) {
+            int knot = pad.AddNode();
+            pad.AddEdge(from, knot, null);
+            pad.nodes[knot].final = true;
+        } else {
+            sub.ToNFA(pad, from, to);
+        }
+
+        pad.method_stack.Remove(name);
     }
 
     public override void Dump(int indent) {
@@ -441,7 +507,8 @@ public class Lexer {
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
-    public Lexer(string tag, LAD[] alts) {
+    public Lexer(IP6 cursorObj, string tag, LAD[] alts) {
+        pad.cursor_class = ((DynObject)cursorObj).klass;
         this.alts = alts;
         this.tag = tag;
         int root = pad.AddNode();
@@ -524,7 +591,7 @@ public class Lexer {
     }
 
     public static void SelfTest() {
-        Lexer l = new Lexer("[for|forall]", new LAD[] {
+        Lexer l = new Lexer(null, "[for|forall]", new LAD[] {
                 new LADStr("for"),
                 new LADStr("forall"),
                 new LADPlus(new LADCC(new CCTerm[] { new CCTerm(CCTerm.AlNum) }))

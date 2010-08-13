@@ -938,7 +938,7 @@ sub _rxalt($C, $lad, $k, *@alts) {
 
     Q:CgOp {
         (letn csr   (unbox Cursor (@ (l $C)))
-              lexer (rawnew Lexer (clr_string "")
+              lexer (rawnew Lexer (@ (l $C)) (clr_string "")
                                   (unwrap 'LAD[]' (@ (l $lad))))
               fates (rawcall (l lexer) Run (getfield backing (l csr))
                                            (getfield pos (l csr)))
