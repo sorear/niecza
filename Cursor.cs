@@ -326,6 +326,28 @@ public class LADSequence : LAD {
     }
 }
 
+public class LADImp : LAD {
+    public override void ToNFA(NFA pad, int from, int to) {
+        int knot = pad.AddNode();
+        pad.nodes[knot].final = true;
+        pad.AddEdge(from, knot, null);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "imp");
+    }
+}
+
+public class LADNull : LAD {
+    public override void ToNFA(NFA pad, int from, int to) {
+        pad.AddEdge(from, to, null);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "null");
+    }
+}
+
 // These objects get put in hash tables, so don't change nstates[] after
 // that happens
 public class LexerState {
@@ -403,7 +425,8 @@ public class Lexer {
     public NFA pad = new NFA();
     public string tag;
 
-    public static bool LtmTrace = true;
+    public static bool LtmTrace =
+        Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
     public Lexer(string tag, LAD[] alts) {
         this.alts = alts;

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 276;
+plan 280;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -720,4 +720,17 @@ end
     ok ("ab   ab" ~~ / ab <.ws> ab /), "ws matches several spaces";
     ok !("abab" ~~ / ab <.ws> ab /), "ws does not match nothing";
     ok ("ab   ab" ~~ rule { ab ab }), "rule gives space";
+}
+
+{
+    sub meow(*@x) {
+        is @x[0], 'a', "can index [0] slurpies";
+        is @x[1], 'b', "can index [1] slurpies";
+    }
+
+    meow('a', 'b');
+
+    # doing a more reasonable test will probably require embedded blocks
+    ok "foobarx" ~~ / [ foo | foobar ]: x /, "LTM picks longest even if second";
+    ok "foobarx" ~~ / [ foobar | foo ]: x /, "LTM picks longest even if first";
 }

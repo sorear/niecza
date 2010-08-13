@@ -79,6 +79,11 @@ use CgOp;
             ]);
     }
 
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADStr', CgOp::clr_string($self->text));
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -106,6 +111,13 @@ use CgOp;
                 $self->_close_k($cn, $cont)]);
     }
 
+    sub lad {
+        my ($self) = @_;
+        $self->minimal ? CgOp::rawnew('LADImp') :
+            CgOp::rawnew('LAD' . ucfirst($qf{$self->type}),
+                    $self->zyg->[0]->lad);
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -125,6 +137,37 @@ use CgOp;
         }
 
         $cn, $cont;
+    }
+
+    sub lad {
+        my ($self) = @_;
+        my @z = map { $_->lad } @{ $self->zyg };
+        while (@z >= 2) {
+            my $x = pop @z;
+            $z[-1] = CgOp::rawnew('LADSequence', $z[-1], $x);
+        }
+        $z[0] // CgOp::rawnew('LADNull');
+    }
+
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::ConfineLang;
+    use Moose;
+    extends 'RxOp';
+
+    # TODO once :lang is implemented, this will be a bit more complicated
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        $self->zyg->[0]->op($cn, $cont);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        $self->zyg->[0]->lad;
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -148,6 +191,11 @@ use CgOp;
                 Op::Lexical->new(name => $icn),
                 $self->_close_op($self->zyg->[0]),
                 $self->_close_k($cn, $cont)]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        $self->zyg->[0]->lad;
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -183,6 +231,11 @@ use CgOp;
                 $self->_close_k($cn, $cont)]);
     }
 
+    sub lad {
+        my ($self) = @_;
+        $self->zyg->[0]->lad;
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -205,6 +258,11 @@ use CgOp;
                 $self->_close_k($cn, $cont)]);
     }
 
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADMethod', CgOp::clr_string($self->name));
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -223,6 +281,40 @@ use CgOp;
                 Op::CallMethod->new(name => 'ws',
                     receiver => Op::Lexical->new(name => $icn)),
                 $self->_close_k($cn, $cont)]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADImp');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::Alt;
+    use Moose;
+    extends 'RxOp';
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxalt'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                Op::CgOp->new(op => CgOp::wrap(CgOp::rawnewarr('LAD',
+                            map { $_->lad } @{ $self->zyg }))), #XXX
+                $self->_close_k($cn, $cont),
+                map { $self->_close_op($_) } @{ $self->zyg }
+            ]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADAny', CgOp::rawnewarr('LAD',
+                map { $_->lad } @{ $self->zyg }));
     }
 
     __PACKAGE__->meta->make_immutable;

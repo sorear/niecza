@@ -566,6 +566,12 @@ use warnings;
             zyg => \@args);
     }
 
+    sub rawnewarr {
+        my ($name, @args) = @_;
+        CgOp::Primitive->new(op => [ 'clr_new_arr', $name, scalar @args ],
+            zyg => \@args);
+    }
+
     # must only be called during to_cgop phase!
     sub protosub {
         my ($body, @extra) = @_;

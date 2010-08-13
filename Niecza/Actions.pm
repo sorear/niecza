@@ -355,6 +355,23 @@ sub quant_atom_list { my ($cl, $M) = @_;
         [ map { $_->{_ast} } @{ $M->{quantified_atom} } ]);
 }
 
+my %LISTrx_types = (
+    '&'  => 'RxOp::Conj',
+    '|'  => 'RxOp::Alt',
+    '&&' => 'RxOp::SeqConj',
+    '||' => 'RxOp::SeqAlt',
+);
+sub LISTrx { my ($cl, $M) = @_;
+    $M->{_ast} = $LISTrx_types{$M->{delims}[0]{sym}}->new(zyg =>
+        [ map { $_->{_ast} } @{ $M->{list} } ]);
+}
+
+sub regex_infix {}
+sub regex_infix__S_Vert {}
+sub regex_infix__S_VertVert {}
+sub regex_infix__S_Amp {}
+sub regex_infix__S_AmpAmp {}
+
 sub metachar {}
 sub metachar__S_sigwhite { my ($cl, $M) = @_;
     $M->{_ast} = $::RX{s} ? RxOp::Sigspace->new : RxOp::Sequence->new;
@@ -663,6 +680,9 @@ my %loose2tight = (
     'orelse' => '//', 'and' => '&&', 'or' => '||',
 );
 sub LIST { my ($cl, $M) = @_;
+    if ($M->isa('STD::Regex')) {
+        goto &LISTrx;
+    }
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
     my $op  = $M->{delims}[0]{sym};

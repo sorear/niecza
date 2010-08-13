@@ -63,6 +63,8 @@ use 5.010;
               SetCaps      => [m => 'Cursor'],
               SimpleWS     => [m => 'Cursor'],
               Bind         => [m => 'Cursor'] },
+        'Lexer' =>
+            { Run          => [m => 'Int32[]'] },
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
@@ -415,6 +417,12 @@ use 5.010;
         my ($self, $class, $nargs) = @_;
         my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         $self->_push($class, "new $class(" . join(", ", @args) . ")");
+    }
+
+    sub clr_new_arr {
+        my ($self, $class, $nitems) = @_;
+        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nitems;
+        $self->_push($class . "[]", "new $class []{" . join(", ", @args) . "}");
     }
 
     sub clr_string {
