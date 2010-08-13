@@ -1,6 +1,7 @@
 using Niecza;
 using System;
 using System.Collections.Generic;
+using System.Text;
 // this exists to allow O(1) addition, since additions (esp. in the presence
 // of backtracking) dominate lookups
 
@@ -91,6 +92,16 @@ public sealed class CCTerm {
             new char[0] {}) { }
     public CCTerm(int catmask) : this(catmask, new char[0] {}, new char[0]{}) {}
 
+    public bool Accepts(char ch) {
+        foreach (char y in butyes)
+            if (y == ch)
+                return true;
+        foreach (char n in butno)
+            if (n == ch)
+                return false;
+        return (catmask & (1 << ((int)char.GetUnicodeCategory(ch)))) != 0;
+    }
+
     public const int Alpha   =       0x1F;
     public const int Mark    =       0xE0;
     public const int Num     =      0x700;
@@ -141,7 +152,7 @@ public sealed class NFA {
         public Node(int curfate) { fate = curfate; }
 
         public override string ToString() {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            StringBuilder sb = new StringBuilder();
             sb.Append("(" + fate + ")" + (final ? "+" : ""));
 
             foreach (Edge e in edges) {
@@ -315,6 +326,75 @@ public class LADSequence : LAD {
     }
 }
 
+// These objects get put in hash tables, so don't change nstates[] after
+// that happens
+public class LexerState {
+    public int[] nstates;
+    public readonly Lexer parent;
+    public LexerState(Lexer parent) {
+        this.parent = parent;
+        this.nstates = new int[parent.pad.nodes.Count];
+    }
+
+    // But these cachey fields are fair game
+    // note there will be no epsilons here
+    public List<NFA.Edge> alledges = new List<NFA.Edge>();
+
+    public override int GetHashCode() {
+        int o = 0;
+        for (int i = 0; i < nstates.Length; i++)
+            o = o * 1342883 + nstates[i];
+        return o;
+    }
+
+    public void AddNFAState(int num) {
+        Stack<int> grey = new Stack<int>();
+        grey.Push(num);
+        while (grey.Count != 0) {
+            int val = grey.Pop();
+            int vm  = 1 << (val & 31);
+            if ((nstates[val >> 5] & vm) != 0)
+                continue;
+            nstates[val >> 5] |= vm;
+            foreach (NFA.Edge e in parent.pad.nodes[val].edges) {
+                if (e.when == null)
+                    grey.Push(e.to);
+                else
+                    alledges.Add(e);
+            }
+        }
+    }
+
+    public void CollectFates(Stack<int> f) {
+        for (int i = parent.pad.nodes.Count - 1; i >= 0; i--) {
+            if ((nstates[i >> 5] & (1 << (i & 31))) != 0) {
+                NFA.Node n = parent.pad.nodes[i];
+                if (n.final) {
+                    if (Lexer.LtmTrace)
+                        Console.WriteLine("+ Adding fate {0}", n.fate);
+                    f.Push(n.fate);
+                }
+            }
+        }
+    }
+
+    public override string ToString() {
+        StringBuilder sb = new StringBuilder();
+        int ct = 0;
+
+        for (int i = 0; i < nstates.Length; i++)
+            for (int j = 0; j < 32; j++) {
+                if ((nstates[i] & (1 << j)) == 0)
+                    continue;
+                if (ct++ != 0)
+                    sb.Append("|");
+                sb.Append(32*i + j);
+            }
+
+        return sb.ToString();
+    }
+}
+
 public class Lexer {
     public LAD[] alts;
     public NFA pad = new NFA();
@@ -356,11 +436,63 @@ public class Lexer {
         Console.WriteLine("--- END");
     }
 
+
+    public int[] Run(string from, int pos) {
+        LexerState state = new LexerState(this);
+        state.AddNFAState(0);
+
+        Stack<int> fate = new Stack<int>();
+
+        if (LtmTrace)
+            Console.WriteLine("+ Trying lexer {0} at {1}", tag, pos);
+
+        while (true) {
+            state.CollectFates(fate);
+
+            if (pos == from.Length) break;
+            char ch = from[pos++];
+
+            if (LtmTrace)
+                Console.WriteLine("+ Adding character {0}", ch);
+
+            LexerState next = new LexerState(this);
+
+            foreach (NFA.Edge e in state.alledges) {
+                if (!e.when.Accepts(ch)) continue;
+                next.AddNFAState(e.to);
+            }
+
+            if (LtmTrace)
+                Console.WriteLine("+ Changing state to {0}", next);
+
+            state = next;
+        }
+
+        List<int> uniqfates = new List<int>();
+        HashSet<int> usedfates = new HashSet<int>();
+
+        while (fate.Count != 0) {
+            int f = fate.Pop();
+            if (usedfates.Contains(f))
+                continue;
+            usedfates.Add(f);
+            if (LtmTrace)
+                Console.WriteLine("+ Useful fate: {0}", f);
+            uniqfates.Add(f);
+        }
+
+        return uniqfates.ToArray();
+    }
+
     public static void SelfTest() {
-        new Lexer("[for|forall]", new LAD[] {
+        Lexer l = new Lexer("[for|forall]", new LAD[] {
                 new LADStr("for"),
                 new LADStr("forall"),
                 new LADPlus(new LADCC(new CCTerm[] { new CCTerm(CCTerm.AlNum) }))
             });
+
+        l.Run("xforfoo--", 1);
+        l.Run("forallx", 0);
+        l.Run("forall", 0);
     }
 }
