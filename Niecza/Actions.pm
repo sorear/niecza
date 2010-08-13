@@ -1289,6 +1289,11 @@ sub blockoid { my ($cl, $M) = @_;
     }
 }
 sub lambda {}
+sub embeddedblock { my ($cl, $M) = @_;
+    $M->{_ast} = $cl->block_to_immediate($M, 'bare',
+        $cl->sl_to_block('bare', $M->{statementlist}{_ast},
+            signature => Sig->simple()));
+}
 
 sub sigil {}
 sub sigil__S_Amp {}

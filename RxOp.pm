@@ -321,4 +321,25 @@ use CgOp;
     no Moose;
 }
 
+{
+    package RxOp::VoidBlock;
+    use Moose;
+    extends 'RxOp';
+
+    has block => (isa => 'Op', is => 'ro', required => 1);
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        $cn, Op::StatementList->new(children => [$self->block, $cont]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADImp');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;
