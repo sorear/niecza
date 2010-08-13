@@ -275,8 +275,9 @@ sub regex_def { my ($cl, $M) = @_;
     local $::parenid = 0;
     my ($cn, $op) = $M->{regex_block}{_ast}->term_rx;
     $M->{_ast} = Op::SubDef->new(
-        var => $var, class => 'Regex',
+        var  => $var, class => 'Regex',
         method_too => ($scope eq 'has' ? $name : undef),
+        ltm  => $M->{regex_block}{_ast}->lad,
         body => Body->new(
             type => 'regex',
             signature => $sig->for_regex($cn),

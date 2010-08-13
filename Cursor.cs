@@ -348,6 +348,19 @@ public class LADNull : LAD {
     }
 }
 
+public class LADMethod : LAD {
+    public readonly string name;
+
+    public LADMethod(string name) { this.name = name; }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        throw new NotImplementedException();
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "methodcall " + name);
+    }
+}
 // These objects get put in hash tables, so don't change nstates[] after
 // that happens
 public class LexerState {

@@ -60,6 +60,7 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has class  => (isa => 'Str', is => 'ro', default => 'Sub');
     has code   => (isa => 'Body', is => 'ro', required => 1);
+    has ltm    => (isa => 'Maybe[CgOp]', is => 'ro', default => undef);
 
     sub bodies { $_[0]->code }
 
@@ -75,10 +76,21 @@ use CgOp;
                     CgOp::protosub($self->code)));
         } else {
             # TODO: More direct support
-            CgOp::proto_var($self->var,
+            my $cg = CgOp::proto_var($self->var,
                 CgOp::methodcall(
                     CgOp::scopedlex($self->class), 'bless',
                     CgOp::newscalar(CgOp::protosub($self->code))));
+
+            if ($self->ltm) {
+                # ick
+                $cg = CgOp::prog($cg,
+                    CgOp::setindex("ltm-prefix",
+                        CgOp::getfield("slots", CgOp::cast('DynObject',
+                                CgOp::fetch(CgOp::scopedlex($self->var)))),
+                        $self->ltm));
+            }
+
+            $cg;
         }
     }
 

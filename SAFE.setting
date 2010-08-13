@@ -975,6 +975,7 @@ sub _rxbind($C, @names, $fun, $k) {
 }
 
 my class Regex is Sub {
+    has $!ltm-prefix; # a LAD tree
     method ACCEPTS($str) {
         my $i = 0;
         my $win = 0;
