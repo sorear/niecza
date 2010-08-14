@@ -33,19 +33,13 @@ use CgOp;
 
     sub used_slots {
         my ($self) = @_;
-        $self->has_var ? ($self->var, 'Variable') : ();
+        $self->has_var ? [$self->var, 'Variable', 1] : ();
     }
 
     sub preinit_code {
         my ($self, $body) = @_;
         my $c = CgOp::subcall(CgOp::protosub($self->code));
         $self->has_var ? CgOp::proto_var($self->var, $c) : CgOp::sink($c);
-    }
-
-    sub enter_code {
-        my ($self, $body) = @_;
-        !$self->has_var ? CgOp::noop :
-            CgOp::share_lex($self->var);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -65,7 +59,7 @@ use CgOp;
     sub bodies { $_[0]->code }
 
     sub used_slots {
-        $_[0]->var, 'Variable';
+        [$_[0]->var, 'Variable', $_[1]];
     }
 
     sub preinit_code {
@@ -96,9 +90,7 @@ use CgOp;
 
     sub enter_code {
         my ($self, $body) = @_;
-        $body->mainline ?
-            CgOp::share_lex($self->var) :
-            CgOp::clone_lex($self->var);
+        $body->mainline ? CgOp::noop : CgOp::clone_lex($self->var);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -117,8 +109,12 @@ use CgOp;
     has zeroinit => (isa => 'Bool', is => 'ro', default => 0);
     has noenter  => (isa => 'Bool', is => 'ro', default => 0);
 
+    sub dynamic {
+        $_[0]->slot =~ /^.?[?*]/;
+    }
+
     sub used_slots {
-        $_[0]->slot, 'Variable';
+        [$_[0]->slot, 'Variable', ($_[1] || $_[0]->shared) && !$_[0]->dynamic];
     }
 
     sub preinit_code {
@@ -141,8 +137,7 @@ use CgOp;
 
         return CgOp::noop if $self->noenter;
 
-        ($body->mainline || $self->shared) ?
-            CgOp::share_lex($self->slot) :
+        (($body->mainline || $self->shared) && !$self->dynamic) ? CgOp::noop :
             CgOp::scopedlex($self->slot, $self->list ? CgOp::newblanklist :
                 $self->hash ? CgOp::newblankhash :
                 CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
@@ -188,7 +183,7 @@ use CgOp;
         default => sub { ['OUR'] });
     has name   => (isa => 'Str', is => 'ro', required => 1);
 
-    sub used_slots { $_[0]->slot, 'Variable' }
+    sub used_slots { [ $_[0]->slot, 'Variable', 1 ] }
 
     sub preinit_code {
         my ($self, $body) = @_;
@@ -198,9 +193,6 @@ use CgOp;
     }
 
     sub enter_code {
-        my ($self, $body) = @_;
-
-        CgOp::share_lex($self->slot);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -217,7 +209,7 @@ use CgOp;
     has list    => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
-        $_[0]->slot ? ($_[0]->slot, 'Variable') : ();
+        $_[0]->slot ? [$_[0]->slot, 'Variable', 0] : ();
     }
 
     sub outer_decls {
@@ -287,8 +279,8 @@ use CgOp;
 
     sub used_slots {
         my ($self) = @_;
-        $self->var, 'Variable', $self->stashvar,
-            'Variable', (!$self->stub ? ($self->bodyvar, 'Variable') : ());
+        [$self->var, 'Variable', 1], [$self->stashvar, 'Variable', 1],
+            (!$self->stub ? [$self->bodyvar, 'Variable', $_[1]] : ());
     }
 
     sub make_how { CgOp::newscalar(CgOp::null('IP6')); }
@@ -321,13 +313,8 @@ use CgOp;
 
     sub enter_code {
         my ($self, $body) = @_;
-        CgOp::prog(
-            CgOp::share_lex($self->var),
-            CgOp::share_lex($self->var . "::"),
-            ($self->stub ? () :
-                ($body->mainline ?
-                    CgOp::share_lex($self->bodyvar) :
-                    CgOp::clone_lex($self->bodyvar))));
+        ($self->stub || $body->mainline) ? CgOp::noop :
+            CgOp::clone_lex($self->bodyvar);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -483,7 +470,7 @@ use CgOp;
     has name  => (is => 'ro', isa => 'Str', required => 1);
     has value => (is => 'ro', isa => 'CgOp', required => 1);
 
-    sub used_slots { $_[0]->name, 'Variable' }
+    sub used_slots { [ $_[0]->name, 'Variable', 0 ] } #XXX
     sub preinit_code {
         my ($self, $body) = @_;
         CgOp::proto_var($self->name, $self->value);
@@ -508,38 +495,30 @@ use CgOp;
 
     sub used_slots {
         my ($self) = @_;
-        map { $_, 'Variable' } sort keys %{ $self->symbols };
+        map { [ $_, 'Variable', 1 ] } sort keys %{ $self->symbols };
     }
 
     sub preinit_code {
         my ($self, $body) = @_;
+        my $scope = Storable::retrieve($self->unit . "_ast.store");
+
         CodeGen->know_module($self->unit);
-        CgOp::let(CgOp::prog(
-                CgOp::rawscall($self->unit . '.Initialize'),
-                CgOp::getfield('lex',
-                    CgOp::rawsget($self->unit . '.Environment'))),
-            sub {
-                my $lex = shift;
-                CgOp::prog(map {
-                    my @path = @{ $self->symbols->{$_} };
-                    my $first = CgOp::cast('Variable',
-                        CgOp::getindex(shift(@path), $lex));
-                    for (@path) {
-                        $first = CgOp::rawscall('Kernel.PackageLookup',
-                            CgOp::fetch($first), CgOp::clr_string($_));
-                    }
+        CgOp::prog(
+            CgOp::rawscall($self->unit . '.Initialize'),
+            map {
+                my ($head, @path) = @{ $self->symbols->{$_} };
+                CodeGen->know_sfield($scope->{$head}[1], $scope->{$head}[0]);
+                my $first = CgOp::rawsget($scope->{$head}[1]);
+                for (@path) {
+                    $first = CgOp::rawscall('Kernel.PackageLookup',
+                        CgOp::fetch($first), CgOp::clr_string($_));
+                }
 
-                    CgOp::prog(
-                        CgOp::proto_var($_, CgOp::newrwscalar(CgOp::fetch(
-                            CgOp::scopedlex('Any')))),
-                        CgOp::bind(0, CgOp::scopedlex($_), $first));
-                } sort keys %{ $self->symbols });
-            });
-    }
-
-    sub enter_code {
-        my ($self) = @_;
-        CgOp::prog(map { CgOp::share_lex($_) } sort keys %{ $self->symbols });
+                CgOp::prog(
+                    CgOp::proto_var($_, CgOp::newrwscalar(CgOp::fetch(
+                        CgOp::scopedlex('Any')))),
+                    CgOp::bind(0, CgOp::scopedlex($_), $first));
+            } sort keys %{ $self->symbols });
     }
 
     __PACKAGE__->meta->make_immutable;

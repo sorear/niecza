@@ -18,7 +18,9 @@ use CgOp ();
     # '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
 
-    has lexical   => (isa => 'HashRef[Str]', is => 'rw');
+    # Any => [ 'Variable', 'SAFE.F12_34' ] # a global
+    # $x  => [ 'Variable', undef, 5 ] # slot 5 in pad
+    has lexical   => (isa => 'HashRef', is => 'rw');
     # my $x inside, floats out; mostly for blasts; set by context so must be rw
     has transparent => (isa => 'Bool', is => 'rw', default => 0);
     has decls => (isa => 'ArrayRef[Decl]', is => 'rw');
@@ -32,9 +34,7 @@ use CgOp ();
     sub extract_scopes {
         my ($self, $outer) = @_;
 
-        $self->lexical(+{ map { $_->used_slots } @{ $self->decls } });
-        my %h = %{ $self->lexical };
-
+        my %h;
         if ($self->type eq 'mainline') {
             $h{'?is_mainline'} = 1;
         } elsif ($self->type =~ /^(?:bare|package|module|class|grammar|role|slang|knowhow)$/) {
@@ -42,6 +42,20 @@ use CgOp ();
         } else {
             $h{'?is_mainline'} = 0;
         }
+
+        my $nfields_global;
+        for my $le (map { $_->used_slots($h{'?is_mainline'}) } @{ $self->decls }) {
+            if ($le->[2]) {
+                my $sanname = $le->[0];
+                $sanname =~ s/\W//g;
+                $le->[2] = sprintf "%s.F%d_%d_%s", Unit->csname($::UNITNAME),
+                    $self->uid, $nfields_global++, $sanname;
+            } else {
+                # TODO generate numbered lookups for clonedvars
+            }
+            $h{shift(@$le)} = $le;
+        }
+        $self->lexical(\%h);
 
         $h{'OUTER::'} = $outer;
         $_->extract_scopes(\%h) for (map { $_->bodies } @{ $self->decls });
@@ -120,18 +134,23 @@ use CgOp ();
 
     sub write {
         my ($self) = @_;
-        CodeGen->new(lex2types => $self->lexical, csname => $self->csname,
-            body => $self, ops => $self->cgoptree)->write;
+        CodeGen->new(csname => $self->csname, body => $self,
+            ops => $self->cgoptree)->write;
         $_->write for (map { $_->bodies } @{ $self->decls });
     }
 
     sub lex_level {
         my ($self, $var) = @_;
+        ($self->lex_info($var))[0];
+    }
+
+    sub lex_info {
+        my ($self, $var) = @_;
 
         my $i = 0;
         my $st = $self->scopetree;
         while ($st) {
-            return $i if ($st->{$var});
+            return ($i, @{ $st->{$var} }) if ($st->{$var});
             $i++;
             $st = $st->{'OUTER::'};
         }

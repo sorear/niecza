@@ -1779,7 +1779,7 @@ sub statement_control__S_use { my ($cl, $M) = @_;
         return;
     }
 
-    push @::UNITDEPS, $name;
+    $::UNITDEPS{$name} = 1;
     my %symbols;
     $symbols{$name} = [ $name ];
     $symbols{$name . '::'} = [ $name . '::' ];

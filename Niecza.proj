@@ -29,7 +29,7 @@
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', main => 1, file => 'test.pl');"/>
         <Csc Sources="MAIN.cs" TargetType="exe" OutputAssembly="MAIN.exe"
-            References="Test.dll;CORE.dll;Kernel.dll"/>
+            References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
         <Exec Command="prove -e mono MAIN.exe"/>
     </Target>
 
@@ -70,7 +70,7 @@
 
     <Target Name="Test.dll" Inputs="Test.cs;CORE.dll;Kernel.dll" Outputs="Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
         <Csc Sources="Test.cs" TargetType="library"
-            OutputAssembly="Test.dll" References="CORE.dll;Kernel.dll"/>
+            OutputAssembly="Test.dll" References="CORE.dll;SAFE.dll;Kernel.dll"/>
         <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot Test.dll"/>
     </Target>
 

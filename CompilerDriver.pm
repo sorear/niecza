@@ -31,7 +31,7 @@ sub compile {
     my %args = @_;
     $args{lang} //= 'CORE';
 
-    local @::UNITDEPS;
+    local %::UNITDEPS;
     local $::SETTING_RESUME;
     local $::YOU_WERE_HERE;
     local $::UNITNAME = $args{main} ? '' : $args{file};
@@ -42,7 +42,7 @@ sub compile {
 
     $::SETTING_RESUME = retrieve($args{lang} . '_ast.store')
         unless $args{lang} eq 'NULL';
-    push @::UNITDEPS, $args{lang} if $args{lang} ne 'NULL';
+    $::UNITDEPS{$args{lang}} = 1 if $args{lang} ne 'NULL';
 
     my ($m, $a) = $args{file} ? ('parsefile', $args{file}) :
         ('parse', $args{code});
@@ -79,8 +79,9 @@ EOH
                 if $::SETTING_RESUME;
             $ast = undef; } ],
         [ 'gmcs', sub {
+            delete $::UNITDEPS{MAIN};
             system "gmcs", ($args{main} ? () : ("/target:library")),
-                "/r:Kernel.dll", (map { "/r:$_.dll" } @::UNITDEPS),
+                "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITDEPS),
                 "/out:${basename}." . ($args{main} ? 'exe' : 'dll'),
                 "${basename}.cs"; } ],
         [ 'aot', sub {

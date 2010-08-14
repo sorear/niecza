@@ -105,6 +105,11 @@ use 5.010;
         'Kernel.UnboxAny'      => [m => 'object'],
     );
 
+    sub know_sfield {
+        my ($class, $n, $ty) = @_;
+        $typedata{$n} = [ f => $ty ];
+    }
+
     sub know_module {
         my ($class, $mname) = @_;
         # for settings
@@ -250,7 +255,7 @@ use 5.010;
     sub push_let {
         my ($self, $which) = @_;
         my $var = "let!${which}!" . ($self->letdepths->{$which}++);
-        $self->lex2type->{$var} = $self->stacktype->[-1];
+        $self->lex2type->{$var} = [$self->stacktype->[-1]];
         $self->rawlexput($var);
     }
 
@@ -316,7 +321,7 @@ use 5.010;
     sub rawlexget {
         my ($self, $name) = @_;
         $self->_push("object", "th.lex[" . qm($name) . "]");
-        $self->cast($self->lex2type->{$name});
+        $self->cast($self->lex2type->{$name}[0]);
     }
 
     sub rawlexput {
@@ -325,22 +330,28 @@ use 5.010;
     }
 
     sub lexget {
-        my ($self, $order, $name) = @_;
+        my ($self, $order, $type, $sname, $name) = @_;
+        if ($sname) {
+            $self->_push($type, $sname);
+            return;
+        }
         my $frame = 'th.';
         if ($self->letdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
                 qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
                 ']).';
         }
-        # XXX need a better type tracking system
         $self->_push("object", $frame . ("outer." x $order) .
             "lex[" . qm($name) . "]");
-        $self->cast(($order ? 'Variable' : ($self->lex2type->{$name}
-                    // 'Variable')));
+        $self->cast($type);
     }
 
     sub lexput {
-        my ($self, $order, $name) = @_;
+        my ($self, $order, $type, $sname, $name) = @_;
+        if ($sname) {
+            $self->clr_sfield_set($sname);
+            return;
+        }
         my $frame = 'th.';
         if ($self->letdepths->{'protopad'}) {
             $frame = '((Frame)th.lex[' .
@@ -582,6 +593,10 @@ use 5.010;
 
     sub proto_var {
         my ($self, $name) = @_;
+        if (my $var = $self->bodies->[-1]->lexical->{$name}[1]) {
+            $self->clr_sfield_set($var);
+            return;
+        }
         $self->peek_let('protopad');
         my ($pv, $pp) = $self->_popn(2);
         $self->_emit("$pp.lex[" . qm($name) . "] = ($pv)");
@@ -593,19 +608,25 @@ use 5.010;
         my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
         my $order = 0;
+        my $type;
+        my $sname;
         if ($self->letdepths->{$name}) {
             $name = "let!${name}!" . ($self->letdepths->{$name} - 1);
+            ($type) = @{ $self->lex2type->{$name} };
         } else {
-            $order = $body->lex_level($name);
+            ($order, $type, $sname) = $body->lex_info($name);
             if ($order < 0) {
                 #print STDERR YAML::XS::Dump ($body);
                 die "Internal error: failed to resolve lexical $name in " . $body->name;
             }
         }
+        if ($sname && $sname =~ /(.*)\./) {
+            $::UNITDEPS{$1} = 1;
+        }
         if ($set) {
-            $self->lexput($order, $name);
+            $self->lexput($order, $type, $sname, $name);
         } else {
-            $self->lexget($order, $name);
+            $self->lexget($order, $type, $sname, $name);
         }
     }
 
@@ -621,6 +642,16 @@ use 5.010;
 
     sub write {
         my ($self) = @_;
+        if ($self->body) {
+            my $l = $self->body->lexical;
+            for my $ve (sort keys %$l) {
+                next unless ref $l->{$ve} eq 'ARRAY';
+                my ($ty, $n) = @{ $l->{$ve} };
+                next unless $n;
+                $n =~ s/.*\.//;
+                print ::NIECZA_OUT " " x 4, "public static $ty $n;\n";
+            }
+        }
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
