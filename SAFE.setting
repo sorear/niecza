@@ -350,15 +350,11 @@ sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 PRE-INIT {
     # rawcall to avoid putting a rw binding on self... TODO
     Mu.HOW.add-method("defined", anon method defined is rawcall {
-            Q:CgOp { (box Bool (!= (null Dictionary<string,object>)
-                (getfield slots (cast DynObject (@ (pos 0)))))) }
+            Q:CgOp { (box Bool (rawcall (@ (pos 0)) IsDefined)) }
         });
     Mu.HOW.add-method("Bool", anon method Bool() { self.defined });
     Mu.HOW.add-method("Str", anon method Str() {
-            my $tn := Q:CgOp {
-                (box Str (getfield name (getfield klass
-                    (cast DynObject (fetch (scopedlex self))))))
-            };
+            my $tn := Q:CgOp { (box Str (rawcall (@ (l self)) GetTypeName)) };
             if self.defined {
                 $tn ~ "()<instance>"
             } else {
@@ -404,8 +400,8 @@ PRE-INIT {
     Sub.HOW.add-method("ACCEPTS", anon method ACCEPTS($t) { (self)($t) });
 
     ClassHOW.HOW.add-method("isa", anon method isa($obj, $type) { Q:CgOp {
-            (box Bool (rawcall (getfield klass (cast DynObject (@ (l $obj))))
-              HasMRO (getfield klass (cast DynObject (@ (l $type))))))
+            (box Bool (rawcall (@ (l $obj)) Isa
+              (getfield klass (cast DynObject (@ (l $type))))))
         } });
     ClassHOW.HOW.add-method("does",
         anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
@@ -704,11 +700,6 @@ PRE-INIT {
 }
 
 my class CallFrame {
-    # major fudge until Mu starts treating the RI with respect
-    method Bool    { True }
-    method defined { True }
-    method Str     { "callframe" }
-
     method caller() { Q:CgOp {
         (letn c (getfield caller (cast Frame (@ (l self))))
           (ternary

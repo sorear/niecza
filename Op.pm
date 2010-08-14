@@ -245,8 +245,7 @@ use CgOp;
                 $c = CgOp::how($c);
             }
             when ("WHAT") {
-                $c = CgOp::getfield('typeObject',
-                    CgOp::getfield('klass', CgOp::cast('DynObject', $c)));
+                $c = CgOp::rawcall(CgOp::cast('IP6', $c), 'GetTypeObject');
             }
             default {
                 die "Invalid interrogative $_";

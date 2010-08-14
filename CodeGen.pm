@@ -12,7 +12,12 @@ use 5.010;
     # Beta will do this using reflection
     my %typedata = (
         IP6 =>
-            { HOW          => [c => 'IP6'] },
+            { Isa          => [m => 'Boolean'],
+              Does         => [m => 'Boolean'],
+              GetTypeName  => [m => 'String'],
+              GetTypeObject=> [m => 'IP6'],
+              IsDefined    => [m => 'Boolean'],
+              HOW          => [c => 'IP6'] },
         DynObject =>
             { klass        => [f => 'DynMetaObject'],
               slots        => [f => 'Dictionary<string,Object>'] },

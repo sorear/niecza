@@ -24,6 +24,11 @@ namespace Niecza {
         Frame GetAttribute(Frame caller, string name);
         //public Frame WHERE(Frame caller);
         Frame HOW(Frame caller);
+        string GetTypeName();
+        IP6 GetTypeObject();
+        bool IsDefined();
+        bool Isa(DynMetaObject super);
+        bool Does(DynMetaObject super);
         // These exist as a concession to circularity - FETCH as a completely
         // ordinary method could not work under the current calling convention.
         Frame Fetch(Frame caller);
@@ -104,6 +109,16 @@ namespace Niecza {
         public Frame GetAttribute(Frame c, string name) {
             c.resultSlot = lex[name];
             return c;
+        }
+
+        public string GetTypeName() { return "Frame"; }
+        public bool IsDefined() { return true; }
+        public IP6 GetTypeObject() { return Kernel.CallFrameMO.typeObject; }
+        public bool Isa(DynMetaObject sc) {
+            return Kernel.CallFrameMO.HasMRO(sc);
+        }
+        public bool Does(DynMetaObject sc) {
+            return Kernel.CallFrameMO.HasMRO(sc);
         }
 
         public Frame Invoke(Frame c, Variable[] p,
@@ -349,6 +364,26 @@ blocked:
             return caller;
         }
 
+        public IP6 GetTypeObject() {
+            return klass.typeObject;
+        }
+
+        public bool IsDefined() {
+            return slots != null;
+        }
+
+        public string GetTypeName() {
+            return klass.name;
+        }
+
+        public bool Isa(DynMetaObject mo) {
+            return klass.HasMRO(mo);
+        }
+
+        public bool Does(DynMetaObject mo) {
+            return klass.HasMRO(mo);
+        }
+
         public Frame Invoke(Frame c, Variable[] p,
                 Dictionary<string, Variable> n) {
             if (klass.OnInvoke != null) {
@@ -381,9 +416,8 @@ blocked:
         }
     }
 
-    // Allows native CLR objects to be treated as Perl 6 data.  They don't
-    // currently support any operations; you'll need to use CLR code to work
-    // with them.
+    // This class is slated for bloody death.  See Kernel.BoxAny for the
+    // replacement.
     public class CLRImportObject : IP6 {
         public readonly object val;
 
@@ -417,6 +451,12 @@ blocked:
             //TODO
             return Kernel.Die(c, "No metaobject available for CLRImportObject");
         }
+
+        public IP6 GetTypeObject() { return null; }
+        public bool IsDefined() { return true; }
+        public string GetTypeName() { return "<clr>"; }
+        public bool Isa(DynMetaObject mo) { return false; }
+        public bool Does(DynMetaObject mo) { return false; }
     }
 
     // A bunch of stuff which raises big circularity issues if done in the
