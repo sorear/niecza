@@ -149,13 +149,13 @@ namespace Niecza {
 
         public string ExecutingFile() {
             object l;
-            if (((proto != null) ? proto.lex : lex).
-                    TryGetValue("?files", out l)) {
-                string[] rl = (string[])l;
-                return ip >= rl.Length ? "" : rl[ip];
-            } else {
-                return "";
+            Frame p = (proto != null) ? proto : this;
+            while (p != null) {
+                if (p.lex.TryGetValue("?file", out l))
+                    return ((l as string) ?? "");
+                p = p.outer;
             }
+            return "";
         }
 
         public Variable LexicalFind(string name) {

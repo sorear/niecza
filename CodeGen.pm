@@ -599,8 +599,11 @@ use 5.010;
 
         $self->_push('object', $body->csname . "_lines");
         $self->proto_var('?lines');
-        $self->_push('object', $body->csname . "_files");
-        $self->proto_var('?files');
+
+        if ($body->type eq 'mainline') {
+            $self->clr_string($body->file);
+            $self->proto_var('?file');
+        }
 
         $self->pop_let('protopad');
         pop @{ $self->bodies };
@@ -697,8 +700,6 @@ use 5.010;
         if ($name ne 'BOOT') {
             print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
                 join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
-            print ::NIECZA_OUT " " x 4, "private static string[] ${name}_files = {",
-                join (", ", map { qm($_ // "") } @{ $self->fileinfo }), "};\n";
         }
     }
 
