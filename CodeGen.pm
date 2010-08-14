@@ -166,7 +166,7 @@ use 5.010;
     has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
-    has fileinfo  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has numips    => (isa => 'Int', is => 'rw', default => 1);
     has lineinfo  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has stackterm => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
@@ -234,11 +234,10 @@ use 5.010;
     sub _cpscall {
         my ($self, $rt, $expr) = @_;
         die "Invalid operation of CPS converter" if $self->depth;
-        my $n = $self->label;
+        my $n = $self->ip;
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
         $self->lineinfo->[$n] = $line;
-        $self->fileinfo->[$n] = $file;
         push @{ $self->buffer }, "case $n:\n";
         die "Broken call $expr" if !defined($rt);
         $self->resulttype($rt);
@@ -305,39 +304,42 @@ use 5.010;
         return $n;
     }
 
+    sub ip {
+        my ($self) = @_;
+        my $n = $self->numips;
+        $self->numips($n + 1);
+        return $n;
+    }
+
     sub labelhere {
         my ($self, $n) = @_;
-        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
+        my $ip = $self->labelname->{$n} = $self->ip;
         $self->_restorestackstate($n) if $self->savedstks->{$n};
-        push @{ $self->buffer }, "    goto case $n;\n" unless $self->unreach;
-        push @{ $self->buffer }, "case $n:\n";
-        $self->lineinfo->[$n] = $line;
-        $self->fileinfo->[$n] = $file;
+        push @{ $self->buffer }, "    goto case $ip;\n" unless $self->unreach;
+        push @{ $self->buffer }, "case $ip:\n";
+        $self->lineinfo->[$ip] = $line;
         $self->unreach(0);
     }
 
     sub goto {
         my ($self, $n) = @_;
-        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         $self->_savestackstate($n);
-        push @{ $self->buffer }, "    goto case $n;\n";
+        push @{ $self->buffer }, "    goto case \@\@L$n;\n";
         $self->unreach(1);
     }
 
     sub cgoto {
         my ($self, $n) = @_;
-        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my ($top) = $self->_popn(1);
         $self->_savestackstate($n);
-        push @{ $self->buffer }, "    if ($top) { goto case $n; }\n";
+        push @{ $self->buffer }, "    if ($top) { goto case \@\@L$n; }\n";
     }
 
     sub ncgoto {
         my ($self, $n) = @_;
-        $n = ($self->labelname->{$n} //= $self->label) if $n < 0;
         my ($top) = $self->_popn(1);
         $self->_savestackstate($n);
-        push @{ $self->buffer }, "    if (!$top) { goto case $n; }\n";
+        push @{ $self->buffer }, "    if (!$top) { goto case \@\@L$n; }\n";
     }
 
     sub rawlexget {
@@ -691,6 +693,9 @@ use 5.010;
         if ($self->numlets + $self->minlets) {
             print ::NIECZA_OUT " " x 16, "th.lexn = new object[",
                 ($self->numlets + $self->minlets), "];\n";
+        }
+        for (@{ $self->buffer }) {
+            s/\@\@L(\d+)/$self->labelname->{$1}/eg;
         }
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
         print ::NIECZA_OUT " " x 12, "default:\n";
