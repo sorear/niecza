@@ -24,8 +24,8 @@ ok ("fooo" ~~ / fo* { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
     "foo ~~ fo*|foo";
 is $x, 1, "longer length wins over prefix";
 $x = '';
-ok !("fooo" ~~ / [ fo* { $x = $x ~ 1 } | foo { $x = $x ~ 2 } ] x /),
-    "foo !~~ [fo*|foo]x";
+ok !("fooo" ~~ / [ fo*: { $x = $x ~ 1 } | foo { $x = $x ~ 2 } ] x /),
+    "foo !~~ [fo*:|foo]x";
 is $x, '12', "will backtrack into shorter token";
 
 my grammar G5 {
