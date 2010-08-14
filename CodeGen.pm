@@ -175,7 +175,10 @@ use 5.010;
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
 
-    has letdepths => (isa => 'HashRef', is => 'ro', default => sub { +{} });
+    has letstack  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has lettypes  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has numlets   => (isa => 'Int', is => 'rw', default => 0);
+    has minlets   => (isa => 'Int', is => 'ro', default => 0);
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
@@ -196,14 +199,16 @@ use 5.010;
         my ($self, $lbl) = @_;
         my %save;
         die "Invalid operation of CPS converter" if @{ $self->stacktype };
-        $save{letdepths} = { %{ $self->letdepths } };
+        $save{lettypes} = [ @{ $self->lettypes } ];
+        $save{letstack} = [ @{ $self->letstack } ];
         $self->savedstks->{$lbl} = \%save;
     }
 
     sub _restorestackstate {
         my ($self, $lbl) = @_;
         my $save = $self->savedstks->{$lbl};
-        %{ $self->letdepths } = %{ $save->{letdepths} };
+        @{ $self->letstack } = @{ $save->{letstack} };
+        @{ $self->lettypes } = @{ $save->{lettypes} };
     }
 
     sub _emit {
@@ -254,26 +259,42 @@ use 5.010;
 
     sub push_let {
         my ($self, $which) = @_;
-        my $var = "let!${which}!" . ($self->letdepths->{$which}++);
-        $self->lex2type->{$var} = [$self->stacktype->[-1]];
-        $self->rawlexput($var);
+        my ($v, $ty) = $self->_popn(1);
+        $self->_emit("th.lexn[" . ($self->minlets + @{$self->letstack}) .
+            "] = $v");
+        push @{$self->letstack}, $which;
+        push @{$self->lettypes}, $ty;
+        if (@{$self->letstack} > $self->numlets) {
+            $self->numlets(scalar @{$self->letstack});
+        }
     }
 
     sub pop_let {
         my ($self, $which) = @_;
-        my $var = "let!${which}!" . (--$self->letdepths->{$which});
-        $self->rawlexget($var);
+        $self->peek_let($which);
+        $self->drop_let($which);
     }
 
     sub drop_let {
         my ($self, $which) = @_;
-        --$self->letdepths->{$which};
+        die "Let consistency error" if $which ne $self->letstack->[-1];
+        pop @{ $self->letstack };
+        pop @{ $self->lettypes };
     }
 
     sub peek_let {
         my ($self, $which) = @_;
-        my $var = "let!${which}!" . ($self->letdepths->{$which} - 1);
-        $self->rawlexget($var);
+        my $i = @{ $self->letstack } - 1;
+        while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
+        $self->_push("object", "th.lexn[" . ($self->minlets + $i) . "]");
+        $self->cast($self->lettypes->[$i]);
+    }
+
+    sub has_let {
+        my ($self, $which) = @_;
+        my $i = @{ $self->letstack } - 1;
+        while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
+        $i >= 0;
     }
 
     sub label {
@@ -336,10 +357,9 @@ use 5.010;
             return;
         }
         my $frame = 'th.';
-        if ($self->letdepths->{'protopad'}) {
-            $frame = '((Frame)th.lex[' .
-                qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
-                ']).';
+        if ($self->has_let('protopad')) {
+            $self->peek_let('protopad');
+            $frame = ($self->_popn(1))[0] . ".";
         }
         $self->_push("object", $frame . ("outer." x $order) .
             "lex[" . qm($name) . "]");
@@ -353,10 +373,9 @@ use 5.010;
             return;
         }
         my $frame = 'th.';
-        if ($self->letdepths->{'protopad'}) {
-            $frame = '((Frame)th.lex[' .
-                qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
-                ']).';
+        if ($self->has_let('protopad')) {
+            $self->peek_let('protopad');
+            $frame = ($self->_popn(1))[0] . ".";
         }
         $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . ($self->_popn(1))[0]);
     }
@@ -364,12 +383,11 @@ use 5.010;
     sub callframe {
         my ($self) = @_;
         my $frame = 'th';
-        if ($self->letdepths->{'protopad'}) {
-            $frame = '((Frame)th.lex[' .
-                qm('let!protopad!' . ($self->letdepths->{'protopad'} - 1)) .
-                '])';
+        if ($self->has_let('protopad')) {
+            $self->peek_let('protopad');
+        } else {
+            $self->_push("Frame", $frame);
         }
-        $self->_push("Frame", $frame);
     }
 
     sub drop {
@@ -602,17 +620,25 @@ use 5.010;
         $self->_emit("$pp.lex[" . qm($name) . "] = ($pv)");
     }
 
-    # These are completely derived.
-
     sub scopelex {
         my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
         my $order = 0;
         my $type;
         my $sname;
-        if ($self->letdepths->{$name}) {
-            $name = "let!${name}!" . ($self->letdepths->{$name} - 1);
-            ($type) = @{ $self->lex2type->{$name} };
+        if ($self->has_let($name)) {
+            my $i = @{ $self->letstack } - 1;
+            while ($i >= 0 && $self->letstack->[$i] ne $name) { $i-- }
+            $name = "th.lexn[" . ($self->minlets + $i) . "]";
+            $type = $self->lettypes->[$i];
+
+            if ($set) {
+                $self->_emit("$name = " . ($self->_popn(1))[0]);
+            } else {
+                $self->_push("object", $name);
+                $self->cast($type);
+            }
+            return;
         } else {
             ($order, $type, $sname) = $body->lex_info($name);
             if ($order < 0) {
@@ -658,6 +684,10 @@ use 5.010;
         print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(th.DepthMark() + \"$::UNITNAME : $name @ \" + th.ip); }\n";
         print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
         print ::NIECZA_OUT " " x 12, "case 0:\n";
+        if ($self->numlets + $self->minlets) {
+            print ::NIECZA_OUT " " x 16, "th.lexn = new object[",
+                ($self->numlets + $self->minlets), "];\n";
+        }
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
         print ::NIECZA_OUT " " x 12, "default:\n";
         print ::NIECZA_OUT " " x 16, "throw new Exception(\"Invalid IP\");\n";

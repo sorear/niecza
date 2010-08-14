@@ -83,6 +83,7 @@ namespace Niecza {
         public readonly DynBlockDelegate code;
         public readonly Dictionary<string, object> lex
             = new Dictionary<string, object>();
+        public object[] lexn;
 
         public Variable[] pos;
         public Dictionary<string, Variable> named;
@@ -465,7 +466,7 @@ blocked:
 
         public static Frame Take(Frame th, Variable payload) {
             Frame r = TakeReturnStack.Pop();
-            r.lex["$nextframe"] = NewROScalar(th);
+            r.lex["$*nextframe"] = NewROScalar(th);
             r.resultSlot = payload;
             th.resultSlot = payload;
             return r;

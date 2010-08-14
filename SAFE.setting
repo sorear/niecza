@@ -856,13 +856,13 @@ my class GatherIterator is Iterator {
     has $!frame;
 
     method validate() {
-        my $nextframe;
+        my $*nextframe;
         $!value = Q:CgOp {
             (rawsccall Kernel.CoTake (cast Frame (getattr frame (@ (l self)))))
         };
         $!valid = True;
         $!frame = Any;
-        $!next  = GatherIterator.RAWCREATE("frame", $nextframe, "valid", False,
+        $!next  = GatherIterator.RAWCREATE("frame", $*nextframe, "valid", False,
             "value", Any, "next", Any);
     }
 }
