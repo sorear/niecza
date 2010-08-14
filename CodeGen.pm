@@ -20,6 +20,7 @@ use 5.010;
         DynMetaObject =>
             { BuildC3MRO   => [m => 'Void'],
               HasMRO       => [m => 'Boolean'],
+              AddMultiRegex=> [m => 'Void'],
               typeObject   => [f => 'IP6'],
               how          => [f => 'IP6'],
               local        => [f => 'Dictionary<string,IP6>'],
@@ -68,6 +69,7 @@ use 5.010;
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
+        'Lexer.RunProtoregex'  => [m => 'IP6[]'],
         'Kernel.CoTake'        => [c => 'Variable'],
         'Kernel.Take'          => [c => 'Variable'],
         'Kernel.GatherHelper'  => [c => 'Frame'],

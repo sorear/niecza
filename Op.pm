@@ -764,6 +764,7 @@ use CgOp;
     has class  => (isa => 'Str', is => 'ro', default => 'Sub');
     has ltm    => (isa => 'Maybe[CgOp]', is => 'ro', default => undef);
     has method_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
+    has proto_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
 
     sub lift_decls {
@@ -773,6 +774,8 @@ use CgOp;
             code => $self->body, ltm => $self->ltm);
         push @r, Decl::HasMethod->new(name => $self->method_too,
             var => $self->var) if defined($self->method_too);
+        push @r, Decl::HasMultiRx->new(name => $self->proto_too,
+            var => $self->var) if defined($self->proto_too);
         push @r, Decl::PackageAlias->new(slot => $self->var,
             name => $self->var, path => [ 'OUR', 'EXPORT', $_ ])
                 for (@{ $self->exports });

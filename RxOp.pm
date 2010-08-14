@@ -356,4 +356,34 @@ use CgOp;
     no Moose;
 }
 
+{
+    package RxOp::ProtoRedis;
+    use Moose;
+    extends 'RxOp';
+
+    has name    => (isa => 'Str', is => 'ro', required => 1);
+    has cutltm  => (isa => 'Bool', is => 'ro', default => 0);
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxproto'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                $self->_close_k($cn, $cont),
+                Op::StringLiteral->new(text => $self->name)
+            ]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        $self->cutltm ? CgOp::rawnew('LADImp') :
+            CgOp::rawnew('LADProtoRegex', CgOp::clr_string($self->name));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;

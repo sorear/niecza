@@ -956,6 +956,31 @@ sub _rxcall(@list, $k) {
     $k(@list.shift) while @list;
 }
 
+PRE-INIT {
+    ClassHOW.HOW.add-method("add-multiregex",
+        anon method add-multiregex($name, $rx) {
+            Q:CgOp { (prog
+                [rawcall (unwrap DynMetaObject (getattr meta-object (@ (pos 0))))
+                  AddMultiRegex (unbox String (@ (l $name))) (@ (l $rx))]
+                [l True])
+            }
+        });
+}
+
+sub _rxproto($C, $k, $name) {
+    sub lbody($fn) { $fn($C).for($k) }
+    Q:CgOp {
+        (letn branches (rawscall Lexer.RunProtoregex
+                         (@ (l $C)) (unbox String (@ (l $name))))
+              ix       (int 0)
+              max      (getfield Length (l branches))
+          (whileloop 0 0 (< (l ix) (l max))
+            (sink (subcall (@ (l &lbody))
+                    (newscalar (getindex (l ix) (l branches))))))
+          (null Variable))
+    };
+}
+
 # A call to a subrule could return a cursor of a different type, or with
 # unwanted subcaptures that need to be cleared for <.foo>
 sub _rxbind($C, @names, $fun, $k) {

@@ -201,6 +201,8 @@ namespace Niecza {
         public Dictionary<string, IP6> local_attr
             = new Dictionary<string, IP6>();
 
+        public Dictionary<string, List<DynObject>> multiregex;
+
         public List<DynMetaObject> mro;
         public HashSet<DynMetaObject> isa;
 
@@ -211,6 +213,41 @@ namespace Niecza {
 
             isa = new HashSet<DynMetaObject>();
             isa.Add(this);
+        }
+
+        public void AddMultiRegex(string name, IP6 m) {
+            if (multiregex == null)
+                multiregex = new Dictionary<string, List<DynObject>>();
+            List<DynObject> dl;
+            if (! multiregex.TryGetValue(name, out dl)) {
+                dl = new List<DynObject>();
+                multiregex[name] = dl;
+            }
+            dl.Add((DynObject)m);
+        }
+
+        public IP6 Can(string name) {
+            IP6 m;
+            foreach (DynMetaObject k in mro)
+                if (k.local.TryGetValue(name, out m))
+                    return m;
+            return null;
+        }
+
+        public Dictionary<string,IP6> AllMethods() {
+            Dictionary<string,IP6> r = new Dictionary<string,IP6>();
+            foreach (DynMetaObject k in mro)
+                foreach (KeyValuePair<string,IP6> kv in k.local)
+                    if (!r.ContainsKey(kv.Key))
+                        r[kv.Key] = kv.Value;
+            return r;
+        }
+
+        public HashSet<IP6> AllMethodsSet() {
+            HashSet<IP6> r = new HashSet<IP6>();
+            foreach (KeyValuePair<string,IP6> kv in AllMethods())
+                r.Add(kv.Value);
+            return r;
         }
 
         public bool HasMRO(DynMetaObject m) {

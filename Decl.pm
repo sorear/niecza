@@ -409,6 +409,25 @@ use CgOp;
 }
 
 {
+    package Decl::HasMultiRx;
+    use Moose;
+    extends 'Decl';
+
+    has name => (is => 'ro', isa => 'Str', required => 1);
+    has var  => (is => 'ro', isa => 'Str', required => 1);
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+        CgOp::sink(
+            CgOp::methodcall(CgOp::letvar("how"), "add-multiregex",
+                CgOp::string_var($self->name), CgOp::scopedlex($self->var)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::Super;
     use Moose;
     extends 'Decl';

@@ -281,6 +281,31 @@ sub regex_def { my ($cl, $M) = @_;
         return;
     }
 
+    my $isproto;
+    local $::symtext =
+        !defined($name) ? undef :
+        ($name =~ /:sym<(.*)>/) ? $1 :
+        ($name =~ /:(\w+)/) ? $1 :
+        undef; #XXX
+    my $unsymtext =
+        !defined($name) ? undef :
+        ($name =~ /(.*):sym<.*>/) ? $1 :
+        ($name =~ /(.*):\w+/) ? $1 :
+        undef;
+    if ($::MULTINESS eq 'proto') {
+        if ($M->{signature}[0] || !$M->{regex_block}{onlystar} || $scope ne 'has') {
+            $M->sorry("Only simple {*} protoregexes with no parameters are supported");
+            return;
+        }
+        $isproto = 1;
+    } else {
+        my $m2 = defined($::symtext) ? 'multi' : 'only';
+        if ($::MULTINESS && $::MULTINESS ne $m2) {
+            $M->sorry("Inferred multiness disagrees with explicit");
+            return;
+        }
+    }
+
     if ($path && $scope ne 'our') {
         $M->sorry("Putting a regex in a package requires using the our scope.");
         return;
@@ -303,15 +328,18 @@ sub regex_def { my ($cl, $M) = @_;
         : '&' . $name;
 
     local $::parenid = 0;
-    local $::symtext =
-        ($name =~ /:sym<(.*)>/) ? $1 :
-        ($name =~ /:(\w+)/) ? $1 :
-        undef; #XXX
-    my ($cn, $op) = $M->{regex_block}{_ast}->term_rx;
+
+    my $ast = $M->{regex_block}{_ast};
+    if ($isproto) {
+        $ast = RxOp::ProtoRedis->new(name => $name);
+    }
+
+    my ($cn, $op) = $ast->term_rx;
     $M->{_ast} = Op::SubDef->new(
         var  => $var, class => 'Regex',
         method_too => ($scope eq 'has' ? $name : undef),
-        ltm  => $M->{regex_block}{_ast}->lad,
+        proto_too => ($scope eq 'has' ? $unsymtext : undef),
+        ltm  => $ast->lad,
         body => Body->new(
             type => 'regex',
             signature => $sig->for_regex($cn),
@@ -1451,7 +1479,17 @@ sub scope_declarator__S_has {}
 sub scope_declarator__S_state {}
 sub scope_declarator__S_anon {}
 
+sub multi_declarator { my ($cl, $M) = @_;
+    $M->{_ast} = ($M->{declarator} // $M->{routine_def})->{_ast};
+}
+sub multi_declarator__S_multi {}
+sub multi_declarator__S_proto {}
+sub multi_declarator__S_only  {}
+
 sub variable_declarator { my ($cl, $M) = @_;
+    if ($::MULTINESS) {
+        $M->sorry("Multi variables NYI");
+    }
     if ($M->{trait}[0] || $M->{post_constraint}[0] || $M->{shape}[0]) {
         $M->sorry("Traits, postconstraints, and shapes on variable declarators NYI");
         return;
@@ -1508,6 +1546,9 @@ sub variable_declarator { my ($cl, $M) = @_;
 
 sub type_declarator {}
 sub type_declarator__S_constant { my ($cl, $M) = @_;
+    if ($::MULTINESS) {
+        $M->sorry("Multi variables NYI");
+    }
     my $scope = $::SCOPE // 'my';
     if (!$M->{identifier} && !$M->{variable}) {
         $M->sorry("Anonymous constants NYI"); #wtf?
@@ -1763,6 +1804,9 @@ sub statement_control__S_use { my ($cl, $M) = @_;
 # All package defs have a couple things in common - a special-ish block,
 # with a special decl, and some nice runtimey code
 sub package_def { my ($cl, $M) = @_;
+    if ($::MULTINESS) {
+        $M->sorry("Multi variables NYI");
+    }
     my $scope = $::SCOPE;
     if (!$M->{longname}[0]) {
         $scope = 'anon';
@@ -1916,6 +1960,9 @@ sub get_placeholder_sig { my ($cl, $M) = @_;
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
 sub routine_def { my ($cl, $M) = @_;
+    if ($::MULTINESS) {
+        $M->sorry("Multi routines NYI");
+    }
     if ($M->{sigil}[0] && $M->{sigil}[0]->Str eq '&*') {
         $M->sorry("Contextuals NYI");
         return;

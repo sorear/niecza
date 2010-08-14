@@ -184,10 +184,7 @@ public sealed class NFA {
         LAD sub = null;
         if (method_cache.TryGetValue(name, out sub))
             return sub;
-        IP6 method = null;
-        foreach (DynMetaObject dmo in cursor_class.mro)
-            if (dmo.local.TryGetValue(name, out method))
-                break;
+        IP6 method = cursor_class.Can(name);
 
         if (Lexer.LtmTrace && method != null)
             Console.WriteLine("+ Found method");
@@ -403,8 +400,6 @@ public class LADNull : LAD {
 public class LADMethod : LAD {
     public readonly string name;
 
-    //XXX need to handle literal prefix *soon*
-
     public LADMethod(string name) { this.name = name; }
 
     public override void ToNFA(NFA pad, int from, int to) {
@@ -450,6 +445,22 @@ public class LADMethod : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "methodcall " + name);
+    }
+}
+
+public class LADProtoRegex : LAD {
+    public readonly string name;
+
+    public LADProtoRegex(string name) { this.name = name; }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        foreach (DynObject cand in Lexer.ResolveProtoregex(pad.cursor_class, name)) {
+            ((LAD)cand.slots["ltm-prefix"]).ToNFA(pad, from, to);
+        }
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "protorx " + name);
     }
 }
 // These objects get put in hash tables, so don't change nstates[] after
@@ -615,6 +626,47 @@ public class Lexer {
         }
 
         return uniqfates.ToArray();
+    }
+
+    public static IP6[] RunProtoregex(IP6 cursor, string name) {
+        DynObject dc = (DynObject)cursor;
+        DynObject[] candidates = ResolveProtoregex(dc.klass, name);
+        LAD[] branches = new LAD[candidates.Length];
+        for (int i = 0; i < candidates.Length; i++)
+            branches[i] = (LAD) candidates[i].slots["ltm-prefix"];
+        Lexer l = new Lexer(dc, name, branches);
+        Cursor c = (Cursor)Kernel.UnboxAny(cursor);
+        int[] brnum = l.Run(c.backing, c.pos);
+        IP6[] ret = new IP6[brnum.Length];
+        for (int i = 0; i < brnum.Length; i++)
+            ret[i] = candidates[brnum[i]];
+        return ret;
+    }
+
+    public static DynObject[] ResolveProtoregex(DynMetaObject cursor_class,
+            string name) {
+        IP6 proto = cursor_class.Can(name);
+
+        List<DynObject> raword = new List<DynObject>();
+
+        foreach (DynMetaObject k in cursor_class.mro) {
+            if (proto != k.Can(name))
+                continue;
+            if (k.multiregex == null)
+                continue;
+            List<DynObject> locord;
+            if (k.multiregex.TryGetValue(name, out locord))
+                foreach (DynObject o in locord)
+                    raword.Add(o);
+        }
+
+        HashSet<IP6> unshadowed = cursor_class.AllMethodsSet();
+        List<DynObject> useord = new List<DynObject>();
+        foreach (DynObject o in raword)
+            if (unshadowed.Contains(o))
+                useord.Add(o);
+
+        return useord.ToArray();
     }
 
     public static void SelfTest() {

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 320;
+plan 322;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -813,4 +813,17 @@ end
     my $cow = 'hi';
     is "foo $cow bar", "foo hi bar", '$-interpolation works';
     is "foo $cow.substr(0,1) bar", "foo h bar", 'methodcall interpolation works';
+}
+
+{
+    my grammar G7 {
+        proto token tok  {*}
+        token tok:sym<+> { <sym> }
+        token tok:foo    { <sym> }
+
+        rule TOP { <tok> }
+    }
+
+    ok G7.parse('+'), "can parse :sym<> symbols";
+    ok G7.parse('foo'), "can parse : symbols";
 }
