@@ -178,6 +178,35 @@ public sealed class NFA {
 
     public DynMetaObject cursor_class;
     public HashSet<string> method_stack = new HashSet<string>();
+    public Dictionary<string,LAD> method_cache = new Dictionary<string,LAD>();
+
+    public LAD ResolveMethod(string name) {
+        LAD sub = null;
+        if (method_cache.TryGetValue(name, out sub))
+            return sub;
+        IP6 method = null;
+        foreach (DynMetaObject dmo in cursor_class.mro)
+            if (dmo.local.TryGetValue(name, out method))
+                break;
+
+        if (Lexer.LtmTrace && method != null)
+            Console.WriteLine("+ Found method");
+
+        DynObject dom = method as DynObject;
+        if (dom != null) {
+            object o;
+            if (dom.slots.TryGetValue("ltm-prefix", out o)) {
+                sub = o as LAD;
+            }
+        }
+
+        if (Lexer.LtmTrace)
+            Console.WriteLine("+ {0} to sub-automaton",
+                    (sub != null ? "Resolved" : "Failed to resolve"));
+
+        method_cache[name] = sub;
+        return sub;
+    }
 
     public int AddNode() {
         nodes.Add(new Node(curfate));
@@ -201,16 +230,18 @@ public sealed class NFA {
 public abstract class LAD {
     public abstract void ToNFA(NFA pad, int from, int to);
     public abstract void Dump(int indent);
-    public virtual bool IsLiteral { get { return false; } }
-    public virtual int LiteralPrefixLength { get { return 0; } }
+    public virtual void QueryLiteral(NFA pad, out int len, out bool cont) {
+        len = 0; cont = false;
+    }
 }
 
 public class LADStr : LAD {
     public readonly string text;
     public LADStr(string text) { this.text = text; }
 
-    public override bool IsLiteral { get { return true; } }
-    public override int LiteralPrefixLength { get { return text.Length; } }
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        len = text.Length; cont = true;
+    }
 
     public override void ToNFA(NFA pad, int from, int to) {
         if (text.Length == 0) {
@@ -281,8 +312,9 @@ public class LADPlus : LAD {
     public readonly LAD child;
     public LADPlus(LAD child) { this.child = child; }
 
-    public override bool IsLiteral { get { return child.IsLiteral; } }
-    public override int LiteralPrefixLength { get { return child.LiteralPrefixLength; } }
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        child.QueryLiteral(pad, out len, out cont);
+    }
 
     public override void ToNFA(NFA pad, int from, int to) {
         int knot1 = pad.AddNode();
@@ -304,15 +336,12 @@ public class LADSequence : LAD {
     public readonly LAD snd;
     public LADSequence(LAD fst, LAD snd) { this.fst = fst; this.snd = snd; }
 
-    public override bool IsLiteral {
-        get { return fst.IsLiteral && snd.IsLiteral; }
-    }
-
-    public override int LiteralPrefixLength {
-        get {
-            return fst.IsLiteral ?
-                (fst.LiteralPrefixLength + snd.LiteralPrefixLength) :
-                snd.LiteralPrefixLength;
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        fst.QueryLiteral(pad, out len, out cont);
+        if (cont) {
+            int l1 = len;
+            snd.QueryLiteral(pad, out len, out cont);
+            len += l1;
         }
     }
 
@@ -365,6 +394,10 @@ public class LADNull : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "null");
     }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        len = 0; cont = true;
+    }
 }
 
 public class LADMethod : LAD {
@@ -391,27 +424,7 @@ public class LADMethod : LAD {
 
         pad.method_stack.Add(name);
 
-        IP6 method = null;
-        foreach (DynMetaObject dmo in pad.cursor_class.mro)
-            if (dmo.local.TryGetValue(name, out method))
-                break;
-
-        if (Lexer.LtmTrace && method != null)
-            Console.WriteLine("+ Found method");
-
-        LAD sub = null;
-        DynObject dom = method as DynObject;
-        if (dom != null) {
-            object o;
-            if (dom.slots.TryGetValue("ltm-prefix", out o)) {
-                sub = o as LAD;
-            }
-        }
-
-        if (Lexer.LtmTrace)
-            Console.WriteLine("+ {0} to sub-automaton",
-                    (sub != null ? "Resolved" : "Failed to resolve"));
-
+        LAD sub = pad.ResolveMethod(name);
         if (sub == null) {
             int knot = pad.AddNode();
             pad.AddEdge(from, knot, null);
@@ -421,6 +434,18 @@ public class LADMethod : LAD {
         }
 
         pad.method_stack.Remove(name);
+    }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        LAD sub = pad.ResolveMethod(name);
+
+        if (pad.method_stack.Contains(name)) {
+            len = 0; cont = false;
+        } else {
+            pad.method_stack.Add(name);
+            sub.QueryLiteral(pad, out len, out cont);
+            pad.method_stack.Remove(name);
+        }
     }
 
     public override void Dump(int indent) {
@@ -515,8 +540,10 @@ public class Lexer {
         int[] alt_shuffle = new int[alts.Length];
         for (int i = 0; i < alts.Length; i++) alt_shuffle[i] = i;
         Array.Sort(alt_shuffle, delegate (int i1, int i2) {
-            int j1 = alts[i1].LiteralPrefixLength;
-            int j2 = alts[i2].LiteralPrefixLength;
+            int j1, j2;
+            bool c1, c2;
+            alts[i1].QueryLiteral(pad, out j1, out c1);
+            alts[i2].QueryLiteral(pad, out j2, out c2);
             return (j1 != j2) ? (j2 - j1) : (i1 - i2);
         });
         for (int ix = 0; ix < alts.Length; ix++) {
