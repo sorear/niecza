@@ -477,12 +477,9 @@ blocked:
         }
 
         public static Frame Die(Frame caller, string msg) {
-            // TODO: Unbreak p6exceptions
-            throw new Exception(msg);
-            //Frame f = new Frame(caller, null, new DynBlockDelegate(ThrowC));
-            //f.pos = new LValue[1] { new LValue(true, false, new CLRImportObject(msg)) };
-            //f.named = null;
-            //return f;
+            DynObject n = new DynObject(((DynObject)StrP).klass);
+            n.slots["value"] = msg;
+            return new FatalException(n).SearchForHandler(caller);
         }
 
         public static readonly DynMetaObject SubMO;
@@ -555,7 +552,7 @@ blocked:
                     }
                     return th.caller;
                 default:
-                    throw new Exception("IP invalid");
+                    return Kernel.Die(th, "IP invalid");
             }
         }
 
@@ -588,7 +585,7 @@ blocked:
                     return Vivify(th, th.pos[0]);
                 case 1:
                     if (!th.pos[0].rw) {
-                        throw new Exception("assigning to readonly value");
+                        return Kernel.Die(th.caller, "assigning to readonly value");
                     }
                     if (th.pos[0].islist) {
                         return th.pos[0].container.InvokeMethod(th.caller,
@@ -606,7 +603,7 @@ blocked:
                     return th.pos[0].container.Store(th.caller,
                             (IP6)th.resultSlot);
                 default:
-                    throw new Exception("invalid IP");
+                    return Kernel.Die(th, "Invalid IP");
             }
         }
 
