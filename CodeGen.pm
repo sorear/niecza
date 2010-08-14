@@ -70,6 +70,7 @@ use 5.010;
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
         'Lexer.RunProtoregex'  => [m => 'IP6[]'],
+        'Kernel.Die'           => [c => 'Void'],
         'Kernel.CoTake'        => [c => 'Variable'],
         'Kernel.Take'          => [c => 'Variable'],
         'Kernel.GatherHelper'  => [c => 'Frame'],

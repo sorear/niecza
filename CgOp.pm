@@ -589,8 +589,11 @@ use warnings;
 
     sub die {
         my ($msg) = @_;
-        $msg = fetch(string_var($msg)) unless blessed($msg);
-        rawccall(rawnew('Niecza.FatalException', $msg), 'SearchForHandler');
+        if (blessed($msg)) {
+            rawccall(rawnew('Niecza.FatalException', $msg), 'SearchForHandler');
+        } else {
+            rawsccall('Kernel.Die', clr_string($msg));
+        }
     }
 
     sub letn {

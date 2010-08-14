@@ -62,7 +62,7 @@ use 5.010;
         } else {
             return CgOp::prog(
                 CgOp::die("No value in " . $body->name .
-                    "available for parameter " . $self->name),
+                    " available for parameter " . $self->name),
                 CgOp::null('Variable'));
         }
     }
