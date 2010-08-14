@@ -66,6 +66,7 @@ sub compile {
             $basename ||= 'MAIN';
 
             open ::NIECZA_OUT, ">", $basename . ".cs";
+            binmode ::NIECZA_OUT, ":utf8";
             print ::NIECZA_OUT <<EOH;
 using System;
 using System.Collections.Generic;

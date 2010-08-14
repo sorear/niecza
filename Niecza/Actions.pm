@@ -2,6 +2,7 @@ package Niecza::Actions;
 use 5.010;
 use strict;
 use warnings;
+use Scalar::Util 'blessed';
 
 use Op;
 use RxOp;
@@ -24,6 +25,10 @@ sub AUTOLOAD {
         } else {
             return $cl->$a($M, $spec);
         }
+    }
+    if (!$M) {
+        Carp::cluck "Critical failure: Autoload $AUTOLOAD with no cursor!";
+        exit 1;
     }
     $M->sorry("Action method $AUTOLOAD not yet implemented") unless $carped{$AUTOLOAD}++;
 }
@@ -93,6 +98,30 @@ sub category__S_mod_internal { }
 
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
+}
+
+sub hexint { my ($cl, $M) = @_;
+    my $s = $M->Str;
+    $s =~ s/_//g;
+    $M->{_ast} = hex $M->Str;
+}
+
+sub octint { my ($cl, $M) = @_;
+    my $s = $M->Str;
+    $s =~ s/_//g;
+    $M->{_ast} = oct $M->Str;
+}
+
+sub decints { my ($cl, $M) = @_;
+    $M->{_ast} = [ map { $_->{_ast} } @{ $M->{decint} } ];
+}
+
+sub hexints { my ($cl, $M) = @_;
+    $M->{_ast} = [ map { $_->{_ast} } @{ $M->{hexint} } ];
+}
+
+sub octints { my ($cl, $M) = @_;
+    $M->{_ast} = [ map { $_->{_ast} } @{ $M->{octint} } ];
 }
 
 sub integer { my ($cl, $M) = @_;
@@ -549,6 +578,56 @@ sub mod_internal__S_ColonBanga {}
 sub mod_internal__S_ColonaParen_Thesis {}
 sub mod_internal__S_Colon0a {}
 
+sub backslash {}
+sub backslash__S_x { my ($cl, $M) = @_;
+    if ($M->{hexint}) {
+        $M->{_ast} = chr($M->{hexint}{_ast});
+    } else {
+        $M->{_ast} = join "", map { chr } @{ $M->{hexints}{_ast} };
+    }
+}
+sub backslash__S_o { my ($cl, $M) = @_;
+    if ($M->{octint}) {
+        $M->{_ast} = chr($M->{octint}{_ast});
+    } else {
+        $M->{_ast} = join "", map { chr } @{ $M->{octints}{_ast} };
+    }
+}
+sub backslash__S_Back { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{text}->Str;
+}
+sub backslash__S_stopper { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{text}->Str;
+}
+sub backslash__S_misc { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{text};
+}
+sub backslash__S_0 { my ($cl, $M) = @_; $M->{_ast} = "\0" }
+sub backslash__S_a { my ($cl, $M) = @_; $M->{_ast} = "\a" }
+sub backslash__S_b { my ($cl, $M) = @_; $M->{_ast} = "\b" }
+sub backslash__S_e { my ($cl, $M) = @_; $M->{_ast} = "\e" }
+sub backslash__S_f { my ($cl, $M) = @_; $M->{_ast} = "\f" }
+sub backslash__S_n { my ($cl, $M) = @_; $M->{_ast} = "\n" }
+sub backslash__S_r { my ($cl, $M) = @_; $M->{_ast} = "\r" }
+sub backslash__S_t { my ($cl, $M) = @_; $M->{_ast} = "\t" }
+
+sub escape {}
+sub escape__S_Back { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{item}{_ast};
+}
+sub escape__S_Cur_Ly { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{embeddedblock}{_ast};
+}
+sub escape__S_Dollar { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{EXPR}{_ast};
+}
+sub escape__S_At { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{EXPR}{_ast};
+}
+sub escape__S_Percent { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{EXPR}{_ast};
+}
+
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         $M->{_ast} = $M->{EXPR}{_ast};
@@ -565,15 +644,24 @@ sub nibbler { my ($cl, $M) = @_;
         $M->{_ast} = Op::CgOp->new(node($M), op => $M->{cgexp}{_ast});
     } else {
         # garden variety nibbler
-        my $str = "";
+        my @bits;
         for my $n (@{ $M->{nibbles} }) {
-            if ($n->isa('Str')) {
-                $str .= $n->{TEXT};
+            my $bit = $n->isa('Str') ? $n->{TEXT} : $n->{_ast};
+
+            # this *might* belong in an optimization pass
+            if (!blessed($bit) && @bits && !blessed($bits[-1])) {
+                $bits[-1] .= $bit;
             } else {
-                $M->sorry("Non-literal contents of strings NYI");
+                push @bits, $bit;
             }
         }
-        $M->{_ast} = Op::StringLiteral->new(node($M), text => $str);
+        push @bits, '' unless @bits;
+        @bits = map { blessed($_) ? $_ : Op::StringLiteral->new(node($M),
+                text => $_) } @bits;
+        $M->{_ast} = (@bits == 1) ? $bits[0] :
+            Op::CallSub->new(node($M),
+                invocant => Op::Lexical->new(name => '&infix:<~>'),
+                positionals => \@bits);
     }
 }
 
