@@ -259,6 +259,7 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my $slot = $cl->gensym;
     # TODO should be a real pass.
     local $::parenid = 0;
+    local $::symtext;
     $M->{_ast} = $M->{nibble}{_ast}->close_rx;
 }
 
@@ -302,6 +303,10 @@ sub regex_def { my ($cl, $M) = @_;
         : '&' . $name;
 
     local $::parenid = 0;
+    local $::symtext =
+        ($name =~ /:sym<(.*)>/) ? $1 :
+        ($name =~ /:(\w+)/) ? $1 :
+        undef; #XXX
     my ($cn, $op) = $M->{regex_block}{_ast}->term_rx;
     $M->{_ast} = Op::SubDef->new(
         var  => $var, class => 'Regex',

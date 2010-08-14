@@ -250,6 +250,17 @@ use CgOp;
     sub op {
         my ($self, $cn, $cont) = @_;
         my $icn = Niecza::Actions->gensym;
+        if ($self->name eq 'sym') {
+            # Should probably be a separate pass (before rx optimizer)
+            return $icn, Op::CallSub->new(
+                invocant => Op::Lexical->new(name => '&_rxstr'),
+                positionals => [
+                    Op::Lexical->new(name => $icn),
+                    Op::StringLiteral->new(text => $::symtext),
+                    $self->_close_k($cn, $cont)
+                ]);
+        }
+
         $icn, Op::CallSub->new(
             invocant => Op::Lexical->new(name => '&_rxcall'),
             positionals => [
@@ -260,6 +271,9 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
+        if ($self->name eq 'sym') {
+            return CgOp::rawnew('LADStr', CgOp::clr_string($::symtext));
+        }
         CgOp::rawnew('LADMethod', CgOp::clr_string($self->name));
     }
 
