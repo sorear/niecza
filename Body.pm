@@ -134,9 +134,9 @@ use CgOp ();
 
     sub write {
         my ($self) = @_;
+        $_->write for (map { $_->bodies } @{ $self->decls });
         CodeGen->new(csname => $self->csname, body => $self,
             ops => $self->cgoptree)->write;
-        $_->write for (map { $_->bodies } @{ $self->decls });
     }
 
     sub lex_level {

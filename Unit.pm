@@ -62,8 +62,8 @@ use 5.010;
         print ::NIECZA_OUT <<EOH;
 public class @{[ $self->csname ]} {
 EOH
-        CodeGen->new(csname => 'BOOT', ops => $self->bootcgop)->write;
         $self->mainline->write;
+        CodeGen->new(csname => 'BOOT', ops => $self->bootcgop)->write;
         if ($self->is_setting) {
             print ::NIECZA_OUT <<EOSB ;
     public static IP6 Installer;
