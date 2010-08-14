@@ -9,10 +9,12 @@
 
         <!-- Other centralized variables -->
         <STDUrl>http://svn.pugscode.org/pugs/src/perl6</STDUrl>
+        <SpecTestUrl>http://svn.pugscode.org/pugs/t/spec</SpecTestUrl>
         <UseAOT>Y</UseAOT>
 
         <!-- infrastructure -->
         <STD_existed Condition="Exists('STD_checkout')">Y</STD_existed>
+        <SpecTest_existed Condition="Exists('t/spec')">Y</SpecTest_existed>
     </PropertyGroup>
 
     <ItemGroup>
@@ -91,6 +93,13 @@
             Command="$(Subversion) update -r@(StdRevision) STD_checkout"/>
         <Touch AlwaysCreate="true" Files=".STD_checkout_stamp"
             ContinueOnError="true"/>
+    </Target>
+
+    <Target Name="CheckoutSpecTest">
+        <Exec Condition="$(SpecTest_existed) != 'Y'"
+            Command="$(Subversion) checkout $(SpecTestUrl) t/spec"/>
+        <Exec Condition="$(STD_existed) == 'Y'"
+            Command="$(Subversion) update t/spec"/>
     </Target>
 
     <Target Name="BuildSTD" Inputs=".STD_checkout_stamp"
