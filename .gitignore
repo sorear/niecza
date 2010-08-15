@@ -15,6 +15,10 @@ Test.dll
 Test.dll.so
 Test.cs
 Test_ast.store
+Threads.dll
+Threads.dll.so
+Threads.cs
+Threads_ast.store
 MONKEY_TYPING.dll
 MONKEY_TYPING.dll.so
 MONKEY_TYPING.cs

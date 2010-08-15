@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 namespace Niecza {
     // We like to reuse continuation objects for speed - every function only
     // creates one kind of continuation, but tweaks a field for exact return
@@ -778,6 +779,25 @@ blocked:
                 // TODO: @foo, %foo
                 return (stash[name] = NewRWScalar(AnyP));
             }
+        }
+
+        public static Frame StartP6Thread(Frame th, IP6 sub) {
+            Thread thr = new Thread(delegate () {
+                    Frame current = sub.Invoke(th, new Variable[0], null);
+
+                    while (current != th) {
+                        try {
+                            current = current.Continue();
+                        } catch (Exception ex) {
+                            ExceptionPacket ep = new FatalException(
+                                    new CLRImportObject(ex));
+                            current = ep.SearchForHandler(current);
+                        }
+                    }
+                });
+            thr.Start();
+            th.resultSlot = thr;
+            return th;
         }
 
         public static void RunLoop(DynBlockDelegate boot) {
