@@ -12,25 +12,49 @@ use Sig;
 
 use Try::Tiny;
 
-our $AUTOLOAD;
-my %carped;
-sub AUTOLOAD {
-    my ($cl, $M) = @_;
-    if ($AUTOLOAD =~ /^Niecza::Actions::(.*)__S_\d\d\d(.*)$/) {
-        my ($cat, $spec) = ($1, $2);
-        my $m = "${cat}__S_$spec";
-        my $a = "${cat}__S_ANY";
-        if ($cl->can($m) || !$cl->can($a)) {
-            return $cl->$m($M);
-        } else {
-            return $cl->$a($M, $spec);
+# I actually prefer this to the official AUTOLOAD solution
+{
+    package CursorBase;
+
+    no warnings 'redefine';
+    sub _REDUCE { my $self = shift;
+        my $S = shift;
+        my $meth = shift;
+        my $key = $meth;
+        $key .= ' ' . $_[0] if @_;
+
+        $self->{_reduced} = $key;
+        $self->{_from} = $S;
+        if ($::ACTIONS) {
+            $::ACTIONS->REDUCE($meth, $self, @_);
         }
+        $self->deb("REDUCE $key from " . $S . " to " . $self->{_pos}) if &CursorBase::DEBUG() & &DEBUG::matchers();
+        $self;
     }
-    if (!$M) {
-        Carp::cluck "Critical failure: Autoload $AUTOLOAD with no cursor!";
-        exit 1;
+}
+
+my %carped;
+sub REDUCE {
+    my ($cl, $meth, $M) = @_;
+    eval {
+        my ($snd, $spec);
+        if ($meth =~ /^(.*)__S_\d\d\d(.*)$/) {
+            $meth = "$1__S_$2";
+            $snd  = "$1__S_ANY";
+            $spec = $2;
+        }
+        if ($cl->can($meth)) {
+            return $cl->$meth($M);
+        } elsif ($snd && $cl->can($snd)) {
+            return $cl->$snd($M, $spec);
+        } elsif (!( $carped{$meth}++ )) {
+            die("Action method $meth not yet implemented");
+        }
+    };
+
+    if ($@) {
+        $M->sorry($@);
     }
-    $M->sorry("Action method $AUTOLOAD not yet implemented") unless $carped{$AUTOLOAD}++;
 }
 
 sub node { my ($M) = @_;
