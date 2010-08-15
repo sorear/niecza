@@ -99,16 +99,55 @@ use CgOp;
     # zyg * 1
 
     my %qf = ( '+', 'plus', '*', 'star', '?', 'opt' );
-    sub op {
+    sub op { goto &{ $_[0]->can('op_' . $qf{$_[0]->type}) }; }
+
+    sub op_opt {
         my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rx' . $qf{$self->type} .
-                ($self->minimal ? 'g' : '')),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                $self->_close_op($self->zyg->[0]),
-                $self->_close_k($cn, $cont)]);
+        my $kcl = $self->_close_k($cn, $cont);
+        my $zzcn = Niecza::Actions->gensym;
+        my ($zcn, $zcont) = $self->zyg->[0]->op($zzcn,
+            Op::CallSub->new(invocant => Op::Lexical->new(name => $kcl->var),
+                positionals => [Op::Lexical->new(name => $zzcn)]));
+        $zcn, Op::StatementList->new(children => [
+                $kcl, $zcont, Op::CallSub->new(
+                    invocant => Op::Lexical->new(name => $kcl->var),
+                    positionals => [Op::Lexical->new(name => $zcn)])]);
+    }
+
+    # (sub loop($C) { zyg($C, &loop); cont($C) })($C)
+    sub op_star {
+        my ($self, $cn, $cont) = @_;
+        my $lpn =  Niecza::Actions->gensym;
+        my $zzcn = Niecza::Actions->gensym;
+        my ($zcn, $zcont) = $self->zyg->[0]->op($zzcn, Op::CallSub->new(
+                invocant => Op::Lexical->new(name => $lpn),
+                positionals => [Op::Lexical->new(name => $zzcn)]));
+        $cn, Op::CallSub->new(
+            invocant => Op::SubDef->new(var => $lpn, class => 'Sub', body =>
+                Body->new(type => 'sub', signature => Sig->simple($zcn), do =>
+                    Op::StatementList->new(children => [ $zcont,
+                            Op::CallSub->new(
+                                invocant => $self->_close_k($cn, $cont),
+                                positionals => [Op::Lexical->new(name => $zcn)])]))),
+            positionals => [Op::Lexical->new(name => $cn)]);
+    }
+
+    # (sub loop($C) { zyg($C, -> $nC { loop($nC); cont($nC) }) })($C)
+    sub op_plus {
+        my ($self, $cn, $cont) = @_;
+        my $lpn =  Niecza::Actions->gensym;
+        my ($zcn, $zcont) = $self->zyg->[0]->op($cn, Op::StatementList->new(
+                children => [
+                    Op::CallSub->new(
+                        invocant => Op::Lexical->new(name => $lpn),
+                        positionals => [Op::Lexical->new(name => $cn)]),
+                    $cont
+                ]));
+        $cn, Op::CallSub->new(
+            invocant => Op::SubDef->new(var => $lpn, class => 'Sub', body =>
+                Body->new(type => 'sub', signature => Sig->simple($zcn), do =>
+                    $zcont)),
+            positionals => [Op::Lexical->new(name => $cn)]);
     }
 
     sub lad {

@@ -893,20 +893,6 @@ my class Cursor {
     }
 }
 
-sub _rxstar($C, $f, $k) {
-    $f($C, -> $nC { _rxstar($nC, $f, $k) });
-    $k($C);
-}
-
-sub _rxopt($C, $f, $k) {
-    $f($C, $k);
-    $k($C);
-}
-
-sub _rxplus($C, $f, $k) {
-    $f($C, -> $nC { _rxstar($nC, $f, $k) });
-}
-
 sub _rxstr($C, $str, $k) {
     #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
     Q:CgOp {
