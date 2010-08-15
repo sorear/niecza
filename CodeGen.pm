@@ -147,6 +147,10 @@ use 5.010;
     sub _typedata {
         my ($self, $types, @path) = @_;
 
+        if ($path[-1] =~ /(.*):(.),(.*)/) {
+            return $1, $2, $3;
+        }
+
         for ($path[0]) { $typedata{$_} //= _generic_infer; }
 
         my $cursor = \%typedata;
@@ -159,9 +163,9 @@ use 5.010;
                 $cursor->[0];
         }
         if (length($types) > 1) {
-            return @$cursor;
+            return $path[-1], @$cursor;
         } else {
-            return $cursor->[1];
+            return $path[-1], $types, $cursor->[1];
         }
     }
 
@@ -497,8 +501,8 @@ use 5.010;
     sub clr_field_get {
         my ($self, $f) = @_;
         my ($obj, $oty) = $self->_popn(1);
-        my $ty = $self->_typedata('f', $oty, $f);
-        $self->_push($ty, "($obj.$f)");
+        my ($nm, $cl, $ty) = $self->_typedata('f', $oty, $f);
+        $self->_push($ty, "($obj.$nm)");
     }
 
     sub clr_field_set {
@@ -509,8 +513,8 @@ use 5.010;
 
     sub clr_sfield_get {
         my ($self, $f) = @_;
-        my $ty = $self->_typedata('f', $f);
-        $self->_push($ty, "$f");
+        my ($nm, $cl, $ty) = $self->_typedata('f', $f);
+        $self->_push($ty, "$nm");
     }
 
     sub clr_sfield_set {
@@ -558,30 +562,31 @@ use 5.010;
 
     sub clr_call_direct {
         my ($self, $name, $nargs) = @_;
-        my ($cl, $rt) = $self->_typedata('cm', $name);
+        my ($nm, $cl, $rt) = $self->_typedata('cm', $name);
         my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         if ($cl eq 'c') {
             $self->_cpscall($rt,
-                "$name(" . join(", ", "th", @args) . ")");
+                "$nm(" . join(", ", "th", @args) . ")");
         } elsif ($rt ne 'Void') {
-            $self->_push($rt, "$name(" . join(", ", @args) . ")");
+            $self->_push($rt, "$nm(" . join(", ", @args) . ")");
         } else {
-            $self->_emit("$name(" . join(", ", @args) . ")");
+            $self->_emit("$nm(" . join(", ", @args) . ")");
         }
     }
 
     sub clr_call_virt {
         my ($self, $name, $nargs) = @_;
         my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
-        my ($cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1], $name);
+        my ($nm, $cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1],
+            $name);
         my ($inv) = $self->_popn(1);
         if ($cl eq 'c') {
             $self->_cpscall($rt,
-                "$inv.$name(" . join(", ", "th", @args) . ")");
+                "$inv.$nm(" . join(", ", "th", @args) . ")");
         } elsif ($rt ne 'Void') {
-            $self->_push($rt, "$inv.$name(" . join(", ", @args) . ")");
+            $self->_push($rt, "$inv.$nm(" . join(", ", @args) . ")");
         } else {
-            $self->_emit("$inv.$name(" . join(", ", @args) . ")");
+            $self->_emit("$inv.$nm(" . join(", ", @args) . ")");
         }
     }
 
