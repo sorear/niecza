@@ -1,7 +1,8 @@
-module Threads;
+my module Threads;
 
 # Should be a role, since it can be applied to any class with minimal overhead
-class Monitor is export {
+# XXX STD doesn't want to do the export if the class is our
+my class Monitor is export {
     method enter() {
         Q:CgOp {
             (prog (rawscall System.Threading.Monitor.Enter:m,Void
@@ -18,7 +19,9 @@ class Monitor is export {
     method lock($f) { self.enter; $f(); self.exit }
 }
 
-class Thread is export {
+sub lock($m,$f) is export { $m.lock($f); }
+
+my class Thread is export {
     method new($func) {
         Q:CgOp { (box Thread (rawsccall
             Kernel.StartP6Thread:c,System.Threading.Thread (@ (l $func)))) }
@@ -33,3 +36,5 @@ class Thread is export {
         Q:CgOp { (prog (rawscall System.Threading.Thread.Sleep:m,Void (cast Int32 (unbox Double (@ (l $t))))) (null Variable)) }
     }
 }
+
+sub sleep($time) is export { Thread.sleep($time) }
