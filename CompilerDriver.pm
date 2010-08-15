@@ -79,7 +79,7 @@ EOH
                 if $::SETTING_RESUME;
             $ast = undef; } ],
         [ 'gmcs', sub {
-            delete $::UNITDEPS{MAIN};
+            delete $::UNITDEPS{$::UNITNAME || 'MAIN'};
             system "gmcs", ($args{main} ? () : ("/target:library")),
                 "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITDEPS),
                 "/out:${basename}." . ($args{main} ? 'exe' : 'dll'),
