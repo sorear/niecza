@@ -30,12 +30,13 @@ grammar CgOp is STD {
     token category:cgexp { <sym> }
     proto token cgexp { <...> }
 
-    token cgopname { <-[ ' " ( ) \[ \] \s ]> + }
+    token cgopname { <-[ ' " ( ) { } \[ \] \s ]> + }
 
     token cgexp:op { <[ ( \[ ]>:s {} <cgopname> [ <cgexp> ]* <[ ) \] ]> }
     token cgexp:name { <cgopname> }
     token cgexp:quote { <?before <[ ' " ]>> {} [ :lang(%*LANG<MAIN>) <quote> ] }
     token cgexp:decint { <decint> }
+    token cgexp:p6exp { :lang(%*LANG<MAIN>) '{' ~ '}' <statementlist> }
     token cgexp:bad { <!before <[ ) \] ]> > {}
         [ <?stdstopper> <.panic "Missing cgop"> ]
         <.panic: "Unparsable cgop">

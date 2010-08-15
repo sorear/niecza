@@ -698,7 +698,7 @@ sub nibbler { my ($cl, $M) = @_;
         for my $k (keys %$::CURLEX) {
             $::CURLEX->{$k}{used} = 1 if $k =~ /^[\@\%\&\$]\w/;
         }
-        $M->{_ast} = Op::CgOp->new(node($M), op => $M->{cgexp}{_ast});
+        $M->{_ast} = Op::CgOp->new(node($M), optree => $M->{cgexp}{_ast});
     } else {
         # garden variety nibbler
         my @bits;
@@ -1379,6 +1379,10 @@ sub cgexp__S_name { my ($cl, $M) = @_;
     $M->{_ast} = $M->{cgopname}{_ast};
 }
 
+sub cgexp__S_p6exp { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{statementlist}{_ast};
+}
+
 sub cgexp__S_decint { my ($cl, $M) = @_;
     $M->{_ast} = $M->{decint}{_ast};
 }
@@ -1406,8 +1410,8 @@ my %opshortcut = (
 sub cgexp__S_op { my ($cl, $M) = @_;
     no strict 'refs';
     my $l = $M->{cgopname}{_ast};
-    my ($op, @p) = @{ $opshortcut{$l} // [ $l ] };
-    $M->{_ast} = &{"CgOp::$op"}(@p, map { $_->{_ast} } @{ $M->{cgexp} });
+    my @p = @{ $opshortcut{$l} // [ $l ] };
+    $M->{_ast} = [@p, map { $_->{_ast} } @{ $M->{cgexp} }];
 }
 
 sub apostrophe {}

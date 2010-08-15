@@ -39,9 +39,29 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has op => (is => 'ro', required => 1);
+    has optree => (is => 'ro', required => 1);
 
-    sub code { $_[0]->op }
+    sub zyg {
+        our $rec; local $rec = sub {
+            my ($node) = @_;
+            blessed($node) ? ($node) :
+                ref($node) ? (map { $rec->($_) } @$node) : ();
+        };
+        $rec->($_[0]->optree);
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        our $rec; local $rec = sub {
+            my ($node) = @_;
+            return $node if !ref($node);
+            return $node->code($body) if blessed($node);
+            my ($cmd, @vals) = @$node;
+            no strict 'refs';
+            "CgOp::$cmd"->(map { $rec->($_) } @vals);
+        };
+        $rec->($self->optree);
+    }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
