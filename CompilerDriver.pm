@@ -22,6 +22,7 @@ use Body ();
 use Decl ();
 use Unit ();
 use Op ();
+use Optimizer::Beta ();
 use Storable;
 
 use Niecza::Grammar ();
@@ -57,6 +58,7 @@ sub compile {
         [ 'lift_decls', sub {
             $::SETTING_RESUME = undef;
             $ast->lift_decls; } ],
+        #[ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'extract_scopes', sub { $ast->extract_scopes } ],
         [ 'to_cgop', sub { $ast->to_cgop } ],
         [ 'to_anf', sub { $ast->to_anf } ],

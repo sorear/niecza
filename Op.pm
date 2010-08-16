@@ -983,6 +983,8 @@ use CgOp;
     has signature   => (isa => 'Sig', is => 'ro', required => 1);
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
 
+    sub zyg { @{ $_[0]->positionals } }
+
     sub lift_decls {
         my $self = shift;
         $self->signature->local_decls, $self->SUPER::lift_decls(@_);
@@ -992,6 +994,30 @@ use CgOp;
         my ($self, $body) = @_;
 
         $self->signature->bind_inline($body, @{ $self->positionals });
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::Let;
+    use Moose;
+    extends 'Op';
+
+    has var  => (isa => 'Str', is => 'ro', required => 1);
+    has type => (isa => 'Str', is => 'ro');
+    has to   => (isa => 'Op',  is => 'ro');
+    has in   => (isa => 'Op',  is => 'ro', required => 1);
+
+    sub zyg { ($_[0]->to ? ($_[0]->to) : ()), $_[0]->in }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        CgOp::letn($self->var,
+            ($self->to ? $self->to->cgop($body) : CgOp::null($self->type)),
+            $self->in->cgop($body));
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -45,6 +45,11 @@ sub is_removable_body {
 
     deb $body->csname, " is a candidate for beta-removal";
 
+    if (!$body->signature) {
+        deb "... unsuitable because it's a raw call";
+        return 0;
+    }
+
     # We can't currently handle the possibility of outer references to the
     # frame we're mangling
     for (@{ $body->decls }) {
@@ -82,26 +87,24 @@ sub beta_optimize {
     @{ $body->decls } = grep { !$_->isa('Decl::Sub') ||
         $_->code != $ib } @{ $body->decls };
 
-    my $nop = ...;
+    my @pos = (map { Op::Lexical->new(name => $_->[0]) } @args);
 
-    my $sig = $ib->signature;
-    my @bindy;
-    my @pos = map { Op::Lexical->new(name => $_->[0]) } @args;
-    for my $p ($sig ? @{ $sig->params } : ()) {
-        if ($p->positional && @pos) {
-            my $arg = shift @pos;
-            if ($p->slot) {
-                push @bindy, Op::Bind->new(readonly => $p->readonly,
-                    lhs => Op::Lexical->new($p->slot), rhs => $arg);
-            } else {
-                push @bindy, $arg;
-            }
-        } elsif ($p->optional) { 
-            # XXX nameds?
-            push @bindy, 
+    my $nop = Op::StatementList->new(children => [
+        Op::SigBind->new(signature => $ib->signature,
+            positionals => \@pos),
+        $ib->do]);
+
+    for my $ke (reverse map { $_->used_slots(0) } @{ $ib->decls }) {
+        $nop = Op::Let->new(var => $ke->[0], type => $ke->[1], in => $nop);
     }
 
     for my $a (reverse @args) {
-        $nop = Op::Bind->new(var => $a->[1], to => $a->[0], in => $nop);
+        $nop = Op::Let->new(var => $a->[1], to => $a->[0], in => $nop);
     }
-    
+
+    # XXX
+    %$op = %$nop;
+    bless $op, ref($nop);
+}
+
+1;

@@ -1789,6 +1789,7 @@ sub statement_control__S_until { my ($cl, $M) = @_;
 
 sub statement_control__S_for { my ($cl, $M) = @_;
     $M->{xblock}{_ast}[1]->type('loop');
+    # TODO: should use 'once'
     $M->{_ast} = Op::ForLoop->new(node($M), source => $M->{xblock}{_ast}[0],
         sink => $cl->block_to_closure($M, $M->{xblock}{_ast}[1]));
 }
@@ -1952,7 +1953,7 @@ sub get_outer { my ($cl, $pad) = @_;
 sub block_to_immediate { my ($cl, $M, $type, $blk) = @_;
     $blk->type($type);
     Op::CallSub->new(node($M),
-        invocant => $cl->block_to_closure($M, $blk),
+        invocant => $cl->block_to_closure($M, $blk, once => 1),
         positionals => []);
 }
 
@@ -1960,7 +1961,8 @@ sub block_to_closure { my ($cl, $M, $blk, %args) = @_;
     my $outer_key = $args{outer_key} // $cl->gensym;
 
     Op::SubDef->new(var => $outer_key, body => $blk, node($M),
-        method_too => $args{method_too}, exports => ($args{exports} // []));
+        once => $args{once}, method_too => $args{method_too},
+        exports => ($args{exports} // []));
 }
 
 sub get_placeholder_sig { my ($cl, $M) = @_;
