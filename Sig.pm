@@ -99,11 +99,35 @@ use 5.010;
         $cg;
     }
 
+    sub single_get_inline {
+        my ($self, $body, $posr) = @_;
+
+        if ($self->positional && @$posr) {
+            return shift @$posr;
+        } else {
+            return $self->_default_get($body);
+        }
+    }
+
     sub binder {
         my ($self, $body) = @_;
 
         my $get = $self->slurpy ? $self->slurpy_get :
             $self->single_get($body);
+
+        if (defined $self->slot) {
+            return CgOp::bind($self->readonly, CgOp::scopedlex($self->slot),
+                    $get);
+        } else {
+            return CgOp::sink($get);
+        }
+    }
+
+    sub bind_inline {
+        my ($self, $body, $posr) = @_;
+
+        my $get = $self->slurpy ? $self->slurpy_get_inline($posr) :
+            $self->single_get_inline($body, $posr);
 
         if (defined $self->slot) {
             return CgOp::bind($self->readonly, CgOp::scopedlex($self->slot),
@@ -154,6 +178,17 @@ use 5.010;
             push @p, $_->binder($body);
         }
         CgOp::letn('!ix', CgOp::int(0), CgOp::prog(@p));
+    }
+
+    sub bind_inline {
+        my ($self, $body, @pos) = @_;
+
+        my @p;
+        for (@{ $self->params }) {
+            push @p, $_->bind_inline($body, \@pos);
+        }
+
+        CgOp::prog(@p);
     }
 
     __PACKAGE__->meta->make_immutable;

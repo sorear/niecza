@@ -970,5 +970,32 @@ use CgOp;
     no Moose;
 }
 
+### BEGIN DESUGARING OPS
+# These don't appear in source code, but are used by other ops to preserve
+# useful structure.
+
+# used after β-reductions
+{
+    package Op::SigBind;
+    use Moose;
+    extends 'Op';
+
+    has signature   => (isa => 'Sig', is => 'ro', required => 1);
+    has positionals => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+
+    sub lift_decls {
+        my $self = shift;
+        $self->signature->local_decls, $self->SUPER::lift_decls(@_);
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        $self->signature->bind_inline($body, @{ $self->positionals });
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
 
 1;
