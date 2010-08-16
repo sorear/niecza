@@ -785,6 +785,9 @@ use CgOp;
     has method_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has proto_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
+    # Is candidate for beta-optimization.  Not compatible with method_too,
+    # proto_too, exports, ltm
+    has once   => (isa => 'Bool', is => 'ro', default => 0);
 
     sub lift_decls {
         my ($self) = @_;
