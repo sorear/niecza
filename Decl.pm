@@ -60,7 +60,7 @@ use CgOp;
     sub bodies { $_[0]->code }
 
     sub used_slots {
-        [$_[0]->var, 'Variable', $_[1] ? 1 : 0];
+        [$_[0]->var, 'Variable', $_[1] ? 3 : 0];
     }
 
     sub preinit_code {
@@ -69,7 +69,9 @@ use CgOp;
         $body->needs_protovars ?
             CgOp::prog(
                 CgOp::protosub($self->code),
-                CgOp::proto_var($self->var, CgOp::sub_var($self->code))) :
+                CgOp::proto_var($self->var,
+                    $body->mainline ? CgOp::sub_obj($self->code)
+                                    : CgOp::sub_var($self->code))) :
             CgOp::protosub($self->code);
     }
 
