@@ -310,6 +310,21 @@ namespace Niecza {
             return isa.Contains(m);
         }
 
+        private static bool C3Debug =
+            Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
+
+        private static string MROStr(List<DynMetaObject> chain) {
+            return Kernel.JoinS(" <- ", chain, delegate(DynMetaObject o) {
+                return o.name;
+            });
+        }
+
+        private static void DumpC3Lists(string f, List<DynMetaObject> m,
+                List<List<DynMetaObject>> d) {
+            Console.WriteLine(f + MROStr(m) + " // " +
+                    Kernel.JoinS(" | ", d, MROStr));
+        }
+
         public void BuildC3MRO() {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
             mro = new List<DynMetaObject>();
@@ -322,8 +337,14 @@ namespace Niecza {
                 toMerge.Add(new List<DynMetaObject>(dmo.mro));
             }
 
+            if (C3Debug)
+                DumpC3Lists("C3 start: " + name + ": ", mro, toMerge);
+
             while (true) {
 top:
+                if (C3Debug)
+                    DumpC3Lists("C3 iter: ", mro, toMerge);
+
                 foreach (List<DynMetaObject> h in toMerge) {
                     if (h.Count == 0) {
                         continue; // next CANDIDATE
@@ -351,6 +372,8 @@ top:
 blocked:
                     ;
                 }
+                if (C3Debug)
+                    DumpC3Lists("C3 end: ", mro, toMerge);
                 foreach (List<DynMetaObject> l in toMerge) {
                     if (l.Count != 0) {
                         // should refactor this to use a real p6exception
@@ -846,6 +869,24 @@ blocked:
             Global = NewROScalar(GlobalO);
             ProcessO = new CLRImportObject(new Dictionary<string,Variable>());
             Process = NewROScalar(ProcessO);
+        }
+
+        // This is a library function in .NET 4
+        public delegate string JoinSFormatter<T>(T x);
+        public static string JoinS<T>(string sep, IEnumerable<T> things) {
+            return JoinS(sep, things, delegate(T y) { return y.ToString(); });
+        }
+        public static string JoinS<T>(string sep, IEnumerable<T> things,
+                JoinSFormatter<T> fmt) {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+            bool fst = true;
+            foreach (T x in things) {
+                if (!fst) sb.Append(sep);
+                fst = false;
+                sb.Append(fmt(x));
+            }
+            return sb.ToString();
         }
     }
 

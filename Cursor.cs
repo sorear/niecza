@@ -152,15 +152,8 @@ public sealed class NFA {
         public Node(int curfate) { fate = curfate; }
 
         public override string ToString() {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("(" + fate + ")" + (final ? "+" : ""));
-
-            foreach (Edge e in edges) {
-                sb.Append(", ");
-                sb.Append(e);
-            }
-
-            return sb.ToString();
+            return "(" + fate + ")" + (final ? "+ " : " ") +
+                Kernel.JoinS(", ", edges);
         }
     }
 
@@ -513,19 +506,16 @@ public class LexerState {
     }
 
     public override string ToString() {
-        StringBuilder sb = new StringBuilder();
-        int ct = 0;
+        List<int> li = new List<int>();
 
         for (int i = 0; i < nstates.Length; i++)
             for (int j = 0; j < 32; j++) {
                 if ((nstates[i] & (1 << j)) == 0)
                     continue;
-                if (ct++ != 0)
-                    sb.Append("|");
-                sb.Append(32*i + j);
+                li.Add(32*i + j);
             }
 
-        return sb.ToString();
+        return Kernel.JoinS("|", li);
     }
 }
 
