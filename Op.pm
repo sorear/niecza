@@ -39,9 +39,11 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has optree => (is => 'ro', required => 1);
+    has op => (is => 'ro');
+    has optree => (is => 'ro');
 
     sub zyg {
+        return () unless $_[0]->optree;
         our $rec; local $rec = sub {
             my ($node) = @_;
             blessed($node) ? ($node) :
@@ -52,6 +54,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
+        return $self->op if $self->op;
         our $rec; local $rec = sub {
             my ($node) = @_;
             return $node if !ref($node);

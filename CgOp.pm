@@ -392,6 +392,10 @@ use warnings;
         rawscall('Kernel.NewROScalar', $_[0]);
     }
 
+    sub newblankrwscalar {
+        rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyP'));
+    }
+
     sub newrwscalar {
         rawscall('Kernel.NewRWScalar', $_[0]);
     }

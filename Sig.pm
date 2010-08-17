@@ -17,14 +17,13 @@ use 5.010;
     has name => (is => 'ro', isa => 'Str', required => 1);
     has list => (is => 'ro', isa => 'Bool', default => 0);
     has hash => (is => 'ro', isa => 'Bool', default => 0);
-    has zeroinit => (is => 'ro', isa => 'Bool', default => 0);
     has type => (is => 'ro', isa => 'Str', default => 'Any');
 
     sub local_decls {
         my ($self) = @_;
         my @r;
         push @r, Decl::SimpleVar->new(slot => $self->slot, hash => $self->hash,
-                list => $self->list, zeroinit => $self->zeroinit)
+                list => $self->list)
             if defined $self->slot;
         push @r, $self->default->lift_decls if $self->default;
         @r;

@@ -2156,10 +2156,10 @@ sub comp_unit { my ($cl, $M) = @_;
             name => 'install',
             signature => Sig->new(params => [
                     Sig::Parameter->new(name => '!mainline',
-                        slot => '!mainline', zeroinit => 1)]),
+                        slot => '!mainline')]),
             do => Op::CallSub->new(node($M),
-                invocant => Op::CgOp->new(op => CgOp::newscalar(
-                        CgOp::rawsget($::SETTINGNAME . ".Installer"))),
+                invocant => Op::CgOp->new(optree => [ 'newscalar',
+                        [ 'rawsget', $::SETTINGNAME . ".Installer" ] ]),
                 positionals => [Op::SubDef->new(
                     var => $cl->gensym, body => $body)]));
     }

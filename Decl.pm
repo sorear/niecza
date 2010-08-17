@@ -105,42 +105,33 @@ use CgOp;
     has slot     => (isa => 'Str', is => 'ro', required => 1);
     has list     => (isa => 'Bool', is => 'ro', default => 0);
     has hash     => (isa => 'Bool', is => 'ro', default => 0);
-    has shared   => (isa => 'Bool', is => 'ro', default => 0);
-    has zeroinit => (isa => 'Bool', is => 'ro', default => 0);
-    has noenter  => (isa => 'Bool', is => 'ro', default => 0);
 
     sub dynamic {
         $_[0]->slot =~ /^.?[?*]/;
     }
 
     sub used_slots {
-        [$_[0]->slot, 'Variable', ($_[1] || $_[0]->shared) && !$_[0]->dynamic];
+        [$_[0]->slot, 'Variable', $_[1] && !$_[0]->dynamic];
     }
 
     sub preinit_code {
         my ($self, $body) = @_;
 
-        if ($self->zeroinit) {
-            CgOp::proto_var($self->slot, CgOp::newrwscalar(CgOp::null('IP6')));
-        } elsif ($self->list) {
+        if ($self->list) {
             CgOp::proto_var($self->slot, CgOp::newblanklist);
         } elsif ($self->hash) {
             CgOp::proto_var($self->slot, CgOp::newblankhash);
         } else {
-            CgOp::proto_var($self->slot,
-                CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
+            CgOp::proto_var($self->slot, CgOp::newblankrwscalar);
         }
     }
 
     sub enter_code {
         my ($self, $body) = @_;
 
-        return CgOp::noop if $self->noenter;
-
-        (($body->mainline || $self->shared) && !$self->dynamic) ? CgOp::noop :
+        ($body->mainline && !$self->dynamic) ? CgOp::noop :
             CgOp::scopedlex($self->slot, $self->list ? CgOp::newblanklist :
-                $self->hash ? CgOp::newblankhash :
-                CgOp::newrwscalar(CgOp::fetch(CgOp::scopedlex('Any'))));
+                $self->hash ? CgOp::newblankhash : CgOp::newblankrwscalar);
     }
 
     __PACKAGE__->meta->make_immutable;
