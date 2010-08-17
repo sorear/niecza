@@ -70,6 +70,23 @@ use CgOp ();
         $self->scopetree(\%h);
     }
 
+    # call after decl lifting
+    has needs_protopad => (isa => 'Bool', is => 'ro', lazy_build => 1);
+    sub _build_needs_protopad {
+        my ($self) = @_;
+
+        for my $d (@{ $self->decls }) {
+            return 1 if $d->needs_protopad;
+            for my $b ($d->bodies) {
+                return 1 if $b->needs_protopad;
+            }
+        }
+
+        return 0;
+    }
+
+    sub needs_protovars { $_[0]->needs_protopad || $_[0]->mainline }
+
     sub lift_decls {
         my ($self) = @_;
         my (@self_q, @outer_q);

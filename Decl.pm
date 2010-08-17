@@ -13,6 +13,7 @@ use CgOp;
     sub used_slots   { () }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
+    sub needs_protopad {0}
 
     sub outer_decls  {}
     sub bodies       {}
@@ -36,6 +37,7 @@ use CgOp;
         $self->has_var ? [$self->var, 'Variable', 1] : ();
     }
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
         my $c = CgOp::prog(CgOp::protosub($self->code),
@@ -64,9 +66,11 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::prog(
-            CgOp::protosub($self->code),
-            CgOp::proto_var($self->var, CgOp::sub_var($self->code)));
+        $body->needs_protovars ?
+            CgOp::prog(
+                CgOp::protosub($self->code),
+                CgOp::proto_var($self->var, CgOp::sub_var($self->code))) :
+            CgOp::protosub($self->code);
     }
 
     sub enter_code {
@@ -98,6 +102,8 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
+
+        return CgOp::noop if !$body->needs_protovars;
 
         if ($self->list) {
             CgOp::proto_var($self->slot, CgOp::newblanklist);
@@ -192,7 +198,7 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        $self->slot ?
+        ($self->slot && $body->needs_protovars) ?
             CgOp::proto_var($self->slot, CgOp::scopedlex($self->backing)) :
             CgOp::noop;
     }
@@ -215,6 +221,7 @@ use CgOp;
 
     has unitname => (isa => 'Str', is => 'ro', required => 1);
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
 
@@ -259,6 +266,7 @@ use CgOp;
     sub make_how { CgOp::newscalar(CgOp::null('IP6')); }
     sub finish_obj { CgOp::noop; }
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
 
@@ -352,6 +360,7 @@ use CgOp;
     has name => (is => 'ro', isa => 'Str', required => 1);
     has var  => (is => 'ro', isa => 'Str', required => 1);
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
         if ($body->type !~ /class|grammar|role/) {
@@ -375,6 +384,7 @@ use CgOp;
     has name => (is => 'ro', isa => 'Str', required => 1);
     has var  => (is => 'ro', isa => 'Str', required => 1);
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
         CgOp::sink(
@@ -393,6 +403,7 @@ use CgOp;
 
     has name => (is => 'ro', isa => 'Str', required => 1);
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
         if ($body->type ne 'class' && $body->type ne 'grammar' &&
@@ -417,6 +428,7 @@ use CgOp;
 
     has name => (is => 'ro', isa => 'Str', required => 1);
 
+    sub needs_protopad { 1 }
     sub preinit_code {
         my ($self, $body) = @_;
         if ($body->type ne 'class' && $body->type ne 'grammar' &&
