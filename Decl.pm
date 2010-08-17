@@ -38,7 +38,8 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        my $c = CgOp::subcall(CgOp::protosub($self->code));
+        my $c = CgOp::prog(CgOp::protosub($self->code),
+            CgOp::subcall(CgOp::sub_obj($self->code)));
         $self->has_var ? CgOp::proto_var($self->var, $c) : CgOp::sink($c);
     }
 
@@ -63,13 +64,15 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::proto_var($self->var, CgOp::newscalar(
-                CgOp::protosub($self->code)));
+        CgOp::prog(
+            CgOp::protosub($self->code),
+            CgOp::proto_var($self->var, CgOp::sub_var($self->code)));
     }
 
     sub enter_code {
         my ($self, $body) = @_;
-        $body->mainline ? CgOp::noop : CgOp::clone_lex($self->var);
+        $body->mainline ? CgOp::noop :
+            CgOp::scopedlex($self->var, CgOp::sub_var($self->code));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -275,16 +278,15 @@ use CgOp;
                 CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
                 CgOp::proto_var($self->var . "::", CgOp::letvar("pkg")),
 
-                CgOp::proto_var($self->bodyvar,
-                    CgOp::newscalar(
-                        CgOp::protosub($self->body))),
+                CgOp::protosub($self->body),
+                CgOp::proto_var($self->bodyvar, CgOp::sub_var($self->body)),
                 $self->finish_obj($body)));
     }
 
     sub enter_code {
         my ($self, $body) = @_;
         ($self->stub || $body->mainline) ? CgOp::noop :
-            CgOp::clone_lex($self->bodyvar);
+            CgOp::scopedlex($self->bodyvar, CgOp::sub_var($self->body));
     }
 
     __PACKAGE__->meta->make_immutable;

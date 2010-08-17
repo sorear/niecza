@@ -520,31 +520,6 @@ blocked:
             return caller;
         }
 
-        private static SubInfo SubCloneSI = new SubInfo(SubCloneC);
-        private static Frame SubCloneC(Frame th) {
-            DynObject a, b;
-            Frame c;
-            switch (th.ip) {
-                case 0:
-                    th.ip = 1;
-                    return th.pos[0].container.Fetch(th);
-                case 1:
-                    th.lex["s0"] = th.resultSlot;
-                    th.ip = 2;
-                    return th.pos[1].container.Fetch(th);
-                case 2:
-                    a = (DynObject) th.lex["s0"];
-                    c = (Frame) th.resultSlot;
-                    b = new DynObject(a.klass);
-                    b.slots = new Dictionary<string,object>(a.slots);
-                    b.slots["outer"] = c;
-                    th.caller.resultSlot = NewROScalar(b);
-                    return th.caller;
-                default:
-                    return Kernel.Die(th, "invalid IP");
-            }
-        }
-
         public static Stack<Frame> TakeReturnStack = new Stack<Frame>();
 
         public static Frame Take(Frame th, Variable payload) {
@@ -863,7 +838,6 @@ blocked:
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
-            SubMO.local["clone"] = MakeSub(SubCloneSI, null);
             SubMO.local["INVOKE"] = MakeSub(SubInvokeSubSI, null);
 
             ScalarMO = new DynMetaObject("Scalar");

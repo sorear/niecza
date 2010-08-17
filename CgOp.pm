@@ -506,10 +506,11 @@ use warnings;
         scopedlex($_[0], protolget($_[0]));
     }
 
-    sub clone_lex {
-        scopedlex($_[0], methodcall(protolget($_[0]), "clone",
-          newscalar(callframe)));
+    sub sub_obj {
+        CgOp::Primitive->new(op => [ 'sub_obj', $_[0]->csname ]);
     }
+
+    sub sub_var { newscalar(sub_obj($_[0])) }
 
     sub proto_var {
         CgOp::Primitive->new(op => [ 'proto_var', $_[0] ], zyg => [ $_[1] ]);

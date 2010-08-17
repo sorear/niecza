@@ -32,9 +32,10 @@ use 5.010;
                             '.Environment')),
                     ($self->is_setting ?
                         CgOp::rawsset($self->csname . '.Installer',
-                            CgOp::protosub($self->mainline)) :
+                            CgOp::prog(CgOp::protosub($self->mainline),
+                                CgOp::sub_obj($self->mainline))) :
                         CgOp::subcall(CgOp::rawsget($self->csname($self->setting_name) . '.Installer'),
-                            CgOp::newscalar(CgOp::protosub($self->mainline)))),
+                            CgOp::prog(CgOp::protosub($self->mainline), CgOp::sub_var($self->mainline)))),
                     CgOp::return())));
     }
 

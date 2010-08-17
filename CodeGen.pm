@@ -621,10 +621,15 @@ use 5.010;
 
         $self->pop_let('protopad');
         pop @{ $self->bodies };
-        $self->peek_let('protopad');
-        my ($pp, $op) = $self->_popn(2);
+        my ($pp) = $self->_popn(1);
         $self->_emit($body->csname . "_info.proto = $pp");
-        $self->_push('IP6', "Kernel.MakeSub(" . $body->csname . "_info, $op)");
+    }
+
+    sub sub_obj {
+        my ($self, $bodyname) = @_;
+        $self->callframe;
+        my ($op) = $self->_popn(1);
+        $self->_push('IP6', "Kernel.MakeSub(${bodyname}_info, $op)");
     }
 
     sub proto_var {
