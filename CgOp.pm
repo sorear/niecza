@@ -502,10 +502,6 @@ use warnings;
         }
     }
 
-    sub share_lex {
-        scopedlex($_[0], protolget($_[0]));
-    }
-
     sub sub_obj {
         CgOp::Primitive->new(op => [ 'sub_obj', $_[0]->csname ]);
     }
@@ -514,10 +510,6 @@ use warnings;
 
     sub proto_var {
         CgOp::Primitive->new(op => [ 'proto_var', $_[0] ], zyg => [ $_[1] ]);
-    }
-
-    sub protolget {
-        CgOp::Primitive->new(op => [ 'protolget', $_[0] ]);
     }
 
     sub return {

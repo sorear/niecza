@@ -89,8 +89,6 @@ namespace Niecza {
         public Dictionary<string, object> hints;
         // maybe should be a hint
         public LAD ltm;
-        // needs to go, currently used for some share stuff
-        public Frame proto;
 
         public void PutHint(string name, object val) {
             if (hints == null)

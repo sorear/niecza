@@ -278,12 +278,6 @@ use 5.010;
         }
     }
 
-    sub pop_let {
-        my ($self, $which) = @_;
-        $self->peek_let($which);
-        $self->drop_let($which);
-    }
-
     sub drop_let {
         my ($self, $which) = @_;
         die "Let consistency error" if $which ne $self->letstack->[-1];
@@ -421,12 +415,6 @@ use 5.010;
             $num = ($self->_popn(1))[0];
         }
         $self->_push('Variable', "th.pos[$num]");
-    }
-
-    sub protolget {
-        my ($self, $name) = @_;
-        $self->_push('object', "th.info.proto.lex[" . qm($name) . "]");
-        $self->cast('Variable');
     }
 
     sub call_method {
@@ -627,10 +615,8 @@ use 5.010;
             $self->_emit($body->csname . "_info.mo = ((DynObject)$cl).klass");
         }
 
-        $self->pop_let('protopad');
+        $self->drop_let('protopad');
         pop @{ $self->bodies };
-        my ($pp) = $self->_popn(1);
-        $self->_emit($body->csname . "_info.proto = $pp");
     }
 
     sub sub_obj {
