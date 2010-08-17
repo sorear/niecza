@@ -620,6 +620,13 @@ use 5.010;
     sub proto_var {
         my ($self, $name) = @_;
         my ($type, $kind, $data) = @{ $self->bodies->[-1]->lexical->{$name} };
+        if ($kind == 3) {
+            $self->clr_sfield_set($data);
+            $self->clr_sfield_get($data . ":f,IP6");
+            $self->newscalar;
+            $self->clr_sfield_set($data . "_var");
+            return;
+        }
         if ($kind == 1) {
             $self->clr_sfield_set($data);
             return;
@@ -663,9 +670,14 @@ use 5.010;
             for my $ve (sort keys %$l) {
                 next unless ref $l->{$ve} eq 'ARRAY';
                 my ($ty, $k, $d) = @{ $l->{$ve} };
-                next unless $k == 1;
-                $d =~ s/.*\.//;
-                print ::NIECZA_OUT " " x 4, "public static $ty $d;\n";
+                if ($k == 1) {
+                    $d =~ s/.*\.//;
+                    print ::NIECZA_OUT " " x 4, "public static $ty $d;\n";
+                } elsif ($k == 3) {
+                    $d =~ s/.*\.//;
+                    print ::NIECZA_OUT " " x 4, "public static IP6 $d;\n";
+                    print ::NIECZA_OUT " " x 4, "public static Variable ${d}_var;\n";
+                }
             }
         }
         my $name = $self->csname;

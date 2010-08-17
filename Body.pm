@@ -50,7 +50,8 @@ use CgOp ();
         my $nfields_global;
         for my $le (map { $_->used_slots($h{'?is_mainline'}) } @{ $self->decls }) {
             # 0: cloned  1: static field  2: hint
-            if ($le->[2] == 1) {
+            # 3: readonly static field
+            if ($le->[2] == 1 || $le->[2] == 3) {
                 my $sanname = $le->[0];
                 $sanname =~ s/\W//g;
                 $le->[3] = sprintf "%s.F%d_%d_%s", Unit->csname($::UNITNAME),

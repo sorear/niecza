@@ -42,6 +42,13 @@ sub run_cgop {
             push @$btree, $arg;
         } elsif ($opc eq 'close_sub') {
             pop @$btree;
+        } elsif ($opc eq 'fetch' &&
+                $op->zyg->[0]->isa('CgOp::Primitive') &&
+                $op->zyg->[0]->op->[0] eq 'clr_sfield_get' &&
+                $op->zyg->[0]->op->[1] =~ /(.*)_var:f,Variable/) {
+            my $nn = CgOp::rawsget($1 . ":f,IP6");
+            %$op = %$nn;
+            bless $op, ref($nn);
         } elsif ($opc eq 'scopelex') {
             my $nn = resolve_lex($arg, $btree->[-1], $op->zyg->[0]);
             #XXX
@@ -64,11 +71,17 @@ sub resolve_lex {
         die "Internal error: failed to resolve lexical $name in " . $body->name;
     }
 
-    if (($kind == 1 || $kind == 2) && $data =~ /(.*)\./) {
+    if (($kind == 1 || $kind == 2 || $kind == 3) && $data =~ /(.*)\./) {
         $::UNITDEPS{$1} = 1;
     }
 
-    if ($kind == 2) {
+    if ($kind == 3) {
+        if ($set_to) {
+            die "panic: Assigning to a kind3";
+        } else {
+            return CgOp::rawsget($data . "_var:f,Variable");
+        }
+    } elsif ($kind == 2) {
         if ($set_to) {
             die "panic: Assigning to a hint";
         } else {
