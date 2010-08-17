@@ -83,6 +83,7 @@ namespace Niecza {
     public class SubInfo {
         public int[] lines;
         public DynBlockDelegate code;
+        public DynMetaObject mo;
         // for inheriting hints
         public SubInfo outer;
         public Dictionary<string, object> hints;
@@ -606,14 +607,7 @@ blocked:
         public static bool TraceCont;
 
         public static IP6 MakeSub(SubInfo info, Frame outer) {
-            DynObject n = new DynObject(SubMO);
-            n.slots["outer"] = outer;
-            n.slots["info"] = info;
-            return n;
-        }
-
-        public static IP6 MakeSub(SubInfo info, Frame outer, IP6 proto) {
-            DynObject n = new DynObject(((DynObject)proto).klass);
+            DynObject n = new DynObject(info.mo ?? SubMO);
             n.slots["outer"] = outer;
             n.slots["info"] = info;
             return n;
