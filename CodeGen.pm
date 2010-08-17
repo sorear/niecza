@@ -623,7 +623,7 @@ use 5.010;
         if ($kind == 3) {
             $self->clr_sfield_set($data);
             $self->clr_sfield_get($data . ":f,IP6");
-            $self->newscalar;
+            $self->clr_call_direct('Kernel.NewROScalar', 1);
             $self->clr_sfield_set($data . "_var");
             return;
         }

@@ -259,7 +259,7 @@ use CgOp;
 
     sub used_slots {
         my ($self) = @_;
-        [$self->var, 'Variable', 1], [$self->stashvar, 'Variable', 1],
+        [$self->var, 'Variable', 3], [$self->stashvar, 'Variable', 3],
             (!$self->stub ? [$self->bodyvar, 'Variable', $_[1] ? 1 : 0] : ());
     }
 
@@ -272,10 +272,10 @@ use CgOp;
 
         if ($self->stub) {
             return CgOp::prog(
-                CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
-                CgOp::proto_var($self->stashvar,
+                CgOp::proto_var($self->var, CgOp::null('IP6')),
+                CgOp::proto_var($self->stashvar, CgOp::fetch(
                     ($self->ourpkg ? $self->stash($body, '::') :
-                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>')))));
+                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))))));
         }
 
         CgOp::letn("pkg",
@@ -283,8 +283,8 @@ use CgOp;
                 CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
-                CgOp::proto_var($self->var, CgOp::newscalar(CgOp::null('IP6'))),
-                CgOp::proto_var($self->var . "::", CgOp::letvar("pkg")),
+                CgOp::proto_var($self->var, CgOp::null('IP6')),
+                CgOp::proto_var($self->stashvar, CgOp::fetch(CgOp::letvar("pkg"))),
 
                 CgOp::protosub($self->body),
                 CgOp::proto_var($self->bodyvar, CgOp::sub_var($self->body)),
@@ -488,7 +488,7 @@ use CgOp;
             map {
                 my ($head, @path) = @{ $self->symbols->{$_} };
                 CodeGen->know_sfield($scope->{$head}[2], $scope->{$head}[0]);
-                my $first = CgOp::rawsget($scope->{$head}[2]);
+                my $first = CgOp::newscalar(CgOp::rawsget($scope->{$head}[2]));
                 for (@path) {
                     $first = CgOp::rawscall('Kernel.PackageLookup',
                         CgOp::fetch($first), CgOp::clr_string($_));

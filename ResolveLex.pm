@@ -42,7 +42,7 @@ sub run_cgop {
             push @$btree, $arg;
         } elsif ($opc eq 'close_sub') {
             pop @$btree;
-        } elsif ($opc eq 'fetch' &&
+        } elsif ($opc eq 'clr_call_direct' && $arg eq 'Kernel.Fetch' &&
                 $op->zyg->[0]->isa('CgOp::Primitive') &&
                 $op->zyg->[0]->op->[0] eq 'clr_sfield_get' &&
                 $op->zyg->[0]->op->[1] =~ /(.*)_var:f,Variable/) {
@@ -77,7 +77,10 @@ sub resolve_lex {
 
     if ($kind == 3) {
         if ($set_to) {
-            die "panic: Assigning to a kind3";
+            return CgOp::let($set_to, sub { my $x = $_[0];
+                CgOp::prog( CgOp::rawsset($data, CgOp::fetch($x)),
+                    CgOp::rawsset($data . "_var", CgOp::newscalar(
+                            CgOp::rawsget($data . ":f,IP6")))) });
         } else {
             return CgOp::rawsget($data . "_var:f,Variable");
         }
