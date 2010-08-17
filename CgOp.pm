@@ -578,14 +578,14 @@ use warnings;
 
     # must only be called during to_cgop phase!
     sub protosub {
-        my ($body, $ltm) = @_;
+        my ($body) = @_;
         prog(
             CgOp::Primitive->new(op => [ 'open_protopad', $body ]),
             $body->to_cgop,
-            (!$ltm ? () : (
+            (!$body->ltm ? () : (
                 CgOp::Primitive->new(op => [ 'set_ltm', $body->csname ],
-                    zyg => [ $ltm ]))),
-            CgOp::Primitive->new(op => [ 'close_sub', $body ]));
+                    zyg => [ $body->ltm ]))),
+            CgOp::Primitive->new(op => [ 'close_sub', $body, ($body->class ne 'Sub') ], zyg => ($body->class eq 'Sub' ? [] : [ fetch(scopedlex($body->class)) ])))
     }
 
     sub ann {

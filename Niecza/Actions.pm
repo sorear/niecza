@@ -360,12 +360,13 @@ sub regex_def { my ($cl, $M) = @_;
 
     my ($cn, $op) = $ast->term_rx;
     $M->{_ast} = Op::SubDef->new(
-        var  => $var, class => 'Regex',
+        var  => $var,
         method_too => ($scope eq 'has' ? $name : undef),
         proto_too => ($scope eq 'has' ? $unsymtext : undef),
-        ltm  => $ast->lad,
         body => Body->new(
-            type => 'regex',
+            ltm   => $ast->lad,
+            class => 'Regex',
+            type  => 'regex',
             signature => $sig->for_regex($cn),
             do => $op));
 }

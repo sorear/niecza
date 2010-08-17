@@ -607,7 +607,7 @@ use 5.010;
     }
 
     sub close_sub {
-        my ($self, $body) = @_;
+        my ($self, $body, $withclass) = @_;
 
         $self->_emit($body->csname . "_info.PutHint(\"?file\", " . qm($body->file) . ")") if $body->type eq 'mainline';
         my $ob = $self->bodies->[-2];
@@ -619,8 +619,10 @@ use 5.010;
         pop @{ $self->bodies };
         $self->peek_let('protopad');
         my ($pp, $op) = $self->_popn(2);
+        my ($cl) = $self->_popn(1) if $withclass;
         $self->_emit($body->csname . "_info.proto = $pp");
-        $self->_push('IP6', "Kernel.MakeSub(" . $body->csname . "_info, $op)");
+        $self->_push('IP6', "Kernel.MakeSub(" . $body->csname . "_info, $op" .
+            ($withclass ? ", $cl)" : ")"));
     }
 
     sub proto_var {

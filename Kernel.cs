@@ -612,6 +612,13 @@ blocked:
             return n;
         }
 
+        public static IP6 MakeSub(SubInfo info, Frame outer, IP6 proto) {
+            DynObject n = new DynObject(((DynObject)proto).klass);
+            n.slots["outer"] = outer;
+            n.slots["info"] = info;
+            return n;
+        }
+
         public static Variable BoxAny(object v, IP6 proto) {
             DynObject n = new DynObject(((DynObject)proto).klass);
             n.slots["value"] = v;

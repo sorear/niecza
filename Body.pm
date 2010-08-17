@@ -29,6 +29,10 @@ use CgOp ();
     has file => (isa => 'Str', is => 'ro');
     has text => (isa => 'Str', is => 'ro');
 
+    # metadata for runtime inspection
+    has class => (isa => 'Str', is => 'rw', default => 'Sub');
+    has ltm   => (is => 'rw');
+
     sub is_mainline { $_[0]->scopetree->{'?is_mainline'} }
 
     sub extract_scopes {

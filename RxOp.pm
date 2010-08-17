@@ -17,9 +17,10 @@ use CgOp;
 
     sub _close {
         my ($self, $type, $parms, $op) = @_;
-        Op::SubDef->new(var => Niecza::Actions->gensym, class => ucfirst($type),
+        Op::SubDef->new(var => Niecza::Actions->gensym,
             once => 1, body => Body->new(
                 type        => $type,
+                class       => ucfirst($type),
                 signature   => Sig->simple(@$parms),
                 do          => $op));
     }
@@ -123,7 +124,7 @@ use CgOp;
                 invocant => Op::Lexical->new(name => $lpn),
                 positionals => [Op::Lexical->new(name => $zzcn)]));
         $cn, Op::CallSub->new(
-            invocant => Op::SubDef->new(var => $lpn, class => 'Sub',
+            invocant => Op::SubDef->new(var => $lpn,
                 once => 1, body =>
                 Body->new(type => 'sub', signature => Sig->simple($zcn), do =>
                     Op::StatementList->new(children => [ $zcont,
@@ -145,7 +146,7 @@ use CgOp;
                     $cont
                 ]));
         $cn, Op::CallSub->new(
-            invocant => Op::SubDef->new(var => $lpn, class => 'Sub', once => 1,
+            invocant => Op::SubDef->new(var => $lpn, once => 1,
                 body => Body->new(type => 'sub', signature =>
                     Sig->simple($zcn), do => $zcont)),
             positionals => [Op::Lexical->new(name => $cn)]);
