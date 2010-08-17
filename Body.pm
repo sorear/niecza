@@ -49,11 +49,15 @@ use CgOp ();
 
         my $nfields_global;
         for my $le (map { $_->used_slots($h{'?is_mainline'}) } @{ $self->decls }) {
-            if ($le->[2]) {
+            # 0: cloned  1: static field  2: hint
+            if ($le->[2] == 1) {
                 my $sanname = $le->[0];
                 $sanname =~ s/\W//g;
-                $le->[2] = sprintf "%s.F%d_%d_%s", Unit->csname($::UNITNAME),
+                $le->[3] = sprintf "%s.F%d_%d_%s", Unit->csname($::UNITNAME),
                     $self->uid, $nfields_global++, $sanname;
+            } elsif ($le->[2] == 2) {
+                $le->[3] = sprintf "%s.%s_info", Unit->csname($::UNITNAME),
+                    $self->csname;
             } else {
                 # TODO generate numbered lookups for clonedvars
             }

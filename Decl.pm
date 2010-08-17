@@ -58,7 +58,7 @@ use CgOp;
     sub bodies { $_[0]->code }
 
     sub used_slots {
-        [$_[0]->var, 'Variable', $_[1]];
+        [$_[0]->var, 'Variable', $_[1] ? 1 : 0];
     }
 
     sub preinit_code {
@@ -93,7 +93,7 @@ use CgOp;
     }
 
     sub used_slots {
-        [$_[0]->slot, 'Variable', $_[1] && !$_[0]->dynamic];
+        [$_[0]->slot, 'Variable', ($_[1] && !$_[0]->dynamic) ? 1 : 0];
     }
 
     sub preinit_code {
@@ -253,7 +253,7 @@ use CgOp;
     sub used_slots {
         my ($self) = @_;
         [$self->var, 'Variable', 1], [$self->stashvar, 'Variable', 1],
-            (!$self->stub ? [$self->bodyvar, 'Variable', $_[1]] : ());
+            (!$self->stub ? [$self->bodyvar, 'Variable', $_[1] ? 1 : 0] : ());
     }
 
     sub make_how { CgOp::newscalar(CgOp::null('IP6')); }
@@ -442,15 +442,11 @@ use CgOp;
     has name  => (is => 'ro', isa => 'Str', required => 1);
     has value => (is => 'ro', isa => 'CgOp', required => 1);
 
-    sub used_slots { [ $_[0]->name, 'Variable', 0 ] } #XXX
+    # 2?  yeah we're going into magic number land.  that means use a hint.
+    sub used_slots { [ $_[0]->name, 'Variable', 2 ] }
     sub preinit_code {
         my ($self, $body) = @_;
         CgOp::proto_var($self->name, $self->value);
-    }
-
-    sub enter_code {
-        my ($self, $body) = @_;
-        CgOp::share_lex($self->name);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -479,8 +475,8 @@ use CgOp;
             CgOp::rawscall($self->unit . '.Initialize'),
             map {
                 my ($head, @path) = @{ $self->symbols->{$_} };
-                CodeGen->know_sfield($scope->{$head}[1], $scope->{$head}[0]);
-                my $first = CgOp::rawsget($scope->{$head}[1]);
+                CodeGen->know_sfield($scope->{$head}[2], $scope->{$head}[0]);
+                my $first = CgOp::rawsget($scope->{$head}[2]);
                 for (@path) {
                     $first = CgOp::rawscall('Kernel.PackageLookup',
                         CgOp::fetch($first), CgOp::clr_string($_));

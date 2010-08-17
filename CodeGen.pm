@@ -363,9 +363,14 @@ use 5.010;
     }
 
     sub lexget {
-        my ($self, $order, $type, $sname, $name) = @_;
-        if ($sname) {
-            $self->_push($type, $sname);
+        my ($self, $order, $type, $kind, $data, $name) = @_;
+        if ($kind == 1) {
+            $self->_push($type, $data);
+            return;
+        }
+        if ($kind == 2) {
+            $self->_push("object", "$data.hints[" . qm($name) . "]");
+            $self->cast($type);
             return;
         }
         my $frame = 'th.';
@@ -379,10 +384,13 @@ use 5.010;
     }
 
     sub lexput {
-        my ($self, $order, $type, $sname, $name) = @_;
-        if ($sname) {
-            $self->clr_sfield_set($sname);
+        my ($self, $order, $type, $kind, $data, $name) = @_;
+        if ($kind == 1) {
+            $self->clr_sfield_set($data);
             return;
+        }
+        if ($kind == 2) {
+            die "panic: assigning to a hint";
         }
         my $frame = 'th.';
         if ($self->has_let('protopad')) {
@@ -634,8 +642,14 @@ use 5.010;
 
     sub proto_var {
         my ($self, $name) = @_;
-        if (my $var = $self->bodies->[-1]->lexical->{$name}[1]) {
-            $self->clr_sfield_set($var);
+        my ($type, $kind, $data) = @{ $self->bodies->[-1]->lexical->{$name} };
+        if ($kind == 1) {
+            $self->clr_sfield_set($data);
+            return;
+        }
+        if ($kind == 2) {
+            my ($pv) = $self->_popn(1);
+            $self->_emit("$data.PutHint(" . qm($name) . ", $pv)");
             return;
         }
         $self->peek_let('protopad');
@@ -647,8 +661,7 @@ use 5.010;
         my ($self, $name, $set) = @_;
         my $body = $self->body // $self->bodies->[-1];
         my $order = 0;
-        my $type;
-        my $sname;
+        my ($type, $kind, $data);
         if ($self->has_let($name)) {
             my $i = @{ $self->letstack } - 1;
             while ($i >= 0 && $self->letstack->[$i] ne $name) { $i-- }
@@ -663,19 +676,19 @@ use 5.010;
             }
             return;
         } else {
-            ($order, $type, $sname) = $body->lex_info($name);
+            ($order, $type, $kind, $data) = $body->lex_info($name);
             if ($order < 0) {
                 #print STDERR YAML::XS::Dump ($body);
                 die "Internal error: failed to resolve lexical $name in " . $body->name;
             }
         }
-        if ($sname && $sname =~ /(.*)\./) {
+        if (($kind == 1 || $kind == 2) && $data =~ /(.*)\./) {
             $::UNITDEPS{$1} = 1;
         }
         if ($set) {
-            $self->lexput($order, $type, $sname, $name);
+            $self->lexput($order, $type, $kind, $data, $name);
         } else {
-            $self->lexget($order, $type, $sname, $name);
+            $self->lexget($order, $type, $kind, $data, $name);
         }
     }
 
@@ -704,10 +717,10 @@ use 5.010;
             my $l = $self->body->lexical;
             for my $ve (sort keys %$l) {
                 next unless ref $l->{$ve} eq 'ARRAY';
-                my ($ty, $n) = @{ $l->{$ve} };
-                next unless $n;
-                $n =~ s/.*\.//;
-                print ::NIECZA_OUT " " x 4, "public static $ty $n;\n";
+                my ($ty, $k, $d) = @{ $l->{$ve} };
+                next unless $k == 1;
+                $d =~ s/.*\.//;
+                print ::NIECZA_OUT " " x 4, "public static $ty $d;\n";
             }
         }
         my $name = $self->csname;
