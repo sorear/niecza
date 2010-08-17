@@ -615,7 +615,7 @@ use 5.010;
             $self->_emit($body->csname . "_info.mo = ((DynObject)$cl).klass");
         }
 
-        $self->drop_let('protopad');
+        $self->drop_let('protopad') if $body->needs_protopad;
         pop @{ $self->bodies };
     }
 
@@ -685,13 +685,16 @@ use 5.010;
         $self->_emit("${bodyn}_info.ltm = $ltm");
     }
 
+    # somewhat misnamed; it generally controls the binding context in BOOT
     sub open_protopad {
         my ($self, $body) = @_;
-        $self->push_null('Frame');
-        $self->peek_let('protopad');
-        $self->_push('SubInfo', $body->csname . "_info");
-        $self->clr_new('Frame', 3);
-        $self->push_let('protopad');
+        if ($body->needs_protopad) {
+            $self->push_null('Frame');
+            $self->peek_let('protopad');
+            $self->_push('SubInfo', $body->csname . "_info");
+            $self->clr_new('Frame', 3);
+            $self->push_let('protopad');
+        }
         push @{ $self->bodies }, $body;
     }
 
