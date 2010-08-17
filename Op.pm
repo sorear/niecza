@@ -985,6 +985,8 @@ use CgOp;
     extends 'Op';
 
     has signature   => (isa => 'Sig', is => 'ro', required => 1);
+    # positionals *really* should be a bunch of gensym Lexical's, or else
+    # you risk shadowing hell.  this needs to be handled at a different level
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
 
     sub zyg { @{ $_[0]->positionals } }
@@ -998,7 +1000,8 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::prog(
-            $self->signature->bind_inline($body, @{ $self->positionals }),
+            $self->signature->bind_inline($body,
+                map { $_->cgop($body) } @{ $self->positionals }),
             CgOp::null('Variable'));
     }
 

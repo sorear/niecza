@@ -87,7 +87,7 @@ sub beta_optimize {
     @{ $body->decls } = grep { !$_->isa('Decl::Sub') ||
         $_->code != $ib } @{ $body->decls };
 
-    my @pos = (map { Op::Lexical->new(name => $_->[0]) } @args);
+    my @pos = (map { Op::Lexical->new(name => $_->[1]) } @args);
 
     my $nop = Op::StatementList->new(children => [
         Op::SigBind->new(signature => $ib->signature,
