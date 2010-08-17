@@ -37,7 +37,7 @@ sub run_optree {
 }
 
 sub deb {
-    say @_;
+    #say @_;
 }
 
 sub is_removable_body {

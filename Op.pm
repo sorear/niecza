@@ -997,7 +997,9 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
 
-        $self->signature->bind_inline($body, @{ $self->positionals });
+        CgOp::prog(
+            $self->signature->bind_inline($body, @{ $self->positionals }),
+            CgOp::null('Variable'));
     }
 
     __PACKAGE__->meta->make_immutable;
