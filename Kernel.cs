@@ -78,15 +78,58 @@ namespace Niecza {
         }
     }
 
+    // This stores all the invariant stuff about a Sub, i.e. everything
+    // except the outer pointer.  Now distinct from protopads
+    public class SubInfo {
+        public int[] lines;
+        public DynBlockDelegate code;
+        // for inheriting hints
+        public SubInfo outer;
+        public Dictionary<string, object> hints;
+        // maybe should be a hint
+        public LAD ltm;
+        // needs to go, currently used for some share stuff
+        public Frame proto;
+
+        public void PutHint(string name, object val) {
+            if (hints == null)
+                hints = new Dictionary<string,object>();
+            hints[name] = val;
+        }
+
+        public bool GetLocalHint<T>(string name, out T val) where T: class {
+            object o;
+            if (hints != null && hints.TryGetValue(name, out o)) {
+                val = o as T;
+                return true;
+            } else {
+                val = null;
+                return false;
+            }
+        }
+
+        public SubInfo(int[] lines, DynBlockDelegate code, SubInfo outer,
+                Dictionary<string,object> hints, LAD ltm) {
+            this.lines = lines;
+            this.code = code;
+            this.outer = outer;
+            this.hints = hints;
+            this.ltm = ltm;
+        }
+
+        public SubInfo(DynBlockDelegate code) :
+            this(null, code, null, null, null) { }
+    }
+
     // We need hashy frames available to properly handle BEGIN; for the time
     // being, all frames will be hashy for simplicity
     public class Frame: IP6 {
         public readonly Frame caller;
         public readonly Frame outer;
-        public Frame proto;
+        public readonly SubInfo info;
         public object resultSlot = null;
         public int ip = 0;
-        public readonly DynBlockDelegate code;
+        public readonly DynBlockDelegate code; // premature optimization?
         public readonly Dictionary<string, object> lex
             = new Dictionary<string, object>();
         public object[] lexn;
@@ -94,13 +137,12 @@ namespace Niecza {
         public Variable[] pos;
         public Dictionary<string, Variable> named;
 
-        public Frame(Frame outer_) : this(null, outer_, null) {}
-
         public Frame(Frame caller_, Frame outer_,
-                DynBlockDelegate code_) {
+                SubInfo info_) {
             caller = caller_;
             outer = outer_;
-            code = code_;
+            code = info_.code;
+            info = info_;
         }
 
         public Frame Continue() {
@@ -153,23 +195,21 @@ namespace Niecza {
         }
 
         public int ExecutingLine() {
-            object l;
-            if (((proto != null) ? proto.lex : lex).
-                    TryGetValue("?lines", out l)) {
-                int[] rl = (int[])l;
-                return ip >= rl.Length ? 0 : rl[ip];
+            if (info != null && info.lines != null) {
+                return ip >= info.lines.Length ? 0 : info.lines[ip];
             } else {
                 return 0;
             }
         }
 
         public string ExecutingFile() {
-            object l;
-            Frame p = (proto != null) ? proto : this;
-            while (p != null) {
-                if (p.lex.TryGetValue("?file", out l))
-                    return ((l as string) ?? "");
-                p = p.outer;
+            string l;
+            SubInfo i = info;
+            while (i != null) {
+                // possibly, using $?FILE and Fetch would be better
+                if (i.GetLocalHint("?file", out l))
+                    return l;
+                i = i.outer;
             }
             return "";
         }
@@ -479,6 +519,7 @@ blocked:
             return caller;
         }
 
+        private static SubInfo SubCloneSI = new SubInfo(SubCloneC);
         private static Frame SubCloneC(Frame th) {
             DynObject a, b;
             Frame c;
@@ -522,25 +563,23 @@ blocked:
             DynObject dyo = (DynObject) sub;
             Frame n = new Frame(th,
                                 (Frame) dyo.slots["outer"],
-                                (DynBlockDelegate) dyo.slots["code"]);
-            n.proto = (Frame) dyo.slots["proto"];
+                                (SubInfo) dyo.slots["info"]);
             th.resultSlot = n;
             return th;
         }
 
         private static Frame SubInvoke(DynObject th, Frame caller,
                 Variable[] pos, Dictionary<string,Variable> named) {
-            Frame proto = (Frame) th.slots["proto"];
             Frame outer = (Frame) th.slots["outer"];
-            DynBlockDelegate code = (DynBlockDelegate) th.slots["code"];
+            SubInfo info = (SubInfo) th.slots["info"];
 
-            Frame n = new Frame(caller, outer, code);
-            n.proto = proto;
+            Frame n = new Frame(caller, outer, info);
             n.pos = pos;
             n.named = named;
 
             return n;
         }
+        private static SubInfo SubInvokeSubSI = new SubInfo(SubInvokeSubC);
         private static Frame SubInvokeSubC(Frame th) {
             Variable[] post;
             switch (th.ip) {
@@ -566,12 +605,10 @@ blocked:
 
         public static bool TraceCont;
 
-        public static IP6 MakeSub(DynBlockDelegate code, Frame proto,
-                Frame outer) {
+        public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(SubMO);
             n.slots["outer"] = outer;
-            n.slots["code"] = code;
-            n.slots["proto"] = proto;
+            n.slots["info"] = info;
             return n;
         }
 
@@ -599,6 +636,7 @@ blocked:
             return w.Invoke(th, new Variable[1] { v }, null);
         }
 
+        private static SubInfo BindSI = new SubInfo(BindC);
         private static Frame BindC(Frame th) {
             switch (th.ip) {
                 case 0:
@@ -648,13 +686,14 @@ blocked:
                 return th;
             }
 
-            n = new Frame(th, null, new DynBlockDelegate(BindC));
+            n = new Frame(th, null, BindSI);
             n.pos = new Variable[2] { lhs, rhs };
             n.lex["ro"] = ro;
             return n;
         }
 
         // This isn't just a fetch and a store...
+        private static SubInfo AssignSI = new SubInfo(AssignC);
         private static Frame AssignC(Frame th) {
             switch (th.ip) {
                 case 0:
@@ -687,8 +726,7 @@ blocked:
         }
 
         public static Frame Assign(Frame th, Variable lhs, Variable rhs) {
-            Frame n = new Frame(th, null,
-                    new DynBlockDelegate(AssignC));
+            Frame n = new Frame(th, null, AssignSI);
             n.pos = new Variable[2] { lhs, rhs };
             return n;
         }
@@ -800,7 +838,7 @@ blocked:
             return th;
         }
 
-        public static void RunLoop(DynBlockDelegate boot) {
+        public static void RunLoop(SubInfo boot) {
             Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
             Frame root_f = new Frame(null, null, boot);
             Frame current = root_f;
@@ -824,10 +862,8 @@ blocked:
         static Kernel() {
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
-            SubMO.local["clone"] = MakeSub(new DynBlockDelegate(SubCloneC),
-                    null, null);
-            SubMO.local["INVOKE"] = MakeSub(new DynBlockDelegate(SubInvokeSubC),
-                    null, null);
+            SubMO.local["clone"] = MakeSub(SubCloneSI, null);
+            SubMO.local["INVOKE"] = MakeSub(SubInvokeSubSI, null);
 
             ScalarMO = new DynMetaObject("Scalar");
             ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
@@ -858,9 +894,9 @@ blocked:
                 bot = bot.caller;
                 object o;
 
-                if (pop.proto.lex.TryGetValue("!unwind", out o)) {
-                    Frame n = new Frame(bot, bot, (DynBlockDelegate) o);
-                    n.proto = (Frame) pop.proto.lex["!unwindp"];
+                if (pop.info.hints != null &&
+                        pop.info.hints.TryGetValue("!unwind", out o)) {
+                    Frame n = new Frame(bot, bot, (SubInfo) o);
                     n.lex["!reunwind"] = this;
                     return n;
                 }
@@ -875,13 +911,10 @@ blocked:
             }
             string key = IsFatal() ? "!ehcatch" : "!ehcontrol";
             while (top != null) {
-                Frame test = top;
-                if (test.proto != null) { test = test.proto; }
-
                 object o;
-                if (test.lex.TryGetValue(key, out o)) {
-                    Frame fn = new Frame(bot, top, (DynBlockDelegate) o);
-                    fn.proto = (Frame) test.lex[key + "p"];
+                if (top.info.hints != null &&
+                        top.info.hints.TryGetValue(key, out o)) {
+                    Frame fn = new Frame(bot, top, (SubInfo) o);
                     fn.lex["!rethrow"] = this;
                     return fn;
                 }
@@ -968,9 +1001,9 @@ blocked:
 // The root setting
 public class NULL {
     public static Niecza.Frame Environment = null;
-    public static Niecza.IP6 Installer = Niecza.Kernel.MakeSub(
-            new Niecza.DynBlockDelegate(MAIN), null, null);
 
+    private static Niecza.SubInfo MAINSI = new Niecza.SubInfo(MAIN);
+    public static Niecza.IP6 Installer = Niecza.Kernel.MakeSub(MAINSI, null);
     private static Niecza.Frame MAIN(Niecza.Frame th) {
         switch (th.ip) {
             case 0:

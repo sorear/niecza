@@ -189,13 +189,7 @@ public sealed class NFA {
         if (Lexer.LtmTrace && method != null)
             Console.WriteLine("+ Found method");
 
-        DynObject dom = method as DynObject;
-        if (dom != null) {
-            object o;
-            if (dom.slots.TryGetValue("ltm-prefix", out o)) {
-                sub = o as LAD;
-            }
-        }
+        sub = ((SubInfo)(((DynObject)method).slots["info"])).ltm;
 
         if (Lexer.LtmTrace)
             Console.WriteLine("+ {0} to sub-automaton",
@@ -455,7 +449,7 @@ public class LADProtoRegex : LAD {
 
     public override void ToNFA(NFA pad, int from, int to) {
         foreach (DynObject cand in Lexer.ResolveProtoregex(pad.cursor_class, name)) {
-            ((LAD)cand.slots["ltm-prefix"]).ToNFA(pad, from, to);
+            ((SubInfo)cand.slots["info"]).ltm.ToNFA(pad, from, to);
         }
     }
 
@@ -633,7 +627,7 @@ public class Lexer {
         DynObject[] candidates = ResolveProtoregex(dc.klass, name);
         LAD[] branches = new LAD[candidates.Length];
         for (int i = 0; i < candidates.Length; i++)
-            branches[i] = (LAD) candidates[i].slots["ltm-prefix"];
+            branches[i] = ((SubInfo) candidates[i].slots["info"]).ltm;
         Lexer l = new Lexer(dc, name, branches);
         Cursor c = (Cursor)Kernel.UnboxAny(cursor);
         int[] brnum = l.Run(c.backing, c.pos);

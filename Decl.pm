@@ -69,22 +69,10 @@ use CgOp;
             CgOp::proto_var($self->var, CgOp::newscalar(
                     CgOp::protosub($self->code)));
         } else {
-            # TODO: More direct support
-            my $cg = CgOp::proto_var($self->var,
+            CgOp::proto_var($self->var,
                 CgOp::methodcall(
                     CgOp::scopedlex($self->class), 'bless',
-                    CgOp::newscalar(CgOp::protosub($self->code))));
-
-            if ($self->ltm) {
-                # ick
-                $cg = CgOp::prog($cg,
-                    CgOp::setindex("ltm-prefix",
-                        CgOp::getfield("slots", CgOp::cast('DynObject',
-                                CgOp::fetch(CgOp::scopedlex($self->var)))),
-                        $self->ltm));
-            }
-
-            $cg;
+                    CgOp::newscalar(CgOp::protosub($self->code, $self->ltm))));
         }
     }
 

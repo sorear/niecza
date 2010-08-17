@@ -417,7 +417,7 @@ use 5.010;
 
     sub protolget {
         my ($self, $name) = @_;
-        $self->_push('object', "th.proto.lex[" . qm($name) . "]");
+        $self->_push('object', "th.info.proto.lex[" . qm($name) . "]");
         $self->cast('Variable');
     }
 
@@ -609,20 +609,18 @@ use 5.010;
     sub close_sub {
         my ($self, $body) = @_;
 
-        $self->_push('object', $body->csname . "_lines");
-        $self->proto_var('?lines');
-
-        if ($body->type eq 'mainline') {
-            $self->clr_string($body->file);
-            $self->proto_var('?file');
+        $self->_emit($body->csname . "_info.PutHint(\"?file\", " . qm($body->file) . ")") if $body->type eq 'mainline';
+        my $ob = $self->bodies->[-2];
+        if ($ob) {
+            $self->_emit($body->csname . "_info.outer = " . $ob->csname . "_info");
         }
 
         $self->pop_let('protopad');
         pop @{ $self->bodies };
         $self->peek_let('protopad');
         my ($pp, $op) = $self->_popn(2);
-        $self->_push('IP6', "Kernel.MakeSub(new DynBlockDelegate(" .
-            $body->csname . "), $pp, $op)");
+        $self->_emit($body->csname . "_info.proto = $pp");
+        $self->_push('IP6', "Kernel.MakeSub(" . $body->csname . "_info, $op)");
     }
 
     sub proto_var {
@@ -672,10 +670,19 @@ use 5.010;
         }
     }
 
+    # XXX a bit too much integration here
+    sub set_ltm {
+        my ($self, $bodyn) = @_;
+        my ($ltm) = $self->_popn(1);
+        $self->_emit("${bodyn}_info.ltm = $ltm");
+    }
+
     sub open_protopad {
         my ($self, $body) = @_;
+        $self->push_null('Frame');
         $self->peek_let('protopad');
-        $self->clr_new('Frame', 1);
+        $self->_push('SubInfo', $body->csname . "_info");
+        $self->clr_new('Frame', 3);
         $self->push_let('protopad');
         push @{ $self->bodies }, $body;
     }
@@ -712,10 +719,10 @@ use 5.010;
         print ::NIECZA_OUT " " x 16, "throw new Exception(\"Invalid IP\");\n";
         print ::NIECZA_OUT " " x 8, "}\n";
         print ::NIECZA_OUT " " x 4, "}\n";
-        if ($name ne 'BOOT') {
-            print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
-                join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
-        }
+        print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
+            join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
+        print ::NIECZA_OUT " " x 4, "private static SubInfo ${name}_info = ",
+            "new SubInfo(${name}_lines, ${name}, null, null, null);\n";
     }
 
     sub BUILD {

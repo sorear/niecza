@@ -82,7 +82,7 @@ EOMAIN
     public static void Initialize() {
         if (!Initialized) {
             Initialized = true;
-            Kernel.RunLoop(new DynBlockDelegate(BOOT));
+            Kernel.RunLoop(BOOT_info);
         }
     }
 }
