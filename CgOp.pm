@@ -208,7 +208,16 @@ use warnings;
                         $z->zyg->[0]->var_cg($cg);
                         return;
                     }
-                    when ("scopelex") {
+                    when ("hint_get") {
+                        return;
+                    }
+                    when ("peek_let") {
+                        return;
+                    }
+                    when ("clr_sfield_get") {
+                        return;
+                    }
+                    when ("rtpadget") {
                         return;
                     }
                     when ("push_null") {
@@ -461,6 +470,7 @@ use warnings;
             zyg => [ $_[1], $_[2] ]);
     }
 
+    # Not a CgOp function, rewritten by the resolve_lex pass
     sub scopedlex {
         my $n = shift;
         CgOp::Primitive->new(op => [ scopelex => $n, scalar @_ ],
@@ -485,7 +495,9 @@ use warnings;
     }
 
     sub letvar {
-        CgOp::Primitive->new(op => [ 'peek_let', $_[0] ]);
+        $_[1] ?
+            CgOp::Primitive->new(op => [ 'poke_let', $_[0] ], zyg => [ $_[1] ]):
+            CgOp::Primitive->new(op => [ 'peek_let', $_[0] ]);
     }
 
     sub clr_string {

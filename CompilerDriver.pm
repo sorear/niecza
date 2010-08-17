@@ -23,6 +23,7 @@ use Decl ();
 use Unit ();
 use Op ();
 use Optimizer::Beta ();
+use ResolveLex ();
 use Storable;
 
 use Niecza::Grammar ();
@@ -61,6 +62,7 @@ sub compile {
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'extract_scopes', sub { $ast->extract_scopes } ],
         [ 'to_cgop', sub { $ast->to_cgop } ],
+        [ 'resolve_lex', sub { ResolveLex::run($ast) } ],
         [ 'to_anf', sub { $ast->to_anf } ],
         [ 'writecs', sub {
             $basename = $::UNITNAME;

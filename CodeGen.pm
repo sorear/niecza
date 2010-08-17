@@ -293,6 +293,14 @@ use 5.010;
         $self->cast($self->lettypes->[$i]);
     }
 
+    sub poke_let {
+        my ($self, $which) = @_;
+        my $i = @{ $self->letstack } - 1;
+        while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
+        my ($v) = $self->_popn(1);
+        $self->_emit("th.lexn[" . ($self->minlets + $i) . "] = $v");
+    }
+
     sub has_let {
         my ($self, $which) = @_;
         my $i = @{ $self->letstack } - 1;
@@ -356,42 +364,25 @@ use 5.010;
         $self->_emit("th.lex[" . qm($name) . "] = " . ($self->_popn(1))[0]);
     }
 
-    sub lexget {
-        my ($self, $order, $type, $kind, $data, $name) = @_;
-        if ($kind == 1) {
-            $self->_push($type, $data);
-            return;
-        }
-        if ($kind == 2) {
-            $self->_push("object", "$data.hints[" . qm($name) . "]");
-            $self->cast($type);
-            return;
-        }
-        my $frame = 'th.';
-        if ($self->has_let('protopad')) {
-            $self->peek_let('protopad');
-            $frame = ($self->_popn(1))[0] . ".";
-        }
-        $self->_push("object", $frame . ("outer." x $order) .
-            "lex[" . qm($name) . "]");
+    sub hintget {
+        my ($self, $type, $data, $name) = @_;
+        $self->_push("object", "$data.hints[" . qm($name) . "]");
         $self->cast($type);
     }
 
-    sub lexput {
-        my ($self, $order, $type, $kind, $data, $name) = @_;
-        if ($kind == 1) {
-            $self->clr_sfield_set($data);
-            return;
-        }
-        if ($kind == 2) {
-            die "panic: assigning to a hint";
-        }
-        my $frame = 'th.';
-        if ($self->has_let('protopad')) {
-            $self->peek_let('protopad');
-            $frame = ($self->_popn(1))[0] . ".";
-        }
-        $self->_emit($frame . ("outer." x $order) . "lex[" . qm($name) . "] = " . ($self->_popn(1))[0]);
+    sub rtpadget {
+        my ($self, $type, $order, $name) = @_;
+        $self->callframe;
+        my ($frame) = $self->_popn(1);
+        $self->_push("object", $frame . (".outer" x $order) . ".lex[" . qm($name) . "]");
+        $self->cast($type);
+    }
+
+    sub rtpadput {
+        my ($self, $order, $name) = @_;
+        $self->callframe;
+        my ($val, $frame) = $self->_popn(2);
+        $self->_emit($frame . (".outer" x $order) . ".lex[" . qm($name) . "] = $val");
     }
 
     sub callframe {
@@ -641,41 +632,6 @@ use 5.010;
         $self->peek_let('protopad');
         my ($pv, $pp) = $self->_popn(2);
         $self->_emit("$pp.lex[" . qm($name) . "] = ($pv)");
-    }
-
-    sub scopelex {
-        my ($self, $name, $set) = @_;
-        my $body = $self->body // $self->bodies->[-1];
-        my $order = 0;
-        my ($type, $kind, $data);
-        if ($self->has_let($name)) {
-            my $i = @{ $self->letstack } - 1;
-            while ($i >= 0 && $self->letstack->[$i] ne $name) { $i-- }
-            $name = "th.lexn[" . ($self->minlets + $i) . "]";
-            $type = $self->lettypes->[$i];
-
-            if ($set) {
-                $self->_emit("$name = " . ($self->_popn(1))[0]);
-            } else {
-                $self->_push("object", $name);
-                $self->cast($type);
-            }
-            return;
-        } else {
-            ($order, $type, $kind, $data) = $body->lex_info($name);
-            if ($order < 0) {
-                #print STDERR YAML::XS::Dump ($body);
-                die "Internal error: failed to resolve lexical $name in " . $body->name;
-            }
-        }
-        if (($kind == 1 || $kind == 2) && $data =~ /(.*)\./) {
-            $::UNITDEPS{$1} = 1;
-        }
-        if ($set) {
-            $self->lexput($order, $type, $kind, $data, $name);
-        } else {
-            $self->lexget($order, $type, $kind, $data, $name);
-        }
     }
 
     # XXX a bit too much integration here
