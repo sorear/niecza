@@ -94,8 +94,12 @@ sub beta_optimize {
             positionals => \@pos),
         $ib->do]);
 
-    for my $ke (reverse map { $_->used_slots(0) } @{ $ib->decls }) {
-        $nop = Op::Let->new(var => $ke->[0], type => $ke->[1], in => $nop);
+    for my $d (reverse @{ $ib->decls }) {
+        my $to = $d->hash ? CgOp::newblankhash :
+                 $d->list ? CgOp::newblanklist :
+                            CgOp::newblankrwscalar;
+        $nop = Op::Let->new(var => $d->slot,
+            to => Op::CgOp->new(op => $to), in => $nop);
     }
 
     for my $a (reverse @args) {

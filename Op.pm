@@ -769,7 +769,8 @@ use CgOp;
     }
 
     sub statement_level {
-        Op::CallSub->new(invocant => $_[0]);
+        Op::CallSub->new(invocant => Op::SubDef->new(var => $_[0]->var,
+                body => $_[0]->body, once => 1));
     }
 
     __PACKAGE__->meta->make_immutable;
