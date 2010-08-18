@@ -185,6 +185,7 @@ use 5.010;
     has lex2type  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
+    has outcap    => (isa => 'Bool', is => 'rw', default => 0);
 
     has letstack  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has lettypes  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
@@ -409,33 +410,54 @@ use 5.010;
         $self->_push('Variable', "th.pos[$num]");
     }
 
+    sub _prepcall {
+        my ($self, @sig) = @_;
+        my $quick = 1;
+        for (@sig) { $quick &&= ($_ eq '') }
+        my ($inv, @vals) = $self->_popn(1 + scalar(@sig));
+        $#vals = $#sig;
+        if ($quick) {
+            return $inv, "new Variable[] { " . join(", ", @vals) . "}", "null";
+        } else {
+            # TODO: optimize harder
+            $self->outcap(1);
+            $self->_emit("_inv = $inv");
+            $self->_emit("_pos = new List<Variable>()");
+            $self->_emit("_nam = new Dictionary<string,Variable>()");
+            for (my $ix = 0; $ix < @sig; $ix++) {
+                if ($sig[$ix] eq '') {
+                    $self->_emit("_pos.Add($vals[$ix])");
+                } elsif (substr($sig[$ix],0,1) eq ':') {
+                    my $n = qm(substr($sig[$ix],1));
+                    $self->_emit("_nam[$n] = $vals[$ix]");
+                } elsif ($sig[$ix] eq 'flatpos') {
+                    $self->_emit("_pos.AddRange($vals[$ix])");
+                } elsif ($sig[$ix] eq 'flatnam') {
+                    $self->_emit("Kernel.AddMany(_nam, $vals[$ix])");
+                } else {
+                    die "weird sig bit $sig[$ix]";
+                }
+            }
+            return "_inv", "_pos.ToArray()", "_nam";
+        }
+    }
+
     sub call_method {
-        my ($self, $nv, $name, $numargs) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] }
-                (1 .. $numargs + 1);  # invocant LV
-        my ($inv) = $self->_popn(1);
-        $self->_cpscall(($nv ? 'Variable' : 'Void'),
-            "$inv.InvokeMethod(th, " . qm($name) . ", new Variable[" .
-            scalar(@args) . "] { " . join(", ", @args) .
-            " }, null)");
+        my ($self, $name, @sig) = @_;
+        my ($inv, $pos, $nam) = $self->_prepcall(@sig);
+        $self->_cpscall('Variable', "$inv.InvokeMethod(th, ".qm($name).", $pos, $nam)");
     }
 
     sub call_sub {
-        my ($self, $nv, $numargs) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
-        my ($inv) = $self->_popn(1);
-        $self->_cpscall(($nv ? 'Variable' : 'Void'),
-            "$inv.Invoke(th, new Variable[" . scalar(@args) . "] { " .
-            join(", ", @args) . " }, null)");
+        my ($self, @sig) = @_;
+        my ($inv, $pos, $nam) = $self->_prepcall(@sig);
+        $self->_cpscall('Variable', "$inv.Invoke(th, $pos, $nam)");
     }
 
     sub tail_call_sub {
-        my ($self, $numargs) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] } (1 .. $numargs);
-        my ($inv) = $self->_popn(1);
-        $self->_emit("return $inv.Invoke(th.caller, new Variable[" .
-            scalar(@args) . "] { " . join(", ", @args) .
-            " }, null)");
+        my ($self, @sig) = @_;
+        my ($inv, $pos, $nam) = $self->_prepcall(@sig);
+        $self->_emit("return $inv.Invoke(th.caller, $pos, $nam)");
         $self->unreach(1);
     }
 
@@ -684,6 +706,9 @@ use 5.010;
         my $name = $self->csname;
         my $vis  = ($self->entry ? 'public' : 'private');
         print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
+        if ($self->outcap) {
+            print ::NIECZA_OUT " " x 8, "IP6 _inv; List<Variable> _pos; Dictionary<string,Variable> _nam;\n";
+        }
         print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(th.DepthMark() + \"$::UNITNAME : $name @ \" + th.ip); }\n";
         print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
         print ::NIECZA_OUT " " x 12, "case 0:\n";

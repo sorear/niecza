@@ -477,16 +477,34 @@ use warnings;
             zyg => [ @_ ]);
     }
 
+    sub _process_arglist {
+        my $ar = shift;
+        my @sig;
+        my $j = 0;
+        for (my $i = 0; $i < @$ar; ) {
+            if (blessed($ar->[$i])) {
+                push @sig, '';
+            } else {
+                push @sig, $ar->[$i++];
+            }
+            $ar->[$j++] = $ar->[$i++];
+        }
+        $#$ar = $j - 1;
+        @sig;
+    }
+
     sub subcall {
         my ($sub, @args) = @_;
-        CgOp::Primitive->new(op => [ 'call_sub', 1, scalar @args ],
+        my @sig = _process_arglist(\@args);
+        CgOp::Primitive->new(op => [ 'call_sub', @sig ],
             zyg => [ $sub, @args ], is_cps_call => 1);
     }
 
     sub methodcall {
         my ($obj, $name, @args) = @_;
+        my @sig = _process_arglist(\@args);
         let($obj, sub {
-            CgOp::Primitive->new(op => [ 'call_method', 1, $name, scalar @args ],
+            CgOp::Primitive->new(op => [ 'call_method', $name, '', @sig ],
                 zyg => [ fetch($_[0]), $_[0], @args ], is_cps_call => 1)});
     }
 

@@ -860,6 +860,13 @@ blocked:
             }
         }
 
+        public static void AddMany(Dictionary<string,Variable> d1,
+                Dictionary<string,Variable> d2) {
+            foreach (KeyValuePair<string,Variable> kv in d2) {
+                d1[kv.Key] = kv.Value;
+            }
+        }
+
         // XXX should be per-unit
         public static Variable Global;
         public static IP6 GlobalO;
