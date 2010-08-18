@@ -13,9 +13,10 @@ use autodie ':all';
 
 open ::NIECZA_OUT, ">&", \*STDOUT;
 
+use lib 'STD_checkout';
 BEGIN {
-    unshift @INC, 'STD_checkout';
-    $ENV{PERL6LIB} = ".:STD_checkout:STD_checkout/lib";
+    use File::Spec;
+    $CursorBase::SET_PERL6LIB = [ File::Spec->curdir ];
 }
 
 use Body ();

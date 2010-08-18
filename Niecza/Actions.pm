@@ -63,6 +63,7 @@ sub node { my ($M) = @_;
 
 sub ws { }
 sub is_ok { }
+sub dumbsmart { }
 sub normspace { }
 sub vws { }
 sub unv { }

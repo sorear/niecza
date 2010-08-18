@@ -79,7 +79,10 @@
         <CombinePath BasePath="$(MSBuildProjectDirectory)" Paths="STD_checkout">
             <Output TaskParameter="CombinedPaths" PropertyName="STDDir"/>
         </CombinePath>
-        <Exec Command="PERL5LIB=$(STDDir) PERL6LIB=$(STDDir):$(STDDir)/lib STD5PREFIX=$(STDDir)/ $(Perl) $(STDDir)/viv -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6"/>
+        <CombinePath BasePath="$(STDDir)" Paths="lib">
+            <Output TaskParameter="CombinedPaths" PropertyName="STDDirLib"/>
+        </CombinePath>
+        <Exec Command="$(Perl) $(STDDir)/viv --clear-inc --inc $(STDDirLib) --inc $(STDDir) --symlroot $(STDDir) -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6"/>
     </Target>
 
     <Target Name="CheckoutSTD" Inputs="STD_REVISION"
