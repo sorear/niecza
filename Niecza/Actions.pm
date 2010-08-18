@@ -874,12 +874,12 @@ sub POSTFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::CallMetaMethod->new(node($M),
             receiver => $arg,
             name => $op->{metamethod},
-            positionals => $op->{args} // []);
+            args => $op->{args} // []);
     } elsif ($op->{name}) {
         $M->{_ast} = Op::CallMethod->new(node($M),
             receiver => $arg,
             name => ($op->{private} ? '!' . $op->{name} : $op->{name}),
-            positionals => $op->{args} // []);
+            args => $op->{args} // []);
     } elsif ($op->{postcall}) {
         if (@{ $op->{postcall} } > 1) {
             $M->sorry("Slicels NYI");
@@ -887,7 +887,7 @@ sub POSTFIX { my ($cl, $M) = @_;
         }
         $M->{_ast} = Op::CallSub->new(node($M),
             invocant => $arg,
-            positionals => ($op->{postcall}[0] // []));
+            args => ($op->{postcall}[0] // []));
     } else {
         $M->sorry("Unhandled postop type");
     }
@@ -1017,16 +1017,15 @@ sub colonpair { my ($cl, $M) = @_;
     } elsif (defined $M->{v}{qpvalue}) {
         $n = ":" . $M->{k} . $M->{v}{qpvalue};
     }
-    my $tk = Op::StringLiteral->new(text => $M->{k});
     my $tv = ref($M->{v}) ? $M->{v}{_ast} :
         Op::Lexical->new(name => $M->{v} ? 'True' : 'False');
     $M->{_ast} = { ext => $n, term => Op::SimplePair->new(
-            key => $tk, value => $tv) };
+            key => $M->{k}, value => $tv) };
 }
 
 sub fatarrow { my ($cl, $M) = @_;
     $M->{_ast} = Op::SimplePair->new(
-        key => Op::StringLiteral->new(text => $M->{key}->Str),
+        key => $M->{key}->Str,
         value => $M->{val}{_ast});
 }
 
@@ -1098,7 +1097,7 @@ sub term__S_identifier { my ($cl, $M) = @_;
 
     $M->{_ast} = Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(name => '&' . $id),
-        positionals => $args);
+        args => $args);
 }
 
 sub term__S_self { my ($cl, $M) = @_;

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 322;
+plan 333;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -826,4 +826,21 @@ end
 
     ok G7.parse('+'), "can parse :sym<> symbols";
     ok G7.parse('foo'), "can parse : symbols";
+}
+
+{
+    sub t1(*@k, :$x, :y($)) { $x } #OK
+    sub t2(*@k, :y($x), :x($)) { $x } #OK
+    sub t3(*@k, :y(:$x)) { $x } #OK
+    ok !t1.defined, "no arg, no value";
+    ok !t1(12).defined, "positional is not enough";
+    ok t1(x => 5) == 5, "can pass argument (fatarrow)";
+    ok !t1("x" => 5), "quoted fatarrow doesn't work";
+    ok !t1((x => 5)), "parenned fatarrow doesn't work";
+    ok t1(:x(6)) == 6, "colonpair works";
+    ok !t1(:y(7)).defined, "wrong name, no cigar";
+    ok t2(y => 9) == 9, ":y(\$x) syntax picks out y as name";
+    ok !t2(x => 10).defined, "x is NOT a usable name";
+    ok t3(:x(11)) == 11, ":y(:\$x) works for both (1)";
+    ok t3(:y(11)) == 11, ":y(:\$x) works for both (2)";
 }

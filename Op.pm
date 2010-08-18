@@ -92,19 +92,47 @@ use CgOp;
 }
 
 {
-    package Op::CallSub;
+    package Op::CallLike;
     use Moose;
     extends 'Op';
 
-    has invocant    => (isa => 'Op', is => 'ro', required => 1);
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
         default => sub { [] });
-    sub zyg { $_[0]->invocant, @{ $_[0]->positionals } }
+    has args => (isa => 'ArrayRef[Op]', is => 'ro');
+    sub zyg { @{ $_[0]->args // $_[0]->positionals } }
+
+    sub argblock {
+        my ($self, $body) = @_;
+        if (! $self->args) {
+            return map { $_->cgop($body) } @{ $self->positionals };
+        }
+        my @out;
+        for my $a (@{ $self->args }) {
+            if ($a->isa('Op::SimplePair')) {
+                push @out, ":" . $a->key, $a->value->cgop($body);
+            } else {
+                push @out, $a->cgop($body);
+            }
+        }
+        @out;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::CallSub;
+    use Moose;
+    extends 'Op::CallLike';
+
+    has invocant    => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->invocant, $_[0]->SUPER::zyg }
 
     sub code {
         my ($self, $body) = @_;
         CgOp::subcall(CgOp::fetch($self->invocant->cgop($body)),
-            map { $_->cgop($body) } @{ $self->positionals });
+            $self->argblock($body));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -137,18 +165,16 @@ use CgOp;
 {
     package Op::CallMethod;
     use Moose;
-    extends 'Op';
+    extends 'Op::CallLike';
 
     has receiver    => (isa => 'Op', is => 'ro', required => 1);
-    has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
-        default => sub { [] });
     has name        => (isa => 'Str', is => 'ro', required => 1);
-    sub zyg { $_[0]->receiver, @{ $_[0]->positionals } }
+    sub zyg { $_[0]->receiver, $_[0]->SUPER::zyg }
 
     sub code {
         my ($self, $body) = @_;
         CgOp::methodcall($self->receiver->cgop($body),
-            $self->name, map { $_->cgop($body) } @{ $self->positionals });
+            $self->name, $self->argblock($body));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -177,20 +203,17 @@ use CgOp;
 {
     package Op::CallMetaMethod;
     use Moose;
-    extends 'Op';
+    extends 'Op::CallLike';
 
     has receiver    => (isa => 'Op', is => 'ro', required => 1);
-    has positionals => (isa => 'ArrayRef[Op]', is => 'ro',
-        default => sub { [] });
     has name        => (isa => 'Str', is => 'ro', required => 1);
-    sub zyg { $_[0]->receiver, @{ $_[0]->positionals } }
+    sub zyg { $_[0]->receiver, $_[0]->SUPER::zyg }
 
     sub code {
         my ($self, $body) = @_;
         CgOp::let($self->receiver->cgop($body), sub {
             CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
-                $self->name, $_[0], map { $_->cgop($body) }
-                    @{ $self->positionals })});
+                $self->name, $_[0], $self->argblock($body))});
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -219,14 +242,14 @@ use CgOp;
     use Moose;
     extends 'Op';
 
-    has key   => (isa => 'Op', is => 'ro', required => 1);
+    has key   => (isa => 'Str', is => 'ro', required => 1);
     has value => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->key, $_[0]->value }
+    sub zyg { $_[0]->value }
 
     sub code {
         my ($self, $body) = @_;
         CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&infix:<=>>')),
-            $self->key->cgop($body), $self->value->cgop($body));
+            CgOp::string_var($self->key), $self->value->cgop($body));
     }
 
     __PACKAGE__->meta->make_immutable;

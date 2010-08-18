@@ -27,6 +27,7 @@ sub run_optree {
     my ($body, $op) = @_;
 
     if ($op->isa('Op::CallSub') && $op->invocant->isa('Op::SubDef')
+            && no_named_params($op)
             && $op->invocant->once && is_removable_body($op->invocant->body)) {
         beta_optimize($body, $op);
     } else {
@@ -34,6 +35,19 @@ sub run_optree {
             run_optree($body, $_);
         }
     }
+}
+
+sub no_named_params {
+    my $op = shift;
+
+    if ($op->args) {
+        for (@{ $op->args }) {
+            if ($_->isa('Op::SimplePair') || $_->isa('Op::Flatten')) {
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
 
 sub deb {
