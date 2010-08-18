@@ -1276,7 +1276,29 @@ sub variable { my ($cl, $M) = @_;
 
 sub param_sep {}
 
-# :: { list : Bool, slot : Maybe[Str] }
+# :: { list : Bool, hash : Bool  slot : Maybe[Str], names : [Str] }
+sub named_param { my ($cl, $M) = @_;
+    my %rt;
+    if ($M->{name}) {
+        if ($M->{named_param}) {
+            %rt = %{ $M->{named_param}{_ast} };
+        } else {
+            %rt = %{ $M->{param_var}{_ast} };
+        }
+        $rt{names} = [ @{ $rt{names} // [] }, $M->{name}->Str ];
+    } else {
+        %rt = %{ $M->{param_var}{_ast} };
+        if ($rt{slot} && $rt{slot} =~ /^[\@\$\%][.*!]?(.*)/) {
+            $rt{names} = [ $1 ];
+        } else {
+            $M->sorry("Abbreviated named parameter must have a name");
+        }
+    }
+    $rt{positional} = 0;
+    $M->{_ast} = \%rt;
+}
+
+# :: { list : Bool, hash : Bool, slot : Maybe[Str] }
 sub param_var { my ($cl, $M) = @_;
     if ($M->{signature}) {
         $M->sorry('Sub-signatures NYI');
@@ -1311,11 +1333,6 @@ sub parameter { my ($cl, $M) = @_;
 
     my $default = $M->{default_value}[0] ? $M->{default_value}[0]{_ast} : undef;
 
-    if ($M->{named_param}) {
-        $M->sorry('Named parameters NYI');
-        return;
-    }
-
     my $sorry;
     my $slurpy;
     my $optional;
@@ -1335,9 +1352,10 @@ sub parameter { my ($cl, $M) = @_;
         default       { $sorry = "Confusing parameters ($_)" }
     }
     if ($sorry) { $M->sorry($sorry); return }
+    my $p = $M->{param_var} // $M->{named_param};
 
     $M->{_ast} = Sig::Parameter->new(name => $M->Str, default => $default,
-        optional => $optional, slurpy => $slurpy, %{ $M->{param_var}{_ast} });
+        optional => $optional, slurpy => $slurpy, %{ $p->{_ast} });
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
