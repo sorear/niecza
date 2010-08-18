@@ -153,6 +153,16 @@ namespace Niecza {
             return c;
         }
 
+        public Variable ExtractNamed(string n) {
+            Variable r;
+            if (named != null && named.TryGetValue(n, out r)) {
+                named.Remove(n);
+                return r;
+            } else {
+                return null;
+            }
+        }
+
         public string GetTypeName() { return "Frame"; }
         public bool IsDefined() { return true; }
         public IP6 GetTypeObject() { return Kernel.CallFrameMO.typeObject; }

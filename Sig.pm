@@ -82,9 +82,14 @@ use 5.010;
 
     sub _named_get {
         my ($self, $name, $fb) = @_;
-        # TODO: implement named parameters
 
-        $fb;
+        CgOp::letn('!v', CgOp::rawcall(CgOp::callframe, 'ExtractNamed',
+                CgOp::clr_string($name)),
+            CgOp::ternary(
+                CgOp::compare('!=', CgOp::null('Variable'),
+                    CgOp::letvar('!v')),
+                CgOp::letvar('!v'),
+                $fb));
     }
 
     sub single_get {

@@ -55,6 +55,7 @@ use 5.010;
               lex          => [f => 'Dictionary<string,object>'],
               ExecutingLine=> [m => 'Int32'],
               ExecutingFile=> [m => 'String'],
+              ExtractNamed => [m => 'Variable'],
               LexicalFind  => [m => 'Variable'] },
         'Niecza.FatalException' =>
             { SearchForHandler => [c => 'Void'] },
