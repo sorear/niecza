@@ -2,6 +2,9 @@ use strict; use warnings;
 open my $realstderr, ">&STDERR";
 open STDERR, ">&STDOUT";
 
+use lib 'src';
+use CompilerDriver ':all';
+
 while(1) {
     my $line = <STDIN>;
     last unless defined($line) && length($line);

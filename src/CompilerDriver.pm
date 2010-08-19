@@ -33,7 +33,7 @@ use Niecza::Actions ();
 my $builddir;
 {
     my $libdir = dirname($INC{'CompilerDriver.pm'});
-    $builddir = File::Spec->catdir($libdir, "build");
+    $builddir = File::Spec->catdir($libdir, "../obj");
 }
 File::Path::make_path($builddir);
 

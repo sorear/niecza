@@ -3,6 +3,7 @@ use warnings;
 use strict;
 use 5.010;
 
+use lib 'src';
 use CompilerDriver ':all';
 use Getopt::Long;
 use autodie ':all';

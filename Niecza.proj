@@ -1,6 +1,6 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     ToolsVersion="2.0">
-    <UsingTask TaskName="Perl" AssemblyFile="build\PerlTask.dll"/>
+    <UsingTask TaskName="Perl" AssemblyFile="obj\PerlTask.dll"/>
     <PropertyGroup>
         <!-- Tool paths -->
         <Subversion>svn</Subversion>
@@ -18,7 +18,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <CompilerPerl Include="Body.pm;CgOp.pm;CodeGen.pm;CompilerDriver.pm;Decl.pm;Op.pm;RxOp.pm;Sig.pm;Unit.pm;Niecza\Actions.pm;Niecza\Grammar.pmc;.STD_build_stamp"/>
+        <CompilerPerl Include="src\Body.pm;src\CgOp.pm;src\CodeGen.pm;src\CompilerDriver.pm;src\Decl.pm;src\Op.pm;src\RxOp.pm;src\Sig.pm;src\Unit.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc;.STD_build_stamp"/>
     </ItemGroup>
 
     <!-- Meta targets -->
@@ -27,11 +27,11 @@
     <Target Name="SafeMode" DependsOnTargets="SAFE.dll;WriteVersion"/>
 
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', main => 1, file => 'test.pl');"/>
-        <Csc Sources="build\MAIN.cs" TargetType="exe" AdditionalLibPaths="build"
-            OutputAssembly="build\MAIN.exe"
+        <Perl Code="compile(stopafter => 'writecs', lang => 'CORE', main => 1, file => 'test.pl');"/>
+        <Csc Sources="obj\MAIN.cs" TargetType="exe" AdditionalLibPaths="obj"
+            OutputAssembly="obj\MAIN.exe"
             References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
-        <Exec Command="prove -e mono build\MAIN.exe"/>
+        <Exec Command="prove -e mono obj\MAIN.exe"/>
     </Target>
 
     <Target Name="WriteVersion">
@@ -40,60 +40,60 @@
 
     <!-- Libraries -->
     <Target Name="Kernel.dll" Inputs="Kernel.cs;Cursor.cs"
-        Outputs="build\Kernel.dll">
+        Outputs="obj\Kernel.dll">
         <Csc Sources="Kernel.cs;Cursor.cs" TargetType="library"
-            OutputAssembly="build\Kernel.dll"/>
+            OutputAssembly="obj\Kernel.dll"/>
         <Exec Condition="$(UseAOT) == 'Y'"
-            Command="mono --aot build\Kernel.dll"/>
+            Command="mono --aot obj\Kernel.dll"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);build\SAFE.store;CORE.setting" Outputs="build\CORE.cs;build\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'SAFE', file => 'CORE.setting');"/>
+    <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
+        <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', file => 'CORE.setting');"/>
     </Target>
 
     <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting"
-        Outputs="build\SAFE.cs;build\SAFE.store"
+        Outputs="obj\SAFE.cs;obj\SAFE.store"
         DependsOnTargets="BuildSTD;Grammar;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'NULL', file => 'SAFE.setting');"/>
+        <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', file => 'SAFE.setting');"/>
     </Target>
 
-    <Target Name="Test.cs" Inputs="@(CompilerPerl);build\CORE.store;Test.pm6"
-        Outputs="build\Test.cs;build\Test.store"
+    <Target Name="Test.cs" Inputs="@(CompilerPerl);obj\CORE.store;Test.pm6"
+        Outputs="obj\Test.cs;obj\Test.store"
         DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
-        <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', file => 'Test.pm6');"/>
+        <Perl Code="compile(stopafter => 'writecs', lang => 'CORE', file => 'Test.pm6');"/>
     </Target>
 
-    <Target Name="CORE.dll" Inputs="build\CORE.cs;build\SAFE.dll;build\Kernel.dll" Outputs="build\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
-        <Csc Sources="build\CORE.cs" TargetType="library"
-            AdditionalLibPaths="build" OutputAssembly="build\CORE.dll"
+    <Target Name="CORE.dll" Inputs="obj\CORE.cs;obj\SAFE.dll;obj\Kernel.dll" Outputs="obj\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
+        <Csc Sources="obj\CORE.cs" TargetType="library"
+            AdditionalLibPaths="obj" OutputAssembly="obj\CORE.dll"
             References="SAFE.dll;Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot build\CORE.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\CORE.dll"/>
     </Target>
 
-    <Target Name="SAFE.dll" Inputs="build\SAFE.cs;build\Kernel.dll"
-        Outputs="build\SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
-        <Csc Sources="build\SAFE.cs" TargetType="library"
-            AdditionalLibPaths="build" OutputAssembly="build\SAFE.dll"
+    <Target Name="SAFE.dll" Inputs="obj\SAFE.cs;obj\Kernel.dll"
+        Outputs="obj\SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
+        <Csc Sources="obj\SAFE.cs" TargetType="library"
+            AdditionalLibPaths="obj" OutputAssembly="obj\SAFE.dll"
             References="Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot build\SAFE.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\SAFE.dll"/>
     </Target>
 
-    <Target Name="Test.dll" Inputs="build\Test.cs;build\CORE.dll;build\Kernel.dll" Outputs="build\Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
-        <Csc Sources="build\Test.cs" TargetType="library"
-            AdditionalLibPaths="build" OutputAssembly="build\Test.dll"
+    <Target Name="Test.dll" Inputs="obj\Test.cs;obj\CORE.dll;obj\Kernel.dll" Outputs="obj\Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
+        <Csc Sources="obj\Test.cs" TargetType="library"
+            AdditionalLibPaths="obj" OutputAssembly="obj\Test.dll"
             References="CORE.dll;SAFE.dll;Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot build\Test.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\Test.dll"/>
     </Target>
 
     <!-- Proper compiler bits -->
-    <Target Name="Grammar" Inputs="Niecza\Grammar.pm6" Outputs="Niecza\Grammar.pmc" DependsOnTargets="BuildSTD">
+    <Target Name="Grammar" Inputs="src\Niecza\Grammar.pm6" Outputs="src\Niecza\Grammar.pmc" DependsOnTargets="BuildSTD">
         <CombinePath BasePath="$(MSBuildProjectDirectory)" Paths="STD_checkout">
             <Output TaskParameter="CombinedPaths" PropertyName="STDDir"/>
         </CombinePath>
         <CombinePath BasePath="$(STDDir)" Paths="lib">
             <Output TaskParameter="CombinedPaths" PropertyName="STDDirLib"/>
         </CombinePath>
-        <Exec Command="$(Perl) $(STDDir)/viv --clear-inc --inc $(STDDirLib) --inc $(STDDir) --symlroot $(STDDir) -5 -o Niecza/Grammar.pmc Niecza/Grammar.pm6"/>
+        <Exec Command="$(Perl) $(STDDir)/viv --clear-inc --inc $(STDDirLib) --inc $(STDDir) --symlroot $(STDDir) -5 -o src/Niecza/Grammar.pmc src/Niecza/Grammar.pm6"/>
     </Target>
 
     <Target Name="CheckoutSTD" Inputs="STD_REVISION"
@@ -123,9 +123,9 @@
             ContinueOnError="true"/>
     </Target>
 
-    <Target Name="PerlTask" Inputs="PerlTask.cs" Outputs="build\PerlTask.dll">
+    <Target Name="PerlTask" Inputs="PerlTask.cs" Outputs="obj\PerlTask.dll">
         <Csc Sources="PerlTask.cs" TargetType="library"
-            OutputAssembly="build\PerlTask.dll"
+            OutputAssembly="obj\PerlTask.dll"
             References="Microsoft.Build.Framework.dll;Microsoft.Build.Utilities.dll"/>
     </Target>
 </Project>
