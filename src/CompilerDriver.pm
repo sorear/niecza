@@ -40,7 +40,7 @@ my ($srcdir, $rootdir, $builddir, $libdir);
 }
 File::Path::make_path($builddir);
 
-sub build_file { File::Spec->catfile($builddir, $_[1]) }
+sub build_file { File::Spec->catfile($builddir, $_[0]) }
 
 sub metadata_for {
     my ($unit) = @_;
@@ -197,12 +197,21 @@ sub compile {
     local $::SAFEMODE = $safe;
     $STD::ALL = {};
 
-    $::SETTING_RESUME = metadata_for($lang)->{setting} unless $lang eq 'NULL';
-    $::UNITREFS{$lang} = 1 if $lang ne 'NULL';
+    if ($lang ne 'NULL') {
+        my $metasetting = metadata_for($lang);
+        $::SETTING_RESUME = $metasetting->{setting};
+        $::UNITREFS{$lang} = 1;
+        $::UNITREFSTRANS{$lang} = 1;
+        %::UNITREFSTRANS = (%::UNITREFSTRANS, %{ $metasetting->{trefs} });
+    }
 
     if (defined($name) && !$setting) {
         my $rp = Cwd::realpath($path);
         $::UNITDEPSTRANS{$name} = [ $rp, ((stat $rp)[9]) ];
+    }
+
+    if (defined($name)) {
+        $::UNITREFSTRANS{$name} = 1;
     }
 
     my ($m, $a) = defined($path) ? (parsefile => $path) : (parse => $code);
@@ -249,12 +258,24 @@ EOH
         } ],
         [ 'gmcs', sub {
             delete $::UNITREFS{$basename};
-            my @args = ("gmcs",
-                (defined($name) ? ("/target:library") : ()),
-                "/lib:$builddir",
-                "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITREFS),
-                "/out:$outfile",
-                $csfile);
+            my @args;
+            if ($args{selfcontained}) {
+                @args = ("gmcs",
+                    "/out:" . $args{selfcontained},
+                    (map { File::Spec->catfile($libdir, $_) }
+                        "Kernel.cs", "Cursor.cs"),
+                    (map { build_file($_ . ".cs") }
+                        (sort keys %::UNITREFSTRANS)),
+                    $csfile);
+            } else {
+                @args = ("gmcs",
+                    (defined($name) ? ("/target:library") : ()),
+                    "/lib:$builddir",
+                    "/r:Kernel.dll",
+                    (map { "/r:$_.dll" } sort keys %::UNITREFS),
+                    "/out:$outfile",
+                    $csfile);
+            }
             print STDERR "@args\n" if $args{stagetime};
             system @args;
         } ],
