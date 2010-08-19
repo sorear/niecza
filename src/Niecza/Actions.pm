@@ -637,7 +637,16 @@ sub mod_internal__S_ColonBanga {}
 sub mod_internal__S_ColonaParen_Thesis {}
 sub mod_internal__S_Colon0a {}
 
-sub backslash {}
+sub backslash { my ($cl, $M) = @_;
+    if ($M->isa('STD::Regex') && !ref($M->{_ast})) {
+        if (!defined($M->{_ast})) {
+            say $M->Str, " - NO RX AST";
+            exit 1;
+        }
+        $M->{_ast} = RxOp::String->new(text => $M->{_ast}, igcase => $::RX{i},
+            igmark => $::RX{a});
+    }
+}
 sub backslash__S_x { my ($cl, $M) = @_;
     if ($M->{hexint}) {
         $M->{_ast} = chr($M->{hexint}{_ast});
@@ -658,9 +667,23 @@ sub backslash__S_Back { my ($cl, $M) = @_;
 sub backslash__S_stopper { my ($cl, $M) = @_;
     $M->{_ast} = $M->{text}->Str;
 }
-sub backslash__S_misc { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{text};
+sub backslash__S_unspace { my ($cl, $M) = @_;
+    $M->{_ast} = "";
 }
+sub backslash__S_misc { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{text} // $M->{litchar}->Str;
+}
+sub backslash__S_d { my ($cl, $M) = @_; $M->{_ast} =
+    RxOp::CClass->build('+', '@N'); }
+# XXX needs spec clarification
+sub backslash__S_h { my ($cl, $M) = @_; $M->{_ast} =
+    RxOp::CClass->build('+', ' ', '+', "\t"); }
+sub backslash__S_v { my ($cl, $M) = @_; $M->{_ast} =
+    RxOp::CClass->build('+', "\r", '+', "\n"); }
+sub backslash__S_s { my ($cl, $M) = @_; $M->{_ast} =
+    RxOp::CClass->build('+', "\r", '+', "\n", '+', "\t", '+', " "); }
+sub backslash__S_w { my ($cl, $M) = @_; $M->{_ast} =
+    RxOp::CClass->build('+', "_", '+', '@L', '+', '@N'); }
 sub backslash__S_0 { my ($cl, $M) = @_; $M->{_ast} = "\0" }
 sub backslash__S_a { my ($cl, $M) = @_; $M->{_ast} = "\a" }
 sub backslash__S_b { my ($cl, $M) = @_; $M->{_ast} = "\b" }
