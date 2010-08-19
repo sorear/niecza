@@ -13,9 +13,10 @@ use autodie ':all';
 
 open ::NIECZA_OUT, ">&", \*STDOUT;
 
-use lib 'STD_checkout';
 BEGIN {
     use File::Spec;
+    unshift @INC, File::Spec->catdir(
+        dirname(dirname($INC{'CompilerDriver.pm'})), 'STD_checkout');
     $CursorBase::SET_PERL6LIB = [ File::Spec->curdir ];
 }
 

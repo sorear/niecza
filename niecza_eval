@@ -3,7 +3,12 @@ use warnings;
 use strict;
 use 5.010;
 
-use lib 'src';
+BEGIN {
+    use FindBin;
+    use File::Spec;
+    unshift @INC, File::Spec->catdir($FindBin::RealBin, "src");
+}
+
 use CompilerDriver ':all';
 use Getopt::Long;
 use autodie ':all';
