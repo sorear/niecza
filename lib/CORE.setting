@@ -7,4 +7,39 @@ sub slurp($path) {
         (unbox System.String (@ (l $path))))) }
 }
 
+my class IO is Cool {
+}
+
+my class TextReader is IO {
+    method get() {
+        Q:CgOp { (box Str (rawcall (unbox System.IO.TextReader (@ {self}))
+                     ReadLine:m,System.String)) };
+    }
+
+    method slurp() {
+        Q:CgOp { (box Str (rawcall (unbox System.IO.TextReader (@ {self}))
+                     ReadToEnd:m,System.String)) };
+    }
+
+    method getc() {
+        Q:CgOp {
+            (letn chi (rawcall (unbox System.IO.TextReader (@ {self}))
+                        Read:m,System.Int32)
+              (ternary (>= (l chi) (int 0))
+                (box Str (rawnew System.String
+                           (cast System.Char (l chi)) (int 1)))
+                {Str}))
+        };
+    }
+
+    method lines() {
+        gather take my $l while ($l = self.get).defined;
+    }
+}
+
+PRE-INIT {
+    $PROCESS::IN ::= Q:CgOp { (box TextReader (rawsget
+        System.Console.In:f,System.IO.TextReader)) };
+}
+
 {YOU_ARE_HERE}

@@ -620,6 +620,8 @@ blocked:
         }
 
         public static Variable BoxAny(object v, IP6 proto) {
+            if (v == null)
+                return NewROScalar(proto);
             DynObject n = new DynObject(((DynObject)proto).klass);
             n.slots["value"] = v;
             return NewROScalar(n);
