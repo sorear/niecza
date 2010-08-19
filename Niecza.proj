@@ -1,6 +1,6 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     ToolsVersion="2.0">
-    <UsingTask TaskName="Perl" AssemblyFile="PerlTask.dll"/>
+    <UsingTask TaskName="Perl" AssemblyFile="build\PerlTask.dll"/>
     <PropertyGroup>
         <!-- Tool paths -->
         <Subversion>svn</Subversion>
@@ -28,9 +28,10 @@
 
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', main => 1, file => 'test.pl');"/>
-        <Csc Sources="MAIN.cs" TargetType="exe" OutputAssembly="MAIN.exe"
+        <Csc Sources="build\MAIN.cs" TargetType="exe" AdditionalLibPaths="build"
+            OutputAssembly="build\MAIN.exe"
             References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
-        <Exec Command="prove -e mono MAIN.exe"/>
+        <Exec Command="prove -e mono build\MAIN.exe"/>
     </Target>
 
     <Target Name="WriteVersion">
@@ -38,40 +39,50 @@
     </Target>
 
     <!-- Libraries -->
-    <Target Name="Kernel.dll" Inputs="Kernel.cs;Cursor.cs" Outputs="Kernel.dll">
+    <Target Name="Kernel.dll" Inputs="Kernel.cs;Cursor.cs"
+        Outputs="build\Kernel.dll">
         <Csc Sources="Kernel.cs;Cursor.cs" TargetType="library"
-            OutputAssembly="Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot Kernel.dll"/>
+            OutputAssembly="build\Kernel.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'"
+            Command="mono --aot build\Kernel.dll"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);SAFE.store;CORE.setting" Outputs="CORE.cs;CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
+    <Target Name="CORE.cs" Inputs="@(CompilerPerl);build\SAFE.store;CORE.setting" Outputs="build\CORE.cs;build\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'SAFE', file => 'CORE.setting');"/>
     </Target>
 
-    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting" Outputs="SAFE.cs;SAFE.store" DependsOnTargets="BuildSTD;Grammar;PerlTask">
+    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting"
+        Outputs="build\SAFE.cs;build\SAFE.store"
+        DependsOnTargets="BuildSTD;Grammar;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'NULL', file => 'SAFE.setting');"/>
     </Target>
 
-    <Target Name="Test.cs" Inputs="@(CompilerPerl);CORE.store;Test.pm6" Outputs="Test.cs;Test.store" DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
+    <Target Name="Test.cs" Inputs="@(CompilerPerl);build\CORE.store;Test.pm6"
+        Outputs="build\Test.cs;build\Test.store"
+        DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', file => 'Test.pm6');"/>
     </Target>
 
-    <Target Name="CORE.dll" Inputs="CORE.cs;SAFE.dll;Kernel.dll" Outputs="CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
-        <Csc Sources="CORE.cs" TargetType="library"
-            OutputAssembly="CORE.dll" References="SAFE.dll;Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot CORE.dll"/>
+    <Target Name="CORE.dll" Inputs="build\CORE.cs;build\SAFE.dll;build\Kernel.dll" Outputs="build\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
+        <Csc Sources="build\CORE.cs" TargetType="library"
+            AdditionalLibPaths="build" OutputAssembly="build\CORE.dll"
+            References="SAFE.dll;Kernel.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot build\CORE.dll"/>
     </Target>
 
-    <Target Name="SAFE.dll" Inputs="SAFE.cs;Kernel.dll" Outputs="SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
-        <Csc Sources="SAFE.cs" TargetType="library"
-            OutputAssembly="SAFE.dll" References="Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot SAFE.dll"/>
+    <Target Name="SAFE.dll" Inputs="build\SAFE.cs;build\Kernel.dll"
+        Outputs="build\SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
+        <Csc Sources="build\SAFE.cs" TargetType="library"
+            AdditionalLibPaths="build" OutputAssembly="build\SAFE.dll"
+            References="Kernel.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot build\SAFE.dll"/>
     </Target>
 
-    <Target Name="Test.dll" Inputs="Test.cs;CORE.dll;Kernel.dll" Outputs="Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
-        <Csc Sources="Test.cs" TargetType="library"
-            OutputAssembly="Test.dll" References="CORE.dll;SAFE.dll;Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot Test.dll"/>
+    <Target Name="Test.dll" Inputs="build\Test.cs;build\CORE.dll;build\Kernel.dll" Outputs="build\Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
+        <Csc Sources="build\Test.cs" TargetType="library"
+            AdditionalLibPaths="build" OutputAssembly="build\Test.dll"
+            References="CORE.dll;SAFE.dll;Kernel.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot build\Test.dll"/>
     </Target>
 
     <!-- Proper compiler bits -->
@@ -112,9 +123,9 @@
             ContinueOnError="true"/>
     </Target>
 
-    <Target Name="PerlTask" Inputs="PerlTask.cs" Outputs="PerlTask.dll">
+    <Target Name="PerlTask" Inputs="PerlTask.cs" Outputs="build\PerlTask.dll">
         <Csc Sources="PerlTask.cs" TargetType="library"
-            OutputAssembly="PerlTask.dll"
+            OutputAssembly="build\PerlTask.dll"
             References="Microsoft.Build.Framework.dll;Microsoft.Build.Utilities.dll"/>
     </Target>
 </Project>

@@ -8,7 +8,7 @@ use Sub::Exporter -setup => {
 };
 
 use Time::HiRes 'time';
-
+use File::Basename;
 use autodie ':all';
 
 open ::NIECZA_OUT, ">&", \*STDOUT;
@@ -30,8 +30,21 @@ use Storable;
 use Niecza::Grammar ();
 use Niecza::Actions ();
 
-# TODO
-my $builddir = File::Spec->curdir;
+my $builddir;
+{
+    my $libdir = dirname($INC{'CompilerDriver.pm'});
+    $builddir = File::Spec->catdir($libdir, "build");
+}
+File::Path::make_path($builddir);
+
+sub build_file { File::Spec->catfile($builddir, $_[1]) }
+
+sub metadata_for {
+    my ($cl, $unit) = @_;
+    $unit =~ s/::/./g;
+
+    Storable::retrieve(File::Spec->catfile($builddir, "$unit.store"))
+}
 
 {
     package
@@ -100,7 +113,7 @@ sub compile {
     $::UNITNAME =~ s|[\\/]|.|g;
     $STD::ALL = {};
 
-    $::SETTING_RESUME = retrieve($args{lang} . '.store')->{setting}
+    $::SETTING_RESUME = CompilerDriver->metadata_for($args{lang})->{setting}
         unless $args{lang} eq 'NULL';
     $::UNITDEPS{$args{lang}} = 1 if $args{lang} ne 'NULL';
 
@@ -109,6 +122,9 @@ sub compile {
 
     my $ast;
     my $basename = $::UNITNAME || 'MAIN';
+    my $csfile = File::Spec->catfile($builddir, "$basename.cs");
+    my $outname = File::Spec->catfile($builddir,
+        $basename . ($args{main} ? ".exe" : ".dll"));
 
     my @phases = (
         [ 'parse', sub {
@@ -124,7 +140,7 @@ sub compile {
         [ 'to_anf', sub { $ast->to_anf } ],
         [ 'writecs', sub {
 
-            open ::NIECZA_OUT, ">", "$basename.cs";
+            open ::NIECZA_OUT, ">", $csfile;
             binmode ::NIECZA_OUT, ":utf8";
             print ::NIECZA_OUT <<EOH;
 using System;
@@ -137,18 +153,24 @@ EOH
             if ($::SETTING_RESUME || $::niecza_mod_symbols) {
                 my $blk = { setting => $::SETTING_RESUME,
                             syml    => $::niecza_mod_symbols };
-                store $blk, "$basename.store";
+                store $blk, File::Spec->catfile($builddir, "$basename.store");
             }
-            $ast = undef; } ],
+            $ast = undef;
+        } ],
         [ 'gmcs', sub {
             delete $::UNITDEPS{$basename};
-            system "gmcs", ($args{main} ? () : ("/target:library")),
+            my @args = ("gmcs",
+                ($args{main} ? () : ("/target:library")),
+                "/lib:$builddir",
                 "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITDEPS),
-                "/out:${basename}." . ($args{main} ? 'exe' : 'dll'),
-                "${basename}.cs"; } ],
+                "/out:$outname",
+                $csfile);
+            print STDERR "@args\n" if $args{stagetime};
+            system @args;
+        } ],
         [ 'aot', sub {
-            system "mono", "--aot", "${basename}." .
-                ($args{main} ? 'exe' : 'dll'); } ]);
+            system "mono", "--aot", $outname;
+        } ]);
 
     for my $p (@phases) {
         next if $p->[0] eq 'aot' && !$args{aot};

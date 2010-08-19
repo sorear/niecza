@@ -53,7 +53,8 @@ $lang = 'SAFE' if $safe;
 sub run {
     compile(main => !$module, stopafter => $stopafter, aot => $aot,
         stagetime => $stagestats, lang => $lang, safe => $safe, @_);
-    system 'mono MAIN.exe' if !$module && !$stopafter;
+    system 'mono', CompilerDriver->build_file('MAIN.exe')
+        if !$module && !$stopafter;
 }
 
 if (@ARGV) {
