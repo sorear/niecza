@@ -44,15 +44,15 @@
         <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot Kernel.dll"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);SAFE_ast.store;CORE.setting" Outputs="CORE.cs;CORE_ast.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
+    <Target Name="CORE.cs" Inputs="@(CompilerPerl);SAFE.store;CORE.setting" Outputs="CORE.cs;CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'SAFE', file => 'CORE.setting');"/>
     </Target>
 
-    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting" Outputs="SAFE.cs;SAFE_ast.store" DependsOnTargets="BuildSTD;Grammar;PerlTask">
+    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting" Outputs="SAFE.cs;SAFE.store" DependsOnTargets="BuildSTD;Grammar;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'NULL', file => 'SAFE.setting');"/>
     </Target>
 
-    <Target Name="Test.cs" Inputs="@(CompilerPerl);CORE_ast.store;Test.pm6" Outputs="Test.cs;Test_ast.store" DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
+    <Target Name="Test.cs" Inputs="@(CompilerPerl);CORE.store;Test.pm6" Outputs="Test.cs;Test.store" DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
         <Perl Code="use CompilerDriver ':all'; compile(stopafter => 'writecs', lang => 'CORE', file => 'Test.pm6');"/>
     </Target>
 

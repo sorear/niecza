@@ -482,7 +482,7 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        my $scope = Storable::retrieve($self->unit . "_ast.store");
+        my $scope = Storable::retrieve($self->unit . ".store")->{setting};
 
         CodeGen->know_module($self->unit);
         CgOp::prog(
