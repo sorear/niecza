@@ -229,7 +229,6 @@ use CgOp;
 
         $::SETTING_RESUME = $body->scopetree;
         my $n = $self->unitname;
-        $n =~ s/::/./g;
 
         CgOp::rawsset($n . '.Environment', CgOp::letvar('protopad'));
     }
@@ -482,7 +481,7 @@ use CgOp;
 
     sub preinit_code {
         my ($self, $body) = @_;
-        my $scope = CompilerDriver->metadata_for($self->unit)->{setting};
+        my $scope = CompilerDriver::metadata_for($self->unit)->{setting};
 
         CodeGen->know_module($self->unit);
         CgOp::prog(

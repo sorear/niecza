@@ -26,15 +26,15 @@ use 5.010;
         my $self = shift;
         $self->mainline->to_cgop;
         $self->bootcgop(CgOp::letn('pkg', CgOp::rawsget('Kernel.Global'),
-                CgOp::rawscall($self->csname($self->setting_name) . '.Initialize'),
+                CgOp::rawscall($self->setting_name . '.Initialize'),
                 CgOp::letn('protopad',
-                    CgOp::cast('Frame', CgOp::rawsget($self->csname($self->setting_name) .
+                    CgOp::cast('Frame', CgOp::rawsget($self->setting_name .
                             '.Environment')),
                     ($self->is_setting ?
-                        CgOp::rawsset($self->csname . '.Installer',
+                        CgOp::rawsset($self->name . '.Installer',
                             CgOp::prog(CgOp::protosub($self->mainline),
                                 CgOp::sub_obj($self->mainline))) :
-                        CgOp::subcall(CgOp::rawsget($self->csname($self->setting_name) . '.Installer'),
+                        CgOp::subcall(CgOp::rawsget($self->setting_name . '.Installer'),
                             CgOp::prog(CgOp::protosub($self->mainline), CgOp::sub_var($self->mainline)))),
                     CgOp::return())));
     }
@@ -48,20 +48,13 @@ use 5.010;
         $_[0]->mainline->extract_scopes($_[0]->setting);
     }
 
-    sub csname {
-        my $x = $_[1] // $_[0]->name;
-        $x =~ s/::/./g;
-        $x ||= 'MAIN';
-        $x;
-    }
-
     sub write {
         my ($self) = @_;
-        CodeGen->know_module($self->csname($self->setting_name));
-        CodeGen->know_module($self->csname);
+        CodeGen->know_module($self->setting_name);
+        CodeGen->know_module($self->name);
 
         print ::NIECZA_OUT <<EOH;
-public class @{[ $self->csname ]} {
+public class @{[ $self->name ]} {
 EOH
         $self->mainline->write;
         CodeGen->new(csname => 'BOOT', ops => $self->bootcgop)->write;
@@ -70,7 +63,7 @@ EOH
     public static IP6 Installer;
 EOSB
         }
-        if (!$self->name) { # || has_MAIN
+        if ($self->name eq 'MAIN') {
             print ::NIECZA_OUT <<EOMAIN ;
     public static void Main() {
         Initialize();

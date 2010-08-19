@@ -1827,9 +1827,11 @@ sub statement_control__S_use { my ($cl, $M) = @_;
         return;
     }
 
-    my $meta = CompilerDriver->metadata_for($name);
+    my $meta = CompilerDriver::metadata_for($name);
     $::UNITREFS{$name} = 1;
+    $::UNITREFSTRANS{$name} = 1;
     %::UNITDEPSTRANS = (%::UNITDEPSTRANS, %{ $meta->{deps} });
+    %::UNITREFSTRANS = (%::UNITREFSTRANS, %{ $meta->{trefs} });
     my %symbols;
     $symbols{$name} = [ $name ];
     $symbols{$name . '::'} = [ $name . '::' ];
@@ -2165,7 +2167,7 @@ sub comp_unit { my ($cl, $M) = @_;
     my $body;
     my $sl = $M->{statementlist}{_ast};
 
-    if (!$::YOU_WERE_HERE && $::UNITNAME) {
+    if (!$::YOU_WERE_HERE && $::UNITNAME ne 'MAIN') {
         $sl = Op::StatementList->new(node($M), children => [ $sl,
                 Op::YouAreHere->new(save_only => 1, unitname => $::UNITNAME)]);
     }
@@ -2185,10 +2187,11 @@ sub comp_unit { my ($cl, $M) = @_;
                     var => $cl->gensym, body => $body)]));
     }
 
+    my $sn = $::SETTINGNAME; $sn =~ s/::/./g;
     $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME,
         ($::SETTING_RESUME ? (setting => $::SETTING_RESUME) : ()),
         is_setting => (!!$::YOU_WERE_HERE),
-        setting_name => $::SETTINGNAME);
+        setting_name => $sn);
 }
 
 1;

@@ -27,7 +27,7 @@
     <Target Name="SafeMode" DependsOnTargets="SAFE.dll;WriteVersion"/>
 
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'CORE', main => 1, file => 'test.pl');"/>
+        <Perl Code="compile(stopafter => 'writecs', file => 'test.pl');"/>
         <Csc Sources="obj\MAIN.cs" TargetType="exe" AdditionalLibPaths="obj"
             OutputAssembly="obj\MAIN.exe"
             References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
@@ -48,19 +48,19 @@
     </Target>
 
     <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', file => 'lib/CORE.setting');"/>
+        <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', setting => 1, name => 'CORE');"/>
     </Target>
 
     <Target Name="SAFE.cs" Inputs="@(CompilerPerl);lib\SAFE.setting"
         Outputs="obj\SAFE.cs;obj\SAFE.store"
         DependsOnTargets="BuildSTD;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', file => 'lib/SAFE.setting');"/>
+        <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', setting => 1, name => 'SAFE');"/>
     </Target>
 
     <Target Name="Test.cs" Inputs="@(CompilerPerl);obj\CORE.store;lib\Test.pm6"
         Outputs="obj\Test.cs;obj\Test.store"
         DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'CORE', file => 'lib/Test.pm6');"/>
+        <Perl Code="compile(stopafter => 'writecs', name => 'Test');"/>
     </Target>
 
     <Target Name="CORE.dll" Inputs="obj\CORE.cs;obj\SAFE.dll;obj\Kernel.dll" Outputs="obj\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">

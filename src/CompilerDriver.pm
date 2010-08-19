@@ -43,11 +43,46 @@ File::Path::make_path($builddir);
 sub build_file { File::Spec->catfile($builddir, $_[1]) }
 
 sub metadata_for {
-    my ($cl, $unit) = @_;
+    my ($unit) = @_;
     $unit =~ s/::/./g;
 
     Storable::retrieve(File::Spec->catfile($builddir, "$unit.store"))
 }
+
+sub get_perl6lib {
+    $libdir, File::Spec->curdir
+}
+
+sub find_module {
+    my $module = shift;
+    my $issetting = shift;
+
+    my @toks = split '::', $module;
+    my $end = pop @toks;
+
+    for my $d (get_perl6lib) {
+        for my $ext (qw( .setting .pm6 .pm )) {
+            next if ($issetting xor ($ext eq '.setting'));
+
+            my $file = File::Spec->catfile($d, @toks, "$end$ext");
+            next unless -f $file;
+
+            if ($ext eq '.pm') {
+                local $/;
+                open my $pm, "<", $file or next;
+                my $pmtx = <$pm>;
+                close $pm;
+                next if $pmtx =~ /^\s*package\s+\w+\s*;/m; # ignore p5 code
+            }
+
+            return $file;
+        }
+    }
+
+    return;
+}
+
+
 
 {
     package
@@ -59,23 +94,22 @@ sub metadata_for {
         $::niecza_mod_symbols = $all;
     }
 
-    sub sys_get_perl6lib {
-        $libdir, File::Spec->curdir
-    }
-
     sub sys_load_modinfo {
         my $self = shift;
         my $module = shift;
-        $module =~ s/::/./g;
+        return CompilerDriver::metadata_for($module)->{'syml'};
+        #$module =~ s/::/./g;
 
-        my ($symlfile) = File::Spec->catfile($builddir, "$module.store");
-        my ($modfile) = $self->sys_find_module($module, 0)
-            or return undef;
+        #my ($symlfile) = File::Spec->catfile($builddir, "$module.store");
+        #my ($modfile) = CompilerDriver::find_module($module, 0) or do {
+        #    $self->sorry("Cannot locate module $module");
+        #    return undef;
+        #};
 
-        unless (-f $symlfile and -M $modfile > -M $symlfile) {
-            $self->sys_compile_module($module, $symlfile, $modfile);
-        }
-        return Storable::retrieve($symlfile)->{'syml'};
+        #unless (-f $symlfile and -M $modfile > -M $symlfile) {
+        #    $self->sys_compile_module($module, $symlfile, $modfile);
+        #}
+        #return CompilerDriver::metadata_for($symlfile)->{'syml'};
     }
 
     sub load_lex {
@@ -104,46 +138,54 @@ sub metadata_for {
 
 sub compile {
     my %args = @_;
-    $args{lang} //= 'CORE';
+
+    my ($name, $file, $code, $lang, $safe, $setting) =
+        @args{'name', 'file', 'code', 'lang', 'safe', 'setting'};
+
+    $lang //= 'CORE';
+
+    if (defined($name) + defined($file) + defined($code) != 1) {
+        Carp::croak("Exactly one of name, file, and code must be used");
+    }
+
+    my $path = $file;
+    if (defined($name)) {
+        $path = find_module($name, $setting);
+        if (!defined($path)) {
+            Carp::croak("Module $name not found");
+        }
+    }
 
     local %::UNITREFS;
+    local %::UNITREFSTRANS;
     local %::UNITDEPSTRANS;
     local $::SETTING_RESUME;
     local $::niecza_mod_symbols;
     local $::YOU_WERE_HERE;
-    local $::UNITNAME = $args{main} ? '' : $args{file};
-    local $::SAFEMODE = $args{safe};
-    $::UNITNAME =~ s/\.(?:pm6?|setting)//;
-    $::UNITNAME =~ s|[\\/]|.|g;
-    $::UNITNAME =~ s|lib\.||; # XXX
+    local $::UNITNAME = $name // 'MAIN';
+    $::UNITNAME =~ s/::/./g;
+    local $::SAFEMODE = $safe;
     $STD::ALL = {};
 
-    if ($::UNITNAME && !defined($args{file})) {
-        Carp::croak("Evals cannot be modules");
+    $::SETTING_RESUME = metadata_for($lang)->{setting} unless $lang eq 'NULL';
+    $::UNITREFS{$lang} = 1 if $lang ne 'NULL';
+
+    if (defined($name)) {
+        my $rp = Cwd::realpath($path);
+        $::UNITDEPSTRANS{$name} = [ $rp, ((stat $rp)[9]) ];
     }
 
-    $::SETTING_RESUME = CompilerDriver->metadata_for($args{lang})->{setting}
-        unless $args{lang} eq 'NULL';
-    $::UNITREFS{$args{lang}} = 1 if $args{lang} ne 'NULL';
-
-    my $time = $args{file} ? ((stat $args{file})[9]) : 0;
-
-    if ($::UNITNAME) {
-        $::UNITDEPSTRANS{$::UNITNAME} = [ Cwd::realpath($args{file}), $time ];
-    }
-
-    my ($m, $a) = $args{file} ? ('parsefile', $args{file}) :
-        ('parse', $args{code});
+    my ($m, $a) = defined($path) ? (parsefile => $path) : (parse => $code);
 
     my $ast;
-    my $basename = $::UNITNAME || 'MAIN';
+    my $basename = $::UNITNAME;
     my $csfile = File::Spec->catfile($builddir, "$basename.cs");
-    my $outname = File::Spec->catfile($builddir,
+    my $outfile = File::Spec->catfile($builddir,
         $basename . ($args{main} ? ".exe" : ".dll"));
 
     my @phases = (
         [ 'parse', sub {
-            $ast = Niecza::Grammar->$m($a, setting => $args{lang},
+            $ast = Niecza::Grammar->$m($a, setting => $lang,
                 actions => 'Niecza::Actions')->{_ast}; } ],
         [ 'lift_decls', sub {
             $::SETTING_RESUME = undef;
@@ -165,10 +207,11 @@ using Niecza;
 EOH
             $ast->write;
             close ::NIECZA_OUT;
-            if ($::UNITNAME) {
+            if (defined $name) {
                 my $blk = { setting => $::SETTING_RESUME,
                             deps    => \%::UNITDEPSTRANS,
                             refs    => \%::UNITREFS,
+                            trefs   => \%::UNITREFSTRANS,
                             syml    => $::niecza_mod_symbols };
                 store $blk, File::Spec->catfile($builddir, "$basename.store");
             }
@@ -180,13 +223,13 @@ EOH
                 ($args{main} ? () : ("/target:library")),
                 "/lib:$builddir",
                 "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITREFS),
-                "/out:$outname",
+                "/out:$outfile",
                 $csfile);
             print STDERR "@args\n" if $args{stagetime};
             system @args;
         } ],
         [ 'aot', sub {
-            system "mono", "--aot", $outname;
+            system "mono", "--aot", $outfile;
         } ]);
 
     for my $p (@phases) {

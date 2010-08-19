@@ -54,11 +54,10 @@ use CgOp ();
             if ($le->[2] == 1 || $le->[2] == 3) {
                 my $sanname = $le->[0];
                 $sanname =~ s/\W//g;
-                $le->[3] = sprintf "%s.F%d_%d_%s", Unit->csname($::UNITNAME),
-                    $self->uid, $nfields_global++, $sanname;
+                $le->[3] = sprintf "%s.F%d_%d_%s", $::UNITNAME, $self->uid,
+                    $nfields_global++, $sanname;
             } elsif ($le->[2] == 2) {
-                $le->[3] = sprintf "%s.%s_info", Unit->csname($::UNITNAME),
-                    $self->csname;
+                $le->[3] = sprintf "%s.%s_info", $::UNITNAME, $self->csname;
             } else {
                 # TODO generate numbered lookups for clonedvars
             }

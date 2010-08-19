@@ -19,6 +19,7 @@ my $stagestats;
 my $stopafter;
 my $aot;
 my $lang = 'CORE';
+my $setting;
 my $safe;
 
 sub usage {
@@ -28,15 +29,16 @@ niecza -- a command line wrapper for Niecza
 
 usage: niecza -e 'code'      # run a one-liner
    OR: niecza file.pl        # run a program
-   OR: niecza -c File.pm     # precompile a module
+   OR: niecza -c My::Module  # precompile a module
    OR: niecza                # interactive shell
 
 general options:
-   --language=NAME           # select your setting
-   --stage-stats             # detailed timing info
-   --stop-after=STAGE        # stop after STAGE and dump AST
-   --aot                     # run ahead-of-time compiler
-   --safe                    # disable system interaction, implies -L SAFE
+   -L --language=NAME        # select your setting
+      --setting              # precompile target is a setting
+   -v --stage-stats          # detailed timing info
+      --stop-after=STAGE     # stop after STAGE and dump AST
+      --aot                  # run ahead-of-time compiler
+      --safe                 # disable system interaction, implies -L SAFE
 EOM
     exit $ex;
 }
@@ -44,7 +46,7 @@ EOM
 GetOptions('evaluate|e=s' => \@evaluate, 'aot' => \$aot,
         'compile|c' => \$module, 'language|L=s' => \$lang,
         'stage-stats|v' => \$stagestats, 'stop-after=s' => \$stopafter,
-        'safe' => \$safe)
+        'safe' => \$safe, 'setting' => \$setting)
     or usage(\*STDERR, 1);
 
 my $excl = 0;
@@ -57,13 +59,18 @@ if ($excl > 1 || $module && !@ARGV || $safe && ($lang ne 'CORE')) {
 $lang = 'SAFE' if $safe;
 
 sub run {
-    compile(main => !$module, stopafter => $stopafter, aot => $aot,
-        stagetime => $stagestats, lang => $lang, safe => $safe, @_);
+    compile(stopafter => $stopafter, aot => $aot,
+        stagetime => $stagestats, lang => $lang, safe => $safe,
+        setting => $setting, @_);
     system 'mono', CompilerDriver->build_file('MAIN.exe')
-        if !$module && !$stopafter;
+        if !({@_}->{name}) && !$stopafter;
 }
 
-if (@ARGV) {
+if ($module) {
+    for (@ARGV) {
+        run(name => $_);
+    }
+} elsif (@ARGV) {
     require File::Slurp;
     for (@ARGV) {
         run(file => $_);
