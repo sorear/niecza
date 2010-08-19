@@ -31,7 +31,7 @@
         <Csc Sources="obj\MAIN.cs" TargetType="exe" AdditionalLibPaths="obj"
             OutputAssembly="obj\MAIN.exe"
             References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
-        <Exec Command="prove -e mono obj\MAIN.exe"/>
+        <Exec Command="prove -e mono obj/MAIN.exe"/>
     </Target>
 
     <Target Name="WriteVersion">
@@ -41,26 +41,26 @@
     <!-- Libraries -->
     <Target Name="Kernel.dll" Inputs="Kernel.cs;Cursor.cs"
         Outputs="obj\Kernel.dll">
-        <Csc Sources="Kernel.cs;Cursor.cs" TargetType="library"
+        <Csc Sources="lib\Kernel.cs;lib\Cursor.cs" TargetType="library"
             OutputAssembly="obj\Kernel.dll"/>
         <Exec Condition="$(UseAOT) == 'Y'"
             Command="mono --aot obj\Kernel.dll"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', file => 'CORE.setting');"/>
+    <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
+        <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', file => 'lib/CORE.setting');"/>
     </Target>
 
-    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);SAFE.setting"
+    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);lib\SAFE.setting"
         Outputs="obj\SAFE.cs;obj\SAFE.store"
         DependsOnTargets="BuildSTD;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', file => 'SAFE.setting');"/>
+        <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', file => 'lib/SAFE.setting');"/>
     </Target>
 
-    <Target Name="Test.cs" Inputs="@(CompilerPerl);obj\CORE.store;Test.pm6"
+    <Target Name="Test.cs" Inputs="@(CompilerPerl);obj\CORE.store;lib\Test.pm6"
         Outputs="obj\Test.cs;obj\Test.store"
         DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'CORE', file => 'Test.pm6');"/>
+        <Perl Code="compile(stopafter => 'writecs', lang => 'CORE', file => 'lib/Test.pm6');"/>
     </Target>
 
     <Target Name="CORE.dll" Inputs="obj\CORE.cs;obj\SAFE.dll;obj\Kernel.dll" Outputs="obj\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">

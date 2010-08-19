@@ -30,10 +30,12 @@ use Storable;
 use Niecza::Grammar ();
 use Niecza::Actions ();
 
-my $builddir;
+my ($srcdir, $rootdir, $builddir, $libdir);
 {
-    my $libdir = dirname($INC{'CompilerDriver.pm'});
-    $builddir = File::Spec->catdir($libdir, "../obj");
+    $srcdir   = dirname($INC{'CompilerDriver.pm'});
+    $rootdir  = dirname($srcdir);
+    $builddir = File::Spec->catdir($rootdir, "obj");
+    $libdir   = File::Spec->catdir($rootdir, "lib");
 }
 File::Path::make_path($builddir);
 
@@ -57,7 +59,7 @@ sub metadata_for {
     }
 
     sub sys_get_perl6lib {
-        File::Spec->curdir
+        $libdir, File::Spec->curdir
     }
 
     sub sys_load_modinfo {
