@@ -82,8 +82,6 @@ sub find_module {
     return;
 }
 
-
-
 {
     package
         CursorBase;
@@ -94,22 +92,53 @@ sub find_module {
         $::niecza_mod_symbols = $all;
     }
 
+    sub sys_do_compile_module {
+        my ($self, $mod, $syml, $file) = @_;
+        CompilerDriver::compile(name => $mod, stagetime => $::stagetime);
+    }
+
     sub sys_load_modinfo {
         my $self = shift;
         my $module = shift;
-        return CompilerDriver::metadata_for($module)->{'syml'};
-        #$module =~ s/::/./g;
 
-        #my ($symlfile) = File::Spec->catfile($builddir, "$module.store");
-        #my ($modfile) = CompilerDriver::find_module($module, 0) or do {
-        #    $self->sorry("Cannot locate module $module");
-        #    return undef;
-        #};
+        my $csmod = $module;
+        $csmod =~ s/::/./g;
+        my ($symlfile) = File::Spec->catfile($builddir, "$csmod.store");
+        my ($modfile) = CompilerDriver::find_module($module, 0) or do {
+            $self->sorry("Cannot locate module $module");
+            return undef;
+        };
 
-        #unless (-f $symlfile and -M $modfile > -M $symlfile) {
-        #    $self->sys_compile_module($module, $symlfile, $modfile);
-        #}
-        #return CompilerDriver::metadata_for($symlfile)->{'syml'};
+        REUSE: {
+            last REUSE unless -f $symlfile;
+            my $meta = Storable::retrieve($symlfile);
+
+            for my $dmod (keys %{ $meta->{deps} }) {
+                my ($dpath, $dtime) = @{ $meta->{deps}{$dmod} };
+
+                my ($npath) = CompilerDriver::find_module($dmod, 0) or do {
+                    $self->sorry("Dependancy $dmod of $module cannot be located");
+                    return undef;
+                };
+
+                $npath = Cwd::realpath($npath);
+                if ($npath ne $dpath) {
+                    print STDERR "Recompiling $module because dependancy $dmod now points to $npath, was $dpath\n";
+                    last REUSE;
+                }
+
+                my $ntime = (stat $npath)[9];
+                if ($ntime ne $dtime) {
+                    print STDERR "Recompiling $module because dependancy $dmod is newer ($dtime -> $ntime)\n";
+                    last REUSE;
+                }
+            }
+
+            return $meta->{'syml'};
+        }
+
+        $self->sys_compile_module($module, $symlfile, $modfile);
+        return Storable::retrieve($symlfile)->{'syml'};
     }
 
     sub load_lex {
@@ -156,6 +185,7 @@ sub compile {
         }
     }
 
+    local $::stagetime = $args{stagetime};
     local %::UNITREFS;
     local %::UNITREFSTRANS;
     local %::UNITDEPSTRANS;
@@ -170,7 +200,7 @@ sub compile {
     $::SETTING_RESUME = metadata_for($lang)->{setting} unless $lang eq 'NULL';
     $::UNITREFS{$lang} = 1 if $lang ne 'NULL';
 
-    if (defined($name)) {
+    if (defined($name) && !$setting) {
         my $rp = Cwd::realpath($path);
         $::UNITDEPSTRANS{$name} = [ $rp, ((stat $rp)[9]) ];
     }
@@ -181,7 +211,7 @@ sub compile {
     my $basename = $::UNITNAME;
     my $csfile = File::Spec->catfile($builddir, "$basename.cs");
     my $outfile = File::Spec->catfile($builddir,
-        $basename . ($args{main} ? ".exe" : ".dll"));
+        $basename . (defined($name) ? ".dll" : ".exe"));
 
     my @phases = (
         [ 'parse', sub {
@@ -220,7 +250,7 @@ EOH
         [ 'gmcs', sub {
             delete $::UNITREFS{$basename};
             my @args = ("gmcs",
-                ($args{main} ? () : ("/target:library")),
+                (defined($name) ? ("/target:library") : ()),
                 "/lib:$builddir",
                 "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITREFS),
                 "/out:$outfile",
