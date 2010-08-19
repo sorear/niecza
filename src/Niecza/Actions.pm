@@ -1827,7 +1827,9 @@ sub statement_control__S_use { my ($cl, $M) = @_;
         return;
     }
 
-    $::UNITDEPS{$name} = 1;
+    my $meta = CompilerDriver->metadata_for($name);
+    $::UNITREFS{$name} = 1;
+    %::UNITDEPSTRANS = (%::UNITDEPSTRANS, %{ $meta->{deps} });
     my %symbols;
     $symbols{$name} = [ $name ];
     $symbols{$name . '::'} = [ $name . '::' ];

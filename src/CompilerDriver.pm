@@ -106,7 +106,8 @@ sub compile {
     my %args = @_;
     $args{lang} //= 'CORE';
 
-    local %::UNITDEPS;
+    local %::UNITREFS;
+    local %::UNITDEPSTRANS;
     local $::SETTING_RESUME;
     local $::niecza_mod_symbols;
     local $::YOU_WERE_HERE;
@@ -114,11 +115,22 @@ sub compile {
     local $::SAFEMODE = $args{safe};
     $::UNITNAME =~ s/\.(?:pm6?|setting)//;
     $::UNITNAME =~ s|[\\/]|.|g;
+    $::UNITNAME =~ s|lib\.||; # XXX
     $STD::ALL = {};
+
+    if ($::UNITNAME && !defined($args{file})) {
+        Carp::croak("Evals cannot be modules");
+    }
 
     $::SETTING_RESUME = CompilerDriver->metadata_for($args{lang})->{setting}
         unless $args{lang} eq 'NULL';
-    $::UNITDEPS{$args{lang}} = 1 if $args{lang} ne 'NULL';
+    $::UNITREFS{$args{lang}} = 1 if $args{lang} ne 'NULL';
+
+    my $time = $args{file} ? ((stat $args{file})[9]) : 0;
+
+    if ($::UNITNAME) {
+        $::UNITDEPSTRANS{$::UNITNAME} = [ Cwd::realpath($args{file}), $time ];
+    }
 
     my ($m, $a) = $args{file} ? ('parsefile', $args{file}) :
         ('parse', $args{code});
@@ -153,19 +165,21 @@ using Niecza;
 EOH
             $ast->write;
             close ::NIECZA_OUT;
-            if ($::SETTING_RESUME || $::niecza_mod_symbols) {
+            if ($::UNITNAME) {
                 my $blk = { setting => $::SETTING_RESUME,
+                            deps    => \%::UNITDEPSTRANS,
+                            refs    => \%::UNITREFS,
                             syml    => $::niecza_mod_symbols };
                 store $blk, File::Spec->catfile($builddir, "$basename.store");
             }
             $ast = undef;
         } ],
         [ 'gmcs', sub {
-            delete $::UNITDEPS{$basename};
+            delete $::UNITREFS{$basename};
             my @args = ("gmcs",
                 ($args{main} ? () : ("/target:library")),
                 "/lib:$builddir",
-                "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITDEPS),
+                "/r:Kernel.dll", (map { "/r:$_.dll" } sort keys %::UNITREFS),
                 "/out:$outname",
                 $csfile);
             print STDERR "@args\n" if $args{stagetime};

@@ -72,7 +72,7 @@ sub resolve_lex {
     }
 
     if (($kind == 1 || $kind == 2 || $kind == 3) && $data =~ /(.*)\./) {
-        $::UNITDEPS{$1} = 1;
+        $::UNITREFS{$1} = 1;
     }
 
     if ($kind == 3) {
