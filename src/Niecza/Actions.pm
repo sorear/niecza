@@ -625,6 +625,26 @@ sub assertion__S_method { my ($cl, $M) = @_;
         zyg => $M->{assertion}{_ast}->zyg);
 }
 
+sub assertion__S_Question { my ($cl, $M) = @_;
+    if ($M->{assertion}) {
+        $M->{_ast} = RxOp::Before->new(zyg => [$M->{assertion}{_ast}]);
+    } else {
+        $M->{_ast} = RxOp::Sequence->new;
+    }
+}
+
+sub assertion__S_Bang { my ($cl, $M) = @_;
+    if ($M->{assertion}) {
+        $M->{_ast} = RxOp::Before->new(zyg => [$M->{assertion}{_ast}]);
+    } else {
+        $M->{_ast} = RxOp::None->new;
+    }
+}
+
+sub assertion__S_Cur_Ly { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::CheckBlock->new(block => $M->{embeddedblock}{_ast});
+}
+
 # These have effects only in the parser, so undef ast is correct.
 sub mod_value {}
 sub mod_internal {}
