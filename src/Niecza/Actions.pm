@@ -9,6 +9,7 @@ use RxOp;
 use Body;
 use Unit;
 use Sig;
+use CClass;
 
 use Try::Tiny;
 
@@ -531,11 +532,11 @@ sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Back { my ($cl, $M) = @_;
-    my $cl = $M->{backslash}{_ast};
-    $M->{_ast} = ref($cl) ?
-        RxOp::CClass->new(cc => CClass->build(@$cl),
+    my $cc = $M->{backslash}{_ast};
+    $M->{_ast} = ref($cc) ?
+        RxOp::CClass->new(cc => CClass->build(@$cc),
             igcase => $::RX{i}, igmark => $::RX{a}) :
-        RxOp::String->new(text => $cl,
+        RxOp::String->new(text => $cc,
             igcase => $::RX{i}, igmark => $::RX{a});
 }
 
@@ -575,10 +576,6 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
     }
     $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
         igcase => $::RX{i}, igmark => $::RX{a});
-}
-
-sub cclass_elem { my ($cl, $M) = @_;
-    ...
 }
 
 sub rxcapturize { my ($cl, $name, $rxop) = @_;
@@ -719,6 +716,15 @@ sub escape__S_At { my ($cl, $M) = @_;
 sub escape__S_Percent { my ($cl, $M) = @_;
     $M->{_ast} = $M->{EXPR}{_ast};
 }
+sub escape__S_ch { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{ch}->Str;
+}
+sub escape__S_ws { my ($cl, $M) = @_;
+    $M->{_ast} = "";
+}
+sub escape__S_DotDot { my ($cl, $M) = @_;
+    $M->{_ast} = \"DotDot";  #yuck
+}
 
 sub nibbler { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
@@ -734,6 +740,36 @@ sub nibbler { my ($cl, $M) = @_;
             $::CURLEX->{$k}{used} = 1 if $k =~ /^[\@\%\&\$]\w/;
         }
         $M->{_ast} = Op::CgOp->new(node($M), optree => $M->{cgexp}{_ast});
+    } elsif ($M->can('ccstate')) { #XXX XXX try to catch cclasses
+        my @bits = @{ $M->{nibbles} };
+        my @addends;
+        FACTOR: for (my $i = 0; $i < @bits; ) {
+            if (@bits - $i >= 3 && ref($bits[$i+1]->{_ast}) eq 'SCALAR') {
+                $i += 3;
+                for (@bits[$i-3, $i-1]) {
+                    if (ref($_->{_ast}) || length($_->{_ast}) != 1) {
+                        $_->sorry("Bad range endpoint");
+                        next FACTOR;
+                    } else {
+                        $_ = $_->{_ast};
+                    }
+                }
+                push @addends, CClass->range($bits[$i-3], $bits[$i-1]);
+            } else {
+                $i++;
+                if (ref($_->{_ast})) {
+                    push @addends, $_->{_ast};
+                } elsif (length($_->{_ast}) != 1) {
+                    $_->sorry("Improper attempt to use a non-unit-length string in a character class");
+                    next FACTOR;
+                } else {
+                    push @addends, CClass->enum($_->{_ast});
+                }
+            }
+        }
+        $M->{_ast} = $CClass::Empty;
+        $M->{_ast} = $M->{_ast}->plus($_) for @addends;
+        say(YAML::XS::Dump($M->{_ast}));
     } else {
         # garden variety nibbler
         my @bits;
