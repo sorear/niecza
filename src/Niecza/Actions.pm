@@ -121,6 +121,8 @@ sub category__S_assertion { }
 sub category__S_quantifier { }
 sub category__S_mod_internal { }
 
+sub sign { }
+
 sub decint { my ($cl, $M) = @_;
     $M->{_ast} = eval $M->Str; # XXX use a real string parser
 }
@@ -529,7 +531,12 @@ sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Back { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{backslash}{_ast};
+    my $cl = $M->{backslash}{_ast};
+    $M->{_ast} = ref($cl) ?
+        RxOp::CClass->new(cc => CClass->build(@$cl),
+            igcase => $::RX{i}, igmark => $::RX{a}) :
+        RxOp::String->new(text => $cl,
+            igcase => $::RX{i}, igmark => $::RX{a});
 }
 
 sub metachar__S_Dot { my ($cl, $M) = @_;
@@ -568,6 +575,10 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
     }
     $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
         igcase => $::RX{i}, igmark => $::RX{a});
+}
+
+sub cclass_elem { my ($cl, $M) = @_;
+    ...
 }
 
 sub rxcapturize { my ($cl, $name, $rxop) = @_;
@@ -638,13 +649,12 @@ sub mod_internal__S_ColonaParen_Thesis {}
 sub mod_internal__S_Colon0a {}
 
 sub backslash { my ($cl, $M) = @_;
-    if ($M->isa('STD::Regex') && !ref($M->{_ast})) {
-        if (!defined($M->{_ast})) {
-            say $M->Str, " - NO RX AST";
-            exit 1;
+    if ($M->Str =~ /^[A-Z]$/) {
+        if (!ref($M->{_ast}) && length($M->{_ast}) != 1) {
+            $M->sorry("Improper attempt to negate a string");
+            return;
         }
-        $M->{_ast} = RxOp::String->new(text => $M->{_ast}, igcase => $::RX{i},
-            igmark => $::RX{a});
+        $M->{_ast} = [ "", ref($M->{_ast}) ? @{ $M->{_ast} } : ( $M->{_ast} ) ];
     }
 }
 sub backslash__S_x { my ($cl, $M) = @_;
@@ -673,29 +683,29 @@ sub backslash__S_unspace { my ($cl, $M) = @_;
 sub backslash__S_misc { my ($cl, $M) = @_;
     $M->{_ast} = $M->{text} // $M->{litchar}->Str;
 }
-sub backslash__S_d { my ($cl, $M) = @_; $M->{_ast} =
-    RxOp::CClass->build('+', '@N'); }
-# XXX needs spec clarification
-sub backslash__S_h { my ($cl, $M) = @_; $M->{_ast} =
-    RxOp::CClass->build('+', ' ', '+', "\t"); }
-sub backslash__S_v { my ($cl, $M) = @_; $M->{_ast} =
-    RxOp::CClass->build('+', "\r", '+', "\n"); }
-sub backslash__S_s { my ($cl, $M) = @_; $M->{_ast} =
-    RxOp::CClass->build('+', "\r", '+', "\n", '+', "\t", '+', " "); }
-sub backslash__S_w { my ($cl, $M) = @_; $M->{_ast} =
-    RxOp::CClass->build('+', "_", '+', '@L', '+', '@N'); }
+# XXX h, v, s, needs spec clarification
 sub backslash__S_0 { my ($cl, $M) = @_; $M->{_ast} = "\0" }
 sub backslash__S_a { my ($cl, $M) = @_; $M->{_ast} = "\a" }
 sub backslash__S_b { my ($cl, $M) = @_; $M->{_ast} = "\b" }
+sub backslash__S_d { my ($cl, $M) = @_; $M->{_ast} = ['@N'] }
 sub backslash__S_e { my ($cl, $M) = @_; $M->{_ast} = "\e" }
 sub backslash__S_f { my ($cl, $M) = @_; $M->{_ast} = "\f" }
+sub backslash__S_h { my ($cl, $M) = @_; $M->{_ast} = [" ", "\t"] }
 sub backslash__S_n { my ($cl, $M) = @_; $M->{_ast} = "\n" }
 sub backslash__S_r { my ($cl, $M) = @_; $M->{_ast} = "\r" }
+sub backslash__S_s { my ($cl, $M) = @_; $M->{_ast} = [" ", "\t", "\r", "\n"] }
 sub backslash__S_t { my ($cl, $M) = @_; $M->{_ast} = "\t" }
+sub backslash__S_v { my ($cl, $M) = @_; $M->{_ast} = ["\r", "\n"] }
+sub backslash__S_w { my ($cl, $M) = @_; $M->{_ast} = ['_', '@L', '@N'] }
 
 sub escape {}
 sub escape__S_Back { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{item}{_ast};
+    my $cc = $M->{item}{_ast};
+    if (ref($cc)) {
+        $M->sorry("Improper use of character class " . $M->Str . " in string");
+        return;
+    }
+    $M->{_ast} = $cc;
 }
 sub escape__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{_ast} = $M->{embeddedblock}{_ast};
