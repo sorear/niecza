@@ -645,12 +645,36 @@ blocked:
             return w.Invoke(th, new Variable[1] { v }, null);
         }
 
+        private static SubInfo BindROSI = new SubInfo(BindROC);
+        private static Frame BindROC(Frame th) {
+            switch (th.ip) {
+                case 0:
+                    if (th.pos[0].whence == null)
+                        goto case 1;
+                    th.ip = 1;
+                    return Vivify(th, th.pos[0]);
+                case 1:
+                    th.ip = 2;
+                    return Fetch(th, th.pos[1]);
+                case 2:
+                    if (th.pos[0].islist) {
+                        th.pos[0].container = (IP6) th.resultSlot;
+                    } else {
+                        th.pos[0].container = MakeSC((IP6) th.resultSlot);
+                    }
+                    th.pos[0].rw = false;
+                    return th.caller;
+                default:
+                    return Kernel.Die(th, "IP invalid");
+            }
+        }
+
         private static SubInfo BindSI = new SubInfo(BindC);
         private static Frame BindC(Frame th) {
             switch (th.ip) {
                 case 0:
                     // autovivify rhs if needed
-                    if (th.pos[1].whence == null || ((bool)th.lex["ro"]))
+                    if (th.pos[1].whence == null)
                         goto case 1;
                     th.ip = 1;
                     return Vivify(th, th.pos[1]);
@@ -671,7 +695,7 @@ blocked:
                     return th.caller;
                 case 4:
                     th.pos[0].container = th.pos[1].container;
-                    th.pos[0].rw = th.pos[1].rw && !((bool)th.lex["ro"]);
+                    th.pos[0].rw = th.pos[1].rw;
                     if (th.pos[1].islist && !th.pos[0].islist) {
                         th.pos[0].rw = false;
                         th.pos[0].container = MakeSC(th.pos[0].container);
@@ -687,15 +711,15 @@ blocked:
             // TODO: need exceptions for forcerw to be used
             Frame n;
             // fast path
-            if (lhs.islist == rhs.islist &&
+            if (lhs.islist == rhs.islist && !ro &&
                     (ro || rhs.whence == null) &&
                     (lhs.whence == null)) {
                 lhs.container = rhs.container;
-                lhs.rw = !ro && rhs.rw;
+                lhs.rw = rhs.rw;
                 return th;
             }
 
-            n = new Frame(th, null, BindSI);
+            n = new Frame(th, null, ro ? BindROSI : BindSI);
             n.pos = new Variable[2] { lhs, rhs };
             n.lex["ro"] = ro;
             return n;
