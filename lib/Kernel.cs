@@ -15,25 +15,84 @@ namespace Niecza {
     // Used by DynFrame to plug in code
     public delegate Frame DynBlockDelegate(Frame frame);
 
-    public interface IP6 {
-        Frame Invoke(Frame caller, Variable[] pos,
-                Dictionary<string, Variable> named);
+    public abstract class IP6 {
+        public abstract DynMetaObject GetMO();
+        public abstract Frame GetAttribute(Frame caller, string name);
+
+        protected Frame Fail(Frame caller, string msg) {
+            return Kernel.Die(caller, msg + " in class " + GetMO().name);
+        }
+
+        // Most reprs won't have a concept of type objects
+        public virtual bool IsDefined() { return true; }
+
         // include the invocant in the positionals!  it will not usually be
         // this, rather a container of this
-        Frame InvokeMethod(Frame caller, string name,
-                Variable[] pos, Dictionary<string, Variable> named);
-        Frame GetAttribute(Frame caller, string name);
-        //public Frame WHERE(Frame caller);
-        Frame HOW(Frame caller);
-        string GetTypeName();
-        IP6 GetTypeObject();
-        bool IsDefined();
-        bool Isa(DynMetaObject super);
-        bool Does(DynMetaObject super);
-        // These exist as a concession to circularity - FETCH as a completely
-        // ordinary method could not work under the current calling convention.
-        Frame Fetch(Frame caller);
-        Frame Store(Frame caller, IP6 thing);
+        public virtual Frame InvokeMethod(Frame caller, string name,
+                Variable[] pos, Dictionary<string, Variable> named) {
+            IP6 m;
+            foreach (DynMetaObject k in GetMO().mro) {
+                if (k.local.TryGetValue(name, out m)) {
+                    return m.Invoke(caller, pos, named);
+                }
+            }
+            return Fail(caller, "Unable to resolve method " + name);
+        }
+
+        public virtual Frame HOW(Frame caller) {
+            caller.resultSlot = GetMO().how;
+            return caller;
+        }
+
+        public virtual IP6 GetTypeObject() {
+            return GetMO().typeObject;
+        }
+
+        public virtual string GetTypeName() {
+            return GetMO().name;
+        }
+
+        public virtual bool Isa(DynMetaObject mo) {
+            return GetMO().HasMRO(mo);
+        }
+
+        public virtual bool Does(DynMetaObject mo) {
+            return GetMO().HasMRO(mo);
+        }
+
+        public virtual Frame Invoke(Frame c, Variable[] p,
+                Dictionary<string, Variable> n) {
+            DynMetaObject.InvokeHandler ih = GetMO().OnInvoke;
+            if (ih != null) {
+                return ih(this, c, p, n);
+            } else {
+                Variable[] np = new Variable[p.Length + 1];
+                Array.Copy(p, 0, np, 1, p.Length);
+                np[0] = Kernel.NewROScalar(this);
+                return InvokeMethod(c, "INVOKE", np, n);
+            }
+        }
+
+        public virtual Frame Fetch(Frame c) {
+            DynMetaObject.FetchHandler fh = GetMO().OnFetch;
+            if (fh != null) {
+                return fh(this, c);
+            } else {
+                return InvokeMethod(c, "FETCH", new Variable[1] {
+                        Kernel.NewROScalar(this) }, null);
+            }
+        }
+
+        public virtual Frame Store(Frame c, IP6 o) {
+            DynMetaObject.StoreHandler sh = GetMO().OnStore;
+            if (sh != null) {
+                return sh(this, c, o);
+            } else {
+                return InvokeMethod(c, "STORE", new Variable[2] {
+                        Kernel.NewROScalar(this), Kernel.NewROScalar(o) },
+                        null);
+            }
+        }
     }
 
     // TODO: update this comment
@@ -148,7 +207,7 @@ namespace Niecza {
             return code(this);
         }
 
-        public Frame GetAttribute(Frame c, string name) {
+        public override Frame GetAttribute(Frame c, string name) {
             c.resultSlot = lex[name];
             return c;
         }
@@ -163,45 +222,7 @@ namespace Niecza {
             }
         }
 
-        public string GetTypeName() { return "Frame"; }
-        public bool IsDefined() { return true; }
-        public IP6 GetTypeObject() { return Kernel.CallFrameMO.typeObject; }
-        public bool Isa(DynMetaObject sc) {
-            return Kernel.CallFrameMO.HasMRO(sc);
-        }
-        public bool Does(DynMetaObject sc) {
-            return Kernel.CallFrameMO.HasMRO(sc);
-        }
-
-        public Frame Invoke(Frame c, Variable[] p,
-                Dictionary<string, Variable> n) {
-            return Kernel.Die(c, "Tried to invoke a Frame");
-        }
-
-        // FIXME A horrible hack, code duplication and doesn't support FETCH etc
-        public Frame InvokeMethod(Frame caller, string name,
-                Variable[] pos, Dictionary<string, Variable> named) {
-            IP6 m;
-            foreach (DynMetaObject k in Kernel.CallFrameMO.mro) {
-                if (k.local.TryGetValue(name, out m)) {
-                    return m.Invoke(caller, pos, named);
-                }
-            }
-            return Kernel.Die(caller, "Unable to resolve method " + name);
-        }
-
-        public Frame Fetch(Frame c) {
-            return Kernel.Die(c, "Method FETCH not defined on Frame");
-        }
-
-        public Frame Store(Frame c, IP6 o) {
-            return Kernel.Die(c, "Method STORE not defined on Frame");
-        }
-
-        public Frame HOW(Frame c) {
-            c.resultSlot = Kernel.CallFrameMO.how;
-            return c;
-        }
+        public override DynMetaObject GetMO() { return Kernel.CallFrameMO; }
 
         public int ExecutingLine() {
             if (info != null && info.lines != null) {
@@ -251,10 +272,10 @@ namespace Niecza {
         public IP6 typeObject;
         public string name;
 
-        public delegate Frame InvokeHandler(DynObject th, Frame c,
+        public delegate Frame InvokeHandler(IP6 th, Frame c,
                 Variable[] pos, Dictionary<string, Variable> named);
-        public delegate Frame FetchHandler(DynObject th, Frame c);
-        public delegate Frame StoreHandler(DynObject th, Frame c, IP6 n);
+        public delegate Frame FetchHandler(IP6 th, Frame c);
+        public delegate Frame StoreHandler(IP6 th, Frame c, IP6 n);
 
         public InvokeHandler OnInvoke;
         public FetchHandler OnFetch;
@@ -408,22 +429,9 @@ blocked:
             this.klass = klass;
         }
 
-        private Frame Fail(Frame caller, string msg) {
-            return Kernel.Die(caller, msg + " in class " + klass.name);
-        }
+        public override DynMetaObject GetMO() { return klass; }
 
-        public Frame InvokeMethod(Frame caller, string name,
-                Variable[] pos, Dictionary<string, Variable> named) {
-            IP6 m;
-            foreach (DynMetaObject k in klass.mro) {
-                if (k.local.TryGetValue(name, out m)) {
-                    return m.Invoke(caller, pos, named);
-                }
-            }
-            return Fail(caller, "Unable to resolve method " + name);
-        }
-
-        public Frame GetAttribute(Frame caller, string name) {
+        public override Frame GetAttribute(Frame caller, string name) {
             if (slots == null) {
                 return Fail(caller, "Attempted to access slot " + name +
                         " via a protoobject");
@@ -432,60 +440,8 @@ blocked:
             return caller;
         }
 
-        public Frame HOW(Frame caller) {
-            caller.resultSlot = klass.how;
-            return caller;
-        }
-
-        public IP6 GetTypeObject() {
-            return klass.typeObject;
-        }
-
-        public bool IsDefined() {
+        public override bool IsDefined() {
             return slots != null;
-        }
-
-        public string GetTypeName() {
-            return klass.name;
-        }
-
-        public bool Isa(DynMetaObject mo) {
-            return klass.HasMRO(mo);
-        }
-
-        public bool Does(DynMetaObject mo) {
-            return klass.HasMRO(mo);
-        }
-
-        public Frame Invoke(Frame c, Variable[] p,
-                Dictionary<string, Variable> n) {
-            if (klass.OnInvoke != null) {
-                return klass.OnInvoke(this, c, p, n);
-            } else {
-                Variable[] np = new Variable[p.Length + 1];
-                Array.Copy(p, 0, np, 1, p.Length);
-                np[0] = Kernel.NewROScalar(this);
-                return InvokeMethod(c, "INVOKE", np, n);
-            }
-        }
-
-        public Frame Fetch(Frame c) {
-            if (klass.OnFetch != null) {
-                return klass.OnFetch(this, c);
-            } else {
-                return InvokeMethod(c, "FETCH", new Variable[1] {
-                        Kernel.NewROScalar(this) }, null);
-            }
-        }
-
-        public Frame Store(Frame c, IP6 o) {
-            if (klass.OnStore != null) {
-                return klass.OnStore(this, c, o);
-            } else {
-                return InvokeMethod(c, "STORE", new Variable[2] {
-                        Kernel.NewROScalar(this), Kernel.NewROScalar(o) },
-                        null);
-            }
         }
     }
 
@@ -496,40 +452,12 @@ blocked:
 
         public CLRImportObject(object val_) { val = val_; }
 
-        public Frame GetAttribute(Frame c, string nm) {
+        public override Frame GetAttribute(Frame c, string nm) {
             return Kernel.Die(c, "Attribute " + nm +
                     " not available on CLRImportObject");
         }
 
-        public Frame Invoke(Frame c, Variable[] p,
-                Dictionary<string, Variable> n) {
-            return Kernel.Die(c, "Tried to invoke a CLRImportObject");
-        }
-
-        public Frame InvokeMethod(Frame c, string nm, Variable[] p,
-                Dictionary<string, Variable> n) {
-            return Kernel.Die(c, "Method " + nm +
-                    " not defined on CLRImportObject");
-        }
-
-        public Frame Fetch(Frame c) {
-            return Kernel.Die(c, "Method FETCH not defined on CLRImportObject");
-        }
-
-        public Frame Store(Frame c, IP6 o) {
-            return Kernel.Die(c, "Method STORE not defined on CLRImportObject");
-        }
-
-        public Frame HOW(Frame c) {
-            //TODO
-            return Kernel.Die(c, "No metaobject available for CLRImportObject");
-        }
-
-        public IP6 GetTypeObject() { return null; }
-        public bool IsDefined() { return true; }
-        public string GetTypeName() { return "<clr>"; }
-        public bool Isa(DynMetaObject mo) { return false; }
-        public bool Does(DynMetaObject mo) { return false; }
+        public override DynMetaObject GetMO() { return null; }
     }
 
     // A bunch of stuff which raises big circularity issues if done in the
@@ -541,13 +469,18 @@ blocked:
             return o.slots["value"];
         }
 
-        private static Frame SCFetch(DynObject th, Frame caller) {
-            caller.resultSlot = UnboxDO(th);
+        public static object UnboxAny(IP6 o) {
+            // TODO: Check for compatibility?
+            return UnboxDO((DynObject)o);
+        }
+
+        private static Frame SCFetch(IP6 th, Frame caller) {
+            caller.resultSlot = UnboxAny(th);
             return caller;
         }
 
-        private static Frame SCStore(DynObject th, Frame caller, IP6 nv) {
-            th.slots["value"] = nv;
+        private static Frame SCStore(IP6 th, Frame caller, IP6 nv) {
+            ((DynObject)th).slots["value"] = nv;
             return caller;
         }
 
@@ -575,10 +508,11 @@ blocked:
             return th;
         }
 
-        private static Frame SubInvoke(DynObject th, Frame caller,
+        private static Frame SubInvoke(IP6 th, Frame caller,
                 Variable[] pos, Dictionary<string,Variable> named) {
-            Frame outer = (Frame) th.slots["outer"];
-            SubInfo info = (SubInfo) th.slots["info"];
+            Dictionary<string,object> sl = ((DynObject) th).slots;
+            Frame outer = (Frame) sl["outer"];
+            SubInfo info = (SubInfo) sl["info"];
 
             Frame n = new Frame(caller, outer, info);
             n.pos = pos;
@@ -625,11 +559,6 @@ blocked:
             DynObject n = new DynObject(((DynObject)proto).klass);
             n.slots["value"] = v;
             return NewROScalar(n);
-        }
-
-        public static object UnboxAny(IP6 o) {
-            // TODO: Check for compatibility?
-            return UnboxDO((DynObject)o);
         }
 
         public static IP6 MakeSC(IP6 inside) {
