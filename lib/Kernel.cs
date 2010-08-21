@@ -190,6 +190,11 @@ namespace Niecza {
         public readonly DynBlockDelegate code; // premature optimization?
         public readonly Dictionary<string, object> lex
             = new Dictionary<string, object>();
+        // statistically, most subs have between 1 and 4 anonymous lexicals
+        public object lex0;
+        public object lex1;
+        public object lex2;
+        public object lex3;
         public object[] lexn;
 
         public Variable[] pos;
@@ -650,7 +655,6 @@ blocked:
 
             n = new Frame(th, null, ro ? BindROSI : BindSI);
             n.pos = new Variable[2] { lhs, rhs };
-            n.lex["ro"] = ro;
             return n;
         }
 

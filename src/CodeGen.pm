@@ -268,11 +268,15 @@ use 5.010;
         $self->_emit("th.resultSlot = " . ($self->_popn(1))[0]);
     }
 
+    sub _lexn {
+        my ($which) = @_;
+        ($which < 4) ? ("th.lex$which") : ("th.lexn[" . ($which - 4) . "]");
+    }
+
     sub push_let {
         my ($self, $which) = @_;
         my ($v, $ty) = $self->_popn(1);
-        $self->_emit("th.lexn[" . ($self->minlets + @{$self->letstack}) .
-            "] = $v");
+        $self->_emit(_lexn($self->minlets + @{$self->letstack}) . " = $v");
         push @{$self->letstack}, $which;
         push @{$self->lettypes}, $ty;
         if (@{$self->letstack} > $self->numlets) {
@@ -291,7 +295,7 @@ use 5.010;
         my ($self, $which) = @_;
         my $i = @{ $self->letstack } - 1;
         while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
-        $self->_push("object", "th.lexn[" . ($self->minlets + $i) . "]");
+        $self->_push("object", _lexn($self->minlets + $i));
         $self->cast($self->lettypes->[$i]);
     }
 
@@ -300,7 +304,7 @@ use 5.010;
         my $i = @{ $self->letstack } - 1;
         while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
         my ($v) = $self->_popn(1);
-        $self->_emit("th.lexn[" . ($self->minlets + $i) . "] = $v");
+        $self->_emit(_lexn($self->minlets + $i) . " = $v");
     }
 
     sub has_let {
@@ -712,9 +716,9 @@ use 5.010;
         print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(th.DepthMark() + \"$::UNITNAME : $name @ \" + th.ip); }\n";
         print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
         print ::NIECZA_OUT " " x 12, "case 0:\n";
-        if ($self->numlets + $self->minlets) {
+        if ($self->numlets + $self->minlets > 4) {
             print ::NIECZA_OUT " " x 16, "th.lexn = new object[",
-                ($self->numlets + $self->minlets), "];\n";
+                ($self->numlets + $self->minlets - 4), "];\n";
         }
         for (@{ $self->buffer }) {
             s/\@\@L(\d+)/$self->labelname->{$1}/eg;
