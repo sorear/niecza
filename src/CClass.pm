@@ -10,6 +10,7 @@ our %Gc = (map { $_ => ((state $i)++) } qw/ Lu Ll Lt Lm Lo
     Sc Sk So Cn /);
 
 our $Empty = bless [ ], 'CClass';
+our $Full  = bless [ 0, 0x1FFF_FFFF ], 'CClass';
 
 sub range {
     my ($cl, $c1, $c2) = @_;

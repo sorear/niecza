@@ -593,6 +593,30 @@ sub rxcapturize { my ($cl, $name, $rxop) = @_;
         zyg => $rxop->zyg);
 }
 
+sub do_cclass { my ($cl, $M) = @_;
+    my @cce = @{ $M->{cclass_elem} };
+
+    my $rxop;
+    for (@cce) {
+        my $sign = $_->{sign}->Str ne '-';
+        my $exp = $_->{quibble} ?
+            RxOp::CClassElem->new(cc => $_->{quibble}{_ast}) :
+            RxOp::CallMethod->new(name => $_->{name}->Str); # assumes no capture
+
+        if ($sign) {
+            $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $rxop;
+        } else {
+            $rxop = RxOp::Sequence->new(zyg => [
+                RxOp::NotBefore->new(zyg => [ $exp ]),
+                $rxop // RxOp::Any->new]);
+        }
+    }
+
+    $M->{_ast} = $rxop;
+}
+
+sub cclass_elem {}
+
 sub assertion {}
 # This needs to be deconstructed by :method, so it needs a regular structure
 sub assertion__S_name { my ($cl, $M) = @_;
@@ -644,6 +668,10 @@ sub assertion__S_Bang { my ($cl, $M) = @_;
 sub assertion__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{_ast} = RxOp::CheckBlock->new(block => $M->{embeddedblock}{_ast});
 }
+
+*assertion__S_Bra   = \&do_cclass;
+*assertion__S_Minus = \&do_cclass;
+*assertion__S_Plus  = \&do_cclass;
 
 # These have effects only in the parser, so undef ast is correct.
 sub mod_value {}
