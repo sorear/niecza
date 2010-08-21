@@ -671,7 +671,8 @@ sub backslash { my ($cl, $M) = @_;
             $M->sorry("Improper attempt to negate a string");
             return;
         }
-        $M->{_ast} = [ "", ref($M->{_ast}) ? @{ $M->{_ast} } : ( $M->{_ast} ) ];
+        $M->{_ast} = CClass->enum($M->{_ast}) unless blessed $M->{_ast};
+        $M->{_ast} = $M->{_ast}->negate;
     }
 }
 sub backslash__S_x { my ($cl, $M) = @_;
@@ -704,25 +705,20 @@ sub backslash__S_misc { my ($cl, $M) = @_;
 sub backslash__S_0 { my ($cl, $M) = @_; $M->{_ast} = "\0" }
 sub backslash__S_a { my ($cl, $M) = @_; $M->{_ast} = "\a" }
 sub backslash__S_b { my ($cl, $M) = @_; $M->{_ast} = "\b" }
-sub backslash__S_d { my ($cl, $M) = @_; $M->{_ast} = ['@N'] }
+sub backslash__S_d { my ($cl, $M) = @_; $M->{_ast} = $CClass::Digit }
 sub backslash__S_e { my ($cl, $M) = @_; $M->{_ast} = "\e" }
 sub backslash__S_f { my ($cl, $M) = @_; $M->{_ast} = "\f" }
-sub backslash__S_h { my ($cl, $M) = @_; $M->{_ast} = [" ", "\t"] }
+sub backslash__S_h { my ($cl, $M) = @_; $M->{_ast} = $CClass::HSpace }
 sub backslash__S_n { my ($cl, $M) = @_; $M->{_ast} = "\n" }
 sub backslash__S_r { my ($cl, $M) = @_; $M->{_ast} = "\r" }
-sub backslash__S_s { my ($cl, $M) = @_; $M->{_ast} = [" ", "\t", "\r", "\n"] }
+sub backslash__S_s { my ($cl, $M) = @_; $M->{_ast} = $CClass::Space }
 sub backslash__S_t { my ($cl, $M) = @_; $M->{_ast} = "\t" }
-sub backslash__S_v { my ($cl, $M) = @_; $M->{_ast} = ["\r", "\n"] }
-sub backslash__S_w { my ($cl, $M) = @_; $M->{_ast} = ['_', '@L', '@N'] }
+sub backslash__S_v { my ($cl, $M) = @_; $M->{_ast} = $CClass::VSpace }
+sub backslash__S_w { my ($cl, $M) = @_; $M->{_ast} = $CClass::Word }
 
 sub escape {}
 sub escape__S_Back { my ($cl, $M) = @_;
-    my $cc = $M->{item}{_ast};
-    if (ref($cc)) {
-        $M->sorry("Improper use of character class " . $M->Str . " in string");
-        return;
-    }
-    $M->{_ast} = $cc;
+    $M->{_ast} = $M->{item}{_ast};
 }
 sub escape__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{_ast} = $M->{embeddedblock}{_ast};
@@ -761,40 +757,59 @@ sub nibbler { my ($cl, $M) = @_;
         }
         $M->{_ast} = Op::CgOp->new(node($M), optree => $M->{cgexp}{_ast});
     } elsif ($M->can('ccstate')) { #XXX XXX try to catch cclasses
-        my @bits = @{ $M->{nibbles} };
-        my @addends;
-        FACTOR: for (my $i = 0; $i < @bits; ) {
-            if (@bits - $i >= 3 && ref($bits[$i+1]->{_ast}) eq 'SCALAR') {
-                $i += 3;
-                for (@bits[$i-3, $i-1]) {
-                    if (ref($_->{_ast}) || length($_->{_ast}) != 1) {
-                        $_->sorry("Bad range endpoint");
-                        next FACTOR;
-                    } else {
-                        $_ = $_->{_ast};
-                    }
+        my @nib = @{ $M->{nibbles} };
+        my @bits = map { $_->{_ast} } @nib;
+
+        for (my $i = 0; $i < @bits; $i++) {
+            my $t = ref($bits[$i]);
+            if (!$t) {
+                if (length($bits[$i]) > 1) {
+                    $nib[$i]->sorry("Cannot use a string in a character class");
+                    $bits[$i] = "";
                 }
-                push @addends, CClass->range($bits[$i-3], $bits[$i-1]);
+            } elsif ($t eq 'SCALAR') {
+                # .. hack
+            } elsif ($t eq 'CClass') {
+                # also ok
             } else {
-                $i++;
-                if (ref($_->{_ast})) {
-                    push @addends, $_->{_ast};
-                } elsif (length($_->{_ast}) != 1) {
-                    $_->sorry("Improper attempt to use a non-unit-length string in a character class");
-                    next FACTOR;
-                } else {
-                    push @addends, CClass->enum($_->{_ast});
-                }
+                $nib[$i]->sorry("Cannot use an interpolation in a character class");
+                $bits[$i] = "";
+            }
+
+            if ($bits[$i] eq "") {
+                splice @bits, $i, 1;
+                splice @nib, $i, 1;
+                $i--;
             }
         }
+
+        for (my $i = 0; $i < @bits; $i++) {
+            next unless ref($bits[$i]) && ref($bits[$i]) eq 'SCALAR';
+
+            for ($i-1, $i + 1) {
+                if (ref($bits[$_])) {
+                    $nib[$_]->sorry("Bad range endpoint");
+                    $bits[$_] = "\0";
+                }
+            }
+
+            splice @bits, $i-1, 3, CClass->range($bits[$i-1], $bits[$i+1]);
+            splice @nib, $i-1, 2;
+            $i--;
+        }
         $M->{_ast} = $CClass::Empty;
-        $M->{_ast} = $M->{_ast}->plus($_) for @addends;
+        $M->{_ast} = $M->{_ast}->plus($_) for @bits;
         say(YAML::XS::Dump($M->{_ast}));
     } else {
         # garden variety nibbler
         my @bits;
         for my $n (@{ $M->{nibbles} }) {
             my $bit = $n->isa('Str') ? $n->{TEXT} : $n->{_ast};
+
+            if (ref($bit) && ref($bit) eq 'CClass') {
+                $n->sorry("Tried to use a character class in a string");
+                $bit = "";
+            }
 
             # this *might* belong in an optimization pass
             if (!blessed($bit) && @bits && !blessed($bits[-1])) {
