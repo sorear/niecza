@@ -43,7 +43,7 @@
         Outputs="obj\Kernel.dll">
         <Csc Sources="lib\Kernel.cs;lib\Cursor.cs" TargetType="library"
             OutputAssembly="obj\Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'"
+        <Exec Condition="$(UseAOT) == 'Y'" ContinueOnError="true"
             Command="mono --aot obj\Kernel.dll"/>
     </Target>
 
@@ -67,7 +67,8 @@
         <Csc Sources="obj\CORE.cs" TargetType="library"
             AdditionalLibPaths="obj" OutputAssembly="obj\CORE.dll"
             References="SAFE.dll;Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\CORE.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\CORE.dll"
+            ContinueOnError="true"/>
     </Target>
 
     <Target Name="SAFE.dll" Inputs="obj\SAFE.cs;obj\Kernel.dll"
@@ -75,14 +76,16 @@
         <Csc Sources="obj\SAFE.cs" TargetType="library"
             AdditionalLibPaths="obj" OutputAssembly="obj\SAFE.dll"
             References="Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\SAFE.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\SAFE.dll"
+            ContinueOnError="true"/>
     </Target>
 
     <Target Name="Test.dll" Inputs="obj\Test.cs;obj\CORE.dll;obj\Kernel.dll" Outputs="obj\Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
         <Csc Sources="obj\Test.cs" TargetType="library"
             AdditionalLibPaths="obj" OutputAssembly="obj\Test.dll"
             References="CORE.dll;SAFE.dll;Kernel.dll"/>
-        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\Test.dll"/>
+        <Exec Condition="$(UseAOT) == 'Y'" Command="mono --aot obj\Test.dll"
+            ContinueOnError="true"/>
     </Target>
 
     <!-- Proper compiler bits -->

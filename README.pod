@@ -13,7 +13,7 @@ C<test.pl>.
 
 =item *
 
-Mono (2.6.4 recommended)
+Mono.  2.6.4 and later are well-tested, though success has been reported with 2.4.x as well.  ggoebel on #perl6 reports that 2.6.7 fails with a bus error on OS X 10.4 x86, but 2.6.4 works; 2.6.7 is fine on other platforms.
 
 =item *
 
@@ -32,7 +32,7 @@ File::ShareDir, and YAML::XS from CPAN
 
 =head1 USING
 
-    $ xbuild
+    $ xbuild # see note
     ... snip build spam ...
     $ ./niecza_eval
     > say 2 + 2
@@ -41,6 +41,10 @@ File::ShareDir, and YAML::XS from CPAN
     $ ./niecza_eval -e 'say 2 + 2'
     4
     $
+
+Note: Some versions of xbuild seem to ignore the ContinueOnError hint, and some
+builds of mono do not support C<--aot>.  If both factors combine, you will need
+to change C<UseAOT> to C<N> in Niecza.proj for the build to succeed.
 
 =head1 COPYRIGHT AND LICENSE
 
