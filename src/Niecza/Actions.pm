@@ -898,7 +898,6 @@ sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
 
 sub infixish { my ($cl, $M) = @_;
     $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];
-    $M->sorry("Adverbs NYI") if $M->{colonpair};
 }
 
 sub INFIX { my ($cl, $M) = @_;
@@ -1023,7 +1022,15 @@ sub POSTFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::CallSub->new(node($M),
             invocant => $arg,
             args => ($op->{postcall}[0] // []));
+    } elsif ($M->{colonpair}) {
+        if ($arg->isa('Op::CallLike')) {
+            $M->{_ast} = $arg->adverb($M->{colonpair}{_ast}{term});
+        } else {
+            $M->sorry("You can't adverb that");
+            return;
+        }
     } else {
+        say join(" ", %$M);
         $M->sorry("Unhandled postop type");
     }
     $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});

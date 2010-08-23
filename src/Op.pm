@@ -101,6 +101,19 @@ use CgOp;
     has args => (isa => 'ArrayRef[Op]', is => 'ro');
     sub zyg { @{ $_[0]->args // $_[0]->positionals } }
 
+    sub getargs {
+        $_[0]->args ? @{ $_[0]->args } :
+            map { Op::Paren->new(inside => $_) } @{ $_[0]->positionals };
+    }
+
+    sub adverb {
+        my ($self, $adv) = @_;
+        my %h = %$self;
+        delete $h{args};
+        delete $h{positionals};
+        blessed($self)->new(args => [ $self->getargs, $adv ], %h);
+    }
+
     sub argblock {
         my ($self, $body) = @_;
         if (! $self->args) {

@@ -19,4 +19,9 @@ is $a, 1, '$/.pos is the right sort of thing';
 'xxy' ~~ /x { $a = ($¢ ~~ Cursor) }/;
 is $a, True, '$¢ isa Cursor';
 
+{
+    sub infix:<@>($x, $y, :$z) { $x, $y, $z }
+    is (1 @ 2 :z(3)).join("|"), "1|2|3", "adverbs on infix ops work";
+}
+
 done-testing;
