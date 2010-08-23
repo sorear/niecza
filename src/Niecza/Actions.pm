@@ -1321,6 +1321,10 @@ sub term__S_fatarrow { my ($cl, $M) = @_;
 }
 
 sub do_variable_reference { my ($cl, $M, $v) = @_;
+    if ($v->{term}) {
+        return $v->{term};
+    }
+
     my $sl = $v->{sigil} . $v->{twigil} . $v->{name};
 
     if ($v->{rest} && $v->{twigil} =~ /[*=~?^:]/) {
@@ -1400,6 +1404,19 @@ sub variable { my ($cl, $M) = @_;
         }
     } elsif ($M->{special_variable}) {
         $name = substr($M->{special_variable}->Str, 1);
+    } elsif ($M->{postcircumfix}[0]) {
+        if ($M->{postcircumfix}[0]{sym} eq '< >') {
+            $M->{_ast} = { term =>
+                # maybe a little of a cheat
+                $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-key',
+                    receiver => Op::Lexical->new(name => '$/'),
+                    positionals => $M->{postcircumfix}[0]{_ast}{args})
+            };
+            return;
+        } else {
+            $M->sorry("Contextualizer variables NYI");
+            return;
+        }
     } else {
         $M->sorry("Non-simple variables NYI");
         return;
