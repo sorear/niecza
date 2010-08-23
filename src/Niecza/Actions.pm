@@ -54,7 +54,9 @@ sub REDUCE {
     };
 
     if ($@) {
-        $M->sorry($@);
+        my $foo = $@;
+        $foo =~ s/^(?:[^\n]*\n){5}\K.*//s;
+        $M->sorry($foo);
     }
 }
 
@@ -1396,6 +1398,8 @@ sub variable { my ($cl, $M) = @_;
             $name = $M->{name}[0]{_ast}{names}[0];
             $twigil = ':';
         }
+    } elsif ($M->{special_variable}) {
+        $name = substr($M->{special_variable}->Str, 1);
     } else {
         $M->sorry("Non-simple variables NYI");
         return;
@@ -1405,6 +1409,10 @@ sub variable { my ($cl, $M) = @_;
         sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
     };
 }
+
+sub special_variable {}
+sub special_variable__S_DollarSlash {}
+sub special_variable__S_Dollar_a2_ {}
 
 sub param_sep {}
 

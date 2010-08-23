@@ -14,4 +14,9 @@ my $b ::= $a;
 $a = 5;
 is $b, 2, "ro binding loses original container";
 
+ok 'xxy' ~~ /x { $a = $/.pos } /, "can match with \$/ stuff";
+is $a, 1, '$/.pos is the right sort of thing';
+'xxy' ~~ /x { $a = ($¢ ~~ Cursor) }/;
+is $a, True, '$¢ isa Cursor';
+
 done-testing;
