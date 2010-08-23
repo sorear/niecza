@@ -1411,6 +1411,14 @@ sub variable { my ($cl, $M) = @_;
         }
     } elsif ($M->{special_variable}) {
         $name = substr($M->{special_variable}->Str, 1);
+    } elsif ($M->{index}) {
+        $M->{_ast} = { term =>
+            # maybe a little of a cheat
+            $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-pos',
+                receiver => Op::Lexical->new(name => '$/'),
+                positionals => [ Op::Num->new(value => $M->{index}{_ast}) ])
+        };
+        return;
     } elsif ($M->{postcircumfix}[0]) {
         if ($M->{postcircumfix}[0]{sym} eq '< >') {
             $M->{_ast} = { term =>
@@ -1425,6 +1433,7 @@ sub variable { my ($cl, $M) = @_;
             return;
         }
     } else {
+        say join " ", %$M;
         $M->sorry("Non-simple variables NYI");
         return;
     }
