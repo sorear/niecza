@@ -447,6 +447,32 @@ use CgOp;
     no Moose;
 }
 
+# XXX CHEAP HACK ALERT
+{
+    package Decl::VarAlias;
+    use Moose;
+    extends 'Decl';
+
+    has oname => (is => 'ro', isa => 'Str', required => 1);
+    has nname => (is => 'ro', isa => 'Str', required => 1);
+
+    sub used_slots { [ $_[0]->nname, 'Variable', 0 ] }
+
+    sub preinit_code {
+        my ($self, $body) = @_;
+        return CgOp::noop unless $body->needs_protovars;
+        CgOp::proto_var($self->nname, CgOp::scopedlex($self->oname));
+    }
+
+    sub enter_code {
+        my ($self, $body) = @_;
+        CgOp::scopedlex($self->nname, CgOp::scopedlex($self->oname));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 {
     package Decl::Hint;
     use Moose;

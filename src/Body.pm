@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use 5.010;
+use utf8;
 use CodeGen ();
 use CgOp ();
 
@@ -28,6 +29,9 @@ use CgOp ();
     # only used for the top mainline
     has file => (isa => 'Str', is => 'ro');
     has text => (isa => 'Str', is => 'ro');
+
+    # wtf is this doing here
+    has cname => (isa => 'Str', is => 'rw');
 
     # metadata for runtime inspection
     has class => (isa => 'Str', is => 'rw', default => 'Sub');
@@ -111,6 +115,12 @@ use CgOp ();
         $::process->(Decl::Hint->new(name => '$?CURPKG',
             value => CgOp::letvar('pkg'))) if $self->type =~ /mainline|class|
             package|grammar|module|role|slang|knowhow/x;
+
+        if ($self->cname) {
+            $::process->(
+                Decl::VarAlias->new(oname => $self->cname, nname => '$/'),
+                Decl::VarAlias->new(oname => $self->cname, nname => '$¢'));
+        }
 
         if ($self->type eq 'mainline') {
             $::process->(

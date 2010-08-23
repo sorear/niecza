@@ -385,6 +385,7 @@ use CgOp;
 
     sub op {
         my ($self, $cn, $cont) = @_;
+        $self->block->invocant->body->cname($cn); #XXX
         $cn, Op::StatementList->new(children => [$self->block, $cont]);
     }
 
