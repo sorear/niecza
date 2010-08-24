@@ -877,6 +877,7 @@ sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
     $M->{qpvalue} = '<' . join(" ", map { $_->text } @tok) . '>'; # XXX what if there are spaces or >
 }
 sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
+sub circumfix__S_Fre_Nch { goto &circumfix__S_Lt_Gt }
 
 sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
     my @kids = grep { defined } @{ $M->{semilist}{_ast} };
