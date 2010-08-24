@@ -539,7 +539,7 @@ sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
 sub metachar__S_Back { my ($cl, $M) = @_;
     my $cc = $M->{backslash}{_ast};
     $M->{_ast} = ref($cc) ?
-        RxOp::CClass->new(cc => CClass->build(@$cc),
+        RxOp::CClass->new(cc => $cc,
             igcase => $::RX{i}, igmark => $::RX{a}) :
         RxOp::String->new(text => $cc,
             igcase => $::RX{i}, igmark => $::RX{a});
@@ -832,7 +832,7 @@ sub nibbler { my ($cl, $M) = @_;
         }
         $M->{_ast} = $CClass::Empty;
         $M->{_ast} = $M->{_ast}->plus($_) for @bits;
-        say(YAML::XS::Dump($M->{_ast}));
+        #say(YAML::XS::Dump($M->{_ast}));
     } else {
         # garden variety nibbler
         my @bits;
