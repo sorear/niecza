@@ -190,6 +190,9 @@ sub morename { my ($cl, $M) = @_;
         $M->{EXPR}[0]{_ast};
 }
 
+sub typename { }
+sub type_constraint { }
+
 # { dc: Bool, names: [Either String Op] }
 sub name { my ($cl, $M) = @_;
     my @names = map { $_->{_ast} } @{ $M->{morename} };
@@ -1504,11 +1507,6 @@ sub param_var { my ($cl, $M) = @_;
 
 # :: Sig::Parameter
 sub parameter { my ($cl, $M) = @_;
-    if (@{ $M->{type_constraint} } > 0) {
-        $M->sorry('Parameter type constraints NYI');
-        return;
-    }
-
     if (@{ $M->{trait} } > 0) {
         $M->sorry('Parameter traits NYI');
         return;

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 345;
+plan 347;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -874,4 +874,10 @@ end
     my $x = 4;
     $x += 3;
     is $x, 7, "metaop += works";
+
+    sub testx:sym«foo bar»() { 42 }
+    is &testx:sym<<foo bar>>(), 42, "can use french quotes in declarations";
+
+    sub foo(Str $x) { $x ~ $x }
+    is foo("bar"), "barbar", "can parse type constraints";
 }
