@@ -897,11 +897,21 @@ sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
 }
 
 sub infixish { my ($cl, $M) = @_;
-    $M->sorry("Metaoperators NYI") if $M->{infix_postfix_meta_operator}[0];
+    if ($M->{colonpair}) {
+        return; # handled in POST
+    }
+
+    if ($M->{infix_postfix_meta_operator}[0]) {
+        # TODO: there should probably be at least a potential for others
+        $M->{infix}{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&assignop'),
+            args => [ $M->{infix}{_ast} ]);
+    }
 }
 
 sub INFIX { my ($cl, $M) = @_;
-    my $s = '&infix:<' . $M->{infix}{sym} . '>';
+    my $fn = $M->{infix}{_ast};
+    my $s = $fn->isa('Op::Lexical') ? $fn->name : '';
     my ($st,$l,$r) = $cl->whatever_precheck($s, $M->{left}{_ast},
         $M->{right}{_ast});
 
@@ -915,8 +925,7 @@ sub INFIX { my ($cl, $M) = @_;
         push @r, $r->isa('Op::SimpleParcel') ? @{ $r->items } : ($r);
         $M->{_ast} = Op::SimpleParcel->new(items => \@r);
     } else {
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(node($M), name => $s),
+        $M->{_ast} = Op::CallSub->new(node($M), invocant => $fn,
             positionals => [ $l, $r ]);
 
         if ($s eq '&infix:<=>' && $l->isa('Op::Lexical') && $l->state_decl) {
@@ -1044,9 +1053,14 @@ sub PREFIX { my ($cl, $M) = @_;
         positionals => [ $M->{arg}{_ast} ]));
 }
 
-# infix et al just parse the operator itself
-sub infix { }
+sub infix { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Lexical->new(name => '&infix:<' . $M->{sym} . '>');
+}
 sub infix__S_ANY { }
+
+# hacked in infixish - = is the only one
+sub infix_postfix_meta_operator { }
+sub infix_postfix_meta_operator__S_Equal { }
 
 sub prefix { }
 sub prefix__S_ANY { }

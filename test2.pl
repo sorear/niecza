@@ -1,6 +1,12 @@
 # vim: ft=perl6
 use Test;
 
+sub assignop($fn) {
+    anon sub ANON is rawcall {
+        Q:CgOp { (pos 0) } = $fn(Q:CgOp { (pos 0) }, Q:CgOp { (pos 1) })
+    }
+}
+
 ok "\n" ~~ /\n/, '\n in regex matches literal NL';
 ok !('\n' ~~ /\n/), '\n in regex does not match literal \n';
 ok '+' ~~ /\+/, '\+ in regex matches literal +';
@@ -22,6 +28,12 @@ is $a, True, '$¢ isa Cursor';
 {
     sub infix:<@>($x, $y, :$z) { $x, $y, $z }
     is (1 @ 2 :z(3)).join("|"), "1|2|3", "adverbs on infix ops work";
+}
+
+{
+    my $x = 4;
+    $x += 3;
+    is $x, 7, "metaop += works";
 }
 
 done-testing;

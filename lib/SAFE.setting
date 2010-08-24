@@ -1017,4 +1017,10 @@ my class Pair is Enum {
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
 
+sub assignop($fn) {
+    anon sub ANON is rawcall {
+        Q:CgOp { (pos 0) } = $fn(Q:CgOp { (pos 0) }, Q:CgOp { (pos 1) })
+    }
+}
+
 {YOU_ARE_HERE}
