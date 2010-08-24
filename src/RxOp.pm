@@ -428,4 +428,49 @@ use CgOp;
     no Moose;
 }
 
+{
+    package RxOp::Any;
+    use Moose;
+    extends 'RxOp';
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxdot'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                $self->_close_k($cn, $cont)
+            ]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADDot');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::None;
+    use Moose;
+    extends 'RxOp';
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::StatementList->new(children => []);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADNone');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 1;

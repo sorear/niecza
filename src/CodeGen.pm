@@ -64,6 +64,7 @@ use 5.010;
         'Cursor' =>
             { At           => [m => 'Cursor'],
               Exact        => [m => 'Cursor'],
+              AnyChar      => [m => 'Cursor'],
               pos          => [f => 'Int32'],
               backing      => [f => 'String'],
               captures     => [f => 'Matched'],

@@ -55,6 +55,14 @@ public class Cursor {
         }
     }
 
+    public Cursor AnyChar() {
+        if (backing.Length - 1 >= pos) {
+            return At(pos + 1);
+        } else {
+            return null;
+        }
+    }
+
     public Cursor SetCaps(Matched caps) {
         return new Cursor(caps, backing, pos);
     }
@@ -381,6 +389,25 @@ public class LADNull : LAD {
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
         len = 0; cont = true;
+    }
+}
+
+public class LADNone : LAD {
+    public override void ToNFA(NFA pad, int from, int to) {
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "none");
+    }
+}
+
+public class LADDot : LAD {
+    public override void ToNFA(NFA pad, int from, int to) {
+        pad.AddEdge(from, to, new CCTerm(-1));
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "dot");
     }
 }
 
