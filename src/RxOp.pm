@@ -196,6 +196,33 @@ use CgOp;
 }
 
 {
+    package RxOp::SeqAlt;
+    use Moose;
+    extends 'RxOp';
+
+    # zyg * N
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+
+        my $cni = Niecza::Actions->gensym;
+        my @terms;
+        for (@{ $self->zyg }) {
+            push @terms, Op::CallSub->new(
+                invocant => $self->_close_k($_->op($cn, $cont)),
+                positionals => [ Op::Lexical->new(name => $cni) ]);
+        }
+
+        $cni, Op::StatementList->new(children => \@terms);
+    }
+
+    sub lad { $_->zyg->[0]->lad }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::ConfineLang;
     use Moose;
     extends 'RxOp';

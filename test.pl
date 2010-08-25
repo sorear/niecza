@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 386;
+plan 392;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -905,3 +905,7 @@ rxtest /\w/, '\w', ("x", "1", "_", "\x4E00"), ("+", " ");
 rxtest /<[ y ]>/, '<[ y ]>', ("y"), (" ", "x", "z");
 rxtest /<[ i .. k ]>/, '<[ i .. k ]>', ("i", "j", "k"), ("h", "l");
 rxtest /<[ \W a..z ]>/, '<[\W a..z]>', ("a", "z", "+"), ("\x4E00");
+
+rxtest /a || b/, 'a || b', ("a", "b"), ("c", "");
+rxtest /x [a || aa]: c/, 'x[a||b]:c', ("xac",), ("xaac",);
+
