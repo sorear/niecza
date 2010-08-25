@@ -699,7 +699,7 @@ sub mod_internal__S_ColonaParen_Thesis {}
 sub mod_internal__S_Colon0a {}
 
 sub backslash { my ($cl, $M) = @_;
-    if ($M->Str =~ /^[A-Z]$/) {
+    if ($M->Str =~ /^[A-Z]$/ && $M->{sym} =~ /^[a-z]$/) {
         if (!ref($M->{_ast}) && length($M->{_ast}) != 1) {
             $M->sorry("Improper attempt to negate a string");
             return;
