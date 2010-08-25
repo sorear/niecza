@@ -85,41 +85,47 @@ public class Cursor {
     }
 }
 
-public sealed class CCTerm {
-    public readonly int catmask;
-    // these should probably be inversion lists
-    public readonly char[] butyes;
-    public readonly char[] butno;
+public sealed class CC {
+    public readonly int[] vec;
 
-    public CCTerm(int catmask, char[] butyes, char[] butno) {
-        this.catmask = catmask; this.butyes = butyes; this.butno = butno;
+    public CC(int[] vec) {
+        this.vec = vec;
     }
 
-    public CCTerm(char[] butyes) : this(0, butyes, new char[0]{}) { }
-    public CCTerm(char butyes) : this(0, new char[1] { butyes },
-            new char[0] {}) { }
-    public CCTerm(int catmask) : this(catmask, new char[0] {}, new char[0]{}) {}
+    public CC(char butyes) : this(new int[] { butyes, -1, butyes+1, 0 }) { }
+    public CC(int catmask) : this(new int[] { 0, catmask }) { }
 
     public bool Accepts(char ch) {
-        foreach (char y in butyes)
-            if (y == ch)
-                return true;
-        foreach (char n in butno)
-            if (n == ch)
-                return false;
-        return (catmask & (1 << ((int)char.GetUnicodeCategory(ch)))) != 0;
+        int l = 0;
+        int h = vec.Length / 2;
+
+        while (h - l > 1) {
+            int m = l + (h - l) / 2;
+            if (vec[m * 2] > ch) {
+                h = m;
+            } else {
+                l = m;
+            }
+        }
+
+        int mask = 1 << (int)char.GetUnicodeCategory(ch);
+        return (vec[l * 2 + 1] & mask) != 0;
     }
 
-    public const int Alpha   =       0x1F;
-    public const int Mark    =       0xE0;
-    public const int Num     =      0x700;
-    public const int Space   =     0x3800;
-    public const int Control =    0x3C000;
-    public const int Punct   =  0x1FC0000;
-    public const int Symbol  = 0x1E000000;
-    public const int Other   = 0x20000000;
+    public const int MAlpha   =       0x1F;
+    public const int MMark    =       0xE0;
+    public const int MNum     =      0x700;
+    public const int MSpace   =     0x3800;
+    public const int MControl =    0x3C000;
+    public const int MPunct   =  0x1FC0000;
+    public const int MSymbol  = 0x1E000000;
+    public const int MOther   = 0x20000000;
 
-    public const int AlNum   = Alpha | Num;
+    public const int MAlNum   = MAlpha | MNum;
+
+    public static readonly CC All   = new CC(0x3FFFFFFF);
+    public static readonly CC None  = new CC(0);
+    public static readonly CC AlNum = new CC(MAlNum);
 
     private static readonly string[] categories = new string[] {
         "Lu", "Ll", "Lt", "Lm",  "Lo", "Mn", "Mc", "Me",
@@ -129,26 +135,30 @@ public sealed class CCTerm {
     };
 
     public override string ToString() {
-        string o = "";
-        if (catmask == 0x3FFFFFFF) {
-            o = "+any";
-        } else {
-            for (int c = 0; c <= 29; c++) {
-                if ((catmask & (1 << c)) != 0) {
-                    o += "+is" + categories[c];
+        StringBuilder sb = new StringBuilder();
+        for (int ix = 0; ix < vec.Length; ix += 2) {
+            if (sb.Length != 0)
+                sb.Append(',');
+            int l = vec[ix];
+            int msk = vec[ix+1];
+            int h = (ix + 2 < vec.Length) ? vec[ix+2] : 0x110000;
+
+            if (msk == 0)
+                continue;
+            if (h != 0x110000 || l != 0)
+                sb.AppendFormat("({0:4X}..{1:4X})", l, h-1);
+            if ((msk & 0x3FFFFFFF) != 0x3FFFFFFF) {
+                int used = 0;
+                for (int c = 0; c <= 29; c++) {
+                    if ((msk & (1 << c)) != 0) {
+                        if ((used++) != 0)
+                            sb.Append('+');
+                        sb.Append(categories[c]);
+                    }
                 }
             }
         }
-
-        foreach (char c in butyes) {
-            o += "+[" + c + "]";
-        }
-
-        foreach (char c in butno) {
-            o += "-[" + c + "]";
-        }
-
-        return o;
+        return sb.ToString();
     }
 }
 
@@ -167,7 +177,7 @@ public sealed class NFA {
 
     public sealed class Edge {
         public int to;
-        public CCTerm when; // null if epsilon
+        public CC when; // null if epsilon
 
         public override string ToString() {
             return ((when != null) ? when.ToString() : "ε") + " => " + to;
@@ -204,7 +214,7 @@ public sealed class NFA {
         nodes.Add(new Node(curfate));
         return nodes.Count - 1;
     }
-    public void AddEdge(int from, int to, CCTerm when) {
+    public void AddEdge(int from, int to, CC when) {
         Edge e = new Edge();
         e.to = to;
         e.when = when;
@@ -242,7 +252,7 @@ public class LADStr : LAD {
             int len = text.Length;
             for (int c = 0; c < len; c++) {
                 int fromp = (c == len - 1) ? to : pad.AddNode();
-                pad.AddEdge(from, fromp, new CCTerm(text[c]));
+                pad.AddEdge(from, fromp, new CC(text[c]));
                 from = fromp;
             }
         }
@@ -254,13 +264,11 @@ public class LADStr : LAD {
 }
 
 public class LADCC : LAD {
-    public readonly CCTerm[] cc;
-    public LADCC(CCTerm[] cc) { this.cc = cc; }
+    public readonly CC cc;
+    public LADCC(CC cc) { this.cc = cc; }
 
     public override void ToNFA(NFA pad, int from, int to) {
-        foreach (CCTerm t in cc) {
-            pad.AddEdge(from, to, t);
-        }
+        pad.AddEdge(from, to, cc);
     }
 
     public override void Dump(int indent) {
@@ -403,7 +411,7 @@ public class LADNone : LAD {
 
 public class LADDot : LAD {
     public override void ToNFA(NFA pad, int from, int to) {
-        pad.AddEdge(from, to, new CCTerm(-1));
+        pad.AddEdge(from, to, CC.All);
     }
 
     public override void Dump(int indent) {
@@ -684,7 +692,7 @@ public class Lexer {
         Lexer l = new Lexer(null, "[for|forall]", new LAD[] {
                 new LADStr("for"),
                 new LADStr("forall"),
-                new LADPlus(new LADCC(new CCTerm[] { new CCTerm(CCTerm.AlNum) }))
+                new LADPlus(new LADCC(CC.AlNum))
             });
 
         l.Run("xforfoo--", 1);

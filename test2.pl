@@ -20,6 +20,17 @@ sub _rxdot($C, $k) {
     };
 }
 
+sub _rxcc($C, $cc, $k) {
+    Q:CgOp {
+        (letn rt (rawcall (unbox Cursor (@ {$C})) CClass
+                   (unwrap CC (@ {$cc})))
+          [ternary
+            (!= (l rt) (null Cursor))
+            (subcall (@ {$k}) (box (@ {$C}) (l rt)))
+            (null Variable)])
+    };
+}
+
 rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
 rxtest /<!>/, '<!>', Nil, ("", "x");
 

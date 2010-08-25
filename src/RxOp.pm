@@ -454,6 +454,17 @@ use CgOp;
 }
 
 {
+    package RxOp::CClassElem;
+    use Moose;
+    extends 'RxOp';
+
+    has cc => (isa => 'CClass', is => 'ro', required => 1);
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::None;
     use Moose;
     extends 'RxOp';
