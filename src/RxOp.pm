@@ -460,6 +460,31 @@ use CgOp;
 
     has cc => (isa => 'CClass', is => 'ro', required => 1);
 
+    # TODO: some kind of constant table
+    sub ccop {
+        my ($self) = @_;
+        my @ints = @{ $self->cc };
+        CgOp::rawnew('CC', CgOp::rawnewarr('int',
+                map { CgOp::int($_) } @ints));
+    }
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxcc'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                Op::CgOp->new(op => CgOp::wrap($self->ccop)),
+                $self->_close_k($cn, $cont)
+            ]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADCC', $self->ccop);
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }

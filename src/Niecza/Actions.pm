@@ -539,7 +539,7 @@ sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
 sub metachar__S_Back { my ($cl, $M) = @_;
     my $cc = $M->{backslash}{_ast};
     $M->{_ast} = ref($cc) ?
-        RxOp::CClass->new(cc => $cc,
+        RxOp::CClassElem->new(cc => $cc,
             igcase => $::RX{i}, igmark => $::RX{a}) :
         RxOp::String->new(text => $cc,
             igcase => $::RX{i}, igmark => $::RX{a});
@@ -609,7 +609,7 @@ sub do_cclass { my ($cl, $M) = @_;
             RxOp::CallMethod->new(name => $_->{name}->Str); # assumes no capture
 
         if ($sign) {
-            $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $rxop;
+            $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $exp;
         } else {
             $rxop = RxOp::Sequence->new(zyg => [
                 RxOp::NotBefore->new(zyg => [ $exp ]),

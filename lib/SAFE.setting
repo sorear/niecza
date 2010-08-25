@@ -905,6 +905,27 @@ sub _rxstr($C, $str, $k) {
     };
 }
 
+sub _rxdot($C, $k) {
+    Q:CgOp {
+        (letn rt (rawcall (unbox Cursor (@ (l $C))) AnyChar)
+          [ternary
+            (!= (l rt) (null Cursor))
+            (subcall (@ (l $k)) (box (@ (l $C)) (l rt)))
+            (null Variable)])
+    };
+}
+
+sub _rxcc($C, $cc, $k) {
+    Q:CgOp {
+        (letn rt (rawcall (unbox Cursor (@ {$C})) CClass
+                   (unwrap CC (@ {$cc})))
+          [ternary
+            (!= (l rt) (null Cursor))
+            (subcall (@ {$k}) (box (@ {$C}) (l rt)))
+            (null Variable)])
+    };
+}
+
 sub _rxcut($C, $f, $k) {
     my @l := gather $f($C, &take);
     @l && $k(@l.shift);

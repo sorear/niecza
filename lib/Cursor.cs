@@ -63,6 +63,14 @@ public class Cursor {
         }
     }
 
+    public Cursor CClass(CC cc) {
+        if (backing.Length - 1 >= pos && cc.Accepts(backing[pos])) {
+            return At(pos + 1);
+        } else {
+            return null;
+        }
+    }
+
     public Cursor SetCaps(Matched caps) {
         return new Cursor(caps, backing, pos);
     }
@@ -98,6 +106,9 @@ public sealed class CC {
     public bool Accepts(char ch) {
         int l = 0;
         int h = vec.Length / 2;
+
+        if (h == 0 || ch < vec[0])
+            return false;
 
         while (h - l > 1) {
             int m = l + (h - l) / 2;

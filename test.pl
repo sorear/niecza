@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 347;
+plan 386;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -881,3 +881,27 @@ end
     sub foo(Str $x) { $x ~ $x }
     is foo("bar"), "barbar", "can parse type constraints";
 }
+
+sub rxtest($rgx, $rgxname, @y, @n) {
+    for @y {
+        my $k = $_ ~~ Pair ?? $_.key !! $_;
+        my $v = $_ ~~ Pair ?? $_.value !! $_;
+        ok $k ~~ $rgx, "$rgxname ~~ $v";
+    }
+    for @n {
+        my $k = $_ ~~ Pair ?? $_.key !! $_;
+        my $v = $_ ~~ Pair ?? $_.value !! $_;
+        ok !($k ~~ $rgx), "$rgxname !~~ $v";
+    }
+}
+
+rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
+rxtest /<!>/, '<!>', Nil, ("", "x");
+rxtest /\s/, '\s', (" ", ("\n" => '\n'), ("\r" => '\r'), "\x3000"),
+    ("x", "1", "+");
+rxtest /\S/, '\S', ("x", "1", "+"),
+    (" ", ("\n" => '\n'), ("\r" => '\r'), ("\x3000" => 'id space'));
+rxtest /\w/, '\w', ("x", "1", "_", "\x4E00"), ("+", " ");
+rxtest /<[ y ]>/, '<[ y ]>', ("y"), (" ", "x", "z");
+rxtest /<[ i .. k ]>/, '<[ i .. k ]>', ("i", "j", "k"), ("h", "l");
+rxtest /<[ \W a..z ]>/, '<[\W a..z]>', ("a", "z", "+"), ("\x4E00");
