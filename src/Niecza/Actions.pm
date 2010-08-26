@@ -256,11 +256,11 @@ sub sublongname { my ($cl, $M) = @_;
 
 sub desigilname { my ($cl, $M) = @_;
     if ($M->{variable}) {
-        $M->sorry("Truncated contextualizer syntax NYI");
-        return;
+        $M->{_ast} = { ind => $cl->do_variable_reference($M,
+                $M->{variable}{_ast}) };
+    } else {
+        $M->{_ast} = $cl->mangle_longname($M->{longname});
     }
-
-    $M->{_ast} = $cl->mangle_longname($M->{longname});
 }
 
 sub stopper { }
@@ -900,6 +900,11 @@ sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
         body => $M->{pblock}{_ast});
 }
 
+sub circumfix__S_sigil { my ($cl, $M) = @_;
+    circumfix__S_Paren_Thesis($cl, $M); # XXX
+    $M->{_ast} = $cl->docontext($M, $M->{sigil}->Str, $M->{_ast});
+}
+
 sub infixish { my ($cl, $M) = @_;
     if ($M->{colonpair}) {
         return; # handled in POST
@@ -1401,15 +1406,28 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
     }
 }
 
+sub docontext { my ($cl, $M, $sigil, $term) = @_;
+    if ($sigil !~ /[\$\@\%]/) {
+        $M->sorry("Unhandled conext character $sigil");
+    }
+    my $method = ($sigil eq '$') ? 'item' :
+                 ($sigil eq '@') ? 'list' :
+                                   'hash';
+
+    Op::CallMethod->new(node($M), name => $method, receiver => $term);
+}
+
 sub variable { my ($cl, $M) = @_;
     my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
 
     my ($name, $rest);
-    if ($M->{desigilname}) {
-        ($name, $rest) = @{ $M->{desigilname}{_ast} }{'name', 'path'};
-    } elsif ($M->{sublongname}) {
-        ($name, $rest) = @{ $M->{sublongname}{_ast} }{'name', 'path'};
+    my $dsosl = ($M->{desigilname} || $M->{sublongname} || {})->{_ast};
+    if ($dsosl && $dsosl->{ind}) {
+        $M->{_ast} = { term => $cl->docontext($M, $sigil, $dsosl->{ind}) };
+        return;
+    } elsif ($dsosl) {
+        ($name, $rest) = @$dsosl{'name', 'path'};
     } elsif ($M->{name}[0]) {
         # Both these cases are marked XXX in STD.  I agree.  What are they for?
         if ($M->{name}[0]{dc}) {
