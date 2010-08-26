@@ -931,6 +931,16 @@ sub _rxcut($C, $f, $k) {
     @l && $k(@l.shift);
 }
 
+sub _rxbefore($C, $f, $k) {
+    my @l := gather $f($C, &take);
+    @l && $k($C);
+}
+
+sub _rxnotbefore($C, $f, $k) {
+    my @l := gather $f($C, &take);
+    @l || $k($C);
+}
+
 sub _rxalt($C, $lad, $k, *@alts) {
     sub lbody($ix) { @alts[$ix]($C, $k) }
 

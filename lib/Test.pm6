@@ -64,3 +64,19 @@ sub is($a, $b, $tag) is export { $*TEST-BUILDER.ok($a eq $b, $tag) }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done-testing() is export { $*TEST-BUILDER.done-testing }
 sub done_testing() is export { $*TEST-BUILDER.done-testing }
+
+# TODO standardize me
+sub rxtest($rgx, $rgxname, @y, @n) is export {
+    for @y {
+        my $k = $_ ~~ Pair ?? $_.key !! $_;
+        my $v = $_ ~~ Pair ?? $_.value !! $_;
+        ok $k ~~ $rgx, "$rgxname ~~ $v";
+    }
+    for @n {
+        my $k = $_ ~~ Pair ?? $_.key !! $_;
+        my $v = $_ ~~ Pair ?? $_.value !! $_;
+        ok !($k ~~ $rgx), "$rgxname !~~ $v";
+    }
+}
+
+

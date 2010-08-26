@@ -251,8 +251,6 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    # zyg * N
-
     sub op {
         my ($self, $cn, $cont) = @_;
 
@@ -268,6 +266,59 @@ use CgOp;
     sub lad {
         my ($self) = @_;
         $self->zyg->[0]->lad;
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::Before;
+    use Moose;
+    extends 'RxOp';
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxbefore'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                $self->_close_op($self->zyg->[0]),
+                $self->_close_k($cn, $cont)]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADSequence', $self->zyg->[0]->lad,
+            CgOp::rawnew('LADImp'));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::NotBefore;
+    use Moose;
+    extends 'RxOp';
+
+    sub op {
+        my ($self, $cn, $cont) = @_;
+
+        my $icn = Niecza::Actions->gensym;
+        $icn, Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&_rxnotbefore'),
+            positionals => [
+                Op::Lexical->new(name => $icn),
+                $self->_close_op($self->zyg->[0]),
+                $self->_close_k($cn, $cont)]);
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADNull');
     }
 
     __PACKAGE__->meta->make_immutable;

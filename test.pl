@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 392;
+plan 406;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -882,19 +882,6 @@ end
     is foo("bar"), "barbar", "can parse type constraints";
 }
 
-sub rxtest($rgx, $rgxname, @y, @n) {
-    for @y {
-        my $k = $_ ~~ Pair ?? $_.key !! $_;
-        my $v = $_ ~~ Pair ?? $_.value !! $_;
-        ok $k ~~ $rgx, "$rgxname ~~ $v";
-    }
-    for @n {
-        my $k = $_ ~~ Pair ?? $_.key !! $_;
-        my $v = $_ ~~ Pair ?? $_.value !! $_;
-        ok !($k ~~ $rgx), "$rgxname !~~ $v";
-    }
-}
-
 rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
 rxtest /<!>/, '<!>', Nil, ("", "x");
 rxtest /\s/, '\s', (" ", ("\n" => '\n'), ("\r" => '\r'), "\x3000"),
@@ -909,3 +896,28 @@ rxtest /<[ \W a..z ]>/, '<[\W a..z]>', ("a", "z", "+"), ("\x4E00");
 rxtest /a || b/, 'a || b', ("a", "b"), ("c", "");
 rxtest /x [a || aa]: c/, 'x[a||b]:c', ("xac",), ("xaac",);
 
+{
+    my $obj ::= (class {
+        method item() { "item" }
+        method list() { "list" }
+        method hash() { "hash" }
+    }).new;
+
+    is $($obj), "item", '$() calls item';
+    is @($obj), "list", '@() calls list';
+    is %($obj), "hash", '%() calls hash';
+
+    is $$obj, "item", '$$ truncated context';
+    is @$obj, "list", '@$ truncated context';
+    is %$obj, "hash", '%$ truncated context';
+
+    is "x$$obj", "xitem", '$$ interpolation';
+    is "x@$obj", "xlist", '@$ interpolation';
+    is "x%$obj", "xhash", '%$ interpolation';
+}
+
+ok "axy" ~~ / a <before x> \w y / , "before is zero-width";
+ok "axy" ~~ / a <?before x> \w y / , "?before is zero-width";
+ok "azy" ~~ / a <!before x> \w y / , "!before is zero-width";
+ok !("azy" ~~ / a <?before x> \w y /) , "?before x needs x";
+ok !("axy" ~~ / a <!before x> \w y /) , "!before x needs !x";

@@ -620,6 +620,19 @@ sub do_cclass { my ($cl, $M) = @_;
     $M->{_ast} = $rxop;
 }
 
+sub decapturize { my ($cl, $M) = @_;
+    if ($M->{assertion}{assertion}[0]) {
+        $M->sorry("Binding to a method doesn't work like that");
+        return;
+    }
+    if (!$M->{assertion}{_ast}->isa('RxOp::Capture')) {
+        $M->sorry("Internal error in assertion:method parse");
+        return;
+    }
+    RxOp::Capture->new(names => [],
+        zyg => $M->{assertion}{_ast}->zyg);
+}
+
 sub cclass_elem {}
 
 sub assertion {}
@@ -630,9 +643,15 @@ sub assertion__S_name { my ($cl, $M) = @_;
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
     } else {
-        $M->{_ast} = RxOp::CallMethod->new(arglist =>
-            ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} :
-            $M->{nibbler}[0] ? [$M->{nibbler}[0]{_ast}] : []), name => $name);
+        my $args = ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} :
+            $M->{nibbler}[0] ? [$M->{nibbler}[0]{_ast}] : []);
+        if ($name eq 'before') {
+            $M->{_ast} = RxOp::Before->new(zyg => $args);
+        } elsif ($name eq 'after') {
+            $M->{_ast} = RxOp::After->new(zyg => $args);
+        } else {
+            $M->{_ast} = RxOp::CallMethod->new(arglist => $args, name => $name);
+        }
     }
     $M->{_ast} = $cl->rxcapturize($name, $M->{_ast});
 }
@@ -642,21 +661,12 @@ sub assertion__S_method { my ($cl, $M) = @_;
         $M->sorry("Dottyop assertions NYI");
         return;
     }
-    if ($M->{assertion}{assertion}[0]) {
-        $M->sorry("Binding to a method doesn't work like that");
-        return;
-    }
-    if (!$M->{assertion}{_ast}->isa('RxOp::Capture')) {
-        $M->sorry("Internal error in assertion:method parse");
-        return;
-    }
-    $M->{_ast} = RxOp::Capture->new(names => [],
-        zyg => $M->{assertion}{_ast}->zyg);
+    $M->{_ast} = $cl->decapturize($M);
 }
 
 sub assertion__S_Question { my ($cl, $M) = @_;
     if ($M->{assertion}) {
-        $M->{_ast} = RxOp::Before->new(zyg => [$M->{assertion}{_ast}]);
+        $M->{_ast} = RxOp::Before->new(zyg => [$cl->decapturize($M)]);
     } else {
         $M->{_ast} = RxOp::Sequence->new;
     }
@@ -664,7 +674,7 @@ sub assertion__S_Question { my ($cl, $M) = @_;
 
 sub assertion__S_Bang { my ($cl, $M) = @_;
     if ($M->{assertion}) {
-        $M->{_ast} = RxOp::Before->new(zyg => [$M->{assertion}{_ast}]);
+        $M->{_ast} = RxOp::NotBefore->new(zyg => [$cl->decapturize($M)]);
     } else {
         $M->{_ast} = RxOp::None->new;
     }
