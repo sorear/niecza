@@ -207,9 +207,13 @@ use CgOp;
 
         my $cni = Niecza::Actions->gensym;
         my @terms;
+        push @terms, $self->_close_k($cn, $cont);
         for (@{ $self->zyg }) {
             push @terms, Op::CallSub->new(
-                invocant => $self->_close_k($_->op($cn, $cont)),
+                invocant => $self->_close_k($_->op($cn,
+                    Op::CallSub->new(
+                        invocant => Op::Lexical->new(name => $terms[0]->var),
+                        positionals => [ Op::Lexical->new(name => $cn) ]))),
                 positionals => [ Op::Lexical->new(name => $cni) ]);
         }
 
