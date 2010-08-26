@@ -216,7 +216,7 @@ use CgOp;
         $cni, Op::StatementList->new(children => \@terms);
     }
 
-    sub lad { $_->zyg->[0]->lad }
+    sub lad { $_[0]->zyg->[0]->lad }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
