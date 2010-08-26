@@ -97,8 +97,8 @@ public class Cursor {
     public Cursor SimpleWS() {
         int l = backing.Length;
         int p = pos;
-        if (p != 0 && p != l && !Char.IsWhiteSpace(backing, p) &&
-                !Char.IsWhiteSpace(backing, p-1)) {
+        if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
+                CC.Word.Accepts(backing[p-1])) {
             if (Trace)
                 Console.WriteLine("! no match <ws> at {0}", pos);
             return null;
@@ -150,10 +150,14 @@ public sealed class CC {
     public const int MPunct   =  0x1FC0000;
     public const int MSymbol  = 0x1E000000;
     public const int MOther   = 0x20000000;
+    public const int MAll     = 0x3FFFFFFF;
 
     public const int MAlNum   = MAlpha | MNum;
 
-    public static readonly CC All   = new CC(0x3FFFFFFF);
+    public static readonly CC Word  = new CC(new int[] { 0, MAlNum,
+            '_', MAll, '_'+1, MAlNum });
+
+    public static readonly CC All   = new CC(MAll);
     public static readonly CC None  = new CC(0);
     public static readonly CC AlNum = new CC(MAlNum);
 
@@ -177,7 +181,7 @@ public sealed class CC {
                 continue;
             if (h != 0x110000 || l != 0)
                 sb.AppendFormat("({0:X4}..{1:X4})", l, h-1);
-            if ((msk & 0x3FFFFFFF) != 0x3FFFFFFF) {
+            if ((msk & MAll) != MAll) {
                 int used = 0;
                 for (int c = 0; c <= 29; c++) {
                     if ((msk & (1 << c)) != 0) {
