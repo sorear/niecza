@@ -34,6 +34,9 @@ public class Cursor {
     public string backing;
     public int pos;
 
+    public static bool Trace =
+        Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
+
     public Cursor(Matched captures, string backing, int pos) {
         this.captures = captures;
         this.backing = backing;
@@ -49,24 +52,36 @@ public class Cursor {
     public Cursor Exact(string what) {
         if (backing.Length - what.Length >= pos &&
                 backing.Substring(pos, what.Length) == what) {
+            if (Trace)
+                Console.WriteLine("* matched {0} at {1}", what, pos);
             return At(pos + what.Length);
         } else {
+            if (Trace)
+                Console.WriteLine("! no match {0} at {1}", what, pos);
             return null;
         }
     }
 
     public Cursor AnyChar() {
         if (backing.Length - 1 >= pos) {
+            if (Trace)
+                Console.WriteLine("* matched any char at {0}", pos);
             return At(pos + 1);
         } else {
+            if (Trace)
+                Console.WriteLine("! no match any char at {0}", pos);
             return null;
         }
     }
 
     public Cursor CClass(CC cc) {
         if (backing.Length - 1 >= pos && cc.Accepts(backing[pos])) {
+            if (Trace)
+                Console.WriteLine("* matched cc {0} at {1}", cc, pos);
             return At(pos + 1);
         } else {
+            if (Trace)
+                Console.WriteLine("! no match cc {0} at {1}", cc, pos);
             return null;
         }
     }
@@ -84,10 +99,14 @@ public class Cursor {
         int p = pos;
         if (p != 0 && p != l && !Char.IsWhiteSpace(backing, p) &&
                 !Char.IsWhiteSpace(backing, p-1)) {
+            if (Trace)
+                Console.WriteLine("! no match <ws> at {0}", pos);
             return null;
         }
 
         while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
+        if (Trace)
+            Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
 
         return At(p);
     }
@@ -157,7 +176,7 @@ public sealed class CC {
             if (msk == 0)
                 continue;
             if (h != 0x110000 || l != 0)
-                sb.AppendFormat("({0:4X}..{1:4X})", l, h-1);
+                sb.AppendFormat("({0:X4}..{1:X4})", l, h-1);
             if ((msk & 0x3FFFFFFF) != 0x3FFFFFFF) {
                 int used = 0;
                 for (int c = 0; c <= 29; c++) {
