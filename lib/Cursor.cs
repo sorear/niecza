@@ -27,6 +27,29 @@ public class Matched {
 //public class Xact {
 //    
 
+// extends Frame for a time/space tradeoff
+// we keep the cursor in exploded form to avoid creating lots and lots of
+// cursor objects
+public sealed class RxFrame {
+    // our backing string, in a cheap to index form
+    public char[] orig;
+    // cache of orig.Length
+    public int end;
+    // the current match position; restored on backtrack
+    public int pos;
+    // uninterpreted value which is restored on backtrack
+    public int xtra;
+    // cursor class to use if cursor needs to be deexploded
+    public DynMetaObject cklass;
+    // used for efficiently restoring classes, since :lang is always scoped
+    public DynMetaObject[] saved_cklasses;
+    // stack of backtrack states, each 3 ints long
+    // each record looks like: ip pos xtra
+    public int[] bstack;
+    // auxilliary vector for bstack entries that need to refer to objects
+    // not automatically managed
+}
+
 public class Cursor {
     // XXX It's a bit wrong that we ref the string both from the cursor and
     // from $*ORIG.
