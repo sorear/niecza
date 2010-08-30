@@ -560,6 +560,12 @@ blocked:
             return n;
         }
 
+        public static DynObject MockBox(object v) {
+            DynObject n = new DynObject(ScalarMO);
+            n.slots["value"] = v;
+            return n;
+        }
+
         public static Variable BoxAny(object v, IP6 proto) {
             if (v == null)
                 return NewROScalar(proto);

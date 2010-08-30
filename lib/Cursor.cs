@@ -119,42 +119,6 @@ public sealed class RxFrame {
     public int GetQuant() {
         return bt.obj.reps.obj;
     }
-
-    private RxFrame(string st) {
-        orig = st.ToCharArray();
-        end = orig.Length;
-        bt = new PSN<State>(default(State), null);
-        bt.obj.klasses = new PSN<DynMetaObject>(null, null);
-        bt.obj.pos = 0;
-    }
-
-    private static SubInfo TestSI = new SubInfo(TestC);
-    private static Frame TestC(Frame th) {
-        if (Kernel.TraceCont) System.Console.WriteLine("At {0}", th.ip);
-        switch (th.ip) {
-            case 0:
-                th.rx = new RxFrame("aaaaab");
-                th.rx.OpenQuant();
-                goto case 1;
-            case 1:
-                th.rx.PushBacktrack("*", 3);
-                th.ip = 2;
-                return th.rx.ExactOne(th, 'a');
-            case 2:
-                th.rx.IncQuant();
-                goto case 1;
-            case 3:
-                th.rx.CloseQuant();
-                th.ip = 4;
-                return th.rx.Exact(th, "ab");
-            case 4:
-                System.Console.WriteLine("Match!");
-                return null;
-            default:
-                System.Console.WriteLine("Bad IP");
-                return null;
-        }
-    }
 }
 
 public sealed class XAct {
