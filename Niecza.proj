@@ -8,17 +8,15 @@
         <Perl>perl</Perl>
 
         <!-- Other centralized variables -->
-        <STDUrl>http://svn.pugscode.org/pugs/src/perl6</STDUrl>
         <SpecTestUrl>http://svn.pugscode.org/pugs/t/spec</SpecTestUrl>
         <UseAOT>Y</UseAOT>
 
         <!-- infrastructure -->
-        <STD_existed Condition="Exists('STD_checkout')">Y</STD_existed>
         <SpecTest_existed Condition="Exists('t/spec')">Y</SpecTest_existed>
     </PropertyGroup>
 
     <ItemGroup>
-        <CompilerPerl Include="src\Body.pm;src\CClass.pm;src\CgOp.pm;src\CodeGen.pm;src\CompilerDriver.pm;src\Decl.pm;src\Op.pm;src\Optimizer\Beta.pm;src\ResolveLex.pm;src\RxOp.pm;src\Sig.pm;src\Unit.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc;.STD_build_stamp"/>
+        <CompilerPerl Include="src\Body.pm;src\CClass.pm;src\CgOp.pm;src\CodeGen.pm;src\CompilerDriver.pm;src\Decl.pm;src\Op.pm;src\Optimizer\Beta.pm;src\ResolveLex.pm;src\RxOp.pm;src\Sig.pm;src\Unit.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc"/>
     </ItemGroup>
 
     <!-- Meta targets -->
@@ -39,7 +37,7 @@
     </Target>
 
     <!-- Libraries -->
-    <Target Name="Kernel.dll" Inputs="Kernel.cs;Cursor.cs"
+    <Target Name="Kernel.dll" Inputs="lib\Kernel.cs;lib\Cursor.cs"
         Outputs="obj\Kernel.dll">
         <Csc Sources="lib\Kernel.cs;lib\Cursor.cs" TargetType="library"
             OutputAssembly="obj\Kernel.dll"/>
@@ -47,19 +45,19 @@
             Command="mono --aot obj\Kernel.dll"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="BuildSTD;SAFE.cs;Grammar;PerlTask">
+    <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="SAFE.cs;Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', setting => 1, name => 'CORE');"/>
     </Target>
 
     <Target Name="SAFE.cs" Inputs="@(CompilerPerl);lib\SAFE.setting"
         Outputs="obj\SAFE.cs;obj\SAFE.store"
-        DependsOnTargets="BuildSTD;Grammar;PerlTask">
+        DependsOnTargets="Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', setting => 1, name => 'SAFE');"/>
     </Target>
 
     <Target Name="Test.cs" Inputs="@(CompilerPerl);obj\CORE.store;lib\Test.pm6"
         Outputs="obj\Test.cs;obj\Test.store"
-        DependsOnTargets="CORE.cs;BuildSTD;Grammar;PerlTask">
+        DependsOnTargets="CORE.cs;Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writecs', name => 'Test');"/>
     </Target>
 
@@ -89,27 +87,8 @@
     </Target>
 
     <!-- Proper compiler bits -->
-    <Target Name="Grammar" Inputs="src\Niecza\Grammar.pm6" Outputs="src\Niecza\Grammar.pmc" DependsOnTargets="BuildSTD">
-        <CombinePath BasePath="$(MSBuildProjectDirectory)" Paths="STD_checkout">
-            <Output TaskParameter="CombinedPaths" PropertyName="STDDir"/>
-        </CombinePath>
-        <CombinePath BasePath="$(STDDir)" Paths="lib">
-            <Output TaskParameter="CombinedPaths" PropertyName="STDDirLib"/>
-        </CombinePath>
-        <Exec Command="$(Perl) $(STDDir)/viv --clear-inc --inc $(STDDirLib) --inc $(STDDir) --symlroot $(STDDir) -5 -o src/Niecza/Grammar.pmc src/Niecza/Grammar.pm6"/>
-    </Target>
-
-    <Target Name="CheckoutSTD" Inputs="STD_REVISION"
-        Outputs=".STD_checkout_stamp">
-        <ReadLinesFromFile File="STD_REVISION">
-            <Output TaskParameter="Lines" ItemName="StdRevision"/>
-        </ReadLinesFromFile>
-        <Exec Condition="$(STD_existed) != 'Y'"
-            Command="$(Subversion) checkout $(STDUrl)@@(StdRevision) STD_checkout"/>
-        <Exec Condition="$(STD_existed) == 'Y'"
-            Command="$(Subversion) update -r@(StdRevision) STD_checkout"/>
-        <Touch AlwaysCreate="true" Files=".STD_checkout_stamp"
-            ContinueOnError="true"/>
+    <Target Name="Grammar" Inputs="src\Niecza\Grammar.pm6" Outputs="src\Niecza\Grammar.pmc">
+        <Exec Command="viv --noperl6lib -5 -o src/Niecza/Grammar.pmc src/Niecza/Grammar.pm6"/>
     </Target>
 
     <Target Name="CheckoutSpecTest">
@@ -117,13 +96,6 @@
             Command="$(Subversion) checkout $(SpecTestUrl) t/spec"/>
         <Exec Condition="$(STD_existed) == 'Y'"
             Command="$(Subversion) update t/spec"/>
-    </Target>
-
-    <Target Name="BuildSTD" Inputs=".STD_checkout_stamp"
-        Outputs=".STD_build_stamp" DependsOnTargets="CheckoutSTD">
-        <Exec WorkingDirectory="STD_checkout" Command="$(Make)"/>
-        <Touch AlwaysCreate="true" Files=".STD_build_stamp"
-            ContinueOnError="true"/>
     </Target>
 
     <Target Name="PerlTask" Inputs="PerlTask.cs" Outputs="obj\PerlTask.dll">

@@ -1,8 +1,6 @@
 *.swp
 *.pmc
 *.bc
-.STD_build_stamp
-.STD_checkout_stamp
-STD_checkout
+syml
 VERSION
 t/spec

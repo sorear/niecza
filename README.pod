@@ -17,16 +17,12 @@ Mono.  2.6.4 and later are well-tested, though success has been reported with 2.
 
 =item *
 
-Subversion
-
-=item *
-
 Perl 5.10.1 (or 5.10.0 with autodie installed from CPAN) in your PATH
 
 =item *
 
 Moose, Sub::Exporter, File::Slurp, Term::ReadLine, IPC::System::Simple,
-File::ShareDir, and YAML::XS from CPAN
+STD, File::ShareDir, and YAML::XS from CPAN
 
 =back
 
