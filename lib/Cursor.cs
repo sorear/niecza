@@ -44,7 +44,10 @@ public sealed class RxFrame {
 
         public int pos;
         public int ip;
+
+        public XAct xact;
     }
+    // invariant: xact of top state is NEVER committed
 
     public PSN<State> bt;
 
@@ -63,7 +66,9 @@ public sealed class RxFrame {
     }
 
     public Frame Backtrack(Frame th) {
-        bt = bt.next;
+        do {
+            bt = bt.next;
+        } while (bt != null && bt.obj.xact.committed);
         if (bt == null) {
             return th.caller;
         } else {
@@ -72,9 +77,14 @@ public sealed class RxFrame {
         }
     }
 
-    public void PushMark(int ip) {
+    public void PushBacktrack(string name, int ip) {
         bt.obj.ip = ip;
         bt = new PSN<State>(bt.obj, bt);
+        PushMark(name);
+    }
+
+    public void PushMark(string name) {
+        bt.obj.xact = new XAct(name, bt.obj.xact);
     }
 
     public Frame Exact(Frame th, string st) {
@@ -127,7 +137,7 @@ public sealed class RxFrame {
                 th.rx.OpenQuant();
                 goto case 1;
             case 1:
-                th.rx.PushMark(3);
+                th.rx.PushBacktrack("*", 3);
                 th.ip = 2;
                 return th.rx.ExactOne(th, 'a');
             case 2:
@@ -147,11 +157,20 @@ public sealed class RxFrame {
     }
 }
 
+public sealed class XAct {
+    public readonly string tag;
+    public bool committed;
+    public readonly XAct next;
+
+    public XAct(string tag, XAct next) { this.tag = tag; this.next = next; }
+}
+
 public class Cursor {
     // XXX It's a bit wrong that we ref the string both from the cursor and
     // from $*ORIG.
     public Matched captures;
     public string backing;
+    public XAct xact;
     public int pos;
 
     public static bool Trace =
@@ -840,17 +859,5 @@ public class Lexer {
                 useord.Add(o);
 
         return useord.ToArray();
-    }
-
-    public static void SelfTest() {
-        Lexer l = new Lexer(null, "[for|forall]", new LAD[] {
-                new LADStr("for"),
-                new LADStr("forall"),
-                new LADPlus(new LADCC(CC.AlNum))
-            });
-
-        l.Run("xforfoo--", 1);
-        l.Run("forallx", 0);
-        l.Run("forall", 0);
     }
 }
