@@ -197,6 +197,8 @@ namespace Niecza {
         public object lex3;
         public object[] lexn;
 
+        public RxFrame rx;
+
         public Variable[] pos;
         public Dictionary<string, Variable> named;
 
@@ -470,7 +472,7 @@ blocked:
     public class Kernel {
         public static DynBlockDelegate MainlineContinuation;
 
-        private static object UnboxDO(DynObject o) {
+        public static object UnboxDO(DynObject o) {
             return o.slots["value"];
         }
 

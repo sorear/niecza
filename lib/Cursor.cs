@@ -31,23 +31,120 @@ public class Matched {
 // we keep the cursor in exploded form to avoid creating lots and lots of
 // cursor objects
 public sealed class RxFrame {
+    public sealed class PSN<X> {
+        public X obj;
+        public readonly PSN<X> next;
+        public PSN(X obj, PSN<X> next) { this.obj = obj; this.next = next; }
+    }
+
+    public struct State {
+        public PSN<int> reps;
+        public PSN<IP6> captures;
+        public PSN<DynMetaObject> klasses;
+
+        public int pos;
+        public int ip;
+    }
+
+    public PSN<State> bt;
+
     // our backing string, in a cheap to index form
     public char[] orig;
     // cache of orig.Length
     public int end;
-    // the current match position; restored on backtrack
-    public int pos;
-    // uninterpreted value which is restored on backtrack
-    public int xtra;
-    // cursor class to use if cursor needs to be deexploded
-    public DynMetaObject cklass;
-    // used for efficiently restoring classes, since :lang is always scoped
-    public DynMetaObject[] saved_cklasses;
-    // stack of backtrack states, each 3 ints long
-    // each record looks like: ip pos xtra
-    public int[] bstack;
-    // auxilliary vector for bstack entries that need to refer to objects
-    // not automatically managed
+
+    public RxFrame(DynObject csr) {
+        Cursor c = (Cursor) Kernel.UnboxDO(csr);
+        orig = c.backing.ToCharArray();
+        end = orig.Length;
+        bt = new PSN<State>(default(State), null);
+        bt.obj.klasses = new PSN<DynMetaObject>(csr.klass, null);
+        bt.obj.pos = c.pos;
+    }
+
+    public Frame Backtrack(Frame th) {
+        bt = bt.next;
+        if (bt == null) {
+            return th.caller;
+        } else {
+            th.ip = bt.obj.ip;
+            return th;
+        }
+    }
+
+    public void PushMark(int ip) {
+        bt.obj.ip = ip;
+        bt = new PSN<State>(bt.obj, bt);
+    }
+
+    public Frame Exact(Frame th, string st) {
+        if (bt.obj.pos + st.Length > end)
+            return Backtrack(th);
+        foreach (char ch in st)
+            if (orig[bt.obj.pos++] != ch)
+                return Backtrack(th);
+        return th;
+    }
+
+    public Frame ExactOne(Frame th, char ch) {
+        if (bt.obj.pos == end || orig[bt.obj.pos++] != ch)
+            return Backtrack(th);
+        return th;
+    }
+
+    public void OpenQuant() {
+        bt.obj.reps = new PSN<int>(0, bt.obj.reps);
+    }
+
+    public int CloseQuant() {
+        int x = bt.obj.reps.obj;
+        bt.obj.reps = bt.obj.reps.next;
+        return x;
+    }
+
+    public void IncQuant() {
+        bt.obj.reps.obj++;
+    }
+
+    public int GetQuant() {
+        return bt.obj.reps.obj;
+    }
+
+    private RxFrame(string st) {
+        orig = st.ToCharArray();
+        end = orig.Length;
+        bt = new PSN<State>(default(State), null);
+        bt.obj.klasses = new PSN<DynMetaObject>(null, null);
+        bt.obj.pos = 0;
+    }
+
+    private static SubInfo TestSI = new SubInfo(TestC);
+    private static Frame TestC(Frame th) {
+        if (Kernel.TraceCont) System.Console.WriteLine("At {0}", th.ip);
+        switch (th.ip) {
+            case 0:
+                th.rx = new RxFrame("aaaaab");
+                th.rx.OpenQuant();
+                goto case 1;
+            case 1:
+                th.rx.PushMark(3);
+                th.ip = 2;
+                return th.rx.ExactOne(th, 'a');
+            case 2:
+                th.rx.IncQuant();
+                goto case 1;
+            case 3:
+                th.rx.CloseQuant();
+                th.ip = 4;
+                return th.rx.Exact(th, "ab");
+            case 4:
+                System.Console.WriteLine("Match!");
+                return null;
+            default:
+                System.Console.WriteLine("Bad IP");
+                return null;
+        }
+    }
 }
 
 public class Cursor {
