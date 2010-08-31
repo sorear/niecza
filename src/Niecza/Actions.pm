@@ -347,7 +347,7 @@ sub regex_def { my ($cl, $M) = @_;
     my $sig = $M->{signature}[0] ? $M->{signature}[0]{_ast}
         : $cl->get_placeholder_sig($M);
 
-    if ($scope =~ /state|augment|supercede/) {
+    if ($scope =~ /state|augment|supersede/) {
         $M->sorry("Nonsensical scope $scope for regex");
         return;
     }
@@ -1735,7 +1735,7 @@ sub scope_declarator { my ($cl, $M) = @_;
 sub scope_declarator__S_my {}
 sub scope_declarator__S_our {}
 sub scope_declarator__S_augment {}
-sub scope_declarator__S_supercede {}
+sub scope_declarator__S_supersede {}
 sub scope_declarator__S_has {}
 sub scope_declarator__S_state {}
 sub scope_declarator__S_anon {}
@@ -1758,7 +1758,7 @@ sub variable_declarator { my ($cl, $M) = @_;
 
     my $scope = $::SCOPE // 'my';
 
-    if ($scope eq 'augment' || $scope eq 'supercede') {
+    if ($scope eq 'augment' || $scope eq 'supersede') {
         $M->sorry("Illogical scope $scope for simple variable");
         return;
     }
@@ -2077,7 +2077,7 @@ sub package_def { my ($cl, $M) = @_;
     if (!$M->{longname}[0]) {
         $scope = 'anon';
     }
-    if ($scope eq 'augment' || $scope eq 'supercede') {
+    if ($scope eq 'augment' || $scope eq 'supersede') {
         $M->sorry('Monkey typing is not yet supported');
         return;
     }
@@ -2297,7 +2297,7 @@ sub method_def { my ($cl, $M) = @_;
 
     my $sym = ($scope eq 'my') ? ('&' . $name) : $cl->gensym;
 
-    if ($scope eq 'augment' || $scope eq 'supercede' || $scope eq 'state') {
+    if ($scope eq 'augment' || $scope eq 'supersede' || $scope eq 'state') {
         $M->sorry("Illogical scope $scope for method");
         return;
     }
