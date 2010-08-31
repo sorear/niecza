@@ -47,7 +47,7 @@ public sealed class RxFrame {
 
         public XAct xact;
     }
-    // invariant: xact of top state is NEVER committed
+    // invariant: xact of top state is NEVER committed/pruned
 
     public PSN<State> bt;
 
@@ -68,7 +68,7 @@ public sealed class RxFrame {
     public Frame Backtrack(Frame th) {
         do {
             bt = bt.next;
-        } while (bt != null && bt.obj.xact.committed);
+        } while (bt != null && (bt.obj.xact.committed || bt.obj.ip < 0));
         if (bt == null) {
             return th.caller;
         } else {
@@ -80,10 +80,6 @@ public sealed class RxFrame {
     public void PushBacktrack(string name, int ip) {
         bt.obj.ip = ip;
         bt = new PSN<State>(bt.obj, bt);
-        PushMark(name);
-    }
-
-    public void PushMark(string name) {
         bt.obj.xact = new XAct(name, bt.obj.xact);
     }
 
