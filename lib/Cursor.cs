@@ -62,6 +62,7 @@ public sealed class RxFrame {
         end = orig.Length;
         bt = new PSN<State>(default(State), null);
         bt.obj.klasses = new PSN<DynMetaObject>(csr.klass, null);
+        bt.obj.xact = new XAct("MATCH", null);
         bt.obj.pos = c.pos;
     }
 
@@ -81,6 +82,35 @@ public sealed class RxFrame {
         bt.obj.ip = ip;
         bt = new PSN<State>(bt.obj, bt);
         bt.obj.xact = new XAct(name, bt.obj.xact);
+    }
+
+    public void CommitAll() {
+        XAct x = bt.next.obj.xact;
+        while (x != null) {
+            x.committed = true;
+            x = x.next;
+        }
+    }
+
+    public void CommitSpecificRule(string name) {
+        XAct x = bt.next.obj.xact;
+        name = "RULE " + name;
+        while (x != null) {
+            x.committed = true;
+            x = x.next;
+            if (x.tag.Equals(name))
+                break;
+        }
+    }
+
+    public void CommitRule() {
+        XAct x = bt.next.obj.xact;
+        while (x != null) {
+            x.committed = true;
+            x = x.next;
+            if (x.tag.StartsWith("RULE "))
+                break;
+        }
     }
 
     public Frame Exact(Frame th, string st) {

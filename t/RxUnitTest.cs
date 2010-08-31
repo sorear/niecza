@@ -25,6 +25,18 @@ class RxExact: RxOp {
     }
 }
 
+class RxMeta: RxOp {
+    public delegate void MD(RxFrame rx);
+    MD md;
+    public RxMeta(MD md) { this.md = md; }
+    public override void Compile(CodeBuf cb) {
+        cb.ops.Add(delegate(Frame th) {
+            md(th.rx);
+            return th;
+        });
+    }
+}
+
 class RxStar: RxOp {
     RxOp inner;
     public RxStar(RxOp inner) { this.inner = inner; }
@@ -94,5 +106,6 @@ public class RxUnitTest {
 
     public static void Main() {
         RunTest(0, true, "aaaaab", new RxSeq(new RxOp[] { new RxStar( new RxExact("a") ), new RxExact("ab") }));
+        RunTest(1, false, "aaaaab", new RxSeq(new RxOp[] { new RxStar( new RxExact("a") ), new RxMeta(delegate(RxFrame rx) { rx.CommitAll(); }), new RxExact("ab") }));
     }
 }
