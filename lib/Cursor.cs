@@ -113,19 +113,17 @@ public sealed class RxFrame {
         }
     }
 
-    public Frame Exact(Frame th, string st) {
+    public bool Exact(string st) {
         if (bt.obj.pos + st.Length > end)
-            return Backtrack(th);
+            return false;
         foreach (char ch in st)
             if (orig[bt.obj.pos++] != ch)
-                return Backtrack(th);
-        return th;
+                return false;
+        return true;
     }
 
-    public Frame ExactOne(Frame th, char ch) {
-        if (bt.obj.pos == end || orig[bt.obj.pos++] != ch)
-            return Backtrack(th);
-        return th;
+    public bool ExactOne(char ch) {
+        return !(bt.obj.pos == end || orig[bt.obj.pos++] != ch);
     }
 
     public void OpenQuant() {
@@ -145,6 +143,22 @@ public sealed class RxFrame {
     public int GetQuant() {
         return bt.obj.reps.obj;
     }
+
+    /*
+    public static DynMetaObject ListMO;
+    public static DynMetaObject LLArrayMO;
+    public static DynMetaObject RegexBacktrackIteratorMO;
+    public static Variable FalseV;
+    public Frame End(Frame th) {
+        if (return_one) {
+            th.caller.resultSlot = MakeCursor();
+        } else {
+            DynObject lst = new DynObject(ListMO);
+            DynObject obs = new DynObject(LLArrayMO);
+            DynObject its = new DynObject(LLArrayMO);
+            DynObject it  = new RegexBacktrackIteratorMO;
+    }
+    */
 }
 
 public sealed class XAct {

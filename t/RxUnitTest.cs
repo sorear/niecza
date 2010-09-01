@@ -20,7 +20,9 @@ class RxExact: RxOp {
     public RxExact(string s) { this.s = s; }
     public override void Compile(CodeBuf cb) {
         cb.ops.Add(delegate(Frame th) {
-            return th.rx.Exact(th, s);
+            if (!th.rx.Exact(th, s))
+                return th.rx.Backtrack(th);
+            return th;
         });
     }
 }
