@@ -2,30 +2,6 @@ using Niecza;
 using System;
 using System.Collections.Generic;
 using System.Text;
-// this exists to allow O(1) addition, since additions (esp. in the presence
-// of backtracking) dominate lookups
-
-public class Matched {
-    public Matched  next;
-    public string   name;
-    public Variable val; // or null for a list-mode sentinel
-
-    public Matched(Matched next, string name, Variable val) {
-        this.next = next;
-        this.name = name;
-        this.val = val;
-    }
-}
-//
-//public class Match {
-//    public string backing;
-//    public int from;
-//    public int to;
-//    public Dictionary<string,Variable> captures;
-//}
-//
-//public class Xact {
-//    
 
 // extends Frame for a time/space tradeoff
 // we keep the cursor in exploded form to avoid creating lots and lots of
@@ -51,7 +27,12 @@ public sealed class RxFrame {
 
     public PSN<State> bt;
 
+    // when this is set, one value has already been given, so we don't need
+    // any more Lists
+    public bool return_one;
+
     // our backing string, in a cheap to index form
+    public string orig_s;
     public char[] orig;
     // cache of orig.Length
     public int end;
@@ -144,21 +125,38 @@ public sealed class RxFrame {
         return bt.obj.reps.obj;
     }
 
-    /*
+    public Cursor MakeCursor() {
+        return new Cursor(bt.obj.klasses.obj, bt.obj.xact, orig_s, orig, bt.obj.pos);
+    }
+
     public static DynMetaObject ListMO;
     public static DynMetaObject LLArrayMO;
     public static DynMetaObject RegexBacktrackIteratorMO;
-    public static Variable FalseV;
     public Frame End(Frame th) {
         if (return_one) {
             th.caller.resultSlot = MakeCursor();
         } else {
-            DynObject lst = new DynObject(ListMO);
             DynObject obs = new DynObject(LLArrayMO);
+            List<Variable> ks = new List<Variable>();
+            ks.Add(Kernel.NewROScalar(MakeCursor()));
+            obs.slots["value"] = ks;
+            DynObject it  = new DynObject(RegexBacktrackIteratorMO);
+            it.slots["value"]   = Kernel.NewRWScalar(Kernel.AnyP);
+            it.slots["next"]    = Kernel.NewRWScalar(Kernel.AnyP);
+            it.slots["valid"]   = Kernel.NewRWScalar(Kernel.AnyP);
+            it.slots["rxframe"] = Kernel.BoxAny(this, Kernel.AnyP);
             DynObject its = new DynObject(LLArrayMO);
-            DynObject it  = new RegexBacktrackIteratorMO;
+            List<Variable> iss = new List<Variable>();
+            iss.Add(Kernel.NewROScalar(it));
+            its.slots["value"] = iss;
+            DynObject lst = new DynObject(ListMO);
+            lst.slots["items"] = Kernel.NewROScalar(obs);
+            lst.slots["rest"]  = Kernel.NewROScalar(its);
+            lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
+            th.caller.resultSlot = Kernel.NewROScalar(lst);
+        }
+        return th.caller;
     }
-    */
 }
 
 public sealed class XAct {
@@ -169,89 +167,68 @@ public sealed class XAct {
     public XAct(string tag, XAct next) { this.tag = tag; this.next = next; }
 }
 
-public class Cursor {
-    // XXX It's a bit wrong that we ref the string both from the cursor and
-    // from $*ORIG.
-    public Matched captures;
-    public string backing;
-    public XAct xact;
-    public int pos;
-
+// This is used to carry match states in and out of subrules.  Within subrules,
+// match states are represented much more ephemerally in the state of RxFrame.
+public class Cursor : IP6 {
     public static bool Trace =
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
 
-    public Cursor(Matched captures, string backing, int pos) {
-        this.captures = captures;
+    public DynMetaObject klass;
+    public XAct xact;
+    public string backing;
+    public char[] backing_ca;
+    public int pos;
+
+    public Cursor(DynMetaObject klass, XAct xact, string backing, char[] backing_ca, int pos) {
+        this.klass = klass;
+        this.xact = xact;
         this.backing = backing;
+        this.backing_ca = backing_ca;
         this.pos = pos;
     }
 
-    public Cursor(string backing) : this(null, backing, 0) { }
+    public override DynMetaObject GetMO() { return klass; }
+
+    public override Frame GetAttribute(Frame caller, string name) {
+        return Fail(caller, "Cursors cannot have attributes");
+    }
+
+    public override bool IsDefined() {
+        return true;
+    }
 
     public Cursor At(int npos) {
-        return new Cursor(captures, backing, npos);
+        return new Cursor(klass, xact, backing, backing_ca, npos);
     }
 
-    public Cursor Exact(string what) {
-        if (backing.Length - what.Length >= pos &&
-                backing.Substring(pos, what.Length) == what) {
-            if (Trace)
-                Console.WriteLine("* matched {0} at {1}", what, pos);
-            return At(pos + what.Length);
-        } else {
-            if (Trace)
-                Console.WriteLine("! no match {0} at {1}", what, pos);
-            return null;
-        }
-    }
-
-    public Cursor AnyChar() {
-        if (backing.Length - 1 >= pos) {
-            if (Trace)
-                Console.WriteLine("* matched any char at {0}", pos);
-            return At(pos + 1);
-        } else {
-            if (Trace)
-                Console.WriteLine("! no match any char at {0}", pos);
-            return null;
-        }
-    }
-
-    public Cursor CClass(CC cc) {
-        if (backing.Length - 1 >= pos && cc.Accepts(backing[pos])) {
-            if (Trace)
-                Console.WriteLine("* matched cc {0} at {1}", cc, pos);
-            return At(pos + 1);
-        } else {
-            if (Trace)
-                Console.WriteLine("! no match cc {0} at {1}", cc, pos);
-            return null;
-        }
-    }
-
-    public Cursor SetCaps(Matched caps) {
-        return new Cursor(caps, backing, pos);
-    }
-
-    public Cursor Bind(string name, Variable what) {
-        return SetCaps(new Matched(captures, name, what));
-    }
-
-    public Cursor SimpleWS() {
-        int l = backing.Length;
+    public Variable SimpleWS() {
+        int l = backing_ca.Length;
         int p = pos;
+
+        DynObject obs = new DynObject(RxFrame.LLArrayMO);
+        List<Variable> ks = new List<Variable>();
+        obs.slots["value"] = ks;
+
+        DynObject its = new DynObject(RxFrame.LLArrayMO);
+        its.slots["value"] = new List<Variable>();
+
+        DynObject lst = new DynObject(RxFrame.ListMO);
+        lst.slots["items"] = Kernel.NewROScalar(obs);
+        lst.slots["rest"]  = Kernel.NewROScalar(its);
+        lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
+
         if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
                 CC.Word.Accepts(backing[p-1])) {
             if (Trace)
                 Console.WriteLine("! no match <ws> at {0}", pos);
-            return null;
+        } else {
+            while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
+            if (Trace)
+                Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
+            ks.Add(Kernel.NewROScalar(At(p)));
         }
 
-        while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
-        if (Trace)
-            Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
-
-        return At(p);
+        return Kernel.NewROScalar(lst);
     }
 }
 

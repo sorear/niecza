@@ -869,8 +869,6 @@ sub take($p) { # should be \|$p
     Q:CgOp { (rawsccall Kernel.Take (l $p)) }
 }
 
-# these are immutable, though we may wind up reusing them in some cases by
-# uniqueness rules (TBD)
 my class Cursor {
     method new($str) { Q:CgOp { (box (@ (l self)) (rawnew Cursor (unbox String
         (@ (l $str))))) } }
@@ -893,77 +891,6 @@ my class Cursor {
     }
 }
 
-sub _rxstr($C, $str, $k) {
-    #say "_rxstr : " ~ ($C.str ~ (" @ " ~ ($C.from ~ (" ? " ~ $str))));
-    Q:CgOp {
-        (letn rt (rawcall (unbox Cursor (@ (l $C))) Exact
-                   (unbox String (@ (l $str))))
-          [ternary
-            (!= (l rt) (null Cursor))
-            (subcall (@ (l $k)) (box (@ (l $C)) (l rt)))
-            (null Variable)])
-    };
-}
-
-sub _rxdot($C, $k) {
-    Q:CgOp {
-        (letn rt (rawcall (unbox Cursor (@ (l $C))) AnyChar)
-          [ternary
-            (!= (l rt) (null Cursor))
-            (subcall (@ (l $k)) (box (@ (l $C)) (l rt)))
-            (null Variable)])
-    };
-}
-
-sub _rxcc($C, $cc, $k) {
-    Q:CgOp {
-        (letn rt (rawcall (unbox Cursor (@ {$C})) CClass
-                   (unwrap CC (@ {$cc})))
-          [ternary
-            (!= (l rt) (null Cursor))
-            (subcall (@ {$k}) (box (@ {$C}) (l rt)))
-            (null Variable)])
-    };
-}
-
-sub _rxcut($C, $f, $k) {
-    my @l := gather $f($C, &take);
-    @l && $k(@l.shift);
-}
-
-sub _rxbefore($C, $f, $k) {
-    my @l := gather $f($C, &take);
-    @l && $k($C);
-}
-
-sub _rxnotbefore($C, $f, $k) {
-    my @l := gather $f($C, &take);
-    @l || $k($C);
-}
-
-sub _rxalt($C, $lad, $k, *@alts) {
-    sub lbody($ix) { @alts[$ix]($C, $k) }
-
-    Q:CgOp {
-        (letn csr   (unbox Cursor (@ (l $C)))
-              lexer (rawnew Lexer (@ (l $C)) (clr_string "")
-                                  (unwrap 'LAD[]' (@ (l $lad))))
-              fates (rawcall (l lexer) Run (getfield backing (l csr))
-                                           (getfield pos (l csr)))
-              i     (int 0)
-              nfate (getfield Length (l fates))
-          (whileloop 0 0 (< (l i) (l nfate)) (prog
-            (sink (subcall (@ (l &lbody))
-                    (box Num (cast Double (getindex (l i) (l fates))))))
-            (l i (+ (l i) (int 1)))))
-          (null Variable))
-    };
-}
-
-sub _rxcall(@list, $k) {
-    $k(@list.shift) while @list;
-}
-
 PRE-INIT {
     ClassHOW.HOW.add-method("add-multiregex",
         anon method add-multiregex($name, $rx) {
@@ -973,38 +900,6 @@ PRE-INIT {
                 [l True])
             }
         });
-}
-
-sub _rxproto($C, $k, $name) {
-    sub lbody($fn) { $fn($C).for($k) }
-    Q:CgOp {
-        (letn branches (rawscall Lexer.RunProtoregex
-                         (@ (l $C)) (unbox String (@ (l $name))))
-              ix       (int 0)
-              max      (getfield Length (l branches))
-          (whileloop 0 0 (< (l ix) (l max))
-            (sink (subcall (@ (l &lbody))
-                    (newscalar (getindex (l ix) (l branches))))))
-          (null Variable))
-    };
-}
-
-# A call to a subrule could return a cursor of a different type, or with
-# unwanted subcaptures that need to be cleared for <.foo>
-sub _rxbind($C, @names, $fun, $k) {
-    $fun($C, -> $C2 {
-        my $C3 = Q:CgOp {
-            (box (@ (l $C)) (rawcall (unbox Cursor (@ (l $C2)))
-                SetCaps (getfield captures (unbox Cursor (@ (l $C))))))
-        };
-        for @names -> $n { #OK
-            $C3 = Q:CgOp {
-                (box (@ (l $C3)) (rawcall (unbox Cursor (@ (l $C3)))
-                    Bind (unbox String (@ (l $n))) (l $C3)))
-            };
-        }
-        $k($C3);
-    });
 }
 
 my class Regex is Sub {
