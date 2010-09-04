@@ -37,14 +37,14 @@ public sealed class RxFrame {
     // cache of orig.Length
     public int end;
 
-    public RxFrame(DynObject csr) {
-        Cursor c = (Cursor) Kernel.UnboxDO(csr);
-        orig = c.backing.ToCharArray();
+    public RxFrame(Cursor csr) {
+        orig = csr.backing_ca;
+        orig_s = csr.backing;
         end = orig.Length;
         bt = new PSN<State>(default(State), null);
         bt.obj.klasses = new PSN<DynMetaObject>(csr.klass, null);
-        bt.obj.xact = new XAct("MATCH", null);
-        bt.obj.pos = c.pos;
+        bt.obj.xact = new XAct("MATCH", csr.xact);
+        bt.obj.pos = csr.pos;
     }
 
     public Frame Backtrack(Frame th) {
@@ -178,6 +178,9 @@ public class Cursor : IP6 {
     public string backing;
     public char[] backing_ca;
     public int pos;
+
+    public Cursor(IP6 proto, string text)
+        : this(proto.GetMO(), null, text, text.ToCharArray(), 0) { }
 
     public Cursor(DynMetaObject klass, XAct xact, string backing, char[] backing_ca, int pos) {
         this.klass = klass;

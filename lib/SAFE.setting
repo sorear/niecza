@@ -870,25 +870,16 @@ sub take($p) { # should be \|$p
 }
 
 my class Cursor {
-    method new($str) { Q:CgOp { (box (@ (l self)) (rawnew Cursor (unbox String
-        (@ (l $str))))) } }
+    method new($str) { Q:CgOp { (ns (rawnew Cursor
+        (@ {self}) (unbox System.String (@ {$str})))) } }
     method pos { Q:CgOp { (box Num (cast Double (getfield pos
-        (unbox Cursor (@ (l self)))))) } }
-    method cursor($np) { Q:CgOp { (box (@ (l self)) (rawcall
-        (unbox Cursor (@ (l self))) At
-          (cast Int32 (unbox Double (@ (l $np)))))) } }
+        (cast Cursor (@ {self}))))) } }
+    method cursor($np) { Q:CgOp { (ns (rawcall
+        (cast Cursor (@ {self})) At
+          (cast Int32 (unbox Double (@ {$np}))))) } }
     method orig { Q:CgOp {
-        (box Str (getfield backing (unbox Cursor (@ (l self))))) } }
-    method ws() {
-        gather
-            Q:CgOp {
-                (letn rt (rawcall (unbox Cursor (@ (l self))) SimpleWS)
-                  [ternary
-                    (!= (l rt) (null Cursor))
-                    (subcall (@ (l &take)) (box (@ (l self)) (l rt)))
-                    (null Variable)])
-            };
-    }
+        (box Str (getfield backing (cast Cursor (@ {self})))) } }
+    method ws() { Q:CgOp { (rawcall (cast Cursor (@ {self})) SimpleWS) } }
 }
 
 PRE-INIT {

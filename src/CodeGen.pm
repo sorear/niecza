@@ -63,15 +63,9 @@ use 5.010;
             { SearchForHandler => [c => 'Void'] },
         'Cursor' =>
             { At           => [m => 'Cursor'],
-              Exact        => [m => 'Cursor'],
-              AnyChar      => [m => 'Cursor'],
-              CClass       => [m => 'Cursor'],
               pos          => [f => 'Int32'],
               backing      => [f => 'String'],
-              captures     => [f => 'Matched'],
-              SetCaps      => [m => 'Cursor'],
-              SimpleWS     => [m => 'Cursor'],
-              Bind         => [m => 'Cursor'] },
+              SimpleWS     => [m => 'Variable'] },
         'Lexer' =>
             { Run          => [m => 'Int32[]'] },
 
