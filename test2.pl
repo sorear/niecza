@@ -21,11 +21,13 @@ PRE-INIT {
           (rawsset RxFrame.ListMO (getfield klass (cast DynObject (@ {List}))))
           (rawsset RxFrame.LLArrayMO (getfield klass
               (cast DynObject (@ {LLArray}))))
+          (rawsset RxFrame.GatherIteratorMO (getfield klass
+              (cast DynObject (@ {GatherIterator}))))
           (null Variable))
     }
 }
 
-ok rxt(Cursor.new("x")).Bool, "/x/ ~~ x";
-ok !rxt(Cursor.new("y")).Bool, "/x/ !~ y";
+is +rxt(Cursor.new("x")), 1, "/x/ ~~ x";
+is +rxt(Cursor.new("y")), 0, "/x/ !~ y";
 
 done-testing;

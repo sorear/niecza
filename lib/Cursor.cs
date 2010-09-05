@@ -63,7 +63,7 @@ public sealed class RxFrame {
                 lst.slots["items"] = Kernel.NewROScalar(obs);
                 lst.slots["rest"]  = Kernel.NewROScalar(its);
                 lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
-                th.caller.resultSlot = Kernel.NewROScalar(lst);
+                th.caller.resultSlot = Kernel.NewRWListVar(lst);
             }
 
             return th.caller;
@@ -145,7 +145,7 @@ public sealed class RxFrame {
 
     public static DynMetaObject ListMO;
     public static DynMetaObject LLArrayMO;
-    public static DynMetaObject RegexBacktrackIteratorMO;
+    public static DynMetaObject GatherIteratorMO;
     public static IP6 EMPTYP;
     public Frame End(Frame th) {
         if (return_one) {
@@ -156,11 +156,11 @@ public sealed class RxFrame {
             List<Variable> ks = new List<Variable>();
             ks.Add(Kernel.NewROScalar(MakeCursor()));
             obs.slots["value"] = ks;
-            DynObject it  = new DynObject(RegexBacktrackIteratorMO);
+            DynObject it  = new DynObject(GatherIteratorMO);
             it.slots["value"]   = Kernel.NewRWScalar(Kernel.AnyP);
             it.slots["next"]    = Kernel.NewRWScalar(Kernel.AnyP);
             it.slots["valid"]   = Kernel.NewRWScalar(Kernel.AnyP);
-            it.slots["rxframe"] = Kernel.NewRWScalar(th);
+            it.slots["frame"]   = Kernel.NewRWScalar(th);
             DynObject its = new DynObject(LLArrayMO);
             List<Variable> iss = new List<Variable>();
             iss.Add(Kernel.NewROScalar(it));
@@ -169,7 +169,7 @@ public sealed class RxFrame {
             lst.slots["items"] = Kernel.NewROScalar(obs);
             lst.slots["rest"]  = Kernel.NewROScalar(its);
             lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
-            th.caller.resultSlot = Kernel.NewROScalar(lst);
+            th.caller.resultSlot = Kernel.NewRWListVar(lst);
         }
         return th.caller;
     }
