@@ -7,7 +7,12 @@ sub rxt($C) {
     Q:CgOp {
         (prog
           (setfield rx (callframe) (rawnew RxFrame (cast Cursor (@ {$C}))))
+          (rxpushb SEQALT b1)
           (rxbprim ExactOne (char x))
+          (goto b2)
+          (label b1)
+          (rxbprim ExactOne (char y))
+          (label b2)
           (rawccall (getfield rx (callframe)) End)
           (rawccall (getfield rx (callframe)) Backtrack)
           (null Variable))
@@ -27,7 +32,8 @@ PRE-INIT {
     }
 }
 
-is +rxt(Cursor.new("x")), 1, "/x/ ~~ x";
-is +rxt(Cursor.new("y")), 0, "/x/ !~ y";
+is +rxt(Cursor.new("x")), 1, "/x||y/ ~~ x";
+is +rxt(Cursor.new("y")), 1, "/x||y/ ~~ y";
+is +rxt(Cursor.new("z")), 0, "/x||y/ !~~ z";
 
 done-testing;

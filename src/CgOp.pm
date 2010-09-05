@@ -576,6 +576,24 @@ use warnings;
             zyg => [ $inv, @args ], is_cps_call => 1);
     }
 
+    sub label {
+        my ($name) = @_;
+        CgOp::Primitive->new(op => [ 'labelhere', $name ],
+            zyg => [ ], is_cps_call => 1);
+    }
+
+    sub goto {
+        my ($name) = @_;
+        CgOp::Primitive->new(op => [ 'goto', $name ],
+            zyg => [ ], is_cps_call => 1);
+    }
+
+    sub rxpushb {
+        my ($tag, $lbl) = @_;
+        CgOp::Primitive->new(op => [ 'rxpushb', $tag, $lbl ],
+            zyg => [ ], is_cps_call => 1);
+    }
+
     sub rxbprim {
         my ($name, @args) = @_;
         CgOp::Primitive->new(op => [ 'rxbprim', $name, scalar @args ],

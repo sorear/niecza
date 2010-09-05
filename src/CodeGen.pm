@@ -621,6 +621,12 @@ use 5.010;
         $self->_emit("if (!th.rx.$name(" . join(", ", @args) . ")) return th.rx.Backtrack(th)");
     }
 
+    sub rxpushb {
+        my ($self, $tag, $label) = @_;
+        push @{ $self->buffer }, "    th.rx.PushBacktrack(" . qm($tag) .
+            ", \@\@L$label);\n";
+    }
+
     sub return {
         my ($self, $nv) = @_;
         return if $self->unreach;
@@ -738,7 +744,7 @@ use 5.010;
                 ($self->numlets + $self->minlets - 4), "];\n";
         }
         for (@{ $self->buffer }) {
-            s/\@\@L(\d+)/$self->labelname->{$1}/eg;
+            s/\@\@L(\w+)/$self->labelname->{$1}/eg;
         }
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
         print ::NIECZA_OUT " " x 12, "default:\n";
