@@ -158,8 +158,8 @@ use 5.010;
     }
 
     sub for_regex {
-        my ($self, $cn) = @_;
-        my $sp = Sig::Parameter->new(slot => $cn, name => '$¢');
+        my ($self) = @_;
+        my $sp = Sig::Parameter->new(slot => '$¢', name => '$¢');
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 

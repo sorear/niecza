@@ -11,51 +11,7 @@ use CgOp;
 
     has zyg => (isa => 'ArrayRef[RxOp]', is => 'ro', default => sub { [] });
 
-    # op(cn, cont): provides cn in environment, calls cont per result, then
-    # returns; -> (cn, cont)
-    # closure: like op but just returns a function, takes cn/cont though
-
-    sub _close {
-        my ($self, $type, $parms, $op) = @_;
-        Op::SubDef->new(var => Niecza::Actions->gensym,
-            once => 1, body => Body->new(
-                type        => $type,
-                class       => ucfirst($type),
-                signature   => Sig->simple(@$parms),
-                do          => $op));
-    }
-
-    sub _close_k {
-        my ($self, $cn, $cont) = @_;
-        $self->_close('sub', [$cn], $cont);
-    }
-
-    sub _close_op {
-        my ($self, $op) = @_;
-        my $icn   = Niecza::Actions->gensym;
-        my $icv   = Niecza::Actions->gensym;
-        my $icont = Op::CallSub->new(
-            invocant => Op::Lexical->new(name => $icv),
-            positionals => [ Op::Lexical->new(name => $icn) ]);
-        my ($cn, $cont) = $op->op($icn, $icont);
-        $self->_close('sub', [$cn, $icv], $cont);
-    }
-
-    sub term_rx {
-        my ($self) = @_;
-        my $icn   = Niecza::Actions->gensym;
-        my $icont = Op::Take->new(value => Op::Lexical->new(name => $icn));
-        my ($cn, $cont) = $self->op($icn, $icont);
-        $cn, Op::Gather->new(
-            var => Niecza::Actions->gensym,
-            body => Body->new(type => 'gather', do => $cont));
-    }
-
-    sub close_rx {
-        my ($self) = @_;
-        my ($cn, $op) = $self->term_rx;
-        $self->_close('regex', [$cn], $op);
-    }
+    sub opzyg { map { $_->opzyg } @{ $_[0]->zyg } }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -68,16 +24,14 @@ use CgOp;
 
     has text => (isa => 'Str', is => 'ro', required => 1);
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxstr'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                Op::StringLiteral->new(text => $self->text),
-                $self->_close_k($cn, $cont)
-            ]);
+    sub code {
+        my ($self, $body) = @_;
+        my $t = $self->text;
+        if (length($t) == 1) {
+            CgOp::rxbprim('ExactOne', CgOp::char($t));
+        } else {
+            CgOp::rxbprim('Exact', CgOp::clr_string($t));
+        }
     }
 
     sub lad {
@@ -170,14 +124,10 @@ use CgOp;
 
     # zyg * N
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
+    sub code {
+        my ($self, $body) = @_;
 
-        for (reverse @{ $self->zyg }) {
-            ($cn, $cont) = $_->op($cn, $cont);
-        }
-
-        $cn, $cont;
+        CgOp::prog(map { $_->code($body) } @{ $self->zyg });
     }
 
     sub lad {

@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use utf8;
 use 5.010;
 
 use CgOp;
@@ -1001,6 +1002,32 @@ use CgOp;
         CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&_gather')),
             CgOp::newscalar(CgOp::rawsccall('Kernel.GatherHelper',
                     CgOp::fetch(CgOp::scopedlex($self->var)))));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::RegexBody;
+    use Moose;
+    extends 'Op';
+
+    has rxop => (isa => 'RxOp', is => 'ro', required => 1);
+
+    sub zyg { $_[0]->rxop->opzyg }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        CgOp::prog(
+            CgOp::setfield('rx', CgOp::callframe,
+                CgOp::rawnew('RxFrame', CgOp::cast('Cursor',
+                        CgOp::fetch(CgOp::scopedlex('$¢'))))),
+            $self->rxop->code($body),
+            CgOp::rawccall(CgOp::getfield('rx', CgOp::callframe), 'End'),
+            CgOp::rawccall(CgOp::getfield('rx', CgOp::callframe), 'Backtrack'),
+            CgOp::null('Variable'));
     }
 
     __PACKAGE__->meta->make_immutable;

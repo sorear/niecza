@@ -289,11 +289,13 @@ sub quote__S_Q { my ($cl, $M) = @_;
 }
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
-    my $slot = $cl->gensym;
-    # TODO should be a real pass.
-    local $::parenid = 0;
-    local $::symtext;
-    $M->{_ast} = $M->{nibble}{_ast}->close_rx;
+    $M->{_ast} = Op::SubDef->new(
+        var  => $cl->gensym,
+        body => Body->new(
+            class => 'Regex',
+            type  => 'regex',
+            signature => Sig->simple->for_regex,
+            do => Op::RegexBody->new(rxop => $M->{nibble}{_ast})));
 }
 
 sub regex_block { my ($cl, $M) = @_;
@@ -315,7 +317,7 @@ sub regex_def { my ($cl, $M) = @_;
     }
 
     my $isproto;
-    local $::symtext =
+    my $symtext =
         !defined($name) ? undef :
         ($name =~ /:sym<(.*)>/) ? $1 :
         ($name =~ /:(\w+)/) ? $1 :
@@ -359,8 +361,6 @@ sub regex_def { my ($cl, $M) = @_;
 
     my $var = ($scope eq 'anon' || $scope eq 'has') ? $cl->gensym
         : '&' . $name;
-
-    local $::parenid = 0;
 
     my $ast = $M->{regex_block}{_ast};
     if ($isproto) {

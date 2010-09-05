@@ -3,21 +3,21 @@ use Test;
 
 #ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
 
-sub rxt($C) {
-    Q:CgOp {
-        (prog
-          (setfield rx (callframe) (rawnew RxFrame (cast Cursor (@ {$C}))))
-          (rxpushb SEQALT b1)
-          (rxbprim ExactOne (char x))
-          (goto b2)
-          (label b1)
-          (rxbprim ExactOne (char y))
-          (label b2)
-          (rawccall (getfield rx (callframe)) End)
-          (rawccall (getfield rx (callframe)) Backtrack)
-          (null Variable))
-    }
-}
+#sub rxt($C) {
+#    Q:CgOp {
+#        (prog
+#          (setfield rx (callframe) (rawnew RxFrame (cast Cursor (@ {$C}))))
+#          (rxpushb SEQALT b1)
+#          (rxbprim ExactOne (char x))
+#          (goto b2)
+#          (label b1)
+#          (rxbprim ExactOne (char y))
+#          (label b2)
+#          (rawccall (getfield rx (callframe)) End)
+#          (rawccall (getfield rx (callframe)) Backtrack)
+#          (null Variable))
+#    }
+#}
 
 PRE-INIT {
     Q:CgOp {
@@ -32,8 +32,11 @@ PRE-INIT {
     }
 }
 
-is +rxt(Cursor.new("x")), 1, "/x||y/ ~~ x";
-is +rxt(Cursor.new("y")), 1, "/x||y/ ~~ y";
-is +rxt(Cursor.new("z")), 0, "/x||y/ !~~ z";
+is +("x" ~~ /x/), 1, "x ~~ /x/";
+is +("y" ~~ /x/), 0, "y !~~ /x/";
+
+#is +rxt(Cursor.new("x")), 1, "/x||y/ ~~ x";
+#is +rxt(Cursor.new("y")), 1, "/x||y/ ~~ y";
+#is +rxt(Cursor.new("z")), 0, "/x||y/ !~~ z";
 
 done-testing;
