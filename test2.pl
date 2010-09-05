@@ -34,14 +34,14 @@ PRE-INIT {
     ok !("adc" ~~ /ab+c/), "plus cannot match other";
     ok !("ac" ~~ /ab+c/), "plus cannot match none";
 
-    #grammar Bob {
-    #    rule TOP {ab*c}
-    #}
+    grammar Bob {
+        regex TOP {ab*c}
+    }
 
-    #ok Bob.parse("abbc"), "grammars work (1)";
-    #ok !Bob.parse("adc"), "grammars work (2)";
-    #ok !Bob.parse("xac"), "grammars anchor (1)";
-    #ok !Bob.parse("acx"), "grammars anchor (2)";
+    ok Bob.parse("abbc"), "grammars work (1)";
+    ok !Bob.parse("adc"), "grammars work (2)";
+    ok !Bob.parse("xac"), "grammars anchor (1)";
+    ok !Bob.parse("acx"), "grammars anchor (2)";
 }
 
 # {
