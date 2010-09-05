@@ -52,6 +52,20 @@ public sealed class RxFrame {
             bt = bt.next;
         } while (bt != null && (bt.obj.xact.committed || bt.obj.ip < 0));
         if (bt == null) {
+            if (return_one) {
+                return Kernel.Take(th, Kernel.NewROScalar(EMPTYP));
+            } else {
+                DynObject obs = new DynObject(LLArrayMO);
+                obs.slots["value"] = new List<Variable>();
+                DynObject its = new DynObject(LLArrayMO);
+                its.slots["value"] = new List<Variable>();
+                DynObject lst = new DynObject(ListMO);
+                lst.slots["items"] = Kernel.NewROScalar(obs);
+                lst.slots["rest"]  = Kernel.NewROScalar(its);
+                lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
+                th.caller.resultSlot = Kernel.NewROScalar(lst);
+            }
+
             return th.caller;
         } else {
             th.ip = bt.obj.ip;
@@ -132,10 +146,12 @@ public sealed class RxFrame {
     public static DynMetaObject ListMO;
     public static DynMetaObject LLArrayMO;
     public static DynMetaObject RegexBacktrackIteratorMO;
+    public static IP6 EMPTYP;
     public Frame End(Frame th) {
         if (return_one) {
-            th.caller.resultSlot = MakeCursor();
+            return Kernel.Take(th, Kernel.NewROScalar(MakeCursor()));
         } else {
+            return_one = true;
             DynObject obs = new DynObject(LLArrayMO);
             List<Variable> ks = new List<Variable>();
             ks.Add(Kernel.NewROScalar(MakeCursor()));
@@ -144,7 +160,7 @@ public sealed class RxFrame {
             it.slots["value"]   = Kernel.NewRWScalar(Kernel.AnyP);
             it.slots["next"]    = Kernel.NewRWScalar(Kernel.AnyP);
             it.slots["valid"]   = Kernel.NewRWScalar(Kernel.AnyP);
-            it.slots["rxframe"] = Kernel.BoxAny(this, Kernel.AnyP);
+            it.slots["rxframe"] = Kernel.NewRWScalar(th);
             DynObject its = new DynObject(LLArrayMO);
             List<Variable> iss = new List<Variable>();
             iss.Add(Kernel.NewROScalar(it));
