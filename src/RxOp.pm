@@ -51,69 +51,52 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    has type => (isa => 'Str', is => 'ro', required => 1);
     has minimal => (isa => 'Bool', is => 'ro', required => 1);
-    # ? + * only
-    # zyg * 1
+    has min => (isa => 'Int', is => 'ro', required => 1);
+    has max => (isa => 'Maybe[Int]', is => 'ro', default => undef);
 
-    my %qf = ( '+', 'plus', '*', 'star', '?', 'opt' );
-    sub op { goto &{ $_[0]->can('op_' . $qf{$_[0]->type}) }; }
+    sub code {
+        my ($self, $body) = @_;
+        my @code;
 
-    sub op_opt {
-        my ($self, $cn, $cont) = @_;
-        my $kcl = $self->_close_k($cn, $cont);
-        my $zzcn = Niecza::Actions->gensym;
-        my ($zcn, $zcont) = $self->zyg->[0]->op($zzcn,
-            Op::CallSub->new(invocant => Op::Lexical->new(name => $kcl->var),
-                positionals => [Op::Lexical->new(name => $zzcn)]));
-        $zcn, Op::StatementList->new(children => [
-                $kcl, $zcont, Op::CallSub->new(
-                    invocant => Op::Lexical->new(name => $kcl->var),
-                    positionals => [Op::Lexical->new(name => $zcn)])]);
-    }
+        my $exit = $self->label;
+        my $repeat = $self->label;
 
-    # (sub loop($C) { zyg($C, &loop); cont($C) })($C)
-    sub op_star {
-        my ($self, $cn, $cont) = @_;
-        my $lpn =  Niecza::Actions->gensym;
-        my $zzcn = Niecza::Actions->gensym;
-        my ($zcn, $zcont) = $self->zyg->[0]->op($zzcn, Op::CallSub->new(
-                invocant => Op::Lexical->new(name => $lpn),
-                positionals => [Op::Lexical->new(name => $zzcn)]));
-        $cn, Op::CallSub->new(
-            invocant => Op::SubDef->new(var => $lpn,
-                once => 1, body =>
-                Body->new(type => 'sub', signature => Sig->simple($zcn), do =>
-                    Op::StatementList->new(children => [ $zcont,
-                            Op::CallSub->new(
-                                invocant => $self->_close_k($cn, $cont),
-                                positionals => [Op::Lexical->new(name => $zcn)])]))),
-            positionals => [Op::Lexical->new(name => $cn)]);
-    }
+        push @code, CgOp::rawcall(CgOp::rxframe, 'OpenQuant');
+        push @code, CgOp::label($repeat);
+        push @code, CgOp::ternary(CgOp::compare('>=',
+                CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
+                CgOp::int($self->min)),
+            CgOp::rxpushb('QUANT', $exit), CgOp::prog());
+        if (defined $self->max) {
+            push @code, CgOp::ternary(CgOp::compare('>=',
+                    CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
+                    CgOp::int($self->max)),
+                CgOp::rawccall(CgOp::rxframe, 'Backtrack'), CgOp::prog());
+        }
+        push @code, $self->zyg->[0]->code($body);
+        push @code, CgOp::rawcall(CgOp::rxframe, 'IncQuant');
+        push @code, CgOp::goto($repeat);
+        push @code, CgOp::label($exit);
+        push @code, CgOp::rawcall(CgOp::rxframe, 'CloseQuant');
 
-    # (sub loop($C) { zyg($C, -> $nC { loop($nC); cont($nC) }) })($C)
-    sub op_plus {
-        my ($self, $cn, $cont) = @_;
-        my $lpn =  Niecza::Actions->gensym;
-        my ($zcn, $zcont) = $self->zyg->[0]->op($cn, Op::StatementList->new(
-                children => [
-                    Op::CallSub->new(
-                        invocant => Op::Lexical->new(name => $lpn),
-                        positionals => [Op::Lexical->new(name => $cn)]),
-                    $cont
-                ]));
-        $cn, Op::CallSub->new(
-            invocant => Op::SubDef->new(var => $lpn, once => 1,
-                body => Body->new(type => 'sub', signature =>
-                    Sig->simple($zcn), do => $zcont)),
-            positionals => [Op::Lexical->new(name => $cn)]);
+        @code;
     }
 
     sub lad {
         my ($self) = @_;
-        $self->minimal ? CgOp::rawnew('LADImp') :
-            CgOp::rawnew('LAD' . ucfirst($qf{$self->type}),
-                    $self->zyg->[0]->lad);
+        if ($self->minimal) { return CgOp::rawnew('LADImp'); }
+        my ($mi,$ma) = ($self->min, $self->max // -1);
+        my $str;
+        if ($mi == 0 && $ma == -1) { $str = 'Star' }
+        if ($mi == 1 && $ma == -1) { $str = 'Plus' }
+        if ($mi == 0 && $ma == 1) { $str = 'Opt' }
+
+        if ($str) {
+            CgOp::rawnew("LAD$str", $self->zyg->[0]->lad);
+        } else {
+            CgOp::rawnew("LADImp");
+        }
     }
 
     __PACKAGE__->meta->make_immutable;

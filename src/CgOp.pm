@@ -512,6 +512,8 @@ use warnings;
         CgOp::Primitive->new(op => [ 'callframe' ]);
     }
 
+    sub rxframe { getfield('rx', callframe) }
+
     sub letvar {
         $_[1] ?
             CgOp::Primitive->new(op => [ 'poke_let', $_[0] ], zyg => [ $_[1] ]):

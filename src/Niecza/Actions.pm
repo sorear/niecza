@@ -73,6 +73,9 @@ sub unv { }
 sub begid { }
 sub comment { }
 sub comment__S_Sharp { }
+sub comment__S_SharpGraveParenDotDotDotThesis { }
+sub opener { }
+sub starter { }
 sub spacey { }
 sub unspacey { }
 sub unsp { }
@@ -409,9 +412,9 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
         $q->{mod} //= '';
     }
 
-    if ($q->{simple}) {
-        $atom = RxOp::Quantifier->new(type => $q->{simple}, zyg => [$atom],
-            minimal => ($q->{mod} && $q->{mod} eq '?'));
+    if (defined $q->{min}) {
+        $atom = RxOp::Quantifier->new(min => $q->{min}, max => $q->{max},
+            zyg => [$atom], minimal => ($q->{mod} && $q->{mod} eq '?'));
     }
 
     if (defined $q->{mod} && $q->{mod} eq '') {
@@ -424,13 +427,13 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
 # :: Context hash interpreted by quantified_atom
 sub quantifier {}
 sub quantifier__S_Star { my ($cl, $M) = @_;
-    $M->{_ast} = { simple => '*', mod => $M->{quantmod}{_ast} };
+    $M->{_ast} = { min => 0, mod => $M->{quantmod}{_ast} };
 }
 sub quantifier__S_Plus { my ($cl, $M) = @_;
-    $M->{_ast} = { simple => '+', mod => $M->{quantmod}{_ast} };
+    $M->{_ast} = { min => 1, mod => $M->{quantmod}{_ast} };
 }
 sub quantifier__S_Question { my ($cl, $M) = @_;
-    $M->{_ast} = { simple => '?', mod => $M->{quantmod}{_ast} };
+    $M->{_ast} = { min => 0, max => 1, mod => $M->{quantmod}{_ast} };
 }
 sub quantifier__S_Colon { my ($cl, $M) = @_;
     $M->{_ast} = { mod => '' };
@@ -847,6 +850,10 @@ sub nibbler { my ($cl, $M) = @_;
         # garden variety nibbler
         my @bits;
         for my $n (@{ $M->{nibbles} }) {
+            if (!blessed($n)) {
+                say(STDERR YAML::XS::Dump($n));
+                next;
+            }
             my $bit = $n->isa('Str') ? $n->{TEXT} : $n->{_ast};
 
             if (ref($bit) && ref($bit) eq 'CClass') {
