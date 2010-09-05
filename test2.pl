@@ -32,8 +32,10 @@ PRE-INIT {
     }
 }
 
-is +("x" ~~ /x/), 1, "x ~~ /x/";
-is +("y" ~~ /x/), 0, "y !~~ /x/";
+is +("x" ~~ /x||y/), 1, "x  ~~ /x||y/";
+is +("y" ~~ /x||y/), 1, "y  ~~ /x||y/";
+is +("z" ~~ /x||y/), 0, "z !~~ /x||y/";
+is +(/x||x/(Cursor.new("x"))), 2, "x  ~~ /x||x/ (2x) ";
 
 #is +rxt(Cursor.new("x")), 1, "/x||y/ ~~ x";
 #is +rxt(Cursor.new("y")), 1, "/x||y/ ~~ y";

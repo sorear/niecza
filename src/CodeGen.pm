@@ -624,7 +624,7 @@ use 5.010;
     sub rxpushb {
         my ($self, $tag, $label) = @_;
         push @{ $self->buffer }, "    th.rx.PushBacktrack(" . qm($tag) .
-            ", \@\@L$label);\n";
+            ", " . ($label ? "\@\@L$label" : "-1") . ");\n";
     }
 
     sub return {

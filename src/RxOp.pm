@@ -13,6 +13,9 @@ use CgOp;
 
     sub opzyg { map { $_->opzyg } @{ $_[0]->zyg } }
 
+    my $nlabel = 0;
+    sub label { "b" . ($nlabel++) }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -152,22 +155,23 @@ use CgOp;
 
     # zyg * N
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
+    sub code {
+        my ($self, $body) = @_;
 
-        my $cni = Niecza::Actions->gensym;
-        my @terms;
-        push @terms, $self->_close_k($cn, $cont);
-        for (@{ $self->zyg }) {
-            push @terms, Op::CallSub->new(
-                invocant => $self->_close_k($_->op($cn,
-                    Op::CallSub->new(
-                        invocant => Op::Lexical->new(name => $terms[0]->var),
-                        positionals => [ Op::Lexical->new(name => $cn) ]))),
-                positionals => [ Op::Lexical->new(name => $cni) ]);
+        my @ends = map { $self->label } @{ $self->zyg };
+        my @code;
+        my $n = @{ $self->zyg };
+
+        for (my $i = 0; $i < $n; $i++) {
+            push @code, CgOp::rxpushb("SEQALT",
+                ($i == $n - 1) ? undef : $ends[$i]);
+            push @code, $self->zyg->[$i]->code($body);
+            push @code, CgOp::goto($ends[$n-1]) unless $i == $n-1;
+            push @code, CgOp::label($ends[$i]);
         }
 
-        $cni, Op::StatementList->new(children => \@terms);
+        push @code, CgOp::rxpushb("ENDSEQALT");
+        @code;
     }
 
     sub lad { $_[0]->zyg->[0]->lad }
