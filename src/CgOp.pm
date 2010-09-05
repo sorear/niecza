@@ -522,6 +522,10 @@ use warnings;
         CgOp::Primitive->new(op => [ 'clr_string', $_[0] ]);
     }
 
+    sub char {
+        CgOp::Primitive->new(op => [ 'clr_char', $_[0] ]);
+    }
+
     sub withtypes {
         if (blessed($_[0])) {
             prog(@_);
@@ -570,6 +574,12 @@ use warnings;
         my ($inv, $name, @args) = @_;
         CgOp::Primitive->new(op => [ 'clr_call_virt', $name, scalar @args ],
             zyg => [ $inv, @args ], is_cps_call => 1);
+    }
+
+    sub rxbprim {
+        my ($name, @args) = @_;
+        CgOp::Primitive->new(op => [ 'rxbprim', $name, scalar @args ],
+            zyg => [ @args ], is_cps_call => 1);
     }
 
     sub fgoto {

@@ -49,6 +49,7 @@ use 5.010;
               ToString     => [m => 'String'] },
         'Frame' =>
             { pos          => [f => 'Variable[]'],
+              rx           => [f => 'RxFrame'],
               caller       => [f => 'Frame'],
               outer        => [f => 'Frame'],
               proto        => [f => 'Frame'],
@@ -57,6 +58,15 @@ use 5.010;
               ExecutingFile=> [m => 'String'],
               ExtractNamed => [m => 'Variable'],
               LexicalFind  => [m => 'Variable'] },
+        'RxFrame' =>
+            { Exact        => [m => 'Boolean'],
+              Exact1       => [m => 'Boolean'],
+              IncQuant     => [m => 'Void'],
+              GetQuant     => [m => 'Int32'],
+              OpenQuant    => [m => 'Void'],
+              CloseQuant   => [m => 'Int32'],
+              Backtrack    => [c => 'Void'],
+              End          => [c => 'Void'] },
         'Niecza.FatalException' =>
             { SearchForHandler => [c => 'Void'] },
         'Niecza.LexoticControlException' =>
@@ -483,6 +493,11 @@ use 5.010;
         $self->_push('System.String', qm($text));
     }
 
+    sub clr_char {
+        my ($self, $val) = @_;
+        $self->_push('Char', "((char)" . ord($val) . ")");
+    }
+
     sub clr_int {
         my ($self, $val) = @_;
         $self->_push('Int32', $val);
@@ -598,6 +613,12 @@ use 5.010;
         } else {
             $self->_emit("$inv.$nm(" . join(", ", @args) . ")");
         }
+    }
+
+    sub rxbprim {
+        my ($self, $name, $nargs) = @_;
+        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
+        $self->_emit("if (!th.rx.$name(" . join(", ", @args) . ")) return th.rx.Backtrack(th)");
     }
 
     sub return {
