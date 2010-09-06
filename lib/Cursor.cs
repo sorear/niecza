@@ -152,6 +152,14 @@ public sealed class RxFrame {
         return !(bt.obj.pos == end || orig[bt.obj.pos++] != ch);
     }
 
+    public bool AnyChar() {
+        return !(bt.obj.pos++ == end);
+    }
+
+    public bool CClass(CC x) {
+        return !(bt.obj.pos == end || !x.Accepts(orig[bt.obj.pos++]));
+    }
+
     public void OpenQuant() {
         bt.obj.reps = new PSN<int>(0, bt.obj.reps);
     }

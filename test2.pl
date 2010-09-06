@@ -77,39 +77,39 @@ end
 }
 
 {
-#     # doing a more reasonable test will probably require embedded blocks
-#     ok "foobarx" ~~ / [ foo | foobar ]: x /, "LTM picks longest even if second";
-#     ok "foobarx" ~~ / [ foobar | foo ]: x /, "LTM picks longest even if first";
+#    # doing a more reasonable test will probably require embedded blocks
+#    ok "foobarx" ~~ / [ foo | foobar ]: x /, "LTM picks longest even if second";
+#    ok "foobarx" ~~ / [ foobar | foo ]: x /, "LTM picks longest even if first";
 }
 
 {
-    my $x = '';
-    ok !("a" ~~ / a { $x = 1; } b /), '{} does not terminate regex';
-    is $x, 1, '{} is run even if regex fails';
-    $x = '';
-    ok !("" ~~ / a { $x = 1; } b /), '{} does not affect regex that ends before it';
-    is $x, '', '{} is only run if reached';
-    $x = 0;
-    ok ("aab" ~~ / a* { $x++ } ab /), '{} does not block backtracking';
-    is $x, 2, '{} is run multiple times when backtracking';
-# 
-#     $x = '';
-#     ok ("foo" ~~ / foo { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
-#         "foo ~~ foo|foo";
-#     is $x, 1, "with no other constraints, first item is used";
-#     $x = '';
-#     ok ("foo" ~~ / fo* { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
-#         "foo ~~ fo*|foo";
-#     is $x, 2, "longer literal prefix wins over seniority";
-#     $x = '';
-#     ok ("fooo" ~~ / fo* { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
-#         "foo ~~ fo*|foo";
-#     is $x, 1, "longer length wins over prefix";
-#     $x = '';
-#     ok !("fooo" ~~ / [ fo*: { $x = $x ~ 1 } | foo { $x = $x ~ 2 } ] x /),
-#         "foo !~~ [fo*:|foo]x";
-#     is $x, '12', "will backtrack into shorter token";
-# 
+#    my $x = '';
+#    ok !("a" ~~ / a { $x = 1; } b /), '{} does not terminate regex';
+#    is $x, 1, '{} is run even if regex fails';
+#    $x = '';
+#    ok !("" ~~ / a { $x = 1; } b /), '{} does not affect regex that ends before it';
+#    is $x, '', '{} is only run if reached';
+#    $x = 0;
+#    ok ("aab" ~~ / a* { $x++ } ab /), '{} does not block backtracking';
+#    is $x, 2, '{} is run multiple times when backtracking';
+#
+#    $x = '';
+#    ok ("foo" ~~ / foo { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
+#        "foo ~~ foo|foo";
+#    is $x, 1, "with no other constraints, first item is used";
+#    $x = '';
+#    ok ("foo" ~~ / fo* { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
+#        "foo ~~ fo*|foo";
+#    is $x, 2, "longer literal prefix wins over seniority";
+#    $x = '';
+#    ok ("fooo" ~~ / fo* { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
+#        "foo ~~ fo*|foo";
+#    is $x, 1, "longer length wins over prefix";
+#    $x = '';
+#    ok !("fooo" ~~ / [ fo*: { $x = $x ~ 1 } | foo { $x = $x ~ 2 } ] x /),
+#        "foo !~~ [fo*:|foo]x";
+#    is $x, '12', "will backtrack into shorter token";
+
 #     my grammar G5 {
 #         token a { foo }
 #         token b { foobar }
@@ -154,16 +154,16 @@ end
     is $a, True, '$¢ isa Cursor';
 }
 
-#rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
-#rxtest /<!>/, '<!>', Nil, ("", "x");
-#rxtest /\s/, '\s', (" ", ("\n" => '\n'), ("\r" => '\r'), "\x3000"),
-#    ("x", "1", "+");
-#rxtest /\S/, '\S', ("x", "1", "+"),
-#    (" ", ("\n" => '\n'), ("\r" => '\r'), ("\x3000" => 'id space'));
-#rxtest /\w/, '\w', ("x", "1", "_", "\x4E00"), ("+", " ");
-#rxtest /<[ y ]>/, '<[ y ]>', ("y"), (" ", "x", "z");
-#rxtest /<[ i .. k ]>/, '<[ i .. k ]>', ("i", "j", "k"), ("h", "l");
-#rxtest /<[ \W a..z ]>/, '<[\W a..z]>', ("a", "z", "+"), ("\x4E00");
+rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
+rxtest /<!>/, '<!>', Nil, ("", "x");
+rxtest /\s/, '\s', (" ", ("\n" => '\n'), ("\r" => '\r'), "\x3000"),
+    ("x", "1", "+");
+rxtest /\S/, '\S', ("x", "1", "+"),
+    (" ", ("\n" => '\n'), ("\r" => '\r'), ("\x3000" => 'id space'));
+rxtest /\w/, '\w', ("x", "1", "_", "\x4E00"), ("+", " ");
+rxtest /<[ y ]>/, '<[ y ]>', ("y"), (" ", "x", "z");
+rxtest /<[ i .. k ]>/, '<[ i .. k ]>', ("i", "j", "k"), ("h", "l");
+rxtest /<[ \W a..z ]>/, '<[\W a..z]>', ("a", "z", "+"), ("\x4E00");
 
 rxtest /a || b/, 'a || b', ("a", "b"), ("c", "");
 rxtest /x [a || aa]: c/, 'x[a||aa]:c', ("xac",), ("xaac",);

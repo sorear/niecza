@@ -405,15 +405,9 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxdot'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                $self->_close_k($cn, $cont)
-            ]);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim("AnyChar");
     }
 
     sub lad {
@@ -440,16 +434,9 @@ use CgOp;
                 map { CgOp::int($_) } @ints));
     }
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxcc'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                Op::CgOp->new(op => CgOp::wrap($self->ccop)),
-                $self->_close_k($cn, $cont)
-            ]);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim("CClass", $self->ccop);
     }
 
     sub lad {
@@ -466,10 +453,9 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::StatementList->new(children => []);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rawccall(CgOp::rxframe, "Backtrack");
     }
 
     sub lad {
