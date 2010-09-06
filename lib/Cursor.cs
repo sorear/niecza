@@ -139,6 +139,10 @@ public sealed class RxFrame {
         }
     }
 
+    public bool IsTopCut() {
+        return bt.next.obj.xact.committed;
+    }
+
     public bool Exact(string st) {
         if (bt.obj.pos + st.Length > end)
             return false;
@@ -868,13 +872,12 @@ public class Lexer {
     }
 
     public static IP6[] RunProtoregex(IP6 cursor, string name) {
-        DynObject dc = (DynObject)cursor;
-        DynObject[] candidates = ResolveProtoregex(dc.klass, name);
+        DynObject[] candidates = ResolveProtoregex(cursor.GetMO(), name);
         LAD[] branches = new LAD[candidates.Length];
         for (int i = 0; i < candidates.Length; i++)
             branches[i] = ((SubInfo) candidates[i].slots["info"]).ltm;
-        Lexer l = new Lexer(dc, name, branches);
-        Cursor c = (Cursor)Kernel.UnboxAny(cursor);
+        Lexer l = new Lexer(cursor, name, branches);
+        Cursor c = (Cursor)cursor;
         int[] brnum = l.Run(c.backing, c.pos);
         IP6[] ret = new IP6[brnum.Length];
         for (int i = 0; i < brnum.Length; i++)

@@ -61,6 +61,7 @@ use 5.010;
         'RxFrame' =>
             { Exact        => [m => 'Boolean'],
               Exact1       => [m => 'Boolean'],
+              IsTopCut     => [m => 'Boolean'],
               IncQuant     => [m => 'Void'],
               GetQuant     => [m => 'Int32'],
               OpenQuant    => [m => 'Void'],

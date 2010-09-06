@@ -281,6 +281,10 @@ use CgOp;
         my $bt = $self->label;
         my $sk = $self->label;
 
+        if ($self->name eq 'sym') {
+            return RxOp::String->new(text => $::symtext)->code($body);
+        }
+
         my @code;
         push @code, CgOp::rawcall(CgOp::rxframe, "PushCursorList",
             CgOp::rawnewarr('String', map { CgOp::clr_string($_) } @{ $self->captures }),
@@ -400,16 +404,38 @@ use CgOp;
     has name    => (isa => 'Str', is => 'ro', required => 1);
     has cutltm  => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxproto'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                $self->_close_k($cn, $cont),
-                Op::StringLiteral->new(text => $self->name)
-            ]);
+    sub code {
+        my ($self, $body) = @_;
+        # will probably break with complicated harnesses
+        CgOp::letn(
+          "fns", CgOp::rawscall('Lexer.RunProtoregex',
+            CgOp::fetch(CgOp::scopedlex('$¢')),
+            CgOp::clr_string($self->name)),
+          "i",   CgOp::int(0),
+          CgOp::rxpushb('LTM'),
+          CgOp::whileloop(0, 0,
+            CgOp::compare('<', CgOp::letvar("i"),
+              CgOp::getfield("Length", CgOp::letvar("fns"))),
+            CgOp::ternary(
+              CgOp::rawcall(CgOp::rxframe, 'IsTopCut'),
+              CgOp::letvar("i", CgOp::int(2**31-1)),
+              CgOp::letn(
+                "ks", CgOp::methodcall(CgOp::methodcall(
+                    CgOp::subcall(CgOp::getindex(CgOp::letvar("i"),
+                        CgOp::letvar("fns")), CgOp::scopedlex('$¢')),
+                    'list'), 'clone'),
+                CgOp::letvar("i", CgOp::arith('+',
+                    CgOp::letvar("i"), CgOp::int(1))),
+                CgOp::whileloop(0, 0,
+                  CgOp::unbox('Boolean', CgOp::fetch(
+                    CgOp::methodcall(CgOp::letvar('ks'), 'Bool'))),
+                  CgOp::prog(
+                    CgOp::rawcall(CgOp::rxframe, 'SetPos',
+                      CgOp::getfield('pos', CgOp::cast('Cursor',
+                          CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'),
+                              'shift'))))),
+                    CgOp::rawccall(CgOp::rxframe, 'End')))))),
+          CgOp::rawccall(CgOp::rxframe, 'Backtrack'));
     }
 
     sub lad {

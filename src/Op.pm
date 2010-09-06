@@ -1015,11 +1015,14 @@ use CgOp;
 
     has rxop => (isa => 'RxOp', is => 'ro', required => 1);
     has name => (isa => 'Str', is => 'ro', default => '');
+    has sym => (isa => 'Maybe[Str]', is => 'ro');
 
     sub zyg { $_[0]->rxop->opzyg }
 
     sub code {
         my ($self, $body) = @_;
+
+        local $::symtext = $self->sym;
 
         CgOp::prog(
             CgOp::setfield('rx', CgOp::callframe,

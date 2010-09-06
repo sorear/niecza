@@ -371,6 +371,7 @@ sub regex_def { my ($cl, $M) = @_;
         $ast = RxOp::ProtoRedis->new(name => $name);
     }
 
+    local $::symtext = $symtext;
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
         method_too => ($scope eq 'has' ? $name : undef),
@@ -380,7 +381,8 @@ sub regex_def { my ($cl, $M) = @_;
             class => 'Regex',
             type  => 'regex',
             signature => $sig->for_regex,
-            do => Op::RegexBody->new(name => ($name // ''), rxop => $ast)));
+            do => Op::RegexBody->new(sym => $symtext,
+                name => ($name // ''), rxop => $ast)));
 }
 
 sub regex_declarator { my ($cl, $M) = @_;
