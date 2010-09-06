@@ -145,13 +145,14 @@ end
 #     ok G7.parse('+'), "can parse :sym<> symbols";
 #     ok G7.parse('foo'), "can parse : symbols";
 # }
-# 
-# {
-#     ok 'xxy' ~~ /x { $a = $/.pos } /, "can match with \$/ stuff";
-#     is $a, 1, '$/.pos is the right sort of thing';
-#     'xxy' ~~ /x { $a = ($¢ ~~ Cursor) }/;
-#     is $a, True, '$¢ isa Cursor';
-# }
+
+{
+    my $a;
+    ok 'xxy' ~~ /x { $a = $/.pos } /, "can match with \$/ stuff";
+    is $a, 1, '$/.pos is the right sort of thing';
+    'xxy' ~~ /x { $a = ($¢ ~~ Cursor) }/;
+    is $a, True, '$¢ isa Cursor';
+}
 
 #rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
 #rxtest /<!>/, '<!>', Nil, ("", "x");

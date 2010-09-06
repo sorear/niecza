@@ -2,6 +2,7 @@ package Niecza::Actions;
 use 5.010;
 use strict;
 use warnings;
+use utf8;
 use Scalar::Util 'blessed';
 
 use Op;
