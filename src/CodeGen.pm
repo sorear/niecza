@@ -67,6 +67,7 @@ use 5.010;
               OpenQuant    => [m => 'Void'],
               CloseQuant   => [m => 'Int32'],
               CommitGroup  => [m => 'Void'],
+              CommitGroupZW => [m => 'Void'],
               GetCursorList => [m => 'Variable'],
               LTMPushAlts  => [m => 'Void'],
               PushCursorList => [m => 'Void'],

@@ -593,7 +593,8 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
 
 sub rxcapturize { my ($cl, $name, $rxop) = @_;
     if (!$rxop->isa('RxOp::Subrule')) {
-        die '$<foo> = [bar] NYI';
+        # <before>, etc.  Not yet really handled XXX
+        return $rxop;
     }
 
     my @extra = map { $_ => $rxop->$_ } qw/zyg arglist name/;

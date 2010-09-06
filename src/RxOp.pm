@@ -219,16 +219,25 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
+    sub code {
+        my ($self, $body) = @_;
 
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxbefore'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                $self->_close_op($self->zyg->[0]),
-                $self->_close_k($cn, $cont)]);
+        my $fail = $self->label;
+        my $pass = $self->label;
+        my @code;
+        push @code, CgOp::rxpushb("CUTGRP", $pass);
+        push @code, CgOp::rxpushb("CUTGRP", $fail);
+        push @code, $self->zyg->[0]->code($body);
+        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
+            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
+        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::label($fail);
+        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
+            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
+        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::label($pass);
+
+        @code;
     }
 
     sub lad {
@@ -246,16 +255,19 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
+    sub code {
+        my ($self, $body) = @_;
 
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxnotbefore'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                $self->_close_op($self->zyg->[0]),
-                $self->_close_k($cn, $cont)]);
+        my $pass = $self->label;
+        my @code;
+        push @code, CgOp::rxpushb("CUTGRP", $pass);
+        push @code, $self->zyg->[0]->code($body);
+        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
+            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
+        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::label($pass);
+
+        @code;
     }
 
     sub lad {
@@ -274,15 +286,29 @@ use CgOp;
 
     has name     => (isa => 'Str', is => 'ro', required => 1);
     has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
-    has arglist  => (isa => 'ArrayRef[Op]', is => 'ro');
+    has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
+
+    sub true {
+        my ($self) = @_;
+        # all not quite right in the capturey case
+        if ($self->name eq 'sym') {
+            return RxOp::String->new(text => $::symtext);
+        }
+        if ($self->name eq 'before') {
+            return RxOp::Before->new(zyg => $self->zyg);
+        }
+        if ($self->name eq 'after') {
+            return RxOp::After->new(zyg => $self->zyg);
+        }
+    }
 
     sub code {
         my ($self, $body) = @_;
         my $bt = $self->label;
         my $sk = $self->label;
 
-        if ($self->name eq 'sym') {
-            return RxOp::String->new(text => $::symtext)->code($body);
+        if (my $true = $self->true) {
+            return $true->code($body);
         }
 
         my @code;
@@ -307,8 +333,8 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        if ($self->name eq 'sym') {
-            return CgOp::rawnew('LADStr', CgOp::clr_string($::symtext));
+        if (my $true = $self->true) {
+            return $true->lad;
         }
         CgOp::rawnew('LADMethod', CgOp::clr_string($self->name));
     }
