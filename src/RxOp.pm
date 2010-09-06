@@ -363,6 +363,45 @@ use CgOp;
 }
 
 {
+    package RxOp::CutLTM;
+    use Moose;
+    extends 'RxOp';
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
+            CgOp::clr_string("LTM"), CgOp::clr_string("ENDLTM"));
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADImp'); #special case
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::CutRule;
+    use Moose;
+    extends 'RxOp';
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rawcall(CgOp::rxframe, 'CommitRule');
+    }
+
+    sub lad {
+        my ($self) = @_;
+        CgOp::rawnew('LADNull');
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::Alt;
     use Moose;
     extends 'RxOp';
@@ -448,7 +487,8 @@ use CgOp;
               CgOp::letn(
                 "ks", CgOp::methodcall(CgOp::methodcall(
                     CgOp::subcall(CgOp::getindex(CgOp::letvar("i"),
-                        CgOp::letvar("fns")), CgOp::scopedlex('$¢')),
+                        CgOp::letvar("fns")), CgOp::newscalar(
+                        CgOp::rawcall(CgOp::rxframe, 'MakeCursor'))),
                     'list'), 'clone'),
                 CgOp::letvar("i", CgOp::arith('+',
                     CgOp::letvar("i"), CgOp::int(1))),

@@ -125,7 +125,9 @@ public sealed class RxFrame {
     }
 
     public void CommitGroup(string open, string close) {
-        XAct x = bt.next.obj.xact;
+        XAct x = bt.obj.xact;
+        if (Cursor.Trace)
+            x.Dump("committing " + open + "," + close);
         int level = 1;
         while (x != null) {
             x.committed = true;
@@ -232,6 +234,15 @@ public sealed class XAct {
     public readonly XAct next;
 
     public XAct(string tag, XAct next) { this.tag = tag; this.next = next; }
+
+    public void Dump(string st) {
+        string ac = st;
+        for (XAct x = this; x != null; x = x.next) {
+            ac += x.committed ? " + " : " - ";
+            ac += x.tag;
+        }
+        Console.WriteLine(ac);
+    }
 }
 
 // This is used to carry match states in and out of subrules.  Within subrules,
