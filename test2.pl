@@ -176,9 +176,9 @@ PRE-INIT {
 #rxtest /<[ y ]>/, '<[ y ]>', ("y"), (" ", "x", "z");
 #rxtest /<[ i .. k ]>/, '<[ i .. k ]>', ("i", "j", "k"), ("h", "l");
 #rxtest /<[ \W a..z ]>/, '<[\W a..z]>', ("a", "z", "+"), ("\x4E00");
-#
-#rxtest /a || b/, 'a || b', ("a", "b"), ("c", "");
-#rxtest /x [a || aa]: c/, 'x[a||b]:c', ("xac",), ("xaac",);
+
+rxtest /a || b/, 'a || b', ("a", "b"), ("c", "");
+rxtest /x [a || aa]: c/, 'x[a||aa]:c', ("xac",), ("xaac",);
 
 #ok "axy" ~~ / a <before x> \w y / , "before is zero-width";
 #ok "axy" ~~ / a <?before x> \w y / , "?before is zero-width";

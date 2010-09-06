@@ -169,9 +169,13 @@ use CgOp;
     extends 'RxOp';
 
     # TODO once :lang is implemented, this will be a bit more complicated
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        $self->zyg->[0]->op($cn, $cont);
+    sub code {
+        my ($self, $body) = @_;
+        my @code;
+        push @code, CgOp::rxpushb("BRACK");
+        push @code, $self->zyg->[0]->code($body);
+        push @code, CgOp::rxpushb("ENDBRACK");
+        @code;
     }
 
     sub lad {
