@@ -75,23 +75,23 @@ end
     ok !("abab" ~~ / ab <.ws> ab /), "ws does not match nothing";
     ok ("ab   ab" ~~ rule { ab ab }), "rule gives space";
 }
-# 
-# {
+
+{
 #     # doing a more reasonable test will probably require embedded blocks
 #     ok "foobarx" ~~ / [ foo | foobar ]: x /, "LTM picks longest even if second";
 #     ok "foobarx" ~~ / [ foobar | foo ]: x /, "LTM picks longest even if first";
-# }
-# 
-# {
-#     my $x = '';
-#     ok !("a" ~~ / a { $x = 1; } b /), '{} does not terminate regex';
-#     is $x, 1, '{} is run even if regex fails';
-#     $x = '';
-#     ok !("" ~~ / a { $x = 1; } b /), '{} does not affect regex that ends before it';
-#     is $x, '', '{} is only run if reached';
-#     $x = 0;
-#     ok ("aab" ~~ / a* { $x++ } ab /), '{} does not block backtracking';
-#     is $x, 2, '{} is run multiple times when backtracking';
+}
+
+{
+    my $x = '';
+    ok !("a" ~~ / a { $x = 1; } b /), '{} does not terminate regex';
+    is $x, 1, '{} is run even if regex fails';
+    $x = '';
+    ok !("" ~~ / a { $x = 1; } b /), '{} does not affect regex that ends before it';
+    is $x, '', '{} is only run if reached';
+    $x = 0;
+    ok ("aab" ~~ / a* { $x++ } ab /), '{} does not block backtracking';
+    is $x, 2, '{} is run multiple times when backtracking';
 # 
 #     $x = '';
 #     ok ("foo" ~~ / foo { $x = $x ~ 1 } | foo { $x = $x ~ 2 } /),
@@ -131,8 +131,8 @@ end
 #     }
 #     G6.parse("foo");
 #     is $x, 2, "prefix length testing works in subrules";
-# }
-# 
+}
+
 # {
 #     my grammar G7 {
 #         proto token tok  {*}

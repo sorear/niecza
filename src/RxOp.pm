@@ -353,11 +353,12 @@ use CgOp;
     extends 'RxOp';
 
     has block => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_->block }
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        $self->block->invocant->body->cname($cn); #XXX
-        $cn, Op::StatementList->new(children => [$self->block, $cont]);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
+            CgOp::newscalar(CgOp::rawcall(CgOp::rxframe, "MakeCursor")));
     }
 
     sub lad {

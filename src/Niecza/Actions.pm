@@ -481,7 +481,10 @@ sub metachar__S_unsp { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::VoidBlock->new(block => $M->{embeddedblock}{_ast});
+    my $inv = $M->{embeddedblock}{_ast}->invocant;
+    $inv->body->type('rxembedded');
+    $inv->body->signature(Sig->simple('$¢'));
+    $M->{_ast} = RxOp::VoidBlock->new(block => $inv);
 }
 
 sub metachar__S_mod { my ($cl, $M) = @_;
@@ -684,7 +687,10 @@ sub assertion__S_Bang { my ($cl, $M) = @_;
 }
 
 sub assertion__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::CheckBlock->new(block => $M->{embeddedblock}{_ast});
+    my $inv = $M->{embeddedblock}{_ast}->invocant;
+    $inv->body->type('rxembedded');
+    $inv->body->signature(Sig->simple('$¢'));
+    $M->{_ast} = RxOp::CheckBlock->new(block => $inv);
 }
 
 *assertion__S_Bra   = \&do_cclass;

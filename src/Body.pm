@@ -13,7 +13,7 @@ use CgOp ();
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has do        => (isa => 'Op', is => 'rw');
     has scopetree => (is => 'rw');
-    has signature => (isa => 'Maybe[Sig]', is => 'ro');
+    has signature => (isa => 'Maybe[Sig]', is => 'rw');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
             builder => 'is_mainline');
     # '' for incorrectly contextualized {p,x,}block, blast
@@ -29,9 +29,6 @@ use CgOp ();
     # only used for the top mainline
     has file => (isa => 'Str', is => 'ro');
     has text => (isa => 'Str', is => 'ro');
-
-    # wtf is this doing here
-    has cname => (isa => 'Str', is => 'rw');
 
     # metadata for runtime inspection
     has class => (isa => 'Str', is => 'rw', default => 'Sub');
@@ -116,12 +113,6 @@ use CgOp ();
             value => CgOp::letvar('pkg'))) if $self->type =~ /mainline|class|
             package|grammar|module|role|slang|knowhow/x;
 
-        if ($self->cname) {
-            $::process->(
-                Decl::VarAlias->new(oname => $self->cname, nname => '$/'),
-                Decl::VarAlias->new(oname => $self->cname, nname => '$¢'));
-        }
-
         if ($self->type eq 'mainline') {
             $::process->(
                 Decl::Hint->new(name => '$?GLOBAL',
@@ -132,6 +123,10 @@ use CgOp ();
                     value => CgOp::string_var($self->text)));
         }
         $::process->($self->signature->local_decls) if $self->signature;
+        if ($self->type eq 'rxembedded') {
+            $::process->(
+                Decl::VarAlias->new(oname => '$¢', nname => '$/'));
+        }
         if ($self->transparent) {
             push @outer_q, $self->do->lift_decls;
         } else {
