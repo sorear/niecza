@@ -67,6 +67,7 @@ use 5.010;
               CloseQuant   => [m => 'Int32'],
               CommitGroup  => [m => 'Void'],
               GetCursorList => [m => 'Variable'],
+              LTMPushAlts  => [m => 'Void'],
               PushCursorList => [m => 'Void'],
               MakeCursor   => [m => 'Cursor'],
               SetPos       => [m => 'Void'],
@@ -221,7 +222,12 @@ use 5.010;
     sub _savestackstate {
         my ($self, $lbl) = @_;
         my %save;
-        die "Invalid operation of CPS converter" if @{ $self->stacktype };
+        if (@{ $self->stacktype }) {
+            print for @{ $self->buffer };
+            print(YAML::XS::Dump($self->stacktype));
+            print(YAML::XS::Dump($self->stackterm));
+            Carp::confess "Invalid operation of CPS converter";
+        }
         $save{lettypes} = [ @{ $self->lettypes } ];
         $save{letstack} = [ @{ $self->letstack } ];
         $self->savedstks->{$lbl} = \%save;
@@ -511,6 +517,11 @@ use 5.010;
     sub clr_double {
         my ($self, $val) = @_;
         $self->_push('System.Double', "((Double)$val)");
+    }
+
+    sub labelid {
+        my ($self, $lbl) = @_;
+        $self->_push('Int32', "\@\@L$lbl");
     }
 
     sub clr_arith {

@@ -433,6 +433,10 @@ use warnings;
         CgOp::Primitive->new(op => [ 'clr_double', $_[0] ]);
     }
 
+    sub labelid {
+        CgOp::Primitive->new(op => [ 'labelid', $_[0] ], zyg => [ ]);
+    }
+
     sub int {
         CgOp::Primitive->new(op => [ 'clr_int', $_[0] ]);
     }

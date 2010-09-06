@@ -160,6 +160,14 @@ public sealed class RxFrame {
         return !(bt.obj.pos == end || !x.Accepts(orig[bt.obj.pos++]));
     }
 
+    public void LTMPushAlts(Lexer lx, int[] addrs) {
+        PushBacktrack("LTM", -1);
+        int[] cases = lx.Run(orig_s, bt.obj.pos);
+        for (int i = cases.Length - 1; i >= 0; i--) {
+            PushBacktrack("LTMALT", addrs[cases[i]]);
+        }
+    }
+
     public void OpenQuant() {
         bt.obj.reps = new PSN<int>(0, bt.obj.reps);
     }
@@ -775,7 +783,7 @@ public class Lexer {
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
     public Lexer(IP6 cursorObj, string tag, LAD[] alts) {
-        pad.cursor_class = ((DynObject)cursorObj).klass;
+        pad.cursor_class = cursorObj.GetMO();
         this.alts = alts;
         this.tag = tag;
         int root = pad.AddNode();

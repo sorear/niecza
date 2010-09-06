@@ -78,7 +78,7 @@ use CgOp;
         push @code, CgOp::rawcall(CgOp::rxframe, 'IncQuant');
         push @code, CgOp::goto($repeat);
         push @code, CgOp::label($exit);
-        push @code, CgOp::rawcall(CgOp::rxframe, 'CloseQuant');
+        push @code, CgOp::sink(CgOp::rawcall(CgOp::rxframe, 'CloseQuant'));
 
         @code;
     }
@@ -336,6 +336,28 @@ use CgOp;
     package RxOp::Alt;
     use Moose;
     extends 'RxOp';
+
+    sub code {
+        my ($self, $body) = @_;
+        my @ls = map { $self->label } @{ $self->zyg };
+        my $end = $self->label;
+
+        my @code;
+        push @code, CgOp::rawcall(CgOp::rxframe, "LTMPushAlts",
+            CgOp::rawnew('Lexer',
+                CgOp::rawcall(CgOp::rxframe,'MakeCursor'), CgOp::clr_string(''),
+                CgOp::rawnewarr('LAD', map { $_->lad } @{ $self->zyg })),
+            CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls));
+        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        for (my $i = 0; $i < @ls; $i++) {
+            push @code, CgOp::label($ls[$i]);
+            push @code, $self->zyg->[$i]->code($body);
+            push @code, CgOp::goto($end) unless $i == @ls - 1;
+        }
+        push @code, CgOp::label($end);
+        push @code, CgOp::rxpushb('ENDLTM');
+        @code;
+    }
 
     sub lad {
         my ($self) = @_;
