@@ -1,7 +1,7 @@
 # vim: ft=perl6
 use Test;
 
-#ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
+ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
 
 {
     ok ("a" ~~ /a/), "letter matches itself";
@@ -48,13 +48,13 @@ use Test;
     ok G2.parse("yxxy"), "subrule position tracking works";
     ok !G2.parse("yxy"), "subrule position tracking works (2)";
 
-#     my grammar G3 {
-#         regex TOP { <moo> }
-#         regex moo { x }
-#     }
-# 
-#     ok G3.parse("x"), "capturing subrules work (positive)";
-#     ok !G3.parse("y"), "capturing subrules work (negative)";
+    my grammar G3 {
+        regex TOP { <moo> }
+        regex moo { x }
+    }
+
+    ok G3.parse("x"), "capturing subrules work (positive)";
+    ok !G3.parse("y"), "capturing subrules work (negative)";
 }
 
 {
@@ -65,15 +65,15 @@ use Test;
     ok !("aab" ~~ /:r a*: ab/), "ratcheting a*: ab does not";
     ok ("aab" ~~ /:r a*! ab/), "ratcheting a*! ab does";
     ok !("aab" ~~ token { a* ab }), "a* ab in a token does not";
-# 
-#     ok ("ab ab" ~~ / ab <.ws> ab /), "ws matches a space";
-#     ok (q:to/end/ ~~ / ab <.ws> ab /), "ws matches a newline";
-# ab
-# ab
-# end
-#     ok ("ab   ab" ~~ / ab <.ws> ab /), "ws matches several spaces";
-#     ok !("abab" ~~ / ab <.ws> ab /), "ws does not match nothing";
-#     ok ("ab   ab" ~~ rule { ab ab }), "rule gives space";
+
+    ok ("ab ab" ~~ / ab <.ws> ab /), "ws matches a space";
+    ok (q:to/end/ ~~ / ab <.ws> ab /), "ws matches a newline";
+ab
+ab
+end
+    ok ("ab   ab" ~~ / ab <.ws> ab /), "ws matches several spaces";
+    ok !("abab" ~~ / ab <.ws> ab /), "ws does not match nothing";
+    ok ("ab   ab" ~~ rule { ab ab }), "rule gives space";
 }
 # 
 # {
