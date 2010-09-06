@@ -379,7 +379,7 @@ sub regex_def { my ($cl, $M) = @_;
             class => 'Regex',
             type  => 'regex',
             signature => $sig->for_regex,
-            do => Op::RegexBody->new(rxop => $ast)));
+            do => Op::RegexBody->new(name => ($name // ''), rxop => $ast)));
 }
 
 sub regex_declarator { my ($cl, $M) = @_;

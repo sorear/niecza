@@ -65,6 +65,7 @@ use 5.010;
               GetQuant     => [m => 'Int32'],
               OpenQuant    => [m => 'Void'],
               CloseQuant   => [m => 'Int32'],
+              CommitGroup  => [m => 'Void'],
               Backtrack    => [c => 'Void'],
               End          => [c => 'Void'] },
         'Niecza.FatalException' =>

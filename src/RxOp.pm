@@ -188,16 +188,17 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
+    sub code {
+        my ($self, $body) = @_;
 
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxcut'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                $self->_close_op($self->zyg->[0]),
-                $self->_close_k($cn, $cont)]);
+        my @code;
+        push @code, CgOp::rxpushb("CUTGRP");
+        push @code, $self->zyg->[0]->code($body);
+        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
+            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
+        push @code, CgOp::rxpushb("ENDCUTGRP");
+
+        @code;
     }
 
     sub lad {

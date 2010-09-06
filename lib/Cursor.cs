@@ -23,7 +23,8 @@ public sealed class RxFrame {
 
         public XAct xact;
     }
-    // invariant: xact of top state is NEVER committed/pruned
+    // the current State doesn't really have an xact; bt.obj.xact is used to
+    // hold the parent of what will become bt.next.obj.xact
 
     public PSN<State> bt;
 
@@ -37,13 +38,13 @@ public sealed class RxFrame {
     // cache of orig.Length
     public int end;
 
-    public RxFrame(Cursor csr) {
+    public RxFrame(string name, Cursor csr) {
         orig = csr.backing_ca;
         orig_s = csr.backing;
         end = orig.Length;
         bt = new PSN<State>(default(State), null);
         bt.obj.klasses = new PSN<DynMetaObject>(csr.klass, null);
-        bt.obj.xact = new XAct("MATCH", csr.xact);
+        bt.obj.xact = new XAct("RULE " + name, csr.xact);
         bt.obj.pos = csr.pos;
     }
 
@@ -68,6 +69,7 @@ public sealed class RxFrame {
 
             return th.caller;
         } else {
+            bt.obj.xact = bt.obj.xact.next;
             th.ip = bt.obj.ip;
             return th;
         }
@@ -75,8 +77,8 @@ public sealed class RxFrame {
 
     public void PushBacktrack(string name, int ip) {
         bt.obj.ip = ip;
-        bt = new PSN<State>(bt.obj, bt);
         bt.obj.xact = new XAct(name, bt.obj.xact);
+        bt = new PSN<State>(bt.obj, bt);
     }
 
     public void CommitAll() {
@@ -92,9 +94,9 @@ public sealed class RxFrame {
         name = "RULE " + name;
         while (x != null) {
             x.committed = true;
-            x = x.next;
             if (x.tag.Equals(name))
                 break;
+            x = x.next;
         }
     }
 
@@ -102,8 +104,23 @@ public sealed class RxFrame {
         XAct x = bt.next.obj.xact;
         while (x != null) {
             x.committed = true;
-            x = x.next;
             if (x.tag.StartsWith("RULE "))
+                break;
+            x = x.next;
+        }
+    }
+
+    public void CommitGroup(string open, string close) {
+        XAct x = bt.next.obj.xact;
+        int level = 1;
+        while (x != null) {
+            x.committed = true;
+            if (x.tag == open)
+                level--;
+            else if (x.tag == close)
+                level++;
+            x = x.next;
+            if (level == 0)
                 break;
         }
     }

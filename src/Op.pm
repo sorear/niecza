@@ -1014,6 +1014,7 @@ use CgOp;
     extends 'Op';
 
     has rxop => (isa => 'RxOp', is => 'ro', required => 1);
+    has name => (isa => 'Str', is => 'ro', default => '');
 
     sub zyg { $_[0]->rxop->opzyg }
 
@@ -1022,8 +1023,8 @@ use CgOp;
 
         CgOp::prog(
             CgOp::setfield('rx', CgOp::callframe,
-                CgOp::rawnew('RxFrame', CgOp::cast('Cursor',
-                        CgOp::fetch(CgOp::scopedlex('$¢'))))),
+                CgOp::rawnew('RxFrame', CgOp::clr_string($self->name),
+                    CgOp::cast('Cursor', CgOp::fetch(CgOp::scopedlex('$¢'))))),
             $self->rxop->code($body),
             CgOp::rawccall(CgOp::getfield('rx', CgOp::callframe), 'End'),
             CgOp::rawccall(CgOp::getfield('rx', CgOp::callframe), 'Backtrack'),
