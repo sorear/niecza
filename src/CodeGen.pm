@@ -66,6 +66,10 @@ use 5.010;
               OpenQuant    => [m => 'Void'],
               CloseQuant   => [m => 'Int32'],
               CommitGroup  => [m => 'Void'],
+              GetCursorList => [m => 'Variable'],
+              PushCursorList => [m => 'Void'],
+              MakeCursor   => [m => 'Cursor'],
+              SetPos       => [m => 'Void'],
               Backtrack    => [c => 'Void'],
               End          => [c => 'Void'] },
         'Niecza.FatalException' =>

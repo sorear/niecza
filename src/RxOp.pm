@@ -268,70 +268,37 @@ use CgOp;
 }
 
 {
-    package RxOp::Capture;
+    package RxOp::Subrule;
     use Moose;
     extends 'RxOp';
 
-    has names => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', required => 1);
+    has name     => (isa => 'Str', is => 'ro', required => 1);
+    has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
+    has arglist  => (isa => 'ArrayRef[Op]', is => 'ro');
 
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        my @n = @{ $self->names };
-        for (@n) {
-            $::parennum = $_ if defined($_) && $_ =~ /^[0-9]+$/;
-            $_ = $::parennum++ if !defined($_);
-        }
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxbind'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                Op::CallSub->new(
-                    invocant => Op::Lexical->new(name => '&infix:<,>'),
-                    positionals => [
-                        map { Op::StringLiteral->new(text => $_) }
-                            @{ $self->names }
-                    ]),
-                $self->_close_op($self->zyg->[0]),
-                $self->_close_k($cn, $cont)]);
-    }
+    sub code {
+        my ($self, $body) = @_;
+        my $bt = $self->label;
+        my $sk = $self->label;
 
-    sub lad {
-        my ($self) = @_;
-        $self->zyg->[0]->lad;
-    }
+        my @code;
+        push @code, CgOp::rawcall(CgOp::rxframe, "PushCursorList",
+            CgOp::rawnewarr('String', map { CgOp::clr_string($_) } @{ $self->captures }),
+            CgOp::methodcall(CgOp::methodcall(CgOp::methodcall(
+                CgOp::newscalar(CgOp::rawcall(CgOp::rxframe, "MakeCursor")),
+                $self->name), "list"), "clone"));
+        push @code, CgOp::goto($sk);
+        push @code, CgOp::label($bt);
+        push @code, CgOp::methodcall(CgOp::rawcall(CgOp::rxframe,
+                "GetCursorList"), "shift");
+        push @code, CgOp::label($sk);
+        push @code, CgOp::letn("k", CgOp::rawcall(CgOp::rxframe, "GetCursorList"),
+            CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(CgOp::methodcall(CgOp::letvar("k"), "!fill", CgOp::box('Num', CgOp::double(1))))),
+                CgOp::rawcall(CgOp::rxframe, "SetPos", CgOp::getfield("pos", CgOp::cast("Cursor", CgOp::fetch(CgOp::methodcall(CgOp::letvar("k"), "at-pos", CgOp::box('Num', CgOp::double(0))))))),
+                CgOp::rawccall(CgOp::rxframe, "Backtrack")));
+        push @code, CgOp::rxpushb("SUBRULE", $bt);
 
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package RxOp::CallMethod;
-    use Moose;
-    extends 'RxOp';
-
-    has name => (isa => 'Str', is => 'ro', required => 1);
-
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        if ($self->name eq 'sym') {
-            # Should probably be a separate pass (before rx optimizer)
-            return $icn, Op::CallSub->new(
-                invocant => Op::Lexical->new(name => '&_rxstr'),
-                positionals => [
-                    Op::Lexical->new(name => $icn),
-                    Op::StringLiteral->new(text => $::symtext),
-                    $self->_close_k($cn, $cont)
-                ]);
-        }
-
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxcall'),
-            positionals => [
-                Op::CallMethod->new(name => $self->name,
-                    receiver => Op::Lexical->new(name => $icn)),
-                $self->_close_k($cn, $cont)]);
+        @code;
     }
 
     sub lad {
@@ -375,20 +342,6 @@ use CgOp;
     package RxOp::Alt;
     use Moose;
     extends 'RxOp';
-
-    sub op {
-        my ($self, $cn, $cont) = @_;
-        my $icn = Niecza::Actions->gensym;
-        $icn, Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&_rxalt'),
-            positionals => [
-                Op::Lexical->new(name => $icn),
-                Op::CgOp->new(op => CgOp::wrap(CgOp::rawnewarr('LAD',
-                            map { $_->lad } @{ $self->zyg }))), #XXX
-                $self->_close_k($cn, $cont),
-                map { $self->_close_op($_) } @{ $self->zyg }
-            ]);
-    }
 
     sub lad {
         my ($self) = @_;

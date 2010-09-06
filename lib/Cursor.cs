@@ -15,7 +15,8 @@ public sealed class RxFrame {
 
     public struct State {
         public PSN<int> reps;
-        public PSN<IP6> captures;
+        public PSN<Variable> captures;
+        public PSN<string[]> capnames;
         public PSN<DynMetaObject> klasses;
 
         public int pos;
@@ -79,6 +80,19 @@ public sealed class RxFrame {
         bt.obj.ip = ip;
         bt.obj.xact = new XAct(name, bt.obj.xact);
         bt = new PSN<State>(bt.obj, bt);
+    }
+
+    public void PushCursorList(string[] cn, Variable cl) {
+        bt.obj.capnames = new PSN<string[]>(cn, bt.obj.capnames);
+        bt.obj.captures = new PSN<Variable>(cl, bt.obj.captures);
+    }
+
+    public Variable GetCursorList() {
+        return bt.obj.captures.obj;
+    }
+
+    public void SetPos(int pos) {
+        bt.obj.pos = pos;
     }
 
     public void CommitAll() {

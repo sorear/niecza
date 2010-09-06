@@ -564,6 +564,7 @@ my class List is Cool {
             "items", LLArray.new(), "rest", LLArray.new(self.iterator)));
         @y;
     }
+    method list() { my @y := self; @y }
 
     method clone() {
         self.RAWCREATE("flat", $!flat, "items", $!items.clone, "rest",
@@ -926,6 +927,19 @@ my class Enum is Cool {
 
     method pairs() {
         self.flat;
+    }
+}
+
+PRE-INIT {
+    Q:CgOp {
+        (prog
+          (rawsset RxFrame.EMPTYP (@ {EMPTY}))
+          (rawsset RxFrame.ListMO (getfield klass (cast DynObject (@ {List}))))
+          (rawsset RxFrame.LLArrayMO (getfield klass
+              (cast DynObject (@ {LLArray}))))
+          (rawsset RxFrame.GatherIteratorMO (getfield klass
+              (cast DynObject (@ {GatherIterator}))))
+          (null Variable))
     }
 }
 

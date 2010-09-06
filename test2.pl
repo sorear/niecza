@@ -3,19 +3,6 @@ use Test;
 
 #ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
 
-PRE-INIT {
-    Q:CgOp {
-        (prog
-          (rawsset RxFrame.EMPTYP (@ {EMPTY}))
-          (rawsset RxFrame.ListMO (getfield klass (cast DynObject (@ {List}))))
-          (rawsset RxFrame.LLArrayMO (getfield klass
-              (cast DynObject (@ {LLArray}))))
-          (rawsset RxFrame.GatherIteratorMO (getfield klass
-              (cast DynObject (@ {GatherIterator}))))
-          (null Variable))
-    }
-}
-
 {
     ok ("a" ~~ /a/), "letter matches itself";
     ok !("a" ~~ /b/), "letter does not match other";
@@ -44,23 +31,23 @@ PRE-INIT {
     ok !Bob.parse("acx"), "grammars anchor (2)";
 }
 
-# {
-#     my grammar G1 {
-#         regex TOP { <.foo> }
-#         regex foo { x }
-#     }
-# 
-#     ok G1.parse("x"), "subrules work (positive)";
-#     ok !G1.parse("y"), "subrules work (negative)";
-# 
-#     my grammar G2 {
-#         regex TOP { y <.foo> <.foo> y }
-#         regex foo { x }
-#     }
-# 
-#     ok G2.parse("yxxy"), "subrule position tracking works";
-#     ok !G2.parse("yxy"), "subrule position tracking works (2)";
-# 
+{
+    my grammar G1 {
+        regex TOP { <.foo> }
+        regex foo { x }
+    }
+
+    ok G1.parse("x"), "subrules work (positive)";
+    ok !G1.parse("y"), "subrules work (negative)";
+
+    my grammar G2 {
+        regex TOP { y <.foo> <.foo> y }
+        regex foo { x }
+    }
+
+    ok G2.parse("yxxy"), "subrule position tracking works";
+    ok !G2.parse("yxy"), "subrule position tracking works (2)";
+
 #     my grammar G3 {
 #         regex TOP { <moo> }
 #         regex moo { x }
@@ -68,8 +55,8 @@ PRE-INIT {
 # 
 #     ok G3.parse("x"), "capturing subrules work (positive)";
 #     ok !G3.parse("y"), "capturing subrules work (negative)";
-# }
-# 
+}
+
 {
     ok ("aab" ~~ /a* ab/), "a*ab backtracks";
     ok !("aab" ~~ /a*: ab/), "a*: ab doesn't";

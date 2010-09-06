@@ -586,18 +586,19 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
 }
 
 sub rxcapturize { my ($cl, $name, $rxop) = @_;
-    if (!$rxop->isa('RxOp::Capture')) {
-        # $<foo>=[ ] or ( ) or <foo>
-        return RxOp::Capture->new(names => [$name], zyg => [$rxop]);
+    if (!$rxop->isa('RxOp::Subrule')) {
+        die '$<foo> = [bar] NYI';
     }
+
+    my @extra = map { $_ => $rxop->$_ } qw/zyg arglist name/;
 
     # $<foo>=(...)
-    if (@{ $rxop->names } == 1 && !defined($rxop->names->[0])) {
-        return RxOp::Capture->new(names => [$name], zyg => $rxop->zyg);
+    if (@{ $rxop->captures } == 1 && !defined($rxop->captures->[0])) {
+        return RxOp::Subrule->new(captures => [$name], @extra);
     }
 
-    return RxOp::Capture->new(names => [ $name, @{ $rxop->names } ],
-        zyg => $rxop->zyg);
+    return RxOp::Subrule->new(captures => [ $name, @{ $rxop->captures } ],
+        @extra);
 }
 
 sub do_cclass { my ($cl, $M) = @_;
@@ -627,12 +628,14 @@ sub decapturize { my ($cl, $M) = @_;
         $M->sorry("Binding to a method doesn't work like that");
         return;
     }
-    if (!$M->{assertion}{_ast}->isa('RxOp::Capture')) {
+    if (!$M->{assertion}{_ast}->isa('RxOp::Subrule')) {
         $M->sorry("Internal error in assertion:method parse");
         return;
     }
-    RxOp::Capture->new(names => [],
-        zyg => $M->{assertion}{_ast}->zyg);
+    RxOp::Subrule->new(captures => [],
+        zyg => $M->{assertion}{_ast}->zyg,
+        arglist => $M->{assertion}{_ast}->arglist,
+        name => $M->{assertion}{_ast}->name);
 }
 
 sub cclass_elem {}
@@ -645,14 +648,12 @@ sub assertion__S_name { my ($cl, $M) = @_;
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
     } else {
-        my $args = ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} :
-            $M->{nibbler}[0] ? [$M->{nibbler}[0]{_ast}] : []);
-        if ($name eq 'before') {
-            $M->{_ast} = RxOp::Before->new(zyg => $args);
-        } elsif ($name eq 'after') {
-            $M->{_ast} = RxOp::After->new(zyg => $args);
+        if ($M->{nibbler}[0]) {
+            my $args = [$M->{nibbler}[0]{_ast}];
+            $M->{_ast} = RxOp::Subrule->new(zyg => $args, name => $name);
         } else {
-            $M->{_ast} = RxOp::CallMethod->new(arglist => $args, name => $name);
+            my $args = ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} : []);
+            $M->{_ast} = RxOp::Subrule->new(arglist => $args, name => $name);
         }
     }
     $M->{_ast} = $cl->rxcapturize($name, $M->{_ast});
