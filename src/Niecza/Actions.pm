@@ -11,6 +11,7 @@ use Body;
 use Unit;
 use Sig;
 use CClass;
+use Optimizer::RxSimple;
 
 use Try::Tiny;
 
@@ -293,13 +294,14 @@ sub quote__S_Q { my ($cl, $M) = @_;
 }
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
+    my $rxop = Optimizer::RxSimple::run($M->{nibble}{_ast});
     $M->{_ast} = Op::SubDef->new(
         var  => $cl->gensym,
         body => Body->new(
             class => 'Regex',
             type  => 'regex',
             signature => Sig->simple->for_regex,
-            do => Op::RegexBody->new(rxop => $M->{nibble}{_ast})));
+            do => Op::RegexBody->new(rxop => $rxop)));
 }
 
 sub regex_block { my ($cl, $M) = @_;
@@ -372,6 +374,7 @@ sub regex_def { my ($cl, $M) = @_;
     }
 
     local $::symtext = $symtext;
+    $ast = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
         method_too => ($scope eq 'has' ? $name : undef),
