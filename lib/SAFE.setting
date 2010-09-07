@@ -352,6 +352,7 @@ PRE-INIT {
     Mu.HOW.add-method("defined", anon method defined is rawcall {
             Q:CgOp { (box Bool (rawcall (@ (pos 0)) IsDefined)) }
         });
+    Mu.HOW.add-method("head", anon method head { @(self).head });
     Mu.HOW.add-method("Bool", anon method Bool() { self.defined });
     Mu.HOW.add-method("Str", anon method Str() {
             my $tn := Q:CgOp { (box Str (rawcall (@ (l self)) GetTypeName)) };
@@ -618,6 +619,8 @@ my class List is Cool {
         self;
     }
 
+    method head { self!fill(1) ?? $!items.at-pos(0) !! Any }
+
     method elems() { self!fill(1000_000_000); $!items.elems; }
     method Numeric () { self.elems }
 
@@ -646,6 +649,13 @@ my class List is Cool {
         $!items.pop;
     }
 }
+
+PRE-INIT { Q:CgOp {
+    (prog
+      (rawsset Kernel.ListMO
+        (getfield klass (cast DynObject (@ {List}))))
+      (null Variable))
+} }
 
 sub _it_shift($it) {
     if ! $it.valid {

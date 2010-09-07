@@ -800,6 +800,23 @@ blocked:
             return NewROScalar(n);
         }
 
+        public static Frame GetFirst(Frame th, IP6 lst) {
+            DynObject dyl = lst as DynObject;
+            if (dyl == null) goto slow;
+            if (dyl.klass != ListMO) goto slow;
+            Variable itemsv = (Variable) dyl.GetSlot("items");
+            IP6 itemso = (IP6) UnboxAny(itemsv.container);
+            List<Variable> itemsl = (List<Variable>) UnboxAny(itemso);
+            if (itemsl.Count == 0) goto slow;
+            th.resultSlot = itemsl[0];
+            return th;
+
+slow:
+            return lst.InvokeMethod(th, "head", new Variable[] {
+                    NewROScalar(lst) }, null);
+        }
+
+        public static DynMetaObject ListMO;
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 HashP;

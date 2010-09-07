@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 406;
+plan 424;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -921,3 +921,28 @@ ok "axy" ~~ / a <?before x> \w y / , "?before is zero-width";
 ok "azy" ~~ / a <!before x> \w y / , "!before is zero-width";
 ok !("azy" ~~ / a <?before x> \w y /) , "?before x needs x";
 ok !("axy" ~~ / a <!before x> \w y /) , "!before x needs !x";
+
+ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
+
+{
+    rxtest /z .* y [ a :: x | . ]/, "z.*y[a::x|.]",
+        ("zyax", "zyb", "zyaxya"), ("zya",);
+    # no ::> until STD gets here...
+    rxtest /z .* y [ a ::: x || . ]/, "z.*y[a:::x||.]",
+        ("zyax", "zyb"), ("zya", "zyaxya");
+
+    my grammar G7 {
+        proto regex TOP {*}
+        regex TOP:foo { a :: x }
+        regex TOP:bar { . }
+    }
+
+    ok G7.parse("ax"), ":: does not block forward";
+    ok G7.parse("b"), ":: does not affect other paths";
+    ok !G7.parse("a"), "cannot backtrack past :: in proto ltm";
+}
+
+rxtest /y [ [ foo || bar ] | . ]: y/, "|| hides both sides from LTM",
+    ("yky",), ("yfooy", "ybary");
+rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
+    ("yay","yby","ycy"), Nil;

@@ -1,29 +1,6 @@
 # vim: ft=perl6
 use Test;
 
-ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
-
-{
-    rxtest /z .* y [ a :: x | . ]/, "z.*y[a::x|.]",
-        ("zyax", "zyb", "zyaxya"), ("zya",);
-    # no ::> until STD gets here...
-    rxtest /z .* y [ a ::: x || . ]/, "z.*y[a:::x||.]",
-        ("zyax", "zyb"), ("zya", "zyaxya");
-
-    my grammar G7 {
-        proto regex TOP {*}
-        regex TOP:foo { a :: x }
-        regex TOP:bar { . }
-    }
-
-    ok G7.parse("ax"), ":: does not block forward";
-    ok G7.parse("b"), ":: does not affect other paths";
-    ok !G7.parse("a"), "cannot backtrack past :: in proto ltm";
-}
-
-rxtest /y [ [ foo || bar ] | . ]: y/, "|| hides both sides from LTM",
-    ("yky",), ("yfooy", "ybary");
-rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
-    ("yay","yby","ycy"), Nil;
+say Q:CgOp { (rawsccall Kernel.GetFirst:c,Variable (@ { flat(1,2,3) })) };
 
 done-testing;

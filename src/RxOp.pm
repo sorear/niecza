@@ -322,9 +322,13 @@ use CgOp;
         push @code, CgOp::methodcall(CgOp::rawcall(CgOp::rxframe,
                 "GetCursorList"), "shift");
         push @code, CgOp::label($sk);
-        push @code, CgOp::letn("k", CgOp::rawcall(CgOp::rxframe, "GetCursorList"),
-            CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(CgOp::methodcall(CgOp::letvar("k"), "!fill", CgOp::box('Num', CgOp::double(1))))),
-                CgOp::rawcall(CgOp::rxframe, "SetPos", CgOp::getfield("pos", CgOp::cast("Cursor", CgOp::fetch(CgOp::methodcall(CgOp::letvar("k"), "at-pos", CgOp::box('Num', CgOp::double(0))))))),
+        push @code, CgOp::letn(
+            "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+                CgOp::fetch(CgOp::rawcall(CgOp::rxframe, "GetCursorList")))),
+            CgOp::ternary(CgOp::rawcall(CgOp::letvar("k"), 'IsDefined'),
+                CgOp::rawcall(CgOp::rxframe, "SetPos",
+                    CgOp::getfield("pos", CgOp::cast("Cursor",
+                            CgOp::letvar("k")))),
                 CgOp::rawccall(CgOp::rxframe, "Backtrack")));
         push @code, CgOp::rxpushb("SUBRULE", $bt);
 
