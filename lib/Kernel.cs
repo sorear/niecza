@@ -302,6 +302,17 @@ namespace Niecza {
         public Dictionary<string, IP6> local_attr
             = new Dictionary<string, IP6>();
 
+        public Dictionary<string, int> slotMap = new Dictionary<string, int>();
+        public int nslots = 0;
+
+        public int FindSlot(string name) {
+            int v;
+            if (slotMap.TryGetValue(name, out v))
+                return v;
+            else
+                return slotMap[name] = nslots++;
+        }
+
         public Dictionary<string, List<DynObject>> multiregex;
 
         public List<DynMetaObject> mro;
@@ -435,12 +446,12 @@ blocked:
     public class DynObject: IP6 {
         // the slots have to support non-containerized values, because
         // containers are objects now
-        public Dictionary<string, object> slots
-            = new Dictionary<string, object>();
+        public object[] slots;
         public DynMetaObject klass;
 
         public DynObject(DynMetaObject klass) {
             this.klass = klass;
+            this.slots = new object[klass.nslots];
         }
 
         public override DynMetaObject GetMO() { return klass; }
@@ -448,14 +459,26 @@ blocked:
         public override Frame GetAttribute(Frame caller, string name) {
             if (slots == null) {
                 return Fail(caller, "Attempted to access slot " + name +
-                        " via a protoobject");
+                        " via an object with no slots");
             }
-            caller.resultSlot = slots[name];
+            caller.resultSlot = GetSlot(name);
             return caller;
         }
 
+        public void SetSlot(string name, object obj) {
+            int ix = klass.FindSlot(name);
+            if (ix >= slots.Length)
+                Array.Resize(ref slots, ix+1);
+            slots[klass.FindSlot(name)] = obj;
+        }
+
+        public object GetSlot(string name) {
+            int ix = klass.FindSlot(name);
+            return (ix >= slots.Length) ? null : slots[ix];
+        }
+
         public override bool IsDefined() {
-            return slots != null;
+            return this != klass.typeObject;
         }
     }
 
@@ -480,7 +503,7 @@ blocked:
         public static DynBlockDelegate MainlineContinuation;
 
         public static object UnboxDO(DynObject o) {
-            return o.slots["value"];
+            return o.GetSlot("value");
         }
 
         public static object UnboxAny(IP6 o) {
@@ -489,12 +512,14 @@ blocked:
         }
 
         private static Frame SCFetch(IP6 th, Frame caller) {
-            caller.resultSlot = UnboxAny(th);
+            DynObject dyo = (DynObject) th;
+            caller.resultSlot = dyo.GetSlot("value");
             return caller;
         }
 
         private static Frame SCStore(IP6 th, Frame caller, IP6 nv) {
-            ((DynObject)th).slots["value"] = nv;
+            DynObject dyo = (DynObject) th;
+            dyo.SetSlot("value", nv);
             return caller;
         }
 
@@ -516,17 +541,17 @@ blocked:
         public static Frame GatherHelper(Frame th, IP6 sub) {
             DynObject dyo = (DynObject) sub;
             Frame n = new Frame(th,
-                                (Frame) dyo.slots["outer"],
-                                (SubInfo) dyo.slots["info"]);
+                                (Frame) dyo.GetSlot("outer"),
+                                (SubInfo) dyo.GetSlot("info"));
             th.resultSlot = n;
             return th;
         }
 
         private static Frame SubInvoke(IP6 th, Frame caller,
                 Variable[] pos, Dictionary<string,Variable> named) {
-            Dictionary<string,object> sl = ((DynObject) th).slots;
-            Frame outer = (Frame) sl["outer"];
-            SubInfo info = (SubInfo) sl["info"];
+            DynObject dyo = ((DynObject) th);
+            Frame outer = (Frame) dyo.GetSlot("outer");
+            SubInfo info = (SubInfo) dyo.GetSlot("info");
 
             Frame n = new Frame(caller, outer, info);
             n.pos = pos;
@@ -551,7 +576,7 @@ blocked:
 
         public static Frame Die(Frame caller, string msg) {
             DynObject n = new DynObject(((DynObject)StrP).klass);
-            n.slots["value"] = msg;
+            n.SetSlot("value", msg);
             return new FatalException(n).SearchForHandler(caller);
         }
 
@@ -562,14 +587,14 @@ blocked:
 
         public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(info.mo ?? SubMO);
-            n.slots["outer"] = outer;
-            n.slots["info"] = info;
+            n.SetSlot("outer", outer);
+            n.SetSlot("info", info);
             return n;
         }
 
         public static DynObject MockBox(object v) {
             DynObject n = new DynObject(ScalarMO);
-            n.slots["value"] = v;
+            n.SetSlot("value", v);
             return n;
         }
 
@@ -577,13 +602,13 @@ blocked:
             if (v == null)
                 return NewROScalar(proto);
             DynObject n = new DynObject(((DynObject)proto).klass);
-            n.slots["value"] = v;
+            n.SetSlot("value", v);
             return NewROScalar(n);
         }
 
         public static IP6 MakeSC(IP6 inside) {
             DynObject n = new DynObject(ScalarMO);
-            n.slots["value"] = inside;
+            n.slots[0] = inside;
             return n;
         }
 
@@ -768,7 +793,7 @@ blocked:
 
             for (int i = mro.Count - 1; i >= 0; i--) {
                 foreach (string s in mro[i].local_attr.Keys) {
-                    n.slots[s] = NewRWScalar(AnyP);
+                    n.SetSlot(s, NewRWScalar(AnyP));
                 }
             }
 
@@ -778,7 +803,7 @@ blocked:
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 HashP;
-        public static IP6 StrP = new DynObject(null);
+        public static IP6 StrP = new DynObject(new DynMetaObject("proto-Str"));
         public static DynMetaObject CallFrameMO;
 
         public static Variable PackageLookup(IP6 parent, string name) {
@@ -853,6 +878,7 @@ blocked:
             SubMO.local["INVOKE"] = MakeSub(SubInvokeSubSI, null);
 
             ScalarMO = new DynMetaObject("Scalar");
+            ScalarMO.FindSlot("value");
             ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
             ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
@@ -947,8 +973,8 @@ blocked:
             CLRImportObject cp = p as CLRImportObject;
             DynObject dp = p as DynObject;
             Exception e = (cp != null) ? (cp.val as Exception) : null;
-            string s = (dp != null && dp.slots.ContainsKey("value")) ?
-                (dp.slots["value"] as string) : null;
+            string s = (dp != null && dp.klass.slotMap.ContainsKey("value")) ?
+                (dp.GetSlot("value") as string) : null;
 
             if (e != null) {
                 // Wrapped CLR exception; has a message, and inner frames

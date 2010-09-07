@@ -36,7 +36,7 @@ PRE-INIT {
             (cast DynObject (@ (pos 0)))))]
 
           [setfield how (l $mo) (l $self)]
-          [setindex meta-object (getfield slots (l $self))
+          [rawcall (l $self) SetSlot (clr_string meta-object)
             (nsw (rawnew CLRImportObject (l $mo)))]
 
           [ns (l $self)])
@@ -81,7 +81,7 @@ PRE-INIT {
 
           [rawcall (l $mo) BuildC3MRO]
 
-          [setfield slots (l $p) (null Dictionary<string,object>)]
+          [setfield slots (l $p) (null 'object[]')]
           [setfield typeObject (l $mo) (l $p)]
 
           [newscalar (l $p)])
@@ -95,8 +95,8 @@ PRE-INIT {
           [l $chch (ns (rawnew DynObject (l $chmo)))]
 
           [setfield how (l $chmo) (@ (l $chch))]
-          [setindex meta-object (getfield slots (cast DynObject (@ (l $chch))))
-            (w (l $chmo))]
+          [rawcall (cast DynObject (@ (l $chch))) SetSlot
+            (clr_string meta-object) (w (l $chmo))]
 
           [sink (subcall (@ (l &add-method)) (l $chch)
             (string_var "new") (l &new))]
@@ -370,9 +370,8 @@ PRE-INIT {
               [l obj (rawnew DynObject (getfield klass (cast DynObject
                       (@ (pos 0)))))]
               [whileloop 0 0 (< (l i) (l max)) (prog
-                  [setindex
+                  [rawcall (l obj) SetSlot
                     (unbox String (@ (pos (l i))))
-                    (getfield slots (l obj))
                     (nsw (@ (pos (+ (l i) (int 1)))))]
                   [l i (+ (l i) (int 2))])]
               [ns (l obj)])
@@ -484,9 +483,8 @@ sub unfold-iter($fn) {
                 Any, "fun", $f);
             Q:CgOp {
                 (prog
-                  [setindex value (getfield slots
-                      (cast DynObject (@ (l self))))
-                    (subcall (@ (l $f)))]
+                  [rawcall (cast DynObject (@ (l self))) SetSlot
+                    (clr_string value) (subcall (@ (l $f)))]
                   [null Variable])
             };
         }
@@ -528,9 +526,8 @@ my class Parcel is Cool {
             $it = $nit;
             Q:CgOp {
                 (prog
-                  [setindex value (getfield slots
-                      (cast DynObject (@ (l $it))))
-                    (methodcall (l $ll) at-pos (l $ix))]
+                  [rawcall (cast DynObject (@ (l $it))) SetSlot
+                    (clr_string value) (methodcall (l $ll) at-pos (l $ix))]
                   [null Variable])
             };
             $ix--;

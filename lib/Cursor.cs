@@ -58,13 +58,13 @@ public sealed class RxFrame {
                 return Kernel.Take(th, Kernel.NewROScalar(EMPTYP));
             } else {
                 DynObject obs = new DynObject(LLArrayMO);
-                obs.slots["value"] = new List<Variable>();
+                obs.SetSlot("value", new List<Variable>());
                 DynObject its = new DynObject(LLArrayMO);
-                its.slots["value"] = new List<Variable>();
+                its.SetSlot("value", new List<Variable>());
                 DynObject lst = new DynObject(ListMO);
-                lst.slots["items"] = Kernel.NewROScalar(obs);
-                lst.slots["rest"]  = Kernel.NewROScalar(its);
-                lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
+                lst.SetSlot("items", Kernel.NewROScalar(obs));
+                lst.SetSlot("rest",  Kernel.NewROScalar(its));
+                lst.SetSlot("flat",  Kernel.NewROScalar(Kernel.AnyP));
                 th.caller.resultSlot = Kernel.NewRWListVar(lst);
             }
 
@@ -208,20 +208,20 @@ public sealed class RxFrame {
             DynObject obs = new DynObject(LLArrayMO);
             List<Variable> ks = new List<Variable>();
             ks.Add(Kernel.NewROScalar(MakeCursor()));
-            obs.slots["value"] = ks;
+            obs.SetSlot("value", ks);
             DynObject it  = new DynObject(GatherIteratorMO);
-            it.slots["value"]   = Kernel.NewRWScalar(Kernel.AnyP);
-            it.slots["next"]    = Kernel.NewRWScalar(Kernel.AnyP);
-            it.slots["valid"]   = Kernel.NewRWScalar(Kernel.AnyP);
-            it.slots["frame"]   = Kernel.NewRWScalar(th);
+            it.SetSlot("value", Kernel.NewRWScalar(Kernel.AnyP));
+            it.SetSlot("next",  Kernel.NewRWScalar(Kernel.AnyP));
+            it.SetSlot("valid", Kernel.NewRWScalar(Kernel.AnyP));
+            it.SetSlot("frame", Kernel.NewRWScalar(th));
             DynObject its = new DynObject(LLArrayMO);
             List<Variable> iss = new List<Variable>();
             iss.Add(Kernel.NewROScalar(it));
-            its.slots["value"] = iss;
+            its.SetSlot("value", iss);
             DynObject lst = new DynObject(ListMO);
-            lst.slots["items"] = Kernel.NewROScalar(obs);
-            lst.slots["rest"]  = Kernel.NewROScalar(its);
-            lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
+            lst.SetSlot("items", Kernel.NewROScalar(obs));
+            lst.SetSlot("rest",  Kernel.NewROScalar(its));
+            lst.SetSlot("flat",  Kernel.NewROScalar(Kernel.AnyP));
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
         }
         return th.caller;
@@ -288,15 +288,15 @@ public class Cursor : IP6 {
 
         DynObject obs = new DynObject(RxFrame.LLArrayMO);
         List<Variable> ks = new List<Variable>();
-        obs.slots["value"] = ks;
+        obs.SetSlot("value", ks);
 
         DynObject its = new DynObject(RxFrame.LLArrayMO);
-        its.slots["value"] = new List<Variable>();
+        its.SetSlot("value", new List<Variable>());
 
         DynObject lst = new DynObject(RxFrame.ListMO);
-        lst.slots["items"] = Kernel.NewROScalar(obs);
-        lst.slots["rest"]  = Kernel.NewROScalar(its);
-        lst.slots["flat"]  = Kernel.NewROScalar(Kernel.AnyP);
+        lst.SetSlot("items", Kernel.NewROScalar(obs));
+        lst.SetSlot("rest",  Kernel.NewROScalar(its));
+        lst.SetSlot("flat",  Kernel.NewROScalar(Kernel.AnyP));
 
         if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
                 CC.Word.Accepts(backing[p-1])) {
@@ -435,7 +435,7 @@ public sealed class NFA {
         if (Lexer.LtmTrace && method != null)
             Console.WriteLine("+ Found method");
 
-        sub = ((SubInfo)(((DynObject)method).slots["info"])).ltm;
+        sub = ((SubInfo)(((DynObject)method).GetSlot("info"))).ltm;
 
         if (Lexer.LtmTrace)
             Console.WriteLine("+ {0} to sub-automaton",
@@ -712,7 +712,7 @@ public class LADProtoRegex : LAD {
 
     public override void ToNFA(NFA pad, int from, int to) {
         foreach (DynObject cand in Lexer.ResolveProtoregex(pad.cursor_class, name)) {
-            ((SubInfo)cand.slots["info"]).ltm.ToNFA(pad, from, to);
+            ((SubInfo)cand.GetSlot("info")).ltm.ToNFA(pad, from, to);
         }
     }
 
@@ -911,7 +911,7 @@ public class Lexer {
                         kl.name, name);
             LAD[] branches = new LAD[candidates.Length];
             for (int i = 0; i < candidates.Length; i++)
-                branches[i] = ((SubInfo) candidates[i].slots["info"]).ltm;
+                branches[i] = ((SubInfo) candidates[i].GetSlot("info")).ltm;
             lc.protorx_nfa[name] = l = new Lexer(cursor.GetMO(), name, branches);
         } else {
             if (LtmTrace)

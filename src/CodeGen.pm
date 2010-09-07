@@ -20,6 +20,8 @@ use 5.010;
               HOW          => [c => 'IP6'] },
         DynObject =>
             { klass        => [f => 'DynMetaObject'],
+              GetSlot      => [m => 'object'],
+              SetSlot      => [m => 'Void'],
               slots        => [f => 'Dictionary<string,Object>'] },
 
         DynMetaObject =>

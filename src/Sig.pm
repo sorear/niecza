@@ -35,11 +35,11 @@ use 5.010;
                     CgOp::cast('DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
             my $do = shift;
             CgOp::prog(
-                CgOp::setindex('flat', CgOp::getfield('slots', $do),
+                CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('flat'),
                     CgOp::box('Bool', CgOp::bool(1))),
-                CgOp::setindex('items', CgOp::getfield('slots', $do),
+                CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('items'),
                     CgOp::box('LLArray', CgOp::rawnew('List<Variable>'))),
-                CgOp::setindex('rest', CgOp::getfield('slots', $do),
+                CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('rest'),
                     CgOp::box('LLArray',
                         CgOp::rawscall('Kernel.SlurpyHelper',
                             CgOp::callframe, CgOp::letvar('!ix')))),
