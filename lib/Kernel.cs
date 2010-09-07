@@ -279,6 +279,13 @@ namespace Niecza {
         public IP6 typeObject;
         public string name;
 
+        public LexerCache lexcache;
+        public LexerCache GetLexerCache() {
+            if (lexcache == null)
+                lexcache = new LexerCache();
+            return lexcache;
+        }
+
         public delegate Frame InvokeHandler(IP6 th, Frame c,
                 Variable[] pos, Dictionary<string, Variable> named);
         public delegate Frame FetchHandler(IP6 th, Frame c);

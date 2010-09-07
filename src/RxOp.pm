@@ -413,9 +413,11 @@ use CgOp;
 
         my @code;
         push @code, CgOp::rawcall(CgOp::rxframe, "LTMPushAlts",
-            CgOp::rawnew('Lexer',
-                CgOp::rawcall(CgOp::rxframe,'MakeCursor'), CgOp::clr_string(''),
-                CgOp::rawnewarr('LAD', map { $_->lad } @{ $self->zyg })),
+            CgOp::rawscall('Lexer.GetLexer',
+                CgOp::rawcall(CgOp::rxframe, 'MakeCursor'),
+                CgOp::const(CgOp::rawnewarr('LAD',
+                        map { $_->lad } @{ $self->zyg })),
+                CgOp::clr_string('')),
             CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls));
         push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
         for (my $i = 0; $i < @ls; $i++) {

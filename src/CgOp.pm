@@ -397,6 +397,10 @@ use warnings;
         CgOp::Primitive->new(op => [ 'cast', $_[0] ], zyg => [ $_[1] ]);
     }
 
+    sub const {
+        CgOp::Primitive->new(op => [ 'const' ], zyg => [ $_[0] ]);
+    }
+
     sub newscalar {
         rawscall('Kernel.NewROScalar', $_[0]);
     }

@@ -92,6 +92,7 @@ use 5.010;
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
         'Lexer.RunProtoregex'  => [m => 'IP6[]'],
+        'Lexer.GetLexer'       => [m => 'Lexer'],
         'Kernel.Die'           => [c => 'Void'],
         'Kernel.CoTake'        => [c => 'Variable'],
         'Kernel.Take'          => [c => 'Variable'],
@@ -209,6 +210,7 @@ use 5.010;
     has minlets   => (isa => 'Int', is => 'ro', default => 0);
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has consttab  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
     has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
 
@@ -326,6 +328,15 @@ use 5.010;
         while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
         my ($v) = $self->_popn(1);
         $self->_emit(_lexn($self->minlets + $i) . " = $v");
+    }
+
+    sub const {
+        my ($self) = @_;
+        my ($val, $type) = $self->_popn(1);
+        my $knum = @{ $self->consttab };
+        my $name = "K_" . $self->csname . "_$knum";
+        push @{ $self->consttab }, "$type $name = $val";
+        $self->_push($type, $name);
     }
 
     sub has_let {
@@ -775,6 +786,9 @@ use 5.010;
             join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
         print ::NIECZA_OUT " " x 4, "private static SubInfo ${name}_info = ",
             "new SubInfo(${name}_lines, ${name}, null, null, null);\n";
+        for (@{ $self->consttab }) {
+            print ::NIECZA_OUT " " x 4, "private static $_;\n";
+        }
     }
 
     sub BUILD {

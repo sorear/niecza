@@ -789,6 +789,14 @@ public class LexerState {
     }
 }
 
+public class LexerCache {
+    public Dictionary<LAD[], Lexer> nfas = new Dictionary<LAD[], Lexer>();
+    public Dictionary<string, DynObject[]> protorx_fns =
+        new Dictionary<string, DynObject[]>();
+    public Dictionary<string, Lexer> protorx_nfa =
+        new Dictionary<string, Lexer>();
+}
+
 public class Lexer {
     public LAD[] alts;
     public NFA pad = new NFA();
@@ -797,8 +805,18 @@ public class Lexer {
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
-    public Lexer(IP6 cursorObj, string tag, LAD[] alts) {
-        pad.cursor_class = cursorObj.GetMO();
+    public static Lexer GetLexer(IP6 cursor, LAD[] lads, string title) {
+        LexerCache lc = cursor.GetMO().GetLexerCache();
+        Lexer ret;
+        if (lc.nfas.TryGetValue(lads, out ret))
+            return ret;
+        ret = new Lexer(cursor.GetMO(), title, lads);
+        lc.nfas[lads] = ret;
+        return ret;
+    }
+
+    public Lexer(DynMetaObject cmo, string tag, LAD[] alts) {
+        pad.cursor_class = cmo;
         this.alts = alts;
         this.tag = tag;
         int root = pad.AddNode();
@@ -883,11 +901,23 @@ public class Lexer {
     }
 
     public static IP6[] RunProtoregex(IP6 cursor, string name) {
-        DynObject[] candidates = ResolveProtoregex(cursor.GetMO(), name);
-        LAD[] branches = new LAD[candidates.Length];
-        for (int i = 0; i < candidates.Length; i++)
-            branches[i] = ((SubInfo) candidates[i].slots["info"]).ltm;
-        Lexer l = new Lexer(cursor, name, branches);
+        DynMetaObject kl = cursor.GetMO();
+        LexerCache lc = kl.GetLexerCache();
+        DynObject[] candidates = ResolveProtoregex(kl, name);
+        Lexer l;
+        if (!lc.protorx_nfa.TryGetValue(name, out l)) {
+            if (LtmTrace)
+                Console.WriteLine("+ Protoregex lexer MISS on {0}.{1}",
+                        kl.name, name);
+            LAD[] branches = new LAD[candidates.Length];
+            for (int i = 0; i < candidates.Length; i++)
+                branches[i] = ((SubInfo) candidates[i].slots["info"]).ltm;
+            lc.protorx_nfa[name] = l = new Lexer(cursor.GetMO(), name, branches);
+        } else {
+            if (LtmTrace)
+                Console.WriteLine("+ Protoregex lexer HIT on {0}.{1}",
+                        kl.name, name);
+        }
         Cursor c = (Cursor)cursor;
         int[] brnum = l.Run(c.backing, c.pos);
         IP6[] ret = new IP6[brnum.Length];
@@ -898,6 +928,18 @@ public class Lexer {
 
     public static DynObject[] ResolveProtoregex(DynMetaObject cursor_class,
             string name) {
+        DynObject[] ret;
+        if (cursor_class.GetLexerCache().
+                protorx_fns.TryGetValue(name, out ret)) {
+            if (LtmTrace)
+                Console.WriteLine("+ Protoregex method list HIT on {0}.{1}",
+                        cursor_class.name, name);
+            return ret;
+        }
+        if (LtmTrace)
+            Console.WriteLine("+ Protoregex method list MISS on {0}.{1}",
+                    cursor_class.name, name);
+
         IP6 proto = cursor_class.Can(name);
 
         List<DynObject> raword = new List<DynObject>();
@@ -919,6 +961,8 @@ public class Lexer {
             if (unshadowed.Contains(o))
                 useord.Add(o);
 
-        return useord.ToArray();
+        ret = useord.ToArray();
+        cursor_class.GetLexerCache().protorx_fns[name] = ret;
+        return ret;
     }
 }
