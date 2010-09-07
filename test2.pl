@@ -21,4 +21,9 @@ ok '{}' ~~ / \{ <.ws> \} /, 'ws matches between \W';
     ok !G7.parse("a"), "cannot backtrack past :: in proto ltm";
 }
 
+rxtest /y [ [ foo || bar ] | . ]: y/, "|| hides both sides from LTM",
+    ("yky",), ("yfooy", "ybary");
+rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
+    ("yay","yby","ycy"), Nil;
+
 done-testing;

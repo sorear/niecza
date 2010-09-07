@@ -157,7 +157,7 @@ use CgOp;
         @code;
     }
 
-    sub lad { $_[0]->zyg->[0]->lad }
+    sub lad { CgOp::rawnew('LADImp') }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
