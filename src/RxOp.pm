@@ -287,6 +287,7 @@ use CgOp;
     has name     => (isa => 'Str', is => 'ro', required => 1);
     has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
+    has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
 
     sub true {
         my ($self) = @_;
@@ -314,14 +315,19 @@ use CgOp;
         my @code;
         push @code, CgOp::rawcall(CgOp::rxframe, "PushCursorList",
             CgOp::rawnewarr('String', map { CgOp::clr_string($_) } @{ $self->captures }),
-            CgOp::methodcall(CgOp::methodcall(CgOp::methodcall(
-                CgOp::newscalar(CgOp::rawcall(CgOp::rxframe, "MakeCursor")),
-                $self->name), "list"), "clone"));
-        push @code, CgOp::goto($sk);
-        push @code, CgOp::label($bt);
-        push @code, CgOp::methodcall(CgOp::rawcall(CgOp::rxframe,
-                "GetCursorList"), "shift");
-        push @code, CgOp::label($sk);
+            ($self->selfcut ?
+                CgOp::methodcall(CgOp::newscalar(CgOp::rawcall(
+                            CgOp::rxframe, "MakeCursor")), $self->name) :
+                CgOp::methodcall(CgOp::methodcall(CgOp::methodcall(
+                    CgOp::newscalar(CgOp::rawcall(CgOp::rxframe, "MakeCursor")),
+                    $self->name), "list"), "clone")));
+        unless ($self->selfcut) {
+            push @code, CgOp::goto($sk);
+            push @code, CgOp::label($bt);
+            push @code, CgOp::sink(CgOp::methodcall(CgOp::rawcall(CgOp::rxframe,
+                    "GetCursorList"), "shift"));
+            push @code, CgOp::label($sk);
+        }
         push @code, CgOp::letn(
             "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
                 CgOp::fetch(CgOp::rawcall(CgOp::rxframe, "GetCursorList")))),
@@ -330,7 +336,8 @@ use CgOp;
                     CgOp::getfield("pos", CgOp::cast("Cursor",
                             CgOp::letvar("k")))),
                 CgOp::rawccall(CgOp::rxframe, "Backtrack")));
-        push @code, CgOp::rxpushb("SUBRULE", $bt);
+        push @code, CgOp::rxpushb("SUBRULE", $bt)
+            unless $self->selfcut;
 
         @code;
     }

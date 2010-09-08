@@ -289,6 +289,9 @@ use 5.010;
 
     sub set_result {
         my ($self) = @_;
+        if (!@{ $self->stacktype }) {
+            print for @{ $self->buffer };
+        }
         $self->resulttype($self->stacktype->[-1]);
         $self->_emit("th.resultSlot = " . ($self->_popn(1))[0]);
     }

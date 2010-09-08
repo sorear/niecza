@@ -1,6 +1,7 @@
 # vim: ft=perl6
 use Test;
 
-say Q:CgOp { (rawsccall Kernel.GetFirst:c,Variable (@ { flat(1,2,3) })) };
+# one CgOp bug manifested as a failure to compile this
+ok (/ <?before x>: <ws>: /).defined, "unnamed regression";
 
 done-testing;

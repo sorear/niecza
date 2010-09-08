@@ -105,7 +105,7 @@ use warnings;
         my ($self, $nv) = @_;
         my $zyg = $self->zyg;
         for (my $i = 0; $i < @$zyg; $i++) {
-            $zyg->[$i] = $zyg->[$i]->cps_convert($i == $#$zyg);
+            $zyg->[$i] = $zyg->[$i]->cps_convert($nv && $i == $#$zyg);
         }
         $self->cps_type(2);
         $self->cps_type($zyg->[-1]->cps_type) if @$zyg;

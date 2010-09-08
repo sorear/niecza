@@ -39,9 +39,27 @@ sub RxOp::Sequence::mayback { my ($self) = @_;
 }
 
 sub RxOp::Cut::rxsimp { my ($self, $cut) = @_;
-    return $self->zyg->[0]->rxsimp(0) if !$self->zyg->[0]->mayback;
+    my $kid = $self->zyg->[0]->rxsimp(1);
+    return $kid unless $kid->mayback;
 
-    return RxOp::Cut->new(zyg => [$self->zyg->[0]->rxsimp(1)]);
+    return RxOp::Cut->new(zyg => [$kid]);
+}
+
+sub RxOp::Subrule::rxsimp { my ($self, $cut) = @_;
+    if (my $true = $self->true) {
+        return $true->rxsimp($cut);
+    }
+    if ($cut) {
+        return RxOp::Subrule->new(%$self, selfcut => 1);
+    }
+    return $self;
+}
+
+sub RxOp::Subrule::mayback { my ($self) = @_;
+    if (my $true = $self->true) {
+        return $true->mayback;
+    }
+    return !$self->selfcut;
 }
 
 1;
