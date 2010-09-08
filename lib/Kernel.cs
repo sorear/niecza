@@ -762,10 +762,10 @@ blocked:
             return new Variable(true, true, true, null, container);
         }
 
-        public static List<Variable> SlurpyHelper(Frame th, int from) {
-            List<Variable> lv = new List<Variable>();
+        public static VarDeque SlurpyHelper(Frame th, int from) {
+            VarDeque lv = new VarDeque();
             for (int i = from; i < th.pos.Length; i++) {
-                lv.Add(th.pos[i]);
+                lv.Push(th.pos[i]);
             }
             return lv;
         }
@@ -811,10 +811,8 @@ blocked:
             DynObject dyl = lst as DynObject;
             if (dyl == null) goto slow;
             if (dyl.klass != ListMO) goto slow;
-            Variable itemsv = (Variable) dyl.GetSlot("items");
-            IP6 itemso = (IP6) UnboxAny(itemsv.container);
-            List<Variable> itemsl = (List<Variable>) UnboxAny(itemso);
-            if (itemsl.Count == 0) goto slow;
+            VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
+            if (itemsl.Count() == 0) goto slow;
             th.resultSlot = itemsl[0];
             return th;
 
@@ -1052,6 +1050,94 @@ slow:
         public override bool IsFatal() { return true; }
         public override IP6 Payload() { return payload; }
         public override Frame Process(Frame t) { return t; }
+    }
+
+    public sealed class VarDeque {
+        private Variable[] data;
+        private int head;
+        private int count;
+
+        public int Count() { return count; }
+
+        public VarDeque() {
+            data = new Variable[8];
+        }
+
+        public VarDeque(VarDeque tp) {
+            data = (Variable[]) tp.data.Clone();
+            head = tp.head;
+            count = tp.count;
+        }
+
+        public VarDeque(Variable[] parcel) {
+            int cap = 8;
+            while (cap <= parcel.Length) cap *= 2;
+            data = new Variable[cap];
+            Array.Copy(parcel, 0, data, 0, parcel.Length);
+            count = parcel.Length;
+        }
+
+        private int fixindex(int index) {
+            int rix = index + head;
+            if (rix >= data.Length) rix -= data.Length;
+            return rix;
+        }
+
+        private int fixindexc(int index) {
+            if (index >= count)
+                throw new IndexOutOfRangeException();
+            return fixindex(index);
+        }
+
+        public Variable this[int index] {
+            get { return data[fixindexc(index)]; }
+            set { data[fixindexc(index)] = value; }
+        }
+
+        public void Push(Variable vr) {
+            checkgrow();
+            data[fixindex(count++)] = vr;
+        }
+
+        public Variable Pop() {
+            int index = fixindex(--count);
+            Variable d = data[index];
+            data[index] = null;
+            return d;
+        }
+
+        public void Unshift(Variable vr) {
+            checkgrow();
+            head--;
+            count++;
+            if (head < 0) head += data.Length;
+            data[head] = vr;
+        }
+
+        public Variable Shift() {
+            int index = head++;
+            if (head == data.Length) head = 0;
+            count--;
+            Variable d = data[index];
+            data[index] = null;
+            return d;
+        }
+
+        private void checkgrow() {
+            if (count == data.Length - 1) {
+                Variable[] ndata = new Variable[data.Length * 2];
+                int z1 = data.Length - head;
+                if (z1 >= count) {
+                    Array.Copy(data, head, ndata, 0, count);
+                } else {
+                    Array.Copy(data, head, ndata, 0, z1);
+                    int z2 = count - z1;
+                    Array.Copy(data, 0, ndata, z1, z2);
+                }
+                data = ndata;
+                head = 0;
+            }
+        }
     }
 }
 

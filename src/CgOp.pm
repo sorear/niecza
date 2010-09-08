@@ -391,6 +391,14 @@ use warnings;
         fetch(varattr($_[0], $_[1]));
     }
 
+    sub getslot {
+        rawcall(cast('DynObject', $_[1]), 'GetSlot', $_[0]);
+    }
+
+    sub setslot {
+        rawcall(cast('DynObject', $_[1]), 'SetSlot', $_[0], $_[2]);
+    }
+
     sub varattr {
         CgOp::Primitive->new(op => [ 'attr_var', $_[0] ], zyg => [ $_[1] ],
             is_cps_call => 1);

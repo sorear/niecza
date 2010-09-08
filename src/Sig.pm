@@ -38,11 +38,10 @@ use 5.010;
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('flat'),
                     CgOp::box('Bool', CgOp::bool(1))),
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('items'),
-                    CgOp::box('LLArray', CgOp::rawnew('List<Variable>'))),
+                    CgOp::rawnew('VarDeque')),
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('rest'),
-                    CgOp::box('LLArray',
-                        CgOp::rawscall('Kernel.SlurpyHelper',
-                            CgOp::callframe, CgOp::letvar('!ix')))),
+                    CgOp::rawscall('Kernel.SlurpyHelper',
+                        CgOp::callframe, CgOp::letvar('!ix'))),
                 CgOp::newscalar($do))});
     }
 

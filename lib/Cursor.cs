@@ -57,13 +57,9 @@ public sealed class RxFrame {
             if (return_one) {
                 return Kernel.Take(th, Kernel.NewROScalar(EMPTYP));
             } else {
-                DynObject obs = new DynObject(LLArrayMO);
-                obs.SetSlot("value", new List<Variable>());
-                DynObject its = new DynObject(LLArrayMO);
-                its.SetSlot("value", new List<Variable>());
                 DynObject lst = new DynObject(ListMO);
-                lst.SetSlot("items", Kernel.NewROScalar(obs));
-                lst.SetSlot("rest",  Kernel.NewROScalar(its));
+                lst.SetSlot("items", new VarDeque());
+                lst.SetSlot("rest",  new VarDeque());
                 lst.SetSlot("flat",  Kernel.NewROScalar(Kernel.AnyP));
                 th.caller.resultSlot = Kernel.NewRWListVar(lst);
             }
@@ -197,7 +193,6 @@ public sealed class RxFrame {
     }
 
     public static DynMetaObject ListMO;
-    public static DynMetaObject LLArrayMO;
     public static DynMetaObject GatherIteratorMO;
     public static IP6 EMPTYP;
     public Frame End(Frame th) {
@@ -205,22 +200,18 @@ public sealed class RxFrame {
             return Kernel.Take(th, Kernel.NewROScalar(MakeCursor()));
         } else {
             return_one = true;
-            DynObject obs = new DynObject(LLArrayMO);
-            List<Variable> ks = new List<Variable>();
-            ks.Add(Kernel.NewROScalar(MakeCursor()));
-            obs.SetSlot("value", ks);
+            VarDeque ks = new VarDeque();
+            ks.Push(Kernel.NewROScalar(MakeCursor()));
             DynObject it  = new DynObject(GatherIteratorMO);
             it.SetSlot("value", Kernel.NewRWScalar(Kernel.AnyP));
             it.SetSlot("next",  Kernel.NewRWScalar(Kernel.AnyP));
             it.SetSlot("valid", Kernel.NewRWScalar(Kernel.AnyP));
             it.SetSlot("frame", Kernel.NewRWScalar(th));
-            DynObject its = new DynObject(LLArrayMO);
-            List<Variable> iss = new List<Variable>();
-            iss.Add(Kernel.NewROScalar(it));
-            its.SetSlot("value", iss);
+            VarDeque iss = new VarDeque();
+            iss.Push(Kernel.NewROScalar(it));
             DynObject lst = new DynObject(ListMO);
-            lst.SetSlot("items", Kernel.NewROScalar(obs));
-            lst.SetSlot("rest",  Kernel.NewROScalar(its));
+            lst.SetSlot("items", ks);
+            lst.SetSlot("rest",  iss);
             lst.SetSlot("flat",  Kernel.NewROScalar(Kernel.AnyP));
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
         }
@@ -286,16 +277,11 @@ public class Cursor : IP6 {
         int l = backing_ca.Length;
         int p = pos;
 
-        DynObject obs = new DynObject(RxFrame.LLArrayMO);
-        List<Variable> ks = new List<Variable>();
-        obs.SetSlot("value", ks);
-
-        DynObject its = new DynObject(RxFrame.LLArrayMO);
-        its.SetSlot("value", new List<Variable>());
+        VarDeque ks = new VarDeque();
 
         DynObject lst = new DynObject(RxFrame.ListMO);
-        lst.SetSlot("items", Kernel.NewROScalar(obs));
-        lst.SetSlot("rest",  Kernel.NewROScalar(its));
+        lst.SetSlot("items", ks);
+        lst.SetSlot("rest",  new VarDeque());
         lst.SetSlot("flat",  Kernel.NewROScalar(Kernel.AnyP));
 
         if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
@@ -306,7 +292,7 @@ public class Cursor : IP6 {
             while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
             if (Trace)
                 Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
-            ks.Add(Kernel.NewROScalar(At(p)));
+            ks.Push(Kernel.NewROScalar(At(p)));
         }
 
         return Kernel.NewROScalar(lst);

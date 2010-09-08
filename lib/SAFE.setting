@@ -388,7 +388,7 @@ PRE-INIT {
     Mu.HOW.add-method("new", anon method new() { Q:CgOp {
             (rawscall Kernel.DefaultNew (@ (l self))) } });
 
-    Any.HOW.add-method("flat", anon method flat() { self, });
+    Any.HOW.add-method("flat", anon method flat() { (self,).flat });
 
     Any.HOW.add-method("ACCEPTS", anon method ACCEPTS($t) { self === $t });
     Any.HOW.add-method('!butWHENCE', anon method !butWHENCE($cr) {
@@ -407,10 +407,6 @@ PRE-INIT {
         anon method does($obj, $role) { self.isa($obj, $role) }); #no roles yet
 }
 
-# boxes a List<Variable>. SCHLIEMEL WAS HERE
-# we can't use sigs on push and unshift because $x loses the flat bit
-# this underlies Parcel and List.  It looks a lot like RPA.
-
 # Parcel: immutable list of boxes which have no context - may flatten, may
 # autovivify, don't rebind or push/shift/etc
 # List: mutable list of boxes without much context.  accessing off end returns
@@ -418,48 +414,6 @@ PRE-INIT {
 # Seq: mutable list of boxes which are taken to be read-only scalars. The .Seq
 # coercion makes the elements of a List read-only and maybe fetches them too.
 # Array: mutable list of read-write scalar boxes
-my class LLArray {
-    method push is rawcall { Q:CgOp { (prog
-      [rawcall (unbox List<Variable> (@ (pos 0))) Add (pos 1)] [pos 0]) } }
-    method pop() { Q:CgOp { (withtypes $f Variable $lv List<Variable>
-      [l $lv (unbox List<Variable> (@ (l self)))]
-      [l $f (getindex (- (getfield Count (l $lv)) (int 1)) (l $lv))]
-      [rawcall (l $lv) RemoveAt (- (getfield Count (l $lv)) (int 1))]
-      [l $f]) } }
-    method shift() { Q:CgOp { (withtypes $f Variable $lv List<Variable>
-      [l $lv (unbox List<Variable> (@ (l self)))]
-      [l $f (getindex (int 0) (l $lv))]
-      [rawcall (l $lv) RemoveAt (int 0)]
-      [l $f]) } }
-    method unshift is rawcall { Q:CgOp { (prog
-      [rawcall (unbox List<Variable> (@ (pos 0))) Insert (int 0) (pos 1)]
-      [pos 0]) } }
-    method first-flattens() { Q:CgOp {
-      (box Bool (getfield islist (getindex (int 0)
-        (unbox List<Variable> (@ (l self)))))) } }
-    method elems() { Q:CgOp {
-      (box Num (cast Double (getfield Count (unbox List<Variable>
-        (@ (l self)))))) } }
-    method Bool() { ?( self.elems ) }
-    method new is rawcall { Q:CgOp {
-      (letn list (rawnew List<Variable>)
-            max  (getfield Length (getfield pos (callframe)))
-            i    (int 1)
-        [whileloop 0 0 (< (l i) (l max))
-          (prog
-            [rawcall (l list) Add (pos (l i))]
-            [l i (+ (l i) (int 1))])]
-        [box LLArray (l list)])
-    } }
-    method at-pos($i) {
-        Q:CgOp { (getindex (cast Int32 (unbox Double (@ (l $i))))
-                   (unbox List<Variable> (@ (l self)))) }
-    }
-    method clone() { Q:CgOp {
-        (box LLArray (rawnew List<Variable>
-            (unbox List<Variable> (@ (l self)))))
-    } }
-}
 
 my class Iterator {
     has $.valid;
@@ -499,9 +453,7 @@ sub unfold-list($l) {
 }
 
 sub unfold($fn) {
-    my @l := List.RAWCREATE("flat", 1, "items", LLArray.new(),
-        "rest", LLArray.new(unfold-iter($fn)));
-    @l;
+    List.SETUP(True, (&infix:<,>(unfold-iter($fn))));
 }
 
 sub flat(*@x) { @x }
@@ -509,17 +461,20 @@ sub flat(*@x) { @x }
 my class Whatever { }
 
 my class Parcel is Cool {
-    # $!ll
+    # $!value -> Variable[]
 
-    method flat() {
-        List.RAWCREATE("flat", 1, "items", LLArray.new(), "rest", $!ll.clone);
-    }
+    method flat() { List.SETUP(True, self) }
+    method list() { List.SETUP(False, self) }
+
+    method elems() { Q:CgOp {
+        (box Num (cast Double (getfield Length
+              (unbox 'Variable[]' (@ {self})))))
+    } }
 
     method iterator() {
-        my $ll = $!ll;
         my $it = Iterator.RAWCREATE("valid", 1, "value", Any, "next", Any);
         $it.value = EMPTY;
-        my $ix = ($ll.elems - 1);
+        my $ix = ($.elems - 1);
 
         while $ix >= 0 {
             my $nit = Iterator.RAWCREATE("valid", 1, "next", Any);
@@ -527,8 +482,10 @@ my class Parcel is Cool {
             $it = $nit;
             Q:CgOp {
                 (prog
-                  [rawcall (cast DynObject (@ (l $it))) SetSlot
-                    (clr_string value) (methodcall (l $ll) at-pos (l $ix))]
+                  [rawcall (cast DynObject (@ {$it})) SetSlot
+                      (clr_string value) (getindex
+                        (cast Int32 (unbox Double (@ {$ix})))
+                        (unbox 'Variable[]' (@ {self})))]
                   [null Variable])
             };
             $ix--;
@@ -538,9 +495,12 @@ my class Parcel is Cool {
     }
 }
 
-sub infix:<,>(*@v) {
-    my @r := Parcel.RAWCREATE("ll", Q:CgOp { (varattr rest (@ (l @v))) });
-    @r;
+sub infix:<,> is rawcall {
+    Q:CgOp { (newrwlistvar (@ (box Parcel (getfield pos (callframe))))) };
+}
+
+sub unitem is rawcall {
+    Q:CgOp { (newrwlistvar (@ (pos 0))) }
 }
 
 # Maybe this should be a constant, but constants are currently forced to
@@ -548,7 +508,7 @@ sub infix:<,>(*@v) {
 sub Nil {
     state @n;
     START {
-        @n := Parcel.RAWCREATE("ll", LLArray.new);
+        @n := &infix:<,>();
     }
     @n;
 }
@@ -558,34 +518,85 @@ my class List is Cool {
     has @!rest;
     has $!flat;
     method flat() {
-        my @y := ($!flat ?? self !! self.RAWCREATE("flat", 1,
-            "items", LLArray.new(), "rest", LLArray.new(self.iterator)));
-        @y;
+        unitem($!flat ?? self !! self.SETUP(True, (&infix:<,>(self.iterator))));
     }
-    method list() { my @y := self; @y }
+    method list() { unitem(self) }
 
-    method clone() {
-        self.RAWCREATE("flat", $!flat, "items", $!items.clone, "rest",
-            $!rest.clone);
-    }
+    method clone() { Q:CgOp {
+        (letn dys (cast DynObject (@ {self}))
+              new (rawnew DynObject (getfield klass (l dys)))
+          (rawcall (l new) SetSlot (s flat)
+            (rawcall (l dys) GetSlot (s flat)))
+          (rawcall (l new) SetSlot (s items) (rawnew VarDeque
+              (cast VarDeque (rawcall (l dys) GetSlot (s items)))))
+          (rawcall (l new) SetSlot (s rest) (rawnew VarDeque
+              (cast VarDeque (rawcall (l dys) GetSlot (s rest)))))
+          (newrwlistvar (l new)))
+    } }
+
+    method SETUP($flat, $parcel) { Q:CgOp {
+        (letn new (rawnew DynObject (rawcall (@ {self}) GetMO))
+          (rawcall (l new) SetSlot (s flat) {$flat})
+          (rawcall (l new) SetSlot (s rest) (rawnew VarDeque
+              (unbox 'Variable[]' (@ {$parcel}))))
+          (rawcall (l new) SetSlot (s items) (rawnew VarDeque))
+          (newrwlistvar (l new)))
+    } }
 
     method Seq() {
-        Seq.RAWCREATE("flat", 1, "items", LLArray.new,
-            "rest", LLArray.new(self.iterator));
+        Seq.SETUP(True, (&infix:<,>(self.iterator)));
     }
 
     #| Takes an object and applies whatever semantics the List subclass
     #| needs to apply on stuff out of the iterator stack
     method !elem is rawcall { Q:CgOp { (pos 1) } }
 
+    sub first-rest-flattens($self) { Q:CgOp {
+        (box Bool (getfield islist (getindex (i 0) (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))))))
+    } }
+
+    sub has-iterators($self) { Q:CgOp {
+        (box Bool (!= (i 0) (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))) Count)))
+    } }
+
+    sub count-items($self) { Q:CgOp {
+        (box Num (cast Double (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s items))) Count)))
+    } }
+
+    sub shift-iterator($self) { Q:CgOp {
+        (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))) Shift)
+    } }
+
+    sub shift-item($self) { Q:CgOp {
+        (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s items))) Shift)
+    } }
+
+    method !item-at-pos($ix) { Q:CgOp {
+        (getindex (cast Int32 (unbox Double (@ {$ix}))) (cast VarDeque (rawcall (cast DynObject (@ {self})) GetSlot (s items))))
+    } }
+
+    sub pop-item($self) { Q:CgOp {
+        (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s items))) Pop)
+    } }
+
+    sub push-iterator is rawcall { Q:CgOp {
+        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) Push (pos 1)) (null Variable))
+    } }
+
+    sub push-item is rawcall { Q:CgOp {
+        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s items))) Push (pos 1)) (null Variable))
+    } }
+
+    sub unshift-iterator is rawcall { Q:CgOp {
+        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) Unshift (pos 1)) (null Variable))
+    } }
+
     method !fill($nr) {
-        my $i = $!items;
-        my $r = $!rest;
-        while $i.elems < $nr && $r {
-            if $!flat && $r.first-flattens {
-                $r.unshift($r.shift.iterator);
+        while count-items(self) < $nr && has-iterators(self) {
+            if $!flat && first-rest-flattens(self) {
+                unshift-iterator(self, shift-iterator(self).iterator);
             } else {
-                my $v := $r.shift;
+                my $v := shift-iterator(self);
 
                 if $v.^isa(EMPTY) {
                     # Discard summarily
@@ -596,22 +607,22 @@ my class List is Cool {
                     # we can't push anything onto items because it might be
                     # EMPTY
                     if ! $v.value.^isa(EMPTY) {
-                        $r.unshift($v.next);
-                        $r.unshift($v.value);
+                        unshift-iterator(self, $v.next);
+                        unshift-iterator(self, $v.value);
                     }
                 } else {
-                    $i.push(self!elem($v));
+                    push-item(self, self!elem($v));
                 }
             }
         }
 
-        $i.elems >= $nr;
+        count-items(self) >= $nr;
     }
 
     method Bool() { self!fill(1) }
     method shift() {
         self!fill(1);
-        $!items.shift;
+        shift-item(self);
     }
 
     method eager() {
@@ -619,14 +630,14 @@ my class List is Cool {
         self;
     }
 
-    method head { self!fill(1) ?? $!items.at-pos(0) !! Any }
+    method head { self!fill(1) ?? self!item-at-pos(0) !! Any }
 
-    method elems() { self!fill(1000_000_000); $!items.elems; }
+    method elems() { self!fill(1000_000_000); count-items(self); }
     method Numeric () { self.elems }
 
     method at-pos($i) {
         self!fill($i + 1);
-        $!items.at-pos($i);
+        self!item-at-pos($i);
     }
 
     method iterator() { unfold-list(self.clone) }
@@ -642,11 +653,11 @@ my class List is Cool {
     method Str() { self.join(" ") }
 
     method push(*@items) {
-        $!rest.push(@items.Seq.eager.iterator)
+        push-iterator(self, @items.Seq.eager.iterator)
     }
     method pop() {
         self.eager;
-        $!items.pop;
+        pop-item(self);
     }
 }
 
@@ -750,36 +761,40 @@ my class Seq is List {
 
 my class Array is List {
     method new() {
-        Array.RAWCREATE("flat", 1, "items", LLArray.new, "rest", LLArray.new);
+        Array.SETUP(True, &infix:<,>())
     }
 
     method LISTSTORE(*@in) {
         # fetch everything NOW in case self is mentioned
         my $inn := @in.Seq.eager;
 
-        $!items = Q:CgOp { (varattr items (@ (l $inn))) };
-        self;
+        Q:CgOp { (prog
+            (rawcall (cast DynObject (@ {self})) SetSlot (s items)
+              (rawcall (cast DynObject (@ {$inn})) GetSlot (s items)))
+            (null Variable))
+        };
+        unitem(self);
     }
 
     method !extend is rawcall {
         Q:CgOp {
-            (letn i (unbox List<Variable> (getattr items (@ (pos 0))))
+            (letn i (cast VarDeque (getslot (s items) (@ (pos 0))))
                   ct (- (cast Int32 (unbox Double (@ (pos 1))))
-                        (getfield Count (l i)))
+                        (rawcall (l i) Count))
               (ternary (>= (l ct) (int 0)) [prog]
                 [die "Autovivification collision"])
               (whileloop 0 0 (!= (l ct) (int 0))
                 (prog
                   (l ct (- (l ct) (int 1)))
-                  (rawcall (l i) Add (newrwscalar (@ (l Any))))))
-              (rawcall (l i) Add (pos 2))
+                  (rawcall (l i) Push (newrwscalar (@ {Any})))))
+              (rawcall (l i) Push (pos 2))
               (null Variable))
         };
     }
 
     method at-pos($ix) {
         self!fill($ix+1)
-            ?? $!items.at-pos($ix)
+            ?? self!item-at-pos($ix)
             !! Any!butWHENCE(sub () is rawcall {
                 self!extend($ix, Q:CgOp { (pos 0) });
             });
@@ -867,10 +882,8 @@ my class GatherIterator is Iterator {
 }
 
 sub _gather($fr) {
-    my @l := List.RAWCREATE("flat", True, "items", LLArray.new, "rest",
-        LLArray.new(GatherIterator.RAWCREATE("frame", $fr, "valid", False,
-            "value", Any, "next", Any)));
-    @l;
+    List.SETUP(True, (&infix:<,>(GatherIterator.RAWCREATE("frame", $fr,
+        "valid", False, "value", Any, "next", Any))));
 }
 
 sub take($p) { # should be \|$p
@@ -942,8 +955,6 @@ PRE-INIT {
         (prog
           (rawsset RxFrame.EMPTYP (@ {EMPTY}))
           (rawsset RxFrame.ListMO (getfield klass (cast DynObject (@ {List}))))
-          (rawsset RxFrame.LLArrayMO (getfield klass
-              (cast DynObject (@ {LLArray}))))
           (rawsset RxFrame.GatherIteratorMO (getfield klass
               (cast DynObject (@ {GatherIterator}))))
           (null Variable))

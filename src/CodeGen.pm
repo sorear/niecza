@@ -16,6 +16,7 @@ use 5.010;
               Does         => [m => 'Boolean'],
               GetTypeName  => [m => 'String'],
               GetTypeObject=> [m => 'IP6'],
+              GetMO        => [m => 'DynMetaObject'],
               IsDefined    => [m => 'Boolean'],
               HOW          => [c => 'IP6'] },
         DynObject =>
@@ -90,6 +91,12 @@ use 5.010;
               SimpleWS     => [m => 'Variable'] },
         'Lexer' =>
             { Run          => [m => 'Int32[]'] },
+        'VarDeque' =>
+            { Push         => [m => 'Void'],
+              Unshift      => [m => 'Void'],
+              Pop          => [m => 'Variable'],
+              Shift        => [m => 'Variable'],
+              Count        => [m => 'Int32'] },
 
         'System.IO.File.ReadAllText' => [m => 'System.String'],
 
@@ -105,7 +112,7 @@ use 5.010;
         'Kernel.Process'       => [f => 'Variable'],
         'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [m => 'Variable'],
-        'Kernel.SlurpyHelper'  => [m => 'List<Variable>'],
+        'Kernel.SlurpyHelper'  => [m => 'VarDeque'],
         'Kernel.Bind'          => [c => 'Void'],
         'Kernel.BindNewScalar' => [c => 'Variable'],
         'Kernel.BindNewList'   => [c => 'Variable'],
@@ -615,6 +622,7 @@ use 5.010;
         }
         my ($obj, $ix, $oty, $ixty)  = $self->_popn(2);
         my $ty  = ($oty =~ /^Dictionary<.*,(.*)>$/) ? $1 :
+                  ($oty =~ /^VarDeque$/) ? 'Variable' :
                   ($oty =~ /^(.*)\[\]$/) ? $1 :
                   ($oty =~ /^List<(.*)>$/) ? $1 :
                   die "type inference needs more hacks $oty";
