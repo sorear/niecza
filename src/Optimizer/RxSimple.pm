@@ -62,4 +62,15 @@ sub RxOp::Subrule::mayback { my ($self) = @_;
     return !$self->selfcut;
 }
 
+sub RxOp::Sigspace::rxsimp { my ($self, $cut) = @_;
+    if ($cut) {
+        return RxOp::Sigspace->new(selfcut => 1);
+    }
+    return $self;
+}
+
+sub RxOp::Sigspace::mayback { my ($self) = @_;
+    return !$self->selfcut;
+}
+
 1;

@@ -358,10 +358,12 @@ use CgOp;
     package RxOp::Sigspace;
     use Moose;
     extends 'RxOp';
+    has selfcut => (isa => 'Bool', is => 'ro', default => 0);
 
     sub code {
         my ($self, $body) = @_;
-        RxOp::Subrule->new(name => 'ws')->code($body);
+        RxOp::Subrule->new(name => 'ws',
+            selfcut => $self->selfcut)->code($body);
     }
 
     sub lad {
