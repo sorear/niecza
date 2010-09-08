@@ -75,7 +75,14 @@ sub resolve_lex {
         $::UNITREFS{$1} = 1;
     }
 
-    if ($kind == 3) {
+    if ($kind == 4) {
+        if ($set_to) {
+            return CgOp::Primitive->new(op => ['rtpadputi', $order, $data],
+                zyg => [$set_to]);
+        } else {
+            return CgOp::Primitive->new(op => ['rtpadgeti', $type, $order, $data]);
+        }
+    } elsif ($kind == 3) {
         if ($set_to) {
             return CgOp::let($set_to, sub { my $x = $_[0];
                 CgOp::prog( CgOp::rawsset($data, CgOp::fetch($x)),

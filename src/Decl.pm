@@ -10,6 +10,8 @@ use CgOp;
 
     has zyg => (is => 'ro', isa => 'ArrayRef', default => sub { [] });
 
+    sub dyn_name { $_[1] =~ /^.?[?*]/ }
+
     sub used_slots   { () }
     sub preinit_code { CgOp::noop }
     sub enter_code   { CgOp::noop }
@@ -60,7 +62,8 @@ use CgOp;
     sub bodies { $_[0]->code }
 
     sub used_slots {
-        [$_[0]->var, 'Variable', $_[1] ? 3 : 0];
+        [$_[0]->var, 'Variable', $_[1] ? 3 :
+            ($_[0]->dyn_name($_[0]->var) ? 0 : 4)];
     }
 
     sub preinit_code {
@@ -99,7 +102,7 @@ use CgOp;
     }
 
     sub used_slots {
-        [$_[0]->slot, 'Variable', ($_[1] && !$_[0]->dynamic) ? 1 : 0];
+        [$_[0]->slot, 'Variable', $_[0]->dynamic ? 0 : $_[1] ? 1 : 4];
     }
 
     sub preinit_code {
@@ -190,7 +193,7 @@ use CgOp;
     has list    => (isa => 'Bool', is => 'ro', default => 0);
 
     sub used_slots {
-        $_[0]->slot ? [$_[0]->slot, 'Variable', 0] : ();
+        $_[0]->slot ? [$_[0]->slot, 'Variable', 4] : ();
     }
 
     sub outer_decls {
@@ -261,7 +264,7 @@ use CgOp;
     sub used_slots {
         my ($self) = @_;
         [$self->var, 'Variable', 3], [$self->stashvar, 'Variable', 3],
-            (!$self->stub ? [$self->bodyvar, 'Variable', $_[1] ? 1 : 0] : ());
+            (!$self->stub ? [$self->bodyvar, 'Variable', $_[1] ? 1 : 4] : ());
     }
 
     sub make_how { CgOp::newscalar(CgOp::null('IP6')); }
@@ -456,7 +459,8 @@ use CgOp;
     has oname => (is => 'ro', isa => 'Str', required => 1);
     has nname => (is => 'ro', isa => 'Str', required => 1);
 
-    sub used_slots { [ $_[0]->nname, 'Variable', 0 ] }
+    sub used_slots { [ $_[0]->nname, 'Variable',
+            $_[0]->dyn_name($_[0]->nname) ? 0 : 4 ] }
 
     sub preinit_code {
         my ($self, $body) = @_;

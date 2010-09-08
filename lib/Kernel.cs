@@ -188,8 +188,7 @@ namespace Niecza {
         public object resultSlot = null;
         public int ip = 0;
         public readonly DynBlockDelegate code; // premature optimization?
-        public readonly Dictionary<string, object> lex
-            = new Dictionary<string, object>();
+        public Dictionary<string, object> lex;
         // statistically, most subs have between 1 and 4 anonymous lexicals
         public object lex0;
         public object lex1;
@@ -255,6 +254,10 @@ namespace Niecza {
             Frame csr = this;
             while (csr != null) {
                 object o;
+                if (csr.lex == null) {
+                    csr = csr.outer;
+                    continue;
+                }
                 if (csr.lex.TryGetValue(name, out o))
                     return (Variable)o;
                 csr = csr.outer;
@@ -770,6 +773,10 @@ blocked:
         public static Variable ContextHelper(Frame th, string name) {
             object rt;
             while (th != null) {
+                if (th.lex == null) {
+                    th = th.caller;
+                    continue;
+                }
                 if (th.lex.TryGetValue(name, out rt)) {
                     return (Variable)rt;
                 }
@@ -945,6 +952,7 @@ slow:
                 if (pop.info.hints != null &&
                         pop.info.hints.TryGetValue("!unwind", out o)) {
                     Frame n = new Frame(bot, bot, (SubInfo) o);
+                    n.lex = new Dictionary<string,object>();
                     n.lex["!reunwind"] = this;
                     return n;
                 }
@@ -963,11 +971,12 @@ slow:
                 if (top.info.hints != null &&
                         top.info.hints.TryGetValue(key, out o)) {
                     Frame fn = new Frame(bot, top, (SubInfo) o);
+                    fn.lex = new Dictionary<string,object>();
                     fn.lex["!rethrow"] = this;
                     return fn;
                 }
 
-                if (top.lex.ContainsKey("!rethrow")) {
+                if (top.lex != null && top.lex.ContainsKey("!rethrow")) {
                     // this is an active exception handling frame!  skip
                     // the corresponding handler
                     top = top.outer.caller;

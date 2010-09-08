@@ -210,6 +210,7 @@ use 5.010;
     has lettypes  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has numlets   => (isa => 'Int', is => 'rw', default => 0);
     has minlets   => (isa => 'Int', is => 'ro', default => 0);
+    has usednamed => (isa => 'Bool', is => 'ro', default => 0);
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has consttab  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
@@ -426,6 +427,23 @@ use 5.010;
         $self->callframe;
         my ($val, $frame) = $self->_popn(2);
         $self->_emit($frame . (".outer" x $order) . ".lex[" . qm($name) . "] = $val");
+    }
+
+    sub rtpadgeti {
+        my ($self, $type, $order, $name) = @_;
+        $self->callframe;
+        my ($frame) = $self->_popn(1);
+        my $tag = $name < 4 ? "lex$name" : ("lexn[" . ($name - 4) . "]");
+        $self->_push("object", $frame . (".outer" x $order) . ".$tag");
+        $self->cast($type);
+    }
+
+    sub rtpadputi {
+        my ($self, $order, $name) = @_;
+        $self->callframe;
+        my ($val, $frame) = $self->_popn(2);
+        my $tag = $name < 4 ? "lex$name" : ("lexn[" . ($name - 4) . "]");
+        $self->_emit($frame . (".outer" x $order) . ".$tag = $val");
     }
 
     sub callframe {
@@ -706,11 +724,23 @@ use 5.010;
     sub proto_var {
         my ($self, $name) = @_;
         my ($type, $kind, $data) = @{ $self->bodies->[-1]->lexical->{$name} };
+        if (($kind == 4 || $kind == 0) && !$self->bodies->[-1]->needs_protopad) {
+            # XXX this isn't the right way
+            $self->_popn(1);
+            return
+        }
         if ($kind == 3) {
             $self->clr_sfield_set($data);
             $self->clr_sfield_get($data . ":f,IP6");
             $self->clr_call_direct('Kernel.NewROScalar', 1);
             $self->clr_sfield_set($data . "_var");
+            return;
+        }
+        if ($kind == 4) {
+            $self->peek_let('protopad');
+            my ($pv, $pp) = $self->_popn(2);
+            my $tag = $data > 4 ? ("lexn[" . ($data - 4) . "]") : "lex$data";
+            $self->_emit("$pp.$tag = ($pv)");
             return;
         }
         if ($kind == 1) {
@@ -743,6 +773,16 @@ use 5.010;
             $self->_push('SubInfo', $body->csname . "_info");
             $self->clr_new('Frame', 3);
             $self->push_let('protopad');
+            if ($body->lexical->{'?usednamed'}) {
+                $self->peek_let('protopad');
+                $self->clr_new('Dictionary<string,object>', 0);
+                $self->clr_field_set('lex');
+            }
+            if ($body->lexical->{'?num_slots'} > 4) {
+                $self->peek_let('protopad');
+                $self->_push('object[]', 'new object[' . ($body->lexical->{'?num_slots'} - 4) . ']');
+                $self->clr_field_set('lexn');
+            }
         }
         push @{ $self->bodies }, $body;
     }
@@ -778,6 +818,9 @@ use 5.010;
         if ($self->numlets + $self->minlets > 4) {
             print ::NIECZA_OUT " " x 16, "th.lexn = new object[",
                 ($self->numlets + $self->minlets - 4), "];\n";
+        }
+        if ($self->usednamed) {
+            print ::NIECZA_OUT " " x 16, "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
         }
         for (@{ $self->buffer }) {
             s/\@\@L(\w+)/$self->labelname->{$1}/eg;

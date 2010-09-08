@@ -48,10 +48,12 @@ use CgOp ();
             $h{'?is_mainline'} = 0;
         }
 
-        my $nfields_global;
+        my $nfields_global = 0;
+        my $nslots_local = 0;
+        my $usednamed = 0;
         for my $le (map { $_->used_slots($h{'?is_mainline'}) } @{ $self->decls }) {
-            # 0: cloned  1: static field  2: hint
-            # 3: readonly static field
+            # 0: cloned dynamic  1: static field  2: hint
+            # 3: readonly static field  4: cloned non-dynamic
             if ($le->[2] == 1 || $le->[2] == 3) {
                 my $sanname = $le->[0];
                 $sanname =~ s/\W//g;
@@ -59,11 +61,15 @@ use CgOp ();
                     $nfields_global++, $sanname;
             } elsif ($le->[2] == 2) {
                 $le->[3] = sprintf "%s.%s_info", $::UNITNAME, $self->csname;
+            } elsif ($le->[2] == 4) {
+                $le->[3] = $nslots_local++;
             } else {
-                # TODO generate numbered lookups for clonedvars
+                $usednamed = 1;
             }
             $h{shift(@$le)} = $le;
         }
+        $h{'?num_slots'} = $nslots_local;
+        $h{'?usednamed'} = $usednamed;
         $self->lexical(\%h);
 
         $h{'OUTER::'} = $outer;
@@ -166,6 +172,8 @@ use CgOp ();
         my ($self) = @_;
         $_->write for (map { $_->bodies } @{ $self->decls });
         CodeGen->new(csname => $self->csname, body => $self,
+            minlets => $self->lexical->{'?num_slots'},
+            usednamed => $self->lexical->{'?usednamed'},
             ops => $self->cgoptree)->write;
     }
 

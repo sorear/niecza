@@ -217,6 +217,9 @@ use warnings;
                     when ("clr_sfield_get") {
                         return;
                     }
+                    when ("rtpadgeti") {
+                        return;
+                    }
                     when ("rtpadget") {
                         return;
                     }
