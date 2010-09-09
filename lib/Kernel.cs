@@ -31,6 +31,7 @@ namespace Niecza {
         public virtual Frame InvokeMethod(Frame caller, string name,
                 Variable[] pos, Dictionary<string, Variable> named) {
             IP6 m;
+            //Kernel.LogNameLookup(name);
             foreach (DynMetaObject k in GetMO().mro) {
                 if (k.local.TryGetValue(name, out m)) {
                     return m.Invoke(caller, pos, named);
@@ -310,6 +311,7 @@ namespace Niecza {
 
         public int FindSlot(string name) {
             int v;
+            //Kernel.LogNameLookup(name);
             if (slotMap.TryGetValue(name, out v))
                 return v;
             else
@@ -908,6 +910,18 @@ slow:
             Global = NewROScalar(GlobalO);
             ProcessO = new CLRImportObject(new Dictionary<string,Variable>());
             Process = NewROScalar(ProcessO);
+        }
+
+        public static Dictionary<string, int> usedNames = new Dictionary<string, int>();
+        public static void LogNameLookup(string name) {
+            int k;
+            usedNames.TryGetValue(name, out k);
+            usedNames[name] = k + 1;
+        }
+
+        public static void DumpNameLog() {
+            foreach (KeyValuePair<string, int> kv in usedNames)
+                Console.WriteLine("{0} {1}", kv.Value, kv.Key);
         }
 
         // This is a library function in .NET 4
