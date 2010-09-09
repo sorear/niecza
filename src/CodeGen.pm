@@ -271,7 +271,10 @@ use 5.010;
 
     sub _popn {
         my ($self, $nr) = @_;
-        Carp::confess "Stack underflow" if $nr > @{ $self->stacktype };
+        if ($nr > @{ $self->stacktype }) {
+            print for @{ $self->buffer };
+            Carp::confess "stack undeflow";
+        }
         (splice @{ $self->stackterm }, -$nr, $nr),
             (splice @{ $self->stacktype }, -$nr, $nr);
     }

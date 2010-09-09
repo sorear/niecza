@@ -548,23 +548,26 @@ my class List is Cool {
         (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) UnshiftN (unbox 'Variable[]' (@ (pos 1)))) (null Variable))
     } }
 
-    method !fill($nr) {
-        while count-items(self) < $nr && has-iterators(self) {
-            if $!flat && first-rest-flattens(self) {
-                unshift-iterator(self, shift-iterator(self).iterator);
-            } else {
-                my $v := shift-iterator(self);
-
-                if $v.^isa(Iterator) {
-                    unshift-iterator-n(self, $v.reify);
-                } else {
-                    push-item(self, self!elem($v));
-                }
-            }
-        }
-
-        count-items(self) >= $nr;
-    }
+    method !fill($nr) { Q:CgOp {
+        (letn  nr    (cast Int32 (unbox Double (@ {$nr})))
+               items (cast VarDeque (getslot (s items) (@ {self})))
+               rest  (cast VarDeque (getslot (s rest) (@ {self})))
+               flat  (unbox Boolean (@ {$!flat.Bool}))
+               v     (null Variable)
+               ItMo  (rawcall (@ {Iterator}) GetMO)
+          (whileloop 0 0
+            (ternary (< (rawcall (l items) Count) (l nr))
+              (!= (rawcall (l rest) Count) (i 0)) (b 0))
+            (prog
+              (l v (rawcall (l rest) Shift))
+              (ternary (ternary (l flat) (getfield islist (l v)) (b 0))
+                (rawcall (l rest) Unshift (methodcall (l v) iterator))
+                (ternary (rawcall (@ (l v)) Isa (l ItMo))
+                  (rawcall (l rest) UnshiftN (unbox 'Variable[]'
+                      (@ (methodcall (l v) reify))))
+                  (rawcall (l items) Push (methodcall {self} !elem (l v)))))))
+          (box Bool (>= (rawcall (l items) Count) (l nr))))
+    } }
 
     method Bool() { self!fill(1) }
     method shift() {

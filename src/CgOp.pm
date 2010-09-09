@@ -258,6 +258,9 @@ use warnings;
         $self->zyg->[0] = $self->zyg->[0]->cps_convert(1);
         $self->zyg->[$_] = $self->zyg->[$_]->cps_convert($nv) for (1,2);
 
+        $self->zyg->[0] = CgOp::Primitive->new(op => ['result'],
+            zyg => [$self->zyg->[0]]) if $self->zyg->[0]->cps_type == 1;
+
         if ($nv) {
             $self->zyg->[$_] = ($self->zyg->[$_]->cps_type == 1) ?
                 $self->zyg->[$_] : CgOp::Primitive->new(op => ['set_result'],
@@ -299,6 +302,9 @@ use warnings;
         my ($self, $nv) = @_;
         $self->zyg->[0] = $self->zyg->[0]->cps_convert(1);
         $self->zyg->[1] = $self->zyg->[1]->cps_convert(0);
+
+        $self->zyg->[0] = CgOp::Primitive->new(op => ['result'],
+            zyg => [$self->zyg->[0]]) if $self->zyg->[0]->cps_type == 1;
 
         $self->cps_type(1);
         $self;
