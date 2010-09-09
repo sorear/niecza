@@ -416,10 +416,7 @@ PRE-INIT {
 # Array: mutable list of read-write scalar boxes
 
 my class Iterator {
-    has $.valid;
-    has $.value;
-    has $.next;
-    # subclasses must provide .validate
+    # subclasses must provide .reify, return parcel
 }
 
 my class EMPTY { }
@@ -427,34 +424,6 @@ my class EMPTY { }
 my class List { ... }
 my class Seq { ... }
 my class Array { ... }
-
-sub unfold-iter($fn) {
-    my class UnfoldIterator is Iterator {
-        has $.fun;
-        method validate() {
-            $!valid = 1;
-            my $f = $!fun;
-            $!next = UnfoldIterator.RAWCREATE("valid", 0, "value", Any, "next",
-                Any, "fun", $f);
-            Q:CgOp {
-                (prog
-                  [rawcall (cast DynObject (@ (l self))) SetSlot
-                    (clr_string value) (subcall (@ (l $f)))]
-                  [null Variable])
-            };
-        }
-    }
-    UnfoldIterator.RAWCREATE("valid", 0, "value", Any, "next",
-        Any, "fun", $fn);
-}
-
-sub unfold-list($l) {
-    unfold-iter(sub () { $l ?? $l.shift !! EMPTY; });
-}
-
-sub unfold($fn) {
-    List.SETUP(True, (&infix:<,>(unfold-iter($fn))));
-}
 
 sub flat(*@x) { @x }
 
@@ -472,26 +441,10 @@ my class Parcel is Cool {
     } }
 
     method iterator() {
-        my $it = Iterator.RAWCREATE("valid", 1, "value", Any, "next", Any);
-        $it.value = EMPTY;
-        my $ix = ($.elems - 1);
-
-        while $ix >= 0 {
-            my $nit = Iterator.RAWCREATE("valid", 1, "next", Any);
-            $nit.next = $it;
-            $it = $nit;
-            Q:CgOp {
-                (prog
-                  [rawcall (cast DynObject (@ {$it})) SetSlot
-                      (clr_string value) (getindex
-                        (cast Int32 (unbox Double (@ {$ix})))
-                        (unbox 'Variable[]' (@ {self})))]
-                  [null Variable])
-            };
-            $ix--;
+        my class ParcelIterator is Iterator {
+            has $.reify;
         }
-
-        $it;
+        ParcelIterator.RAWCREATE("reify", self);
     }
 }
 
@@ -591,6 +544,10 @@ my class List is Cool {
         (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) Unshift (pos 1)) (null Variable))
     } }
 
+    sub unshift-iterator-n is rawcall { Q:CgOp {
+        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) UnshiftN (unbox 'Variable[]' (@ (pos 1)))) (null Variable))
+    } }
+
     method !fill($nr) {
         while count-items(self) < $nr && has-iterators(self) {
             if $!flat && first-rest-flattens(self) {
@@ -598,18 +555,8 @@ my class List is Cool {
             } else {
                 my $v := shift-iterator(self);
 
-                if $v.^isa(EMPTY) {
-                    # Discard summarily
-                } elsif $v.^isa(Iterator) {
-                    if ! $v.valid {
-                        $v.validate;
-                    }
-                    # we can't push anything onto items because it might be
-                    # EMPTY
-                    if ! $v.value.^isa(EMPTY) {
-                        unshift-iterator(self, $v.next);
-                        unshift-iterator(self, $v.value);
-                    }
+                if $v.^isa(Iterator) {
+                    unshift-iterator-n(self, $v.reify);
                 } else {
                     push-item(self, self!elem($v));
                 }
@@ -640,7 +587,21 @@ my class List is Cool {
         self!item-at-pos($i);
     }
 
-    method iterator() { unfold-list(self.clone) }
+    method iterator() {
+        my class ListIterator is Iterator {
+            has $!list;
+            has $!reify;
+            method reify() {
+                $!reify // ($!reify = (
+                    $!list ??
+                        ($!list.shift, ListIterator.RAWCREATE("list", $!list,
+                            "reify", Any)) !!
+                        &infix:<,>()));
+            }
+        }
+        my $itp = self.clone;
+        ListIterator.RAWCREATE("list", $itp, "reify", Any);
+    }
 
     method join($sep) {
         my $t;
@@ -668,40 +629,32 @@ PRE-INIT { Q:CgOp {
       (null Variable))
 } }
 
-sub _it_shift($it) {
-    if ! $it.valid {
-        $it.validate;
-    }
-    my $oit = $it;
-    $it = $it.next;
-    $oit.value;
+sub take($p) { # should be \|$p
+    Q:CgOp { (rawsccall Kernel.Take (l $p)) }
 }
 
 PRE-INIT {
     Cool.HOW.add-method("grep", anon method grep($sm) {
-            my $it = self.flat.iterator;
-
-            unfold(sub () {
-                my $item = _it_shift($it);
-                ($item === EMPTY) ?? EMPTY !!
-                    ($item ~~ $sm) ?? $item !! Nil;
-            });
+            my $itp = @(self).clone;
+            gather while $itp {
+                my $r = $itp.shift;
+                take $r if $r ~~ $sm;
+            }
         });
     Cool.HOW.add-method("map",
         anon method map($func) {
-            my $it = self.flat.iterator;
-
-            unfold(sub () {
-                my $item = _it_shift($it);
-                ($item === EMPTY) ?? EMPTY !! $func($item);
-            });
+            my $itp = @(self).clone;
+            gather while $itp {
+                my $r = $itp.shift;
+                take $func($r);
+            }
         });
     Cool.HOW.add-method("for",
         anon method for($func) {
-            my $it = self.flat.iterator;
-            while $it {
-                my $item = _it_shift($it);
-                ($item === EMPTY) ?? ($it = Any) !! ($func($item));
+            my $itp = @(self).clone;
+            while $itp {
+                my $r = $itp.shift;
+                $func($r);
             }
         });
     Cool.HOW.add-method("say", anon method say() { self.Str.say });
@@ -868,26 +821,26 @@ sub postcircumfix:<{ }> is rawcall {
 
 my class GatherIterator is Iterator {
     has $!frame;
+    has $!reify;
 
-    method validate() {
+    method reify() {
         my $*nextframe;
-        $!value = Q:CgOp {
-            (rawsccall Kernel.CoTake (cast Frame (getattr frame (@ (l self)))))
-        };
-        $!valid = True;
-        $!frame = Any;
-        $!next  = GatherIterator.RAWCREATE("frame", $*nextframe, "valid", False,
-            "value", Any, "next", Any);
+        $!reify // ($!reify = (
+            Q:CgOp {
+                (letn getv (rawsccall Kernel.CoTake (cast Frame
+                    (@ {$!frame})))
+                  (box Parcel (ternary (== (@ {EMPTY}) (@ (l getv)))
+                    (rawnewarr Variable)
+                    (rawnewarr Variable
+                      (l getv)
+                      {GatherIterator.RAWCREATE("frame", $*nextframe, "reify", Any)}))))
+            }));
     }
 }
 
 sub _gather($fr) {
     List.SETUP(True, (&infix:<,>(GatherIterator.RAWCREATE("frame", $fr,
-        "valid", False, "value", Any, "next", Any))));
-}
-
-sub take($p) { # should be \|$p
-    Q:CgOp { (rawsccall Kernel.Take (l $p)) }
+        "reify", Any))));
 }
 
 my class Cursor {

@@ -94,6 +94,7 @@ use 5.010;
         'VarDeque' =>
             { Push         => [m => 'Void'],
               Unshift      => [m => 'Void'],
+              UnshiftN     => [m => 'Void'],
               Pop          => [m => 'Variable'],
               Shift        => [m => 'Variable'],
               Count        => [m => 'Int32'] },

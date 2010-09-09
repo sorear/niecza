@@ -1114,6 +1114,11 @@ slow:
             data[head] = vr;
         }
 
+        public void UnshiftN(Variable[] vrs) {
+            for (int i = vrs.Length - 1; i >= 0; i--)
+                Unshift(vrs[i]);
+        }
+
         public Variable Shift() {
             int index = head++;
             if (head == data.Length) head = 0;

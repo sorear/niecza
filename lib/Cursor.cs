@@ -203,9 +203,7 @@ public sealed class RxFrame {
             VarDeque ks = new VarDeque();
             ks.Push(Kernel.NewROScalar(MakeCursor()));
             DynObject it  = new DynObject(GatherIteratorMO);
-            it.SetSlot("value", Kernel.NewRWScalar(Kernel.AnyP));
-            it.SetSlot("next",  Kernel.NewRWScalar(Kernel.AnyP));
-            it.SetSlot("valid", Kernel.NewRWScalar(Kernel.AnyP));
+            it.SetSlot("reify", Kernel.NewRWScalar(Kernel.AnyP));
             it.SetSlot("frame", Kernel.NewRWScalar(th));
             VarDeque iss = new VarDeque();
             iss.Push(Kernel.NewROScalar(it));
