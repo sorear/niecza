@@ -314,7 +314,7 @@ use CgOp;
 
         my @code;
         push @code, CgOp::rawcall(CgOp::rxframe, "PushCursorList",
-            CgOp::rawnewarr('String', map { CgOp::clr_string($_) } @{ $self->captures }),
+            CgOp::const(CgOp::rawnewarr('String', map { CgOp::clr_string($_) } @{ $self->captures })),
             ($self->selfcut ?
                 CgOp::methodcall(CgOp::newscalar(CgOp::rawcall(
                             CgOp::rxframe, "MakeCursor")), $self->name) :
@@ -431,7 +431,7 @@ use CgOp;
                 CgOp::const(CgOp::rawnewarr('LAD',
                         map { $_->lad } @{ $self->zyg })),
                 CgOp::clr_string('')),
-            CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls));
+            CgOp::const(CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls)));
         push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
         for (my $i = 0; $i < @ls; $i++) {
             push @code, CgOp::label($ls[$i]);
@@ -565,7 +565,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim("CClass", $self->ccop);
+        CgOp::rxbprim("CClass", CgOp::const($self->ccop));
     }
 
     sub lad {

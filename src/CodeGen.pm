@@ -834,7 +834,7 @@ use 5.010;
         if ($self->usednamed) {
             print ::NIECZA_OUT " " x 16, "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
         }
-        for (@{ $self->buffer }) {
+        for (@{ $self->buffer }, @{ $self->consttab }) {
             s/\@\@L(\w+)/$self->labelname->{$1}/eg;
         }
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
