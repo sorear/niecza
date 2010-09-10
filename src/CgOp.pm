@@ -485,6 +485,11 @@ use warnings;
         rawsccall('Kernel.Bind', $_[1], $_[2], bool($_[0]), bool(0));
     }
 
+    sub newboundvar {
+        rawsccall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
+            $_[2]);
+    }
+
     sub assign {
         rawsccall('Kernel.Assign', $_[0], $_[1]);
     }

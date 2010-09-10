@@ -96,6 +96,7 @@ use CgOp;
     has slot     => (isa => 'Str', is => 'ro', required => 1);
     has list     => (isa => 'Bool', is => 'ro', default => 0);
     has hash     => (isa => 'Bool', is => 'ro', default => 0);
+    has noinit   => (isa => 'Bool', is => 'ro', default => 0);
 
     sub dynamic {
         $_[0]->slot =~ /^.?[?*]/;
@@ -122,7 +123,9 @@ use CgOp;
     sub enter_code {
         my ($self, $body) = @_;
 
-        ($body->mainline && !$self->dynamic) ? CgOp::noop :
+        # conveniently, uncloned blocks cannot have interesting signatures
+        # XXX std bug
+        ($body->mainline && !$self->dynamic || $self->noinit) ? CgOp::noop :
             CgOp::scopedlex($self->slot, $self->list ? CgOp::newblanklist :
                 $self->hash ? CgOp::newblankhash : CgOp::newblankrwscalar);
     }

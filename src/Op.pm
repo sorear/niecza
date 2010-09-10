@@ -806,6 +806,7 @@ use CgOp;
     }
 
     sub statement_level {
+        $_[0]->body->type('voidbare');
         Op::CallSub->new(invocant => Op::SubDef->new(var => $_[0]->var,
                 body => $_[0]->body, once => 1));
     }

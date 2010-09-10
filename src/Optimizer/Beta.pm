@@ -109,9 +109,10 @@ sub beta_optimize {
         $ib->do]);
 
     for my $d (reverse @{ $ib->decls }) {
-        my $to = $d->hash ? CgOp::newblankhash :
-                 $d->list ? CgOp::newblanklist :
-                            CgOp::newblankrwscalar;
+        my $to = $d->noinit ? CgOp::null('Variable') :
+                 $d->hash   ? CgOp::newblankhash :
+                 $d->list   ? CgOp::newblanklist :
+                              CgOp::newblankrwscalar;
         $nop = Op::Let->new(var => $d->slot,
             to => Op::CgOp->new(op => $to), in => $nop);
     }

@@ -699,6 +699,13 @@ blocked:
             return n;
         }
 
+        public static Frame NewBoundVar(Frame th, bool ro, bool islist,
+                Variable rhs) {
+            Variable lhs = islist ? NewRWListVar(null) : NewROScalar(null);
+            th.resultSlot = lhs;
+            return Bind(th, lhs, rhs, ro, false);
+        }
+
         // This isn't just a fetch and a store...
         private static SubInfo AssignSI = new SubInfo(AssignC);
         private static Frame AssignC(Frame th) {

@@ -23,7 +23,7 @@ use 5.010;
         my ($self) = @_;
         my @r;
         push @r, Decl::SimpleVar->new(slot => $self->slot, hash => $self->hash,
-                list => $self->list)
+                list => $self->list, noinit => 1)
             if defined $self->slot;
         push @r, $self->default->lift_decls if $self->default;
         @r;
@@ -119,8 +119,8 @@ use 5.010;
             $self->single_get($body);
 
         if (defined $self->slot) {
-            return CgOp::bind($self->readonly, CgOp::scopedlex($self->slot),
-                    $get);
+            return CgOp::scopedlex($self->slot,
+                CgOp::newboundvar($self->readonly, $self->list, $get));
         } else {
             return CgOp::sink($get);
         }
@@ -133,8 +133,8 @@ use 5.010;
             $self->single_get_inline($body, $posr);
 
         if (defined $self->slot) {
-            return CgOp::bind($self->readonly, CgOp::scopedlex($self->slot),
-                    $get);
+            return CgOp::scopedlex($self->slot,
+                CgOp::newboundvar($self->readonly, $self->list, $get));
         } else {
             return CgOp::sink($get);
         }

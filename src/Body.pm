@@ -42,7 +42,7 @@ use CgOp ();
         my %h;
         if ($self->type eq 'mainline') {
             $h{'?is_mainline'} = 1;
-        } elsif ($self->type =~ /^(?:bare|package|module|class|grammar|role|slang|knowhow)$/) {
+        } elsif ($self->type =~ /^(?:voidbare|package|module|class|grammar|role|slang|knowhow)$/) {
             $h{'?is_mainline'} = $outer->{'?is_mainline'};
         } else {
             $h{'?is_mainline'} = 0;
@@ -147,8 +147,8 @@ use CgOp ();
     sub to_cgop {
         my ($self) = @_;
         my @enter;
-        push @enter, map { $_->enter_code($self) } @{ $self->decls };
         push @enter, $self->signature->binder($self) if $self->signature;
+        push @enter, map { $_->enter_code($self) } @{ $self->decls };
         # TODO: Bind a return value here to catch non-ro sub use
         if ($self->type eq 'gather') {
             $self->cgoptree(CgOp::prog(@enter,
