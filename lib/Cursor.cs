@@ -3,31 +3,54 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+public sealed class PSN<X> {
+    public X obj;
+    public readonly PSN<X> next;
+    public PSN(X obj, PSN<X> next) { this.obj = obj; this.next = next; }
+}
+
+public struct State {
+    public PSN<int> reps;
+    public PSN<Variable> captures;
+    public PSN<string[]> capnames;
+    public PSN<DynMetaObject> klasses;
+
+    public int pos;
+}
+
+public sealed class Choice {
+    public Choice prev;
+    public State st;
+
+    // the current Choice doesn't really have any of these fields, which are
+    // used for backtrack control
+    public int ip;
+    public string tag;
+    public bool committed;
+
+    public Choice(Choice prev, string tag, int ip, State st) {
+        this.tag = tag;
+        this.ip = ip;
+        this.st = st;
+        this.prev = prev;
+    }
+
+    public void Dump(string st) {
+        string ac = st;
+        for (Choice x = this; x != null; x = x.prev) {
+            ac += x.committed ? " + " : " - ";
+            ac += x.tag;
+        }
+        Console.WriteLine(ac);
+    }
+}
+
 // extends Frame for a time/space tradeoff
 // we keep the cursor in exploded form to avoid creating lots and lots of
 // cursor objects
 public sealed class RxFrame {
-    public sealed class PSN<X> {
-        public X obj;
-        public readonly PSN<X> next;
-        public PSN(X obj, PSN<X> next) { this.obj = obj; this.next = next; }
-    }
-
-    public struct State {
-        public PSN<int> reps;
-        public PSN<Variable> captures;
-        public PSN<string[]> capnames;
-        public PSN<DynMetaObject> klasses;
-
-        public int pos;
-        public int ip;
-
-        public XAct xact;
-    }
-    // the current State doesn't really have an xact; bt.obj.xact is used to
-    // hold the parent of what will become bt.next.obj.xact
-
-    public PSN<State> bt;
+    public Choice bt;
+    public State st;
 
     // when this is set, one value has already been given, so we don't need
     // any more Lists
@@ -39,21 +62,23 @@ public sealed class RxFrame {
     // cache of orig.Length
     public int end;
 
+    // don't remove this on backtracking, and quit if we would back into it
+    public readonly Choice rootf;
+
     public RxFrame(string name, Cursor csr) {
         orig = csr.backing_ca;
         orig_s = csr.backing;
         end = orig.Length;
-        bt = new PSN<State>(default(State), null);
-        bt.obj.klasses = new PSN<DynMetaObject>(csr.klass, null);
-        bt.obj.xact = new XAct("RULE " + name, csr.xact);
-        bt.obj.pos = csr.pos;
+        rootf = bt = new Choice(csr.xact, "RULE " + name, -1, default(State));
+        st.klasses = new PSN<DynMetaObject>(csr.klass, null);
+        st.pos = csr.pos;
     }
 
     public Frame Backtrack(Frame th) {
-        do {
-            bt = bt.next;
-        } while (bt != null && (bt.obj.xact.committed || bt.obj.ip < 0));
-        if (bt == null) {
+        // throw away cut or mark-only frames
+        while (bt != rootf && (bt.committed || bt.ip < 0))
+            bt = bt.prev;
+        if (bt == rootf) {
             if (return_one) {
                 return Kernel.Take(th, Kernel.NewROScalar(EMPTYP));
             } else {
@@ -66,62 +91,59 @@ public sealed class RxFrame {
 
             return th.caller;
         } else {
-            bt.obj.xact = bt.obj.xact.next;
-            th.ip = bt.obj.ip;
+            th.ip = bt.ip;
+            st = bt.st;
+            bt = bt.prev;
             return th;
         }
     }
 
     public void PushBacktrack(string name, int ip) {
-        bt.obj.ip = ip;
-        bt.obj.xact = new XAct(name, bt.obj.xact);
-        bt = new PSN<State>(bt.obj, bt);
+        bt = new Choice(bt, name, ip, st);
     }
 
     public void PushCursorList(string[] cn, Variable cl) {
-        bt.obj.capnames = new PSN<string[]>(cn, bt.obj.capnames);
-        bt.obj.captures = new PSN<Variable>(cl, bt.obj.captures);
+        st.capnames = new PSN<string[]>(cn, st.capnames);
+        st.captures = new PSN<Variable>(cl, st.captures);
     }
 
     public Variable GetCursorList() {
-        return bt.obj.captures.obj;
+        return st.captures.obj;
     }
 
     public void SetPos(int pos) {
-        bt.obj.pos = pos;
+        st.pos = pos;
     }
 
     public void CommitAll() {
-        XAct x = bt.next.obj.xact;
+        Choice x = bt;
         while (x != null) {
             x.committed = true;
-            x = x.next;
+            x = x.prev;
         }
     }
 
     public void CommitSpecificRule(string name) {
-        XAct x = bt.next.obj.xact;
+        Choice x = bt;
         name = "RULE " + name;
         while (x != null) {
             x.committed = true;
             if (x.tag.Equals(name))
                 break;
-            x = x.next;
+            x = x.prev;
         }
     }
 
     public void CommitRule() {
-        XAct x = bt.next.obj.xact;
-        while (x != null) {
+        Choice x = bt;
+        while (x != rootf) {
             x.committed = true;
-            if (x.tag.StartsWith("RULE "))
-                break;
-            x = x.next;
+            x = x.prev;
         }
     }
 
     public void CommitGroup(string open, string close) {
-        XAct x = bt.obj.xact;
+        Choice x = bt;
         if (Cursor.Trace)
             x.Dump("committing " + open + "," + close);
         int level = 1;
@@ -131,65 +153,65 @@ public sealed class RxFrame {
                 level--;
             else if (x.tag == close)
                 level++;
-            x = x.next;
+            x = x.prev;
             if (level == 0)
                 break;
         }
     }
 
     public bool IsTopCut() {
-        return bt.next.obj.xact.committed;
+        return bt.committed;
     }
 
-    public bool Exact(string st) {
-        if (bt.obj.pos + st.Length > end)
+    public bool Exact(string str) {
+        if (st.pos + str.Length > end)
             return false;
-        foreach (char ch in st)
-            if (orig[bt.obj.pos++] != ch)
+        foreach (char ch in str)
+            if (orig[st.pos++] != ch)
                 return false;
         return true;
     }
 
     public bool ExactOne(char ch) {
-        return !(bt.obj.pos == end || orig[bt.obj.pos++] != ch);
+        return !(st.pos == end || orig[st.pos++] != ch);
     }
 
     public bool AnyChar() {
-        return !(bt.obj.pos++ == end);
+        return !(st.pos++ == end);
     }
 
     public bool CClass(CC x) {
-        return !(bt.obj.pos == end || !x.Accepts(orig[bt.obj.pos++]));
+        return !(st.pos == end || !x.Accepts(orig[st.pos++]));
     }
 
     public void LTMPushAlts(Lexer lx, int[] addrs) {
         PushBacktrack("LTM", -1);
-        int[] cases = lx.Run(orig_s, bt.obj.pos);
+        int[] cases = lx.Run(orig_s, st.pos);
         for (int i = cases.Length - 1; i >= 0; i--) {
             PushBacktrack("LTMALT", addrs[cases[i]]);
         }
     }
 
     public void OpenQuant() {
-        bt.obj.reps = new PSN<int>(0, bt.obj.reps);
+        st.reps = new PSN<int>(0, st.reps);
     }
 
     public int CloseQuant() {
-        int x = bt.obj.reps.obj;
-        bt.obj.reps = bt.obj.reps.next;
+        int x = st.reps.obj;
+        st.reps = st.reps.next;
         return x;
     }
 
     public void IncQuant() {
-        bt.obj.reps.obj++;
+        st.reps.obj++;
     }
 
     public int GetQuant() {
-        return bt.obj.reps.obj;
+        return st.reps.obj;
     }
 
     public Cursor MakeCursor() {
-        return new Cursor(bt.obj.klasses.obj, bt.obj.xact, orig_s, orig, bt.obj.pos);
+        return new Cursor(st.klasses.obj, bt, orig_s, orig, st.pos);
     }
 
     public static DynMetaObject ListMO;
@@ -217,23 +239,6 @@ public sealed class RxFrame {
     }
 }
 
-public sealed class XAct {
-    public readonly string tag;
-    public bool committed;
-    public readonly XAct next;
-
-    public XAct(string tag, XAct next) { this.tag = tag; this.next = next; }
-
-    public void Dump(string st) {
-        string ac = st;
-        for (XAct x = this; x != null; x = x.next) {
-            ac += x.committed ? " + " : " - ";
-            ac += x.tag;
-        }
-        Console.WriteLine(ac);
-    }
-}
-
 // This is used to carry match states in and out of subrules.  Within subrules,
 // match states are represented much more ephemerally in the state of RxFrame.
 public class Cursor : IP6 {
@@ -241,7 +246,7 @@ public class Cursor : IP6 {
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
 
     public DynMetaObject klass;
-    public XAct xact;
+    public Choice xact;
     public string backing;
     public char[] backing_ca;
     public int pos;
@@ -249,7 +254,7 @@ public class Cursor : IP6 {
     public Cursor(IP6 proto, string text)
         : this(proto.GetMO(), null, text, text.ToCharArray(), 0) { }
 
-    public Cursor(DynMetaObject klass, XAct xact, string backing, char[] backing_ca, int pos) {
+    public Cursor(DynMetaObject klass, Choice xact, string backing, char[] backing_ca, int pos) {
         this.klass = klass;
         this.xact = xact;
         this.backing = backing;
