@@ -16,7 +16,7 @@ use warnings;
     # 2: returns on eval stack, cannot appear w/ non-empty
     has cps_type => (isa => 'Int', is => 'rw');
 
-    sub delayable { 0 }
+    sub constant { 0 }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -29,6 +29,8 @@ use warnings;
 
     has file => (isa => 'Str', is => 'ro', required => 1);
     has line => (isa => 'Int', is => 'ro', required => 1);
+
+    sub constant { $_[0]->zyg->[0]->constant }
 
     sub cps_convert {
         my ($self, $nv) = @_;
@@ -135,6 +137,7 @@ use warnings;
 
     has op  => (isa => 'ArrayRef', is => 'ro', required => 1);
     has is_cps_call => (isa => 'Bool', is => 'ro', default => 0);
+    has constant => (isa => 'Bool', is => 'ro', default => 0);
 
     my $tsn = 0;
     sub cps_convert {
@@ -168,6 +171,8 @@ use warnings;
                 }
                 push @lifted, [ undef, $zyg[$n] ];
                 $zyg[$n] = CgOp::Primitive->new(op => ['result']);
+            } elsif ($zyg[$n]->constant) {
+                # We don't need to store this anywhere
             } else { # !last_lift, so resultSlot is useless as is the stack
                 # must have a let-spill
                 if ($zty[$n] == 1) {
@@ -344,7 +349,7 @@ use warnings;
     }
 
     sub null {
-        CgOp::Primitive->new(op => [ push_null => $_[0] ]);
+        CgOp::Primitive->new(op => [ push_null => $_[0] ], constant => 1);
     }
 
     sub prog {
@@ -419,7 +424,7 @@ use warnings;
     }
 
     sub const {
-        CgOp::Primitive->new(op => [ 'const' ], zyg => [ $_[0] ]);
+        CgOp::Primitive->new(op => [ 'const' ], zyg => [ $_[0] ], constant => 1);
     }
 
     sub newscalar {
@@ -455,19 +460,20 @@ use warnings;
     }
 
     sub double {
-        CgOp::Primitive->new(op => [ 'clr_double', $_[0] ]);
+        CgOp::Primitive->new(op => [ 'clr_double', $_[0] ], constant => 1);
     }
 
     sub labelid {
-        CgOp::Primitive->new(op => [ 'labelid', $_[0] ], zyg => [ ]);
+        CgOp::Primitive->new(op => [ 'labelid', $_[0] ], zyg => [ ],
+            constant => 1);
     }
 
     sub int {
-        CgOp::Primitive->new(op => [ 'clr_int', $_[0] ]);
+        CgOp::Primitive->new(op => [ 'clr_int', $_[0] ], constant => 1);
     }
 
     sub bool {
-        CgOp::Primitive->new(op => [ 'clr_bool', $_[0] ]);
+        CgOp::Primitive->new(op => [ 'clr_bool', $_[0] ], constant => 1);
     }
 
     sub unbox {
@@ -543,7 +549,8 @@ use warnings;
     }
 
     sub callframe {
-        CgOp::Primitive->new(op => [ 'callframe' ]);
+        # for the life of the function, constant
+        CgOp::Primitive->new(op => [ 'callframe' ], constant => 1);
     }
 
     sub rxframe { getfield('rx', callframe) }
@@ -555,11 +562,11 @@ use warnings;
     }
 
     sub clr_string {
-        CgOp::Primitive->new(op => [ 'clr_string', $_[0] ]);
+        CgOp::Primitive->new(op => [ 'clr_string', $_[0] ], constant => 1);
     }
 
     sub char {
-        CgOp::Primitive->new(op => [ 'clr_char', $_[0] ]);
+        CgOp::Primitive->new(op => [ 'clr_char', $_[0] ], constant => 1);
     }
 
     sub withtypes {
@@ -705,7 +712,7 @@ use warnings;
 
     sub pos {
         CgOp::Primitive->new(op => [ 'pos', blessed($_[0]) ? () : $_[0] ],
-            zyg => [blessed($_[0]) ? ($_[0]) : ()]);
+            zyg => [blessed($_[0]) ? ($_[0]) : ()], constant => 1);
     }
 
     sub ternary {
