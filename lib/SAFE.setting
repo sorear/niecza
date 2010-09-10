@@ -76,6 +76,7 @@ PRE-INIT {
                chhow  [null DynObject]
                chhvar [null Variable]
           [rawcall  (l chdmo) AddAttribute (s value)]
+          [rawcall  (l chdmo) Complete]
 
           [l chhow  (rawnew DynObject (l chdmo))]
           [l chhvar (ns (l chhow))]

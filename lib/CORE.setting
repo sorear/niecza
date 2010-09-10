@@ -8,6 +8,7 @@ sub slurp($path) {
 }
 
 my class IO is Cool {
+    has $!value;
 }
 
 my class TextReader is IO {

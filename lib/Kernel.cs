@@ -303,19 +303,14 @@ namespace Niecza {
             = new List<DynMetaObject>();
         public Dictionary<string, IP6> local
             = new Dictionary<string, IP6>();
-        public Dictionary<string, IP6> local_attr
-            = new Dictionary<string, IP6>();
+        public List<string> local_attr = new List<string>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
 
         public int FindSlot(string name) {
-            int v;
             //Kernel.LogNameLookup(name);
-            if (slotMap.TryGetValue(name, out v))
-                return v;
-            else
-                return slotMap[name] = nslots++;
+            return slotMap[name];
         }
 
         public Dictionary<string, List<DynObject>> multiregex;
@@ -391,13 +386,15 @@ namespace Niecza {
         }
 
         public void AddAttribute(string name) {
-            local_attr[name] = null;
+            local_attr.Add(name);
         }
 
         public void AddSuperclass(DynMetaObject other) {
             superclasses.Add(other);
         }
 
+        // this gets called more than once for Scalar, ClassHOW, and Sub
+        // just be sure that the attrib list doesn't change
         public void Complete() {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
             mro = new List<DynMetaObject>();
@@ -453,7 +450,14 @@ blocked:
                         throw new Exception("C3 MRO inconsistency detected");
                     }
                 }
-                return;
+                break;
+            }
+
+            nslots = 0;
+            foreach (DynMetaObject k in mro) {
+                foreach (string an in k.local_attr) {
+                    slotMap[an] = nslots++;
+                }
             }
         }
     }
@@ -483,15 +487,11 @@ blocked:
         }
 
         public void SetSlot(string name, object obj) {
-            int ix = klass.FindSlot(name);
-            if (ix >= slots.Length)
-                Array.Resize(ref slots, ix+1);
             slots[klass.FindSlot(name)] = obj;
         }
 
         public object GetSlot(string name) {
-            int ix = klass.FindSlot(name);
-            return (ix >= slots.Length) ? null : slots[ix];
+            return slots[klass.FindSlot(name)];
         }
 
         public override bool IsDefined() {
@@ -813,7 +813,7 @@ blocked:
             List<DynMetaObject> mro = n.klass.mro;
 
             for (int i = mro.Count - 1; i >= 0; i--) {
-                foreach (string s in mro[i].local_attr.Keys) {
+                foreach (string s in mro[i].local_attr) {
                     n.SetSlot(s, NewRWScalar(AnyP));
                 }
             }
@@ -839,7 +839,7 @@ slow:
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 HashP;
-        public static IP6 StrP = new DynObject(new DynMetaObject("proto-Str"));
+        public static IP6 StrP;
         public static DynMetaObject CallFrameMO;
 
         public static Variable PackageLookup(IP6 parent, string name) {
@@ -909,12 +909,21 @@ slow:
         public static IP6 ProcessO;
 
         static Kernel() {
+            DynMetaObject pStrMO = new DynMetaObject("protoStr");
+            pStrMO.AddAttribute("value");
+            pStrMO.Complete();
+            StrP = new DynObject(pStrMO);
+
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
-            SubMO.local["INVOKE"] = MakeSub(SubInvokeSubSI, null);
+            SubMO.AddAttribute("outer");
+            SubMO.AddAttribute("info");
+            SubMO.Complete();
+            SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
 
             ScalarMO = new DynMetaObject("Scalar");
-            ScalarMO.FindSlot("value");
+            ScalarMO.AddAttribute("value");
+            ScalarMO.Complete();
             ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
             ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
