@@ -11,10 +11,11 @@ public sealed class PSN<X> {
 
 public struct State {
     public PSN<int> reps;
-    public PSN<Variable> captures;
+    public PSN<Cursor>   captures;
     public PSN<string[]> capnames;
     public PSN<DynMetaObject> klasses;
 
+    public Variable subrule_iter;
     public int pos;
 }
 
@@ -27,6 +28,13 @@ public sealed class Choice {
     public int ip;
     public string tag;
     public bool committed;
+
+    public void Commit() {
+        // we aren't going to backtrack here, so we can't use this.
+        // help out the GC
+        st.subrule_iter = null;
+        committed = true;
+    }
 
     public Choice(Choice prev, string tag, int ip, State st) {
         this.tag = tag;
@@ -102,13 +110,17 @@ public sealed class RxFrame {
         bt = new Choice(bt, name, ip, st);
     }
 
-    public void PushCursorList(string[] cn, Variable cl) {
+    public void PushCapture(string[] cn, Cursor cl) {
         st.capnames = new PSN<string[]>(cn, st.capnames);
-        st.captures = new PSN<Variable>(cl, st.captures);
+        st.captures = new PSN<Cursor>(cl, st.captures);
+    }
+
+    public void SetCursorList(Variable cl) {
+        st.subrule_iter = cl;
     }
 
     public Variable GetCursorList() {
-        return st.captures.obj;
+        return st.subrule_iter;
     }
 
     public void SetPos(int pos) {
@@ -118,7 +130,7 @@ public sealed class RxFrame {
     public void CommitAll() {
         Choice x = bt;
         while (x != null) {
-            x.committed = true;
+            x.Commit();
             x = x.prev;
         }
     }
@@ -127,7 +139,7 @@ public sealed class RxFrame {
         Choice x = bt;
         name = "RULE " + name;
         while (x != null) {
-            x.committed = true;
+            x.Commit();
             if (x.tag.Equals(name))
                 break;
             x = x.prev;
@@ -137,7 +149,7 @@ public sealed class RxFrame {
     public void CommitRule() {
         Choice x = bt;
         while (x != rootf) {
-            x.committed = true;
+            x.Commit();
             x = x.prev;
         }
     }
@@ -148,7 +160,7 @@ public sealed class RxFrame {
             x.Dump("committing " + open + "," + close);
         int level = 1;
         while (x != null) {
-            x.committed = true;
+            x.Commit();
             if (x.tag == open)
                 level--;
             else if (x.tag == close)

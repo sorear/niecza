@@ -312,32 +312,43 @@ use CgOp;
             return $true->code($body);
         }
 
+        my $namesf = CgOp::const(CgOp::rawnewarr('String',
+                map { CgOp::clr_string($_) } @{ $self->captures }));
+        my $callf = CgOp::methodcall(CgOp::newscalar(CgOp::rawcall(
+                    CgOp::rxframe, "MakeCursor")), $self->name);
+        my @pushcapf = (@{ $self->captures } == 0) ? () : (
+            CgOp::rawcall(CgOp::rxframe, "PushCapture",
+                $namesf, CgOp::cast('Cursor', CgOp::letvar("k"))));
+        my $updatef =
+            CgOp::ternary(CgOp::rawcall(CgOp::letvar("k"), 'IsDefined'),
+                CgOp::prog(
+                    @pushcapf, CgOp::rawcall(CgOp::rxframe, "SetPos",
+                        CgOp::getfield("pos", CgOp::cast("Cursor",
+                                CgOp::letvar("k"))))),
+                CgOp::rawccall(CgOp::rxframe, "Backtrack"));
+
         my @code;
-        push @code, CgOp::rawcall(CgOp::rxframe, "PushCursorList",
-            CgOp::const(CgOp::rawnewarr('String', map { CgOp::clr_string($_) } @{ $self->captures })),
-            ($self->selfcut ?
-                CgOp::methodcall(CgOp::newscalar(CgOp::rawcall(
-                            CgOp::rxframe, "MakeCursor")), $self->name) :
-                CgOp::methodcall(CgOp::methodcall(CgOp::methodcall(
-                    CgOp::newscalar(CgOp::rawcall(CgOp::rxframe, "MakeCursor")),
-                    $self->name), "list"), "clone")));
-        unless ($self->selfcut) {
+
+        if ($self->selfcut) {
+            push @code, CgOp::letn(
+                "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+                    CgOp::fetch($callf))),
+                $updatef);
+        } else {
+            push @code, CgOp::rawcall(CgOp::rxframe, "SetCursorList", $callf);
             push @code, CgOp::goto($sk);
             push @code, CgOp::label($bt);
             push @code, CgOp::sink(CgOp::methodcall(CgOp::rawcall(CgOp::rxframe,
-                    "GetCursorList"), "shift"));
+                        "GetCursorList"), "shift"));
             push @code, CgOp::label($sk);
+            push @code, CgOp::letn(
+                "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+                    CgOp::fetch(CgOp::rawcall(CgOp::rxframe, "GetCursorList")))),
+                $updatef);
+            push @code, CgOp::rxpushb("SUBRULE", $bt);
+            push @code, CgOp::rawcall(CgOp::rxframe, "SetCursorList",
+                CgOp::null("Variable"));
         }
-        push @code, CgOp::letn(
-            "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
-                CgOp::fetch(CgOp::rawcall(CgOp::rxframe, "GetCursorList")))),
-            CgOp::ternary(CgOp::rawcall(CgOp::letvar("k"), 'IsDefined'),
-                CgOp::rawcall(CgOp::rxframe, "SetPos",
-                    CgOp::getfield("pos", CgOp::cast("Cursor",
-                            CgOp::letvar("k")))),
-                CgOp::rawccall(CgOp::rxframe, "Backtrack")));
-        push @code, CgOp::rxpushb("SUBRULE", $bt)
-            unless $self->selfcut;
 
         @code;
     }
