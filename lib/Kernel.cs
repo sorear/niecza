@@ -686,11 +686,14 @@ blocked:
             Frame n;
             if (lhs.islist) ro = true;
             // fast path
-            if (lhs.islist == rhs.islist && !ro &&
-                    (ro || rhs.whence == null) &&
-                    (lhs.whence == null)) {
+            if (ro && !rhs.rw && lhs.whence == null) {
+                lhs.rw = false;
                 lhs.container = rhs.container;
+                return th;
+            }
+            if (!ro && lhs.whence == null && rhs.whence == null) {
                 lhs.rw = rhs.rw;
+                lhs.container = rhs.container;
                 return th;
             }
 
@@ -701,9 +704,25 @@ blocked:
 
         public static Frame NewBoundVar(Frame th, bool ro, bool islist,
                 Variable rhs) {
+            Frame n;
+            // fast path
+            if (ro && !rhs.rw) {
+                th.resultSlot = new Variable(true, false, islist, null,
+                        rhs.container);
+                return th;
+            }
+            if (!ro && rhs.whence == null) {
+                th.resultSlot = new Variable(true, rhs.rw, false, null,
+                        rhs.container);
+                return th;
+            }
+
             Variable lhs = islist ? NewRWListVar(null) : NewROScalar(null);
             th.resultSlot = lhs;
-            return Bind(th, lhs, rhs, ro, false);
+
+            n = new Frame(th, null, ro ? BindROSI : BindSI);
+            n.pos = new Variable[2] { lhs, rhs };
+            return n;
         }
 
         // This isn't just a fetch and a store...
