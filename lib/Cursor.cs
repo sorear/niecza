@@ -716,7 +716,7 @@ public class LexerState {
     public readonly Lexer parent;
     public LexerState(Lexer parent) {
         this.parent = parent;
-        this.nstates = new int[parent.pad.nodes.Count];
+        this.nstates = new int[(parent.pad.nodes.Count + 31) >> 5];
     }
 
     public bool alive;
