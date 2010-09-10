@@ -6,7 +6,7 @@ my module SAFE;
 # reason forces uncontainerized .NET values.
 #
 # class ClassHOW {
-#     has DynMetaObject $.meta-object;
+#     has DynMetaObject $!value;
 # }
 #
 # Due to concerns of screwing up composition, adding new superclasses, roles,
@@ -19,8 +19,7 @@ my module SAFE;
 #         $Foo_HOW.add-super(...);
 #         $Foo_HOW.add-role(...);
 #         $Foo_HOW.add-method("bar", anon method bar { ... });
-#         $Foo_HOW.compose;
-#         $Foo ::= $Foo_HOW.create-protoobject;
+#         $Foo ::= $Foo_HOW.create-typeobject;
 #     }
 #
 # to augment:
@@ -32,86 +31,66 @@ PRE-INIT {
     sub new is rawcall { Q:CgOp {
         (withtypes $mo DynMetaObject $self DynObject
           [l $mo   (rawnew DynMetaObject (unbox String (@ (pos 1))))]
-          [l $self (rawnew DynObject (getfield klass
-            (cast DynObject (@ (pos 0)))))]
+          [l $self (rawnew DynObject (rawcall (@ (pos 0)) GetMO))]
 
           [setfield how (l $mo) (l $self)]
-          [rawcall (l $self) SetSlot (clr_string meta-object)
-            (nsw (rawnew CLRImportObject (l $mo)))]
+          [rawcall (l $self) SetSlot (s value) (l $mo)]
 
           [ns (l $self)])
     } }
 
     # $how.add-super($p)
-    sub add-super is rawcall { Q:CgOp { (prog
-        [rawcall
-          (getfield superclasses (unwrap DynMetaObject
-            (getattr meta-object (@ (pos 0))))) Add
-          (unwrap DynMetaObject (getattr meta-object (how (@ (pos 1)))))]
-        [null Variable])
+    sub add-super is rawcall { Q:CgOp {
+        (rnull (rawcall (unbox DynMetaObject (@ (pos 0)))
+                 AddSuperclass (unbox DynMetaObject (how (@ (pos 1))))))
     } }
 
     # $how.add-method($name, $sub)
     sub add-method is rawcall { Q:CgOp {
-        (prog
-          [setindex (unbox String (@ (pos 1)))
-            (getfield local (unwrap DynMetaObject (getattr meta-object
-              (@ (pos 0)))))
-            (@ (pos 2))]
-
-          [null Variable])
+        (rnull (rawcall (unbox DynMetaObject (@ (pos 0))) AddMethod
+                 (unbox String (@ (pos 1))) (@ (pos 2))))
     } }
 
     # $how.add-attribute($name)
     sub add-attribute is rawcall { Q:CgOp {
-        (prog
-          [setindex (unbox String (@ (pos 1)))
-            (getfield local_attr (unwrap DynMetaObject (getattr meta-object
-              (@ (pos 0)))))
-            (null IP6)]
-
-          [null Variable])
+        (rnull (rawcall (unbox DynMetaObject (@ (pos 0))) AddAttribute
+                 (unbox String (@ (pos 1)))))
     } }
 
-    # $how.create-protoobject()
-    sub create-protoobject is rawcall { Q:CgOp {
+    # $how.create-typeobject()
+    sub create-typeobject is rawcall { Q:CgOp {
         (withtypes $p DynObject $mo DynMetaObject
-          [l $mo (unwrap DynMetaObject (getattr meta-object (@ (pos 0))))]
+          [l $mo (unbox DynMetaObject (@ (pos 0)))]
           [l $p (rawnew DynObject (l $mo))]
 
-          [rawcall (l $mo) BuildC3MRO]
+          [rawcall (l $mo) Complete]
 
           [setfield slots (l $p) (null 'object[]')]
           [setfield typeObject (l $mo) (l $p)]
 
-          [newscalar (l $p)])
+          [ns (l $p)])
     } }
 
-    sub compose is rawcall { Q:CgOp { (null Variable) } }
-
     Q:CgOp {
-        (withtypes $chmo DynMetaObject $chch Variable
-          [l $chmo (rawnew DynMetaObject (clr_string "ClassHOW"))]
-          [l $chch (ns (rawnew DynObject (l $chmo)))]
+        (letn  chdmo  [rawnew DynMetaObject (s ClassHOW)]
+               chhow  [null DynObject]
+               chhvar [null Variable]
+          [rawcall  (l chdmo) AddAttribute (s value)]
 
-          [setfield how (l $chmo) (@ (l $chch))]
-          [rawcall (cast DynObject (@ (l $chch))) SetSlot
-            (clr_string meta-object) (w (l $chmo))]
+          [l chhow  (rawnew DynObject (l chdmo))]
+          [l chhvar (ns (l chhow))]
 
-          [sink (subcall (@ (l &add-method)) (l $chch)
-            (string_var "new") (l &new))]
-          [sink (subcall (@ (l &add-method)) (l $chch) 
-            (string_var "add-method") (l &add-method))]
-          [sink (subcall (@ (l &add-method)) (l $chch)
-            (string_var "add-attribute") (l &add-attribute))]
-          [sink (subcall (@ (l &add-method)) (l $chch)
-            (string_var "add-super") (l &add-super))]
-          [sink (subcall (@ (l &add-method)) (l $chch)
-            (string_var "compose") (l &compose))]
-          [sink (subcall (@ (l &add-method)) (l $chch)
-            (string_var "create-protoobject") (l &create-protoobject))]
+          [setfield how (l chdmo) (l chhow)]
+          [rawcall (l chhow) SetSlot (s value) (l chdmo)]
 
-          [l ClassHOW (subcall (@ (l &create-protoobject)) (l $chch))]
+          [rawcall (l chdmo) AddMethod (s new) (@ {&new})]
+          [rawcall (l chdmo) AddMethod (s add-method) (@ {&add-method})]
+          [rawcall (l chdmo) AddMethod (s add-attribute) (@ {&add-attribute})]
+          [rawcall (l chdmo) AddMethod (s add-super) (@ {&add-super})]
+          [rawcall (l chdmo) AddMethod (s create-typeobject)
+            (@ {&create-typeobject})]
+
+          [l ClassHOW (subcall (@ {&create-typeobject}) (l chhvar))]
 
           [null Variable])
     }
@@ -125,13 +104,12 @@ my class Cool { ... }
 my class Scalar { ... }
 my class Sub { ... }
 PRE-INIT {
-    # (DynMetaObject $dmo, ClassHOW $super --> ClassHOW)
+    # (ClassHOW $boxed, ClassHOW $super --> ClassHOW)
     sub wrap-dpmo is rawcall { Q:CgOp {
         (withtypes $ch Variable $dm DynMetaObject
-          [l $ch (methodcall (l ClassHOW) new (string_var ""))]
-          [l $dm (unwrap DynMetaObject (@ (pos 0)))]
+          [l $ch (pos 0)]
+          [l $dm (unbox DynMetaObject (@ (pos 0)))]
 
-          [assign (varattr meta-object (@ (l $ch))) (w (l $dm))]
           [setfield how (l $dm) (@ (l $ch))]
           [sink (methodcall (l $ch) add-super (pos 1))]
           [l $ch])
@@ -141,35 +119,36 @@ Q:CgOp {
     (withtypes !plist List<DynMetaObject> Mu!HOW Variable Any!HOW Variable
         Cool!HOW Variable Scalar!HOW Variable Sub!HOW Variable
 
-      [l Mu!HOW (methodcall (l ClassHOW) new (string_var Mu))]
-      [l Mu (methodcall (l Mu!HOW) create-protoobject)]
+      [l Mu!HOW (methodcall {ClassHOW} new (string_var Mu))]
+      [l Mu (methodcall (l Mu!HOW) create-typeobject)]
 
-      [l Any!HOW (methodcall (l ClassHOW) new (string_var Any))]
+      [l Any!HOW (methodcall {ClassHOW} new (string_var Any))]
       [sink (methodcall (l Any!HOW) add-super (l Mu))]
-      [l Any (methodcall (l Any!HOW) create-protoobject)]
+      [l Any (methodcall (l Any!HOW) create-typeobject)]
 
       [rawsset Kernel.AnyP (@ (l Any))]
 
       [l Cool!HOW (methodcall (l ClassHOW) new (string_var Cool))]
       [sink (methodcall (l Cool!HOW) add-super (l Any))]
-      [l Cool (methodcall (l Cool!HOW) create-protoobject)]
+      [l Cool (methodcall (l Cool!HOW) create-typeobject)]
 
-      [sink (methodcall (ns (how (@ (l ClassHOW)))) add-super (l Any))]
-      [rawcall (getfield klass (cast DynObject (@ (l ClassHOW)))) BuildC3MRO]
+      [sink (methodcall (ns (how (@ {ClassHOW}))) add-super (l Any))]
+      [rawcall (rawcall (@ {ClassHOW}) GetMO) Complete]
 
       [l Sub!HOW (subcall (@ (l &wrap-dpmo))
-        (w (rawsget Kernel.SubMO)) (l Any))]
-      [l Sub (methodcall (l Sub!HOW) create-protoobject)]
+        (box ClassHOW (rawsget Kernel.SubMO)) (l Any))]
+      [l Sub (methodcall (l Sub!HOW) create-typeobject)]
 
       [l Scalar!HOW (subcall (@ (l &wrap-dpmo))
-        (w (rawsget Kernel.ScalarMO)) (l Any))]
-      [l Scalar (methodcall (l Scalar!HOW) create-protoobject)]
+        (box ClassHOW (rawsget Kernel.ScalarMO)) (l Any))]
+      [l Scalar (methodcall (l Scalar!HOW) create-typeobject)]
 
       [null Variable])
 } }
 
 my class Junction is Mu { }
 my class Num is Cool {
+    has $!value;
     method Str () { Q:CgOp {
         (box Str (rawcall (unbox Double (fetch (scopedlex self))) ToString))
     } }
@@ -181,6 +160,7 @@ my class Num is Cool {
     method ACCEPTS($t) { self == $t }
 }
 my class Str is Cool {
+    has $!value;
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
     method chars() { Q:CgOp {
@@ -217,6 +197,7 @@ my class Instant { }
 my class Duration { }
 my class EnumType is Cool { }
 my class Bool is EnumType {
+    has $!value;
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Bool() { self }
     method ACCEPTS($) { self }
@@ -430,6 +411,7 @@ sub flat(*@x) { @x }
 my class Whatever { }
 
 my class Parcel is Cool {
+    has $!value;
     # $!value -> Variable[]
 
     method flat() { List.SETUP(True, self) }
@@ -504,10 +486,6 @@ my class List is Cool {
     #| needs to apply on stuff out of the iterator stack
     method !elem is rawcall { Q:CgOp { (pos 1) } }
 
-    sub first-rest-flattens($self) { Q:CgOp {
-        (box Bool (getfield islist (getindex (i 0) (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))))))
-    } }
-
     sub has-iterators($self) { Q:CgOp {
         (box Bool (!= (i 0) (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))) Count)))
     } }
@@ -538,14 +516,6 @@ my class List is Cool {
 
     sub push-item is rawcall { Q:CgOp {
         (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s items))) Push (pos 1)) (null Variable))
-    } }
-
-    sub unshift-iterator is rawcall { Q:CgOp {
-        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) Unshift (pos 1)) (null Variable))
-    } }
-
-    sub unshift-iterator-n is rawcall { Q:CgOp {
-        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) UnshiftN (unbox 'Variable[]' (@ (pos 1)))) (null Variable))
     } }
 
     method !fill($nr) { Q:CgOp {
@@ -772,6 +742,7 @@ sub postcircumfix:<[ ]> is rawcall {
 }
 
 my class Hash {
+    has $!value;
     method new() { Q:CgOp { (box Hash (rawnew Dictionary<string,Variable>)) } }
     method !extend is rawcall {
         Q:CgOp {
@@ -863,7 +834,7 @@ PRE-INIT {
     ClassHOW.HOW.add-method("add-multiregex",
         anon method add-multiregex($name, $rx) {
             Q:CgOp { (prog
-                [rawcall (unwrap DynMetaObject (getattr meta-object (@ (pos 0))))
+                [rawcall (unbox DynMetaObject (@ (pos 0)))
                   AddMultiRegex (unbox String (@ (l $name))) (@ (l $rx))]
                 [l True])
             }

@@ -363,6 +363,10 @@ use warnings;
         CgOp::Primitive->new(op => ['drop'], zyg => [ $_[0] ]);
     }
 
+    sub rnull {
+        prog($_[0], null('Variable'));
+    }
+
     sub fetch {
         rawsccall("Kernel.Fetch", $_[0]);
     }

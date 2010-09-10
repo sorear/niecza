@@ -386,7 +386,19 @@ namespace Niecza {
                     Kernel.JoinS(" | ", d, MROStr));
         }
 
-        public void BuildC3MRO() {
+        public void AddMethod(string name, IP6 code) {
+            local[name] = code;
+        }
+
+        public void AddAttribute(string name) {
+            local_attr[name] = null;
+        }
+
+        public void AddSuperclass(DynMetaObject other) {
+            superclasses.Add(other);
+        }
+
+        public void Complete() {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
             mro = new List<DynMetaObject>();
             isa = new HashSet<DynMetaObject>();

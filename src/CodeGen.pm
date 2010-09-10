@@ -26,14 +26,14 @@ use 5.010;
               slots        => [f => 'Dictionary<string,Object>'] },
 
         DynMetaObject =>
-            { BuildC3MRO   => [m => 'Void'],
+            { Complete     => [m => 'Void'],
               HasMRO       => [m => 'Boolean'],
               AddMultiRegex=> [m => 'Void'],
+              AddMethod    => [m => 'Void'],
+              AddSuperclass=> [m => 'Void'],
+              AddAttribute => [m => 'Void'],
               typeObject   => [f => 'IP6'],
               how          => [f => 'IP6'],
-              local        => [f => 'Dictionary<string,IP6>'],
-              local_attr   => [f => 'Dictionary<string,IP6>'],
-              superclasses => [f => 'List<DynMetaObject>'],
               name         => [f => 'String'] },
 
         'Double' =>

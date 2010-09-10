@@ -335,7 +335,7 @@ use CgOp;
                     "add-super", CgOp::scopedlex($self->defsuper)));
         }
         push @r, CgOp::scopedlex($self->var,
-                CgOp::methodcall(CgOp::letvar("how"), "create-protoobject"));
+                CgOp::methodcall(CgOp::letvar("how"), "create-typeobject"));
         push @r, CgOp::bind(1, $self->stash($body, ''),
                 CgOp::scopedlex($self->var)) if $self->ourpkg;
         @r;
