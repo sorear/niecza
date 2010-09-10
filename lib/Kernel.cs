@@ -127,6 +127,7 @@ namespace Niecza {
         // exist only in flight (resultSlots) and in parcel contexts.
         public IP6 whence;
         public IP6 container;
+        // will be a direct ref if !rw; lists are always !rw
 
         public Variable(bool bvalue, bool rw, bool islist, IP6 whence,
                 IP6 container) {
@@ -582,7 +583,7 @@ blocked:
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
-                    return th.pos[0].container.Fetch(th);
+                    return Fetch(th, th.pos[0]);
                 default:
                     post = new Variable[th.pos.Length - 1];
                     Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
@@ -648,11 +649,7 @@ blocked:
                     th.ip = 2;
                     return Fetch(th, th.pos[1]);
                 case 2:
-                    if (th.pos[0].islist) {
-                        th.pos[0].container = (IP6) th.resultSlot;
-                    } else {
-                        th.pos[0].container = MakeSC((IP6) th.resultSlot);
-                    }
+                    th.pos[0].container = (IP6) th.resultSlot;
                     th.pos[0].rw = false;
                     return th.caller;
                 default:
@@ -675,22 +672,8 @@ blocked:
                     th.ip = 2;
                     return Vivify(th, th.pos[0]);
                 case 2:
-                    if (!th.pos[0].islist || th.pos[1].islist)
-                        goto case 4;
-                    th.ip = 3;
-                    return th.pos[1].container.Fetch(th);
-                case 3:
-                    // having to fetch because of a $ -> @ conversion
-                    th.pos[0].container = (IP6) th.resultSlot;
-                    th.pos[0].rw = true;
-                    return th.caller;
-                case 4:
                     th.pos[0].container = th.pos[1].container;
                     th.pos[0].rw = th.pos[1].rw;
-                    if (th.pos[1].islist && !th.pos[0].islist) {
-                        th.pos[0].rw = false;
-                        th.pos[0].container = MakeSC(th.pos[0].container);
-                    }
                     return th.caller;
                 default:
                     return Kernel.Die(th, "IP invalid");
@@ -701,6 +684,7 @@ blocked:
                 bool ro, bool forcerw) {
             // TODO: need exceptions for forcerw to be used
             Frame n;
+            if (lhs.islist) ro = true;
             // fast path
             if (lhs.islist == rhs.islist && !ro &&
                     (ro || rhs.whence == null) &&
@@ -725,20 +709,17 @@ blocked:
                     th.ip = 1;
                     return Vivify(th, th.pos[0]);
                 case 1:
-                    if (!th.pos[0].rw) {
-                        return Kernel.Die(th.caller, "assigning to readonly value");
-                    }
                     if (th.pos[0].islist) {
                         return th.pos[0].container.InvokeMethod(th.caller,
                                 "LISTSTORE", th.pos, null);
+                    } else if (!th.pos[0].rw) {
+                        return Kernel.Die(th.caller, "assigning to readonly value");
+                    } else if (!th.pos[1].rw) {
+                        return th.pos[0].container.Store(th.caller,
+                                th.pos[1].container);
                     } else {
-                        if (th.pos[1].islist) {
-                            return th.pos[0].container.Store(th.caller,
-                                    th.pos[1].container);
-                        } else {
-                            th.ip = 2;
-                            return th.pos[1].container.Fetch(th);
-                        }
+                        th.ip = 2;
+                        return th.pos[1].container.Fetch(th);
                     }
                 case 2:
                     return th.pos[0].container.Store(th.caller,
@@ -755,7 +736,7 @@ blocked:
         }
 
         public static Frame Fetch(Frame th, Variable vr) {
-            if (vr.islist) {
+            if (!vr.rw) {
                 th.resultSlot = vr.container;
                 return th;
             } else {
@@ -765,7 +746,7 @@ blocked:
 
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
-            return new Variable(false, false, false, null, MakeSC(obj));
+            return new Variable(false, false, false, null, obj);
         }
 
         public static Variable NewRWScalar(IP6 obj) {
@@ -773,7 +754,7 @@ blocked:
         }
 
         public static Variable NewRWListVar(IP6 container) {
-            return new Variable(true, true, true, null, container);
+            return new Variable(true, false, true, null, container);
         }
 
         public static VarDeque SlurpyHelper(Frame th, int from) {
