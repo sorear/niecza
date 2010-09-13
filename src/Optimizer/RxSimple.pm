@@ -67,6 +67,27 @@ sub RxOp::Sequence::rxsimp { my ($self, $cut) = @_;
             push @kids, $k;
         }
     }
+    NEGCC: {
+        last NEGCC unless @kids;
+        my @cond = @kids;
+        my $fin = pop @cond;
+        for (@cond) {
+            last NEGCC unless $_->isa('RxOp::NotBefore') &&
+                $_->zyg->[0]->isa('RxOp::CClassElem');
+            $_ = $_->zyg->[0]->cc;
+        }
+        if ($fin->isa('RxOp::CClassElem')) {
+            $fin = $fin->cc;
+        } elsif ($fin->isa('RxOp::Any')) {
+            $fin = $CClass::Full;
+        } else {
+            last NEGCC;
+        }
+        for (@cond) {
+            $fin = $fin->minus($_);
+        }
+        return RxOp::CClassElem->new(cc => $fin);
+    }
     (@kids == 1) ? $kids[0] : RxOp::Sequence->new(zyg => \@kids);
 }
 
