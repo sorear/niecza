@@ -522,8 +522,11 @@ blocked:
     public class Kernel {
         public static DynBlockDelegate MainlineContinuation;
 
+        // Note: for classes without public .new, there's no way to get
+        // "interesting" user subclasses, so direct indexing is safe
+
         public static object UnboxDO(DynObject o) {
-            return o.GetSlot("value");
+            return o.slots[0];
         }
 
         public static object UnboxAny(IP6 o) {
@@ -533,13 +536,13 @@ blocked:
 
         private static Frame SCFetch(IP6 th, Frame caller) {
             DynObject dyo = (DynObject) th;
-            caller.resultSlot = dyo.GetSlot("value");
+            caller.resultSlot = dyo.slots[0];
             return caller;
         }
 
         private static Frame SCStore(IP6 th, Frame caller, IP6 nv) {
             DynObject dyo = (DynObject) th;
-            dyo.SetSlot("value", nv);
+            dyo.slots[0] = nv;
             return caller;
         }
 
@@ -561,8 +564,8 @@ blocked:
         public static Frame GatherHelper(Frame th, IP6 sub) {
             DynObject dyo = (DynObject) sub;
             Frame n = new Frame(th,
-                                (Frame) dyo.GetSlot("outer"),
-                                (SubInfo) dyo.GetSlot("info"));
+                                (Frame) dyo.slots[0],
+                                (SubInfo) dyo.slots[1]);
             th.resultSlot = n;
             return th;
         }
@@ -570,8 +573,8 @@ blocked:
         private static Frame SubInvoke(IP6 th, Frame caller,
                 Variable[] pos, Dictionary<string,Variable> named) {
             DynObject dyo = ((DynObject) th);
-            Frame outer = (Frame) dyo.GetSlot("outer");
-            SubInfo info = (SubInfo) dyo.GetSlot("info");
+            Frame outer = (Frame) dyo.slots[0];
+            SubInfo info = (SubInfo) dyo.slots[1];
 
             Frame n = new Frame(caller, outer, info);
             n.pos = pos;
@@ -596,7 +599,7 @@ blocked:
 
         public static Frame Die(Frame caller, string msg) {
             DynObject n = new DynObject(((DynObject)StrP).klass);
-            n.SetSlot("value", msg);
+            n.slots[0] = msg;
             return new FatalException(n).SearchForHandler(caller);
         }
 
@@ -607,14 +610,14 @@ blocked:
 
         public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(info.mo ?? SubMO);
-            n.SetSlot("outer", outer);
-            n.SetSlot("info", info);
+            n.slots[0] = outer;
+            n.slots[1] = info;
             return n;
         }
 
         public static DynObject MockBox(object v) {
             DynObject n = new DynObject(ScalarMO);
-            n.SetSlot("value", v);
+            n.slots[0] = v;
             return n;
         }
 
@@ -622,7 +625,7 @@ blocked:
             if (v == null)
                 return NewROScalar(proto);
             DynObject n = new DynObject(((DynObject)proto).klass);
-            n.SetSlot("value", v);
+            n.slots[0] = v;
             return NewROScalar(n);
         }
 
