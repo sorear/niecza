@@ -454,7 +454,8 @@ my class List is Cool {
     has @!rest;
     has $!flat;
     method flat() {
-        unitem($!flat ?? self !! self.SETUP(True, (&infix:<,>(self.iterator))));
+        unitem(Q:CgOp { (box Bool (getslot (s flat) (@ {self}))) }
+            ?? self !! self.SETUP(True, (&infix:<,>(self.iterator))));
     }
     method list() { unitem(self) }
 
@@ -472,7 +473,7 @@ my class List is Cool {
 
     method SETUP($flat, $parcel) { Q:CgOp {
         (letn new (rawnew DynObject (rawcall (@ {self}) GetMO))
-          (rawcall (l new) SetSlot (s flat) {$flat})
+          (rawcall (l new) SetSlot (s flat) (unbox Boolean (@ {$flat.Bool})))
           (rawcall (l new) SetSlot (s rest) (rawnew VarDeque
               (unbox 'Variable[]' (@ {$parcel}))))
           (rawcall (l new) SetSlot (s items) (rawnew VarDeque))
@@ -523,7 +524,7 @@ my class List is Cool {
         (letn  nr    (cast Int32 (unbox Double (@ {$nr})))
                items (cast VarDeque (getslot (s items) (@ {self})))
                rest  (cast VarDeque (getslot (s rest) (@ {self})))
-               flat  (unbox Boolean (@ {$!flat.Bool}))
+               flat  (cast Boolean  (getslot (s flat) (@ {self})))
                v     (null Variable)
                ItMo  (rawcall (@ {Iterator}) GetMO)
           (whileloop 0 0

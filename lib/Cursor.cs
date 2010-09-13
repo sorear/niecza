@@ -97,7 +97,7 @@ public sealed class RxFrame {
                 DynObject lst = new DynObject(ListMO);
                 lst.slots[0 /*items*/] = new VarDeque();
                 lst.slots[1 /*rest*/ ] = new VarDeque();
-                lst.slots[2 /*flat*/ ] = Kernel.NewROScalar(Kernel.AnyP);
+                lst.slots[2 /*flat*/ ] = false;
                 th.caller.resultSlot = Kernel.NewRWListVar(lst);
             }
 
@@ -258,7 +258,7 @@ public sealed class RxFrame {
             DynObject lst = new DynObject(ListMO);
             lst.slots[0 /*items*/] = ks;
             lst.slots[1 /*rest*/ ] = iss;
-            lst.slots[2 /*flat*/ ] = Kernel.NewROScalar(Kernel.AnyP);
+            lst.slots[2 /*flat*/ ] = false;
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
         }
         return th.caller;
@@ -346,7 +346,7 @@ no:
             DynObject l = new DynObject(RxFrame.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
-            l.slots[2 /*flat*/ ] = Kernel.NewROScalar(Kernel.AnyP);
+            l.slots[2 /*flat*/ ] = false;
             return Kernel.NewRWListVar(l);
         } else {
             return caps.Count() != 0 ? caps[0] :
@@ -363,7 +363,7 @@ no:
         DynObject lst = new DynObject(RxFrame.ListMO);
         lst.slots[0 /*items*/] = ks;
         lst.slots[1 /*rest*/ ] = new VarDeque();
-        lst.slots[2 /*flat*/ ] = Kernel.NewROScalar(Kernel.AnyP);
+        lst.slots[2 /*flat*/ ] = false;
 
         if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
                 CC.Word.Accepts(backing[p-1])) {

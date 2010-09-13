@@ -36,7 +36,7 @@ use 5.010;
             my $do = shift;
             CgOp::prog(
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('flat'),
-                    CgOp::box('Bool', CgOp::bool(1))),
+                    CgOp::bool(1)),
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('items'),
                     CgOp::rawnew('VarDeque')),
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('rest'),
