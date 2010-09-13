@@ -1049,14 +1049,23 @@ use CgOp;
         my ($self, $body) = @_;
 
         local $::symtext = $self->sym;
+        my @mcaps;
+        local $::in_quant = 0;
+        my $u = $self->rxop->used_caps;
+        for (keys %$u) {
+            push @mcaps, CgOp::clr_string($_) if $u->{$_} >= 2;
+        }
 
         CgOp::prog(
             CgOp::setfield('rx', CgOp::callframe,
                 CgOp::rawnew('RxFrame', CgOp::clr_string($self->name),
                     CgOp::cast('Cursor', CgOp::fetch(CgOp::scopedlex('$¢'))))),
+            CgOp::rawcall(CgOp::rxframe, 'PushCapture',
+                CgOp::const(CgOp::rawnewarr('String', @mcaps)),
+                CgOp::null('Cursor')),
             $self->rxop->code($body),
-            CgOp::rawccall(CgOp::getfield('rx', CgOp::callframe), 'End'),
-            CgOp::rawccall(CgOp::getfield('rx', CgOp::callframe), 'Backtrack'),
+            CgOp::rawccall(CgOp::rxframe, 'End'),
+            CgOp::rawccall(CgOp::rxframe, 'Backtrack'),
             CgOp::null('Variable'));
     }
 

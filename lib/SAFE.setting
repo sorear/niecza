@@ -829,9 +829,17 @@ my class Cursor {
     method orig { Q:CgOp {
         (box Str (getfield backing (cast Cursor (@ {self})))) } }
     method ws() { Q:CgOp { (rawcall (cast Cursor (@ {self})) SimpleWS) } }
+    method at-key($k) { Q:CgOp {
+        (rawcall (cast Cursor (@ {self})) GetKey (unbox String (@ {$k.Str})))
+    } }
+    method at-pos($i) { self.at-key($i) }
 }
 
 my class Match {
+    method at-key($k) { Q:CgOp {
+        (rawcall (cast Cursor (@ {self})) GetKey (unbox String (@ {$k.Str})))
+    } }
+    method at-pos($i) { self.at-key($i) }
     method new($) { die "Match.new NYI" }
     method from { Q:CgOp { (box Num (cast Double (getfield from
         (cast Cursor (@ {self}))))) } }

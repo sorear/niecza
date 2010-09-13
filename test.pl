@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 430;
+plan 454;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -956,4 +956,76 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
     is $ma.from, 2, '$ma.from works';
     is $ma.to, 4, '$ma.to works';
     is $ma.Str, '29', '$ma.Str works';
+}
+
+{
+    use MONKEY_TYPING;
+    my class Foo {
+        method foo { 1 }
+    }
+    is Foo.foo, 2, "augments run early";
+    is Any.g4077, 4077, "can augment core classes";
+    is Cool.g4077, 4077, "augments visible in subclasses";
+
+    augment class Foo {
+        method foo { 2 }
+    }
+    augment class Any {
+        method g4077 { 4077 }
+    }
+}
+
+{
+    my $ma = (grammar {
+        token TOP { <foo> <bar> }
+        token foo { \d+ }
+        token bar { \D+ }
+    }).parse("123abc");
+    ok $ma<foo> ~~ Match, "<foo> sub is a Match";
+    is $ma<foo>, "123", "<foo> sub got 123";
+    ok $ma<bar> ~~ Match, "<bar> sub is a Match";
+    is $ma<bar>, "abc", "<bar> sub got 123";
+    ok !$ma<quux>, "no <quux> sub";
+    my $mb = (grammar {
+        token TOP { <foo> <foo> }
+        token foo { \D+ | \d+ }
+    }).parse("def456");
+    ok $mb.defined, "grammar b matched";
+    ok $mb<foo> ~~ List, "<foo> sub isa List";
+    is +$mb<foo>, 2, "2 matches";
+    ok $mb<foo>[0] ~~ Match, "<foo>[0] sub isa Match";
+    is $mb<foo>[0], "def", "<foo>[0] got def";
+    is $mb<foo>[1], "456", "<foo>[1] got 456";
+    my $mc = (grammar {
+        token TOP { <foo>+ }
+        token foo { \D+ | \d+ }
+    }).parse("def");
+    ok $mc<foo> ~~ List, "<foo>+ makes a list";
+    is +$mc<foo>, 1, "despite only one element";
+    my $md = (grammar {
+        token TOP { \D+ <foo> \D+ }
+        token foo { \d+ <bar> \d+ }
+        token bar { \D+ }
+    }).parse("a1b2c");
+    is $md<foo><bar>, "b", "<foo><bar> works";
+    my $mf = (grammar {
+        proto token TOP {*}
+        token TOP:x { <foo> }
+        token foo { \w+ }
+    }).parse("abc");
+    is $mf<foo>, "abc", "protoregex captures work";
+    my $me = (grammar {
+        token TOP { <tok>+ }
+        proto token tok {*}
+        token tok:num { <sign>? <digit>+ }
+        token tok:ws { \s+ }
+        token sign { \+ | \- }
+        token digit { \d | _ }
+    }).parse("2 -34 5");
+    ok $me<tok> ~~ List, "a list of tokens";
+    is +$me<tok>, 5, "5 of them";
+    is +$me<tok>[0]<sign>, 0, "first no sign";
+    is +$me<tok>[2]<sign>, 1, "third sign";
+    is +$me<tok>[4]<sign>, 0, "fifth no sign";
+    is $me<tok>[2], '-34', "3rd token '-34'";
 }

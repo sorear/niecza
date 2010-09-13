@@ -13,6 +13,18 @@ use CgOp;
 
     sub opzyg { map { $_->opzyg } @{ $_[0]->zyg } }
 
+    # all that matters is 0-1-infty; $*in_quant valid here
+    sub used_caps {
+        my %r;
+        for my $k (@{ $_[0]->zyg }) {
+            my $re = $k->used_caps;
+            for my $cn (keys %$re) {
+                $r{$cn} += $re->{$cn};
+            }
+        }
+        \%r;
+    }
+
     my $nlabel = 0;
     sub label { "b" . ($nlabel++) }
 
@@ -54,6 +66,8 @@ use CgOp;
     has minimal => (isa => 'Bool', is => 'ro', required => 1);
     has min => (isa => 'Int', is => 'ro', required => 1);
     has max => (isa => 'Maybe[Int]', is => 'ro', default => undef);
+
+    sub used_caps { local $::in_quant = 1; $_[0]->zyg->[0]->used_caps }
 
     sub code {
         my ($self, $body) = @_;
@@ -289,6 +303,11 @@ use CgOp;
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
 
+    sub used_caps {
+        my ($self) = @_;
+        +{ map { $_ => $::in_quant ? 2 : 1 } @{ $self->captures } };
+    }
+
     sub true {
         my ($self) = @_;
         # all not quite right in the capturey case
@@ -430,6 +449,17 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
+    sub used_caps {
+        my %used;
+        for my $x (@{ $_[0]->zyg }) {
+            my $used_br = $x->used_caps;
+            for my $y (keys %$used_br) {
+                $used{$y} = $used_br->{$y} if $used_br->{$y} > ($used{$y} // 0);
+            }
+        }
+        \%used;
+    }
+
     sub code {
         my ($self, $body) = @_;
         my @ls = map { $self->label } @{ $self->zyg };
@@ -521,12 +551,8 @@ use CgOp;
                 CgOp::whileloop(0, 0,
                   CgOp::unbox('Boolean', CgOp::fetch(
                     CgOp::methodcall(CgOp::letvar('ks'), 'Bool'))),
-                  CgOp::prog(
-                    CgOp::rawcall(CgOp::rxframe, 'SetPos',
-                      CgOp::getfield('pos', CgOp::cast('Cursor',
-                          CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'),
-                              'shift'))))),
-                    CgOp::rawccall(CgOp::rxframe, 'End')))))),
+                CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
+                    CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))))))),
           CgOp::rawccall(CgOp::rxframe, 'Backtrack'));
     }
 

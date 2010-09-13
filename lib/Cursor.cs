@@ -239,12 +239,16 @@ public sealed class RxFrame {
     public static DynMetaObject GatherIteratorMO;
     public static IP6 EMPTYP;
     public Frame End(Frame th) {
+        return End(th, MakeMatch());
+    }
+    // currently just used for protoregex
+    public Frame End(Frame th, Cursor m) {
         if (return_one) {
-            return Kernel.Take(th, Kernel.NewROScalar(MakeMatch()));
+            return Kernel.Take(th, Kernel.NewROScalar(m));
         } else {
             return_one = true;
             VarDeque ks = new VarDeque();
-            ks.Push(Kernel.NewROScalar(MakeMatch()));
+            ks.Push(Kernel.NewROScalar(m));
             DynObject it  = new DynObject(GatherIteratorMO);
             it.SetSlot("reify", Kernel.NewRWScalar(Kernel.AnyP));
             it.SetSlot("frame", Kernel.NewRWScalar(th));
