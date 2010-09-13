@@ -587,6 +587,31 @@ use CgOp;
 }
 
 {
+    package Op::Augment;
+    use Moose;
+    extends 'Op';
+
+    has name => (is => 'ro', isa => 'Str');
+    has bodyvar => (is => 'ro', isa => 'Str');
+    has body => (is => 'ro', isa => 'Body');
+    has pkg => (is => 'ro', isa => 'ArrayRef[Str]');
+
+    sub lift_decls {
+        my ($self) = @_;
+        Decl::Augment->new(name => $self->name, bodyvar => $self->bodyvar,
+            pkg => $self->pkg, body => $self->body);
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::subcall(CgOp::fetch(CgOp::scopedlex($self->bodyvar)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::PackageDef;
     use Moose;
     extends 'Op';

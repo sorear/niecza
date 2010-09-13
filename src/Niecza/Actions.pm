@@ -2065,6 +2065,10 @@ sub statement_control__S_use { my ($cl, $M) = @_;
         return;
     }
 
+    if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
+        return;
+    }
+
     my $meta = CompilerDriver::metadata_for($name);
     $::UNITREFS{$name} = 1;
     $::UNITREFSTRANS{$name} = 1;
@@ -2101,8 +2105,8 @@ sub package_def { my ($cl, $M) = @_;
     if (!$M->{longname}[0]) {
         $scope = 'anon';
     }
-    if ($scope eq 'augment' || $scope eq 'supersede') {
-        $M->sorry('Monkey typing is not yet supported');
+    if ($scope eq 'supersede') {
+        $M->sorry('Supercede is not yet supported');
         return;
     }
     if ($scope eq 'has' || $scope eq 'state') {
@@ -2120,7 +2124,18 @@ sub package_def { my ($cl, $M) = @_;
     # currently always install into the local stash
     my $ourpkg = ($scope eq 'our') ? [ 'OUR::' ] : undef;
 
-    if (!$M->{decl}{stub}) {
+    if ($scope eq 'augment') {
+        my $stmts = $M->{statementlist} // $M->{blockoid};
+        $stmts = $stmts->{_ast};
+        my $cbody = $cl->sl_to_block($blocktype, $stmts, name => $name);
+
+        $M->{_ast} = Op::Augment->new(
+            node($M),
+            pkg     => [],
+            name    => $name,
+            bodyvar => $bodyvar,
+            body    => $cbody);
+    } elsif (!$M->{decl}{stub}) {
         my $stmts = $M->{statementlist} // $M->{blockoid};
         my @export;
 

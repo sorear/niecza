@@ -244,6 +244,49 @@ use CgOp;
 }
 
 {
+    package Decl::Augment;
+    use Moose;
+    extends 'Decl';
+
+    has body    => (is => 'ro', isa => 'Body', required => 1);
+    has bodyvar => (is => 'ro', isa => 'Str', required => 1);
+    has name    => (is => 'ro', isa => 'Str', required => 1);
+    has pkg     => (is => 'ro', isa => 'ArrayRef[Str]', required => 1);
+
+    sub bodies { $_[0]->body }
+
+    sub stash {
+        my ($self, $body, $suf) = @_;
+        ($body->lookup_pkg(@{ $self->pkg }, $self->name . $suf))[1];
+    }
+
+    sub used_slots {
+        my ($self) = @_;
+        [$self->bodyvar, 'Variable', $_[1] ? 1 : 4];
+    }
+
+    sub needs_protopad { 1 }
+    sub preinit_code {
+        my ($self, $body) = @_;
+
+        CgOp::letn("pkg", $self->stash($body, '::'),
+            CgOp::letn("how", CgOp::newscalar(CgOp::how(
+                        CgOp::fetch($self->stash($body, '')))),
+                CgOp::protosub($self->body),
+                CgOp::proto_var($self->bodyvar, CgOp::sub_var($self->body))));
+    }
+
+    sub enter_code {
+        my ($self, $body) = @_;
+        ($body->mainline) ? CgOp::noop :
+            CgOp::scopedlex($self->bodyvar, CgOp::sub_var($self->body));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Decl::Package;
     use Moose;
     extends 'Decl';

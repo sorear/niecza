@@ -94,6 +94,10 @@ sub find_module {
         my $self = shift;
         my $module = shift;
 
+        # these are handled in the compiler itself
+        return { } if $module eq 'MONKEY_TYPING' || $module eq 'lib' ||
+            $module eq 'fatal';
+
         my $csmod = $module;
         $csmod =~ s/::/./g;
         my ($symlfile) = File::Spec->catfile($builddir, "$csmod.store");
