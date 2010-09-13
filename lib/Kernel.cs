@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Runtime.InteropServices;
 namespace Niecza {
     // We like to reuse continuation objects for speed - every function only
     // creates one kind of continuation, but tweaks a field for exact return
@@ -115,10 +116,8 @@ namespace Niecza {
     // object, but !islist.  Read only.
     //
     // Scalar->list: bind islist, must be Iterable. Bind it same rwness.
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public class Variable {
-        public bool bvalue;
-        public bool rw;
-        public bool islist;
         // If non-null, then this lv is, or at one time was, the result of
         // an autovivifying access, but has not yet committed to becoming
         // real or becoming undef.  We call these virtual containers; they
@@ -126,6 +125,9 @@ namespace Niecza {
         public IP6 whence;
         public IP6 container;
         // will be a direct ref if !rw; lists are always !rw
+        public bool bvalue;
+        public bool rw;
+        public bool islist;
 
         public Variable(bool bvalue, bool rw, bool islist, IP6 whence,
                 IP6 container) {
