@@ -63,15 +63,17 @@ namespace Niecza {
 
         public virtual Frame Invoke(Frame c, Variable[] p,
                 Dictionary<string, Variable> n) {
-            DynMetaObject.InvokeHandler ih = GetMO().OnInvoke;
-            if (ih != null) {
-                return ih(this, c, p, n);
-            } else {
-                Variable[] np = new Variable[p.Length + 1];
-                Array.Copy(p, 0, np, 1, p.Length);
-                np[0] = Kernel.NewROScalar(this);
-                return InvokeMethod(c, "INVOKE", np, n);
+            foreach (DynMetaObject k in GetMO().mro) {
+                DynMetaObject.InvokeHandler ih = k.OnInvoke;;
+                if (ih != null) {
+                    return ih(this, c, p, n);
+                }
             }
+
+            Variable[] np = new Variable[p.Length + 1];
+            Array.Copy(p, 0, np, 1, p.Length);
+            np[0] = Kernel.NewROScalar(this);
+            return InvokeMethod(c, "INVOKE", np, n);
         }
 
         public virtual Frame Fetch(Frame c) {
