@@ -533,27 +533,34 @@ use CgOp;
             CgOp::fetch(CgOp::scopedlex('$¢')),
             CgOp::clr_string($self->name)),
           "i",   CgOp::int(0),
-          CgOp::rxpushb('LTM'),
-          CgOp::whileloop(0, 0,
-            CgOp::compare('<', CgOp::letvar("i"),
-              CgOp::getfield("Length", CgOp::letvar("fns"))),
-            CgOp::ternary(
-              CgOp::rawcall(CgOp::rxframe, 'IsTopCut'),
-              CgOp::letvar("i", CgOp::int(2**31-1)),
-              CgOp::letn(
-                "ks", CgOp::methodcall(CgOp::methodcall(
-                    CgOp::subcall(CgOp::getindex(CgOp::letvar("i"),
-                        CgOp::letvar("fns")), CgOp::newscalar(
-                        CgOp::rawcall(CgOp::rxframe, 'MakeCursor'))),
-                    'list'), 'clone'),
-                CgOp::letvar("i", CgOp::arith('+',
-                    CgOp::letvar("i"), CgOp::int(1))),
-                CgOp::whileloop(0, 0,
-                  CgOp::unbox('Boolean', CgOp::fetch(
-                    CgOp::methodcall(CgOp::letvar('ks'), 'Bool'))),
-                CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
-                    CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))))))),
-          CgOp::rawccall(CgOp::rxframe, 'Backtrack'));
+          "ks",  CgOp::null('Variable'),
+          "k",   CgOp::null('IP6'),
+          CgOp::label('nextfn'),
+          CgOp::cgoto('end',
+            CgOp::compare('>=', CgOp::letvar("i"),
+              CgOp::getfield("Length", CgOp::letvar("fns")))),
+          CgOp::rxpushb('LTM', 'nextfn'),
+          CgOp::letvar("ks", CgOp::subcall(CgOp::getindex(CgOp::letvar("i"),
+                CgOp::letvar("fns")), CgOp::newscalar(CgOp::rawcall(
+                  CgOp::rxframe, 'MakeCursor')))),
+          CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
+          CgOp::letvar("k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+                CgOp::fetch(CgOp::letvar("ks"))))),
+          CgOp::ncgoto('end',
+            CgOp::rawcall(CgOp::letvar("k"), 'IsDefined')),
+          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
+              CgOp::letvar("k"))),
+          CgOp::letvar('ks', CgOp::methodcall(CgOp::methodcall(
+                CgOp::letvar('ks'), "list"), "clone")),
+          CgOp::sink(CgOp::methodcall(CgOp::letvar('ks'), 'shift')),
+          CgOp::label('nextcsr'),
+          CgOp::ncgoto('end', CgOp::unbox('Boolean', CgOp::fetch(
+                CgOp::methodcall(CgOp::letvar('ks'), 'Bool')))),
+          CgOp::rxpushb('SUBRULE', 'nextcsr'),
+          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
+              CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))),
+          CgOp::label('end'),
+          CgOp::rawccall(CgOp::rxframe, 'Backtrack'))
     }
 
     sub lad {

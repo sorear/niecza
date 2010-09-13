@@ -631,6 +631,18 @@ use warnings;
             zyg => [ ], is_cps_call => 1);
     }
 
+    sub cgoto {
+        my ($name) = @_;
+        CgOp::Primitive->new(op => [ 'cgoto', $name ],
+            zyg => [ $_[1] ], is_cps_call => 1);
+    }
+
+    sub ncgoto {
+        my ($name) = @_;
+        CgOp::Primitive->new(op => [ 'ncgoto', $name ],
+            zyg => [ $_[1] ], is_cps_call => 1);
+    }
+
     sub rxpushb {
         my ($tag, $lbl) = @_;
         CgOp::Primitive->new(op => [ 'rxpushb', $tag, $lbl ],
