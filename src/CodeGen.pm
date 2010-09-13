@@ -90,6 +90,7 @@ use 5.010;
             { At           => [m => 'Cursor'],
               pos          => [f => 'Int32'],
               from         => [f => 'Int32'],
+              GetKey       => [m => 'Variable'],
               backing      => [f => 'String'],
               SimpleWS     => [m => 'Variable'] },
         'Lexer' =>

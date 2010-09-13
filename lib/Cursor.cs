@@ -313,6 +313,42 @@ public class Cursor : IP6 {
         return new Cursor(klass, xact, backing, backing_ca, npos);
     }
 
+    // TODO: keep variables around so { $<foo> = 1 } will work
+    public Variable GetKey(string str) {
+        PSN<string[]> cn_it = capnames;
+        PSN<Cursor> cr_it = captures;
+        VarDeque caps = new VarDeque();
+        bool list = false;
+
+        while (cr_it != null) {
+            foreach (string cn in cn_it.obj) {
+                if (cn == str)
+                    goto yes;
+            }
+            goto no;
+yes:
+            if (cr_it.obj == null) {
+                list = true;
+            } else {
+                caps.Unshift(Kernel.NewRWScalar(cr_it.obj));
+            }
+no:
+            cr_it = cr_it.next;
+            cn_it = cn_it.next;
+        }
+
+        if (list) {
+            DynObject l = new DynObject(RxFrame.ListMO);
+            l.SetSlot("flat", Kernel.NewROScalar(Kernel.AnyP));
+            l.SetSlot("items", caps);
+            l.SetSlot("rest", new VarDeque());
+            return Kernel.NewRWListVar(l);
+        } else {
+            return caps.Count() != 0 ? caps[0] :
+                Kernel.NewRWScalar(Kernel.AnyP);
+        }
+    }
+
     public Variable SimpleWS() {
         int l = backing_ca.Length;
         int p = pos;
