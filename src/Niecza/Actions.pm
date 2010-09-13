@@ -352,8 +352,7 @@ sub regex_def { my ($cl, $M) = @_;
         return;
     }
 
-    my $sig = $M->{signature}[0] ? $M->{signature}[0]{_ast}
-        : $cl->get_placeholder_sig($M);
+    my $sig = $M->{signature}[0] ? $M->{signature}[0]{_ast} : Sig->simple();
 
     if ($scope =~ /state|augment|supersede/) {
         $M->sorry("Nonsensical scope $scope for regex");
