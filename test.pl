@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 424;
+plan 430;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -946,3 +946,14 @@ rxtest /y [ [ foo || bar ] | . ]: y/, "|| hides both sides from LTM",
     ("yky",), ("yfooy", "ybary");
 rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
     ("yay","yby","ycy"), Nil;
+
+{
+    # one CgOp bug manifested as a failure to compile this
+    ok (/ <?before x>: <ws>: /).defined, "unnamed regression";
+    my $ma = ("ab29x" ~~ /\d+/);
+    ok $ma.defined, "match is defined";
+    ok $ma.WHAT === Match, "matches are Match";
+    is $ma.from, 2, '$ma.from works';
+    is $ma.to, 4, '$ma.to works';
+    is $ma.Str, '29', '$ma.Str works';
+}

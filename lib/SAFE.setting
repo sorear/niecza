@@ -831,7 +831,20 @@ my class Cursor {
     method ws() { Q:CgOp { (rawcall (cast Cursor (@ {self})) SimpleWS) } }
 }
 
+my class Match {
+    method new($) { die "Match.new NYI" }
+    method from { Q:CgOp { (box Num (cast Double (getfield from
+        (cast Cursor (@ {self}))))) } }
+    method to { Q:CgOp { (box Num (cast Double (getfield pos
+        (cast Cursor (@ {self}))))) } }
+    method orig { Q:CgOp {
+        (box Str (getfield backing (cast Cursor (@ {self})))) } }
+    method chars { $.defined ?? $.to - $.from !! 0 }
+    method Str { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
+}
+
 PRE-INIT {
+    Q:CgOp { (rnull (rawsset RxFrame.MatchMO (rawcall (@ {Match}) GetMO))) };
     ClassHOW.HOW.add-method("add-multiregex",
         anon method add-multiregex($name, $rx) {
             Q:CgOp { (prog
@@ -845,22 +858,19 @@ PRE-INIT {
 my class Regex is Sub {
     method ACCEPTS($str) {
         my $i = 0;
-        my $win = 0;
+        my $mat;
         my $C = Cursor.new($str);
-        while !$win && ($i <= $str.chars) {
-            if (self)($C.cursor($i)) {
-                $win = 1;
-            }
-            $i++;
+        while !$mat && ($i <= $str.chars) {
+            $mat = (self)($C.cursor($i++));
         }
-        $win;
+        $mat.head;
     }
 }
 
 my class Grammar is Cursor {
     method parse($text) {
         my @results := self.new($text).TOP\
-            .grep({ $_.pos == $text.chars });
+            .grep({ $_.to == $text.chars });
         @results ?? @results.shift !! Any; # TODO List.at-pos
     }
 }

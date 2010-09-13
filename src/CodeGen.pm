@@ -78,6 +78,7 @@ use 5.010;
               LTMPushAlts  => [m => 'Void'],
               PushCapture  => [m => 'Void'],
               MakeCursor   => [m => 'Cursor'],
+              MakeMatch    => [m => 'Cursor'],
               SetPos       => [m => 'Void'],
               Backtrack    => [c => 'Void'],
               End          => [c => 'Void'] },
@@ -88,6 +89,7 @@ use 5.010;
         'Cursor' =>
             { At           => [m => 'Cursor'],
               pos          => [f => 'Int32'],
+              from         => [f => 'Int32'],
               backing      => [f => 'String'],
               SimpleWS     => [m => 'Variable'] },
         'Lexer' =>

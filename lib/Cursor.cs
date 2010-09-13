@@ -64,6 +64,9 @@ public sealed class RxFrame {
     // any more Lists
     public bool return_one;
 
+    // .from in matches
+    public int from;
+
     // our backing string, in a cheap to index form
     public string orig_s;
     public char[] orig;
@@ -80,6 +83,7 @@ public sealed class RxFrame {
         rootf = bt = new Choice(csr.xact, "RULE " + name, -1, default(State));
         st.klasses = new PSN<DynMetaObject>(csr.klass, null);
         st.pos = csr.pos;
+        from = csr.pos;
     }
 
     public Frame Backtrack(Frame th) {
@@ -226,16 +230,21 @@ public sealed class RxFrame {
         return new Cursor(st.klasses.obj, bt, orig_s, orig, st.pos);
     }
 
+    public Cursor MakeMatch() {
+        return new Cursor(orig_s, from, st.pos, st.captures, st.capnames);
+    }
+
+    public static DynMetaObject MatchMO;
     public static DynMetaObject ListMO;
     public static DynMetaObject GatherIteratorMO;
     public static IP6 EMPTYP;
     public Frame End(Frame th) {
         if (return_one) {
-            return Kernel.Take(th, Kernel.NewROScalar(MakeCursor()));
+            return Kernel.Take(th, Kernel.NewROScalar(MakeMatch()));
         } else {
             return_one = true;
             VarDeque ks = new VarDeque();
-            ks.Push(Kernel.NewROScalar(MakeCursor()));
+            ks.Push(Kernel.NewROScalar(MakeMatch()));
             DynObject it  = new DynObject(GatherIteratorMO);
             it.SetSlot("reify", Kernel.NewRWScalar(Kernel.AnyP));
             it.SetSlot("frame", Kernel.NewRWScalar(th));
@@ -253,6 +262,9 @@ public sealed class RxFrame {
 
 // This is used to carry match states in and out of subrules.  Within subrules,
 // match states are represented much more ephemerally in the state of RxFrame.
+
+// this does double duty backing Match; note that Cursor and Match need to be
+// treated polymorphically in a couple places
 public class Cursor : IP6 {
     public static bool Trace =
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
@@ -261,10 +273,23 @@ public class Cursor : IP6 {
     public Choice xact;
     public string backing;
     public char[] backing_ca;
+    public int from;
     public int pos;
+    public PSN<Cursor> captures;
+    public PSN<string[]> capnames;
 
     public Cursor(IP6 proto, string text)
         : this(proto.GetMO(), null, text, text.ToCharArray(), 0) { }
+
+    public Cursor(string backing, int from, int pos, PSN<Cursor> captures,
+            PSN<string[]> capnames) {
+        this.backing = backing;
+        this.captures = captures;
+        this.capnames = capnames;
+        this.pos = pos;
+        this.from = from;
+        this.klass = RxFrame.MatchMO;
+    }
 
     public Cursor(DynMetaObject klass, Choice xact, string backing, char[] backing_ca, int pos) {
         this.klass = klass;
