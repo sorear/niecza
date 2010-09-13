@@ -373,13 +373,14 @@ sub regex_def { my ($cl, $M) = @_;
     }
 
     local $::symtext = $symtext;
+    my $lad = Optimizer::RxSimple::run_lad($ast->lad);
     $ast = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
         method_too => ($scope eq 'has' ? $name : undef),
         proto_too => ($scope eq 'has' ? $unsymtext : undef),
         body => Body->new(
-            ltm   => $ast->lad,
+            ltm   => $lad,
             class => 'Regex',
             type  => 'regex',
             signature => $sig->for_regex,

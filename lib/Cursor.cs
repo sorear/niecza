@@ -634,29 +634,33 @@ public class LADPlus : LAD {
 }
 
 public class LADSequence : LAD {
-    public readonly LAD fst;
-    public readonly LAD snd;
-    public LADSequence(LAD fst, LAD snd) { this.fst = fst; this.snd = snd; }
+    public readonly LAD[] args;
+    public LADSequence(LAD[] args) { this.args = args; }
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
-        fst.QueryLiteral(pad, out len, out cont);
-        if (cont) {
+        int i = 0;
+        len = 0; cont = true;
+        while (cont && i < args.Length) {
             int l1 = len;
-            snd.QueryLiteral(pad, out len, out cont);
+            args[i].QueryLiteral(pad, out len, out cont);
             len += l1;
+            i++;
         }
     }
 
     public override void ToNFA(NFA pad, int from, int to) {
-        int knot = pad.AddNode();
-        fst.ToNFA(pad, from, knot);
-        snd.ToNFA(pad, knot, to);
+        for (int i = 0; i < args.Length; i++) {
+            int knot = (i == args.Length - 1) ? to : pad.AddNode();
+            args[i].ToNFA(pad, from, knot);
+            from = knot;
+        }
+        if (from != to) pad.AddEdge(from, to, null);
     }
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "seq:");
-        fst.Dump(indent + 4);
-        snd.Dump(indent + 4);
+        foreach (LAD l in args)
+            l.Dump(indent + 4);
     }
 }
 

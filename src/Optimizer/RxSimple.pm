@@ -8,6 +8,10 @@ sub run {
     $_[0]->rxsimp(0);
 }
 
+sub run_lad {
+    $_[0];
+}
+
 # XXX should use a multi sub.
 sub RxOp::rxsimp { my ($self, $cut) = @_;
     my $selfp = bless { %$self }, ref($self);
@@ -36,6 +40,13 @@ sub RxOp::Sequence::mayback { my ($self) = @_;
         return 1 if $_->mayback;
     }
     return 0;
+}
+
+sub RxOp::Alt::rxsimp { my ($self, $cut) = @_;
+    my @kids = map { $_->rxsimp($cut) } @{ $self->zyg };
+    return RxOp::Alt->new(
+        lads => [ map { Optimizer::RxSimple::run_lad($_) } @{ $self->lads } ],
+        zyg => \@kids);
 }
 
 sub RxOp::Cut::rxsimp { my ($self, $cut) = @_;

@@ -690,7 +690,7 @@ use warnings;
             $body->to_cgop,
             (!$body->ltm ? () : (
                 CgOp::Primitive->new(op => [ 'set_ltm', $body->csname ],
-                    zyg => [ $body->ltm ]))),
+                    zyg => [ RxOp::lad2cgop($body->ltm) ]))),
             CgOp::Primitive->new(op => [ 'close_sub', $body, ($body->class ne 'Sub') ], zyg => ($body->class eq 'Sub' ? [] : [ fetch(scopedlex($body->class)) ])))
     }
 

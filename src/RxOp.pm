@@ -28,6 +28,23 @@ use CgOp;
     my $nlabel = 0;
     sub label { "b" . ($nlabel++) }
 
+    sub lad2cgop {
+        my ($l) = @_;
+        my $r = ref $l;
+        if (!$r) {
+            return CgOp::clr_string($l);
+        } elsif ($r eq 'ARRAY') {
+            if (!@$l || ref ($l->[0])) {
+                return CgOp::rawnewarr('LAD', map { lad2cgop($_) } @$l);
+            } else {
+                my ($h,@r) = @$l;
+                return CgOp::rawnew("LAD$h", map { lad2cgop($_) } @r);
+            }
+        } else {
+            return $l;
+        }
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -51,7 +68,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADStr', CgOp::clr_string($self->text));
+        [ 'Str', $self->text ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -98,7 +115,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        if ($self->minimal) { return CgOp::rawnew('LADImp'); }
+        if ($self->minimal) { return [ 'Imp' ]; }
         my ($mi,$ma) = ($self->min, $self->max // -1);
         my $str;
         if ($mi == 0 && $ma == -1) { $str = 'Star' }
@@ -106,9 +123,9 @@ use CgOp;
         if ($mi == 0 && $ma == 1) { $str = 'Opt' }
 
         if ($str) {
-            CgOp::rawnew("LAD$str", $self->zyg->[0]->lad);
+            [ $str, $self->zyg->[0]->lad ];
         } else {
-            CgOp::rawnew("LADImp");
+            [ 'Imp' ];
         }
     }
 
@@ -132,11 +149,7 @@ use CgOp;
     sub lad {
         my ($self) = @_;
         my @z = map { $_->lad } @{ $self->zyg };
-        while (@z >= 2) {
-            my $x = pop @z;
-            $z[-1] = CgOp::rawnew('LADSequence', $z[-1], $x);
-        }
-        $z[0] // CgOp::rawnew('LADNull');
+        [ 'Sequence', \@z ];
     }
 
 
@@ -170,7 +183,7 @@ use CgOp;
         @code;
     }
 
-    sub lad { CgOp::rawnew('LADImp') }
+    sub lad { [ 'Imp' ] }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -255,8 +268,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADSequence', $self->zyg->[0]->lad,
-            CgOp::rawnew('LADImp'));
+        [ 'Sequence', [ $self->zyg->[0]->lad, [ 'Imp' ] ] ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -285,7 +297,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADNull');
+        [ 'Null' ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -376,7 +388,7 @@ use CgOp;
         if (my $true = $self->true) {
             return $true->lad;
         }
-        CgOp::rawnew('LADMethod', CgOp::clr_string($self->name));
+        [ 'Method', $self->name ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -397,7 +409,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADImp');
+        [ 'Imp' ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -417,7 +429,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADImp'); #special case
+        [ 'Imp' ]; #special case
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -436,7 +448,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADNull');
+        [ 'Null' ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -459,6 +471,9 @@ use CgOp;
         \%used;
     }
 
+    has lads => (is => 'ro', isa => 'ArrayRef', lazy => 1,
+        default => sub { [ map { $_->lad } @{ $_[0]->zyg } ] });
+
     sub code {
         my ($self, $body) = @_;
         my @ls = map { $self->label } @{ $self->zyg };
@@ -468,8 +483,7 @@ use CgOp;
         push @code, CgOp::rawcall(CgOp::rxframe, "LTMPushAlts",
             CgOp::rawscall('Lexer.GetLexer',
                 CgOp::rawcall(CgOp::rxframe, 'MakeCursor'),
-                CgOp::const(CgOp::rawnewarr('LAD',
-                        map { $_->lad } @{ $self->zyg })),
+                CgOp::const(RxOp::lad2cgop($self->lads)),
                 CgOp::clr_string('')),
             CgOp::const(CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls)));
         push @code, CgOp::goto('backtrack');
@@ -485,8 +499,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADAny', CgOp::rawnewarr('LAD',
-                map { $_->lad } @{ $self->zyg }));
+        [ 'Any', [ map { $_->lad } @{ $self->zyg } ] ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -509,7 +522,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADImp');
+        [ 'Imp' ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -563,8 +576,8 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        $self->cutltm ? CgOp::rawnew('LADImp') :
-            CgOp::rawnew('LADProtoRegex', CgOp::clr_string($self->name));
+        $self->cutltm ? [ 'Imp' ] :
+            [ 'ProtoRegex', $self->name ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -583,7 +596,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADDot');
+        [ 'Dot' ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -612,7 +625,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADCC', $self->ccop);
+        [ 'CC', $self->ccop ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -631,7 +644,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        CgOp::rawnew('LADNone');
+        [ 'None' ];
     }
 
     __PACKAGE__->meta->make_immutable;
