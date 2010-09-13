@@ -32,10 +32,8 @@ namespace Niecza {
                 Variable[] pos, Dictionary<string, Variable> named) {
             IP6 m;
             //Kernel.LogNameLookup(name);
-            foreach (DynMetaObject k in GetMO().mro) {
-                if (k.local.TryGetValue(name, out m)) {
-                    return m.Invoke(caller, pos, named);
-                }
+            if (GetMO().mro_methods.TryGetValue(name, out m)) {
+                return m.Invoke(caller, pos, named);
             }
             return Fail(caller, "Unable to resolve method " + name);
         }
@@ -63,21 +61,19 @@ namespace Niecza {
 
         public virtual Frame Invoke(Frame c, Variable[] p,
                 Dictionary<string, Variable> n) {
-            foreach (DynMetaObject k in GetMO().mro) {
-                DynMetaObject.InvokeHandler ih = k.OnInvoke;;
-                if (ih != null) {
-                    return ih(this, c, p, n);
-                }
+            DynMetaObject.InvokeHandler ih = GetMO().mro_OnInvoke;
+            if (ih != null) {
+                return ih(this, c, p, n);
+            } else {
+                Variable[] np = new Variable[p.Length + 1];
+                Array.Copy(p, 0, np, 1, p.Length);
+                np[0] = Kernel.NewROScalar(this);
+                return InvokeMethod(c, "INVOKE", np, n);
             }
-
-            Variable[] np = new Variable[p.Length + 1];
-            Array.Copy(p, 0, np, 1, p.Length);
-            np[0] = Kernel.NewROScalar(this);
-            return InvokeMethod(c, "INVOKE", np, n);
         }
 
         public virtual Frame Fetch(Frame c) {
-            DynMetaObject.FetchHandler fh = GetMO().OnFetch;
+            DynMetaObject.FetchHandler fh = GetMO().mro_OnFetch;
             if (fh != null) {
                 return fh(this, c);
             } else {
@@ -87,7 +83,7 @@ namespace Niecza {
         }
 
         public virtual Frame Store(Frame c, IP6 o) {
-            DynMetaObject.StoreHandler sh = GetMO().OnStore;
+            DynMetaObject.StoreHandler sh = GetMO().mro_OnStore;
             if (sh != null) {
                 return sh(this, c, o);
             } else {
@@ -302,6 +298,11 @@ namespace Niecza {
         public FetchHandler OnFetch;
         public StoreHandler OnStore;
 
+        public InvokeHandler mro_OnInvoke;
+        public FetchHandler mro_OnFetch;
+        public StoreHandler mro_OnStore;
+        public Dictionary<string, IP6> mro_methods;
+
         public List<DynMetaObject> superclasses
             = new List<DynMetaObject>();
         public Dictionary<string, IP6> local
@@ -311,6 +312,11 @@ namespace Niecza {
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
 
+        private WeakReference wr_this;
+        // protected by static lock
+        private HashSet<WeakReference> subclasses = new HashSet<WeakReference>();
+        private static object mro_cache_lock = new object();
+
         public int FindSlot(string name) {
             //Kernel.LogNameLookup(name);
             return slotMap[name];
@@ -318,16 +324,67 @@ namespace Niecza {
 
         public Dictionary<string, List<DynObject>> multiregex;
 
-        public List<DynMetaObject> mro;
+        public DynMetaObject[] mro;
         public HashSet<DynMetaObject> isa;
 
         public DynMetaObject(string name) {
             this.name = name;
-            this.mro = new List<DynMetaObject>();
-            mro.Add(this);
+            this.wr_this = new WeakReference(this);
 
             isa = new HashSet<DynMetaObject>();
-            isa.Add(this);
+        }
+
+        private void Revalidate() {
+            mro_OnStore = null;
+            mro_OnInvoke = null;
+            mro_OnFetch = null;
+            mro_methods = new Dictionary<string,IP6>();
+
+            if (mro == null)
+                return;
+
+            for (int kx = mro.Length - 1; kx >= 0; kx--) {
+                DynMetaObject k = mro[kx];
+                if (k.OnStore != null)
+                    mro_OnStore = k.OnStore;
+                if (k.OnFetch != null)
+                    mro_OnFetch = k.OnFetch;
+                if (k.OnInvoke != null)
+                    mro_OnInvoke = k.OnInvoke;
+
+                foreach (KeyValuePair<string,IP6> m in k.local)
+                    mro_methods[m.Key] = m.Value;
+            }
+        }
+
+        private void SetMRO(DynMetaObject[] arr) {
+            lock(mro_cache_lock) {
+                if (mro != null)
+                    foreach (DynMetaObject k in mro)
+                        k.subclasses.Remove(wr_this);
+                foreach (DynMetaObject k in arr)
+                    k.subclasses.Add(wr_this);
+            }
+            mro = arr;
+        }
+
+        ~DynMetaObject() {
+            lock(mro_cache_lock)
+                if (mro != null)
+                    foreach (DynMetaObject k in mro)
+                        k.subclasses.Remove(wr_this);
+        }
+
+        private void Invalidate() {
+            if (mro == null)
+                return;
+            List<DynMetaObject> notify = new List<DynMetaObject>();
+            lock(mro_cache_lock)
+                foreach (WeakReference k in subclasses)
+                    notify.Add(k.Target as DynMetaObject);
+            foreach (DynMetaObject k in notify)
+                if (k != null)
+                    k.Revalidate();
         }
 
         public void AddMultiRegex(string name, IP6 m) {
@@ -343,24 +400,18 @@ namespace Niecza {
 
         public IP6 Can(string name) {
             IP6 m;
-            foreach (DynMetaObject k in mro)
-                if (k.local.TryGetValue(name, out m))
-                    return m;
+            if (mro_methods.TryGetValue(name, out m))
+                return m;
             return null;
         }
 
         public Dictionary<string,IP6> AllMethods() {
-            Dictionary<string,IP6> r = new Dictionary<string,IP6>();
-            foreach (DynMetaObject k in mro)
-                foreach (KeyValuePair<string,IP6> kv in k.local)
-                    if (!r.ContainsKey(kv.Key))
-                        r[kv.Key] = kv.Value;
-            return r;
+            return mro_methods;
         }
 
         public HashSet<IP6> AllMethodsSet() {
             HashSet<IP6> r = new HashSet<IP6>();
-            foreach (KeyValuePair<string,IP6> kv in AllMethods())
+            foreach (KeyValuePair<string,IP6> kv in mro_methods)
                 r.Add(kv.Value);
             return r;
         }
@@ -378,18 +429,20 @@ namespace Niecza {
             });
         }
 
-        private static void DumpC3Lists(string f, List<DynMetaObject> m,
+        private static void DumpC3Lists(string f, DynMetaObject[] m,
                 List<List<DynMetaObject>> d) {
-            Console.WriteLine(f + MROStr(m) + " // " +
+            Console.WriteLine(f + MROStr(new List<DynMetaObject>(m)) + " // " +
                     Kernel.JoinS(" | ", d, MROStr));
         }
 
         public void AddMethod(string name, IP6 code) {
             local[name] = code;
+            Invalidate();
         }
 
         public void AddAttribute(string name) {
             local_attr.Add(name);
+            Invalidate();
         }
 
         public void AddSuperclass(DynMetaObject other) {
@@ -400,7 +453,7 @@ namespace Niecza {
         // just be sure that the attrib list doesn't change
         public void Complete() {
             List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
-            mro = new List<DynMetaObject>();
+            List<DynMetaObject> mro_l = new List<DynMetaObject>();
             isa = new HashSet<DynMetaObject>();
             toMerge.Add(new List<DynMetaObject>());
             toMerge[0].Add(this);
@@ -436,7 +489,7 @@ top:
                     }
                     // no reason not to immediately put this, and by loop
                     // order the C3 condition is kept
-                    mro.Add(cand);
+                    mro_l.Add(cand);
                     isa.Add(cand);
                     foreach (List<DynMetaObject> l in toMerge) {
                         l.Remove(cand);
@@ -456,12 +509,16 @@ blocked:
                 break;
             }
 
+            SetMRO(mro_l.ToArray());
+
             nslots = 0;
             foreach (DynMetaObject k in mro) {
                 foreach (string an in k.local_attr) {
                     slotMap[an] = nslots++;
                 }
             }
+
+            Invalidate();
         }
     }
 
@@ -822,9 +879,9 @@ blocked:
 
         public static Variable DefaultNew(IP6 proto) {
             DynObject n = new DynObject(((DynObject)proto).klass);
-            List<DynMetaObject> mro = n.klass.mro;
+            DynMetaObject[] mro = n.klass.mro;
 
-            for (int i = mro.Count - 1; i >= 0; i--) {
+            for (int i = mro.Length - 1; i >= 0; i--) {
                 foreach (string s in mro[i].local_attr) {
                     n.SetSlot(s, NewRWScalar(AnyP));
                 }
