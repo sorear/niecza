@@ -9,7 +9,42 @@ sub run {
 }
 
 sub run_lad {
-    $_[0];
+    my $lad = shift;
+    my ($op, @zyg) = @$lad;
+    if ($op eq 'Sequence') {
+        my @ozyg;
+        for my $z (@{ $zyg[0] }) {
+            my $oz = run_lad($z);
+            if ($oz->[0] eq 'Sequence') {
+                push @ozyg, @{ $oz->[1] };
+            } elsif ($oz->[0] eq 'Null') {
+            } else {
+                push @ozyg, $oz;
+            }
+        }
+        for (my $ix = 0; $ix < @ozyg; ) {
+            return ['None'] if ($ozyg[$ix][0] eq 'None');
+            if ($ozyg[$ix][0] eq 'Imp') {
+                $#ozyg = $ix;
+                last;
+            } elsif ($ix >= 1 && $ozyg[$ix][0] eq 'Str' &&
+                    $ozyg[$ix-1][0] eq 'Str') {
+                $ozyg[$ix-1][1] .= $ozyg[$ix][1];
+                splice @ozyg, $ix, 1;
+            } else {
+                $ix++;
+            }
+        }
+        if (@ozyg == 0) {
+            return [ 'Null' ];
+        } elsif (@ozyg == 1) {
+            return $ozyg[0];
+        } else {
+            return [ 'Sequence', [ @ozyg ] ];
+        }
+    } else {
+        return $lad;
+    }
 }
 
 # XXX should use a multi sub.
