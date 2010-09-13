@@ -200,6 +200,16 @@ public sealed class RxFrame {
         return !(st.pos == end || !x.Accepts(orig[st.pos++]));
     }
 
+    public bool ScanCClass(int min, int max, CC x) {
+        int i;
+        int maxr = end - st.pos;
+        if (maxr < max) max = maxr;
+
+        for (i = 0; i < max && x.Accepts(orig[st.pos + i]); i++);
+        st.pos += i;
+        return (i >= min);
+    }
+
     public void LTMPushAlts(Lexer lx, int[] addrs) {
         PushBacktrack("LTM", -1);
         int[] cases = lx.Run(orig_s, st.pos);
