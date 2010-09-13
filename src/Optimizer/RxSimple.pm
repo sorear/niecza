@@ -73,4 +73,9 @@ sub RxOp::Sigspace::mayback { my ($self) = @_;
     return !$self->selfcut;
 }
 
+sub RxOp::String::mayback { 0 }
+sub RxOp::Any::mayback { 0 }
+sub RxOp::None::mayback { 0 }
+sub RxOp::CClassElem::mayback { 0 }
+
 1;
