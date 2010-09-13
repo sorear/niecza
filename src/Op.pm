@@ -1065,6 +1065,7 @@ use CgOp;
                 CgOp::null('Cursor')),
             $self->rxop->code($body),
             CgOp::rawccall(CgOp::rxframe, 'End'),
+            CgOp::label('backtrack'),
             CgOp::rawccall(CgOp::rxframe, 'Backtrack'),
             CgOp::null('Variable'));
     }

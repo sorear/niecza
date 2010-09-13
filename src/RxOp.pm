@@ -83,10 +83,9 @@ use CgOp;
                 CgOp::int($self->min)),
             CgOp::rxpushb('QUANT', $exit), CgOp::prog());
         if (defined $self->max) {
-            push @code, CgOp::ternary(CgOp::compare('>=',
+            push @code, CgOp::cgoto('backtrack', CgOp::compare('>=',
                     CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
-                    CgOp::int($self->max)),
-                CgOp::rawccall(CgOp::rxframe, 'Backtrack'), CgOp::prog());
+                    CgOp::int($self->max)));
         }
         push @code, $self->zyg->[0]->code($body);
         push @code, CgOp::rawcall(CgOp::rxframe, 'IncQuant');
@@ -244,11 +243,11 @@ use CgOp;
         push @code, $self->zyg->[0]->code($body);
         push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
             CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
-        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::goto('backtrack');
         push @code, CgOp::label($fail);
         push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
             CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
-        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::goto('backtrack');
         push @code, CgOp::label($pass);
 
         @code;
@@ -278,7 +277,7 @@ use CgOp;
         push @code, $self->zyg->[0]->code($body);
         push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
             CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
-        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::goto('backtrack');
         push @code, CgOp::label($pass);
 
         @code;
@@ -338,13 +337,13 @@ use CgOp;
         my @pushcapf = (@{ $self->captures } == 0) ? () : (
             CgOp::rawcall(CgOp::rxframe, "PushCapture",
                 $namesf, CgOp::cast('Cursor', CgOp::letvar("k"))));
-        my $updatef =
-            CgOp::ternary(CgOp::rawcall(CgOp::letvar("k"), 'IsDefined'),
-                CgOp::prog(
-                    @pushcapf, CgOp::rawcall(CgOp::rxframe, "SetPos",
-                        CgOp::getfield("pos", CgOp::cast("Cursor",
-                                CgOp::letvar("k"))))),
-                CgOp::rawccall(CgOp::rxframe, "Backtrack"));
+        my $updatef = CgOp::prog(
+            CgOp::ncgoto('backtrack', CgOp::rawcall(CgOp::letvar("k"),
+                    'IsDefined')),
+            @pushcapf,
+            CgOp::rawcall(CgOp::rxframe, "SetPos",
+                CgOp::getfield("pos", CgOp::cast("Cursor",
+                        CgOp::letvar("k")))));
 
         my @code;
 
@@ -473,7 +472,7 @@ use CgOp;
                         map { $_->lad } @{ $self->zyg })),
                 CgOp::clr_string('')),
             CgOp::const(CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls)));
-        push @code, CgOp::rawccall(CgOp::rxframe, 'Backtrack');
+        push @code, CgOp::goto('backtrack');
         for (my $i = 0; $i < @ls; $i++) {
             push @code, CgOp::label($ls[$i]);
             push @code, $self->zyg->[$i]->code($body);
@@ -536,7 +535,7 @@ use CgOp;
           "ks",  CgOp::null('Variable'),
           "k",   CgOp::null('IP6'),
           CgOp::label('nextfn'),
-          CgOp::cgoto('end',
+          CgOp::cgoto('backtrack',
             CgOp::compare('>=', CgOp::letvar("i"),
               CgOp::getfield("Length", CgOp::letvar("fns")))),
           CgOp::rxpushb('LTM', 'nextfn'),
@@ -546,7 +545,7 @@ use CgOp;
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
           CgOp::letvar("k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
                 CgOp::fetch(CgOp::letvar("ks"))))),
-          CgOp::ncgoto('end',
+          CgOp::ncgoto('backtrack',
             CgOp::rawcall(CgOp::letvar("k"), 'IsDefined')),
           CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
               CgOp::letvar("k"))),
@@ -554,13 +553,12 @@ use CgOp;
                 CgOp::letvar('ks'), "list"), "clone")),
           CgOp::sink(CgOp::methodcall(CgOp::letvar('ks'), 'shift')),
           CgOp::label('nextcsr'),
-          CgOp::ncgoto('end', CgOp::unbox('Boolean', CgOp::fetch(
+          CgOp::ncgoto('backtrack', CgOp::unbox('Boolean', CgOp::fetch(
                 CgOp::methodcall(CgOp::letvar('ks'), 'Bool')))),
           CgOp::rxpushb('SUBRULE', 'nextcsr'),
           CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
               CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))),
-          CgOp::label('end'),
-          CgOp::rawccall(CgOp::rxframe, 'Backtrack'))
+          CgOp::goto('backtrack'));
     }
 
     sub lad {
@@ -628,7 +626,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawccall(CgOp::rxframe, "Backtrack");
+        CgOp::goto('backtrack');
     }
 
     sub lad {

@@ -687,7 +687,7 @@ use 5.010;
     sub rxbprim {
         my ($self, $name, $nargs) = @_;
         my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
-        $self->_emit("if (!th.rx.$name(" . join(", ", @args) . ")) return th.rx.Backtrack(th)");
+        $self->_emit("if (!th.rx.$name(" . join(", ", @args) . ")) goto case \@\@Lbacktrack");
     }
 
     sub rxpushb {
