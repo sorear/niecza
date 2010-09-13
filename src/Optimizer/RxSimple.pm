@@ -77,5 +77,24 @@ sub RxOp::String::mayback { 0 }
 sub RxOp::Any::mayback { 0 }
 sub RxOp::None::mayback { 0 }
 sub RxOp::CClassElem::mayback { 0 }
+sub RxOp::CutLTM::mayback { 0 }
+sub RxOp::CutRule::mayback { 0 }
+sub RxOp::Before::mayback { 0 }
+# it's not uncommon to write <!before> and <?before>
+sub RxOp::Before::rxsimp { my ($self, $cut) = @_;
+    my $z = $self->zyg->[0]->rxsimp(1);
+    if ($z->isa('RxOp::Before')) {
+        return RxOp::Before->new(zyg => $z->zyg);
+    }
+    return RxOp::Before->new(zyg => [ $z ]);
+}
+sub RxOp::NotBefore::mayback { 0 }
+sub RxOp::NotBefore::rxsimp { my ($self, $cut) = @_;
+    my $z = $self->zyg->[0]->rxsimp(1);
+    if ($z->isa('RxOp::Before')) {
+        return RxOp::NotBefore->new(zyg => $z->zyg);
+    }
+    return RxOp::NotBefore->new(zyg => [ $z ]);
+}
 
 1;
