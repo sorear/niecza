@@ -554,6 +554,9 @@ use warnings;
     }
 
     sub rxframe { getfield('rx', callframe) }
+    sub rxcall { rawcall(rxframe, @_) }
+    sub pushcut { rxcall('PushCutGroup', clr_string($_[0])) }
+    sub popcut { rxcall('PopCutGroup') }
 
     sub letvar {
         $_[1] ?

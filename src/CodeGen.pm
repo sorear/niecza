@@ -64,7 +64,6 @@ use 5.010;
         'RxFrame' =>
             { Exact        => [m => 'Boolean'],
               Exact1       => [m => 'Boolean'],
-              IsTopCut     => [m => 'Boolean'],
               IncQuant     => [m => 'Void'],
               GetQuant     => [m => 'Int32'],
               OpenQuant    => [m => 'Void'],
@@ -72,7 +71,8 @@ use 5.010;
               CommitGroup  => [m => 'Void'],
               CommitRule   => [m => 'Void'],
               CommitAll    => [m => 'Void'],
-              CommitSpecificRule => [m => 'Void'],
+              PushCutGroup => [m => 'Void'],
+              PopCutGroup  => [m => 'Void'],
               GetCursorList=> [m => 'Variable'],
               SetCursorList=> [m => 'Void'],
               LTMPushAlts  => [m => 'Void'],
@@ -692,8 +692,7 @@ use 5.010;
 
     sub rxpushb {
         my ($self, $tag, $label) = @_;
-        push @{ $self->buffer }, "    th.rx.PushBacktrack(" . qm($tag) .
-            ", " . ($label ? "\@\@L$label" : "-1") . ");\n";
+        push @{ $self->buffer }, "    th.rx.PushBacktrack(\@\@L$label);\n";
     }
 
     sub return {

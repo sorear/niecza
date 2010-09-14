@@ -6,11 +6,14 @@ using System.Text;
 // stuff that should 'N'est, like subrules do
 public sealed class NState {
     public NState next;
+    public string name;
+    public Choice cut_to;
     public int quant;
     public DynMetaObject klass;
 
-    public NState(NState proto) {
-        next = proto; if (proto != null) klass = proto.klass;
+    public NState(Choice cut_to, string name, NState proto) {
+        next = proto; this.cut_to = cut_to; this.name = name;
+        if (proto != null) klass = proto.klass;
     }
 }
 
@@ -39,30 +42,18 @@ public sealed class Choice {
     // the current Choice doesn't really have any of these fields, which are
     // used for backtrack control
     public int ip;
-    public string tag;
-    public bool committed;
 
     public void Commit() {
         // we aren't going to backtrack here, so we can't use this.
         // help out the GC
         st.subrule_iter = null;
-        committed = true;
+        ip = (ip < 0) ? ip : (-ip-1);
     }
 
-    public Choice(Choice prev, string tag, int ip, State st) {
-        this.tag = tag;
+    public Choice(Choice prev, int ip, State st) {
         this.ip = ip;
         this.st = st;
         this.prev = prev;
-    }
-
-    public void Dump(string st) {
-        string ac = st;
-        for (Choice x = this; x != null; x = x.prev) {
-            ac += x.committed ? " + " : " - ";
-            ac += x.tag;
-        }
-        Console.WriteLine(ac);
     }
 }
 
@@ -93,8 +84,8 @@ public sealed class RxFrame {
         orig = csr.backing_ca;
         orig_s = csr.backing;
         end = orig.Length;
-        rootf = bt = new Choice(csr.xact, "RULE " + name, -1, default(State));
-        st.ns = new NState(csr.nstate);
+        rootf = bt = csr.xact;
+        st.ns = new NState(rootf, "RULE " + name, csr.nstate);
         st.ns.klass = csr.klass;
         st.pos = csr.pos;
         from = csr.pos;
@@ -102,7 +93,7 @@ public sealed class RxFrame {
 
     public Frame Backtrack(Frame th) {
         // throw away cut or mark-only frames
-        while (bt != rootf && (bt.committed || bt.ip < 0))
+        while (bt != rootf && (bt.ip < 0))
             bt = bt.prev;
         if (bt == rootf) {
             if (return_one) {
@@ -124,8 +115,8 @@ public sealed class RxFrame {
         }
     }
 
-    public void PushBacktrack(string name, int ip) {
-        bt = new Choice(bt, name, ip, st);
+    public void PushBacktrack(int ip) {
+        bt = new Choice(bt, ip, st);
     }
 
     public void PushCapture(string[] cn, Cursor cl) {
@@ -144,21 +135,18 @@ public sealed class RxFrame {
         st.pos = pos;
     }
 
+    public void PushCutGroup(string tag) {
+        st.ns = new NState(bt, tag, st.ns);
+    }
+
+    public void PopCutGroup() {
+        st.ns = st.ns.next;
+    }
+
     public void CommitAll() {
         Choice x = bt;
         while (x != null) {
             x.Commit();
-            x = x.prev;
-        }
-    }
-
-    public void CommitSpecificRule(string name) {
-        Choice x = bt;
-        name = "RULE " + name;
-        while (x != null) {
-            x.Commit();
-            if (x.tag.Equals(name))
-                break;
             x = x.prev;
         }
     }
@@ -171,25 +159,16 @@ public sealed class RxFrame {
         }
     }
 
-    public void CommitGroup(string open, string close) {
-        Choice x = bt;
-        if (Cursor.Trace)
-            x.Dump("committing " + open + "," + close);
-        int level = 1;
-        while (x != null) {
-            x.Commit();
-            if (x.tag == open)
-                level--;
-            else if (x.tag == close)
-                level++;
-            x = x.prev;
-            if (level == 0)
-                break;
+    public void CommitGroup(string id) {
+        NState nsi = st.ns;
+        while (nsi != null && !nsi.name.Equals(id))
+            nsi = nsi.next;
+        Choice to = (nsi != null) ? nsi.cut_to : null;
+        Choice it = bt;
+        while (it != to) {
+            it.Commit();
+            it = it.prev;
         }
-    }
-
-    public bool IsTopCut() {
-        return bt.committed;
     }
 
     public bool Exact(string str) {
@@ -224,15 +203,15 @@ public sealed class RxFrame {
     }
 
     public void LTMPushAlts(Lexer lx, int[] addrs) {
-        PushBacktrack("LTM", -1);
+        PushCutGroup("LTM");
         int[] cases = lx.Run(orig_s, st.pos);
         for (int i = cases.Length - 1; i >= 0; i--) {
-            PushBacktrack("LTMALT", addrs[cases[i]]);
+            PushBacktrack(addrs[cases[i]]);
         }
     }
 
     public void OpenQuant() {
-        st.ns = new NState(st.ns);
+        st.ns = new NState(bt, "QUANT", st.ns);
     }
 
     public int CloseQuant() {

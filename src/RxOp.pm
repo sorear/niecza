@@ -172,14 +172,12 @@ use CgOp;
         my $n = @{ $self->zyg };
 
         for (my $i = 0; $i < $n; $i++) {
-            push @code, CgOp::rxpushb("SEQALT",
-                ($i == $n - 1) ? undef : $ends[$i]);
+            push @code, CgOp::rxpushb("SEQALT", $ends[$i]) unless $i == $n - 1;
             push @code, $self->zyg->[$i]->code($body);
             push @code, CgOp::goto($ends[$n-1]) unless $i == $n-1;
             push @code, CgOp::label($ends[$i]);
         }
 
-        push @code, CgOp::rxpushb("ENDSEQALT");
         @code;
     }
 
@@ -198,9 +196,9 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         my @code;
-        push @code, CgOp::rxpushb("BRACK");
+        push @code, CgOp::pushcut("BRACK");
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rxpushb("ENDBRACK");
+        push @code, CgOp::popcut();
         @code;
     }
 
@@ -222,11 +220,11 @@ use CgOp;
         my ($self, $body) = @_;
 
         my @code;
-        push @code, CgOp::rxpushb("CUTGRP");
+        push @code, CgOp::pushcut("CUTGRP");
         push @code, $self->zyg->[0]->code($body);
         push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
-            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
-        push @code, CgOp::rxpushb("ENDCUTGRP");
+            CgOp::clr_string("CUTGRP"));
+        push @code, CgOp::popcut();
 
         @code;
     }
@@ -248,22 +246,8 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
 
-        my $fail = $self->label;
-        my $pass = $self->label;
-        my @code;
-        push @code, CgOp::rxpushb("CUTGRP", $pass);
-        push @code, CgOp::rxpushb("CUTGRP", $fail);
-        push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
-            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
-        push @code, CgOp::goto('backtrack');
-        push @code, CgOp::label($fail);
-        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
-            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
-        push @code, CgOp::goto('backtrack');
-        push @code, CgOp::label($pass);
-
-        @code;
+        RxOp::NotBefore->new(zyg => [RxOp::NotBefore->new(zyg => $self->zyg)])
+            ->code($body);
     }
 
     sub lad {
@@ -285,12 +269,13 @@ use CgOp;
 
         my $pass = $self->label;
         my @code;
+        push @code, CgOp::pushcut("CUTGRP");
         push @code, CgOp::rxpushb("CUTGRP", $pass);
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
-            CgOp::clr_string("CUTGRP"), CgOp::clr_string("ENDCUTGRP"));
+        push @code, CgOp::rxcall('CommitGroup', CgOp::clr_string("CUTGRP"));
         push @code, CgOp::goto('backtrack');
         push @code, CgOp::label($pass);
+        push @code, CgOp::popcut;
 
         @code;
     }
@@ -344,17 +329,16 @@ use CgOp;
 
         my $namesf = CgOp::const(CgOp::rawnewarr('String',
                 map { CgOp::clr_string($_) } @{ $self->captures }));
-        my $callf = CgOp::methodcall(CgOp::newscalar(CgOp::rawcall(
-                    CgOp::rxframe, "MakeCursor")), $self->name);
+        my $callf = CgOp::methodcall(CgOp::newscalar(
+                CgOp::rxcall("MakeCursor")), $self->name);
         my @pushcapf = (@{ $self->captures } == 0) ? () : (
-            CgOp::rawcall(CgOp::rxframe, "PushCapture",
-                $namesf, CgOp::cast('Cursor', CgOp::letvar("k"))));
+            CgOp::rxcall("PushCapture", $namesf,
+                CgOp::cast('Cursor', CgOp::letvar("k"))));
         my $updatef = CgOp::prog(
             CgOp::ncgoto('backtrack', CgOp::rawcall(CgOp::letvar("k"),
                     'IsDefined')),
             @pushcapf,
-            CgOp::rawcall(CgOp::rxframe, "SetPos",
-                CgOp::getfield("pos", CgOp::cast("Cursor",
+            CgOp::rxcall("SetPos", CgOp::getfield("pos", CgOp::cast("Cursor",
                         CgOp::letvar("k")))));
 
         my @code;
@@ -365,19 +349,18 @@ use CgOp;
                     CgOp::fetch($callf))),
                 $updatef);
         } else {
-            push @code, CgOp::rawcall(CgOp::rxframe, "SetCursorList", $callf);
+            push @code, CgOp::rxcall("SetCursorList", $callf);
             push @code, CgOp::goto($sk);
             push @code, CgOp::label($bt);
-            push @code, CgOp::sink(CgOp::methodcall(CgOp::rawcall(CgOp::rxframe,
+            push @code, CgOp::sink(CgOp::methodcall(CgOp::rxcall(
                         "GetCursorList"), "shift"));
             push @code, CgOp::label($sk);
             push @code, CgOp::letn(
                 "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
-                    CgOp::fetch(CgOp::rawcall(CgOp::rxframe, "GetCursorList")))),
+                    CgOp::fetch(CgOp::rxcall("GetCursorList")))),
                 $updatef);
             push @code, CgOp::rxpushb("SUBRULE", $bt);
-            push @code, CgOp::rawcall(CgOp::rxframe, "SetCursorList",
-                CgOp::null("Variable"));
+            push @code, CgOp::rxcall("SetCursorList", CgOp::null("Variable"));
         }
 
         @code;
@@ -423,8 +406,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
-            CgOp::clr_string("LTM"), CgOp::clr_string("ENDLTM"));
+        CgOp::rxcall('CommitGroup', CgOp::clr_string("LTM"))
     }
 
     sub lad {
@@ -443,7 +425,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawcall(CgOp::rxframe, 'CommitRule');
+        CgOp::rxcall('CommitRule');
     }
 
     sub lad {
@@ -480,7 +462,7 @@ use CgOp;
         my $end = $self->label;
 
         my @code;
-        push @code, CgOp::rawcall(CgOp::rxframe, "LTMPushAlts",
+        push @code, CgOp::rxcall("LTMPushAlts",
             CgOp::rawscall('Lexer.GetLexer',
                 CgOp::rawcall(CgOp::rxframe, 'MakeCursor'),
                 CgOp::const(RxOp::lad2cgop($self->lads)),
@@ -493,7 +475,7 @@ use CgOp;
             push @code, CgOp::goto($end) unless $i == @ls - 1;
         }
         push @code, CgOp::label($end);
-        push @code, CgOp::rxpushb('ENDLTM');
+        push @code, CgOp::popcut;
         @code;
     }
 
@@ -517,7 +499,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
-            CgOp::newscalar(CgOp::rawcall(CgOp::rxframe, "MakeCursor")));
+            CgOp::newscalar(CgOp::rxcall("MakeCursor")));
     }
 
     sub lad {
@@ -547,14 +529,15 @@ use CgOp;
           "i",   CgOp::int(0),
           "ks",  CgOp::null('Variable'),
           "k",   CgOp::null('IP6'),
+          CgOp::pushcut('LTM'),
           CgOp::label('nextfn'),
           CgOp::cgoto('backtrack',
             CgOp::compare('>=', CgOp::letvar("i"),
               CgOp::getfield("Length", CgOp::letvar("fns")))),
           CgOp::rxpushb('LTM', 'nextfn'),
           CgOp::letvar("ks", CgOp::subcall(CgOp::getindex(CgOp::letvar("i"),
-                CgOp::letvar("fns")), CgOp::newscalar(CgOp::rawcall(
-                  CgOp::rxframe, 'MakeCursor')))),
+                CgOp::letvar("fns")), CgOp::newscalar(CgOp::rxcall(
+                  'MakeCursor')))),
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
           CgOp::letvar("k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
                 CgOp::fetch(CgOp::letvar("ks"))))),
