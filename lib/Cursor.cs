@@ -547,6 +547,9 @@ public sealed class NFA {
         foreach (Node n in nodes)
             n.edges = n.edges_l.ToArray();
     }
+
+    public Dictionary<LexerState,LexerState> dfashare
+        = new Dictionary<LexerState,LexerState>();
 }
 
 // ltm automaton descriptors
@@ -814,6 +817,7 @@ public class LADProtoRegex : LAD {
 // that happens
 public sealed class LexerState {
     public int[] nstates;
+    Dictionary<char,LexerState> dfc = new Dictionary<char,LexerState>();
 
     public LexerState(NFA nf) {
         this.nstates = new int[(nf.nodes.Length + 31) >> 5];
@@ -824,7 +828,10 @@ public sealed class LexerState {
     }
 
     public LexerState Next(NFA nf, char ch) {
-        LexerState l = new LexerState(nf);
+        LexerState l;
+        if (dfc.TryGetValue(ch, out l))
+            return l;
+        l = new LexerState(nf);
         for (int i = 0; i < nstates.Length; i++) {
             int bm = nstates[i];
             for (int j = 0; j < 32; j++) {
@@ -838,13 +845,29 @@ public sealed class LexerState {
         }
 
         l.Close(nf);
-        return l;
+        LexerState cl;
+
+        if (!nf.dfashare.TryGetValue(l, out cl)) {
+            nf.dfashare[l] = cl = l;
+        }
+        dfc[ch] = cl;
+        return cl;
     }
 
     public bool IsAlive() {
         for (int i = 0; i < nstates.Length; i++)
             if (nstates[i] != 0) return true;
         return false;
+    }
+
+    public override bool Equals(object o) {
+        LexerState ls = o as LexerState;
+        if (ls == null) return false;
+        if (ls.nstates.Length != nstates.Length) return false;
+        for (int i = 0; i < nstates.Length; i++)
+            if (ls.nstates[i] != nstates[i])
+                return false;
+        return true;
     }
 
     public override int GetHashCode() {
@@ -921,6 +944,7 @@ public class Lexer {
     public string tag;
 
     LexerState start;
+    LexerState nil;
 
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
@@ -963,6 +987,9 @@ public class Lexer {
         start = new LexerState(pad);
         start.Add(0);
         start.Close(pad);
+        nil = new LexerState(pad);
+        pad.dfashare[nil] = nil;
+        pad.dfashare[start] = start;
     }
 
     public void Dump() {
@@ -987,7 +1014,7 @@ public class Lexer {
         while (true) {
             state.CollectFates(pad, fate);
 
-            if (pos == from.Length || !state.IsAlive()) break;
+            if (pos == from.Length || state == nil) break;
             char ch = from[pos++];
 
             if (LtmTrace)
