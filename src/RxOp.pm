@@ -529,7 +529,7 @@ use CgOp;
         my @code;
         push @code, CgOp::rxcall("LTMPushAlts",
             CgOp::rawscall('Lexer.GetLexer',
-                CgOp::rawcall(CgOp::rxframe, 'MakeCursor'),
+                CgOp::rxcall('GetClass'),
                 CgOp::const(RxOp::lad2cgop($self->lads)),
                 CgOp::clr_string('')),
             CgOp::const(CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls)));

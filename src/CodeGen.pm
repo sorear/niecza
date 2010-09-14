@@ -64,6 +64,7 @@ use 5.010;
         'RxFrame' =>
             { Exact        => [m => 'Boolean'],
               Exact1       => [m => 'Boolean'],
+              GetClass     => [m => 'DynMetaObject'],
               IncQuant     => [m => 'Void'],
               GetQuant     => [m => 'Int32'],
               OpenQuant    => [m => 'Void'],

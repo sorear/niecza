@@ -235,6 +235,8 @@ public sealed class RxFrame {
         return st.ns.quant;
     }
 
+    public DynMetaObject GetClass() { return st.ns.klass; }
+
     public Cursor MakeCursor() {
         return new Cursor(st.ns.klass, st.ns, bt, orig_s, orig, st.pos);
     }
@@ -885,12 +887,12 @@ public class Lexer {
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
-    public static Lexer GetLexer(IP6 cursor, LAD[] lads, string title) {
-        LexerCache lc = cursor.GetMO().GetLexerCache();
+    public static Lexer GetLexer(DynMetaObject kl, LAD[] lads, string title) {
+        LexerCache lc = kl.GetLexerCache();
         Lexer ret;
         if (lc.nfas.TryGetValue(lads, out ret))
             return ret;
-        ret = new Lexer(cursor.GetMO(), title, lads);
+        ret = new Lexer(kl, title, lads);
         lc.nfas[lads] = ret;
         return ret;
     }
