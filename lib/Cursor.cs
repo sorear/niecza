@@ -479,16 +479,17 @@ public sealed class NFA {
     public sealed class Node {
         public int fate;
         public bool final;
-        public List<Edge> edges = new List<Edge>();
+        public List<Edge> edges_l = new List<Edge>();
+        public Edge[] edges;
         public Node(int curfate) { fate = curfate; }
 
         public override string ToString() {
             return "(" + fate + ")" + (final ? "+ " : " ") +
-                Kernel.JoinS(", ", edges);
+                Kernel.JoinS(", ", edges_l);
         }
     }
 
-    public sealed class Edge {
+    public struct Edge {
         public int to;
         public CC when; // null if epsilon
 
@@ -497,7 +498,8 @@ public sealed class NFA {
         }
     }
 
-    public List<Node> nodes = new List<Node>();
+    public List<Node> nodes_l = new List<Node>();
+    public Node[] nodes;
     public int curfate;
 
     public DynMetaObject cursor_class;
@@ -524,20 +526,26 @@ public sealed class NFA {
     }
 
     public int AddNode() {
-        nodes.Add(new Node(curfate));
-        return nodes.Count - 1;
+        nodes_l.Add(new Node(curfate));
+        return nodes_l.Count - 1;
     }
     public void AddEdge(int from, int to, CC when) {
-        Edge e = new Edge();
+        Edge e;
         e.to = to;
         e.when = when;
-        nodes[from].edges.Add(e);
+        nodes_l[from].edges_l.Add(e);
     }
 
     public void Dump() {
-        for (int ix = 0; ix < nodes.Count; ix++) {
-            Console.WriteLine(ix + ": " + nodes[ix].ToString());
+        for (int ix = 0; ix < nodes_l.Count; ix++) {
+            Console.WriteLine(ix + ": " + nodes_l[ix].ToString());
         }
+    }
+
+    public void Complete() {
+        nodes = nodes_l.ToArray();
+        foreach (Node n in nodes)
+            n.edges = n.edges_l.ToArray();
     }
 }
 
@@ -694,7 +702,7 @@ public class LADAny : LAD {
 public class LADImp : LAD {
     public override void ToNFA(NFA pad, int from, int to) {
         int knot = pad.AddNode();
-        pad.nodes[knot].final = true;
+        pad.nodes_l[knot].final = true;
         pad.AddEdge(from, knot, null);
     }
 
@@ -752,7 +760,7 @@ public class LADMethod : LAD {
                 Console.WriteLine("+ Pruning to avoid recursion");
             int knot = pad.AddNode();
             pad.AddEdge(from, knot, null);
-            pad.nodes[knot].final = true;
+            pad.nodes_l[knot].final = true;
             return;
         }
 
@@ -762,7 +770,7 @@ public class LADMethod : LAD {
         if (sub == null) {
             int knot = pad.AddNode();
             pad.AddEdge(from, knot, null);
-            pad.nodes[knot].final = true;
+            pad.nodes_l[knot].final = true;
         } else {
             sub.ToNFA(pad, from, to);
         }
@@ -804,19 +812,40 @@ public class LADProtoRegex : LAD {
 }
 // These objects get put in hash tables, so don't change nstates[] after
 // that happens
-public class LexerState {
+public sealed class LexerState {
     public int[] nstates;
-    public readonly Lexer parent;
-    public LexerState(Lexer parent) {
-        this.parent = parent;
-        this.nstates = new int[(parent.pad.nodes.Count + 31) >> 5];
+
+    public LexerState(NFA nf) {
+        this.nstates = new int[(nf.nodes.Length + 31) >> 5];
     }
 
-    public bool alive;
+    public void Add(int n) {
+        nstates[n >> 5] |= 1 << (n & 31);
+    }
 
-    // But these cachey fields are fair game
-    // note there will be no epsilons here
-    public List<NFA.Edge> alledges = new List<NFA.Edge>();
+    public LexerState Next(NFA nf, char ch) {
+        LexerState l = new LexerState(nf);
+        for (int i = 0; i < nstates.Length; i++) {
+            int bm = nstates[i];
+            for (int j = 0; j < 32; j++) {
+                if ((bm & (1 << j)) == 0)
+                    continue;
+                foreach (NFA.Edge e in nf.nodes[32*i + j].edges) {
+                    if (e.when != null && e.when.Accepts(ch))
+                        l.Add(e.to);
+                }
+            }
+        }
+
+        l.Close(nf);
+        return l;
+    }
+
+    public bool IsAlive() {
+        for (int i = 0; i < nstates.Length; i++)
+            if (nstates[i] != 0) return true;
+        return false;
+    }
 
     public override int GetHashCode() {
         int o = 0;
@@ -825,29 +854,36 @@ public class LexerState {
         return o;
     }
 
-    public void AddNFAState(int num) {
-        Stack<int> grey = new Stack<int>();
-        grey.Push(num);
-        alive = true;
-        while (grey.Count != 0) {
-            int val = grey.Pop();
-            int vm  = 1 << (val & 31);
-            if ((nstates[val >> 5] & vm) != 0)
-                continue;
-            nstates[val >> 5] |= vm;
-            foreach (NFA.Edge e in parent.pad.nodes[val].edges) {
-                if (e.when == null)
-                    grey.Push(e.to);
-                else
-                    alledges.Add(e);
+    public void Close(NFA nf) {
+        int[] grey = new int[nstates.Length * 32];
+        int ngrey = 0;
+        for (int i = 0; i < nstates.Length; i++) {
+            int bm = nstates[i];
+            for (int j = 0; j < 32; j++) {
+                if ((bm & (1 << j)) != 0)
+                    grey[ngrey++] = 32*i + j;
+            }
+        }
+
+        while (ngrey != 0) {
+            int val = grey[--ngrey];
+            foreach (NFA.Edge e in nf.nodes[val].edges) {
+                if (e.when == null) {
+                    int ix = e.to >> 5;
+                    int m = 1 << (e.to & 31);
+                    if ((nstates[ix] & m) == 0) {
+                        nstates[ix] |= m;
+                        grey[ngrey++] = e.to;
+                    }
+                }
             }
         }
     }
 
-    public void CollectFates(Stack<int> f) {
-        for (int i = parent.pad.nodes.Count - 1; i >= 0; i--) {
+    public void CollectFates(NFA nf, Stack<int> f) {
+        for (int i = nf.nodes.Length - 1; i >= 0; i--) {
             if ((nstates[i >> 5] & (1 << (i & 31))) != 0) {
-                NFA.Node n = parent.pad.nodes[i];
+                NFA.Node n = nf.nodes[i];
                 if (n.final) {
                     if (Lexer.LtmTrace)
                         Console.WriteLine("+ Adding fate {0}", n.fate);
@@ -884,6 +920,8 @@ public class Lexer {
     public NFA pad = new NFA();
     public string tag;
 
+    LexerState start;
+
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
@@ -914,13 +952,17 @@ public class Lexer {
         for (int ix = 0; ix < alts.Length; ix++) {
             pad.curfate = alt_shuffle[ix];
             int target = pad.AddNode();
-            pad.nodes[target].final = true;
+            pad.nodes_l[target].final = true;
             alts[alt_shuffle[ix]].ToNFA(pad, root, target);
         }
+        pad.Complete();
         // now the NFA nodes are all in tiebreak order by lowest index
         if (LtmTrace) {
             Dump();
         }
+        start = new LexerState(pad);
+        start.Add(0);
+        start.Close(pad);
     }
 
     public void Dump() {
@@ -936,29 +978,22 @@ public class Lexer {
 
 
     public int[] Run(string from, int pos) {
-        LexerState state = new LexerState(this);
-        state.AddNFAState(0);
-
+        LexerState state = start;
         Stack<int> fate = new Stack<int>();
 
         if (LtmTrace)
             Console.WriteLine("+ Trying lexer {0} at {1}", tag, pos);
 
         while (true) {
-            state.CollectFates(fate);
+            state.CollectFates(pad, fate);
 
-            if (pos == from.Length || !state.alive) break;
+            if (pos == from.Length || !state.IsAlive()) break;
             char ch = from[pos++];
 
             if (LtmTrace)
                 Console.WriteLine("+ Adding character {0}", ch);
 
-            LexerState next = new LexerState(this);
-
-            foreach (NFA.Edge e in state.alledges) {
-                if (!e.when.Accepts(ch)) continue;
-                next.AddNFAState(e.to);
-            }
+            LexerState next = state.Next(pad, ch);
 
             if (LtmTrace)
                 Console.WriteLine("+ Changing state to {0}", next);
