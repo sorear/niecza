@@ -270,6 +270,40 @@ use CgOp;
 }
 
 {
+    package RxOp::BeforeString;
+    use Moose;
+    extends 'RxOp';
+
+    has str => (is => 'ro', isa => 'Str', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim('BeforeStr', CgOp::bool(0),
+            CgOp::clr_string($self->str));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::NotBeforeString;
+    use Moose;
+    extends 'RxOp';
+
+    has str => (is => 'ro', isa => 'Str', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim('BeforeStr', CgOp::bool(1),
+            CgOp::clr_string($self->str));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::Before;
     use Moose;
     extends 'RxOp';

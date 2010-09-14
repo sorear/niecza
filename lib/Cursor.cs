@@ -192,6 +192,13 @@ public sealed class RxFrame {
         return !(st.pos == end || !x.Accepts(orig[st.pos++]));
     }
 
+    public bool BeforeStr(bool not, string tx) {
+        bool ok = st.pos <= end - tx.Length;
+        for (int ix = 0; ix < tx.Length && ok; ix++)
+            ok = orig[st.pos + ix] == tx[ix];
+        return (not != ok);
+    }
+
     public bool ScanCClass(int min, int max, CC x) {
         int i;
         int maxr = end - st.pos;
