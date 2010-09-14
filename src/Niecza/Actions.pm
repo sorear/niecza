@@ -540,7 +540,12 @@ sub metachar__S_Nch { my ($cl, $M) = @_;
 }
 
 sub metachar__S_qw { my ($cl, $M) = @_;
-    $M->sorry("< > splitting NYI");
+    my $cif = $M->{circumfix}{_ast};
+    my @words = ($cif->isa('Op::SimpleParcel')) ? @{ $cif->items } : $cif;
+    @words = map { $_->text } @words;
+
+    $M->{_ast} = RxOp::Alt->new(zyg => [ map { RxOp::String->new(text => $_,
+            igcase => $::RX{i}, igmark => $::RX{a}) } @words ]);
 }
 
 sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
@@ -904,9 +909,7 @@ sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
     @tok = map { Op::StringLiteral->new(node($M), text => $_) } @tok;
 
     $M->{_ast} = (@tok == 1) ? $tok[0] :
-        Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(name => '&infix:<,>'),
-            positionals => \@tok);
+        Op::SimpleParcel->new(node($M), items => \@tok);
     $M->{qpvalue} = '<' . join(" ", map { $_->text } @tok) . '>'; # XXX what if there are spaces or >
 }
 sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
