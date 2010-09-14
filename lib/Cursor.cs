@@ -3,12 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-public sealed class PSN<X> {
-    public X obj;
-    public readonly PSN<X> next;
-    public PSN(X obj, PSN<X> next) { this.obj = obj; this.next = next; }
-}
-
 // stuff that should 'N'est, like subrules do
 public sealed class NState {
     public NState next;
@@ -20,9 +14,18 @@ public sealed class NState {
     }
 }
 
+public sealed class CapInfo {
+    public CapInfo prev;
+    public string[] names;
+    public Cursor cap;
+
+    public CapInfo(CapInfo prev, string[] names, Cursor cap) {
+        this.prev = prev; this.names = names; this.cap = cap;
+    }
+}
+
 public struct State {
-    public PSN<Cursor>   captures;
-    public PSN<string[]> capnames;
+    public CapInfo captures;
     public NState ns;
 
     public Variable subrule_iter;
@@ -126,8 +129,7 @@ public sealed class RxFrame {
     }
 
     public void PushCapture(string[] cn, Cursor cl) {
-        st.capnames = new PSN<string[]>(cn, st.capnames);
-        st.captures = new PSN<Cursor>(cl, st.captures);
+        st.captures = new CapInfo(st.captures, cn, cl);
     }
 
     public void SetCursorList(Variable cl) {
@@ -252,7 +254,7 @@ public sealed class RxFrame {
     }
 
     public Cursor MakeMatch() {
-        return new Cursor(orig_s, from, st.pos, st.captures, st.capnames);
+        return new Cursor(orig_s, from, st.pos, st.captures);
     }
 
     public static DynMetaObject MatchMO;
@@ -295,24 +297,24 @@ public class Cursor : IP6 {
     public static bool Trace =
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
 
-    public DynMetaObject klass;
-    public Choice xact;
-    public NState nstate;
+    // common fields
+    public DynMetaObject klass; // could be Cursor-only, or combined with nstate
     public string backing;
     public char[] backing_ca;
-    public int from;
     public int pos;
-    public PSN<Cursor> captures;
-    public PSN<string[]> capnames;
+    // Cursor only
+    public Choice xact;
+    public NState nstate;
+    // Match only
+    public int from;
+    public CapInfo captures;
 
     public Cursor(IP6 proto, string text)
         : this(proto.GetMO(), null, null, text, text.ToCharArray(), 0) { }
 
-    public Cursor(string backing, int from, int pos, PSN<Cursor> captures,
-            PSN<string[]> capnames) {
+    public Cursor(string backing, int from, int pos, CapInfo captures) {
         this.backing = backing;
         this.captures = captures;
-        this.capnames = capnames;
         this.pos = pos;
         this.from = from;
         this.klass = RxFrame.MatchMO;
@@ -343,26 +345,24 @@ public class Cursor : IP6 {
 
     // TODO: keep variables around so { $<foo> = 1 } will work
     public Variable GetKey(string str) {
-        PSN<string[]> cn_it = capnames;
-        PSN<Cursor> cr_it = captures;
+        CapInfo it = captures;
         VarDeque caps = new VarDeque();
         bool list = false;
 
-        while (cr_it != null) {
-            foreach (string cn in cn_it.obj) {
+        while (it != null) {
+            foreach (string cn in it.names) {
                 if (cn == str)
                     goto yes;
             }
             goto no;
 yes:
-            if (cr_it.obj == null) {
+            if (it.cap == null) {
                 list = true;
             } else {
-                caps.Unshift(Kernel.NewRWScalar(cr_it.obj));
+                caps.Unshift(Kernel.NewRWScalar(it.cap));
             }
 no:
-            cr_it = cr_it.next;
-            cn_it = cn_it.next;
+            it = it.prev;
         }
 
         if (list) {
