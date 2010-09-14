@@ -92,23 +92,54 @@ use CgOp;
 
         my $exit = $self->label;
         my $repeat = $self->label;
+        my $middle = $self->label;
 
-        push @code, CgOp::rawcall(CgOp::rxframe, 'OpenQuant');
-        push @code, CgOp::label($repeat);
-        push @code, CgOp::ternary(CgOp::compare('>=',
-                CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
-                CgOp::int($self->min)),
-            CgOp::rxpushb('QUANT', $exit), CgOp::prog());
-        if (defined $self->max) {
+        my $min = $self->min;
+        my $max = $self->max;
+
+        # get the degenerate cases out the way
+        if (defined($max)) {
+            return CgOp::goto('backtrack') if $max < $min;
+            return CgOp::prog() if $max == 0;
+            return $self->zyg->[0]->code($body) if $max == 1 && $min == 1;
+        }
+
+        my $usequant = (defined($max) && $max != 1) || ($min > 1);
+        my $userep   = !(defined($max) && $max == 1);
+
+        push @code, CgOp::rxcall('OpenQuant') if $usequant;
+        push @code, CgOp::goto($middle) if $min;
+        push @code, CgOp::label($repeat) if $userep;
+        # min == 0 or quant >= 1
+        if ($min > 1) {
+            # only allow exiting if min met
+            push @code, CgOp::ternary(CgOp::compare('>=',
+                    CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
+                    CgOp::int($min)),
+                CgOp::rxpushb('QUANT', $exit), CgOp::prog());
+        } else {
+            # min automatically met
+            push @code, CgOp::rxpushb('QUANT', $exit);
+        }
+
+        # if userep false, quant == 0
+        if (defined($max) && $userep) {
             push @code, CgOp::cgoto('backtrack', CgOp::compare('>=',
                     CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
-                    CgOp::int($self->max)));
+                    CgOp::int($max)));
         }
+
+        push @code, CgOp::label($middle) if $min;
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rawcall(CgOp::rxframe, 'IncQuant');
-        push @code, CgOp::goto($repeat);
+        push @code, CgOp::rxcall('IncQuant') if $usequant;
+        if ($userep) {
+            push @code, CgOp::goto($repeat);
+        } else {
+            # quant == 1
+            # userep implies max == 1, min == 0; fall through
+        }
         push @code, CgOp::label($exit);
-        push @code, CgOp::sink(CgOp::rawcall(CgOp::rxframe, 'CloseQuant'));
+        push @code, CgOp::sink(CgOp::rxcall('CloseQuant')) if $usequant;
 
         @code;
     }
