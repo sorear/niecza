@@ -1741,10 +1741,17 @@ sub scoped { my ($cl, $M) = @_;
         $M->{package_declarator} // $M->{multi_declarator})->{_ast};
 }
 
-# :: Op (but adds decls)
+# :: Op
 sub declarator { my ($cl, $M) = @_;
     if ($M->{signature}) {
-        $M->sorry("Signature declarations NYI");
+        my @p = @{ $M->{signature}{_ast}->params };
+        # TODO: keep the original signature around somewhere := can find it
+        for (@p) {
+            # TODO: fanciness checks
+            $_ = Op::Lexical->new(node($M), name => $_->slot, list => $_->list,
+                hash => $_->hash, declaring => 1);
+        }
+        $M->{_ast} = Op::SimpleParcel->new(node($M), items => \@p);
         return;
     }
     $M->{_ast} = $M->{variable_declarator} ? $M->{variable_declarator}{_ast} :
