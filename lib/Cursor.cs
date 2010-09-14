@@ -9,11 +9,21 @@ public sealed class PSN<X> {
     public PSN(X obj, PSN<X> next) { this.obj = obj; this.next = next; }
 }
 
+// stuff that should 'N'est, like subrules do
+public sealed class NState {
+    public NState next;
+    public int quant;
+    public DynMetaObject klass;
+
+    public NState(NState proto) {
+        next = proto; if (proto != null) klass = proto.klass;
+    }
+}
+
 public struct State {
-    public PSN<int> reps;
     public PSN<Cursor>   captures;
     public PSN<string[]> capnames;
-    public PSN<DynMetaObject> klasses;
+    public NState ns;
 
     public Variable subrule_iter;
     public int pos;
@@ -81,7 +91,8 @@ public sealed class RxFrame {
         orig_s = csr.backing;
         end = orig.Length;
         rootf = bt = new Choice(csr.xact, "RULE " + name, -1, default(State));
-        st.klasses = new PSN<DynMetaObject>(csr.klass, null);
+        st.ns = new NState(csr.nstate);
+        st.ns.klass = csr.klass;
         st.pos = csr.pos;
         from = csr.pos;
     }
@@ -219,25 +230,25 @@ public sealed class RxFrame {
     }
 
     public void OpenQuant() {
-        st.reps = new PSN<int>(0, st.reps);
+        st.ns = new NState(st.ns);
     }
 
     public int CloseQuant() {
-        int x = st.reps.obj;
-        st.reps = st.reps.next;
+        int x = st.ns.quant;
+        st.ns = st.ns.next;
         return x;
     }
 
     public void IncQuant() {
-        st.reps.obj++;
+        st.ns.quant++;
     }
 
     public int GetQuant() {
-        return st.reps.obj;
+        return st.ns.quant;
     }
 
     public Cursor MakeCursor() {
-        return new Cursor(st.klasses.obj, bt, orig_s, orig, st.pos);
+        return new Cursor(st.ns.klass, st.ns, bt, orig_s, orig, st.pos);
     }
 
     public Cursor MakeMatch() {
@@ -286,6 +297,7 @@ public class Cursor : IP6 {
 
     public DynMetaObject klass;
     public Choice xact;
+    public NState nstate;
     public string backing;
     public char[] backing_ca;
     public int from;
@@ -294,7 +306,7 @@ public class Cursor : IP6 {
     public PSN<string[]> capnames;
 
     public Cursor(IP6 proto, string text)
-        : this(proto.GetMO(), null, text, text.ToCharArray(), 0) { }
+        : this(proto.GetMO(), null, null, text, text.ToCharArray(), 0) { }
 
     public Cursor(string backing, int from, int pos, PSN<Cursor> captures,
             PSN<string[]> capnames) {
@@ -306,9 +318,10 @@ public class Cursor : IP6 {
         this.klass = RxFrame.MatchMO;
     }
 
-    public Cursor(DynMetaObject klass, Choice xact, string backing, char[] backing_ca, int pos) {
+    public Cursor(DynMetaObject klass, NState ns, Choice xact, string backing, char[] backing_ca, int pos) {
         this.klass = klass;
         this.xact = xact;
+        this.nstate = ns;
         this.backing = backing;
         this.backing_ca = backing_ca;
         this.pos = pos;
@@ -325,7 +338,7 @@ public class Cursor : IP6 {
     }
 
     public Cursor At(int npos) {
-        return new Cursor(klass, xact, backing, backing_ca, npos);
+        return new Cursor(klass, nstate, xact, backing, backing_ca, npos);
     }
 
     // TODO: keep variables around so { $<foo> = 1 } will work
