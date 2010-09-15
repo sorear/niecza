@@ -157,8 +157,24 @@ namespace Niecza {
         public const int ON_LAST = 2;
         public const int ON_REDO = 3;
         public const int ON_RETURN = 4;
+        public const int ON_DIE = 5;
         public int[] edata;
         public string[] label_names;
+
+        public static string DescribeControl(int type, Frame tgt, int lid,
+                string name) {
+            string ty = (type == ON_RETURN) ? "return" :
+                        (type == ON_REDO)   ? "redo" :
+                        (type == ON_LAST)   ? "last" :
+                        (type == ON_NEXT)   ? "next" : "unknown control";
+            if (lid >= 0) {
+                return ty + "(" + tgt.info.label_names[lid] + ", lexotic)";
+            } else if (name != null) {
+                return ty + "(" + name + ", dynamic)";
+            } else {
+                return ty;
+            }
+        }
 
         public int FindControlEnt(int ip, int ty, string name, int lid) {
             for (int i = 0; i < edata.Length; i+=5) {
@@ -687,7 +703,8 @@ blocked:
         public static Frame Die(Frame caller, string msg) {
             DynObject n = new DynObject(((DynObject)StrP).klass);
             n.slots[0] = msg;
-            return new FatalException(n).SearchForHandler(caller);
+            return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
+                    NewROScalar(n));
         }
 
         public static readonly DynMetaObject SubMO;
@@ -989,9 +1006,7 @@ slow:
                             cur = cur.code(cur);
                     }
                 } catch (Exception ex) {
-                    ExceptionPacket ep = new FatalException(
-                            new CLRImportObject(ex));
-                    cur = ep.SearchForHandler(cur);
+                    cur = Kernel.Die(cur, ex.ToString());
                 }
             }
         }
@@ -1063,129 +1078,78 @@ slow:
             }
             return sb.ToString();
         }
-    }
 
-    public abstract class ExceptionPacket {
-        public Frame bot;
-        public Frame top;
+        // exception processing goes in two stages
+        // 1. find the correct place to unwind to, calling CATCH filters
+        // 2. unwind, calling LEAVE functions
+        public static Frame SearchForHandler(Frame th, int type, Frame tgt,
+                int lid, string name, object payload) {
+            // no CONTROL/CATCH yet, so we don't need to CPS the scanloop
+            Frame csr;
 
-        public abstract bool Filter(Frame cand);
-        // for setting $!
-        public abstract IP6 Payload();
-        // CATCH vs CONTROL
-        public abstract bool IsFatal();
-        public abstract Frame Process(Frame target);
+            Frame unf = null;
+            int unip = 0;
 
-        // stage 2!
-        public Frame Unwind(Frame caller) {
-            while (top != bot) {
-                Frame pop = bot;
-                bot = bot.caller;
-                object o;
-
-                if (pop.info.hints != null &&
-                        pop.info.hints.TryGetValue("!unwind", out o)) {
-                    Frame n = new Frame(bot, bot, (SubInfo) o);
-                    n.lex = new Dictionary<string,object>();
-                    n.lex["!reunwind"] = this;
-                    return n;
+            for (csr = th; csr != null; csr = csr.caller) {
+                // for lexoticism
+                if (tgt != null && tgt != csr)
+                    continue;
+                unip = csr.info.FindControlEnt(csr.ip, type, name, lid);
+                if (unip >= 0) {
+                    unf = csr;
+                    break;
                 }
             }
 
-            return bot;
-        }
-
-        public Frame SearchForHandler(Frame caller) {
-            if (bot == null) { // first call
-                bot = top = caller;
+            if (unf == null) {
+                object mp = (type == SubInfo.ON_DIE) ? payload :
+                    BoxAny("Unhandled control operator: " +
+                            SubInfo.DescribeControl(type, tgt, lid, name), StrP);
+                Frame r = new Frame(th, null, UnhandledSI);
+                r.lex0 = mp;
+                return r;
+            } else {
+                return Unwind(th, unf, unip, payload);
             }
-            string key = IsFatal() ? "!ehcatch" : "!ehcontrol";
-            while (top != null) {
-                object o;
-                if (top.info.hints != null &&
-                        top.info.hints.TryGetValue(key, out o)) {
-                    Frame fn = new Frame(bot, top, (SubInfo) o);
-                    fn.lex = new Dictionary<string,object>();
-                    fn.lex["!rethrow"] = this;
-                    return fn;
-                }
+        }
 
-                if (top.lex != null && top.lex.ContainsKey("!rethrow")) {
-                    // this is an active exception handling frame!  skip
-                    // the corresponding handler
-                    top = top.outer.caller;
-                } else {
-                    if (Filter(top)) {
-                        return Process(top);
-                    }
-                    top = top.caller;
-                }
+        private static SubInfo UnhandledSI = new SubInfo("Unhandled", UnhandledC);
+        private static Frame UnhandledC(Frame th) {
+            switch(th.ip) {
+                case 0:
+                    th.ip = 1;
+                    return Fetch(th, (Variable)th.lex0);
+                case 1:
+                    th.ip = 2;
+                    return ((IP6)th.resultSlot).InvokeMethod(th, "Str",
+                            new Variable[1] { (Variable)th.lex0 }, null);
+                case 2:
+                    th.ip = 3;
+                    return Fetch(th, (Variable)th.resultSlot);
+                case 3:
+                    Console.Error.WriteLine("Unhandled exception: {0}",
+                            (string) UnboxAny((IP6)th.resultSlot));
+                    th.lex0 = th.caller;
+                    goto case 4;
+                case 4:
+                    if (th.lex0 == null)
+                        Environment.Exit(1);
+                    Console.Error.WriteLine("  at {0} line {1}",
+                            ((Frame)th.lex0).ExecutingFile(),
+                            ((Frame)th.lex0).ExecutingLine());
+                    th.lex0 = ((Frame) th.lex0).caller;
+                    goto case 4;
+                default:
+                    return Kernel.Die(th, "Invalid IP");
             }
-
-            Unhandled();
-            return null;
         }
 
-        // This *probably* ought to be handled in Perl 6 code, using .Str,
-        // but we're now at a very low bootstrap level;
-        private void Unhandled() {
-            IP6 p = Payload();
-            CLRImportObject cp = p as CLRImportObject;
-            DynObject dp = p as DynObject;
-            Exception e = (cp != null) ? (cp.val as Exception) : null;
-            string s = (dp != null && dp.klass.slotMap.ContainsKey("value")) ?
-                (dp.GetSlot("value") as string) : null;
-
-            if (e != null) {
-                // Wrapped CLR exception; has a message, and inner frames
-                s = e.ToString();
-            } else if (s == null) {
-                s = "(no message available)";
-            }
-            Console.Error.WriteLine("Unhandled exception: " + s);
-            Frame c;
-            for (c = bot; c != null; c = c.caller) {
-                Console.Error.WriteLine("  at {0} line {1}",
-                        c.ExecutingFile(), c.ExecutingLine());
-            }
-            Environment.Exit(1);
+        public static Frame Unwind(Frame th, Frame tf, int tip, object td) {
+            // LEAVE handlers aren't implemented yet.
+            tf.ip = tip;
+            tf.resultSlot = td;
+            return tf;
         }
-    }
-
-    // no payload; you should have already poked the right value into a
-    // result slot somewhere.  ip = 0 means immediate return (leave)
-    public class LexoticControlException : ExceptionPacket {
-        public Frame target;
-        public int ip;
-
-        public LexoticControlException(Frame target, int ip) {
-            this.target = target;
-            this.ip = ip;
-        }
-
-        public override bool Filter(Frame cand) { return cand == target; }
-        public override IP6 Payload() { return Kernel.AnyP; } // XXX
-        public override bool IsFatal() { return false; }
-        public override Frame Process(Frame t) {
-            if (ip != 0) {
-                t.ip = ip;
-            }
-            return t;
-        }
-    }
-
-    public class FatalException : ExceptionPacket {
-        public IP6 payload;
-
-        public FatalException(IP6 payload) {
-            this.payload = payload;
-        }
-
-        // can only be explicitly caught
-        public override bool Filter(Frame cand) { return false; }
-        public override bool IsFatal() { return true; }
-        public override IP6 Payload() { return payload; }
-        public override Frame Process(Frame t) { return t; }
     }
 
     public sealed class VarDeque {

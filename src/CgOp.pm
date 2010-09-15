@@ -753,7 +753,8 @@ use warnings;
     sub die {
         my ($msg) = @_;
         if (blessed($msg)) {
-            rawccall(rawnew('Niecza.FatalException', $msg), 'SearchForHandler');
+            rawsccall('Kernel.SearchForHandler', &int(5), null('Frame'),
+                &int(-1), null('String'), newscalar($msg));
         } else {
             rawsccall('Kernel.Die', clr_string($msg));
         }

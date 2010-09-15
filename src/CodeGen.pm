@@ -83,10 +83,6 @@ use 5.010;
               SetPos       => [m => 'Void'],
               Backtrack    => [c => 'Void'],
               End          => [c => 'Void'] },
-        'Niecza.FatalException' =>
-            { SearchForHandler => [c => 'Void'] },
-        'Niecza.LexoticControlException' =>
-            { SearchForHandler => [c => 'Void'] },
         'Cursor' =>
             { At           => [m => 'Cursor'],
               pos          => [f => 'Int32'],
@@ -108,6 +104,7 @@ use 5.010;
 
         'Lexer.RunProtoregex'  => [m => 'IP6[]'],
         'Lexer.GetLexer'       => [m => 'Lexer'],
+        'Kernel.SearchForHandler' => [c => 'Variable'],
         'Kernel.Die'           => [c => 'Void'],
         'Kernel.CoTake'        => [c => 'Variable'],
         'Kernel.Take'          => [c => 'Variable'],
