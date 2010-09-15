@@ -99,6 +99,44 @@ use warnings;
 }
 
 {
+    package CgOp::Span;
+    use Moose;
+    extends 'CgOp';
+
+    has lstart => (isa => 'Str', is => 'ro');
+    has lend   => (isa => 'Str', is => 'ro');
+
+    sub cps_convert {
+        my ($self, $nv) = @_;
+        my $z = $self->zyg->[0]->cps_convert($nv);
+        my $zt = $z->cps_type;
+        if ($zt != 1 && $nv) {
+            $zt = 1;
+            $z  = CgOp::Primitive->new(op => ['set_result'], zyg => [$z]);
+        }
+        $self->zyg->[0] = $z;
+        $self->cps_type($zt || 2);
+        $self;
+    }
+
+    sub var_cg {
+        my ($self, $cg) = @_;
+        $cg->labelhere($self->lstart);
+        $self->zyg->[0]->var_cg($cg);
+        $cg->labelhere($self->lend);
+    }
+
+    sub drop_end {
+        my ($self) = @_;
+        $self->zyg->[0] = CgOp::sink($self->zyg->[0]);
+        $self;
+    }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
     package CgOp::Seq;
     use Moose;
     extends 'CgOp';
@@ -354,6 +392,11 @@ use warnings;
 
     sub prog {
         CgOp::Seq->new(zyg => [ @_ ]);
+    }
+
+    sub span {
+        my ($ls,$le,@r) = @_;
+        CgOp::Span->new(lstart => $ls, lend => $le, zyg => [prog(@r)]);
     }
 
     sub wrap {

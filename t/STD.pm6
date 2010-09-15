@@ -1824,18 +1824,16 @@ grammar P6 is STD {
     }
 
     method checkyada {
-        try {
-            my $statements = self.<blockoid><statementlist><statement>;
-            my $startsym = $statements[0]<EXPR><sym> // '';
-            given $startsym {
-                when '...' { $*DECLARAND<stub> = 1 }
-                when '!!!' { $*DECLARAND<stub> = 1 }
-                when '???' { $*DECLARAND<stub> = 1 }
-                when '*' {
-                    if $*MULTINESS eq 'proto' and $statements.elems == 1 {
-                        self.<blockoid>:delete;
-                        self.<onlystar> = 1;
-                    }
+        my $statements = self.<blockoid><statementlist><statement>;
+        my $startsym = $statements[0]<EXPR><sym> // '';
+        given $startsym {
+            when '...' { $*DECLARAND<stub> = 1 }
+            when '!!!' { $*DECLARAND<stub> = 1 }
+            when '???' { $*DECLARAND<stub> = 1 }
+            when '*' {
+                if $*MULTINESS eq 'proto' and $statements.elems == 1 {
+                    self.<blockoid>:delete;
+                    self.<onlystar> = 1;
                 }
             }
         }
@@ -2841,7 +2839,7 @@ grammar P6 is STD {
                 my $twigil = '';
                 $twigil = $t.[0].Str if @$t;
                 $vname ~= $twigil;
-                my $n = try { $<name>[0].Str } // '';
+                my $n = $<name>[0] ?? $<name>[0].Str !! '';
                 $vname ~= $n;
                 given $twigil {
                     when '' {
@@ -3831,16 +3829,14 @@ grammar P6 is STD {
         return self if self.<left><scope_declarator>;
         my $ok = 0;
 
-        try {
-            my $methop = self.<right><methodop>;
-            my $name = $methop.<longname>.Str;
-            if grep { $_ eq $name }, <new clone sort subst trans reverse uniq map samecase substr flip fmt pick> {
-                $ok = 1;
-            }
-            elsif not $methop.<args>[0] {
-                $ok = 1;
-            }
-        };
+        my $methop = self.<right><methodop>;
+        my $name = $methop.<longname>.Str;
+        if grep { $_ eq $name }, <new clone sort subst trans reverse uniq map samecase substr flip fmt pick> {
+            $ok = 1;
+        }
+        elsif not $methop.<args>[0] {
+            $ok = 1;
+        }
 
         self.cursor_force(self.<infix>.pos).worryobs('.= as append operator', '~=') unless $ok;
         self;
@@ -4992,22 +4988,22 @@ grammar Regex is STD {
 
     token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { %*RX<i> = 1 } }
     token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { %*RX<i> = 0 } }
-    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = $<mod_arg>.Str.Bool } }
     token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { %*RX<i> = $0 } }
 
     token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { %*RX<a> = 1 } }
     token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { %*RX<a> = 0 } }
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { %*RX<a> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { %*RX<a> = $<mod_arg>.Str.Bool } }
     token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { %*RX<a> = $0 } }
 
     token mod_internal:sym<:s>    { ':s' 'igspace'? » { %*RX<s> = 1 } }
     token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { %*RX<s> = 0 } }
-    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { %*RX<s> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { %*RX<s> = $<mod_arg>.Str.Bool } }
     token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { %*RX<s> = $0 } }
 
     token mod_internal:sym<:r>    { ':r' 'atchet'? » { %*RX<r> = 1 } }
     token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { %*RX<r> = 0 } }
-    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { %*RX<r> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { %*RX<r> = $<mod_arg>.Str.Bool } }
     token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { %*RX<r> = $0 } }
  
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
@@ -5172,12 +5168,10 @@ method is_name ($n, $curlex = $*CURLEX) {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
-            try {
-                my $outlexid = $curpkg.[0];
-                return False unless $outlexid;
-                $curpkg = $ALL.{$outlexid};
-                return False unless $curpkg;
-            };
+            my $outlexid = $curpkg.[0];
+            return False unless $outlexid;
+            $curpkg = $ALL.{$outlexid};
+            return False unless $curpkg;
             self.deb("Found $pkg okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
@@ -5223,12 +5217,10 @@ method find_stash ($n, $curlex = $*CURLEX) {
             my $lex = shift @components;
             $curlex = $curlex.{$lex};
             return () unless $curlex;
-            try {
-                my $outlexid = $curlex.[0];
-                return False unless $outlexid;
-                $curlex = $ALL.{$outlexid};
-                return () unless $curlex;
-            };
+            my $outlexid = $curlex.[0];
+            return False unless $outlexid;
+            $curlex = $ALL.{$outlexid};
+            return () unless $curlex;
             self.deb("Found $lex okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
@@ -5596,12 +5588,10 @@ method is_known ($n, $curlex = $*CURLEX) {
             self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
-            try {
-                my $outlexid = $curpkg.[0];
-                return False unless $outlexid;
-                $curpkg = $ALL.{$outlexid};
-                return False unless $curpkg;
-            };
+            my $outlexid = $curpkg.[0];
+            return False unless $outlexid;
+            $curpkg = $ALL.{$outlexid};
+            return False unless $curpkg;
             self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
         }
     }

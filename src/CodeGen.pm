@@ -226,6 +226,8 @@ use 5.010;
     has body      => (isa => 'Body', is => 'ro');
     has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has consttab  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has ehspans   => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has ehlabels  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
     has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
 
@@ -410,6 +412,17 @@ use 5.010;
         my ($top) = $self->_popn(1);
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if (!$top) { goto case \@\@L$n; }\n";
+    }
+
+    sub ehspan {
+        my ($self, $type, $lab, $lidl, $ls, $le, $lg) = @_;
+        my $lid = -1;
+        if (defined $lab) {
+            $lid = @{ $self->ehlabels };
+            $self->labelname->{$lidl} = $lid if defined $lidl;
+        }
+        push @{ $self->ehspans }, "\@\@L$ls", "\@\@L$le", $type,
+            "\@\@L$lg", $lid;
     }
 
     sub rawlexget {
@@ -836,7 +849,7 @@ use 5.010;
         if ($self->usednamed) {
             print ::NIECZA_OUT " " x 16, "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
         }
-        for (@{ $self->buffer }, @{ $self->consttab }) {
+        for (@{ $self->buffer }, @{ $self->consttab }, @{ $self->ehspans }) {
             s/\@\@L(\w+)/$self->labelname->{$1}/eg;
         }
         print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
@@ -846,8 +859,11 @@ use 5.010;
         print ::NIECZA_OUT " " x 4, "}\n";
         print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
             join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
+        my $ehs = "new int[] { " . join(", ", @{ $self->ehspans }) . " }";
+        my $els = @{ $self->ehlabels } ? ("new string[] { " .
+            join(", ", map { ::qm($_) } @{ $self->ehlabels }) . " }") : "null";
         print ::NIECZA_OUT " " x 4, "private static SubInfo ${name}_info = ",
-            "new SubInfo(\"$::UNITNAME ${name}\", ${name}_lines, ${name}, null, null, null);\n";
+            "new SubInfo(\"$::UNITNAME ${name}\", ${name}_lines, ${name}, null, null, null, $ehs, $els);\n";
         for (@{ $self->consttab }) {
             print ::NIECZA_OUT " " x 4, "private static $_;\n";
         }

@@ -152,6 +152,28 @@ namespace Niecza {
         // maybe should be a hint
         public LAD ltm;
 
+        // records: $start-ip, $end-ip, $type, $goto, $lid
+        public const int ON_NEXT = 1;
+        public const int ON_LAST = 2;
+        public const int ON_RETURN = 3;
+        public int[] edata;
+        public string[] label_names;
+
+        public int FindControlEnt(int ip, int ty, string name, int lid) {
+            for (int i = 0; i < edata.Length; i+=5) {
+                if (ip < edata[i] || ip >= edata[i+1])
+                    continue;
+                if (ty != edata[i+2])
+                    continue;
+                if (lid >= 0 && lid != edata[i+4])
+                    continue;
+                if (name != null && !name.Equals(label_names[edata[i+4]]))
+                    continue;
+                return edata[i+3];
+            }
+            return -1;
+        }
+
         public void PutHint(string name, object val) {
             if (hints == null)
                 hints = new Dictionary<string,object>();
@@ -170,17 +192,20 @@ namespace Niecza {
         }
 
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
-                SubInfo outer, Dictionary<string,object> hints, LAD ltm) {
+                SubInfo outer, Dictionary<string,object> hints, LAD ltm,
+                int[] edata, string[] label_names) {
             this.lines = lines;
             this.code = code;
             this.outer = outer;
             this.hints = hints;
             this.ltm = ltm;
             this.name = name;
+            this.edata = edata;
+            this.label_names = label_names;
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
-            this(name, null, code, null, null, null) { }
+            this(name, null, code, null, null, null, new int[0], null) { }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -191,7 +216,7 @@ namespace Niecza {
         public readonly SubInfo info;
         public object resultSlot = null;
         public int ip = 0;
-        public readonly DynBlockDelegate code; // premature optimization?
+        public readonly DynBlockDelegate code;
         public Dictionary<string, object> lex;
         // statistically, most subs have between 1 and 4 anonymous lexicals
         public object lex0;
