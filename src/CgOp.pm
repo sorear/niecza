@@ -399,6 +399,10 @@ use warnings;
         CgOp::Span->new(lstart => $ls, lend => $le, zyg => [prog(@r)]);
     }
 
+    sub ehspan {
+        CgOp::Primitive->new(op => [ ehspan => @_ ]);
+    }
+
     sub wrap {
         newscalar(rawnew('CLRImportObject', $_[0]));
     }

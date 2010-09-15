@@ -2227,6 +2227,7 @@ sub routine_declarator__S_method { my ($cl, $M) = @_;
 
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
+sub genid  { ($next_anon_id++) }
 
 sub blockcheck { my ($cl) = @_;
 }

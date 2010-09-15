@@ -155,7 +155,8 @@ namespace Niecza {
         // records: $start-ip, $end-ip, $type, $goto, $lid
         public const int ON_NEXT = 1;
         public const int ON_LAST = 2;
-        public const int ON_RETURN = 3;
+        public const int ON_REDO = 3;
+        public const int ON_RETURN = 4;
         public int[] edata;
         public string[] label_names;
 

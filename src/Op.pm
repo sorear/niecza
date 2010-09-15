@@ -468,13 +468,21 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
+        my $id = Niecza::Actions->genid;
 
         CgOp::prog(
             CgOp::whileloop($self->until, $self->once,
                 CgOp::unbox('Boolean',
                     CgOp::fetch(
                         CgOp::methodcall($self->check->cgop($body), "Bool"))),
-                CgOp::sink($self->body->cgop($body))),
+                CgOp::prog(
+                    CgOp::label("redo$id"),
+                    CgOp::sink($self->body->cgop($body)),
+                    CgOp::label("next$id"),
+                    CgOp::ehspan(1, undef, 0, "redo$id", "next$id", "next$id"),
+                    CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
+                    CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
+            CgOp::label("last$id"),
             CgOp::null('Variable'));
     }
 
