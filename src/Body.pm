@@ -156,7 +156,7 @@ use CgOp ();
                     CgOp::sink($self->do->cgop($self)),
                     CgOp::rawsccall('Kernel.Take',
                         CgOp::scopedlex('EMPTY'))));
-        } elsif ($self->returnable) {
+        } elsif ($self->returnable && defined($self->signature)) {
             $self->cgoptree(CgOp::prog(@enter,
                     CgOp::return(CgOp::span("rstart", "rend",
                         $self->do->cgop($self))),

@@ -1560,7 +1560,7 @@ sub param_var { my ($cl, $M) = @_;
     }
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]->Str : '';
     my $sigil = $M->{sigil}->Str;
-    if ($twigil || ($sigil ne '$' && $sigil ne '@' && $sigil ne '%')) {
+    if ($twigil || ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&')) {
         $M->sorry('Non bare scalar targets NYI');
         return;
     }
