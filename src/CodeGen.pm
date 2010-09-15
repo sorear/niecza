@@ -827,7 +827,6 @@ use 5.010;
         if ($self->outcap) {
             print ::NIECZA_OUT " " x 8, "IP6 _inv; List<Variable> _pos; Dictionary<string,Variable> _nam;\n";
         }
-        print ::NIECZA_OUT " " x 8, "if (Kernel.TraceCont) { Console.WriteLine(th.DepthMark() + \"$::UNITNAME : $name @ \" + th.ip); }\n";
         print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
         print ::NIECZA_OUT " " x 12, "case 0:\n";
         if ($self->numlets + $self->minlets > 4) {
@@ -848,7 +847,7 @@ use 5.010;
         print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
             join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
         print ::NIECZA_OUT " " x 4, "private static SubInfo ${name}_info = ",
-            "new SubInfo(${name}_lines, ${name}, null, null, null);\n";
+            "new SubInfo(\"$::UNITNAME ${name}\", ${name}_lines, ${name}, null, null, null);\n";
         for (@{ $self->consttab }) {
             print ::NIECZA_OUT " " x 4, "private static $_;\n";
         }

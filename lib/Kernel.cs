@@ -147,6 +147,7 @@ namespace Niecza {
         public DynMetaObject mo;
         // for inheriting hints
         public SubInfo outer;
+        public string name;
         public Dictionary<string, object> hints;
         // maybe should be a hint
         public LAD ltm;
@@ -168,17 +169,18 @@ namespace Niecza {
             }
         }
 
-        public SubInfo(int[] lines, DynBlockDelegate code, SubInfo outer,
-                Dictionary<string,object> hints, LAD ltm) {
+        public SubInfo(string name, int[] lines, DynBlockDelegate code,
+                SubInfo outer, Dictionary<string,object> hints, LAD ltm) {
             this.lines = lines;
             this.code = code;
             this.outer = outer;
             this.hints = hints;
             this.ltm = ltm;
+            this.name = name;
         }
 
-        public SubInfo(DynBlockDelegate code) :
-            this(null, code, null, null, null) { }
+        public SubInfo(string name, DynBlockDelegate code) :
+            this(name, null, code, null, null, null) { }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -641,7 +643,7 @@ blocked:
 
             return n;
         }
-        private static SubInfo SubInvokeSubSI = new SubInfo(SubInvokeSubC);
+        private static SubInfo SubInvokeSubSI = new SubInfo("Sub.INVOKE", SubInvokeSubC);
         private static Frame SubInvokeSubC(Frame th) {
             Variable[] post;
             switch (th.ip) {
@@ -701,7 +703,7 @@ blocked:
             return w.Invoke(th, new Variable[1] { v }, null);
         }
 
-        private static SubInfo BindROSI = new SubInfo(BindROC);
+        private static SubInfo BindROSI = new SubInfo("Bind/RO", BindROC);
         private static Frame BindROC(Frame th) {
             switch (th.ip) {
                 case 0:
@@ -721,7 +723,7 @@ blocked:
             }
         }
 
-        private static SubInfo BindSI = new SubInfo(BindC);
+        private static SubInfo BindSI = new SubInfo("Bind", BindC);
         private static Frame BindC(Frame th) {
             switch (th.ip) {
                 case 0:
@@ -790,7 +792,7 @@ blocked:
         }
 
         // This isn't just a fetch and a store...
-        private static SubInfo AssignSI = new SubInfo(AssignC);
+        private static SubInfo AssignSI = new SubInfo("Assign", AssignC);
         private static Frame AssignC(Frame th) {
             switch (th.ip) {
                 case 0:
@@ -935,16 +937,7 @@ slow:
         public static Frame StartP6Thread(Frame th, IP6 sub) {
             Thread thr = new Thread(delegate () {
                     Frame current = sub.Invoke(th, new Variable[0], null);
-
-                    while (current != th) {
-                        try {
-                            current = current.Continue();
-                        } catch (Exception ex) {
-                            ExceptionPacket ep = new FatalException(
-                                    new CLRImportObject(ex));
-                            current = ep.SearchForHandler(current);
-                        }
-                    }
+                    RunCore(current, th);
                 });
             thr.Start();
             th.resultSlot = thr;
@@ -953,15 +946,26 @@ slow:
 
         public static void RunLoop(SubInfo boot) {
             Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
-            Frame root_f = new Frame(null, null, boot);
-            Frame current = root_f;
-            while (current != null) {
+            RunCore(new Frame(null, null, boot), null);
+        }
+
+        public static void RunCore(Frame cur, Frame root) {
+            while (cur != root) {
                 try {
-                    current = current.Continue();
+                    if (TraceCont) {
+                        while (cur != root) {
+                            System.Console.WriteLine("{0}|{1} @ {2}",
+                                    cur.DepthMark(), cur.info.name, cur.ip);
+                            cur = cur.code(cur);
+                        }
+                    } else {
+                        while (cur != root)
+                            cur = cur.code(cur);
+                    }
                 } catch (Exception ex) {
                     ExceptionPacket ep = new FatalException(
                             new CLRImportObject(ex));
-                    current = ep.SearchForHandler(current);
+                    cur = ep.SearchForHandler(cur);
                 }
             }
         }
@@ -1256,7 +1260,7 @@ slow:
 public class NULL {
     public static Niecza.Frame Environment = null;
 
-    private static Niecza.SubInfo MAINSI = new Niecza.SubInfo(MAIN);
+    private static Niecza.SubInfo MAINSI = new Niecza.SubInfo("Null.MAIN", MAIN);
     public static Niecza.IP6 Installer = Niecza.Kernel.MakeSub(MAINSI, null);
     private static Niecza.Frame MAIN(Niecza.Frame th) {
         switch (th.ip) {
