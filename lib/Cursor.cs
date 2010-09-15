@@ -192,6 +192,29 @@ public sealed class RxFrame {
         return !(st.pos == end || !x.Accepts(orig[st.pos++]));
     }
 
+    public bool ZeroWidth(int type) {
+        int next = (st.pos == end) ? -1 : orig[st.pos];
+        int prev = (st.pos == 0) ? -1 : orig[st.pos-1];
+        switch(type) {
+            case 0:
+                return (next >= 0) && !char.IsWhiteSpace((char)next) &&
+                    ((prev < 0) || char.IsWhiteSpace((char)prev));
+            case 1:
+                return (prev >= 0) && !char.IsWhiteSpace((char)prev) &&
+                    ((next < 0) || char.IsWhiteSpace((char)next));
+            case 2:
+                return (prev == -1);
+            case 3:
+                return (next == -1);
+            case 4:
+                return (prev == -1) || (prev == '\n' && next >= 0);
+            case 5:
+                return (next == '\n') || (next == -1 && prev != '\n');
+            default:
+                return false;
+        }
+    }
+
     public bool BeforeStr(bool not, string tx) {
         bool ok = st.pos <= end - tx.Length;
         for (int ix = 0; ix < tx.Length && ok; ix++)

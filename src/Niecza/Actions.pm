@@ -529,19 +529,19 @@ sub metachar__S_ThesisGt { my ($cl, $M) = @_;
 }
 
 sub metachar__S_LtLt { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::LWB->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '<<');
 }
 
 sub metachar__S_GtGt { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::RWB->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '>>');
 }
 
 sub metachar__S_Fre { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::LWB->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '<<');
 }
 
 sub metachar__S_Nch { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::RWB->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '>>');
 }
 
 sub metachar__S_qw { my ($cl, $M) = @_;
@@ -571,19 +571,19 @@ sub metachar__S_Dot { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Caret { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::StrStart->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '^');
 }
 
 sub metachar__S_CaretCaret { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::LineStart->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '^^');
 }
 
 sub metachar__S_Dollar { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::StrEnd->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '$');
 }
 
 sub metachar__S_DollarDollar { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::LineEnd->new;
+    $M->{_ast} = RxOp::ZeroWidth->new(type => '$$');
 }
 
 sub metachar__S_Single_Single { my ($cl, $M) = @_;

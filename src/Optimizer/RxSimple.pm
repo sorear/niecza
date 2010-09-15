@@ -146,6 +146,7 @@ sub RxOp::None::mayback { 0 }
 sub RxOp::CClassElem::mayback { 0 }
 sub RxOp::CutLTM::mayback { 0 }
 sub RxOp::CutRule::mayback { 0 }
+sub RxOp::ZeroWidth::mayback { 0 }
 sub RxOp::BeforeString::mayback { 0 }
 sub RxOp::NotBeforeString::mayback { 0 }
 sub RxOp::Before::mayback { 0 }

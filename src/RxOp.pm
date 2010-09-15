@@ -304,6 +304,25 @@ use CgOp;
 }
 
 {
+    package RxOp::ZeroWidth;
+    use Moose;
+    extends 'RxOp';
+
+    has type => (isa => 'Str', is => 'ro', required => 1);
+
+    my %map = ('<<' => 0, '>>' => 1, '^' => 2, '$' => 3, '^^' => 4, '$$' => 5);
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim('ZeroWidth', CgOp::int($map{$self->type}));
+    }
+
+    sub lad { [ 'Null' ] }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::Before;
     use Moose;
     extends 'RxOp';
