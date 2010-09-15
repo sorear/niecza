@@ -12,6 +12,7 @@ use CgOp;
     has zyg => (isa => 'ArrayRef[RxOp]', is => 'ro', default => sub { [] });
 
     sub opzyg { map { $_->opzyg } @{ $_[0]->zyg } }
+    sub oplift { map { $_->oplift } @{ $_[0]->zyg } }
 
     # all that matters is 0-1-infty; $*in_quant valid here
     sub used_caps {
@@ -590,6 +591,21 @@ use CgOp;
         my ($self) = @_;
         [ 'Imp' ];
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::Statement;
+    use Moose;
+    extends 'RxOp';
+
+    has stmt => (isa => 'Op', is => 'ro', required => 1);
+    sub oplift { $_[0]->stmt }
+
+    sub code { CgOp::prog() }
+    sub lad { ['Null'] }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

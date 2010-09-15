@@ -1042,8 +1042,9 @@ use CgOp;
     has rxop => (isa => 'RxOp', is => 'ro', required => 1);
     has name => (isa => 'Str', is => 'ro', default => '');
     has sym => (isa => 'Maybe[Str]', is => 'ro');
+    has pre => (isa => 'ArrayRef[Op]', is => 'ro', default => sub { [] });
 
-    sub zyg { $_[0]->rxop->opzyg }
+    sub zyg { @{ $_[0]->pre }, $_[0]->rxop->opzyg }
 
     sub code {
         my ($self, $body) = @_;
@@ -1055,8 +1056,10 @@ use CgOp;
         for (keys %$u) {
             push @mcaps, CgOp::clr_string($_) if $u->{$_} >= 2;
         }
+        my @pre = map { CgOp::sink($_->code($body)) } @{ $self->pre };
 
         CgOp::prog(
+            @pre,
             CgOp::setfield('rx', CgOp::callframe,
                 CgOp::rawnew('RxFrame', CgOp::clr_string($self->name),
                     CgOp::cast('Cursor', CgOp::fetch(CgOp::scopedlex('$¢'))))),

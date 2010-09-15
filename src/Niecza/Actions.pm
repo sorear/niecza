@@ -294,14 +294,16 @@ sub quote__S_Q { my ($cl, $M) = @_;
 }
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
+    my @lift = $M->{nibble}{_ast}->oplift;
     my $rxop = Optimizer::RxSimple::run($M->{nibble}{_ast});
     $M->{_ast} = Op::SubDef->new(
         var  => $cl->gensym,
         body => Body->new(
+            transparent => 1,
             class => 'Regex',
             type  => 'regex',
             signature => Sig->simple->for_regex,
-            do => Op::RegexBody->new(rxop => $rxop)));
+            do => Op::RegexBody->new(pre => \@lift, rxop => $rxop)));
 }
 
 sub regex_block { my ($cl, $M) = @_;
@@ -374,6 +376,7 @@ sub regex_def { my ($cl, $M) = @_;
 
     local $::symtext = $symtext;
     my $lad = Optimizer::RxSimple::run_lad($ast->lad);
+    my @lift = $ast->oplift;
     $ast = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
@@ -384,7 +387,7 @@ sub regex_def { my ($cl, $M) = @_;
             class => 'Regex',
             type  => 'regex',
             signature => $sig->for_regex,
-            do => Op::RegexBody->new(sym => $symtext,
+            do => Op::RegexBody->new(sym => $symtext, pre => \@lift,
                 name => ($name // ''), rxop => $ast)));
 }
 
@@ -733,6 +736,10 @@ sub mod_internal__S_Colona {}
 sub mod_internal__S_ColonBanga {}
 sub mod_internal__S_ColonaParen_Thesis {}
 sub mod_internal__S_Colon0a {}
+
+sub mod_internal__S_Colonmy { my ($cl, $M) = @_;
+    $M->{_ast} = RxOp::Statement->new(stmt => $M->{statement}{_ast} );
+}
 
 sub backslash { my ($cl, $M) = @_;
     if ($M->Str =~ /^[A-Z]$/ && $M->{sym} =~ /^[a-z]$/) {
