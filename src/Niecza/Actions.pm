@@ -410,6 +410,8 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
     my $ns   = $M->{normspace}[0];
     my $q    = $M->{quantifier}[0] ? $M->{quantifier}[0]{_ast} : undef;
 
+    return unless $atom;
+
     if ($::RX{r}) {
         # no quantifier at all?  treat it as :
         $q //= { mod => '' };
@@ -456,6 +458,7 @@ sub quantmod { my ($cl, $M) = @_;
 }
 
 sub quant_atom_list { my ($cl, $M) = @_;
+    for (@{ $M->{quantified_atom} }) { return unless $_->{_ast} }
     $M->{_ast} = RxOp::Sequence->new(zyg =>
         [ map { $_->{_ast} } @{ $M->{quantified_atom} } ]);
 }
@@ -467,6 +470,7 @@ my %LISTrx_types = (
     '||' => 'RxOp::SeqAlt',
 );
 sub LISTrx { my ($cl, $M) = @_;
+    for (@{ $M->{list} }) { return unless $_->{_ast} }
     $M->{_ast} = $LISTrx_types{$M->{delims}[0]{sym}}->new(zyg =>
         [ map { $_->{_ast} } @{ $M->{list} } ]);
 }
@@ -507,6 +511,7 @@ sub metachar__S_ColonColonColon { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Bra_Ket { my ($cl, $M) = @_;
+    return unless $M->{nibbler}{_ast};
     $M->{_ast} = RxOp::ConfineLang->new(zyg => [$M->{nibbler}{_ast}]);
 }
 
