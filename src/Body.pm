@@ -18,6 +18,7 @@ use CgOp ();
             builder => 'is_mainline');
     # '' for incorrectly contextualized {p,x,}block, blast
     has type      => (isa => 'Str', is => 'rw');
+    has returnable=> (isa => 'Bool', is => 'rw');
 
     # Any => [ 'Variable', 'SAFE.F12_34' ] # a global
     # $x  => [ 'Variable', undef, 5 ] # slot 5 in pad
@@ -155,6 +156,11 @@ use CgOp ();
                     CgOp::sink($self->do->cgop($self)),
                     CgOp::rawsccall('Kernel.Take',
                         CgOp::scopedlex('EMPTY'))));
+        } elsif ($self->returnable) {
+            $self->cgoptree(CgOp::prog(@enter,
+                    CgOp::return(CgOp::span("rstart", "rend",
+                        $self->do->cgop($self))),
+                    CgOp::ehspan(4, undef, 0, "rstart", "rend", "rend")));
         } else {
             $self->cgoptree(CgOp::prog(@enter,
                     CgOp::return($self->do->cgop($self))));

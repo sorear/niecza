@@ -281,7 +281,7 @@ use warnings;
             $_->var_cg($cg);
         }
         my ($c, @o) = @{ $self->op };
-        if ($cg->unreach && $c ne 'labelhere') {
+        if ($cg->unreach && $c ne 'labelhere' && $c ne 'ehspan') {
             return;
         }
         $cg->$c(@o);

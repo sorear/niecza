@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 454;
+plan 518;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1028,4 +1028,51 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
     is +$me<tok>[2]<sign>, 1, "third sign";
     is +$me<tok>[4]<sign>, 0, "fifth no sign";
     is $me<tok>[2], '-34', "3rd token '-34'";
+}
+
+{
+    rxtest / . << . /, ".<<.", (" x",), ("x ","  ","xx");
+    rxtest / . << /, ".<<", Nil, ("x", " ");
+    rxtest / << . /, "<<.", ("x",), (" ",);
+    rxtest / << /, "<<", Nil, ("",);
+
+    rxtest / . >> . /, ".>>.", ("x ",), (" x","  ","xx");
+    rxtest / . >> /, ".>>", ("x",), (" ",);
+    rxtest / >> . /, ">>.", Nil, ("x"," ");
+    rxtest / >> /, ">>", Nil, ("",);
+
+    rxtest / . « . /, ".«.", (" x",), ("x ","  ","xx");
+    rxtest / . « /, ".«", Nil, ("x", " ");
+    rxtest / « . /, "«.", ("x",), (" ",);
+    rxtest / « /, "«", Nil, ("",);
+
+    rxtest / . » . /, ".».", ("x ",), (" x","  ","xx");
+    rxtest / . » /, ".»", ("x",), (" ",);
+    rxtest / » . /, "».", Nil, ("x"," ");
+    rxtest / » /, "»", Nil, ("",);
+
+    rxtest / . ^ . /, ".^.", Nil, ("x",);
+    rxtest / . ^ /, ".^", Nil, ("x",);
+    rxtest / ^ . /, "^.", ("x",), Nil;
+    rxtest / ^ /, "^", ("",), Nil;
+
+    rxtest / . $ . /, '.$.', Nil, ("x",);
+    rxtest / . $ /, '.$', ("x",), Nil;
+    rxtest / $ . /, '$.', Nil, ("x",);
+    rxtest / $ /, '$', ("",), Nil;
+
+    rxtest / . ^^ . /, '.^^.', ("\nx","\n\n"), ("x\n","xx");
+    rxtest / . ^^ /, '.^^', Nil, ("x","\n");
+    rxtest / ^^ . /, '^^.', ("x","\n"), Nil;
+    rxtest / ^^ /, '^^', ("",), Nil;
+
+    rxtest / . $$ . /, '.$$.', ("x\n", "\n\n"), ("\nx","xx");
+    rxtest / . $$ /, '.$$', ("x",), ("\n",);
+    rxtest / $$ . /, '$$.', ("\n",), ("x",);
+    rxtest / $$ /, '$$', ("",), Nil;
+}
+
+{
+    ok "foo" ~~ / :my $gothere = 1; foo /, "can embed :my in regexes";
+    ok $gothere, ":my code is run";
 }

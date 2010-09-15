@@ -2237,6 +2237,7 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     $cl->blockcheck;
     Body->new(
         name      => $subname,
+        returnable=> ($type eq 'sub'),
         ($type eq 'mainline' ? (
                 file => $::FILE->{name},
                 text => $::ORIG) : ()),
