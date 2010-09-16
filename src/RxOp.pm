@@ -91,6 +91,9 @@ use CgOp;
         my ($self, $body) = @_;
         my @code;
 
+        die "minimal matching NYI" if $self->minimal;
+        die "separators NYI" if $self->zyg->[1];
+
         my $exit = $self->label;
         my $repeat = $self->label;
         my $middle = $self->label;

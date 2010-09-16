@@ -448,6 +448,16 @@ sub quantifier__S_Question { my ($cl, $M) = @_;
 sub quantifier__S_Colon { my ($cl, $M) = @_;
     $M->{_ast} = { mod => '' };
 }
+sub quantifier__S_StarStar { my ($cl, $M) = @_;
+    # XXX can't handle normspace well since it's not labelled 1*/2*
+    $M->{_ast} =
+        $M->{1}[0] ? { min => $M->{0}->Str, max => $M->{1}[0]->Str } :
+        ($M->{0} && $M->Str =~ /\.\./) ? { min => $M->{0}->Str } :
+        $M->{0} ? { min => $M->{0}->Str, max => $M->{0}->Str } :
+        $M->{embeddedblock} ? { min => 0, cond => $M->{embeddedblock}{_ast} } :
+        { min => 1, sep => $M->{quantified_atom}{_ast} };
+    $M->{_ast}{mod} = $M->{quantmod}{_ast};
+}
 
 sub quantmod { my ($cl, $M) = @_;
     my $t = $M->Str;

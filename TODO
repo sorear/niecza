@@ -1,0 +1,16 @@
+* Variable overhaul
+
+class GeneralContainer {
+    IP6 objref;
+    bool islist;
+    bool isrw;
+    IP6 whence;
+}
+
+Fields other than objref and whence constant
+
+my $x; # allocates 1 GeneralContainer
+$x = 2; # change objref
+$x := 3; # set [$x] in stackframe to new container
+
+Blockers: our $x needs bvalue aliasing and I haven't decided the best way yet
