@@ -244,9 +244,10 @@ use CgOp ();
             $pkgcg = CgOp::scopedlex('$?CURPKG');
         }
 
+        $pkgcg = CgOp::rawnew('BValue', $pkgcg);
         for my $c (@components) {
-            $pkgcg = CgOp::rawscall('Kernel.PackageLookup', CgOp::fetch($pkgcg),
-                CgOp::clr_string($c));
+            $pkgcg = CgOp::rawscall('Kernel.PackageLookup',
+                CgOp::fetch(CgOp::bget($pkgcg)), CgOp::clr_string($c));
         }
 
         $usedstate, $pkgcg;

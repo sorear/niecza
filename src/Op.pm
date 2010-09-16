@@ -970,7 +970,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         $self->looks_static ? CgOp::scopedlex($self->slot) :
-            ($body->lookup_var($self->name, @{ $self->path }))[1];
+            CgOp::bget(($body->lookup_var($self->name, @{ $self->path }))[1]);
     }
 
     __PACKAGE__->meta->make_immutable;

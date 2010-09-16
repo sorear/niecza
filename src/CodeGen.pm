@@ -40,6 +40,8 @@ use 5.010;
             { ToString     => [m => 'String'] },
         'Variable' =>
             { islist       => [f => 'Boolean'] },
+        'BValue' =>
+            { v            => [f => 'Variable' ] },
         'VivClosure' =>
             { v            => [f => 'IP6'] },
         'CLRImportObject' =>
@@ -114,7 +116,7 @@ use 5.010;
         'Kernel.CallFrameMO'   => [f => 'DynMetaObject'],
         'Kernel.Process'       => [f => 'Variable'],
         'Kernel.Global'        => [f => 'Variable'],
-        'Kernel.PackageLookup' => [m => 'Variable'],
+        'Kernel.PackageLookup' => [m => 'BValue'],
         'Kernel.SlurpyHelper'  => [m => 'VarDeque'],
         'Kernel.Bind'          => [c => 'Void'],
         'Kernel.NewBoundVar'   => [c => 'Variable'],

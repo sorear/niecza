@@ -139,6 +139,13 @@ namespace Niecza {
         }
     }
 
+    // Used to make Variable sharing explicit in some cases; will eventually be
+    // the only way to share a bvalue
+    public sealed class BValue {
+        public Variable v;
+        public BValue(Variable v) { this.v = v; }
+    }
+
     // This stores all the invariant stuff about a Sub, i.e. everything
     // except the outer pointer.  Now distinct from protopads
     public class SubInfo {
@@ -158,6 +165,9 @@ namespace Niecza {
         public const int ON_REDO = 3;
         public const int ON_RETURN = 4;
         public const int ON_DIE = 5;
+        public const int ON_SUCCEED = 6;
+        public const int ON_PROCEED = 7;
+        public const int ON_GOTO = 8;
         public int[] edata;
         public string[] label_names;
 
@@ -913,14 +923,14 @@ blocked:
                 th = th.caller;
             }
             name = name.Remove(1,1);
-            Dictionary<string,Variable> gstash = (Dictionary<string,Variable>)
+            Dictionary<string,BValue> gstash = (Dictionary<string,BValue>)
                 (((CLRImportObject)GlobalO).val);
-            Variable v;
+            BValue v;
 
             if (gstash.TryGetValue(name, out v)) {
-                return v;
+                return v.v;
             } else {
-                return PackageLookup(ProcessO, name);
+                return PackageLookup(ProcessO, name).v;
             }
         }
 
@@ -958,22 +968,22 @@ slow:
         public static IP6 StrP;
         public static DynMetaObject CallFrameMO;
 
-        public static Variable PackageLookup(IP6 parent, string name) {
-            Dictionary<string,Variable> stash = (Dictionary<string,Variable>)
+        public static BValue PackageLookup(IP6 parent, string name) {
+            Dictionary<string,BValue> stash = (Dictionary<string,BValue>)
                 (((CLRImportObject)parent).val);
-            Variable v;
+            BValue v;
 
             if (stash.TryGetValue(name, out v)) {
                 return v;
             } else if (name.EndsWith("::")) {
-                Dictionary<string,Variable> newstash =
-                    new Dictionary<string,Variable>();
-                newstash["PARENT::"] = NewROScalar(parent);
-                return (stash[name] = NewROScalar(
-                            new CLRImportObject(newstash)));
+                Dictionary<string,BValue> newstash =
+                    new Dictionary<string,BValue>();
+                newstash["PARENT::"] = new BValue(NewROScalar(parent));
+                return (stash[name] = new BValue(NewROScalar(
+                            new CLRImportObject(newstash))));
             } else {
                 // TODO: @foo, %foo
-                return (stash[name] = NewRWScalar(AnyP));
+                return (stash[name] = new BValue(NewRWScalar(AnyP)));
             }
         }
 
@@ -1043,9 +1053,9 @@ slow:
             ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
             ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
-            GlobalO = new CLRImportObject(new Dictionary<string,Variable>());
+            GlobalO = new CLRImportObject(new Dictionary<string,BValue>());
             Global = NewROScalar(GlobalO);
-            ProcessO = new CLRImportObject(new Dictionary<string,Variable>());
+            ProcessO = new CLRImportObject(new Dictionary<string,BValue>());
             Process = NewROScalar(ProcessO);
         }
 

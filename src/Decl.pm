@@ -150,7 +150,7 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::bind(1, ($body->lookup_var($self->name, @{ $self->path }))[1],
+        CgOp::bind(1, CgOp::bget(($body->lookup_var($self->name, @{ $self->path }))[1]),
             CgOp::scopedlex($self->slot));
     }
 
@@ -176,7 +176,7 @@ use CgOp;
         my ($self, $body) = @_;
         my ($st, $cg) = $body->lookup_var($self->name, @{ $self->path });
         Carp::confess("bad use of OurAlias") if $st;
-        CgOp::proto_var($self->slot, $cg);
+        CgOp::proto_var($self->slot, CgOp::bget($cg)); # XXX BValue
     }
 
     sub enter_code {
@@ -257,7 +257,7 @@ use CgOp;
 
     sub stash {
         my ($self, $body, $suf) = @_;
-        ($body->lookup_pkg(@{ $self->pkg }, $self->name . $suf))[1];
+        CgOp::bget(($body->lookup_pkg(@{ $self->pkg }, $self->name . $suf))[1]);
     }
 
     sub used_slots {
@@ -304,7 +304,7 @@ use CgOp;
 
     sub stash {
         my ($self, $body, $suf) = @_;
-        ($body->lookup_pkg(@{ $self->ourpkg }, $self->name . $suf))[1];
+        CgOp::bget(($body->lookup_pkg(@{ $self->ourpkg }, $self->name . $suf))[1]);
     }
 
     sub used_slots {
@@ -325,12 +325,12 @@ use CgOp;
                 CgOp::proto_var($self->var, CgOp::null('IP6')),
                 CgOp::proto_var($self->stashvar, CgOp::fetch(
                     ($self->ourpkg ? $self->stash($body, '::') :
-                    CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))))));
+                    CgOp::wrap(CgOp::rawnew('Dictionary<string,BValue>'))))));
         }
 
         CgOp::letn("pkg",
             ($self->ourpkg ? $self->stash($body, '::') :
-                CgOp::wrap(CgOp::rawnew('Dictionary<string,Variable>'))),
+                CgOp::wrap(CgOp::rawnew('Dictionary<string,BValue>'))),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
                 CgOp::proto_var($self->var, CgOp::null('IP6')),
@@ -567,8 +567,8 @@ use CgOp;
                 CodeGen->know_sfield($scope->{$head}[2], $scope->{$head}[0]);
                 my $first = CgOp::newscalar(CgOp::rawsget($scope->{$head}[2]));
                 for (@path) {
-                    $first = CgOp::rawscall('Kernel.PackageLookup',
-                        CgOp::fetch($first), CgOp::clr_string($_));
+                    $first = CgOp::bget(CgOp::rawscall('Kernel.PackageLookup',
+                        CgOp::fetch($first), CgOp::clr_string($_)));
                 }
 
                 CgOp::prog(
