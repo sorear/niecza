@@ -423,8 +423,10 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
     }
 
     if (defined $q->{min}) {
+        my @z = $atom;
+        push @z, $q->{sep} if defined $q->{sep};
         $atom = RxOp::Quantifier->new(min => $q->{min}, max => $q->{max},
-            zyg => [$atom], minimal => ($q->{mod} && $q->{mod} eq '?'));
+            zyg => [@z], minimal => ($q->{mod} && $q->{mod} eq '?'));
     }
 
     if (defined $q->{mod} && $q->{mod} eq '') {

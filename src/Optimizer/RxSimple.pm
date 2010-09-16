@@ -181,12 +181,12 @@ sub RxOp::NotBefore::rxsimp { my ($self, $cut) = @_;
 }
 
 sub RxOp::Quantifier::rxsimp { my ($self, $cut) = @_;
-    my $z = $self->zyg->[0]->rxsimp(0);
-    if ($cut && $z->isa('RxOp::CClassElem')) {
-        return RxOp::QuantCClass->new(cc => $z->cc, min => $self->min,
+    my @z = map { $_->rxsimp(0) } @{ $self->zyg };
+    if ($cut && @z == 1 && $z[0]->isa('RxOp::CClassElem')) {
+        return RxOp::QuantCClass->new(cc => $z[0]->cc, min => $self->min,
             max => $self->max);
     }
-    return RxOp::Quantifier->new(%$self, zyg => [$z]);
+    return RxOp::Quantifier->new(%$self, zyg => [@z]);
 }
 
 sub RxOp::QuantCClass::mayback { 0 }

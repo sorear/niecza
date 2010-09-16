@@ -42,6 +42,7 @@ sub return is rawcall {
     rxtest /^ x**2..4 $/, 'x**2..4', ('xx','xxx','xxxx'), ('x','xxxxx');
     rxtest /^ x**2..* $/, 'x**2..*', ('xx','xxx','xxxx'), ('x',);
     rxtest /^ [x**2] $/, 'x**2', ('xx',), ('x','xxx');
+    rxtest /^ [x**y] $/, 'x**y', ('x','xyx','xyxyx'), ('','xy','yx');
 }
 
 done-testing;

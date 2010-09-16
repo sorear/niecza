@@ -85,14 +85,13 @@ use CgOp;
     has min => (isa => 'Int', is => 'ro', required => 1);
     has max => (isa => 'Maybe[Int]', is => 'ro', default => undef);
 
-    sub used_caps { local $::in_quant = 1; $_[0]->zyg->[0]->used_caps }
+    sub used_caps { local $::in_quant = 1; $_[0]->SUPER::used_caps }
 
     sub code {
         my ($self, $body) = @_;
         my @code;
 
         die "minimal matching NYI" if $self->minimal;
-        die "separators NYI" if $self->zyg->[1];
 
         my $exit = $self->label;
         my $repeat = $self->label;
@@ -133,6 +132,8 @@ use CgOp;
                     CgOp::int($max)));
         }
 
+        push @code, $self->zyg->[1]->code($body)
+            if $self->zyg->[1];
         push @code, CgOp::label($middle) if $min;
         push @code, $self->zyg->[0]->code($body);
         push @code, CgOp::rxcall('IncQuant') if $usequant;
