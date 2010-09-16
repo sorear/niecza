@@ -260,7 +260,7 @@ use CgOp;
 
     sub stash {
         my ($self, $body, $suf) = @_;
-        CgOp::bget(($body->lookup_pkg(@{ $self->pkg }, $self->name . $suf))[1]);
+        ($body->lookup_pkg(@{ $self->pkg }, $self->name . $suf))[1];
     }
 
     sub used_slots {
@@ -272,9 +272,9 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::letn("pkg", $self->stash($body, '::'),
+        CgOp::letn("pkg", CgOp::bget($self->stash($body, '::')),
             CgOp::letn("how", CgOp::newscalar(CgOp::how(
-                        CgOp::fetch($self->stash($body, '')))),
+                        CgOp::fetch(CgOp::bget($self->stash($body, ''))))),
                 CgOp::protosub($self->body),
                 CgOp::proto_var($self->bodyvar, CgOp::sub_var($self->body))));
     }
@@ -307,7 +307,7 @@ use CgOp;
 
     sub stash {
         my ($self, $body, $suf) = @_;
-        CgOp::bget(($body->lookup_pkg(@{ $self->ourpkg }, $self->name . $suf))[1]);
+        ($body->lookup_pkg(@{ $self->ourpkg }, $self->name . $suf))[1];
     }
 
     sub used_slots {
@@ -327,12 +327,12 @@ use CgOp;
             return CgOp::prog(
                 CgOp::proto_var($self->var, CgOp::null('IP6')),
                 CgOp::proto_var($self->stashvar, CgOp::fetch(
-                    ($self->ourpkg ? $self->stash($body, '::') :
+                    ($self->ourpkg ? CgOp::bget($self->stash($body, '::')) :
                     CgOp::wrap(CgOp::rawnew('Dictionary<string,BValue>'))))));
         }
 
         CgOp::letn("pkg",
-            ($self->ourpkg ? $self->stash($body, '::') :
+            ($self->ourpkg ? CgOp::bget($self->stash($body, '::')) :
                 CgOp::wrap(CgOp::rawnew('Dictionary<string,BValue>'))),
             CgOp::letn("how", $self->make_how,
                 # catch usages before the closing brace
@@ -385,7 +385,7 @@ use CgOp;
         }
         push @r, CgOp::scopedlex($self->var,
                 CgOp::methodcall(CgOp::letvar("how"), "create-typeobject"));
-        push @r, CgOp::bind(1, $self->stash($body, ''),
+        push @r, CgOp::bind(1, CgOp::bget($self->stash($body, '')),
                 CgOp::scopedlex($self->var)) if $self->ourpkg;
         @r;
     }

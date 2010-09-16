@@ -29,6 +29,18 @@ use CgOp;
         }
     }
 
+    # A few words on the nature of bvalues
+    # A bvalue cannot escape a sub; the return would always extract the
+    # Variable.  Most ops don't return bvalues, nor expect them.  To avoid
+    # the overhead of every Op::Lexical returning a bvalue, we do a very
+    # primitive escape analysis here; only generate bvalues on the LHS of
+    # binds.  Further, we don't need to generate the bvalues explicitly, since
+    # we know they'll just be bound.
+    sub code_bvalue {
+        my ($self, $body, $ro, $rhscg) = @_;
+        Carp::confess("Illegal use of " . ref($self) . " in bvalue context");
+    }
+
     sub statement_level { shift }
 
     __PACKAGE__->meta->make_immutable;
@@ -245,6 +257,11 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         $self->inside->cgop($body);
+    }
+
+    sub code_bvalue {
+        my ($self, $body, $ro, $rhscg) = @_;
+        $self->inside->code_bvalue($body, $ro, $rhscg);
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -584,10 +601,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::prog(
-            CgOp::bind($self->readonly, $self->lhs->cgop($body),
-                $self->rhs->cgop($body)),
-            CgOp::null('Variable'));
+        $self->lhs->code_bvalue($body, $self->readonly, $self->rhs->cgop($body))
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -918,6 +932,13 @@ use CgOp;
         CgOp::scopedlex($self->name);
     }
 
+    sub code_bvalue {
+        my ($self, $body, $ro, $rhscg) = @_;
+        CgOp::prog(
+            CgOp::bind($ro, CgOp::scopedlex($self->name), $rhscg),
+            CgOp::scopedlex($self->name));
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -971,6 +992,18 @@ use CgOp;
         my ($self, $body) = @_;
         $self->looks_static ? CgOp::scopedlex($self->slot) :
             CgOp::bget(($body->lookup_var($self->name, @{ $self->path }))[1]);
+    }
+
+    sub code_bvalue {
+        my ($self, $body, $ro, $rhscg) = @_;
+        $self->looks_static ?
+            CgOp::prog(
+                CgOp::bind($ro, CgOp::scopedlex($self->slot), $rhscg),
+                CgOp::scopedlex($self->slot)) :
+            CgOp::letn('!bv', ($body->lookup_var($self->name,
+                        @{ $self->path }))[1],
+                CgOp::bind($ro, CgOp::bget(CgOp::letvar('!bv')), $rhscg),
+                CgOp::bget(CgOp::letvar('!bv')));
     }
 
     __PACKAGE__->meta->make_immutable;
