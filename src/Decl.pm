@@ -150,8 +150,8 @@ use CgOp;
     sub preinit_code {
         my ($self, $body) = @_;
 
-        CgOp::bind(1, CgOp::bget(($body->lookup_var($self->name, @{ $self->path }))[1]),
-            CgOp::scopedlex($self->slot));
+        CgOp::bset(($body->lookup_var($self->name, @{ $self->path }))[1],
+            CgOp::newboundvar(1, 0, CgOp::scopedlex($self->slot)))
     }
 
     sub enter_code { }
@@ -385,8 +385,8 @@ use CgOp;
         }
         push @r, CgOp::scopedlex($self->var,
                 CgOp::methodcall(CgOp::letvar("how"), "create-typeobject"));
-        push @r, CgOp::bind(1, CgOp::bget($self->stash($body, '')),
-                CgOp::scopedlex($self->var)) if $self->ourpkg;
+        push @r, CgOp::bset($self->stash($body, ''),
+                CgOp::newboundvar(1, 0, CgOp::scopedlex($self->var))) if $self->ourpkg;
         @r;
     }
 
@@ -574,10 +574,7 @@ use CgOp;
                         CgOp::fetch($first), CgOp::clr_string($_)));
                 }
 
-                CgOp::prog(
-                    CgOp::proto_var($_, CgOp::newrwscalar(CgOp::fetch(
-                        CgOp::scopedlex('Any')))),
-                    CgOp::bind(0, CgOp::scopedlex($_), $first));
+                CgOp::proto_var($_, CgOp::newboundvar(0, 0, $first));
             } sort keys %{ $self->symbols });
     }
 

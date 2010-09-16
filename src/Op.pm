@@ -935,7 +935,7 @@ use CgOp;
     sub code_bvalue {
         my ($self, $body, $ro, $rhscg) = @_;
         CgOp::prog(
-            CgOp::bind($ro, CgOp::scopedlex($self->name), $rhscg),
+            CgOp::scopedlex($self->name, CgOp::newboundvar($ro, $self->list || $self->hash, $rhscg)),
             CgOp::scopedlex($self->name));
     }
 
@@ -968,6 +968,8 @@ use CgOp;
     has name => (isa => 'Str', is => 'ro', required => 1);
     has slot => (isa => 'Str', is => 'ro', required => 1);
     has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
+    has list => (isa => 'Bool', is => 'ro', default => 0);
+    has hash => (isa => 'Bool', is => 'ro', default => 0);
 
     sub looks_static {
         my ($self) = @_;
@@ -998,11 +1000,13 @@ use CgOp;
         my ($self, $body, $ro, $rhscg) = @_;
         $self->looks_static ?
             CgOp::prog(
-                CgOp::bind($ro, CgOp::scopedlex($self->slot), $rhscg),
+                CgOp::bset(CgOp::scopedlex($self->slot . '!b'),
+                    CgOp::newboundvar($ro, $self->list || $self->hash, $rhscg)),
                 CgOp::scopedlex($self->slot)) :
             CgOp::letn('!bv', ($body->lookup_var($self->name,
                         @{ $self->path }))[1],
-                CgOp::bind($ro, CgOp::bget(CgOp::letvar('!bv')), $rhscg),
+                CgOp::bset(CgOp::letvar('!bv'), CgOp::newboundvar($ro,
+                        $self->list || $self->hash, $rhscg)),
                 CgOp::bget(CgOp::letvar('!bv')));
     }
 

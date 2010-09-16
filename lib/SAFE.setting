@@ -436,13 +436,7 @@ sub unitem is rawcall {
 
 # Maybe this should be a constant, but constants are currently forced to
 # scalar-nature (TODO)
-sub Nil {
-    state @n;
-    START {
-        @n := &infix:<,>();
-    }
-    @n;
-}
+sub Nil is rawcall { Q:CgOp { (newrwlistvar (@ (box Parcel (rawnewarr 'Variable')))) } }
 
 my class List is Cool {
     has @!items;

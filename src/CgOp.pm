@@ -534,10 +534,6 @@ use warnings;
                 fetch(scopedlex($_[0])));
     }
 
-    sub bind {
-        rawsccall('Kernel.Bind', $_[1], $_[2], bool($_[0]), bool(0));
-    }
-
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
 

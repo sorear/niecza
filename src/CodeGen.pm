@@ -118,7 +118,6 @@ use 5.010;
         'Kernel.Global'        => [f => 'Variable'],
         'Kernel.PackageLookup' => [m => 'BValue'],
         'Kernel.SlurpyHelper'  => [m => 'VarDeque'],
-        'Kernel.Bind'          => [c => 'Void'],
         'Kernel.NewBoundVar'   => [c => 'Variable'],
         'Kernel.Assign'        => [c => 'Void'],
         'Kernel.Fetch'         => [c => 'IP6'],
