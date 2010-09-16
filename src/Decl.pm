@@ -170,13 +170,16 @@ use CgOp;
         default => sub { ['OUR'] });
     has name   => (isa => 'Str', is => 'ro', required => 1);
 
-    sub used_slots { [ $_[0]->slot, 'Variable', 1 ] }
+    sub used_slots {
+        [ $_[0]->slot . '!b', 'BValue', 1 ],
+        [ $_[0]->slot, 'Variable', 5 ]
+    }
 
     sub preinit_code {
         my ($self, $body) = @_;
         my ($st, $cg) = $body->lookup_var($self->name, @{ $self->path });
         Carp::confess("bad use of OurAlias") if $st;
-        CgOp::proto_var($self->slot, CgOp::bget($cg)); # XXX BValue
+        CgOp::proto_var($self->slot . '!b', $cg);
     }
 
     sub enter_code {

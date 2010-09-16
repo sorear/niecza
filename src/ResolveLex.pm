@@ -71,11 +71,17 @@ sub resolve_lex {
         die "Internal error: failed to resolve lexical $name in " . $body->name;
     }
 
-    if (($kind == 1 || $kind == 2 || $kind == 3) && $data =~ /(.*)\./) {
+    if (($kind =~ /[1235]/) && $data =~ /(.*)\./) {
         $::UNITREFS{$1} = 1;
     }
 
-    if ($kind == 4) {
+    if ($kind == 5) {
+        if ($set_to) {
+            return CgOp::bset(CgOp::rawsget($data . ":f,BValue"), $set_to);
+        } else {
+            return CgOp::bget(CgOp::rawsget($data . ":f,BValue"));
+        }
+    } elsif ($kind == 4) {
         if ($set_to) {
             return CgOp::Primitive->new(op => ['rtpadputi', $order, $data],
                 zyg => [$set_to]);

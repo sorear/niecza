@@ -55,11 +55,14 @@ use CgOp ();
         for my $le (map { $_->used_slots($h{'?is_mainline'}) } @{ $self->decls }) {
             # 0: cloned dynamic  1: static field  2: hint
             # 3: readonly static field  4: cloned non-dynamic
+            # 5: our-alias for bvalue in some 3
             if ($le->[2] == 1 || $le->[2] == 3) {
                 my $sanname = $le->[0];
                 $sanname =~ s/\W//g;
                 $le->[3] = sprintf "%s.F%d_%d_%s", $::UNITNAME, $self->uid,
                     $nfields_global++, $sanname;
+            } elsif ($le->[2] == 5) {
+                $le->[3] = $h{$le->[0] . '!b'}[2];
             } elsif ($le->[2] == 2) {
                 $le->[3] = sprintf "%s.%s_info", $::UNITNAME, $self->csname;
             } elsif ($le->[2] == 4) {
