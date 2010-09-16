@@ -4,3 +4,5 @@
 syml
 VERSION
 t/spec
+perf/sample_*.json
+perf/STD.errors
