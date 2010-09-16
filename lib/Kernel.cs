@@ -125,13 +125,10 @@ namespace Niecza {
         public IP6 whence;
         public IP6 container;
         // will be a direct ref if !rw; lists are always !rw
-        public bool bvalue;
         public bool rw;
         public bool islist;
 
-        public Variable(bool bvalue, bool rw, bool islist, IP6 whence,
-                IP6 container) {
-            this.bvalue = bvalue;
+        public Variable(bool rw, bool islist, IP6 whence, IP6 container) {
             this.whence = whence;
             this.container = container;
             this.rw = rw;
@@ -756,87 +753,57 @@ blocked:
             return w.Invoke(th, new Variable[1] { v }, null);
         }
 
-        private static SubInfo BindROSI = new SubInfo("Bind/RO", BindROC);
+        private static SubInfo BindROSI = new SubInfo("Bind/ro-fetch", BindROC);
         private static Frame BindROC(Frame th) {
             switch (th.ip) {
                 case 0:
-                    if (th.pos[0].whence == null)
-                        goto case 1;
                     th.ip = 1;
-                    return Vivify(th, th.pos[0]);
-                case 1:
-                    th.ip = 2;
                     return Fetch(th, th.pos[1]);
-                case 2:
+                case 1:
                     th.pos[0].container = (IP6) th.resultSlot;
-                    th.pos[0].rw = false;
                     return th.caller;
                 default:
                     return Kernel.Die(th, "IP invalid");
             }
         }
 
-        private static SubInfo BindSI = new SubInfo("Bind", BindC);
+        private static SubInfo BindSI = new SubInfo("Bind/rw-viv", BindC);
         private static Frame BindC(Frame th) {
             switch (th.ip) {
                 case 0:
-                    // autovivify rhs if needed
-                    if (th.pos[1].whence == null)
-                        goto case 1;
                     th.ip = 1;
                     return Vivify(th, th.pos[1]);
                 case 1:
-                    if (th.pos[0].whence == null)
-                        goto case 2;
-                    th.ip = 2;
-                    return Vivify(th, th.pos[0]);
-                case 2:
                     th.pos[0].container = th.pos[1].container;
-                    th.pos[0].rw = th.pos[1].rw;
                     return th.caller;
                 default:
                     return Kernel.Die(th, "IP invalid");
             }
-        }
-
-        public static Frame Bind(Frame th, Variable lhs, Variable rhs,
-                bool ro, bool forcerw) {
-            // TODO: need exceptions for forcerw to be used
-            Frame n;
-            if (lhs.islist) ro = true;
-            // fast path
-            if (ro && !rhs.rw && lhs.whence == null) {
-                lhs.rw = false;
-                lhs.container = rhs.container;
-                return th;
-            }
-            if (!ro && lhs.whence == null && rhs.whence == null) {
-                lhs.rw = rhs.rw;
-                lhs.container = rhs.container;
-                return th;
-            }
-
-            n = new Frame(th, null, ro ? BindROSI : BindSI);
-            n.pos = new Variable[2] { lhs, rhs };
-            return n;
         }
 
         public static Frame NewBoundVar(Frame th, bool ro, bool islist,
                 Variable rhs) {
             Frame n;
+            if (islist) ro = true;
+            if (!rhs.rw) ro = true;
             // fast path
-            if (ro && !rhs.rw) {
-                th.resultSlot = new Variable(true, false, islist, null,
-                        rhs.container);
+            if (ro == !rhs.rw && islist == rhs.islist && rhs.whence == null) {
+                th.resultSlot = rhs;
                 return th;
             }
-            if (!ro && rhs.whence == null) {
-                th.resultSlot = new Variable(true, rhs.rw, false, null,
-                        rhs.container);
-                return th;
-            }
+            // ro = true and rhs.rw = true OR
+            // islist != rhs.islist OR
+            // whence != null (and rhs.rw = true)
 
-            Variable lhs = islist ? NewRWListVar(null) : NewROScalar(null);
+            if (!rhs.rw) {
+                th.resultSlot = new Variable(false, islist, null,
+                        rhs.container);
+                return th;
+            }
+            // ro = true and rhw.rw = true OR
+            // whence != null
+
+            Variable lhs = new Variable(!ro, islist, null, null);
             th.resultSlot = lhs;
 
             n = new Frame(th, null, ro ? BindROSI : BindSI);
@@ -891,15 +858,15 @@ blocked:
 
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
-            return new Variable(false, false, false, null, obj);
+            return new Variable(false, false, null, obj);
         }
 
         public static Variable NewRWScalar(IP6 obj) {
-            return new Variable(true, true, false, null, MakeSC(obj));
+            return new Variable(true, false, null, MakeSC(obj));
         }
 
         public static Variable NewRWListVar(IP6 container) {
-            return new Variable(true, false, true, null, container);
+            return new Variable(false, true, null, container);
         }
 
         public static VarDeque SlurpyHelper(Frame th, int from) {
