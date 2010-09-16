@@ -297,11 +297,6 @@ sub prefix:<++>($v) { $v = ($v + 1); $v }
 sub postfix:<-->($v) { my $old = $v; $v = ($v - 1); $old }
 sub postfix:<++>($v) { my $old = $v; $v = ($v + 1); $old }
 
-sub infix:<:=> is rawcall { Q:CgOp {
-    (prog [bind 0 (pos 0) (pos 1)] [pos 0]) } }
-sub infix:<::=> is rawcall { Q:CgOp {
-    (prog [bind 1 (pos 0) (pos 1)] [pos 0]) } }
-
 sub prefix:<~>($v) { $v.Str } # should be Stringy
 sub prefix:<?>($v) { $v.Bool }
 sub prefix:<->($v) { 0 - $v }

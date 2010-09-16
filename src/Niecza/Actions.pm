@@ -984,6 +984,12 @@ sub INFIX { my ($cl, $M) = @_;
     if ($s eq '&infix:<?? !!>') { # XXX macro
         $M->{_ast} = Op::Conditional->new(node($M), check => $l,
             true => $M->{middle}{_ast}, false => $r);
+    } elsif ($s eq '&infix:<:=>') {
+        $M->{_ast} = Op::Bind->new(node($M), readonly => 0, lhs => $l,
+            rhs => $r);
+    } elsif ($s eq '&infix:<::=>') {
+        $M->{_ast} = Op::Bind->new(node($M), readonly => 1, lhs => $l,
+            rhs => $r);
     } elsif ($s eq '&infix:<,>') {
         #XXX STD bug causes , in setting to be parsed as left assoc
         my @r;
