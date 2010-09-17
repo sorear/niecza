@@ -72,55 +72,46 @@ namespace Niecza {
                 return InvokeMethod(c, "INVOKE", np, n);
             }
         }
-
-        public virtual IP6 Fetch() {
-            throw new InvalidOperationException("Cannot FETCH from " + GetMO().name);
-        }
-
-        public virtual void Store(IP6 v) {
-            throw new InvalidOperationException("Cannot STORE to " + GetMO().name);
-        }
     }
 
-    // TODO: update this comment
+    // A Variable is the meaning of function arguments, of any subexpression
+    // except the targets of := and ::=.
 
-    // Variables are things which can produce LValues, and can also bind
-    // LValues.  They hold LValues and may or may not be bindable.  Variables
-    // also tend to contextualize stuff put into them.
-    //
-    // Coercions are not used on binding unless necessary.
-    //
-    // Variables also have type constraints, that's how %foo and @foo differ...
-
-    // A LValue is the meaning of function arguments, of any subexpression
-    // except the targets of := and .VAR.
-    //
-    // They come in two flavors.  Scalary lvalues hold a container, which
-    // can do FETCH and STORE.  Listy lvalues FETCH as the container itself,
-    // and STORE as a method to the container.
-    //
-    // List->scalar context: create a simple container holding the list's
-    // object, but !islist.  Read only.
-    //
-    // Scalar->list: bind islist, must be Iterable. Bind it same rwness.
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public class Variable {
-        // If non-null, then this lv is, or at one time was, the result of
-        // an autovivifying access, but has not yet committed to becoming
-        // real or becoming undef.  We call these virtual containers; they
-        // exist only in flight (resultSlots) and in parcel contexts.
-        public IP6 whence;
-        public IP6 container;
-        // will be a direct ref if !rw; lists are always !rw
+    public abstract class Variable : IP6 {
+        // these should be treated as ro for the life of the variable
         public bool rw;
         public bool islist;
+        public IP6 whence;
 
-        public Variable(bool rw, bool islist, IP6 whence, IP6 container) {
-            this.whence = whence;
-            this.container = container;
-            this.rw = rw;
+        public abstract IP6  Fetch();
+        public abstract void Store(IP6 v);
+
+        public abstract IP6  GetVar();
+
+        public override Frame GetAttribute(Frame c, string s) {
+            return Kernel.Die(c, "Containers do not have attributes");
+        }
+        public override DynMetaObject GetMO() { return null; }
+    }
+
+    public sealed class SimpleVariable: Variable {
+        IP6 val;
+
+        public SimpleVariable(bool rw, bool islist, IP6 whence, IP6 val) {
+            this.val = val; this.whence = whence; this.rw = rw;
             this.islist = islist;
         }
+
+        public override IP6  Fetch()       { return val; }
+        public override void Store(IP6 v)  {
+            if (!rw) {
+                throw new InvalidOperationException("Writing to readonly scalar");
+            }
+            val = v;
+        }
+        public override IP6  GetVar()      { return this; }
+
+        public override DynMetaObject GetMO() { return Kernel.ScalarMO; }
     }
 
     // Used to make Variable sharing explicit in some cases; will eventually be
@@ -550,21 +541,6 @@ blocked:
         }
     }
 
-    public class ScalarContainer: IP6 {
-        IP6 val;
-
-        public ScalarContainer(IP6 val) { this.val = val; }
-
-        public override IP6  Fetch()      { return val; }
-        public override void Store(IP6 v) { val = v; }
-
-        public override Frame GetAttribute(Frame c, string name) {
-            return Kernel.Die(c, "Simple scalar containers have no attributes");
-        }
-
-        public override DynMetaObject GetMO() { return Kernel.ScalarMO; }
-    }
-
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
     public class DynObject: IP6 {
@@ -675,7 +651,7 @@ blocked:
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-            return SubInvoke((DynObject)Fetch(th.pos[0]), th.caller,
+            return SubInvoke((DynObject)th.pos[0].Fetch(), th.caller,
                     post, th.named);
         }
 
@@ -712,10 +688,6 @@ blocked:
             return NewROScalar(n);
         }
 
-        public static IP6 MakeSC(IP6 inside) {
-            return new ScalarContainer(inside);
-        }
-
         // check whence before calling
         public static Frame Vivify(Frame th, Variable v) {
             IP6 w = v.whence;
@@ -728,9 +700,8 @@ blocked:
             switch (th.ip) {
                 case 0:
                     th.ip = 1;
-                    return Vivify(th, th.pos[1]);
+                    return Vivify(th, th.pos[0]);
                 case 1:
-                    th.pos[0].container = th.pos[1].container;
                     return th.caller;
                 default:
                     return Kernel.Die(th, "IP invalid");
@@ -752,22 +723,21 @@ blocked:
             // whence != null (and rhs.rw = true)
 
             if (!rhs.rw) {
-                th.resultSlot = new Variable(false, islist, null,
-                        rhs.container);
+                th.resultSlot = new SimpleVariable(false, islist, null,
+                        rhs.Fetch());
                 return th;
             }
             // ro = true and rhw.rw = true OR
             // whence != null
             if (ro) {
-                th.resultSlot = new Variable(false, islist, null, Fetch(rhs));
+                th.resultSlot = new SimpleVariable(false, islist, null, rhs.Fetch());
                 return th;
             }
 
-            Variable lhs = new Variable(true, false, null, null);
-            th.resultSlot = lhs;
+            th.resultSlot = rhs;
 
             n = new Frame(th, null, BindSI);
-            n.pos = new Variable[2] { lhs, rhs };
+            n.pos = new Variable[1] { rhs };
             return n;
         }
 
@@ -782,14 +752,12 @@ blocked:
                     return Vivify(th, th.pos[0]);
                 case 1:
                     if (th.pos[0].islist) {
-                        return th.pos[0].container.InvokeMethod(th.caller,
+                        return th.pos[0].Fetch().InvokeMethod(th.caller,
                                 "LISTSTORE", th.pos, null);
                     } else if (!th.pos[0].rw) {
                         return Kernel.Die(th.caller, "assigning to readonly value");
-                    } else if (!th.pos[1].rw) {
-                        th.pos[0].container.Store(th.pos[1].container);
                     } else {
-                        th.pos[0].container.Store(th.pos[1].container.Fetch());
+                        th.pos[0].Store(th.pos[1].Fetch());
                     }
                     return th.caller;
                 default:
@@ -803,11 +771,7 @@ blocked:
                     return Kernel.Die(th, "assigning to readonly value");
                 }
 
-                if (!rhs.rw) {
-                    lhs.container.Store(rhs.container);
-                } else {
-                    lhs.container.Store(rhs.container.Fetch());
-                }
+                lhs.Store(rhs.Fetch());
                 return th;
             }
 
@@ -816,25 +780,17 @@ blocked:
             return n;
         }
 
-        public static IP6 Fetch(Variable vr) {
-            if (!vr.rw) {
-                return vr.container;
-            } else {
-                return vr.container.Fetch();
-            }
-        }
-
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
-            return new Variable(false, false, null, obj);
+            return new SimpleVariable(false, false, null, obj);
         }
 
         public static Variable NewRWScalar(IP6 obj) {
-            return new Variable(true, false, null, MakeSC(obj));
+            return new SimpleVariable(true, false, null, obj);
         }
 
         public static Variable NewRWListVar(IP6 container) {
-            return new Variable(false, true, null, container);
+            return new SimpleVariable(false, true, null, container);
         }
 
         public static VarDeque SlurpyHelper(Frame th, int from) {
@@ -1061,11 +1017,11 @@ slow:
             switch(th.ip) {
                 case 0:
                     th.ip = 1;
-                    return Fetch((Variable)th.lex0).InvokeMethod(th, "Str",
+                    return ((Variable)th.lex0).Fetch().InvokeMethod(th, "Str",
                             new Variable[1] { (Variable)th.lex0 }, null);
                 case 1:
                     Console.Error.WriteLine("Unhandled exception: {0}",
-                            (string) UnboxAny(Fetch((Variable)th.resultSlot)));
+                            (string) UnboxAny(((Variable)th.resultSlot).Fetch()));
                     th.lex0 = th.caller;
                     goto case 2;
                 case 2:
@@ -1192,7 +1148,7 @@ public class NULL {
     private static Niecza.Frame MAIN(Niecza.Frame th) {
         switch (th.ip) {
             default:
-                return Niecza.Kernel.Fetch(th.pos[0]).Invoke(th.caller,
+                return th.pos[0].Fetch().Invoke(th.caller,
                         new Niecza.Variable[0] {}, null);
         }
     }

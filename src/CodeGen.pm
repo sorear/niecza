@@ -39,7 +39,8 @@ use 5.010;
         'Double' =>
             { ToString     => [m => 'String'] },
         'Variable' =>
-            { islist       => [f => 'Boolean'] },
+            { islist       => [f => 'Boolean'],
+              Fetch        => [m => 'IP6' ] },
         'BValue' =>
             { v            => [f => 'Variable' ] },
         'VivClosure' =>
@@ -120,7 +121,6 @@ use 5.010;
         'Kernel.SlurpyHelper'  => [m => 'VarDeque'],
         'Kernel.NewBoundVar'   => [c => 'Variable'],
         'Kernel.Assign'        => [c => 'Void'],
-        'Kernel.Fetch'         => [m => 'IP6'],
         'Kernel.DefaultNew'    => [m => 'Variable'],
         'Kernel.NewROScalar'   => [m => 'Variable'],
         'Kernel.NewRWScalar'   => [m => 'Variable'],
@@ -136,7 +136,6 @@ use 5.010;
         'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
         'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],
         'Kernel.MakeSub'       => [m => 'IP6'],
-        'Kernel.MakeSC'        => [m => 'IP6'],
         'Kernel.BoxAny'        => [m => 'Variable'],
         'Kernel.UnboxAny'      => [m => 'object'],
     );
