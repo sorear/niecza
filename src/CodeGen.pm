@@ -120,7 +120,7 @@ use 5.010;
         'Kernel.SlurpyHelper'  => [m => 'VarDeque'],
         'Kernel.NewBoundVar'   => [c => 'Variable'],
         'Kernel.Assign'        => [c => 'Void'],
-        'Kernel.Fetch'         => [c => 'IP6'],
+        'Kernel.Fetch'         => [m => 'IP6'],
         'Kernel.DefaultNew'    => [m => 'Variable'],
         'Kernel.NewROScalar'   => [m => 'Variable'],
         'Kernel.NewRWScalar'   => [m => 'Variable'],

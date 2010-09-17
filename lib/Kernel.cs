@@ -73,25 +73,12 @@ namespace Niecza {
             }
         }
 
-        public virtual Frame Fetch(Frame c) {
-            DynMetaObject.FetchHandler fh = GetMO().mro_OnFetch;
-            if (fh != null) {
-                return fh(this, c);
-            } else {
-                return InvokeMethod(c, "FETCH", new Variable[1] {
-                        Kernel.NewROScalar(this) }, null);
-            }
+        public virtual IP6 Fetch() {
+            throw new InvalidOperationException("Cannot FETCH from " + GetMO().name);
         }
 
-        public virtual Frame Store(Frame c, IP6 o) {
-            DynMetaObject.StoreHandler sh = GetMO().mro_OnStore;
-            if (sh != null) {
-                return sh(this, c, o);
-            } else {
-                return InvokeMethod(c, "STORE", new Variable[2] {
-                        Kernel.NewROScalar(this), Kernel.NewROScalar(o) },
-                        null);
-            }
+        public virtual void Store(IP6 v) {
+            throw new InvalidOperationException("Cannot STORE to " + GetMO().name);
         }
     }
 
@@ -344,16 +331,10 @@ namespace Niecza {
 
         public delegate Frame InvokeHandler(IP6 th, Frame c,
                 Variable[] pos, Dictionary<string, Variable> named);
-        public delegate Frame FetchHandler(IP6 th, Frame c);
-        public delegate Frame StoreHandler(IP6 th, Frame c, IP6 n);
 
         public InvokeHandler OnInvoke;
-        public FetchHandler OnFetch;
-        public StoreHandler OnStore;
 
         public InvokeHandler mro_OnInvoke;
-        public FetchHandler mro_OnFetch;
-        public StoreHandler mro_OnStore;
         public Dictionary<string, IP6> mro_methods;
 
         public List<DynMetaObject> superclasses
@@ -388,9 +369,7 @@ namespace Niecza {
         }
 
         private void Revalidate() {
-            mro_OnStore = null;
             mro_OnInvoke = null;
-            mro_OnFetch = null;
             mro_methods = new Dictionary<string,IP6>();
 
             if (mro == null)
@@ -398,10 +377,6 @@ namespace Niecza {
 
             for (int kx = mro.Length - 1; kx >= 0; kx--) {
                 DynMetaObject k = mro[kx];
-                if (k.OnStore != null)
-                    mro_OnStore = k.OnStore;
-                if (k.OnFetch != null)
-                    mro_OnFetch = k.OnFetch;
                 if (k.OnInvoke != null)
                     mro_OnInvoke = k.OnInvoke;
 
@@ -575,6 +550,21 @@ blocked:
         }
     }
 
+    public class ScalarContainer: IP6 {
+        IP6 val;
+
+        public ScalarContainer(IP6 val) { this.val = val; }
+
+        public override IP6  Fetch()      { return val; }
+        public override void Store(IP6 v) { val = v; }
+
+        public override Frame GetAttribute(Frame c, string name) {
+            return Kernel.Die(c, "Simple scalar containers have no attributes");
+        }
+
+        public override DynMetaObject GetMO() { return Kernel.ScalarMO; }
+    }
+
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
     public class DynObject: IP6 {
@@ -644,18 +634,6 @@ blocked:
             return UnboxDO((DynObject)o);
         }
 
-        private static Frame SCFetch(IP6 th, Frame caller) {
-            DynObject dyo = (DynObject) th;
-            caller.resultSlot = dyo.slots[0];
-            return caller;
-        }
-
-        private static Frame SCStore(IP6 th, Frame caller, IP6 nv) {
-            DynObject dyo = (DynObject) th;
-            dyo.slots[0] = nv;
-            return caller;
-        }
-
         public static Stack<Frame> TakeReturnStack = new Stack<Frame>();
 
         public static Frame Take(Frame th, Variable payload) {
@@ -695,16 +673,10 @@ blocked:
         private static SubInfo SubInvokeSubSI = new SubInfo("Sub.INVOKE", SubInvokeSubC);
         private static Frame SubInvokeSubC(Frame th) {
             Variable[] post;
-            switch (th.ip) {
-                case 0:
-                    th.ip = 1;
-                    return Fetch(th, th.pos[0]);
-                default:
-                    post = new Variable[th.pos.Length - 1];
-                    Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-                    return SubInvoke((DynObject)th.resultSlot, th.caller,
-                            post, th.named);
-            }
+            post = new Variable[th.pos.Length - 1];
+            Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
+            return SubInvoke((DynObject)Fetch(th.pos[0]), th.caller,
+                    post, th.named);
         }
 
         public static Frame Die(Frame caller, string msg) {
@@ -727,7 +699,7 @@ blocked:
         }
 
         public static DynObject MockBox(object v) {
-            DynObject n = new DynObject(ScalarMO);
+            DynObject n = new DynObject(StrP.GetMO());
             n.slots[0] = v;
             return n;
         }
@@ -741,9 +713,7 @@ blocked:
         }
 
         public static IP6 MakeSC(IP6 inside) {
-            DynObject n = new DynObject(ScalarMO);
-            n.slots[0] = inside;
-            return n;
+            return new ScalarContainer(inside);
         }
 
         // check whence before calling
@@ -751,20 +721,6 @@ blocked:
             IP6 w = v.whence;
             v.whence = null;
             return w.Invoke(th, new Variable[1] { v }, null);
-        }
-
-        private static SubInfo BindROSI = new SubInfo("Bind/ro-fetch", BindROC);
-        private static Frame BindROC(Frame th) {
-            switch (th.ip) {
-                case 0:
-                    th.ip = 1;
-                    return Fetch(th, th.pos[1]);
-                case 1:
-                    th.pos[0].container = (IP6) th.resultSlot;
-                    return th.caller;
-                default:
-                    return Kernel.Die(th, "IP invalid");
-            }
         }
 
         private static SubInfo BindSI = new SubInfo("Bind/rw-viv", BindC);
@@ -802,11 +758,15 @@ blocked:
             }
             // ro = true and rhw.rw = true OR
             // whence != null
+            if (ro) {
+                th.resultSlot = new Variable(false, islist, null, Fetch(rhs));
+                return th;
+            }
 
-            Variable lhs = new Variable(!ro, islist, null, null);
+            Variable lhs = new Variable(true, false, null, null);
             th.resultSlot = lhs;
 
-            n = new Frame(th, null, ro ? BindROSI : BindSI);
+            n = new Frame(th, null, BindSI);
             n.pos = new Variable[2] { lhs, rhs };
             return n;
         }
@@ -827,32 +787,40 @@ blocked:
                     } else if (!th.pos[0].rw) {
                         return Kernel.Die(th.caller, "assigning to readonly value");
                     } else if (!th.pos[1].rw) {
-                        return th.pos[0].container.Store(th.caller,
-                                th.pos[1].container);
+                        th.pos[0].container.Store(th.pos[1].container);
                     } else {
-                        th.ip = 2;
-                        return th.pos[1].container.Fetch(th);
+                        th.pos[0].container.Store(th.pos[1].container.Fetch());
                     }
-                case 2:
-                    return th.pos[0].container.Store(th.caller,
-                            (IP6)th.resultSlot);
+                    return th.caller;
                 default:
                     return Kernel.Die(th, "Invalid IP");
             }
         }
 
         public static Frame Assign(Frame th, Variable lhs, Variable rhs) {
+            if (lhs.whence == null && !lhs.islist) {
+                if (!lhs.rw) {
+                    return Kernel.Die(th, "assigning to readonly value");
+                }
+
+                if (!rhs.rw) {
+                    lhs.container.Store(rhs.container);
+                } else {
+                    lhs.container.Store(rhs.container.Fetch());
+                }
+                return th;
+            }
+
             Frame n = new Frame(th, null, AssignSI);
             n.pos = new Variable[2] { lhs, rhs };
             return n;
         }
 
-        public static Frame Fetch(Frame th, Variable vr) {
+        public static IP6 Fetch(Variable vr) {
             if (!vr.rw) {
-                th.resultSlot = vr.container;
-                return th;
+                return vr.container;
             } else {
-                return vr.container.Fetch(th);
+                return vr.container.Fetch();
             }
         }
 
@@ -1017,8 +985,6 @@ slow:
             ScalarMO = new DynMetaObject("Scalar");
             ScalarMO.AddAttribute("value");
             ScalarMO.Complete();
-            ScalarMO.OnFetch = new DynMetaObject.FetchHandler(SCFetch);
-            ScalarMO.OnStore = new DynMetaObject.StoreHandler(SCStore);
 
             GlobalO = new CLRImportObject(new Dictionary<string,BValue>());
             Global = NewROScalar(GlobalO);
@@ -1095,27 +1061,21 @@ slow:
             switch(th.ip) {
                 case 0:
                     th.ip = 1;
-                    return Fetch(th, (Variable)th.lex0);
-                case 1:
-                    th.ip = 2;
-                    return ((IP6)th.resultSlot).InvokeMethod(th, "Str",
+                    return Fetch((Variable)th.lex0).InvokeMethod(th, "Str",
                             new Variable[1] { (Variable)th.lex0 }, null);
-                case 2:
-                    th.ip = 3;
-                    return Fetch(th, (Variable)th.resultSlot);
-                case 3:
+                case 1:
                     Console.Error.WriteLine("Unhandled exception: {0}",
-                            (string) UnboxAny((IP6)th.resultSlot));
+                            (string) UnboxAny(Fetch((Variable)th.resultSlot)));
                     th.lex0 = th.caller;
-                    goto case 4;
-                case 4:
+                    goto case 2;
+                case 2:
                     if (th.lex0 == null)
                         Environment.Exit(1);
                     Console.Error.WriteLine("  at {0} line {1}",
                             ((Frame)th.lex0).ExecutingFile(),
                             ((Frame)th.lex0).ExecutingLine());
                     th.lex0 = ((Frame) th.lex0).caller;
-                    goto case 4;
+                    goto case 2;
                 default:
                     return Kernel.Die(th, "Invalid IP");
             }
@@ -1231,11 +1191,8 @@ public class NULL {
     public static Niecza.IP6 Installer = Niecza.Kernel.MakeSub(MAINSI, null);
     private static Niecza.Frame MAIN(Niecza.Frame th) {
         switch (th.ip) {
-            case 0:
-                th.ip = 1;
-                return Niecza.Kernel.Fetch(th, th.pos[0]);
             default:
-                return ((Niecza.IP6)th.resultSlot).Invoke(th.caller,
+                return Niecza.Kernel.Fetch(th.pos[0]).Invoke(th.caller,
                         new Niecza.Variable[0] {}, null);
         }
     }

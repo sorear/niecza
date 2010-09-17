@@ -420,7 +420,7 @@ use warnings;
     }
 
     sub fetch {
-        rawsccall("Kernel.Fetch", $_[0]);
+        rawscall("Kernel.Fetch", $_[0]);
     }
 
     sub how {
