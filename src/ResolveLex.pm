@@ -42,7 +42,7 @@ sub run_cgop {
             push @$btree, $arg;
         } elsif ($opc eq 'close_sub') {
             pop @$btree;
-        } elsif ($opc eq 'clr_call_direct' && $arg eq 'Kernel.Fetch' &&
+        } elsif ($opc eq 'clr_call_virt' && $arg eq 'Fetch' &&
                 $op->zyg->[0]->isa('CgOp::Primitive') &&
                 $op->zyg->[0]->op->[0] eq 'clr_sfield_get' &&
                 $op->zyg->[0]->op->[1] =~ /(.*)_var:f,Variable/) {
