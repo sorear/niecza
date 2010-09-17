@@ -907,4 +907,18 @@ sub assignop($fn) {
     }
 }
 
+# XXX multi dispatch
+sub next {
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 1) (null Frame) (int -1) (null String) (null Variable)) }
+}
+sub last {
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 2) (null Frame) (int -1) (null String) (null Variable)) }
+}
+sub redo {
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 3) (null Frame) (int -1) (null String) (null Variable)) }
+}
+sub return is rawcall {
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 4) (null Frame) (int -1) (null String) (pos 0)) }
+}
+
 {YOU_ARE_HERE}
