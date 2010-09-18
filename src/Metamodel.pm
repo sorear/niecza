@@ -52,6 +52,11 @@ use YAML::XS;
     # an intrinsic name, even if anonymous
     has name => (isa => 'Str', is => 'ro', default => 'ANON');
 
+    sub add_attribute {
+        my ($self, $name, $accessor) = @_;
+        die "attribute $name defined in a lowly package";
+    }
+
     no Moose;
     __PACKAGE__->meta->make_immutable;
 }
@@ -74,6 +79,12 @@ use YAML::XS;
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
+
+    sub add_attribute {
+        my ($self, $name, $accessor) = @_;
+        push @{ $self->attributes }, $name;
+        # TODO $accessor
+    }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -164,6 +175,9 @@ use YAML::XS;
         default => sub { [] });
 
     has body_of  => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
+    has name     => (isa => 'Str', is => 'ro', default => 'ANON');
+    has returnable => (isa => 'Bool', is => 'ro', default => 0);
+    has class    => (isa => 'Str', is => 'ro', default => 'Sub');
 
     sub add_my_name { my ($self, $slot, $list, $hash) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(
@@ -206,9 +220,12 @@ sub Body::begin {
     my $top = @opensubs ? $opensubs[-1] : undef;
 
     push @opensubs, Metamodel::StaticSub->new(
-        outer    => $top,
-        body_of  => $args{body_of},
-        run_once => !defined($top));
+        outer      => $top,
+        body_of    => $args{body_of},
+        name       => $self->name,
+        returnable => $self->returnable,
+        class      => $self->class,
+        run_once   => !defined($top));
 
     $self->do->begin;
 
@@ -232,6 +249,13 @@ sub Op::Lexical::begin {
         $opensubs[-1]->add_my_name($self->name, $self->list,
             $self->hash);
     }
+}
+
+sub Op::Attribute::begin {
+    my $self = shift;
+    my $ns   = $opensubs[-1]->body_of // die ("attribute " . $self->name .
+        " declared outside of any class");
+    $ns->obj->add_attribute($self->name, $self->accessor);
 }
 
 sub Op::PackageDef::begin {
