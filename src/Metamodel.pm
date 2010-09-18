@@ -33,11 +33,13 @@ use YAML::XS;
 # We don't handle normal variables here, those exist only in the runtime
 # package tree.
 {
-    package Metamodel::Packageoid;
+    package Metamodel::Stash;
     use Moose;
 
-    has zyg => (isa => 'HashRef[Metamodel::Packageoid]', is => 'ro',
+    has zyg => (isa => 'HashRef[Metamodel::Stash]', is => 'ro',
         default => sub { +{} });
+    # undef here -> stub like my class Foo { ... }
+    has obj => (isa => 'Maybe[Metamodel::Package]', is => 'rw');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -46,7 +48,9 @@ use YAML::XS;
 {
     package Metamodel::Package;
     use Moose;
-    extends 'Metamodel::Packageoid';
+
+    # an intrinsic name, even if anonymous
+    has name => (isa => 'Str', is => 'ro', default => 'ANON');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -55,7 +59,7 @@ use YAML::XS;
 {
     package Metamodel::Module;
     use Moose;
-    extends 'Metamodel::Packageoid';
+    extends 'Metamodel::Package';
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -64,7 +68,7 @@ use YAML::XS;
 {
     package Metamodel::Class;
     use Moose;
-    extends 'Metamodel::Packageoid';
+    extends 'Metamodel::Module';
 
     has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
         default => sub { [] });
@@ -116,7 +120,6 @@ use YAML::XS;
     extends 'Metamodel::Lexical';
 
     has body => (isa => 'Metamodel::StaticSub', is => 'ro');
-    has name => (isa => 'Str', is => 'ro');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -125,12 +128,11 @@ use YAML::XS;
 # my class Foo { } or our class Foo { }; the difference is whether some
 # package also holds a ref
 {
-    package Metamodel::Lexical::Packageoid;
+    package Metamodel::Lexical::Stash;
     use Moose;
     extends 'Metamodel::Lexical';
 
-    has body => (isa => 'Metamodel::Packageoid', is => 'ro');
-    has name => (isa => 'Str', is => 'ro');
+    has referent => (isa => 'Metamodel::Stash', is => 'ro');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -161,9 +163,21 @@ use YAML::XS;
     has initq    => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
         default => sub { [] });
 
+    has body_of  => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
+
     sub add_my_name { my ($self, $slot, $list, $hash) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(
             slot => $slot, list => $list, hash => $hash);
+    }
+
+    sub add_my_stash { my ($self, $slot, $stash) = @_;
+        $self->lexicals->{$slot} = Metamodel::Lexical::Stash->new(
+            referent => $stash);
+    }
+
+    sub add_my_sub { my ($self, $slot, $body) = @_;
+        $self->lexicals->{$slot} = Metamodel::Lexical::SubDef->new(
+            body => $body);
     }
 
     sub close { }
@@ -187,12 +201,15 @@ sub Unit::begin {
 
 sub Body::begin {
     my $self = shift;
+    my %args = @_;
 
     my $top = @opensubs ? $opensubs[-1] : undef;
 
     push @opensubs, Metamodel::StaticSub->new(
-        outer => $top,
+        outer    => $top,
+        body_of  => $args{body_of},
         run_once => !defined($top));
+
     $self->do->begin;
 
     $opensubs[-1]->close;
@@ -214,6 +231,23 @@ sub Op::Lexical::begin {
     } elsif ($self->declaring) {
         $opensubs[-1]->add_my_name($self->name, $self->list,
             $self->hash);
+    }
+}
+
+sub Op::PackageDef::begin {
+    my $self   = shift;
+    my $pclass = ref($self);
+    $pclass =~ s/Op::(.*)Def/Metamodel::$1/;
+
+    my $ns = Metamodel::Stash->new;
+    # XXX handle exports, ourpkg
+    $opensubs[-1]->add_my_stash($self->var, $ns);
+
+    if (!$self->stub) {
+        my $obj  = $pclass->new(name => $self->name);
+        $ns->obj($obj);
+        my $body = $self->body->begin(body_of => $ns);
+        $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
 }
 
