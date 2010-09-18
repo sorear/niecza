@@ -210,7 +210,7 @@ our $mainline;
 sub Unit::begin {
     my $self = shift;
 
-    $mainline = $self->mainline->begin;
+    $mainline = $self->mainline->begin(once => 1);
 }
 
 sub Body::begin {
@@ -225,7 +225,7 @@ sub Body::begin {
         name       => $self->name,
         returnable => $self->returnable,
         class      => $self->class,
-        run_once   => !defined($top));
+        run_once   => $args{once} && (!defined($top) || $top->run_once));
 
     $self->do->begin;
 
@@ -270,7 +270,7 @@ sub Op::PackageDef::begin {
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name);
         $ns->obj($obj);
-        my $body = $self->body->begin(body_of => $ns);
+        my $body = $self->body->begin(body_of => $ns, once => 1);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
 }
