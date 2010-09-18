@@ -29,6 +29,10 @@ use YAML::XS;
 #
 # This graph is a lot more random than the old trees were...
 
+our @opensubs;
+our $mainline;
+our $global;
+
 # package, class, etc.  Things with stashes, protoobjects, etc.
 # We don't handle normal variables here, those exist only in the runtime
 # package tree.
@@ -164,8 +168,7 @@ use YAML::XS;
     package Metamodel::StaticSub;
     use Moose;
 
-    has outer => (isa => 'Maybe[Metamodel::StaticSub]', is => 'ro',
-        weak_ref => 1);
+    has outer => (isa => 'Maybe[Metamodel::StaticSub]', is => 'ro');
     has run_once => (isa => 'Bool', is => 'ro', default => 0);
 
     has lexicals => (isa => 'HashRef[Metamodel::Lexical]', is => 'ro',
@@ -174,10 +177,30 @@ use YAML::XS;
     has initq    => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
         default => sub { [] });
 
-    has body_of  => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
+    has body_of  => (isa => 'Maybe[Metamodel::Package]', is => 'ro');
     has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
+    has augmenting => (isa => 'Bool', is => 'ro', default => 1);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
+
+    sub find_pkg { my ($self, $names) = @_;
+        if (!ref($names) || @$names != 1) {
+            die "unimplemented form of find_pkg $names";
+        }
+        my $lex = $self->find_lex($names->[0]);
+        if (!$lex || !$lex->isa('Metamodel::Lexical::Stash')) {
+            die "$names->[0] is not declared as a package";
+        }
+        if (!$lex->referent->obj) {
+            die "$names->[0] is an unresolved stub";
+        }
+        return $lex->referent->obj;
+    }
+
+    sub find_lex { my ($self, $name) = @_;
+        return $self->lexicals->{$name} //
+            ($self->outer ? $self->outer->find_lex($name) : undef);
+    }
 
     sub add_my_name { my ($self, $slot, $list, $hash) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(
@@ -204,13 +227,13 @@ use YAML::XS;
 # We should eventually wire this to the parser, so that metamodel stuff can
 # exist during the parse itself; will be needed for macros
 
-our @opensubs;
-our $mainline;
-
 sub Unit::begin {
     my $self = shift;
 
-    $mainline = $self->mainline->begin(once => 1);
+    local @opensubs;
+    local $global = Metamodel::Stash->new;
+
+    $self->mainline->begin(once => 1);
 }
 
 sub Body::begin {
@@ -222,6 +245,7 @@ sub Body::begin {
     push @opensubs, Metamodel::StaticSub->new(
         outer      => $top,
         body_of    => $args{body_of},
+        augmenting => $args{augmenting},
         name       => $self->name,
         returnable => $self->returnable,
         class      => $self->class,
@@ -255,7 +279,7 @@ sub Op::Attribute::begin {
     my $self = shift;
     my $ns   = $opensubs[-1]->body_of // die ("attribute " . $self->name .
         " declared outside of any class");
-    $ns->obj->add_attribute($self->name, $self->accessor);
+    $ns->add_attribute($self->name, $self->accessor);
 }
 
 sub Op::PackageDef::begin {
@@ -265,21 +289,30 @@ sub Op::PackageDef::begin {
 
     my $ns = Metamodel::Stash->new;
     # XXX handle exports, ourpkg
-    $opensubs[-1]->add_my_stash($self->var, $ns);
 
+    $opensubs[-1]->add_my_stash($self->var, $ns);
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name);
+        my $body = $self->body->begin(body_of => $obj, once => 1);
         $ns->obj($obj);
-        my $body = $self->body->begin(body_of => $ns, once => 1);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
+}
+
+sub Op::Augment::begin {
+    my $self = shift;
+
+    # XXX shouldn't we distinguish augment class Foo { } from ::Foo ?
+    my $pkg = $opensubs[-1]->find_pkg([ @{ $self->pkg }, $self->name ]);
+    my $body = $self->body->begin(body_of => $pkg, augmenting => 1, once => 1);
+    $opensubs[-1]->add_my_sub($self->bodyvar, $body);
 }
 
 ### Code goes here to generate C# from the metamodel
 #
 
 my $y = YAML::XS::LoadFile(\*STDIN);
-$y->begin;
+local $mainline = $y->begin;
 
 print(YAML::XS::Dump($mainline));
 
