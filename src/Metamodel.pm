@@ -61,6 +61,11 @@ our $global;
         die "attribute $name defined in a lowly package";
     }
 
+    sub add_method {
+        my ($self, $name, $body) = @_;
+        die "method $name defined in a lowly package";
+    }
+
     no Moose;
     __PACKAGE__->meta->make_immutable;
 }
@@ -87,6 +92,12 @@ our $global;
     sub add_attribute {
         my ($self, $name, $accessor) = @_;
         push @{ $self->attributes }, $name;
+        # TODO $accessor
+    }
+
+    sub add_method {
+        my ($self, $name, $body) = @_;
+        push @{ $self->methods }, Metamodel::Method->new(name => $name, body => $body);
         # TODO $accessor
     }
 
@@ -177,6 +188,7 @@ our $global;
     has initq    => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
         default => sub { [] });
 
+    has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[Metamodel::Package]', is => 'ro');
     has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
@@ -279,7 +291,19 @@ sub Op::Attribute::begin {
     my $self = shift;
     my $ns   = $opensubs[-1]->body_of // die ("attribute " . $self->name .
         " declared outside of any class");
+    die "attribute $self->name declared in an augment"
+        if $opensubs[-1]->augmenting;
     $ns->add_attribute($self->name, $self->accessor);
+}
+
+sub Op::SubDef::begin {
+    my $self = shift;
+    my $body = $self->body->begin;
+    $opensubs[-1]->add_my_sub($self->var, $body);
+    if (defined($self->method_too)) {
+        $body->strong_used(1);
+        $opensubs[-1]->body_of->add_method($self->method_too, $body);
+    }
 }
 
 sub Op::PackageDef::begin {
