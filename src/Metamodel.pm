@@ -83,7 +83,7 @@ our $global;
     has name => (isa => 'Str', is => 'ro', default => 'ANON');
 
     sub add_attribute {
-        my ($self, $name, $accessor) = @_;
+        my ($self, $name) = @_;
         die "attribute $name defined in a lowly package";
     }
 
@@ -125,15 +125,13 @@ our $global;
         default => sub { [] });
 
     sub add_attribute {
-        my ($self, $name, $accessor) = @_;
+        my ($self, $name) = @_;
         push @{ $self->attributes }, $name;
-        # TODO $accessor
     }
 
     sub add_method {
         my ($self, $name, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name, body => $body);
-        # TODO $accessor
     }
 
     sub add_super {
@@ -438,7 +436,20 @@ sub Op::Attribute::begin {
         " declared outside of any class");
     die "attribute $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
-    $ns->add_attribute($self->name, $self->accessor);
+    $ns->add_attribute($self->name);
+    if ($self->accessor) {
+        my $nb = Metamodel::StaticSub->new(
+            outer      => $opensubs[-1],
+            name       => $self->name,
+            cur_pkg    => $opensubs[-1]->cur_pkg,
+            returnable => 0,
+            class      => 'Sub',
+            run_once   => 0,
+            do         => Op::GetSlot->new(name => $self->name,
+                object => Op::CgOp->new(optree => [ pos => 0 ])));
+        $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
+        $ns->add_method($self->name, $nb);
+    }
 }
 
 sub Op::Super::begin {

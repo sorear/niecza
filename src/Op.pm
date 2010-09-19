@@ -650,8 +650,6 @@ use CgOp;
     use Moose;
     extends 'Op::PackageDef';
 
-    sub decl_class { 'Decl::Module' }
-
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -661,8 +659,6 @@ use CgOp;
     use Moose;
     extends 'Op::ModuleDef';
 
-    sub decl_class { 'Decl::Class' }
-
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -671,8 +667,6 @@ use CgOp;
     package Op::GrammarDef;
     use Moose;
     extends 'Op::ClassDef';
-
-    sub decl_class { 'Decl::Grammar' }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -684,11 +678,6 @@ use CgOp;
     extends 'Op';
 
     has name    => (isa => 'Str', is => 'ro');
-
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::Super->new(name => $self->name);
-    }
 
     sub code {
         my ($self, $body) = @_;
@@ -706,25 +695,6 @@ use CgOp;
 
     has name => (isa => 'Str', is => 'ro');
     has accessor => (isa => 'Bool', is => 'ro');
-
-    sub lift_decls {
-        my ($self) = @_;
-        my @r;
-        push @r, Decl::Attribute->new(name => $self->name);
-        if ($self->accessor) {
-            push @r, Decl::Sub->new(var => ($self->name . '!a'),
-                code => Body->new(
-                    name => $self->name,
-                    signature => Sig->new(params => [])->for_method,
-                    type => 'sub',
-                    do => Op::GetSlot->new(
-                        object => Op::Lexical->new(name => "self"),
-                        name => $self->name)));
-            push @r, Decl::HasMethod->new(name => $self->name,
-                var => $self->name . '!a');
-        }
-        @r;
-    }
 
     sub code {
         my ($self, $body) = @_;
