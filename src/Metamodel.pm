@@ -197,6 +197,19 @@ our $global;
     __PACKAGE__->meta->make_immutable;
 }
 
+# our...
+{
+    package Metamodel::Lexical::Common;
+    use Moose;
+    extends 'Metamodel::Lexical';
+
+    has stash => (isa => 'Metamodel::Stash', is => 'ro', required => 1);
+    has name  => (isa => 'Str', is => 'ro', required => 1);
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
 # mostly for state
 {
     package Metamodel::Lexical::Alias;
@@ -310,6 +323,11 @@ our $global;
 
     sub add_my_name { my ($self, $slot, @ops) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
+    }
+
+    sub add_common_name { my ($self, $slot, $stash, $name) = @_;
+        $self->lexicals->{$slot} = Metamodel::Lexical::Common->new(
+            stash => $stash, name => $name);
     }
 
     sub add_state_name { my ($self, $slot, $back, @ops) = @_;
@@ -437,6 +455,16 @@ sub Op::Lexical::begin {
     }
 }
 
+sub Op::PackageVar::begin {
+    my $self = shift;
+
+    if ($self->looks_static) {
+        # cache the lookup here
+        $opensubs[-1]->add_common_name($self->slot,
+            $opensubs[-1]->find_pkg($self->path), $self->name);
+    }
+}
+
 sub Op::Attribute::begin {
     my $self = shift;
     my $ns   = $opensubs[-1]->body_of // die ("attribute " . $self->name .
@@ -465,7 +493,7 @@ sub Op::Super::begin {
         " declared outside of any class");
     die "superclass $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
-    $ns->add_super($opensubs[-1]->find_pkg($self->name));
+    $ns->add_super($opensubs[-1]->find_pkg($self->name)->obj);
 }
 
 sub Op::SubDef::begin {

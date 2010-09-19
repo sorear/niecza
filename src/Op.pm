@@ -799,20 +799,6 @@ use CgOp;
 
     has state_backing => (isa => 'Str', is => 'ro');
 
-    sub lift_decls {
-        my ($self) = @_;
-        return () unless $self->declaring;
-
-        if ($self->state_backing) {
-            return Decl::StateVar->new(slot => $self->name,
-                    backing => $self->state_backing, list => $self->list,
-                    hash => $self->hash);
-        } else {
-            return Decl::SimpleVar->new(slot => $self->name,
-                    list => $self->list, hash => $self->hash);
-        }
-    }
-
     sub code {
         my ($self, $body) = @_;
         CgOp::scopedlex($self->name);
@@ -866,14 +852,6 @@ use CgOp;
         } else {
             return 1;
         }
-    }
-
-    sub lift_decls {
-        my ($self) = @_;
-        $self->looks_static ?
-            Decl::OurAlias->new(name => $self->name, slot => $self->slot,
-                path => $self->path) :
-            ();
     }
 
     sub code {

@@ -19,16 +19,6 @@ use 5.010;
     has hash => (is => 'ro', isa => 'Bool', default => 0);
     has type => (is => 'ro', isa => 'Str', default => 'Any');
 
-    sub local_decls {
-        my ($self) = @_;
-        my @r;
-        push @r, Decl::SimpleVar->new(slot => $self->slot, hash => $self->hash,
-                list => $self->list, noinit => 1)
-            if defined $self->slot;
-        push @r, $self->default->lift_decls if $self->default;
-        @r;
-    }
-
     sub slurpy_get {
         my ($self) = @_;
         CgOp::let(CgOp::rawnew('DynObject', CgOp::getfield('klass',
@@ -166,11 +156,6 @@ use 5.010;
         my ($class, @names) = @_;
         Sig->new(params => [map { Sig::Parameter->new(slot => $_, name => $_)
             } @names]);
-    }
-
-    sub local_decls {
-        my $self = shift;
-        map { $_->local_decls } @{ $self->params };
     }
 
     sub binder {
