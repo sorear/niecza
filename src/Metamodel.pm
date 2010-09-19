@@ -166,6 +166,19 @@ our $global;
     __PACKAGE__->meta->make_immutable;
 }
 
+# mostly for state
+{
+    package Metamodel::Lexical::Alias;
+    use Moose;
+    extends 'Metamodel::Lexical';
+
+    has to => (isa => 'Str', is => 'ro', required => 1);
+    sub BUILDARGS { +{ to => $_[1] } }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
 # sub foo { ... }
 {
     package Metamodel::Lexical::SubDef;
@@ -250,12 +263,23 @@ our $global;
     }
 
     sub find_lex { my ($self, $name) = @_;
-        return $self->lexicals->{$name} //
-            ($self->outer ? $self->outer->find_lex($name) : undef);
+        my $l = $self->lexicals->{$name};
+        if ($l) {
+            return $l->isa('Metamodel::Lexical::Alias') ?
+                $self->find_lex($l->to) : $l;
+        }
+        return ($self->outer ? $self->outer->find_lex($name) : undef);
     }
 
     sub add_my_name { my ($self, $slot, @ops) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
+    }
+
+    sub add_state_name { my ($self, $slot, $back, @ops) = @_;
+        # outermost sub isn't cloned so a fallback to my is safe
+        my $up = $self->outer // $self;
+        $up->lexicals->{$back} = Metamodel::Lexical::Simple->new(@ops);
+        $self->lexicals->{$slot} = Metamodel::Lexical::Alias->new($back);
     }
 
     sub add_my_stash { my ($self, $slot, $stash) = @_;
@@ -354,10 +378,10 @@ sub Op::Lexical::begin {
 
     if ($self->state_backing) {
         $opensubs[-1]->add_state_name($self->name, $self->state_backing,
-            $self->list, $self->hash);
+            list => $self->list, hash => $self->hash);
     } elsif ($self->declaring) {
-        $opensubs[-1]->add_my_name($self->name, $self->list,
-            $self->hash);
+        $opensubs[-1]->add_my_name($self->name, list => $self->list,
+            hash =>$self->hash);
     }
 }
 
