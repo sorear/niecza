@@ -41,13 +41,15 @@ our $global;
     use Moose;
 
     # zyg entries can point to other stashes, to Lexical::Simple, to StaticSub
+    # important: if a stash points to a lexical, it's binding to the static
+    # version of the lexical
     has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
     # undef here -> stub like my class Foo { ... }
     has obj => (isa => 'Maybe[Metamodel::Package]', is => 'rw');
     has parent => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
 
-    sub bind_pkg {
+    sub bind_name {
         my ($self, $name, $sub) = @_;
         $self->zyg->{$name} = $sub;
     }
@@ -323,6 +325,13 @@ our $global;
             body => $body);
     }
 
+    sub add_exports { my ($self, $name, $thing, $tags) = @_;
+        for my $tag (@$tags) {
+            my $repo = $self->cur_pkg->subpkg('EXPORT')->subpkg($tag);
+            $repo->bind_name($name, $thing);
+        }
+    }
+
     sub close { }
 
     no Moose;
@@ -478,8 +487,10 @@ sub Op::PackageDef::begin {
 
     if ($self->ourpkg) {
         my $pkg = $opensubs[-1]->find_pkg($self->ourpkg);
-        $pkg->bind_pkg($self->var, $ns);
+        $pkg->bind_name($self->var, $ns);
     }
+
+    $opensubs[-1]->add_exports($self->var, $ns, $self->exports);
 
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name);

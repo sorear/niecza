@@ -629,25 +629,6 @@ use CgOp;
     has exports => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
     has ourpkg => (is => 'ro', isa => 'Maybe[ArrayRef[Str]]');
 
-    sub decl_class { 'Decl::Package' }
-    sub lift_decls {
-        my ($self) = @_;
-        my @r = $self->decl_class->new(stub => $self->stub, var => $self->var,
-            ($self->has_name ? (name => $self->name) : ()),
-            ($self->stub ? () : (body => $self->body,
-                    bodyvar => $self->bodyvar)),
-            ourpkg => $self->ourpkg);
-
-        for my $tag (@{ $self->exports }) {
-            for my $sym ($self->var, $self->var . '::') {
-                push @r, Decl::PackageAlias->new(slot => $sym,
-                    name => $sym, path => [ 'OUR', 'EXPORT', $tag ]);
-            }
-        }
-
-        @r;
-    }
-
     sub code {
         my ($self, $body) = @_;
         if ($self->stub) {
