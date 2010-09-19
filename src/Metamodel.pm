@@ -327,6 +327,7 @@ sub Op::SubDef::begin {
         $body->strong_used(1);
         $opensubs[-1]->body_of->add_method($self->method_too, $body);
     }
+    delete $self->{$_} for (qw( body method_too proto_too exports once ));
 }
 
 sub Op::PackageDef::begin {
@@ -344,6 +345,8 @@ sub Op::PackageDef::begin {
         $ns->obj($obj);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
+
+    delete $self->{$_} for (qw(name body exports ourpkg));
 }
 
 sub Op::Augment::begin {
@@ -353,6 +356,8 @@ sub Op::Augment::begin {
     my $pkg = $opensubs[-1]->find_pkg([ @{ $self->pkg }, $self->name ]);
     my $body = $self->body->begin(body_of => $pkg, augmenting => 1, once => 1);
     $opensubs[-1]->add_my_sub($self->bodyvar, $body);
+
+    delete $self->{$_} for (qw(name body pkg));
 }
 
 ### Code goes here to generate C# from the metamodel
