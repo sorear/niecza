@@ -8,6 +8,7 @@ use Unit;
 use Body;
 use Op;
 use RxOp;
+use Sig;
 use YAML::XS;
 
 ### NIECZA COMPILER METAMODEL
@@ -133,7 +134,9 @@ our $global;
     use Moose;
     extends 'Metamodel::Lexical';
 
-    has sigil => (isa => 'Str', is => 'ro');
+    has list   => (isa => 'Bool', is => 'ro', default => 0);
+    has hash   => (isa => 'Bool', is => 'ro', default => 0);
+    has noinit => (isa => 'Bool', is => 'ro', default => 0);
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -185,6 +188,7 @@ our $global;
     has lexicals => (isa => 'HashRef[Metamodel::Lexical]', is => 'ro',
         default => sub { +{} });
     has code     => (isa => 'Op', is => 'rw');
+    has signature=> (isa => 'Maybe[Sig]', is => 'rw');
     has initq    => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
         default => sub { [] });
 
@@ -214,9 +218,8 @@ our $global;
             ($self->outer ? $self->outer->find_lex($name) : undef);
     }
 
-    sub add_my_name { my ($self, $slot, $list, $hash) = @_;
-        $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(
-            slot => $slot, list => $list, hash => $hash);
+    sub add_my_name { my ($self, $slot, @ops) = @_;
+        $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
     }
 
     sub add_my_stash { my ($self, $slot, $stash) = @_;
@@ -263,10 +266,30 @@ sub Body::begin {
         class      => $self->class,
         run_once   => $args{once} && (!defined($top) || $top->run_once));
 
+    if ($self->signature) {
+        $self->signature->begin;
+        $opensubs[-1]->signature($self->signature);
+    }
+
     $self->do->begin;
+    $opensubs[-1]->code($self->do);
 
     $opensubs[-1]->close;
     pop @opensubs;
+}
+
+sub Sig::begin {
+    my $self = shift;
+
+    $_->begin for @{ $self->params };
+}
+
+sub Sig::Parameter::begin {
+    my $self = shift;
+
+    $opensubs[-1]->add_my_name($self->slot, list => $self->list,
+        hash => $self->hash, noinit => 1) if defined $self->slot;
+    $self->default->begin if defined($self->default);
 }
 
 sub Op::begin {
