@@ -40,10 +40,34 @@ our $global;
     package Metamodel::Stash;
     use Moose;
 
-    has zyg => (isa => 'HashRef[Metamodel::Stash]', is => 'ro',
+    # zyg entries can point to other stashes, to Lexical::Simple, to StaticSub
+    has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
     # undef here -> stub like my class Foo { ... }
     has obj => (isa => 'Maybe[Metamodel::Package]', is => 'rw');
+    has parent => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
+
+    sub bind_pkg {
+        my ($self, $name, $sub) = @_;
+        $self->zyg->{$name} = $sub;
+    }
+
+    sub subpkg {
+        my ($self, $name) = @_;
+        $name =~ s/::$//; #XXX frontend brokenness
+        if ($name eq 'PARENT') {
+            return $self->parent // die "stash has no parent";
+        }
+        if ($name eq 'CALLER' || $name eq 'OUTER' || $name eq 'SETTING' ||
+                $name eq 'UNIT') {
+            die "$name cannot be used to descend from a package";
+        }
+        my $r = $self->zyg->{$name} //= Metamodel::Stash->new(parent => $self);
+        if (!$r->isa('Metamodel::Stash')) {
+            die "$name is a non-subpackage";
+        }
+        $r;
+    }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -231,35 +255,41 @@ our $global;
 
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[Metamodel::Package]', is => 'ro');
+    has cur_pkg  => (isa => 'Metamodel::Stash', is => 'ro');
     has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
     has augmenting => (isa => 'Bool', is => 'ro', default => 1);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
 
-    sub find_pkg { my ($self, $names) = @_;
-        my $rns;
-        if (ref $names) {
-            if (@$names != 1) {
-                die "unimplemented form of find_pkg @$names";
-            }
-            my $lex = $self->find_lex($names->[0]);
-            if (!$lex || !$lex->isa('Metamodel::Lexical::Stash')) {
-                die "$names->[0] is not declared as a package";
-            }
-            if (!$lex->referent->obj) {
-                die "$names->[0] is an unresolved stub";
-            }
-            return $lex->referent->obj;
-        } else {
-            my $lex = $self->find_lex($names);
-            if (!$lex || !$lex->isa('Metamodel::Lexical::Stash')) {
-                die "$names is not declared as a package";
-            }
-            if (!$lex->referent->obj) {
-                die "$names is an unresolved stub";
-            }
-            return $lex->referent->obj;
+    sub find_lex_pkg { my ($self, $name) = @_;
+        my $toplex = $self->find_lex($name) // return undef;
+        if (!$toplex->isa('Metamodel::Lexical::Stash')) {
+            die "$name is declared as a non-package";
         }
+        $toplex->referent;
+    }
+
+    sub find_pkg { my ($self, $names) = @_;
+        my @names = ref($names) ? @$names : ('MY', $names);
+        $_ =~ s/::$// for (@names); #XXX
+        my $ptr;
+        if ($names[0] eq 'OUR') {
+            $ptr = $self->cur_pkg;
+            shift @names;
+        } elsif ($names[0] eq 'MY') {
+            $ptr = $self->find_lex_pkg($names[1]);
+            splice @names, 0, 2;
+        } elsif ($ptr = $self->find_lex_pkg($names->[0])) {
+            shift @names;
+        } else {
+            $ptr = $global;
+        }
+
+        for my $n (@names) {
+            $ptr = $ptr->subpkg($n);
+        }
+
+        $ptr;
     }
 
     sub find_lex { my ($self, $name) = @_;
@@ -336,6 +366,7 @@ sub Body::begin {
     my $metabody = Metamodel::StaticSub->new(
         outer      => $top,
         body_of    => $args{body_of},
+        cur_pkg    => $args{cur_pkg} // ($top ? $top->cur_pkg : $global),
         augmenting => $args{augmenting},
         name       => $self->name,
         returnable => $self->returnable,
@@ -444,9 +475,16 @@ sub Op::PackageDef::begin {
     # XXX handle exports, ourpkg
 
     $opensubs[-1]->add_my_stash($self->var, $ns);
+
+    if ($self->ourpkg) {
+        my $pkg = $opensubs[-1]->find_pkg($self->ourpkg);
+        $pkg->bind_pkg($self->var, $ns);
+    }
+
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name);
-        my $body = $self->body->begin(body_of => $obj, once => 1);
+        my $body = $self->body->begin(body_of => $obj, cur_pkg => $ns,
+            once => 1);
         $obj->close;
         $ns->obj($obj);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
@@ -460,7 +498,8 @@ sub Op::Augment::begin {
 
     # XXX shouldn't we distinguish augment class Foo { } from ::Foo ?
     my $pkg = $opensubs[-1]->find_pkg([ @{ $self->pkg }, $self->name ]);
-    my $body = $self->body->begin(body_of => $pkg, augmenting => 1, once => 1);
+    my $body = $self->body->begin(body_of => $pkg->obj, augmenting => 1,
+        once => 1, cur_pkg => $pkg);
     $opensubs[-1]->add_my_sub($self->bodyvar, $body);
 
     delete $self->{$_} for (qw(name body pkg));
