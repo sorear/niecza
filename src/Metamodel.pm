@@ -495,6 +495,13 @@ sub Op::BareBlock::begin {
     delete $self->{$_} for (qw( body ));
 }
 
+sub Op::Gather::begin {
+    my $self = shift;
+    my $body = $self->body->begin;
+    $opensubs[-1]->add_my_sub($self->var, $body);
+    delete $self->{$_} for (qw( body ));
+}
+
 sub Op::WhateverCode::begin {
     my $self = shift;
     my $body = Body->new(name => 'ANON', transparent => 1, do => $self->ops,

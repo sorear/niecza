@@ -25,43 +25,6 @@ use CgOp;
 }
 
 {
-    package Decl::Sub;
-    use Moose;
-    extends 'Decl';
-
-    has var    => (isa => 'Str', is => 'ro', required => 1);
-    has code   => (isa => 'Body', is => 'ro', required => 1);
-
-    sub bodies { $_[0]->code }
-
-    sub used_slots {
-        [$_[0]->var, 'Variable', $_[1] ? 3 :
-            ($_[0]->dyn_name($_[0]->var) ? 0 : 4)];
-    }
-
-    sub preinit_code {
-        my ($self, $body) = @_;
-
-        $body->needs_protovars ?
-            CgOp::prog(
-                CgOp::protosub($self->code),
-                CgOp::proto_var($self->var,
-                    $body->mainline ? CgOp::sub_obj($self->code)
-                                    : CgOp::sub_var($self->code))) :
-            CgOp::protosub($self->code);
-    }
-
-    sub enter_code {
-        my ($self, $body) = @_;
-        $body->mainline ? CgOp::noop :
-            CgOp::scopedlex($self->var, CgOp::sub_var($self->code));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
     package Decl::SimpleVar;
     use Moose;
     extends 'Decl';
@@ -102,32 +65,6 @@ use CgOp;
             CgOp::scopedlex($self->slot, $self->list ? CgOp::newblanklist :
                 $self->hash ? CgOp::newblankhash : CgOp::newblankrwscalar);
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-# only use this for classes &c which have no meaningful commoning behavior
-{
-    package Decl::PackageAlias;
-    use Moose;
-    extends 'Decl';
-
-    has slot   => (isa => 'Str', is => 'ro', required => 1);
-    has path   => (isa => 'ArrayRef[Str]', is => 'ro',
-        default => sub { ['OUR'] });
-    has name   => (isa => 'Str', is => 'ro', required => 1);
-
-    sub used_slots { }
-
-    sub preinit_code {
-        my ($self, $body) = @_;
-
-        CgOp::bset(($body->lookup_var($self->name, @{ $self->path }))[1],
-            CgOp::newboundvar(1, 0, CgOp::scopedlex($self->slot)))
-    }
-
-    sub enter_code { }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

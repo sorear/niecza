@@ -776,20 +776,6 @@ use CgOp;
     # proto_too, exports, ltm
     has once   => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub lift_decls {
-        my ($self) = @_;
-        my @r;
-        push @r, Decl::Sub->new(var => $self->var, code => $self->body);
-        push @r, Decl::HasMethod->new(name => $self->method_too,
-            var => $self->var) if defined($self->method_too);
-        push @r, Decl::HasMultiRx->new(name => $self->proto_too,
-            var => $self->var) if defined($self->proto_too);
-        push @r, Decl::PackageAlias->new(slot => $self->var,
-            name => $self->var, path => [ 'OUR', 'EXPORT', $_ ])
-                for (@{ $self->exports });
-        @r;
-    }
-
     sub code {
         my ($self, $body) = @_;
         CgOp::scopedlex($self->var);
@@ -957,11 +943,6 @@ use CgOp;
 
     has body => (isa => 'Body', is => 'ro', required => 1);
     has var  => (isa => 'Str',  is => 'ro', required => 1);
-
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::Sub->new(var => $self->var, code => $self->body);
-    }
 
     sub code {
         my ($self, $body) = @_;
