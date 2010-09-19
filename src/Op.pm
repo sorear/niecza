@@ -747,11 +747,6 @@ use CgOp;
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has body   => (isa => 'Body', is => 'ro', required => 1);
 
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::Sub->new(var => $self->var, code => $self->body);
-    }
-
     sub code {
         my ($self, $body) = @_;
         CgOp::scopedlex($self->var);
