@@ -31,7 +31,6 @@ use YAML::XS;
 # This graph is a lot more random than the old trees were...
 
 our @opensubs;
-our $mainline;
 our $global;
 
 # package, class, etc.  Things with stashes, protoobjects, etc.
@@ -275,17 +274,32 @@ our $global;
     __PACKAGE__->meta->make_immutable;
 }
 
+{
+    package Metamodel::Unit;
+    use Moose;
+
+    has mainline => (isa => 'Metamodel::StaticSub', is => 'rw');
+    has global   => (isa => 'Metamodel::Stash', is => 'ro');
+    has name     => (isa => 'Str', is => 'ro');
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+
 ### Code goes here to build up the metamodel from an Op tree
 # We should eventually wire this to the parser, so that metamodel stuff can
 # exist during the parse itself; will be needed for macros
 
 sub Unit::begin {
     my $self = shift;
+    local $global = Metamodel::Stash->new;
+    my $munit = Metamodel::Unit->new(global => $global, name => $self->name);
 
     local @opensubs;
-    local $global = Metamodel::Stash->new;
+    $munit->mainline($self->mainline->begin(once => 1));
 
-    $self->mainline->begin(once => 1);
+    $munit;
 }
 
 sub Body::begin {
@@ -406,13 +420,5 @@ sub Op::Augment::begin {
 
     delete $self->{$_} for (qw(name body pkg));
 }
-
-### Code goes here to generate C# from the metamodel
-#
-
-my $y = YAML::XS::LoadFile(\*STDIN);
-local $mainline = $y->begin;
-
-print(YAML::XS::Dump($mainline));
 
 1;

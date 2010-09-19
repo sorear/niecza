@@ -19,6 +19,7 @@ use Unit ();
 use Op ();
 use Optimizer::Beta ();
 use ResolveLex ();
+use Metamodel ();
 use Storable;
 
 use Niecza::Grammar ();
@@ -223,6 +224,7 @@ sub compile {
         [ 'parse', sub {
             $ast = Niecza::Grammar->$m($a, setting => $lang,
                 actions => 'Niecza::Actions')->{_ast}; } ],
+        [ 'begin', sub { $ast = $ast->begin } ],
         [ 'lift_decls', sub {
             $::SETTING_RESUME = undef;
             $ast->lift_decls; } ],
