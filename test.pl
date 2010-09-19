@@ -65,13 +65,13 @@ ok 42 / 3 == 14, "division comes out in the right order";
 
 {
     my $x;
-    PRE-INIT {
+    INIT {
         $x = 1;
     }
     ok $x, "changes made in the protolexpad are visible at runtime";
 }
 
-ok PRE-INIT { 1 }, "preinit blocks can return values";
+ok INIT { 1 }, "init blocks can return values";
 
 {
     sub foo() { 42 }
@@ -230,7 +230,7 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
 
 {
     my $x;
-    my $unclonable-sub = PRE-INIT { sub () { $x } };
+    my $unclonable-sub = INIT { sub () { $x } };
     $x = 42;
     ok $unclonable-sub() == 42, "mainlines are not cloned";
 }

@@ -11,9 +11,6 @@ grammar P6 is STD::P6 {
         %*LANG<MAIN> = ::Niecza::Grammar::P6 ;
         self;
     }
-
-    token statement_prefix:sym<PRE-INIT>
-        { :my %*MYSTERY; <sym> <.spacey> <blast> <.explain_mystery> }
 }
 
 grammar Q is STD::Q {

@@ -2443,14 +2443,6 @@ sub statement_prefix__S_gather { my ($cl, $M) = @_;
     $M->{_ast} = Op::Gather->new(node($M), var => $cl->gensym,
         body => $M->{blast}{_ast});
 }
-sub statement_prefix__S_PREMinusINIT { my ($cl, $M) = @_;
-    my $var = $cl->gensym;
-
-    $M->{blast}{_ast}->type('phaser');
-
-    $M->{_ast} = Op::PreInit->new(var => $var, body => $M->{blast}{_ast},
-        node($M));
-}
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;
     my $cv = $cl->gensym;

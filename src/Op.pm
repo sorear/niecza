@@ -679,28 +679,6 @@ use CgOp;
 }
 
 {
-    package Op::PreInit;
-    use Moose;
-    extends 'Op';
-
-    has var    => (isa => 'Str', is => 'ro', predicate => 'has_var');
-    has body   => (isa => 'Body', is => 'ro', required => 1);
-
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::PreInit->new(var => $self->var, code => $self->body);
-    }
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::scopedlex($self->var);
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
     package Op::Super;
     use Moose;
     extends 'Op';
