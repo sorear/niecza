@@ -67,6 +67,11 @@ our $global;
         die "method $name defined in a lowly package";
     }
 
+    sub add_super {
+        my ($self, $super) = @_;
+        die "superclass $super->name defined in a lowly package";
+    }
+
     no Moose;
     __PACKAGE__->meta->make_immutable;
 }
@@ -89,6 +94,8 @@ our $global;
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
+    has superclasses => (isa => 'ArrayRef[Metamodel::Class]', is => 'ro',
+        default => sub { [] });
 
     sub add_attribute {
         my ($self, $name, $accessor) = @_;
@@ -100,6 +107,11 @@ our $global;
         my ($self, $name, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name, body => $body);
         # TODO $accessor
+    }
+
+    sub add_super {
+        my ($self, $targ) = @_;
+        push @{ $self->superclasses }, $targ;
     }
 
     no Moose;
@@ -200,17 +212,29 @@ our $global;
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
 
     sub find_pkg { my ($self, $names) = @_;
-        if (!ref($names) || @$names != 1) {
-            die "unimplemented form of find_pkg $names";
+        my $rns;
+        if (ref $names) {
+            if (@$names != 1) {
+                die "unimplemented form of find_pkg @$names";
+            }
+            my $lex = $self->find_lex($names->[0]);
+            if (!$lex || !$lex->isa('Metamodel::Lexical::Stash')) {
+                die "$names->[0] is not declared as a package";
+            }
+            if (!$lex->referent->obj) {
+                die "$names->[0] is an unresolved stub";
+            }
+            return $lex->referent->obj;
+        } else {
+            my $lex = $self->find_lex($names);
+            if (!$lex || !$lex->isa('Metamodel::Lexical::Stash')) {
+                die "$names is not declared as a package";
+            }
+            if (!$lex->referent->obj) {
+                die "$names is an unresolved stub";
+            }
+            return $lex->referent->obj;
         }
-        my $lex = $self->find_lex($names->[0]);
-        if (!$lex || !$lex->isa('Metamodel::Lexical::Stash')) {
-            die "$names->[0] is not declared as a package";
-        }
-        if (!$lex->referent->obj) {
-            die "$names->[0] is an unresolved stub";
-        }
-        return $lex->referent->obj;
     }
 
     sub find_lex { my ($self, $name) = @_;
@@ -317,6 +341,15 @@ sub Op::Attribute::begin {
     die "attribute $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
     $ns->add_attribute($self->name, $self->accessor);
+}
+
+sub Op::Super::begin {
+    my $self = shift;
+    my $ns   = $opensubs[-1]->body_of // die ("superclass " . $self->name .
+        " declared outside of any class");
+    die "superclass $self->name declared in an augment"
+        if $opensubs[-1]->augmenting;
+    $ns->add_super($opensubs[-1]->find_pkg($self->name));
 }
 
 sub Op::SubDef::begin {
