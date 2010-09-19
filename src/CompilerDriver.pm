@@ -225,9 +225,6 @@ sub compile {
             $ast = Niecza::Grammar->$m($a, setting => $lang,
                 actions => 'Niecza::Actions')->{_ast}; } ],
         [ 'begin', sub { $ast = $ast->begin } ],
-        [ 'lift_decls', sub {
-            $::SETTING_RESUME = undef;
-            $ast->lift_decls; } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'extract_scopes', sub { $ast->extract_scopes } ],
         [ 'to_cgop', sub { $ast->to_cgop } ],

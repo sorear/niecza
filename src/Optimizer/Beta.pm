@@ -12,29 +12,36 @@ package Optimizer::Beta;
 sub run {
     my ($unit) = @_;
 
-    run_body($unit->mainline);
+    run_ssub($unit->mainline);
 }
 
-sub run_body {
+sub run_ssub {
     my ($body) = @_;
-    run_body($_) for map { $_->bodies } @{ $body->decls };
+
+    for my $lname (keys %{ $body->lexicals }) {
+        my $lex = $body->lexicals->{$lname};
+        next unless $lex->isa('Metamodel::Lexical::SubDef');
+        run_ssub($lex->body);
+    }
 
     # XXX enter and sigs need love
-    run_optree($body, $body->do);
+    run_optree($body, $body->code);
 }
 
 sub run_optree {
     my ($body, $op) = @_;
 
-    if ($op->isa('Op::CallSub') && $op->invocant->isa('Op::SubDef')
-            && no_named_params($op)
-            && $op->invocant->once && is_removable_body($op->invocant->body)) {
-        beta_optimize($body, $op);
-    } else {
-        for ($op->zyg) {
-            run_optree($body, $_);
-        }
+    for ($op->zyg) {
+        run_optree($body, $_);
     }
+
+    return unless $op->isa('Op::CallSub') && no_named_params($op);
+    my $inv = $op->invocant;
+    return unless $inv->isa('Op::SubDef') && $inv->once;
+    my $cbody = $body->lexicals->{$inv->var}->body;
+    return unless is_removable_body($cbody);
+
+    beta_optimize($body, $op, $inv, $cbody);
 }
 
 sub no_named_params {
@@ -57,7 +64,7 @@ sub deb {
 sub is_removable_body {
     my ($body) = @_;
 
-    deb $body->csname, " is a candidate for beta-removal";
+    deb $body->name, " is a candidate for beta-removal";
 
     if (!$body->signature) {
         deb "... unsuitable because it's a raw call";
@@ -66,23 +73,17 @@ sub is_removable_body {
 
     # We can't currently handle the possibility of outer references to the
     # frame we're mangling
-    for (@{ $body->decls }) {
-        for ($_->bodies) {
-            deb "... unsuitable because it has a child: ", $_->csname;
-            return 0;
-        }
+    for my $lname (keys %{ $body->lexicals }) {
+        my $lex = $body->lexicals->{$lname};
 
-        if (!$_->isa('Decl::SimpleVar')) {
+        if (!$lex->isa('Metamodel::Lexical::Simple')) {
             deb "... unsuitable because it has an unhandled decl $_";
             return 0;
         }
 
-        for my $ke ($_->used_slots(0)) {
-            my $k = $ke->[0];
-            if ($k =~ /^.?[?*]/) {
-                deb "... unsuitable because it has a context variable ($k)";
-                return 0;
-            }
+        if ($lname =~ /^.?[?*]/) {
+            deb "... unsuitable because it has a context variable ($lname)";
+            return 0;
         }
     }
 
@@ -91,29 +92,28 @@ sub is_removable_body {
 
 # Applicability already checked
 sub beta_optimize {
-    my ($body, $op) = @_;
+    my ($body, $op, $inv, $cbody) = @_;
 
-    my $ib = $op->invocant->body;
     # Bind the arguments to gensyms so they won't be shadowed by anything in
     # the function
     my @args = map { [ $_, Niecza::Actions->gensym ] } @{ $op->positionals };
 
-    @{ $body->decls } = grep { !$_->isa('Decl::Sub') ||
-        $_->code != $ib } @{ $body->decls };
+    delete $body->lexicals->{$inv->var};
 
     my @pos = (map { Op::Lexical->new(name => $_->[1]) } @args);
 
     my $nop = Op::StatementList->new(children => [
-        Op::SigBind->new(signature => $ib->signature,
+        Op::SigBind->new(signature => $cbody->signature,
             positionals => \@pos),
-        $ib->do]);
+        $cbody->code]);
 
-    for my $d (reverse @{ $ib->decls }) {
+    for my $dn (sort keys %{ $cbody->lexicals }) {
+        my $d = $cbody->lexicals->{$dn};
         my $to = $d->noinit ? CgOp::null('Variable') :
                  $d->hash   ? CgOp::newblankhash :
                  $d->list   ? CgOp::newblanklist :
                               CgOp::newblankrwscalar;
-        $nop = Op::Let->new(var => $d->slot,
+        $nop = Op::Let->new(var => $dn,
             to => Op::CgOp->new(op => $to), in => $nop);
     }
 

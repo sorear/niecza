@@ -513,7 +513,7 @@ sub Op::SubDef::begin {
 
     $opensubs[-1]->add_exports($self->var, $body, $self->exports);
 
-    delete $self->{$_} for (qw( body method_too proto_too exports once ));
+    delete $self->{$_} for (qw( body method_too proto_too exports ));
 }
 
 sub Op::BareBlock::begin {
