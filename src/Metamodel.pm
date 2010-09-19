@@ -72,6 +72,8 @@ our $global;
         die "superclass $super->name defined in a lowly package";
     }
 
+    sub close { }
+
     no Moose;
     __PACKAGE__->meta->make_immutable;
 }
@@ -113,6 +115,17 @@ our $global;
         my ($self, $targ) = @_;
         push @{ $self->superclasses }, $targ;
     }
+
+    sub close {
+        my ($self, $targ) = @_;
+        # XXX should probably check that these are CORE::Mu and CORE::Any
+        if ($self->name ne 'Mu' && !@{ $self->superclasses }) {
+            $self->add_super($opensubs[-1]->find_lex($self->_defsuper)
+                ->referent->obj);
+        }
+    }
+
+    sub _defsuper { 'Any' }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -375,6 +388,7 @@ sub Op::PackageDef::begin {
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name);
         my $body = $self->body->begin(body_of => $obj, once => 1);
+        $obj->close;
         $ns->obj($obj);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
