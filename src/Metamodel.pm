@@ -333,7 +333,7 @@ sub Body::begin {
 
     my $top = @opensubs ? $opensubs[-1] : undef;
 
-    push @opensubs, Metamodel::StaticSub->new(
+    my $metabody = Metamodel::StaticSub->new(
         outer      => $top,
         body_of    => $args{body_of},
         augmenting => $args{augmenting},
@@ -342,16 +342,22 @@ sub Body::begin {
         class      => $self->class,
         run_once   => $args{once} && (!defined($top) || $top->run_once));
 
+    push @opensubs, $metabody; # always visible in the signature XXX
+
     if ($self->signature) {
         $self->signature->begin;
-        $opensubs[-1]->signature($self->signature);
+        $metabody->signature($self->signature);
     }
 
-    $self->do->begin;
-    $opensubs[-1]->code($self->do);
+    pop @opensubs if $self->transparent;
 
-    $opensubs[-1]->close;
-    pop @opensubs;
+    $self->do->begin;
+    $metabody->code($self->do);
+
+    $metabody->close;
+    pop @opensubs unless $self->transparent;
+
+    $metabody;
 }
 
 sub Sig::begin {
@@ -413,6 +419,14 @@ sub Op::SubDef::begin {
         $opensubs[-1]->body_of->add_method($self->method_too, $body);
     }
     delete $self->{$_} for (qw( body method_too proto_too exports once ));
+}
+
+sub Op::WhateverCode::begin {
+    my $self = shift;
+    my $body = Body->new(name => 'ANON', transparent => 1, do => $self->ops,
+        signature => Sig->simple(@{ $self->vars }));
+    delete $self->{$_} for (qw( vars ops ));
+    $opensubs[-1]->add_my_sub($self->slot, $body->begin);
 }
 
 sub Op::Start::begin {

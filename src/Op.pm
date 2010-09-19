@@ -15,11 +15,6 @@ use CgOp;
 
     sub zyg { }
 
-    sub lift_decls {
-        my ($self) = shift;
-        map { $_->lift_decls } $self->zyg;
-    }
-
     sub cgop {
         my ($self, $body) = @_;
         if (defined $self->file) {
@@ -548,12 +543,6 @@ use CgOp;
     has body => (isa => 'Op', is => 'ro', required => 1);
     sub zyg { $_[0]->body }
 
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::StateVar->new(backing => $self->condvar),
-            $self->SUPER::lift_decls(@_);
-    }
-
     sub code {
         my ($self, $body) = @_;
 
@@ -817,13 +806,6 @@ use CgOp;
     has ops  => (isa => 'Op', is => 'ro', required => 1);
     has vars => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
     has slot => (isa => 'Str', is => 'ro', required => 1);
-
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::Sub->new(var => $self->slot, code => Body->new(
-                name => "whatever-anon", type => 'sub', transparent => 1,
-                do => $self->ops, signature => Sig->simple(@{ $self->vars })));
-    }
 
     sub code {
         my ($self, $body) = @_;
