@@ -123,6 +123,8 @@ our $global;
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef[Metamodel::Class]', is => 'ro',
         default => sub { [] });
+    has multi_regex_lists => (isa => 'HashRef[ArrayRef[Metamodel::StaticSub]]',
+        is => 'ro', lazy => 1, default => sub { +{} });
 
     sub add_attribute {
         my ($self, $name) = @_;
@@ -132,6 +134,11 @@ our $global;
     sub add_method {
         my ($self, $name, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name, body => $body);
+    }
+
+    sub push_multi_regex {
+        my ($self, $name, $body) = @_;
+        push @{ $self->multi_regex_lists->{$name} //= [] }, $body;
     }
 
     sub add_super {
@@ -468,6 +475,10 @@ sub Op::SubDef::begin {
     if (defined($self->method_too)) {
         $body->strong_used(1);
         $opensubs[-1]->body_of->add_method($self->method_too, $body);
+    }
+    if (defined($self->proto_too)) {
+        $body->strong_used(1);
+        $opensubs[-1]->body_of->push_multi_regex($self->proto_too, $body);
     }
     delete $self->{$_} for (qw( body method_too proto_too exports once ));
 }
