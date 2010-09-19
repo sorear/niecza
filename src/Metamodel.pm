@@ -279,7 +279,8 @@ our $global;
         # outermost sub isn't cloned so a fallback to my is safe
         my $up = $self->outer // $self;
         $up->lexicals->{$back} = Metamodel::Lexical::Simple->new(@ops);
-        $self->lexicals->{$slot} = Metamodel::Lexical::Alias->new($back);
+        $self->lexicals->{$slot} = Metamodel::Lexical::Alias->new($back)
+            if defined($slot);
     }
 
     sub add_my_stash { my ($self, $slot, $stash) = @_;
@@ -412,6 +413,12 @@ sub Op::SubDef::begin {
         $opensubs[-1]->body_of->add_method($self->method_too, $body);
     }
     delete $self->{$_} for (qw( body method_too proto_too exports once ));
+}
+
+sub Op::Start::begin {
+    my $self = shift;
+    $opensubs[-1]->add_state_name(undef, $self->condvar);
+    $self->Op::begin;
 }
 
 sub Op::PackageDef::begin {
