@@ -472,14 +472,19 @@ sub Op::SubDef::begin {
     my $self = shift;
     my $body = $self->body->begin;
     $opensubs[-1]->add_my_sub($self->var, $body);
+    $body->strong_used(1) if @{ $self->exports } ||
+        defined($self->method_too) || defined ($self->proto_too);
+
     if (defined($self->method_too)) {
-        $body->strong_used(1);
         $opensubs[-1]->body_of->add_method($self->method_too, $body);
     }
+
     if (defined($self->proto_too)) {
-        $body->strong_used(1);
         $opensubs[-1]->body_of->push_multi_regex($self->proto_too, $body);
     }
+
+    $opensubs[-1]->add_exports($self->var, $body, $self->exports);
+
     delete $self->{$_} for (qw( body method_too proto_too exports once ));
 }
 
