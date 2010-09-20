@@ -12,20 +12,8 @@ package Optimizer::Beta;
 sub run {
     my ($unit) = @_;
 
-    run_ssub($unit->mainline);
-}
-
-sub run_ssub {
-    my ($body) = @_;
-
-    for my $lname (keys %{ $body->lexicals }) {
-        my $lex = $body->lexicals->{$lname};
-        next unless $lex->isa('Metamodel::Lexical::SubDef');
-        run_ssub($lex->body);
-    }
-
     # XXX enter and sigs need love
-    run_optree($body, $body->code);
+    $unit->visit_local_subs_postorder(sub { run_optree($_, $_->code) });
 }
 
 sub run_optree {

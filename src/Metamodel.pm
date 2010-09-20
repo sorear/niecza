@@ -32,6 +32,7 @@ use YAML::XS;
 
 our @opensubs;
 our $global;
+our $unit;
 
 # package, class, etc.  Things with stashes, protoobjects, etc.
 # We don't handle normal variables here, those exist only in the runtime
@@ -47,6 +48,9 @@ our $global;
     # undef here -> stub like my class Foo { ... }
     has obj => (isa => 'Maybe[Metamodel::Package]', is => 'rw');
     has parent => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
+    has unit_closed => (isa => 'Bool', is => 'rw');
+
+    sub BUILD { push @{ $unit->stashes }, $_[0] }
 
     sub bind_name {
         my ($self, $name, $sub) = @_;
@@ -80,6 +84,9 @@ our $global;
 
     # an intrinsic name, even if anonymous
     has name => (isa => 'Str', is => 'ro', default => 'ANON');
+    has unit_closed => (isa => 'Bool', is => 'rw');
+
+    sub BUILD { push @{ $unit->packages }, $_[0] }
 
     sub add_attribute {
         my ($self, $name) = @_;
@@ -147,14 +154,14 @@ our $global;
 
     sub close {
         my ($self, $targ) = @_;
-        # XXX should probably check that these are CORE::Mu and CORE::Any
-        if ($self->name ne 'Mu' && !@{ $self->superclasses }) {
+        if ($self->name ne 'Mu' && $unit->is_true_setting
+                && !@{ $self->superclasses }) {
             $self->add_super($opensubs[-1]->find_lex($self->_defsuper)
                 ->referent->obj);
         }
     }
 
-    sub _defsuper { 'Any' }
+    sub _defsuper { 'Any' } #XXX CORE::Any
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -294,6 +301,8 @@ our $global;
     has augmenting => (isa => 'Bool', is => 'ro', default => 1);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
 
+    has unit_closed => (isa => 'Bool', is => 'rw');
+
     sub create_static_pad {
         my ($self) = @_;
 
@@ -391,6 +400,49 @@ our $global;
     has global   => (isa => 'Metamodel::Stash', is => 'ro');
     has name     => (isa => 'Str', is => 'ro');
 
+    # we like to delete staticsubs in the optimizer, so visiting them is
+    # a tad harder
+    has packages => (isa => 'ArrayRef[Metamodel::Package]', is => 'ro',
+        default => sub { [] });
+    has stashes  => (isa => 'ArrayRef[Metamodel::Stash]', is => 'ro',
+        default => sub { [] });
+
+    # XXX should be fed in perhaps from name, but this is good for testing
+    sub is_true_setting { 1 }
+
+    sub visit_local_packages {
+        my ($self, $cb) = @_;
+        $cb->($_) for @{ $self->packages };
+    }
+
+    sub visit_local_stashes {
+        my ($self, $cb) = @_;
+        $cb->($_) for @{ $self->stashes };
+    }
+
+    sub visit_local_subs_postorder {
+        my ($self, $cb) = @_;
+        our $rec; local $rec = sub {
+            for (values %{ $_->lexicals }) {
+                next unless $_->isa('Metamodel::Lexical::SubDef');
+                next if $_->body->unit_closed;
+                for ($_->body) { $rec->(); }
+            }
+            $cb->($_);
+        };
+        for ($self->mainline) { $rec->(); }
+    }
+
+    # must be LAST call before Storable dump - breaks visitors!
+    sub close_unit {
+        my ($self) = @_;
+        $self->visit_local_subs_postorder(sub { $_->unit_closed(1) });
+        $self->visit_local_stashes(sub { $_->unit_closed(1) });
+        $self->visit_local_packages(sub { $_->unit_closed(1) });
+        @{ $self->stashes  } = ();
+        @{ $self->packages } = ();
+    }
+
     no Moose;
     __PACKAGE__->meta->make_immutable;
 }
@@ -402,13 +454,14 @@ our $global;
 
 sub Unit::begin {
     my $self = shift;
+    local $unit = Metamodel::Unit->new(name => $self->name);
     local $global = Metamodel::Stash->new;
-    my $munit = Metamodel::Unit->new(global => $global, name => $self->name);
+    $unit->{global} = $global; # chicken and egg...
 
     local @opensubs;
-    $munit->mainline($self->mainline->begin(once => 1));
+    $unit->mainline($self->mainline->begin(once => 1));
 
-    $munit;
+    $unit;
 }
 
 sub Body::begin {
