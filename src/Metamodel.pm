@@ -40,9 +40,8 @@ our $global;
     package Metamodel::Stash;
     use Moose;
 
-    # zyg entries can point to other stashes, to Lexical::Simple, to StaticSub
-    # important: if a stash points to a lexical, it's binding to the static
-    # version of the lexical
+    # zyg entries can point to other stashes, to Lexical::StaticAlias,
+    # to StaticSub
     has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
     # undef here -> stub like my class Foo { ... }
@@ -223,6 +222,19 @@ our $global;
     __PACKAGE__->meta->make_immutable;
 }
 
+# for my $foo is export (and maybe subs too?)
+{
+    package Metamodel::Lexical::StaticAlias;
+    use Moose;
+    extends 'Metamodel::Lexical';
+
+    has body => (isa => 'Metamodel::StaticSub', is => 'ro', required => 1);
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
 # sub foo { ... }
 {
     package Metamodel::Lexical::SubDef;
@@ -265,6 +277,7 @@ our $global;
 
     has outer => (isa => 'Maybe[Metamodel::StaticSub]', is => 'ro');
     has run_once => (isa => 'Bool', is => 'ro', default => 0);
+    has spad_exists => (isa => 'Bool', is => 'rw', default => 0);
 
     has lexicals => (isa => 'HashRef[Metamodel::Lexical]', is => 'ro',
         default => sub { +{} });
@@ -280,6 +293,14 @@ our $global;
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
     has augmenting => (isa => 'Bool', is => 'ro', default => 1);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
+
+    sub create_static_pad {
+        my ($self) = @_;
+
+        return if $self->spad_exists;
+        $self->spad_exists(1);
+        $self->outer->create_static_pad if $self->outer;
+    }
 
     sub find_lex_pkg { my ($self, $name) = @_;
         my $toplex = $self->find_lex($name) // return undef;
@@ -353,6 +374,7 @@ our $global;
             my $repo = $self->cur_pkg->subpkg('EXPORT')->subpkg($tag);
             $repo->bind_name($name, $thing);
         }
+        scalar @$tags;
     }
 
     sub close { }
@@ -472,6 +494,8 @@ sub Op::Attribute::begin {
     die "attribute $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
     $ns->add_attribute($self->name);
+    # we don't need create_static_pad here as the generated accessors close
+    # over no variables
     if ($self->accessor) {
         my $nb = Metamodel::StaticSub->new(
             outer      => $opensubs[-1],
@@ -502,6 +526,7 @@ sub Op::SubDef::begin {
     $opensubs[-1]->add_my_sub($self->var, $body);
     $body->strong_used(1) if @{ $self->exports } ||
         defined($self->method_too) || defined ($self->proto_too);
+    $opensubs[-1]->create_static_pad if $body->strong_used;
 
     if (defined($self->method_too)) {
         $opensubs[-1]->body_of->add_method($self->method_too, $body);
@@ -550,7 +575,6 @@ sub Op::PackageDef::begin {
     $pclass =~ s/Op::(.*)Def/Metamodel::$1/;
 
     my $ns = Metamodel::Stash->new;
-    # XXX handle exports, ourpkg
 
     $opensubs[-1]->add_my_stash($self->var, $ns);
 

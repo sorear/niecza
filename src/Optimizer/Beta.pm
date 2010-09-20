@@ -71,6 +71,10 @@ sub is_removable_body {
         return 0;
     }
 
+    if ($body->strong_used) {
+        return 0;
+    }
+
     # We can't currently handle the possibility of outer references to the
     # frame we're mangling
     for my $lname (keys %{ $body->lexicals }) {
