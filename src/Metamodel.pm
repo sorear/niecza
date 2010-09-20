@@ -557,7 +557,7 @@ sub Op::Attribute::begin {
             returnable => 0,
             class      => 'Sub',
             run_once   => 0,
-            do         => Op::GetSlot->new(name => $self->name,
+            code       => Op::GetSlot->new(name => $self->name,
                 object => Op::CgOp->new(optree => [ pos => 0 ])));
         $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
         $ns->add_method($self->name, $nb);

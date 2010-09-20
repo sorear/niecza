@@ -20,6 +20,7 @@ use Op ();
 use Optimizer::Beta ();
 use ResolveLex ();
 use Metamodel ();
+use CSharpBackend ();
 use Storable;
 
 use Niecza::Grammar ();
@@ -226,6 +227,7 @@ sub compile {
                 actions => 'Niecza::Actions')->{_ast}; } ],
         [ 'begin', sub { $ast = $ast->begin } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
+        [ 'csharp', sub { $ast = CSharpBackend::run($ast) } ],
         [ 'extract_scopes', sub { $ast->extract_scopes } ],
         [ 'to_cgop', sub { $ast->to_cgop } ],
         [ 'resolve_lex', sub { ResolveLex::run($ast) } ],
