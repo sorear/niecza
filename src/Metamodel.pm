@@ -303,6 +303,11 @@ our $unit;
 
     has unit_closed => (isa => 'Bool', is => 'rw');
 
+    sub children {
+        map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
+            values %{ $_[0]->lexicals };
+    }
+
     sub create_static_pad {
         my ($self) = @_;
 
@@ -423,12 +428,19 @@ our $unit;
     sub visit_local_subs_postorder {
         my ($self, $cb) = @_;
         our $rec; local $rec = sub {
-            for (values %{ $_->lexicals }) {
-                next unless $_->isa('Metamodel::Lexical::SubDef');
-                next if $_->body->unit_closed;
-                for ($_->body) { $rec->(); }
-            }
+            return if $_->unit_closed;
+            for ($_->children) { $rec->(); }
             $cb->($_);
+        };
+        for ($self->mainline) { $rec->(); }
+    }
+
+    sub visit_local_subs_preorder {
+        my ($self, $cb) = @_;
+        our $rec; local $rec = sub {
+            return if $_->unit_closed;
+            $cb->($_);
+            for ($_->children) { $rec->(); }
         };
         for ($self->mainline) { $rec->(); }
     }
