@@ -173,6 +173,12 @@ use 5.010;
         };
     }
 
+    sub _striptype {
+        my ($self, $name) = @_;
+        $name =~ s/:.*//;
+        $name;
+    }
+
     sub _typedata {
         my ($self, $types, @path) = @_;
 
@@ -609,7 +615,7 @@ use 5.010;
     sub clr_sfield_set {
         my ($self, $f) = @_;
         my ($val) = $self->_popn(1);
-        $self->_emit("$f = $val");
+        $self->_emit($self->_striptype($f) . " = $val");
     }
 
     sub attr_var {

@@ -59,7 +59,33 @@ sub run {
 
     $unit->visit_local_subs_preorder(\&fill_sub);
 
-    +{ thaw => \@thaw, decls => \@decls, peers => \%peers, cgs => \@cgs };
+    my $mod = '';
+    $mod .= <<EOH ;
+using Niecza;
+using System;
+using System.Collections.Generic;
+
+public class ${\ $unit->name } {
+    public static void Main() {
+        Kernel.RunLoop(new SubInfo("boot", BOOT));
+    }
+
+EOH
+
+    push @thaw, CgOp::subcall(CgOp::rawsget($peers{$unit->mainline}{ps}));
+    push @thaw, CgOp::return;
+
+    for (@decls) {
+        /(?:.*?\.)?(.*):f,(.*)/;
+        $mod .= "    public static $2 $1;\n";
+    }
+
+    $mod .= CodeGen->new(csname => 'BOOT',
+        ops => CgOp::prog(@thaw)->cps_convert(0))->csharp;
+    $mod .= $_ for (@cgs);
+    $mod .= "}\n";
+
+    +{ mod => $mod, peers => \%peers };
 }
 
 sub head_stash {
@@ -180,7 +206,7 @@ sub codegen_sub {
 
     local %haslet;
     resolve_lex($_, $ops);
-    CodeGen->new(csname => $peers{$_}{cbase}, ops => $ops);
+    CodeGen->new(csname => $peers{$_}{cbase}, ops => $ops->cps_convert(0));
 }
 
 # lumped under a sub are all the static-y lexicals
@@ -208,7 +234,7 @@ sub head_sub {
     push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',
             CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
                 CgOp::rawsget($peers{$_->outer}{pp})),
-            CgOp::null('Frame'), CgOp::rawsget($si)));
+            CgOp::rawsget($si)));
     push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
         CgOp::rawnew('Dictionary<string,object>'));
 

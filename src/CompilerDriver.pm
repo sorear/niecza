@@ -228,22 +228,12 @@ sub compile {
         [ 'begin', sub { $ast = $ast->begin } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'csharp', sub { $ast = CSharpBackend::run($ast) } ],
-        [ 'extract_scopes', sub { $ast->extract_scopes } ],
-        [ 'to_cgop', sub { $ast->to_cgop } ],
-        [ 'resolve_lex', sub { ResolveLex::run($ast) } ],
-        [ 'to_anf', sub { $ast->to_anf } ],
         [ 'writecs', sub {
 
-            open ::NIECZA_OUT, ">", $csfile;
-            binmode ::NIECZA_OUT, ":utf8";
-            print ::NIECZA_OUT <<EOH;
-using System;
-using System.Collections.Generic;
-using Niecza;
-
-EOH
-            $ast->write;
-            close ::NIECZA_OUT;
+            open my $fh, ">", $csfile;
+            binmode $fh, ":utf8";
+            print $fh $ast->{mod};
+            close $fh;
             if (defined $name) {
                 my $blk = { setting => $::SETTING_RESUME,
                             deps    => \%::UNITDEPSTRANS,
