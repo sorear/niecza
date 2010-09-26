@@ -49,15 +49,13 @@ sub run {
     local @decls;
     local @cgs;
 
-    # First, set up all the objects
-    # Then, fill them out
-    # this makes reference loops work.
+    $unit->visit_local_stashes(\&stash0);
+    $unit->visit_local_packages(\&pkg0);
+    $unit->visit_local_subs_preorder(\&sub0);
 
-    $unit->visit_local_stashes(\&head_stash);
-    $unit->visit_local_packages(\&head_pkg);
-    $unit->visit_local_subs_preorder(\&head_sub);
+    $unit->visit_local_subs_preorder(\&sub1);
 
-    $unit->visit_local_subs_preorder(\&fill_sub);
+    $unit->visit_local_subs_preorder(\&sub2);
 
     my $mod = '';
     $mod .= <<EOH ;
@@ -88,13 +86,13 @@ EOH
     +{ mod => $mod, peers => \%peers };
 }
 
-sub head_stash {
+sub stash0 {
     my $p = $peers{$_} = gsym($st_ty, 'STASH');
     push @decls, $p;
     push @thaw, CgOp::rawsset($p, CgOp::rawnew($st_ty));
 }
 
-sub head_pkg {
+sub pkg0 {
     return unless $_->isa('Metamodel::Class');
     my $p   = $peers{$_}{mo} = gsym($cl_ty, $_->name);
     my $whv = $peers{$_}{what_var} = gsym('Variable', $_->name . '_WHAT');
@@ -120,7 +118,36 @@ sub head_pkg {
 }
 
 sub enter_code {
-    ();
+    my ($body) = @_;
+    my @code;
+    for my $ln (sort keys %{ $body->lexicals }) {
+        my $lx = $body->lexicals->{$ln};
+
+        if ($lx->isa('Metamodel::Lexical::SubDef')) {
+            push @code, CgOp::Primitive->new(op => [ rtpadput => 0, $ln ],
+                zyg => [ CgOp::newscalar(CgOp::rawscall('Kernel.MakeSub',
+                            CgOp::rawsget($peers{$lx->body}{si}),
+                            CgOp::callframe)) ]);
+        } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
+            my $frag;
+            next if $lx->noinit;
+            if ($lx->hash || $lx->list) {
+                # XXX should be SAFE::
+                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->referent;
+                my $var = $peers{$imp->obj}{what_var};
+                $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
+            } else {
+                $frag = CgOp::newblankrwscalar;
+            }
+            push @code, CgOp::Primitive->new(op => [ rtpadput => 0, $ln ],
+                zyg => [ $frag ]);
+        }
+    }
+
+    if (defined $body->signature) {
+        push @code, $body->signature->binder($body);
+    }
+    @code;
 }
 
 sub access_lex {
@@ -206,18 +233,34 @@ sub codegen_sub {
 
     local %haslet;
     resolve_lex($_, $ops);
-    CodeGen->new(csname => $peers{$_}{cbase}, ops => $ops->cps_convert(0));
+    CodeGen->new(csname => $peers{$_}{cbase}, ops => $ops->cps_convert(0),
+        usednamed => 1);
 }
 
 # lumped under a sub are all the static-y lexicals
 # protopads and proto-sub-instances need to exist early because methods, in
 # particular, bind to them
 # note: preorder
-sub head_sub {
+sub sub0 {
     my $node = ($peers{$_} = {});
-    my $si = $node->{si} = gsym($si_ty, $_->name);
+    push @decls, ($node->{si} = gsym($si_ty, $_->name));
+    push @decls, ($node->{ps} = gsym('IP6', $_->name . 'PS'));
+    push @decls, ($node->{pp} = gsym('Frame', $_->name . 'PP'));
     @$node{'cref','cbase'} = gsym('DynBlockDelegate', $_->name . 'C');
-    push @decls, $si;
+
+    for my $ln (sort keys %{ $_->lexicals }) {
+        my $lx = $_->lexicals->{$ln};
+
+        if ($lx->isa('Metamodel::Lexical::Common')) {
+            my $bv = $peers{$lx} = gsym('BValue', $lx->name);
+            push @decls, $bv;
+        }
+    }
+}
+
+sub sub1 {
+    my $node = $peers{$_};
+    my $si = $node->{si};
 
     my $cg = codegen_sub($_);
 
@@ -229,8 +272,7 @@ sub head_sub {
 
     push @cgs, $cg->csharp;
 
-    my $pp = $node->{pp} = gsym('Frame', $_->name . 'PP');
-    push @decls, $pp;
+    my $pp = $node->{pp};
     push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',
             CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
                 CgOp::rawsget($peers{$_->outer}{pp})),
@@ -238,24 +280,14 @@ sub head_sub {
     push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
         CgOp::rawnew('Dictionary<string,object>'));
 
-    my $ps = $node->{ps} = gsym('IP6', $_->name . 'PS');
-    push @decls, $ps;
+    my $ps = $node->{ps};
     push @thaw, CgOp::rawsset($ps, CgOp::rawscall('Kernel.MakeSub',
             CgOp::rawsget($si), !$_->outer ? CgOp::null('Frame') :
                 CgOp::rawsget($peers{$_->outer}{pp})));
-
-    for my $ln (keys %{ $_->lexicals }) {
-        my $lx = $_->lexicals->{$ln};
-
-        if ($lx->isa('Metamodel::Lexical::Common')) {
-            my $bv = $peers{$lx} = gsym('BValue', $lx->name);
-            push @decls, $bv;
-        }
-    }
 }
 
-sub fill_sub {
-    for my $ln (keys %{ $_->lexicals }) {
+sub sub2 {
+    for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
         my $frag;
 

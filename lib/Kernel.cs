@@ -976,6 +976,8 @@ slow:
             return sb.ToString();
         }
 
+        private static bool in_unhandled;
+
         // exception processing goes in two stages
         // 1. find the correct place to unwind to, calling CATCH filters
         // 2. unwind, calling LEAVE functions
@@ -999,9 +1001,19 @@ slow:
             }
 
             if (unf == null) {
-                object mp = (type == SubInfo.ON_DIE) ? payload :
+                Variable mp = (type == SubInfo.ON_DIE) ? ((Variable)payload) :
                     BoxAny("Unhandled control operator: " +
                             SubInfo.DescribeControl(type, tgt, lid, name), StrP);
+                if (in_unhandled) {
+                    Console.Error.WriteLine("Double fault {0}", type);
+                    DynObject dob = mp.Fetch() as DynObject;
+                    if (dob != null && dob.slots.Length != 0 &&
+                            dob.slots[0] is string) {
+                        Console.Error.WriteLine(dob.slots[0]);
+                    }
+                    Environment.Exit(1);
+                }
+                in_unhandled = true;
                 Frame r = new Frame(th, null, UnhandledSI);
                 r.lex0 = mp;
                 return r;
