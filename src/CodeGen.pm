@@ -198,8 +198,11 @@ use 5.010;
         }
     }
 
+    has ops       => (is => 'ro', required => 1);
     has csname    => (isa => 'Str', is => 'ro');
-    has entry     => (isa => 'Bool', is => 'ro', default => 0);
+    has minlets   => (isa => 'Int', is => 'ro', default => 0);
+    has usednamed => (isa => 'Bool', is => 'ro', default => 0);
+
     has depth     => (isa => 'Int', is => 'rw', default => 0);
     has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
     has savedepth => (isa => 'Int', is => 'rw', default => 0);
@@ -210,7 +213,6 @@ use 5.010;
     has stackterm => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has resulttype =>(isa => 'Maybe[Str]', is => 'rw', default => '');
     has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
-    has lex2type  => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
     has outcap    => (isa => 'Bool', is => 'rw', default => 0);
@@ -218,17 +220,11 @@ use 5.010;
     has letstack  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has lettypes  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has numlets   => (isa => 'Int', is => 'rw', default => 0);
-    has minlets   => (isa => 'Int', is => 'ro', default => 0);
-    has usednamed => (isa => 'Bool', is => 'ro', default => 0);
-    has body      => (isa => 'Body', is => 'ro');
-    has bodies    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has consttab  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has ehspans   => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has ehlabels  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
     has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
-
-    has ops => (is => 'ro', required => 1);
 
     # These are the sub-primitives.  Their very inteface exposes volatile
     # details of the codegen.
@@ -420,17 +416,6 @@ use 5.010;
         }
         push @{ $self->ehspans }, "\@\@L$ls", "\@\@L$le", $type,
             "\@\@L$lg", $lid;
-    }
-
-    sub rawlexget {
-        my ($self, $name) = @_;
-        $self->_push("object", "th.lex[" . qm($name) . "]");
-        $self->cast($self->lex2type->{$name}[0]);
-    }
-
-    sub rawlexput {
-        my ($self, $name) = @_;
-        $self->_emit("th.lex[" . qm($name) . "] = " . ($self->_popn(1))[0]);
     }
 
     sub hintget {
@@ -722,148 +707,52 @@ use 5.010;
         $self->_push($ty, $ty eq 'Int32' ? "0" : "null");
     }
 
-    sub close_sub {
-        my ($self, $body, $withclass) = @_;
-
-        $self->_emit($body->csname . "_info.PutHint(\"?file\", " . qm($body->file) . ")") if $body->type eq 'mainline';
-        my $ob = $self->bodies->[-2];
-        if ($ob) {
-            $self->_emit($body->csname . "_info.outer = " . $ob->csname . "_info");
-        }
-        if ($withclass) {
-            my ($cl) = $self->_popn(1);
-            $self->_emit($body->csname . "_info.mo = ((DynObject)$cl).klass");
-        }
-
-        $self->drop_let('protopad') if $body->needs_protopad;
-        pop @{ $self->bodies };
-    }
-
-    sub sub_obj {
-        my ($self, $bodyname) = @_;
-        $self->callframe;
-        my ($op) = $self->_popn(1);
-        $self->_push('IP6', "Kernel.MakeSub(${bodyname}_info, $op)");
-    }
-
-    sub proto_var {
-        my ($self, $name) = @_;
-        my ($type, $kind, $data) = @{ $self->bodies->[-1]->lexical->{$name} };
-        if (($kind == 4 || $kind == 0) && !$self->bodies->[-1]->needs_protopad) {
-            # XXX this isn't the right way
-            $self->_popn(1);
-            return
-        }
-        if ($kind == 3) {
-            $self->clr_sfield_set($data);
-            $self->clr_sfield_get($data . ":f,IP6");
-            $self->clr_call_direct('Kernel.NewROScalar', 1);
-            $self->clr_sfield_set($data . "_var");
-            return;
-        }
-        if ($kind == 4) {
-            $self->peek_let('protopad');
-            my ($pv, $pp) = $self->_popn(2);
-            my $tag = $data > 4 ? ("lexn[" . ($data - 4) . "]") : "lex$data";
-            $self->_emit("$pp.$tag = ($pv)");
-            return;
-        }
-        if ($kind == 1) {
-            $self->clr_sfield_set($data);
-            return;
-        }
-        if ($kind == 2) {
-            my ($pv) = $self->_popn(1);
-            $self->_emit("$data.PutHint(" . qm($name) . ", $pv)");
-            return;
-        }
-        $self->peek_let('protopad');
-        my ($pv, $pp) = $self->_popn(2);
-        $self->_emit("$pp.lex[" . qm($name) . "] = ($pv)");
-    }
-
-    # XXX a bit too much integration here
-    sub set_ltm {
-        my ($self, $bodyn) = @_;
-        my ($ltm) = $self->_popn(1);
-        $self->_emit("${bodyn}_info.ltm = $ltm");
-    }
-
-    # somewhat misnamed; it generally controls the binding context in BOOT
-    sub open_protopad {
-        my ($self, $body) = @_;
-        if ($body->needs_protopad) {
-            $self->push_null('Frame');
-            $self->peek_let('protopad');
-            $self->_push('SubInfo', $body->csname . "_info");
-            $self->clr_new('Frame', 3);
-            $self->push_let('protopad');
-            if ($body->lexical->{'?usednamed'}) {
-                $self->peek_let('protopad');
-                $self->clr_new('Dictionary<string,object>', 0);
-                $self->clr_field_set('lex');
-            }
-            if ($body->lexical->{'?num_slots'} > 4) {
-                $self->peek_let('protopad');
-                $self->_push('object[]', 'new object[' . ($body->lexical->{'?num_slots'} - 4) . ']');
-                $self->clr_field_set('lexn');
-            }
-        }
-        push @{ $self->bodies }, $body;
-    }
-
     ###
 
-    sub write {
+    sub subinfo_ctor_args {
+        my ($self, $outersi, $ltm) = @_;
+        for (@{ $self->buffer }, @{ $self->consttab }, @{ $self->ehspans }) {
+            s/\@\@L(\w+)/$self->labelname->{$1}/eg;
+        }
+        (CgOp::clr_string("$::UNITNAME " . $self->csname),
+         CgOp::rawnewarr('int', map { CgOp::int($_//0) } @{ $self->lineinfo }),
+         CgOp::rawsget($self->csname . ':f,DynBlockDelegate'),
+         $outersi, $ltm,
+         CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->ehspans }),
+         (@{ $self->ehlabels } ? CgOp::rawnewarr('string',
+              map { CgOp::clr_string($_) } @{ $self->ehlabels }) :
+              CgOp::null('string[]')));
+    }
+
+    sub csharp {
         my ($self) = @_;
-        if ($self->body) {
-            my $l = $self->body->lexical;
-            for my $ve (sort keys %$l) {
-                next unless ref $l->{$ve} eq 'ARRAY';
-                my ($ty, $k, $d) = @{ $l->{$ve} };
-                if ($k == 1) {
-                    $d =~ s/.*\.//;
-                    print ::NIECZA_OUT " " x 4, "public static $ty $d;\n";
-                } elsif ($k == 3) {
-                    $d =~ s/.*\.//;
-                    print ::NIECZA_OUT " " x 4, "public static IP6 $d;\n";
-                    print ::NIECZA_OUT " " x 4, "public static Variable ${d}_var;\n";
-                }
-            }
-        }
+        my $t = '';
         my $name = $self->csname;
-        my $vis  = ($self->entry ? 'public' : 'private');
-        print ::NIECZA_OUT " " x 4, "$vis static Frame $name(Frame th) {\n";
+        $t .= " " x 4 . "private static Frame $name(Frame th) {\n";
         if ($self->outcap) {
-            print ::NIECZA_OUT " " x 8, "IP6 _inv; List<Variable> _pos; Dictionary<string,Variable> _nam;\n";
+            $t .= " " x 8 . "IP6 _inv; List<Variable> _pos; Dictionary<string,Variable> _nam;\n";
         }
-        print ::NIECZA_OUT " " x 8, "switch (th.ip) {\n";
-        print ::NIECZA_OUT " " x 12, "case 0:\n";
+        $t .= " " x 8 . "switch (th.ip) {\n";
+        $t .= " " x 12 . "case 0:\n";
         if ($self->numlets + $self->minlets > 4) {
-            print ::NIECZA_OUT " " x 16, "th.lexn = new object[",
-                ($self->numlets + $self->minlets - 4), "];\n";
+            $t .= " " x 16 . "th.lexn = new object[" .
+                ($self->numlets + $self->minlets - 4) . "];\n";
         }
         if ($self->usednamed) {
-            print ::NIECZA_OUT " " x 16, "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
+            $t .= " " x 16 . "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
         }
         for (@{ $self->buffer }, @{ $self->consttab }, @{ $self->ehspans }) {
             s/\@\@L(\w+)/$self->labelname->{$1}/eg;
         }
-        print ::NIECZA_OUT " " x 12, $_ for @{ $self->buffer };
-        print ::NIECZA_OUT " " x 12, "default:\n";
-        print ::NIECZA_OUT " " x 16, "throw new Exception(\"Invalid IP\");\n";
-        print ::NIECZA_OUT " " x 8, "}\n";
-        print ::NIECZA_OUT " " x 4, "}\n";
-        print ::NIECZA_OUT " " x 4, "private static int[] ${name}_lines = {",
-            join (", ", map { ($_ // 0) } @{ $self->lineinfo }), "};\n";
-        my $ehs = "new int[] { " . join(", ", @{ $self->ehspans }) . " }";
-        my $els = @{ $self->ehlabels } ? ("new string[] { " .
-            join(", ", map { ::qm($_) } @{ $self->ehlabels }) . " }") : "null";
-        print ::NIECZA_OUT " " x 4, "private static SubInfo ${name}_info = ",
-            "new SubInfo(\"$::UNITNAME ${name}\", ${name}_lines, ${name}, null, null, null, $ehs, $els);\n";
+        $t .= " " x 12 . $_ for @{ $self->buffer };
+        $t .= " " x 12 . "default:\n";
+        $t .= " " x 16 . "return Kernel.Die(th, \"Invalid IP\");\n";
+        $t .= " " x 8 . "}\n";
+        $t .= " " x 4 . "}\n";
         for (@{ $self->consttab }) {
-            print ::NIECZA_OUT " " x 4, "private static $_;\n";
+            $t .= " " x 4 . "private static $_;\n";
         }
+        $t;
     }
 
     sub BUILD {

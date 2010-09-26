@@ -5,71 +5,68 @@ use utf8;
 
 package ResolveLex;
 
+our %haslet;
+our $body;
+
 sub run {
-    my ($unit) = @_;
+    my ($ops, $tbody) = @_;
 
-    run_body($unit->mainline);
-    run_cgop($unit->bootcgop, []);
-}
-
-sub run_body {
-    my ($body) = @_;
-
-    for my $d (@{ $body->decls }) {
-        for my $b ($d->bodies) {
-            run_body($b);
-        }
-    }
-
-    local %::haslet;
-    run_cgop($body->cgoptree, [ $body ]);
+    local %haslet;
+    local $body = $tbody;
+    run_cgop($ops);
 }
 
 sub run_cgop {
-    my ($op, $btree) = @_;
-    my $lvl = scalar @$btree;
-
-    if ($op->isa('CgOp::Let')) {
-        local $::haslet{$op->name} = 1;
-        run_cgop($_, $btree) for @{ $op->zyg };
-    } else {
-        run_cgop($_, $btree) for @{ $op->zyg };
-    }
+    my ($op) = @_;
 
     if ($op->isa('CgOp::Primitive')) {
         my ($opc, $arg, @rest) = @{ $op->op };
-        if ($opc eq 'open_protopad') {
-            push @$btree, $arg;
-        } elsif ($opc eq 'close_sub') {
-            pop @$btree;
-        } elsif ($opc eq 'clr_call_virt' && $arg eq 'Fetch' &&
+        if ($opc eq 'clr_call_virt' && $arg eq 'Fetch' &&
                 $op->zyg->[0]->isa('CgOp::Primitive') &&
-                $op->zyg->[0]->op->[0] eq 'clr_sfield_get' &&
-                $op->zyg->[0]->op->[1] =~ /(.*)_var:f,Variable/) {
-            my $nn = CgOp::rawsget($1 . ":f,IP6");
+                $op->zyg->[0]->op->[0] eq 'scopelex') {
+            my $nn = resolve_lex($arg, $op->zyg->[0], undef, 1);
             %$op = %$nn;
             bless $op, ref($nn);
         } elsif ($opc eq 'scopelex') {
-            my $nn = resolve_lex($arg, $btree->[-1], $op->zyg->[0]);
+            my $nn = resolve_lex($arg, $op->zyg->[0]);
             #XXX
             %$op = %$nn;
             bless $op, ref($nn);
         }
     }
+
+    if ($op->isa('CgOp::Let')) {
+        local $::haslet{$op->name} = 1;
+        run_cgop($_) for @{ $op->zyg };
+    } else {
+        run_cgop($_) for @{ $op->zyg };
+    }
+}
+
+sub _dofetch {
+    my ($fetch, $x) = @_;
+    $fetch ? CgOp::fetch($x) : $x;
 }
 
 sub resolve_lex {
-    my ($name, $body, $set_to) = @_;
+    my ($name, $set_to, $pad, $fetch) = @_;
 
-    if ($::haslet{$name}) {
-        return CgOp::letvar($name, $set_to);
+    if ($haslet{$name}) {
+        return _dofetch($fetch, CgOp::letvar($name, $set_to));
     }
 
-    my ($order, $type, $kind, $data) = $body->lex_info($name);
-    if ($order < 0) {
+    my $lex = $body->find_lex($name);
+    return undef;
+
+=for comment
+
+    if (!defined($lex)) {
         #print STDERR YAML::XS::Dump ($body);
         die "Internal error: failed to resolve lexical $name in " . $body->name;
     }
+
+    if ($lex->isa('Metamodel::Lexical::Simple')) {
+        x$CSharpBackend::peers{$lex}
 
     if (($kind =~ /[1235]/) && $data =~ /(.*)\./) {
         $::UNITREFS{$1} = 1;
@@ -119,6 +116,9 @@ sub resolve_lex {
     } else {
         die "panic: invalid kind $kind";
     }
+
+=cut
+
 }
 
 1;

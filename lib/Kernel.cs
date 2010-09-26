@@ -194,12 +194,10 @@ namespace Niecza {
         }
 
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
-                SubInfo outer, Dictionary<string,object> hints, LAD ltm,
-                int[] edata, string[] label_names) {
+                SubInfo outer, LAD ltm, int[] edata, string[] label_names) {
             this.lines = lines;
             this.code = code;
             this.outer = outer;
-            this.hints = hints;
             this.ltm = ltm;
             this.name = name;
             this.edata = edata;
@@ -207,7 +205,7 @@ namespace Niecza {
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
-            this(name, null, code, null, null, null, new int[0], null) { }
+            this(name, null, code, null, null, new int[0], null) { }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time

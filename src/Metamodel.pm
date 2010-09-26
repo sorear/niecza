@@ -293,6 +293,8 @@ our $unit;
     has initq    => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
         default => sub { [] });
 
+    # inject a take EMPTY
+    has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[Metamodel::Package]', is => 'ro');
     has cur_pkg  => (isa => 'Metamodel::Stash', is => 'ro');
@@ -489,6 +491,7 @@ sub Body::begin {
         augmenting => $args{augmenting},
         name       => $self->name,
         returnable => $self->returnable,
+        gather_hack=> $args{gather_hack},
         class      => $self->class,
         run_once   => $args{once} && (!defined($top) || $top->run_once));
 
@@ -615,7 +618,7 @@ sub Op::BareBlock::begin {
 
 sub Op::Gather::begin {
     my $self = shift;
-    my $body = $self->body->begin;
+    my $body = $self->body->begin(gather_hack => 1);
     $opensubs[-1]->add_my_sub($self->var, $body);
     delete $self->{$_} for (qw( body ));
 }
