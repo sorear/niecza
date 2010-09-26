@@ -27,6 +27,7 @@ our $nid = 0;
 our @decls;
 our @thaw;
 our @cgs;
+our %haslet;
 
 sub gsym {
     my ($type, $desc) = @_;
@@ -96,6 +97,71 @@ sub enter_code {
     ();
 }
 
+sub access_lex {
+    my ($body, $name, $set_to) = @_;
+
+    if ($haslet{$name}) {
+        return CgOp::letvar($name, $set_to);
+    }
+
+    my $bp = $body;
+    my $order = 0;
+    my $lex;
+    while ($bp) {
+        $lex = $bp->lexicals->{$name};
+        if (!$lex) {
+            $bp = $bp->outer;
+            $order++;
+        } elsif ($lex->isa('Metamodel::Lexical::Alias')) {
+            $name = $lex->to;
+        } else {
+            last;
+        }
+    }
+
+    if (!defined($lex)) {
+        die "Internal error: failed to resolve lexical $name in " . $body->name;
+    }
+
+    if ($lex->isa('Metamodel::Lexical::SubDef') ||
+            $lex->isa('Metamodel::Lexical::Simple')) {
+        return $set_to ?
+            CgOp::Primitive->new(op => [ rtpadput => $order, $name ],
+                zyg => [ $set_to ]) :
+            CgOp::Primitive->new(op => [ rtpadget => 'Variable',$order,$name ]);
+    } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
+        die "cannot rebind stashes" if $set_to;
+        return CgOp::rawsget($peers{$lex->referent}{what_var});
+    } elsif ($lex->isa('Metamodel::Lexical::Common')) {
+        return $set_to ?
+            CgOp::bset(CgOp::rawsget($peers{$lex}), $set_to) :
+            CgOp::bget(CgOp::rawsget($peers{$lex}));
+    } else {
+        die "unhandled $lex";
+    }
+}
+
+sub resolve_lex {
+    my ($body, $op) = @_;
+
+    if ($op->isa('CgOp::Primitive')) {
+        my ($opc, $arg, @rest) = @{ $op->op };
+        if ($opc eq 'scopelex') {
+            my $nn = access_lex($body, $arg, $op->zyg->[0]);
+            #XXX
+            %$op = %$nn;
+            bless $op, ref($nn);
+        }
+    }
+
+    if ($op->isa('CgOp::Let')) {
+        local $haslet{$op->name} = 1;
+        resolve_lex($body, $_) for @{ $op->zyg };
+    } else {
+        resolve_lex($body, $_) for @{ $op->zyg };
+    }
+}
+
 sub codegen_sub {
     my @enter = enter_code($_);
     my $ops;
@@ -112,11 +178,8 @@ sub codegen_sub {
         $ops = CgOp::prog(@enter, CgOp::return($_->code->cgop));
     }
 
-    #my $rec; local $rec = sub {
-    #    x
-    #};
-    #$rec->($ops);
-    $ops = CgOp::return(CgOp::newblankrwscalar);
+    local %haslet;
+    resolve_lex($_, $ops);
     CodeGen->new(csname => $peers{$_}{cbase}, ops => $ops);
 }
 
@@ -130,13 +193,15 @@ sub head_sub {
     @$node{'cref','cbase'} = gsym('DynBlockDelegate', $_->name . 'C');
     push @decls, $si;
 
-    my $cg = $node->{cg} = codegen_sub($_);
+    my $cg = codegen_sub($_);
 
     push @thaw, CgOp::rawsset($si, CgOp::rawnew($si_ty,
             $cg->subinfo_ctor_args(
                 ($_->outer ? CgOp::rawsget($peers{$_->outer}{si}) :
                     CgOp::null('SubInfo')),
                 CgOp::null('LAD'))));
+
+    push @cgs, $cg->csharp;
 
     my $pp = $node->{pp} = gsym('Frame', $_->name . 'PP');
     push @decls, $pp;
