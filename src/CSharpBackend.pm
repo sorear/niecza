@@ -22,11 +22,11 @@ package CSharpBackend;
 # generation & indexification
 
 our $unit;
-our %peers;
 our $nid = 0;
 our @decls;
 our @thaw;
 our @cgs;
+our %lpeers;
 our %haslet;
 our $libmode;
 
@@ -44,19 +44,22 @@ my $si_ty = 'SubInfo';
 
 sub run {
     local $unit = shift;
-    local %peers;
+    local $libmode = $unit->name ne 'MAIN';
+    local %lpeers;
     local $nid = 0;
     local @thaw;
     local @decls;
     local @cgs;
 
-    $unit->visit_local_stashes(\&stash0);
+    # 0s just set up variables
+    # 1s set up subs
+    # 2s set up objects
+    # 3s set up relationships
+
     $unit->visit_local_packages(\&pkg0);
     $unit->visit_local_subs_preorder(\&sub0);
 
     $unit->visit_local_subs_preorder(\&sub1);
-
-    $unit->visit_local_subs_preorder(\&sub2);
 
     my $mod = '';
     $mod .= <<EOH ;
@@ -65,40 +68,73 @@ using System;
 using System.Collections.Generic;
 
 public class ${\ $unit->name } {
+EOH
+    $mod .= <<EOM unless $libmode ;
     public static void Main() {
         Kernel.RunLoop(new SubInfo("boot", BOOT));
     }
 
-EOH
-
-    push @thaw, CgOp::subcall(CgOp::rawsget($peers{$unit->mainline}{ps}));
-    push @thaw, CgOp::return;
+EOM
 
     for (@decls) {
         /(?:.*?\.)?(.*):f,(.*)/;
         $mod .= "    public static $2 $1;\n";
     }
 
-    $mod .= CodeGen->new(csname => 'BOOT',
-        ops => CgOp::prog(@thaw)->cps_convert(0))->csharp;
+    unless ($libmode) {
+        $unit->visit_units_preorder(sub {
+            $_->visit_local_packages(\&pkg2);
+            $_->visit_local_stashes(\&stash2);
+            $_->visit_local_subs_preorder(\&sub2);
+
+            $_->visit_local_subs_preorder(\&sub3);
+
+            return if $_->bottom_ref;
+
+            my $s = $_->setting;
+            my $m = $_->mainline;
+            while ($s) {
+                my $su = $unit->get_unit($s);
+                push @thaw, CgOp::setindex("*resume_$s",
+                    CgOp::getfield("lex", CgOp::callframe),
+                    CgOp::newscalar(CgOp::rawsget($m->{peer}{ps})));
+                $s = $su->setting;
+                $m = $su->mainline;
+            }
+            push @thaw, CgOp::subcall(CgOp::rawsget($m->{peer}{ps}));
+        });
+        push @thaw, CgOp::return;
+
+        $mod .= CodeGen->new(csname => 'BOOT', usednamed => 1,
+            ops => CgOp::prog(@thaw)->cps_convert(0))->csharp;
+    }
+
     $mod .= $_ for (@cgs);
     $mod .= "}\n";
 
-    +{ mod => $mod, peers => \%peers };
+    $unit->{mod} = $mod;
+    $unit;
 }
 
-sub stash0 {
-    my $p = $peers{$_} = gsym($st_ty, 'STASH');
+sub stash2 {
+    my $p = $lpeers{$_} = gsym($st_ty, 'STASH');
     push @decls, $p;
     push @thaw, CgOp::rawsset($p, CgOp::rawnew($st_ty));
 }
 
 sub pkg0 {
     return unless $_->isa('Metamodel::Class');
-    my $p   = $peers{$_}{mo} = gsym($cl_ty, $_->name);
-    my $whv = $peers{$_}{what_var} = gsym('Variable', $_->name . '_WHAT');
-    my $wh6 = $peers{$_}{what_ip6} = gsym('IP6', $_->name . '_WHAT');
-    push @decls, $p;
+    my $p   = $_->{peer}{mo} = gsym($cl_ty, $_->name);
+    my $whv = $_->{peer}{what_var} = gsym('Variable', $_->name . '_WHAT');
+    my $wh6 = $_->{peer}{what_ip6} = gsym('IP6', $_->name . '_WHAT');
+    push @decls, $p, $whv, $wh6;
+}
+
+sub pkg2 {
+    return unless $_->isa('Metamodel::Class');
+    my $p   = $_->{peer}{mo};
+    my $whv = $_->{peer}{what_var};
+    my $wh6 = $_->{peer}{what_ip6};
     if ($unit->is_true_setting && ($_->name eq 'Scalar' ||
             $_->name eq 'Sub')) {
         push @thaw, CgOp::rawsset($p,
@@ -113,7 +149,7 @@ sub pkg0 {
     }
     for my $s (@{ $_->superclasses }) {
         push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddSuperclass',
-            CgOp::rawsget($peers{$s}{mo}));
+            CgOp::rawsget($s->{peer}{mo}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Complete');
 }
@@ -127,15 +163,16 @@ sub enter_code {
         if ($lx->isa('Metamodel::Lexical::SubDef')) {
             push @code, CgOp::Primitive->new(op => [ rtpadput => 0, $ln ],
                 zyg => [ CgOp::newscalar(CgOp::rawscall('Kernel.MakeSub',
-                            CgOp::rawsget($peers{$lx->body}{si}),
+                            CgOp::rawsget($lx->body->{peer}{si}),
                             CgOp::callframe)) ]);
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             my $frag;
             next if $lx->noinit;
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
-                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->referent;
-                my $var = $peers{$imp->obj}{what_var};
+                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
+                my $var = $unit->deref($unit->get_stash($$imp)->obj)
+                    ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {
                 $frag = CgOp::newblankrwscalar;
@@ -185,11 +222,13 @@ sub access_lex {
             CgOp::Primitive->new(op => [ rtpadget => 'Variable',$order,$name ]);
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
-        return CgOp::rawsget($peers{$lex->referent}{what_var});
+        my $pkg = $unit->deref($unit->get_stash(@{ $lex->path })->obj);
+        return $pkg->{peer} ? CgOp::rawsget($pkg->{peer}{what_var}) :
+            CgOp::null('Variable');
     } elsif ($lex->isa('Metamodel::Lexical::Common')) {
         return $set_to ?
-            CgOp::bset(CgOp::rawsget($peers{$lex}), $set_to) :
-            CgOp::bget(CgOp::rawsget($peers{$lex}));
+            CgOp::bset(CgOp::rawsget($lex->{peer}), $set_to) :
+            CgOp::bget(CgOp::rawsget($lex->{peer}));
     } else {
         die "unhandled $lex";
     }
@@ -234,7 +273,7 @@ sub codegen_sub {
 
     local %haslet;
     resolve_lex($_, $ops);
-    CodeGen->new(csname => $peers{$_}{cbase}, ops => $ops->cps_convert(0),
+    CodeGen->new(csname => $_->{peer}{cbase}, ops => $ops->cps_convert(0),
         usednamed => 1);
 }
 
@@ -243,7 +282,7 @@ sub codegen_sub {
 # particular, bind to them
 # note: preorder
 sub sub0 {
-    my $node = ($peers{$_} = {});
+    my $node = ($_->{peer} = {});
     push @decls, ($node->{si} = gsym($si_ty, $_->name));
     push @decls, ($node->{ps} = gsym('IP6', $_->name . 'PS'));
     push @decls, ($node->{pp} = gsym('Frame', $_->name . 'PP'));
@@ -253,30 +292,35 @@ sub sub0 {
         my $lx = $_->lexicals->{$ln};
 
         if ($lx->isa('Metamodel::Lexical::Common')) {
-            my $bv = $peers{$lx} = gsym('BValue', $lx->name);
+            my $bv = $lx->{peer} = gsym('BValue', $lx->name);
             push @decls, $bv;
         }
     }
 }
 
 sub sub1 {
-    my $node = $peers{$_};
+    my $node = $_->{peer};
     my $si = $node->{si};
 
     my $cg = codegen_sub($_);
-
-    push @thaw, CgOp::rawsset($si, CgOp::rawnew($si_ty,
-            $cg->subinfo_ctor_args(
-                ($_->outer ? CgOp::rawsget($peers{$_->outer}{si}) :
-                    CgOp::null('SubInfo')),
-                CgOp::null('LAD'))));
+    $node->{sictor} = [ $cg->subinfo_ctor_args(
+            ($_->outer ? CgOp::rawsget($_->outer->{peer}{si}) :
+                CgOp::null('SubInfo')),
+            CgOp::null('LAD')) ];
 
     push @cgs, $cg->csharp;
+}
+
+sub sub2 {
+    my $node = $_->{peer};
+    my $si = $node->{si};
+
+    push @thaw, CgOp::rawsset($si, CgOp::rawnew($si_ty, @{ $node->{sictor} }));
 
     my $pp = $node->{pp};
     push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',
             CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
-                CgOp::rawsget($peers{$_->outer}{pp})),
+                CgOp::rawsget($_->outer->{peer}{pp})),
             CgOp::rawsget($si)));
     push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
         CgOp::rawnew('Dictionary<string,object>'));
@@ -284,34 +328,35 @@ sub sub1 {
     my $ps = $node->{ps};
     push @thaw, CgOp::rawsset($ps, CgOp::rawscall('Kernel.MakeSub',
             CgOp::rawsget($si), !$_->outer ? CgOp::null('Frame') :
-                CgOp::rawsget($peers{$_->outer}{pp})));
+                CgOp::rawsget($_->outer->{peer}{pp})));
 }
 
-sub sub2 {
+sub sub3 {
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
         my $frag;
 
         if ($lx->isa('Metamodel::Lexical::Common')) {
-            push @thaw, CgOp::rawsset($peers{$lx},
+            push @thaw, CgOp::rawsset($lx->{peer},
                 CgOp::rawscall('Kernel.PackageLookup',
-                    CgOp::rawsget($peers{$lx->stash}),
+                    CgOp::rawsget($lpeers{$unit->get_stash($lx->path)}),
                     CgOp::clr_string($lx->name)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
             push @thaw, CgOp::setindex($ln,
-                CgOp::getfield('lex', CgOp::rawsget($peers{$_}{pp})),
-                CgOp::newscalar(CgOp::rawsget($peers{$lx->body}{ps})));
+                CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
+                CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
-                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->referent;
-                my $var = $peers{$imp->obj}{what_var};
+                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
+                my $var = $unit->deref($unit->get_stash($$imp)->obj)
+                    ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {
                 $frag = CgOp::newblankrwscalar;
             }
             push @thaw, CgOp::setindex($ln,
-                CgOp::getfield('lex', CgOp::rawsget($peers{$_}{pp})),
+                CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
                 $frag);
         }
     }

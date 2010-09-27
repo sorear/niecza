@@ -425,7 +425,8 @@ our $unit;
     has bottom_ref => (is => 'rw');
 
     has xref     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has tdeps    => (isa => 'HashRef[Metamodel::Unit]', is => 'ro');
+    has tdeps    => (isa => 'HashRef[Metamodel::Unit]', is => 'ro',
+        default => sub { +{} });
 
     has filename => (isa => 'Str', is => 'rw');
     has modtime  => (isa => 'Num', is => 'rw');
@@ -472,6 +473,20 @@ our $unit;
     sub deref {
         my ($self, $thing) = @_;
         return $self->get_unit($thing->[0])->xref->[$thing->[1]];
+    }
+
+    sub visit_units_preorder {
+        my ($self, $cb) = @_;
+        my %seen;
+        our $rec; local $rec = sub {
+            return if $seen{$_};
+            $seen{$_} = 1;
+            for (sort keys %{ $_->tdeps }) {
+                $rec->();
+            }
+            $cb->($_);
+        };
+        $rec->() for ($self);
     }
 
     sub visit_local_packages {

@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 541;
+plan 539;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -961,14 +961,9 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
         method foo { 1 }
     }
     is Foo.foo, 2, "augments run early";
-    is Any.g4077, 4077, "can augment core classes";
-    is Cool.g4077, 4077, "augments visible in subclasses";
 
     augment class Foo {
         method foo { 2 }
-    }
-    augment class Any {
-        method g4077 { 4077 }
     }
 }
 

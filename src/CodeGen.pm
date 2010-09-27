@@ -182,6 +182,10 @@ use 5.010;
     sub _typedata {
         my ($self, $types, @path) = @_;
 
+        if (!defined ($path[-1])) {
+            Carp::confess("Undefined path in _typedata");
+        }
+
         if ($path[-1] =~ /(.*):(.),(.*)/) {
             return $1, $2, $3;
         }

@@ -704,17 +704,13 @@ use warnings;
             zyg => [ @args ], is_cps_call => 1);
     }
 
-    sub fgoto {
-        my ($tgt) = @_;
-        CgOp::Primitive->new(op => [ 'goto', $_[0] ], zyg => [ $_[1] ],
-            is_cps_call => 1);
-    }
-
     sub rawsget {
+        Carp::confess "Undefined name in rawsget" unless defined $_[0];
         CgOp::Primitive->new(op => [ 'clr_sfield_get', $_[0] ]);
     }
 
     sub rawsset {
+        Carp::confess "Undefined name in rawsset" unless defined $_[0];
         CgOp::Primitive->new(op => [ 'clr_sfield_set', $_[0] ],
             zyg => [ $_[1] ]);
     }
