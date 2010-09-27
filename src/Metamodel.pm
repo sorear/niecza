@@ -50,7 +50,7 @@ our $unit;
 
     # zyg entries can point to:
     #  - other Stashes (but only in the same unit)
-    #  - StaticSub
+    #  - StaticSub (via reference)
     has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
     # not canonical, but at least usable in importers
@@ -78,7 +78,7 @@ our $unit;
         my $r = $self->zyg->{$name} //=
             Metamodel::Stash->new(parent => $self,
                 path => [ @{ $self->path }, $name ]);
-        if (!$r->isa('Metamodel::Stash')) {
+        if (!blessed($r) || !$r->isa('Metamodel::Stash')) {
             die "$name is a non-subpackage";
         }
         $r;
@@ -141,7 +141,7 @@ our $unit;
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
-    has multi_regex_lists => (isa => 'HashRef[ArrayRef[Metamodel::StaticSub]]',
+    has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
         is => 'ro', lazy => 1, default => sub { +{} });
 
     sub add_attribute {
@@ -185,7 +185,7 @@ our $unit;
     use Moose;
 
     has name => (isa => 'Str', is => 'ro');
-    has body => (isa => 'Metamodel::StaticSub', is => 'ro');
+    has body => (is => 'ro');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -282,7 +282,8 @@ our $unit;
     package Metamodel::StaticSub;
     use Moose;
 
-    has outer => (isa => 'Maybe[Metamodel::StaticSub]', is => 'ro');
+    has xid => (isa => 'Int', is => 'rw');
+    has outer => (is => 'bare');
     has run_once => (isa => 'Bool', is => 'ro', default => 0);
     has spad_exists => (isa => 'Bool', is => 'rw', default => 0);
 
@@ -290,8 +291,6 @@ our $unit;
         default => sub { +{} });
     has code     => (isa => 'Op', is => 'rw');
     has signature=> (isa => 'Maybe[Sig]', is => 'rw');
-    has initq    => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
-        default => sub { [] });
 
     # inject a take EMPTY
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
@@ -304,6 +303,12 @@ our $unit;
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
 
     has unit_closed => (isa => 'Bool', is => 'rw');
+
+    sub outer {
+        my $v = $_[0]{outer};
+        return $v if !$v or blessed($v);
+        $_[0]{unit}->deref($v);
+    }
 
     sub children {
         map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
@@ -416,6 +421,8 @@ our $unit;
         sub { Metamodel::Stash->new(path => []) });
 
     has setting  => (isa => 'Str', is => 'ro');
+    # ref to parent of Op::YouAreHere
+    has bottom_ref => (is => 'rw');
 
     has xref     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has tdeps    => (isa => 'HashRef[Metamodel::Unit]', is => 'ro');
@@ -538,7 +545,8 @@ sub Body::begin {
     my $top = @opensubs ? $opensubs[-1] : undef;
 
     my $metabody = Metamodel::StaticSub->new(
-        outer      => $top,
+        outer      => $top // ($unit->setting ?
+            $unit->get_unit($unit->setting)->bottom_ref : undef),
         body_of    => $args{body_of},
         cur_pkg    => $args{cur_pkg} // ($top ? $top->cur_pkg : [ 'GLOBAL' ]),
         augmenting => $args{augmenting},
@@ -547,6 +555,8 @@ sub Body::begin {
         gather_hack=> $args{gather_hack},
         class      => $self->class,
         run_once   => $args{once} && (!defined($top) || $top->run_once));
+
+    $unit->get_stash(@{ $metabody->cur_pkg });
 
     push @opensubs, $metabody; # always visible in the signature XXX
 
@@ -629,7 +639,7 @@ sub Op::Attribute::begin {
             code       => Op::GetSlot->new(name => $self->name,
                 object => Op::CgOp->new(optree => [ pos => 0 ])));
         $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
-        $ns->add_method($self->name, $nb);
+        $ns->add_method($self->name, $unit->make_ref($nb));
     }
 }
 
@@ -647,21 +657,25 @@ sub Op::SubDef::begin {
     my $self = shift;
     my $body = $self->body->begin;
     $opensubs[-1]->add_my_sub($self->var, $body);
-    $body->strong_used(1) if @{ $self->exports } ||
-        defined($self->method_too) || defined ($self->proto_too);
+    my $r;
+    if (@{ $self->exports } || defined($self->method_too) ||
+            defined ($self->proto_too)) {
+        $r = $unit->make_ref($body);
+        $body->strong_used(1);
+    }
     $opensubs[-1]->create_static_pad if $body->strong_used;
 
     if (defined($self->method_too)) {
         $unit->deref($opensubs[-1]->body_of)
-            ->add_method($self->method_too, $body);
+            ->add_method($self->method_too, $r);
     }
 
     if (defined($self->proto_too)) {
         $unit->deref($opensubs[-1]->body_of)
-            ->push_multi_regex($self->proto_too, $body);
+            ->push_multi_regex($self->proto_too, $r);
     }
 
-    $opensubs[-1]->add_exports($unit, $self->var, $body, $self->exports);
+    $opensubs[-1]->add_exports($unit, $self->var, $r, $self->exports);
 
     delete $self->{$_} for (qw( body method_too proto_too exports ));
 }
