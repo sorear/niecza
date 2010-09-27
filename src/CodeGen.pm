@@ -726,7 +726,7 @@ use 5.010;
         }
         (CgOp::clr_string("$::UNITNAME " . $self->csname),
          CgOp::rawnewarr('int', map { CgOp::int($_//0) } @{ $self->lineinfo }),
-         CgOp::rawsget($self->csname . ':f,DynBlockDelegate'),
+         CgOp::rawsget($::UNITNAME . '.' . $self->csname . ':f,DynBlockDelegate'),
          $outersi, $ltm,
          CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->ehspans }),
          (@{ $self->ehlabels } ? CgOp::rawnewarr('string',
@@ -738,7 +738,7 @@ use 5.010;
         my ($self) = @_;
         my $t = '';
         my $name = $self->csname;
-        $t .= " " x 4 . "private static Frame $name(Frame th) {\n";
+        $t .= " " x 4 . "public static Frame $name(Frame th) {\n";
         if ($self->outcap) {
             $t .= " " x 8 . "IP6 _inv; List<Variable> _pos; Dictionary<string,Variable> _nam;\n";
         }

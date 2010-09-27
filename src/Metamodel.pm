@@ -49,7 +49,8 @@ our $unit;
     use Moose;
 
     # zyg entries can point to:
-    #  - other Stashes (but only in the same unit)
+    #  - other Stashes (but only in the same unit; also, tree structure)
+    #  - Metamodel::Stash::Graft for class import/export
     #  - StaticSub (via reference)
     has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
@@ -65,24 +66,15 @@ our $unit;
         $self->zyg->{$name} = $sub;
     }
 
-    sub subpkg {
-        my ($self, $name) = @_;
-        $name =~ s/::$//; #XXX frontend brokenness
-        if ($name eq 'PARENT') {
-            return $self->parent // die "stash has no parent";
-        }
-        if ($name eq 'CALLER' || $name eq 'OUTER' || $name eq 'SETTING' ||
-                $name eq 'UNIT') {
-            die "$name cannot be used to descend from a package";
-        }
-        my $r = $self->zyg->{$name} //=
-            Metamodel::Stash->new(parent => $self,
-                path => [ @{ $self->path }, $name ]);
-        if (!blessed($r) || !$r->isa('Metamodel::Stash')) {
-            die "$name is a non-subpackage";
-        }
-        $r;
-    }
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package Metamodel::Stash::Graft;
+    use Moose;
+
+    has to => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -282,6 +274,7 @@ our $unit;
     package Metamodel::StaticSub;
     use Moose;
 
+    has unit => (isa => 'Metamodel::Unit', is => 'ro', weak_ref => 1);
     has xid => (isa => 'Int', is => 'rw');
     has outer => (is => 'bare');
     has run_once => (isa => 'Bool', is => 'ro', default => 0);
@@ -388,8 +381,7 @@ our $unit;
     }
 
     sub add_pkg_exports { my ($self, $unit, $name, $path2, $tags) = @_;
-        # XXX should be using unification here
-        my $thing = $unit->get_stash(@$path2);
+        my $thing = Metamodel::Stash::Graft->new(to => $path2);
         for my $tag (@$tags) {
             my $repo = $unit->get_stash(@{ $self->cur_pkg }, 'EXPORT', $tag);
             $repo->bind_name($name, $thing);
@@ -456,7 +448,27 @@ our $unit;
     sub get_stash {
         my ($self, @path) = @_;
         my $ptr = $self->sroot;
-        for (@path) { $ptr = $ptr->subpkg($_); }
+        for (@path) {
+            my $name = $_;
+            $name =~ s/:://; #XXX frontend broken
+            if ($name eq 'PARENT') {
+                $ptr = $ptr->parent // die "stash has no parent";
+            } elsif ($name eq 'CALLER' || $name eq 'OUTER' ||
+                    $name eq 'SETTING' || $name eq 'UNIT') {
+                die "$name cannot be used to descend from a package";
+            } else {
+                $ptr = $ptr->zyg->{$name} //=
+                    Metamodel::Stash->new(parent => $ptr,
+                        path => [ @{ $ptr->path }, $name ]);
+                $ptr = $self->deref($ptr) if !blessed($ptr);
+                if ($ptr->isa('Metamodel::Stash::Graft')) {
+                    $ptr = $self->get_stash(@{ $ptr->path });
+                } elsif ($ptr->isa('Metamodel::Stash')) {
+                } else {
+                    die "$name is a non-subpackage";
+                }
+            }
+        }
         $ptr;
     }
 
@@ -481,7 +493,7 @@ our $unit;
         our $rec; local $rec = sub {
             return if $seen{$_};
             $seen{$_} = 1;
-            for (sort keys %{ $_->tdeps }) {
+            for (@{ $_->tdeps }{ sort keys %{ $_->tdeps } }) {
                 $rec->();
             }
             $cb->($_);
@@ -496,9 +508,7 @@ our $unit;
 
     sub visit_local_stashes {
         my ($self, $cb) = @_;
-        my %used;
         our $rec; local $rec = sub {
-            return if $used{$_}++;
             $cb->($_);
             for (values %{ $_->zyg }) {
                 next unless $_->isa('Metamodel::Stash');
@@ -532,10 +542,45 @@ our $unit;
     sub close_unit {
         my ($self) = @_;
         $self->visit_local_subs_postorder(sub { $_->unit_closed(1) });
-        $self->visit_local_stashes(sub { $_->unit_closed(1) });
         $self->visit_local_packages(sub { $_->unit_closed(1) });
-        @{ $self->stashes  } = ();
         @{ $self->packages } = ();
+    }
+
+    sub need_unit {
+        my ($self, $u2) = @_;
+        $self->tdeps->{$u2->name} = $u2;
+        for (keys %{ $u2->tdeps }) {
+            $self->tdeps->{$_} //= $u2->tdeps->{$_};
+        }
+        our $rec; local $rec = sub {
+            my (@path) = @_;
+            my $sl = $self->get_stash(@path);
+            my $sf = $u2->get_stash(@path);
+
+            if ($sl->obj && $sf->obj) {
+                die "unification error: clashing main objects on " .
+                    join ("::", @path);
+            }
+            $sl->obj($sl->obj // $sf->obj);
+
+            for my $fk (sort keys %{ $sf->zyg }) {
+                my $fo = $sf->zyg->{$fk};
+                my $lo = $sl->zyg->{$fk};
+                if (blessed($fo) && $fo->isa('Metamodel::Stash')) {
+                    if ($lo && (!blessed($lo) || !$lo->isa('Metamodel::Stash'))) {
+                        die "unification error: non-stash local, stash foreign; " . join("::", @path, $fk);
+                    }
+                    $rec->(@path, $fk);
+                } else {
+                    if ($lo && blessed($lo) && $lo->isa('Metamodel::Stash')) {
+                        die "unification error: stash local, non=stash foreign; " . join("::", @path, $fk);
+                    }
+
+                    $sl->bind_name($fk, $fo);
+                }
+            }
+        };
+        $rec->();
     }
 
     no Moose;
@@ -549,10 +594,14 @@ our $unit;
 
 sub Unit::begin {
     my $self = shift;
-    local $unit = Metamodel::Unit->new(name => $self->name);
+    local $unit = Metamodel::Unit->new(name => $self->name,
+        $::SETTING_UNIT ? (setting => $::SETTING_UNIT->name) : ());
+
+    $unit->need_unit($::SETTING_UNIT) if $::SETTING_UNIT;
 
     local @opensubs;
-    $unit->mainline($self->mainline->begin(once => 1));
+    $unit->mainline($self->mainline->begin(once => 1,
+            top => ($::SETTING_UNIT ? $::SETTING_UNIT->bottom_ref : undef)));
 
     $unit;
 }
@@ -566,6 +615,7 @@ sub Body::begin {
         $unit->deref($top);
 
     my $metabody = Metamodel::StaticSub->new(
+        unit       => $unit,
         outer      => $top,
         body_of    => $args{body_of},
         cur_pkg    => $args{cur_pkg} // (@opensubs ? $opensubs[-1]->cur_pkg :
@@ -658,6 +708,7 @@ sub Op::Attribute::begin {
     # over no variables
     if ($self->accessor) {
         my $nb = Metamodel::StaticSub->new(
+            unit       => $unit,
             outer      => $opensubs[-1],
             name       => $self->name,
             cur_pkg    => $opensubs[-1]->cur_pkg,

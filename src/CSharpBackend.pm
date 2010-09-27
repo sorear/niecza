@@ -76,11 +76,6 @@ EOH
 
 EOM
 
-    for (@decls) {
-        /(?:.*?\.)?(.*):f,(.*)/;
-        $mod .= "    public static $2 $1;\n";
-    }
-
     unless ($libmode) {
         $unit->visit_units_preorder(sub {
             $_->visit_local_packages(\&pkg2);
@@ -105,8 +100,13 @@ EOM
         });
         push @thaw, CgOp::return;
 
-        $mod .= CodeGen->new(csname => 'BOOT', usednamed => 1,
+        push @cgs, CodeGen->new(csname => 'BOOT', usednamed => 1,
             ops => CgOp::prog(@thaw)->cps_convert(0))->csharp;
+    }
+
+    for (@decls) {
+        /(?:.*?\.)?(.*):f,(.*)/;
+        $mod .= "    public static $2 $1;\n";
     }
 
     $mod .= $_ for (@cgs);
@@ -149,7 +149,7 @@ sub pkg2 {
     }
     for my $s (@{ $_->superclasses }) {
         push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddSuperclass',
-            CgOp::rawsget($s->{peer}{mo}));
+            CgOp::rawsget($unit->deref($s)->{peer}{mo}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Complete');
 }
@@ -222,8 +222,9 @@ sub access_lex {
             CgOp::Primitive->new(op => [ rtpadget => 'Variable',$order,$name ]);
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
-        my $pkg = $unit->deref($unit->get_stash(@{ $lex->path })->obj);
-        return $pkg->{peer} ? CgOp::rawsget($pkg->{peer}{what_var}) :
+        my $ref = $unit->get_stash(@{ $lex->path })->obj;
+        my $obj = $ref && $unit->deref($ref);
+        return $obj->{peer} ? CgOp::rawsget($obj->{peer}{what_var}) :
             CgOp::null('Variable');
     } elsif ($lex->isa('Metamodel::Lexical::Common')) {
         return $set_to ?
