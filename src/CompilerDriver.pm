@@ -188,7 +188,7 @@ sub compile {
     local %::UNITREFS;
     local %::UNITREFSTRANS;
     local %::UNITDEPSTRANS;
-    local $::SETTING_RESUME;
+    local $::SETTING_UNIT;
     local $::niecza_mod_symbols;
     local $::YOU_WERE_HERE;
     local $::UNITNAME = $name // 'MAIN';
@@ -198,7 +198,7 @@ sub compile {
 
     if ($lang ne 'NULL') {
         my $metasetting = metadata_for($lang);
-        $::SETTING_RESUME = $metasetting->{setting};
+        $::SETTING_UNIT = $metasetting->{unit};
         $::UNITREFS{$lang} = 1;
         $::UNITREFSTRANS{$lang} = 1;
         %::UNITREFSTRANS = (%::UNITREFSTRANS, %{ $metasetting->{trefs} });
@@ -233,12 +233,13 @@ sub compile {
             open my $fh, ">", $csfile;
             binmode $fh, ":utf8";
             print $fh $ast->{mod};
+            delete $ast->{mod};
             close $fh;
             if (defined $name) {
-                my $blk = { setting => $::SETTING_RESUME,
-                            deps    => \%::UNITDEPSTRANS,
+                my $blk = { deps    => \%::UNITDEPSTRANS,
                             refs    => \%::UNITREFS,
                             trefs   => \%::UNITREFSTRANS,
+                            unit    => $ast,
                             syml    => $::niecza_mod_symbols };
                 store $blk, File::Spec->catfile($builddir, "$basename.store");
             }

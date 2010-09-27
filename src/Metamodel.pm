@@ -24,33 +24,41 @@ use YAML::XS;
 #
 # Kinds of objects which exist in the metamodel
 # - Static subs
-# - Classes
-# - Packages
-# - Scopes (the border between two frames, invariant under frame merging)
+# - Packages (incl. classes, modules, grammars)
+# - Stashes (Foo::)
 #
 # This graph is a lot more random than the old trees were...
 
+# these should only be used during the Op walk
 our @opensubs;
-our $global;
 our $unit;
 
-# package, class, etc.  Things with stashes, protoobjects, etc.
-# We don't handle normal variables here, those exist only in the runtime
-# package tree.
+# a stash is an object like Foo::.  Foo is a member of Foo::, as witnessed by
+# the fact that Foo:: can exist without Foo but not vice versa; Foo is reached
+# by ->obj.
+#
+# a stash is associated with a single unit.  each unit has a graph of stashes
+# rooted from the unit's global.  'my' stashes are really 'our' stashes with
+# gensym mergable names.  because stashes have no identity beyond their contents
+# and set of names, they don't mind being copied around a lot.
+#
+# for the same reasons you generally shouldn't keep references to stashes.  ask
+# for the path and look it up when needed.
 {
     package Metamodel::Stash;
     use Moose;
 
-    # zyg entries can point to other stashes, to Lexical::StaticAlias,
-    # to StaticSub
+    # zyg entries can point to:
+    #  - other Stashes (but only in the same unit)
+    #  - StaticSub
     has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
+    # not canonical, but at least usable in importers
+    # 1st element is always GLOBAL or $unitname $id
+    has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
     # undef here -> stub like my class Foo { ... }
     has obj => (isa => 'Maybe[Metamodel::Package]', is => 'rw');
     has parent => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
-    has unit_closed => (isa => 'Bool', is => 'rw');
-
-    sub BUILD { push @{ $unit->stashes }, $_[0] }
 
     sub bind_name {
         my ($self, $name, $sub) = @_;
@@ -67,7 +75,9 @@ our $unit;
                 $name eq 'UNIT') {
             die "$name cannot be used to descend from a package";
         }
-        my $r = $self->zyg->{$name} //= Metamodel::Stash->new(parent => $self);
+        my $r = $self->zyg->{$name} //=
+            Metamodel::Stash->new(parent => $self,
+                path => [ @{ $self->path }, $name ]);
         if (!$r->isa('Metamodel::Stash')) {
             die "$name is a non-subpackage";
         }
@@ -209,8 +219,8 @@ our $unit;
     use Moose;
     extends 'Metamodel::Lexical';
 
-    has stash => (isa => 'Metamodel::Stash', is => 'ro', required => 1);
-    has name  => (isa => 'Str', is => 'ro', required => 1);
+    has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
+    has name => (isa => 'Str', is => 'ro', required => 1);
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -229,19 +239,6 @@ our $unit;
     __PACKAGE__->meta->make_immutable;
 }
 
-# for my $foo is export (and maybe subs too?)
-{
-    package Metamodel::Lexical::StaticAlias;
-    use Moose;
-    extends 'Metamodel::Lexical';
-
-    has body => (isa => 'Metamodel::StaticSub', is => 'ro', required => 1);
-    has name => (isa => 'Str', is => 'ro', required => 1);
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
-}
-
 # sub foo { ... }
 {
     package Metamodel::Lexical::SubDef;
@@ -254,14 +251,14 @@ our $unit;
     __PACKAGE__->meta->make_immutable;
 }
 
-# my class Foo { } or our class Foo { }; the difference is whether some
-# package also holds a ref
+# my class Foo { } or our class Foo { }; either case, the true stash lives in
+# stashland
 {
     package Metamodel::Lexical::Stash;
     use Moose;
     extends 'Metamodel::Lexical';
 
-    has referent => (isa => 'Metamodel::Stash', is => 'ro');
+    has path => (isa => 'ArrayRef[Str]', is => 'ro');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -297,7 +294,7 @@ our $unit;
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[Metamodel::Package]', is => 'ro');
-    has cur_pkg  => (isa => 'Metamodel::Stash', is => 'ro');
+    has cur_pkg  => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
     has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
     has augmenting => (isa => 'Bool', is => 'ro', default => 1);
@@ -323,30 +320,27 @@ our $unit;
         if (!$toplex->isa('Metamodel::Lexical::Stash')) {
             die "$name is declared as a non-package";
         }
-        $toplex->referent;
+        $toplex->path;
     }
 
     sub find_pkg { my ($self, $names) = @_;
         my @names = ref($names) ? @$names : ('MY', $names);
         $_ =~ s/::$// for (@names); #XXX
-        my $ptr;
+        my @tp;
         if ($names[0] eq 'OUR') {
-            $ptr = $self->cur_pkg;
+            @tp = @{ $self->cur_pkg };
             shift @names;
         } elsif ($names[0] eq 'MY') {
-            $ptr = $self->find_lex_pkg($names[1]);
+            @tp = @{ $self->find_lex_pkg($names[1]) };
             splice @names, 0, 2;
-        } elsif ($ptr = $self->find_lex_pkg($names->[0])) {
+        } elsif (my $p = $self->find_lex_pkg($names->[0])) {
+            @tp = @$p;
             shift @names;
         } else {
-            $ptr = $global;
+            @tp = 'GLOBAL';
         }
 
-        for my $n (@names) {
-            $ptr = $ptr->subpkg($n);
-        }
-
-        $ptr;
+        [ @tp, @names ];
     }
 
     sub find_lex { my ($self, $name) = @_;
@@ -362,9 +356,9 @@ our $unit;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
     }
 
-    sub add_common_name { my ($self, $slot, $stash, $name) = @_;
+    sub add_common_name { my ($self, $slot, $path, $name) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Common->new(
-            stash => $stash, name => $name);
+            path => $path, name => $name);
     }
 
     sub add_state_name { my ($self, $slot, $back, @ops) = @_;
@@ -375,9 +369,9 @@ our $unit;
             if defined($slot);
     }
 
-    sub add_my_stash { my ($self, $slot, $stash) = @_;
+    sub add_my_stash { my ($self, $slot, $path) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Stash->new(
-            referent => $stash);
+            path => $path);
     }
 
     sub add_my_sub { my ($self, $slot, $body) = @_;
@@ -385,9 +379,19 @@ our $unit;
             body => $body);
     }
 
-    sub add_exports { my ($self, $name, $thing, $tags) = @_;
+    sub add_pkg_exports { my ($self, $unit, $name, $path2, $tags) = @_;
+        # XXX should be using unification here
+        my $thing = $unit->get_stash(@$path2);
         for my $tag (@$tags) {
-            my $repo = $self->cur_pkg->subpkg('EXPORT')->subpkg($tag);
+            my $repo = $unit->get_stash(@{ $self->cur_pkg }, 'EXPORT', $tag);
+            $repo->bind_name($name, $thing);
+        }
+        scalar @$tags;
+    }
+
+    sub add_exports { my ($self, $unit, $name, $thing, $tags) = @_;
+        for my $tag (@$tags) {
+            my $repo = $unit->get_stash(@{ $self->cur_pkg }, 'EXPORT', $tag);
             $repo->bind_name($name, $thing);
         }
         scalar @$tags;
@@ -404,18 +408,33 @@ our $unit;
     use Moose;
 
     has mainline => (isa => 'Metamodel::StaticSub', is => 'rw');
-    has global   => (isa => 'Metamodel::Stash', is => 'ro');
     has name     => (isa => 'Str', is => 'ro');
+    has sroot    => (isa => 'Metamodel::Stash', is => 'ro', default =>
+        sub { Metamodel::Stash->new(path => []) });
+
+    has setting  => (isa => 'Metamodel::Unit', is => 'ro');
 
     # we like to delete staticsubs in the optimizer, so visiting them is
     # a tad harder
     has packages => (isa => 'ArrayRef[Metamodel::Package]', is => 'ro',
         default => sub { [] });
-    has stashes  => (isa => 'ArrayRef[Metamodel::Stash]', is => 'ro',
-        default => sub { [] });
+    has next_anon_stash => (isa => 'Int', is => 'rw', default => 0);
 
     # XXX should be fed in perhaps from name, but this is good for testing
     sub is_true_setting { 1 }
+
+    sub anon_stash {
+        my $i = $_[0]->next_anon_stash;
+        $_[0]->next_anon_stash($i+1);
+        $_[0]->name . ":" . $i;
+    }
+
+    sub get_stash {
+        my ($self, @path) = @_;
+        my $ptr = $self->sroot;
+        for (@path) { $ptr = $ptr->subpkg($_); }
+        $ptr;
+    }
 
     sub visit_local_packages {
         my ($self, $cb) = @_;
@@ -424,7 +443,16 @@ our $unit;
 
     sub visit_local_stashes {
         my ($self, $cb) = @_;
-        $cb->($_) for @{ $self->stashes };
+        my %used;
+        our $rec; local $rec = sub {
+            return if $used{$_}++;
+            $cb->($_);
+            for (values %{ $_->zyg }) {
+                next unless $_->isa('Metamodel::Stash');
+                $rec->();
+            }
+        };
+        $rec->() for $self->sroot;
     }
 
     sub visit_local_subs_postorder {
@@ -469,8 +497,6 @@ our $unit;
 sub Unit::begin {
     my $self = shift;
     local $unit = Metamodel::Unit->new(name => $self->name);
-    local $global = Metamodel::Stash->new;
-    $unit->{global} = $global; # chicken and egg...
 
     local @opensubs;
     $unit->mainline($self->mainline->begin(once => 1));
@@ -487,7 +513,7 @@ sub Body::begin {
     my $metabody = Metamodel::StaticSub->new(
         outer      => $top,
         body_of    => $args{body_of},
-        cur_pkg    => $args{cur_pkg} // ($top ? $top->cur_pkg : $global),
+        cur_pkg    => $args{cur_pkg} // ($top ? $top->cur_pkg : [ 'GLOBAL' ]),
         augmenting => $args{augmenting},
         name       => $self->name,
         returnable => $self->returnable,
@@ -585,7 +611,7 @@ sub Op::Super::begin {
         " declared outside of any class");
     die "superclass $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
-    $ns->add_super($opensubs[-1]->find_pkg($self->name)->obj);
+    $ns->add_super($unit->get_stash(@{ $opensubs[-1]->find_pkg($self->name) })->obj);
 }
 
 sub Op::SubDef::begin {
@@ -604,7 +630,7 @@ sub Op::SubDef::begin {
         $opensubs[-1]->body_of->push_multi_regex($self->proto_too, $body);
     }
 
-    $opensubs[-1]->add_exports($self->var, $body, $self->exports);
+    $opensubs[-1]->add_exports($unit, $self->var, $body, $self->exports);
 
     delete $self->{$_} for (qw( body method_too proto_too exports ));
 }
@@ -642,23 +668,19 @@ sub Op::PackageDef::begin {
     my $pclass = ref($self);
     $pclass =~ s/Op::(.*)Def/Metamodel::$1/;
 
-    my $ns = Metamodel::Stash->new;
+    my $ns = $self->ourpkg ?
+        [ @{ $opensubs[-1]->find_pkg($self->ourpkg) }, $self->var ] :
+        [ $unit->anon_stash ];
 
     $opensubs[-1]->add_my_stash($self->var, $ns);
-
-    if ($self->ourpkg) {
-        my $pkg = $opensubs[-1]->find_pkg($self->ourpkg);
-        $pkg->bind_name($self->var, $ns);
-    }
-
-    $opensubs[-1]->add_exports($self->var, $ns, $self->exports);
+    $opensubs[-1]->add_pkg_exports($unit, $self->var, $ns, $self->exports);
 
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name);
         my $body = $self->body->begin(body_of => $obj, cur_pkg => $ns,
             once => 1);
         $obj->close;
-        $ns->obj($obj);
+        $unit->get_stash(@$ns)->obj($obj);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
 
