@@ -2110,13 +2110,8 @@ sub statement_control__S_use { my ($cl, $M) = @_;
     }
 
     my $meta = CompilerDriver::metadata_for($name);
-    $::UNITREFS{$name} = 1;
-    $::UNITREFSTRANS{$name} = 1;
-    %::UNITDEPSTRANS = (%::UNITDEPSTRANS, %{ $meta->{deps} });
-    %::UNITREFSTRANS = (%::UNITREFSTRANS, %{ $meta->{trefs} });
     my %symbols;
     $symbols{$name} = [ $name ];
-    $symbols{$name . '::'} = [ $name . '::' ];
 
     my $pkg = $M->find_stash($name);
     if ($pkg->{really}) {
@@ -2129,7 +2124,7 @@ sub statement_control__S_use { my ($cl, $M) = @_;
     # XXX This code is wrong.  It either needs to be more integrated with STD,
     # or less.
     for my $exp (keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }) {
-        $symbols{$exp} = [ $name . '::', 'EXPORT::', 'DEFAULT::', $exp ];
+        $symbols{$exp} = [ $name, 'EXPORT', 'DEFAULT', $exp ];
     }
 
     $M->{_ast} = Op::Use->new(node($M), unit => $name, symbols => \%symbols);
@@ -2454,31 +2449,11 @@ sub comp_unit { my ($cl, $M) = @_;
     my $body;
     my $sl = $M->{statementlist}{_ast};
 
-    if (!$::YOU_WERE_HERE && $::UNITNAME ne 'MAIN') {
-        $sl = Op::StatementList->new(node($M), children => [ $sl,
-                Op::YouAreHere->new(save_only => 1, unitname => $::UNITNAME)]);
-    }
-
     $body = $cl->sl_to_block('mainline', $sl, subname => 'mainline');
-    if ($::YOU_WERE_HERE) {
-        $body = Body->new(
-            type => 'mainline', file => '(generated)', text => '',
-            name => 'install',
-            signature => Sig->new(params => [
-                    Sig::Parameter->new(name => '!mainline',
-                        slot => '!mainline')]),
-            do => Op::CallSub->new(node($M),
-                invocant => Op::CgOp->new(optree => [ 'newscalar',
-                        [ 'rawsget', $::SETTINGNAME . ".Installer" ] ]),
-                positionals => [Op::SubDef->new(
-                    var => $cl->gensym, body => $body)]));
-    }
 
     my $sn = $::SETTINGNAME; $sn =~ s/::/./g;
     $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME,
-        ($::SETTING_RESUME ? (setting => $::SETTING_RESUME) : ()),
-        is_setting => (!!$::YOU_WERE_HERE),
-        setting_name => $sn);
+        is_setting => (!!$::YOU_WERE_HERE), setting_name => $sn);
 }
 
 1;

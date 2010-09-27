@@ -166,17 +166,12 @@ use CgOp;
     extends 'Op';
 
     has unitname  => (isa => 'Str', is => 'ro', clearer => 'drop_unitname');
-    has save_only => (isa => 'Bool', is => 'ro', default => 0);
-
-    sub lift_decls {
-        my $un = $_[0]->unitname; $_[0]->drop_unitname;
-        Decl::SaveEnv->new(unitname => $un)
-    }
 
     sub code {
         my ($self, $body) = @_;
-        $self->save_only ? CgOp::null('Variable') :
-            CgOp::subcall(CgOp::fetch(CgOp::scopedlex('!mainline')));
+        # this should be a little fancier so closure can work
+        CgOp::subcall(CgOp::fetch(CgOp::rawscall('Kernel.ContextHelper',
+                    CgOp::callframe, CgOp::clr_string('*resume_' . $self->unitname))));
     }
 
     __PACKAGE__->meta->make_immutable;

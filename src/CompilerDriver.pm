@@ -112,8 +112,9 @@ sub find_module {
             last REUSE unless -f $symlfile;
             my $meta = Storable::retrieve($symlfile);
 
-            for my $dmod (keys %{ $meta->{deps} }) {
-                my ($dpath, $dtime) = @{ $meta->{deps}{$dmod} };
+            for my $dmod ($meta->name, keys %{ $meta->tdeps }) {
+                my $dpath = $meta->get_unit($dmod)->filename;
+                my $dtime = $meta->get_unit($dmod)->modtime;
 
                 my ($npath) = CompilerDriver::find_module($dmod, 0) or do {
                     $self->sorry("Dependancy $dmod of $module cannot be located");
@@ -133,7 +134,7 @@ sub find_module {
                 }
             }
 
-            return $meta->{'syml'};
+            return $meta->syml;
         }
 
         $self->sys_compile_module($module, $symlfile, $modfile);
@@ -156,7 +157,7 @@ sub find_module {
 
         my $astf = File::Spec->catfile($builddir, "$settingx.store");
         if (-e $astf) {
-            return Storable::retrieve($astf)->{'syml'};
+            return Storable::retrieve($astf)->syml;
         }
 
         $self->sorry("Unable to load setting $setting.");
@@ -185,9 +186,6 @@ sub compile {
     }
 
     local $::stagetime = $args{stagetime};
-    local %::UNITREFS;
-    local %::UNITREFSTRANS;
-    local %::UNITDEPSTRANS;
     local $::SETTING_UNIT;
     local $::niecza_mod_symbols;
     local $::YOU_WERE_HERE;
@@ -195,22 +193,15 @@ sub compile {
     $::UNITNAME =~ s/::/./g;
     local $::SAFEMODE = $safe;
     $STD::ALL = {};
+    my ($filename, $modtime);
 
     if ($lang ne 'NULL') {
-        my $metasetting = metadata_for($lang);
-        $::SETTING_UNIT = $metasetting->{unit};
-        $::UNITREFS{$lang} = 1;
-        $::UNITREFSTRANS{$lang} = 1;
-        %::UNITREFSTRANS = (%::UNITREFSTRANS, %{ $metasetting->{trefs} });
-    }
-
-    if (defined($name) && !$setting) {
-        my $rp = Cwd::realpath($path);
-        $::UNITDEPSTRANS{$name} = [ $rp, ((stat $rp)[9]) ];
+        $::SETTING_UNIT = metadata_for($lang);
     }
 
     if (defined($name)) {
-        $::UNITREFSTRANS{$name} = 1;
+        $filename = Cwd::realpath($path);
+        $modtime  = ((stat $filename)[9]);
     }
 
     my ($m, $a) = defined($path) ? (parsefile => $path) : (parse => $code);
@@ -236,17 +227,13 @@ sub compile {
             delete $ast->{mod};
             close $fh;
             if (defined $name) {
-                my $blk = { deps    => \%::UNITDEPSTRANS,
-                            refs    => \%::UNITREFS,
-                            trefs   => \%::UNITREFSTRANS,
-                            unit    => $ast,
-                            syml    => $::niecza_mod_symbols };
-                store $blk, File::Spec->catfile($builddir, "$basename.store");
+                $ast->syml($::niecza_mod_symbols);
+                $ast->filename($filename);
+                $ast->modtime($modtime);
+                store $ast, File::Spec->catfile($builddir, "$basename.store");
             }
-            $ast = undef;
         } ],
         [ 'gmcs', sub {
-            delete $::UNITREFS{$basename};
             my @args;
             if ($args{selfcontained}) {
                 @args = ("gmcs",
@@ -254,14 +241,14 @@ sub compile {
                     (map { File::Spec->catfile($libdir, $_) }
                         "Kernel.cs", "Cursor.cs"),
                     (map { build_file($_ . ".cs") }
-                        (sort keys %::UNITREFSTRANS)),
+                        (sort keys %{ $ast->tdeps })),
                     $csfile);
             } else {
                 @args = ("gmcs",
                     (defined($name) ? ("/target:library") : ()),
                     "/lib:$builddir",
                     "/r:Kernel.dll",
-                    (map { "/r:$_.dll" } sort keys %::UNITREFS),
+                    (map { "/r:$_.dll" } sort keys %{ $ast->tdeps }),
                     "/out:$outfile",
                     $csfile);
             }

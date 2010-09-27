@@ -427,6 +427,10 @@ our $unit;
     has xref     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has tdeps    => (isa => 'HashRef[Metamodel::Unit]', is => 'ro');
 
+    has filename => (isa => 'Str', is => 'rw');
+    has modtime  => (isa => 'Num', is => 'rw');
+    has syml     => (is => 'rw');
+
     # we like to delete staticsubs in the optimizer, so visiting them is
     # a tad harder
     has packages => (isa => 'ArrayRef[Metamodel::Package]', is => 'ro',
@@ -542,19 +546,21 @@ sub Body::begin {
     my $self = shift;
     my %args = @_;
 
-    my $top = @opensubs ? $opensubs[-1] : undef;
+    my $top = @opensubs ? $opensubs[-1] : $args{top};
+    my $rtop = !$top ? $top : Scalar::Util::blessed($top) ? $top :
+        $unit->deref($top);
 
     my $metabody = Metamodel::StaticSub->new(
-        outer      => $top // ($unit->setting ?
-            $unit->get_unit($unit->setting)->bottom_ref : undef),
+        outer      => $top,
         body_of    => $args{body_of},
-        cur_pkg    => $args{cur_pkg} // ($top ? $top->cur_pkg : [ 'GLOBAL' ]),
+        cur_pkg    => $args{cur_pkg} // (@opensubs ? $opensubs[-1]->cur_pkg :
+            [ 'GLOBAL' ]), # cur_pkg does NOT propagate down from settings
         augmenting => $args{augmenting},
         name       => $self->name,
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
         class      => $self->class,
-        run_once   => $args{once} && (!defined($top) || $top->run_once));
+        run_once   => $args{once} && (!defined($rtop) || $rtop->run_once));
 
     $unit->get_stash(@{ $metabody->cur_pkg });
 
@@ -594,6 +600,13 @@ sub Op::begin {
     my $self = shift;
 
     $_->begin for $self->zyg;
+}
+
+sub Op::YouAreHere::begin {
+    my $self = shift;
+    $unit->bottom_ref($unit->make_ref($opensubs[-1]));
+    $opensubs[-1]->strong_used(1);
+    $opensubs[-1]->create_static_pad;
 }
 
 sub Op::Lexical::begin {
