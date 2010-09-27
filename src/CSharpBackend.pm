@@ -28,6 +28,7 @@ our @decls;
 our @thaw;
 our @cgs;
 our %haslet;
+our $libmode;
 
 sub gsym {
     my ($type, $desc) = @_;

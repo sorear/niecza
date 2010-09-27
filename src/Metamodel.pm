@@ -57,7 +57,7 @@ our $unit;
     # 1st element is always GLOBAL or $unitname $id
     has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
     # undef here -> stub like my class Foo { ... }
-    has obj => (isa => 'Maybe[Metamodel::Package]', is => 'rw');
+    has obj => (isa => 'Maybe[ArrayRef]', is => 'rw');
     has parent => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
 
     sub bind_name {
@@ -92,6 +92,7 @@ our $unit;
     package Metamodel::Package;
     use Moose;
 
+    has xid => (isa => 'Int', is => 'rw');
     # an intrinsic name, even if anonymous
     has name => (isa => 'Str', is => 'ro', default => 'ANON');
     has unit_closed => (isa => 'Bool', is => 'rw');
@@ -110,7 +111,8 @@ our $unit;
 
     sub add_super {
         my ($self, $super) = @_;
-        die "superclass $super->name defined in a lowly package";
+        die "superclass " . $unit->deref($super)->name .
+            " defined in a lowly package";
     }
 
     sub close { }
@@ -137,7 +139,7 @@ our $unit;
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
-    has superclasses => (isa => 'ArrayRef[Metamodel::Class]', is => 'ro',
+    has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
     has multi_regex_lists => (isa => 'HashRef[ArrayRef[Metamodel::StaticSub]]',
         is => 'ro', lazy => 1, default => sub { +{} });
@@ -166,8 +168,9 @@ our $unit;
         my ($self, $targ) = @_;
         if ($self->name ne 'Mu' && $unit->is_true_setting
                 && !@{ $self->superclasses }) {
-            $self->add_super($opensubs[-1]->find_lex($self->_defsuper)
-                ->referent->obj);
+            $self->add_super(
+                $unit->get_stash(@{ $opensubs[-1]->find_pkg($self->_defsuper) })
+                ->obj);
         }
     }
 
@@ -293,7 +296,7 @@ our $unit;
     # inject a take EMPTY
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
-    has body_of  => (isa => 'Maybe[Metamodel::Package]', is => 'ro');
+    has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has cur_pkg  => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
     has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
@@ -412,7 +415,10 @@ our $unit;
     has sroot    => (isa => 'Metamodel::Stash', is => 'ro', default =>
         sub { Metamodel::Stash->new(path => []) });
 
-    has setting  => (isa => 'Metamodel::Unit', is => 'ro');
+    has setting  => (isa => 'Str', is => 'ro');
+
+    has xref     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has tdeps    => (isa => 'HashRef[Metamodel::Unit]', is => 'ro');
 
     # we like to delete staticsubs in the optimizer, so visiting them is
     # a tad harder
@@ -422,6 +428,12 @@ our $unit;
 
     # XXX should be fed in perhaps from name, but this is good for testing
     sub is_true_setting { 1 }
+
+    sub get_unit {
+        my ($self, $name) = @_;
+        if ($name eq $self->name) { return $self }
+        $self->tdeps->{$name};
+    }
 
     sub anon_stash {
         my $i = $_[0]->next_anon_stash;
@@ -434,6 +446,21 @@ our $unit;
         my $ptr = $self->sroot;
         for (@path) { $ptr = $ptr->subpkg($_); }
         $ptr;
+    }
+
+    sub make_ref {
+        my ($self, $thing) = @_;
+        my $xid;
+        if (!defined ($xid = $thing->xid)) {
+            $thing->xid($xid = scalar @{ $self->xref });
+            push @{ $self->xref }, $thing;
+        }
+        return [ $self->name, $xid ];
+    }
+
+    sub deref {
+        my ($self, $thing) = @_;
+        return $self->get_unit($thing->[0])->xref->[$thing->[1]];
     }
 
     sub visit_local_packages {
@@ -587,6 +614,7 @@ sub Op::Attribute::begin {
         " declared outside of any class");
     die "attribute $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
+    $ns = $unit->deref($ns);
     $ns->add_attribute($self->name);
     # we don't need create_static_pad here as the generated accessors close
     # over no variables
@@ -609,6 +637,7 @@ sub Op::Super::begin {
     my $self = shift;
     my $ns   = $opensubs[-1]->body_of // die ("superclass " . $self->name .
         " declared outside of any class");
+    $ns = $unit->deref($ns);
     die "superclass $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
     $ns->add_super($unit->get_stash(@{ $opensubs[-1]->find_pkg($self->name) })->obj);
@@ -623,11 +652,13 @@ sub Op::SubDef::begin {
     $opensubs[-1]->create_static_pad if $body->strong_used;
 
     if (defined($self->method_too)) {
-        $opensubs[-1]->body_of->add_method($self->method_too, $body);
+        $unit->deref($opensubs[-1]->body_of)
+            ->add_method($self->method_too, $body);
     }
 
     if (defined($self->proto_too)) {
-        $opensubs[-1]->body_of->push_multi_regex($self->proto_too, $body);
+        $unit->deref($opensubs[-1]->body_of)
+            ->push_multi_regex($self->proto_too, $body);
     }
 
     $opensubs[-1]->add_exports($unit, $self->var, $body, $self->exports);
@@ -676,10 +707,10 @@ sub Op::PackageDef::begin {
     $opensubs[-1]->add_pkg_exports($unit, $self->var, $ns, $self->exports);
 
     if (!$self->stub) {
-        my $obj  = $pclass->new(name => $self->name);
+        my $obj  = $unit->make_ref($pclass->new(name => $self->name));
         my $body = $self->body->begin(body_of => $obj, cur_pkg => $ns,
             once => 1);
-        $obj->close;
+        $unit->deref($obj)->close;
         $unit->get_stash(@$ns)->obj($obj);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
@@ -692,8 +723,8 @@ sub Op::Augment::begin {
 
     # XXX shouldn't we distinguish augment class Foo { } from ::Foo ?
     my $pkg = $opensubs[-1]->find_pkg([ @{ $self->pkg }, $self->name ]);
-    my $body = $self->body->begin(body_of => $pkg->obj, augmenting => 1,
-        once => 1, cur_pkg => $pkg);
+    my $body = $self->body->begin(body_of => $unit->get_stash(@$pkg)->obj,
+        augmenting => 1, once => 1, cur_pkg => $pkg);
     $opensubs[-1]->add_my_sub($self->bodyvar, $body);
 
     delete $self->{$_} for (qw(name body pkg));
