@@ -205,6 +205,9 @@ sub pkg3 {
 sub enter_code {
     my ($body) = @_;
     my @code;
+    # in this case, the variables were initialized earlier and are still useful
+    goto novars if $body->run_once && $body->spad_exists;
+
     for my $ln (sort keys %{ $body->lexicals }) {
         my $lx = $body->lexicals->{$ln};
 
@@ -229,6 +232,7 @@ sub enter_code {
                 zyg => [ $frag ]);
         }
     }
+novars:
 
     if (defined $body->signature) {
         push @code, $body->signature->binder($body);
@@ -264,6 +268,10 @@ sub access_lex {
 
     if ($lex->isa('Metamodel::Lexical::SubDef') ||
             $lex->isa('Metamodel::Lexical::Simple')) {
+        if ($bp->run_once) {
+            return $set_to ? CgOp::rawsset($lex->{peer}, $set_to) :
+                CgOp::rawsget($lex->{peer});
+        }
         return $set_to ?
             CgOp::Primitive->new(op => [ rtpadput => $order, $name ],
                 zyg => [ $set_to ]) :
@@ -346,6 +354,11 @@ sub sub0 {
             my $bv = $lx->{peer} = gsym('BValue', $lx->name);
             push @decls, $bv;
         }
+
+        if ($_->run_once && ($lx->isa('Metamodel::Lexical::SubDef') ||
+                $lx->isa('Metamodel::Lexical::Simple'))) {
+            push @decls, ($lx->{peer} = gsym('Variable', $ln));
+        }
     }
 }
 
@@ -402,9 +415,14 @@ sub sub3 {
                     CgOp::clr_string($lx->name)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
             next unless $_->spad_exists;
-            push @thaw, CgOp::setindex($ln,
-                CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
-                CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
+            if ($_->run_once) {
+                push @thaw, CgOp::rawsset($lx->{peer},
+                    CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
+            } else {
+                push @thaw, CgOp::setindex($ln,
+                    CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
+                    CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
+            }
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             next unless $_->spad_exists;
             if ($lx->hash || $lx->list) {
@@ -416,9 +434,13 @@ sub sub3 {
             } else {
                 $frag = CgOp::newblankrwscalar;
             }
-            push @thaw, CgOp::setindex($ln,
-                CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
-                $frag);
+            if ($_->run_once) {
+                push @thaw, CgOp::rawsset($lx->{peer}, $frag);
+            } else {
+                push @thaw, CgOp::setindex($ln,
+                    CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
+                    $frag);
+            }
         }
     }
 }
