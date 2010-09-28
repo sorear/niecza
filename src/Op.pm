@@ -879,12 +879,6 @@ use CgOp;
     extends 'Op';
 
     has unit => (isa => 'Str', is => 'ro', required => 1);
-    has symbols => (isa => 'HashRef[ArrayRef[Str]]', is => 'ro', required => 1);
-
-    sub lift_decls {
-        my ($self) = @_;
-        Decl::Use->new(unit => $self->unit, symbols => $self->symbols);
-    }
 
     sub code { CgOp::null('Variable') }
 
@@ -992,11 +986,6 @@ use CgOp;
     has positionals => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
 
     sub zyg { @{ $_[0]->positionals } }
-
-    sub lift_decls {
-        my $self = shift;
-        $self->signature->local_decls, $self->SUPER::lift_decls(@_);
-    }
 
     sub code {
         my ($self, $body) = @_;

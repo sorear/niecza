@@ -57,7 +57,7 @@ sub find_module {
 
     for my $d (get_perl6lib) {
         for my $ext (qw( .setting .pm6 .pm )) {
-            next if ($issetting xor ($ext eq '.setting'));
+            next if defined($issetting) && ($issetting xor ($ext eq '.setting'));
 
             my $file = File::Spec->catfile($d, @toks, "$end$ext");
             next unless -f $file;
@@ -116,7 +116,7 @@ sub find_module {
                 my $dpath = $meta->get_unit($dmod)->filename;
                 my $dtime = $meta->get_unit($dmod)->modtime;
 
-                my ($npath) = CompilerDriver::find_module($dmod, 0) or do {
+                my ($npath) = CompilerDriver::find_module($dmod, undef) or do {
                     $self->sorry("Dependancy $dmod of $module cannot be located");
                     return undef;
                 };
@@ -179,7 +179,7 @@ sub compile {
 
     my $path = $file;
     if (defined($name)) {
-        $path = find_module($name, $setting);
+        $path = find_module($name, $setting // 0);
         if (!defined($path)) {
             Carp::croak("Module $name not found");
         }

@@ -2109,25 +2109,7 @@ sub statement_control__S_use { my ($cl, $M) = @_;
         return;
     }
 
-    my $meta = CompilerDriver::metadata_for($name);
-    my %symbols;
-    $symbols{$name} = [ $name ];
-
-    my $pkg = $M->find_stash($name);
-    if ($pkg->{really}) {
-        $pkg = $pkg->{really}->{UNIT};
-    }
-    else {
-        $pkg = $M->find_stash($name . '::');
-    }
-
-    # XXX This code is wrong.  It either needs to be more integrated with STD,
-    # or less.
-    for my $exp (keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }) {
-        $symbols{$exp} = [ $name, 'EXPORT', 'DEFAULT', $exp ];
-    }
-
-    $M->{_ast} = Op::Use->new(node($M), unit => $name, symbols => \%symbols);
+    $M->{_ast} = Op::Use->new(node($M), unit => $name);
 }
 
 # All package defs have a couple things in common - a special-ish block,

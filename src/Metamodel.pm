@@ -10,6 +10,7 @@ use Op;
 use RxOp;
 use Sig;
 use YAML::XS;
+use Scalar::Util 'blessed';
 
 ### NIECZA COMPILER METAMODEL
 # The metamodel exists to create a timeline inside the compiler.  Previously,
@@ -246,6 +247,17 @@ our $unit;
     __PACKAGE__->meta->make_immutable;
 }
 
+{
+    package Metamodel::Lexical::SubImport;
+    use Moose;
+    extends 'Metamodel::Lexical';
+
+    has ref => (isa => 'ArrayRef', is => 'ro');
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
 # my class Foo { } or our class Foo { }; either case, the true stash lives in
 # stashland
 {
@@ -331,7 +343,7 @@ our $unit;
         if ($names[0] eq 'OUR') {
             @tp = @{ $self->cur_pkg };
             shift @names;
-        } elsif ($names[0] eq 'PROCESS') {
+        } elsif ($names[0] eq 'PROCESS' or $names[0] eq 'GLOBAL') {
             @tp = shift(@names);
         } elsif ($names[0] eq 'MY') {
             @tp = @{ $self->find_lex_pkg($names[1]) };
@@ -496,12 +508,12 @@ our $unit;
         our $rec; local $rec = sub {
             return if $seen{$_};
             $seen{$_} = 1;
-            for (@{ $_->tdeps }{ sort keys %{ $_->tdeps } }) {
+            for (sort keys %{ $self->get_unit($_)->tdeps }) {
                 $rec->();
             }
-            $cb->($_);
+            $cb->($_) for ($self->get_unit($_));
         };
-        $rec->() for ($self);
+        $rec->() for ($self->name);
     }
 
     sub visit_local_packages {
@@ -514,7 +526,7 @@ our $unit;
         our $rec; local $rec = sub {
             $cb->($_);
             for (values %{ $_->zyg }) {
-                next unless $_->isa('Metamodel::Stash');
+                next unless blessed($_) && $_->isa('Metamodel::Stash');
                 $rec->();
             }
         };
@@ -560,7 +572,8 @@ our $unit;
             my $sl = $self->get_stash(@path);
             my $sf = $u2->get_stash(@path);
 
-            if ($sl->obj && $sf->obj) {
+            if ($sl->obj && $sf->obj && ($sl->obj->[0] ne $sf->obj->[0] ||
+                    $sl->obj->[1] != $sf->obj->[1])) {
                 die "unification error: clashing main objects on " .
                     join ("::", @path);
             }
@@ -678,6 +691,37 @@ sub Op::YouAreHere::begin {
     $unit->bottom_ref($unit->make_ref($opensubs[-1]));
     $opensubs[-1]->strong_used(1);
     $opensubs[-1]->create_static_pad;
+}
+
+sub Op::Use::begin {
+    my $self = shift;
+    my $name = $self->unit;
+    my $u2 = CompilerDriver::metadata_for($self->unit);
+    $unit->need_unit($u2);
+
+    my @can = @{ $u2->mainline->find_pkg(split /::/, $name) };
+    my $exp = $unit->get_stash(@can, 'EXPORT', 'DEFAULT');
+
+    # XXX I am not sure how need binding should work
+
+    for my $en (sort keys %{ $exp->zyg }) {
+        my $ref = $exp->zyg->{$en};
+        my $ex = blessed($ref) ? $ref : $unit->deref($ref);
+        my $lex;
+        if ($ex->isa('Metamodel::Stash')) {
+            $lex = Metamodel::Lexical::Stash->new(path => $ex->path);
+        } elsif ($ex->isa('Metamodel::Stash::Graft')) {
+            $lex = Metamodel::Lexical::Stash->new(path => $ex->path);
+        } elsif ($ex->isa('Metamodel::StaticSub')) {
+            $lex = Metamodel::Lexical::SubImport->new(ref => $ref);
+        } elsif ($ex->isa('Metamodel::ExportedVar')) {
+            $lex = Metamodel::Lexical::VarImport->new(ref => $ref);
+        } else {
+            die "unhandled export type " . ref($ex);
+        }
+
+        $opensubs[-1]->lexicals->{$en} = $lex;
+    }
 }
 
 sub Op::Lexical::begin {

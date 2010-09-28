@@ -295,6 +295,9 @@ sub access_lex {
         return $set_to ?
             CgOp::bset(CgOp::rawsget($lex->{peer}), $set_to) :
             CgOp::bget(CgOp::rawsget($lex->{peer}));
+    } elsif ($lex->isa('Metamodel::Lexical::SubImport')) {
+        die "cannot rebind imported subs" if $set_to;
+        return CgOp::newscalar(CgOp::rawsget($unit->deref($lex->ref)->{peer}{ps}));
     } else {
         die "unhandled $lex";
     }
