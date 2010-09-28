@@ -839,7 +839,7 @@ blocked:
         public static Frame GetFirst(Frame th, IP6 lst) {
             DynObject dyl = lst as DynObject;
             if (dyl == null) goto slow;
-            if (dyl.klass != ListMO) goto slow;
+            if (dyl.klass != RxFrame.ListMO) goto slow;
             VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
             if (itemsl.Count() == 0) goto slow;
             th.resultSlot = itemsl[0];
@@ -850,7 +850,6 @@ slow:
                     NewROScalar(lst) }, null);
         }
 
-        public static DynMetaObject ListMO;
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 HashP;
@@ -1147,20 +1146,4 @@ slow:
             }
         }
     }
-}
-
-// The root setting
-public class NULL {
-    public static Niecza.Frame Environment = null;
-
-    private static Niecza.SubInfo MAINSI = new Niecza.SubInfo("Null.MAIN", MAIN);
-    public static Niecza.IP6 Installer = Niecza.Kernel.MakeSub(MAINSI, null);
-    private static Niecza.Frame MAIN(Niecza.Frame th) {
-        switch (th.ip) {
-            default:
-                return th.pos[0].Fetch().Invoke(th.caller,
-                        new Niecza.Variable[0] {}, null);
-        }
-    }
-    public static void Initialize() {}
 }

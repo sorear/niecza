@@ -145,19 +145,6 @@ use 5.010;
         $typedata{$n} = [ f => $ty ];
     }
 
-    sub know_module {
-        my ($class, $mname) = @_;
-        # for settings
-        $typedata{ $mname . '.Environment' } = [ f => 'Frame' ];
-        $typedata{ $mname . '.Installer' } = [ f => 'IP6' ];
-        # for importable modules
-        $typedata{ $mname . '.Type' } = [ f => 'Variable' ];
-        $typedata{ $mname . '.Stash' } = [ f => 'Variable' ];
-        # for all
-        $typedata{ $mname . '.Initialize' } = [ m => 'Void' ];
-    }
-    __PACKAGE__->know_module('NULL');
-
     sub _generic_infer {
         /Dictionary<(.*),(.*)>/ && return {
             ContainsKey         => [ m => 'Boolean' ],

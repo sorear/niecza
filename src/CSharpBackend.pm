@@ -82,6 +82,7 @@ EOM
             $_->visit_local_stashes(\&stash2);
             $_->visit_local_subs_preorder(\&sub2);
 
+            $_->visit_local_packages(\&pkg3);
             $_->visit_local_subs_preorder(\&sub3);
 
             return if $_->bottom_ref;
@@ -122,6 +123,19 @@ sub stash2 {
     push @thaw, CgOp::rawsset($p, CgOp::rawnew($st_ty));
 }
 
+# xxx check for SAFE::
+my %loopbacks = (
+    'MCallFrame', 'Kernel.CallFrameMO',
+    'MGatherIterator', 'RxFrame.GatherIteratorMO',
+    'MList', 'Kernel.ListMO',
+    'MMatch', 'RxFrame.MatchMO',
+    'PAny', 'Kernel.AnyP',
+    'PArray', 'Kernel.ArrayP',
+    'PEMPTY', 'RxFrame.EMPTYP',
+    'PHash', 'Kernel.HashP',
+    'PStr', 'Kernel.StrP',
+);
+
 sub pkg0 {
     return unless $_->isa('Metamodel::Class');
     my $p   = $_->{peer}{mo} = gsym($cl_ty, $_->name);
@@ -152,6 +166,32 @@ sub pkg2 {
             CgOp::rawsget($unit->deref($s)->{peer}{mo}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Complete');
+    push @thaw, CgOp::rawsset($wh6, CgOp::rawnew('DynObject', CgOp::rawsget($p)));
+    push @thaw, CgOp::setfield('slots', CgOp::cast('DynObject', CgOp::rawsget($wh6)), CgOp::null('object[]'));
+    push @thaw, CgOp::setfield('typeObject', CgOp::rawsget($p), CgOp::rawsget($wh6));
+    push @thaw, CgOp::rawsset($whv, CgOp::newscalar(CgOp::rawsget($wh6)));
+
+    push @thaw, CgOp::rawsset($loopbacks{'P' . $_->name}, CgOp::rawsget($wh6))
+        if $loopbacks{'P' . $_->name};
+    push @thaw, CgOp::rawsset($loopbacks{'M' . $_->name}, CgOp::rawsget($p))
+        if $loopbacks{'M' . $_->name};
+}
+
+sub pkg3 {
+    return unless $_->isa('Metamodel::Class');
+    my $p   = $_->{peer}{mo};
+    for my $m (@{ $_->methods }) {
+        push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddMethod',
+            CgOp::clr_string($m->name),
+            CgOp::rawsget($unit->deref($m->body)->{peer}{ps}));
+    }
+    for my $k (sort keys %{ $_->multi_regex_lists }) {
+        for my $b (@{ $_->multi_regex_lists->{$k} }) {
+            push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddMultiRegex',
+                CgOp::clr_string($k),
+                CgOp::rawsget($unit->deref($b)->{peer}{ps}));
+        }
+    }
 }
 
 sub enter_code {
