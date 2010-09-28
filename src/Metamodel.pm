@@ -600,6 +600,9 @@ sub Unit::begin {
 
     $unit->need_unit($::SETTING_UNIT) if $::SETTING_UNIT;
 
+    $unit->get_stash('GLOBAL');
+    $unit->get_stash('PROCESS');
+
     local @opensubs;
     $unit->mainline($self->mainline->begin(once => 1,
             top => ($::SETTING_UNIT ? $::SETTING_UNIT->bottom_ref : undef)));
@@ -705,8 +708,6 @@ sub Op::Attribute::begin {
         if $opensubs[-1]->augmenting;
     $ns = $unit->deref($ns);
     $ns->add_attribute($self->name);
-    # we don't need create_static_pad here as the generated accessors close
-    # over no variables
     if ($self->accessor) {
         my $nb = Metamodel::StaticSub->new(
             unit       => $unit,
@@ -718,6 +719,8 @@ sub Op::Attribute::begin {
             run_once   => 0,
             code       => Op::GetSlot->new(name => $self->name,
                 object => Op::CgOp->new(optree => [ pos => 0 ])));
+        $opensubs[-1]->create_static_pad; # for protosub instance
+        $nb->strong_used(1);
         $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
         $ns->add_method($self->name, $unit->make_ref($nb));
     }

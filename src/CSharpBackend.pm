@@ -130,7 +130,7 @@ sub stash2 {
 my %loopbacks = (
     'MCallFrame', 'Kernel.CallFrameMO',
     'MGatherIterator', 'RxFrame.GatherIteratorMO',
-    'MList', 'Kernel.ListMO',
+    'MList', 'RxFrame.ListMO',
     'MMatch', 'RxFrame.MatchMO',
     'PAny', 'Kernel.AnyP',
     'PArray', 'Kernel.ArrayP',
@@ -222,7 +222,7 @@ sub enter_code {
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
                 my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
-                my $var = $unit->deref($unit->get_stash($$imp)->obj)
+                my $var = $unit->deref($unit->get_stash(@$imp)->obj)
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {

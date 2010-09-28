@@ -26,7 +26,8 @@ sub run_optree {
     return unless $op->isa('Op::CallSub') && no_named_params($op);
     my $inv = $op->invocant;
     return unless $inv->isa('Op::SubDef') && $inv->once;
-    my $cbody = $body->lexicals->{$inv->var}->body;
+    my $cbody = $body->lexicals->{$inv->var} or return;
+    $cbody = $cbody->body;
     return unless is_removable_body($cbody);
 
     beta_optimize($body, $op, $inv, $cbody);
