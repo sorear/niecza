@@ -358,6 +358,7 @@ our $unit;
     }
 
     sub add_common_name { my ($self, $slot, $path, $name) = @_;
+        $unit->get_stash(@$path);
         $self->lexicals->{$slot} = Metamodel::Lexical::Common->new(
             path => $path, name => $name);
     }

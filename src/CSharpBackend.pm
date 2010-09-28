@@ -28,6 +28,7 @@ our @thaw;
 our @cgs;
 our %lpeers;
 our %haslet;
+our $classhow;
 our $libmode;
 
 sub gsym {
@@ -49,11 +50,14 @@ sub run {
     local @thaw;
     local @decls;
     local @cgs;
+    local $classhow;
 
     # 0s just set up variables
     # 1s set up subs
     # 2s set up objects
     # 3s set up relationships
+
+    $unit->visit_local_stashes(\&stash2) unless $libmode; #XXX weird timing
 
     $unit->visit_local_packages(\&pkg0);
     $unit->visit_local_subs_preorder(\&sub0);
@@ -78,7 +82,6 @@ EOM
     unless ($libmode) {
         $unit->visit_units_preorder(sub {
             $_->visit_local_packages(\&pkg2);
-            $_->visit_local_stashes(\&stash2);
             $_->visit_local_subs_preorder(\&sub2);
 
             $_->visit_local_packages(\&pkg3);
@@ -175,6 +178,7 @@ sub pkg2 {
         if $loopbacks{'P' . $_->name};
     push @thaw, CgOp::rawsset($loopbacks{'M' . $_->name}, CgOp::rawsget($p))
         if $loopbacks{'M' . $_->name};
+    $classhow = $wh6 if $_->name eq 'ClassHOW';
 }
 
 sub pkg3 {
@@ -191,6 +195,10 @@ sub pkg3 {
                 CgOp::clr_string($k),
                 CgOp::rawsget($unit->deref($b)->{peer}{ps}));
         }
+    }
+    if ($classhow) {
+        push @thaw, CgOp::setfield('how', CgOp::rawsget($p), CgOp::fetch(
+                CgOp::box(CgOp::rawsget($classhow), CgOp::rawsget($p))));
     }
 }
 
@@ -378,9 +386,13 @@ sub sub3 {
         my $frag;
 
         if ($lx->isa('Metamodel::Lexical::Common')) {
+            my $stash = $unit->get_stash(@{ $lx->path });
+            if (!$lpeers{$stash}) {
+                Carp::confess("Peer for " . join("::", @{ $stash->path }) . " has gone missing!");
+            }
             push @thaw, CgOp::rawsset($lx->{peer},
                 CgOp::rawscall('Kernel.PackageLookup',
-                    CgOp::rawsget($lpeers{$unit->get_stash(@{$lx->path})}),
+                    CgOp::rawsget($lpeers{$stash}),
                     CgOp::clr_string($lx->name)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
             push @thaw, CgOp::setindex($ln,

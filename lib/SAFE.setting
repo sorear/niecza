@@ -1,5 +1,5 @@
 # vim: ft=perl6
-my module mmSAFE;
+my module SAFE;
 
 my class Mu {
     # rawcall to avoid putting a rw binding on self... TODO
@@ -100,6 +100,7 @@ my class Sub {
 }
 
 my class ClassHOW {
+    has $!value;
     method isa($obj, $type) { Q:CgOp {
         (box Bool (rawcall (@ {$obj}) Isa
           (getfield klass (cast DynObject (@ {$type})))))
