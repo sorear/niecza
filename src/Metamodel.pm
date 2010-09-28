@@ -317,6 +317,7 @@ our $unit;
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
     has augmenting => (isa => 'Bool', is => 'ro', default => 1);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
+    has ltm      => (is => 'rw');
 
     has unit_closed => (isa => 'Bool', is => 'rw');
 
@@ -655,6 +656,7 @@ sub Body::begin {
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
         class      => $self->class,
+        ltm        => $self->ltm,
         run_once   => $args{once} && (!@opensubs || $rtop->run_once));
 
     if ($self->signature && @{ $self->signature->params } >= 1 &&

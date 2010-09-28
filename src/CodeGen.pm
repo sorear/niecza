@@ -60,6 +60,7 @@ use 5.010;
               outer        => [f => 'Frame'],
               proto        => [f => 'Frame'],
               lex          => [f => 'Dictionary<string,object>'],
+              lexn         => [f => 'object[]'],
               ExecutingLine=> [m => 'Int32'],
               ExecutingFile=> [m => 'String'],
               ExtractNamed => [m => 'Variable'],
