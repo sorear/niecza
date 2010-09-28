@@ -633,16 +633,6 @@ use warnings;
         }
     }
 
-    sub sub_obj {
-        CgOp::Primitive->new(op => [ 'sub_obj', $_[0]->csname ]);
-    }
-
-    sub sub_var { newscalar(sub_obj($_[0])) }
-
-    sub proto_var {
-        CgOp::Primitive->new(op => [ 'proto_var', $_[0] ], zyg => [ $_[1] ]);
-    }
-
     sub return {
         $_[0] ?
             CgOp::Primitive->new(op => [ 'return', 1 ], zyg => [ $_[0] ]) :
@@ -735,18 +725,6 @@ use warnings;
     sub rawnewzarr {
         my ($name, $ni) = @_;
         CgOp::Primitive->new(op => [ 'clr_new_zarr', $name ], zyg => [ $ni ]);
-    }
-
-    # must only be called during to_cgop phase!
-    sub protosub {
-        my ($body) = @_;
-        prog(
-            CgOp::Primitive->new(op => [ 'open_protopad', $body ]),
-            $body->to_cgop,
-            (!$body->ltm ? () : (
-                CgOp::Primitive->new(op => [ 'set_ltm', $body->csname ],
-                    zyg => [ RxOp::lad2cgop($body->ltm) ]))),
-            CgOp::Primitive->new(op => [ 'close_sub', $body, ($body->class ne 'Sub') ], zyg => ($body->class eq 'Sub' ? [] : [ fetch(scopedlex($body->class)) ])))
     }
 
     sub ann {

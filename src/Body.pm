@@ -12,7 +12,6 @@ use CgOp ();
     has name      => (isa => 'Str', is => 'rw', default => "anon");
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has do        => (isa => 'Op', is => 'rw');
-    has scopetree => (is => 'rw');
     has signature => (isa => 'Maybe[Sig]', is => 'rw');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
             builder => 'is_mainline');
@@ -20,13 +19,8 @@ use CgOp ();
     has type      => (isa => 'Str', is => 'rw');
     has returnable=> (isa => 'Bool', is => 'rw');
 
-    # Any => [ 'Variable', 'SAFE.F12_34' ] # a global
-    # $x  => [ 'Variable', undef, 5 ] # slot 5 in pad
-    has lexical   => (isa => 'HashRef', is => 'rw');
     # my $x inside, floats out; mostly for blasts; set by context so must be rw
     has transparent => (isa => 'Bool', is => 'rw', default => 0);
-    has decls => (isa => 'ArrayRef[Decl]', is => 'rw');
-    has cgoptree => (isa => 'CgOp', is => 'rw');
     # only used for the top mainline
     has file => (isa => 'Str', is => 'ro');
     has text => (isa => 'Str', is => 'ro');
@@ -37,223 +31,11 @@ use CgOp ();
 
     sub is_mainline { $_[0]->scopetree->{'?is_mainline'} }
 
-    sub extract_scopes {
-        my ($self, $outer) = @_;
-
-        my %h;
-        if ($self->type eq 'mainline') {
-            $h{'?is_mainline'} = 1;
-        } elsif ($self->type =~ /^(?:voidbare|package|module|class|grammar|role|slang|knowhow)$/) {
-            $h{'?is_mainline'} = $outer->{'?is_mainline'};
-        } else {
-            $h{'?is_mainline'} = 0;
-        }
-
-        my $nfields_global = 0;
-        my $nslots_local = 0;
-        my $usednamed = 0;
-        for my $le (map { $_->used_slots($h{'?is_mainline'}) } @{ $self->decls }) {
-            # 0: cloned dynamic  1: static field  2: hint
-            # 3: readonly static field  4: cloned non-dynamic
-            # 5: our-alias for bvalue in some 3
-            if ($le->[2] == 1 || $le->[2] == 3) {
-                my $sanname = $le->[0];
-                $sanname =~ s/\W//g;
-                $le->[3] = sprintf "%s.F%d_%d_%s", $::UNITNAME, $self->uid,
-                    $nfields_global++, $sanname;
-            } elsif ($le->[2] == 5) {
-                $le->[3] = $h{$le->[0] . '!b'}[2];
-            } elsif ($le->[2] == 2) {
-                $le->[3] = sprintf "%s.%s_info", $::UNITNAME, $self->csname;
-            } elsif ($le->[2] == 4) {
-                $le->[3] = $nslots_local++;
-            } else {
-                $usednamed = 1;
-            }
-            $h{shift(@$le)} = $le;
-        }
-        $h{'?num_slots'} = $nslots_local;
-        $h{'?usednamed'} = $usednamed;
-        $self->lexical(\%h);
-
-        $h{'OUTER::'} = $outer;
-        $_->extract_scopes(\%h) for (map { $_->bodies } @{ $self->decls });
-        $self->scopetree(\%h);
-    }
-
-    # call after decl lifting
-    has needs_protopad => (isa => 'Bool', is => 'ro', lazy_build => 1);
-    sub _build_needs_protopad {
-        my ($self) = @_;
-
-        for my $d (@{ $self->decls }) {
-            return 1 if $d->needs_protopad;
-            for my $b ($d->bodies) {
-                return 1 if $b->needs_protopad;
-            }
-        }
-
-        return 0;
-    }
-
-    sub needs_protovars { $_[0]->needs_protopad || $_[0]->mainline }
-
-    sub lift_decls {
-        my ($self) = @_;
-        my (@self_q, @outer_q);
-
-        # it is the caller's responsibility to process returned decls
-        local $::process = sub {
-            my (@decls) = @_;
-            for my $decl (@decls) {
-                push @outer_q, $decl->outer_decls;
-                for my $b ($decl->bodies) {
-                    my @o = $b->lift_decls;
-                    if ($self->transparent) {
-                        push @outer_q, @o;
-                    } else {
-                        for (@o) { $::process->($_); }
-                    }
-                }
-                push @self_q, $decl;
-            }
-        };
-
-        $::process->(Decl::Hint->new(name => '$?CURPKG',
-            value => CgOp::letvar('pkg'))) if $self->type =~ /mainline|class|
-            package|grammar|module|role|slang|knowhow/x;
-
-        if ($self->type eq 'mainline') {
-            $::process->(
-                Decl::Hint->new(name => '$?GLOBAL',
-                    value => CgOp::letvar('pkg')),
-                Decl::Hint->new(name => '$?FILE',
-                    value => CgOp::string_var($self->file)),
-                Decl::Hint->new(name => '$?ORIG',
-                    value => CgOp::string_var($self->text)));
-        }
-        $::process->($self->signature->local_decls) if $self->signature;
-        if ($self->type eq 'rxembedded') {
-            $::process->(
-                Decl::VarAlias->new(oname => '$¢', nname => '$/'));
-        }
-        if ($self->transparent) {
-            push @outer_q, $self->do->lift_decls;
-        } else {
-            $::process->($self->do->lift_decls);
-        }
-
-        $self->decls(\@self_q);
-
-        @outer_q;
-    }
-
-    sub to_cgop {
-        my ($self) = @_;
-        my @enter;
-        push @enter, $self->signature->binder($self) if $self->signature;
-        push @enter, map { $_->enter_code($self) } @{ $self->decls };
-        # TODO: Bind a return value here to catch non-ro sub use
-        if ($self->type eq 'gather') {
-            $self->cgoptree(CgOp::prog(@enter,
-                    CgOp::sink($self->do->cgop($self)),
-                    CgOp::rawsccall('Kernel.Take',
-                        CgOp::scopedlex('EMPTY'))));
-        } elsif ($self->returnable && defined($self->signature)) {
-            $self->cgoptree(CgOp::prog(@enter,
-                    CgOp::return(CgOp::span("rstart", "rend",
-                        $self->do->cgop($self))),
-                    CgOp::ehspan(4, undef, 0, "rstart", "rend", "rend")));
-        } else {
-            $self->cgoptree(CgOp::prog(@enter,
-                    CgOp::return($self->do->cgop($self))));
-        }
-        map { $_->preinit_code($self) } @{ $self->decls };
-    }
-
-    sub to_anf {
-        my ($self) = @_;
-        $self->cgoptree($self->cgoptree->cps_convert(1));
-        $_->to_anf for (map { $_->bodies } @{ $self->decls });
-    }
-
-    sub write {
-        my ($self) = @_;
-        $_->write for (map { $_->bodies } @{ $self->decls });
-        CodeGen->new(csname => $self->csname, body => $self,
-            minlets => $self->lexical->{'?num_slots'},
-            usednamed => $self->lexical->{'?usednamed'},
-            ops => $self->cgoptree)->write;
-    }
-
-    sub lex_level {
-        my ($self, $var) = @_;
-        ($self->lex_info($var))[0];
-    }
-
-    sub lex_info {
-        my ($self, $var) = @_;
-
-        my $i = 0;
-        my $st = $self->scopetree;
-        while ($st) {
-            return ($i, @{ $st->{$var} }) if ($st->{$var});
-            $i++;
-            $st = $st->{'OUTER::'};
-        }
-        return -1;
-    }
-
     sub csname {
         my ($self) = @_;
         my @name = split /\W+/, $self->name;
         shift @name if @name && $name[0] eq '';
         join("", (map { ucfirst $_ } @name), "_", $self->uid, "C");
-    }
-
-    # In order to support proper COMMON semantics on package variables
-    # we have only one operation here - autovivifying lookup.
-    #
-    # This should be used for all accesses like $a::b, $::b.  $a is a simple
-    # lexical.
-    sub lookup_var {
-        my ($self, $name, @path) = @_;
-
-        return $self->lookup_pkg((map { $_ . "::" } @path),
-            (defined $name) ? ($name) : ());
-    }
-
-    sub lookup_pkg {
-        my ($self, @components) = @_;
-
-        my $pkgcg;
-        my $usedstate = 0;
-        # TODO: S02 says PROCESS:: and GLOBAL:: are also accessible as lexical
-        # packages in UNIT::.
-        if ($components[0] eq 'PROCESS::') {
-            $pkgcg = CgOp::rawsget('Kernel.Process');
-            shift @components;
-        } elsif ($components[0] eq 'GLOBAL::') {
-            $pkgcg = CgOp::scopedlex('$?GLOBAL');
-            shift @components;
-        } elsif ($components[0] eq 'OUR::') {
-            $pkgcg = CgOp::scopedlex('$?CURPKG');
-            shift @components;
-        } elsif ($self->lex_level($components[0]) >= 0) {
-            $pkgcg = CgOp::scopedlex($components[0]);
-            $usedstate = 1 unless $components[0] =~ /::$/;
-            shift @components;
-        } else {
-            $pkgcg = CgOp::scopedlex('$?CURPKG');
-        }
-
-        $pkgcg = CgOp::rawnew('BValue', $pkgcg);
-        for my $c (@components) {
-            $pkgcg = CgOp::rawscall('Kernel.PackageLookup',
-                CgOp::fetch(CgOp::bget($pkgcg)), CgOp::clr_string($c));
-        }
-
-        $usedstate, $pkgcg;
     }
 
     __PACKAGE__->meta->make_immutable;

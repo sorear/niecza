@@ -14,11 +14,9 @@ use autodie ':all';
 open ::NIECZA_OUT, ">&", \*STDOUT;
 
 use Body ();
-use Decl ();
 use Unit ();
 use Op ();
 use Optimizer::Beta ();
-use ResolveLex ();
 use Metamodel ();
 use CSharpBackend ();
 use Storable;
