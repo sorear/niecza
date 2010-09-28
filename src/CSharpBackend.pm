@@ -124,6 +124,10 @@ sub stash2 {
     push @decls, $p;
     push @thaw, CgOp::rawsset($p, CgOp::rawnew('CLRImportObject',
         CgOp::rawnew('Dictionary<string,BValue>')));
+    if (@{ $_->path } == 1 && $_->path->[0] =~ /^(?:GLOBAL|PROCESS)$/) {
+        push @thaw, CgOp::rawsset('Kernel.' . ucfirst(lc($_->path->[0])) .
+            'O', CgOp::rawsget($p));
+    }
 }
 
 # xxx check for SAFE::

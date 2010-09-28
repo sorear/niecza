@@ -916,10 +916,8 @@ slow:
             }
         }
 
-        // XXX should be per-unit
-        public static Variable Global;
+        // used as the fallbacks for $*FOO
         public static IP6 GlobalO;
-        public static Variable Process;
         public static IP6 ProcessO;
 
         static Kernel() {
@@ -938,11 +936,6 @@ slow:
             ScalarMO = new DynMetaObject("Scalar");
             ScalarMO.AddAttribute("value");
             ScalarMO.Complete();
-
-            GlobalO = new CLRImportObject(new Dictionary<string,BValue>());
-            Global = NewROScalar(GlobalO);
-            ProcessO = new CLRImportObject(new Dictionary<string,BValue>());
-            Process = NewROScalar(ProcessO);
         }
 
         public static Dictionary<string, int> usedNames = new Dictionary<string, int>();
