@@ -209,11 +209,10 @@ sub pkg3 {
 sub enter_code {
     my ($body) = @_;
     my @code;
-    # in this case, the variables were initialized earlier and are still useful
-    goto novars if $body->run_once && $body->spad_exists;
-
     for my $ln (sort keys %{ $body->lexicals }) {
         my $lx = $body->lexicals->{$ln};
+
+        next if $body->run_once && $body->spad_exists && !dynname($ln);
 
         if ($lx->isa('Metamodel::Lexical::SubDef')) {
             push @code, access_lex($body, $ln,
@@ -271,7 +270,7 @@ sub access_lex {
 
     if ($lex->isa('Metamodel::Lexical::SubDef') ||
             $lex->isa('Metamodel::Lexical::Simple')) {
-        if ($bp->run_once) {
+        if ($bp->run_once && !dynname($name)) {
             return $set_to ? CgOp::rawsset($lex->{peer}, $set_to) :
                 CgOp::rawsget($lex->{peer});
         } elsif ((my $ix = $lex->{peer}) >= 0) {
@@ -346,6 +345,7 @@ sub codegen_sub {
         usednamed => $_->{peer}{uname}, minlets => $_->{peer}{nlexn});
 }
 
+sub dynname { $_[0] =~ /^.?[*?]/ }
 # lumped under a sub are all the static-y lexicals
 # protopads and proto-sub-instances need to exist early because methods, in
 # particular, bind to them
@@ -371,11 +371,11 @@ sub sub0 {
 
         if ($lx->isa('Metamodel::Lexical::SubDef') ||
                 $lx->isa('Metamodel::Lexical::Simple')) {
-            if ($_->run_once) {
-                push @decls, ($lx->{peer} = gsym('Variable', $ln));
-            } elsif ($ln =~ /^.?[*?]/) {
+            if (dynname($ln)) {
                 $lx->{peer} = -1;
                 $uname = 1;
+            } elsif ($_->run_once) {
+                push @decls, ($lx->{peer} = gsym('Variable', $ln));
             } else {
                 $lx->{peer} = ($nlexn++);
             }
@@ -437,7 +437,7 @@ sub sub2 {
 sub protolset {
     my ($body, $lname, $lex, $frag) = @_;
 
-    if ($body->run_once) {
+    if ($body->run_once && !dynname($lname)) {
         push @thaw, CgOp::rawsset($lex->{peer}, $frag);
     } elsif ((my $ix = $lex->{peer}) >= 4) {
         push @thaw, CgOp::setindex(CgOp::int($ix - 4),

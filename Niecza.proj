@@ -16,7 +16,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <CompilerPerl Include="src\Body.pm;src\CClass.pm;src\CgOp.pm;src\CodeGen.pm;src\CompilerDriver.pm;src\Decl.pm;src\Op.pm;src\Optimizer\Beta.pm;src\Optimizer\RxSimple.pm;src\ResolveLex.pm;src\RxOp.pm;src\Sig.pm;src\Unit.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc"/>
+        <CompilerPerl Include="src\Body.pm;src\CClass.pm;src\CgOp.pm;src\CSharpBackend.pm;src\CodeGen.pm;src\CompilerDriver.pm;src\Metamodel.pm;src\Op.pm;src\Optimizer\Beta.pm;src\Optimizer\RxSimple.pm;src\RxOp.pm;src\Sig.pm;src\Unit.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc"/>
     </ItemGroup>
 
     <!-- Meta targets -->

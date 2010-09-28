@@ -802,7 +802,7 @@ sub Op::Super::begin {
 
 sub Op::SubDef::begin {
     my $self = shift;
-    my $body = $self->body->begin;
+    my $body = $self->body->begin(once => $self->once);
     $opensubs[-1]->add_my_sub($self->var, $body);
     my $r;
     if (@{ $self->exports } || defined($self->method_too) ||

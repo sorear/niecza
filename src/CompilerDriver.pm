@@ -254,6 +254,7 @@ sub compile {
             }
             print STDERR "@args\n" if $args{stagetime};
             system @args;
+            $ast = undef;
         } ],
         [ 'aot', sub {
             system "mono", "--aot", $outfile;
@@ -267,7 +268,7 @@ sub compile {
         printf "%-20s: %gs\n", "$basename " . $p->[0],
             $t2 - $t1 if $args{stagetime};
         if ($args{stopafter} && $args{stopafter} eq $p->[0]) {
-            if ($ast) {
+            if ($ast && $args{stopafter} ne 'writecs') {
                 print STDERR YAML::XS::Dump($ast);
             }
             return;
