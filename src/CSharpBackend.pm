@@ -38,7 +38,6 @@ sub gsym {
     wantarray ? ($full, $base) : $full;
 }
 
-my $st_ty = 'Dictionary<string,BValue>';
 my $cl_ty = 'DynMetaObject';
 my $si_ty = 'SubInfo';
 
@@ -118,9 +117,10 @@ EOM
 }
 
 sub stash2 {
-    my $p = $lpeers{$_} = gsym($st_ty, 'STASH');
+    my $p = $lpeers{$_} = gsym('IP6', join("_", @{ $_->path }));
     push @decls, $p;
-    push @thaw, CgOp::rawsset($p, CgOp::rawnew($st_ty));
+    push @thaw, CgOp::rawsset($p, CgOp::rawnew('CLRImportObject',
+        CgOp::rawnew('Dictionary<string,BValue>')));
 }
 
 # xxx check for SAFE::
@@ -380,7 +380,7 @@ sub sub3 {
         if ($lx->isa('Metamodel::Lexical::Common')) {
             push @thaw, CgOp::rawsset($lx->{peer},
                 CgOp::rawscall('Kernel.PackageLookup',
-                    CgOp::rawsget($lpeers{$unit->get_stash($lx->path)}),
+                    CgOp::rawsget($lpeers{$unit->get_stash(@{$lx->path})}),
                     CgOp::clr_string($lx->name)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
             push @thaw, CgOp::setindex($ln,
