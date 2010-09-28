@@ -333,8 +333,10 @@ sub codegen_sub {
 sub sub0 {
     my $node = ($_->{peer} = {});
     push @decls, ($node->{si} = gsym($si_ty, $_->name));
-    push @decls, ($node->{ps} = gsym('IP6', $_->name . 'PS'));
-    push @decls, ($node->{pp} = gsym('Frame', $_->name . 'PP'));
+    push @decls, ($node->{ps} = gsym('IP6', $_->name . 'PS'))
+        if !$_->outer || $_->outer->spad_exists;
+    push @decls, ($node->{pp} = gsym('Frame', $_->name . 'PP'))
+        if $_->spad_exists;
     @$node{'cref','cbase'} = gsym('DynBlockDelegate', $_->name . 'C');
 
     for my $ln (sort keys %{ $_->lexicals }) {
@@ -367,17 +369,21 @@ sub sub2 {
     push @thaw, CgOp::rawsset($si, CgOp::rawnew($si_ty, @{ $node->{sictor} }));
 
     my $pp = $node->{pp};
-    push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',
-            CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
-                CgOp::rawsget($_->outer->{peer}{pp})),
-            CgOp::rawsget($si)));
-    push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
-        CgOp::rawnew('Dictionary<string,object>'));
+    if ($pp) {
+        push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',
+                CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
+                    CgOp::rawsget($_->outer->{peer}{pp})),
+                CgOp::rawsget($si)));
+        push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
+            CgOp::rawnew('Dictionary<string,object>'));
+    }
 
     my $ps = $node->{ps};
-    push @thaw, CgOp::rawsset($ps, CgOp::rawscall('Kernel.MakeSub',
-            CgOp::rawsget($si), !$_->outer ? CgOp::null('Frame') :
-                CgOp::rawsget($_->outer->{peer}{pp})));
+    if ($ps) {
+        push @thaw, CgOp::rawsset($ps, CgOp::rawscall('Kernel.MakeSub',
+                CgOp::rawsget($si), !$_->outer ? CgOp::null('Frame') :
+                    CgOp::rawsget($_->outer->{peer}{pp})));
+    }
 }
 
 sub sub3 {
@@ -395,10 +401,12 @@ sub sub3 {
                     CgOp::rawsget($lpeers{$stash}),
                     CgOp::clr_string($lx->name)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
+            next unless $_->spad_exists;
             push @thaw, CgOp::setindex($ln,
                 CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
                 CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
+            next unless $_->spad_exists;
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
                 my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
