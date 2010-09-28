@@ -544,6 +544,12 @@ use 5.010;
         $self->_push($class . "[]", "new $class []{" . join(", ", @args) . "}");
     }
 
+    sub clr_new_zarr {
+        my ($self, $class) = @_;
+        my ($nitems) = $self->_popn(1);
+        $self->_push($class . "[]", "(new $class [$nitems])");
+    }
+
     sub clr_string {
         my ($self, $text) = @_;
         $self->_push('System.String', qm($text));

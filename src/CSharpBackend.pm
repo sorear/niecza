@@ -271,11 +271,17 @@ sub access_lex {
         if ($bp->run_once) {
             return $set_to ? CgOp::rawsset($lex->{peer}, $set_to) :
                 CgOp::rawsget($lex->{peer});
+        } elsif ((my $ix = $lex->{peer}) >= 0) {
+            return $set_to ?
+                CgOp::Primitive->new(op => [ rtpadputi => $order, $ix ],
+                    zyg => [ $set_to ]) :
+                CgOp::Primitive->new(op => [ rtpadgeti => 'Variable',$order,$ix ]);
+        } else {
+            return $set_to ?
+                CgOp::Primitive->new(op => [ rtpadput => $order, $name ],
+                    zyg => [ $set_to ]) :
+                CgOp::Primitive->new(op => [ rtpadget => 'Variable',$order,$name ]);
         }
-        return $set_to ?
-            CgOp::Primitive->new(op => [ rtpadput => $order, $name ],
-                zyg => [ $set_to ]) :
-            CgOp::Primitive->new(op => [ rtpadget => 'Variable',$order,$name ]);
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
         my $ref = $unit->get_stash(@{ $lex->path })->obj;
@@ -331,7 +337,7 @@ sub codegen_sub {
     local %haslet;
     resolve_lex($_, $ops);
     CodeGen->new(csname => $_->{peer}{cbase}, ops => $ops->cps_convert(0),
-        usednamed => 1);
+        usednamed => $_->{peer}{uname}, minlets => $_->{peer}{nlexn});
 }
 
 # lumped under a sub are all the static-y lexicals
@@ -347,6 +353,8 @@ sub sub0 {
         if $_->spad_exists;
     @$node{'cref','cbase'} = gsym('DynBlockDelegate', $_->name . 'C');
 
+    my ($nlexn, $uname) = (0,0);
+
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
 
@@ -355,11 +363,20 @@ sub sub0 {
             push @decls, $bv;
         }
 
-        if ($_->run_once && ($lx->isa('Metamodel::Lexical::SubDef') ||
-                $lx->isa('Metamodel::Lexical::Simple'))) {
-            push @decls, ($lx->{peer} = gsym('Variable', $ln));
+        if ($lx->isa('Metamodel::Lexical::SubDef') ||
+                $lx->isa('Metamodel::Lexical::Simple')) {
+            if ($_->run_once) {
+                push @decls, ($lx->{peer} = gsym('Variable', $ln));
+            } elsif ($ln =~ /^.?[*?]/) {
+                $lx->{peer} = -1;
+                $uname = 1;
+            } else {
+                $lx->{peer} = ($nlexn++);
+            }
         }
     }
+
+    @$node{'nlexn', 'uname'} = ($nlexn, $uname);
 }
 
 sub sub1 {
@@ -387,8 +404,14 @@ sub sub2 {
                 CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
                     CgOp::rawsget($_->outer->{peer}{pp})),
                 CgOp::rawsget($si)));
-        push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
-            CgOp::rawnew('Dictionary<string,object>'));
+        if ($node->{uname}) {
+            push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
+                CgOp::rawnew('Dictionary<string,object>'));
+        }
+        if ($node->{nlexn} > 4) {
+            push @thaw, CgOp::setfield('lexn', CgOp::rawsget($pp),
+                CgOp::rawnewzarr('object', CgOp::int($node->{nlexn} - 4)));
+        }
     }
 
     my $ps = $node->{ps};
@@ -398,6 +421,27 @@ sub sub2 {
                     CgOp::rawsget($_->outer->{peer}{pp})));
     }
 }
+
+# use for SubDef / Simple only
+sub protolset {
+    my ($body, $lname, $lex, $frag) = @_;
+
+    if ($body->run_once) {
+        push @thaw, CgOp::rawsset($lex->{peer}, $frag);
+    } elsif ((my $ix = $lex->{peer}) >= 4) {
+        push @thaw, CgOp::setindex(CgOp::int($ix - 4),
+            CgOp::getfield('lexn', CgOp::rawsget($body->{peer}{pp})),
+            $frag);
+    } elsif ($ix >= 0) {
+        push @thaw, CgOp::setfield("lex$ix",
+            CgOp::rawsget($body->{peer}{pp}), $frag);
+    } else {
+        push @thaw, CgOp::setindex($lname,
+            CgOp::getfield('lex', CgOp::rawsget($body->{peer}{pp})),
+            $frag);
+    }
+}
+
 
 sub sub3 {
     for my $ln (sort keys %{ $_->lexicals }) {
@@ -415,14 +459,8 @@ sub sub3 {
                     CgOp::clr_string($lx->name)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
             next unless $_->spad_exists;
-            if ($_->run_once) {
-                push @thaw, CgOp::rawsset($lx->{peer},
-                    CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
-            } else {
-                push @thaw, CgOp::setindex($ln,
-                    CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
-                    CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
-            }
+            protolset($_, $ln, $lx,
+                CgOp::newscalar(CgOp::rawsget($lx->body->{peer}{ps})));
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             next unless $_->spad_exists;
             if ($lx->hash || $lx->list) {
@@ -434,13 +472,7 @@ sub sub3 {
             } else {
                 $frag = CgOp::newblankrwscalar;
             }
-            if ($_->run_once) {
-                push @thaw, CgOp::rawsset($lx->{peer}, $frag);
-            } else {
-                push @thaw, CgOp::setindex($ln,
-                    CgOp::getfield('lex', CgOp::rawsget($_->{peer}{pp})),
-                    $frag);
-            }
+            protolset($_, $ln, $lx, $frag);
         }
     }
 }

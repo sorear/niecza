@@ -727,6 +727,11 @@ use warnings;
             zyg => \@args);
     }
 
+    sub rawnewzarr {
+        my ($name, $ni) = @_;
+        CgOp::Primitive->new(op => [ 'clr_new_zarr', $name ], zyg => [ $ni ]);
+    }
+
     # must only be called during to_cgop phase!
     sub protosub {
         my ($body) = @_;
