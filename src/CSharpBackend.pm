@@ -212,10 +212,10 @@ sub enter_code {
         my $lx = $body->lexicals->{$ln};
 
         if ($lx->isa('Metamodel::Lexical::SubDef')) {
-            push @code, CgOp::Primitive->new(op => [ rtpadput => 0, $ln ],
-                zyg => [ CgOp::newscalar(CgOp::rawscall('Kernel.MakeSub',
-                            CgOp::rawsget($lx->body->{peer}{si}),
-                            CgOp::callframe)) ]);
+            push @code, access_lex($body, $ln,
+                CgOp::newscalar(CgOp::rawscall('Kernel.MakeSub',
+                        CgOp::rawsget($lx->body->{peer}{si}),
+                        CgOp::callframe)));
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             my $frag;
             next if $lx->noinit;
@@ -228,8 +228,7 @@ sub enter_code {
             } else {
                 $frag = CgOp::newblankrwscalar;
             }
-            push @code, CgOp::Primitive->new(op => [ rtpadput => 0, $ln ],
-                zyg => [ $frag ]);
+            push @code, access_lex($body, $ln, $frag);
         }
     }
 novars:

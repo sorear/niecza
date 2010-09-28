@@ -4,7 +4,7 @@ my module CORE;
 
 sub slurp($path) {
     Q:CgOp { (box Str (rawscall System.IO.File.ReadAllText
-        (unbox System.String (@ (l $path))))) }
+        (unbox System.String (@ {$path})))) }
 }
 
 my class IO is Cool {
@@ -38,9 +38,7 @@ my class TextReader is IO {
     }
 }
 
-PRE-INIT {
-    $PROCESS::IN ::= Q:CgOp { (box TextReader (rawsget
-        System.Console.In:f,System.IO.TextReader)) };
-}
+$PROCESS::IN ::= Q:CgOp { (box TextReader (rawsget
+    System.Console.In:f,System.IO.TextReader)) };
 
 {YOU_ARE_HERE}

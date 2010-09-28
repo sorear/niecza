@@ -859,7 +859,7 @@ use CgOp;
         my ($self, $body, $ro, $rhscg) = @_;
         $self->looks_static ?
             CgOp::prog(
-                CgOp::bset(CgOp::scopedlex($self->slot . '!b'),
+                CgOp::scopedlex($self->slot,
                     CgOp::newboundvar($ro, $self->list || $self->hash, $rhscg)),
                 CgOp::scopedlex($self->slot)) :
             CgOp::letn('!bv', ($body->lookup_var($self->name,

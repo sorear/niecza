@@ -331,6 +331,8 @@ our $unit;
         if ($names[0] eq 'OUR') {
             @tp = @{ $self->cur_pkg };
             shift @names;
+        } elsif ($names[0] eq 'PROCESS') {
+            @tp = shift(@names);
         } elsif ($names[0] eq 'MY') {
             @tp = @{ $self->find_lex_pkg($names[1]) };
             splice @names, 0, 2;
@@ -629,7 +631,7 @@ sub Body::begin {
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
         class      => $self->class,
-        run_once   => $args{once} && (!defined($rtop) || $rtop->run_once));
+        run_once   => $args{once} && (!@opensubs || $rtop->run_once));
 
     $unit->get_stash(@{ $metabody->cur_pkg });
 

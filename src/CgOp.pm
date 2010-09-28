@@ -251,6 +251,11 @@ use warnings;
                         $z->zyg->[0]->var_cg($cg);
                         return;
                     }
+                    when ("clr_field_get") {
+                        CgOp::Primitive->new(op => [ 'drop' ],
+                            zyg => [ $z->zyg->[0] ])->var_cg($cg);
+                        return;
+                    }
                     when ("hint_get") {
                         return;
                     }
