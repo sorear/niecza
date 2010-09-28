@@ -657,6 +657,11 @@ sub Body::begin {
         class      => $self->class,
         run_once   => $args{once} && (!@opensubs || $rtop->run_once));
 
+    if ($self->signature && @{ $self->signature->params } >= 1 &&
+            $self->signature->params->[0]->slot eq '$¢') {
+        $metabody->lexicals->{'$/'} = Metamodel::Lexical::Alias->new('$¢');
+    }
+
     $unit->get_stash(@{ $metabody->cur_pkg });
 
     push @opensubs, $metabody; # always visible in the signature XXX
