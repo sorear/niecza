@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 539;
+plan 534;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -62,16 +62,6 @@ ok 42 / 3 == 14, "division comes out in the right order";
 
     ok $a == 55, "looping works";
 }
-
-{
-    my $x;
-    INIT {
-        $x = 1;
-    }
-    ok $x, "changes made in the protolexpad are visible at runtime";
-}
-
-ok INIT { 1 }, "init blocks can return values";
 
 {
     sub foo() { 42 }
@@ -226,13 +216,6 @@ ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
     ok $f() == 0, "state variables can be initialized";
     ok $f() == 1, "state variables preserve values";
     ok $g() == 0, "different clones have different state vars";
-}
-
-{
-    my $x;
-    my $unclonable-sub = INIT { sub () { $x } };
-    $x = 42;
-    ok $unclonable-sub() == 42, "mainlines are not cloned";
 }
 
 {
@@ -448,9 +431,6 @@ EOB
 Foo
 EOC
 }
-
-is $?FILE, 'test.pl', '$?FILE works';
-is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 {
     my @x;

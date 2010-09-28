@@ -404,6 +404,11 @@ sub sub2 {
 
     push @thaw, CgOp::rawsset($si, CgOp::rawnew($si_ty, @{ $node->{sictor} }));
 
+    if ($_->class ne 'Sub') {
+        my $cl = $unit->deref($unit->get_stash(@{ $_->find_lex_pkg($_->class) })->obj);
+        push @thaw, CgOp::setfield('mo', CgOp::rawsget($si), CgOp::rawsget($cl->{peer}{mo}));
+    }
+
     my $pp = $node->{pp};
     if ($pp) {
         push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',

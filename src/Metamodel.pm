@@ -174,6 +174,17 @@ our $unit;
 }
 
 {
+    package Metamodel::Grammar;
+    use Moose;
+    extends 'Metamodel::Class';
+
+    sub _defsuper { 'Grammar' }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
     package Metamodel::Method;
     use Moose;
 
