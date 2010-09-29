@@ -99,12 +99,12 @@ EOM
                 $s = $su->setting;
                 $m = $su->mainline;
             }
-            push @thaw, CgOp::subcall(CgOp::rawsget($m->{peer}{ps}));
+            push @thaw, CgOp::sink(CgOp::subcall(CgOp::rawsget($m->{peer}{ps})));
         });
         push @thaw, CgOp::return;
 
         push @cgs, CodeGen->new(csname => 'BOOT', usednamed => 1,
-            ops => CgOp::prog(@thaw)->cps_convert(0))->csharp;
+            ops => CgOp::prog(@thaw))->csharp;
     }
 
     for (@decls) {
@@ -341,7 +341,7 @@ sub codegen_sub {
 
     local %haslet;
     resolve_lex($_, $ops);
-    CodeGen->new(csname => $_->{peer}{cbase}, ops => $ops->cps_convert(0),
+    CodeGen->new(csname => $_->{peer}{cbase}, ops => $ops,
         usednamed => $_->{peer}{uname}, minlets => $_->{peer}{nlexn});
 }
 

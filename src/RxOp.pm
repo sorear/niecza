@@ -587,8 +587,8 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
-            CgOp::newscalar(CgOp::rxcall("MakeCursor")));
+        CgOp::sink(CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
+            CgOp::newscalar(CgOp::rxcall("MakeCursor"))));
     }
 
     sub lad {

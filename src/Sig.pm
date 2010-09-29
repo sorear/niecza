@@ -48,10 +48,8 @@ use 5.010;
                 return CgOp::scopedlex($self->type);
             }
         } else {
-            return CgOp::prog(
-                CgOp::die("No value in " . $body->name .
-                    " available for parameter " . $self->name),
-                CgOp::null('Variable'));
+            return CgOp::die("No value in " . $body->name .
+                " available for parameter " . $self->name);
         }
     }
 

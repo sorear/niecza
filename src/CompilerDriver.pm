@@ -11,8 +11,6 @@ use Time::HiRes 'time';
 use File::Basename;
 use autodie ':all';
 
-open ::NIECZA_OUT, ">&", \*STDOUT;
-
 use Body ();
 use Unit ();
 use Op ();

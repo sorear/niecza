@@ -485,7 +485,7 @@ my class Array is List {
                   ct (- (cast Int32 (unbox Double (@ (pos 1))))
                         (rawcall (l i) Count))
               (ternary (>= (l ct) (int 0)) [prog]
-                [die "Autovivification collision"])
+                [sink [die "Autovivification collision"]])
               (whileloop 0 0 (!= (l ct) (int 0))
                 (prog
                   (l ct (- (l ct) (int 1)))
@@ -512,7 +512,7 @@ my class Hash {
             (letn d [unbox Dictionary<string,Variable> (@ (pos 0))]
                   k [unbox String (@ (methodcall (pos 1) Str))]
               [ternary (rawcall (l d) ContainsKey (l k))
-                (die "Autovivification collision")
+                (sink (die "Autovivification collision"))
                 (prog)]
               [setindex (l k) (l d) (pos 2)]
               [null Variable])
@@ -640,7 +640,7 @@ my class CallFrame {
 sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
 sub callframe { Q:CgOp { (ns (getfield caller (callframe))) } }
 
-sub die($msg) { Q:CgOp { (prog (die (@ (l $msg))) (null Variable)) } }
+sub die($msg) { Q:CgOp { (die (@ (l $msg))) } }
 
 # XXX multi dispatch
 sub next {

@@ -2,12 +2,11 @@ use strict;
 use warnings;
 use 5.010;
 
+use CgOpToCLROp;
+
 {
     package CodeGen;
     use Moose;
-
-    our $file = '';
-    our $line = 0;
 
     # Beta will do this using reflection
     my %typedata = (
@@ -99,6 +98,7 @@ use 5.010;
         'VarDeque' =>
             { Push         => [m => 'Void'],
               Unshift      => [m => 'Void'],
+              Item         => [i => 'Variable'],
               UnshiftN     => [m => 'Void'],
               Pop          => [m => 'Variable'],
               Shift        => [m => 'Variable'],
@@ -109,7 +109,7 @@ use 5.010;
         'Lexer.RunProtoregex'  => [m => 'IP6[]'],
         'Lexer.GetLexer'       => [m => 'Lexer'],
         'Kernel.SearchForHandler' => [c => 'Variable'],
-        'Kernel.Die'           => [c => 'Void'],
+        'Kernel.Die'           => [c => 'Variable'],
         'Kernel.CoTake'        => [c => 'Variable'],
         'Kernel.Take'          => [c => 'Variable'],
         'Kernel.GatherHelper'  => [c => 'Frame'],
@@ -149,15 +149,18 @@ use 5.010;
     sub _generic_infer {
         /Dictionary<(.*),(.*)>/ && return {
             ContainsKey         => [ m => 'Boolean' ],
+            Item                => [ i => $2 ],
         };
         /List<(.*)>/ && return {
             Add                 => [m => 'Void'],
             Insert              => [m => 'Void'],
             RemoveAt            => [m => 'Void'],
             Count               => [f => 'Int32'],
+            Item                => [i => $1],
         };
         /(.*)\[\]/ && return {
             Length              => [f => 'Int32'],
+            Item                => [i => $1],
         };
     }
 
@@ -219,6 +222,7 @@ use 5.010;
     has lettypes  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has numlets   => (isa => 'Int', is => 'rw', default => 0);
     has consttab  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
+    has linestack => (isa => 'ArrayRef', is => 'ro', default => sub { [0] });
     has ehspans   => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has ehlabels  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
 
@@ -282,7 +286,7 @@ use 5.010;
         my $n = $self->ip;
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
-        $self->lineinfo->[$n] = $line;
+        $self->lineinfo->[$n] = $self->linestack->[-1];
         push @{ $self->buffer }, "case $n:\n";
         die "Broken call $expr" if !defined($rt);
         $self->resulttype($rt);
@@ -308,6 +312,16 @@ use 5.010;
     sub _lexn {
         my ($which) = @_;
         ($which < 4) ? ("th.lex$which") : ("th.lexn[" . ($which - 4) . "]");
+    }
+
+    sub push_line {
+        my ($self, $line) = @_;
+        push @{ $self->linestack }, $line;
+    }
+
+    sub pop_line {
+        my ($self) = @_;
+        pop @{ $self->linestack };
     }
 
     sub push_let {
@@ -380,7 +394,7 @@ use 5.010;
         $self->_restorestackstate($n) if $self->savedstks->{$n};
         push @{ $self->buffer }, "    goto case $ip;\n" unless $self->unreach;
         push @{ $self->buffer }, "case $ip:\n";
-        $self->lineinfo->[$ip] = $line;
+        $self->lineinfo->[$ip] = $self->linestack->[-1];
         $self->unreach(0);
     }
 
@@ -628,11 +642,7 @@ use 5.010;
             $self->clr_string($f);
         }
         my ($obj, $ix, $oty, $ixty)  = $self->_popn(2);
-        my $ty  = ($oty =~ /^Dictionary<.*,(.*)>$/) ? $1 :
-                  ($oty =~ /^VarDeque$/) ? 'Variable' :
-                  ($oty =~ /^(.*)\[\]$/) ? $1 :
-                  ($oty =~ /^List<(.*)>$/) ? $1 :
-                  die "type inference needs more hacks $oty";
+        my ($nm, $cl, $ty) = $self->_typedata('i', $oty, 'Item');
         $self->_push($ty, "($obj" . "[$ix])");
     }
 
@@ -647,11 +657,6 @@ use 5.010;
     sub cast {
         my ($self, $type) = @_;
         $self->_push($type, "(($type)" . ($self->_popn(1))[0] . ")");
-    }
-
-    sub fgoto {
-        my ($nv, $self) = @_;
-        $self->_cpscall(($nv ? 'Variable' : 'Void'), ($self->_popn(1))[0]);
     }
 
     sub clr_call_direct {
@@ -761,7 +766,7 @@ use 5.010;
 
     sub BUILD {
         my $self = shift;
-        $self->ops->var_cg($self);
+        CgOpToCLROp::codegen($self, $self->ops);
     }
 
     __PACKAGE__->meta->make_immutable;
