@@ -63,7 +63,7 @@ $fixtype{$_} = 'Void' for (qw/ poke_let labelhere goto cgoto ncgoto ehspan
     rtpadput rtpadputi drop tail_call_sub clr_field_set clr_sfield_set
     clr_index_set rxbprim rxpushb return/);
 
-$fixtype{$_} = 'Variable' for (qw/ pos call_sub call_method attr_var /);
+$fixtype{$_} = 'Variable' for (qw/ pos call_sub call_method /);
 
 sub type_infer {
     my ($op, @argtypes) = @_;

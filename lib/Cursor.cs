@@ -342,10 +342,6 @@ public class Cursor : IP6 {
 
     public override DynMetaObject GetMO() { return klass; }
 
-    public override Frame GetAttribute(Frame caller, string name) {
-        return Fail(caller, "Cursors cannot have attributes");
-    }
-
     public override bool IsDefined() {
         return true;
     }

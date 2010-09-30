@@ -378,11 +378,6 @@ use CLRTypes;
         $self->_emit(CLRTypes->strip($f) . " = $val");
     }
 
-    sub attr_var {
-        my ($self, $f, $oty, $obj) = @_;
-        $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
-    }
-
     sub clr_index_get {
         my ($self, $f) = splice @_, 0, 2;
         my ($oty, $obj, $ixty, $ix) = defined($f) ?

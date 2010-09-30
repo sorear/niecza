@@ -162,16 +162,15 @@ use warnings;
     }
 
     sub getslot {
-        rawcall(cast('clr:DynObject', $_[1]), 'GetSlot', $_[0]);
+        cast($_[1], rawcall($_[2], 'GetSlot', (blessed($_[0]) ? $_[0] : clr_string($_[0]))));
     }
 
     sub setslot {
-        rawcall(cast('clr:DynObject', $_[1]), 'SetSlot', $_[0], $_[2]);
+        rawcall($_[1], 'SetSlot', (blessed($_[0]) ? $_[0] : clr_string($_[0])), $_[2]);
     }
 
     sub varattr {
-        CgOp::Primitive->new(op => [ 'attr_var', $_[0] ], zyg => [ $_[1] ],
-            is_cps_call => 1);
+        getslot($_[0], 'var', $_[1]);
     }
 
     sub cast {

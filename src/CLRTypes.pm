@@ -10,6 +10,8 @@ my %typedata = (
     IP6 =>
         { Isa          => [m => 'Boolean'],
           Does         => [m => 'Boolean'],
+          GetSlot      => [m => 'object'],
+          SetSlot      => [m => 'Void'],
           GetTypeName  => [m => 'String'],
           GetTypeObject=> [m => 'IP6'],
           GetMO        => [m => 'DynMetaObject'],
@@ -17,8 +19,6 @@ my %typedata = (
           HOW          => [c => 'IP6'] },
     DynObject =>
         { klass        => [f => 'DynMetaObject'],
-          GetSlot      => [m => 'object'],
-          SetSlot      => [m => 'Void'],
           slots        => [f => 'Dictionary<string,Object>'] },
 
     DynMetaObject =>
@@ -137,6 +137,9 @@ my %typedata = (
     'Kernel.BoxAny'        => [m => 'Variable'],
     'Kernel.UnboxAny'      => [m => 'object'],
 );
+
+%{ $typedata{ $_->[0] } } = (%{ $typedata{ $_->[0] } },
+    %{ $typedata{ $_->[1] } }) for ( ['DynObject', 'IP6'] );
 
 my %tmap = (
     'str'       => 'String',

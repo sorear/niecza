@@ -18,7 +18,14 @@ namespace Niecza {
 
     public abstract class IP6 {
         public abstract DynMetaObject GetMO();
-        public abstract Frame GetAttribute(Frame caller, string name);
+
+        public virtual object GetSlot(string name) {
+            throw new InvalidOperationException("no slots in this repr");
+        }
+
+        public virtual void SetSlot(string name, object v) {
+            throw new InvalidOperationException("no slots in this repr");
+        }
 
         protected Frame Fail(Frame caller, string msg) {
             return Kernel.Die(caller, msg + " in class " + GetMO().name);
@@ -88,9 +95,6 @@ namespace Niecza {
 
         public abstract IP6  GetVar();
 
-        public override Frame GetAttribute(Frame c, string s) {
-            return Kernel.Die(c, "Containers do not have attributes");
-        }
         public override DynMetaObject GetMO() { return null; }
     }
 
@@ -240,11 +244,6 @@ namespace Niecza {
 
         public Frame Continue() {
             return code(this);
-        }
-
-        public override Frame GetAttribute(Frame c, string name) {
-            c.resultSlot = lex[name];
-            return c;
         }
 
         public Variable ExtractNamed(string n) {
@@ -554,20 +553,11 @@ blocked:
 
         public override DynMetaObject GetMO() { return klass; }
 
-        public override Frame GetAttribute(Frame caller, string name) {
-            if (slots == null) {
-                return Fail(caller, "Attempted to access slot " + name +
-                        " via an object with no slots");
-            }
-            caller.resultSlot = GetSlot(name);
-            return caller;
-        }
-
-        public void SetSlot(string name, object obj) {
+        public override void SetSlot(string name, object obj) {
             slots[klass.FindSlot(name)] = obj;
         }
 
-        public object GetSlot(string name) {
+        public override object GetSlot(string name) {
             return slots[klass.FindSlot(name)];
         }
 

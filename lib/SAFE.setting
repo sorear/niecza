@@ -26,8 +26,8 @@ my class Mu {
           [l obj (rawnew clr:DynObject (getfield klass (cast clr:DynObject
                   (@ (pos 0)))))]
           [whileloop 0 0 (< (l i) (l max)) (prog
-              [rawcall (l obj) SetSlot
-                (unbox str (@ (pos (l i))))
+              [setslot
+                (unbox str (@ (pos (l i)))) (l obj)
                 (nsw (@ (pos (+ (l i) (int 1)))))]
               [l i (+ (l i) (int 2))])]
           [ns (l obj)])
@@ -313,7 +313,7 @@ my class List is Cool {
     has @!rest;
     has $!flat;
     method flat() {
-        unitem(Q:CgOp { (box Bool (getslot (s flat) (@ {self}))) }
+        unitem(Q:CgOp { (box Bool (getslot flat bool (@ {self}))) }
             ?? self !! self.SETUP(True, (&infix:<,>(self.iterator))));
     }
     method list() { unitem(self) }
@@ -321,21 +321,20 @@ my class List is Cool {
     method clone() { Q:CgOp {
         (letn dys (cast clr:DynObject (@ {self}))
               new (rawnew clr:DynObject (getfield klass (l dys)))
-          (rawcall (l new) SetSlot (s flat)
-            (rawcall (l dys) GetSlot (s flat)))
-          (rawcall (l new) SetSlot (s items) (rawnew clr:VarDeque
-              (cast clr:VarDeque (rawcall (l dys) GetSlot (s items)))))
-          (rawcall (l new) SetSlot (s rest) (rawnew clr:VarDeque
-              (cast clr:VarDeque (rawcall (l dys) GetSlot (s rest)))))
+          (setslot flat (l new) (getslot flat bool (l dys)))
+          (setslot items (l new) (rawnew clr:VarDeque
+              (getslot items clr:VarDeque (l dys))))
+          (setslot rest (l new) (rawnew clr:VarDeque
+              (getslot rest clr:VarDeque (l dys))))
           (newrwlistvar (l new)))
     } }
 
     method SETUP($flat, $parcel) { Q:CgOp {
         (letn new (rawnew clr:DynObject (rawcall (@ {self}) GetMO))
-          (rawcall (l new) SetSlot (s flat) (unbox bool (@ {$flat.Bool})))
-          (rawcall (l new) SetSlot (s rest) (rawnew clr:VarDeque
+          (setslot flat (l new) (unbox bool (@ {$flat.Bool})))
+          (setslot rest (l new) (rawnew clr:VarDeque
               (unbox 'clr:Variable[]' (@ {$parcel}))))
-          (rawcall (l new) SetSlot (s items) (rawnew clr:VarDeque))
+          (setslot items (l new) (rawnew clr:VarDeque))
           (newrwlistvar (l new)))
     } }
 
@@ -347,43 +346,35 @@ my class List is Cool {
     #| needs to apply on stuff out of the iterator stack
     method !elem is rawcall { Q:CgOp { (pos 1) } }
 
-    sub has-iterators($self) { Q:CgOp {
-        (box Bool (!= (i 0) (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s rest))) Count)))
-    } }
-
     sub count-items($self) { Q:CgOp {
-        (box Num (cast num (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s items))) Count)))
-    } }
-
-    sub shift-iterator($self) { Q:CgOp {
-        (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s rest))) Shift)
+        (box Num (cast num (rawcall (getslot items clr:VarDeque (@ {$self})) Count)))
     } }
 
     sub shift-item($self) { Q:CgOp {
-        (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s items))) Shift)
+        (rawcall (getslot items clr:VarDeque (@ {$self})) Shift)
     } }
 
     method !item-at-pos($ix) { Q:CgOp {
-        (getindex (cast int (unbox num (@ {$ix}))) (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {self})) GetSlot (s items))))
+        (getindex (cast int (unbox num (@ {$ix}))) (getslot items clr:VarDeque (@ {self})))
     } }
 
     sub pop-item($self) { Q:CgOp {
-        (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s items))) Pop)
+        (rawcall (getslot items clr:VarDeque (@ {$self})) Pop)
     } }
 
     sub push-iterator is rawcall { Q:CgOp {
-        (prog (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ (pos 0))) GetSlot (s rest))) Push (pos 1)) (null var))
+        (rnull (rawcall (getslot rest clr:VarDeque (@ (pos 0))) Push (pos 1)))
     } }
 
     sub push-item is rawcall { Q:CgOp {
-        (prog (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ (pos 0))) GetSlot (s items))) Push (pos 1)) (null var))
+        (prog (rawcall (getslot items clr:VarDeque (@ (pos 0))) Push (pos 1)) (null var))
     } }
 
     method !fill($nr) { Q:CgOp {
         (letn  nr    (cast int (unbox num (@ {$nr})))
-               items (cast clr:VarDeque (getslot (s items) (@ {self})))
-               rest  (cast clr:VarDeque (getslot (s rest) (@ {self})))
-               flat  (cast bool  (getslot (s flat) (@ {self})))
+               items (getslot items clr:VarDeque (@ {self}))
+               rest  (getslot rest clr:VarDeque (@ {self}))
+               flat  (getslot flat bool (@ {self}))
                v     (null var)
                ItMo  (rawcall (@ {Iterator}) GetMO)
           (whileloop 0 0
@@ -471,17 +462,15 @@ my class Array is List {
         # fetch everything NOW in case self is mentioned
         my $inn := @in.Seq.eager;
 
-        Q:CgOp { (prog
-            (rawcall (cast clr:DynObject (@ {self})) SetSlot (s items)
-              (rawcall (cast clr:DynObject (@ {$inn})) GetSlot (s items)))
-            (null var))
+        Q:CgOp { (rnull
+            (setslot items (@ {self}) (getslot items clr:VarDeque (@ {$inn}))))
         };
         unitem(self);
     }
 
     method !extend is rawcall {
         Q:CgOp {
-            (letn i (cast clr:VarDeque (getslot (s items) (@ (pos 0))))
+            (letn i (getslot items clr:VarDeque (@ (pos 0)))
                   ct (- (cast int (unbox num (@ (pos 1))))
                         (rawcall (l i) Count))
               (ternary (>= (l ct) (int 0)) [prog]
