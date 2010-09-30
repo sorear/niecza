@@ -204,15 +204,10 @@ use CgOpToCLROp;
     has minlets   => (isa => 'Int', is => 'ro', default => 0);
     has usednamed => (isa => 'Bool', is => 'ro', default => 0);
 
-    has depth     => (isa => 'Int', is => 'rw', default => 0);
-    has maxdepth  => (isa => 'Int', is => 'rw', default => 0);
-    has savedepth => (isa => 'Int', is => 'rw', default => 0);
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
     has numips    => (isa => 'Int', is => 'rw', default => 1);
     has lineinfo  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has stacktype => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has stackterm => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has resulttype =>(isa => 'Maybe[Str]', is => 'rw', default => '');
+    has resulttype=>(isa => 'Maybe[Str]', is => 'rw', default => '');
     has labelname => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has buffer    => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has unreach   => (isa => 'Bool', is => 'rw', default => 0);
@@ -237,15 +232,13 @@ use CgOpToCLROp;
         "@\"$out\"";
     }
 
+    sub _odds {
+        my @o; for (my $i = 1; $i < @_; $i+=2 ) { push @o, $_[$i] } @o
+    }
+
     sub _savestackstate {
         my ($self, $lbl) = @_;
         my %save;
-        if (@{ $self->stacktype }) {
-            print for @{ $self->buffer };
-            print(YAML::XS::Dump($self->stacktype));
-            print(YAML::XS::Dump($self->stackterm));
-            Carp::confess "Invalid operation of CPS converter";
-        }
         $save{lettypes} = [ @{ $self->lettypes } ];
         $save{letstack} = [ @{ $self->letstack } ];
         $self->savedstks->{$lbl} = \%save;
@@ -263,26 +256,8 @@ use CgOpToCLROp;
         push @{ $self->buffer }, "    $line;\n";
     }
 
-    sub _push {
-        my ($self, $ty, $expr) = @_;
-        Carp::confess('Untyped push') unless defined $ty;
-        push @{ $self->stacktype }, $ty;
-        push @{ $self->stackterm }, $expr;
-    }
-
-    sub _popn {
-        my ($self, $nr) = @_;
-        if ($nr > @{ $self->stacktype }) {
-            print for @{ $self->buffer };
-            Carp::confess "stack undeflow";
-        }
-        (splice @{ $self->stackterm }, -$nr, $nr),
-            (splice @{ $self->stacktype }, -$nr, $nr);
-    }
-
     sub _cpscall {
         my ($self, $rt, $expr) = @_;
-        die "Invalid operation of CPS converter" if $self->depth;
         my $n = $self->ip;
         $self->_emit("th.ip = $n");
         $self->_emit("return $expr");
@@ -296,17 +271,13 @@ use CgOpToCLROp;
 
     sub result {
         my ($self) = @_;
-        $self->_push("object", "th.resultSlot");
-        $self->cast($self->resulttype);
+        $self->cast($self->resulttype, "object", "th.resultSlot");
     }
 
     sub set_result {
-        my ($self) = @_;
-        if (!@{ $self->stacktype }) {
-            print for @{ $self->buffer };
-        }
-        $self->resulttype($self->stacktype->[-1]);
-        $self->_emit("th.resultSlot = " . ($self->_popn(1))[0]);
+        my ($self, $ty, $it) = @_;
+        $self->resulttype($ty);
+        $self->_emit("th.resultSlot = $it");
     }
 
     sub _lexn {
@@ -325,8 +296,7 @@ use CgOpToCLROp;
     }
 
     sub push_let {
-        my ($self, $which) = @_;
-        my ($v, $ty) = $self->_popn(1);
+        my ($self, $which, $ty, $v) = @_;
         $self->_emit(_lexn($self->minlets + @{$self->letstack}) . " = $v");
         push @{$self->letstack}, $which;
         push @{$self->lettypes}, $ty;
@@ -346,25 +316,23 @@ use CgOpToCLROp;
         my ($self, $which) = @_;
         my $i = @{ $self->letstack } - 1;
         while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
-        $self->_push("object", _lexn($self->minlets + $i));
-        $self->cast($self->lettypes->[$i]);
+        $self->cast($self->lettypes->[$i], "object",
+            _lexn($self->minlets + $i));
     }
 
     sub poke_let {
-        my ($self, $which) = @_;
+        my ($self, $which, $ty, $v) = @_;
         my $i = @{ $self->letstack } - 1;
         while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
-        my ($v) = $self->_popn(1);
         $self->_emit(_lexn($self->minlets + $i) . " = $v");
     }
 
     sub const {
-        my ($self) = @_;
-        my ($val, $type) = $self->_popn(1);
+        my ($self, $type, $val) = @_;
         my $knum = @{ $self->consttab };
         my $name = "K_" . $self->csname . "_$knum";
         push @{ $self->consttab }, "$type $name = $val";
-        $self->_push($type, $name);
+        $type, $name;
     }
 
     sub has_let {
@@ -406,15 +374,13 @@ use CgOpToCLROp;
     }
 
     sub cgoto {
-        my ($self, $n) = @_;
-        my ($top) = $self->_popn(1);
+        my ($self, $n, $ty, $top) = @_;
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if ($top) { goto case \@\@L$n; }\n";
     }
 
     sub ncgoto {
-        my ($self, $n) = @_;
-        my ($top) = $self->_popn(1);
+        my ($self, $n, $ty, $top) = @_;
         $self->_savestackstate($n);
         push @{ $self->buffer }, "    if (!$top) { goto case \@\@L$n; }\n";
     }
@@ -432,71 +398,51 @@ use CgOpToCLROp;
 
     sub hintget {
         my ($self, $type, $data, $name) = @_;
-        $self->_push("object", "$data.hints[" . qm($name) . "]");
-        $self->cast($type);
+        $self->cast($type, "object", "$data.hints[" . qm($name) . "]");
     }
 
     sub rtpadget {
         my ($self, $type, $order, $name) = @_;
-        $self->callframe;
-        my ($frame) = $self->_popn(1);
-        $self->_push("object", $frame . (".outer" x $order) . ".lex[" . qm($name) . "]");
-        $self->cast($type);
+        $self->cast($type, "object", "th" . (".outer" x $order) . ".lex[" . qm($name) . "]");
     }
 
     sub rtpadput {
-        my ($self, $order, $name) = @_;
-        $self->callframe;
-        my ($val, $frame) = $self->_popn(2);
-        $self->_emit($frame . (".outer" x $order) . ".lex[" . qm($name) . "] = $val");
+        my ($self, $order, $name, $ty, $val) = @_;
+        $self->_emit("th" . (".outer" x $order) . ".lex[" . qm($name) . "] = $val");
     }
 
     sub rtpadgeti {
         my ($self, $type, $order, $name) = @_;
-        $self->callframe;
-        my ($frame) = $self->_popn(1);
         my $tag = $name < 4 ? "lex$name" : ("lexn[" . ($name - 4) . "]");
-        $self->_push("object", $frame . (".outer" x $order) . ".$tag");
-        $self->cast($type);
+        $self->cast($type, "object", "th" . (".outer" x $order) . ".$tag");
     }
 
     sub rtpadputi {
-        my ($self, $order, $name) = @_;
-        $self->callframe;
-        my ($val, $frame) = $self->_popn(2);
+        my ($self, $order, $name, $type, $val) = @_;
         my $tag = $name < 4 ? "lex$name" : ("lexn[" . ($name - 4) . "]");
-        $self->_emit($frame . (".outer" x $order) . ".$tag = $val");
+        $self->_emit("th" . (".outer" x $order) . ".$tag = $val");
     }
 
     sub callframe {
         my ($self) = @_;
-        my $frame = 'th';
-        if ($self->has_let('protopad')) {
-            $self->peek_let('protopad');
-        } else {
-            $self->_push("Frame", $frame);
-        }
+        "Frame", "th";
     }
 
     sub drop {
-        my ($self) = @_;
-        $self->_emit(($self->_popn(1))[0]);
+        my ($self, $ty, $val) = @_;
+        $self->_emit($val);
     }
 
     sub pos {
-        my ($self, $num) = @_;
-        if (! defined($num)) {
-            $num = ($self->_popn(1))[0];
-        }
-        $self->_push('Variable', "th.pos[$num]");
+        my ($self, $num, $vty, $val) = @_;
+        'Variable', "th.pos[" . ($num // $val) . "]";
     }
 
     sub _prepcall {
-        my ($self, @sig) = @_;
+        my ($self, $sig, @args) = @_;
         my $quick = 1;
-        for (@sig) { $quick &&= ($_ eq '') }
-        my ($inv, @vals) = $self->_popn(1 + scalar(@sig));
-        $#vals = $#sig;
+        for (@$sig) { $quick &&= ($_ eq '') }
+        my ($inv, @vals) = _odds(@args);
         if ($quick) {
             return $inv, "new Variable[] { " . join(", ", @vals) . "}", "null";
         } else {
@@ -505,18 +451,18 @@ use CgOpToCLROp;
             $self->_emit("_inv = $inv");
             $self->_emit("_pos = new List<Variable>()");
             $self->_emit("_nam = new Dictionary<string,Variable>()");
-            for (my $ix = 0; $ix < @sig; $ix++) {
-                if ($sig[$ix] eq '') {
+            for (my $ix = 0; $ix < @$sig; $ix++) {
+                if ($sig->[$ix] eq '') {
                     $self->_emit("_pos.Add($vals[$ix])");
-                } elsif (substr($sig[$ix],0,1) eq ':') {
-                    my $n = qm(substr($sig[$ix],1));
+                } elsif (substr($sig->[$ix],0,1) eq ':') {
+                    my $n = qm(substr($sig->[$ix],1));
                     $self->_emit("_nam[$n] = $vals[$ix]");
-                } elsif ($sig[$ix] eq 'flatpos') {
+                } elsif ($sig->[$ix] eq 'flatpos') {
                     $self->_emit("_pos.AddRange($vals[$ix])");
-                } elsif ($sig[$ix] eq 'flatnam') {
+                } elsif ($sig->[$ix] eq 'flatnam') {
                     $self->_emit("Kernel.AddMany(_nam, $vals[$ix])");
                 } else {
-                    die "weird sig bit $sig[$ix]";
+                    die "weird sig bit $sig->[$ix]";
                 }
             }
             return "_inv", "_pos.ToArray()", "_nam";
@@ -524,175 +470,159 @@ use CgOpToCLROp;
     }
 
     sub call_method {
-        my ($self, $name, @sig) = @_;
-        my ($inv, $pos, $nam) = $self->_prepcall(@sig);
+        my ($self, $name, $sig, @args) = @_;
+        my ($inv, $pos, $nam) = $self->_prepcall($sig, @args);
         $self->_cpscall('Variable', "$inv.InvokeMethod(th, ".qm($name).", $pos, $nam)");
     }
 
     sub call_sub {
-        my ($self, @sig) = @_;
-        my ($inv, $pos, $nam) = $self->_prepcall(@sig);
+        my ($self, $sig, @args) = @_;
+        my ($inv, $pos, $nam) = $self->_prepcall($sig, @args);
         $self->_cpscall('Variable', "$inv.Invoke(th, $pos, $nam)");
     }
 
     sub tail_call_sub {
-        my ($self, @sig) = @_;
-        my ($inv, $pos, $nam) = $self->_prepcall(@sig);
+        my ($self, $sig, @args) = @_;
+        my ($inv, $pos, $nam) = $self->_prepcall($sig, @args);
         $self->_emit("return $inv.Invoke(th.caller, $pos, $nam)");
         $self->unreach(1);
     }
 
     sub clr_bool {
         my ($self, $v) = @_;
-        $self->_push('System.Boolean', $v ? 'true' : 'false');
+        'System.Boolean', $v ? 'true' : 'false';
     }
 
     sub clr_new {
-        my ($self, $class, $nargs) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
-        $self->_push($class, "new $class(" . join(", ", @args) . ")");
+        my ($self, $class, $nargs, @args) = @_;
+        $class, "new $class(" . join(", ", _odds @args) . ")";
     }
 
     sub clr_new_arr {
-        my ($self, $class, $nitems) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nitems;
-        $self->_push($class . "[]", "new $class []{" . join(", ", @args) . "}");
+        my ($self, $class, $nitems, @args) = @_;
+        $class . "[]", "new $class []{" .  join(", ", _odds @args) . "}";
     }
 
     sub clr_new_zarr {
-        my ($self, $class) = @_;
-        my ($nitems) = $self->_popn(1);
-        $self->_push($class . "[]", "(new $class [$nitems])");
+        my ($self, $class, $nity, $nitems) = @_;
+        $class . "[]", "(new $class [$nitems])";
     }
 
     sub clr_string {
         my ($self, $text) = @_;
-        $self->_push('System.String', qm($text));
+        'System.String', qm($text);
     }
 
     sub clr_char {
         my ($self, $val) = @_;
-        $self->_push('Char', "((char)" . ord($val) . ")");
+        'Char', "((char)" . ord($val) . ")";
     }
 
     sub clr_int {
         my ($self, $val) = @_;
-        $self->_push('Int32', $val);
+        'Int32', $val;
     }
 
     sub clr_double {
         my ($self, $val) = @_;
-        $self->_push('System.Double', "((Double)$val)");
+        'System.Double', "((Double)$val)";
     }
 
     sub labelid {
         my ($self, $lbl) = @_;
-        $self->_push('Int32', "\@\@L$lbl");
+        'Int32', "\@\@L$lbl";
     }
 
     sub clr_arith {
-        my ($self, $op) = @_;
-        my ($a1, $a2, $ty1, $ty2) = $self->_popn(2);
+        my ($self, $op, $ty1, $a1, $ty2, $a2) = @_;
         if ($ty1 ne $ty2) {
             die "Overloaded operations not yet supported";
         }
-        $self->_push($ty1, "($a1 $op $a2)");
+        $ty1, "($a1 $op $a2)";
     }
 
     sub clr_compare {
-        my ($self, $op) = @_;
-        my ($a1, $a2) = $self->_popn(2);
-        $self->_push('Boolean', "($a1 $op $a2)");
+        my ($self, $op, $ty1, $a1, $ty2, $a2) = @_;
+        'Boolean', "($a1 $op $a2)";
     }
 
     sub clr_field_get {
-        my ($self, $f) = @_;
-        my ($obj, $oty) = $self->_popn(1);
+        my ($self, $f, $oty, $obj) = @_;
         my ($nm, $cl, $ty) = $self->_typedata('f', $oty, $f);
-        $self->_push($ty, "($obj.$nm)");
+        $ty, "($obj.$nm)";
     }
 
     sub clr_field_set {
-        my ($self, $f) = @_;
-        my ($obj, $val) = $self->_popn(2);
+        my ($self, $f, $oty, $obj, $vty, $val) = @_;
         $self->_emit("$obj.$f = $val");
     }
 
     sub clr_sfield_get {
         my ($self, $f) = @_;
         my ($nm, $cl, $ty) = $self->_typedata('f', $f);
-        $self->_push($ty, "$nm");
+        $ty, "$nm";
     }
 
     sub clr_sfield_set {
-        my ($self, $f) = @_;
-        my ($val) = $self->_popn(1);
+        my ($self, $f, $vty, $val) = @_;
         $self->_emit($self->_striptype($f) . " = $val");
     }
 
     sub attr_var {
-        my ($self, $f) = @_;
-        my ($obj) = $self->_popn(1);
+        my ($self, $f, $oty, $obj) = @_;
         $self->_cpscall('Variable', "$obj.GetAttribute(th, " . qm($f) . ")");
     }
 
     sub clr_index_get {
-        my ($self, $f) = @_;
-        if ($f) {
-            $self->clr_string($f);
-        }
-        my ($obj, $ix, $oty, $ixty)  = $self->_popn(2);
+        my ($self, $f) = splice @_, 0, 2;
+        my ($oty, $obj, $ixty, $ix) = defined($f) ?
+            (@_, '', qm($f)) : @_;
         my ($nm, $cl, $ty) = $self->_typedata('i', $oty, 'Item');
-        $self->_push($ty, "($obj" . "[$ix])");
+        $ty, "($obj" . "[$ix])";
     }
 
     sub clr_index_set {
-        my ($self, $f) = @_;
-        my ($val) = $self->_popn(1);
-        my ($ix)  = $self->_popn(1) unless $f;
-        my ($obj) = $self->_popn(1);
-        $self->_emit("$obj" . "[" . ($f ? qm($f) : $ix) . "] = ($val)");
+        my ($self, $f) = splice @_, 0, 2;
+        my ($oty, $obj) = splice(@_,0,2);
+        my ($ixty, $ix) = splice(@_,0,2) unless $f;
+        my ($vty, $val) = splice(@_,0,2);
+        $self->_emit("$obj" . "[" . (defined($f)? qm($f) : $ix) . "] = ($val)");
     }
 
     sub cast {
-        my ($self, $type) = @_;
-        $self->_push($type, "(($type)" . ($self->_popn(1))[0] . ")");
+        my ($self, $type, $vty, $val) = @_;
+        $type, "(($type)$val)";
     }
 
     sub clr_call_direct {
-        my ($self, $name, $nargs) = @_;
+        my ($self, $name, $nargs, @args) = @_;
         my ($nm, $cl, $rt) = $self->_typedata('cm', $name);
-        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
         if ($cl eq 'c') {
             $self->_cpscall($rt,
-                "$nm(" . join(", ", "th", @args) . ")");
+                "$nm(" . join(", ", "th", _odds @args) . ")");
         } elsif ($rt ne 'Void') {
-            $self->_push($rt, "$nm(" . join(", ", @args) . ")");
+            return ($rt, "$nm(" . join(", ", _odds @args) . ")");
         } else {
-            $self->_emit("$nm(" . join(", ", @args) . ")");
+            $self->_emit("$nm(" . join(", ", _odds @args) . ")");
         }
     }
 
     sub clr_call_virt {
-        my ($self, $name, $nargs) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
-        my ($nm, $cl, $rt) = $self->_typedata('cm', $self->stacktype->[-1],
-            $name);
-        my ($inv) = $self->_popn(1);
+        my ($self, $name, $nargs, $ity, $inv, @args) = @_;
+        my ($nm, $cl, $rt) = $self->_typedata('cm', $ity, $name);
         if ($cl eq 'c') {
             $self->_cpscall($rt,
-                "$inv.$nm(" . join(", ", "th", @args) . ")");
+                "$inv.$nm(" . join(", ", "th", _odds @args) . ")");
         } elsif ($rt ne 'Void') {
-            $self->_push($rt, "$inv.$nm(" . join(", ", @args) . ")");
+            return ($rt, "$inv.$nm(" . join(", ", _odds @args) . ")");
         } else {
-            $self->_emit("$inv.$nm(" . join(", ", @args) . ")");
+            $self->_emit("$inv.$nm(" . join(", ", _odds @args) . ")");
         }
     }
 
     sub rxbprim {
-        my ($self, $name, $nargs) = @_;
-        my @args = reverse map { ($self->_popn(1))[0] } 1 .. $nargs;
-        $self->_emit("if (!th.rx.$name(" . join(", ", @args) . ")) goto case \@\@Lbacktrack");
+        my ($self, $name, $nargs, @args) = @_;
+        $self->_emit("if (!th.rx.$name(" . join(", ", _odds @args) . ")) goto case \@\@Lbacktrack");
     }
 
     sub rxpushb {
@@ -701,10 +631,10 @@ use CgOpToCLROp;
     }
 
     sub return {
-        my ($self, $nv) = @_;
+        my ($self, $nv, $rty, $rval) = @_;
         return if $self->unreach;
         if ($nv) {
-            $self->_emit("th.caller.resultSlot = " . ($self->_popn(1))[0]);
+            $self->_emit("th.caller.resultSlot = $rval");
         }
         $self->_emit("return th.caller");
         $self->unreach(1);
@@ -713,7 +643,7 @@ use CgOpToCLROp;
     sub push_null {
         my ($self, $ty) = @_;
         # (Int32)null isn't liked much
-        $self->_push($ty, $ty eq 'Int32' ? "0" : "null");
+        $ty, $ty eq 'Int32' ? "0" : "null";
     }
 
     ###

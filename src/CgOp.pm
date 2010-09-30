@@ -155,13 +155,13 @@ use warnings;
 
     sub getindex {
         CgOp::Primitive->new(
-            op  => [ 'clr_index_get', (blessed($_[0])) ? () : $_[0] ],
+            op  => [ 'clr_index_get', blessed($_[0]) ? undef : $_[0] ],
             zyg => [ $_[1], (blessed($_[0]) ? $_[0] : ()) ]);
     }
 
     sub setindex {
         CgOp::Primitive->new(
-            op  => [ 'clr_index_set', (blessed($_[0])) ? () : $_[0] ],
+            op  => [ 'clr_index_set', blessed($_[0]) ? undef : $_[0] ],
             zyg => [ $_[1], (blessed($_[0]) ? $_[0] : ()), $_[2] ]);
     }
 
@@ -298,7 +298,7 @@ use warnings;
     sub subcall {
         my ($sub, @args) = @_;
         my @sig = _process_arglist(\@args);
-        CgOp::Primitive->new(op => [ 'call_sub', @sig ],
+        CgOp::Primitive->new(op => [ 'call_sub', \@sig ],
             zyg => [ $sub, @args ], is_cps_call => 1);
     }
 
@@ -306,7 +306,7 @@ use warnings;
         my ($obj, $name, @args) = @_;
         my @sig = _process_arglist(\@args);
         let($obj, sub {
-            CgOp::Primitive->new(op => [ 'call_method', $name, '', @sig ],
+            CgOp::Primitive->new(op => [ 'call_method', $name, ['', @sig] ],
                 zyg => [ fetch($_[0]), $_[0], @args ], is_cps_call => 1)});
     }
 
@@ -468,7 +468,7 @@ use warnings;
     }
 
     sub pos {
-        CgOp::Primitive->new(op => [ 'pos', blessed($_[0]) ? () : $_[0] ],
+        CgOp::Primitive->new(op => [ 'pos', blessed($_[0]) ? undef : $_[0] ],
             zyg => [blessed($_[0]) ? ($_[0]) : ()], constant => 1);
     }
 

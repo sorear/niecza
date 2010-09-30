@@ -327,6 +327,5 @@ sub codegen {
 sub codegen_term {
     my ($cg, $term) = @_;
     my ($op, @args) = @{ $term->op };
-    for (@{ $term->zyg }) { codegen_term($cg, $_) }
-    $cg->$op(@args);
+    $cg->$op(@args, map { codegen_term($cg, $_) } @{ $term->zyg });
 }
