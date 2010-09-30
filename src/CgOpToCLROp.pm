@@ -73,19 +73,19 @@ sub type_infer {
 
     given ($head) {
         when ("clr_call_direct") {
-            return (CodeGen->_typedata("cm", $op->[1]))[2];
+            return (CLRTypes->info("cm", $op->[1]))[2];
         }
         when ("clr_call_virt") {
-            return (CodeGen->_typedata("cm", $argtypes[0], $op->[1]))[2];
+            return (CLRTypes->info("cm", $argtypes[0], $op->[1]))[2];
         }
         when ("clr_field_get") {
-            return (CodeGen->_typedata("f", $argtypes[0], $op->[1]))[2];
+            return (CLRTypes->info("f", $argtypes[0], $op->[1]))[2];
         }
         when ("clr_index_get") {
-            return (CodeGen->_typedata("i", $argtypes[0], 'Item'))[2];
+            return (CLRTypes->info("i", $argtypes[0], 'Item'))[2];
         }
         when ("clr_sfield_get") {
-            return (CodeGen->_typedata("f", $op->[1]))[2];
+            return (CLRTypes->info("f", $op->[1]))[2];
         }
         when ("cast")           { return $op->[1] }
         when ("clr_arith")      { return $argtypes[0] }
