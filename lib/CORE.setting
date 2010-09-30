@@ -4,7 +4,7 @@ my module CORE;
 
 sub slurp($path) {
     Q:CgOp { (box Str (rawscall System.IO.File.ReadAllText
-        (unbox System.String (@ {$path})))) }
+        (unbox str (@ {$path})))) }
 }
 
 my class IO is Cool {
@@ -13,22 +13,22 @@ my class IO is Cool {
 
 my class TextReader is IO {
     method get() {
-        Q:CgOp { (box Str (rawcall (unbox System.IO.TextReader (@ {self}))
+        Q:CgOp { (box Str (rawcall (unbox clr:System.IO.TextReader (@ {self}))
                      ReadLine:m,System.String)) };
     }
 
     method slurp() {
-        Q:CgOp { (box Str (rawcall (unbox System.IO.TextReader (@ {self}))
+        Q:CgOp { (box Str (rawcall (unbox clr:System.IO.TextReader (@ {self}))
                      ReadToEnd:m,System.String)) };
     }
 
     method getc() {
         Q:CgOp {
-            (letn chi (rawcall (unbox System.IO.TextReader (@ {self}))
+            (letn chi (rawcall (unbox clr:System.IO.TextReader (@ {self}))
                         Read:m,System.Int32)
               (ternary (>= (l chi) (int 0))
-                (box Str (rawnew System.String
-                           (cast System.Char (l chi)) (int 1)))
+                (box Str (rawnew str
+                           (cast clr:System.Char (l chi)) (int 1)))
                 {Str}))
         };
     }

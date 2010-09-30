@@ -102,7 +102,7 @@ sub beta_optimize {
 
     for my $dn (sort keys %{ $cbody->lexicals }) {
         my $d = $cbody->lexicals->{$dn};
-        my $to = $d->noinit ? CgOp::null('Variable') :
+        my $to = $d->noinit ? CgOp::null('var') :
                  $d->hash   ? CgOp::newblankhash :
                  $d->list   ? CgOp::newblanklist :
                               CgOp::newblankrwscalar;

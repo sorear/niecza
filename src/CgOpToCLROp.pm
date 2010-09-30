@@ -56,7 +56,7 @@ our $spill;
 
 my %fixtype = ( callframe => 'Frame',
     clr_bool => 'System.Boolean', clr_string => 'System.String',
-    clr_char => 'Char', clr_int => 'Int32', clr_double => 'System.Double',
+    clr_char => 'Char', clr_int => 'Int32', clr_double => 'Double',
     labelid => 'Int32', clr_compare => 'Boolean' );
 
 $fixtype{$_} = 'Void' for (qw/ poke_let labelhere goto cgoto ncgoto ehspan

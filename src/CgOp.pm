@@ -103,7 +103,7 @@ use warnings;
     }
 
     sub null {
-        CgOp::Primitive->new(op => [ push_null => $_[0] ], constant => 1);
+        CgOp::Primitive->new(op => [ push_null => CLRTypes->mapt($_[0]) ], constant => 1);
     }
 
     sub prog {
@@ -124,7 +124,7 @@ use warnings;
     }
 
     sub rnull {
-        prog($_[0], null('Variable'));
+        prog($_[0], null('var'));
     }
 
     sub fetch {
@@ -162,11 +162,11 @@ use warnings;
     }
 
     sub getslot {
-        rawcall(cast('DynObject', $_[1]), 'GetSlot', $_[0]);
+        rawcall(cast('clr:DynObject', $_[1]), 'GetSlot', $_[0]);
     }
 
     sub setslot {
-        rawcall(cast('DynObject', $_[1]), 'SetSlot', $_[0], $_[2]);
+        rawcall(cast('clr:DynObject', $_[1]), 'SetSlot', $_[0], $_[2]);
     }
 
     sub varattr {
@@ -175,7 +175,7 @@ use warnings;
     }
 
     sub cast {
-        CgOp::Primitive->new(op => [ 'cast', $_[0] ], zyg => [ $_[1] ]);
+        CgOp::Primitive->new(op => [ 'cast', CLRTypes->mapt($_[0]) ], zyg => [ $_[1] ]);
     }
 
     sub const {
@@ -200,8 +200,8 @@ use warnings;
 
     sub newblanklist {
         newrwlistvar(ternary(
-                compare('==', rawsget('Kernel.ArrayP'), null('IP6')),
-                null('IP6'),
+                compare('==', rawsget('Kernel.ArrayP'), null('obj')),
+                null('obj'),
                 fetch(methodcall(newscalar(rawsget('Kernel.ArrayP')), 'new'))));
     }
 
@@ -415,19 +415,19 @@ use warnings;
 
     sub rawnew {
         my ($name, @args) = @_;
-        CgOp::Primitive->new(op => [ 'clr_new', $name, scalar @args ],
+        CgOp::Primitive->new(op => [ 'clr_new', CLRTypes->mapt($name), scalar @args ],
             zyg => \@args);
     }
 
     sub rawnewarr {
         my ($name, @args) = @_;
-        CgOp::Primitive->new(op => [ 'clr_new_arr', $name, scalar @args ],
+        CgOp::Primitive->new(op => [ 'clr_new_arr', CLRTypes->mapt($name), scalar @args ],
             zyg => \@args);
     }
 
     sub rawnewzarr {
         my ($name, $ni) = @_;
-        CgOp::Primitive->new(op => [ 'clr_new_zarr', $name ], zyg => [ $ni ]);
+        CgOp::Primitive->new(op => [ 'clr_new_zarr', CLRTypes->mapt($name) ], zyg => [ $ni ]);
     }
 
     sub ann {
@@ -439,8 +439,8 @@ use warnings;
     sub die {
         my ($msg) = @_;
         if (blessed($msg)) {
-            rawsccall('Kernel.SearchForHandler', &int(5), null('Frame'),
-                &int(-1), null('String'), newscalar($msg));
+            rawsccall('Kernel.SearchForHandler', &int(5), null('clr:Niecza.Frame'),
+                &int(-1), null('str'), newscalar($msg));
         } else {
             rawsccall('Kernel.Die', clr_string($msg));
         }

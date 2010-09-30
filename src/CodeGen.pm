@@ -335,7 +335,7 @@ use CLRTypes;
 
     sub clr_double {
         my ($self, $val) = @_;
-        'System.Double', "((Double)$val)";
+        'Double', "((Double)$val)";
     }
 
     sub labelid {
@@ -468,9 +468,9 @@ use CLRTypes;
          CgOp::rawsget($::UNITNAME . '.' . $self->csname . ':f,DynBlockDelegate'),
          $outersi, $ltm,
          CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->ehspans }),
-         (@{ $self->ehlabels } ? CgOp::rawnewarr('string',
+         (@{ $self->ehlabels } ? CgOp::rawnewarr('str',
               map { CgOp::clr_string($_) } @{ $self->ehlabels }) :
-              CgOp::null('string[]')));
+              CgOp::null('clr:string[]')));
     }
 
     sub csharp {

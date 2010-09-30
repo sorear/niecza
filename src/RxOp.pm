@@ -36,10 +36,10 @@ use CgOp;
             return CgOp::clr_string($l);
         } elsif ($r eq 'ARRAY') {
             if (!@$l || ref ($l->[0])) {
-                return CgOp::rawnewarr('LAD', map { lad2cgop($_) } @$l);
+                return CgOp::rawnewarr('clr:LAD', map { lad2cgop($_) } @$l);
             } else {
                 my ($h,@r) = @$l;
-                return CgOp::rawnew("LAD$h", map { lad2cgop($_) } @r);
+                return CgOp::rawnew("clr:LAD$h", map { lad2cgop($_) } @r);
             }
         } else {
             return $l;
@@ -416,18 +416,18 @@ use CgOp;
             return $true->code($body);
         }
 
-        my $namesf = CgOp::const(CgOp::rawnewarr('String',
+        my $namesf = CgOp::const(CgOp::rawnewarr('str',
                 map { CgOp::clr_string($_) } @{ $self->captures }));
         my $callf = CgOp::methodcall(CgOp::newscalar(
                 CgOp::rxcall("MakeCursor")), $self->name);
         my @pushcapf = (@{ $self->captures } == 0) ? () : (
             CgOp::rxcall("PushCapture", $namesf,
-                CgOp::cast('Cursor', CgOp::letvar("k"))));
+                CgOp::cast('clr:Cursor', CgOp::letvar("k"))));
         my $updatef = CgOp::prog(
             CgOp::ncgoto('backtrack', CgOp::rawcall(CgOp::letvar("k"),
                     'IsDefined')),
             @pushcapf,
-            CgOp::rxcall("SetPos", CgOp::getfield("pos", CgOp::cast("Cursor",
+            CgOp::rxcall("SetPos", CgOp::getfield("pos", CgOp::cast("clr:Cursor",
                         CgOp::letvar("k")))));
 
         my @code;
@@ -449,7 +449,7 @@ use CgOp;
                     CgOp::fetch(CgOp::rxcall("GetCursorList")))),
                 $updatef);
             push @code, CgOp::rxpushb("SUBRULE", $bt);
-            push @code, CgOp::rxcall("SetCursorList", CgOp::null("Variable"));
+            push @code, CgOp::rxcall("SetCursorList", CgOp::null("var"));
         }
 
         @code;
@@ -556,7 +556,7 @@ use CgOp;
                 CgOp::rxcall('GetClass'),
                 CgOp::const(RxOp::lad2cgop($self->lads)),
                 CgOp::clr_string('')),
-            CgOp::const(CgOp::rawnewarr('Int32', map { CgOp::labelid($_) } @ls)));
+            CgOp::const(CgOp::rawnewarr('int', map { CgOp::labelid($_) } @ls)));
         push @code, CgOp::goto('backtrack');
         for (my $i = 0; $i < @ls; $i++) {
             push @code, CgOp::label($ls[$i]);
@@ -631,8 +631,8 @@ use CgOp;
             CgOp::fetch(CgOp::scopedlex('$¢')),
             CgOp::clr_string($self->name)),
           "i",   CgOp::int(0),
-          "ks",  CgOp::null('Variable'),
-          "k",   CgOp::null('IP6'),
+          "ks",  CgOp::null('var'),
+          "k",   CgOp::null('obj'),
           CgOp::pushcut('LTM'),
           CgOp::label('nextfn'),
           CgOp::cgoto('backtrack',
@@ -647,16 +647,16 @@ use CgOp;
                 CgOp::fetch(CgOp::letvar("ks"))))),
           CgOp::ncgoto('backtrack',
             CgOp::rawcall(CgOp::letvar("k"), 'IsDefined')),
-          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
+          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
               CgOp::letvar("k"))),
           CgOp::letvar('ks', CgOp::methodcall(CgOp::methodcall(
                 CgOp::letvar('ks'), "list"), "clone")),
           CgOp::sink(CgOp::methodcall(CgOp::letvar('ks'), 'shift')),
           CgOp::label('nextcsr'),
-          CgOp::ncgoto('backtrack', CgOp::unbox('Boolean', CgOp::fetch(
+          CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
                 CgOp::methodcall(CgOp::letvar('ks'), 'Bool')))),
           CgOp::rxpushb('SUBRULE', 'nextcsr'),
-          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('Cursor',
+          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
               CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))),
           CgOp::goto('backtrack'));
     }
@@ -722,7 +722,7 @@ use CgOp;
     sub ccop {
         my ($self) = @_;
         my @ints = @{ $self->cc };
-        CgOp::rawnew('CC', CgOp::rawnewarr('int',
+        CgOp::rawnew('clr:CC', CgOp::rawnewarr('int',
                 map { CgOp::int($_) } @ints));
     }
 

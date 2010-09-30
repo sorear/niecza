@@ -139,11 +139,12 @@ my %typedata = (
 );
 
 my %tmap = (
-    'str'       => 'System.String',
-    'var'       => 'Niecza.Variable',
-    'obj'       => 'Niecza.IP6',
-    'int'       => 'System.Int32',
-    'num'       => 'System.Double',
+    'str'       => 'String',
+    'var'       => 'Variable',
+    'obj'       => 'IP6',
+    'int'       => 'Int32',
+    'num'       => 'Double',
+    'bool'      => 'Boolean',
 );
 
 sub _generic_infer {
@@ -184,8 +185,8 @@ sub info {
     for ($path[0]) { $typedata{$_} //= _generic_infer; }
 
     my $cursor = \%typedata;
-    for (@path) { $cursor = $cursor->{$_}; }
-    if (!defined $cursor) {
+    for (@path) { $cursor = $cursor && $cursor->{$_}; }
+    if (!$cursor) {
         die "No type data for " . join(":", @path);
     }
     if (index($types, $cursor->[0]) < 0) {
@@ -197,6 +198,16 @@ sub info {
     } else {
         return $path[-1], $types, $cursor->[1];
     }
+}
+
+sub mapt {
+    my ($self, $t) = @_;
+    if ($tmap{$t}) { return $tmap{$t} }
+    if (substr($t,0,4) eq 'clr:') {
+        return substr($t,4);
+    }
+    warn "Invalid type form $t\n";
+    return $t;
 }
 
 1;

@@ -21,14 +21,14 @@ use 5.010;
 
     sub slurpy_get {
         my ($self) = @_;
-        CgOp::let(CgOp::rawnew('DynObject', CgOp::getfield('klass',
-                    CgOp::cast('DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
+        CgOp::let(CgOp::rawnew('clr:DynObject', CgOp::getfield('klass',
+                    CgOp::cast('clr:DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
             my $do = shift;
             CgOp::prog(
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('flat'),
                     CgOp::bool(1)),
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('items'),
-                    CgOp::rawnew('VarDeque')),
+                    CgOp::rawnew('clr:VarDeque')),
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('rest'),
                     CgOp::rawscall('Kernel.SlurpyHelper',
                         CgOp::callframe, CgOp::letvar('!ix'))),
@@ -73,7 +73,7 @@ use 5.010;
         CgOp::letn('!v', CgOp::rawcall(CgOp::callframe, 'ExtractNamed',
                 CgOp::clr_string($name)),
             CgOp::ternary(
-                CgOp::compare('!=', CgOp::null('Variable'),
+                CgOp::compare('!=', CgOp::null('var'),
                     CgOp::letvar('!v')),
                 CgOp::letvar('!v'),
                 $fb));

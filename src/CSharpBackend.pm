@@ -124,7 +124,7 @@ sub stash2 {
     push @decls, $p;
     push @thaw, CgOp::rawsset($p, CgOp::fetch(CgOp::box(
             CgOp::rawsget('Kernel.StashP'),
-            CgOp::rawnew('Dictionary<string,BValue>'))));
+            CgOp::rawnew('clr:Dictionary<string,BValue>'))));
     if (@{ $_->path } == 1 && $_->path->[0] =~ /^(?:GLOBAL|PROCESS)$/) {
         push @thaw, CgOp::rawsset('Kernel.' . ucfirst(lc($_->path->[0])) .
             'O', CgOp::rawsget($p));
@@ -163,7 +163,7 @@ sub pkg2 {
         push @thaw, CgOp::rawsset($p,
             CgOp::rawsget("Kernel." . $_->name . "MO:f,$cl_ty"));
     } else {
-        push @thaw, CgOp::rawsset($p, CgOp::rawnew($cl_ty,
+        push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
                 CgOp::clr_string($_->name)));
         for my $a (@{ $_->attributes }) {
             push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddAttribute',
@@ -175,8 +175,8 @@ sub pkg2 {
             CgOp::rawsget($unit->deref($s)->{peer}{mo}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Complete');
-    push @thaw, CgOp::rawsset($wh6, CgOp::rawnew('DynObject', CgOp::rawsget($p)));
-    push @thaw, CgOp::setfield('slots', CgOp::cast('DynObject', CgOp::rawsget($wh6)), CgOp::null('object[]'));
+    push @thaw, CgOp::rawsset($wh6, CgOp::rawnew('clr:DynObject', CgOp::rawsget($p)));
+    push @thaw, CgOp::setfield('slots', CgOp::cast('clr:DynObject', CgOp::rawsget($wh6)), CgOp::null('clr:object[]'));
     push @thaw, CgOp::setfield('typeObject', CgOp::rawsget($p), CgOp::rawsget($wh6));
     push @thaw, CgOp::rawsset($whv, CgOp::newscalar(CgOp::rawsget($wh6)));
 
@@ -291,7 +291,7 @@ sub access_lex {
         my $ref = $unit->get_stash(@{ $lex->path })->obj;
         my $obj = $ref && $unit->deref($ref);
         return $obj->{peer} ? CgOp::rawsget($obj->{peer}{what_var}) :
-            CgOp::null('Variable');
+            CgOp::null('var');
     } elsif ($lex->isa('Metamodel::Lexical::Common')) {
         return $set_to ?
             CgOp::bset(CgOp::rawsget($lex->{peer}), $set_to) :
@@ -394,8 +394,8 @@ sub sub1 {
     my $cg = codegen_sub($_);
     $node->{sictor} = [ $cg->subinfo_ctor_args(
             ($_->outer ? CgOp::rawsget($_->outer->{peer}{si}) :
-                CgOp::null('SubInfo')),
-            ($_->ltm ? RxOp::lad2cgop($_->ltm) : CgOp::null('LAD'))) ];
+                CgOp::null('clr:SubInfo')),
+            ($_->ltm ? RxOp::lad2cgop($_->ltm) : CgOp::null('clr:LAD'))) ];
 
     push @cgs, $cg->csharp;
 }
@@ -404,7 +404,7 @@ sub sub2 {
     my $node = $_->{peer};
     my $si = $node->{si};
 
-    push @thaw, CgOp::rawsset($si, CgOp::rawnew($si_ty, @{ $node->{sictor} }));
+    push @thaw, CgOp::rawsset($si, CgOp::rawnew("clr:$si_ty", @{ $node->{sictor} }));
 
     if ($_->class ne 'Sub') {
         my $cl = $unit->deref($unit->get_stash(@{ $_->find_lex_pkg($_->class) })->obj);
@@ -413,24 +413,24 @@ sub sub2 {
 
     my $pp = $node->{pp};
     if ($pp) {
-        push @thaw, CgOp::rawsset($pp, CgOp::rawnew('Frame',
-                CgOp::null('Frame'), (!$_->outer ? CgOp::null('Frame') :
+        push @thaw, CgOp::rawsset($pp, CgOp::rawnew('clr:Frame',
+                CgOp::null('clr:Frame'), (!$_->outer ? CgOp::null('clr:Frame') :
                     CgOp::rawsget($_->outer->{peer}{pp})),
                 CgOp::rawsget($si)));
         if ($node->{uname}) {
             push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
-                CgOp::rawnew('Dictionary<string,object>'));
+                CgOp::rawnew('clr:Dictionary<string,object>'));
         }
         if ($node->{nlexn} > 4) {
             push @thaw, CgOp::setfield('lexn', CgOp::rawsget($pp),
-                CgOp::rawnewzarr('object', CgOp::int($node->{nlexn} - 4)));
+                CgOp::rawnewzarr('clr:object', CgOp::int($node->{nlexn} - 4)));
         }
     }
 
     my $ps = $node->{ps};
     if ($ps) {
         push @thaw, CgOp::rawsset($ps, CgOp::rawscall('Kernel.MakeSub',
-                CgOp::rawsget($si), !$_->outer ? CgOp::null('Frame') :
+                CgOp::rawsget($si), !$_->outer ? CgOp::null('clr:Frame') :
                     CgOp::rawsget($_->outer->{peer}{pp})));
     }
 }

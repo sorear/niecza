@@ -5,14 +5,14 @@ my module Threads;
 my class Monitor is export {
     method enter() {
         Q:CgOp {
-            (prog (rawscall System.Threading.Monitor.Enter:m,Void
-                (@ (l self))) (null Variable))
+            (rnull (rawscall System.Threading.Monitor.Enter:m,Void
+                (@ {self})))
         }
     }
     method exit() {
         Q:CgOp {
-            (prog (rawscall System.Threading.Monitor.Exit:m,Void
-                (@ (l self))) (null Variable))
+            (rnull (rawscall System.Threading.Monitor.Exit:m,Void
+                (@ {self})))
         }
     }
     # TODO exception handling
@@ -25,16 +25,16 @@ my class Thread is export {
     has $!value;
     method new($func) {
         Q:CgOp { (box Thread (rawsccall
-            Kernel.StartP6Thread:c,System.Threading.Thread (@ (l $func)))) }
+            Kernel.StartP6Thread:c,System.Threading.Thread (@ {$func}))) }
     }
 
     method join() {
-        Q:CgOp { (prog (rawcall (unbox System.Threading.Thread (@ (l self))) Join:m,Void) (null Variable)) }
+        Q:CgOp { (rnull (rawcall (unbox System.Threading.Thread (@ {self})) Join:m,Void)) }
     }
 
     method sleep($time) {
         my $t = $time * 1000;
-        Q:CgOp { (prog (rawscall System.Threading.Thread.Sleep:m,Void (cast Int32 (unbox Double (@ (l $t))))) (null Variable)) }
+        Q:CgOp { (rnull (rawscall System.Threading.Thread.Sleep:m,Void (cast int (unbox num (@ {$t}))))) }
     }
 }
 

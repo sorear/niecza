@@ -312,7 +312,7 @@ use CgOp;
                 $c = CgOp::how($c);
             }
             when ("WHAT") {
-                $c = CgOp::rawcall(CgOp::cast('IP6', $c), 'GetTypeObject');
+                $c = CgOp::rawcall(CgOp::cast('obj', $c), 'GetTypeObject');
             }
             default {
                 die "Invalid interrogative $_";
@@ -382,19 +382,19 @@ use CgOp;
         my ($self, $sym, $o2) = @_;
         given ($self->kind) {
             when ("&&") {
-                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
                         CgOp::methodcall($sym, 'Bool'))), $o2, $sym);
             }
             when ("||") {
-                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
                         CgOp::methodcall($sym, 'Bool'))), $sym, $o2);
             }
             when ("andthen") {
-                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
                         CgOp::methodcall($sym, 'defined'))), $o2, $sym);
             }
             when ("//") {
-                return CgOp::ternary(CgOp::unbox('Boolean', CgOp::fetch(
+                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
                         CgOp::methodcall($sym, 'defined'))), $sym, $o2);
             }
             default {
@@ -448,14 +448,14 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::ternary(
-            CgOp::unbox('Boolean',
+            CgOp::unbox('bool',
                 CgOp::fetch(
                     CgOp::methodcall($self->check->cgop($body), "Bool"))),
             # XXX use Nil
             ($self->true ? $self->true->cgop($body) :
-                CgOp::null('Variable')),
+                CgOp::null('var')),
             ($self->false ? $self->false->cgop($body) :
-                CgOp::null('Variable')));
+                CgOp::null('var')));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -479,7 +479,7 @@ use CgOp;
 
         CgOp::prog(
             CgOp::whileloop($self->until, $self->once,
-                CgOp::unbox('Boolean',
+                CgOp::unbox('bool',
                     CgOp::fetch(
                         CgOp::methodcall($self->check->cgop($body), "Bool"))),
                 CgOp::prog(
@@ -490,7 +490,7 @@ use CgOp;
                     CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
                     CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
             CgOp::label("last$id"),
-            CgOp::null('Variable'));
+            CgOp::null('var'));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -542,7 +542,7 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::ternary(
-            CgOp::unbox('Boolean',
+            CgOp::unbox('bool',
                 CgOp::fetch(
                     CgOp::methodcall(CgOp::scopedlex($self->condvar), "Bool"))),
             CgOp::scopedlex('Any'), #Nil
@@ -676,7 +676,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::null('Variable');
+        CgOp::null('var');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -693,7 +693,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::null('Variable');
+        CgOp::null('var');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -880,7 +880,7 @@ use CgOp;
 
     has unit => (isa => 'Str', is => 'ro', required => 1);
 
-    sub code { CgOp::null('Variable') }
+    sub code { CgOp::null('var') }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -954,16 +954,16 @@ use CgOp;
         CgOp::prog(
             @pre,
             CgOp::setfield('rx', CgOp::callframe,
-                CgOp::rawnew('RxFrame', CgOp::clr_string($self->name),
-                    CgOp::cast('Cursor', CgOp::fetch(CgOp::scopedlex('$¢'))))),
+                CgOp::rawnew('clr:RxFrame', CgOp::clr_string($self->name),
+                    CgOp::cast('clr:Cursor', CgOp::fetch(CgOp::scopedlex('$¢'))))),
             CgOp::rawcall(CgOp::rxframe, 'PushCapture',
-                CgOp::const(CgOp::rawnewarr('String', @mcaps)),
-                CgOp::null('Cursor')),
+                CgOp::const(CgOp::rawnewarr('str', @mcaps)),
+                CgOp::null('clr:Cursor')),
             $self->rxop->code($body),
             CgOp::rawccall(CgOp::rxframe, 'End'),
             CgOp::label('backtrack'),
             CgOp::rawccall(CgOp::rxframe, 'Backtrack'),
-            CgOp::null('Variable'));
+            CgOp::null('var'));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -993,7 +993,7 @@ use CgOp;
         CgOp::prog(
             $self->signature->bind_inline($body,
                 map { $_->cgop($body) } @{ $self->positionals }),
-            CgOp::null('Variable'));
+            CgOp::null('var'));
     }
 
     __PACKAGE__->meta->make_immutable;

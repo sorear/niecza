@@ -20,22 +20,22 @@ my class Mu {
     method so() { self.Bool }
     method not() { ! self.Bool }
     method RAWCREATE is rawcall { Q:CgOp {
-        (withtypes i Int32 max Int32 obj DynObject
+        (withtypes i int max int obj clr:DynObject
           [l max (getfield Length (getfield pos (callframe)))]
           [l i (int 1)]
-          [l obj (rawnew DynObject (getfield klass (cast DynObject
+          [l obj (rawnew clr:DynObject (getfield klass (cast clr:DynObject
                   (@ (pos 0)))))]
           [whileloop 0 0 (< (l i) (l max)) (prog
               [rawcall (l obj) SetSlot
-                (unbox String (@ (pos (l i))))
+                (unbox str (@ (pos (l i))))
                 (nsw (@ (pos (+ (l i) (int 1)))))]
               [l i (+ (l i) (int 2))])]
           [ns (l obj)])
     } }
     method bless($obj) { Q:CgOp {
         (prog
-          [setfield klass (cast DynObject (@ {$obj}))
-            (getfield klass (cast DynObject (@ {self})))]
+          [setfield klass (cast clr:DynObject (@ {$obj}))
+            (getfield klass (cast clr:DynObject (@ {self})))]
           {$obj})
     } }
     method CREATE() { Q:CgOp {
@@ -51,7 +51,7 @@ my class Any is Mu {
 
     method ACCEPTS($t) { self === $t }
     method !butWHENCE($cr) {
-        Q:CgOp { (rawnew SimpleVariable (bool 1) (bool 0) (@ {$cr}) (@ {self})) }
+        Q:CgOp { (rawnew clr:SimpleVariable (bool 1) (bool 0) (@ {$cr}) (@ {self})) }
     }
 }
 
@@ -92,11 +92,11 @@ my class Cool {
 my class Num is Cool {
     has $!value;
     method Str () { Q:CgOp {
-        (box Str (rawcall (unbox Double (@ {self})) ToString))
+        (box Str (rawcall (unbox num (@ {self})) ToString))
     } }
     method Bool() { Q:CgOp {
         (box Bool (compare != (double 0)
-                    (unbox Double (@ {self}))))
+                    (unbox num (@ {self}))))
     } }
     method Numeric() { self }
     method ACCEPTS($t) { self == $t }
@@ -107,18 +107,18 @@ my class Str is Cool {
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
     method chars() { Q:CgOp {
-        (box Num (cast Double (getfield Length (unbox String (@ (l self))))))
+        (box Num (cast num (getfield Length (unbox str (@ (l self))))))
     } }
     method say() { Q:CgOp {
         (prog [rawscall Console.WriteLine
-                (unbox String (@ {self}))]
+                (unbox str (@ {self}))]
               [box Bool (bool 1)]
         )
     } }
     method substr($from, $len) { Q:CgOp {
-        (box Str (rawcall [unbox String (@ {self})] Substring
-                    [cast Int32 (unbox Double (@ {$from}))]
-                    [cast Int32 (unbox Double (@ {$len}))]))
+        (box Str (rawcall [unbox str (@ {self})] Substring
+                    [cast int (unbox num (@ {$from}))]
+                    [cast int (unbox num (@ {$len}))]))
     } }
 }
 
@@ -138,7 +138,7 @@ my class ClassHOW {
     has $!value;
     method isa($obj, $type) { Q:CgOp {
         (box Bool (rawcall (@ {$obj}) Isa
-          (getfield klass (cast DynObject (@ {$type})))))
+          (getfield klass (cast clr:DynObject (@ {$type})))))
     } }
     method does($obj, $role) { self.isa($obj, $role) } #no roles yet
 }
@@ -161,59 +161,59 @@ constant False = Q:CgOp { (box Bool (bool 0)) };
 # taking a slurpy is wrong for this due to flattening.  I'm not sure what is
 # right, maybe **@foo
 sub infix:<~> is rawcall { Q:CgOp {
-    (letn buf (rawnew System.Text.StringBuilder)
+    (letn buf (rawnew clr:System.Text.StringBuilder)
           i   (int 0)
           max (getfield Length (getfield pos (callframe)))
       [whileloop 0 0 (< (l i) (l max)) (prog
           [rawcall (l buf) Append
-            (unbox String (@ (methodcall (pos (l i)) Str)))]
+            (unbox str (@ (methodcall (pos (l i)) Str)))]
           [l i (+ (l i) (int 1))])]
       [box Str (rawcall (l buf) ToString)])
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
-    (box Num (+ (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Num (+ (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<->($l,$r) { Q:CgOp {
-    (box Num (- (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Num (- (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<*>($l,$r) { Q:CgOp {
-    (box Num (* (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Num (* (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:</>($l,$r) { Q:CgOp {
-    (box Num (/ (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Num (/ (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<< < >>($l,$r) { Q:CgOp {
-    (box Bool (< (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Bool (< (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<< > >>($l,$r) { Q:CgOp {
-    (box Bool (> (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Bool (> (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<< <= >>($l,$r) { Q:CgOp {
-    (box Bool (<= (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Bool (<= (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<< >= >>($l,$r) { Q:CgOp {
-    (box Bool (>= (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Bool (>= (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<< == >>($l,$r) { Q:CgOp {
-    (box Bool (== (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Bool (== (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub infix:<< != >>($l,$r) { Q:CgOp {
-    (box Bool (!= (unbox Double (@ {$l})) (unbox Double (@ {$r}))))
+    (box Bool (!= (unbox num (@ {$l})) (unbox num (@ {$r}))))
 } }
 
 sub warn($str) { Q:CgOp {
     (prog [rawscall Console.Error.WriteLine
-            (unbox String (@ {$str.Str}))]
+            (unbox str (@ {$str.Str}))]
           [box Bool (bool 1)]
     )
 } }
@@ -222,7 +222,7 @@ sub say($obj) { ($obj ~~ Cool) ?? $obj.say !! $obj.Str.say }
 
 sub exit() { Q:CgOp {
     (prog [rawscall System.Environment.Exit (int 0) ]
-          [null Variable]
+          [null var]
     )
 } }
 
@@ -243,12 +243,12 @@ sub prefix:<+>($x) { $x.Numeric }
 sub prefix:<!>($v) { $v ?? False !! True }
 
 sub infix:<eq>($l,$r) { Q:CgOp {
-    (box Bool (compare == (unbox String (@ {$l.Str}))
-      (unbox String (@ {$r.Str}))))
+    (box Bool (compare == (unbox str (@ {$l.Str}))
+      (unbox str (@ {$r.Str}))))
 } }
 sub infix:<ne>($l,$r) { Q:CgOp {
-    (box Bool (compare != (unbox String (@ {$l.Str}))
-      (unbox String (@ {$r.Str}))))
+    (box Bool (compare != (unbox str (@ {$l.Str}))
+      (unbox str (@ {$r.Str}))))
 } }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
@@ -292,8 +292,8 @@ my class Parcel is Cool {
     method list() { List.SETUP(False, self) }
 
     method elems() { Q:CgOp {
-        (box Num (cast Double (getfield Length
-              (unbox 'Variable[]' (@ {self})))))
+        (box Num (cast num (getfield Length
+              (unbox 'clr:Variable[]' (@ {self})))))
     } }
 
     method iterator() {
@@ -306,7 +306,7 @@ my class Parcel is Cool {
 
 # Maybe this should be a constant, but constants are currently forced to
 # scalar-nature (TODO)
-sub Nil is rawcall { Q:CgOp { (newrwlistvar (@ (box Parcel (rawnewarr 'Variable')))) } }
+sub Nil is rawcall { Q:CgOp { (newrwlistvar (@ (box Parcel (rawnewarr 'var')))) } }
 
 my class List is Cool {
     has @!items;
@@ -319,23 +319,23 @@ my class List is Cool {
     method list() { unitem(self) }
 
     method clone() { Q:CgOp {
-        (letn dys (cast DynObject (@ {self}))
-              new (rawnew DynObject (getfield klass (l dys)))
+        (letn dys (cast clr:DynObject (@ {self}))
+              new (rawnew clr:DynObject (getfield klass (l dys)))
           (rawcall (l new) SetSlot (s flat)
             (rawcall (l dys) GetSlot (s flat)))
-          (rawcall (l new) SetSlot (s items) (rawnew VarDeque
-              (cast VarDeque (rawcall (l dys) GetSlot (s items)))))
-          (rawcall (l new) SetSlot (s rest) (rawnew VarDeque
-              (cast VarDeque (rawcall (l dys) GetSlot (s rest)))))
+          (rawcall (l new) SetSlot (s items) (rawnew clr:VarDeque
+              (cast clr:VarDeque (rawcall (l dys) GetSlot (s items)))))
+          (rawcall (l new) SetSlot (s rest) (rawnew clr:VarDeque
+              (cast clr:VarDeque (rawcall (l dys) GetSlot (s rest)))))
           (newrwlistvar (l new)))
     } }
 
     method SETUP($flat, $parcel) { Q:CgOp {
-        (letn new (rawnew DynObject (rawcall (@ {self}) GetMO))
-          (rawcall (l new) SetSlot (s flat) (unbox Boolean (@ {$flat.Bool})))
-          (rawcall (l new) SetSlot (s rest) (rawnew VarDeque
-              (unbox 'Variable[]' (@ {$parcel}))))
-          (rawcall (l new) SetSlot (s items) (rawnew VarDeque))
+        (letn new (rawnew clr:DynObject (rawcall (@ {self}) GetMO))
+          (rawcall (l new) SetSlot (s flat) (unbox bool (@ {$flat.Bool})))
+          (rawcall (l new) SetSlot (s rest) (rawnew clr:VarDeque
+              (unbox 'clr:Variable[]' (@ {$parcel}))))
+          (rawcall (l new) SetSlot (s items) (rawnew clr:VarDeque))
           (newrwlistvar (l new)))
     } }
 
@@ -348,43 +348,43 @@ my class List is Cool {
     method !elem is rawcall { Q:CgOp { (pos 1) } }
 
     sub has-iterators($self) { Q:CgOp {
-        (box Bool (!= (i 0) (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))) Count)))
+        (box Bool (!= (i 0) (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s rest))) Count)))
     } }
 
     sub count-items($self) { Q:CgOp {
-        (box Num (cast Double (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s items))) Count)))
+        (box Num (cast num (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s items))) Count)))
     } }
 
     sub shift-iterator($self) { Q:CgOp {
-        (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s rest))) Shift)
+        (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s rest))) Shift)
     } }
 
     sub shift-item($self) { Q:CgOp {
-        (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s items))) Shift)
+        (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s items))) Shift)
     } }
 
     method !item-at-pos($ix) { Q:CgOp {
-        (getindex (cast Int32 (unbox Double (@ {$ix}))) (cast VarDeque (rawcall (cast DynObject (@ {self})) GetSlot (s items))))
+        (getindex (cast int (unbox num (@ {$ix}))) (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {self})) GetSlot (s items))))
     } }
 
     sub pop-item($self) { Q:CgOp {
-        (rawcall (cast VarDeque (rawcall (cast DynObject (@ {$self})) GetSlot (s items))) Pop)
+        (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ {$self})) GetSlot (s items))) Pop)
     } }
 
     sub push-iterator is rawcall { Q:CgOp {
-        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s rest))) Push (pos 1)) (null Variable))
+        (prog (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ (pos 0))) GetSlot (s rest))) Push (pos 1)) (null var))
     } }
 
     sub push-item is rawcall { Q:CgOp {
-        (prog (rawcall (cast VarDeque (rawcall (cast DynObject (@ (pos 0))) GetSlot (s items))) Push (pos 1)) (null Variable))
+        (prog (rawcall (cast clr:VarDeque (rawcall (cast clr:DynObject (@ (pos 0))) GetSlot (s items))) Push (pos 1)) (null var))
     } }
 
     method !fill($nr) { Q:CgOp {
-        (letn  nr    (cast Int32 (unbox Double (@ {$nr})))
-               items (cast VarDeque (getslot (s items) (@ {self})))
-               rest  (cast VarDeque (getslot (s rest) (@ {self})))
-               flat  (cast Boolean  (getslot (s flat) (@ {self})))
-               v     (null Variable)
+        (letn  nr    (cast int (unbox num (@ {$nr})))
+               items (cast clr:VarDeque (getslot (s items) (@ {self})))
+               rest  (cast clr:VarDeque (getslot (s rest) (@ {self})))
+               flat  (cast bool  (getslot (s flat) (@ {self})))
+               v     (null var)
                ItMo  (rawcall (@ {Iterator}) GetMO)
           (whileloop 0 0
             (ternary (< (rawcall (l items) Count) (l nr))
@@ -394,7 +394,7 @@ my class List is Cool {
               (ternary (ternary (l flat) (getfield islist (l v)) (b 0))
                 (rawcall (l rest) Unshift (methodcall (l v) iterator))
                 (ternary (rawcall (@ (l v)) Isa (l ItMo))
-                  (rawcall (l rest) UnshiftN (unbox 'Variable[]'
+                  (rawcall (l rest) UnshiftN (unbox 'clr:Variable[]'
                       (@ (methodcall (l v) reify))))
                   (rawcall (l items) Push (methodcall {self} !elem (l v)))))))
           (box Bool (>= (rawcall (l items) Count) (l nr))))
@@ -472,17 +472,17 @@ my class Array is List {
         my $inn := @in.Seq.eager;
 
         Q:CgOp { (prog
-            (rawcall (cast DynObject (@ {self})) SetSlot (s items)
-              (rawcall (cast DynObject (@ {$inn})) GetSlot (s items)))
-            (null Variable))
+            (rawcall (cast clr:DynObject (@ {self})) SetSlot (s items)
+              (rawcall (cast clr:DynObject (@ {$inn})) GetSlot (s items)))
+            (null var))
         };
         unitem(self);
     }
 
     method !extend is rawcall {
         Q:CgOp {
-            (letn i (cast VarDeque (getslot (s items) (@ (pos 0))))
-                  ct (- (cast Int32 (unbox Double (@ (pos 1))))
+            (letn i (cast clr:VarDeque (getslot (s items) (@ (pos 0))))
+                  ct (- (cast int (unbox num (@ (pos 1))))
                         (rawcall (l i) Count))
               (ternary (>= (l ct) (int 0)) [prog]
                 [sink [die "Autovivification collision"]])
@@ -491,7 +491,7 @@ my class Array is List {
                   (l ct (- (l ct) (int 1)))
                   (rawcall (l i) Push (newrwscalar (@ {Any})))))
               (rawcall (l i) Push (pos 2))
-              (null Variable))
+              (null var))
         };
     }
 
@@ -506,28 +506,28 @@ my class Array is List {
 
 my class Hash {
     has $!value;
-    method new() { Q:CgOp { (box Hash (rawnew Dictionary<string,Variable>)) } }
+    method new() { Q:CgOp { (box Hash (rawnew clr:Dictionary<string,Variable>)) } }
     method !extend is rawcall {
         Q:CgOp {
-            (letn d [unbox Dictionary<string,Variable> (@ (pos 0))]
-                  k [unbox String (@ (methodcall (pos 1) Str))]
+            (letn d [unbox clr:Dictionary<string,Variable> (@ (pos 0))]
+                  k [unbox str (@ (methodcall (pos 1) Str))]
               [ternary (rawcall (l d) ContainsKey (l k))
                 (sink (die "Autovivification collision"))
                 (prog)]
               [setindex (l k) (l d) (pos 2)]
-              [null Variable])
+              [null var])
         };
     }
 
     # TODO: We need something like pir:: notation for this to not suck
     method at-key($key) {
         Q:CgOp {
-            (box Bool (rawcall [unbox Dictionary<string,Variable> (@ (l self))]
-                ContainsKey [unbox String (@ (methodcall (l $key) Str))]))
+            (box Bool (rawcall [unbox clr:Dictionary<string,Variable> (@ (l self))]
+                ContainsKey [unbox str (@ (methodcall (l $key) Str))]))
         }
             ?? Q:CgOp {
-                (getindex [unbox String (@ (methodcall (l $key) Str))]
-                  [unbox Dictionary<string,Variable> (@ (l self))])
+                (getindex [unbox str (@ (methodcall (l $key) Str))]
+                  [unbox clr:Dictionary<string,Variable> (@ (l self))])
             } !! Any!butWHENCE({ self!extend($key, Q:CgOp { (pos 0) }) });
     }
 }
@@ -585,11 +585,11 @@ my class GatherIterator is Iterator {
         my $*nextframe;
         $!reify // ($!reify = (
             Q:CgOp {
-                (letn getv (rawsccall Kernel.CoTake (cast Frame
+                (letn getv (rawsccall Kernel.CoTake (cast clr:Frame
                     (@ {$!frame})))
                   (box Parcel (ternary (== (@ {EMPTY}) (@ (l getv)))
-                    (rawnewarr Variable)
-                    (rawnewarr Variable
+                    (rawnewarr var)
+                    (rawnewarr var
                       (l getv)
                       {GatherIterator.RAWCREATE("frame", $*nextframe, "reify", Any)}))))
             }));
@@ -614,27 +614,27 @@ sub infix:<,> is rawcall {
 # Flow inspection and control {{{
 my class CallFrame {
     method caller() { Q:CgOp {
-        (letn c (getfield caller (cast Frame (@ (l self))))
+        (letn c (getfield caller (cast clr:Frame (@ (l self))))
           (ternary
-            (!= (letvar c) (null Frame))
+            (!= (letvar c) (null clr:Frame))
             (ns (letvar c))
             (l Any)))
     } }
     method outer() { Q:CgOp {
-        (letn c (getfield outer (cast Frame (@ (l self))))
+        (letn c (getfield outer (cast clr:Frame (@ (l self))))
           (ternary
-            (!= (letvar c) (null Frame))
+            (!= (letvar c) (null clr:Frame))
             (ns (letvar c))
             (l Any)))
     } }
 
     method file() { Q:CgOp { (box Str (rawcall
-        (cast Frame (@ (l self))) ExecutingFile)) } }
-    method line() { Q:CgOp { (box Num (cast Double (rawcall
-        (cast Frame (@ (l self))) ExecutingLine))) } }
+        (cast clr:Frame (@ (l self))) ExecutingFile)) } }
+    method line() { Q:CgOp { (box Num (cast num (rawcall
+        (cast clr:Frame (@ (l self))) ExecutingLine))) } }
 
-    method hints($var) { Q:CgOp { (rawcall (cast Frame (@ (l self)))
-        LexicalFind (unbox String (@ (l $var)))) } }
+    method hints($var) { Q:CgOp { (rawcall (cast clr:Frame (@ (l self)))
+        LexicalFind (unbox str (@ (l $var)))) } }
 }
 
 sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
@@ -644,16 +644,16 @@ sub die($msg) { Q:CgOp { (die (@ (l $msg))) } }
 
 # XXX multi dispatch
 sub next {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 1) (null Frame) (int -1) (null String) (null Variable)) }
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 1) (null clr:Frame) (int -1) (null str) (null var)) }
 }
 sub last {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 2) (null Frame) (int -1) (null String) (null Variable)) }
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 2) (null clr:Frame) (int -1) (null str) (null var)) }
 }
 sub redo {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 3) (null Frame) (int -1) (null String) (null Variable)) }
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 3) (null clr:Frame) (int -1) (null str) (null var)) }
 }
 sub return is rawcall {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 4) (null Frame) (int -1) (null String) (pos 0)) }
+    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 4) (null clr:Frame) (int -1) (null str) (pos 0)) }
 }
 
 sub assignop($fn) {
@@ -664,34 +664,34 @@ sub assignop($fn) {
 # }}}
 # Regular expression support {{{
 my class Cursor {
-    method new($str) { Q:CgOp { (ns (rawnew Cursor
-        (@ {self}) (unbox System.String (@ {$str})))) } }
-    method pos { Q:CgOp { (box Num (cast Double (getfield pos
-        (cast Cursor (@ {self}))))) } }
+    method new($str) { Q:CgOp { (ns (rawnew clr:Cursor
+        (@ {self}) (unbox str (@ {$str})))) } }
+    method pos { Q:CgOp { (box Num (cast num (getfield pos
+        (cast clr:Cursor (@ {self}))))) } }
     method cursor($np) { Q:CgOp { (ns (rawcall
-        (cast Cursor (@ {self})) At
-          (cast Int32 (unbox Double (@ {$np}))))) } }
+        (cast clr:Cursor (@ {self})) At
+          (cast int (unbox num (@ {$np}))))) } }
     method orig { Q:CgOp {
-        (box Str (getfield backing (cast Cursor (@ {self})))) } }
-    method ws() { Q:CgOp { (rawcall (cast Cursor (@ {self})) SimpleWS) } }
+        (box Str (getfield backing (cast clr:Cursor (@ {self})))) } }
+    method ws() { Q:CgOp { (rawcall (cast clr:Cursor (@ {self})) SimpleWS) } }
     method at-key($k) { Q:CgOp {
-        (rawcall (cast Cursor (@ {self})) GetKey (unbox String (@ {$k.Str})))
+        (rawcall (cast clr:Cursor (@ {self})) GetKey (unbox str (@ {$k.Str})))
     } }
     method at-pos($i) { self.at-key($i) }
 }
 
 my class Match {
     method at-key($k) { Q:CgOp {
-        (rawcall (cast Cursor (@ {self})) GetKey (unbox String (@ {$k.Str})))
+        (rawcall (cast clr:Cursor (@ {self})) GetKey (unbox str (@ {$k.Str})))
     } }
     method at-pos($i) { self.at-key($i) }
     method new($) { die "Match.new NYI" }
-    method from { Q:CgOp { (box Num (cast Double (getfield from
-        (cast Cursor (@ {self}))))) } }
-    method to { Q:CgOp { (box Num (cast Double (getfield pos
-        (cast Cursor (@ {self}))))) } }
+    method from { Q:CgOp { (box Num (cast num (getfield from
+        (cast clr:Cursor (@ {self}))))) } }
+    method to { Q:CgOp { (box Num (cast num (getfield pos
+        (cast clr:Cursor (@ {self}))))) } }
     method orig { Q:CgOp {
-        (box Str (getfield backing (cast Cursor (@ {self})))) } }
+        (box Str (getfield backing (cast clr:Cursor (@ {self})))) } }
     method chars { $.defined ?? $.to - $.from !! 0 }
     method Str { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
 }
