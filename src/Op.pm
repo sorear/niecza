@@ -90,7 +90,7 @@ use CgOp;
         my ($self, $body) = @_;
         my @ch = map { $_->cgop($body) } @{ $self->children };
         # XXX should be Nil or something
-        my $end = @ch ? pop(@ch) : CgOp::wrap(CgOp::null('object'));
+        my $end = @ch ? pop(@ch) : CgOp::scopedlex('Any');
 
         CgOp::prog((map { CgOp::sink($_) } @ch), $end);
     }
@@ -545,7 +545,7 @@ use CgOp;
             CgOp::unbox('Boolean',
                 CgOp::fetch(
                     CgOp::methodcall(CgOp::scopedlex($self->condvar), "Bool"))),
-            CgOp::wrap(CgOp::null('object')),
+            CgOp::scopedlex('Any'), #Nil
             CgOp::prog(
                 CgOp::assign(CgOp::scopedlex($self->condvar),
                     CgOp::box('Bool', CgOp::bool(1))),

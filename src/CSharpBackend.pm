@@ -122,8 +122,9 @@ EOM
 sub stash2 {
     my $p = $lpeers{$_} = gsym('IP6', join("_", @{ $_->path }));
     push @decls, $p;
-    push @thaw, CgOp::rawsset($p, CgOp::rawnew('CLRImportObject',
-        CgOp::rawnew('Dictionary<string,BValue>')));
+    push @thaw, CgOp::rawsset($p, CgOp::fetch(CgOp::box(
+            CgOp::rawsget('Kernel.StashP'),
+            CgOp::rawnew('Dictionary<string,BValue>'))));
     if (@{ $_->path } == 1 && $_->path->[0] =~ /^(?:GLOBAL|PROCESS)$/) {
         push @thaw, CgOp::rawsset('Kernel.' . ucfirst(lc($_->path->[0])) .
             'O', CgOp::rawsget($p));
@@ -136,6 +137,7 @@ my %loopbacks = (
     'MGatherIterator', 'RxFrame.GatherIteratorMO',
     'MList', 'RxFrame.ListMO',
     'MMatch', 'RxFrame.MatchMO',
+    'PStash', 'Kernel.StashP',
     'PAny', 'Kernel.AnyP',
     'PArray', 'Kernel.ArrayP',
     'PEMPTY', 'RxFrame.EMPTYP',
@@ -157,7 +159,7 @@ sub pkg2 {
     my $whv = $_->{peer}{what_var};
     my $wh6 = $_->{peer}{what_ip6};
     if ($unit->is_true_setting && ($_->name eq 'Scalar' ||
-            $_->name eq 'Sub')) {
+            $_->name eq 'Sub' || $_->name eq 'Stash')) {
         push @thaw, CgOp::rawsset($p,
             CgOp::rawsget("Kernel." . $_->name . "MO:f,$cl_ty"));
     } else {

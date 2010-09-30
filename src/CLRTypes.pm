@@ -41,8 +41,6 @@ my %typedata = (
         { v            => [f => 'Variable' ] },
     'VivClosure' =>
         { v            => [f => 'IP6'] },
-    'CLRImportObject' =>
-        { val          => [f => 'Object'] },
     'String' =>
         { Length       => [f => 'Int32'],
           Substring    => [m => 'String'] },
@@ -130,12 +128,22 @@ my %typedata = (
     'Kernel.AnyP'          => [f => 'IP6'],
     'Kernel.ArrayP'        => [f => 'IP6'],
     'Kernel.HashP'         => [f => 'IP6'],
+    'Kernel.StashP',       => [f => 'IP6'],
     'Kernel.SubMO'         => [f => 'DynMetaObject'],
     'Kernel.ScalarMO'      => [f => 'DynMetaObject'],
+    'Kernel.StashMO'       => [f => 'DynMetaObject'],
     'Kernel.MainlineContinuation' => [f => 'DynBlockDelegate'],
     'Kernel.MakeSub'       => [m => 'IP6'],
     'Kernel.BoxAny'        => [m => 'Variable'],
     'Kernel.UnboxAny'      => [m => 'object'],
+);
+
+my %tmap = (
+    'str'       => 'System.String',
+    'var'       => 'Niecza.Variable',
+    'obj'       => 'Niecza.IP6',
+    'int'       => 'System.Int32',
+    'num'       => 'System.Double',
 );
 
 sub _generic_infer {

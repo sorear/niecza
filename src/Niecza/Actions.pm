@@ -1683,7 +1683,6 @@ sub cgexp__S_quote { my ($cl, $M) = @_;
 my %opshortcut = (
     '@',   [ 'fetch' ],
     'l',   [ 'scopedlex' ],
-    'w',   [ 'wrap' ],
     'ns',  [ 'newscalar' ],
     'nsw', [ 'newrwscalar' ],
     's',   [ 'clr_string' ],

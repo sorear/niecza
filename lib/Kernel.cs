@@ -576,21 +576,6 @@ blocked:
         }
     }
 
-    // This class is slated for bloody death.  See Kernel.BoxAny for the
-    // replacement.
-    public class CLRImportObject : IP6 {
-        public readonly object val;
-
-        public CLRImportObject(object val_) { val = val_; }
-
-        public override Frame GetAttribute(Frame c, string nm) {
-            return Kernel.Die(c, "Attribute " + nm +
-                    " not available on CLRImportObject");
-        }
-
-        public override DynMetaObject GetMO() { return null; }
-    }
-
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
@@ -662,6 +647,9 @@ blocked:
 
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject ScalarMO;
+        public static readonly DynMetaObject StashMO;
+
+        public static readonly IP6 StashP;
 
         public static bool TraceCont;
 
@@ -813,7 +801,7 @@ blocked:
             }
             name = name.Remove(1,1);
             Dictionary<string,BValue> gstash = (Dictionary<string,BValue>)
-                (((CLRImportObject)GlobalO).val);
+                UnboxAny(GlobalO);
             BValue v;
 
             if (gstash.TryGetValue(name, out v)) {
@@ -858,7 +846,7 @@ slow:
 
         public static BValue PackageLookup(IP6 parent, string name) {
             Dictionary<string,BValue> stash = (Dictionary<string,BValue>)
-                (((CLRImportObject)parent).val);
+                UnboxAny(parent);
             BValue v;
 
             if (stash.TryGetValue(name, out v)) {
@@ -867,8 +855,8 @@ slow:
                 Dictionary<string,BValue> newstash =
                     new Dictionary<string,BValue>();
                 newstash["PARENT::"] = new BValue(NewROScalar(parent));
-                return (stash[name] = new BValue(NewROScalar(
-                            new CLRImportObject(newstash))));
+                return (stash[name] = new BValue(BoxAny(newstash,
+                                StashP)));
             } else {
                 // TODO: @foo, %foo
                 return (stash[name] = new BValue(NewRWScalar(AnyP)));
@@ -925,6 +913,11 @@ slow:
             pStrMO.AddAttribute("value");
             pStrMO.Complete();
             StrP = new DynObject(pStrMO);
+
+            StashMO = new DynMetaObject("Stash");
+            StashMO.AddAttribute("value");
+            StashMO.Complete();
+            StashP = new DynObject(StashMO);
 
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);

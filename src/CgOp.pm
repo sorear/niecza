@@ -119,14 +119,6 @@ use warnings;
         CgOp::Primitive->new(op => [ ehspan => @_ ]);
     }
 
-    sub wrap {
-        newscalar(rawnew('CLRImportObject', $_[0]));
-    }
-
-    sub unwrap {
-        cast($_[0], getfield('val', cast('CLRImportObject', $_[1])));
-    }
-
     sub sink {
         CgOp::Primitive->new(op => ['drop'], zyg => [ $_[0] ]);
     }
