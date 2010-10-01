@@ -244,8 +244,8 @@ use CLRTypes;
     }
 
     sub pos {
-        my ($self, $num, $vty, $val) = @_;
-        'Variable', "th.pos[" . ($num // $val) . "]";
+        my ($self, $vty, $val) = @_;
+        'Variable', "th.pos[$val]";
     }
 
     sub _prepcall {
@@ -379,19 +379,14 @@ use CLRTypes;
     }
 
     sub clr_index_get {
-        my ($self, $f) = splice @_, 0, 2;
-        my ($oty, $obj, $ixty, $ix) = defined($f) ?
-            (@_, '', qm($f)) : @_;
+        my ($self, $ixty, $ix, $oty, $obj) = @_;
         my ($nm, $cl, $ty) = CLRTypes->info('i', $oty, 'Item');
         $ty, "($obj" . "[$ix])";
     }
 
     sub clr_index_set {
-        my ($self, $f) = splice @_, 0, 2;
-        my ($oty, $obj) = splice(@_,0,2);
-        my ($ixty, $ix) = splice(@_,0,2) unless $f;
-        my ($vty, $val) = splice(@_,0,2);
-        $self->_emit("$obj" . "[" . (defined($f)? qm($f) : $ix) . "] = ($val)");
+        my ($self, $ixty, $ix, $oty, $obj, $vty, $val) = @_;
+        $self->_emit("$obj" . "[$ix] = ($val)");
     }
 
     sub cast {

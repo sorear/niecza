@@ -5,12 +5,12 @@ my module SAFE;
 my class Mu {
     # rawcall to avoid putting a rw binding on self... TODO
     method defined is rawcall {
-        Q:CgOp { (box Bool (rawcall (@ (pos 0)) IsDefined)) }
+        Q:CgOp { (box Bool (obj_is_defined (@ (pos 0)))) }
     }
-    method head { @(self).head }
+    method head() { @(self).head }
     method Bool() { self.defined }
     method Str() {
-        my $tn := Q:CgOp { (box Str (rawcall (@ {self}) GetTypeName)) };
+        my $tn := Q:CgOp { (box Str (obj_typename (@ {self}))) };
         if self.defined {
             $tn ~ "()<instance>"
         } else {
@@ -51,7 +51,7 @@ my class Any is Mu {
 
     method ACCEPTS($t) { self === $t }
     method !butWHENCE($cr) {
-        Q:CgOp { (rawnew clr:SimpleVariable (bool 1) (bool 0) (@ {$cr}) (@ {self})) }
+        Q:CgOp { (newgeneralvar (bool 1) (bool 0) (@ {$cr}) (@ {self})) }
     }
 }
 
@@ -92,11 +92,10 @@ my class Cool {
 my class Num is Cool {
     has $!value;
     method Str () { Q:CgOp {
-        (box Str (rawcall (unbox num (@ {self})) ToString))
+        (box Str (num_to_string (unbox num (@ {self}))))
     } }
     method Bool() { Q:CgOp {
-        (box Bool (compare != (double 0)
-                    (unbox num (@ {self}))))
+        (box Bool (compare != (double 0) (unbox num (@ {self}))))
     } }
     method Numeric() { self }
     method ACCEPTS($t) { self == $t }
@@ -107,7 +106,7 @@ my class Str is Cool {
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
     method chars() { Q:CgOp {
-        (box Num (cast num (getfield Length (unbox str (@ (l self))))))
+        (box Num (cast num (str_length (unbox str (@ (l self))))))
     } }
     method say() { Q:CgOp {
         (prog [rawscall Console.WriteLine
@@ -137,8 +136,7 @@ my class Sub {
 my class ClassHOW {
     has $!value;
     method isa($obj, $type) { Q:CgOp {
-        (box Bool (rawcall (@ {$obj}) Isa
-          (getfield klass (cast clr:DynObject (@ {$type})))))
+        (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))
     } }
     method does($obj, $role) { self.isa($obj, $role) } #no roles yet
 }
@@ -292,8 +290,7 @@ my class Parcel is Cool {
     method list() { List.SETUP(False, self) }
 
     method elems() { Q:CgOp {
-        (box Num (cast num (getfield Length
-              (unbox 'clr:Variable[]' (@ {self})))))
+        (box Num (cast num (fvarlist_length (unbox fvarlist (@ {self})))))
     } }
 
     method iterator() {
@@ -306,7 +303,7 @@ my class Parcel is Cool {
 
 # Maybe this should be a constant, but constants are currently forced to
 # scalar-nature (TODO)
-sub Nil is rawcall { Q:CgOp { (newrwlistvar (@ (box Parcel (rawnewarr 'var')))) } }
+sub Nil is rawcall { Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) } }
 
 my class List is Cool {
     has @!items;
@@ -319,22 +316,22 @@ my class List is Cool {
     method list() { unitem(self) }
 
     method clone() { Q:CgOp {
-        (letn dys (cast clr:DynObject (@ {self}))
-              new (rawnew clr:DynObject (getfield klass (l dys)))
-          (setslot flat (l new) (getslot flat bool (l dys)))
-          (setslot items (l new) (rawnew clr:VarDeque
-              (getslot items clr:VarDeque (l dys))))
-          (setslot rest (l new) (rawnew clr:VarDeque
-              (getslot rest clr:VarDeque (l dys))))
+        (letn selfo (@ {self})
+              new (rawnew clr:DynObject (obj_llhow (l selfo)))
+          (setslot flat (l new) (getslot flat bool (l selfo)))
+          (setslot items (l new) (rawnew vvarlist
+              (getslot items vvarlist (l selfo))))
+          (setslot rest (l new) (rawnew vvarlist
+              (getslot rest vvarlist (l selfo))))
           (newrwlistvar (l new)))
     } }
 
     method SETUP($flat, $parcel) { Q:CgOp {
-        (letn new (rawnew clr:DynObject (rawcall (@ {self}) GetMO))
+        (letn new (rawnew clr:DynObject (obj_llhow (@ {self})))
           (setslot flat (l new) (unbox bool (@ {$flat.Bool})))
-          (setslot rest (l new) (rawnew clr:VarDeque
-              (unbox 'clr:Variable[]' (@ {$parcel}))))
-          (setslot items (l new) (rawnew clr:VarDeque))
+          (setslot rest (l new) (vvarlist_from_fvarlist
+              (unbox fvarlist (@ {$parcel}))))
+          (setslot items (l new) (vvarlist_new_empty))
           (newrwlistvar (l new)))
     } }
 
@@ -347,7 +344,7 @@ my class List is Cool {
     method !elem is rawcall { Q:CgOp { (pos 1) } }
 
     sub count-items($self) { Q:CgOp {
-        (box Num (cast num (rawcall (getslot items clr:VarDeque (@ {$self})) Count)))
+        (box Num (cast num (rawcall (getslot items vvarlist (@ {$self})) Count)))
     } }
 
     sub shift-item($self) { Q:CgOp {
@@ -498,12 +495,12 @@ my class Hash {
     method new() { Q:CgOp { (box Hash (rawnew clr:Dictionary<string,Variable>)) } }
     method !extend is rawcall {
         Q:CgOp {
-            (letn d [unbox clr:Dictionary<string,Variable> (@ (pos 0))]
+            (letn d [unbox varhash (@ (pos 0))]
                   k [unbox str (@ (methodcall (pos 1) Str))]
-              [ternary (rawcall (l d) ContainsKey (l k))
+              [ternary (varhash_contains_key (l d) (l k))
                 (sink (die "Autovivification collision"))
                 (prog)]
-              [setindex (l k) (l d) (pos 2)]
+              [varhash_setindex (l k) (l d) (pos 2)]
               [null var])
         };
     }
@@ -511,12 +508,12 @@ my class Hash {
     # TODO: We need something like pir:: notation for this to not suck
     method at-key($key) {
         Q:CgOp {
-            (box Bool (rawcall [unbox clr:Dictionary<string,Variable> (@ (l self))]
-                ContainsKey [unbox str (@ (methodcall (l $key) Str))]))
+            (box Bool (varhash_contains_key [unbox varhash (@ {self})]
+                [unbox str (@ {$key.Str})]))
         }
             ?? Q:CgOp {
-                (getindex [unbox str (@ (methodcall (l $key) Str))]
-                  [unbox clr:Dictionary<string,Variable> (@ (l self))])
+                (varhash_getindex [unbox str (@ {$key.Str})]
+                  [unbox varhash (@ {self})])
             } !! Any!butWHENCE({ self!extend($key, Q:CgOp { (pos 0) }) });
     }
 }
@@ -603,18 +600,18 @@ sub infix:<,> is rawcall {
 # Flow inspection and control {{{
 my class CallFrame {
     method caller() { Q:CgOp {
-        (letn c (getfield caller (cast clr:Frame (@ (l self))))
+        (letn c (getfield caller (cast clr:Frame (@ {self})))
           (ternary
             (!= (letvar c) (null clr:Frame))
             (ns (letvar c))
-            (l Any)))
+            {Any}))
     } }
     method outer() { Q:CgOp {
-        (letn c (getfield outer (cast clr:Frame (@ (l self))))
+        (letn c (getfield outer (cast clr:Frame (@ {self})))
           (ternary
             (!= (letvar c) (null clr:Frame))
             (ns (letvar c))
-            (l Any)))
+            {Any}))
     } }
 
     method file() { Q:CgOp { (box Str (rawcall
@@ -629,7 +626,7 @@ my class CallFrame {
 sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
 sub callframe { Q:CgOp { (ns (getfield caller (callframe))) } }
 
-sub die($msg) { Q:CgOp { (die (@ (l $msg))) } }
+sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
 # XXX multi dispatch
 sub next {

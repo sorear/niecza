@@ -98,6 +98,9 @@ use warnings;
     package CgOp;
     use Scalar::Util 'blessed';
 
+    sub _str { blessed($_[0]) ? $_[0] : clr_string($_[0]) }
+    sub _int { blessed($_[0]) ? $_[0] : CgOp::int($_[0]) }
+
     sub noop {
         CgOp::Seq->new;
     }
@@ -146,32 +149,24 @@ use warnings;
     }
 
     sub getindex {
-        CgOp::Primitive->new(
-            op  => [ 'clr_index_get', blessed($_[0]) ? undef : $_[0] ],
-            zyg => [ $_[1], (blessed($_[0]) ? $_[0] : ()) ]);
+        CgOp::Primitive->new(op => [ 'clr_index_get' ],
+            zyg => [ _str($_[0]), $_[1] ]);
     }
 
     sub setindex {
-        CgOp::Primitive->new(
-            op  => [ 'clr_index_set', blessed($_[0]) ? undef : $_[0] ],
-            zyg => [ $_[1], (blessed($_[0]) ? $_[0] : ()), $_[2] ]);
+        CgOp::Primitive->new(op  => [ 'clr_index_set' ],
+            zyg => [ _str($_[0]), $_[1], $_[2] ]);
     }
 
     sub getattr {
         fetch(varattr($_[0], $_[1]));
     }
 
-    sub getslot {
-        cast($_[1], rawcall($_[2], 'GetSlot', (blessed($_[0]) ? $_[0] : clr_string($_[0]))));
-    }
+    sub getslot { cast($_[1], rawcall($_[2], 'GetSlot', _str($_[0]))); }
 
-    sub setslot {
-        rawcall($_[1], 'SetSlot', (blessed($_[0]) ? $_[0] : clr_string($_[0])), $_[2]);
-    }
+    sub setslot { rawcall($_[1], 'SetSlot', _str($_[0]), $_[2]); }
 
-    sub varattr {
-        getslot($_[0], 'var', $_[1]);
-    }
+    sub varattr { getslot($_[0], 'var', $_[1]); }
 
     sub cast {
         CgOp::Primitive->new(op => [ 'cast', CLRTypes->mapt($_[0]) ], zyg => [ $_[1] ]);
@@ -189,13 +184,9 @@ use warnings;
         rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyP'));
     }
 
-    sub newrwscalar {
-        rawscall('Kernel.NewRWScalar', $_[0]);
-    }
+    sub newrwscalar { rawscall('Kernel.NewRWScalar', $_[0]); }
 
-    sub newrwlistvar {
-        rawscall('Kernel.NewRWListVar', $_[0]);
-    }
+    sub newrwlistvar { rawscall('Kernel.NewRWListVar', $_[0]); }
 
     sub newblanklist {
         newrwlistvar(ternary(
@@ -209,9 +200,7 @@ use warnings;
                 fetch(methodcall(newscalar(rawsget('Kernel.HashP')), 'new')));
     }
 
-    sub string_var {
-        box('Str', clr_string($_[0]));
-    }
+    sub string_var { box('Str', clr_string($_[0])); }
 
     sub double {
         CgOp::Primitive->new(op => [ 'clr_double', $_[0] ], constant => 1);
@@ -240,6 +229,31 @@ use warnings;
             ($_[0] eq 'Str') ? rawsget('Kernel.StrP') :
                 fetch(scopedlex($_[0])));
     }
+
+    sub obj_is_defined { rawcall($_[0], 'IsDefined') }
+    sub obj_typename { rawcall($_[0], 'GetTypeName') }
+    sub obj_what { rawcall($_[0], 'GetTypeObject') }
+    sub obj_llhow { rawcall($_[0], 'GetMO') }
+    sub obj_isa { rawcall($_[0], 'Isa', $_[1]) }
+    sub obj_does { rawcall($_[0], 'Does', $_[1]) }
+
+    sub llhow_name { getfield('name', $_[0]) }
+
+    sub varhash_setindex { setindex(@_) }
+    sub varhash_getindex { getindex(@_) }
+    sub varhash_contains_key { rawcall($_[0], 'ContainsKey', _str($_[1])) }
+    sub varhash_new { rawnew('varhash') }
+
+    sub newgeneralvar { rawnew('clr:SimpleVariable', @_) }
+
+    sub num_to_string { rawcall($_[0], 'ToString') }
+    sub str_length { getfield('Length', $_[0]) }
+
+    sub fvarlist_length { getfield('Length', $_[0]) }
+    sub fvarlist_new { rawnewarr('var', @_) }
+
+    sub vvarlist_from_fvarlist { rawnew('vvarlist', $_[0]) }
+    sub vvarlist_new_empty { rawnew('vvarlist') }
 
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
@@ -459,8 +473,8 @@ use warnings;
     }
 
     sub pos {
-        CgOp::Primitive->new(op => [ 'pos', blessed($_[0]) ? undef : $_[0] ],
-            zyg => [blessed($_[0]) ? ($_[0]) : ()], constant => 1);
+        CgOp::Primitive->new(op => [ 'pos' ], zyg => [ _int($_[0]) ],
+            constant => 1);
     }
 
     sub ternary {

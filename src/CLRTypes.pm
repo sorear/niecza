@@ -142,12 +142,20 @@ my %typedata = (
     %{ $typedata{ $_->[1] } }) for ( ['DynObject', 'IP6'] );
 
 my %tmap = (
+    # a simple string, like string or $S32.  May support nulls
     'str'       => 'String',
+    # a reference to a container + usage flags
     'var'       => 'Variable',
+    # a reference to a single Perl 6 object, decontainerized
     'obj'       => 'IP6',
     'int'       => 'Int32',
     'num'       => 'Double',
     'bool'      => 'Boolean',
+    'varhash'   => 'Dictionary<string,Variable>',
+    'fvarlist'  => 'Variable[]',
+    'vvarlist'  => 'VarDeque',
+    # XXX does this leak too much information about the metamodel?
+    'class'     => 'DynMetaObject',
 );
 
 sub _generic_infer {

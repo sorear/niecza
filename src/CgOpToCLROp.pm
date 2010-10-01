@@ -82,7 +82,7 @@ sub type_infer {
             return (CLRTypes->info("f", $argtypes[0], $op->[1]))[2];
         }
         when ("clr_index_get") {
-            return (CLRTypes->info("i", $argtypes[0], 'Item'))[2];
+            return (CLRTypes->info("i", $argtypes[1], 'Item'))[2];
         }
         when ("clr_sfield_get") {
             return (CLRTypes->info("f", $op->[1]))[2];
