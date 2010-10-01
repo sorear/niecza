@@ -254,6 +254,13 @@ use warnings;
 
     sub vvarlist_from_fvarlist { rawnew('vvarlist', $_[0]) }
     sub vvarlist_new_empty { rawnew('vvarlist') }
+    sub vvarlist_shift { rawcall($_[0], 'Shift') }
+    sub vvarlist_pop { rawcall($_[0], 'Pop') }
+    sub vvarlist_count { rawcall($_[0], 'Count') }
+    sub vvarlist_unshift { rawcall($_[0], 'Unshift', $_[1]) }
+    sub vvarlist_unshiftn { rawcall($_[0], 'UnshiftN', $_[1]) }
+    sub vvarlist_push { rawcall($_[0], 'Push', $_[1]) }
+    sub vvarlist_item { getindex($_[0], $_[1]) }
 
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }

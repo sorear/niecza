@@ -344,48 +344,48 @@ my class List is Cool {
     method !elem is rawcall { Q:CgOp { (pos 1) } }
 
     sub count-items($self) { Q:CgOp {
-        (box Num (cast num (rawcall (getslot items vvarlist (@ {$self})) Count)))
+        (box Num (cast num (vvarlist_count (getslot items vvarlist (@ {$self})))))
     } }
 
     sub shift-item($self) { Q:CgOp {
-        (rawcall (getslot items clr:VarDeque (@ {$self})) Shift)
+        (vvarlist_shift (getslot items vvarlist (@ {$self})))
     } }
 
     method !item-at-pos($ix) { Q:CgOp {
-        (getindex (cast int (unbox num (@ {$ix}))) (getslot items clr:VarDeque (@ {self})))
+        (vvarlist_item (cast int (unbox num (@ {$ix}))) (getslot items vvarlist (@ {self})))
     } }
 
     sub pop-item($self) { Q:CgOp {
-        (rawcall (getslot items clr:VarDeque (@ {$self})) Pop)
+        (vvarlist_pop (getslot items vvarlist (@ {$self})))
     } }
 
     sub push-iterator is rawcall { Q:CgOp {
-        (rnull (rawcall (getslot rest clr:VarDeque (@ (pos 0))) Push (pos 1)))
+        (rnull (vvarlist_push (getslot rest vvarlist (@ (pos 0))) (pos 1)))
     } }
 
     sub push-item is rawcall { Q:CgOp {
-        (prog (rawcall (getslot items clr:VarDeque (@ (pos 0))) Push (pos 1)) (null var))
+        (rnull (vvarlist_push (getslot items vvarlist (@ (pos 0))) (pos 1)))
     } }
 
     method !fill($nr) { Q:CgOp {
         (letn  nr    (cast int (unbox num (@ {$nr})))
-               items (getslot items clr:VarDeque (@ {self}))
-               rest  (getslot rest clr:VarDeque (@ {self}))
+               items (getslot items vvarlist (@ {self}))
+               rest  (getslot rest vvarlist (@ {self}))
                flat  (getslot flat bool (@ {self}))
                v     (null var)
-               ItMo  (rawcall (@ {Iterator}) GetMO)
+               ItMo  (obj_llhow (@ {Iterator}))
           (whileloop 0 0
-            (ternary (< (rawcall (l items) Count) (l nr))
-              (!= (rawcall (l rest) Count) (i 0)) (b 0))
+            (ternary (< (vvarlist_count (l items)) (l nr))
+              (!= (vvarlist_count (l rest)) (i 0)) (b 0))
             (prog
-              (l v (rawcall (l rest) Shift))
+              (l v (vvarlist_shift (l rest)))
               (ternary (ternary (l flat) (getfield islist (l v)) (b 0))
-                (rawcall (l rest) Unshift (methodcall (l v) iterator))
-                (ternary (rawcall (@ (l v)) Isa (l ItMo))
-                  (rawcall (l rest) UnshiftN (unbox 'clr:Variable[]'
+                (vvarlist_unshift (l rest) (methodcall (l v) iterator))
+                (ternary (obj_isa (@ (l v)) (l ItMo))
+                  (vvarlist_unshiftn (l rest) (unbox fvarlist
                       (@ (methodcall (l v) reify))))
-                  (rawcall (l items) Push (methodcall {self} !elem (l v)))))))
-          (box Bool (>= (rawcall (l items) Count) (l nr))))
+                  (vvarlist_push (l items) (methodcall {self} !elem (l v)))))))
+          (box Bool (>= (vvarlist_count (l items)) (l nr))))
     } }
 
     method Bool() { self!fill(1) }
@@ -460,23 +460,23 @@ my class Array is List {
         my $inn := @in.Seq.eager;
 
         Q:CgOp { (rnull
-            (setslot items (@ {self}) (getslot items clr:VarDeque (@ {$inn}))))
+            (setslot items (@ {self}) (getslot items vvarlist (@ {$inn}))))
         };
         unitem(self);
     }
 
     method !extend is rawcall {
         Q:CgOp {
-            (letn i (getslot items clr:VarDeque (@ (pos 0)))
+            (letn i (getslot items vvarlist (@ (pos 0)))
                   ct (- (cast int (unbox num (@ (pos 1))))
-                        (rawcall (l i) Count))
+                        (vvarlist_count (l i)))
               (ternary (>= (l ct) (int 0)) [prog]
                 [sink [die "Autovivification collision"]])
               (whileloop 0 0 (!= (l ct) (int 0))
                 (prog
                   (l ct (- (l ct) (int 1)))
-                  (rawcall (l i) Push (newrwscalar (@ {Any})))))
-              (rawcall (l i) Push (pos 2))
+                  (vvarlist_push (l i) (newrwscalar (@ {Any})))))
+              (vvarlist_push (l i) (pos 2))
               (null var))
         };
     }
@@ -492,7 +492,7 @@ my class Array is List {
 
 my class Hash {
     has $!value;
-    method new() { Q:CgOp { (box Hash (rawnew clr:Dictionary<string,Variable>)) } }
+    method new() { Q:CgOp { (box Hash (varhash_new)) } }
     method !extend is rawcall {
         Q:CgOp {
             (letn d [unbox varhash (@ (pos 0))]
