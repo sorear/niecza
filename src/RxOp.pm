@@ -434,7 +434,7 @@ use CgOp;
 
         if ($self->selfcut) {
             push @code, CgOp::letn(
-                "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+                "k", CgOp::fetch(CgOp::rawscall('Kernel.GetFirst:c,Variable',
                     CgOp::fetch($callf))),
                 $updatef);
         } else {
@@ -445,7 +445,7 @@ use CgOp;
                         "GetCursorList"), "shift"));
             push @code, CgOp::label($sk);
             push @code, CgOp::letn(
-                "k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+                "k", CgOp::fetch(CgOp::rawscall('Kernel.GetFirst:c,Variable',
                     CgOp::fetch(CgOp::rxcall("GetCursorList")))),
                 $updatef);
             push @code, CgOp::rxpushb("SUBRULE", $bt);
@@ -643,11 +643,11 @@ use CgOp;
                 CgOp::letvar("fns")), CgOp::newscalar(CgOp::rxcall(
                   'MakeCursor')))),
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
-          CgOp::letvar("k", CgOp::fetch(CgOp::rawsccall('Kernel.GetFirst:c,Variable',
+          CgOp::letvar("k", CgOp::fetch(CgOp::rawscall('Kernel.GetFirst:c,Variable',
                 CgOp::fetch(CgOp::letvar("ks"))))),
           CgOp::ncgoto('backtrack',
             CgOp::rawcall(CgOp::letvar("k"), 'IsDefined')),
-          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
+          CgOp::rawcall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
               CgOp::letvar("k"))),
           CgOp::letvar('ks', CgOp::methodcall(CgOp::methodcall(
                 CgOp::letvar('ks'), "list"), "clone")),
@@ -656,7 +656,7 @@ use CgOp;
           CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
                 CgOp::methodcall(CgOp::letvar('ks'), 'Bool')))),
           CgOp::rxpushb('SUBRULE', 'nextcsr'),
-          CgOp::rawccall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
+          CgOp::rawcall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
               CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))),
           CgOp::goto('backtrack'));
     }

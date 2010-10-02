@@ -904,7 +904,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawsccall('Kernel.Take', $self->value->cgop($body));
+        CgOp::rawscall('Kernel.Take', $self->value->cgop($body));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -927,7 +927,7 @@ use CgOp;
         # construct a List from the iterator
 
         CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&_gather')),
-            CgOp::newscalar(CgOp::rawsccall('Kernel.GatherHelper',
+            CgOp::newscalar(CgOp::rawscall('Kernel.GatherHelper',
                     CgOp::fetch(CgOp::scopedlex($self->var)))));
     }
 
@@ -968,9 +968,9 @@ use CgOp;
                 CgOp::const(CgOp::rawnewarr('str', @mcaps)),
                 CgOp::null('clr:Cursor')),
             $self->rxop->code($body),
-            CgOp::rawccall(CgOp::rxframe, 'End'),
+            CgOp::rawcall(CgOp::rxframe, 'End'),
             CgOp::label('backtrack'),
-            CgOp::rawccall(CgOp::rxframe, 'Backtrack'),
+            CgOp::rawcall(CgOp::rxframe, 'Backtrack'),
             CgOp::null('var'));
     }
 

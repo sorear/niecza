@@ -571,7 +571,7 @@ my class GatherIterator is Iterator {
         my $*nextframe;
         $!reify // ($!reify = (
             Q:CgOp {
-                (letn getv (rawsccall Kernel.CoTake (cast clr:Frame
+                (letn getv (rawscall Kernel.CoTake (cast clr:Frame
                     (@ {$!frame})))
                   (box Parcel (ternary (== (@ {EMPTY}) (@ (l getv)))
                     (rawnewarr var)
@@ -588,7 +588,7 @@ sub _gather($fr) {
 }
 
 sub take($p) { # should be \|$p
-    Q:CgOp { (rawsccall Kernel.Take (l $p)) }
+    Q:CgOp { (rawscall Kernel.Take (l $p)) }
 }
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
@@ -630,16 +630,16 @@ sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
 # XXX multi dispatch
 sub next {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 1) (null clr:Frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 1) (null clr:Frame) (int -1) (null str) (null var)) }
 }
 sub last {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 2) (null clr:Frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 2) (null clr:Frame) (int -1) (null str) (null var)) }
 }
 sub redo {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 3) (null clr:Frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 3) (null clr:Frame) (int -1) (null str) (null var)) }
 }
 sub return is rawcall {
-    Q:CgOp { (rawsccall Kernel.SearchForHandler (int 4) (null clr:Frame) (int -1) (null str) (pos 0)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 4) (null clr:Frame) (int -1) (null str) (pos 0)) }
 }
 
 sub assignop($fn) {

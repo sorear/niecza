@@ -155,6 +155,7 @@ our $unit;
 
     sub add_super {
         my ($self, $targ) = @_;
+        Carp::confess "bad attempt to add null super" unless $targ;
         push @{ $self->superclasses }, $targ;
     }
 
@@ -514,6 +515,7 @@ our $unit;
 
     sub deref {
         my ($self, $thing) = @_;
+        Carp::confess "trying to dereference null" unless $thing;
         return $self->get_unit($thing->[0])->xref->[$thing->[1]];
     }
 

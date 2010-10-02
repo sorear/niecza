@@ -304,12 +304,12 @@ use CLRTypes;
     }
 
     sub clr_new {
-        my ($self, $class, $nargs, @args) = @_;
+        my ($self, $class, @args) = @_;
         $class, "new $class(" . join(", ", _odds @args) . ")";
     }
 
     sub clr_new_arr {
-        my ($self, $class, $nitems, @args) = @_;
+        my ($self, $class, @args) = @_;
         $class . "[]", "new $class []{" .  join(", ", _odds @args) . "}";
     }
 
@@ -395,7 +395,7 @@ use CLRTypes;
     }
 
     sub clr_call_direct {
-        my ($self, $name, $nargs, @args) = @_;
+        my ($self, $name, @args) = @_;
         my ($nm, $cl, $rt) = CLRTypes->info('cm', $name);
         if ($cl eq 'c') {
             $self->_cpscall($rt,
@@ -408,7 +408,7 @@ use CLRTypes;
     }
 
     sub clr_call_virt {
-        my ($self, $name, $nargs, $ity, $inv, @args) = @_;
+        my ($self, $name, $ity, $inv, @args) = @_;
         my ($nm, $cl, $rt) = CLRTypes->info('cm', $ity, $name);
         if ($cl eq 'c') {
             $self->_cpscall($rt,
@@ -421,7 +421,7 @@ use CLRTypes;
     }
 
     sub rxbprim {
-        my ($self, $name, $nargs, @args) = @_;
+        my ($self, $name, @args) = @_;
         $self->_emit("if (!th.rx.$name(" . join(", ", _odds @args) . ")) goto case \@\@Lbacktrack");
     }
 

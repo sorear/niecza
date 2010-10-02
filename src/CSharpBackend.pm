@@ -278,14 +278,14 @@ sub access_lex {
                 CgOp::rawsget($lex->{peer});
         } elsif ((my $ix = $lex->{peer}) >= 0) {
             return $set_to ?
-                CgOp::Primitive->new(op => [ rtpadputi => $order, $ix ],
+                CgOp->new(op => [ rtpadputi => $order, $ix ],
                     zyg => [ $set_to ]) :
-                CgOp::Primitive->new(op => [ rtpadgeti => 'Variable',$order,$ix ]);
+                CgOp->new(op => [ rtpadgeti => 'Variable', $order, $ix ]);
         } else {
             return $set_to ?
-                CgOp::Primitive->new(op => [ rtpadput => $order, $name ],
+                CgOp->new(op => [ rtpadput => $order, $name ],
                     zyg => [ $set_to ]) :
-                CgOp::Primitive->new(op => [ rtpadget => 'Variable',$order,$name ]);
+                CgOp->new(op => [ rtpadget => 'Variable', $order, $name ]);
         }
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
@@ -308,18 +308,17 @@ sub access_lex {
 sub resolve_lex {
     my ($body, $op) = @_;
 
-    if ($op->isa('CgOp::Primitive')) {
-        my ($opc, $arg, @rest) = @{ $op->op };
-        if ($opc eq 'scopelex') {
-            my $nn = access_lex($body, $arg, $op->zyg->[0]);
-            #XXX
-            %$op = %$nn;
-            bless $op, ref($nn);
-        }
-    }
+    my ($opc, $arg, @rest) = @{ $op->op };
+    if ($opc eq 'scopelex') {
+        my $nn = access_lex($body, $arg, $op->zyg->[0]);
+        #XXX
+        %$op = %$nn;
+        bless $op, ref($nn);
 
-    if ($op->isa('CgOp::Let')) {
-        local $haslet{$op->name} = 1;
+        resolve_lex($body, $_) for @{ $op->zyg };
+    } elsif ($opc eq 'let') {
+        local $haslet{$arg} = 1;
+
         resolve_lex($body, $_) for @{ $op->zyg };
     } else {
         resolve_lex($body, $_) for @{ $op->zyg };
@@ -332,7 +331,7 @@ sub codegen_sub {
     # TODO: Bind a return value here to catch non-ro sub use
     if ($_->gather_hack) {
         $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop($_)),
-            CgOp::rawsccall('Kernel.Take', CgOp::scopedlex('EMPTY')));
+            CgOp::rawscall('Kernel.Take', CgOp::scopedlex('EMPTY')));
     } elsif ($_->returnable && defined($_->signature)) {
         $ops = CgOp::prog(@enter,
             CgOp::return(CgOp::span("rstart", "rend",

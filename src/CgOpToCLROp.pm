@@ -65,18 +65,27 @@ $fixtype{$_} = 'Void' for (qw/ poke_let labelhere goto cgoto ncgoto ehspan
 
 $fixtype{$_} = 'Variable' for (qw/ pos call_sub call_method /);
 
+my %_cps = map { $_ => 1 } qw/ call_method call_sub cgoto goto labelhere
+    ncgoto return rxbprim /;
+my %_const = map { $_ => 1 } qw/ callframe clr_bool clr_char clr_double clr_int
+    clr_string const labelid pos push_null /;
+
 sub type_infer {
-    my ($op, @argtypes) = @_;
+    my ($cpsr, $op, @argtypes) = @_;
     my $head = $op->[0];
 
     if ($fixtype{$head}) { return $fixtype{$head} }
 
     given ($head) {
         when ("clr_call_direct") {
-            return (CLRTypes->info("cm", $op->[1]))[2];
+            my ($n, $cps, $type) = CLRTypes->info("cm", $op->[1]);
+            $$cpsr = ($cps eq 'c');
+            return $type;
         }
         when ("clr_call_virt") {
-            return (CLRTypes->info("cm", $argtypes[0], $op->[1]))[2];
+            my ($n, $cps, $type) = CLRTypes->info("cm", $argtypes[0], $op->[1]);
+            $$cpsr = ($cps eq 'c');
+            return $type;
         }
         when ("clr_field_get") {
             return (CLRTypes->info("f", $argtypes[0], $op->[1]))[2];
@@ -103,37 +112,36 @@ sub type_infer {
 }
 
 # C# has a lot of special cases for this.
-sub _drop { CgOp::Primitive->new(op => ['drop'], zyg => [$_[0]]) }
+sub _drop { CgOp->new(op => ['drop'], zyg => [$_[0]]) }
 my %_dropnow = map {; $_ => 1 } qw/ push_null rtpadget rtpadgeti hint_get
     clr_sfield_get result pos peek_let /;
-sub cvt_drop {
-    my $self = shift;
+sub do_drop {
+    my ($tgt) = @_;
 
-    my $tgt = $self->zyg->[0];
     my @zyg = @{ $tgt->zyg };
+    my $op = $tgt->op;
 
-    given (ref $tgt) {
-        when ('CgOp::Let') {
+    given ($op->[0]) {
+        when ('let') {
             $zyg[-1] = _drop($zyg[-1]);
-            return cvt(CgOp::Let->new(name => $tgt->name, zyg => [ @zyg ]));
+            return cvt(CgOp->new(op => $op, zyg => [ @zyg ]));
         }
-        when ('CgOp::Seq') {
+        when ('seq') {
             $zyg[-1] = _drop($zyg[-1]);
-            return cvt(CgOp::Seq->new(zyg => [ @zyg ]));
+            return cvt(CgOp->new(op => $op, zyg => [ @zyg ]));
         }
-        when ('CgOp::Ternary') {
+        when ('ternary') {
             @zyg[1,2] = map { _drop($_) } @zyg[1,2];
-            return cvt(CgOp::Ternary->new(zyg => [ @zyg ]));
+            return cvt(CgOp->new(op => $op, zyg => [ @zyg ]));
         }
-        when ('CgOp::Annotation') {
-            return cvt(CgOp::Annotation->new(line => $tgt->line,
-                    file => $tgt->file, zyg => [ _drop($zyg[0]) ]));
+        when ('ann') {
+            return cvt(CgOp->new(op => $op, zyg => [ _drop($zyg[0]) ]));
         }
-        when ('CgOp::Span') {
-            return cvt(CgOp::Span->new(lstart => $tgt->lstart,
-                    lend => $tgt->lend, zyg => [ _drop($zyg[0]) ]));
+        when ('span') {
+            return cvt(CgOp->new(op => $op, zyg => [ _drop($zyg[0]) ]));
         }
-        when ('CgOp::Primitive') {
+        when ("while") { die "implausible use of drop on while" }
+        default {
             my $v = cvt($tgt);
             my @zyg = @{ $v->stmts };
             my $h = $v->head;
@@ -143,14 +151,11 @@ sub cvt_drop {
             }
             return CLROp::Value->new(type => 'Void', stmts => \@zyg);
         }
-        when ("CgOp::While") { die "implausible use of drop on while" }
     }
 }
 
-sub cvt_primitive {
-    my $self = $_[0];
-    if ($self->op->[0] eq 'drop') { goto &cvt_drop; }
-    my @zyg = map { cvt($_) } @{ $self->zyg };
+sub do_primitive {
+    my ($ops, @zyg) = @_;
     my @args;
     my @prep;
     my @pop;
@@ -181,39 +186,40 @@ sub cvt_primitive {
         }
     }
 
-    my $type = type_infer($self->op, map { $_->type } @args);
+    my $cps = $_cps{$ops->[0]};
+    my $type = type_infer(\$cps, $ops, map { $_->type } @args);
+    my $const = $_const{$ops->[0]};
 
     if ($type eq 'Void') {
-        my $nhead = CLROp::Term->new(op => $self->op, type => $type,
+        my $nhead = CLROp::Term->new(op => $ops, type => $type,
             zyg => [ @args ]);
 
         return CLROp::Value->new(stmts => [ @prep, $nhead, @pop ],
             type => 'Void');
-    } elsif ($self->is_cps_call) {
-        my $nhead = CLROp::Term->new(op => $self->op, type => 'Void',
+    } elsif ($cps) {
+        my $nhead = CLROp::Term->new(op => $ops, type => 'Void',
             zyg => [ @args ]);
 
         return CLROp::Value->new(stmts => [ @prep, $nhead, @pop ],
             type => $type);
     } elsif (@pop) {
         my $nhead = CLROp::Term->new(op => ['set_result'], type => 'Void',
-            zyg => [ CLROp::Term->new(op => $self->op, type => $type,
+            zyg => [ CLROp::Term->new(op => $ops, type => $type,
                     zyg => [ @args ]) ]);
 
         return CLROp::Value->new(stmts => [ @prep, $nhead, @pop ],
             type => $type);
     } else {
-        my $nhead = CLROp::Term->new(op => $self->op, type => $type,
-            zyg => [ @args ], constant => $self->constant);
+        my $nhead = CLROp::Term->new(op => $ops, type => $type,
+            zyg => [ @args ], constant => $const);
 
         return CLROp::Value->new(stmts => [ @prep ],
             type => $type, head => $nhead);
     }
 }
 
-sub cvt_ternary {
-    my $self = shift;
-    my ($check, $true, $false) = map { cvt($_) } @{ $self->zyg };
+sub do_ternary {
+    my ($op, $check, $true, $false) = @_;
 
     my $lf = 'false' . ($spill++);
     my $le = 'end' . ($spill++);
@@ -231,11 +237,10 @@ sub cvt_ternary {
         ]);
 }
 
-sub cvt_while {
-    my $self = shift;
-    my ($check, $body) = map { cvt($_) } @{ $self->zyg };
-    my $once = $self->once;
-    my $until = $self->until;
+sub do_while {
+    my ($op, $check, $body) = @_;
+    my $once = $op->[1];
+    my $until = $op->[2];
     die "type error" unless $body->type eq 'Void';
 
     my $lagain = 'again' . ($spill++);
@@ -252,9 +257,8 @@ sub cvt_while {
     CLROp::Value->new(stmts => \@bits, type => 'Void');
 }
 
-sub cvt_seq {
-    my $self = shift;
-    my @zyg = map { cvt($_) } @{ $self->zyg };
+sub do_seq {
+    my ($op, @zyg) = @_;
     return CLROp::Value->new(stmts => [ ], type => 'Void') unless @zyg;
     my $fin = pop @zyg;
     for (@zyg) { next if $_->type eq 'Void'; say(YAML::XS::Dump($_)); die "type error"; }
@@ -262,51 +266,65 @@ sub cvt_seq {
         head => $fin->head, type => $fin->type);
 }
 
-sub cvt_span {
-    my $self = shift;
-    my $zyg = cvt($self->zyg->[0]);
+sub do_span {
+    my ($op, $zyg) = @_;
     CLROp::Value->new(type => $zyg->type, stmts => [
-            CLROp::Term->new(op => ['labelhere', $self->lstart]),
+            CLROp::Term->new(op => ['labelhere', $op->[1]]),
             $zyg->stmts_result,
-            CLROp::Term->new(op => ['labelhere', $self->lend]) ]);
+            CLROp::Term->new(op => ['labelhere', $op->[2]]) ]);
 }
 
-sub cvt_annotation {
-    my $self = shift;
-    my $zyg = cvt($self->zyg->[0]);
+sub do_annotation {
+    my ($op, $zyg) = @_;
     return $zyg unless @{ $zyg->stmts };
     CLROp::Value->new(type => $zyg->type, head => $zyg->head, stmts => [
-            CLROp::Term->new(op => ['push_line', $self->line]),
+            CLROp::Term->new(op => ['push_line', $op->[1]]),
             @{ $zyg->stmts },
             CLROp::Term->new(op => ['pop_line']) ]);
 }
 
-sub cvt_let {
-    my $self = shift;
-    my ($head, @zyg) = @{ $self->zyg };
-    $head = cvt($head);
-    {
-        local $lettypes{$self->name} = $head->type;
-        @zyg = map { cvt($_) } @zyg;
-    }
+sub do_let {
+    my ($op, $head, @zyg) = @_;
     CLROp::Value->new(type => (@zyg ? $zyg[-1]->type : 'Void'), stmts => [
             @{ $head->stmts },
-            CLROp::Term->new(op => ['push_let', $self->name],
+            CLROp::Term->new(op => ['push_let', $op->[1]],
                 zyg => [ $head->anyhead ]),
             (map { $_->stmts_result } @zyg),
-            CLROp::Term->new(op => ['drop_let', $self->name])]);
+            CLROp::Term->new(op => ['drop_let', $op->[1]])]);
 }
 
+my @_all = qw/ callframe call_method call_sub cast cgoto clr_arith clr_bool
+    clr_call_direct clr_call_virt clr_char clr_compare clr_double clr_field_get
+    clr_field_set clr_index_get clr_index_set clr_int clr_new clr_new_arr
+    clr_new_zarr clr_sfield_get clr_sfield_set clr_string const drop drop_let
+    ehspan goto hintget labelhere labelid ncgoto peek_let poke_let pop_line
+    pos push_let push_line push_null return rtpadget rtpadgeti rtpadput
+    rtpadputi rxbprim rxpushb /;
+
 my %_md = (
-    'CgOp::Annotation' => \&cvt_annotation,
-    'CgOp::Let' => \&cvt_let,
-    'CgOp::Primitive' => \&cvt_primitive,
-    'CgOp::While' => \&cvt_while,
-    'CgOp::Ternary' => \&cvt_ternary,
-    'CgOp::Span' => \&cvt_span,
-    'CgOp::Seq' => \&cvt_seq,
+    'ann' => \&do_annotation,
+    'while' => \&do_while,
+    'ternary' => \&do_ternary,
+    'span' => \&do_span,
+    'seq' => \&do_seq,
+    (map { $_ => \&do_primitive } @_all),
 );
-sub cvt { goto &{ $_md{ref($_[0])} } }
+
+sub cvt {
+    my $zyg = $_[0]->zyg;
+    my $op  = $_[0]->op;
+
+    if ($op->[0] eq 'let') {
+        my ($z, @r) = @$zyg;
+        $z = cvt($z);
+        local $lettypes{$op->[1]} = $z->type;
+        do_let($op, $z, map { cvt($_) } @r);
+    } elsif ($op->[0] eq 'drop') {
+        do_drop($zyg->[0]);
+    } else {
+        $_md{$op->[0]}->($op, map { cvt($_) } @$zyg);
+    }
+}
 
 sub codegen {
     my ($cg, $root) = @_;
