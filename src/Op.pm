@@ -185,12 +185,20 @@ use CgOp;
 
     has receiver    => (isa => 'Op', is => 'ro', required => 1);
     has name        => (isa => 'Str', is => 'ro', required => 1);
+    has private     => (isa => 'Bool', is => 'ro', default => 0);
+    has ppath       => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
+    has pclass      => (isa => 'ArrayRef', is => 'rw');
     sub zyg { $_[0]->receiver, $_[0]->SUPER::zyg }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::methodcall($self->receiver->cgop($body),
-            $self->name, $self->argblock($body));
+        if ($self->private) {
+            # XXX encapsulation break
+            CgOp::subcall(CgOp::rawcall(CgOp::rawsget($body->unit->deref($self->pclass)->{peer}{mo}), "GetPrivateMethod", CgOp::clr_string($self->name)), $self->receiver->cgop($body), $self->argblock($body));
+        } else {
+            CgOp::methodcall($self->receiver->cgop($body),
+                $self->name, $self->argblock($body));
+        }
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -764,7 +772,7 @@ use CgOp;
 
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has body   => (isa => 'Body', is => 'ro', required => 1);
-    has method_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
+    has method_too => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
     has proto_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
     # Is candidate for beta-optimization.  Not compatible with method_too,

@@ -191,7 +191,8 @@ sub pkg3 {
     return unless $_->isa('Metamodel::Class');
     my $p   = $_->{peer}{mo};
     for my $m (@{ $_->methods }) {
-        push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddMethod',
+        push @thaw, CgOp::rawcall(CgOp::rawsget($p),
+            ($m->private ? 'AddPrivateMethod' : 'AddMethod'),
             CgOp::clr_string($m->name),
             CgOp::rawsget($unit->deref($m->body)->{peer}{ps}));
     }
@@ -330,15 +331,15 @@ sub codegen_sub {
     my $ops;
     # TODO: Bind a return value here to catch non-ro sub use
     if ($_->gather_hack) {
-        $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop),
+        $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop($_)),
             CgOp::rawsccall('Kernel.Take', CgOp::scopedlex('EMPTY')));
     } elsif ($_->returnable && defined($_->signature)) {
         $ops = CgOp::prog(@enter,
             CgOp::return(CgOp::span("rstart", "rend",
-                    $_->code->cgop)),
+                    $_->code->cgop($_))),
             CgOp::ehspan(4, undef, 0, "rstart", "rend", "rend"));
     } else {
-        $ops = CgOp::prog(@enter, CgOp::return($_->code->cgop));
+        $ops = CgOp::prog(@enter, CgOp::return($_->code->cgop($_)));
     }
 
     local %haslet;

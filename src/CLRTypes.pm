@@ -28,6 +28,8 @@ my %typedata = (
           AddMethod    => [m => 'Void'],
           AddSuperclass=> [m => 'Void'],
           AddAttribute => [m => 'Void'],
+          AddPrivateMethod => [m => 'Void'],
+          GetPrivateMethod => [m => 'IP6'],
           typeObject   => [f => 'IP6'],
           how          => [f => 'IP6'],
           name         => [f => 'String'] },

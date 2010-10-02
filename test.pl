@@ -464,11 +464,11 @@ EOC
     my $d = 0;
     my $e = 0;
 
-    (Any!butWHENCE({ $a = 1 }));
-    my $x := (Any!butWHENCE({ $b = 1 }));  #OK not used
-    my $y ::= (Any!butWHENCE({ $c = 1 })); #OK not used
-    my $z = (Any!butWHENCE({ $d = 1 }));   #OK not used
-    (Any!butWHENCE({ $e = 1 })) = 2;
+    (Any!Any::butWHENCE({ $a = 1 }));
+    my $x := (Any!Any::butWHENCE({ $b = 1 }));  #OK not used
+    my $y ::= (Any!Any::butWHENCE({ $c = 1 })); #OK not used
+    my $z = (Any!Any::butWHENCE({ $d = 1 }));   #OK not used
+    (Any!Any::butWHENCE({ $e = 1 })) = 2;
 
     ok !$a, "no autovivification in void context";
     ok $b, "autovivification after rw bind";

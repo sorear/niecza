@@ -303,6 +303,11 @@ namespace Niecza {
         }
     }
 
+    public class NieczaException: Exception {
+        public NieczaException(string detail) : base(detail) {}
+        public NieczaException() : base() {}
+    }
+
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
@@ -328,6 +333,8 @@ namespace Niecza {
         public List<DynMetaObject> superclasses
             = new List<DynMetaObject>();
         public Dictionary<string, IP6> local
+            = new Dictionary<string, IP6>();
+        public Dictionary<string, IP6> priv
             = new Dictionary<string, IP6>();
         public List<string> local_attr = new List<string>();
 
@@ -454,6 +461,16 @@ namespace Niecza {
         public void AddMethod(string name, IP6 code) {
             local[name] = code;
             Invalidate();
+        }
+
+        public void AddPrivateMethod(string name, IP6 code) {
+            priv[name] = code;
+        }
+
+        public IP6 GetPrivateMethod(string name) {
+            IP6 code = priv[name];
+            if (code == null) { throw new NieczaException("private method lookup failed for " + name + " in class " + this.name); }
+            return code;
         }
 
         public void AddAttribute(string name) {

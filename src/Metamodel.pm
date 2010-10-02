@@ -143,8 +143,9 @@ our $unit;
     }
 
     sub add_method {
-        my ($self, $name, $body) = @_;
-        push @{ $self->methods }, Metamodel::Method->new(name => $name, body => $body);
+        my ($self, $type, $name, $body) = @_;
+        push @{ $self->methods }, Metamodel::Method->new(name => $name,
+            body => $body, private => ($type eq '!'));
     }
 
     sub push_multi_regex {
@@ -188,8 +189,9 @@ our $unit;
     package Metamodel::Method;
     use Moose;
 
-    has name => (isa => 'Str', is => 'ro');
-    has body => (is => 'ro');
+    has name => (isa => 'Str', is => 'ro', required => 1);
+    has private => (isa => 'Bool', is => 'ro', required => 1);
+    has body => (is => 'ro', required => 1);
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -312,6 +314,7 @@ our $unit;
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
+    has in_class => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has cur_pkg  => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
     has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
@@ -649,6 +652,8 @@ sub Body::begin {
         unit       => $unit,
         outer      => $top,
         body_of    => $args{body_of},
+        in_class   => $args{body_of} // (@opensubs ? $opensubs[-1]->in_class :
+            undef),
         cur_pkg    => $args{cur_pkg} // (@opensubs ? $opensubs[-1]->cur_pkg :
             [ 'GLOBAL' ]), # cur_pkg does NOT propagate down from settings
         augmenting => $args{augmenting},
@@ -754,6 +759,21 @@ sub Op::Lexical::begin {
     }
 }
 
+sub Op::CallMethod::begin {
+    my $self = shift;
+
+    $self->Op::begin;
+    if ($self->private) {
+        if ($self->ppath) {
+            $self->pclass($unit->get_stash(@{ $opensubs[-1]->find_pkg($self->ppath) })->obj);
+        } elsif ($opensubs[-1]->in_class) {
+            $self->pclass($opensubs[-1]->in_class);
+        } else {
+            die "unable to resolve class of reference for method";
+        }
+    }
+}
+
 sub Op::PackageVar::begin {
     my $self = shift;
 
@@ -786,7 +806,7 @@ sub Op::Attribute::begin {
         $opensubs[-1]->create_static_pad; # for protosub instance
         $nb->strong_used(1);
         $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
-        $ns->add_method($self->name, $unit->make_ref($nb));
+        $ns->add_method('', $self->name, $unit->make_ref($nb));
     }
 }
 
@@ -814,7 +834,7 @@ sub Op::SubDef::begin {
 
     if (defined($self->method_too)) {
         $unit->deref($opensubs[-1]->body_of)
-            ->add_method($self->method_too, $r);
+            ->add_method(@{ $self->method_too }, $r);
     }
 
     if (defined($self->proto_too)) {

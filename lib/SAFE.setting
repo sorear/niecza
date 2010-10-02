@@ -341,7 +341,7 @@ my class List is Cool {
 
     #| Takes an object and applies whatever semantics the List subclass
     #| needs to apply on stuff out of the iterator stack
-    method !elem is rawcall { Q:CgOp { (pos 1) } }
+    method _elem is rawcall { Q:CgOp { (pos 1) } }
 
     sub count-items($self) { Q:CgOp {
         (box Num (cast num (vvarlist_count (getslot items vvarlist (@ {$self})))))
@@ -384,7 +384,7 @@ my class List is Cool {
                 (ternary (obj_isa (@ (l v)) (l ItMo))
                   (vvarlist_unshiftn (l rest) (unbox fvarlist
                       (@ (methodcall (l v) reify))))
-                  (vvarlist_push (l items) (methodcall {self} !elem (l v)))))))
+                  (vvarlist_push (l items) (methodcall {self} _elem (l v)))))))
           (box Bool (>= (vvarlist_count (l items)) (l nr))))
     } }
 
@@ -446,7 +446,7 @@ my class List is Cool {
 
 # exactly like List, but flattens, and with "is copy" semantics on stuff
 my class Seq is List {
-    method !elem($x) { my $y = $x; $y }
+    method _elem($x) { my $y = $x; $y }
     method Seq { self }
 }
 
@@ -482,9 +482,9 @@ my class Array is List {
     }
 
     method at-pos($ix) {
-        self!fill($ix+1)
-            ?? self!item-at-pos($ix)
-            !! Any!butWHENCE(sub () is rawcall {
+        self!List::fill($ix+1)
+            ?? self!List::item-at-pos($ix)
+            !! Any!Any::butWHENCE(sub () is rawcall {
                 self!extend($ix, Q:CgOp { (pos 0) });
             });
     }
@@ -514,7 +514,7 @@ my class Hash {
             ?? Q:CgOp {
                 (varhash_getindex [unbox str (@ {$key.Str})]
                   [unbox varhash (@ {self})])
-            } !! Any!butWHENCE({ self!extend($key, Q:CgOp { (pos 0) }) });
+            } !! Any!Any::butWHENCE({ self!extend($key, Q:CgOp { (pos 0) }) });
     }
 }
 
@@ -540,12 +540,12 @@ sub postcircumfix:<[ ]> is rawcall {
 
     (Q:CgOp { (pos 0) }).defined
         ?? (Q:CgOp { (pos 0) }).at-pos($index)
-        !! Any!butWHENCE(sub () is rawcall {
+        !! Any!Any::butWHENCE(sub () is rawcall {
             my $ar := Q:CgOp { (getindex (int 0) (getfield pos
                                  (getfield outer (callframe)))) };
             $ar.defined && die("Autovivification collision");
             $ar = Array.new;
-            $ar!extend($index, Q:CgOp { (pos 0) });
+            $ar!Array::extend($index, Q:CgOp { (pos 0) });
         });
 }
 
@@ -554,12 +554,12 @@ sub postcircumfix:<{ }> is rawcall {
 
     (Q:CgOp { (pos 0) }).defined
         ?? (Q:CgOp { (pos 0) }).at-key($key)
-        !! Any!butWHENCE(sub () is rawcall {
+        !! Any!Any::butWHENCE(sub () is rawcall {
             my $ar := Q:CgOp { (getindex (int 0) (getfield pos
                                  (getfield outer (callframe)))) };
             $ar.defined && die("Autovivification collision");
             $ar = Hash.new;
-            $ar!extend($key, Q:CgOp { (pos 0) });
+            $ar!Hash::extend($key, Q:CgOp { (pos 0) });
         });
 }
 

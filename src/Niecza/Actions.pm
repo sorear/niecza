@@ -380,7 +380,7 @@ sub regex_def { my ($cl, $M) = @_;
     $ast = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
-        method_too => ($scope eq 'has' ? $name : undef),
+        method_too => ($scope eq 'has' ? ['', $name] : undef),
         proto_too => ($scope eq 'has' ? $unsymtext : undef),
         body => Body->new(
             ltm   => $lad,
@@ -1091,10 +1091,15 @@ sub POSTFIX { my ($cl, $M) = @_;
             name => $op->{metamethod},
             args => $op->{args} // []);
     } elsif ($op->{name}) {
+        if ($op->{path} && !$op->{private}) {
+            $M->sorry("Qualified references to non-private methods NYI");
+        }
         $M->{_ast} = Op::CallMethod->new(node($M),
             receiver => $arg,
-            name => ($op->{private} ? '!' . $op->{name} : $op->{name}),
-            args => $op->{args} // []);
+            private  => $op->{private},
+            ppath    => $op->{path},
+            name     => $op->{name},
+            args     => $op->{args} // []);
     } elsif ($op->{postcall}) {
         if (@{ $op->{postcall} } > 1) {
             $M->sorry("Slicels NYI");
@@ -1190,8 +1195,10 @@ sub PRE { }
 
 sub methodop { my ($cl, $M) = @_;
     my %r;
-    $r{name}  = $cl->unqual_longname($M->{longname},
-        "Qualified method calls NYI") if $M->{longname};
+    if ($M->{longname}) {
+        my $c = $cl->mangle_longname($M->{longname});
+        @r{"name", "path"} = @$c{"name", "path"};
+    }
     $r{quote} = $M->{quote}{_ast} if $M->{quote};
     $r{ref}   = $cl->do_variable_reference($M, $M->{variable}{_ast})
         if $M->{variable};
@@ -2379,7 +2386,7 @@ sub method_def { my ($cl, $M) = @_;
         signature => $sig ? $sig->for_method : undef);
 
     $M->{_ast} = $cl->block_to_closure($M, $bl, outer_key => $sym,
-        method_too => ($scope ne 'anon' ? "$type$name" : undef));
+        method_too => ($scope ne 'anon' ? [ $type, $name ] : undef));
 }
 
 sub block { my ($cl, $M) = @_;
