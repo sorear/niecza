@@ -652,6 +652,21 @@ blocked:
                     NewROScalar(n));
         }
 
+        public static Frame BindFail(Frame caller, string msg) {
+            // TODO: Junctional failover goes here, as does some multi stuff
+            return Die(caller, msg);
+        }
+
+        public static Frame CheckArgEnd(Frame caller, int i, string m) {
+            // TODO: checking for SigCheckOnly goes here
+            if (i == caller.pos.Length &&
+                    (caller.named == null || caller.named.Count == 0)) {
+                return caller;
+            } else {
+                return BindFail(caller, m);
+            }
+        }
+
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject ScalarMO;
         public static readonly DynMetaObject StashMO;

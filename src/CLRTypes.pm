@@ -107,6 +107,8 @@ my %typedata = (
     'Lexer.GetLexer'       => [m => 'Lexer'],
     'Kernel.SearchForHandler' => [c => 'Variable'],
     'Kernel.Die'           => [c => 'Variable'],
+    'Kernel.BindFail'      => [c => 'Variable'],
+    'Kernel.CheckArgEnd'   => [c => 'Void'],
     'Kernel.CoTake'        => [c => 'Variable'],
     'Kernel.Take'          => [c => 'Variable'],
     'Kernel.GatherHelper'  => [c => 'Frame'],

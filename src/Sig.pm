@@ -32,6 +32,8 @@ use 5.010;
                 CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('rest'),
                     CgOp::rawscall('Kernel.SlurpyHelper',
                         CgOp::callframe, CgOp::letvar('!ix'))),
+                CgOp::scopedlex('!ix', CgOp::getfield('Length',
+                        CgOp::getfield('pos', CgOp::callframe))),
                 CgOp::newscalar($do))});
     }
 
@@ -48,8 +50,9 @@ use 5.010;
                 return CgOp::scopedlex($self->type);
             }
         } else {
-            return CgOp::die("No value in " . $body->name .
-                " available for parameter " . $self->name);
+            return CgOp::rawscall('Kernel.BindFail', CgOp::clr_string(
+                "No value in " . $body->name . " available for parameter " .
+                $self->name));
         }
     }
 
@@ -163,6 +166,8 @@ use 5.010;
         for (@{ $self->params }) {
             push @p, $_->binder($body);
         }
+        push @p, CgOp::rawscall('Kernel.CheckArgEnd', CgOp::letvar('!ix'),
+            CgOp::clr_string("Unexpectedly many arguments to " . $body->name));
         CgOp::letn('!ix', CgOp::int(0), CgOp::prog(@p));
     }
 
