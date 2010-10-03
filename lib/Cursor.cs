@@ -281,6 +281,7 @@ public sealed class RxFrame {
         if (return_one) {
             return Kernel.Take(th, Kernel.NewROScalar(m));
         } else {
+            th.MarkSharedChain();
             return_one = true;
             VarDeque ks = new VarDeque();
             ks.Push(Kernel.NewROScalar(m));

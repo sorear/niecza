@@ -215,12 +215,15 @@ namespace Niecza {
     // We need hashy frames available to properly handle BEGIN; for the time
     // being, all frames will be hashy for simplicity
     public class Frame: IP6 {
-        public readonly Frame caller;
-        public readonly Frame outer;
-        public readonly SubInfo info;
+        public Frame caller;
+        public Frame outer;
+        public SubInfo info;
+        // a doubly-linked list of frames being used by a given coroutine
+        public Frame reusable_child;
+        public Frame reuser;
         public object resultSlot = null;
         public int ip = 0;
-        public readonly DynBlockDelegate code;
+        public DynBlockDelegate code;
         public Dictionary<string, object> lex;
         // statistically, most subs have between 1 and 4 anonymous lexicals
         public object lex0;
@@ -234,12 +237,39 @@ namespace Niecza {
         public Variable[] pos;
         public Dictionary<string, Variable> named;
 
+        // after MakeSub, GatherHelper
+        public const int SHARED = 1;
+        public int flags;
+
         public Frame(Frame caller_, Frame outer_,
                 SubInfo info_) {
             caller = caller_;
             outer = outer_;
             code = info_.code;
             info = info_;
+        }
+
+        public Frame() {}
+
+        public Frame MakeChild(Frame outer, SubInfo info) {
+            if (reusable_child == null) {
+                reusable_child = new Frame();
+                reusable_child.reuser = this;
+            }
+            reusable_child.ip = 0;
+            reusable_child.resultSlot = null;
+            reusable_child.lexn = null;
+            reusable_child.lex = null;
+            reusable_child.lex0 = null;
+            reusable_child.lex1 = null;
+            reusable_child.lex2 = null;
+            reusable_child.lex3 = null;
+            reusable_child.caller = this;
+            reusable_child.outer = outer;
+            reusable_child.info = info;
+            reusable_child.code = info.code;
+            reusable_child.rx = null;
+            return reusable_child;
         }
 
         public Frame Continue() {
@@ -254,6 +284,21 @@ namespace Niecza {
             } else {
                 return null;
             }
+        }
+
+        public void MarkShared() {
+            if (0 == (flags & SHARED)) {
+                flags |= SHARED;
+                if (reuser != null) reuser.reusable_child = reusable_child;
+                if (reusable_child != null) reusable_child.reuser = reuser;
+                reuser = reusable_child = null;
+            }
+        }
+
+        // when control might re-enter a function
+        public void MarkSharedChain() {
+            for (Frame x = this; x != null; x = x.caller)
+                x.MarkShared();
         }
 
         public override DynMetaObject GetMO() { return Kernel.CallFrameMO; }
@@ -617,9 +662,9 @@ blocked:
 
         public static Frame GatherHelper(Frame th, IP6 sub) {
             DynObject dyo = (DynObject) sub;
-            Frame n = new Frame(th,
-                                (Frame) dyo.slots[0],
-                                (SubInfo) dyo.slots[1]);
+            Frame n = th.MakeChild((Frame) dyo.slots[0],
+                    (SubInfo) dyo.slots[1]);
+            n.MarkSharedChain();
             th.resultSlot = n;
             return th;
         }
@@ -630,7 +675,7 @@ blocked:
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
 
-            Frame n = new Frame(caller, outer, info);
+            Frame n = caller.MakeChild(outer, info);
             n.pos = pos;
             n.named = named;
 
@@ -678,6 +723,7 @@ blocked:
         public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(info.mo ?? SubMO);
             n.slots[0] = outer;
+            if (outer != null) outer.MarkShared();
             n.slots[1] = info;
             return n;
         }
@@ -744,7 +790,7 @@ blocked:
 
             th.resultSlot = rhs;
 
-            n = new Frame(th, null, BindSI);
+            n = th.MakeChild(null, BindSI);
             n.pos = new Variable[1] { rhs };
             return n;
         }
@@ -783,7 +829,7 @@ blocked:
                 return th;
             }
 
-            Frame n = new Frame(th, null, AssignSI);
+            Frame n = th.MakeChild(null, AssignSI);
             n.pos = new Variable[2] { lhs, rhs };
             return n;
         }
@@ -886,8 +932,11 @@ slow:
         }
 
         public static Frame StartP6Thread(Frame th, IP6 sub) {
+            th.MarkSharedChain();
             Thread thr = new Thread(delegate () {
-                    Frame current = sub.Invoke(th, new Variable[0], null);
+                    Frame current = new Frame();
+                    current = sub.Invoke(current, new Variable[0], null);
+                    current.caller = current.caller.caller;
                     RunCore(current, th);
                 });
             thr.Start();
@@ -1021,7 +1070,7 @@ slow:
                     Environment.Exit(1);
                 }
                 in_unhandled = true;
-                Frame r = new Frame(th, null, UnhandledSI);
+                Frame r = th.MakeChild(null, UnhandledSI);
                 r.lex0 = mp;
                 return r;
             } else {
