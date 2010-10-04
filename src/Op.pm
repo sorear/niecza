@@ -194,7 +194,10 @@ use CgOp;
         my ($self, $body) = @_;
         if ($self->private) {
             # XXX encapsulation break
-            CgOp::subcall(CgOp::rawcall(CgOp::rawsget($body->unit->deref($self->pclass)->{peer}{mo}), "GetPrivateMethod", CgOp::clr_string($self->name)), $self->receiver->cgop($body), $self->argblock($body));
+            CgOp::subcall(CgOp::rawcall(
+                    CgOp::class_ref('mo', @{ $self->pclass }),
+                    "GetPrivateMethod", CgOp::clr_string($self->name)),
+                $self->receiver->cgop($body), $self->argblock($body));
         } else {
             CgOp::methodcall($self->receiver->cgop($body),
                 $self->name, $self->argblock($body));

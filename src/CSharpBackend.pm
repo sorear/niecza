@@ -316,6 +316,11 @@ sub resolve_lex {
         bless $op, ref($nn);
 
         resolve_lex($body, $_) for @{ $op->zyg };
+    } elsif ($opc eq 'class_ref') {
+        my $cl = $unit->deref([ @rest ]);
+        my $nn = CgOp::rawsget($cl->{peer}{$arg});
+        %$op = %$nn;
+        bless $op, ref($nn);
     } elsif ($opc eq 'let') {
         local $haslet{$arg} = 1;
 

@@ -190,6 +190,8 @@ use warnings;
         CgOp->new(op => [ scopelex => $n ], zyg => [ @_ ]);
     }
 
+    sub class_ref { CgOp->new(op => [ class_ref => @_ ]); }
+
     sub _process_arglist {
         my $ar = shift;
         my @sig;
