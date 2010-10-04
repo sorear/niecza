@@ -24,14 +24,11 @@ use CLRTypes;
     has outcap    => (isa => 'Bool', is => 'rw', default => 0);
 
     has letstack  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has lettypes  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has numlets   => (isa => 'Int', is => 'rw', default => 0);
+    has letused   => (isa => 'HashRef', is => 'ro', default => sub { +{} });
     has consttab  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has linestack => (isa => 'ArrayRef', is => 'ro', default => sub { [0] });
     has ehspans   => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
     has ehlabels  => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-
-    has savedstks => (isa => 'HashRef', is => 'ro', default => sub { +{} });
 
     # These are the sub-primitives.  Their very inteface exposes volatile
     # details of the codegen.
@@ -44,21 +41,6 @@ use CLRTypes;
 
     sub _odds {
         my @o; for (my $i = 1; $i < @_; $i+=2 ) { push @o, $_[$i] } @o
-    }
-
-    sub _savestackstate {
-        my ($self, $lbl) = @_;
-        my %save;
-        $save{lettypes} = [ @{ $self->lettypes } ];
-        $save{letstack} = [ @{ $self->letstack } ];
-        $self->savedstks->{$lbl} = \%save;
-    }
-
-    sub _restorestackstate {
-        my ($self, $lbl) = @_;
-        my $save = $self->savedstks->{$lbl};
-        @{ $self->letstack } = @{ $save->{letstack} };
-        @{ $self->lettypes } = @{ $save->{lettypes} };
     }
 
     sub _emit {
@@ -105,36 +87,54 @@ use CLRTypes;
         pop @{ $self->linestack };
     }
 
+    sub lexnsize {
+        my ($self) = @_;
+        my $i = 0;
+        for (keys %{ $self->letused }) { $i++ if $_ >= 6 }
+        $i;
+    }
+
     sub push_let {
         my ($self, $which, $ty, $v) = @_;
-        $self->_emit(_lexn($self->minlets + @{$self->letstack}) . " = $v");
-        push @{$self->letstack}, $which;
-        push @{$self->lettypes}, $ty;
-        if (@{$self->letstack} > $self->numlets) {
-            $self->numlets(scalar @{$self->letstack});
+
+        my $ls = $self->letstack;
+        my $lu = $self->letused;
+        my $i;
+
+        for ($i = 0; ; $i++) {
+            last if !$lu->{$i} &&
+                ($i >= 2 || $ty eq 'Int32' || $ty eq 'System.Int32');
         }
+
+        my $ph = ($i < 2) ? "th.lexi$i" : _lexn($i-2);
+        my $pht = ($i < 2) ? $ty : "object";
+
+        push @$ls, [ $which, $ph, $pht, $ty, $i ];
+        $lu->{$i} = 1;
+
+        $self->_emit("$ph = $v");
     }
 
     sub drop_let {
         my ($self, $which) = @_;
-        die "Let consistency error" if $which ne $self->letstack->[-1];
-        pop @{ $self->letstack };
-        pop @{ $self->lettypes };
+        die "Let consistency error" if $which ne $self->letstack->[-1][0];
+        my $r = pop @{ $self->letstack };
+        $self->letused->{ $r->[4] } = 0;
     }
 
     sub peek_let {
         my ($self, $which) = @_;
         my $i = @{ $self->letstack } - 1;
-        while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
-        $self->cast($self->lettypes->[$i], "object",
-            _lexn($self->minlets + $i));
+        while ($i >= 0 && $self->letstack->[$i][0] ne $which) { $i-- }
+        my $k = $self->letstack->[$i];
+        ($k->[2] eq $k->[3]) ? (@$k[2,1]) : $self->cast(@$k[3,2,1]);
     }
 
     sub poke_let {
         my ($self, $which, $ty, $v) = @_;
         my $i = @{ $self->letstack } - 1;
-        while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
-        $self->_emit(_lexn($self->minlets + $i) . " = $v");
+        while ($i >= 0 && $self->letstack->[$i][0] ne $which) { $i-- }
+        $self->_emit($self->letstack->[$i][1] . " = $v");
     }
 
     sub const {
@@ -143,13 +143,6 @@ use CLRTypes;
         my $name = "K_" . $self->csname . "_$knum";
         push @{ $self->consttab }, "$type $name = $val";
         $type, $name;
-    }
-
-    sub has_let {
-        my ($self, $which) = @_;
-        my $i = @{ $self->letstack } - 1;
-        while ($i >= 0 && $self->letstack->[$i] ne $which) { $i-- }
-        $i >= 0;
     }
 
     sub label {
@@ -169,7 +162,6 @@ use CLRTypes;
     sub labelhere {
         my ($self, $n) = @_;
         my $ip = $self->labelname->{$n} = $self->ip;
-        $self->_restorestackstate($n) if $self->savedstks->{$n};
         push @{ $self->buffer }, "    goto case $ip;\n" unless $self->unreach;
         push @{ $self->buffer }, "case $ip:\n";
         $self->lineinfo->[$ip] = $self->linestack->[-1];
@@ -178,20 +170,17 @@ use CLRTypes;
 
     sub goto {
         my ($self, $n) = @_;
-        $self->_savestackstate($n);
         push @{ $self->buffer }, "    goto case \@\@L$n;\n";
         $self->unreach(1);
     }
 
     sub cgoto {
         my ($self, $n, $ty, $top) = @_;
-        $self->_savestackstate($n);
         push @{ $self->buffer }, "    if ($top) { goto case \@\@L$n; }\n";
     }
 
     sub ncgoto {
         my ($self, $n, $ty, $top) = @_;
-        $self->_savestackstate($n);
         push @{ $self->buffer }, "    if (!$top) { goto case \@\@L$n; }\n";
     }
 
@@ -473,9 +462,8 @@ use CLRTypes;
         }
         $t .= " " x 8 . "switch (th.ip) {\n";
         $t .= " " x 12 . "case 0:\n";
-        if ($self->numlets + $self->minlets > 4) {
-            $t .= " " x 16 . "th.lexn = new object[" .
-                ($self->numlets + $self->minlets - 4) . "];\n";
+        if ($self->lexnsize > 0) {
+            $t .= " " x 16 . "th.lexn = new object[" . $self->lexnsize . "];\n";
         }
         if ($self->usednamed) {
             $t .= " " x 16 . "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
@@ -496,6 +484,11 @@ use CLRTypes;
 
     sub BUILD {
         my $self = shift;
+
+        for (my $i = 0; $i < $self->minlets; $i++) {
+            $self->letused->{$i + 2} = 1;
+        }
+
         CgOpToCLROp::codegen($self, $self->ops);
     }
 

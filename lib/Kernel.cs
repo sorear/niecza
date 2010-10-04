@@ -230,6 +230,10 @@ namespace Niecza {
         public object lex1;
         public object lex2;
         public object lex3;
+
+        public int lexi0;
+        public int lexi1;
+
         public object[] lexn;
 
         public RxFrame rx;
