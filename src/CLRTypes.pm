@@ -105,6 +105,7 @@ my %typedata = (
 
     'Lexer.RunProtoregex'  => [m => 'IP6[]'],
     'Lexer.GetLexer'       => [m => 'Lexer'],
+    'Variable.None'        => [f => 'Variable[]'],
     'Kernel.SearchForHandler' => [c => 'Variable'],
     'Kernel.Die'           => [c => 'Variable'],
     'Kernel.BindFail'      => [c => 'Variable'],

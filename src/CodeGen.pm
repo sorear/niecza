@@ -242,7 +242,9 @@ use CLRTypes;
         my $quick = 1;
         for (@$sig) { $quick &&= ($_ eq '') }
         my ($inv, @vals) = _odds(@args);
-        if ($quick) {
+        if (!@vals) {
+            return $inv, "Variable.None", "null";
+        } elsif ($quick) {
             return $inv, "new Variable[] { " . join(", ", @vals) . "}", "null";
         } else {
             # TODO: optimize harder
@@ -299,11 +301,17 @@ use CLRTypes;
 
     sub clr_new_arr {
         my ($self, $class, @args) = @_;
+        if ($class eq 'Variable' && !@args) {
+            return "Variable[]", "Variable.None";
+        }
         $class . "[]", "new $class []{" .  join(", ", _odds @args) . "}";
     }
 
     sub clr_new_zarr {
         my ($self, $class, $nity, $nitems) = @_;
+        if ($class eq 'Variable' && $nitems eq "0") {
+            return "Variable[]", "Variable.None";
+        }
         $class . "[]", "(new $class [$nitems])";
     }
 

@@ -95,6 +95,8 @@ namespace Niecza {
 
         public abstract IP6  GetVar();
 
+        public static readonly Variable[] None = new Variable[0];
+
         public override DynMetaObject GetMO() { return null; }
     }
 
@@ -939,7 +941,7 @@ slow:
             th.MarkSharedChain();
             Thread thr = new Thread(delegate () {
                     Frame mark = new Frame(th, null, ExitRunloopSI);
-                    Frame cur = sub.Invoke(mark, new Variable[0], null);
+                    Frame cur = sub.Invoke(mark, Variable.None, null);
                     RunCore(cur);
                 });
             thr.Start();
