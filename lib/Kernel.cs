@@ -938,10 +938,9 @@ slow:
         public static Frame StartP6Thread(Frame th, IP6 sub) {
             th.MarkSharedChain();
             Thread thr = new Thread(delegate () {
-                    Frame current = new Frame();
-                    current = sub.Invoke(current, new Variable[0], null);
-                    current.caller = current.caller.caller;
-                    RunCore(current, th);
+                    Frame mark = new Frame(th, null, ExitRunloopSI);
+                    Frame cur = sub.Invoke(mark, new Variable[0], null);
+                    RunCore(cur);
                 });
             thr.Start();
             th.resultSlot = thr;
@@ -950,22 +949,31 @@ slow:
 
         public static void RunLoop(SubInfo boot) {
             Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
-            RunCore(new Frame(null, null, boot), null);
+            RunCore(new Frame(new Frame(null,null, ExitRunloopSI), null, boot));
         }
 
-        public static void RunCore(Frame cur, Frame root) {
-            while (cur != root) {
+        class ExitRunloopException : Exception { }
+        public static SubInfo ExitRunloopSI =
+            new SubInfo("ExitRunloop", ExitRunloopC);
+        private static Frame ExitRunloopC(Frame th) {
+            throw new ExitRunloopException();
+        }
+
+        public static void RunCore(Frame cur) {
+            for(;;) {
                 try {
                     if (TraceCont) {
-                        while (cur != root) {
+                        for(;;) {
                             System.Console.WriteLine("{0}|{1} @ {2}",
                                     cur.DepthMark(), cur.info.name, cur.ip);
                             cur = cur.code(cur);
                         }
                     } else {
-                        while (cur != root)
+                        for(;;)
                             cur = cur.code(cur);
                     }
+                } catch (ExitRunloopException) {
+                    return;
                 } catch (Exception ex) {
                     cur = Kernel.Die(cur, ex.ToString());
                 }
