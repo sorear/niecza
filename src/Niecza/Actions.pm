@@ -1435,13 +1435,9 @@ sub do_variable_reference { my ($cl, $M, $v) = @_;
 
     given ($v->{twigil}) {
         when ('!') {
-            if ($v->{rest}) {
-                $M->sorry('$!Foo::bar syntax NYI');
-                return;
-            }
-
-            return Op::GetSlot->new(node($M), name => $v->{name},
-                object => Op::Lexical->new(name => 'self'));
+            return Op::CallMethod->new(node($M), name => $v->{name},
+                receiver => Op::Lexical->new(name => 'self'),
+                private => 1, ppath => $v->{rest});
         }
         when ('.') {
             if ($v->{rest}) {
