@@ -103,8 +103,8 @@ EOM
         });
         push @thaw, CgOp::return;
 
-        push @cgs, CodeGen->new(csname => 'BOOT', usednamed => 1,
-            ops => CgOp::prog(@thaw))->csharp;
+        push @cgs, CodeGen->new(csname => 'BOOT', name => 'BOOT',
+            usednamed => 1, ops => CgOp::prog(@thaw))->csharp;
     }
 
     for (@decls) {
@@ -348,7 +348,7 @@ sub codegen_sub {
 
     local %haslet;
     resolve_lex($_, $ops);
-    CodeGen->new(csname => $_->{peer}{cbase}, ops => $ops,
+    CodeGen->new(csname => $_->{peer}{cbase}, name => $_->name, ops => $ops,
         usednamed => $_->{peer}{uname}, minlets => $_->{peer}{nlexn});
 }
 

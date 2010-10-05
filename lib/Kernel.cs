@@ -1107,9 +1107,11 @@ slow:
                 case 2:
                     if (th.lex0 == null)
                         Environment.Exit(1);
-                    Console.Error.WriteLine("  at {0} line {1}",
-                            ((Frame)th.lex0).ExecutingFile(),
-                            ((Frame)th.lex0).ExecutingLine());
+                    Frame f = (Frame) th.lex0;
+                    Console.Error.WriteLine("  at {0} line {1} ({2} @ {3})",
+                            new object[] {
+                                f.ExecutingFile(), f.ExecutingLine(),
+                                f.info.name, f.ip });
                     th.lex0 = ((Frame) th.lex0).caller;
                     goto case 2;
                 default:

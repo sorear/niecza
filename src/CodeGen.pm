@@ -10,6 +10,7 @@ use CLRTypes;
     use Moose;
 
     has ops       => (is => 'ro', required => 1);
+    has name    => (isa => 'Str', is => 'ro');
     has csname    => (isa => 'Str', is => 'ro');
     has minlets   => (isa => 'Int', is => 'ro', default => 0);
     has usednamed => (isa => 'Bool', is => 'ro', default => 0);
@@ -450,7 +451,7 @@ use CLRTypes;
         for (@{ $self->buffer }, @{ $self->consttab }, @{ $self->ehspans }) {
             s/\@\@L(\w+)/$self->labelname->{$1}/eg;
         }
-        (CgOp::clr_string("$::UNITNAME " . $self->csname),
+        (CgOp::clr_string("$::UNITNAME " . $self->name),
          CgOp::rawnewarr('int', map { CgOp::int($_//0) } @{ $self->lineinfo }),
          CgOp::rawsget($::UNITNAME . '.' . $self->csname . ':f,DynBlockDelegate'),
          $outersi, $ltm,
