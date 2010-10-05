@@ -286,8 +286,8 @@ public sealed class RxFrame {
             VarDeque ks = new VarDeque();
             ks.Push(Kernel.NewROScalar(m));
             DynObject it  = new DynObject(GatherIteratorMO);
-            it.slots[0 /*frame*/] = Kernel.NewRWScalar(th);
-            it.slots[1 /*reify*/] = Kernel.NewRWScalar(Kernel.AnyP);
+            it.slots[0 /*frame*/] = Kernel.NewRWScalar(Kernel.AnyMO, th);
+            it.slots[1 /*reify*/] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
             VarDeque iss = new VarDeque();
             iss.Push(Kernel.NewROScalar(it));
             DynObject lst = new DynObject(ListMO);
@@ -367,7 +367,7 @@ yes:
             if (it.cap == null) {
                 list = true;
             } else {
-                caps.Unshift(Kernel.NewRWScalar(it.cap));
+                caps.Unshift(Kernel.NewRWScalar(Kernel.AnyMO, it.cap));
             }
 no:
             it = it.prev;
@@ -381,7 +381,7 @@ no:
             return Kernel.NewRWListVar(l);
         } else {
             return caps.Count() != 0 ? caps[0] :
-                Kernel.NewRWScalar(Kernel.AnyP);
+                Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
         }
     }
 

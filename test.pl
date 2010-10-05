@@ -68,8 +68,8 @@ ok 42 / 3 == 14, "division comes out in the right order";
     ok (foo) == 42, "can call argless function without parens";
 }
 
-ok !Mu, "undefined type objects are false";
-ok !Mu.defined, "type objects are undefined";
+ok !Cool, "undefined type objects are false";
+ok !Cool.defined, "type objects are undefined";
 ok "Foo".defined, "strings are defined";
 ok !Str.defined, "derived type objects are still undefined";
 
@@ -77,8 +77,8 @@ ok "foo" eq "foo", "equal strings are equal";
 ok !("foo" ne "foo"), "equal strings are not not equal";
 ok "foo" ne "bar", "unequal strings are unequal";
 
-ok Mu === Mu, "identical objects are identical";
-ok !(Mu === Any), "unidentical objects are unidentical";
+ok Cool === Cool, "identical objects are identical";
+ok !(Cool === Any), "unidentical objects are unidentical";
 
 ok 12 eq "12", "eq stringifies";
 ok ("a" ~ "b") eq "ab", "a + b = ab";

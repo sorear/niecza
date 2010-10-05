@@ -131,6 +131,7 @@ my %typedata = (
     'System.Environment.Exit'     => [m => 'Void'],
     'String.Concat'        => [m => 'String'],
     'Kernel.AnyP'          => [f => 'IP6'],
+    'Kernel.AnyMO'         => [f => 'DynMetaObject'],
     'Kernel.ArrayP'        => [f => 'IP6'],
     'Kernel.HashP'         => [f => 'IP6'],
     'Kernel.StashP',       => [f => 'IP6'],

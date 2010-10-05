@@ -76,10 +76,12 @@ use warnings;
     }
 
     sub newblankrwscalar {
-        rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyP'));
+        rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyMO'),
+            rawsget('Kernel.AnyP'));
     }
 
-    sub newrwscalar { rawscall('Kernel.NewRWScalar', $_[0]); }
+    sub newrwscalar { rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyMO'),
+            $_[0]); }
 
     sub newrwlistvar { rawscall('Kernel.NewRWListVar', $_[0]); }
 
@@ -146,7 +148,7 @@ use warnings;
     sub varhash_contains_key { rawcall($_[0], 'ContainsKey', _str($_[1])) }
     sub varhash_new { rawnew('varhash') }
 
-    sub newgeneralvar { rawnew('clr:SimpleVariable', @_) }
+    sub newgeneralvar { rawnew('clr:SimpleVariable', $_[0], $_[1], rawsget('Kernel.AnyMO'), $_[2], $_[3]) }
 
     sub num_to_string { rawcall($_[0], 'ToString') }
     sub str_length { getfield('Length', $_[0]) }
@@ -169,7 +171,7 @@ use warnings;
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
-            $_[2]);
+            rawsget('Kernel.AnyMO'), $_[2]);
     }
 
     sub assign {

@@ -133,6 +133,7 @@ sub stash2 {
 
 # xxx check for SAFE::
 my %loopbacks = (
+    'MAny', 'Kernel.AnyMO',
     'MCallFrame', 'Kernel.CallFrameMO',
     'MGatherIterator', 'RxFrame.GatherIteratorMO',
     'MList', 'RxFrame.ListMO',
@@ -350,7 +351,8 @@ sub codegen_sub {
 
     local %haslet;
     resolve_lex($_, $ops);
-    CodeGen->new(csname => $_->{peer}{cbase}, name => $_->name, ops => $ops,
+    CodeGen->new(csname => $_->{peer}{cbase}, name => ($_->name eq 'ANON' ?
+            $_->{peer}{cbase} : $_->name), ops => $ops,
         usednamed => $_->{peer}{uname}, minlets => $_->{peer}{nlexn});
 }
 

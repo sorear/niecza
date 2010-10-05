@@ -84,11 +84,14 @@ namespace Niecza {
     // A Variable is the meaning of function arguments, of any subexpression
     // except the targets of := and ::=.
 
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public abstract class Variable : IP6 {
+        public IP6 whence;
+
         // these should be treated as ro for the life of the variable
+        public DynMetaObject type;
         public bool rw;
         public bool islist;
-        public IP6 whence;
 
         public abstract IP6  Fetch();
         public abstract void Store(IP6 v);
@@ -103,15 +106,18 @@ namespace Niecza {
     public sealed class SimpleVariable: Variable {
         IP6 val;
 
-        public SimpleVariable(bool rw, bool islist, IP6 whence, IP6 val) {
+        public SimpleVariable(bool rw, bool islist, DynMetaObject type, IP6 whence, IP6 val) {
             this.val = val; this.whence = whence; this.rw = rw;
-            this.islist = islist;
+            this.islist = islist; this.type = type;
         }
 
         public override IP6  Fetch()       { return val; }
         public override void Store(IP6 v)  {
             if (!rw) {
-                throw new InvalidOperationException("Writing to readonly scalar");
+                throw new NieczaException("Writing to readonly scalar");
+            }
+            if (!v.Isa(type)) {
+                throw new NieczaException("Nominal type check failed for scalar store; got " + v.GetMO().name + ", needed " + type.name + " or subtype");
             }
             val = v;
         }
@@ -769,12 +775,14 @@ blocked:
         }
 
         public static Frame NewBoundVar(Frame th, bool ro, bool islist,
-                Variable rhs) {
+                DynMetaObject type, Variable rhs) {
             Frame n;
             if (islist) ro = true;
             if (!rhs.rw) ro = true;
             // fast path
             if (ro == !rhs.rw && islist == rhs.islist && rhs.whence == null) {
+                if (!rhs.type.HasMRO(type))
+                    return Kernel.Die(th, "Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
                 th.resultSlot = rhs;
                 return th;
             }
@@ -783,16 +791,24 @@ blocked:
             // whence != null (and rhs.rw = true)
 
             if (!rhs.rw) {
-                th.resultSlot = new SimpleVariable(false, islist, null,
-                        rhs.Fetch());
+                IP6 v = rhs.Fetch();
+                if (!v.Isa(type))
+                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.GetMO().name + ", needed " + type.name);
+                th.resultSlot = new SimpleVariable(false, islist, v.GetMO(), null, v);
                 return th;
             }
             // ro = true and rhw.rw = true OR
             // whence != null
             if (ro) {
-                th.resultSlot = new SimpleVariable(false, islist, null, rhs.Fetch());
+                IP6 v = rhs.Fetch();
+                if (!v.Isa(type))
+                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.GetMO().name + ", needed " + type.name);
+                th.resultSlot = new SimpleVariable(false, islist, v.GetMO(), null, rhs.Fetch());
                 return th;
             }
+
+            if (!rhs.type.HasMRO(type))
+                return Kernel.Die(th, "Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
 
             th.resultSlot = rhs;
 
@@ -842,15 +858,16 @@ blocked:
 
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
-            return new SimpleVariable(false, false, null, obj);
+            return new SimpleVariable(false, false, obj.GetMO(), null, obj);
         }
 
-        public static Variable NewRWScalar(IP6 obj) {
-            return new SimpleVariable(true, false, null, obj);
+        public static Variable NewRWScalar(DynMetaObject t, IP6 obj) {
+            return new SimpleVariable(true, false, t, null, obj);
         }
 
         public static Variable NewRWListVar(IP6 container) {
-            return new SimpleVariable(false, true, null, container);
+            return new SimpleVariable(false, true, container.GetMO(), null,
+                    container);
         }
 
         public static VarDeque SlurpyHelper(Frame th, int from) {
@@ -891,7 +908,7 @@ blocked:
 
             for (int i = mro.Length - 1; i >= 0; i--) {
                 foreach (string s in mro[i].local_attr) {
-                    n.SetSlot(s, NewRWScalar(AnyP));
+                    n.SetSlot(s, NewRWScalar(AnyMO, AnyP));
                 }
             }
 
@@ -912,6 +929,7 @@ slow:
                     NewROScalar(lst) }, null);
         }
 
+        public static DynMetaObject AnyMO;
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 HashP;
@@ -933,7 +951,7 @@ slow:
                                 StashP)));
             } else {
                 // TODO: @foo, %foo
-                return (stash[name] = new BValue(NewRWScalar(AnyP)));
+                return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
             }
         }
 
