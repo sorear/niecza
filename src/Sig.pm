@@ -18,6 +18,7 @@ use 5.010;
     has list => (is => 'ro', isa => 'Bool', default => 0);
     has hash => (is => 'ro', isa => 'Bool', default => 0);
     has type => (is => 'ro', isa => 'Str', default => 'Any');
+    has tclass => (is => 'rw', isa => 'ArrayRef');
 
     sub slurpy_get {
         my ($self) = @_;
@@ -143,19 +144,21 @@ use 5.010;
 
     sub for_method {
         my $self = shift;
-        my $sp = Sig::Parameter->new(slot => 'self', name => 'self');
+        my $sp = Sig::Parameter->new(slot => 'self', name => 'self',
+            readonly => 1);
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
     sub for_regex {
         my ($self) = @_;
-        my $sp = Sig::Parameter->new(slot => '$¢', name => '$¢');
+        my $sp = Sig::Parameter->new(slot => '$¢', name => '$¢', readonly => 1);
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
     sub simple {
         my ($class, @names) = @_;
-        Sig->new(params => [map { Sig::Parameter->new(slot => $_, name => $_)
+        Sig->new(params => [map { Sig::Parameter->new(slot => $_, name => $_,
+                readonly => 1)
             } @names]);
     }
 

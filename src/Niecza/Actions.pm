@@ -1591,9 +1591,13 @@ sub param_var { my ($cl, $M) = @_;
 
 # :: Sig::Parameter
 sub parameter { my ($cl, $M) = @_;
-    if (@{ $M->{trait} } > 0) {
-        $M->sorry('Parameter traits NYI');
-        return;
+    my $rw;
+
+    for (@{ $M->{trait} }) {
+        if ($_->{_ast}{rw}) { $rw = 1 }
+        else {
+            $M->sorry('Unhandled trait ' . (keys(%{ $_->{_ast} }))[0]);
+        }
     }
 
     if (@{ $M->{post_constraint} } > 0) {
@@ -1625,7 +1629,8 @@ sub parameter { my ($cl, $M) = @_;
     my $p = $M->{param_var} // $M->{named_param};
 
     $M->{_ast} = Sig::Parameter->new(name => $M->Str, default => $default,
-        optional => $optional, slurpy => $slurpy, %{ $p->{_ast} });
+        optional => $optional, slurpy => $slurpy, readonly => !$rw,
+        %{ $p->{_ast} });
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -2195,6 +2200,8 @@ sub trait_mod__S_is { my ($cl, $M) = @_;
         $noparm = 'Export tags NYI';
     } elsif ($trait eq 'rawcall') {
         $M->{_ast} = { nobinder => 1 };
+    } elsif ($trait eq 'rw') {
+        $M->{_ast} = { rw => 1 };
     } else {
         $M->sorry('Unhandled trait ' . $trait);
     }
