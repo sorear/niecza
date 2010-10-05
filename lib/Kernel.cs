@@ -361,6 +361,8 @@ namespace Niecza {
     }
 
     public class NieczaException: Exception {
+        // hide clr stack trace for these
+        public override string ToString() { return Message; }
         public NieczaException(string detail) : base(detail) {}
         public NieczaException() : base() {}
     }
