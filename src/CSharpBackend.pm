@@ -317,7 +317,9 @@ sub resolve_lex {
 
         resolve_lex($body, $_) for @{ $op->zyg };
     } elsif ($opc eq 'class_ref') {
-        my $cl = $unit->deref([ @rest ]);
+        my $cl = (@rest > 1) ? $unit->deref([ @rest ]) :
+            $unit->deref($unit->get_stash(@{ $body->find_lex(@rest)->path })
+                ->obj);
         my $nn = CgOp::rawsget($cl->{peer}{$arg});
         %$op = %$nn;
         bless $op, ref($nn);
