@@ -229,7 +229,7 @@ sub enter_code {
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
                 my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
-                my $var = $unit->deref($unit->get_stash(@$imp)->obj)
+                my $var = $unit->deref($unit->get_stash_obj(@$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {
@@ -290,7 +290,7 @@ sub access_lex {
         }
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
-        my $ref = $unit->get_stash(@{ $lex->path })->obj;
+        my $ref = $unit->get_stash_obj(@{ $lex->path });
         my $obj = $ref && $unit->deref($ref);
         return $obj->{peer} ? CgOp::rawsget($obj->{peer}{what_var}) :
             CgOp::null('var');
@@ -319,8 +319,7 @@ sub resolve_lex {
         resolve_lex($body, $_) for @{ $op->zyg };
     } elsif ($opc eq 'class_ref') {
         my $cl = (@rest > 1) ? $unit->deref([ @rest ]) :
-            $unit->deref($unit->get_stash(@{ $body->find_lex(@rest)->path })
-                ->obj);
+            $unit->deref($unit->get_stash_obj(@{$body->find_lex(@rest)->path}));
         my $nn = CgOp::rawsget($cl->{peer}{$arg});
         %$op = %$nn;
         bless $op, ref($nn);
@@ -416,7 +415,7 @@ sub sub2 {
     push @thaw, CgOp::rawsset($si, CgOp::rawnew("clr:$si_ty", @{ $node->{sictor} }));
 
     if ($_->class ne 'Sub') {
-        my $cl = $unit->deref($unit->get_stash(@{ $_->find_lex_pkg($_->class) })->obj);
+        my $cl = $unit->deref($unit->get_stash_obj(@{ $_->find_lex_pkg($_->class) }));
         push @thaw, CgOp::setfield('mo', CgOp::rawsget($si), CgOp::rawsget($cl->{peer}{mo}));
     }
 
@@ -488,7 +487,7 @@ sub sub3 {
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
                 my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
-                my $var = $unit->deref($unit->get_stash($$imp)->obj)
+                my $var = $unit->deref($unit->get_stash_obj($$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {

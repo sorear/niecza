@@ -34,9 +34,11 @@ use Scalar::Util 'blessed';
 our @opensubs;
 our $unit;
 
-# a stash is an object like Foo::.  Foo is a member of Foo::, as witnessed by
-# the fact that Foo:: can exist without Foo but not vice versa; Foo is reached
-# by ->obj.
+# A stash is an object like Foo::.  Foo and Foo:: are closely related, but
+# generally must be accessed separately due to constants (which have Foo but
+# not Foo::) and stub packages (vice versa).  They are reached as distinct
+# slots in the parent package.  Note that the root stash can have no
+# corresponding package.
 #
 # a stash is associated with a single unit.  each unit has a graph of stashes
 # rooted from the unit's global.  'my' stashes are really 'our' stashes with
@@ -50,16 +52,15 @@ our $unit;
     use Moose;
 
     # zyg entries can point to:
-    #  - other Stashes (but only in the same unit; also, tree structure)
+    #  - other Stashes in the same unit (for ::; also, tree structure)
     #  - Metamodel::Stash::Graft for class import/export
     #  - StaticSub (via reference)
+    #  - Package (via reference)
     has zyg => (isa => 'HashRef', is => 'ro',
         default => sub { +{} });
     # not canonical, but at least usable in importers
     # 1st element is always GLOBAL or $unitname $id
     has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
-    # undef here -> stub like my class Foo { ... }
-    has obj => (isa => 'Maybe[ArrayRef]', is => 'rw');
     has parent => (isa => 'Maybe[Metamodel::Stash]', is => 'ro');
 
     sub bind_name {
@@ -163,9 +164,8 @@ our $unit;
         my ($self, $targ) = @_;
         if ($self->name ne 'Mu' && $unit->is_true_setting
                 && !@{ $self->superclasses }) {
-            $self->add_super(
-                $unit->get_stash(@{ $opensubs[-1]->find_pkg($self->_defsuper) })
-                ->obj);
+            $self->add_super($unit->get_stash_obj(
+                    @{ $opensubs[-1]->find_pkg($self->_defsuper) }));
         }
     }
 
@@ -415,7 +415,7 @@ our $unit;
         my $thing = Metamodel::Stash::Graft->new(to => $path2);
         for my $tag (@$tags) {
             my $repo = $unit->get_stash(@{ $self->cur_pkg }, 'EXPORT', $tag);
-            $repo->bind_name($name, $thing);
+            $repo->bind_name($name . '::', $thing);
         }
         scalar @$tags;
     }
@@ -476,6 +476,13 @@ our $unit;
         $_[0]->name . ":" . $i;
     }
 
+    sub get_stash_obj {
+        my ($self, @path) = @_;
+        my $end = pop @path;
+        my $stash = $self->get_stash(@path);
+        return $stash->zyg->{$end};
+    }
+
     sub get_stash {
         my ($self, @path) = @_;
         my $ptr = $self->sroot;
@@ -488,7 +495,7 @@ our $unit;
                     $name eq 'SETTING' || $name eq 'UNIT') {
                 die "$name cannot be used to descend from a package";
             } else {
-                $ptr = $ptr->zyg->{$name} //=
+                $ptr = $ptr->zyg->{$name . '::'} //=
                     Metamodel::Stash->new(parent => $ptr,
                         path => [ @{ $ptr->path }, $name ]);
                 $ptr = $self->deref($ptr) if !blessed($ptr);
@@ -589,27 +596,20 @@ our $unit;
             my $sl = $self->get_stash(@path);
             my $sf = $u2->get_stash(@path);
 
-            if ($sl->obj && $sf->obj && ($sl->obj->[0] ne $sf->obj->[0] ||
-                    $sl->obj->[1] != $sf->obj->[1])) {
-                die "unification error: clashing main objects on " .
-                    join ("::", @path);
-            }
-            $sl->obj($sl->obj // $sf->obj);
-
             for my $fk (sort keys %{ $sf->zyg }) {
                 my $fo = $sf->zyg->{$fk};
                 my $lo = $sl->zyg->{$fk};
-                if (blessed($fo) && $fo->isa('Metamodel::Stash')) {
-                    if ($lo && (!blessed($lo) || !$lo->isa('Metamodel::Stash'))) {
-                        die "unification error: non-stash local, stash foreign; " . join("::", @path, $fk);
-                    }
-                    $rec->(@path, $fk);
-                } else {
-                    if ($lo && blessed($lo) && $lo->isa('Metamodel::Stash')) {
-                        die "unification error: stash local, non=stash foreign; " . join("::", @path, $fk);
-                    }
-
+                if (!$lo) {
                     $sl->bind_name($fk, $fo);
+                    next;
+                }
+                if (blessed($fo) && blessed($lo)) {
+                    $rec->(@path, $fk);
+                } elsif (!blessed($fo) && !blessed($lo) && $fo->[0] eq $lo->[0]
+                        && $fo->[1] == $lo->[1]) {
+                    # same object, no collision
+                } else {
+                    die "unification error: " . join("::", @path, $fk);
                 }
             }
         };
@@ -767,7 +767,7 @@ sub Op::CallMethod::begin {
     $self->Op::begin;
     if ($self->private) {
         if ($self->ppath) {
-            $self->pclass($unit->get_stash(@{ $opensubs[-1]->find_pkg($self->ppath) })->obj);
+            $self->pclass($unit->get_stash_obj(@{ $opensubs[-1]->find_pkg($self->ppath) }));
         } elsif ($opensubs[-1]->in_class) {
             $self->pclass($opensubs[-1]->in_class);
         } else {
@@ -821,7 +821,7 @@ sub Op::Super::begin {
     $ns = $unit->deref($ns);
     die "superclass $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
-    $ns->add_super($unit->get_stash(@{ $opensubs[-1]->find_pkg($self->name) })->obj);
+    $ns->add_super($unit->get_stash_obj(@{ $opensubs[-1]->find_pkg($self->name) }));
 }
 
 sub Op::SubDef::begin {
@@ -884,19 +884,20 @@ sub Op::PackageDef::begin {
     my $pclass = ref($self);
     $pclass =~ s/Op::(.*)Def/Metamodel::$1/;
 
-    my $ns = $self->ourpkg ?
-        [ @{ $opensubs[-1]->find_pkg($self->ourpkg) }, $self->var ] :
-        [ $unit->anon_stash ];
+    my @ns = $self->ourpkg ?
+        (@{ $opensubs[-1]->find_pkg($self->ourpkg) }, $self->var) :
+        ($unit->anon_stash);
+    my $n = pop(@ns);
 
-    $opensubs[-1]->add_my_stash($self->var, $ns);
-    $opensubs[-1]->add_pkg_exports($unit, $self->var, $ns, $self->exports);
-
+    $opensubs[-1]->add_my_stash($self->var, [ @ns, $n ]);
+    $opensubs[-1]->add_pkg_exports($unit, $self->var, [ @ns, $n ], $self->exports);
     if (!$self->stub) {
         my $obj  = $unit->make_ref($pclass->new(name => $self->name));
-        my $body = $self->body->begin(body_of => $obj, cur_pkg => $ns,
+        my $body = $self->body->begin(body_of => $obj, cur_pkg => [ @ns, $n ],
             once => 1);
         $unit->deref($obj)->close;
-        $unit->get_stash(@$ns)->obj($obj);
+        $unit->get_stash(@ns)->bind_name($n, $obj);
+        $opensubs[-1]->add_exports($unit, $self->var, $obj, $self->exports);
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
 
@@ -908,7 +909,7 @@ sub Op::Augment::begin {
 
     # XXX shouldn't we distinguish augment class Foo { } from ::Foo ?
     my $pkg = $opensubs[-1]->find_pkg([ @{ $self->pkg }, $self->name ]);
-    my $body = $self->body->begin(body_of => $unit->get_stash(@$pkg)->obj,
+    my $body = $self->body->begin(body_of => $unit->get_stash_obj(@$pkg),
         augmenting => 1, once => 1, cur_pkg => $pkg);
     $opensubs[-1]->add_my_sub($self->bodyvar, $body);
 
