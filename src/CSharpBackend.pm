@@ -5,6 +5,8 @@ use utf8;
 
 package CSharpBackend;
 
+use Scalar::Util 'blessed';
+
 # Input:  A Metamodel::Unit object
 # Output: A CodeGenUnit object
 
@@ -84,6 +86,7 @@ EOM
             $_->visit_local_packages(\&pkg2);
             $_->visit_local_subs_preorder(\&sub2);
 
+            $unit->visit_local_stashes(\&stash3) if $_ == $unit;
             $_->visit_local_packages(\&pkg3);
             $_->visit_local_subs_preorder(\&sub3);
 
@@ -131,6 +134,28 @@ sub stash2 {
     }
 }
 
+sub stash3 {
+    my $p = $lpeers{$_};
+    for my $k (sort keys %{ $_->zyg }) {
+        my $ch = $_->zyg->{$k};
+        my $bit;
+
+        if (blessed($ch)) {
+            $bit = CgOp::newscalar(CgOp::rawsget($lpeers{$ch}));
+        } else {
+            my $chd = $unit->deref($ch);
+            if ($chd->isa('Metamodel::Package') &&
+                    defined $chd->{peer}{what_var}) {
+                $bit = CgOp::rawsget($chd->{peer}{what_var});
+            }
+        }
+
+        next unless $bit;
+        push @thaw, CgOp::bset(CgOp::rawscall('Kernel.PackageLookup',
+                CgOp::rawsget($p), CgOp::clr_string($k)), $bit);
+    }
+}
+
 # xxx check for SAFE::
 my %loopbacks = (
     'MAny', 'Kernel.AnyMO',
@@ -138,7 +163,6 @@ my %loopbacks = (
     'MGatherIterator', 'RxFrame.GatherIteratorMO',
     'MList', 'RxFrame.ListMO',
     'MMatch', 'RxFrame.MatchMO',
-    'PStash', 'Kernel.StashP',
     'PAny', 'Kernel.AnyP',
     'PArray', 'Kernel.ArrayP',
     'PEMPTY', 'RxFrame.EMPTYP',

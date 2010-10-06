@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 520;
+plan 533;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1035,4 +1035,37 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
     rxtest /^ x**2..* $/, 'x**2..*', ('xx','xxx','xxxx'), ('x',);
     rxtest /^ [x**2] $/, 'x**2', ('xx',), ('x','xxx');
     rxtest /^ [x**y] $/, 'x**y', ('x','xyx','xyxyx'), ('','xy','yx');
+}
+
+{
+    my $x;
+    (class { method foo() {
+        $x = 1;
+    } }).foo;
+    ok $x, "changes made in the protolexpad are visible at runtime";
+}
+
+{
+    my $x;
+    my $unclonable-sub = (class { method foo() { sub () { $x } } }).foo;
+    $x = 42;
+    ok $unclonable-sub() == 42, "mainlines are not cloned";
+}
+
+{
+    class Foo {
+        method foo() { 42 }
+        class Bar {
+            method bar() { 51 }
+        }
+        ok Bar.bar == 51, "within Foo, Bar is directly accessible";
+        ok OUR::Bar.bar == 51, "within Foo, Bar is package accessible";
+        ok Foo::Bar.bar == 51, "within Foo, Bar is longname accessible";
+        ok GLOBAL::Foo::Bar.bar == 51, "within Foo, Bar is GLOBAL accessible";
+    }
+    ok Foo eq 'Foo()', "lexical lookup of our-class works";
+    ok OUR::Foo eq 'Foo()', "also visible in ourpad";
+    ok GLOBAL::Foo eq 'Foo()', "also visible globally";
+    ok Foo::Bar.bar == 51, "can call through nested methods";
+    ok GLOBAL::Foo::Bar.bar == 51, "can call through GLOBAL nested";
 }
