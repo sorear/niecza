@@ -500,7 +500,7 @@ our $unit;
                         path => [ @{ $ptr->path }, $name ]);
                 $ptr = $self->deref($ptr) if !blessed($ptr);
                 if ($ptr->isa('Metamodel::Stash::Graft')) {
-                    $ptr = $self->get_stash(@{ $ptr->path });
+                    $ptr = $self->get_stash(@{ $ptr->to });
                 } elsif ($ptr->isa('Metamodel::Stash')) {
                 } else {
                     die "$name is a non-subpackage";
@@ -599,11 +599,11 @@ our $unit;
             for my $fk (sort keys %{ $sf->zyg }) {
                 my $fo = $sf->zyg->{$fk};
                 my $lo = $sl->zyg->{$fk};
-                if (!$lo) {
+                if (!$lo && !blessed($fo)) {
                     $sl->bind_name($fk, $fo);
                     next;
                 }
-                if (blessed($fo) && blessed($lo)) {
+                if (blessed($fo) && (!$lo || blessed($lo))) {
                     $rec->(@path, $fk);
                 } elsif (!blessed($fo) && !blessed($lo) && $fo->[0] eq $lo->[0]
                         && $fo->[1] == $lo->[1]) {
@@ -730,13 +730,18 @@ sub Op::Use::begin {
     # XXX I am not sure how need binding should work
 
     for my $en (sort keys %{ $exp->zyg }) {
+        my $uname = $en;
         my $ref = $exp->zyg->{$en};
         my $ex = blessed($ref) ? $ref : $unit->deref($ref);
         my $lex;
         if ($ex->isa('Metamodel::Stash')) {
+            $uname =~ s/:://;
             $lex = Metamodel::Lexical::Stash->new(path => $ex->path);
+        } elsif ($ex->isa('Metamodel::Package')) {
+            next; # XXX this is hacked elsewhere
         } elsif ($ex->isa('Metamodel::Stash::Graft')) {
-            $lex = Metamodel::Lexical::Stash->new(path => $ex->path);
+            $uname =~ s/:://;
+            $lex = Metamodel::Lexical::Stash->new(path => $ex->to);
         } elsif ($ex->isa('Metamodel::StaticSub')) {
             $lex = Metamodel::Lexical::SubImport->new(ref => $ref);
         } elsif ($ex->isa('Metamodel::ExportedVar')) {
@@ -745,7 +750,7 @@ sub Op::Use::begin {
             die "unhandled export type " . ref($ex);
         }
 
-        $opensubs[-1]->lexicals->{$en} = $lex;
+        $opensubs[-1]->lexicals->{$uname} = $lex;
     }
 }
 

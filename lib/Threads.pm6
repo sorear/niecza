@@ -29,7 +29,7 @@ my class Thread is export {
     }
 
     method join() {
-        Q:CgOp { (rnull (rawcall (unbox System.Threading.Thread (@ {self})) Join:m,Void)) }
+        Q:CgOp { (rnull (rawcall (unbox clr:System.Threading.Thread (@ {self})) Join:m,Void)) }
     }
 
     method sleep($time) {
