@@ -137,6 +137,7 @@ our $unit;
         default => sub { [] });
     has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
         is => 'ro', lazy => 1, default => sub { +{} });
+    has linearized_mro => (isa => 'ArrayRef[ArrayRef]', is => 'rw');
 
     sub add_attribute {
         my ($self, $name) = @_;
@@ -167,6 +168,35 @@ our $unit;
             $self->add_super($unit->get_stash_obj(
                     @{ $opensubs[-1]->find_pkg($self->_defsuper) }));
         }
+
+        my @merge;
+        push @merge, [ $unit->make_ref($self), @{ $self->superclasses } ];
+        for (@{ $self->superclasses }) {
+            push @merge, [ @{ $unit->deref($_)->linearized_mro } ];
+        }
+        my @mro;
+        my %used;
+
+        MRO: for(;;) {
+            CANDIDATE: for (my $i = 0; $i < @merge; $i++) {
+                my $item = $merge[$i][0];
+                for (my $j = 0; $j < @merge; $j++) {
+                    for (my $k = 1; $k < @{ $merge[$j] }; $k++) {
+                        next CANDIDATE if $unit->deref($merge[$j][$k])
+                            == $unit->deref($item);
+                    }
+                }
+                shift @{ $merge[$i] };
+                splice @merge, $i, 1 if !@{ $merge[$i] };
+                push @mro, $item unless $used{$unit->deref($item)}++;
+                next MRO;
+            }
+            last MRO if (!@merge);
+            die "C3-MRO wedged! " . join(" | ", map { (join " <- ",
+                    map { $unit->deref($_)->name } @$_) } @merge);
+        }
+
+        $self->linearized_mro(\@mro);
     }
 
     sub _defsuper { 'Any' } #XXX CORE::Any
@@ -513,6 +543,7 @@ our $unit;
     sub make_ref {
         my ($self, $thing) = @_;
         my $xid;
+        Carp::confess "trying to make_ref null" unless $thing;
         if (!defined ($xid = $thing->xid)) {
             $thing->xid($xid = scalar @{ $self->xref });
             push @{ $self->xref }, $thing;
@@ -523,7 +554,8 @@ our $unit;
     sub deref {
         my ($self, $thing) = @_;
         Carp::confess "trying to dereference null" unless $thing;
-        return $self->get_unit($thing->[0])->xref->[$thing->[1]];
+        return $self->get_unit($thing->[0])->xref->[$thing->[1]] //
+            Carp::confess "invalid ref @$thing";
     }
 
     sub visit_units_preorder {

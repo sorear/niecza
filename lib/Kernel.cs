@@ -448,6 +448,9 @@ namespace Niecza {
                     k.subclasses.Add(wr_this);
             }
             mro = arr;
+            isa.Clear();
+            foreach (DynMetaObject k in arr)
+                isa.Add(k);
         }
 
         ~DynMetaObject() {
@@ -502,21 +505,6 @@ namespace Niecza {
             return isa.Contains(m);
         }
 
-        private static bool C3Debug =
-            Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
-
-        private static string MROStr(List<DynMetaObject> chain) {
-            return Kernel.JoinS(" <- ", chain, delegate(DynMetaObject o) {
-                return o.name;
-            });
-        }
-
-        private static void DumpC3Lists(string f, DynMetaObject[] m,
-                List<List<DynMetaObject>> d) {
-            Console.WriteLine(f + MROStr(new List<DynMetaObject>(m)) + " // " +
-                    Kernel.JoinS(" | ", d, MROStr));
-        }
-
         public void AddMethod(string name, IP6 code) {
             local[name] = code;
             Invalidate();
@@ -532,82 +520,21 @@ namespace Niecza {
             return code;
         }
 
-        public void AddAttribute(string name) {
-            local_attr.Add(name);
-            Invalidate();
+
+        public void FillProtoClass(string[] attr) {
+            FillClass(attr, attr, new DynMetaObject[] {},
+                    new DynMetaObject[] { this });
         }
 
-        public void AddSuperclass(DynMetaObject other) {
-            superclasses.Add(other);
-        }
-
-        // this gets called more than once for Scalar, ClassHOW, and Sub
-        // just be sure that the attrib list doesn't change
-        public void Complete() {
-            List<List<DynMetaObject>> toMerge = new List<List<DynMetaObject>>();
-            List<DynMetaObject> mro_l = new List<DynMetaObject>();
-            isa = new HashSet<DynMetaObject>();
-            toMerge.Add(new List<DynMetaObject>());
-            toMerge[0].Add(this);
-
-            foreach (DynMetaObject dmo in superclasses) {
-                toMerge[0].Add(dmo);
-                toMerge.Add(new List<DynMetaObject>(dmo.mro));
-            }
-
-            if (C3Debug)
-                DumpC3Lists("C3 start: " + name + ": ", mro, toMerge);
-
-            while (true) {
-top:
-                if (C3Debug)
-                    DumpC3Lists("C3 iter: ", mro, toMerge);
-
-                foreach (List<DynMetaObject> h in toMerge) {
-                    if (h.Count == 0) {
-                        continue; // next CANDIDATE
-                    }
-                    DynMetaObject cand = h[0];
-                    foreach (List<DynMetaObject> bs in toMerge) {
-                        if (bs.Count == 0) {
-                            continue; // next BLOCKER
-                        }
-                        if (bs[0] == cand) {
-                            continue;
-                        }
-                        if (bs.Contains(cand)) {
-                            goto blocked;
-                        }
-                    }
-                    // no reason not to immediately put this, and by loop
-                    // order the C3 condition is kept
-                    mro_l.Add(cand);
-                    isa.Add(cand);
-                    foreach (List<DynMetaObject> l in toMerge) {
-                        l.Remove(cand);
-                    }
-                    goto top;
-blocked:
-                    ;
-                }
-                if (C3Debug)
-                    DumpC3Lists("C3 end: ", mro, toMerge);
-                foreach (List<DynMetaObject> l in toMerge) {
-                    if (l.Count != 0) {
-                        // should refactor this to use a real p6exception
-                        throw new Exception("C3 MRO inconsistency detected");
-                    }
-                }
-                break;
-            }
-
-            SetMRO(mro_l.ToArray());
+        public void FillClass(string[] local_attr, string[] all_attr,
+                DynMetaObject[] superclasses, DynMetaObject[] mro) {
+            this.superclasses = new List<DynMetaObject>(superclasses);
+            SetMRO(mro);
+            this.local_attr = new List<string>(local_attr);
 
             nslots = 0;
-            foreach (DynMetaObject k in mro) {
-                foreach (string an in k.local_attr) {
-                    slotMap[an] = nslots++;
-                }
+            foreach (string an in all_attr) {
+                slotMap[an] = nslots++;
             }
 
             Invalidate();
@@ -1015,25 +942,20 @@ slow:
 
         static Kernel() {
             DynMetaObject pStrMO = new DynMetaObject("protoStr");
-            pStrMO.AddAttribute("value");
-            pStrMO.Complete();
+            pStrMO.FillProtoClass(new string[] { "value" });
             StrP = new DynObject(pStrMO);
 
             StashMO = new DynMetaObject("Stash");
-            StashMO.AddAttribute("value");
-            StashMO.Complete();
+            StashMO.FillProtoClass(new string[] { "value" });
             StashP = new DynObject(StashMO);
 
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
-            SubMO.AddAttribute("outer");
-            SubMO.AddAttribute("info");
-            SubMO.Complete();
+            SubMO.FillProtoClass(new string[] { "outer", "info" });
             SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
 
             ScalarMO = new DynMetaObject("Scalar");
-            ScalarMO.AddAttribute("value");
-            ScalarMO.Complete();
+            ScalarMO.FillProtoClass(new string[] { "value" });
         }
 
         public static Dictionary<string, int> usedNames = new Dictionary<string, int>();

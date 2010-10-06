@@ -54,6 +54,8 @@ sub run {
     local @cgs;
     local $classhow;
 
+    local $Metamodel::unit = $unit;
+
     # 0s just set up variables
     # 1s set up subs
     # 2s set up objects
@@ -190,16 +192,22 @@ sub pkg2 {
     } else {
         push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
                 CgOp::clr_string($_->name)));
-        for my $a (@{ $_->attributes }) {
-            push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddAttribute',
-                CgOp::clr_string($a));
-        }
     }
-    for my $s (@{ $_->superclasses }) {
-        push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddSuperclass',
-            CgOp::rawsget($unit->deref($s)->{peer}{mo}));
+    my $abase;
+    for (@{ $_->linearized_mro }) {
+        $abase += scalar @{ $unit->deref($_)->attributes };
     }
-    push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Complete');
+    push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'FillClass',
+        CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
+            @{ $_->attributes }),
+        CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
+            map { @{ $unit->deref($_)->attributes } } @{ $_->linearized_mro }),
+        CgOp::rawnewarr('clr:DynMetaObject',
+            map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
+                @{ $_->superclasses }),
+        CgOp::rawnewarr('clr:DynMetaObject',
+            map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
+                @{ $_->linearized_mro }));
     push @thaw, CgOp::rawsset($wh6, CgOp::rawnew('clr:DynObject', CgOp::rawsget($p)));
     push @thaw, CgOp::setfield('slots', CgOp::cast('clr:DynObject', CgOp::rawsget($wh6)), CgOp::null('clr:object[]'));
     push @thaw, CgOp::setfield('typeObject', CgOp::rawsget($p), CgOp::rawsget($wh6));

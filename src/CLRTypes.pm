@@ -22,12 +22,10 @@ my %typedata = (
           slots        => [f => 'Dictionary<string,Object>'] },
 
     DynMetaObject =>
-        { Complete     => [m => 'Void'],
+        { FillClass    => [m => 'Void'],
           HasMRO       => [m => 'Boolean'],
           AddMultiRegex=> [m => 'Void'],
           AddMethod    => [m => 'Void'],
-          AddSuperclass=> [m => 'Void'],
-          AddAttribute => [m => 'Void'],
           AddPrivateMethod => [m => 'Void'],
           GetPrivateMethod => [m => 'IP6'],
           typeObject   => [f => 'IP6'],
