@@ -7,3 +7,5 @@ t/spec
 perf/sample_*.json
 perf/STD.errors
 perf/*.exe
+perf/profile.txt
+perf/xdb.il
