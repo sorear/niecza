@@ -5,7 +5,8 @@ use strict;
 use warnings;
 
 sub run {
-    $_[0]->rxsimp(0);
+    my $r = $_[0]->rxsimp(0);
+    $r, $r->mayback;
 }
 
 sub run_lad {

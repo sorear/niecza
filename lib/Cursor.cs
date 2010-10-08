@@ -273,6 +273,16 @@ public sealed class RxFrame {
     public static DynMetaObject GatherIteratorMO;
     public static IP6 EMPTYP;
 
+    public Frame FinalEnd(Frame th) {
+        VarDeque ks = new VarDeque();
+        ks.Push(Kernel.NewROScalar(MakeMatch()));
+        DynObject lst = new DynObject(ListMO);
+        lst.slots[0 /*items*/] = ks;
+        lst.slots[1 /*rest*/ ] = new VarDeque();
+        lst.slots[2 /*flat*/ ] = false;
+        th.caller.resultSlot = Kernel.NewRWListVar(lst);
+        return th.caller;
+    }
     public Frame End(Frame th) {
         return End(th, MakeMatch());
     }

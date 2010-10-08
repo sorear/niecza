@@ -80,6 +80,7 @@ my %typedata = (
           MakeMatch    => [m => 'Cursor'],
           SetPos       => [m => 'Void'],
           Backtrack    => [c => 'Void'],
+          FinalEnd     => [c => 'Void'],
           End          => [c => 'Void'] },
     'Cursor' =>
         { At           => [m => 'Cursor'],

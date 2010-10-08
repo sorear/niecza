@@ -956,6 +956,7 @@ use CgOp;
     has name => (isa => 'Str', is => 'ro', default => '');
     has sym => (isa => 'Maybe[Str]', is => 'ro');
     has pre => (isa => 'ArrayRef[Op]', is => 'ro', default => sub { [] });
+    has canback => (isa => 'Bool', is => 'ro', default => 1);
 
     sub zyg { @{ $_[0]->pre }, $_[0]->rxop->opzyg }
 
@@ -980,7 +981,7 @@ use CgOp;
                 CgOp::const(CgOp::rawnewarr('str', @mcaps)),
                 CgOp::null('clr:Cursor')),
             $self->rxop->code($body),
-            CgOp::rawcall(CgOp::rxframe, 'End'),
+            CgOp::rawcall(CgOp::rxframe, $self->canback ? 'End' : 'FinalEnd'),
             CgOp::label('backtrack'),
             CgOp::rawcall(CgOp::rxframe, 'Backtrack'),
             CgOp::null('var'));

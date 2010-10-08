@@ -295,7 +295,7 @@ sub quote__S_Q { my ($cl, $M) = @_;
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my @lift = $M->{nibble}{_ast}->oplift;
-    my $rxop = Optimizer::RxSimple::run($M->{nibble}{_ast});
+    my ($rxop, $mb) = Optimizer::RxSimple::run($M->{nibble}{_ast});
     $M->{_ast} = Op::SubDef->new(
         var  => $cl->gensym,
         body => Body->new(
@@ -303,7 +303,8 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
             class => 'Regex',
             type  => 'regex',
             signature => Sig->simple->for_regex,
-            do => Op::RegexBody->new(pre => \@lift, rxop => $rxop)));
+            do => Op::RegexBody->new(canback => $mb, pre => \@lift,
+                rxop => $rxop)));
 }
 
 sub regex_block { my ($cl, $M) = @_;
@@ -377,7 +378,7 @@ sub regex_def { my ($cl, $M) = @_;
     local $::symtext = $symtext;
     my $lad = Optimizer::RxSimple::run_lad($ast->lad);
     my @lift = $ast->oplift;
-    $ast = Optimizer::RxSimple::run($ast);
+    ($ast, my $mb) = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
         method_too => ($scope eq 'has' ? ['', $name] : undef),
@@ -388,7 +389,7 @@ sub regex_def { my ($cl, $M) = @_;
             type  => 'regex',
             signature => $sig->for_regex,
             do => Op::RegexBody->new(sym => $symtext, pre => \@lift,
-                name => ($name // ''), rxop => $ast)));
+                name => ($name // ''), rxop => $ast, canback => $mb)));
 }
 
 sub regex_declarator { my ($cl, $M) = @_;
