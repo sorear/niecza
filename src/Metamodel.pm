@@ -111,6 +111,8 @@ our $unit;
 
     sub close { }
 
+    sub for_body { $_[0] }
+
     no Moose;
     __PACKAGE__->meta->make_immutable;
 }
@@ -200,6 +202,68 @@ our $unit;
     }
 
     sub _defsuper { 'Any' } #XXX CORE::Any
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+# a ::Role is poked in where it matters; the Role holds a ref to the
+# ConcreteRole for the zero-argument candidate (if there is one) and
+# also refs to CandidateRole objects.  body_of pointers always go to
+# a ConcreteRole or a CandidateRole.
+{
+    package Metamodel::ConcreteRole;
+    use Moose;
+    extends 'Metamodel::Package';
+
+    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+        default => sub { [] });
+    has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
+        default => sub { [] });
+    has superclasses => (isa => 'ArrayRef', is => 'ro',
+        default => sub { [] });
+    has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
+        is => 'ro', lazy => 1, default => sub { +{} });
+
+    sub add_attribute {
+        my ($self, $name) = @_;
+        push @{ $self->attributes }, $name;
+    }
+
+    sub add_method {
+        my ($self, $type, $name, $body) = @_;
+        push @{ $self->methods }, Metamodel::Method->new(name => $name,
+            body => $body, private => ($type eq '!'));
+    }
+
+    sub push_multi_regex {
+        my ($self, $name, $body) = @_;
+        push @{ $self->multi_regex_lists->{$name} //= [] }, $body;
+    }
+
+    sub add_super {
+        my ($self, $targ) = @_;
+        Carp::confess "bad attempt to add null super" unless $targ;
+        push @{ $self->superclasses }, $targ;
+    }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package Metamodel::Role;
+    use Moose;
+    extends 'Metamodel::Module';
+
+    has concrete => (isa => 'ArrayRef', is => 'rw');
+
+    sub for_body {
+        my $self = shift;
+        $self->concrete or $self->concrete($unit->make_ref(
+                Metamodel::ConcreteRole->new(name => $self->name)));
+        $unit->deref($self->concrete);
+    }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -921,6 +985,10 @@ sub Op::PackageDef::begin {
     my $pclass = ref($self);
     $pclass =~ s/Op::(.*)Def/Metamodel::$1/;
 
+    # the handling of roles is a bit wrong here.  roles need to be treated as
+    # multis of a sort, so role Foo[::X] { }; role Foo[::X,::Y] { } in the same
+    # scope will merge.
+
     my @ns = $self->ourpkg ?
         (@{ $opensubs[-1]->find_pkg($self->ourpkg) }, $self->var) :
         ($unit->anon_stash);
@@ -930,7 +998,8 @@ sub Op::PackageDef::begin {
     $opensubs[-1]->add_pkg_exports($unit, $self->var, [ @ns, $n ], $self->exports);
     if (!$self->stub) {
         my $obj  = $unit->make_ref($pclass->new(name => $self->name));
-        my $body = $self->body->begin(body_of => $obj, cur_pkg => [ @ns, $n ],
+        my $bobj = $unit->make_ref($unit->deref($obj)->for_body);
+        my $body = $self->body->begin(body_of => $bobj, cur_pkg => [ @ns, $n ],
             once => 1);
         $unit->deref($obj)->close;
         $unit->get_stash(@ns)->bind_name($n, $obj);

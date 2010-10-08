@@ -661,6 +661,15 @@ use CgOp;
 }
 
 {
+    package Op::RoleDef;
+    use Moose;
+    extends 'Op::ModuleDef';
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::ClassDef;
     use Moose;
     extends 'Op::ModuleDef';
