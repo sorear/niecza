@@ -2172,6 +2172,8 @@ sub package_def { my ($cl, $M) = @_;
             name => $name);
         $M->{_ast} = $optype->new(
             node($M),
+            ($blocktype eq 'role' ?
+                (signature => $M->{signature}[0]{_ast}) : ()),
             name    => $name,
             var     => $outervar,
             exports => \@export,

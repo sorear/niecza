@@ -173,7 +173,8 @@ my %loopbacks = (
 );
 
 sub pkg0 {
-    return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role');
+    return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role')
+        || $_->isa('Metamodel::ParametricRole');
     my $p   = $_->{peer}{mo} = gsym($cl_ty, $_->name);
     my $whv = $_->{peer}{what_var} = gsym('Variable', $_->name . '_WHAT');
     my $wh6 = $_->{peer}{what_ip6} = gsym('IP6', $_->name . '_WHAT');
@@ -181,8 +182,11 @@ sub pkg0 {
 }
 
 sub pkg2 {
-    goto &pkg2_class if $_->isa('Metamodel::Class');
-    goto &pkg2_role  if $_->isa('Metamodel::Role');
+    return unless $_->{peer};
+    @_ = ($_->{peer}{mo}, $_->{peer}{what_ip6}, $_->{peer}{what_var});
+    &pkg2_class if $_->isa('Metamodel::Class');
+    &pkg2_role  if $_->isa('Metamodel::Role');
+    &pkg2_prole if $_->isa('Metamodel::ParametricRole');
 }
 
 sub create_type_object {
@@ -200,9 +204,7 @@ sub create_type_object {
 }
 
 sub pkg2_role {
-    my $p   = $_->{peer}{mo};
-    my $whv = $_->{peer}{what_var};
-    my $wh6 = $_->{peer}{what_ip6};
+    my ($p, $wh6, $whv) = @_;
     push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
             CgOp::clr_string($_->name)));
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'FillRole',
@@ -216,10 +218,16 @@ sub pkg2_role {
     create_type_object($_->{peer});
 }
 
+sub pkg2_prole {
+    my ($p, $wh6, $whv) = @_;
+    push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
+            CgOp::clr_string($_->name)));
+
+    create_type_object($_->{peer});
+}
+
 sub pkg2_class {
-    my $p   = $_->{peer}{mo};
-    my $whv = $_->{peer}{what_var};
-    my $wh6 = $_->{peer}{what_ip6};
+    my ($p, $wh6, $whv) = @_;
     if ($unit->is_true_setting && ($_->name eq 'Scalar' ||
             $_->name eq 'Sub' || $_->name eq 'Stash')) {
         push @thaw, CgOp::rawsset($p,
@@ -404,6 +412,39 @@ sub codegen_sub {
     if ($_->gather_hack) {
         $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop($_)),
             CgOp::rawscall('Kernel.Take', CgOp::scopedlex('EMPTY')));
+    } elsif ($_->parametric_role_hack) {
+        my $obj = $unit->deref($_->parametric_role_hack);
+        my @build;
+        push @build, CgOp::rawcall(CgOp::letvar('!mo'), "FillRole",
+            CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
+                @{ $obj->attributes }),
+            CgOp::rawnewarr('clr:DynMetaObject',
+                map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
+                @{ $obj->superclasses }),
+            CgOp::rawnewarr('clr:DynMetaObject'));
+        for my $m (@{ $obj->methods }) {
+            push @build, CgOp::rawcall(CgOp::letvar('!mo'),
+                ($m->[2] ? 'AddPrivateMethod' : 'AddMethod'),
+                CgOp::clr_string($m->[0]),
+                CgOp::fetch(CgOp::scopedlex($m->[1])));
+        }
+        for my $k (sort keys %{ $obj->multi_regex_lists }) {
+            for my $b (@{ $obj->multi_regex_lists->{$k} }) {
+                push @build, CgOp::rawcall(CgOp::letvar('!mo'),
+                    'AddMultiRegex', CgOp::clr_string($k),
+                    CgOp::fetch(CgOp::scopedlex($b)));
+            }
+        }
+        $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop($_)),
+            CgOp::letn("!mo", CgOp::rawnew('clr:DynMetaObject',
+                    CgOp::clr_string($obj->name)),
+                "!to", CgOp::rawnew('clr:DynObject', CgOp::letvar('!mo')),
+                @build,
+                CgOp::setfield('slots', CgOp::letvar('!to'),
+                    CgOp::null('clr:object[]')),
+                CgOp::setfield('typeObject', CgOp::letvar('!mo'),
+                    CgOp::letvar('!to')),
+                CgOp::return(CgOp::newscalar(CgOp::letvar('!to')))));
     } elsif ($_->returnable && defined($_->signature)) {
         $ops = CgOp::prog(@enter,
             CgOp::return(CgOp::span("rstart", "rend",
@@ -505,6 +546,11 @@ sub sub2 {
         push @thaw, CgOp::rawsset($ps, CgOp::rawscall('Kernel.MakeSub',
                 CgOp::rawsget($si), !$_->outer ? CgOp::null('clr:Frame') :
                     CgOp::rawsget($_->outer->{peer}{pp})));
+        if ($_->parametric_role_hack) {
+            push @thaw, CgOp::rawcall(
+                CgOp::rawsget($unit->deref($_->parametric_role_hack)
+                    ->{peer}{mo}), "FillParametricRole", CgOp::rawsget($ps));
+        }
     }
 }
 

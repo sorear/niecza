@@ -99,7 +99,7 @@ our $unit;
     }
 
     sub add_method {
-        my ($self, $name, $body) = @_;
+        my ($self, $type, $name, $var, $body) = @_;
         die "method $name defined in a lowly package";
     }
 
@@ -145,13 +145,13 @@ our $unit;
     }
 
     sub add_method {
-        my ($self, $type, $name, $body) = @_;
+        my ($self, $type, $name, $var, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
             body => $body, private => ($type eq '!'));
     }
 
     sub push_multi_regex {
-        my ($self, $name, $body) = @_;
+        my ($self, $name, $var, $body) = @_;
         push @{ $self->multi_regex_lists->{$name} //= [] }, $body;
     }
 
@@ -230,13 +230,13 @@ our $unit;
     }
 
     sub add_method {
-        my ($self, $type, $name, $body) = @_;
+        my ($self, $type, $name, $var, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
             body => $body, private => ($type eq '!'));
     }
 
     sub push_multi_regex {
-        my ($self, $name, $body) = @_;
+        my ($self, $name, $var, $body) = @_;
         push @{ $self->multi_regex_lists->{$name} //= [] }, $body;
     }
 
@@ -245,6 +245,47 @@ our $unit;
         Carp::confess "bad attempt to add null super" unless $targ;
         push @{ $self->superclasses }, $targ;
     }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package Metamodel::ParametricRole;
+    use Moose;
+    extends 'Metamodel::Module';
+
+    has builder => (isa => 'ArrayRef', is => 'rw');
+    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+        default => sub { [] });
+    has methods => (isa => 'ArrayRef', is => 'ro',
+        default => sub { [] });
+    has superclasses => (isa => 'ArrayRef', is => 'ro',
+        default => sub { [] });
+    has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
+        is => 'ro', lazy => 1, default => sub { +{} });
+
+    sub add_attribute {
+        my ($self, $name) = @_;
+        push @{ $self->attributes }, $name;
+    }
+
+    sub add_method {
+        my ($self, $type, $name, $var, $body) = @_;
+        push @{ $self->methods }, [ $name, $var, ($type eq '!') ];
+    }
+
+    sub push_multi_regex {
+        my ($self, $name, $var, $body) = @_;
+        push @{ $self->multi_regex_lists->{$name} //= [] }, $var;
+    }
+
+    sub add_super {
+        my ($self, $targ) = @_;
+        Carp::confess "bad attempt to add null super" unless $targ;
+        push @{ $self->superclasses }, $targ;
+    }
+
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -388,6 +429,8 @@ our $unit;
 
     # inject a take EMPTY
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
+    # inject a role constructor
+    has parametric_role_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has in_class => (isa => 'Maybe[ArrayRef]', is => 'ro');
@@ -890,9 +933,9 @@ sub Op::Attribute::begin {
     $nb->strong_used(1);
     $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
     my $r = $unit->make_ref($nb);
-    $ns->add_method('!', $self->name, $r);
+    $ns->add_method('!', $self->name, $self->name . '!a', $r);
     if ($self->accessor) {
-        $ns->add_method('', $self->name, $unit->make_ref($nb));
+        $ns->add_method('', $self->name, $self->name . '!a', $r);
     }
 }
 
@@ -920,12 +963,12 @@ sub Op::SubDef::begin {
 
     if (defined($self->method_too)) {
         $unit->deref($opensubs[-1]->body_of)
-            ->add_method(@{ $self->method_too }, $r);
+            ->add_method(@{ $self->method_too }, $self->var, $r);
     }
 
     if (defined($self->proto_too)) {
         $unit->deref($opensubs[-1]->body_of)
-            ->push_multi_regex($self->proto_too, $r);
+            ->push_multi_regex($self->proto_too, $self->var, $r);
     }
 
     $opensubs[-1]->add_exports($unit, $self->var, $r, $self->exports);
@@ -966,6 +1009,11 @@ sub Op::PackageDef::begin {
     my $pclass = ref($self);
     $pclass =~ s/Op::(.*)Def/Metamodel::$1/;
 
+    if ($pclass eq 'Metamodel::Role' && $self->signature) {
+        $pclass = 'Metamodel::ParametricRole';
+        $self->body->signature($self->signature);
+    }
+
     my @ns = $self->ourpkg ?
         (@{ $opensubs[-1]->find_pkg($self->ourpkg) }, $self->var) :
         ($unit->anon_stash);
@@ -976,10 +1024,16 @@ sub Op::PackageDef::begin {
     if (!$self->stub) {
         my $obj  = $unit->make_ref($pclass->new(name => $self->name));
         my $body = $self->body->begin(body_of => $obj, cur_pkg => [ @ns, $n ],
-            once => 1);
+            once => ($pclass ne 'Metamodel::ParametricRole'));
         $unit->deref($obj)->close;
         $unit->get_stash(@ns)->bind_name($n, $obj);
         $opensubs[-1]->add_exports($unit, $self->var, $obj, $self->exports);
+
+        if ($pclass eq 'Metamodel::ParametricRole') {
+            $unit->deref($obj)->builder($unit->make_ref($body));
+            $body->parametric_role_hack($obj);
+            $body->create_static_pad;
+        }
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);
     }
 

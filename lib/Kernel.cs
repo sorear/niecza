@@ -375,6 +375,7 @@ namespace Niecza {
         public string name;
 
         public bool isRole;
+        public IP6 roleFactory;
         // role type objects have an empty MRO cache so no methods can be
         // called against them; the fallback (NYI) is to pun.
 
@@ -556,6 +557,13 @@ namespace Niecza {
             this.local_does = cronies;
             this.isRole = true;
             Revalidate(); // need to call directly as we aren't in any mro list
+            SetMRO(Kernel.AnyMO.mro);
+        }
+
+        public void FillParametricRole(IP6 factory) {
+            this.isRole = true;
+            this.roleFactory = factory;
+            Revalidate();
             SetMRO(Kernel.AnyMO.mro);
         }
     }

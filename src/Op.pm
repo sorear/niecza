@@ -665,6 +665,17 @@ use CgOp;
     use Moose;
     extends 'Op::ModuleDef';
 
+    has signature => (isa => 'Sig', is => 'ro');
+
+    sub code {
+        my ($self, $body) = @_;
+        if ($self->signature) {
+            CgOp::scopedlex($self->var);
+        } else {
+            $self->SUPER::code($body);
+        }
+    }
+
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
