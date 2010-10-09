@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 533;
+plan 531;
 
 ok 1, "one is true";
 ok 2, "two is also true";

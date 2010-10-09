@@ -137,7 +137,7 @@ use warnings;
     sub obj_is_defined { rawcall($_[0], 'IsDefined') }
     sub obj_typename { rawcall($_[0], 'GetTypeName') }
     sub obj_what { rawcall($_[0], 'GetTypeObject') }
-    sub obj_llhow { rawcall($_[0], 'GetMO') }
+    sub obj_llhow { getfield('mo', $_[0]) }
     sub obj_isa { rawcall($_[0], 'Isa', $_[1]) }
     sub obj_does { rawcall($_[0], 'Does', $_[1]) }
 

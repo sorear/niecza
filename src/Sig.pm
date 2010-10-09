@@ -22,7 +22,7 @@ use 5.010;
 
     sub slurpy_get {
         my ($self) = @_;
-        CgOp::let(CgOp::rawnew('clr:DynObject', CgOp::getfield('klass',
+        CgOp::let(CgOp::rawnew('clr:DynObject', CgOp::getfield('mo',
                     CgOp::cast('clr:DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
             my $do = shift;
             CgOp::prog(

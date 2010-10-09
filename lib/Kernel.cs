@@ -17,7 +17,7 @@ namespace Niecza {
     public delegate Frame DynBlockDelegate(Frame frame);
 
     public abstract class IP6 {
-        public abstract DynMetaObject GetMO();
+        public DynMetaObject mo;
 
         public virtual object GetSlot(string name) {
             throw new InvalidOperationException("no slots in this repr");
@@ -28,11 +28,16 @@ namespace Niecza {
         }
 
         protected Frame Fail(Frame caller, string msg) {
-            return Kernel.Die(caller, msg + " in class " + GetMO().name);
+            return Kernel.Die(caller, msg + " in class " + mo.name);
         }
 
         // Most reprs won't have a concept of type objects
         public virtual bool IsDefined() { return true; }
+
+        public Frame HOW(Frame caller) {
+            caller.resultSlot = mo.how;
+            return caller;
+        }
 
         // include the invocant in the positionals!  it will not usually be
         // this, rather a container of this
@@ -40,36 +45,31 @@ namespace Niecza {
                 Variable[] pos, Dictionary<string, Variable> named) {
             IP6 m;
             //Kernel.LogNameLookup(name);
-            if (GetMO().mro_methods.TryGetValue(name, out m)) {
+            if (mo.mro_methods.TryGetValue(name, out m)) {
                 return m.Invoke(caller, pos, named);
             }
             return Fail(caller, "Unable to resolve method " + name);
         }
 
-        public virtual Frame HOW(Frame caller) {
-            caller.resultSlot = GetMO().how;
-            return caller;
+        public IP6 GetTypeObject() {
+            return mo.typeObject;
         }
 
-        public virtual IP6 GetTypeObject() {
-            return GetMO().typeObject;
+        public string GetTypeName() {
+            return mo.name;
         }
 
-        public virtual string GetTypeName() {
-            return GetMO().name;
+        public bool Isa(DynMetaObject mo) {
+            return this.mo.HasMRO(mo);
         }
 
-        public virtual bool Isa(DynMetaObject mo) {
-            return GetMO().HasMRO(mo);
+        public bool Does(DynMetaObject mo) {
+            return this.mo.HasMRO(mo);
         }
 
-        public virtual bool Does(DynMetaObject mo) {
-            return GetMO().HasMRO(mo);
-        }
-
-        public virtual Frame Invoke(Frame c, Variable[] p,
+        public Frame Invoke(Frame c, Variable[] p,
                 Dictionary<string, Variable> n) {
-            DynMetaObject.InvokeHandler ih = GetMO().mro_OnInvoke;
+            DynMetaObject.InvokeHandler ih = mo.mro_OnInvoke;
             if (ih != null) {
                 return ih(this, c, p, n);
             } else {
@@ -85,7 +85,7 @@ namespace Niecza {
     // except the targets of := and ::=.
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public abstract class Variable : IP6 {
+    public abstract class Variable {
         public IP6 whence;
 
         // these should be treated as ro for the life of the variable
@@ -99,8 +99,6 @@ namespace Niecza {
         public abstract IP6  GetVar();
 
         public static readonly Variable[] None = new Variable[0];
-
-        public override DynMetaObject GetMO() { return null; }
     }
 
     public sealed class SimpleVariable: Variable {
@@ -117,13 +115,16 @@ namespace Niecza {
                 throw new NieczaException("Writing to readonly scalar");
             }
             if (!v.Isa(type)) {
-                throw new NieczaException("Nominal type check failed for scalar store; got " + v.GetMO().name + ", needed " + type.name + " or subtype");
+                throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
             }
             val = v;
         }
-        public override IP6  GetVar()      { return this; }
 
-        public override DynMetaObject GetMO() { return Kernel.ScalarMO; }
+        public override IP6  GetVar()      {
+            DynObject d = new DynObject(Kernel.ScalarMO);
+            d.slots[0] = this;
+            return d;
+        }
     }
 
     // Used to make Variable sharing explicit in some cases; will eventually be
@@ -259,9 +260,10 @@ namespace Niecza {
             outer = outer_;
             code = info_.code;
             info = info_;
+            mo = Kernel.CallFrameMO;
         }
 
-        public Frame() {}
+        public Frame() { mo = Kernel.CallFrameMO; }
 
         public Frame MakeChild(Frame outer, SubInfo info) {
             if (reusable_child == null) {
@@ -312,8 +314,6 @@ namespace Niecza {
             for (Frame x = this; x != null; x = x.caller)
                 x.MarkShared();
         }
-
-        public override DynMetaObject GetMO() { return Kernel.CallFrameMO; }
 
         public int ExecutingLine() {
             if (info != null && info.lines != null) {
@@ -574,25 +574,22 @@ namespace Niecza {
         // the slots have to support non-containerized values, because
         // containers are objects now
         public object[] slots;
-        public DynMetaObject klass;
 
         public DynObject(DynMetaObject klass) {
-            this.klass = klass;
+            this.mo = klass;
             this.slots = new object[klass.nslots];
         }
 
-        public override DynMetaObject GetMO() { return klass; }
-
         public override void SetSlot(string name, object obj) {
-            slots[klass.FindSlot(name)] = obj;
+            slots[mo.FindSlot(name)] = obj;
         }
 
         public override object GetSlot(string name) {
-            return slots[klass.FindSlot(name)];
+            return slots[mo.FindSlot(name)];
         }
 
         public override bool IsDefined() {
-            return this != klass.typeObject;
+            return this != mo.typeObject;
         }
     }
 
@@ -659,7 +656,7 @@ namespace Niecza {
         }
 
         public static Frame Die(Frame caller, string msg) {
-            DynObject n = new DynObject(((DynObject)StrP).klass);
+            DynObject n = new DynObject(((DynObject)StrP).mo);
             n.slots[0] = msg;
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
                     NewROScalar(n));
@@ -697,7 +694,7 @@ namespace Niecza {
         }
 
         public static DynObject MockBox(object v) {
-            DynObject n = new DynObject(StrP.GetMO());
+            DynObject n = new DynObject(StrP.mo);
             n.slots[0] = v;
             return n;
         }
@@ -705,7 +702,7 @@ namespace Niecza {
         public static Variable BoxAny(object v, IP6 proto) {
             if (v == null)
                 return NewROScalar(proto);
-            DynObject n = new DynObject(((DynObject)proto).klass);
+            DynObject n = new DynObject(((DynObject)proto).mo);
             n.slots[0] = v;
             return NewROScalar(n);
         }
@@ -749,8 +746,8 @@ namespace Niecza {
             if (!rhs.rw) {
                 IP6 v = rhs.Fetch();
                 if (!v.Isa(type))
-                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.GetMO().name + ", needed " + type.name);
-                th.resultSlot = new SimpleVariable(false, islist, v.GetMO(), null, v);
+                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
+                th.resultSlot = new SimpleVariable(false, islist, v.mo, null, v);
                 return th;
             }
             // ro = true and rhw.rw = true OR
@@ -758,8 +755,8 @@ namespace Niecza {
             if (ro) {
                 IP6 v = rhs.Fetch();
                 if (!v.Isa(type))
-                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.GetMO().name + ", needed " + type.name);
-                th.resultSlot = new SimpleVariable(false, islist, v.GetMO(), null, rhs.Fetch());
+                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
+                th.resultSlot = new SimpleVariable(false, islist, v.mo, null, rhs.Fetch());
                 return th;
             }
 
@@ -814,7 +811,7 @@ namespace Niecza {
 
         // ro, not rebindable
         public static Variable NewROScalar(IP6 obj) {
-            return new SimpleVariable(false, false, obj.GetMO(), null, obj);
+            return new SimpleVariable(false, false, obj.mo, null, obj);
         }
 
         public static Variable NewRWScalar(DynMetaObject t, IP6 obj) {
@@ -822,7 +819,7 @@ namespace Niecza {
         }
 
         public static Variable NewRWListVar(IP6 container) {
-            return new SimpleVariable(false, true, container.GetMO(), null,
+            return new SimpleVariable(false, true, container.mo, null,
                     container);
         }
 
@@ -859,8 +856,8 @@ namespace Niecza {
         }
 
         public static Variable DefaultNew(IP6 proto) {
-            DynObject n = new DynObject(((DynObject)proto).klass);
-            DynMetaObject[] mro = n.klass.mro;
+            DynObject n = new DynObject(((DynObject)proto).mo);
+            DynMetaObject[] mro = n.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
                 foreach (string s in mro[i].local_attr) {
@@ -874,7 +871,7 @@ namespace Niecza {
         public static Frame GetFirst(Frame th, IP6 lst) {
             DynObject dyl = lst as DynObject;
             if (dyl == null) goto slow;
-            if (dyl.klass != RxFrame.ListMO) goto slow;
+            if (dyl.mo != RxFrame.ListMO) goto slow;
             VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
             if (itemsl.Count() == 0) goto slow;
             th.resultSlot = itemsl[0];

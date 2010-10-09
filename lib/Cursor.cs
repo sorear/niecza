@@ -86,7 +86,7 @@ public sealed class RxFrame {
         end = orig.Length;
         rootf = bt = csr.xact;
         st.ns = new NState(rootf, "RULE " + name, csr.nstate);
-        st.ns.klass = csr.klass;
+        st.ns.klass = csr.mo;
         st.pos = csr.pos;
         from = csr.pos;
     }
@@ -320,7 +320,6 @@ public class Cursor : IP6 {
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
 
     // common fields
-    public DynMetaObject klass; // could be Cursor-only, or combined with nstate
     public string backing;
     public char[] backing_ca;
     public int pos;
@@ -332,18 +331,18 @@ public class Cursor : IP6 {
     public CapInfo captures;
 
     public Cursor(IP6 proto, string text)
-        : this(proto.GetMO(), null, null, text, text.ToCharArray(), 0) { }
+        : this(proto.mo, null, null, text, text.ToCharArray(), 0) { }
 
     public Cursor(string backing, int from, int pos, CapInfo captures) {
         this.backing = backing;
         this.captures = captures;
         this.pos = pos;
         this.from = from;
-        this.klass = RxFrame.MatchMO;
+        this.mo = RxFrame.MatchMO;
     }
 
     public Cursor(DynMetaObject klass, NState ns, Choice xact, string backing, char[] backing_ca, int pos) {
-        this.klass = klass;
+        this.mo = klass;
         this.xact = xact;
         this.nstate = ns;
         this.backing = backing;
@@ -351,14 +350,12 @@ public class Cursor : IP6 {
         this.pos = pos;
     }
 
-    public override DynMetaObject GetMO() { return klass; }
-
     public override bool IsDefined() {
         return true;
     }
 
     public Cursor At(int npos) {
-        return new Cursor(klass, nstate, xact, backing, backing_ca, npos);
+        return new Cursor(mo, nstate, xact, backing, backing_ca, npos);
     }
 
     // TODO: keep variables around so { $<foo> = 1 } will work
@@ -1075,7 +1072,7 @@ public class Lexer {
     }
 
     public static IP6[] RunProtoregex(IP6 cursor, string name) {
-        DynMetaObject kl = cursor.GetMO();
+        DynMetaObject kl = cursor.mo;
         LexerCache lc = kl.GetLexerCache();
         DynObject[] candidates = ResolveProtoregex(kl, name);
         Lexer l;
@@ -1086,7 +1083,7 @@ public class Lexer {
             LAD[] branches = new LAD[candidates.Length];
             for (int i = 0; i < candidates.Length; i++)
                 branches[i] = ((SubInfo) candidates[i].GetSlot("info")).ltm;
-            lc.protorx_nfa[name] = l = new Lexer(cursor.GetMO(), name, branches);
+            lc.protorx_nfa[name] = l = new Lexer(cursor.mo, name, branches);
         } else {
             if (LtmTrace)
                 Console.WriteLine("+ Protoregex lexer HIT on {0}.{1}",

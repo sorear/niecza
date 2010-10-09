@@ -14,12 +14,11 @@ my %typedata = (
           SetSlot      => [m => 'Void'],
           GetTypeName  => [m => 'String'],
           GetTypeObject=> [m => 'IP6'],
-          GetMO        => [m => 'DynMetaObject'],
           IsDefined    => [m => 'Boolean'],
+          mo           => [f => 'DynMetaObject'],
           HOW          => [c => 'IP6'] },
     DynObject =>
-        { klass        => [f => 'DynMetaObject'],
-          slots        => [f => 'Dictionary<string,Object>'] },
+        { slots        => [f => 'Dictionary<string,Object>'] },
 
     DynMetaObject =>
         { FillClass    => [m => 'Void'],
