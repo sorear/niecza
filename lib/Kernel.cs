@@ -374,6 +374,10 @@ namespace Niecza {
         public IP6 typeObject;
         public string name;
 
+        public bool isRole;
+        // role type objects have an empty MRO cache so no methods can be
+        // called against them; the fallback (NYI) is to pun.
+
         public LexerCache lexcache;
         public LexerCache GetLexerCache() {
             if (lexcache == null)
@@ -388,6 +392,8 @@ namespace Niecza {
 
         public InvokeHandler mro_OnInvoke;
         public Dictionary<string, IP6> mro_methods;
+
+        public DynMetaObject[] local_does;
 
         public List<DynMetaObject> superclasses
             = new List<DynMetaObject>();
@@ -427,6 +433,8 @@ namespace Niecza {
             mro_methods = new Dictionary<string,IP6>();
 
             if (mro == null)
+                return;
+            if (isRole)
                 return;
 
             for (int kx = mro.Length - 1; kx >= 0; kx--) {
@@ -531,6 +539,7 @@ namespace Niecza {
             this.superclasses = new List<DynMetaObject>(superclasses);
             SetMRO(mro);
             this.local_attr = new List<string>(local_attr);
+            this.local_does = new DynMetaObject[0];
 
             nslots = 0;
             foreach (string an in all_attr) {
@@ -538,6 +547,16 @@ namespace Niecza {
             }
 
             Invalidate();
+        }
+
+        public void FillRole(string[] attr, DynMetaObject[] superclasses,
+                DynMetaObject[] cronies) {
+            this.superclasses = new List<DynMetaObject>(superclasses);
+            this.local_attr = new List<string>(attr);
+            this.local_does = cronies;
+            this.isRole = true;
+            Revalidate(); // need to call directly as we aren't in any mro list
+            SetMRO(Kernel.AnyMO.mro);
         }
     }
 

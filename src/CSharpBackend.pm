@@ -173,7 +173,7 @@ my %loopbacks = (
 );
 
 sub pkg0 {
-    return unless $_->isa('Metamodel::Class');
+    return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role');
     my $p   = $_->{peer}{mo} = gsym($cl_ty, $_->name);
     my $whv = $_->{peer}{what_var} = gsym('Variable', $_->name . '_WHAT');
     my $wh6 = $_->{peer}{what_ip6} = gsym('IP6', $_->name . '_WHAT');
@@ -181,7 +181,42 @@ sub pkg0 {
 }
 
 sub pkg2 {
-    return unless $_->isa('Metamodel::Class');
+    goto &pkg2_class if $_->isa('Metamodel::Class');
+    goto &pkg2_role  if $_->isa('Metamodel::Role');
+}
+
+sub create_type_object {
+    my $peer = shift;
+
+    push @thaw, CgOp::rawsset($peer->{what_ip6},
+        CgOp::rawnew('clr:DynObject', CgOp::rawsget($peer->{mo})));
+    push @thaw, CgOp::setfield('slots',
+        CgOp::cast('clr:DynObject', CgOp::rawsget($peer->{what_ip6})),
+        CgOp::null('clr:object[]'));
+    push @thaw, CgOp::setfield('typeObject', CgOp::rawsget($peer->{mo}),
+        CgOp::rawsget($peer->{what_ip6}));
+    push @thaw, CgOp::rawsset($peer->{what_var},
+        CgOp::newscalar(CgOp::rawsget($peer->{what_ip6})));
+}
+
+sub pkg2_role {
+    my $p   = $_->{peer}{mo};
+    my $whv = $_->{peer}{what_var};
+    my $wh6 = $_->{peer}{what_ip6};
+    push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
+            CgOp::clr_string($_->name)));
+    push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'FillRole',
+        CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
+            @{ $_->attributes }),
+        CgOp::rawnewarr('clr:DynMetaObject',
+            map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
+                @{ $_->superclasses }),
+        CgOp::rawnewarr('clr:DynMetaObject'));
+
+    create_type_object($_->{peer});
+}
+
+sub pkg2_class {
     my $p   = $_->{peer}{mo};
     my $whv = $_->{peer}{what_var};
     my $wh6 = $_->{peer}{what_ip6};
@@ -208,10 +243,8 @@ sub pkg2 {
         CgOp::rawnewarr('clr:DynMetaObject',
             map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
                 @{ $_->linearized_mro }));
-    push @thaw, CgOp::rawsset($wh6, CgOp::rawnew('clr:DynObject', CgOp::rawsget($p)));
-    push @thaw, CgOp::setfield('slots', CgOp::cast('clr:DynObject', CgOp::rawsget($wh6)), CgOp::null('clr:object[]'));
-    push @thaw, CgOp::setfield('typeObject', CgOp::rawsget($p), CgOp::rawsget($wh6));
-    push @thaw, CgOp::rawsset($whv, CgOp::newscalar(CgOp::rawsget($wh6)));
+
+    create_type_object($_->{peer});
 
     push @thaw, CgOp::rawsset($loopbacks{'P' . $_->name}, CgOp::rawsget($wh6))
         if $loopbacks{'P' . $_->name};
@@ -221,7 +254,7 @@ sub pkg2 {
 }
 
 sub pkg3 {
-    return unless $_->isa('Metamodel::Class');
+    return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role');
     my $p   = $_->{peer}{mo};
     for my $m (@{ $_->methods }) {
         push @thaw, CgOp::rawcall(CgOp::rawsget($p),

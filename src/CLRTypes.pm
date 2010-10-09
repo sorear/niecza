@@ -23,6 +23,7 @@ my %typedata = (
 
     DynMetaObject =>
         { FillClass    => [m => 'Void'],
+          FillRole     => [m => 'Void'],
           HasMRO       => [m => 'Boolean'],
           AddMultiRegex=> [m => 'Void'],
           AddMethod    => [m => 'Void'],
