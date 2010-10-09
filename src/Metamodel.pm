@@ -33,6 +33,7 @@ use Scalar::Util 'blessed';
 # these should only be used during the Op walk
 our @opensubs;
 our $unit;
+our %units;
 
 # A stash is an object like Foo::.  Foo and Foo:: are closely related, but
 # generally must be accessed separately due to constants (which have Foo but
@@ -83,10 +84,25 @@ our $unit;
 }
 
 {
-    package Metamodel::Package;
+    package Metamodel::RefTarget;
     use Moose;
 
-    has xid => (isa => 'Int', is => 'rw');
+    has xref => (isa => 'ArrayRef', is => 'rw');
+
+    sub BUILD {
+        $_[0]->xref([ $unit->name, scalar(@{ $unit->xref }) ]);
+        push @{ $unit->xref }, $_[0];
+    }
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package Metamodel::Package;
+    use Moose;
+    extends 'Metamodel::RefTarget';
+
     # an intrinsic name, even if anonymous
     has name => (isa => 'Str', is => 'ro', default => 'ANON');
     has unit_closed => (isa => 'Bool', is => 'rw');
@@ -170,7 +186,7 @@ our $unit;
         }
 
         my @merge;
-        push @merge, [ $unit->make_ref($self), @{ $self->superclasses } ];
+        push @merge, [ $self->xref, @{ $self->superclasses } ];
         for (@{ $self->superclasses }) {
             push @merge, [ @{ $unit->deref($_)->linearized_mro } ];
         }
@@ -415,9 +431,9 @@ our $unit;
 {
     package Metamodel::StaticSub;
     use Moose;
+    extends 'Metamodel::RefTarget';
 
     has unit => (isa => 'Metamodel::Unit', is => 'ro', weak_ref => 1);
-    has xid => (isa => 'Int', is => 'rw');
     has outer => (is => 'bare');
     has run_once => (isa => 'Bool', is => 'ro', default => 0);
     has spad_exists => (isa => 'Bool', is => 'rw', default => 0);
@@ -584,8 +600,7 @@ our $unit;
 
     sub get_unit {
         my ($self, $name) = @_;
-        if ($name eq $self->name) { return $self }
-        $self->tdeps->{$name};
+        $units{$name};
     }
 
     sub anon_stash {
@@ -626,17 +641,6 @@ our $unit;
             }
         }
         $ptr;
-    }
-
-    sub make_ref {
-        my ($self, $thing) = @_;
-        my $xid;
-        Carp::confess "trying to make_ref null" unless $thing;
-        if (!defined ($xid = $thing->xid)) {
-            $thing->xid($xid = scalar @{ $self->xref });
-            push @{ $self->xref }, $thing;
-        }
-        return [ $self->name, $xid ];
     }
 
     sub deref {
@@ -706,9 +710,11 @@ our $unit;
     }
 
     sub need_unit {
-        my ($self, $u2) = @_;
-        $self->tdeps->{$u2->name} = $u2;
+        my ($self, $u2name) = @_;
+        my $u2 = $units{$u2name} //= CompilerDriver::metadata_for($u2name);
+        $self->tdeps->{$u2name} = [ $u2->filename, $u2->modtime ];
         for (keys %{ $u2->tdeps }) {
+            $units{$_} //= CompilerDriver::metadata_for($_);
             $self->tdeps->{$_} //= $u2->tdeps->{$_};
         }
         our $rec; local $rec = sub {
@@ -734,6 +740,7 @@ our $unit;
             }
         };
         $rec->();
+        $u2;
     }
 
     no Moose;
@@ -748,7 +755,8 @@ our $unit;
 sub Unit::begin {
     my $self = shift;
     local $unit = Metamodel::Unit->new(name => $self->name,
-        $::SETTING_UNIT ? (setting => $::SETTING_UNIT->name) : ());
+        $::SETTING_UNIT ? (setting => $::SETTING_UNIT) : ());
+    $units{$self->name} = $unit;
 
     $unit->need_unit($::SETTING_UNIT) if $::SETTING_UNIT;
 
@@ -757,7 +765,7 @@ sub Unit::begin {
 
     local @opensubs;
     $unit->mainline($self->mainline->begin(once => 1,
-            top => ($::SETTING_UNIT ? $::SETTING_UNIT->bottom_ref : undef)));
+            top => ($::SETTING_UNIT ? $unit->get_unit($::SETTING_UNIT)->bottom_ref : undef)));
 
     $unit;
 }
@@ -833,7 +841,7 @@ sub Op::begin {
 
 sub Op::YouAreHere::begin {
     my $self = shift;
-    $unit->bottom_ref($unit->make_ref($opensubs[-1]));
+    $unit->bottom_ref($opensubs[-1]->xref);
     $opensubs[-1]->strong_used(1);
     $opensubs[-1]->create_static_pad;
 }
@@ -841,8 +849,7 @@ sub Op::YouAreHere::begin {
 sub Op::Use::begin {
     my $self = shift;
     my $name = $self->unit;
-    my $u2 = CompilerDriver::metadata_for($self->unit);
-    $unit->need_unit($u2);
+    my $u2 = $unit->need_unit($self->unit);
 
     my @can = @{ $u2->mainline->find_pkg(split /::/, $name) };
     my $exp = $unit->get_stash(@can, 'EXPORT', 'DEFAULT');
@@ -932,10 +939,9 @@ sub Op::Attribute::begin {
     $opensubs[-1]->create_static_pad; # for protosub instance
     $nb->strong_used(1);
     $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
-    my $r = $unit->make_ref($nb);
-    $ns->add_method('!', $self->name, $self->name . '!a', $r);
+    $ns->add_method('!', $self->name, $self->name . '!a', $nb->xref);
     if ($self->accessor) {
-        $ns->add_method('', $self->name, $self->name . '!a', $r);
+        $ns->add_method('', $self->name, $self->name . '!a', $nb->xref);
     }
 }
 
@@ -953,10 +959,9 @@ sub Op::SubDef::begin {
     my $self = shift;
     my $body = $self->body->begin(once => $self->once);
     $opensubs[-1]->add_my_sub($self->var, $body);
-    my $r;
+    my $r = $body->xref;
     if (@{ $self->exports } || defined($self->method_too) ||
             defined ($self->proto_too)) {
-        $r = $unit->make_ref($body);
         $body->strong_used(1);
     }
     $opensubs[-1]->create_static_pad if $body->strong_used;
@@ -1022,7 +1027,7 @@ sub Op::PackageDef::begin {
     $opensubs[-1]->add_my_stash($self->var, [ @ns, $n ]);
     $opensubs[-1]->add_pkg_exports($unit, $self->var, [ @ns, $n ], $self->exports);
     if (!$self->stub) {
-        my $obj  = $unit->make_ref($pclass->new(name => $self->name));
+        my $obj  = $pclass->new(name => $self->name)->xref;
         my $body = $self->body->begin(body_of => $obj, cur_pkg => [ @ns, $n ],
             once => ($pclass ne 'Metamodel::ParametricRole'));
         $unit->deref($obj)->close;
@@ -1030,7 +1035,7 @@ sub Op::PackageDef::begin {
         $opensubs[-1]->add_exports($unit, $self->var, $obj, $self->exports);
 
         if ($pclass eq 'Metamodel::ParametricRole') {
-            $unit->deref($obj)->builder($unit->make_ref($body));
+            $unit->deref($obj)->builder($body->xref);
             $body->parametric_role_hack($obj);
             $body->create_static_pad;
         }

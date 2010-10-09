@@ -106,11 +106,12 @@ sub find_module {
 
         REUSE: {
             last REUSE unless -f $symlfile;
-            my $meta = Storable::retrieve($symlfile);
+            my $meta = CompilerDriver::metadata_for($module);
 
-            for my $dmod ($meta->name, keys %{ $meta->tdeps }) {
-                my $dpath = $meta->get_unit($dmod)->filename;
-                my $dtime = $meta->get_unit($dmod)->modtime;
+            for my $dmod ($module, keys %{ $meta->tdeps }) {
+                my $u = CompilerDriver::metadata_for($dmod);
+                my ($dpath, $dtime) = @{ $meta->tdeps->{$dmod} //
+                    [ $meta->filename, $meta->modtime ] };
 
                 my ($npath) = CompilerDriver::find_module($dmod, undef) or do {
                     $self->sorry("Dependancy $dmod of $module cannot be located");
@@ -181,6 +182,7 @@ sub compile {
         }
     }
 
+    local %Metamodel::units;
     local $::stagetime = $args{stagetime};
     local $::SETTING_UNIT;
     local $::niecza_mod_symbols;
@@ -192,7 +194,7 @@ sub compile {
     my ($filename, $modtime);
 
     if ($lang ne 'NULL') {
-        $::SETTING_UNIT = metadata_for($lang);
+        $::SETTING_UNIT = $lang;
     }
 
     if (defined($name)) {
