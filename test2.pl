@@ -1,6 +1,8 @@
 # vim: ft=perl6
 use Test;
 
+ok "abc" ~~ / :dba("foo") abc /, ":dba doesn't affect parsing";
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

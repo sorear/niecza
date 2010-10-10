@@ -754,6 +754,32 @@ sub mod_internal__S_Colonmy { my ($cl, $M) = @_;
     $M->{_ast} = RxOp::Statement->new(stmt => $M->{statement}{_ast} );
 }
 
+sub mod_internal__S_p6adv { my ($cl, $M) = @_;
+    my ($k, $v) = @{ $M->{quotepair} }{"k", "v"};
+
+    if (!ref ($v)) {
+        $M->sorry(":$k requires an expression argument");
+        return:
+    }
+    $v = $v->[0]{_ast};
+
+    if ($k eq 'lang') {
+        $M->{_ast} = RxOp::SetLang->new(expr => $v);
+    } elsif ($k eq 'dba') {
+        UNWRAP: {
+            $v->isa('Op::Paren') && ($v = $v->inside, redo UNWRAP);
+            $v->isa('Op::StatementList') && @{ $v->children } == 1 &&
+                ($v = $v->children->[0], redo UNWRAP);
+        }
+        if (! $v->isa('Op::StringLiteral')) {
+            say (YAML::XS::Dump($v));
+            $M->sorry(":dba requires a literal string");
+            return;
+        }
+        $::RX{dba} = $v->text;
+    }
+}
+
 sub backslash { my ($cl, $M) = @_;
     if ($M->Str =~ /^[A-Z]$/ && $M->{sym} =~ /^[a-z]$/) {
         if (!ref($M->{_ast}) && length($M->{_ast}) != 1) {
