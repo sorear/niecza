@@ -64,6 +64,7 @@ my %typedata = (
         { Exact        => [m => 'Boolean'],
           Exact1       => [m => 'Boolean'],
           GetClass     => [m => 'DynMetaObject'],
+          SetClass     => [m => 'Void'],
           IncQuant     => [m => 'Void'],
           GetQuant     => [m => 'Int32'],
           OpenQuant    => [m => 'Void'],

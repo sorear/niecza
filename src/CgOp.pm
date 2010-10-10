@@ -294,6 +294,7 @@ use warnings;
     sub rxopenquant   { rxcall('OpenQuant') }
     sub rxclosequant  { rxcall('CloseQuant') }
     sub rxincquant    { rxcall('IncQuant') }
+    sub rxsetclass    { rxcall('SetClass', $_[0]) }
     sub rxsetpos      { rxcall('SetPos', $_[0]) }
     sub rxcommitgroup { rxcall('CommitGroup', $_[0]) }
 

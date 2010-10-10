@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 533;
+plan 535;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1083,4 +1083,23 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
 
     is (Bar but Quux).rquux, "quux", "can bind roles to classes";
     is (Bar but OUR::Foo6596["hi"]).rfoo, "hi", "can bind parametric roles to classes";
+}
+
+ok "abc" ~~ / :dba("foo") abc /, ":dba doesn't affect parsing";
+
+{
+    my $log = '';
+    my grammar B {
+        token a { { $log ~= 'A' } }
+        token b { { $log ~= 'B' } }
+        token c { { $log ~= 'C' } }
+    }
+    my grammar A {
+        token a { { $log ~= 'a' } }
+        token b { { $log ~= 'b' } }
+        token c { { $log ~= 'c' } }
+        token TOP { x <.a> [ :lang(B) <.b> ] <.c> x }
+    }
+    A.parse("xx");
+    is $log, 'aBc', ':lang has the expected effect';
 }

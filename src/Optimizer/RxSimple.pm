@@ -147,6 +147,7 @@ sub RxOp::None::mayback { 0 }
 sub RxOp::CClassElem::mayback { 0 }
 sub RxOp::CutLTM::mayback { 0 }
 sub RxOp::CutRule::mayback { 0 }
+sub RxOp::SetLang::mayback { 0 }
 sub RxOp::ZeroWidth::mayback { 0 }
 sub RxOp::Statement::rxsimp { RxOp::Sequence->new(zyg => []) }
 sub RxOp::BeforeString::mayback { 0 }

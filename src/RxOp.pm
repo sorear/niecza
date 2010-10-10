@@ -210,7 +210,7 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    # TODO once :lang is implemented, this will be a bit more complicated
+    # Note that BRACK automatically confines the language change
     sub code {
         my ($self, $body) = @_;
         my @code;
@@ -492,6 +492,29 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::rxcall('CommitRule');
+    }
+
+    sub lad {
+        my ($self) = @_;
+        [ 'Null' ];
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::SetLang;
+    use Moose;
+    extends 'RxOp';
+
+    has expr => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_[0]->expr }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxsetclass(CgOp::obj_llhow(CgOp::fetch(
+                    $self->expr->cgop($body))));
     }
 
     sub lad {

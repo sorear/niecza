@@ -260,6 +260,10 @@ public sealed class RxFrame {
 
     public DynMetaObject GetClass() { return st.ns.klass; }
 
+    public void SetClass(DynMetaObject dm) {
+        st.ns.klass = dm;
+    }
+
     public Cursor MakeCursor() {
         return new Cursor(st.ns.klass, st.ns, bt, orig_s, orig, st.pos);
     }
