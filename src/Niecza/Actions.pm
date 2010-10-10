@@ -1302,7 +1302,7 @@ sub term__S_value { my ($cl, $M) = @_;
 sub term__S_name { my ($cl, $M) = @_;
     my ($id, $path) = @{ $cl->mangle_longname($M->{longname}) }{'name','path'};
 
-    if ($M->{postcircumfix}[0] || $M->{args}) {
+    if ($M->{args}) {
         $M->sorry("Unsupported form of term:name");
         return;
     }
@@ -1312,6 +1312,13 @@ sub term__S_name { my ($cl, $M) = @_;
             slot => $cl->gensym, path => $path);
     } else {
         $M->{_ast} = Op::Lexical->new(node($M), name => $id);
+    }
+
+    if ($M->{postcircumfix}[0]) {
+        # XXX SAFE::
+        $M->{_ast} = Op::CallSub->new(node($M),
+            invocant => Op::Lexical->new(name => '&_param_role_inst'),
+            args => [ $M->{_ast}, @{ $M->{postcircumfix}[0]{_ast}{args} } ]);
     }
 }
 

@@ -376,6 +376,7 @@ namespace Niecza {
 
         public bool isRole;
         public IP6 roleFactory;
+        public Dictionary<string, IP6> instCache;
         // role type objects have an empty MRO cache so no methods can be
         // called against them; the fallback (NYI) is to pun.
 
@@ -563,6 +564,7 @@ namespace Niecza {
         public void FillParametricRole(IP6 factory) {
             this.isRole = true;
             this.roleFactory = factory;
+            this.instCache = new Dictionary<string, IP6>();
             Revalidate();
             SetMRO(Kernel.AnyMO.mro);
         }
@@ -906,6 +908,51 @@ slow:
                 // TODO: @foo, %foo
                 return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
             }
+        }
+
+        private static SubInfo IRSI = new SubInfo("InstantiateRole", IRC);
+        private static Frame IRC(Frame th) {
+            switch (th.ip) {
+                case 0:
+                    {
+                        string s = "";
+                        th.lex0 = th.pos[0].Fetch().mo;
+                        for (int i = 1; i < th.pos.Length; i++) {
+                            string p = (string)UnboxAny(th.pos[i].Fetch());
+                            s += new string((char)p.Length, 1);
+                            s += p;
+                        }
+                        th.lex1 = s;
+                        bool ok;
+                        IP6 r;
+                        lock (th.lex0)
+                            ok = ((DynMetaObject) th.lex0).instCache.
+                                TryGetValue((string) th.lex1, out r);
+                        if (ok) {
+                            th.caller.resultSlot = NewROScalar(r);
+                            return th.caller;
+                        }
+                        th.ip = 1;
+                        Variable[] to_pass = new Variable[th.pos.Length - 1];
+                        Array.Copy(th.pos, 1, to_pass, 0, th.pos.Length - 1);
+                        return ((DynMetaObject) th.lex0).roleFactory.
+                            Invoke(th, to_pass, null);
+                    }
+                case 1:
+                    lock (th.lex0) {
+                        ((DynMetaObject) th.lex0).instCache[(string) th.lex1]
+                            = ((Variable) th.resultSlot).Fetch();
+                    }
+                    th.caller.resultSlot = th.resultSlot;
+                    return th.caller;
+                default:
+                    return Die(th, "Invalid IP");
+            }
+        }
+        public static Frame InstantiateRole(Frame th, Variable[] pcl) {
+            Frame n = th.MakeChild(null, IRSI);
+            n.pos = pcl;
+            return n;
         }
 
         public static Frame StartP6Thread(Frame th, IP6 sub) {

@@ -115,6 +115,7 @@ my %typedata = (
     'Kernel.Take'          => [c => 'Variable'],
     'Kernel.GatherHelper'  => [c => 'Frame'],
     'Kernel.ContextHelper' => [m => 'Variable'],
+    'Kernel.InstantiateRole' => [c => 'Variable'],
     'Kernel.StrP'          => [f => 'IP6'],
     'Kernel.CallFrameMO'   => [f => 'DynMetaObject'],
     'Kernel.Process'       => [f => 'Variable'],

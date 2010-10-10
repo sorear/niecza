@@ -213,6 +213,7 @@ use warnings;
     sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0]) }
     sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
     sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
+    sub instrole       { rawscall('Kernel.InstantiateRole', $_[0]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
