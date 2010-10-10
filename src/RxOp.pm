@@ -29,23 +29,6 @@ use CgOp;
     my $nlabel = 0;
     sub label { "b" . ($nlabel++) }
 
-    sub lad2cgop {
-        my ($l) = @_;
-        my $r = ref $l;
-        if (!$r) {
-            return CgOp::clr_string($l);
-        } elsif ($r eq 'ARRAY') {
-            if (!@$l || ref ($l->[0])) {
-                return CgOp::rawnewarr('clr:LAD', map { lad2cgop($_) } @$l);
-            } else {
-                my ($h,@r) = @$l;
-                return CgOp::rawnew("clr:LAD$h", map { lad2cgop($_) } @r);
-            }
-        } else {
-            return $l;
-        }
-    }
-
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
@@ -110,14 +93,14 @@ use CgOp;
         my $usequant = (defined($max) && $max != 1) || ($min > 1);
         my $userep   = !(defined($max) && $max == 1);
 
-        push @code, CgOp::rxcall('OpenQuant') if $usequant;
+        push @code, CgOp::rxopenquant if $usequant;
         push @code, CgOp::goto($middle) if $min;
         push @code, CgOp::label($repeat) if $userep;
         # min == 0 or quant >= 1
         if ($min > 1) {
             # only allow exiting if min met
             push @code, CgOp::ternary(CgOp::compare('>=',
-                    CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
+                    CgOp::rxgetquant,
                     CgOp::int($min)),
                 CgOp::rxpushb('QUANT', $exit), CgOp::prog());
         } else {
@@ -128,15 +111,14 @@ use CgOp;
         # if userep false, quant == 0
         if (defined($max) && $userep) {
             push @code, CgOp::cgoto('backtrack', CgOp::compare('>=',
-                    CgOp::rawcall(CgOp::rxframe, 'GetQuant'),
-                    CgOp::int($max)));
+                    CgOp::rxgetquant, CgOp::int($max)));
         }
 
         push @code, $self->zyg->[1]->code($body)
             if $self->zyg->[1];
         push @code, CgOp::label($middle) if $min;
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rxcall('IncQuant') if $usequant;
+        push @code, CgOp::rxincquant if $usequant;
         if ($userep) {
             push @code, CgOp::goto($repeat);
         } else {
@@ -144,7 +126,7 @@ use CgOp;
             # userep implies max == 1, min == 0; fall through
         }
         push @code, CgOp::label($exit);
-        push @code, CgOp::sink(CgOp::rxcall('CloseQuant')) if $usequant;
+        push @code, CgOp::sink(CgOp::rxclosequant) if $usequant;
 
         @code;
     }
@@ -258,8 +240,7 @@ use CgOp;
         my @code;
         push @code, CgOp::pushcut("CUTGRP");
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rawcall(CgOp::rxframe, 'CommitGroup',
-            CgOp::clr_string("CUTGRP"));
+        push @code, CgOp::rxcommitgroup(CgOp::clr_string("CUTGRP"));
         push @code, CgOp::popcut();
 
         @code;
@@ -416,26 +397,22 @@ use CgOp;
             return $true->code($body);
         }
 
-        my $namesf = CgOp::const(CgOp::rawnewarr('str',
-                map { CgOp::clr_string($_) } @{ $self->captures }));
         my $callf = CgOp::methodcall(CgOp::newscalar(
                 CgOp::rxcall("MakeCursor")), $self->name);
         my @pushcapf = (@{ $self->captures } == 0) ? () : (
-            CgOp::rxcall("PushCapture", $namesf,
-                CgOp::cast('clr:Cursor', CgOp::letvar("k"))));
+            CgOp::rxpushcapture(CgOp::cast('cursor', CgOp::letvar("k")),
+                @{ $self->captures }));
         my $updatef = CgOp::prog(
-            CgOp::ncgoto('backtrack', CgOp::rawcall(CgOp::letvar("k"),
-                    'IsDefined')),
+            CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
             @pushcapf,
-            CgOp::rxcall("SetPos", CgOp::getfield("pos", CgOp::cast("clr:Cursor",
+            CgOp::rxsetpos(CgOp::cursor_pos(CgOp::cast("cursor",
                         CgOp::letvar("k")))));
 
         my @code;
 
         if ($self->selfcut) {
             push @code, CgOp::letn(
-                "k", CgOp::fetch(CgOp::rawscall('Kernel.GetFirst:c,Variable',
-                    CgOp::fetch($callf))),
+                "k", CgOp::fetch(CgOp::get_first(CgOp::fetch($callf))),
                 $updatef);
         } else {
             push @code, CgOp::rxcall("SetCursorList", $callf);
@@ -445,8 +422,8 @@ use CgOp;
                         "GetCursorList"), "shift"));
             push @code, CgOp::label($sk);
             push @code, CgOp::letn(
-                "k", CgOp::fetch(CgOp::rawscall('Kernel.GetFirst:c,Variable',
-                    CgOp::fetch(CgOp::rxcall("GetCursorList")))),
+                "k", CgOp::fetch(CgOp::get_first(CgOp::fetch(
+                            CgOp::rxcall("GetCursorList")))),
                 $updatef);
             push @code, CgOp::rxpushb("SUBRULE", $bt);
             push @code, CgOp::rxcall("SetCursorList", CgOp::null("var"));
@@ -554,7 +531,7 @@ use CgOp;
         push @code, CgOp::rxcall("LTMPushAlts",
             CgOp::rawscall('Lexer.GetLexer',
                 CgOp::rxcall('GetClass'),
-                CgOp::const(RxOp::lad2cgop($self->lads)),
+                CgOp::const(CgOp::construct_lad($self->lads)),
                 CgOp::clr_string('')),
             CgOp::const(CgOp::rawnewarr('int', map { CgOp::labelid($_) } @ls)));
         push @code, CgOp::goto('backtrack');
@@ -643,12 +620,10 @@ use CgOp;
                 CgOp::letvar("fns")), CgOp::newscalar(CgOp::rxcall(
                   'MakeCursor')))),
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
-          CgOp::letvar("k", CgOp::fetch(CgOp::rawscall('Kernel.GetFirst:c,Variable',
+          CgOp::letvar("k", CgOp::fetch(CgOp::get_first(
                 CgOp::fetch(CgOp::letvar("ks"))))),
-          CgOp::ncgoto('backtrack',
-            CgOp::rawcall(CgOp::letvar("k"), 'IsDefined')),
-          CgOp::rawcall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
-              CgOp::letvar("k"))),
+          CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
+          CgOp::rxcall('End', CgOp::cast('cursor', CgOp::letvar("k"))),
           CgOp::letvar('ks', CgOp::methodcall(CgOp::methodcall(
                 CgOp::letvar('ks'), "list"), "clone")),
           CgOp::sink(CgOp::methodcall(CgOp::letvar('ks'), 'shift')),
@@ -656,7 +631,7 @@ use CgOp;
           CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
                 CgOp::methodcall(CgOp::letvar('ks'), 'Bool')))),
           CgOp::rxpushb('SUBRULE', 'nextcsr'),
-          CgOp::rawcall(CgOp::rxframe, 'End', CgOp::cast('clr:Cursor',
+          CgOp::rxcall('End', CgOp::cast('cursor',
               CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))),
           CgOp::goto('backtrack'));
     }

@@ -170,8 +170,8 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         # this should be a little fancier so closure can work
-        CgOp::subcall(CgOp::fetch(CgOp::rawscall('Kernel.ContextHelper',
-                    CgOp::callframe, CgOp::clr_string('*resume_' . $self->unitname))));
+        CgOp::subcall(CgOp::fetch(CgOp::context_get(CgOp::clr_string(
+                        '*resume_' . $self->unitname))));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -193,10 +193,9 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         if ($self->private) {
-            # XXX encapsulation break
-            CgOp::subcall(CgOp::rawcall(
+            CgOp::subcall(CgOp::stab_privatemethod(
                     CgOp::class_ref('mo', @{ $self->pclass }),
-                    "GetPrivateMethod", CgOp::clr_string($self->name)),
+                    CgOp::clr_string($self->name)),
                 $self->receiver->cgop($body), $self->argblock($body));
         } else {
             CgOp::methodcall($self->receiver->cgop($body),
@@ -323,7 +322,7 @@ use CgOp;
                 $c = CgOp::how($c);
             }
             when ("WHAT") {
-                $c = CgOp::rawcall(CgOp::cast('obj', $c), 'GetTypeObject');
+                $c = CgOp::obj_what($c);
             }
             default {
                 die "Invalid interrogative $_";
@@ -850,8 +849,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawscall('Kernel.ContextHelper', CgOp::callframe,
-            CgOp::clr_string($self->name));
+        CgOp::context_get(CgOp::clr_string($self->name));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -927,7 +925,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rawscall('Kernel.Take', $self->value->cgop($body));
+        CgOp::take($self->value->cgop($body));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -950,7 +948,7 @@ use CgOp;
         # construct a List from the iterator
 
         CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&_gather')),
-            CgOp::newscalar(CgOp::rawscall('Kernel.GatherHelper',
+            CgOp::newscalar(CgOp::startgather(
                     CgOp::fetch(CgOp::scopedlex($self->var)))));
     }
 
@@ -979,22 +977,19 @@ use CgOp;
         local $::in_quant = 0;
         my $u = $self->rxop->used_caps;
         for (keys %$u) {
-            push @mcaps, CgOp::clr_string($_) if $u->{$_} >= 2;
+            push @mcaps, $_ if $u->{$_} >= 2;
         }
         my @pre = map { CgOp::sink($_->code($body)) } @{ $self->pre };
 
         CgOp::prog(
             @pre,
-            CgOp::setfield('rx', CgOp::callframe,
-                CgOp::rawnew('clr:RxFrame', CgOp::clr_string($self->name),
-                    CgOp::cast('clr:Cursor', CgOp::fetch(CgOp::scopedlex('$¢'))))),
-            CgOp::rawcall(CgOp::rxframe, 'PushCapture',
-                CgOp::const(CgOp::rawnewarr('str', @mcaps)),
-                CgOp::null('clr:Cursor')),
+            CgOp::rxinit(CgOp::clr_string($self->name),
+                    CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('$¢')))),
+            CgOp::rxpushcapture(CgOp::null('cursor'), @mcaps),
             $self->rxop->code($body),
-            CgOp::rawcall(CgOp::rxframe, $self->canback ? 'End' : 'FinalEnd'),
+            ($self->canback ? CgOp::rxend() : CgOp::rxfinalend()),
             CgOp::label('backtrack'),
-            CgOp::rawcall(CgOp::rxframe, 'Backtrack'),
+            CgOp::rxbacktrack(),
             CgOp::null('var'));
     }
 

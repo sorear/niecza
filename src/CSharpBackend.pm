@@ -509,7 +509,7 @@ sub sub1 {
     $node->{sictor} = [ $cg->subinfo_ctor_args(
             ($_->outer ? CgOp::rawsget($_->outer->{peer}{si}) :
                 CgOp::null('clr:SubInfo')),
-            ($_->ltm ? RxOp::lad2cgop($_->ltm) : CgOp::null('clr:LAD'))) ];
+            ($_->ltm ? CgOp::construct_lad($_->ltm) : CgOp::null('lad'))) ];
 
     push @cgs, $cg->csharp;
 }

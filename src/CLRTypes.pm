@@ -111,6 +111,7 @@ my %typedata = (
     'Kernel.BindFail'      => [c => 'Variable'],
     'Kernel.CheckArgEnd'   => [c => 'Void'],
     'Kernel.CoTake'        => [c => 'Variable'],
+    'Kernel.GetFirst'      => [c => 'Variable'],
     'Kernel.Take'          => [c => 'Variable'],
     'Kernel.GatherHelper'  => [c => 'Frame'],
     'Kernel.ContextHelper' => [m => 'Variable'],
@@ -168,6 +169,7 @@ my %tmap = (
     # this is a fair leak as it reveals that Frame is its own repr.
     'frame'     => 'Frame',
     'cursor'    => 'Cursor',
+    'lad'       => 'LAD',
 );
 
 sub _generic_infer {

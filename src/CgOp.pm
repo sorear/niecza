@@ -145,6 +145,7 @@ use warnings;
     sub var_islist { getfield('islist', $_[0]) }
 
     sub llhow_name { getfield('name', $_[0]) }
+    sub stab_privatemethod { rawcall($_[0], 'GetPrivateMethod', $_[1]) }
 
     sub varhash_setindex { setindex(@_) }
     sub varhash_getindex { getindex(@_) }
@@ -203,6 +204,15 @@ use warnings;
 
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
+
+    sub default_new    { rawscall('Kernel.DefaultNew', $_[0]) }
+    sub cotake         { rawscall('Kernel.CoTake', $_[0]) }
+    sub take           { rawscall('Kernel.Take', $_[0]) }
+    sub control        { rawscall('Kernel.SearchForHandler', CgOp::int(shift()),
+            @_) }
+    sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0]) }
+    sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
+    sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
@@ -265,6 +275,41 @@ use warnings;
     sub rxcall { rawcall(rxframe, @_) }
     sub pushcut { rxcall('PushCutGroup', clr_string($_[0])) }
     sub popcut { rxcall('PopCutGroup') }
+
+    sub rxinit {
+        setfield('rx', callframe(), rawnew('clr:RxFrame', $_[0], $_[1]))
+    }
+    sub rxpushcapture {
+        my $c = shift;
+        rxcall('PushCapture', const(rawnewarr('str',
+                    map { clr_string($_) } @_)), $c);
+    }
+    sub rxend         { rxcall('End') }
+    sub rxfinalend    { rxcall('FinalEnd') }
+    sub rxbacktrack   { rxcall('Backtrack') }
+    sub rxgetquant    { rxcall('GetQuant') }
+    sub rxopenquant   { rxcall('OpenQuant') }
+    sub rxclosequant  { rxcall('CloseQuant') }
+    sub rxincquant    { rxcall('IncQuant') }
+    sub rxsetpos      { rxcall('SetPos', $_[0]) }
+    sub rxcommitgroup { rxcall('CommitGroup', $_[0]) }
+
+    sub construct_lad {
+        my ($l) = @_;
+        my $r = ref $l;
+        if (!$r) {
+            return CgOp::clr_string($l);
+        } elsif ($r eq 'ARRAY') {
+            if (!@$l || ref ($l->[0])) {
+                return CgOp::rawnewarr('clr:LAD', map { construct_lad($_) } @$l);
+            } else {
+                my ($h,@r) = @$l;
+                return CgOp::rawnew("clr:LAD$h", map { construct_lad($_) } @r);
+            }
+        } else {
+            return $l;
+        }
+    }
 
     sub letvar {
         $_[1] ?

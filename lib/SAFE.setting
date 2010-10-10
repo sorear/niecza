@@ -30,9 +30,8 @@ my class Mu {
               [l i (+ (l i) (int 2))])]
           [ns (l obj)])
     } }
-    method CREATE() { Q:CgOp {
-        (rawscall Kernel.DefaultNew (@ (l self))) } }
-    method new() { Q:CgOp { (rawscall Kernel.DefaultNew (@ {self})) } }
+    method CREATE() { Q:CgOp { (default_new (@ (l self))) } }
+    method new() { Q:CgOp { (default_new (@ {self})) } }
 }
 
 my class Any is Mu {
@@ -548,8 +547,7 @@ my class GatherIterator is Iterator {
         my $*nextframe;
         $!reify // ($!reify = (
             Q:CgOp {
-                (letn getv (rawscall Kernel.CoTake (cast frame
-                    (@ {$!frame})))
+                (letn getv (cotake (cast frame (@ {$!frame})))
                   (box Parcel (ternary (== (@ {EMPTY}) (@ (l getv)))
                     (fvarlist_new)
                     (fvarlist_new
@@ -565,7 +563,7 @@ sub _gather($fr) {
 }
 
 sub take($p) { # should be \|$p
-    Q:CgOp { (rawscall Kernel.Take (l $p)) }
+    Q:CgOp { (take (l $p)) }
 }
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
@@ -597,17 +595,17 @@ sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
 # XXX multi dispatch
-sub next {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 1) (null frame) (int -1) (null str) (null var)) }
+sub next() {
+    Q:CgOp { (control 1 (null frame) (int -1) (null str) (null var)) }
 }
-sub last {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 2) (null frame) (int -1) (null str) (null var)) }
+sub last() {
+    Q:CgOp { (control 2 (null frame) (int -1) (null str) (null var)) }
 }
-sub redo {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 3) (null frame) (int -1) (null str) (null var)) }
+sub redo() {
+    Q:CgOp { (control 3 (null frame) (int -1) (null str) (null var)) }
 }
 sub return(\$obj) is return-pass {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 4) (null frame) (int -1) (null str) {$obj}) }
+    Q:CgOp { (control 4 (null frame) (int -1) (null str) {$obj}) }
 }
 
 sub assignop($fn) {
