@@ -211,7 +211,7 @@ sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (unbox num (@ {$status})))])
 } }
 
-sub infix:<=> is rawcall { Q:CgOp { (prog [assign (pos 0) (pos 1)] (pos 0)) } }
+sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
@@ -251,7 +251,7 @@ sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 # coercion makes the elements of a List read-only and maybe fetches them too.
 # Array: mutable list of read-write scalar boxes
 
-sub unitem is rawcall { Q:CgOp { (newrwlistvar (@ (pos 0))) } }
+sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
 
 my class Iterator {
     # subclasses must provide .reify, return parcel
@@ -326,30 +326,30 @@ my class List is Cool {
 
     #| Takes an object and applies whatever semantics the List subclass
     #| needs to apply on stuff out of the iterator stack
-    method _elem is rawcall { Q:CgOp { (pos 1) } }
+    method _elem(\$x) { $x }
 
-    sub count-items($self) { Q:CgOp {
-        (box Num (cast num (vvarlist_count (getslot items vvarlist (@ {$self})))))
+    method !count-items() { Q:CgOp {
+        (box Num (cast num (vvarlist_count (getslot items vvarlist (@ {self})))))
     } }
 
-    sub shift-item($self) { Q:CgOp {
-        (vvarlist_shift (getslot items vvarlist (@ {$self})))
+    method !shift-item() { Q:CgOp {
+        (vvarlist_shift (getslot items vvarlist (@ {self})))
     } }
 
     method !item-at-pos($ix) { Q:CgOp {
         (vvarlist_item (cast int (unbox num (@ {$ix}))) (getslot items vvarlist (@ {self})))
     } }
 
-    sub pop-item($self) { Q:CgOp {
-        (vvarlist_pop (getslot items vvarlist (@ {$self})))
+    method !pop-item() { Q:CgOp {
+        (vvarlist_pop (getslot items vvarlist (@ {self})))
     } }
 
-    sub push-iterator is rawcall { Q:CgOp {
-        (rnull (vvarlist_push (getslot rest vvarlist (@ (pos 0))) (pos 1)))
+    method !push-iterator(\$x) { Q:CgOp {
+        (rnull (vvarlist_push (getslot rest vvarlist (@ {self})) {$x}))
     } }
 
-    sub push-item is rawcall { Q:CgOp {
-        (rnull (vvarlist_push (getslot items vvarlist (@ (pos 0))) (pos 1)))
+    method !push-item(\$x) { Q:CgOp {
+        (rnull (vvarlist_push (getslot items vvarlist (@ {self})) {$x}))
     } }
 
     method !fill($nr) { Q:CgOp {
@@ -376,7 +376,7 @@ my class List is Cool {
     method Bool() { self!fill(1) }
     method shift() {
         self!fill(1);
-        shift-item(self);
+        self!shift-item;
     }
 
     method eager() {
@@ -386,7 +386,7 @@ my class List is Cool {
 
     method head { self!fill(1) ?? self!item-at-pos(0) !! Any }
 
-    method elems() { self!fill(1000_000_000); count-items(self); }
+    method elems() { self!fill(1000_000_000); self!count-items; }
     method Numeric () { self.elems }
 
     method at-pos($i) {
@@ -421,11 +421,11 @@ my class List is Cool {
     method Str() { self.join(" ") }
 
     method push(*@items) {
-        push-iterator(self, @items.Seq.eager.iterator)
+        self!push-iterator(@items.Seq.eager.iterator)
     }
     method pop() {
         self.eager;
-        pop-item(self);
+        self!pop-item;
     }
 }
 
@@ -450,10 +450,10 @@ my class Array is List {
         unitem(self);
     }
 
-    method !extend is rawcall {
+    method !extend($ix, \$var) {
         Q:CgOp {
-            (letn i (getslot items vvarlist (@ (pos 0)))
-                  ct (- (cast int (unbox num (@ (pos 1))))
+            (letn i (getslot items vvarlist (@ {self}))
+                  ct (- (cast int (unbox num (@ {$ix})))
                         (vvarlist_count (l i)))
               (ternary (>= (l ct) (int 0)) [prog]
                 [sink [die "Autovivification collision"]])
@@ -461,7 +461,7 @@ my class Array is List {
                 (prog
                   (l ct (- (l ct) (int 1)))
                   (vvarlist_push (l i) (newrwscalar (@ {Any})))))
-              (vvarlist_push (l i) (pos 2))
+              (vvarlist_push (l i) {$var})
               (null var))
         };
     }
@@ -469,23 +469,21 @@ my class Array is List {
     method at-pos($ix) {
         self!List::fill($ix+1)
             ?? self!List::item-at-pos($ix)
-            !! Any!Any::butWHENCE(sub () is rawcall {
-                self!extend($ix, Q:CgOp { (pos 0) });
-            });
+            !! Any!Any::butWHENCE(sub (\$var) { self!extend($ix, $var); });
     }
 }
 
 my class Hash {
     has $!value;
     method new() { Q:CgOp { (box Hash (varhash_new)) } }
-    method !extend is rawcall {
+    method !extend($key, \$var) {
         Q:CgOp {
-            (letn d [unbox varhash (@ (pos 0))]
-                  k [unbox str (@ (methodcall (pos 1) Str))]
+            (letn d [unbox varhash (@ {self})]
+                  k [unbox str (@ {$key.Str})]
               [ternary (varhash_contains_key (l d) (l k))
                 (sink (die "Autovivification collision"))
                 (prog)]
-              [varhash_setindex (l k) (l d) (pos 2)]
+              [varhash_setindex (l k) (l d) {$var}]
               [null var])
         };
     }
@@ -499,7 +497,9 @@ my class Hash {
             ?? Q:CgOp {
                 (varhash_getindex [unbox str (@ {$key.Str})]
                   [unbox varhash (@ {self})])
-            } !! Any!Any::butWHENCE({ self!extend($key, Q:CgOp { (pos 0) }) });
+            } !! Any!Any::butWHENCE(sub (\$var) {
+                self!extend($key, $var)
+            });
     }
 }
 
@@ -523,20 +523,20 @@ my class Pair is Enum {
 sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
     $container.defined
         ?? $container.at-pos($index)
-        !! Any!Any::butWHENCE(sub () is rawcall {
+        !! Any!Any::butWHENCE(sub (\$var) {
             $container.defined && die("Autovivification collision");
             $container = Array.new;
-            $container!Array::extend($index, Q:CgOp { (pos 0) });
+            $container!Array::extend($index, $var);
         });
 }
 
 sub postcircumfix:<{ }>(\$container, $key) {
     $container.defined
         ?? $container.at-key($key)
-        !! Any!Any::butWHENCE(sub () is rawcall {
+        !! Any!Any::butWHENCE(sub (\$var) {
             $container.defined && die("Autovivification collision");
             $container = Hash.new;
-            $container!Hash::extend($key, Q:CgOp { (pos 0) });
+            $container!Hash::extend($key, $var);
         });
 }
 
@@ -591,8 +591,8 @@ my class CallFrame {
         (unbox str (@ (l $var)))) } }
 }
 
-sub caller { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
-sub callframe { Q:CgOp { (ns (frame_caller (callframe))) } }
+sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
+sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 
 sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
@@ -606,13 +606,13 @@ sub last {
 sub redo {
     Q:CgOp { (rawscall Kernel.SearchForHandler (int 3) (null frame) (int -1) (null str) (null var)) }
 }
-sub return is rawcall is return-pass {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 4) (null frame) (int -1) (null str) (pos 0)) }
+sub return(\$obj) is return-pass {
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 4) (null frame) (int -1) (null str) {$obj}) }
 }
 
 sub assignop($fn) {
-    anon sub ANON is rawcall {
-        Q:CgOp { (pos 0) } = $fn(Q:CgOp { (pos 0) }, Q:CgOp { (pos 1) })
+    anon sub _assign(\$lhs, \$rhs) {
+        $lhs = $fn($lhs, $rhs)
     }
 }
 # }}}
@@ -620,12 +620,12 @@ sub assignop($fn) {
 my class Cursor {
     method new($str) { Q:CgOp { (ns (cursor_start
         (@ {self}) (unbox str (@ {$str})))) } }
-    method pos { Q:CgOp { (box Num (cast num (cursor_pos
+    method pos() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
     method cursor($np) { Q:CgOp { (ns (cursor_butpos
         (cast cursor (@ {self}))
           (cast int (unbox num (@ {$np}))))) } }
-    method orig { Q:CgOp {
+    method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method at-key($k) { Q:CgOp {
@@ -640,14 +640,14 @@ my class Match {
     } }
     method at-pos($i) { self.at-key($i) }
     method new($) { die "Match.new NYI" }
-    method from { Q:CgOp { (box Num (cast num (cursor_from
+    method from() { Q:CgOp { (box Num (cast num (cursor_from
         (cast cursor (@ {self}))))) } }
-    method to { Q:CgOp { (box Num (cast num (cursor_pos
+    method to() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
-    method orig { Q:CgOp {
+    method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
-    method chars { $.defined ?? $.to - $.from !! 0 }
-    method Str { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
+    method chars() { $.defined ?? $.to - $.from !! 0 }
+    method Str() { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
 }
 
 my class Regex is Sub {
