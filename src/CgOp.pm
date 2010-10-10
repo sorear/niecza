@@ -178,6 +178,7 @@ use warnings;
     sub fvarlist_item { getindex($_[0], $_[1]) }
 
     sub vvarlist_from_fvarlist { rawnew('vvarlist', $_[0]) }
+    sub vvarlist_clone { rawnew('vvarlist', $_[0]) }
     sub vvarlist_new_empty { rawnew('vvarlist') }
     sub vvarlist_shift { rawcall($_[0], 'Shift') }
     sub vvarlist_pop { rawcall($_[0], 'Pop') }

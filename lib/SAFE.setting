@@ -304,9 +304,9 @@ my class List is Cool {
         (letn selfo (@ {self})
               new (obj_newblank (obj_llhow (l selfo)))
           (setslot flat (l new) (getslot flat bool (l selfo)))
-          (setslot items (l new) (rawnew vvarlist
+          (setslot items (l new) (vvarlist_clone
               (getslot items vvarlist (l selfo))))
-          (setslot rest (l new) (rawnew vvarlist
+          (setslot rest (l new) (vvarlist_clone
               (getslot rest vvarlist (l selfo))))
           (newrwlistvar (l new)))
     } }
@@ -520,31 +520,23 @@ my class Pair is Enum {
 }
 # }}}
 # List utilities {{{
-sub postcircumfix:<[ ]> is rawcall {
-    my $index ::= Q:CgOp { (pos 1) };
-
-    (Q:CgOp { (pos 0) }).defined
-        ?? (Q:CgOp { (pos 0) }).at-pos($index)
+sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
+    $container.defined
+        ?? $container.at-pos($index)
         !! Any!Any::butWHENCE(sub () is rawcall {
-            my $ar := Q:CgOp { (getindex (int 0) (getfield pos
-                                 (getfield outer (callframe)))) };
-            $ar.defined && die("Autovivification collision");
-            $ar = Array.new;
-            $ar!Array::extend($index, Q:CgOp { (pos 0) });
+            $container.defined && die("Autovivification collision");
+            $container = Array.new;
+            $container!Array::extend($index, Q:CgOp { (pos 0) });
         });
 }
 
-sub postcircumfix:<{ }> is rawcall {
-    my $key ::= Q:CgOp { (pos 1) };
-
-    (Q:CgOp { (pos 0) }).defined
-        ?? (Q:CgOp { (pos 0) }).at-key($key)
+sub postcircumfix:<{ }>(\$container, $key) {
+    $container.defined
+        ?? $container.at-key($key)
         !! Any!Any::butWHENCE(sub () is rawcall {
-            my $ar := Q:CgOp { (getindex (int 0) (getfield pos
-                                 (getfield outer (callframe)))) };
-            $ar.defined && die("Autovivification collision");
-            $ar = Hash.new;
-            $ar!Hash::extend($key, Q:CgOp { (pos 0) });
+            $container.defined && die("Autovivification collision");
+            $container = Hash.new;
+            $container!Hash::extend($key, Q:CgOp { (pos 0) });
         });
 }
 

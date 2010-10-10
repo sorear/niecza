@@ -123,9 +123,8 @@ use 5.010;
             $self->single_get($body);
 
         if (defined $self->slot) {
-            return CgOp::scopedlex($self->slot,
-                CgOp::newboundvar($self->readonly && !$self->rwtrans,
-                    $self->list, $get));
+            return CgOp::scopedlex($self->slot, $self->rwtrans ? $get :
+                CgOp::newboundvar($self->readonly, $self->list, $get));
         } else {
             return CgOp::sink($get);
         }
@@ -139,9 +138,8 @@ use 5.010;
             $self->single_get_inline($body, $posr);
 
         if (defined $self->slot) {
-            return CgOp::scopedlex($self->slot,
-                CgOp::newboundvar($self->readonly && !$self->rwtrans,
-                    $self->list, $get));
+            return CgOp::scopedlex($self->slot, $self->rwtrans ? $get :
+                CgOp::newboundvar($self->readonly, $self->list, $get));
         } else {
             return CgOp::sink($get);
         }
