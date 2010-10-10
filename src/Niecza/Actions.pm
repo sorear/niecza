@@ -1611,12 +1611,13 @@ sub parameter { my ($cl, $M) = @_;
     my $sorry;
     my $slurpy;
     my $optional;
+    my $rwt;
     given ($M->{quant} . ':' . $M->{kind}) {
         when ('**:*') { $sorry = "Slice parameters NYI" }
         when ('*:*')  { $slurpy = 1 }
         when ('|:*')  { $sorry = "Captures NYI" }
-        when ('\\:!') { $sorry = "Simple parcel parameters NYI" }
-        when ('\\:?') { $sorry = "Simple parcel parameters NYI" }
+        when ('\\:!') { $rwt = 1 }
+        when ('\\:?') { $rwt = 1; $optional = 1 }
         when (':!')   { }
         when (':*')   { $optional = 1 }
         when (':?')   { $optional = 1 }
@@ -1631,7 +1632,7 @@ sub parameter { my ($cl, $M) = @_;
 
     $M->{_ast} = Sig::Parameter->new(name => $M->Str, default => $default,
         optional => $optional, slurpy => $slurpy, readonly => !$rw,
-        %{ $p->{_ast} });
+        rwtrans => $rwt, %{ $p->{_ast} });
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -1642,7 +1643,9 @@ sub signature { my ($cl, $M) = @_;
     }
 
     if ($M->{param_var}) {
-        $M->sorry('\| signatures NYI');
+        $M->{_ast} = Sig->new(params => [ Sig::Parameter->new(
+                name => $M->{param_var}->Str, %{ $M->{param_var}{_ast} },
+                full_parcel => 1) ]);
         return;
     }
 

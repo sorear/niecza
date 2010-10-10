@@ -18,14 +18,15 @@ my class Mu {
     }
     method so() { self.Bool }
     method not() { ! self.Bool }
-    method RAWCREATE is rawcall { Q:CgOp {
-        (letn max (poscount)
+    method RAWCREATE(\|$vars) { Q:CgOp {
+        (letn ar  (unbox fvarlist (@ {$vars}))
+              max (fvarlist_length (l ar))
               i   (int 1)
-              obj (obj_newblank (obj_llhow (@ (pos 0))))
+              obj (obj_newblank (obj_llhow (@ (fvarlist_item (i 0) (l ar)))))
           [whileloop 0 0 (< (l i) (l max)) (prog
               [setslot
-                (unbox str (@ (pos (l i)))) (l obj)
-                (nsw (@ (pos (+ (l i) (int 1)))))]
+                (unbox str (@ (fvarlist_item (l i) (l ar)))) (l obj)
+                (nsw (@ (fvarlist_item (+ (l i) (int 1)) (l ar))))]
               [l i (+ (l i) (int 2))])]
           [ns (l obj)])
     } }
@@ -146,15 +147,14 @@ constant True  = Q:CgOp { (box Bool (bool 1)) };
 constant False = Q:CgOp { (box Bool (bool 0)) };
 # }}}
 # Fundamental scalar operators {{{
-# taking a slurpy is wrong for this due to flattening.  I'm not sure what is
-# right, maybe **@foo
-sub infix:<~> is rawcall { Q:CgOp {
+sub infix:<~>(\|$bits) { Q:CgOp {
     (letn buf (strbuf_new)
           i   (int 0)
-          max (poscount)
+          ar  (unbox fvarlist (@ {$bits}))
+          max (fvarlist_length (l ar))
       [whileloop 0 0 (< (l i) (l max)) (prog
           [strbuf_append (l buf)
-            (unbox str (@ (methodcall (pos (l i)) Str)))]
+            (unbox str (@ (methodcall (fvarlist_item (l i) (l ar)) Str)))]
           [l i (+ (l i) (int 1))])]
       [box Str (strbuf_seal (l buf))])
 } }
@@ -251,9 +251,7 @@ sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 # coercion makes the elements of a List read-only and maybe fetches them too.
 # Array: mutable list of read-write scalar boxes
 
-sub unitem is rawcall {
-    Q:CgOp { (newrwlistvar (@ (pos 0))) }
-}
+sub unitem is rawcall { Q:CgOp { (newrwlistvar (@ (pos 0))) } }
 
 my class Iterator {
     # subclasses must provide .reify, return parcel
@@ -290,7 +288,7 @@ my class Parcel is Cool {
 
 # Maybe this should be a constant, but constants are currently forced to
 # scalar-nature (TODO)
-sub Nil is rawcall { Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) } }
+sub Nil() { Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) } }
 
 my class List is Cool {
     has @!items;

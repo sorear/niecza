@@ -9,6 +9,9 @@ use 5.010;
 
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
+    # rw binding to Mu that does not viv
+    has rwtrans => (is => 'ro', isa => 'Bool', default => 0);
+    has full_parcel => (is => 'ro', isa => 'Bool', default => 0);
     has optional => (is => 'ro', isa => 'Bool', default => 0);
     has default => (is => 'ro', isa => 'Maybe[Op]', default => undef);
     has positional => (is => 'ro', isa => 'Bool', default => 1);
@@ -36,6 +39,14 @@ use 5.010;
                 CgOp::scopedlex('!ix', CgOp::getfield('Length',
                         CgOp::getfield('pos', CgOp::callframe))),
                 CgOp::newscalar($do))});
+    }
+
+    sub parcel_get {
+        my ($self) = @_;
+        CgOp::prog(
+            CgOp::scopedlex('!ix', CgOp::poscount),
+            CgOp::box('Parcel', CgOp::getfield('pos',
+                    CgOp::callframe)));
     }
 
     sub _default_get {
@@ -107,12 +118,14 @@ use 5.010;
     sub binder {
         my ($self, $body) = @_;
 
-        my $get = $self->slurpy ? $self->slurpy_get :
+        my $get = $self->full_parcel ? $self->parcel_get :
+            $self->slurpy ? $self->slurpy_get :
             $self->single_get($body);
 
         if (defined $self->slot) {
             return CgOp::scopedlex($self->slot,
-                CgOp::newboundvar($self->readonly, $self->list, $get));
+                CgOp::newboundvar($self->readonly && !$self->rwtrans,
+                    $self->list, $get));
         } else {
             return CgOp::sink($get);
         }
@@ -121,12 +134,14 @@ use 5.010;
     sub bind_inline {
         my ($self, $body, $posr) = @_;
 
-        my $get = $self->slurpy ? $self->slurpy_get_inline($posr) :
+        my $get = $self->full_parcel ? $self->parcel_get_inline($posr) :
+            $self->slurpy ? $self->slurpy_get_inline($posr) :
             $self->single_get_inline($body, $posr);
 
         if (defined $self->slot) {
             return CgOp::scopedlex($self->slot,
-                CgOp::newboundvar($self->readonly, $self->list, $get));
+                CgOp::newboundvar($self->readonly && !$self->rwtrans,
+                    $self->list, $get));
         } else {
             return CgOp::sink($get);
         }

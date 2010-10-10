@@ -175,6 +175,7 @@ use warnings;
 
     sub fvarlist_length { getfield('Length', $_[0]) }
     sub fvarlist_new { rawnewarr('var', @_) }
+    sub fvarlist_item { getindex($_[0], $_[1]) }
 
     sub vvarlist_from_fvarlist { rawnew('vvarlist', $_[0]) }
     sub vvarlist_new_empty { rawnew('vvarlist') }
