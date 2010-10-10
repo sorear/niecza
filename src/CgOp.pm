@@ -187,6 +187,19 @@ use warnings;
     sub vvarlist_push { rawcall($_[0], 'Push', $_[1]) }
     sub vvarlist_item { getindex($_[0], $_[1]) }
 
+    sub frame_caller { getfield('caller', $_[0]) }
+    sub frame_file { rawcall($_[0], 'ExecutingFile') }
+    sub frame_line { rawcall($_[0], 'ExecutingLine') }
+    sub frame_hint { rawcall($_[0], 'LexicalFind', $_[1]) }
+
+    sub cursor_start   { rawnew('cursor', $_[0], $_[1]) }
+    sub cursor_pos     { getfield('pos', $_[0]) }
+    sub cursor_from    { getfield('from', $_[0]) }
+    sub cursor_butpos  { rawcall($_[0], 'At', $_[1]) }
+    sub cursor_backing { getfield('backing', $_[0]) }
+    sub cursor_dows    { rawcall($_[0], 'SimpleWS') }
+    sub cursor_item    { rawcall($_[0], 'GetKey', $_[1]) }
+
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
 

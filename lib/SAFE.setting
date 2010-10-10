@@ -556,11 +556,11 @@ my class GatherIterator is Iterator {
         my $*nextframe;
         $!reify // ($!reify = (
             Q:CgOp {
-                (letn getv (rawscall Kernel.CoTake (cast clr:Frame
+                (letn getv (rawscall Kernel.CoTake (cast frame
                     (@ {$!frame})))
                   (box Parcel (ternary (== (@ {EMPTY}) (@ (l getv)))
-                    (rawnewarr var)
-                    (rawnewarr var
+                    (fvarlist_new)
+                    (fvarlist_new
                       (l getv)
                       {GatherIterator.RAWCREATE("frame", $*nextframe, "reify", Any)}))))
             }));
@@ -578,53 +578,44 @@ sub take($p) { # should be \|$p
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
 
-sub infix:<,> is rawcall {
-    Q:CgOp { (newrwlistvar (@ (box Parcel (getfield pos (callframe))))) };
-}
+sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 # }}}
 # Flow inspection and control {{{
 my class CallFrame {
     method caller() { Q:CgOp {
-        (letn c (getfield caller (cast clr:Frame (@ {self})))
+        (letn c (frame_caller (cast frame (@ {self})))
           (ternary
-            (!= (letvar c) (null clr:Frame))
-            (ns (letvar c))
-            {Any}))
-    } }
-    method outer() { Q:CgOp {
-        (letn c (getfield outer (cast clr:Frame (@ {self})))
-          (ternary
-            (!= (letvar c) (null clr:Frame))
+            (!= (letvar c) (null frame))
             (ns (letvar c))
             {Any}))
     } }
 
-    method file() { Q:CgOp { (box Str (rawcall
-        (cast clr:Frame (@ (l self))) ExecutingFile)) } }
-    method line() { Q:CgOp { (box Num (cast num (rawcall
-        (cast clr:Frame (@ (l self))) ExecutingLine))) } }
+    method file() { Q:CgOp { (box Str (frame_file
+        (cast frame (@ (l self))))) } }
+    method line() { Q:CgOp { (box Num (cast num (frame_line
+        (cast frame (@ (l self)))))) } }
 
-    method hints($var) { Q:CgOp { (rawcall (cast clr:Frame (@ (l self)))
-        LexicalFind (unbox str (@ (l $var)))) } }
+    method hints($var) { Q:CgOp { (frame_hint (cast frame (@ (l self)))
+        (unbox str (@ (l $var)))) } }
 }
 
-sub caller { Q:CgOp { (ns (getfield caller (getfield caller (callframe)))) } }
-sub callframe { Q:CgOp { (ns (getfield caller (callframe))) } }
+sub caller { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
+sub callframe { Q:CgOp { (ns (frame_caller (callframe))) } }
 
 sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
 # XXX multi dispatch
 sub next {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 1) (null clr:Frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 1) (null frame) (int -1) (null str) (null var)) }
 }
 sub last {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 2) (null clr:Frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 2) (null frame) (int -1) (null str) (null var)) }
 }
 sub redo {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 3) (null clr:Frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 3) (null frame) (int -1) (null str) (null var)) }
 }
-sub return is rawcall {
-    Q:CgOp { (rawscall Kernel.SearchForHandler (int 4) (null clr:Frame) (int -1) (null str) (pos 0)) }
+sub return is rawcall is return-pass {
+    Q:CgOp { (rawscall Kernel.SearchForHandler (int 4) (null frame) (int -1) (null str) (pos 0)) }
 }
 
 sub assignop($fn) {
@@ -635,34 +626,34 @@ sub assignop($fn) {
 # }}}
 # Regular expression support {{{
 my class Cursor {
-    method new($str) { Q:CgOp { (ns (rawnew clr:Cursor
+    method new($str) { Q:CgOp { (ns (cursor_start
         (@ {self}) (unbox str (@ {$str})))) } }
-    method pos { Q:CgOp { (box Num (cast num (getfield pos
-        (cast clr:Cursor (@ {self}))))) } }
-    method cursor($np) { Q:CgOp { (ns (rawcall
-        (cast clr:Cursor (@ {self})) At
+    method pos { Q:CgOp { (box Num (cast num (cursor_pos
+        (cast cursor (@ {self}))))) } }
+    method cursor($np) { Q:CgOp { (ns (cursor_butpos
+        (cast cursor (@ {self}))
           (cast int (unbox num (@ {$np}))))) } }
     method orig { Q:CgOp {
-        (box Str (getfield backing (cast clr:Cursor (@ {self})))) } }
-    method ws() { Q:CgOp { (rawcall (cast clr:Cursor (@ {self})) SimpleWS) } }
+        (box Str (cursor_backing (cast cursor (@ {self})))) } }
+    method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method at-key($k) { Q:CgOp {
-        (rawcall (cast clr:Cursor (@ {self})) GetKey (unbox str (@ {$k.Str})))
+        (cursor_item (cast cursor (@ {self})) (unbox str (@ {$k.Str})))
     } }
     method at-pos($i) { self.at-key($i) }
 }
 
 my class Match {
     method at-key($k) { Q:CgOp {
-        (rawcall (cast clr:Cursor (@ {self})) GetKey (unbox str (@ {$k.Str})))
+        (cursor_item (cast cursor (@ {self})) (unbox str (@ {$k.Str})))
     } }
     method at-pos($i) { self.at-key($i) }
     method new($) { die "Match.new NYI" }
-    method from { Q:CgOp { (box Num (cast num (getfield from
-        (cast clr:Cursor (@ {self}))))) } }
-    method to { Q:CgOp { (box Num (cast num (getfield pos
-        (cast clr:Cursor (@ {self}))))) } }
+    method from { Q:CgOp { (box Num (cast num (cursor_from
+        (cast cursor (@ {self}))))) } }
+    method to { Q:CgOp { (box Num (cast num (cursor_pos
+        (cast cursor (@ {self}))))) } }
     method orig { Q:CgOp {
-        (box Str (getfield backing (cast clr:Cursor (@ {self})))) } }
+        (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method chars { $.defined ?? $.to - $.from !! 0 }
     method Str { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
 }

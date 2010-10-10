@@ -165,6 +165,9 @@ my %tmap = (
     # portable IO is hard, we let CgOp fake it for now?
     'treader'   => 'System.IO.TextReader',
     'twriter'   => 'System.IO.TextWriter',
+    # this is a fair leak as it reveals that Frame is its own repr.
+    'frame'     => 'Frame',
+    'cursor'    => 'Cursor',
 );
 
 sub _generic_infer {

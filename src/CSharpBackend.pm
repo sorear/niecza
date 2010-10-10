@@ -445,7 +445,7 @@ sub codegen_sub {
                 CgOp::setfield('typeObject', CgOp::letvar('!mo'),
                     CgOp::letvar('!to')),
                 CgOp::return(CgOp::newscalar(CgOp::letvar('!to')))));
-    } elsif ($_->returnable && defined($_->signature)) {
+    } elsif ($_->returnable) {
         $ops = CgOp::prog(@enter,
             CgOp::return(CgOp::span("rstart", "rend",
                     $_->code->cgop($_))),

@@ -2206,6 +2206,8 @@ sub trait_mod__S_is { my ($cl, $M) = @_;
         $noparm = 'Export tags NYI';
     } elsif ($trait eq 'rawcall') {
         $M->{_ast} = { nobinder => 1 };
+    } elsif ($trait eq 'return-pass') { # &return special
+        $M->{_ast} = { return_pass => 1 };
     } elsif ($trait eq 'rw') {
         $M->{_ast} = { rw => 1 };
     } else {
@@ -2247,7 +2249,7 @@ sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
     $cl->blockcheck;
     Body->new(
         name      => $subname,
-        returnable=> ($type eq 'sub'),
+        returnable=> $args{returnable} // ($type eq 'sub'),
         ($type eq 'mainline' ? (
                 file => $::FILE->{name},
                 text => $::ORIG) : ()),
@@ -2313,6 +2315,7 @@ sub routine_def { my ($cl, $M) = @_;
         return;
     }
     my @export;
+    my $return_pass = 0;
     my $signature = $M->{multisig}[0] ? $M->{multisig}[0]{_ast} :
         $cl->get_placeholder_sig($M);
     for my $t (@{ $M->{trait} }) {
@@ -2320,6 +2323,8 @@ sub routine_def { my ($cl, $M) = @_;
             push @export, @{ $t->{_ast}{export} };
         } elsif ($t->{_ast}{nobinder}) {
             $signature = undef;
+        } elsif ($t->{_ast}{return_pass}) {
+            $return_pass = 1;
         } else {
             $M->sorry('Non-export sub traits NYI');
         }
@@ -2342,6 +2347,7 @@ sub routine_def { my ($cl, $M) = @_;
     $M->{_ast} = $cl->block_to_closure($M,
             $cl->sl_to_block('sub',
                 $M->{blockoid}{_ast},
+                returnable => !$return_pass,
                 subname => $m,
                 signature => $signature),
         outer_key => (($scope eq 'my') ? "&$m" : undef),
