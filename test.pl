@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 531;
+plan 533;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1068,4 +1068,19 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix",
     ok GLOBAL::Foo eq 'Foo()', "also visible globally";
     ok Foo::Bar.bar == 51, "can call through nested methods";
     ok GLOBAL::Foo::Bar.bar == 51, "can call through GLOBAL nested";
+}
+
+{
+    role Foo6596[$x] { # XXX std bug, need to use OUR::Foo[$x]
+        method rfoo { $x }
+    }
+
+    my role Quux {
+        method rquux { "quux" }
+    }
+
+    my class Bar { }
+
+    is (Bar but Quux).rquux, "quux", "can bind roles to classes";
+    is (Bar but OUR::Foo6596["hi"]).rfoo, "hi", "can bind parametric roles to classes";
 }

@@ -239,6 +239,14 @@ sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
 } }
 
+sub _param_role_inst(\|$t) {
+    Q:CgOp { (instrole (unbox fvarlist (@ {$t}))) }
+}
+
+sub infix:<but>($obj, $role) { Q:CgOp {
+    (ns (stab_what (role_apply (obj_llhow (@ {$obj})) (obj_llhow (@ {$role})))))
+} }
+
 sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 # }}}
 # Aggregate types {{{

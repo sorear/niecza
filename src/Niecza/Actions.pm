@@ -2182,7 +2182,7 @@ sub package_def { my ($cl, $M) = @_;
             name => $name);
         $M->{_ast} = $optype->new(
             node($M),
-            ($blocktype eq 'role' ?
+            (($blocktype eq 'role' && $M->{signature}[0]) ?
                 (signature => $M->{signature}[0]{_ast}) : ()),
             name    => $name,
             var     => $outervar,

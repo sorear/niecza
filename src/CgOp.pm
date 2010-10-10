@@ -146,6 +146,7 @@ use warnings;
 
     sub llhow_name { getfield('name', $_[0]) }
     sub stab_privatemethod { rawcall($_[0], 'GetPrivateMethod', $_[1]) }
+    sub stab_what { getfield('typeObject', $_[0]) }
 
     sub varhash_setindex { setindex(@_) }
     sub varhash_getindex { getindex(@_) }
@@ -214,6 +215,7 @@ use warnings;
     sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
     sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
     sub instrole       { rawscall('Kernel.InstantiateRole', $_[0]) }
+    sub role_apply     { rawscall('Kernel.RoleApply', $_[0], $_[1]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),

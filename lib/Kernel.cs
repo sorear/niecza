@@ -407,6 +407,7 @@ namespace Niecza {
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
+        public string[] all_attr;
 
         private WeakReference wr_this;
         // protected by static lock
@@ -422,6 +423,8 @@ namespace Niecza {
 
         public DynMetaObject[] mro;
         public HashSet<DynMetaObject> isa;
+
+        public Dictionary<DynMetaObject, DynMetaObject> butCache;
 
         public DynMetaObject(string name) {
             this.name = name;
@@ -541,6 +544,8 @@ namespace Niecza {
             this.superclasses = new List<DynMetaObject>(superclasses);
             SetMRO(mro);
             this.local_attr = new List<string>(local_attr);
+            this.butCache = new Dictionary<DynMetaObject, DynMetaObject>();
+            this.all_attr = all_attr;
             this.local_does = new DynMetaObject[0];
 
             nslots = 0;
@@ -953,6 +958,45 @@ slow:
             Frame n = th.MakeChild(null, IRSI);
             n.pos = pcl;
             return n;
+        }
+
+        private static DynMetaObject DoRoleApply(DynMetaObject b,
+                DynMetaObject role) {
+            DynMetaObject n = new DynMetaObject(b.name + " but " + role.name);
+            if (role.local_attr.Count != 0)
+                throw new NieczaException("RoleApply with attributes NYI");
+            if (role.superclasses.Count != 0)
+                throw new NieczaException("RoleApply with superclasses NYI");
+            DynMetaObject[] nmro = new DynMetaObject[b.mro.Length + 1];
+            Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
+            nmro[0] = n;
+            n.FillClass(b.local_attr.ToArray(), b.all_attr,
+                    new DynMetaObject[] { b }, nmro);
+            foreach (KeyValuePair<string, IP6> kv in role.priv)
+                n.AddPrivateMethod(kv.Key, kv.Value);
+            foreach (KeyValuePair<string, IP6> kv in role.local)
+                n.AddMethod(kv.Key, kv.Value);
+            if (role.multiregex != null)
+                foreach (KeyValuePair<string, List<DynObject>> kv
+                        in role.multiregex)
+                    foreach (DynObject dx in kv.Value)
+                        n.AddMultiRegex(kv.Key, dx);
+
+            n.how = BoxAny(n, b.how).Fetch();
+            n.typeObject = new DynObject(n);
+            ((DynObject)n.typeObject).slots = null;
+
+            return n;
+        }
+
+        public static DynMetaObject RoleApply(DynMetaObject b,
+                DynMetaObject role) {
+            lock (b) {
+                DynMetaObject rs;
+                if (b.butCache.TryGetValue(role, out rs))
+                    return rs;
+                return b.butCache[role] = DoRoleApply(b, role);
+            }
         }
 
         public static Frame StartP6Thread(Frame th, IP6 sub) {
