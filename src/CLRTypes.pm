@@ -150,6 +150,7 @@ my %typedata = (
 my %tmap = (
     # a simple string, like string or $S32.  May support nulls
     'str'       => 'String',
+    'strbuf'    => 'System.Text.StringBuilder',
     # a reference to a container + usage flags
     'var'       => 'Variable',
     # a reference to a single Perl 6 object, decontainerized
@@ -160,8 +161,10 @@ my %tmap = (
     'varhash'   => 'Dictionary<string,Variable>',
     'fvarlist'  => 'Variable[]',
     'vvarlist'  => 'VarDeque',
-    # XXX does this leak too much information about the metamodel?
-    'class'     => 'DynMetaObject',
+    'stab'      => 'DynMetaObject',
+    # portable IO is hard, we let CgOp fake it for now?
+    'treader'   => 'System.IO.TextReader',
+    'twriter'   => 'System.IO.TextWriter',
 );
 
 sub _generic_infer {

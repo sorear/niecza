@@ -19,23 +19,15 @@ my class Mu {
     method so() { self.Bool }
     method not() { ! self.Bool }
     method RAWCREATE is rawcall { Q:CgOp {
-        (withtypes i int max int obj clr:DynObject
-          [l max (getfield Length (getfield pos (callframe)))]
-          [l i (int 1)]
-          [l obj (rawnew clr:DynObject (getfield mo (cast clr:DynObject
-                  (@ (pos 0)))))]
+        (letn max (poscount)
+              i   (int 1)
+              obj (obj_newblank (obj_llhow (@ (pos 0))))
           [whileloop 0 0 (< (l i) (l max)) (prog
               [setslot
                 (unbox str (@ (pos (l i)))) (l obj)
                 (nsw (@ (pos (+ (l i) (int 1)))))]
               [l i (+ (l i) (int 2))])]
           [ns (l obj)])
-    } }
-    method bless($obj) { Q:CgOp {
-        (prog
-          [setfield mo (cast clr:DynObject (@ {$obj}))
-            (getfield mo (cast clr:DynObject (@ {self})))]
-          {$obj})
     } }
     method CREATE() { Q:CgOp {
         (rawscall Kernel.DefaultNew (@ (l self))) } }
@@ -108,13 +100,12 @@ my class Str is Cool {
         (box Num (cast num (str_length (unbox str (@ (l self))))))
     } }
     method say() { Q:CgOp {
-        (prog [rawscall Console.WriteLine
-                (unbox str (@ {self}))]
+        (prog [say (unbox str (@ {self}))]
               [box Bool (bool 1)]
         )
     } }
     method substr($from, $len) { Q:CgOp {
-        (box Str (rawcall [unbox str (@ {self})] Substring
+        (box Str (str_substring [unbox str (@ {self})]
                     [cast int (unbox num (@ {$from}))]
                     [cast int (unbox num (@ {$len}))]))
     } }
@@ -158,14 +149,14 @@ constant False = Q:CgOp { (box Bool (bool 0)) };
 # taking a slurpy is wrong for this due to flattening.  I'm not sure what is
 # right, maybe **@foo
 sub infix:<~> is rawcall { Q:CgOp {
-    (letn buf (rawnew clr:System.Text.StringBuilder)
+    (letn buf (strbuf_new)
           i   (int 0)
-          max (getfield Length (getfield pos (callframe)))
+          max (poscount)
       [whileloop 0 0 (< (l i) (l max)) (prog
-          [rawcall (l buf) Append
+          [strbuf_append (l buf)
             (unbox str (@ (methodcall (pos (l i)) Str)))]
           [l i (+ (l i) (int 1))])]
-      [box Str (rawcall (l buf) ToString)])
+      [box Str (strbuf_seal (l buf))])
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
@@ -209,18 +200,15 @@ sub infix:<< != >>($l,$r) { Q:CgOp {
 } }
 
 sub warn($str) { Q:CgOp {
-    (prog [rawscall Console.Error.WriteLine
-            (unbox str (@ {$str.Str}))]
+    (prog [note (unbox str (@ {$str.Str}))]
           [box Bool (bool 1)]
     )
 } }
 
 sub say($obj) { ($obj ~~ Cool) ?? $obj.say !! $obj.Str.say }
 
-sub exit() { Q:CgOp {
-    (prog [rawscall System.Environment.Exit (int 0) ]
-          [null var]
-    )
+sub exit($status = 0) { Q:CgOp {
+    (rnull [exit (cast int (unbox num (@ {$status})))])
 } }
 
 sub infix:<=> is rawcall { Q:CgOp { (prog [assign (pos 0) (pos 1)] (pos 0)) } }
@@ -316,7 +304,7 @@ my class List is Cool {
 
     method clone() { Q:CgOp {
         (letn selfo (@ {self})
-              new (rawnew clr:DynObject (obj_llhow (l selfo)))
+              new (obj_newblank (obj_llhow (l selfo)))
           (setslot flat (l new) (getslot flat bool (l selfo)))
           (setslot items (l new) (rawnew vvarlist
               (getslot items vvarlist (l selfo))))
@@ -326,7 +314,7 @@ my class List is Cool {
     } }
 
     method SETUP($flat, $parcel) { Q:CgOp {
-        (letn new (rawnew clr:DynObject (obj_llhow (@ {self})))
+        (letn new (obj_newblank (obj_llhow (@ {self})))
           (setslot flat (l new) (unbox bool (@ {$flat.Bool})))
           (setslot rest (l new) (vvarlist_from_fvarlist
               (unbox fvarlist (@ {$parcel}))))
@@ -378,7 +366,7 @@ my class List is Cool {
               (!= (vvarlist_count (l rest)) (i 0)) (b 0))
             (prog
               (l v (vvarlist_shift (l rest)))
-              (ternary (ternary (l flat) (getfield islist (l v)) (b 0))
+              (ternary (ternary (l flat) (var_islist (l v)) (b 0))
                 (vvarlist_unshift (l rest) (methodcall (l v) iterator))
                 (ternary (obj_isa (@ (l v)) (l ItMo))
                   (vvarlist_unshiftn (l rest) (unbox fvarlist

@@ -140,6 +140,9 @@ use warnings;
     sub obj_llhow { getfield('mo', $_[0]) }
     sub obj_isa { rawcall($_[0], 'Isa', $_[1]) }
     sub obj_does { rawcall($_[0], 'Does', $_[1]) }
+    sub obj_newblank { rawnew('clr:DynObject', $_[0]) }
+
+    sub var_islist { getfield('islist', $_[0]) }
 
     sub llhow_name { getfield('name', $_[0]) }
 
@@ -149,9 +152,26 @@ use warnings;
     sub varhash_new { rawnew('varhash') }
 
     sub newgeneralvar { rawnew('clr:SimpleVariable', $_[0], $_[1], rawsget('Kernel.AnyMO'), $_[2], $_[3]) }
+    sub poscount { getfield('Length', getfield('pos', callframe())) }
 
     sub num_to_string { rawcall($_[0], 'ToString') }
     sub str_length { getfield('Length', $_[0]) }
+    sub str_substring { rawcall($_[0], 'Substring', $_[1], $_[2]) }
+    sub str_chr { rawnew('str', cast('clr:System.Char', $_[0]), CgOp::int(1)) }
+
+    sub strbuf_new { rawnew('strbuf') }
+    sub strbuf_append { rawcall($_[0], 'Append', $_[1]) }
+    sub strbuf_seal { rawcall($_[0], 'ToString') }
+
+    sub say { rawscall('Console.WriteLine', $_[0]) }
+    sub note { rawscall('Console.Error.WriteLine', $_[0]) }
+    sub exit { rawscall('System.Environment.Exit', $_[0]) }
+    sub slurp { rawscall('System.IO.File.ReadAllText', $_[0]) }
+
+    sub treader_getc    { rawcall($_[0], 'Read:m,Int32') }
+    sub treader_slurp   { rawcall($_[0], 'ReadToEnd:m,String') }
+    sub treader_getline { rawcall($_[0], 'ReadLine:m,String') }
+    sub treader_stdin   { rawsget('System.Console.In:f,System.IO.TextReader') }
 
     sub fvarlist_length { getfield('Length', $_[0]) }
     sub fvarlist_new { rawnewarr('var', @_) }

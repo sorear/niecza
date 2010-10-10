@@ -2,10 +2,7 @@
 
 my module CORE;
 
-sub slurp($path) {
-    Q:CgOp { (box Str (rawscall System.IO.File.ReadAllText
-        (unbox str (@ {$path})))) }
-}
+sub slurp($path) { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
 
 my class IO is Cool {
     has $!value;
@@ -13,22 +10,18 @@ my class IO is Cool {
 
 my class TextReader is IO {
     method get() {
-        Q:CgOp { (box Str (rawcall (unbox clr:System.IO.TextReader (@ {self}))
-                     ReadLine:m,System.String)) };
+        Q:CgOp { (box Str (treader_getline (unbox treader (@ {self})))) }
     }
 
     method slurp() {
-        Q:CgOp { (box Str (rawcall (unbox clr:System.IO.TextReader (@ {self}))
-                     ReadToEnd:m,System.String)) };
+        Q:CgOp { (box Str (treader_slurp (unbox treader (@ {self})))) }
     }
 
     method getc() {
         Q:CgOp {
-            (letn chi (rawcall (unbox clr:System.IO.TextReader (@ {self}))
-                        Read:m,System.Int32)
+            (letn chi (treader_getc (unbox treader (@ {self})))
               (ternary (>= (l chi) (int 0))
-                (box Str (rawnew str
-                           (cast clr:System.Char (l chi)) (int 1)))
+                (box Str (str_chr (l chi)))
                 {Str}))
         };
     }
@@ -38,7 +31,6 @@ my class TextReader is IO {
     }
 }
 
-$PROCESS::IN ::= Q:CgOp { (box TextReader (rawsget
-    System.Console.In:f,System.IO.TextReader)) };
+$PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
 
 {YOU_ARE_HERE}
