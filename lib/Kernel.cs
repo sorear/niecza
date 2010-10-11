@@ -43,10 +43,14 @@ namespace Niecza {
         // this, rather a container of this
         public virtual Frame InvokeMethod(Frame caller, string name,
                 Variable[] pos, Dictionary<string, Variable> named) {
-            IP6 m;
+            DispatchEnt m;
             //Kernel.LogNameLookup(name);
             if (mo.mro_methods.TryGetValue(name, out m)) {
-                return m.Invoke(caller, pos, named);
+                Frame nf = caller.MakeChild(m.outer, m.info);
+                nf.pos = pos;
+                nf.named = named;
+                nf.curDisp = m;
+                return nf;
             }
             return Fail(caller, "Unable to resolve method " + name);
         }
@@ -78,6 +82,21 @@ namespace Niecza {
                 np[0] = Kernel.NewROScalar(this);
                 return InvokeMethod(c, "INVOKE", np, n);
             }
+        }
+    }
+
+    public sealed class DispatchEnt {
+        public DispatchEnt next;
+        public SubInfo info;
+        public Frame outer;
+        public IP6 ip6;
+
+        public DispatchEnt(DispatchEnt next, IP6 ip6) {
+            this.ip6 = ip6;
+            this.next = next;
+            DynObject d = (DynObject)ip6;
+            this.outer = (Frame) d.slots[0];
+            this.info = (SubInfo) d.slots[1];
         }
     }
 
@@ -245,6 +264,7 @@ namespace Niecza {
 
         public object[] lexn;
 
+        public DispatchEnt curDisp;
         public RxFrame rx;
 
         public Variable[] pos;
@@ -278,6 +298,7 @@ namespace Niecza {
             reusable_child.lex1 = null;
             reusable_child.lex2 = null;
             reusable_child.lex3 = null;
+            reusable_child.curDisp = null;
             reusable_child.caller = this;
             reusable_child.outer = outer;
             reusable_child.info = info;
@@ -393,7 +414,7 @@ namespace Niecza {
         public InvokeHandler OnInvoke;
 
         public InvokeHandler mro_OnInvoke;
-        public Dictionary<string, IP6> mro_methods;
+        public Dictionary<string, DispatchEnt> mro_methods;
 
         public DynMetaObject[] local_does;
 
@@ -435,7 +456,7 @@ namespace Niecza {
 
         private void Revalidate() {
             mro_OnInvoke = null;
-            mro_methods = new Dictionary<string,IP6>();
+            mro_methods = new Dictionary<string,DispatchEnt>();
 
             if (mro == null)
                 return;
@@ -447,8 +468,11 @@ namespace Niecza {
                 if (k.OnInvoke != null)
                     mro_OnInvoke = k.OnInvoke;
 
-                foreach (KeyValuePair<string,IP6> m in k.local)
-                    mro_methods[m.Key] = m.Value;
+                foreach (KeyValuePair<string,IP6> m in k.local) {
+                    DispatchEnt de;
+                    mro_methods.TryGetValue(m.Key, out de);
+                    mro_methods[m.Key] = new DispatchEnt(de, m.Value);
+                }
             }
         }
 
@@ -497,20 +521,20 @@ namespace Niecza {
         }
 
         public IP6 Can(string name) {
-            IP6 m;
+            DispatchEnt m;
             if (mro_methods.TryGetValue(name, out m))
-                return m;
+                return m.ip6; // TODO return an iterator
             return null;
         }
 
-        public Dictionary<string,IP6> AllMethods() {
+        public Dictionary<string,DispatchEnt> AllMethods() {
             return mro_methods;
         }
 
         public HashSet<IP6> AllMethodsSet() {
             HashSet<IP6> r = new HashSet<IP6>();
-            foreach (KeyValuePair<string,IP6> kv in mro_methods)
-                r.Add(kv.Value);
+            foreach (KeyValuePair<string,DispatchEnt> kv in mro_methods)
+                r.Add(kv.Value.ip6);
             return r;
         }
 
