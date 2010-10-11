@@ -273,6 +273,8 @@ namespace Niecza {
 
         // after MakeSub, GatherHelper
         public const int SHARED = 1;
+        // nextsame; on binder failure
+        public const int MULTIPHASE = 2;
         public int flags;
 
         public Frame(Frame caller_, Frame outer_,
@@ -695,7 +697,22 @@ namespace Niecza {
         }
 
         public static Frame BindFail(Frame caller, string msg) {
-            // TODO: Junctional failover goes here, as does some multi stuff
+            // TODO: Junctional failover goes here
+            if ((caller.flags & Frame.MULTIPHASE) != 0) {
+                // TODO: Figure out how .*foo fits in here.
+                Variable[] p = caller.pos;
+                Dictionary<string,Variable> n = caller.named;
+                DispatchEnt de = caller.curDisp.next;
+                if (de == null) {
+                    return Die(caller.caller, "Multiple dispatch failed to find a candidate");
+                }
+                caller = caller.caller.MakeChild(de.outer, de.info);
+                caller.pos = p;
+                caller.named = n;
+                caller.curDisp = de;
+                caller.flags |= Frame.MULTIPHASE;
+                return caller;
+            }
             return Die(caller, msg);
         }
 
@@ -703,6 +720,7 @@ namespace Niecza {
             // TODO: checking for SigCheckOnly goes here
             if (i == caller.pos.Length &&
                     (caller.named == null || caller.named.Count == 0)) {
+                caller.flags &= ~Frame.MULTIPHASE;
                 return caller;
             } else {
                 return BindFail(caller, m);
@@ -1219,6 +1237,7 @@ slow:
                 if (de != null) {
                     Variable[] p = tf.pos;
                     Dictionary<string, Variable> n = tf.named;
+                    int fl = tf.flags & Frame.MULTIPHASE;
                     tf = tf.caller.MakeChild(de.outer, de.info);
                     if (o != null) {
                         tf.pos = (Variable[]) o.slots[0];
@@ -1228,6 +1247,7 @@ slow:
                         tf.named = n;
                     }
                     tf.curDisp = de;
+                    tf.flags |= fl;
                     return tf;
                 } else {
                     tf.caller.resultSlot = Kernel.NewROScalar(Kernel.AnyP);
