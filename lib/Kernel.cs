@@ -175,15 +175,16 @@ namespace Niecza {
         public const int ON_SUCCEED = 6;
         public const int ON_PROCEED = 7;
         public const int ON_GOTO = 8;
+        public const int ON_NEXTDISPATCH = 9;
         public int[] edata;
         public string[] label_names;
 
+        private static string[] controls = new string[] { "unknown", "next",
+            "last", "redo", "return", "die", "succeed", "proceed", "goto",
+            "nextsame/nextwith" };
         public static string DescribeControl(int type, Frame tgt, int lid,
                 string name) {
-            string ty = (type == ON_RETURN) ? "return" :
-                        (type == ON_REDO)   ? "redo" :
-                        (type == ON_LAST)   ? "last" :
-                        (type == ON_NEXT)   ? "next" : "unknown control";
+            string ty = (type < controls.Length) ? controls[type] : "unknown";
             if (lid >= 0) {
                 return ty + "(" + tgt.info.label_names[lid] + ", lexotic)";
             } else if (name != null) {
@@ -1141,6 +1142,13 @@ slow:
             int unip = 0;
 
             for (csr = th; csr != null; csr = csr.caller) {
+                if (type == SubInfo.ON_NEXTDISPATCH) {
+                    if (csr.curDisp != null) {
+                        unf = csr;
+                        break;
+                    }
+                    continue;
+                }
                 // for lexoticism
                 if (tgt != null && tgt != csr)
                     continue;
@@ -1169,7 +1177,7 @@ slow:
                 r.lex0 = mp;
                 return r;
             } else {
-                return Unwind(th, unf, unip, payload);
+                return Unwind(th, type, unf, unip, payload);
             }
         }
 
@@ -1200,8 +1208,32 @@ slow:
             }
         }
 
-        public static Frame Unwind(Frame th, Frame tf, int tip, object td) {
+        public static Frame Unwind(Frame th, int type, Frame tf, int tip,
+                object td) {
             // LEAVE handlers aren't implemented yet.
+            if (type == SubInfo.ON_NEXTDISPATCH) {
+                // These are a bit special because there isn't actually a
+                // catching frame.
+                DispatchEnt de = tf.curDisp.next;
+                DynObject o = td as DynObject;
+                if (de != null) {
+                    Variable[] p = tf.pos;
+                    Dictionary<string, Variable> n = tf.named;
+                    tf = tf.caller.MakeChild(de.outer, de.info);
+                    if (o != null) {
+                        tf.pos = (Variable[]) o.slots[0];
+                        tf.named = o.slots[1] as Dictionary<string,Variable>;
+                    } else {
+                        tf.pos = p;
+                        tf.named = n;
+                    }
+                    tf.curDisp = de;
+                    return tf;
+                } else {
+                    tf.caller.resultSlot = Kernel.NewROScalar(Kernel.AnyP);
+                    return tf.caller;
+                }
+            }
             tf.ip = tip;
             tf.resultSlot = td;
             return tf;
