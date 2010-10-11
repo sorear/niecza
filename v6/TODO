@@ -1,0 +1,45 @@
+Cursor.cursor_fresh
+Cursor.mixin
+Cursor.makestr
+Hash.LISTSTORE
+temp $*FOO
+self in regexes
+:exists
+:delete
+~
+<alpha>
+substr($str,$from,$len)
+invert(%hash)
+not($bool)
+defined($thing)
+infix:<x>
+token { $param-role-var }
+token { :my $var = expr; $var }
+func(|($key => $value))
+circumfix:<[ ]>
+Cursor.trim_heredoc
+shift(@array)
+push(@array, $thing)
+Mu.new(foo => $bar)
+hash literals
+Cursor.moreinput
+Cursor.suppose
+<?{ }>
+Cursor.O
+&note
+&join
+List.at-pos(WhateverCode)
+Cursor.mark_sinks
+Cursor.do_import
+Cursor.do_use
+given & when
+$*FOO as a parameter
+Cursor.deb
+Cursor.gettrait
+pop(@array)
+Parcel.LISTSTORE
+Match.iterator should return numbered captures
+Cursor.add_categorical
+&item
+
+Resume at line 3143
