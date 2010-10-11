@@ -1,0 +1,49 @@
+=head1 Synopsis
+
+This is an overview of the Niecza ecosystem, which is currently contained
+entirely inside the repository.
+
+=head1 Compiler
+
+Found mostly in C<src/>, this converts Perl 6 source to C#.  See
+C<compiler.pod> for more details.
+
+=head1 Runtime system
+
+This comprises C<lib/Kernel.cs> and C<lib/Cursor.cs>; it is the body of C#
+primitives necessary for compiler output to function, or that underlie the
+lowest levels of library functionality.
+
+=head1 Core library
+
+C<lib/SAFE.setting> and C<lib/CORE.setting> are used automatically in Perl 6
+programs and provide definitions of all Perl 6 functions.  They use Niecza
+extensions fairly heavily, especially inline NAM code and references into
+the runtime.
+
+=head1 Other libraries
+
+C<lib/*.pm6> currently provides multithreading and a TAP stub.  I hope to see
+more here eventually.
+
+=head1 Build system
+
+C<Niecza.proj> is in charge of getting the compiler and libraries into a
+usable state and running the tests.  It is supported by C<PerlTask.cs> and
+C<PerlStub.pl>, a Microsoft.Build plugin for running Perl 5 code; not having
+to load Niecza more than once saves quite a few seconds.
+
+=head1 Documentation
+
+Watch this space.
+
+=head1 Miscellany
+
+C<perf/> contains various scripts and tools used to microbenchmark changes in
+Niecza.  C<t/> contains a handful of unit tests (unmaintained).
+
+=head1 Test suite
+
+C<test.pl> is the main test suite; all tests in it are expected to pass.
+C<test2.pl> and C<test3.pl> are much smaller and allowed to contain failing
+tests; I use them as a TDD staging area.

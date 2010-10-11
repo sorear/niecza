@@ -1,0 +1,203 @@
+=head1 Synopsis
+
+This document describes NAM, aka CgOp, the Niecza Abstract Machine.  It is a
+language used to connect the portable parts of Niecza to the unportable, and
+as such requires a fairly strong definition.  Unfortunately this document
+is rather incomplete.
+
+=head1 General model
+
+NAM code consists of one or more units.  Each unit contains a set of fixups
+(details TBD) which allow compiled code to find metaobject data, and a set of
+compilable function bodies.  One unit shall contain a body named MAIN, which
+is run to start execution.
+
+A body contains some basic metadata such as the number of lexical slots
+required, and also a tree of operations.  This tree is structured much like a
+Lisp program and obeys similar evaluation rules.  One difference is that NAM
+nodes have two kinds of children, scalar children and node children, which are
+treated separately.
+
+NAM code must be statically typable but this may not always be enforced.
+Different data objects have logical types, which can map many-to-one onto
+lower-level types, especially in type-poor environments such as Parrot and
+JavaScript.
+
+=head1 Runtime data objects, by static type
+
+=head2 int
+
+A native integer, suitable for loop variables and similar purposes.
+
+=head2 num
+
+A native float, suitable for the Perl 6 Num class.
+
+=head2 bool
+
+A native bool, as returned by comparison operators.
+
+=head2 str
+
+A reference to a native immutable string.
+
+=head2 strbuf
+
+A reference to a native mutable string.
+
+=head2 var
+
+A Perl 6 variable, with identity, potentially mutable and tied.
+
+=head2 obj
+
+A reference to a Perl 6 object; not a variable and cannot be assigned to.
+
+=head2 varhash
+
+A hash table mapping strings to Perl 6 variables.
+
+=head2 fvarlist
+
+An array of Perl 6 variables fixed in length at creation.
+
+=head2 vvarlist
+
+An array of Perl 6 variables supporting OZ<>(1) deque operations.
+
+=head2 stab
+
+The nexus of HOW, WHAT, WHO, and REPR.  Details subject to flux.
+
+=head2 treader
+
+A reference to a native text input object.
+
+=head2 twriter
+
+A reference to a native text output object.
+
+=head2 lad
+
+A node in the LTM Automaton Descriptor metaobject tree.
+
+=head2 cc
+
+A reference to a compiled character class.
+
+=head2 cursor
+
+A reference to a low-level cursor.  Currently a subtype of obj.
+
+=head2 frame
+
+A reference to a call frame.  Currently a subtype of obj.
+
+=head1 Operations
+
+=head2 Aritmetic and logical operations
+
+=head2 Sequence control
+
+=head3 prog
+
+=head3 span
+
+=head3 ehspan
+
+=head3 sink
+
+=head3 labelhere
+
+=head3 cgoto
+
+=head3 goto
+
+=head3 ncgoto
+
+=head3 ternary
+
+=head3 whileloop
+
+=head3 take
+
+=head3 cotake
+
+=head2 Data control
+
+=head3 letn
+
+=head3 fetch
+
+=head3 assign
+
+=head3 newscalar
+
+=head3 newrwscalar
+
+=head3 newblankrwscalar
+
+=head3 newrwlistvar
+
+=head3 null
+
+=head3 sink
+
+=head3 cast
+
+=head2 Object model
+
+=head3 getslot
+
+=head3 setslot
+
+=head3 how
+
+=head3 obj_is_defined
+
+=head3 obj_llhow
+
+=head3 obj_isa
+
+=head3 obj_does
+
+=head3 subcall
+
+=head3 methodcall
+
+=head2 I/O
+
+=head3 say
+
+=head3 slurp
+
+=head3 treader_stdin
+
+=head2 Native operations (CLR)
+
+These are for user code only.  Core library code should define custom system
+primitives instead.
+
+=head3 getfield
+
+=head3 setfield
+
+=head3 rawsget
+
+=head3 rawsset
+
+=head3 rawscall
+
+=head3 rawcall
+
+=head3 setindex
+
+=head3 getindex
+
+=head3 rawnew
+
+=head3 rawnewarr
+
+=head3 rawnewzarr
+
+=head3 labelid
