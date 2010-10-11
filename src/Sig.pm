@@ -25,6 +25,14 @@ use 5.010;
 
     sub slurpy_get {
         my ($self) = @_;
+
+        if ($self->hash) {
+            return CgOp::letn('!h', CgOp::getfield('named', CgOp::callframe),
+                CgOp::setfield('named', CgOp::callframe,
+                    CgOp::null('varhash')),
+                CgOp::box('Hash', CgOp::letvar('!h')));
+        }
+
         CgOp::let(CgOp::rawnew('clr:DynObject', CgOp::getfield('mo',
                     CgOp::cast('clr:DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
             my $do = shift;

@@ -50,6 +50,7 @@ my %typedata = (
           ToString     => [m => 'String'] },
     'Frame' =>
         { pos          => [f => 'Variable[]'],
+          named        => [f => 'Dictionary<string,Variable>'],
           rx           => [f => 'RxFrame'],
           caller       => [f => 'Frame'],
           outer        => [f => 'Frame'],

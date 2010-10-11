@@ -20,6 +20,9 @@ sub nextsame() {
     is B.foo(5), 25, "nextsame functional w/ argument";
     # TODO
     # is B.bar(:x(7)), 14, "nextsame functional w/ named arg";
+
+    sub foo(*%x) { %x }
+    is foo(:z(2))<z>, 2, "slurpy hashes work";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
