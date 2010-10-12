@@ -5,6 +5,37 @@ sub nextsame() {
     Q:CgOp { (control 9 (null frame) (int -1) (null str) (null obj)) }
 }
 
+sub chars($str) { $str.chars }
+sub substr($str, $start, $len = $str.chars - $start) {
+    $str.substr($start, $len)
+}
+
+sub reverse(*@arr) {
+    my @acc;
+    while my $x = @arr.pop { @acc.push($x) }
+    @acc;
+}
+
+sub item($x) { $x }
+
+sub not($x) { $x.not }
+sub defined($x) { $x.defined }
+
+sub push(@arr, *@stuff) { @arr.push(@stuff) }
+sub unshift(@arr, *@stuff) { @arr.unshift(@stuff) }
+sub pop(@arr) { @arr.pop }
+sub shift(@arr) { @arr.shift }
+sub join($tween, *@stuff) { @stuff.join($tween) }
+sub note($text) { Q:CgOp { (rnull (note (unbox str (@ {$text})))) } }
+
+augment class Mu {
+    method item() { self }
+}
+
+augment class Bool {
+    method Numeric() { self ?? 1 !! 0 }
+}
+
 {
     my class A {
         method tom() { 12 }

@@ -2,7 +2,9 @@ class STDStash { # does Associative
     has $!guts;
 
     method new(*%bits) {
-        self.CREATE(guts => %bits);
+        my $new = self.CREATE;
+        $new!guts = %bits;
+        $new;
     }
 
     method at-key($str) { # is rw

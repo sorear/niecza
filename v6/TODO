@@ -7,27 +7,18 @@ self in regexes
 :exists
 :delete
 ~
-<alpha>
-substr($str,$from,$len)
-invert(%hash)
-not($bool)
-defined($thing)
 infix:<x>
 token { $param-role-var }
 token { :my $var = expr; $var }
 func(|($key => $value))
 circumfix:<[ ]>
 Cursor.trim_heredoc
-shift(@array)
-push(@array, $thing)
-Mu.new(foo => $bar)
 hash literals
 Cursor.moreinput
 Cursor.suppose
 <?{ }>
 Cursor.O
-&note
-&join
+<alpha>
 List.at-pos(WhateverCode)
 Cursor.mark_sinks
 Cursor.do_import
@@ -36,28 +27,41 @@ given & when
 $*FOO as a parameter
 Cursor.deb
 Cursor.gettrait
-pop(@array)
 Parcel.LISTSTORE
 Match.iterator should return numbered captures
 Cursor.add_categorical
-&item
 $<sym>
 Cursor.cursor_all
 Cursor.cursor_herelang
-&reverse
 Match.synthetic
 $<foo> = 1
 Match.perl
 Match.CURSOR
 Cursor.check_old_cclass
-&chars
 Cursor.lineof
 &sort
 Cursor.canonicalize_name
 () being Nil
 if not binding $_
 gt, lt, leg, etc
-Bool.Numeric
 Cursor.load_lex
 Hash.keys &keys
 EXPR will need a re-write with tests.
+invert(%hash)
+
+DONE OR AVERTED:
+
+Mu.new(foo => $bar)
+Bool.Numeric
+//=, ||=, &&=, etc
+substr($str,$from,$len)
+not($bool)
+defined($thing)
+shift(@array)
+push(@array, $thing)
+&item
+&reverse
+&chars
+&note
+&join
+pop(@array)

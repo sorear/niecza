@@ -328,7 +328,7 @@ regex stdstopper {
     | <?before <stopper> >
     | $                                 # unlikely, check last (normal LTM behavior)
     ]
-    { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
+    { @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$¢.pos] || 1; }
 }
 
 token longname {
@@ -725,6 +725,14 @@ class Herestub {
     has $.delim;
     has $.orignode;
     has $.lang;
+
+    method new(:$delim, :$orignode, :$lang) {
+        my $new = self.CREATE;
+        $new!delim = $delim;
+        $new!orignode = $orignode;
+        $new!lang = $lang;
+        $new;
+    }
 }
 
 role herestop {
@@ -1209,7 +1217,7 @@ grammar P6 is STD {
         :my $*GOAL ::= '{';
         :my $*BORG = {};
         <EXPR>
-        { $*BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
+        { $*BORG.<culprit> = $*BORG<culprit> // $<EXPR>.cursor(self.pos) }
         <.ws>
         <pblock>
     }
@@ -1740,7 +1748,7 @@ grammar P6 is STD {
         :my $outer = $*CURLEX;
         :temp $*CURPKG;
         :temp $*CURLEX;
-        { $*SCOPE ||= 'our'; }
+        { $*SCOPE = $*SCOPE || 'our'; }
         [
             [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
             <.newlex>
@@ -1768,7 +1776,7 @@ grammar P6 is STD {
                         }
                     }
                     $*begin_compunit = 0;
-                    $*UNIT<$?LONGNAME> ||= $longname ?? $longname<name>.Str !! '';
+                    $*UNIT<$?LONGNAME> = $*UNIT<$?LONGNAME> || ($longname ?? $longname<name>.Str !! '');
                 }}
                 { $*IN_DECL = ''; }
                 <blockoid>
@@ -2403,7 +2411,7 @@ grammar P6 is STD {
         :my $name;
         <?before <sigil> {
             $sigil = $<sigil>.Str;
-            $*LEFTSIGIL ||= $sigil;
+            $*LEFTSIGIL = $*LEFTSIGIL || $sigil;
         }> {}
         [
         || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
@@ -2910,7 +2918,7 @@ grammar P6 is STD {
                 ]
                 [
                 | '?'           { $quant = '?'; $kind = '?' }
-                | '!'           { $quant = '!'; $kind //= '!' }
+                | '!'           { $quant = '!'; $kind = $kind // '!' }
                 | <?>
                 ]
             | <?> { $quant = ''; $kind = '!' }
@@ -2926,7 +2934,7 @@ grammar P6 is STD {
             ]
             [
             | '?'           { $quant = '?'; $kind = '?' }
-            | '!'           { $quant = '!'; $kind //= '!' }
+            | '!'           { $quant = '!'; $kind = $kind // '!' }
             | <?>
             ]
         | {} <longname> <.panic("In parameter declaration, typename '" ~ $<longname>.Str ~ "' must be predeclared (or marked as declarative with :: prefix)")>
@@ -3112,7 +3120,7 @@ grammar P6 is STD {
     }
 
     token circumfix:sigil
-        { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
+        { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL = $*LEFTSIGIL || $<sigil>.Str } <O(|%term)> }
 
     token circumfix:sym<( )>
         { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
@@ -4031,7 +4039,7 @@ grammar P6 is STD {
                 if $*BORG and $*BORG.<block> {
                     if not $*BORG.<name> {
                         $*BORG.<culprit> = $<longname>.cursor($pos);
-                        $*BORG.<name> //= $name;
+                        $*BORG.<name> = $*BORG<name> // $name;
                     }
                 }
             }}
@@ -5118,7 +5126,7 @@ method newlex ($needsig = 0) {
     }
     else {
         $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
-        $*CURLEX = Stash.new(
+        $*CURLEX = STDStash.new(
             'OUTER::' => [$oid],
             '!file' => $*FILE, '!line' => $line,
             '!id' => [$id],
@@ -5134,9 +5142,9 @@ method newlex ($needsig = 0) {
 
 method finishlex {
     my $line = self.lineof(self.pos);
-    $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$_> = $*CURLEX<$_> // NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$/> = $*CURLEX<$/> // NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$!> = $*CURLEX<$!> // NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
     $*SIGNUM = 0;
     self;
 }
@@ -5344,7 +5352,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= Stash.new(
+        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // STDStash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
@@ -5416,14 +5424,14 @@ method add_my_name ($n, $d = Nil, $p = Nil) {
         $*DECLARAND<declaredat> = self.pos;
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
-        $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
+        $*DECLARAND<const> = $*DECLARAND<const> || 1 if $*IN_DECL eq 'constant';
         $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %::MYSTERY{substr($name,1)};
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
-            $curstash.{"&$shortname"} //= $curstash.{$shortname};
-            $curstash.{"&$shortname"}<used> = 1;
+            $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $curstash.{$shortname};
+            $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
-                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
+                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // STDStash.new(
                     'PARENT::' => $curstash.idref,
                     '!file' => $*FILE, '!line' => self.line,
                     '!id' => [$sid] ));
@@ -5452,7 +5460,7 @@ method add_our_name ($n) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= Stash.new(
+        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // STDStash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
@@ -5508,16 +5516,16 @@ method add_our_name ($n) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        $curstash.{$shortname} //= $declaring unless $shortname eq $name;
+        $curstash.{$shortname} = $curstash{$shortname} // $declaring unless $shortname eq $name;
         $*DECLARAND<inpkg> = $curstash.idref;
         if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
-            $curstash.{"\&$shortname"} //= $declaring;
+            $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $declaring;
             $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
-            $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
+            $*NEWPKG = ($curstash.{$name ~ '::'} = $curstash.{$name ~ '::'} // STDStash.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
-                '!id' => [$sid] );
+                '!id' => [$sid] ));
         }
     }
     self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
@@ -5593,12 +5601,12 @@ method load_setting ($setting) {
     $ALL = self.load_lex($setting);
 
     $*CORE = $ALL<CORE>;
-    $*CORE.<!id> //= ['CORE'];
+    $*CORE.<!id> = $*CORE.<!id> // ['CORE'];
 
     $*SETTING = $ALL<SETTING>;
     $*CURLEX = $*SETTING;
 
-    $*GLOBAL = $*CORE.<GLOBAL::> = Stash.new(
+    $*GLOBAL = $*CORE.<GLOBAL::> = STDStash.new(
         '!file' => $*FILE, '!line' => 1,
         '!id' => ['GLOBAL'],
     );
@@ -5769,11 +5777,11 @@ method check_variable ($variable) {
     given $twigil {
         when '' {
             my $ok = 0;
-            $ok ||= $*IN_DECL;
-            $ok ||= $sigil eq '&';
-            $ok ||= $first lt 'A';
-            $ok ||= self.is_known($name);
-            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+            $ok = $ok || $*IN_DECL;
+            $ok = $ok || $sigil eq '&';
+            $ok = $ok || $first lt 'A';
+            $ok = $ok || self.is_known($name);
+            $ok = $ok || $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
             if not $ok {
                 my $id = $name;
                 ($id) = ($id ~~ /\W ** 0..2 (.*)/);
