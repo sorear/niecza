@@ -2661,28 +2661,26 @@ grammar P6 is STD {
         <!after \s>
         (< i g s m x c e >+) 
         {{
-            given $0.Str {
-                $_ ~~ /i/ and $¢.worryobs('/i',':i');
-                $_ ~~ /g/ and $¢.worryobs('/g',':g');
-                $_ ~~ /m/ and $¢.worryobs('/m','^^ and $$ anchors');
-                $_ ~~ /s/ and $¢.worryobs('/s','. or \N');
-                $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
-                $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
-                $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
-                $¢.obs('suffix regex modifiers','prefix adverbs');
-            }
+            my $m = $0.Str;
+            $m ~~ /i/ and $¢.worryobs('/i',':i');
+            $m ~~ /g/ and $¢.worryobs('/g',':g');
+            $m ~~ /m/ and $¢.worryobs('/m','^^ and $$ anchors');
+            $m ~~ /s/ and $¢.worryobs('/s','. or \N');
+            $m ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
+            $m ~~ /c/ and $¢.worryobs('/c',':c or :p');
+            $m ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
+            $¢.obs('suffix regex modifiers','prefix adverbs');
         }}
     }
 
     token old_tr_mods {
         (< c d s ] >+) 
         {{
-            given $0.Str {
-                $_ ~~ /c/ and $¢.worryobs('/c',':c');
-                $_ ~~ /d/ and $¢.worryobs('/g',':d');
-                $_ ~~ /s/ and $¢.worryobs('/s',':s');
-                $¢.obs('suffix transliteration modifiers','prefix adverbs');
-            }
+            my $m = $0.Str;
+            $m ~~ /c/ and $¢.worryobs('/c',':c');
+            $m ~~ /d/ and $¢.worryobs('/g',':d');
+            $m ~~ /s/ and $¢.worryobs('/s',':s');
+            $¢.obs('suffix transliteration modifiers','prefix adverbs');
         }}
     }
 
@@ -2904,7 +2902,7 @@ grammar P6 is STD {
         | <type_constraint>+
             {{
                 my $t = $<type_constraint>;
-                my @t = grep { substr($_.Str,0,2) ne '::' }, @$t;
+                my @t = grep { substr($^tc.Str,0,2) ne '::' }, @$t;
                 @t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
             }}
             [
@@ -3086,18 +3084,18 @@ grammar P6 is STD {
         <?before '{' | '->' > <!{ $*IN_META }> {{
             my $needparens = 0;
             my $line = $¢.lineof($¢.pos);
-            for 'if', 'unless', 'while', 'until', 'for', 'given', 'when', 'loop', 'sub', 'method' {
-                $needparens++ if $_ eq 'loop';
-                my $m = %*MYSTERY{$_};
+            for 'if', 'unless', 'while', 'until', 'for', 'given', 'when', 'loop', 'sub', 'method' -> $loopy {
+                $needparens++ if $loopy eq 'loop';
+                my $m = %*MYSTERY{$loopy};
                 next unless $m;
                 if $line - ($m.<line>//-123) < 5 {
                     if $m.<ctx> eq '(' {
-                        $¢.panic("Word '$_' interpreted as '$_" ~ "()' function call; please use whitespace " ~
+                        $¢.panic("Word '$loopy' interpreted as '$loopy" ~ "()' function call; please use whitespace " ~
                         ($needparens ?? 'around the parens' !! 'instead of parens') ~ $m<token>.locmess ~
                         "\nUnexpected block in infix position (two terms in a row)");
                     }
                     else {
-                        $¢.panic("Word '$_' interpreted as a listop; please use 'do $_' to introduce the statement control word" ~ $m<token>.cursor($m<token>.from).locmess ~
+                        $¢.panic("Word '$loopy' interpreted as a listop; please use 'do $loopy' to introduce the statement control word" ~ $m<token>.cursor($m<token>.from).locmess ~
                         "\nUnexpected block in infix position (two terms in a row)");
                     }
                 }
@@ -3430,8 +3428,8 @@ grammar P6 is STD {
         | <?stdstopper>
         | <EXPR(item %list_prefix)> {{
                 my $delims = $<EXPR><delims>;
-                for @$delims {
-                    if $_.<infix><wascolon> // '' {
+                for @$delims -> $d {
+                    if $d.<infix><wascolon> // '' {
                         if $inv_ok {
                             $*INVOCANT_IS = $<EXPR><list>[0];
                         }
@@ -3879,7 +3877,7 @@ grammar P6 is STD {
         try {
             my $methop = $node<right><methodop>;
             my $name = $methop<longname>.Str;
-            if grep { $_ eq $name }, <new clone sort subst trans reverse uniq map samecase substr flip fmt pick> {
+            if grep { $^valid eq $name }, <new clone sort subst trans reverse uniq map samecase substr flip fmt pick> {
                 $ok = 1;
             }
             elsif not $methop.<args>[0] {
@@ -5279,13 +5277,14 @@ method find_stash ($n, $curlex = $*CURLEX) {
     return $curlex if $name eq '';
 
     my $lex = $curlex;
+    my $old;
     while $lex {
-        return $_ if $_ = $lex.{$name};
+        return $old if $old = $lex.{$name};
         my $oid = $lex.<OUTER::>[0] || last;
         $lex = $ALL.{$oid};
     }
-    return $_ if $_ = $curlex.{$name};
-    return $_ if $_ = $*GLOBAL.{$name};
+    return $old if $old = $curlex.{$name};
+    return $old if $old = $*GLOBAL.{$name};
     return ();
 }
 
@@ -5554,22 +5553,22 @@ method explain_mystery() {
     my %unk_types;
     my %unk_routines;
     my $m = '';
-    for keys(%*MYSTERY) {
-        my $p = %*MYSTERY{$_}.<lex>;
-        if self.is_name($_, $p) {
+    for keys(%*MYSTERY) -> $unk {
+        my $p = %*MYSTERY{$unk}.<lex>;
+        if self.is_name($unk, $p) {
             # types may not be post-declared
-            %post_types{$_} = %*MYSTERY{$_};
+            %post_types{$unk} = %*MYSTERY{$unk};
             next;
         }
 
-        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
+        next if self.is_known($unk, $p) or self.is_known('&' ~ $unk, $p);
 
         # just a guess, but good enough to improve error reporting
-        if $_ lt 'a' {
-            %unk_types{$_} = %*MYSTERY{$_};
+        if $unk lt 'a' {
+            %unk_types{$unk} = %*MYSTERY{$unk};
         }
         else {
-            %unk_routines{$_} = %*MYSTERY{$_};
+            %unk_routines{$unk} = %*MYSTERY{$unk};
         }
     }
     if %post_types {

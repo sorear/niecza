@@ -42,7 +42,6 @@ Cursor.lineof
 &sort
 Cursor.canonicalize_name
 () being Nil
-if not binding $_
 gt, lt, leg, etc
 Cursor.load_lex
 Hash.keys &keys
@@ -51,6 +50,7 @@ invert(%hash)
 
 DONE OR AVERTED:
 
+if not binding $_
 Mu.new(foo => $bar)
 Bool.Numeric
 //=, ||=, &&=, etc
