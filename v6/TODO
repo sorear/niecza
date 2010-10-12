@@ -41,5 +41,23 @@ Parcel.LISTSTORE
 Match.iterator should return numbered captures
 Cursor.add_categorical
 &item
-
-Resume at line 3143
+$<sym>
+Cursor.cursor_all
+Cursor.cursor_herelang
+&reverse
+Match.synthetic
+$<foo> = 1
+Match.perl
+Match.CURSOR
+Cursor.check_old_cclass
+&chars
+Cursor.lineof
+&sort
+Cursor.canonicalize_name
+() being Nil
+if not binding $_
+gt, lt, leg, etc
+Bool.Numeric
+Cursor.load_lex
+Hash.keys &keys
+EXPR will need a re-write with tests.
