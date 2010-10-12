@@ -23,7 +23,6 @@ List.at-pos(WhateverCode)
 Cursor.mark_sinks
 Cursor.do_import
 Cursor.do_use
-given & when
 $*FOO as a parameter
 Cursor.deb
 Cursor.gettrait
@@ -50,6 +49,7 @@ invert(%hash)
 
 DONE OR AVERTED:
 
+given & when
 if not binding $_
 Mu.new(foo => $bar)
 Bool.Numeric

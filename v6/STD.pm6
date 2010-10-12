@@ -1625,19 +1625,18 @@ grammar P6 is STD {
             $<shape> = [
             | '(' ~ ')' <signature>
                 {{
-                    given substr($var,0,1) {
-                        when '&' {
-                            $¢.sorry("The () shape syntax in routine declarations is reserved (maybe use :() to declare a longname?)");
-                        }
-                        when '@' {
-                            $¢.sorry("The () shape syntax in array declarations is reserved");
-                        }
-                        when '%' {
-                            $¢.sorry("The () shape syntax in hash declarations is reserved");
-                        }
-                        default {
-                            $¢.sorry("The () shape syntax in variable declarations is reserved");
-                        }
+                    my $sigil = substr($var,0,1);
+                    if $sigil eq '&' {
+                        $¢.sorry("The () shape syntax in routine declarations is reserved (maybe use :() to declare a longname?)");
+                    }
+                    elsif $sigil eq '@' {
+                        $¢.sorry("The () shape syntax in array declarations is reserved");
+                    }
+                    elsif $sigil eq '%' {
+                        $¢.sorry("The () shape syntax in hash declarations is reserved");
+                    }
+                    else {
+                        $¢.sorry("The () shape syntax in variable declarations is reserved");
                     }
                 }}
             | :dba('shape definition') '[' ~ ']' <semilist>
@@ -1857,15 +1856,13 @@ grammar P6 is STD {
         try {
             my $statements = self.<blockoid><statementlist><statement>;
             my $startsym = $statements[0]<EXPR><sym> // '';
-            given $startsym {
-                when '...' { $*DECLARAND<stub> = 1 }
-                when '!!!' { $*DECLARAND<stub> = 1 }
-                when '???' { $*DECLARAND<stub> = 1 }
-                when '*' {
-                    if $*MULTINESS eq 'proto' and $statements.elems == 1 {
-                        self.<blockoid>:delete;
-                        self.<onlystar> = 1;
-                    }
+            if $startsym eq '...' { $*DECLARAND<stub> = 1 }
+            elsif $startsym eq '!!!' { $*DECLARAND<stub> = 1 }
+            elsif $startsym eq '???' { $*DECLARAND<stub> = 1 }
+            elsif $startsym eq '*' {
+                if $*MULTINESS eq 'proto' and $statements.elems == 1 {
+                    self.<blockoid>:delete;
+                    self.<onlystar> = 1;
                 }
             }
         }
@@ -2258,44 +2255,40 @@ grammar P6 is STD {
     # XXX should eventually rely on multi instead of nested cases here...
     method obscaret (Str $var, Str $sigil, Str $name) {
         my $repl;
-        given $sigil {
-            when '$' {
-                given $name {
-                    when 'MATCH'         { $repl = '$/' }
-                    when 'PREMATCH'      { $repl = 'an explicit pattern before <(' }
-                    when 'POSTMATCH'     { $repl = 'an explicit pattern after )>' }
-                    when 'ENCODING'      { $repl = '$?ENCODING' }
-                    when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
-                    when 'TAINT'         { $repl = '$*TAINT' }
-                    when 'OPEN'          { $repl = 'filehandle introspection' }
-                    when 'N'             { $repl = '$-1' } # XXX ???
-                    when 'L'             { $repl = 'Form module' }
-                    when 'A'             { $repl = 'Form module' }
-                    when 'E'             { $repl = '$!.extended_os_error' }
-                    when 'C'             { $repl = 'COMPILING namespace' }
-                    when 'D'             { $repl = '$*DEBUGGING' }
-                    when 'F'             { $repl = '$*SYSTEM_FD_MAX' }
-                    when 'H'             { $repl = '$?FOO variables' }
-                    when 'I'             { $repl = '$*INPLACE' } # XXX ???
-                    when 'O'             { $repl = '$?OS or $*OS' }
-                    when 'P'             { $repl = 'whatever debugger Perl 6 comes with' }
-                    when 'R'             { $repl = 'an explicit result variable' }
-                    when 'S'             { $repl = 'the context function' } # XXX ???
-                    when 'T'             { $repl = '$*BASETIME' }
-                    when 'V'             { $repl = '$*PERL_VERSION' }
-                    when 'W'             { $repl = '$*WARNING' }
-                    when 'X'             { $repl = '$*EXECUTABLE_NAME' }
-                    when *               { $repl = "a global form such as $sigil*$name" }
-                }
-            }
-            when '%' {
-                given $name {
-                    when 'H'             { $repl = '$?FOO variables' }
-                    when *               { $repl = "a global form such as $sigil*$name" }
-                }
-            }
-            when * { $repl = "a global form such as $sigil*$name" }
-        };
+        if $sigil eq '$' {
+            if $name eq 'MATCH'        { $repl = '$/' }
+            elsif $name eq 'PREMATCH'  { $repl = 'an explicit pattern before <(' }
+            elsif $name eq 'POSTMATCH' { $repl = 'an explicit pattern after )>' }
+            elsif $name eq 'ENCODING'  { $repl = '$?ENCODING' }
+            elsif $name eq 'UNICODE'   { $repl = '$?UNICODE' }  # XXX ???
+            elsif $name eq 'TAINT'     { $repl = '$*TAINT' }
+            elsif $name eq 'OPEN'      { $repl = 'filehandle introspection' }
+            elsif $name eq 'N'         { $repl = '$-1' } # XXX ???
+            elsif $name eq 'L'         { $repl = 'Form module' }
+            elsif $name eq 'A'         { $repl = 'Form module' }
+            elsif $name eq 'E'         { $repl = '$!.extended_os_error' }
+            elsif $name eq 'C'         { $repl = 'COMPILING namespace' }
+            elsif $name eq 'D'         { $repl = '$*DEBUGGING' }
+            elsif $name eq 'F'         { $repl = '$*SYSTEM_FD_MAX' }
+            elsif $name eq 'H'         { $repl = '$?FOO variables' }
+            elsif $name eq 'I'         { $repl = '$*INPLACE' } # XXX ???
+            elsif $name eq 'O'         { $repl = '$?OS or $*OS' }
+            elsif $name eq 'P'         { $repl = 'whatever debugger Perl 6 comes with' }
+            elsif $name eq 'R'         { $repl = 'an explicit result variable' }
+            elsif $name eq 'S'         { $repl = 'the context function' } # XXX ???
+            elsif $name eq 'T'         { $repl = '$*BASETIME' }
+            elsif $name eq 'V'         { $repl = '$*PERL_VERSION' }
+            elsif $name eq 'W'         { $repl = '$*WARNING' }
+            elsif $name eq 'X'         { $repl = '$*EXECUTABLE_NAME' }
+            else                       { $repl = "a global form such as $sigil*$name" }
+        }
+        elsif $sigil eq '%' {
+            if $name eq 'H'            { $repl = '$?FOO variables' }
+            else                       { $repl = "a global form such as $sigil*$name" }
+        }
+        else {
+            $repl = "a global form such as $sigil*$name"
+        }
         return self.obs("$var variable", $repl);
     }
 
@@ -2871,22 +2864,17 @@ grammar P6 is STD {
                 $vname ~= $twigil;
                 my $n = try { $<name>[0].Str } // '';
                 $vname ~= $n;
-                given $twigil {
-                    when '' {
-                        self.add_my_name($vname) if $n ne '';
-                        # :$param is often used as a multi matcher without $param used in body
-                        #   so don't count as "declared but not used"
-                        $*CURLEX{$vname}<used> = 1 if $named and $n;
-                    }
-                    when '.' {
-                    }
-                    when '!' {
-                    }
-                    when '*' {
-                    }
-                    default {
-                        self.panic("You may not use the $twigil twigil in a signature");
-                    }
+                if $twigil eq '' {
+                    self.add_my_name($vname) if $n ne '';
+                    # :$param is often used as a multi matcher without $param used in body
+                    #   so don't count as "declared but not used"
+                    $*CURLEX{$vname}<used> = 1 if $named and $n;
+                }
+                elsif $twigil eq '.' { }
+                elsif $twigil eq '!' { }
+                elsif $twigil eq '*' { }
+                else {
+                    self.panic("You may not use the $twigil twigil in a signature");
                 }
             }}
         ]
@@ -2946,13 +2934,11 @@ grammar P6 is STD {
 
         [
             <default_value> {{
-                given $quant {
-                  when '!' { $¢.sorry("Can't put a default on a required parameter") }
-                  when '*' { $¢.sorry("Can't put a default on a slurpy parameter") }
-                  when '**' { $¢.sorry("Can't put a default on a slice parameter") }
-                  when '|' { $¢.sorry("Can't put a default on an slurpy capture parameter") }
-                  when '\\' { $¢.sorry("Can't put a default on a capture parameter") }
-                }
+                if $quant eq '!' { $¢.sorry("Can't put a default on a required parameter") }
+                elsif $quant eq '*' { $¢.sorry("Can't put a default on a slurpy parameter") }
+                elsif $quant eq '**' { $¢.sorry("Can't put a default on a slice parameter") }
+                elsif $quant eq '|' { $¢.sorry("Can't put a default on an slurpy capture parameter") }
+                elsif $quant eq '\\' { $¢.sorry("Can't put a default on a capture parameter") }
                 $kind = '?' if $kind eq '!';
             }}
             [<?before ':' > <.sorry: "Can't put a default on the invocant parameter">]?
@@ -2967,28 +2953,22 @@ grammar P6 is STD {
 
         # enforce zone constraints
         {{
-            given $kind {
-                when '!' {
-                    given $*zone {
-                        when 'posopt' {
+            if $kind eq '!' {
+                if $*zone eq 'posopt' {
     $¢.sorry("Can't put required parameter after optional parameters");
-                        }
-                        when 'var' {
+                }
+                elsif $*zone eq 'var' {
     $¢.sorry("Can't put required parameter after variadic parameters");
-                        }
-                    }
                 }
-                when '?' {
-                    given $*zone {
-                        when 'posreq' { $*zone = 'posopt' }
-                        when 'var' {
-    $¢.sorry("Can't put optional positional parameter after variadic parameters");
-                        }
-                    }
+            }
+            elsif $kind eq '?' {
+                if $*zone eq 'posreq' { $*zone = 'posopt' }
+                elsif $*zone eq 'var' {
+$¢.sorry("Can't put optional positional parameter after variadic parameters");
                 }
-                when '*' {
-                    $*zone = 'var';
-                }
+            }
+            elsif $kind eq '*' {
+                $*zone = 'var';
             }
         }}
     }
@@ -4425,117 +4405,116 @@ method EXPR ($preclvl?) {
         self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $DEBUG::EXPR;
         my $op = pop @opstack;
         my $sym = $op<sym>;
-        given $op<O><assoc> // 'unary' {
-            when 'chain' {
-                self.deb("reducing chain") if $DEBUG::EXPR;
-                my @chain;
+        my $assoc = $op<O><assoc> // 'unary';
+        if $assoc eq 'chain' {
+            self.deb("reducing chain") if $DEBUG::EXPR;
+            my @chain;
+            push @chain, pop(@termstack);
+            push @chain, $op;
+            while @opstack {
+                last if $op<O><prec> ne @opstack[*-1]<O><prec>;
                 push @chain, pop(@termstack);
-                push @chain, $op;
-                while @opstack {
-                    last if $op<O><prec> ne @opstack[*-1]<O><prec>;
-                    push @chain, pop(@termstack);
-                    push @chain, pop(@opstack);
-                }
-                push @chain, pop(@termstack);
-                my $endpos = @chain[0].pos;
-                @chain = reverse @chain if @chain > 1;
-                my $startpos = @chain[0].from;
-                # NIECZA had to rewrite this, check if it's working
-                my $i = 0;
-                my @caplist;
-                for @chain -> $c {
-                    push @caplist, (($i %% 2) ?? 'term' !! 'op') => $c;
-                    $i++;
-                }
-                push @termstack, Match.synthetic(
-                    :suphash({ _arity => 'CHAIN', chain => @chain }),
-                    :captures(@caplist),
-                    :method<CHAIN>,
-                    :cursor($op.CURSOR),
-                    :from($startpos),
-                    :to($endpos));
+                push @chain, pop(@opstack);
             }
-            when 'list' {
-                self.deb("reducing list") if $DEBUG::EXPR;
-                my @list;
-                my @delims = $op;
-                push @list, pop(@termstack);
-                while @opstack {
-                    self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $DEBUG::EXPR;
-                    last if $sym ne @opstack[*-1]<sym>;
-                    if @termstack and defined @termstack[0] {
-                        push @list, pop(@termstack);
-                    }
-                    else {
-                        self.worry("Missing term in " ~ $sym ~ " list");
-                    }
-                    push @delims, pop(@opstack);
-                }
+            push @chain, pop(@termstack);
+            my $endpos = @chain[0].pos;
+            @chain = reverse @chain if @chain > 1;
+            my $startpos = @chain[0].from;
+            # NIECZA had to rewrite this, check if it's working
+            my $i = 0;
+            my @caplist;
+            for @chain -> $c {
+                push @caplist, (($i %% 2) ?? 'term' !! 'op') => $c;
+                $i++;
+            }
+            push @termstack, Match.synthetic(
+                :suphash({ _arity => 'CHAIN', chain => @chain }),
+                :captures(@caplist),
+                :method<CHAIN>,
+                :cursor($op.CURSOR),
+                :from($startpos),
+                :to($endpos));
+        }
+        elsif $assoc eq 'list' {
+            self.deb("reducing list") if $DEBUG::EXPR;
+            my @list;
+            my @delims = $op;
+            push @list, pop(@termstack);
+            while @opstack {
+                self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $DEBUG::EXPR;
+                last if $sym ne @opstack[*-1]<sym>;
                 if @termstack and defined @termstack[0] {
                     push @list, pop(@termstack);
                 }
                 else {
-                    self.worry("Missing final term in '" ~ $sym ~ "' list");
+                    self.worry("Missing term in " ~ $sym ~ " list");
                 }
-                my $endpos = @list[0].pos;
-                @list = reverse @list if @list > 1;
-                my $startpos = @list[0].from;
-                @delims = reverse @delims if @delims > 1;
-                my @caps;
-                if @list {
-                    push @caps, elem => @list[0] if @list[0];
-                    for 0..@delims-1 {
-                        my $d = @delims[$_];
-                        my $l = @list[$_+1];
-                        push @caps, delim => $d;
-                        push @caps, elem => $l if $l;  # nullterm?
-                    }
-                }
-                push @termstack, Match.synthetic(
-                    :method<LIST>, :cursor($op.CURSOR), :captures(@caps),
-                    :from($startpos), :to($endpos),
-                    :suphash({ _arity => 'LIST', delims => @delims,
-                        list => @list, O => $op<O>, sym => $sym }));
+                push @delims, pop(@opstack);
             }
-            when 'unary' {
-                self.deb("reducing") if $DEBUG::EXPR;
-                self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
-
-                self.deb($op.perl) if $DEBUG::EXPR;
-                my $arg = pop @termstack;
-                if $arg.from < $op.from { # postfix
-                    push @termstack, Match.synthetic(
-                        :cursor($op.CURSOR), :to($op.to), :from($arg.from),
-                        :captures(arg => $arg, op => $op), :method<POSTFIX>,
-                        :suphash({ _arity => 'UNARY' }));
-                }
-                elsif $arg.pos > $op.pos {   # prefix
-                    push @termstack, Match.synthetic(
-                        :cursor($op.CURSOR), :to($arg.to), :from($op.from),
-                        :captures(op => $op, arg => $arg), :method<PREFIX>,
-                        :suphash({ _arity => 'UNARY' }));
+            if @termstack and defined @termstack[0] {
+                push @list, pop(@termstack);
+            }
+            else {
+                self.worry("Missing final term in '" ~ $sym ~ "' list");
+            }
+            my $endpos = @list[0].pos;
+            @list = reverse @list if @list > 1;
+            my $startpos = @list[0].from;
+            @delims = reverse @delims if @delims > 1;
+            my @caps;
+            if @list {
+                push @caps, elem => @list[0] if @list[0];
+                for 0..@delims-1 {
+                    my $d = @delims[$_];
+                    my $l = @list[$_+1];
+                    push @caps, delim => $d;
+                    push @caps, elem => $l if $l;  # nullterm?
                 }
             }
-            default {
-                self.deb("reducing") if $DEBUG::EXPR;
-                self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
+            push @termstack, Match.synthetic(
+                :method<LIST>, :cursor($op.CURSOR), :captures(@caps),
+                :from($startpos), :to($endpos),
+                :suphash({ _arity => 'LIST', delims => @delims,
+                    list => @list, O => $op<O>, sym => $sym }));
+        }
+        elsif $assoc eq 'unary' {
+            self.deb("reducing") if $DEBUG::EXPR;
+            self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
 
-                my $right = pop @termstack;
-                my $left = pop @termstack;
-
+            self.deb($op.perl) if $DEBUG::EXPR;
+            my $arg = pop @termstack;
+            if $arg.from < $op.from { # postfix
                 push @termstack, Match.synthetic(
-                    :to($right.to), :from($left.from), :cursor($op.CURSOR),
-                    :captures(:left($left), :infix($op), :right($right)),
-                    :suphash({_arity => 'BINARY'}), :method<INFIX>);
-
-                self.deb(@termstack[*-1].dump) if $*DEBUG +& DEBUG::EXPR;
-                my $ck;
-                if $ck = $op<O><_reducecheck> {
-                    @termstack[*-1] = $ck(@termstack[*-1]);
-                }
+                    :cursor($op.CURSOR), :to($op.to), :from($arg.from),
+                    :captures(arg => $arg, op => $op), :method<POSTFIX>,
+                    :suphash({ _arity => 'UNARY' }));
+            }
+            elsif $arg.pos > $op.pos {   # prefix
+                push @termstack, Match.synthetic(
+                    :cursor($op.CURSOR), :to($arg.to), :from($op.from),
+                    :captures(op => $op, arg => $arg), :method<PREFIX>,
+                    :suphash({ _arity => 'UNARY' }));
             }
         }
-    };
+        else {
+            self.deb("reducing") if $DEBUG::EXPR;
+            self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
+
+            my $right = pop @termstack;
+            my $left = pop @termstack;
+
+            push @termstack, Match.synthetic(
+                :to($right.to), :from($left.from), :cursor($op.CURSOR),
+                :captures(:left($left), :infix($op), :right($right)),
+                :suphash({_arity => 'BINARY'}), :method<INFIX>);
+
+            self.deb(@termstack[*-1].dump) if $*DEBUG +& DEBUG::EXPR;
+            my $ck;
+            if $ck = $op<O><_reducecheck> {
+                @termstack[*-1] = $ck(@termstack[*-1]);
+            }
+        }
+    }
 
   TERM:
     loop {
@@ -4639,17 +4618,16 @@ method EXPR ($preclvl?) {
             # Equal precedence, so use associativity to decide.
             if @opstack[*-1]<O><prec> eq $inprec {
                 my $assoc = 1;
-                given $inO<assoc> {
-                    when 'non'   { $assoc = 0; }
-                    when 'left'  { &reduce() }   # reduce immediately
-                    when 'right' { }            # just shift
-                    when 'chain' { }            # just shift
-                    when 'unary' { }            # just shift
-                    when 'list'  {
-                        $assoc = 0 unless $infix<sym> eqv @opstack[*-1]<sym>;
-                    }
-                    default { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
+                my $atype = $inO<assoc>;
+                if $atype eq 'non'   { $assoc = 0; }
+                elsif $atype eq 'left'  { &reduce() }   # reduce immediately
+                elsif $atype eq 'right' { }            # just shift
+                elsif $atype eq 'chain' { }            # just shift
+                elsif $atype eq 'unary' { }            # just shift
+                elsif $atype eq 'list'  {
+                    $assoc = 0 unless $infix<sym> eqv @opstack[*-1]<sym>;
                 }
+                else { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
                 if not $assoc {
                    $here.sorry('"' ~ @opstack[*-1]<sym> ~ '" and "' ~ $infix.Str ~ '" are non-associative and require parens');
                 }
@@ -5773,60 +5751,58 @@ method check_variable ($variable) {
     my $name = $variable.Str;
     self.deb("check_variable $name") if $DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
-    given $twigil {
-        when '' {
-            my $ok = 0;
-            $ok = $ok || $*IN_DECL;
-            $ok = $ok || $sigil eq '&';
-            $ok = $ok || $first lt 'A';
-            $ok = $ok || self.is_known($name);
-            $ok = $ok || $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
-            if not $ok {
-                my $id = $name;
-                ($id) = ($id ~~ /\W ** 0..2 (.*)/);
-                if $name eq '@_' or $name eq '%_' {
-                    $variable.add_placeholder($name);
+    if $twigil eq '' {
+        my $ok = 0;
+        $ok = $ok || $*IN_DECL;
+        $ok = $ok || $sigil eq '&';
+        $ok = $ok || $first lt 'A';
+        $ok = $ok || self.is_known($name);
+        $ok = $ok || $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+        if not $ok {
+            my $id = $name;
+            ($id) = ($id ~~ /\W ** 0..2 (.*)/);
+            if $name eq '@_' or $name eq '%_' {
+                $variable.add_placeholder($name);
+            }
+            else {  # guaranteed fail now
+                if my $scope = @*MEMOS[$variable.from]<declend> {
+                    return $variable.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                 }
-                else {  # guaranteed fail now
-                    if my $scope = @*MEMOS[$variable.from]<declend> {
-                        return $variable.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                elsif $id !~~ /\:\:/ {
+                    if self.is_known('@' ~ $id) {
+                        return $variable.sorry("Variable $name is not predeclared (did you mean \@$id?)");
                     }
-                    elsif $id !~~ /\:\:/ {
-                        if self.is_known('@' ~ $id) {
-                            return $variable.sorry("Variable $name is not predeclared (did you mean \@$id?)");
-                        }
-                        elsif self.is_known('%' ~ $id) {
-                            return $variable.sorry("Variable $name is not predeclared (did you mean \%$id?)");
-                        }
+                    elsif self.is_known('%' ~ $id) {
+                        return $variable.sorry("Variable $name is not predeclared (did you mean \%$id?)");
                     }
-                    return $variable.sorry("Variable $name is not predeclared");
                 }
-            }
-            elsif $*CURLEX{$name} {
-                $*CURLEX{$name}<used>++;
+                return $variable.sorry("Variable $name is not predeclared");
             }
         }
-        when '^' {
-            my $*MULTINESS = 'multi';
-            $variable.add_placeholder($name);
+        elsif $*CURLEX{$name} {
+            $*CURLEX{$name}<used>++;
         }
-        when ':' {
-            my $*MULTINESS = 'multi';
-            $variable.add_placeholder($name);
+    }
+    elsif $twigil eq '^' {
+        my $*MULTINESS = 'multi';
+        $variable.add_placeholder($name);
+    }
+    elsif $twigil eq ':' {
+        my $*MULTINESS = 'multi';
+        $variable.add_placeholder($name);
+    }
+    elsif $twigil eq '~' {
+        return %*LANG.{substr($name,2,$name.chars - 2)};
+    }
+    elsif $twigil eq '?' {
+        if $name ~~ /\:\:/ {
+            my ($first) = self.canonicalize_name($name);
+            $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
         }
-        when '~' {
-            return %*LANG.{substr($name,2,$name.chars - 2)};
-        }
-        when '?' {
-            if $name ~~ /\:\:/ {
-                my ($first) = self.canonicalize_name($name);
-                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
-            }
-            else {
-                # search upward through languages to STD
-                my $v = $variable.lookup_compiler_var($name);
-                $variable.<value> = $v if $v;
-            }
+        else {
+            # search upward through languages to STD
+            my $v = $variable.lookup_compiler_var($name);
+            $variable.<value> = $v if $v;
         }
     }
     self;
@@ -5845,37 +5821,37 @@ method lookup_compiler_var($name, $default = Nil) {
         }
     }
 
-    given $name {
-        when '$?FILE'     { return $*FILE<name>; }
-        when '$?LINE'     { return self.lineof(self.pos); }
-        when '$?POSITION' { return self.pos; }
+    if    $name eq '$?FILE'     { return $*FILE<name>; }
+    elsif $name eq '$?LINE'     { return self.lineof(self.pos); }
+    elsif $name eq '$?POSITION' { return self.pos; }
 
-        when '$?LANG'     { return item %*LANG; }
+    elsif $name eq '$?LANG'     { return item %*LANG; }
 
-        when '$?LEXINFO'   { return $*CURLEX; }
+    elsif $name eq '$?LEXINFO'   { return $*CURLEX; }
 
-        when '$?PACKAGE'  { return $*CURPKG; }
-        when '$?MODULE'   { return $*CURPKG; } #  XXX should scan
-        when '$?CLASS'    { return $*CURPKG; } #  XXX should scan
-        when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
-        when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
+    elsif $name eq '$?PACKAGE'  { return $*CURPKG; }
+    elsif $name eq '$?MODULE'   { return $*CURPKG; } #  XXX should scan
+    elsif $name eq '$?CLASS'    { return $*CURPKG; } #  XXX should scan
+    elsif $name eq '$?ROLE'     { return $*CURPKG; } #  XXX should scan
+    elsif $name eq '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
 
-        when '$?PACKAGENAME' { return $*CURPKG.id }
+    elsif $name eq '$?PACKAGENAME' { return $*CURPKG.id }
 
-        when '$?OS'       { return 'unimpl'; }
-        when '$?DISTRO'   { return 'unimpl'; }
-        when '$?VM'       { return 'unimpl'; }
-        when '$?XVM'      { return 'unimpl'; }
-        when '$?PERL'     { return 'unimpl'; }
+    elsif $name eq '$?OS'       { return 'unimpl'; }
+    elsif $name eq '$?DISTRO'   { return 'unimpl'; }
+    elsif $name eq '$?VM'       { return 'unimpl'; }
+    elsif $name eq '$?XVM'      { return 'unimpl'; }
+    elsif $name eq '$?PERL'     { return 'unimpl'; }
 
-        when '$?USAGE'    { return 'unimpl'; }
+    elsif $name eq '$?USAGE'    { return 'unimpl'; }
 
-        when '&?ROUTINE'  { return 'unimpl'; }
-        when '&?BLOCK'    { return 'unimpl'; }
+    elsif $name eq '&?ROUTINE'  { return 'unimpl'; }
+    elsif $name eq '&?BLOCK'    { return 'unimpl'; }
 
-        when '%?CONFIG'    { return 'unimpl'; }
-        when '%?DEEPMAGIC' { return 'unimpl'; }
+    elsif $name eq '%?CONFIG'    { return 'unimpl'; }
+    elsif $name eq '%?DEEPMAGIC' { return 'unimpl'; }
 
+    else {
         my $dynvar = self.lookup_dynvar($name);
         return $dynvar if defined $dynvar;
 
