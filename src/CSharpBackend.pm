@@ -87,11 +87,13 @@ EOM
         $unit->visit_units_preorder(sub {
             $_->visit_local_packages(\&pkg2);
             $_->visit_local_subs_preorder(\&sub2);
-
+        });
+        $unit->visit_units_preorder(sub {
             $unit->visit_local_stashes(\&stash3) if $_ == $unit;
             $_->visit_local_packages(\&pkg3);
             $_->visit_local_subs_preorder(\&sub3);
-
+        });
+        $unit->visit_units_preorder(sub {
             return if $_->bottom_ref;
 
             my $s = $_->setting;
@@ -598,7 +600,7 @@ sub sub3 {
             if ($lx->hash || $lx->list) {
                 # XXX should be SAFE::
                 my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
-                my $var = $unit->deref($unit->get_stash_obj($$imp))
+                my $var = $unit->deref($unit->get_stash_obj(@$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {

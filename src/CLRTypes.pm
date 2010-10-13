@@ -109,6 +109,7 @@ my %typedata = (
     'Lexer.GetLexer'       => [m => 'Lexer'],
     'Variable.None'        => [f => 'Variable[]'],
     'Kernel.SearchForHandler' => [c => 'Variable'],
+    'Kernel.KeysHelper'    => [m => 'VarDeque'],
     'Kernel.Die'           => [c => 'Variable'],
     'Kernel.BindFail'      => [c => 'Variable'],
     'Kernel.CheckArgEnd'   => [c => 'Void'],
@@ -179,6 +180,8 @@ my %tmap = (
 sub _generic_infer {
     /Dictionary<(.*),(.*)>/ && return {
         ContainsKey         => [ m => 'Boolean' ],
+        Remove              => [ m => 'Boolean' ],
+        Clear               => [ m => 'Void' ],
         Item                => [ i => $2 ],
     };
     /List<(.*)>/ && return {

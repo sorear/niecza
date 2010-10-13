@@ -881,6 +881,15 @@ namespace Niecza {
             return lv;
         }
 
+        // TODO: Returning keys unboxed would be better.
+        public static VarDeque KeysHelper(Dictionary<string,Variable> d) {
+            VarDeque lv = new VarDeque();
+            foreach (string s in d.Keys) {
+                lv.Push(BoxAny(s, StrP));
+            }
+            return lv;
+        }
+
         public static Variable ContextHelper(Frame th, string name) {
             object rt;
             while (th != null) {

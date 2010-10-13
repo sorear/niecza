@@ -16,6 +16,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
+    method item() { self }
     method so() { self.Bool }
     method not() { ! self.Bool }
     method RAWCREATE(\|$vars) { Q:CgOp {
@@ -205,12 +206,23 @@ sub warn($str) { Q:CgOp {
 } }
 
 sub say($obj) { ($obj ~~ Cool) ?? $obj.say !! $obj.Str.say }
+sub note($text) { Q:CgOp { (rnull (note (unbox str (@ {$text})))) } }
 
 sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (unbox num (@ {$status})))])
 } }
 
 sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
+
+sub chars($str) { $str.chars }
+sub substr($str, $start, $len = $str.chars - $start) {
+    $str.substr($start, $len)
+}
+
+sub item($x) { $x }
+
+sub prefix:<not>($x) { $x.not }
+sub defined($x) { $x.defined }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
@@ -248,6 +260,53 @@ sub infix:<but>($obj, $role) { Q:CgOp {
 } }
 
 sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
+# }}}
+# Flow inspection and control {{{
+my class CallFrame {
+    method caller() { Q:CgOp {
+        (letn c (frame_caller (cast frame (@ {self})))
+          (ternary
+            (!= (letvar c) (null frame))
+            (ns (letvar c))
+            {Any}))
+    } }
+
+    method file() { Q:CgOp { (box Str (frame_file
+        (cast frame (@ (l self))))) } }
+    method line() { Q:CgOp { (box Num (cast num (frame_line
+        (cast frame (@ (l self)))))) } }
+
+    method hints($var) { Q:CgOp { (frame_hint (cast frame (@ (l self)))
+        (unbox str (@ (l $var)))) } }
+}
+
+sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
+sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
+
+sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
+
+# XXX multi dispatch
+sub next() {
+    Q:CgOp { (control 1 (null frame) (int -1) (null str) (null var)) }
+}
+sub last() {
+    Q:CgOp { (control 2 (null frame) (int -1) (null str) (null var)) }
+}
+sub redo() {
+    Q:CgOp { (control 3 (null frame) (int -1) (null str) (null var)) }
+}
+sub return(\$obj) is return-pass {
+    Q:CgOp { (control 4 (null frame) (int -1) (null str) {$obj}) }
+}
+sub nextsame() {
+    Q:CgOp { (control 9 (null frame) (int -1) (null str) (null obj)) }
+}
+
+sub assignop($fn) {
+    anon sub _assign(\$lhs, \$rhs) {
+        $lhs = $fn($lhs, $rhs)
+    }
+}
 # }}}
 # Aggregate types {{{
 # Parcel: immutable list of boxes which have no context - may flatten, may
@@ -359,6 +418,10 @@ my class List is Cool {
         (rnull (vvarlist_push (getslot items vvarlist (@ {self})) {$x}))
     } }
 
+    method !unshift-item(\$x) { Q:CgOp {
+        (rnull (vvarlist_unshift (getslot items vvarlist (@ {self})) {$x}))
+    } }
+
     method !fill($nr) { Q:CgOp {
         (letn  nr    (cast int (unbox num (@ {$nr})))
                items (getslot items vvarlist (@ {self}))
@@ -434,6 +497,10 @@ my class List is Cool {
         self.eager;
         self!pop-item;
     }
+
+    method unshift(*@a) {
+        for reverse(@a) -> $v { self!unshift-item($v) }
+    }
 }
 
 # exactly like List, but flattens, and with "is copy" semantics on stuff
@@ -495,6 +562,60 @@ my class Hash {
         };
     }
 
+    method keys() {
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {List})))
+              (setslot flat (l n) (bool 1))
+              (setslot items (l n) (varhash_keys (unbox varhash (@ {self}))))
+              (setslot rest (l n) (vvarlist_new_empty))
+              (newrwlistvar (l n)))
+        }
+    }
+
+    method values() {
+        gather { for self.keys -> $k { take self.at-key($k) } }
+    }
+
+    method list() {
+        gather { for self.keys -> $k { take ($k => self.at-key($k)) } }
+    }
+
+    method kv() {
+        gather { for self.keys -> $k { take $k; take self.at-key($k) } }
+    }
+
+    method invert() {
+        my %new;
+        for self.keys -> $k { %new{self{$k}} = $k }
+        %new
+    }
+
+    method LISTSTORE(*@in) {
+        my @r := @in.Seq.eager;
+
+        Q:CgOp { (rnull (varhash_clear (unbox varhash (@ {self})))) };
+
+        for @r -> $p { self.{$p.key} = $p.value }
+
+        unitem(self);
+    }
+
+    method exists-key($str) {
+        Q:CgOp { (box Bool (varhash_contains_key (unbox varhash (@ {self})) (unbox str (@ {$str.Str})))) }
+    }
+
+    method delete-key($str) {
+        Q:CgOp {
+            (letn r   (unbox varhash (@ {self}))
+                  k   (unbox str (@ {$str.Str}))
+                  old (ternary (varhash_contains_key (l r) (l k))
+                               (varhash_getindex (l k) (l r))
+                               {Any})
+              (varhash_delete_key (l r) (l k))
+              (l old))
+        };
+    }
+
     # TODO: We need something like pir:: notation for this to not suck
     method at-key($key) {
         Q:CgOp {
@@ -537,7 +658,9 @@ sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
         });
 }
 
-sub postcircumfix:<{ }>(\$container, $key) {
+sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {
+    $exists ?? ($container.defined ?? $container.exists-key($key) !! False) !!
+    $delete ?? $container.delete-key($key) !!
     $container.defined
         ?? $container.at-key($key)
         !! Any!Any::butWHENCE(sub (\$var) {
@@ -576,51 +699,23 @@ sub take($p) { # should be \|$p
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
 
+sub reverse(*@arr) {
+    my @acc;
+    while @arr { @acc.push(@arr.pop) }
+    @acc;
+}
+
+sub push(@arr, *@stuff) { @arr.push(@stuff) }
+sub unshift(@arr, *@stuff) { @arr.unshift(@stuff) }
+sub pop(@arr) { @arr.pop }
+sub shift(@arr) { @arr.shift }
+sub join($tween, *@stuff) { @stuff.join($tween) }
+
+sub invert(%h) { %h.invert }
+sub keys(%h) { %h.keys }
+sub values(%h) { %h.values }
+
 sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
-# }}}
-# Flow inspection and control {{{
-my class CallFrame {
-    method caller() { Q:CgOp {
-        (letn c (frame_caller (cast frame (@ {self})))
-          (ternary
-            (!= (letvar c) (null frame))
-            (ns (letvar c))
-            {Any}))
-    } }
-
-    method file() { Q:CgOp { (box Str (frame_file
-        (cast frame (@ (l self))))) } }
-    method line() { Q:CgOp { (box Num (cast num (frame_line
-        (cast frame (@ (l self)))))) } }
-
-    method hints($var) { Q:CgOp { (frame_hint (cast frame (@ (l self)))
-        (unbox str (@ (l $var)))) } }
-}
-
-sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
-sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
-
-sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
-
-# XXX multi dispatch
-sub next() {
-    Q:CgOp { (control 1 (null frame) (int -1) (null str) (null var)) }
-}
-sub last() {
-    Q:CgOp { (control 2 (null frame) (int -1) (null str) (null var)) }
-}
-sub redo() {
-    Q:CgOp { (control 3 (null frame) (int -1) (null str) (null var)) }
-}
-sub return(\$obj) is return-pass {
-    Q:CgOp { (control 4 (null frame) (int -1) (null str) {$obj}) }
-}
-
-sub assignop($fn) {
-    anon sub _assign(\$lhs, \$rhs) {
-        $lhs = $fn($lhs, $rhs)
-    }
-}
 # }}}
 # Regular expression support {{{
 my class Cursor {

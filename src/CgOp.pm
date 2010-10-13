@@ -151,6 +151,9 @@ use warnings;
     sub varhash_setindex { setindex(@_) }
     sub varhash_getindex { getindex(@_) }
     sub varhash_contains_key { rawcall($_[0], 'ContainsKey', _str($_[1])) }
+    sub varhash_delete_key { rawcall($_[0], 'Remove', _str($_[1])) }
+    sub varhash_clear { rawcall($_[0], 'Clear') }
+    sub varhash_keys { rawscall('Kernel.KeysHelper', $_[0]) }
     sub varhash_new { rawnew('varhash') }
 
     sub newgeneralvar { rawnew('clr:SimpleVariable', $_[0], $_[1], rawsget('Kernel.AnyMO'), $_[2], $_[3]) }
