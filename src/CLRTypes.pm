@@ -136,6 +136,7 @@ my %typedata = (
     'Console.Error.WriteLine'    => [m => 'Void'],
     'System.Environment.Exit'     => [m => 'Void'],
     'String.Concat'        => [m => 'String'],
+    'String.CompareOrdinal'=> [m => 'Int32'],
     'Kernel.AnyP'          => [f => 'IP6'],
     'Kernel.AnyMO'         => [f => 'DynMetaObject'],
     'Kernel.ArrayP'        => [f => 'IP6'],

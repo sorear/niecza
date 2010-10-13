@@ -163,6 +163,7 @@ use warnings;
     sub str_length { getfield('Length', $_[0]) }
     sub str_substring { rawcall($_[0], 'Substring', $_[1], $_[2]) }
     sub str_chr { rawnew('str', cast('clr:System.Char', $_[0]), CgOp::int(1)) }
+    sub strcmp { rawscall('String.CompareOrdinal', $_[0], $_[1]) }
 
     sub strbuf_new { rawnew('strbuf') }
     sub strbuf_append { rawcall($_[0], 'Append', $_[1]) }

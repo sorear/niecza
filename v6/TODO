@@ -22,18 +22,13 @@ Cursor.moreinput
 Cursor.O
 Cursor.suppose
 Cursor.trim_heredoc
-:delete
-:exists
 EXPR will need a re-write with tests.
 $<foo> = 1
 $*FOO as a parameter
 func(|($key => $value))
 gt, lt, leg, etc
-Hash.keys &keys
-Hash.LISTSTORE
 hash literals
 infix:<x>
-invert(%hash)
 List.at-pos(WhateverCode)
 Match.CURSOR
 Match.iterator should return numbered captures
@@ -47,21 +42,28 @@ temp $*FOO
 token { :my $var = expr; $var }
 token { $param-role-var }
 
-DONE OR AVERTED:
+DONE:
+Bool.Numeric
+&chars
+defined($thing)
+:delete
+:exists
+Hash.keys &keys
+Hash.LISTSTORE
+invert(%hash)
+&item
+&join
+not($bool)
+&note
+pop(@array)
+push(@array, $thing)
+&reverse
+shift(@array)
+substr($str,$from,$len)
 
+AVERTED:
+
+//=, ||=, &&=, etc
 given & when
 if not binding $_
 Mu.new(foo => $bar)
-Bool.Numeric
-//=, ||=, &&=, etc
-substr($str,$from,$len)
-not($bool)
-defined($thing)
-shift(@array)
-push(@array, $thing)
-&item
-&reverse
-&chars
-&note
-&join
-pop(@array)

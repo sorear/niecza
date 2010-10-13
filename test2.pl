@@ -1,57 +1,33 @@
 # vim: ft=perl6
 use Test;
 
-{
-    is chars("foo"), 3, '&chars works';
-    is substr("Hello",1,3), 'ell', '&substr works';
-    is substr("Hello",2), "llo", '&substr works (2 args)';
-    is reverse(1,2,3).join("|"), '3|2|1', '&reverse works';
-    is join("|",1,2,3), '1|2|3', '&join works';
-    my @foo = 4,5,6;
-    is join("|",item @foo), '4 5 6', '&item works';
-    is join("|",@foo.item), '4 5 6', 'Mu.item works';
-    is (not False), 'Bool::True', '&not works';
-    is (defined 5), 'Bool::True', '&defined works';
-    push @foo, 7, 8;
-    is join("|",@foo), '4|5|6|7|8', '&push works';
-    unshift @foo, 2, 3;
-    is join("|",@foo), '2|3|4|5|6|7|8', '&unshift works';
-    is pop(@foo), '8', '&pop works';
-    is shift(@foo), '2', '&shift works';
-    is join("|",@foo), '3|4|5|6|7', '... with side effects';
-    is +True, '1', "Bool.Numeric works";
-    my %bar = :a<9>;
-    is %bar<a>, '9', "Hash.LISTSTORE works";
-    %bar = :c<9>;
-    ok (!defined %bar<a>), "Hash.LISTSTORE clears existing";
-    is keys(%bar), "c", "Hash.keys works";
-    is values(%bar), "9", "Hash.values works";
-    is (join "|", %bar.kv), "c|9", "Hash.kv works";
-    is (%bar.invert.<9>), "c", "Hash.invert works";
-    ok %bar<c> :exists, ":exists works";
-    is (%bar<c> :delete), "9", ":delete returns old";
-    ok !(%bar<c> :exists), ":delete removes value";
+sub infix:<x>($str, $ct) {
+    my $i = +$ct;
+    my $j = ''; # XXX use strbuf
+    while $i >= 1 {
+        $i--;
+        $j ~= $str;
+    }
+    $j;
 }
 
-{
-    my class A {
-        method tom() { 12 }
-        method foo($x) { $x * $x }
-        method bar(:$x) { $x + $x }
-    }
-    my class B is A {
-        method tom() { nextsame; }
-        method foo($x) { nextsame; } #OK
-        method bar(:$x) { nextsame; } #OK
-    }
-    is B.tom(), 12, "nextsame functional";
-    is B.foo(5), 25, "nextsame functional w/ argument";
-    # TODO
-    # is B.bar(:x(7)), 14, "nextsame functional w/ named arg";
+sub grep($filter, *@items) { @items.grep($filter) }
+sub map($callback, *@items) { @items.map($callback) }
 
-    sub foo(*%x) { %x }
-    is foo(:z(2))<z>, 2, "slurpy hashes work";
+sub infix:<leg>($s1, $s2) {
+    Q:CgOp { (box Num (cast num (strcmp (unbox str (@ {$s1.Str})) (unbox str (@ {$s2.Str}))))) }
 }
+
+sub infix:<ge>($s1, $s2) { ($s1 leg $s2) >= 0 }
+sub infix:<gt>($s1, $s2) { ($s1 leg $s2) > 0  }
+sub infix:<le>($s1, $s2) { ($s1 leg $s2) <= 0 }
+sub infix:<lt>($s1, $s2) { ($s1 leg $s2) < 0  }
+
+ok 'cow' le 'sow', 'cow le sow';
+ok !('sow' le 'cow'), 'sow !le cow';
+ok 'row' lt 'tow', 'row lt tow';
+ok 'how' gt 'bow', 'how gt bow';
+ok 'yow' ge 'yow', 'yow ge yow';
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
