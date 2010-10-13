@@ -1,5 +1,6 @@
 # vim: ft=perl6
 use Test;
+use MONKEY_TYPING;
 
 sub infix:<x>($str, $ct) {
     my $i = +$ct;
@@ -23,11 +24,30 @@ sub infix:<gt>($s1, $s2) { ($s1 leg $s2) > 0  }
 sub infix:<le>($s1, $s2) { ($s1 leg $s2) <= 0 }
 sub infix:<lt>($s1, $s2) { ($s1 leg $s2) < 0  }
 
+augment class Any {
+    method sort($cmp = &infix:<leg>) {
+        my $l = self.list.eager;
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {List})))
+              (setslot flat (l n) (bool 1))
+              (setslot items (l n) (vvarlist_sort (@ {$cmp})
+                  (getslot items vvarlist (@ {$l}))))
+              (setslot rest (l n) (vvarlist_new_empty))
+              (newrwlistvar (l n)))
+        }
+    }
+}
+
+sub sort(*@bits) { @bits.sort }
+
 ok 'cow' le 'sow', 'cow le sow';
 ok !('sow' le 'cow'), 'sow !le cow';
 ok 'row' lt 'tow', 'row lt tow';
 ok 'how' gt 'bow', 'how gt bow';
 ok 'yow' ge 'yow', 'yow ge yow';
+is join("|", sort <c f d z a>), 'a|c|d|f|z', '&sort works';
+is join("|", <a3 b2 c1 d0>.sort({ substr($^a,1) leg substr($^b,1) })),
+    'd0|c1|b2|a3', '.sort with callback works';
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

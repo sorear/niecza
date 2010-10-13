@@ -193,6 +193,7 @@ use warnings;
     sub vvarlist_unshiftn { rawcall($_[0], 'UnshiftN', $_[1]) }
     sub vvarlist_push { rawcall($_[0], 'Push', $_[1]) }
     sub vvarlist_item { getindex($_[0], $_[1]) }
+    sub vvarlist_sort { rawscall('Kernel.SortHelper', callframe(), $_[0], $_[1]) }
 
     sub frame_caller { getfield('caller', $_[0]) }
     sub frame_file { rawcall($_[0], 'ExecutingFile') }

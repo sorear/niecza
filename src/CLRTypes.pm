@@ -131,6 +131,7 @@ my %typedata = (
     'Kernel.DefaultNew'    => [m => 'Variable'],
     'Kernel.NewROScalar'   => [m => 'Variable'],
     'Kernel.NewRWScalar'   => [m => 'Variable'],
+    'Kernel.SortHelper'    => [m => 'VarDeque'],
     'Kernel.NewRWListVar'  => [m => 'Variable'],
     'Console.WriteLine'    => [m => 'Void'],
     'Console.Error.WriteLine'    => [m => 'Void'],

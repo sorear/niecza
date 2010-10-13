@@ -1,9 +1,9 @@
 ~
 <?{ }>
-<alpha>
 () being Nil
 circumfix:<[ ]>
 Cursor.add_categorical
+Cursor.alpha
 Cursor.canonicalize_name
 Cursor.check_old_cclass
 Cursor.cursor_all
@@ -28,7 +28,6 @@ $*FOO as a parameter
 func(|($key => $value))
 gt, lt, leg, etc
 hash literals
-infix:<x>
 List.at-pos(WhateverCode)
 Match.CURSOR
 Match.iterator should return numbered captures
@@ -50,6 +49,7 @@ defined($thing)
 :exists
 Hash.keys &keys
 Hash.LISTSTORE
+infix:<x>
 invert(%hash)
 &item
 &join

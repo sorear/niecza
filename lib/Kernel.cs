@@ -890,6 +890,18 @@ namespace Niecza {
             return lv;
         }
 
+        public static VarDeque SortHelper(Frame th, IP6 cb, VarDeque from) {
+            Variable[] tmp = from.CopyAsArray();
+            Array.Sort(tmp, delegate (Variable v1, Variable v2) {
+                Frame end  = th.MakeChild(null, ExitRunloopSI);
+                Frame call = cb.Invoke(end, new Variable[] { v1, v2 }, null);
+                RunCore(call);
+                return (int)(double)UnboxAny(
+                    ((Variable)end.resultSlot).Fetch());
+            });
+            return new VarDeque(tmp);
+        }
+
         public static Variable ContextHelper(Frame th, string name) {
             object rt;
             while (th != null) {
@@ -1345,17 +1357,26 @@ slow:
             return d;
         }
 
+        private void CopyToArray(Variable[] tg) {
+            int z1 = data.Length - head;
+            if (z1 >= count) {
+                Array.Copy(data, head, tg, 0, count);
+            } else {
+                Array.Copy(data, head, tg, 0, z1);
+                int z2 = count - z1;
+                Array.Copy(data, 0, tg, z1, z2);
+            }
+        }
+
+        public Variable[] CopyAsArray() {
+            Variable[] ret = new Variable[count];
+            CopyToArray(ret);
+            return ret;
+        }
+
         private void checkgrow() {
             if (count == data.Length - 1) {
                 Variable[] ndata = new Variable[data.Length * 2];
-                int z1 = data.Length - head;
-                if (z1 >= count) {
-                    Array.Copy(data, head, ndata, 0, count);
-                } else {
-                    Array.Copy(data, head, ndata, 0, z1);
-                    int z2 = count - z1;
-                    Array.Copy(data, 0, ndata, z1, z2);
-                }
                 data = ndata;
                 head = 0;
             }
