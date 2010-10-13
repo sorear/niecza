@@ -2111,7 +2111,7 @@ grammar P6 is STD {
         '$!' '{' ~ '}' [<identifier> | <statementlist>]
         {{
             my $all = substr(self.orig, self.pos, $¢.pos - self.pos);
-            my ($inside) = $all ~~ m!^...\s*(.*?)\s*.$!;
+            my ($inside) = $all ~~ /^...\s*(.*?)\s*.$/;
             $¢.obs("Perl 5's $all construct", "a smartmatch like \$! ~~ $inside" );
         }}
     }
@@ -5386,8 +5386,8 @@ method add_my_name ($n, $d = Nil, $p = Nil) {
             elsif $name ~~ /^\w/ {
                 self.sorry("Illegal redeclaration of symbol '$name'$loc");
             }
-            elsif $name ~~ s/^\&// {
-                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '';
+            elsif $name ~~ /^\&// {
+                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '&';
             }
             else {  # XXX eventually check for conformant arrays here
                 self.worry("Useless redeclaration of variable $name$loc");
@@ -5447,7 +5447,7 @@ method add_our_name ($n) {
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     if $shortname ~~ /\:/ {
-        $shortname ~~ s/\:.*//;
+        ($shortname) = ($shortname ~~ /^(.*?)\:/);
     }
 
     my $declaring = $*DECLARAND // NAME.new(
@@ -5482,8 +5482,8 @@ method add_our_name ($n) {
             if $name ~~ /^\w/ {
                 self.sorry("Illegal redeclaration of symbol '$sid'$loc");
             }
-            elsif $name ~~ s/^\&// {
-                self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '';
+            elsif $name ~~ /^\&// {
+                self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '&';
             }
             else {  # XXX eventually check for conformant arrays here
                 # (redeclaration of identical package vars is not useless)
@@ -5895,7 +5895,11 @@ method panic (Str $s) {
     $m ~= $s;
 
     if substr(self.orig,$here.pos,1) ~~ /\)|\]|\}|\»/ {
-        $m ~~ s|Confused|Unexpected closing bracket| and $highvalid = False;
+        my $ma = ($m ~~ /(.*?)Confused(.*)/);
+        if ($ma) {
+            $m = $ma[0] ~ "Unexpected closing bracket" ~ $ma[1];
+            $highvalid = False;
+        }
     }
 
     if $highvalid {
@@ -5922,29 +5926,33 @@ method panic (Str $s) {
     }
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
         my @t = $here.suppose( sub { $here.term } );
+        my $conf;
         if @t {
             my $endpos = $here.pos;
             my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
 
             if self.lineof($startpos) != self.lineof($endpos) {
-                $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+                $conf = "Two terms in a row (previous line missing its semicolon?)";
             }
             elsif @*MEMOS[$here.pos - 1]<baremeth> {
-                $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
+                $conf = "Two terms in a row (method call requires colon or parens to take arguments)";
             }
             elsif @*MEMOS[$here.pos - 1]<arraycomp> {
-                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
+                $conf = "Two terms in a row (preceding is not a valid reduce operator)";
             }
             else {
-                $m ~~ s|Confused|Two terms in a row|;
+                $conf = "Two terms in a row";
             }
         }
         elsif my $type = @*MEMOS[$here.pos - 1]<nodecl> {
             my @t = $here.suppose( sub { $here.variable } );
             if @t {
                 my $variable = @t[0].Str;
-                $m ~~ s|Confused|Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'|;
+                $conf = "Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'";
             }
+        }
+        if $conf && my $ma = ($m ~~ /(.*?)Confused(.*)/) {
+            $m = $ma[0] ~ $conf ~ $ma[1];
         }
     }
     elsif my $type = @*MEMOS[$here.pos - 1]<wasname> {
@@ -5953,7 +5961,8 @@ method panic (Str $s) {
         my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
         my $d = $*IN_DECL;
         $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
-        $m ~~ s|Malformed block|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
+        my ($a,$b) = $m ~~ /(.*?)Malformed block(.*)/;
+        defined($a) and $m = $a ~ "Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.$b";
     }
 
     if @*WORRIES {
