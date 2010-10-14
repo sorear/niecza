@@ -617,7 +617,7 @@ use CgOp;
     extends 'RxOp';
 
     has block => (isa => 'Op', is => 'ro', required => 1);
-    sub opzyg { $_->block }
+    sub opzyg { $_[0]->block }
 
     sub code {
         my ($self, $body) = @_;
