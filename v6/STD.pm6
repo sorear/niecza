@@ -5132,7 +5132,7 @@ method getsig {
         if $pv {
             my $h_ = $pv.<%_>:delete;
             my $a_ = $pv.<@_>:delete;
-            $sig = join ', ', sort { substr($^a,1) leg substr($^b,1) }, keys %$pv;
+            $sig = join ', ', (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) });
             $sig ~= ', *@_' if $a_;
             $sig ~= ', *%_' if $h_;
         }

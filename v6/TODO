@@ -26,7 +26,6 @@ EXPR will need a re-write with tests.
 $<foo> = 1
 $*FOO as a parameter
 func(|($key => $value))
-gt, lt, leg, etc
 hash literals
 List.at-pos(WhateverCode)
 Match.CURSOR
@@ -35,7 +34,6 @@ Match.perl
 Match.synthetic
 Parcel.LISTSTORE
 self in regexes
-&sort
 $<sym>
 temp $*FOO
 token { :my $var = expr; $var }
@@ -47,6 +45,7 @@ Bool.Numeric
 defined($thing)
 :delete
 :exists
+gt, lt, leg, etc
 Hash.keys &keys
 Hash.LISTSTORE
 infix:<x>
@@ -59,6 +58,7 @@ pop(@array)
 push(@array, $thing)
 &reverse
 shift(@array)
+&sort
 substr($str,$from,$len)
 
 AVERTED:

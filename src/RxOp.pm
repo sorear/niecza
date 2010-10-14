@@ -70,11 +70,45 @@ use CgOp;
 
     sub used_caps { local $::in_quant = 1; $_[0]->SUPER::used_caps }
 
+    sub mincode {
+        my ($self, $body) = @_;
+        my @code;
+
+        my $exit = $self->label;
+        my $add  = $self->label;
+        my $mid  = $self->label;
+
+        my $min = $self->min;
+        my $max = $self->max;
+
+        push @code, CgOp::rxopenquant;
+        push @code, CgOp::goto($exit);
+        push @code, CgOp::label($add);
+        push @code, CgOp::cgoto('backtrack', CgOp::compare('>=',
+                CgOp::rxgetquant, CgOp::int($max))) if defined ($max);
+        if ($self->zyg->[1]) {
+            push @code, $self->zyg->[1]->code($body) if $self->zyg->[1];
+            push @code, CgOp::label($exit);
+            push @code, $self->zyg->[0]->code($body);
+            push @code, CgOp::rxincquant;
+        } else {
+            push @code, $self->zyg->[0]->code($body);
+            push @code, CgOp::rxincquant;
+            push @code, CgOp::label($exit);
+        }
+        push @code, CgOp::rxpushb('QUANT', $add);
+        push @code, CgOp::cgoto('backtrack', CgOp::compare('<',
+                CgOp::rxgetquant, CgOp::int($min))) if $min > 0;
+        push @code, CgOp::sink(CgOp::rxclosequant);
+
+        @code;
+    }
+
     sub code {
         my ($self, $body) = @_;
         my @code;
 
-        die "minimal matching NYI" if $self->minimal;
+        goto &mincode if $self->minimal;
 
         my $exit = $self->label;
         my $repeat = $self->label;

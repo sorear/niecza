@@ -49,6 +49,9 @@ is join("|", sort <c f d z a>), 'a|c|d|f|z', '&sort works';
 is join("|", <a3 b2 c1 d0>.sort({ substr($^a,1) leg substr($^b,1) })),
     'd0|c1|b2|a3', '.sort with callback works';
 
+is ("yayay" ~~ /y\w*?y/), "yay", "minimal matching works";
+is ("yayay" ~~ /y**?a/), "y", "minimal matching works with **";
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
