@@ -5224,12 +5224,12 @@ method find_stash ($n, $curlex = $*CURLEX) {
     my $name = $n;
     self.deb("find_stash $name") if $DEBUG::symtab;
 
-    return () if $name ~~ /\:\:\(/;
+    return Any if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
-        return () if @components[0] eq 'COMPILING::';
-        return () if @components[0] eq 'CALLER::';
-        return () if @components[0] eq 'CONTEXT::';
+        return Any if @components[0] eq 'COMPILING::';
+        return Any if @components[0] eq 'CALLER::';
+        return Any if @components[0] eq 'CONTEXT::';
         if $curlex = self.find_top_pkg(@components[0]) {
             self.deb("Found lexical package ", @components[0]) if $DEBUG::symtab;
             shift @components;
@@ -5241,12 +5241,12 @@ method find_stash ($n, $curlex = $*CURLEX) {
         while @components > 1 {
             my $lex = shift @components;
             $curlex = $curlex.{$lex};
-            return () unless $curlex;
+            return Any unless $curlex;
             try {
                 my $outlexid = $curlex.[0];
-                return False unless $outlexid;
+                return Any unless $outlexid;
                 $curlex = $ALL.{$outlexid};
-                return () unless $curlex;
+                return Any unless $curlex;
             };
             self.deb("Found $lex okay") if $DEBUG::symtab;
         }
@@ -5263,7 +5263,7 @@ method find_stash ($n, $curlex = $*CURLEX) {
     }
     return $old if $old = $curlex.{$name};
     return $old if $old = $*GLOBAL.{$name};
-    return ();
+    return Any;
 }
 
 method find_top_pkg ($name) {
@@ -5319,7 +5319,7 @@ method add_name ($name) {
     self;
 }
 
-method add_my_name ($n, $d = Nil, $p = Nil) {
+method add_my_name ($n, $d?, $p?) {
     my $name = $n;
     self.deb("add_my_name $name in ", $*CURLEX.id) if $DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
@@ -5808,7 +5808,7 @@ method check_variable ($variable) {
     self;
 }
 
-method lookup_compiler_var($name, $default = Nil) {
+method lookup_compiler_var($name, $default?) {
 
     # see if they did "constant $?FOO = something" earlier
     my $lex = $*CURLEX.{$name};
