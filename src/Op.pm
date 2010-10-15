@@ -89,8 +89,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         my @ch = map { $_->cgop($body) } @{ $self->children };
-        # XXX should be Nil or something
-        my $end = @ch ? pop(@ch) : CgOp::scopedlex('Any');
+        my $end = @ch ? pop(@ch) : CgOp::scopedlex('Nil');
 
         CgOp::prog((map { CgOp::sink($_) } @ch), $end);
     }
@@ -461,11 +460,10 @@ use CgOp;
             CgOp::unbox('bool',
                 CgOp::fetch(
                     CgOp::methodcall($self->check->cgop($body), "Bool"))),
-            # XXX use Nil
             ($self->true ? $self->true->cgop($body) :
-                CgOp::null('var')),
+                CgOp::scopedlex('Nil')),
             ($self->false ? $self->false->cgop($body) :
-                CgOp::null('var')));
+                CgOp::scopedlex('Nil')));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -500,7 +498,7 @@ use CgOp;
                     CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
                     CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
             CgOp::label("last$id"),
-            CgOp::null('var'));
+            CgOp::scopedlex('Nil'));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -555,7 +553,7 @@ use CgOp;
             CgOp::unbox('bool',
                 CgOp::fetch(
                     CgOp::methodcall(CgOp::scopedlex($self->condvar), "Bool"))),
-            CgOp::scopedlex('Any'), #Nil
+            CgOp::scopedlex('Nil'),
             CgOp::prog(
                 CgOp::assign(CgOp::scopedlex($self->condvar),
                     CgOp::box('Bool', CgOp::bool(1))),
@@ -706,7 +704,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::null('var');
+        CgOp::scopedlex('Nil');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -723,7 +721,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::null('var');
+        CgOp::scopedlex('Nil');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -927,7 +925,7 @@ use CgOp;
 
     has unit => (isa => 'Str', is => 'ro', required => 1);
 
-    sub code { CgOp::null('var') }
+    sub code { CgOp::scopedlex('Nil') }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

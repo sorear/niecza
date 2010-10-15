@@ -1,6 +1,5 @@
 ~
 <?{ }>
-() being Nil
 circumfix:<[ ]>
 Cursor.add_categorical
 Cursor.alpha
@@ -40,6 +39,7 @@ token { :my $var = expr; $var }
 token { $param-role-var }
 
 DONE:
+() being Nil
 Bool.Numeric
 &chars
 defined($thing)

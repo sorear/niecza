@@ -104,7 +104,7 @@ use warnings;
     sub noop { prog() }
 
     sub rnull {
-        prog($_[0], null('var'));
+        prog($_[0], scopedlex('Nil'));
     }
 
     sub getattr {

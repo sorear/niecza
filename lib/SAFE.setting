@@ -352,9 +352,7 @@ my class Parcel is Cool {
     }
 }
 
-# Maybe this should be a constant, but constants are currently forced to
-# scalar-nature (TODO)
-sub Nil() { Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) } }
+constant Nil = Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) };
 
 my class List is Cool {
     has @!items;
