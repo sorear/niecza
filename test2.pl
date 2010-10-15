@@ -52,6 +52,12 @@ is join("|", <a3 b2 c1 d0>.sort({ substr($^a,1) leg substr($^b,1) })),
 is ("yayay" ~~ /y\w*?y/), "yay", "minimal matching works";
 is ("yayay" ~~ /y**?a/), "y", "minimal matching works with **";
 
+{
+    sub bar { $*x + $*x }
+    sub foo($*x) { bar }
+    is foo(12), 24, "*-twigilled arguments work";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

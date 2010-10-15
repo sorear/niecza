@@ -1620,12 +1620,23 @@ sub param_var { my ($cl, $M) = @_;
     }
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]->Str : '';
     my $sigil = $M->{sigil}->Str;
-    if ($twigil || ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&')) {
+
+    my $slot;
+    if ($twigil eq '') {
+        $slot = $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef;
+    } elsif ($twigil eq '*') {
+        $slot = "$sigil*" . $M->{name}[0]->Str;
+    } else {
+        $M->sorry("Unhandled parameter twigil $twigil");
+        return;
+    }
+
+    if ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&') {
         $M->sorry('Non bare scalar targets NYI');
         return;
     }
-    $M->{_ast} = { list => ($sigil eq '@'), hash => ($sigil eq '%'), slot =>
-        $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef };
+    $M->{_ast} = { list => ($sigil eq '@'), hash => ($sigil eq '%'),
+        slot => $slot };
 }
 
 # :: Sig::Parameter
