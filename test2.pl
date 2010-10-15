@@ -40,6 +40,8 @@ augment class Any {
 
 sub sort(*@bits) { @bits.sort }
 
+sub _array_constructor(\$parcel) { anon @new = $parcel }
+
 ok 'cow' le 'sow', 'cow le sow';
 ok !('sow' le 'cow'), 'sow !le cow';
 ok 'row' lt 'tow', 'row lt tow';
@@ -51,6 +53,11 @@ is join("|", <a3 b2 c1 d0>.sort({ substr($^a,1) leg substr($^b,1) })),
 
 is ("yayay" ~~ /y\w*?y/), "yay", "minimal matching works";
 is ("yayay" ~~ /y**?a/), "y", "minimal matching works with **";
+
+is +[ 2 ], 1, "array construction w/ one argument";
+is +[ ], 0, "array construction w/ no arguments";
+is +[ 3, 4 ], 2, "array construction w/ two";
+is +[ $( 3, 4 ) ], 1, "array construction w/ scalar argument";
 
 {
     sub bar { $*x + $*x }

@@ -979,6 +979,14 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
     }
 }
 
+sub circumfix__S_Bra_Ket { my ($cl, $M) = @_;
+    my @kids = grep { defined } @{ $M->{semilist}{_ast} };
+    $M->{_ast} = Op::CallSub->new(node($M),
+        invocant => Op::Lexical->new(node($M), name => '&_array_constructor'),
+        args => [Op::StatementList->new(node($M), children => 
+                [ map { Op::Paren->new(inside => $_) } @kids ])]);
+}
+
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{pblock}{_ast}->type('bare');
     $M->{_ast} = Op::BareBlock->new(node($M), var => $cl->gensym,
