@@ -204,7 +204,7 @@ use warnings;
     sub cursor_pos     { getfield('pos', $_[0]) }
     sub cursor_from    { getfield('from', $_[0]) }
     sub cursor_butpos  { rawcall($_[0], 'At', $_[1]) }
-    sub cursor_backing { getfield('backing', $_[0]) }
+    sub cursor_backing { rawcall($_[0], 'GetBacking:m,String') }
     sub cursor_dows    { rawcall($_[0], 'SimpleWS') }
     sub cursor_item    { rawcall($_[0], 'GetKey', $_[1]) }
 

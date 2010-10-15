@@ -3,6 +3,17 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+// global stuff
+public sealed class GState {
+    public char[] orig_a;
+    public string orig_s;
+
+    public GState(string orig) {
+        orig_s = orig;
+        orig_a = orig.ToCharArray();
+    }
+}
+
 // stuff that should 'N'est, like subrules do
 public sealed class NState {
     public NState next;
@@ -71,8 +82,8 @@ public sealed class RxFrame {
     // .from in matches
     public int from;
 
+    public GState global;
     // our backing string, in a cheap to index form
-    public string orig_s;
     public char[] orig;
     // cache of orig.Length
     public int end;
@@ -81,8 +92,8 @@ public sealed class RxFrame {
     public readonly Choice rootf;
 
     public RxFrame(string name, Cursor csr) {
-        orig = csr.backing_ca;
-        orig_s = csr.backing;
+        global = csr.global;
+        orig = global.orig_a;
         end = orig.Length;
         rootf = bt = csr.xact;
         st.ns = new NState(rootf, "RULE " + name, csr.nstate);
@@ -234,7 +245,7 @@ public sealed class RxFrame {
 
     public void LTMPushAlts(Lexer lx, int[] addrs) {
         PushCutGroup("LTM");
-        int[] cases = lx.Run(orig_s, st.pos);
+        int[] cases = lx.Run(global.orig_s, st.pos);
         for (int i = cases.Length - 1; i >= 0; i--) {
             PushBacktrack(addrs[cases[i]]);
         }
@@ -265,11 +276,11 @@ public sealed class RxFrame {
     }
 
     public Cursor MakeCursor() {
-        return new Cursor(st.ns.klass, st.ns, bt, orig_s, orig, st.pos);
+        return new Cursor(global, st.ns.klass, st.ns, bt, st.pos);
     }
 
     public Cursor MakeMatch() {
-        return new Cursor(orig_s, from, st.pos, st.captures);
+        return new Cursor(global, st.ns.klass, from, st.pos, st.captures);
     }
 
     public static DynMetaObject MatchMO;
@@ -324,8 +335,7 @@ public class Cursor : IP6 {
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
 
     // common fields
-    public string backing;
-    public char[] backing_ca;
+    public GState global;
     public int pos;
     // Cursor only
     public Choice xact;
@@ -333,24 +343,27 @@ public class Cursor : IP6 {
     // Match only
     public int from;
     public CapInfo captures;
+    public DynMetaObject save_klass;
+
+    public string GetBacking() { return global.orig_s; }
 
     public Cursor(IP6 proto, string text)
-        : this(proto.mo, null, null, text, text.ToCharArray(), 0) { }
+        : this(new GState(text), proto.mo, null, null, 0) { }
 
-    public Cursor(string backing, int from, int pos, CapInfo captures) {
-        this.backing = backing;
+    public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures) {
+        this.global = g;
         this.captures = captures;
         this.pos = pos;
         this.from = from;
         this.mo = RxFrame.MatchMO;
+        this.save_klass = klass;
     }
 
-    public Cursor(DynMetaObject klass, NState ns, Choice xact, string backing, char[] backing_ca, int pos) {
+    public Cursor(GState g, DynMetaObject klass, NState ns, Choice xact, int pos) {
         this.mo = klass;
         this.xact = xact;
         this.nstate = ns;
-        this.backing = backing;
-        this.backing_ca = backing_ca;
+        this.global = g;
         this.pos = pos;
     }
 
@@ -359,7 +372,7 @@ public class Cursor : IP6 {
     }
 
     public Cursor At(int npos) {
-        return new Cursor(mo, nstate, xact, backing, backing_ca, npos);
+        return new Cursor(global, mo, nstate, xact, npos);
     }
 
     // TODO: keep variables around so { $<foo> = 1 } will work
@@ -397,6 +410,8 @@ no:
     }
 
     public Variable SimpleWS() {
+        string backing = global.orig_s;
+        char[] backing_ca = global.orig_a;
         int l = backing_ca.Length;
         int p = pos;
 
@@ -1094,7 +1109,7 @@ public class Lexer {
                         kl.name, name);
         }
         Cursor c = (Cursor)cursor;
-        int[] brnum = l.Run(c.backing, c.pos);
+        int[] brnum = l.Run(c.global.orig_s, c.pos);
         IP6[] ret = new IP6[brnum.Length];
         for (int i = 0; i < brnum.Length; i++)
             ret[i] = candidates[brnum[i]];
