@@ -5402,7 +5402,7 @@ method add_my_name ($n, $d?, $p?) {
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> = $*DECLARAND<const> || 1 if $*IN_DECL eq 'constant';
-        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %::MYSTERY{substr($name,1)};
+        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %*MYSTERY{substr($name,1)};
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
             $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $curstash.{$shortname};
             $curstash.{"\&$shortname"}<used> = 1;

@@ -841,6 +841,24 @@ use CgOp;
 }
 
 {
+    package Op::ConstantDecl;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+    has init => (isa => 'Op', is => 'rw');
+    has path => (isa => 'Maybe[ArrayRef]', is => 'ro');
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rnull(CgOp::scopedlex($self->name, $self->init->cgop($body)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::ContextVar;
     use Moose;
     extends 'Op';

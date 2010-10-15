@@ -1036,6 +1036,10 @@ sub INFIX { my ($cl, $M) = @_;
                 Op::Start->new(condvar => $cv, body => $M->{_ast}),
                 Op::Lexical->new(name => $l->name)]);
         }
+        elsif ($s eq '&infix:<=>' && $l->isa('Op::ConstantDecl') && !$l->init) {
+            $l->init($r);
+            $M->{_ast} = $l;
+        }
     }
     $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
 }
@@ -1926,13 +1930,8 @@ sub type_declarator__S_constant { my ($cl, $M) = @_;
     }
     my $slot  = ($M->{identifier} // $M->{variable})->Str;
 
-    # This is a cheat.  Constants should be, well, constant, and we should be
-    # using the phaser rewrite mechanism to get the initializer here.  XXX
-    # terms need to use a context hash.
-    $M->{_ast} = ($::SCOPE eq 'our') ?
-        Op::PackageVar->new(node($M), name => $slot, slot => $slot,
-            path => [ 'OUR' ]) :
-        Op::Lexical->new(node($M), name => $slot, declaring => 1);
+    $M->{_ast} = Op::ConstantDecl->new(node($M), name => $slot,
+        path => ($::SCOPE eq 'our' ? [ 'OUR' ] : undef));
 }
 
 sub package_declarator {}

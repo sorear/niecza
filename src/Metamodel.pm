@@ -908,6 +908,17 @@ sub Op::CallMethod::begin {
     }
 }
 
+sub Op::ConstantDecl::begin {
+    my $self = shift;
+
+    if ($self->path) {
+        $opensubs[-1]->add_common_name($self->name,
+            $opensubs[-1]->find_pkg($self->path), $self->name);
+    } else {
+        $opensubs[-1]->add_my_name($self->name);
+    }
+}
+
 sub Op::PackageVar::begin {
     my $self = shift;
 
