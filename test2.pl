@@ -2,45 +2,16 @@
 use Test;
 use MONKEY_TYPING;
 
-sub infix:<x>($str, $ct) {
-    my $i = +$ct;
-    my $j = ''; # XXX use strbuf
-    while $i >= 1 {
-        $i--;
-        $j ~= $str;
-    }
-    $j;
-}
-
 sub grep($filter, *@items) { @items.grep($filter) }
 sub map($callback, *@items) { @items.map($callback) }
 
-sub infix:<leg>($s1, $s2) {
-    Q:CgOp { (box Num (cast num (strcmp (unbox str (@ {$s1.Str})) (unbox str (@ {$s2.Str}))))) }
-}
-
-sub infix:<ge>($s1, $s2) { ($s1 leg $s2) >= 0 }
-sub infix:<gt>($s1, $s2) { ($s1 leg $s2) > 0  }
-sub infix:<le>($s1, $s2) { ($s1 leg $s2) <= 0 }
-sub infix:<lt>($s1, $s2) { ($s1 leg $s2) < 0  }
-
 augment class Any {
-    method sort($cmp = &infix:<leg>) {
-        my $l = self.list.eager;
-        Q:CgOp {
-            (letn n (obj_newblank (obj_llhow (@ {List})))
-              (setslot flat (l n) (bool 1))
-              (setslot items (l n) (vvarlist_sort (@ {$cmp})
-                  (getslot items vvarlist (@ {$l}))))
-              (setslot rest (l n) (vvarlist_new_empty))
-              (newrwlistvar (l n)))
-        }
-    }
 }
 
 sub sort(*@bits) { @bits.sort }
 
 sub _array_constructor(\$parcel) { anon @new = $parcel }
+sub _hash_constructor(\$parcel) { anon %hash = $parcel }
 
 ok 'cow' le 'sow', 'cow le sow';
 ok !('sow' le 'cow'), 'sow !le cow';

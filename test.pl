@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 562;
+plan 581;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1155,3 +1155,32 @@ ok "abc" ~~ / :dba("foo") abc /, ":dba doesn't affect parsing";
     sub foo(*%x) { %x }
     is foo(:z(2))<z>, 2, "slurpy hashes work";
 }
+
+ok 'cow' le 'sow', 'cow le sow';
+ok !('sow' le 'cow'), 'sow !le cow';
+ok 'row' lt 'tow', 'row lt tow';
+ok 'how' gt 'bow', 'how gt bow';
+ok 'yow' ge 'yow', 'yow ge yow';
+is join("|", sort <c f d z a>), 'a|c|d|f|z', '&sort works';
+is join("|", <a3 b2 c1 d0>.sort({ substr($^a,1) leg substr($^b,1) })),
+    'd0|c1|b2|a3', '.sort with callback works';
+
+is ("yayay" ~~ /y\w*?y/), "yay", "minimal matching works";
+is ("yayay" ~~ /y**?a/), "y", "minimal matching works with **";
+
+is +[ 2 ], 1, "array construction w/ one argument";
+is +[ ], 0, "array construction w/ no arguments";
+is +[ 3, 4 ], 2, "array construction w/ two";
+is +[ $( 3, 4 ) ], 1, "array construction w/ scalar argument";
+
+{
+    sub bar { $*x + $*x }
+    sub foo($*x) { bar }
+    is foo(12), 24, "*-twigilled arguments work";
+}
+
+is { a => 1 }.<a>, 1, "hash constructors work (1)";
+is { "a" => 1 }.<a>, 1, "hash constructors work w/ quotes";
+is { :a(1) }.<a>, 1, "hash constructors work w/ colons";
+is { a => 1, b => 2 }.<b>, 2, "hash constructors work w/ lists";
+ok { } ~~ Hash, "hash constructors work w/ nothing";

@@ -987,10 +987,42 @@ sub circumfix__S_Bra_Ket { my ($cl, $M) = @_;
                 [ map { Op::Paren->new(inside => $_) } @kids ])]);
 }
 
+sub check_hash { my ($cl, $M) = @_;
+    my $do = $M->{pblock}{_ast}->do;
+
+    return 0 unless $do->isa('Op::StatementList');
+    return 1 if @{ $do->children } == 0;
+    return 0 if @{ $do->children } > 1;
+
+    $do = $do->children->[0];
+    my @bits = $do->isa('Op::SimpleParcel') ? @{ $do->items } : ($do);
+
+    return 1 if $bits[0]->isa('Op::SimplePair');
+
+    if ($bits[0]->isa('Op::CallSub') &&
+            $bits[0]->invocant->isa('Op::Lexical') &&
+            $bits[0]->invocant->name eq '&infix:<=>>') {
+        return 1;
+    }
+
+    if ($bits[0]->isa('Op::Lexical') && substr($bits[0]->name,0,1) eq '%') {
+        return 1;
+    }
+
+    return 0;
+}
+
 sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
     $M->{pblock}{_ast}->type('bare');
     $M->{_ast} = Op::BareBlock->new(node($M), var => $cl->gensym,
         body => $M->{pblock}{_ast});
+
+    if ($cl->check_hash($M)) {
+        $M->{_ast} = Op::CallSub->new(node($M),
+            invocant => Op::Lexical->new(node($M), name => '&_hash_constructor'),
+            args => [Op::CallSub->new(node($M), invocant =>
+                    $cl->block_to_closure($M, $M->{pblock}{_ast}, once => 1))]);
+    }
 }
 
 sub circumfix__S_sigil { my ($cl, $M) = @_;
