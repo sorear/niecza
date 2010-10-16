@@ -3,7 +3,6 @@ Cursor.canonicalize_name
 Cursor.check_old_cclass
 Cursor.cursor_all
 Cursor.cursor_fresh
-Cursor.cursor_herelang
 Cursor.do_import
 Cursor.do_use
 Cursor.gettrait

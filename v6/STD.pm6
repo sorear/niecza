@@ -755,6 +755,8 @@ method heredoc () {
     return self.cursor($here.pos);  # return to initial type
 }
 
+method herelang () { Any }
+
 token quibble ($l) {
     :my ($lang, $start, $stop);
     <babble($l)>
@@ -763,12 +765,12 @@ token quibble ($l) {
     $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
     {
-        if $lang<_herelang> {
+        if $lang.herelang {
             push @herestub_queue,
                 Herestub.new(
                     delim => $<nibble><nibbles>[0]<TEXT>,
                     orignode => $¢,
-                    lang => $lang<_herelang>,
+                    lang => $lang.herelang,
                 );
         }
     }
@@ -4326,6 +4328,9 @@ grammar Q is STD {
         }
     }
 
+    role herehead[$lang] {
+        method herelang() { $lang }
+    }
 
     method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), :backslash(:$b),
             :scalar(:$s), :array(:$a), :hash(:$h), :function(:$f),
@@ -4349,7 +4354,7 @@ grammar Q is STD {
         elsif $w.defined  { self.mixin($w  ?? STD::Q::w1  !! STD::Q::w0) }
         elsif $ww.defined { self.mixin($ww ?? STD::Q::ww1 !! STD::Q::ww0) }
 
-        elsif $to.defined { self.truly($to, ':to'); self.cursor_herelang }
+        elsif $to.defined { self.truly($to, ':to'); STD::Q.mixin(STD::Q::herehead[self]) }
 
         elsif $regex.defined {
             %*LANG<Regex>
