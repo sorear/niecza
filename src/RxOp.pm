@@ -650,6 +650,30 @@ use CgOp;
 }
 
 {
+    package RxOp::CheckBlock;
+    use Moose;
+    extends 'RxOp';
+
+    has block => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_[0]->block }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
+                    CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
+            CgOp::newscalar(CgOp::rxcall("MakeCursor"))))));
+    }
+
+    sub lad {
+        my ($self) = @_;
+        [ 'Imp' ];
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::VoidBlock;
     use Moose;
     extends 'RxOp';
