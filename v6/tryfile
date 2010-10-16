@@ -1,0 +1,60 @@
+# vim: ft=perl6
+use MONKEY_TYPING;
+
+sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
+
+augment class Cursor {
+    our $RED    = "\e[31m";
+    our $GREEN  = "\e[32m";
+    our $YELLOW = "\e[33m";
+    our $CLEAR  = "\e[37m";
+
+    method locmess () {
+        my $pos = self.pos;
+        my $line = self.lineof($pos);
+
+        if $pos >= chars(self.orig) {
+            $line = $line ~ " (EOF)";
+        }
+
+        my $pre = substr(self.orig, 0, $pos);
+        my $prel = chars($pre) min 40;
+        $pre = substr($pre, chars($pre)-$prel, $prel);
+        if my $M = ($pre ~~ /^.*\n/) {
+            $pre = substr($pre, $M.to);
+        }
+        $pre = '<BOL>' if $pre eq '';
+        my $post = substr(self.orig, $pos, (chars(self.orig)-$pos) min 40);
+        if $M = ($post ~~ /\n/) {
+            $post = substr($post,0,$M.from);
+        }
+        $post = '<EOL>' if $post eq '';
+        " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~
+            $pre ~ $Cursor::YELLOW ~ "\x23CF" ~ $Cursor::RED ~ $post ~
+            $Cursor::CLEAR;
+    }
+
+    method line {
+        self.lineof(self.pos);
+    }
+
+    method lineof ($p) {
+        return 1 unless defined $p;
+        my $line = @*MEMOS[$p]<L>;
+        return $line if $line;
+        $line = 1; my $pos = 0;
+        self.orig ~~ / [ \n { @*MEMOS[$pos++]<L> = $line++ } ||
+                         .  { @*MEMOS[$pos++]<L> = $line } ]* /;
+        @*MEMOS[$pos++]<L> = $line;
+        return @*MEMOS[$p]<L> // 0;
+    }
+
+    method SETGOAL { }
+    method FAILGOAL ($stop, $name, $startpos) {
+        my $s = "'$stop'";
+        $s = '"\'"' if $s eq "'''";
+        self.panic("Unable to parse $name" ~ $startpos.locmess ~ "\nCouldn't find final $s; gave up");
+    }
+
+    method deb($str) { note $str }
+}

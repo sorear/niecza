@@ -24,9 +24,6 @@ package DEBUG {
     our $mixins = False;
     our $callm_show_subnames = False;
     our $use_color = False;
-
-    our $RED = "\e[31m";
-    our $CLEAR = "\e[37m";
 }
 
 our $ALL;

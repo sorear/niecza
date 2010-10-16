@@ -4,11 +4,9 @@ Cursor.check_old_cclass
 Cursor.cursor_all
 Cursor.cursor_fresh
 Cursor.cursor_herelang
-Cursor.deb
 Cursor.do_import
 Cursor.do_use
 Cursor.gettrait
-Cursor.lineof
 Cursor.load_lex
 Cursor.makestr
 Cursor.mark_sinks
@@ -36,6 +34,8 @@ DONE:
 ~
 <?{ }>
 circumfix:<[ ]>
+Cursor.deb
+Cursor.lineof
 hash literals
 () being Nil
 Bool.Numeric
