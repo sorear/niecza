@@ -639,7 +639,22 @@ sub metachar__S_Double_Double { my ($cl, $M) = @_;
 }
 
 sub metachar__S_var { my ($cl, $M) = @_;
-    if ($M->{quantified_atom}) {
+    if ($M->{binding}) {
+        my $a = $M->{binding}{quantified_atom}{_ast}->uncut;
+        my $cid = $M->{variable}{_ast}{capid};
+
+        if (!defined $cid) {
+            $M->sorry("Non-Match bindings NYI");
+            $M->{_ast} = RxOp::Sequence->new;
+            return;
+        }
+
+        if ($a->isa('RxOp::VoidBlock')) {
+            $M->{_ast} = RxOp::SaveValue->new(capid => $cid,
+                block => $a->block);
+            return;
+        }
+
         $M->sorry("Explicit regex bindings NYI");
         $M->{_ast} = RxOp::Sequence->new;
         return;
@@ -1625,7 +1640,7 @@ sub variable { my ($cl, $M) = @_;
     } elsif ($M->{special_variable}) {
         $name = substr($M->{special_variable}->Str, 1);
     } elsif ($M->{index}) {
-        $M->{_ast} = { term =>
+        $M->{_ast} = { capid => $M->{index}{_ast}, term =>
             # maybe a little of a cheat
             $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-pos',
                 receiver => Op::Lexical->new(name => '$/'),
@@ -1634,7 +1649,8 @@ sub variable { my ($cl, $M) = @_;
         return;
     } elsif ($M->{postcircumfix}[0]) {
         if ($M->{postcircumfix}[0]{sym} eq '< >') {
-            $M->{_ast} = { term =>
+            $M->{_ast} = { capid => $M->{postcircumfix}[0]{_ast}{args}[0]->text,
+                term =>
                 # maybe a little of a cheat
                 $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-key',
                     receiver => Op::Lexical->new(name => '$/'),

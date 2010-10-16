@@ -79,6 +79,12 @@ ok 'xy' ~~ /x <{ True }> y/, '<{True}> does not affect it';
 
 rxtest / <alpha> / , '<alpha>', ('a', 'A', "\x4E00"), ("+", "1", " ");
 
+{
+    my $m = "" ~~ / $<foo> = { 2 + 2 } $<bar> = {"x"} $<bar> = {"y"} /;
+    is $m<foo>, 4, "value aliasing works (sing)";
+    is $m<bar>, "x y", "value aliasing works (plur)";
+}
+
 # {
 #     our role Stop4717[$a] {
 #         token foo { $a }

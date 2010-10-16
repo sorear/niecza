@@ -13,6 +13,7 @@ use CgOp;
 
     sub opzyg { map { $_->opzyg } @{ $_[0]->zyg } }
     sub oplift { map { $_->oplift } @{ $_[0]->zyg } }
+    sub uncut { $_[0] }
 
     # all that matters is 0-1-infty; $*in_quant valid here
     sub used_caps {
@@ -288,6 +289,8 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
+    sub uncut { $_[0]->zyg->[0] }
+
     sub code {
         my ($self, $body) = @_;
 
@@ -492,7 +495,7 @@ use CgOp;
         my $callf = CgOp::methodcall(CgOp::newscalar(
                 CgOp::rxcall("MakeCursor")), $self->name);
         my @pushcapf = (@{ $self->captures } == 0) ? () : (
-            CgOp::rxpushcapture(CgOp::cast('cursor', CgOp::letvar("k")),
+            CgOp::rxpushcapture(CgOp::letvar("kv"),
                 @{ $self->captures }));
         my $updatef = CgOp::prog(
             CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
@@ -504,7 +507,8 @@ use CgOp;
 
         if ($self->selfcut) {
             push @code, CgOp::letn(
-                "k", CgOp::fetch(CgOp::get_first(CgOp::fetch($callf))),
+                "kv", CgOp::get_first(CgOp::fetch($callf)),
+                "k", CgOp::fetch(CgOp::letvar("kv")),
                 $updatef);
         } else {
             push @code, CgOp::rxcall("SetCursorList", $callf);
@@ -514,8 +518,9 @@ use CgOp;
                         "GetCursorList"), "shift"));
             push @code, CgOp::label($sk);
             push @code, CgOp::letn(
-                "k", CgOp::fetch(CgOp::get_first(CgOp::fetch(
-                            CgOp::rxcall("GetCursorList")))),
+                "kv", CgOp::get_first(CgOp::fetch(
+                        CgOp::rxcall("GetCursorList"))),
+                "k", CgOp::fetch(CgOp::letvar("kv")),
                 $updatef);
             push @code, CgOp::rxpushb("SUBRULE", $bt);
             push @code, CgOp::rxcall("SetCursorList", CgOp::null("var"));
@@ -682,6 +687,36 @@ use CgOp;
         CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
                     CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
             CgOp::newscalar(CgOp::rxcall("MakeCursor"))))));
+    }
+
+    sub lad {
+        my ($self) = @_;
+        [ 'Imp' ];
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::SaveValue;
+    use Moose;
+    extends 'RxOp';
+
+    has capid => (isa => 'Str', is => 'ro', required => 1);
+    has block => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_[0]->block }
+
+    sub used_caps {
+        my ($self) = @_;
+        +{ $self->capid => ($::in_quant ? 2 : 1) };
+    }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxpushcapture(CgOp::subcall(
+                CgOp::fetch($self->block->cgop($body)),
+            CgOp::newscalar(CgOp::rxcall("MakeCursor"))), $self->capid);
     }
 
     sub lad {

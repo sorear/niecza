@@ -31,9 +31,9 @@ public sealed class NState {
 public sealed class CapInfo {
     public CapInfo prev;
     public string[] names;
-    public Cursor cap;
+    public Variable cap;
 
-    public CapInfo(CapInfo prev, string[] names, Cursor cap) {
+    public CapInfo(CapInfo prev, string[] names, Variable cap) {
         this.prev = prev; this.names = names; this.cap = cap;
     }
 }
@@ -130,7 +130,7 @@ public sealed class RxFrame {
         bt = new Choice(bt, ip, st);
     }
 
-    public void PushCapture(string[] cn, Cursor cl) {
+    public void PushCapture(string[] cn, Variable cl) {
         st.captures = new CapInfo(st.captures, cn, cl);
     }
 
@@ -383,7 +383,7 @@ public class Cursor : IP6 {
         return new Cursor(global, mo, nstate, xact, npos);
     }
 
-    // TODO: keep variables around so { $<foo> = 1 } will work
+    // TODO: cache generated lists
     public Variable GetKey(string str) {
         CapInfo it = captures;
         VarDeque caps = new VarDeque();
@@ -399,7 +399,7 @@ yes:
             if (it.cap == null) {
                 list = true;
             } else {
-                caps.Unshift(Kernel.NewRWScalar(Kernel.AnyMO, it.cap));
+                caps.Unshift(it.cap);
             }
 no:
             it = it.prev;
@@ -413,7 +413,7 @@ no:
             return Kernel.NewRWListVar(l);
         } else {
             return caps.Count() != 0 ? caps[0] :
-                Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+                Kernel.NewROScalar(Kernel.AnyP);
         }
     }
 
