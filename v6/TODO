@@ -14,20 +14,19 @@ Cursor.mixin
 Cursor.O
 Cursor.suppose
 Cursor.trim_heredoc
-$*GOAL handling XXX
-Highwater stuff
-EXPR will need a re-write with tests.
-$<foo> = 1
 List.at-pos(WhateverCode)
 Match.CURSOR
 Match.iterator should return numbered captures
 Match.perl
 Match.synthetic
 Parcel.LISTSTORE
+$*GOAL handling XXX
+Highwater stuff
+Audit EXPR, termish, nibble
+Change STD to use $<foo> = { 1 }
 self in regexes
 $<sym>
 temp $*FOO
-try
 token { $param-role-var }
 
 DONE:
@@ -61,6 +60,7 @@ push(@array, $thing)
 shift(@array)
 &sort
 substr($str,$from,$len)
+try
 token { :my $var = expr; $var }
 
 AVERTED:

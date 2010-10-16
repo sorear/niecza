@@ -568,6 +568,28 @@ use CgOp;
     no Moose;
 }
 
+{
+    package Op::Try;
+    use Moose;
+    extends 'Op';
+
+    has body => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->body }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        my $id = Niecza::Actions->genid;
+
+        CgOp::prog(
+            CgOp::ehspan(5, undef, 0, "start$id", "end$id", "end$id"),
+            CgOp::span("start$id", "end$id", 1, $self->body->cgop($body)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 
 {
     package Op::Num;

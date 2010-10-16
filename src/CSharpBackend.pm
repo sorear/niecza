@@ -449,7 +449,7 @@ sub codegen_sub {
                 CgOp::return(CgOp::newscalar(CgOp::letvar('!to')))));
     } elsif ($_->returnable) {
         $ops = CgOp::prog(@enter,
-            CgOp::return(CgOp::span("rstart", "rend",
+            CgOp::return(CgOp::span("rstart", "rend", 0,
                     $_->code->cgop($_))),
             CgOp::ehspan(4, undef, 0, "rstart", "rend", "rend"));
     } else {

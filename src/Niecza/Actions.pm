@@ -2573,6 +2573,10 @@ sub statement_prefix__S_gather { my ($cl, $M) = @_;
     $M->{_ast} = Op::Gather->new(node($M), var => $cl->gensym,
         body => $M->{blast}{_ast});
 }
+sub statement_prefix__S_try { my ($cl, $M) = @_;
+    $M->{_ast} = Op::Try->new(node($M), body =>
+        $cl->block_to_immediate($M, 'try', $M->{blast}{_ast}));
+}
 
 sub statement_prefix__S_START { my ($cl, $M) = @_;
     my $cv = $cl->gensym;

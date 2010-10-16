@@ -24,8 +24,8 @@ use warnings;
     }
 
     sub span {
-        my ($ls,$le,@r) = @_;
-        CgOp->new(op => [span => $ls, $le], zyg => [prog(@r)]);
+        my ($ls,$le,$sy,@r) = @_;
+        CgOp->new(op => [span => $ls, $le, $sy], zyg => [prog(@r)]);
     }
 
     sub null {
@@ -35,6 +35,7 @@ use warnings;
     sub ehspan { CgOp->new(op => [ ehspan => @_ ]); }
 
     sub sink { CgOp->new(op => ['drop'], zyg => [ $_[0] ]); }
+    sub sync { CgOp->new(op => ['cpssync']) }
 
     sub fetch { rawcall($_[0], 'Fetch'); }
 

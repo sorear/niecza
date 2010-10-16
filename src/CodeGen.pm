@@ -60,7 +60,10 @@ use CLRTypes;
         $self->resulttype($rt);
     }
 
-    # These functions are usable from user code, but still depend on volatiles.
+    sub cpssync {
+        my ($self) = @_;
+        $self->_emit("th.ip = " . ($self->numips - 1));
+    }
 
     sub result {
         my ($self) = @_;

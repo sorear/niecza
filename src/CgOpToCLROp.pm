@@ -61,12 +61,12 @@ my %fixtype = ( callframe => 'Frame',
 
 $fixtype{$_} = 'Void' for (qw/ poke_let labelhere goto cgoto ncgoto ehspan
     rtpadput rtpadputi drop tail_call_sub clr_field_set clr_sfield_set
-    clr_index_set rxbprim rxpushb return/);
+    clr_index_set rxbprim rxpushb return cpssync /);
 
 $fixtype{$_} = 'Variable' for (qw/ pos call_sub call_method /);
 
 my %_cps = map { $_ => 1 } qw/ call_method call_sub cgoto goto labelhere
-    ncgoto return rxbprim /;
+    ncgoto return rxbprim cpssync /;
 my %_const = map { $_ => 1 } qw/ callframe clr_bool clr_char clr_double clr_int
     clr_string const labelid pos push_null /;
 
@@ -270,7 +270,9 @@ sub do_span {
     my ($op, $zyg) = @_;
     CLROp::Value->new(type => $zyg->type, stmts => [
             CLROp::Term->new(op => ['labelhere', $op->[1]]),
+            ($op->[3] ? (CLROp::Term->new(op => ['cpssync'])) : ()),
             $zyg->stmts_result,
+            ($op->[3] ? (CLROp::Term->new(op => ['cpssync'])) : ()),
             CLROp::Term->new(op => ['labelhere', $op->[2]]) ]);
 }
 
@@ -299,7 +301,7 @@ my @_all = qw/ callframe call_method call_sub cast cgoto clr_arith clr_bool
     clr_new_zarr clr_sfield_get clr_sfield_set clr_string const drop drop_let
     ehspan goto hintget labelhere labelid ncgoto peek_let poke_let pop_line
     pos push_let push_line push_null return rtpadget rtpadgeti rtpadput
-    rtpadputi rxbprim rxpushb /;
+    rtpadputi rxbprim rxpushb cpssync /;
 
 my %_md = (
     'ann' => \&do_annotation,
