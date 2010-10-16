@@ -60,6 +60,26 @@ use CgOp;
 }
 
 {
+    package RxOp::VarString;
+    use Moose;
+    extends 'RxOp';
+
+    has value => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_[0]->value }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(
+                    $self->value->cgop($body))));
+    }
+
+    sub lad { ['Imp'] }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::Quantifier;
     use Moose;
     extends 'RxOp';

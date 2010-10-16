@@ -1,5 +1,3 @@
-~
-<?{ }>
 Cursor.add_categorical
 Cursor.alpha
 Cursor.canonicalize_name
@@ -19,6 +17,8 @@ Cursor.mixin
 Cursor.O
 Cursor.suppose
 Cursor.trim_heredoc
+Cursor.top_goal
+Highwater stuff
 EXPR will need a re-write with tests.
 $<foo> = 1
 func(|($key => $value))
@@ -32,10 +32,11 @@ self in regexes
 $<sym>
 temp $*FOO
 something with $*HIGHWATER, $*HIGHEXPECT, $*GOAL
-token { :my $var = expr; $var }
 token { $param-role-var }
 
 DONE:
+~
+<?{ }>
 circumfix:<[ ]>
 hash literals
 () being Nil
@@ -60,6 +61,7 @@ push(@array, $thing)
 shift(@array)
 &sort
 substr($str,$from,$len)
+token { :my $var = expr; $var }
 
 AVERTED:
 

@@ -629,11 +629,21 @@ sub metachar__S_Single_Single { my ($cl, $M) = @_;
 
 sub metachar__S_Double_Double { my ($cl, $M) = @_;
     if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
-        $M->sorry("Interpolating strings in regexes NYI");
+        $M->{_ast} = RxOp::VarString->new(value => $M->{quote}{_ast});
         return;
     }
     $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
         igcase => $::RX{i}, igmark => $::RX{a});
+}
+
+sub metachar__S_var { my ($cl, $M) = @_;
+    if ($M->{quantified_atom}) {
+        $M->sorry("Explicit regex bindings NYI");
+        $M->{_ast} = RxOp::Sequence->new;
+        return;
+    }
+    $M->{_ast} = RxOp::VarString->new(value =>
+        $cl->do_variable_reference($M, $M->{variable}{_ast}));
 }
 
 sub rxcapturize { my ($cl, $name, $rxop) = @_;
