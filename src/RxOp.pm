@@ -373,10 +373,10 @@ use CgOp;
 
         my $pass = $self->label;
         my @code;
-        push @code, CgOp::pushcut("CUTGRP");
-        push @code, CgOp::rxpushb("CUTGRP", $pass);
+        push @code, CgOp::pushcut("NOTBEFORE");
+        push @code, CgOp::rxpushb("NOTBEFORE", $pass);
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rxcall('CommitGroup', CgOp::clr_string("CUTGRP"));
+        push @code, CgOp::rxcall('CommitGroup', CgOp::clr_string("NOTBEFORE"));
         push @code, CgOp::goto('backtrack');
         push @code, CgOp::label($pass);
         push @code, CgOp::popcut;
@@ -392,6 +392,44 @@ use CgOp;
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
+
+{
+    package RxOp::Tilde;
+    use Moose;
+    extends 'RxOp';
+
+    has closer => (isa => 'Str', is => 'ro', required => 1);
+    has dba    => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code {
+        my ($self, $body) = @_;
+        my @code;
+        my $fail = $self->label;
+        my $pass = $self->label;
+
+        push @code, CgOp::pushcut("TILDE " . $self->closer);
+        push @code, CgOp::rxsetquant(CgOp::rxgetpos);
+        push @code, $self->zyg->[0]->code($body);
+        push @code, CgOp::rxpushb("TILDE", $fail);
+        push @code, CgOp::rxbprim('Exact', CgOp::clr_string($self->closer));
+        push @code, CgOp::goto($pass);
+        push @code, CgOp::label($fail);
+        push @code, CgOp::sink(CgOp::methodcall(CgOp::newscalar(
+                CgOp::rxcall("MakeCursor")), 'FAILGOAL',
+            CgOp::string_var($self->closer), CgOp::string_var($self->dba),
+            CgOp::box('Num', CgOp::cast('num', CgOp::rxgetquant))));
+        push @code, CgOp::label($pass);
+        push @code, CgOp::popcut;
+
+        @code;
+    }
+
+    sub lad { ['Imp'] }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 
 {
     package RxOp::Subrule;

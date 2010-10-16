@@ -435,6 +435,18 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
         $atom = RxOp::Cut->new(zyg => [$atom]);
     }
 
+    if (defined $q->{tilde}) {
+        my ($closer, $inner) = @{ $q->{tilde} };
+        if (!$closer->isa('RxOp::String')) {
+            $M->sorry("Non-literal closers for ~ NYI");
+            $M->{_ast} = RxOp::None->new();
+            return;
+        }
+        $atom = RxOp::Sequence->new(zyg => [$atom,
+            RxOp::Tilde->new(closer => $closer->text, dba => $::RX{dba} // '?',
+                zyg => [$inner])]); # TODO
+    }
+
     $M->{_ast} = $atom;
 }
 
@@ -451,6 +463,9 @@ sub quantifier__S_Question { my ($cl, $M) = @_;
 }
 sub quantifier__S_Colon { my ($cl, $M) = @_;
     $M->{_ast} = { mod => '' };
+}
+sub quantifier__S_Tilde { my ($cl, $M) = @_;
+    $M->{_ast} = { tilde => [ map { $_->{_ast} } @{ $M->{quantified_atom} } ] };
 }
 sub quantifier__S_StarStar { my ($cl, $M) = @_;
     # XXX can't handle normspace well since it's not labelled 1*/2*

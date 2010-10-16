@@ -146,6 +146,10 @@ public sealed class RxFrame {
         st.pos = pos;
     }
 
+    public int GetPos() {
+        return st.pos;
+    }
+
     public void PushCutGroup(string tag) {
         st.ns = new NState(bt, tag, st.ns);
     }
@@ -263,6 +267,10 @@ public sealed class RxFrame {
 
     public void IncQuant() {
         st.ns.quant++;
+    }
+
+    public void SetQuant(int data) {
+        st.ns.quant = data;
     }
 
     public int GetQuant() {

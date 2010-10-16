@@ -1,6 +1,5 @@
 ~
 <?{ }>
-circumfix:<[ ]>
 Cursor.add_categorical
 Cursor.alpha
 Cursor.canonicalize_name
@@ -17,15 +16,12 @@ Cursor.load_lex
 Cursor.makestr
 Cursor.mark_sinks
 Cursor.mixin
-Cursor.moreinput
 Cursor.O
 Cursor.suppose
 Cursor.trim_heredoc
 EXPR will need a re-write with tests.
 $<foo> = 1
-$*FOO as a parameter
 func(|($key => $value))
-hash literals
 List.at-pos(WhateverCode)
 Match.CURSOR
 Match.iterator should return numbered captures
@@ -35,16 +31,20 @@ Parcel.LISTSTORE
 self in regexes
 $<sym>
 temp $*FOO
+something with $*HIGHWATER, $*HIGHEXPECT, $*GOAL
 token { :my $var = expr; $var }
 token { $param-role-var }
 
 DONE:
+circumfix:<[ ]>
+hash literals
 () being Nil
 Bool.Numeric
 &chars
 defined($thing)
 :delete
 :exists
+$*FOO as a parameter
 gt, lt, leg, etc
 Hash.keys &keys
 Hash.LISTSTORE

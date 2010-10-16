@@ -296,11 +296,13 @@ use warnings;
     sub rxfinalend    { rxcall('FinalEnd') }
     sub rxbacktrack   { rxcall('Backtrack') }
     sub rxgetquant    { rxcall('GetQuant') }
+    sub rxsetquant    { rxcall('SetQuant:m,Void', $_[0]) }
     sub rxopenquant   { rxcall('OpenQuant') }
     sub rxclosequant  { rxcall('CloseQuant') }
     sub rxincquant    { rxcall('IncQuant') }
     sub rxsetclass    { rxcall('SetClass', $_[0]) }
     sub rxsetpos      { rxcall('SetPos', $_[0]) }
+    sub rxgetpos      { rxcall('GetPos:m,Int32') }
     sub rxcommitgroup { rxcall('CommitGroup', $_[0]) }
 
     sub construct_lad {
