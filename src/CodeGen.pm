@@ -263,6 +263,8 @@ use CLRTypes;
                     $self->_emit("_pos.AddRange($vals[$ix])");
                 } elsif ($sig->[$ix] eq 'flatnam') {
                     $self->_emit("Kernel.AddMany(_nam, $vals[$ix])");
+                } elsif ($sig->[$ix] eq 'flatcap') {
+                    $self->_emit("Kernel.AddCap(_pos, _nam, $vals[$ix])");
                 } else {
                     die "weird sig bit $sig->[$ix]";
                 }

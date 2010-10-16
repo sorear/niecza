@@ -154,6 +154,7 @@ use warnings;
     sub varhash_delete_key { rawcall($_[0], 'Remove', _str($_[1])) }
     sub varhash_clear { rawcall($_[0], 'Clear') }
     sub varhash_keys { rawscall('Kernel.KeysHelper', $_[0]) }
+    sub varhash_dup { rawnew('varhash', $_[0]) }
     sub varhash_new { rawnew('varhash') }
 
     sub newgeneralvar { rawnew('clr:SimpleVariable', $_[0], $_[1], rawsget('Kernel.AnyMO'), $_[2], $_[3]) }
@@ -184,6 +185,7 @@ use warnings;
     sub fvarlist_item { getindex($_[0], $_[1]) }
 
     sub vvarlist_from_fvarlist { rawnew('vvarlist', $_[0]) }
+    sub vvarlist_to_fvarlist { rawcall($_[0], 'CopyAsArray:m,Variable[]') }
     sub vvarlist_clone { rawnew('vvarlist', $_[0]) }
     sub vvarlist_new_empty { rawnew('vvarlist') }
     sub vvarlist_shift { rawcall($_[0], 'Shift') }

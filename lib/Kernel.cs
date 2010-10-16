@@ -1108,6 +1108,15 @@ slow:
             }
         }
 
+        public static void AddCap(List<Variable> p,
+                Dictionary<string,Variable> n, IP6 cap) {
+            Variable[] fp = cap.GetSlot("positionals") as Variable[];
+            Dictionary<string,Variable> fn = cap.GetSlot("named")
+                as Dictionary<string,Variable>;
+            p.AddRange(fp);
+            if (fn != null) AddMany(n, fn);
+        }
+
         public static void AddMany(Dictionary<string,Variable> d1,
                 Dictionary<string,Variable> d2) {
             foreach (KeyValuePair<string,Variable> kv in d2) {

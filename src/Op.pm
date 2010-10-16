@@ -130,6 +130,10 @@ use CgOp;
         for my $a (@{ $self->args }) {
             if ($a->isa('Op::SimplePair')) {
                 push @out, ":" . $a->key, $a->value->cgop($body);
+            } elsif ($a->isa('Op::CallSub') && $a->invocant->isa('Op::Lexical')
+                    && $a->invocant->name eq '&prefix:<|>') {
+                push @out, 'flatcap', CgOp::fetch(CgOp::methodcall(
+                    $a->positionals->[0]->cgop($body), 'Capture'));
             } else {
                 push @out, $a->cgop($body);
             }
