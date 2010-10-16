@@ -4236,7 +4236,7 @@ grammar Q is STD {
         }
     }
 
-    role qq does b1 does c1 does s1 does a1 does h1 does f1 {
+    role qq {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
         token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
@@ -4332,9 +4332,10 @@ grammar Q is STD {
             :closure(:$c), :path(:$p), :exec(:$x), :words(:$w),
             :quotewords(:$ww), :heredoc(:$to), :$regex, *%unknown) {
         # NIECZA ::foo syntax is broken, no role cronies, no MMD
-        if    $q.defined  { self.truly($q,  ':q'); self.mixin(q) }
-        elsif $qq.defined { self.truly($qq, ':qq'); self.mixin(qq) }
-        elsif $cc.defined { self.truly($cc, ':cc'); self.mixin(cc) }
+        if    $q.defined  { self.truly($q,  ':q'); self.mixin(STD::Q::q) }
+        elsif $qq.defined { self.truly($qq, ':qq'); self.mixin(STD::Q::b1).mixin(STD::Q::c1).mixin(STD::Q::s1).mixin(STD::Q::a1).mixin(STD::Q::h1).mixin(STD::Q::f1).mixin(STD::Q::qq) }
+
+        elsif $cc.defined { self.truly($cc, ':cc'); self.mixin(STD::Q::cc) }
 
         elsif $b.defined  { self.mixin($b  ?? STD::Q::b1  !! STD::Q::b0) }
         elsif $s.defined  { self.mixin($s  ?? STD::Q::s1  !! STD::Q::s0) }
@@ -4505,7 +4506,7 @@ method EXPR ($preclvl?) {
                 :captures(:left($left), :infix($op), :right($right)),
                 :suphash({_arity => 'BINARY'}), :method<INFIX>);
 
-            self.deb(@termstack[*-1].dump) if $*DEBUG +& DEBUG::EXPR;
+            self.deb(@termstack[*-1].dump) if $DEBUG::EXPR;
             my $ck;
             if $ck = $op<O><_reducecheck> {
                 @termstack[*-1] = $ck(@termstack[*-1]);
@@ -4515,7 +4516,7 @@ method EXPR ($preclvl?) {
 
   TERM:
     loop {
-        self.deb("In loop, at ", $here.pos) if $& DEBUG::EXPR;
+        self.deb("In loop, at ", $here.pos) if $DEBUG::EXPR;
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
         $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';     # XXX P6

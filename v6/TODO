@@ -14,7 +14,7 @@ Cursor.mixin
 Cursor.O
 Cursor.suppose
 Cursor.trim_heredoc
-Cursor.top_goal
+$*GOAL handling XXX
 Highwater stuff
 EXPR will need a re-write with tests.
 $<foo> = 1
@@ -27,7 +27,7 @@ Parcel.LISTSTORE
 self in regexes
 $<sym>
 temp $*FOO
-something with $*HIGHWATER, $*HIGHEXPECT, $*GOAL
+try
 token { $param-role-var }
 
 DONE:

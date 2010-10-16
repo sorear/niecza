@@ -437,6 +437,8 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
 
     if (defined $q->{tilde}) {
         my ($closer, $inner) = @{ $q->{tilde} };
+        $closer = $closer->zyg->[0] if ($closer->isa('RxOp::Cut') &&
+            $closer->zyg->[0]->isa('RxOp::String'));
         if (!$closer->isa('RxOp::String')) {
             $M->sorry("Non-literal closers for ~ NYI");
             $M->{_ast} = RxOp::None->new();
@@ -694,8 +696,7 @@ sub decapturize { my ($cl, $M) = @_;
         return;
     }
     if (!$M->{assertion}{_ast}->isa('RxOp::Subrule')) {
-        $M->sorry("Internal error in assertion:method parse");
-        return;
+        return $M->{assertion}{_ast};
     }
     RxOp::Subrule->new(captures => [],
         zyg => $M->{assertion}{_ast}->zyg,
@@ -1009,6 +1010,9 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
 
 sub circumfix__S_Bra_Ket { my ($cl, $M) = @_;
     my @kids = grep { defined } @{ $M->{semilist}{_ast} };
+    if (! grep { !$_->isa('Op::StringLiteral') } @kids) {
+        $M->{qpvalue} = "<" . join(" ", map { $_->text } @kids) . ">";
+    }
     $M->{_ast} = Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(node($M), name => '&_array_constructor'),
         args => [Op::StatementList->new(node($M), children => 
