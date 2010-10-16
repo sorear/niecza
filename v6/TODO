@@ -1,5 +1,4 @@
 Cursor.add_categorical
-Cursor.alpha
 Cursor.canonicalize_name
 Cursor.check_old_cclass
 Cursor.cursor_all
@@ -21,7 +20,6 @@ Cursor.top_goal
 Highwater stuff
 EXPR will need a re-write with tests.
 $<foo> = 1
-func(|($key => $value))
 List.at-pos(WhateverCode)
 Match.CURSOR
 Match.iterator should return numbered captures
@@ -42,10 +40,12 @@ hash literals
 () being Nil
 Bool.Numeric
 &chars
+Cursor.alpha
 defined($thing)
 :delete
 :exists
 $*FOO as a parameter
+func(|($key => $value))
 gt, lt, leg, etc
 Hash.keys &keys
 Hash.LISTSTORE

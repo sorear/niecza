@@ -56,6 +56,10 @@ augment class Hash {
     }
 }
 
+augment class Cursor {
+    token alpha { <+INTERNAL::alpha> }
+}
+
 ok !('xy' ~~ /x <{ False }> y/), '<{False}> blocks a match';
 ok 'xy' ~~ /x <{ True }> y/, '<{True}> does not affect it';
 
@@ -72,6 +76,8 @@ ok 'xy' ~~ /x <{ True }> y/, '<{True}> does not affect it';
     is f2(|[1,2]), 1, "can flatten lists";
     is f2(|(1,2)), 1, "can flatten parcels";
 }
+
+rxtest / <alpha> / , '<alpha>', ('a', 'A', "\x4E00"), ("+", "1", " ");
 
 # {
 #     our role Stop4717[$a] {

@@ -669,9 +669,12 @@ sub do_cclass { my ($cl, $M) = @_;
     my $rxop;
     for (@cce) {
         my $sign = $_->{sign}->Str ne '-';
-        my $exp = $_->{quibble} ?
-            RxOp::CClassElem->new(cc => $_->{quibble}{_ast}) :
-            RxOp::CallMethod->new(name => $_->{name}->Str); # assumes no capture
+        my $exp =
+            ($_->{name} && $_->{name}->Str =~ /^INTERNAL::(.*)/) ?
+                RxOp::CClassElem->new(cc => CClass::internal($1)) :
+            $_->{quibble} ?
+                RxOp::CClassElem->new(cc => $_->{quibble}{_ast}) :
+            RxOp::Subrule->new(captures => [], name => $_->{name}->Str);
 
         if ($sign) {
             $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $exp;

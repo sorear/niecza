@@ -102,4 +102,10 @@ our $Space  = CClass->enum(' ', "\t", "\r", "\cK", "\n", "\x{3000}"); # TODO
 our $HSpace = CClass->enum("\t", " ", "\x{3000}");
 our $VSpace = CClass->enum("\r", "\cK", "\n");
 
+sub internal {
+    my ($name) = @_;
+    ($name eq 'alpha') && return CClass->catm(qw< Lu Lt Ll Lm Lo >);
+    die "unknown internal cclass $name";
+}
+
 1;
