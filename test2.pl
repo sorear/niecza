@@ -97,6 +97,10 @@ rxtest / <alpha> / , '<alpha>', ('a', 'A', "\x4E00"), ("+", "1", " ");
     is $m<c>, "f", "aliased [] transparent to captures";
     is $m<moo>, "ef", "aliased [] captures string";
     ok !$m<moo><b>, "no spurious nested captures";
+
+    my $save;
+    "()" ~~ / '(' ~ ')' { $save = $*GOAL } /;
+    is $save, ')', 'Setting $*GOAL works';
 }
 
 # {

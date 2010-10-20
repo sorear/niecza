@@ -28,6 +28,7 @@ Non-string parameterized role arguments
 $<sym>
 temp $*FOO
 token { $param-role-var }
+Make sure / (\w+) $0 / works
 
 DONE:
 ~
