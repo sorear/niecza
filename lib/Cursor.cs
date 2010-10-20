@@ -388,36 +388,16 @@ public class Cursor : IP6 {
     }
 
     public Cursor At(int npos) {
-        return new Cursor(global, mo, nstate, xact, npos, captures);
+        return new Cursor(global, mo, nstate, xact, npos, null);
     }
 
     public Cursor StripCaps() {
         return new Cursor(global, save_klass, from, pos, null);
     }
 
-    // TODO: cache generated lists
-    public Variable GetKey(string str) {
-        CapInfo it = captures;
-        VarDeque caps = new VarDeque();
-        bool list = false;
-
-        while (it != null) {
-            foreach (string cn in it.names) {
-                if (cn == str)
-                    goto yes;
-            }
-            goto no;
-yes:
-            if (it.cap == null) {
-                list = true;
-            } else {
-                caps.Unshift(it.cap);
-            }
-no:
-            it = it.prev;
-        }
-
-        if (list) {
+    private Variable FixupList(VarDeque caps) {
+        if (caps.Count() != 0 && caps[caps.Count() - 1] == null) {
+            caps.Pop();
             DynObject l = new DynObject(RxFrame.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
@@ -427,6 +407,64 @@ no:
             return caps.Count() != 0 ? caps[0] :
                 Kernel.NewROScalar(Kernel.AnyP);
         }
+    }
+
+    // TODO: cache generated lists
+    public Variable GetKey(string str) {
+        CapInfo it = captures;
+        VarDeque caps = new VarDeque();
+
+        while (it != null) {
+            foreach (string cn in it.names) {
+                if (cn == str) {
+                    caps.Unshift(it.cap);
+                    break;
+                }
+            }
+            it = it.prev;
+        }
+
+        return FixupList(caps);
+    }
+
+    public void UnpackCaps(IP6 into) {
+        List<VarDeque> posr = new List<VarDeque>();
+        Dictionary<string,VarDeque> namr = new Dictionary<string,VarDeque>();
+        CapInfo it = captures;
+
+        while (it != null) {
+            foreach (string name in it.names) {
+                int nami;
+                VarDeque t;
+                if (int.TryParse(name, out nami) && nami >= 0) {
+                    while(posr.Count <= nami) posr.Add(new VarDeque());
+                    t = posr[nami];
+                } else {
+                    if (!namr.TryGetValue(name, out t))
+                        namr[name] = t = new VarDeque();
+                }
+                t.Unshift(it.cap);
+            }
+            it = it.prev;
+        }
+
+        Dictionary<string,Variable> nam = new Dictionary<string,Variable>();
+        Variable[] pos = new Variable[posr.Count];
+
+        foreach (KeyValuePair<string, VarDeque> kv in namr)
+            nam[kv.Key] = FixupList(kv.Value);
+        for (int i = 0; i < pos.Length; i++)
+            pos[i] = FixupList(posr[i]);
+
+        into.SetSlot("positionals", pos);
+        into.SetSlot("named", nam);
+    }
+
+    public Cursor O(Dictionary<string,Variable> caps) {
+        Cursor nw = At(pos);
+        foreach (KeyValuePair<string,Variable> kv in caps)
+            nw.captures = new CapInfo(nw.captures, new string[] { kv.Key }, kv.Value);
+        return nw;
     }
 
     public Variable SimpleWS() {

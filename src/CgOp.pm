@@ -210,7 +210,9 @@ use warnings;
     sub cursor_backing { rawcall($_[0], 'GetBacking:m,String') }
     sub cursor_dows    { rawcall($_[0], 'SimpleWS') }
     sub cursor_item    { rawcall($_[0], 'GetKey', $_[1]) }
-    sub rxstripcaps   { rawcall($_[0], 'StripCaps:m,Cursor') }
+    sub cursor_unpackcaps { rawcall($_[0], 'UnpackCaps:m,Void', $_[1]) }
+    sub cursor_O       { rawcall($_[0], 'O:m,Cursor', $_[1]) }
+    sub rxstripcaps    { rawcall($_[0], 'StripCaps:m,Cursor') }
 
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
