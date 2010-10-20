@@ -3132,7 +3132,6 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
             $<O> = { {:prec(%item_assignment<prec>), :assoc<unary>,
                 :dba<adverb> } }
                 # actual test is non-inclusive!
-            }
         |   [
             | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
             | <infix=infix_circumfix_meta_operator> $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
@@ -3277,7 +3276,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     token infix_prefix_meta_operator:sym<S> {
         <sym> {} <infixish('S')>
         <.can_meta($<infixish>, "sequence the args of")>
-        $<O> = {$<infixish><O>>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_prefix_meta_operator:sym<X> {
@@ -4524,7 +4523,7 @@ method EXPR ($preclvl?) {
     }
 
   TERM:
-    loop {
+    while True {
         self.deb("In loop, at ", $here.pos) if $DEBUG::EXPR;
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
@@ -4568,11 +4567,11 @@ method EXPR ($preclvl?) {
 
         push @termstack, $here.<term>;
         @termstack[*-1].<POST>:delete;
-        self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
+        self.deb("after push: " ~ (0+@termstack)) if $DEBUG::EXPR;
 
         last TERM if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
 
-        loop {     # while we see adverbs
+        while True {     # while we see adverbs
             $oldpos = $here.pos;
             last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;   # XXX P6
             $here = $here.cursor_fresh.ws;
@@ -4582,14 +4581,14 @@ method EXPR ($preclvl?) {
             last TERM unless $infix.pos > $oldpos;
             
             if not $infix<sym> {
-                die $infix.dump if $*DEBUG +& DEBUG::EXPR;
+                die $infix.dump if $DEBUG::EXPR;
             }
 
             my $inO = $infix<O>;
             my Str $inprec = $inO<prec>;
             if not defined $inprec {
-                self.deb("No prec given in infix!") if $*DEBUG +& DEBUG::EXPR;
-                die $infix.dump if $*DEBUG +& DEBUG::EXPR;
+                self.deb("No prec given in infix!") if $DEBUG::EXPR;
+                die $infix.dump if $DEBUG::EXPR;
                 $inprec = %terminator<prec>;   # XXX lexical scope is wrong
             }
 
@@ -5360,7 +5359,7 @@ method add_my_name ($n, $d?, $p?) {
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
-        self.deb("$name exists, curstash = ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
+        self.deb("$name exists, curstash = ", $curstash.id) if $DEBUG::symtab;
         my $omult = $old<mult> // '';
         if $declaring === $old {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
@@ -5391,7 +5390,7 @@ method add_my_name ($n, $d?, $p?) {
             elsif $name ~~ /^\w/ {
                 self.sorry("Illegal redeclaration of symbol '$name'$loc");
             }
-            elsif $name ~~ /^\&// {
+            elsif $name ~~ /^\&/ {
                 self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '&';
             }
             else {  # XXX eventually check for conformant arrays here
@@ -5429,7 +5428,7 @@ method add_our_name ($n) {
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
     self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $DEBUG::symtab;
-    $name = ($name ~~ /(.*?):[ver|auth]/).[0] // $name;
+    $name = ($name ~~ /(.*?)\:[ver|auth]/).[0] // $name;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
         my $c = self.find_top_pkg(@components[0]);
@@ -5487,7 +5486,7 @@ method add_our_name ($n) {
             if $name ~~ /^\w/ {
                 self.sorry("Illegal redeclaration of symbol '$sid'$loc");
             }
-            elsif $name ~~ /^\&// {
+            elsif $name ~~ /^\&/ {
                 self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '&';
             }
             else {  # XXX eventually check for conformant arrays here
@@ -5738,7 +5737,7 @@ method add_placeholder($name) {
     my $signame;
     my @r = ($varname ~~ /(.*?)(<[ ^ : ]>?)(.*)/);
     $twigil = @r[1];
-    $signame = @r[1] eq ':' ?? ':' : ''
+    $signame = @r[1] eq ':' ?? ':' !! '';
     $varname = @r[0] ~ @r[2];
     $signame ~= $varname;
     return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
@@ -5862,7 +5861,7 @@ method lookup_compiler_var($name, $default?) {
 
         return $default if defined $default;
         # (derived grammars should default to nextsame, terminating here)
-        default { self.worry("Unrecognized variable: $name"); return 0; }
+        self.worry("Unrecognized variable: $name"); return 0;
     }
 }
 
