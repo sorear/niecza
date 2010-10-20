@@ -708,11 +708,11 @@ token babble ($l) {
         }
     ]*
 
-    {
+    $<B> = {
         ($start,$stop) = $¢.peek_delimiters();
         $lang = $start ne $stop ?? $lang.balanced($start,$stop)
                                 !! $lang.unbalanced($stop);
-        $<B> = [$lang,$start,$stop];
+        [$lang,$start,$stop];
     }
 }
 
@@ -794,7 +794,7 @@ token quotepair {
     | $<n>=(\d+) $<id>=(<[a..z]>+) [ <?before '('> <.sorry: "2nd argument not allowed on pair"> <circumfix> ]?
         { $key = $<id>.Str; $value = $<n>.Str; }
     ]
-    { $<k> = $key; $<v> = $value; }
+    $<k> = {$key} $<v> = {$value}
 }
 
 token quote:sym<' '>   { :dba('single quotes') "'" ~ "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> }
@@ -2097,7 +2097,7 @@ grammar P6 is STD {
             )
             { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
         ]
-        { $<k> = $key; $<v> = $value; }
+        $<k> = {$key} $<v> = {$value}
     }
 
     # Most of these special variable rules are there simply to catch old p5 brainos
@@ -2945,10 +2945,8 @@ grammar P6 is STD {
         ]?
         [<?before ':'> <?{ $kind ne '!' }> <.sorry: "Invocant is too exotic">]?
 
-        {
-            $<quant> = $quant;
-            $<kind> = $kind;
-        }
+        $<quant> = {$quant}
+        $<kind> = {$kind}
 
         # enforce zone constraints
         {{
@@ -3113,9 +3111,9 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         :dba('prefix or meta-prefix')
         [
         | <prefix>
-            { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
+            $<O> = {$<prefix><O>} $<sym> = {$<prefix><sym>}
         | <prefix_circumfix_meta_operator>
-            { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
+            $<O> = {$<prefix_circumfix_meta_operator><O>} $<sym> = {$<prefix_circumfix_meta_operator>.Str}
         ]
         # XXX assuming no precedence change
         
@@ -3130,23 +3128,22 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         <!infixstopper>
         :dba('infix or meta-infix')
         [
-        | <colonpair> {
-                $<fake> = 1;
-                $<sym> = ':';
-                %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
-                %<O><assoc> = 'unary';
-                %<O><dba> = 'adverb';
+        | <colonpair> $<fake> = {1} $<sym> = {':'}
+            $<O> = { {:prec(%item_assignment<prec>), :assoc<unary>,
+                :dba<adverb> } }
+                # actual test is non-inclusive!
             }
         |   [
-            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
-            | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
-            | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
-            | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
+            | <infix=infix_circumfix_meta_operator> $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
+            | <infix=infix_prefix_meta_operator>    $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
+            | <infix>                               $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
             | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
             | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
             ]
-            [ <?before '='> <?{ $infix = $<infix>; }> <assign_meta_operator($infix)>
-                   { $<O> = $<assign_meta_operator>[0]<O>; $<sym> = $<assign_meta_operator>[0]<sym>; }
+            [ <?before '='> <assign_meta_operator($<infix>)>
+                   $<O> = {$<assign_meta_operator>[0]<O>}
+                   $<sym> = {$<assign_meta_operator>[0]<sym>}
             ]?
 
         ]
@@ -3159,7 +3156,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     # doing fancy as one rule simplifies LTM
     token dotty:sym<.*> {
         ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
-        { $<sym> = $0.Str; }
+        $<sym> = {$0.Str}
         <O(%methodcall)>
     }
 
@@ -3182,7 +3179,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         [
         | <methodop>
         | <colonpair>
-        | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
+        | <!alpha> <postop> $<O> = {$<postop><O>} $<sym> = {$<postop><sym>}  # only non-alpha postfixes have dotty form
         ]
     }
 
@@ -3201,9 +3198,9 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
 
         :dba('postfix')
         [
-        | <dotty>  { $<O> = $<dotty><O>;  $<sym> = $<dotty><sym>;  $<~CAPS> = $<dotty><~CAPS>; }
-        | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
-        | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
+        | <dotty>  $<O> = {$<dotty><O>}  $<sym> = {$<dotty><sym>}
+        | <privop> $<O> = {$<privop><O>} $<sym> = {$<privop><sym>}
+        | <postop> $<O> = {$<postop><O>} $<sym> = {$<postop><sym>}
         ]
         { $*LEFTSIGIL = '@'; }
     }
@@ -3216,7 +3213,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
 
     regex prefix_circumfix_meta_operator:reduce {
         :my $*IN_REDUCE = 1;
-        :my $op;
+        :my ($op, $term);
         <?before '['\S+']'>
         $<s> = (
             '['
@@ -3237,10 +3234,15 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         || <.sorry("Can't reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
         ]
 
-        <O(|($op<O>), |%list_prefix, assoc => 'unary', uassoc => 'left')>
-        { $<sym> = $<s>.Str; }
+        [
+        || <?before '('>
+        || <?before \s+ [ <?stdstopper> { $term = 1 } ]? >
+        || { $term = 1 }
+        ]
 
-        [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
+        <O(|($op<O>), |%list_prefix, assoc => 'unary', uassoc => 'left', term => $term)>
+        $<sym> = {$<s>.Str}
+
     }
 
     token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
@@ -3260,7 +3262,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
            
         || <.can_meta($<infixish>, "negate")>    
            <?{ $<infixish><O><iffy> }>
-           <?{ $<O> = $<infixish><O>; }>
+           $<O> = {$<infixish><O>}
             
         || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
         ]
@@ -3269,31 +3271,33 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     token infix_prefix_meta_operator:sym<R> {
         <sym> {} <infixish('R')>
         <.can_meta($<infixish>, "reverse the args of")>
-        <?{ $<O> = $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_prefix_meta_operator:sym<S> {
         <sym> {} <infixish('S')>
         <.can_meta($<infixish>, "sequence the args of")>
-        <?{ $<O> = $<infixish><O>; }>
+        $<O> = {$<infixish><O>>
     }
 
     token infix_prefix_meta_operator:sym<X> {
+        :my %subO;
         <sym> <?before \S> {}
         [ <infixish('X')>
             <.can_meta($<infixish>[0], "cross with")>
-            <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $<sym> ~= $<infixish>[0].Str }
         ]?
-        <O(|%list_infix, self.Opairs)>
+        <O(|%list_infix, |%subO)>
     }
 
     token infix_prefix_meta_operator:sym<Z> {
+        :my %subO;
         <sym> <?before \S> {}
         [ <infixish('Z')>
             <.can_meta($<infixish>[0], "zip with")>
-            <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+            { %subO = %( $<infixish><O> ); %subO<prec>:delete; $<sym> ~= $<infixish>[0].Str }
         ]?
-        <O(|%list_infix, self.Opairs)>
+        <O(|%list_infix, |%subO)>
     }
 
     token infix_circumfix_meta_operator:sym<« »> {
@@ -3303,7 +3307,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         ]
         {} <infixish('hyper')> [ '«' | '»' || <.panic: "Missing « or »"> ]
         <.can_meta($<infixish>, "hyper with")>
-        <?{ $<O> := $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_circumfix_meta_operator:sym«<< >>» {
@@ -3313,7 +3317,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         ]
         {} <infixish('HYPER')> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
         <.can_meta($<infixish>, "hyper with")>
-        <?{ $<O> := $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token assign_meta_operator ($op) {
@@ -3330,7 +3334,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
                 %prec = %list_assignment;
             }
         }
-        <O($op.Opairs, |%prec, dba => 'assignment operator', iffy => 0)>
+        <O(|%( $op<O> ), |%prec, dba => 'assignment operator', iffy => 0)>
     }
 
     token postcircumfix:sym<( )>
@@ -3368,8 +3372,8 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
     token postop {
-        | <postfix>         { $<O> = $<postfix><O>; $<sym> = $<postfix><sym>; }
-        | <postcircumfix>   { $<O> = $<postcircumfix><O>; $<sym> = $<postcircumfix><sym>; }
+        | <postfix>         $<O> = {$<postfix><O>} $<sym> = {$<postfix><sym>}
+        | <postcircumfix>   $<O> = {$<postcircumfix><O>} $<sym> = {$<postcircumfix><sym>}
     }
 
     token methodop {
@@ -3891,9 +3895,9 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         ':' <?before \s | <terminator> >
         {
             $¢.sorry("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec;
-            $<sym> = ',';
-            $<wascolon> = True;
         }
+        $<wascolon> = {True}
+        $<sym> = {','}
         <O(|%comma)>
     }
 
@@ -3972,13 +3976,13 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
         |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
         ]
-        { $<invocant> = $*INVOCANT_IS; }
+        $<invocant> = {$*INVOCANT_IS}
 
         :dba('extra arglist after (...):')
         [
         || <?{ $listopish }>
         || ':' <?before \s> <moreargs=.arglist>    # either switch to listopiness
-        || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
+        || $<O> = { {} }   # or allow adverbs (XXX needs hoisting?)
         ]
     }
 
@@ -4109,7 +4113,7 @@ grammar Q is STD {
 
     role b1 {
         token escape:sym<\\> { <sym> {} <item=.backslash> }
-        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
+        token backslash:qq { <?before 'q'> [ :lang(%*LANG<MAIN>) <quote> ] }
         token backslash:sym<\\> { <text=.sym> }
         token backslash:stopper { <text=.stopper> }
         token backslash:a { <sym> }
@@ -4222,12 +4226,12 @@ grammar Q is STD {
 
         token escape:sym<\\> { <sym> <item=.backslash> }
 
-        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
+        token backslash:qq { <?before 'q'> [ :lang(%*LANG<MAIN>) <quote> ] }
         token backslash:sym<\\> { <text=.sym> }
         token backslash:stopper { <text=.stopper> }
 
         # in single quotes, keep backslash on random character by default
-        token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
+        token backslash:misc { {} (.) $<text> = {"\\" ~ $0.Str} }
 
         # NIECZA multi methods NYI
         method tweak(:single(:$q), :double(:$qq), :cclass(:$cc)) {
@@ -4241,7 +4245,7 @@ grammar Q is STD {
     role qq {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
-        token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
+        token backslash:misc { {} [ (\W) $<text> = {$0.Str} | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # NIECZA multi methods NYI
         method tweak(:single(:$q), :double(:$qq), :cclass(:$cc)) {
@@ -4302,7 +4306,7 @@ grammar Q is STD {
         token backslash:sym<0> { <sym> }
 
         # keep random backslashes like qq does
-        token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
+        token backslash:misc { {} [ (\W) $<text> = {$0.Str} | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # NIECZA multi methods NYI
         method tweak(:single(:$q), :double(:$qq), :cclass(:$cc)) {
@@ -4750,10 +4754,8 @@ grammar Regex is STD {
         <!infixstopper>
         <!stdstopper>
         <regex_infix>
-        {
-            $<O> = $<regex_infix><O>;
-            $<sym> = $<regex_infix><sym>;
-        }
+        $<O> = {$<regex_infix><O>}
+        $<sym> = {$<regex_infix><sym>}
     }
     regex infixstopper {
         :dba('infix stopper')
@@ -4823,7 +4825,7 @@ grammar Regex is STD {
     token metachar:mod {
         <?before ':'>
         <mod_internal>
-        { $/<sym> = $<mod_internal><sym> }
+        $<sym> = {$<mod_internal><sym>}
     }
 
     token metachar:sym<-> {
@@ -4850,13 +4852,13 @@ grammar Regex is STD {
         :dba("bracketed regex")
         '[' ~ ']' <nibbler>
         { $¢.check_old_cclass($<nibbler>.Str); }
-        { $/<sym> := <[ ]>; }
+        $<sym> = {<[ ]>}
     }
 
     token metachar:sym<( )> {
         :dba("capture parens")
         '(' ~ ')' <nibbler>
-        { $/<sym> := <( )> }
+        $<sym> = {<( )>}
     }
 
     token metachar:sym« <( » { '<(' }
@@ -4906,7 +4908,7 @@ grammar Regex is STD {
         <!before '$$'>
         <?before <sigil>>
         [:lang(%*LANG<MAIN>) <variable> ]
-        { $<sym> = $<variable>.Str; }
+        $<sym> = {$<variable>.Str}
         [
         || $<binding> = ( \s* '=' \s* <quantified_atom> )
            { $¢.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }

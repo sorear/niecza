@@ -19,9 +19,9 @@ Match.iterator should return numbered captures
 Match.perl
 Match.synthetic
 Parcel.LISTSTORE
+Action methods
 Highwater stuff
-Audit EXPR, termish, nibble
-Change STD to use $<foo> = { 1 }
+Audit EXPR, termish, nulltermish, nibble
 self in regexes
 Non-string parameterized role arguments
 $<sym>
@@ -32,6 +32,7 @@ Make sure / (\w+) $0 / works
 DONE:
 ~
 <?{ }>
+Change STD to use $<foo> = { 1 }
 circumfix:<[ ]>
 Cursor.deb
 Cursor.lineof
