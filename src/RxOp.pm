@@ -459,26 +459,37 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    has name     => (isa => 'Str', is => 'ro', required => 1);
+    has method   => (isa => 'Maybe[Str]', is => 'ro');
+    has regex    => (isa => 'Maybe[Op]', is => 'ro');
+    has passcap  => (isa => 'Bool', is => 'ro', default => 0);
+    has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'ro');
     has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
 
+    sub opzyg { ($_[0]->regex ? ($_[0]->regex) : ()), @{ $_[0]->arglist // [] } }
+
     sub used_caps {
         my ($self) = @_;
-        +{ map { $_ => $::in_quant ? 2 : 1 } @{ $self->captures } };
+        my $h = { map { $_ => $::in_quant ? 2 : 1 } @{ $self->captures } };
+        if ($self->passcap) {
+            my $h2 = $self->_passcapzyg->used_caps;
+            for (keys %$h2) { $h->{$_} += $h2->{$_} }
+        }
+        $h
     }
 
     sub true {
         my ($self) = @_;
         # all not quite right in the capturey case
-        if ($self->name eq 'sym') {
+        return unless $self->method;
+        if ($self->method eq 'sym') {
             return RxOp::String->new(text => $::symtext);
         }
-        if ($self->name eq 'before') {
+        if ($self->method eq 'before') {
             return RxOp::Before->new(zyg => $self->zyg);
         }
-        if ($self->name eq 'after') {
+        if ($self->method eq 'after') {
             return RxOp::After->new(zyg => $self->zyg);
         }
     }
@@ -492,11 +503,18 @@ use CgOp;
             return $true->code($body);
         }
 
-        my $callf = CgOp::methodcall(CgOp::newscalar(
-                CgOp::rxcall("MakeCursor")), $self->name);
-        my @pushcapf = (@{ $self->captures } == 0) ? () : (
-            CgOp::rxpushcapture(CgOp::letvar("kv"),
-                @{ $self->captures }));
+        my $callf = $self->regex ?
+            CgOp::subcall(CgOp::fetch($self->regex->cgop($body)),
+                CgOp::newscalar(CgOp::rxcall("MakeCursor"))) :
+            CgOp::methodcall(CgOp::newscalar(
+                CgOp::rxcall("MakeCursor")), $self->method);
+        my @pushcapf = (@{ $self->captures } == 0) ? () : ($self->passcap ?
+            (CgOp::rxsetcapsfrom(CgOp::cast("cursor",
+                    CgOp::letvar("k"))),
+                CgOp::rxpushcapture(CgOp::newscalar(CgOp::rxstripcaps(CgOp::cast("cursor", CgOp::letvar("k")))),
+                    @{ $self->captures })) :
+            (CgOp::rxpushcapture(CgOp::letvar("kv"),
+                @{ $self->captures })));
         my $updatef = CgOp::prog(
             CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
             @pushcapf,
@@ -534,7 +552,7 @@ use CgOp;
         if (my $true = $self->true) {
             return $true->lad;
         }
-        [ 'Method', $self->name ];
+        [ 'Method', $self->method ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -549,7 +567,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        RxOp::Subrule->new(name => 'ws',
+        RxOp::Subrule->new(method => 'ws',
             selfcut => $self->selfcut)->code($body);
     }
 

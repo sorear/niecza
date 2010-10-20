@@ -307,6 +307,27 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
                 rxop => $rxop)));
 }
 
+sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
+    my @lift = $rxop->oplift;
+    my ($nrxop, $mb) = Optimizer::RxSimple::run($rxop);
+    unshift @lift, Op::Bind->new(readonly => 1,
+        lhs => Op::Lexical->new(name => '$*GOAL', declaring => 1),
+        rhs => Op::StringLiteral->new(text => $args{goal}))
+            if exists $args{goal};
+    my $subop = Op::SubDef->new(
+        var  => $cl->gensym,
+        body => Body->new(
+            transparent => 1,
+            class => 'Regex',
+            type  => 'regex',
+            signature => Sig->simple->for_regex,
+            do => Op::RegexBody->new(canback => $mb, pre => \@lift,
+                passcut => $args{passcut}, passcap => $args{passcap},
+                rxop => $nrxop)));
+    return RxOp::Subrule->new(regex => $subop, passcap => $args{passcap},
+        _passcapzyg => $nrxop);
+}
+
 sub regex_block { my ($cl, $M) = @_;
     if (@{ $M->{quotepair} }) {
         $M->sorry('Regex adverbs NYI');
@@ -655,21 +676,20 @@ sub metachar__S_var { my ($cl, $M) = @_;
             return;
         }
 
-        $M->sorry("Explicit regex bindings NYI");
-        $M->{_ast} = RxOp::Sequence->new;
+        $M->{_ast} = $cl->rxcapturize($M, $cid, $a);
         return;
     }
     $M->{_ast} = RxOp::VarString->new(value =>
         $cl->do_variable_reference($M, $M->{variable}{_ast}));
 }
 
-sub rxcapturize { my ($cl, $name, $rxop) = @_;
+sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;
     if (!$rxop->isa('RxOp::Subrule')) {
-        # <before>, etc.  Not yet really handled XXX
-        return $rxop;
+        # $<foo>=[...]
+        $rxop = $cl->encapsulate_regex($M, $rxop, passcut => 1, passcap => 1);
     }
 
-    my @extra = map { $_ => $rxop->$_ } qw/zyg arglist name/;
+    my @extra = map { $_ => $rxop->$_ } qw/zyg arglist method regex passcap _passcapzyg/;
 
     # $<foo>=(...)
     if (@{ $rxop->captures } == 1 && !defined($rxop->captures->[0])) {
@@ -691,7 +711,7 @@ sub do_cclass { my ($cl, $M) = @_;
                 RxOp::CClassElem->new(cc => CClass::internal($1)) :
             $_->{quibble} ?
                 RxOp::CClassElem->new(cc => $_->{quibble}{_ast}) :
-            RxOp::Subrule->new(captures => [], name => $_->{name}->Str);
+            RxOp::Subrule->new(captures => [], method => $_->{name}->Str);
 
         if ($sign) {
             $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $exp;
@@ -713,16 +733,12 @@ sub decapturize { my ($cl, $M) = @_;
     if (!$M->{assertion}{_ast}->isa('RxOp::Subrule')) {
         return $M->{assertion}{_ast};
     }
-    RxOp::Subrule->new(captures => [],
-        zyg => $M->{assertion}{_ast}->zyg,
-        arglist => $M->{assertion}{_ast}->arglist,
-        name => $M->{assertion}{_ast}->name);
+    RxOp::Subrule->new(%{ $M->{assertion}{_ast} }, captures => []);
 }
 
 sub cclass_elem {}
 
 sub assertion {}
-# This needs to be deconstructed by :method, so it needs a regular structure
 sub assertion__S_name { my ($cl, $M) = @_;
     my $name = $cl->unqual_longname($M->{longname},
         "Qualified method calls NYI");
@@ -731,13 +747,13 @@ sub assertion__S_name { my ($cl, $M) = @_;
     } else {
         if ($M->{nibbler}[0]) {
             my $args = [$M->{nibbler}[0]{_ast}];
-            $M->{_ast} = RxOp::Subrule->new(zyg => $args, name => $name);
+            $M->{_ast} = RxOp::Subrule->new(zyg => $args, method => $name);
         } else {
             my $args = ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} : []);
-            $M->{_ast} = RxOp::Subrule->new(arglist => $args, name => $name);
+            $M->{_ast} = RxOp::Subrule->new(arglist => $args, method => $name);
         }
     }
-    $M->{_ast} = $cl->rxcapturize($name, $M->{_ast});
+    $M->{_ast} = $cl->rxcapturize($M, $name, $M->{_ast});
 }
 
 sub assertion__S_method { my ($cl, $M) = @_;

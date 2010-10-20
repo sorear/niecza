@@ -1005,6 +1005,8 @@ use CgOp;
 
     has rxop => (isa => 'RxOp', is => 'ro', required => 1);
     has name => (isa => 'Str', is => 'ro', default => '');
+    has passcap => (isa => 'Bool', is => 'ro', default => 0);
+    has passcut => (isa => 'Bool', is => 'ro', default => 0);
     has sym => (isa => 'Maybe[Str]', is => 'ro');
     has pre => (isa => 'ArrayRef[Op]', is => 'ro', default => sub { [] });
     has canback => (isa => 'Bool', is => 'ro', default => 1);
@@ -1017,17 +1019,21 @@ use CgOp;
         local $::symtext = $self->sym;
         my @mcaps;
         local $::in_quant = 0;
-        my $u = $self->rxop->used_caps;
-        for (keys %$u) {
-            push @mcaps, $_ if $u->{$_} >= 2;
+        if (!$self->passcap) {
+            my $u = $self->rxop->used_caps;
+            for (keys %$u) {
+                push @mcaps, $_ if $u->{$_} >= 2;
+            }
         }
         my @pre = map { CgOp::sink($_->code($body)) } @{ $self->pre };
 
         CgOp::prog(
             @pre,
             CgOp::rxinit(CgOp::clr_string($self->name),
-                    CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('$¢')))),
-            CgOp::rxpushcapture(CgOp::null('cursor'), @mcaps),
+                    CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('$¢'))),
+                    $self->passcap, $self->passcut),
+            ($self->passcap ? () :
+                CgOp::rxpushcapture(CgOp::null('cursor'), @mcaps)),
             $self->rxop->code($body),
             ($self->canback ? CgOp::rxend() : CgOp::rxfinalend()),
             CgOp::label('backtrack'),

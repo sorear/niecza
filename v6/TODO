@@ -24,6 +24,7 @@ Highwater stuff
 Audit EXPR, termish, nibble
 Change STD to use $<foo> = { 1 }
 self in regexes
+Non-string parameterized role arguments
 $<sym>
 temp $*FOO
 token { $param-role-var }

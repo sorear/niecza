@@ -83,6 +83,16 @@ rxtest / <alpha> / , '<alpha>', ('a', 'A', "\x4E00"), ("+", "1", " ");
     my $m = "" ~~ / $<foo> = { 2 + 2 } $<bar> = {"x"} $<bar> = {"y"} /;
     is $m<foo>, 4, "value aliasing works (sing)";
     is $m<bar>, "x y", "value aliasing works (plur)";
+
+    #$m = "fo" ~~ / (.) (.) /;
+    #is $m[0], "f", "numbered captures work";
+    #is $m[1], "o", "capture auto-numbering works";
+
+    $m = "def" ~~ /<a=.alpha> $<moo> = [ <b=.alpha> <c=.alpha> ]/;
+    is $m<a>, "d", "aliasing works";
+    is $m<c>, "f", "aliased [] transparent to captures";
+    is $m<moo>, "ef", "aliased [] captures string";
+    ok !$m<moo><b>, "no spurious nested captures";
 }
 
 # {

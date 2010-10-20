@@ -210,6 +210,7 @@ use warnings;
     sub cursor_backing { rawcall($_[0], 'GetBacking:m,String') }
     sub cursor_dows    { rawcall($_[0], 'SimpleWS') }
     sub cursor_item    { rawcall($_[0], 'GetKey', $_[1]) }
+    sub rxstripcaps   { rawcall($_[0], 'StripCaps:m,Cursor') }
 
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
@@ -288,7 +289,8 @@ use warnings;
     sub popcut { rxcall('PopCutGroup') }
 
     sub rxinit {
-        setfield('rx', callframe(), rawnew('clr:RxFrame', $_[0], $_[1]))
+        setfield('rx', callframe(), rawnew('clr:RxFrame', $_[0], $_[1],
+                bool($_[2]), bool($_[3])))
     }
     sub rxpushcapture {
         my $c = shift;
@@ -305,6 +307,7 @@ use warnings;
     sub rxincquant    { rxcall('IncQuant') }
     sub rxsetclass    { rxcall('SetClass', $_[0]) }
     sub rxsetpos      { rxcall('SetPos', $_[0]) }
+    sub rxsetcapsfrom { rxcall('SetCapturesFrom:m,Void', $_[0]) }
     sub rxgetpos      { rxcall('GetPos:m,Int32') }
     sub rxcommitgroup { rxcall('CommitGroup', $_[0]) }
 

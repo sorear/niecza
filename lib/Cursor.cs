@@ -91,12 +91,15 @@ public sealed class RxFrame {
     // don't remove this on backtracking, and quit if we would back into it
     public readonly Choice rootf;
 
-    public RxFrame(string name, Cursor csr) {
+    public RxFrame(string name, Cursor csr, bool passcap, bool passcut) {
         global = csr.global;
         orig = global.orig_a;
         end = orig.Length;
         rootf = bt = csr.xact;
-        st.ns = new NState(rootf, "RULE " + name, csr.nstate);
+        st.ns = passcut ? csr.nstate :
+            new NState(rootf, "RULE " + name, csr.nstate);
+        if (passcap)
+            st.captures = csr.captures;
         st.ns.klass = csr.mo;
         st.pos = csr.pos;
         from = csr.pos;
@@ -140,6 +143,10 @@ public sealed class RxFrame {
 
     public Variable GetCursorList() {
         return st.subrule_iter;
+    }
+
+    public void SetCapturesFrom(Cursor inp) {
+        st.captures = inp.captures;
     }
 
     public void SetPos(int pos) {
@@ -284,7 +291,7 @@ public sealed class RxFrame {
     }
 
     public Cursor MakeCursor() {
-        return new Cursor(global, st.ns.klass, st.ns, bt, st.pos);
+        return new Cursor(global, st.ns.klass, st.ns, bt, st.pos, st.captures);
     }
 
     public Cursor MakeMatch() {
@@ -356,7 +363,7 @@ public class Cursor : IP6 {
     public string GetBacking() { return global.orig_s; }
 
     public Cursor(IP6 proto, string text)
-        : this(new GState(text), proto.mo, null, null, 0) { }
+        : this(new GState(text), proto.mo, null, null, 0, null) { }
 
     public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures) {
         this.global = g;
@@ -367,12 +374,13 @@ public class Cursor : IP6 {
         this.save_klass = klass;
     }
 
-    public Cursor(GState g, DynMetaObject klass, NState ns, Choice xact, int pos) {
+    public Cursor(GState g, DynMetaObject klass, NState ns, Choice xact, int pos, CapInfo captures) {
         this.mo = klass;
         this.xact = xact;
         this.nstate = ns;
         this.global = g;
         this.pos = pos;
+        this.captures = captures;
     }
 
     public override bool IsDefined() {
@@ -380,7 +388,11 @@ public class Cursor : IP6 {
     }
 
     public Cursor At(int npos) {
-        return new Cursor(global, mo, nstate, xact, npos);
+        return new Cursor(global, mo, nstate, xact, npos, captures);
+    }
+
+    public Cursor StripCaps() {
+        return new Cursor(global, save_klass, from, pos, null);
     }
 
     // TODO: cache generated lists
