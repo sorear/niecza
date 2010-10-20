@@ -295,6 +295,7 @@ sub quote__S_Q { my ($cl, $M) = @_;
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my @lift = $M->{nibble}{_ast}->oplift;
+    { local $::paren = 0; $M->{nibble}{_ast}->check }
     my ($rxop, $mb) = Optimizer::RxSimple::run($M->{nibble}{_ast});
     $M->{_ast} = Op::SubDef->new(
         var  => $cl->gensym,
@@ -309,6 +310,7 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
 
 sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
     my @lift = $rxop->oplift;
+    unless ($args{passcap}) { local $::paren = 0; $rxop->check }
     my ($nrxop, $mb) = Optimizer::RxSimple::run($rxop);
     unshift @lift, Op::Bind->new(readonly => 1,
         lhs => Op::Lexical->new(name => '$*GOAL', declaring => 1),
@@ -396,6 +398,7 @@ sub regex_def { my ($cl, $M) = @_;
         $ast = RxOp::ProtoRedis->new(name => $name);
     }
 
+    { local $::paren = 0; $ast->check }
     local $::symtext = $symtext;
     my $lad = Optimizer::RxSimple::run_lad($ast->lad);
     my @lift = $ast->oplift;
@@ -571,8 +574,8 @@ sub metachar__S_Bra_Ket { my ($cl, $M) = @_;
 }
 
 sub metachar__S_Paren_Thesis { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::Capture->new(names => [undef], zyg => [
-            RxOp::ConfineLang->new(zyg => [$M->{nibbler}{_ast}])]);
+    $M->{_ast} = $cl->rxcapturize($M, undef,
+        $cl->encapsulate_regex($M, $M->{nibbler}{_ast}, passcut => 1));
 }
 
 sub metachar__S_LtParen { my ($cl, $M) = @_;

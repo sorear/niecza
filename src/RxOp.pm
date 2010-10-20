@@ -15,6 +15,8 @@ use CgOp;
     sub oplift { map { $_->oplift } @{ $_[0]->zyg } }
     sub uncut { $_[0] }
 
+    sub check { map { $_->check } @{ $_[0]->zyg } }
+
     # all that matters is 0-1-infty; $*in_quant valid here
     sub used_caps {
         my %r;
@@ -235,6 +237,7 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
+    sub check { goto &RxOp::Alt::check }
     # zyg * N
 
     sub code {
@@ -462,7 +465,7 @@ use CgOp;
     has method   => (isa => 'Maybe[Str]', is => 'ro');
     has regex    => (isa => 'Maybe[Op]', is => 'ro');
     has passcap  => (isa => 'Bool', is => 'ro', default => 0);
-    has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'ro');
+    has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'rw');
     has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
@@ -477,6 +480,21 @@ use CgOp;
             for (keys %$h2) { $h->{$_} += $h2->{$_} }
         }
         $h
+    }
+
+    sub check {
+        my ($self) = @_;
+        for (@{ $self->captures }) {
+            if (!defined $_) {
+                $_ = $::paren++;
+            } elsif (/^[0-9]+$/) {
+                $::paren = $_ + 1;
+            }
+        }
+        if ($self->_passcapzyg) {
+            $self->_passcapzyg->check;
+        }
+        $self->SUPER::check;
     }
 
     sub true {
@@ -645,6 +663,19 @@ use CgOp;
     package RxOp::Alt;
     use Moose;
     extends 'RxOp';
+
+    sub check {
+        my ($self) = @_;
+        my $maxparen = $::paren;
+
+        for (@{ $self->zyg }) {
+            local $::paren = $::paren;
+            $_->check;
+            if ($::paren > $maxparen) { $maxparen = $::paren }
+        }
+
+        $::paren = $maxparen;
+    }
 
     sub used_caps {
         my %used;
