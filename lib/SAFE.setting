@@ -81,6 +81,13 @@ my class Cool {
     method iterator() { self.flat.iterator }
     method join($sep) { self.flat.join($sep) }
 }
+
+my class Capture {
+    has $!positionals;
+    has $!named;
+
+    method Capture () { self }
+}
 # }}}
 # Scalar types {{{
 my class Num is Cool {
@@ -328,6 +335,9 @@ sub assignop($fn) {
         $lhs = $fn($lhs, $rhs)
     }
 }
+
+sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
+
 # }}}
 # Aggregate types {{{
 # Parcel: immutable list of boxes which have no context - may flatten, may
@@ -364,6 +374,14 @@ my class Parcel is Cool {
     method elems() { Q:CgOp {
         (box Num (cast num (fvarlist_length (unbox fvarlist (@ {self})))))
     } }
+
+    method Capture () {
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {Capture})))
+              (setslot positionals (l n) (unbox fvarlist (@ {self})))
+              (ns (l n)))
+        }
+    }
 
     method iterator() {
         my class ParcelIterator is Iterator {
@@ -407,6 +425,15 @@ my class List is Cool {
 
     method Seq() {
         Seq.SETUP(True, (&infix:<,>(self.iterator)));
+    }
+
+    method Capture () {
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {Capture})))
+              (setslot positionals (l n) (vvarlist_to_fvarlist
+                  (getslot items vvarlist (@ {self.eager}))))
+              (ns (l n)))
+        }
     }
 
     #| Takes an object and applies whatever semantics the List subclass
@@ -593,6 +620,16 @@ my class Hash {
         };
     }
 
+    method Capture () {
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {Capture})))
+              (setslot positionals (l n) (fvarlist_new))
+              (setslot named (l n) (varhash_dup
+                  (unbox varhash (@ {self}))))
+              (ns (l n)))
+        }
+    }
+
     method keys() {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {List})))
@@ -665,6 +702,18 @@ my class Hash {
 my class Enum is Cool {
     has $.key;
     has $.value;
+
+    method Capture () {
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {Capture})))
+                  d (varhash_new)
+              (setslot positionals (l n) (fvarlist_new))
+              (setslot named (l n) (l d))
+              (varhash_setindex (unbox str (@ {$!key.Str}))
+                (l d) {$!value})
+              (ns (l n)))
+        }
+    }
 
     method kv() {
         ($.key, $.value);
@@ -772,6 +821,7 @@ my class Cursor {
         (cursor_item (cast cursor (@ {self})) (unbox str (@ {$k.Str})))
     } }
     method at-pos($i) { self.at-key($i) }
+    token alpha { <+INTERNAL::alpha> }
 }
 
 my class Match {

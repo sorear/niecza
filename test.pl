@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 581;
+plan 608;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1184,3 +1184,50 @@ is { "a" => 1 }.<a>, 1, "hash constructors work w/ quotes";
 is { :a(1) }.<a>, 1, "hash constructors work w/ colons";
 is { a => 1, b => 2 }.<b>, 2, "hash constructors work w/ lists";
 ok { } ~~ Hash, "hash constructors work w/ nothing";
+
+ok !('xy' ~~ /x <{ False }> y/), '<{False}> blocks a match';
+ok 'xy' ~~ /x <{ True }> y/, '<{True}> does not affect it';
+ok (1 < 3 > 2), "CHAIN works with dissimilar ops";
+
+{
+    my $b = "oo";
+    is ("foox" ~~ /f$b/), "foo", '$x matches contents in a regex';
+}
+
+{
+    sub f1(:$x) { $x }
+    is f1(|("x" => 2)), 2, "can flatten pairs";
+    is f1(|{"x" => 2}), 2, "can flatten hashes";
+    sub f2($x,$) { $x }
+    is f2(|[1,2]), 1, "can flatten lists";
+    is f2(|(1,2)), 1, "can flatten parcels";
+}
+
+rxtest / <alpha> / , '<alpha>', ('a', 'A', "\x4E00"), ("+", "1", " ");
+
+{
+    my $m = "" ~~ / $<foo> = { 2 + 2 } $<bar> = {"x"} $<bar> = {"y"} /;
+    is $m<foo>, 4, "value aliasing works (sing)";
+    is $m<bar>, "x y", "value aliasing works (plur)";
+
+    $m = "fo" ~~ / (.) (.) /;
+    is $m[0], "f", "numbered captures work";
+    is $m[1], "o", "capture auto-numbering works";
+
+    $m = "foo" ~~ / (.) ( (.) (.) ) /;
+    is $m[1], "oo", "outer capture sees inner";
+    is $m[1][1], "o", "nested numeric captures work";
+
+    $m = "def" ~~ /<a=.alpha> $<moo> = [ <b=.alpha> <c=.alpha> ]/;
+    is $m<a>, "d", "aliasing works";
+    is $m<c>, "f", "aliased [] transparent to captures";
+    is $m<moo>, "ef", "aliased [] captures string";
+    ok !$m<moo><b>, "no spurious nested captures";
+
+    my $save;
+    "()" ~~ / '(' ~ ')' { $save = $*GOAL } /;
+    is $save, ')', 'Setting $*GOAL works';
+}
+
+ok 1 !== 2, "infix_prefix_meta_operator:<!> works (T)";
+ok !(1 !== 1), "infix_prefix_meta_operator:<!> works (F)";

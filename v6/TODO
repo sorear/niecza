@@ -19,7 +19,6 @@ Match.iterator should return numbered captures
 Match.perl
 Match.synthetic
 Parcel.LISTSTORE
-$*GOAL handling XXX
 Highwater stuff
 Audit EXPR, termish, nibble
 Change STD to use $<foo> = { 1 }
@@ -47,6 +46,7 @@ defined($thing)
 $*FOO as a parameter
 func(|($key => $value))
 gt, lt, leg, etc
+$*GOAL handling
 Hash.keys &keys
 Hash.LISTSTORE
 infix:<x>

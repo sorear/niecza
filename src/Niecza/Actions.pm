@@ -1098,6 +1098,33 @@ sub circumfix__S_sigil { my ($cl, $M) = @_;
     $M->{_ast} = $cl->docontext($M, $M->{sigil}->Str, $M->{_ast});
 }
 
+sub infix_prefix_meta_operator { }
+sub infix_prefix_meta_operator__S_Bang { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&notop'),
+        args => [ $M->{infixish}{infix}{_ast} ]);
+}
+sub infix_prefix_meta_operator__S_R { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&reverseop'),
+        args => [ $M->{infixish}{infix}{_ast} ]);
+}
+sub infix_prefix_meta_operator__S_Z { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&zipop'),
+        args => [ $M->{infixish}{infix}{_ast} ]);
+}
+sub infix_prefix_meta_operator__S_S { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&seqop'),
+        args => [ $M->{infixish}{infix}{_ast} ]);
+}
+sub infix_prefix_meta_operator__S_X { my ($cl, $M) = @_;
+    $M->{_ast} = Op::CallSub->new(
+        invocant => Op::Lexical->new(name => '&crossop'),
+        args => [ $M->{infixish}{_ast} ]);
+}
+
 sub infixish { my ($cl, $M) = @_;
     if ($M->{colonpair}) {
         return; # handled in POST
@@ -1153,20 +1180,22 @@ sub INFIX { my ($cl, $M) = @_;
 }
 
 sub CHAIN { my ($cl, $M) = @_;
-    my $op = '&infix:<' . $M->{chain}[1]{sym} . '>';
     my @args;
+    my @ops;
     for my $i (0 .. scalar @{ $M->{chain} }) {
-        if (($i % 2) == 0) {
+        if ($i % 2) {
+            push @ops, $M->{chain}[$i]{infix}{_ast};
+        } else {
             push @args, $M->{chain}[$i]{_ast};
         }
     }
 
-    my ($st, @vargs) = $cl->whatever_precheck($op, @args);
+    my ($st, @vargs) = $cl->whatever_precheck('', @args);
 
     my @pairwise;
     while (@vargs >= 2) {
         push @pairwise, Op::CallSub->new(node($M),
-                invocant => Op::Lexical->new(name => $op),
+                invocant => shift(@ops),
                 positionals => [ $vargs[0], $vargs[1] ]);
         shift @vargs;
     }
