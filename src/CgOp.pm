@@ -222,7 +222,7 @@ use warnings;
     sub take           { rawscall('Kernel.Take', $_[0]) }
     sub control        { rawscall('Kernel.SearchForHandler', CgOp::int(shift()),
             @_) }
-    sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0]) }
+    sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0], $_[1]) }
     sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
     sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
     sub instrole       { rawscall('Kernel.InstantiateRole', $_[0]) }

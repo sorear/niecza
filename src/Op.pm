@@ -179,7 +179,7 @@ use CgOp;
         my ($self, $body) = @_;
         # this should be a little fancier so closure can work
         CgOp::subcall(CgOp::fetch(CgOp::context_get(CgOp::clr_string(
-                        '*resume_' . $self->unitname))));
+                        '*resume_' . $self->unitname), CgOp::int(0))));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -893,10 +893,11 @@ use CgOp;
     extends 'Op';
 
     has name => (isa => 'Str', is => 'ro', required => 1);
+    has uplevel => (isa => 'Int', is => 'ro', default => 0);
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::context_get(CgOp::clr_string($self->name));
+        CgOp::context_get(CgOp::clr_string($self->name), CgOp::int($self->uplevel));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -1012,7 +1013,6 @@ use CgOp;
     has name => (isa => 'Str', is => 'ro', default => '');
     has passcap => (isa => 'Bool', is => 'ro', default => 0);
     has passcut => (isa => 'Bool', is => 'ro', default => 0);
-    has sym => (isa => 'Maybe[Str]', is => 'ro');
     has pre => (isa => 'ArrayRef[Op]', is => 'ro', default => sub { [] });
     has canback => (isa => 'Bool', is => 'ro', default => 1);
 
@@ -1021,7 +1021,6 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
 
-        local $::symtext = $self->sym;
         my @mcaps;
         local $::in_quant = 0;
         if (!$self->passcap) {

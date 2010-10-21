@@ -67,6 +67,16 @@ augment class Match {
 
     ok !(try die "foo").defined, "try of an error is undef";
     is $!, "foo", 'the error goes into $!';
+
+    {
+        my @*foo = 1, 2, 3;
+        {
+            temp @*foo;
+            push @*foo, 4;
+            is +@*foo, 4, '@*foo has 4 elements in temp scope';
+        }
+        is +@*foo, 3, '@*foo has 3 elements again after temp';
+    }
 }
 
 # {

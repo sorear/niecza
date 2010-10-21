@@ -902,17 +902,15 @@ namespace Niecza {
             return new VarDeque(tmp);
         }
 
-        public static Variable ContextHelper(Frame th, string name) {
+        public static Variable ContextHelper(Frame th, string name, int up) {
             object rt;
             while (th != null) {
-                if (th.lex == null) {
-                    th = th.caller;
-                    continue;
-                }
-                if (th.lex.TryGetValue(name, out rt)) {
+                if (up <= 0 && th.lex != null &&
+                        th.lex.TryGetValue(name, out rt)) {
                     return (Variable)rt;
                 }
                 th = th.caller;
+                up--;
             }
             name = name.Remove(1,1);
             Dictionary<string,BValue> gstash = (Dictionary<string,BValue>)

@@ -1306,7 +1306,25 @@ sub POSTFIX { my ($cl, $M) = @_;
 
 sub PREFIX { my ($cl, $M) = @_;
     my $op = '&prefix:<' . $M->{sym} . '>';
-    my ($st, $arg) = $cl->whatever_precheck($op, $M->{arg}{_ast});
+    my $rarg = $M->{arg}{_ast};
+
+    # Macros
+    if ($op eq '&prefix:<temp>') {
+        if (!$rarg->isa('Op::ContextVar') || $rarg->uplevel) {
+            $M->sorry('Non-contextual case of temp NYI');
+            $M->{_ast} = Op::StatementList->new;
+            return;
+        }
+        $M->{_ast} = Op::CallSub->new(
+            invocant => Op::Lexical->new(name => '&infix:<=>'),
+            args => [ Op::Lexical->new(name => $rarg->name, declaring => 1,
+                        hash => scalar($rarg->name =~ /^%/),
+                        list => scalar($rarg->name =~ /^@/)),
+                      Op::ContextVar->new(name => $rarg->name, uplevel => 1) ]);
+        return;
+    }
+
+    my ($st, $arg) = $cl->whatever_precheck($op, $rarg);
     $M->{_ast} = $cl->whatever_postcheck($M, $st, Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(name => $op),
         positionals => [ $M->{arg}{_ast} ]));
