@@ -521,11 +521,13 @@ use CgOp;
             return $true->code($body);
         }
 
+        my @args = Op::CallLike::parsearglist($body, @{ $self->arglist // [] });
+
         my $callf = $self->regex ?
             CgOp::subcall(CgOp::fetch($self->regex->cgop($body)),
-                CgOp::newscalar(CgOp::rxcall("MakeCursor"))) :
+                CgOp::newscalar(CgOp::rxcall("MakeCursor")), @args) :
             CgOp::methodcall(CgOp::newscalar(
-                CgOp::rxcall("MakeCursor")), $self->method);
+                CgOp::rxcall("MakeCursor")), $self->method, @args);
         my @pushcapf = (@{ $self->captures } == 0) ? () : ($self->passcap ?
             (CgOp::rxsetcapsfrom(CgOp::cast("cursor",
                     CgOp::letvar("k"))),

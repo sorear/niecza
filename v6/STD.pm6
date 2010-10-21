@@ -4528,7 +4528,12 @@ method EXPR ($preclvl?) {
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
         $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';     # XXX P6
-        my @t = $here.$termish;
+        my @t =
+            ($termish eq 'termish') ?? $here.termish !!
+            ($termish eq 'nulltermish') ?? $here.nulltermish !!
+            ($termish eq 'statement') ?? $here.statement !!
+            ($termish eq 'dottyopish') ?? $here.dottyopish !!
+            die "weird value of $termish";
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
             $here.panic("Bogus term") if @opstack > 1;
@@ -4609,7 +4614,7 @@ method EXPR ($preclvl?) {
 
             # Does new infix (or terminator) force any reductions?
             while @opstack[*-1]<O><prec> gt $inprec {
-                &reduce();
+                reduce();
             }
 
             # Not much point in reducing the sentinels...
@@ -4617,7 +4622,7 @@ method EXPR ($preclvl?) {
 
         if $infix<fake> {
             push @opstack, $infix;
-            &reduce();
+            reduce();
             next;  # not really an infix, so keep trying
         }
 
@@ -4626,7 +4631,7 @@ method EXPR ($preclvl?) {
                 my $assoc = 1;
                 my $atype = $inO<assoc>;
                 if $atype eq 'non'   { $assoc = 0; }
-                elsif $atype eq 'left'  { &reduce() }   # reduce immediately
+                elsif $atype eq 'left'  { reduce() }   # reduce immediately
                 elsif $atype eq 'right' { }            # just shift
                 elsif $atype eq 'chain' { }            # just shift
                 elsif $atype eq 'unary' { }            # just shift
@@ -4644,7 +4649,7 @@ method EXPR ($preclvl?) {
             last;
         }
     }
-    &reduce() while +@opstack > 1;
+    reduce() while +@opstack > 1;
     if @termstack {
         +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
         @termstack[0].from = self.pos;

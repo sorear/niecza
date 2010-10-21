@@ -460,11 +460,19 @@ public class Cursor : IP6 {
         into.SetSlot("named", nam);
     }
 
-    public Cursor O(Dictionary<string,Variable> caps) {
+    public Variable O(Dictionary<string,Variable> caps) {
         Cursor nw = At(pos);
         foreach (KeyValuePair<string,Variable> kv in caps)
             nw.captures = new CapInfo(nw.captures, new string[] { kv.Key }, kv.Value);
-        return nw;
+        VarDeque ks = new VarDeque();
+
+        DynObject lst = new DynObject(RxFrame.ListMO);
+        lst.slots[0 /*items*/] = ks;
+        lst.slots[1 /*rest*/ ] = new VarDeque();
+        lst.slots[2 /*flat*/ ] = false;
+
+        ks.Push(Kernel.NewROScalar(nw));
+        return Kernel.NewRWListVar(lst);
     }
 
     public Variable SimpleWS() {

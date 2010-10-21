@@ -121,13 +121,10 @@ use CgOp;
         blessed($self)->new(args => [ $self->getargs, $adv ], %h);
     }
 
-    sub argblock {
-        my ($self, $body) = @_;
-        if (! $self->args) {
-            return map { $_->cgop($body) } @{ $self->positionals };
-        }
+    sub parsearglist {
+        my ($body, @args) = @_;
         my @out;
-        for my $a (@{ $self->args }) {
+        for my $a (@args) {
             if ($a->isa('Op::SimplePair')) {
                 push @out, ":" . $a->key, $a->value->cgop($body);
             } elsif ($a->isa('Op::CallSub') && $a->invocant->isa('Op::Lexical')
@@ -139,6 +136,14 @@ use CgOp;
             }
         }
         @out;
+    }
+
+    sub argblock {
+        my ($self, $body) = @_;
+        if (! $self->args) {
+            return map { $_->cgop($body) } @{ $self->positionals };
+        }
+        parsearglist($body, @{ $self->args });
     }
 
     __PACKAGE__->meta->make_immutable;

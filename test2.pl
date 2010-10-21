@@ -16,8 +16,8 @@ augment class Regex {
 
 augment class Cursor {
     method O (*%hash) {
-        Q:CgOp { (newscalar (cursor_O (cast cursor (@ {self}))
-                                      (unbox varhash (@ {%hash})))) }
+        Q:CgOp { (cursor_O (cast cursor (@ {self}))
+                           (unbox varhash (@ {%hash}))) }
     }
     method list () { @( self.Capture ) }
     method flat () { @( self.Capture ) }
