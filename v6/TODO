@@ -1,30 +1,30 @@
-Cursor.add_categorical
-Cursor.canonicalize_name
-Cursor.check_old_cclass
 Cursor.cursor_all
 Cursor.cursor_fresh
-Cursor.do_import
-Cursor.do_use
-Cursor.gettrait
-Cursor.load_lex
-Cursor.makestr
-Cursor.mark_sinks
 Cursor.mixin
 Cursor.suppose
-Cursor.trim_heredoc
 List.at-pos(WhateverCode)
 Match.CURSOR
 Match.perl
 Match.synthetic
 Parcel.LISTSTORE
-Action methods
 Highwater stuff
 Audit EXPR, termish, nulltermish, nibble
 self in regexes
-Non-string parameterized role arguments
-temp $*FOO
 token { $param-role-var }
+
+NOT NEEDED FOR #phasers:
+Cursor.canonicalize_name
+Cursor.check_old_cclass
+Cursor.mark_sinks
+Cursor.trim_heredoc
+Cursor.do_import
+Cursor.do_use
+Cursor.gettrait
+Cursor.load_lex
+Cursor.add_categorical
+Action methods
 Make sure / (\w+) $0 / works
+Non-string parameterized role arguments
 
 DONE:
 ~
@@ -62,6 +62,7 @@ shift(@array)
 &sort
 substr($str,$from,$len)
 $<sym>
+temp $*FOO
 try
 token { :my $var = expr; $var }
 

@@ -396,8 +396,8 @@ public class Cursor : IP6 {
     }
 
     private Variable FixupList(VarDeque caps) {
-        if (caps.Count() != 0 && caps[caps.Count() - 1] == null) {
-            caps.Pop();
+        if (caps.Count() != 0 && caps[0] == null) {
+            caps.Shift();
             DynObject l = new DynObject(RxFrame.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
