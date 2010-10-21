@@ -1283,6 +1283,11 @@ slow:
                     tf.caller.resultSlot = Kernel.NewROScalar(Kernel.AnyP);
                     return tf.caller;
                 }
+            } else if (type == SubInfo.ON_DIE) {
+                if (tf.lex == null)
+                    tf.lex = new Dictionary<string,object>();
+                tf.lex["$*!"] = td;
+                td = Kernel.NewROScalar(Kernel.AnyP);
             }
             tf.ip = tip;
             tf.resultSlot = td;

@@ -64,6 +64,9 @@ augment class Match {
         token TOP:foo { <sym> }
     }).parse("foo");
     is $m<sym>, "foo", '$<sym> is functional';
+
+    ok !(try die "foo").defined, "try of an error is undef";
+    is $!, "foo", 'the error goes into $!';
 }
 
 # {
