@@ -10,12 +10,10 @@ Cursor.load_lex
 Cursor.makestr
 Cursor.mark_sinks
 Cursor.mixin
-Cursor.O
 Cursor.suppose
 Cursor.trim_heredoc
 List.at-pos(WhateverCode)
 Match.CURSOR
-Match.iterator should return numbered captures
 Match.perl
 Match.synthetic
 Parcel.LISTSTORE
@@ -24,7 +22,6 @@ Highwater stuff
 Audit EXPR, termish, nulltermish, nibble
 self in regexes
 Non-string parameterized role arguments
-$<sym>
 temp $*FOO
 token { $param-role-var }
 Make sure / (\w+) $0 / works
@@ -36,6 +33,7 @@ Change STD to use $<foo> = { 1 }
 circumfix:<[ ]>
 Cursor.deb
 Cursor.lineof
+Cursor.O
 hash literals
 () being Nil
 Bool.Numeric
@@ -54,6 +52,7 @@ infix:<x>
 invert(%hash)
 &item
 &join
+Match.iterator should return numbered captures
 not($bool)
 &note
 pop(@array)
@@ -62,6 +61,7 @@ push(@array, $thing)
 shift(@array)
 &sort
 substr($str,$from,$len)
+$<sym>
 try
 token { :my $var = expr; $var }
 

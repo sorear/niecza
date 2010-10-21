@@ -295,7 +295,10 @@ sub quote__S_Q { my ($cl, $M) = @_;
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
     my @lift = $M->{nibble}{_ast}->oplift;
-    { local $::paren = 0; $M->{nibble}{_ast}->check }
+    {
+        local $::paren = 0;
+        $M->{nibble}{_ast}->check
+    }
     my ($rxop, $mb) = Optimizer::RxSimple::run($M->{nibble}{_ast});
     $M->{_ast} = Op::SubDef->new(
         var  => $cl->gensym,
@@ -310,7 +313,6 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
 
 sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
     my @lift = $rxop->oplift;
-    unless ($args{passcap}) { local $::paren = 0; $rxop->check }
     my ($nrxop, $mb) = Optimizer::RxSimple::run($rxop);
     unshift @lift, Op::Bind->new(readonly => 1,
         lhs => Op::Lexical->new(name => '$*GOAL', declaring => 1),
@@ -366,7 +368,7 @@ sub regex_def { my ($cl, $M) = @_;
         }
         $isproto = 1;
     } else {
-        my $m2 = defined($::symtext) ? 'multi' : 'only';
+        my $m2 = defined($symtext) ? 'multi' : 'only';
         if ($::MULTINESS && $::MULTINESS ne $m2) {
             $M->sorry("Inferred multiness disagrees with explicit");
             return;
@@ -398,8 +400,11 @@ sub regex_def { my ($cl, $M) = @_;
         $ast = RxOp::ProtoRedis->new(name => $name);
     }
 
-    { local $::paren = 0; $ast->check }
-    local $::symtext = $symtext;
+    {
+        local $::paren = 0;
+        local $::symtext = $symtext;
+        $ast->check;
+    }
     my $lad = Optimizer::RxSimple::run_lad($ast->lad);
     my @lift = $ast->oplift;
     ($ast, my $mb) = Optimizer::RxSimple::run($ast);
@@ -413,7 +418,7 @@ sub regex_def { my ($cl, $M) = @_;
             class => 'Regex',
             type  => 'regex',
             signature => $sig->for_regex,
-            do => Op::RegexBody->new(sym => $symtext, pre => \@lift,
+            do => Op::RegexBody->new(pre => \@lift,
                 name => ($name // ''), rxop => $ast, canback => $mb)));
 }
 
@@ -750,6 +755,14 @@ sub assertion__S_name { my ($cl, $M) = @_;
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
     } else {
+        if ($name eq 'sym') {
+            $M->{_ast} = RxOp::Sym->new;
+            return;
+        } elsif ($name eq 'before') {
+            $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
+            return;
+        }
+
         if ($M->{nibbler}[0]) {
             my $args = [$M->{nibbler}[0]{_ast}];
             $M->{_ast} = RxOp::Subrule->new(zyg => $args, method => $name);

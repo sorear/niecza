@@ -37,6 +37,36 @@ use CgOp;
 }
 
 {
+    package RxOp::Sym;
+    use Moose;
+    extends 'RxOp';
+
+    has text => (isa => 'Str', is => 'rw');
+    sub check { $_[0]->text($::symtext) }
+
+    sub code {
+        my ($self, $body) = @_;
+        my $t = $self->text;
+        # We aren't going to make a real Match unless somebody comes up with
+        # a good reason.
+        my $p = CgOp::rxpushcapture(CgOp::string_var($t), "sym");
+        if (length($t) == 1) {
+            $p, CgOp::rxbprim('ExactOne', CgOp::char($t));
+        } else {
+            $p, CgOp::rxbprim('Exact', CgOp::clr_string($t));
+        }
+    }
+
+    sub lad {
+        my ($self) = @_;
+        [ 'Str', $self->text ];
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package RxOp::String;
     use Moose;
     extends 'RxOp';
@@ -469,6 +499,7 @@ use CgOp;
     has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
+    has symtext  => (isa => 'Maybe[Str]', is => 'rw');
 
     sub opzyg { ($_[0]->regex ? ($_[0]->regex) : ()), @{ $_[0]->arglist // [] } }
 
@@ -491,35 +522,18 @@ use CgOp;
                 $::paren = $_ + 1;
             }
         }
+        $self->symtext($::symtext) if $self->method && $self->method eq 'sym';
         if ($self->_passcapzyg) {
+            local $::paren = 0 unless $self->passcap;
             $self->_passcapzyg->check;
         }
         $self->SUPER::check;
-    }
-
-    sub true {
-        my ($self) = @_;
-        # all not quite right in the capturey case
-        return unless $self->method;
-        if ($self->method eq 'sym') {
-            return RxOp::String->new(text => $::symtext);
-        }
-        if ($self->method eq 'before') {
-            return RxOp::Before->new(zyg => $self->zyg);
-        }
-        if ($self->method eq 'after') {
-            return RxOp::After->new(zyg => $self->zyg);
-        }
     }
 
     sub code {
         my ($self, $body) = @_;
         my $bt = $self->label;
         my $sk = $self->label;
-
-        if (my $true = $self->true) {
-            return $true->code($body);
-        }
 
         my @args = Op::CallLike::parsearglist($body, @{ $self->arglist // [] });
 
@@ -569,9 +583,6 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        if (my $true = $self->true) {
-            return $true->lad;
-        }
         [ 'Method', $self->method ];
     }
 

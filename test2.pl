@@ -58,6 +58,12 @@ augment class Match {
     is @arr.join("|"), "a|b|c", "Regex.ACCEPTS in list context returns captures";
     $m = "" ~~ / <O( foo => 2 )> /;
     is $m<O><foo>, 2, "<O> is functional";
+
+    $m = (grammar {
+        proto token TOP {*}
+        token TOP:foo { <sym> }
+    }).parse("foo");
+    is $m<sym>, "foo", '$<sym> is functional';
 }
 
 # {

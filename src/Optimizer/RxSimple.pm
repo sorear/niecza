@@ -114,9 +114,6 @@ sub RxOp::Cut::rxsimp { my ($self, $cut) = @_;
 }
 
 sub RxOp::Subrule::rxsimp { my ($self, $cut) = @_;
-    if (my $true = $self->true) {
-        return $true->rxsimp($cut);
-    }
     if ($cut) {
         return RxOp::Subrule->new(%$self, selfcut => 1);
     }
@@ -124,9 +121,6 @@ sub RxOp::Subrule::rxsimp { my ($self, $cut) = @_;
 }
 
 sub RxOp::Subrule::mayback { my ($self) = @_;
-    if (my $true = $self->true) {
-        return $true->mayback;
-    }
     return !$self->selfcut;
 }
 
