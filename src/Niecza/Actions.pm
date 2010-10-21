@@ -1702,6 +1702,7 @@ sub variable { my ($cl, $M) = @_;
         }
     } elsif ($M->{special_variable}) {
         $name = substr($M->{special_variable}->Str, 1);
+        $twigil = '*' if $name eq '/' or $name eq '!';
     } elsif ($M->{index}) {
         $M->{_ast} = { capid => $M->{index}{_ast}, term =>
             # maybe a little of a cheat
@@ -1737,6 +1738,7 @@ sub variable { my ($cl, $M) = @_;
 
 sub special_variable {}
 sub special_variable__S_DollarSlash {}
+sub special_variable__S_DollarBang {}
 sub special_variable__S_Dollar_a2_ {}
 
 sub param_sep {}

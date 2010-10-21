@@ -794,11 +794,6 @@ sub Body::begin {
         ltm        => $self->ltm,
         run_once   => $args{once} && (!@opensubs || $rtop->run_once));
 
-    if ($self->signature && @{ $self->signature->params } >= 1 &&
-            $self->signature->params->[0]->slot eq '$¢') {
-        $metabody->lexicals->{'$/'} = Metamodel::Lexical::Alias->new('$¢');
-    }
-
     $unit->get_stash(@{ $metabody->cur_pkg });
 
     push @opensubs, $metabody; # always visible in the signature XXX
@@ -810,8 +805,20 @@ sub Body::begin {
 
     pop @opensubs if $self->transparent;
 
-    $self->do->begin;
-    $metabody->code($self->do);
+    my $do = $self->do;
+
+    if ($self->signature && @{ $self->signature->params } >= 1 &&
+            $self->signature->params->[0]->slot eq '$¢') {
+        $do = Op::StatementList->new(children => [
+                Op::CallSub->new(
+                    invocant => Op::Lexical->new(name => '&infix:<=>'),
+                    args => [ Op::Lexical->new(name => '$*/', declaring => 1),
+                              Op::Lexical->new(name => '$¢') ]),
+                $do]);
+    }
+
+    $do->begin;
+    $metabody->code($do);
 
     $metabody->close;
     pop @opensubs unless $self->transparent;
