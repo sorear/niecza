@@ -2,13 +2,11 @@ Cursor.cursor_all
 Cursor.cursor_fresh
 Cursor.mixin
 Cursor.suppose
-List.at-pos(WhateverCode)
-Match.CURSOR
-Match.perl
 Match.synthetic
 Parcel.LISTSTORE
 Highwater stuff
-Audit EXPR, termish, nulltermish, nibble
+Audit termish, nulltermish, nibble
+Write tests for EXPR
 self in regexes
 token { $param-role-var }
 
@@ -71,4 +69,5 @@ AVERTED:
 //=, ||=, &&=, etc
 given & when
 if not binding $_
+List.at-pos(WhateverCode)
 Mu.new(foo => $bar)

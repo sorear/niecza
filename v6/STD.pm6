@@ -654,7 +654,7 @@ token nibbler {
                         {
                             push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
 
-                            my $n = $<nibbler>[*-1]<nibbles>;
+                            my $n = $<nibbler>[(+$<nibbler>)-1]<nibbles>;
                             my @n = @$n;
 
                             push @nibbles, $<starter>;
@@ -666,7 +666,7 @@ token nibbler {
                         }
         || <escape>     {
                             push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
-                            push @nibbles, $<escape>[*-1];
+                            push @nibbles, $<escape>[(+$<escape>)-1];
                             $text = '';
                             $to = $from = $¢.pos;
                         }
@@ -702,7 +702,7 @@ token babble ($l) {
     <.ws>
     [ <quotepair> <.ws>
         {
-            my $kv = $<quotepair>[*-1];
+            my $kv = $<quotepair>[(+$<quotepair>)-1];
             $lang = ($lang.tweak(| ($kv.<k> => $kv.<v>))
                 or $lang.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
         }
@@ -1265,7 +1265,7 @@ grammar P6 is STD {
 
         [ <quotepair> <.ws>
             {
-                my $kv = $<quotepair>[*-1];
+                my $kv = $<quotepair>[(+$<quotepair>)-1];
                 $lang = ($lang.tweak($kv.<k>, $kv.<v>)
                     or $lang.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
             }
@@ -1407,7 +1407,7 @@ grammar P6 is STD {
             {{
                 my $*IN_DECL = 'use';
                 my $*SCOPE = 'use';
-                $longname = $<module_name>[*-1]<longname>;
+                $longname = $<module_name>[(+$<module_name>)-1]<longname>;
                 $¢.do_need($longname<name>);
             }}
         ] ** ','
@@ -2018,7 +2018,7 @@ grammar P6 is STD {
         :my $*VAR;
         :dba('prefix or term')
         [
-        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
+        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[(+@p)-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
             [ <?{ $<term> }> || <term> || <.panic("Prefix requires an argument")> ]
         | <term>
         ]
@@ -3782,7 +3782,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         || <?before \N*? [\n\N*?]?> '!!' <.sorry("Bogus code found before the !!")> <.panic("Confused")>
         || <.sorry("Found ?? but no !!")> <.panic("Confused")>
         ]
-        <O(|%conditional, _reducecheck => &raise_middle)>
+        <O(|%conditional)>
     }
 
     token infix:sym<!!> {
@@ -3791,11 +3791,6 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         || <.suppose <infixish>> <.panic: "An infix may not start with !!">
         || <.panic: "Ternary !! seems to be missing its ??">
         ]
-    }
-
-    sub raise_middle($node) {
-        $node<middle> = $node<infix><EXPR>;
-        $node;
     }
 
     token infix:sym<?>
@@ -3851,7 +3846,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         )>
     }
 
-    sub check_doteq($node) {
+    sub check_doteq($here, $node) {
         # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt'|'pick' > || ]
         return $node if $node<left><scope_declarator>;
         my $ok = 0;
@@ -3868,7 +3863,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         };
 
         # NIECZA cursor_force was used here
-        $node.CURSOR.cursor($node<infix>.to).worryobs('.= as append operator', '~=') unless $ok;
+        $here.cursor($node<infix>.to).worryobs('.= as append operator', '~=') unless $ok;
         $node;
     }
 
@@ -4387,275 +4382,6 @@ grammar Quasi is STD::P6 {
             self;
         }
     }
-}
-
-##############################
-# Operator Precedence Parser #
-##############################
-
-method EXPR ($preclvl?) {
-    my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
-    my $*LEFTSIGIL = '';        # XXX P6
-    my $*PRECLIM = $preclim;
-    my @termstack;
-    my @opstack;
-    my $termish = 'termish';
-
-    push @opstack, { 'O' => %terminator, 'sym' => '' };         # (just a sentinel value)
-
-    my $here = self;
-    my $S = $here.pos;
-    self.deb("In EXPR, at $S") if $DEBUG::EXPR;
-
-    sub reduce() {
-        self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $DEBUG::EXPR;
-        my $op = pop @opstack;
-        my $sym = $op<sym>;
-        my $assoc = $op<O><assoc> // 'unary';
-        if $assoc eq 'chain' {
-            self.deb("reducing chain") if $DEBUG::EXPR;
-            my @chain;
-            push @chain, pop(@termstack);
-            push @chain, $op;
-            while @opstack {
-                last if $op<O><prec> ne @opstack[*-1]<O><prec>;
-                push @chain, pop(@termstack);
-                push @chain, pop(@opstack);
-            }
-            push @chain, pop(@termstack);
-            my $endpos = @chain[0].pos;
-            @chain = reverse @chain if @chain > 1;
-            my $startpos = @chain[0].from;
-            # NIECZA had to rewrite this, check if it's working
-            my $i = 0;
-            my @caplist;
-            for @chain -> $c {
-                push @caplist, (($i %% 2) ?? 'term' !! 'op') => $c;
-                $i++;
-            }
-            push @termstack, Match.synthetic(
-                :suphash({ _arity => 'CHAIN', chain => @chain }),
-                :captures(@caplist),
-                :method<CHAIN>,
-                :cursor($op.CURSOR),
-                :from($startpos),
-                :to($endpos));
-        }
-        elsif $assoc eq 'list' {
-            self.deb("reducing list") if $DEBUG::EXPR;
-            my @list;
-            my @delims = $op;
-            push @list, pop(@termstack);
-            while @opstack {
-                self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $DEBUG::EXPR;
-                last if $sym ne @opstack[*-1]<sym>;
-                if @termstack and defined @termstack[0] {
-                    push @list, pop(@termstack);
-                }
-                else {
-                    self.worry("Missing term in " ~ $sym ~ " list");
-                }
-                push @delims, pop(@opstack);
-            }
-            if @termstack and defined @termstack[0] {
-                push @list, pop(@termstack);
-            }
-            else {
-                self.worry("Missing final term in '" ~ $sym ~ "' list");
-            }
-            my $endpos = @list[0].pos;
-            @list = reverse @list if @list > 1;
-            my $startpos = @list[0].from;
-            @delims = reverse @delims if @delims > 1;
-            my @caps;
-            if @list {
-                push @caps, elem => @list[0] if @list[0];
-                for 0..@delims-1 {
-                    my $d = @delims[$_];
-                    my $l = @list[$_+1];
-                    push @caps, delim => $d;
-                    push @caps, elem => $l if $l;  # nullterm?
-                }
-            }
-            push @termstack, Match.synthetic(
-                :method<LIST>, :cursor($op.CURSOR), :captures(@caps),
-                :from($startpos), :to($endpos),
-                :suphash({ _arity => 'LIST', delims => @delims,
-                    list => @list, O => $op<O>, sym => $sym }));
-        }
-        elsif $assoc eq 'unary' {
-            self.deb("reducing") if $DEBUG::EXPR;
-            self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
-
-            self.deb($op.perl) if $DEBUG::EXPR;
-            my $arg = pop @termstack;
-            if $arg.from < $op.from { # postfix
-                push @termstack, Match.synthetic(
-                    :cursor($op.CURSOR), :to($op.to), :from($arg.from),
-                    :captures(arg => $arg, op => $op), :method<POSTFIX>,
-                    :suphash({ _arity => 'UNARY' }));
-            }
-            elsif $arg.pos > $op.pos {   # prefix
-                push @termstack, Match.synthetic(
-                    :cursor($op.CURSOR), :to($arg.to), :from($op.from),
-                    :captures(op => $op, arg => $arg), :method<PREFIX>,
-                    :suphash({ _arity => 'UNARY' }));
-            }
-        }
-        else {
-            self.deb("reducing") if $DEBUG::EXPR;
-            self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
-
-            my $right = pop @termstack;
-            my $left = pop @termstack;
-
-            push @termstack, Match.synthetic(
-                :to($right.to), :from($left.from), :cursor($op.CURSOR),
-                :captures(:left($left), :infix($op), :right($right)),
-                :suphash({_arity => 'BINARY'}), :method<INFIX>);
-
-            self.deb(@termstack[*-1].dump) if $DEBUG::EXPR;
-            my $ck;
-            if $ck = $op<O><_reducecheck> {
-                @termstack[*-1] = $ck(@termstack[*-1]);
-            }
-        }
-    }
-
-  TERM:
-    while True {
-        self.deb("In loop, at ", $here.pos) if $DEBUG::EXPR;
-        my $oldpos = $here.pos;
-        $here = $here.cursor_fresh();
-        $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';     # XXX P6
-        my @t =
-            ($termish eq 'termish') ?? $here.termish !!
-            ($termish eq 'nulltermish') ?? $here.nulltermish !!
-            ($termish eq 'statement') ?? $here.statement !!
-            ($termish eq 'dottyopish') ?? $here.dottyopish !!
-            die "weird value of $termish";
-
-        if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
-            $here.panic("Bogus term") if @opstack > 1;
-            return ();
-        }
-        $termish = 'termish';
-        my $PRE = $here.<PRE>:delete // [];
-        my $POST = $here.<POST>:delete // [];
-        my @PRE = @$PRE;
-        my @POST = reverse @$POST;
-
-        # interleave prefix and postfix, pretend they're infixish
-        my $M = $here;
-
-        # note that we push loose stuff onto opstack before tight stuff
-        while @PRE and @POST {
-            my $postO = @POST[0]<O>;
-            my $preO = @PRE[0]<O>;
-            if $postO<prec> lt $preO<prec> {
-                push @opstack, shift @POST;
-            }
-            elsif $postO<prec> gt $preO<prec> {
-                push @opstack, shift @PRE;
-            }
-            elsif $postO<uassoc> eq 'left' {
-                push @opstack, shift @POST;
-            }
-            elsif $postO<uassoc> eq 'right' {
-                push @opstack, shift @PRE;
-            }
-            else {
-                $here.sorry('"' ~ @PRE[0]<sym> ~ '" and "' ~ @POST[0]<sym> ~ '" are not associative');
-            }
-        }
-        push @opstack, @PRE,@POST;
-
-        push @termstack, $here.<term>;
-        @termstack[*-1].<POST>:delete;
-        self.deb("after push: " ~ (0+@termstack)) if $DEBUG::EXPR;
-
-        last TERM if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
-
-        while True {     # while we see adverbs
-            $oldpos = $here.pos;
-            last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;   # XXX P6
-            $here = $here.cursor_fresh.ws;
-            my @infix = $here.cursor_fresh.infixish();
-            last TERM unless @infix;
-            my $infix = @infix[0];
-            last TERM unless $infix.pos > $oldpos;
-            
-            if not $infix<sym> {
-                die $infix.dump if $DEBUG::EXPR;
-            }
-
-            my $inO = $infix<O>;
-            my Str $inprec = $inO<prec>;
-            if not defined $inprec {
-                self.deb("No prec given in infix!") if $DEBUG::EXPR;
-                die $infix.dump if $DEBUG::EXPR;
-                $inprec = %terminator<prec>;   # XXX lexical scope is wrong
-            }
-
-            if $inprec le $preclim {
-                if $preclim ne $LOOSEST {
-                    my $dba = $preclvl.<dba>;
-                    my $h = $*HIGHEXPECT;
-                    %$h = ();
-                    $h.{"an infix operator with precedence tighter than $dba"} = 1;
-                }
-                last TERM;
-            }
-
-            $here = $infix.cursor_fresh.ws();
-
-            # substitute precedence for listops
-            $inO<prec> = $inO<sub> if $inO<sub>;
-
-            # Does new infix (or terminator) force any reductions?
-            while @opstack[*-1]<O><prec> gt $inprec {
-                reduce();
-            }
-
-            # Not much point in reducing the sentinels...
-            last if $inprec lt $LOOSEST;
-
-        if $infix<fake> {
-            push @opstack, $infix;
-            reduce();
-            next;  # not really an infix, so keep trying
-        }
-
-            # Equal precedence, so use associativity to decide.
-            if @opstack[*-1]<O><prec> eq $inprec {
-                my $assoc = 1;
-                my $atype = $inO<assoc>;
-                if $atype eq 'non'   { $assoc = 0; }
-                elsif $atype eq 'left'  { reduce() }   # reduce immediately
-                elsif $atype eq 'right' { }            # just shift
-                elsif $atype eq 'chain' { }            # just shift
-                elsif $atype eq 'unary' { }            # just shift
-                elsif $atype eq 'list'  {
-                    $assoc = 0 unless $infix<sym> eqv @opstack[*-1]<sym>;
-                }
-                else { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
-                if not $assoc {
-                   $here.sorry('"' ~ @opstack[*-1]<sym> ~ '" and "' ~ $infix.Str ~ '" are non-associative and require parens');
-                }
-            }
-
-            $termish = $inO<nextterm> if $inO<nextterm>;
-            push @opstack, $infix;              # The Shift
-            last;
-        }
-    }
-    reduce() while +@opstack > 1;
-    if @termstack {
-        +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
-        @termstack[0].from = self.pos;
-        @termstack[0].pos = $here.pos;
-    }
-    self._MATCHIFYr($S, "EXPR", @termstack);
 }
 
 ##########
