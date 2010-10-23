@@ -178,7 +178,7 @@ our %units;
     }
 
     sub close {
-        my ($self, $targ) = @_;
+        my ($self) = @_;
         if ($self->name ne 'Mu' && $unit->is_true_setting
                 && !@{ $self->superclasses }) {
             $self->add_super($unit->get_stash_obj(
@@ -188,7 +188,9 @@ our %units;
         my @merge;
         push @merge, [ $self->xref, @{ $self->superclasses } ];
         for (@{ $self->superclasses }) {
-            push @merge, [ @{ $unit->deref($_)->linearized_mro } ];
+            my $d = $unit->deref($_);
+            $d->close unless $d->linearized_mro;
+            push @merge, [ @{ $d->linearized_mro } ];
         }
         my @mro;
         my %used;
@@ -1047,10 +1049,10 @@ sub Op::PackageDef::begin {
     $opensubs[-1]->add_pkg_exports($unit, $self->var, [ @ns, $n ], $self->exports);
     if (!$self->stub) {
         my $obj  = $pclass->new(name => $self->name)->xref;
+        $unit->get_stash(@ns)->bind_name($n, $obj);
         my $body = $self->body->begin(body_of => $obj, cur_pkg => [ @ns, $n ],
             once => ($pclass ne 'Metamodel::ParametricRole'));
         $unit->deref($obj)->close;
-        $unit->get_stash(@ns)->bind_name($n, $obj);
         $opensubs[-1]->add_exports($unit, $self->var, $obj, $self->exports);
 
         if ($pclass eq 'Metamodel::ParametricRole') {

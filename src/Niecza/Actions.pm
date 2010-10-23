@@ -744,10 +744,6 @@ sub do_cclass { my ($cl, $M) = @_;
 }
 
 sub decapturize { my ($cl, $M) = @_;
-    if ($M->{assertion}{assertion}[0]) {
-        $M->sorry("Binding to a method doesn't work like that");
-        return;
-    }
     if (!$M->{assertion}{_ast}->isa('RxOp::Subrule')) {
         return $M->{assertion}{_ast};
     }
