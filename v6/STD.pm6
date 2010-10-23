@@ -647,12 +647,11 @@ token nibbler {
     :my $to = $from;
     :my @nibbles = ();
     :my $multiline = 0;
-    # { self.from = self.pos; } NIECZA
     [ <!before <stopper> >
         [
         || <starter> <nibbler> <stopper>
                         {
-                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
+                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to(:$to), :method<Str>, :captures()) if $from != $to;
 
                             my $n = $<nibbler>[(+$<nibbler>)-1]<nibbles>;
                             my @n = @$n;
@@ -665,7 +664,7 @@ token nibbler {
                             $to = $from = $¢.pos;
                         }
         || <escape>     {
-                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
+                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to(:$to), :method<Str>, :captures()) if $from != $to;
                             push @nibbles, $<escape>[(+$<escape>)-1];
                             $text = '';
                             $to = $from = $¢.pos;
@@ -682,16 +681,11 @@ token nibbler {
         ]
     ]*
     {
-        push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to or !@nibbles;
-        $<nibbles> = @nibbles;
-        $.pos = $¢.pos;
-        $<nibbler> :delete;
-        $<escape> :delete;
-        $<starter> :delete;
-        $<stopper> :delete;
+        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to(:$to), :method<Str>, :captures()) if $from != $to or !@nibbles;
         $*LAST_NIBBLE = $¢;
         $*LAST_NIBBLE_MULTILINE = $¢ if $multiline;
     }
+    $<nibbles> = {@nibbles}
 }
 
 token babble ($l) {
@@ -4001,7 +3995,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
             [
                 <?after '::'>
                 <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
-                { $*VAR = $¢.cursor_all(self.pos, $¢.pos) }
+                { $*VAR = Match.synthetic(:cursor($¢), :from(self.pos), :to($¢.pos), :captures(), :method<Str>) }
             ]?
 
         # unrecognized names are assumed to be post-declared listops.

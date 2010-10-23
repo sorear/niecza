@@ -1,10 +1,7 @@
-Cursor.cursor_all
 Cursor.cursor_fresh
 Cursor.mixin
 Parcel.LISTSTORE
 Highwater stuff
-Audit nibble
-$/ and $¢ in subrule argument lists
 <after>
 token { $param-role-var }
 Fix simply returning self from a method
@@ -25,6 +22,7 @@ Non-string parameterized role arguments
 DONE:
 ~
 <?{ }>
+$/ and $¢ in subrule argument lists
 Change STD to use $<foo> = { 1 }
 circumfix:<[ ]>
 Cursor.deb
