@@ -4,19 +4,23 @@ use MONKEY_TYPING;
 
 augment class Hash {
     method iterator () { self.list.iterator }
-    method perl () { '{ ' ~ self.list.map(*.perl).join(', ') ~ ' }' }
+    method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
 }
 
 augment class Pair {
-    method perl () { self.key.perl ~ ' => ' ~ self.value.perl }
+    method dump() { self.key.dump ~ ' => ' ~ self.value.dump }
 }
 
 augment class Str {
-    method perl () { '"' ~ self ~ '"' }
+    method dump() { '"' ~ self ~ '"' }
 }
 
 augment class Num {
-    method perl () { self.Str }
+    method dump() { self.Str }
+}
+
+augment class List {
+    method dump() { '[' ~ self.map(*.dump).join(', ') ~ ']' }
 }
 
 augment class Cursor {
@@ -24,7 +28,14 @@ augment class Cursor {
         (cast cursor (@ {self}))))) } }
 }
 
+augment class Mu {
+    method dump() { self.defined ?? "Unknown{self.Str}" !! "undef" }
+}
+
 augment class Match {
+    method dump() {
+        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
+    }
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
         my $m = Q:CgOp {
             (newscalar (cursor_synthetic
@@ -42,7 +53,7 @@ augment class Match {
     }
 }
 
-package DEBUG { our $EXPR = True }
+package DEBUG { our $EXPR = False }
 
 grammar WithOPP {
     # This is a pretty straightforward LR parser with a few Perl 6 extensions.
@@ -53,7 +64,7 @@ grammar WithOPP {
     # Positional carrying precedence and associativity info, while $<sym>
     # is used for error reporting.
 
-    method deb(\|$str) { note( &infix:<~>(|$str) ) }
+    method deb(*@bits) { note( &infix:<~>(|@bits) ) }
 
     # XXX P6
     my $LOOSEST = "a=!";
@@ -90,8 +101,8 @@ grammar WithOPP {
                     push @chain, pop(@opstack);
                 }
                 push @chain, pop(@termstack);
-                my $endpos = @chain[0].pos;
-                @chain = reverse @chain if @chain > 1;
+                my $endpos = @chain[0].to;
+                @chain = reverse @chain if (+@chain) > 1;
                 my $startpos = @chain[0].from;
                 my $i = True;
                 my @caplist;
@@ -128,19 +139,19 @@ grammar WithOPP {
                 else {
                     self.worry("Missing final term in '" ~ $sym ~ "' list");
                 }
-                my $endpos = @list[0].pos;
-                @list = reverse @list if @list > 1;
+                my $endpos = @list[0].to;
+                @list = reverse @list if (+@list) > 1;
                 my $startpos = @list[0].from;
-                @delims = reverse @delims if @delims > 1;
+                @delims = reverse @delims if (+@delims) > 1;
                 my @caps;
                 if @list {
-                    push @caps, elem => @list[0] if @list[0];
+                    push @caps, (elem => @list[0]) if @list[0];
                     my $i = 0;
-                    while $i < @delims-1 {
+                    while $i < (+@delims)-1 {
                         my $d = @delims[$i];
                         my $l = @list[$i+1];
-                        push @caps, delim => $d;
-                        push @caps, elem => $l if $l;  # nullterm?
+                        push @caps, (delim => $d);
+                        push @caps, (elem => $l) if $l;  # nullterm?
                         $i++;
                     }
                 }
@@ -161,7 +172,7 @@ grammar WithOPP {
                         :captures(arg => $arg, op => $op, _arity => 'UNARY'),
                         :method<POSTFIX>);
                 }
-                elsif $arg.pos > $op.pos {   # prefix
+                elsif $arg.to > $op.to {   # prefix
                     push @termstack, Match.synthetic(
                         :cursor(self), :to($arg.to), :from($op.from),
                         :captures(op => $op, arg => $arg, _arity => 'UNARY'),
@@ -189,7 +200,8 @@ grammar WithOPP {
         }
 
         sub termstate() {
-            $here.deb("Looking for a term at ", $here.pos) if $DEBUG::EXPR;
+            $here.deb("Looking for a term") if $DEBUG::EXPR;
+            $here.deb("Top of opstack is ", _top(@opstack).dump) if $DEBUG::EXPR;
             $*LEFTSIGIL = _top(@opstack)<O><prec> gt $item_assignment_prec
                 ?? '@' !! '';     # XXX P6
             my $term =
@@ -200,9 +212,11 @@ grammar WithOPP {
                 die "weird value of $termish";
 
             if not $term {
-                $here.panic("Bogus term") if @opstack > 1;
+                $here.deb("Didn't find it") if $DEBUG::EXPR;
+                $here.panic("Bogus term") if (+@opstack) > 1;
                 return 2;
             }
+            $here.deb("Found term to {$term.to}") if $DEBUG::EXPR;
             $here = $here.cursor($term.to);
             $termish = 'termish';
             my @PRE = @( $term<PRE> // [] );
@@ -234,13 +248,14 @@ grammar WithOPP {
             push @termstack, $term<term>;
             $here.deb("after push: " ~ (+@termstack)) if $DEBUG::EXPR;
 
-            return 1 if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
+            say "methodcall break" if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
             $state = &infixstate;
             return 0;
         }
 
         # std bug sees infixstate as unused
         sub infixstate() { #OK
+            $here.deb("Looking for an infix") if $DEBUG::EXPR;
             return 1 if (@*MEMOS[$here.pos]<endstmt> // 0) == 2;  # XXX P6
             $here = $here.cursor($here.ws.head.to);
             my $infix = $here.infixish.head;
@@ -307,16 +322,21 @@ grammar WithOPP {
         }
 
         push @opstack, { 'O' => %terminator, 'sym' => '' };         # (just a sentinel value)
-        self.deb(@opstack.perl) if $DEBUG::EXPR;
+        self.deb(@opstack.dump) if $DEBUG::EXPR;
 
         $here = self;
         self.deb("In EXPR, at {$here.pos}") if $DEBUG::EXPR;
 
         my $stop = 0;
         $state = &termstate;
-        $stop = $state() until $stop;
+        until $stop {
+            $here.deb("At {$here.pos}, {@opstack.dump}; {@termstack.dump}") if $DEBUG::EXPR;
+            $stop = $state();
+        }
+        $here.deb("Stop code $stop") if $DEBUG::EXPR;
         return () if $stop == 2;
         reduce() while +@opstack > 1;
+        $here.deb("After final reduction, ", @termstack.dump, @opstack.dump) if $DEBUG::EXPR;
 
         if @termstack {
             +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
@@ -347,7 +367,11 @@ grammar EXPRTest is WithOPP {
     rule TOP { <EXPR> }
 }
 
-EXPRTest.parse(" @ left,b @ left,b @ ");
-EXPRTest.parse(" @ left,a @ left,b @ ");
-EXPRTest.parse(" @ left,b @ right,a @ ");
-EXPRTest.parse(" @ chain,c @ chain,c @ ");
+#say EXPRTest.parse(' @ ').dump;
+#say EXPRTest.parse(' @ left,b @ left,b @ ').dump;
+say EXPRTest.parse(' @ left,b @ left,c @ ').dump;
+say EXPRTest.parse(' @ left,c @ right,b @ ').dump;
+#say EXPRTest.parse(' @ chain,c @ chain,c @ ').dump;
+#say EXPRTest.parse(' @ list,c @ list,c @ ').dump;
+#say EXPRTest.parse(' :non,b:@:non,c: ').dump;
+#say EXPRTest.parse(' :left,b:@:left,b: ').dump;
