@@ -2,53 +2,6 @@
 use Test;
 use MONKEY_TYPING;
 
-augment class Regex {
-    method ACCEPTS($str) {
-        my $i = 0;
-        my $mat;
-        my $C = Cursor.new($str);
-        while !$mat && ($i <= $str.chars) {
-            $mat = (self)($C.cursor($i++));
-        }
-        unitem($mat.head);
-    }
-}
-
-augment class Cursor {
-    method O (*%hash) {
-        Q:CgOp { (cursor_O (cast cursor (@ {self}))
-                           (unbox varhash (@ {%hash}))) }
-    }
-    method list () { @( self.Capture ) }
-    method flat () { @( self.Capture ) }
-    method iterator () { self.flat.iterator }
-    method hash () { %( self.Capture ) }
-    method Capture () { Q:CgOp {
-        (letn cap (obj_newblank (obj_llhow (@ {Capture})))
-          (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
-          (newscalar (l cap)))
-    } }
-}
-
-augment class Capture {
-    method list () { @( Q:CgOp { (box Parcel (getslot positionals fvarlist
-        (@ {self}))) } ) }
-    method hash () { unitem( Q:CgOp { (box Hash (getslot named varhash
-        (@ {self}))) } // {} ) }
-}
-
-augment class Match {
-    method list () { @( self.Capture ) }
-    method hash () { %( self.Capture ) }
-    method flat () { @( self.Capture ) }
-    method iterator () { self.flat.iterator }
-    method Capture () { Q:CgOp {
-        (letn cap (obj_newblank (obj_llhow (@ {Capture})))
-          (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
-          (newscalar (l cap)))
-    } }
-}
-
 {
     my $m = "ab" ~~ / (.) <alpha> /;
     is (@$m)[0], "a", "Match.list returns positional captures";
@@ -77,6 +30,9 @@ augment class Match {
         }
         is +@*foo, 3, '@*foo has 3 elements again after temp';
     }
+
+    my @ar = [1, 2, 3];
+    is +@ar, 1, "array constructors are singular";
 }
 
 # {

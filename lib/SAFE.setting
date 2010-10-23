@@ -87,6 +87,10 @@ my class Capture {
     has $!named;
 
     method Capture () { self }
+    method list () { @( Q:CgOp { (box Parcel (getslot positionals fvarlist
+        (@ {self}))) } ) }
+    method hash () { unitem( Q:CgOp { (box Hash (getslot named varhash
+        (@ {self}))) } // {} ) }
 }
 # }}}
 # Scalar types {{{
@@ -800,13 +804,26 @@ sub map($callback, *@items) { @items.map($callback) }
 
 sub sort(*@bits) { @bits.sort }
 
-sub _array_constructor(\$parcel) { anon @new = $parcel }
-sub _hash_constructor(\$parcel) { anon %hash = $parcel }
+sub _array_constructor(\$parcel) { my $r := (anon @new = $parcel);  $r }
+sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
 
 sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 # }}}
 # Regular expression support {{{
 my class Cursor {
+    method O (*%hash) {
+        Q:CgOp { (cursor_O (cast cursor (@ {self}))
+                           (unbox varhash (@ {%hash}))) }
+    }
+    method list () { @( self.Capture ) }
+    method flat () { @( self.Capture ) }
+    method iterator () { self.flat.iterator }
+    method hash () { %( self.Capture ) }
+    method Capture () { Q:CgOp {
+        (letn cap (obj_newblank (obj_llhow (@ {Capture})))
+          (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
+          (newscalar (l cap)))
+    } }
     method new($str) { Q:CgOp { (ns (cursor_start
         (@ {self}) (unbox str (@ {$str})))) } }
     method pos() { Q:CgOp { (box Num (cast num (cursor_pos
@@ -825,6 +842,15 @@ my class Cursor {
 }
 
 my class Match {
+    method list () { @( self.Capture ) }
+    method hash () { %( self.Capture ) }
+    method flat () { @( self.Capture ) }
+    method iterator () { self.flat.iterator }
+    method Capture () { Q:CgOp {
+        (letn cap (obj_newblank (obj_llhow (@ {Capture})))
+          (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
+          (newscalar (l cap)))
+    } }
     method at-key($k) { Q:CgOp {
         (cursor_item (cast cursor (@ {self})) (unbox str (@ {$k.Str})))
     } }
@@ -848,7 +874,7 @@ my class Regex is Sub {
         while !$mat && ($i <= $str.chars) {
             $mat = (self)($C.cursor($i++));
         }
-        $mat.head;
+        unitem($mat.head);
     }
 }
 
