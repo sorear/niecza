@@ -937,8 +937,29 @@ namespace Niecza {
             return NewROScalar(n);
         }
 
-        public static Frame GetFirst(Frame th, IP6 lst) {
-            DynObject dyl = lst as DynObject;
+        public static Frame PromoteToList(Frame th, Variable v) {
+            if (!v.islist) {
+                DynObject lst = new DynObject(RxFrame.ListMO);
+                lst.slots[0 /*items*/] = new VarDeque(new Variable[] { v });
+                lst.slots[1 /*rest*/ ] = new VarDeque();
+                lst.slots[2 /*flat*/ ] = false;
+                th.resultSlot = Kernel.NewRWListVar(lst);
+                return th;
+            }
+            IP6 o = v.Fetch();
+            if (o.Isa(RxFrame.ListMO)) {
+                th.resultSlot = v;
+                return th;
+            }
+            return o.InvokeMethod(th, "list", new Variable[] { v }, null);
+        }
+
+        public static Frame GetFirst(Frame th, Variable lst) {
+            if (!lst.islist) {
+                th.resultSlot = lst;
+                return th;
+            }
+            DynObject dyl = lst.Fetch() as DynObject;
             if (dyl == null) goto slow;
             if (dyl.mo != RxFrame.ListMO) goto slow;
             VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
@@ -947,8 +968,8 @@ namespace Niecza {
             return th;
 
 slow:
-            return lst.InvokeMethod(th, "head", new Variable[] {
-                    NewROScalar(lst) }, null);
+            return lst.Fetch().InvokeMethod(th, "head", new Variable[] {
+                    lst }, null);
         }
 
         public static DynMetaObject AnyMO;

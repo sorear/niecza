@@ -64,10 +64,10 @@ augment class Cursor {
         token TOP { $<cap>={"hi"} <moo($/)> }
     }).parse("");
 
-    #ok (grammar {
-    #    method moo() { self }
-    #    regex TOP { <.moo> }
-    #}).parse(""), "simply returning self from a regex works";
+    ok (grammar {
+        method moo() { self }
+        regex TOP { <.moo> }
+    }).parse(""), "simply returning self from a regex works";
 }
 
 # {

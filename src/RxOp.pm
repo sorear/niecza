@@ -559,19 +559,18 @@ use CgOp;
 
         if ($self->selfcut) {
             push @code, CgOp::letn(
-                "kv", CgOp::get_first(CgOp::fetch($callf)),
+                "kv", CgOp::get_first($callf),
                 "k", CgOp::fetch(CgOp::letvar("kv")),
                 $updatef);
         } else {
-            push @code, CgOp::rxcall("SetCursorList", CgOp::methodcall($callf, "list"));
+            push @code, CgOp::rxcall("SetCursorList", CgOp::promote_to_list($callf));
             push @code, CgOp::goto($sk);
             push @code, CgOp::label($bt);
             push @code, CgOp::sink(CgOp::methodcall(CgOp::rxcall(
                         "GetCursorList"), "shift"));
             push @code, CgOp::label($sk);
             push @code, CgOp::letn(
-                "kv", CgOp::get_first(CgOp::fetch(
-                        CgOp::rxcall("GetCursorList"))),
+                "kv", CgOp::get_first(CgOp::rxcall("GetCursorList")),
                 "k", CgOp::fetch(CgOp::letvar("kv")),
                 $backf,
                 CgOp::rxpushb("SUBRULE", $bt),
@@ -860,11 +859,11 @@ use CgOp;
                   'MakeCursor')))),
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
           CgOp::letvar("k", CgOp::fetch(CgOp::get_first(
-                CgOp::fetch(CgOp::letvar("ks"))))),
+                CgOp::letvar("ks")))),
           CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
           CgOp::rxcall('End', CgOp::cast('cursor', CgOp::letvar("k"))),
-          CgOp::letvar('ks', CgOp::methodcall(CgOp::methodcall(
-                CgOp::letvar('ks'), "list"), "clone")),
+          CgOp::letvar('ks', CgOp::methodcall(CgOp::promote_to_list(
+                CgOp::letvar('ks')), "clone")),
           CgOp::sink(CgOp::methodcall(CgOp::letvar('ks'), 'shift')),
           CgOp::label('nextcsr'),
           CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(

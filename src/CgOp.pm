@@ -227,6 +227,7 @@ use warnings;
     sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0], $_[1]) }
     sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
     sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
+    sub promote_to_list{ rawscall('Kernel.PromoteToList:c,Variable', $_[0]) }
     sub instrole       { rawscall('Kernel.InstantiateRole', $_[0]) }
     sub role_apply     { rawscall('Kernel.RoleApply', $_[0], $_[1]) }
 
