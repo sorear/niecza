@@ -1476,6 +1476,20 @@ sub colonpair { my ($cl, $M) = @_;
     }
     my $tv = ref($M->{v}) ? $M->{v}{_ast} :
         Op::Lexical->new(name => $M->{v} ? 'True' : 'False');
+
+    if (!defined $tv) {
+        if (substr($M->{v}->Str,1,1) eq '<') {
+            $tv = Op::CallMethod->new(name => 'at-key',
+                receiver => Op::ContextVar->new(name => '$*/'),
+                args => [Op::StringLiteral->new(text => $M->{k})]);
+        } else {
+            $tv = $cl->do_variable_reference($M,
+                { sigil => $M->{v}{sigil}->Str,
+                    twigil => ($M->{v}{twigil}[0] ? $M->{v}{twigil}[0]->Str : ''),
+                    name => $M->{k} });
+        }
+    }
+
     $M->{_ast} = { ext => $n, term => Op::SimplePair->new(
             key => $M->{k}, value => $tv) };
 }

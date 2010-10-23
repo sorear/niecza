@@ -2,7 +2,6 @@ Cursor.cursor_fresh
 Cursor.mixin
 Parcel.LISTSTORE
 Highwater stuff
-<after>
 
 NOT NEEDED FOR #phasers:
 Cursor.canonicalize_name
@@ -22,6 +21,7 @@ DONE:
 ~
 <?{ }>
 $/ and $¢ in subrule argument lists
+<after>
 Change STD to use $<foo> = { 1 }
 circumfix:<[ ]>
 Cursor.deb

@@ -329,6 +329,7 @@ use CgOp;
     extends 'RxOp';
 
     sub uncut { $_[0]->zyg->[0] }
+    sub tocclist { $_[0]->uncut->tocclist }
 
     sub code {
         my ($self, $body) = @_;
