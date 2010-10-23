@@ -17,6 +17,8 @@ use CgOp;
 
     sub check { map { $_->check } @{ $_[0]->zyg } }
 
+    #sub tocclist { undef }
+
     # all that matters is 0-1-infty; $*in_quant valid here
     sub used_caps {
         my %r;
@@ -57,6 +59,8 @@ use CgOp;
         }
     }
 
+    sub tocclist { map { CClass->enum($_) } split //, $_[0]->text }
+
     sub lad {
         my ($self) = @_;
         [ 'Str', $self->text ];
@@ -82,6 +86,8 @@ use CgOp;
             CgOp::rxbprim('Exact', CgOp::clr_string($t));
         }
     }
+
+    sub tocclist { map { CClass->enum($_) } split //, $_[0]->text }
 
     sub lad {
         my ($self) = @_;
@@ -256,6 +262,7 @@ use CgOp;
         [ 'Sequence', \@z ];
     }
 
+    sub tocclist { map { $_->tocclist } @{ $_[0]->zyg } }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -355,6 +362,25 @@ use CgOp;
         my ($self, $body) = @_;
         CgOp::rxbprim('BeforeStr', CgOp::bool(0),
             CgOp::clr_string($self->str));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::AfterCCs;
+    use Moose;
+    extends 'RxOp';
+
+    has ccs => (is => 'ro', isa => 'ArrayRef[CClass]', required => 1);
+
+    sub lad { ['Null'] }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rxbprim('AfterCCs', CgOp::const(CgOp::fcclist_new(
+                    map { CgOp::cc_expr($_) } @{ $self->ccs })));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -917,7 +943,7 @@ use CgOp;
         my ($self, $body) = @_;
         CgOp::rxbprim("ScanCClass", CgOp::int($self->min),
             CgOp::int($self->max // (2**31-1)),
-            CgOp::const(RxOp::CClassElem::ccop($self)));
+            CgOp::const(CgOp::cc_expr($self->cc)));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -931,22 +957,16 @@ use CgOp;
 
     has cc => (isa => 'CClass', is => 'ro', required => 1);
 
-    # TODO: some kind of constant table
-    sub ccop {
-        my ($self) = @_;
-        my @ints = @{ $self->cc };
-        CgOp::rawnew('clr:CC', CgOp::rawnewarr('int',
-                map { CgOp::int($_) } @ints));
-    }
-
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim("CClass", CgOp::const($self->ccop));
+        CgOp::rxbprim("CClass", CgOp::const(CgOp::cc_expr($self->cc)));
     }
+
+    sub tocclist { $_[0]->cc }
 
     sub lad {
         my ($self) = @_;
-        [ 'CC', $self->ccop ];
+        [ 'CC', CgOp::cc_expr($self->cc) ];
     }
 
     __PACKAGE__->meta->make_immutable;

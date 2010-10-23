@@ -216,6 +216,9 @@ use warnings;
     sub cursor_synthcap{ rawcall($_[0], 'SynPushCapture:m,Void', @_[1,2]) }
     sub rxstripcaps    { rawcall($_[0], 'StripCaps:m,Cursor') }
 
+    sub fcclist_new    { rawnewarr('cc', @_) }
+    sub fladlist_new   { rawnewarr('lad', @_) }
+
     sub bget { getfield('v', $_[0]) }
     sub bset { setfield('v', $_[0], $_[1]) }
 
@@ -316,6 +319,8 @@ use warnings;
     sub rxgetpos      { rxcall('GetPos:m,Int32') }
     sub rxcommitgroup { rxcall('CommitGroup', $_[0]) }
 
+    sub cc_expr { rawnew('cc', rawnewarr('int',
+                map { CgOp::int($_) } @{ $_[0] })) }
     sub construct_lad {
         my ($l) = @_;
         my $r = ref $l;
@@ -323,7 +328,7 @@ use warnings;
             return CgOp::clr_string($l);
         } elsif ($r eq 'ARRAY') {
             if (!@$l || ref ($l->[0])) {
-                return CgOp::rawnewarr('clr:LAD', map { construct_lad($_) } @$l);
+                return fladlist_new(map { construct_lad($_) } @$l);
             } else {
                 my ($h,@r) = @$l;
                 return CgOp::rawnew("clr:LAD$h", map { construct_lad($_) } @r);

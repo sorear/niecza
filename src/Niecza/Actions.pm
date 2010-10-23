@@ -768,6 +768,15 @@ sub assertion__S_name { my ($cl, $M) = @_;
     } elsif ($name eq 'before') {
         $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
         return;
+    } elsif ($name eq 'after') {
+        my @l = $M->{nibbler}[0]{_ast}->tocclist;
+        if (grep { !defined } @l) {
+            $M->sorry("Unsuppored elements in after list");
+            $M->{_ast} = RxOp::Sequence->new;
+            return;
+        }
+        $M->{_ast} = RxOp::AfterCCs->new(ccs => \@l);
+        return;
     } elsif (!$M->{nibbler}[0] && !$M->{arglist}[0]) {
         $M->{_ast} = RxOp::Subrule->new(method => $name);
     } else {

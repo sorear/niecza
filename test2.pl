@@ -68,6 +68,10 @@ augment class Cursor {
         method moo() { self }
         regex TOP { <.moo> }
     }).parse(""), "simply returning self from a regex works";
+
+    rxtest / <after ':+'> X / , '<after ":+">X', (':+X', 'a:+X'), (':X','+:X');
+    rxtest / <after \s> X / , '<after \s>X', (' X',), ('xX','X');
+    rxtest / <after ab> X / , '<after ab>X', ('abX',), ('baX',);
 }
 
 # {

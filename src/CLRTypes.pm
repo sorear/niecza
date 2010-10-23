@@ -177,6 +177,9 @@ my %tmap = (
     'frame'     => 'Frame',
     'cursor'    => 'Cursor',
     'lad'       => 'LAD',
+    'cc'        => 'CC',
+    'fladlist'  => 'LAD[]',
+    'fcclist'   => 'CC[]',
 );
 
 sub _generic_infer {

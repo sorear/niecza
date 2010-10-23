@@ -3,8 +3,6 @@ Cursor.mixin
 Parcel.LISTSTORE
 Highwater stuff
 <after>
-token { $param-role-var }
-Fix simply returning self from a method
 
 NOT NEEDED FOR #phasers:
 Cursor.canonicalize_name
@@ -18,6 +16,7 @@ Cursor.load_lex
 Cursor.add_categorical
 Action methods
 Non-string parameterized role arguments
+token { $param-role-var }
 
 DONE:
 ~

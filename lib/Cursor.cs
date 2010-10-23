@@ -244,6 +244,15 @@ public sealed class RxFrame {
         return (not != ok);
     }
 
+    public bool AfterCCs(CC[] vec) {
+        int offs = st.pos - vec.Length;
+        if (offs < 0) return false;
+        for (int i = 0; i < vec.Length; i++)
+            if (!vec[i].Accepts(orig[offs + i]))
+                return false;
+        return true;
+    }
+
     public bool ScanCClass(int min, int max, CC x) {
         int i;
         int maxr = end - st.pos;
