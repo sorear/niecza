@@ -239,8 +239,8 @@ sub do_ternary {
 
 sub do_while {
     my ($op, $check, $body) = @_;
-    my $once = $op->[1];
-    my $until = $op->[2];
+    my $until = $op->[1];
+    my $once = $op->[2];
     die "type error" unless $body->type eq 'Void';
 
     my $lagain = 'again' . ($spill++);

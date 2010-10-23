@@ -33,6 +33,9 @@ use MONKEY_TYPING;
 
     my @ar = [1, 2, 3];
     is +@ar, 1, "array constructors are singular";
+    my $i = 0;
+    $i++ until $i == 10;
+    is $i, 10, "until loops functional";
 }
 
 # {
