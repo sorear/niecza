@@ -1034,7 +1034,7 @@ use CgOp;
         CgOp::prog(
             @pre,
             CgOp::rxinit(CgOp::clr_string($self->name),
-                    CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('$¢'))),
+                    CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('self'))),
                     $self->passcap, $self->passcut),
             ($self->passcap ? () :
                 CgOp::rxpushcapture(CgOp::null('cursor'), @mcaps)),

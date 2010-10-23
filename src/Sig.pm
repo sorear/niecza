@@ -170,12 +170,6 @@ use 5.010;
         Sig->new(params => [ $sp, @{ $self->params } ]);
     }
 
-    sub for_regex {
-        my ($self) = @_;
-        my $sp = Sig::Parameter->new(slot => '$¢', name => '$¢', readonly => 1);
-        Sig->new(params => [ $sp, @{ $self->params } ]);
-    }
-
     sub simple {
         my ($class, @names) = @_;
         Sig->new(params => [map { Sig::Parameter->new(slot => $_, name => $_,

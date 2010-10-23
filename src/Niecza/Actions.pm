@@ -306,7 +306,7 @@ sub op_for_regex { my ($cl, $M, $rxop) = @_;
             transparent => 1,
             class => 'Regex',
             type  => 'regex',
-            signature => Sig->simple->for_regex,
+            signature => Sig->simple->for_method,
             do => Op::RegexBody->new(node($M), canback => $mb, pre => \@lift,
                 rxop => $orxop)));
 }
@@ -330,7 +330,7 @@ sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
             class => 'Regex',
             type  => 'regex',
             ltm   => $lad,
-            signature => Sig->simple->for_regex,
+            signature => Sig->simple->for_method,
             do => Op::RegexBody->new(canback => $mb, pre => \@lift,
                 passcut => $args{passcut}, passcap => $args{passcap},
                 rxop => $nrxop)));
@@ -423,7 +423,7 @@ sub regex_def { my ($cl, $M) = @_;
             returnable => 1,
             class => 'Regex',
             type  => 'regex',
-            signature => $sig->for_regex,
+            signature => $sig->for_method,
             do => Op::RegexBody->new(pre => \@lift,
                 name => ($name // ''), rxop => $ast, canback => $mb)));
 }

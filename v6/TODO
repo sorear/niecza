@@ -1,11 +1,12 @@
 Cursor.cursor_all
 Cursor.cursor_fresh
 Cursor.mixin
-Cursor.suppose
 Parcel.LISTSTORE
 Highwater stuff
 Audit nibble
 self in regexes
+$/ and $¢ in subrule argument lists
+<after>
 token { $param-role-var }
 
 NOT NEEDED FOR #phasers:
@@ -29,6 +30,7 @@ Change STD to use $<foo> = { 1 }
 circumfix:<[ ]>
 Cursor.deb
 Cursor.lineof
+Cursor.suppose
 Cursor.O
 hash literals
 () being Nil

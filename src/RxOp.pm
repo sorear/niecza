@@ -844,7 +844,7 @@ use CgOp;
         # will probably break with complicated harnesses
         CgOp::letn(
           "fns", CgOp::rawscall('Lexer.RunProtoregex',
-            CgOp::fetch(CgOp::scopedlex('$¢')),
+            CgOp::fetch(CgOp::scopedlex('self')),
             CgOp::clr_string($self->name)),
           "i",   CgOp::int(0),
           "ks",  CgOp::null('var'),
