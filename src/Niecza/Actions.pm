@@ -314,6 +314,7 @@ sub quote__S_Slash_Slash { my ($cl, $M) = @_;
 sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
     my @lift = $rxop->oplift;
     my ($nrxop, $mb) = Optimizer::RxSimple::run($rxop);
+    my $lad = $rxop->lad;
     unshift @lift, Op::Bind->new(readonly => 1,
         lhs => Op::Lexical->new(name => '$*GOAL', declaring => 1),
         rhs => Op::StringLiteral->new(text => $args{goal}))
@@ -324,12 +325,13 @@ sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
             transparent => 1,
             class => 'Regex',
             type  => 'regex',
+            ltm   => $lad,
             signature => Sig->simple->for_regex,
             do => Op::RegexBody->new(canback => $mb, pre => \@lift,
                 passcut => $args{passcut}, passcap => $args{passcap},
                 rxop => $nrxop)));
     return RxOp::Subrule->new(regex => $subop, passcap => $args{passcap},
-        _passcapzyg => $nrxop);
+        _passcapzyg => $nrxop, _passcapltm => $lad);
 }
 
 sub regex_block { my ($cl, $M) = @_;
@@ -699,7 +701,7 @@ sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;
         $rxop = $cl->encapsulate_regex($M, $rxop, passcut => 1, passcap => 1);
     }
 
-    my @extra = map { $_ => $rxop->$_ } qw/zyg arglist method regex passcap _passcapzyg/;
+    my @extra = map { $_ => $rxop->$_ } qw/zyg arglist method regex passcap _passcapzyg _passcapltm/;
 
     # $<foo>=(...)
     if (@{ $rxop->captures } == 1 && !defined($rxop->captures->[0])) {
@@ -1725,7 +1727,7 @@ sub variable { my ($cl, $M) = @_;
         $M->{_ast} = { capid => $M->{index}{_ast}, term =>
             # maybe a little of a cheat
             $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-pos',
-                receiver => Op::Lexical->new(name => '$/'),
+                receiver => Op::ContextVar->new(name => '$*/'),
                 positionals => [ Op::Num->new(value => $M->{index}{_ast}) ])
         };
         return;
@@ -1735,7 +1737,7 @@ sub variable { my ($cl, $M) = @_;
                 term =>
                 # maybe a little of a cheat
                 $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-key',
-                    receiver => Op::Lexical->new(name => '$/'),
+                    receiver => Op::ContextVar->new(name => '$*/'),
                     positionals => $M->{postcircumfix}[0]{_ast}{args})
             };
             return;

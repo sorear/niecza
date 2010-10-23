@@ -2,9 +2,44 @@
 use Test;
 use MONKEY_TYPING;
 
+augment class Hash {
+    method iterator () { self.list.iterator }
+    method perl () { '{ ' ~ self.list.map(*.perl).join(', ') ~ ' }' }
+}
+
+augment class Pair {
+    method perl () { self.key.perl ~ ' => ' ~ self.value.perl }
+}
+
+augment class Str {
+    method perl () { '"' ~ self ~ '"' }
+}
+
+augment class Num {
+    method perl () { self.Str }
+}
+
 augment class Cursor {
     method to() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
+}
+
+augment class Match {
+    method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
+        my $m = Q:CgOp {
+            (newscalar (cursor_synthetic
+                (cast cursor (@ {$cursor})) (unbox str (@ {$method.Str}))
+                (cast int (unbox num (@ {$from})))
+                (cast int (unbox num (@ {$to})))))
+        };
+        # this is wrong.  I need a better way to pass lists into primitives.
+        for @captures -> $pair {
+            Q:CgOp { (rnull
+                (cursor_synthcap (cast cursor (@ {$m}))
+                  (unbox str (@ {$pair.key.Str})) (@ {$pair.value}))) };
+        }
+        $m
+    }
 }
 
 package DEBUG { our $EXPR = True }
@@ -272,6 +307,7 @@ grammar WithOPP {
         }
 
         push @opstack, { 'O' => %terminator, 'sym' => '' };         # (just a sentinel value)
+        self.deb(@opstack.perl) if $DEBUG::EXPR;
 
         $here = self;
         self.deb("In EXPR, at {$here.pos}") if $DEBUG::EXPR;
@@ -291,3 +327,27 @@ grammar WithOPP {
         return ();
     }
 }
+
+grammar EXPRTest is WithOPP {
+    token infixish {
+        $<assoc>=( < chain list left right non > ) ','
+        $<prio>=( \w+ )
+        $<sym>={ $<prio> }
+        $<O>={ { assoc => $<assoc>.Str, prec => $<prio>.Str } }
+    }
+    token unary {
+        ':' $<assoc>=( < left right non > ) ','
+        $<prio>=( \w+ ) ':'
+        $<sym>={ $<prio> }
+        $<O>={ { uassoc => $<assoc>.Str, prec => $<prio>.Str } }
+    }
+    token term { '@' }
+    token termish { <PRE=.unary>* <term> <POST=.unary>* }
+
+    rule TOP { <EXPR> }
+}
+
+EXPRTest.parse(" @ left,b @ left,b @ ");
+EXPRTest.parse(" @ left,a @ left,b @ ");
+EXPRTest.parse(" @ left,b @ right,a @ ");
+EXPRTest.parse(" @ chain,c @ chain,c @ ");

@@ -212,6 +212,8 @@ use warnings;
     sub cursor_item    { rawcall($_[0], 'GetKey', $_[1]) }
     sub cursor_unpackcaps { rawcall($_[0], 'UnpackCaps:m,Void', $_[1]) }
     sub cursor_O       { rawcall($_[0], 'O:m,Variable', $_[1]) }
+    sub cursor_synthetic { rawnew('cursor', @_[0,1,2,3]) }
+    sub cursor_synthcap{ rawcall($_[0], 'SynPushCapture:m,Void', @_[1,2]) }
     sub rxstripcaps    { rawcall($_[0], 'StripCaps:m,Cursor') }
 
     sub bget { getfield('v', $_[0]) }
@@ -336,7 +338,9 @@ use warnings;
             CgOp->new(op => [ 'peek_let', $_[0] ]);
     }
 
-    sub clr_string { CgOp->new(op => [ 'clr_string', $_[0] ]); }
+    sub clr_string {
+        Carp::confess "invalid undef in clr_string" unless defined $_[0];
+        CgOp->new(op => [ 'clr_string', $_[0] ]); }
 
     sub char { CgOp->new(op => [ 'clr_char', $_[0] ]); }
 

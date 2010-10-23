@@ -383,6 +383,13 @@ public class Cursor : IP6 {
         this.captures = captures;
     }
 
+    public Cursor(Cursor parent, string method, int from, int to)
+        : this(parent.global, parent.mo, from, to, null) { }
+    public void SynPushCapture(string name, IP6 obj) {
+        captures = new CapInfo(captures, new string[] { name },
+                Kernel.NewROScalar(obj));
+    }
+
     public override bool IsDefined() {
         return true;
     }

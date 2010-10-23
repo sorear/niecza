@@ -496,6 +496,7 @@ use CgOp;
     has regex    => (isa => 'Maybe[Op]', is => 'ro');
     has passcap  => (isa => 'Bool', is => 'ro', default => 0);
     has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'rw');
+    has _passcapltm => (is => 'rw');
     has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
@@ -583,7 +584,9 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        [ 'Method', $self->method ];
+        defined($self->method) ? [ 'Method', $self->method ] :
+            $self->_passcapzyg ? ($self->_passcapltm // die "passcapltm missing") :
+            [ 'Imp' ];
     }
 
     __PACKAGE__->meta->make_immutable;

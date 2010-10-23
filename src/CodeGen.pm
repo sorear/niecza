@@ -36,6 +36,7 @@ use CLRTypes;
 
     sub qm {
         my $out = $_[0];
+        Carp::confess "undef in qm" if !defined($out);
         $out =~ s/"/""/g;
         "@\"$out\"";
     }
