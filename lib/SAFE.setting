@@ -16,6 +16,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
+    method dump() { self.defined ?? "Unknown{self.Str}" !! "undef" }
     method item() { self }
     method so() { self.Bool }
     method not() { ! self.Bool }
@@ -104,6 +105,7 @@ my class Num is Cool {
     } }
     method Numeric() { self }
     method ACCEPTS($t) { self == $t }
+    method dump() { self.Str }
 }
 
 my class Str is Cool {
@@ -123,6 +125,7 @@ my class Str is Cool {
                     [cast int (unbox num (@ {$from}))]
                     [cast int (unbox num (@ {$len}))]))
     } }
+    method dump() { '"' ~ self ~ '"' }
 }
 
 my class Scalar {
@@ -440,6 +443,8 @@ my class List is Cool {
         }
     }
 
+    method dump() { '[' ~ self.map(*.dump).join(', ') ~ ']' }
+
     #| Takes an object and applies whatever semantics the List subclass
     #| needs to apply on stuff out of the iterator stack
     method _elem(\$x) { $x }
@@ -688,6 +693,9 @@ my class Hash {
         };
     }
 
+    method iterator () { self.list.iterator }
+    method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
+
     # TODO: We need something like pir:: notation for this to not suck
     method at-key($key) {
         Q:CgOp {
@@ -722,6 +730,8 @@ my class Enum is Cool {
     method kv() {
         ($.key, $.value);
     }
+
+    method dump() { self.key.dump ~ ' => ' ~ self.value.dump }
 
     method pairs() {
         self.flat;
@@ -828,6 +838,8 @@ my class Cursor {
         (@ {self}) (unbox str (@ {$str})))) } }
     method pos() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
+    method to() { Q:CgOp { (box Num (cast num (cursor_pos
+        (cast cursor (@ {self}))))) } }
     method cursor($np) { Q:CgOp { (ns (cursor_butpos
         (cast cursor (@ {self}))
           (cast int (unbox num (@ {$np}))))) } }
@@ -864,6 +876,24 @@ my class Match {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method chars() { $.defined ?? $.to - $.from !! 0 }
     method Str() { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
+    method dump() {
+        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
+    }
+    method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
+        my $m = Q:CgOp {
+            (newscalar (cursor_synthetic
+                (cast cursor (@ {$cursor})) (unbox str (@ {$method.Str}))
+                (cast int (unbox num (@ {$from})))
+                (cast int (unbox num (@ {$to})))))
+        };
+        # this is wrong.  I need a better way to pass lists into primitives.
+        for @captures -> $pair {
+            Q:CgOp { (rnull
+                (cursor_synthcap (cast cursor (@ {$m}))
+                  (unbox str (@ {$pair.key.Str})) (@ {$pair.value}))) };
+        }
+        $m
+    }
 }
 
 my class Regex is Sub {

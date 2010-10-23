@@ -2,6 +2,22 @@
 use Test;
 use MONKEY_TYPING;
 
+augment class Cursor {
+    method suppose($rx) {
+        my $*IN_SUPPOSE = True;
+        my $*FATALS = 0;
+        my @*WORRIES;
+        my %*WORRIES;
+        my $*HIGHWATER = -1;
+        my $*HIGHEXPECT = {};
+        try {
+            my @ret := $rx(self);
+            if (@ret) { return @( self, ) }
+        };
+        return ();
+    }
+}
+
 {
     my $m = "ab" ~~ / (.) <alpha> /;
     is (@$m)[0], "a", "Match.list returns positional captures";
@@ -36,6 +52,9 @@ use MONKEY_TYPING;
     my $i = 0;
     $i++ until $i == 10;
     is $i, 10, "until loops functional";
+
+    ok "foo" !~~ / f <.suppose { die }> /, ".suppose works (F)";
+    ok "foo" ~~ / f <.suppose o> oo /, ".suppose works (T)";
 }
 
 # {

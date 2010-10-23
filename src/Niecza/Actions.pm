@@ -293,22 +293,26 @@ sub quote__S_Q { my ($cl, $M) = @_;
     $M->{_ast} = $M->{quibble}{_ast};
 }
 
-sub quote__S_Slash_Slash { my ($cl, $M) = @_;
-    my @lift = $M->{nibble}{_ast}->oplift;
+sub op_for_regex { my ($cl, $M, $rxop) = @_;
+    my @lift = $rxop->oplift;
     {
         local $::paren = 0;
-        $M->{nibble}{_ast}->check
+        $rxop->check
     }
-    my ($rxop, $mb) = Optimizer::RxSimple::run($M->{nibble}{_ast});
-    $M->{_ast} = Op::SubDef->new(
+    my ($orxop, $mb) = Optimizer::RxSimple::run($rxop);
+    Op::SubDef->new(node($M),
         var  => $cl->gensym,
         body => Body->new(
             transparent => 1,
             class => 'Regex',
             type  => 'regex',
             signature => Sig->simple->for_regex,
-            do => Op::RegexBody->new(canback => $mb, pre => \@lift,
-                rxop => $rxop)));
+            do => Op::RegexBody->new(node($M), canback => $mb, pre => \@lift,
+                rxop => $orxop)));
+}
+
+sub quote__S_Slash_Slash { my ($cl, $M) = @_;
+    $M->{_ast} = $cl->op_for_regex($M, $M->{nibble}{_ast});
 }
 
 sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
@@ -766,8 +770,8 @@ sub assertion__S_name { my ($cl, $M) = @_;
         }
 
         if ($M->{nibbler}[0]) {
-            my $args = [$M->{nibbler}[0]{_ast}];
-            $M->{_ast} = RxOp::Subrule->new(zyg => $args, method => $name);
+            $M->{_ast} = RxOp::Subrule->new(method => $name,
+                arglist => [ $cl->op_for_regex($M, $M->{nibbler}[0]{_ast}) ]);
         } else {
             my $args = ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} : []);
             $M->{_ast} = RxOp::Subrule->new(arglist => $args, method => $name);

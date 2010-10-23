@@ -2,57 +2,6 @@
 use Test;
 use MONKEY_TYPING;
 
-augment class Hash {
-    method iterator () { self.list.iterator }
-    method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
-}
-
-augment class Pair {
-    method dump() { self.key.dump ~ ' => ' ~ self.value.dump }
-}
-
-augment class Str {
-    method dump() { '"' ~ self ~ '"' }
-}
-
-augment class Num {
-    method dump() { self.Str }
-}
-
-augment class List {
-    method dump() { '[' ~ self.map(*.dump).join(', ') ~ ']' }
-}
-
-augment class Cursor {
-    method to() { Q:CgOp { (box Num (cast num (cursor_pos
-        (cast cursor (@ {self}))))) } }
-}
-
-augment class Mu {
-    method dump() { self.defined ?? "Unknown{self.Str}" !! "undef" }
-}
-
-augment class Match {
-    method dump() {
-        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
-    }
-    method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
-        my $m = Q:CgOp {
-            (newscalar (cursor_synthetic
-                (cast cursor (@ {$cursor})) (unbox str (@ {$method.Str}))
-                (cast int (unbox num (@ {$from})))
-                (cast int (unbox num (@ {$to})))))
-        };
-        # this is wrong.  I need a better way to pass lists into primitives.
-        for @captures -> $pair {
-            Q:CgOp { (rnull
-                (cursor_synthcap (cast cursor (@ {$m}))
-                  (unbox str (@ {$pair.key.Str})) (@ {$pair.value}))) };
-        }
-        $m
-    }
-}
-
 package DEBUG { our $EXPR = False }
 
 grammar WithOPP {

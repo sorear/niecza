@@ -2,11 +2,9 @@ Cursor.cursor_all
 Cursor.cursor_fresh
 Cursor.mixin
 Cursor.suppose
-Match.synthetic
 Parcel.LISTSTORE
 Highwater stuff
-Audit termish, nulltermish, nibble
-Write tests for EXPR
+Audit nibble
 self in regexes
 token { $param-role-var }
 
@@ -51,6 +49,7 @@ invert(%hash)
 &item
 &join
 Match.iterator should return numbered captures
+Match.synthetic
 not($bool)
 &note
 pop(@array)
@@ -63,6 +62,7 @@ $<sym>
 temp $*FOO
 try
 token { :my $var = expr; $var }
+Write tests for EXPR
 
 AVERTED:
 
