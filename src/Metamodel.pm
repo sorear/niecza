@@ -809,10 +809,11 @@ sub Body::begin {
 
     if ($self->signature && @{ $self->signature->params } >= 1 &&
             $self->signature->params->[0]->slot eq '$¢') {
+        $metabody->add_my_name('$*/');
         $do = Op::StatementList->new(children => [
                 Op::CallSub->new(
                     invocant => Op::Lexical->new(name => '&infix:<=>'),
-                    args => [ Op::Lexical->new(name => '$*/', declaring => 1),
+                    args => [ Op::Lexical->new(name => '$*/'),
                               Op::Lexical->new(name => '$¢') ]),
                 $do]);
     }

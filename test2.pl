@@ -55,6 +55,9 @@ augment class Cursor {
 
     ok "foo" !~~ / f <.suppose { die }> /, ".suppose works (F)";
     ok "foo" ~~ / f <.suppose o> oo /, ".suppose works (T)";
+
+    ok "abcabc" ~~ /^ (\w+) $0 $/, '$/ in variable refs functional';
+    ok "abcabc" ~~ /^ (\w+) "$0" $/, '$/ in substrings functional';
 }
 
 # {

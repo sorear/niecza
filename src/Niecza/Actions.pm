@@ -293,6 +293,19 @@ sub quote__S_Q { my ($cl, $M) = @_;
     $M->{_ast} = $M->{quibble}{_ast};
 }
 
+sub transparent { my ($cl, $M, $op, %args) = @_;
+    Op::SubDef->new(node($M),
+        var  => $cl->gensym,
+        once => $args{once},
+        body => Body->new(
+            transparent => 1,
+            ltm => $args{ltm},
+            class => $args{class} // 'Sub',
+            type  => $args{type} // 'sub',
+            signature => $args{sig} // Sig->simple,
+            do => $op))
+}
+
 sub op_for_regex { my ($cl, $M, $rxop) = @_;
     my @lift = $rxop->oplift;
     {
@@ -300,15 +313,9 @@ sub op_for_regex { my ($cl, $M, $rxop) = @_;
         $rxop->check
     }
     my ($orxop, $mb) = Optimizer::RxSimple::run($rxop);
-    Op::SubDef->new(node($M),
-        var  => $cl->gensym,
-        body => Body->new(
-            transparent => 1,
-            class => 'Regex',
-            type  => 'regex',
-            signature => Sig->simple->for_method,
-            do => Op::RegexBody->new(node($M), canback => $mb, pre => \@lift,
-                rxop => $orxop)));
+    $cl->transparent($M, Op::RegexBody->new(node($M), canback => $mb,
+            pre => \@lift, rxop => $orxop),
+        class => 'Regex', type => 'regex', sig => Sig->simple->for_method);
 }
 
 sub quote__S_Slash_Slash { my ($cl, $M) = @_;
@@ -323,17 +330,10 @@ sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
         lhs => Op::Lexical->new(name => '$*GOAL', declaring => 1),
         rhs => Op::StringLiteral->new(text => $args{goal}))
             if exists $args{goal};
-    my $subop = Op::SubDef->new(
-        var  => $cl->gensym,
-        body => Body->new(
-            transparent => 1,
-            class => 'Regex',
-            type  => 'regex',
-            ltm   => $lad,
-            signature => Sig->simple->for_method,
-            do => Op::RegexBody->new(canback => $mb, pre => \@lift,
-                passcut => $args{passcut}, passcap => $args{passcap},
-                rxop => $nrxop)));
+    my $subop = $cl->transparent($M, Op::RegexBody->new(canback => $mb,
+            pre => \@lift, passcut => $args{passcut}, passcap => $args{passcap},
+            rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
+        sig => Sig->simple->for_method);
     return RxOp::Subrule->new(regex => $subop, passcap => $args{passcap},
         _passcapzyg => $nrxop, _passcapltm => $lad);
 }
@@ -668,7 +668,9 @@ sub metachar__S_Single_Single { my ($cl, $M) = @_;
 
 sub metachar__S_Double_Double { my ($cl, $M) = @_;
     if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
-        $M->{_ast} = RxOp::VarString->new(value => $M->{quote}{_ast});
+        $M->{_ast} = RxOp::VarString->new(thunk =>
+            $cl->transparent($M, $M->{quote}{_ast}, once => 1, sig =>
+                Sig->simple('$¢'), type => 'rxembedded'));
         return;
     }
     $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
@@ -695,8 +697,8 @@ sub metachar__S_var { my ($cl, $M) = @_;
         $M->{_ast} = $cl->rxcapturize($M, $cid, $a);
         return;
     }
-    $M->{_ast} = RxOp::VarString->new(value =>
-        $cl->do_variable_reference($M, $M->{variable}{_ast}));
+    $M->{_ast} = RxOp::VarString->new(thunk =>
+        $cl->transparent($M, $cl->do_variable_reference($M, $M->{variable}{_ast}), once => 1, sig => Sig->simple('$¢'), type => 'rxembedded'));
 }
 
 sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;

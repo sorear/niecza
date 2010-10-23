@@ -97,13 +97,12 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    has value => (isa => 'Op', is => 'ro', required => 1);
-    sub opzyg { $_[0]->value }
+    has thunk => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_[0]->thunk }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(
-                    $self->value->cgop($body))));
+        CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(CgOp::methodcall(CgOp::subcall(CgOp::fetch($self->thunk->cgop($body)), CgOp::newscalar(CgOp::rxcall('MakeCursor'))), "Str"))));
     }
 
     sub lad { ['Imp'] }
@@ -550,8 +549,8 @@ use CgOp;
                     @{ $self->captures })) :
             (CgOp::rxpushcapture(CgOp::letvar("kv"),
                 @{ $self->captures })));
+        my $backf = CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k")));
         my $updatef = CgOp::prog(
-            CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
             @pushcapf,
             CgOp::rxsetpos(CgOp::cursor_pos(CgOp::cast("cursor",
                         CgOp::letvar("k")))));
@@ -564,7 +563,7 @@ use CgOp;
                 "k", CgOp::fetch(CgOp::letvar("kv")),
                 $updatef);
         } else {
-            push @code, CgOp::rxcall("SetCursorList", $callf);
+            push @code, CgOp::rxcall("SetCursorList", CgOp::methodcall($callf, "list"));
             push @code, CgOp::goto($sk);
             push @code, CgOp::label($bt);
             push @code, CgOp::sink(CgOp::methodcall(CgOp::rxcall(
@@ -574,8 +573,9 @@ use CgOp;
                 "kv", CgOp::get_first(CgOp::fetch(
                         CgOp::rxcall("GetCursorList"))),
                 "k", CgOp::fetch(CgOp::letvar("kv")),
+                $backf,
+                CgOp::rxpushb("SUBRULE", $bt),
                 $updatef);
-            push @code, CgOp::rxpushb("SUBRULE", $bt);
             push @code, CgOp::rxcall("SetCursorList", CgOp::null("var"));
         }
 
