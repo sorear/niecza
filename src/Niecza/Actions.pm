@@ -762,22 +762,27 @@ sub assertion__S_name { my ($cl, $M) = @_;
         "Qualified method calls NYI");
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
+    } elsif ($name eq 'sym') {
+        $M->{_ast} = RxOp::Sym->new;
+        return;
+    } elsif ($name eq 'before') {
+        $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
+        return;
+    } elsif (!$M->{nibbler}[0] && !$M->{arglist}[0]) {
+        $M->{_ast} = RxOp::Subrule->new(method => $name);
     } else {
-        if ($name eq 'sym') {
-            $M->{_ast} = RxOp::Sym->new;
-            return;
-        } elsif ($name eq 'before') {
-            $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
-            return;
-        }
+        my $args = $M->{nibbler}[0] ?
+            [ $cl->op_for_regex($M, $M->{nibbler}[0]{_ast}) ] :
+            $M->{arglist}[0]{_ast};
 
-        if ($M->{nibbler}[0]) {
-            $M->{_ast} = RxOp::Subrule->new(method => $name,
-                arglist => [ $cl->op_for_regex($M, $M->{nibbler}[0]{_ast}) ]);
-        } else {
-            my $args = ($M->{arglist}[0] ? $M->{arglist}[0]{_ast} : []);
-            $M->{_ast} = RxOp::Subrule->new(arglist => $args, method => $name);
-        }
+        my $callop = Op::CallMethod->new(
+            receiver => Op::Lexical->new(name => '$¢'),
+            name => $name,
+            args => $args);
+
+        my $regex = $cl->transparent($M, $callop, sig => Sig->simple('$¢'));
+
+        $M->{_ast} = RxOp::Subrule->new(regex => $regex);
     }
     $M->{_ast} = $cl->rxcapturize($M, $name, $M->{_ast});
 }

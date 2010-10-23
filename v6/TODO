@@ -4,10 +4,10 @@ Cursor.mixin
 Parcel.LISTSTORE
 Highwater stuff
 Audit nibble
-self in regexes
 $/ and $¢ in subrule argument lists
 <after>
 token { $param-role-var }
+Fix simply returning self from a method
 
 NOT NEEDED FOR #phasers:
 Cursor.canonicalize_name
@@ -20,7 +20,6 @@ Cursor.gettrait
 Cursor.load_lex
 Cursor.add_categorical
 Action methods
-Make sure / (\w+) $0 / works
 Non-string parameterized role arguments
 
 DONE:
@@ -41,9 +40,11 @@ defined($thing)
 :delete
 :exists
 $*FOO as a parameter
+self in regexes
 func(|($key => $value))
 gt, lt, leg, etc
 $*GOAL handling
+Make sure / (\w+) $0 / works
 Hash.keys &keys
 Hash.LISTSTORE
 infix:<x>

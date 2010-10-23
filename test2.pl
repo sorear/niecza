@@ -58,6 +58,16 @@ augment class Cursor {
 
     ok "abcabc" ~~ /^ (\w+) $0 $/, '$/ in variable refs functional';
     ok "abcabc" ~~ /^ (\w+) "$0" $/, '$/ in substrings functional';
+
+    (grammar {
+        method moo($cap) { is $cap<cap>, "hi", '$/ from subrule args works'; @( self, ) }
+        token TOP { $<cap>={"hi"} <moo($/)> }
+    }).parse("");
+
+    #ok (grammar {
+    #    method moo() { self }
+    #    regex TOP { <.moo> }
+    #}).parse(""), "simply returning self from a regex works";
 }
 
 # {
