@@ -2386,10 +2386,19 @@ sub package_def { my ($cl, $M) = @_;
         $M->sorry("Illogical scope $scope for package block");
         return;
     }
-    my $name = $M->{longname}[0] ?
-        $cl->unqual_longname($M->{longname}[0],
-            "Qualified package definitions NYI", 1) : 'ANON';
-    my $outervar = $scope ne 'anon' ? $name : $cl->gensym;
+
+    my ($name, $outervar, @augpkg);
+
+    if ($scope eq 'augment') {
+        my $r = $cl->mangle_longname($M->{longname}[0]);
+        $name = $r->{name};
+        @augpkg = @{ $r->{path} // ['MY'] };
+    } else {
+        $name = $M->{longname}[0] ?
+            $cl->unqual_longname($M->{longname}[0],
+                "Qualified package definitions NYI", 1) : 'ANON';
+        $outervar = $scope ne 'anon' ? $name : $cl->gensym;
+    }
 
     my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
     my $blocktype = $::PKGDECL;
@@ -2404,7 +2413,7 @@ sub package_def { my ($cl, $M) = @_;
 
         $M->{_ast} = Op::Augment->new(
             node($M),
-            pkg     => [],
+            pkg     => [@augpkg],
             name    => $name,
             bodyvar => $bodyvar,
             body    => $cbody);
