@@ -736,7 +736,7 @@ method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
-        my $lang = $herestub.lang.mixin( ::herestop );
+        my $lang = $herestub.lang.mixin( STD::herestop );
         my $doc;
         if ($doc) = $here.nibble($lang) {
             $here = $doc.trim_heredoc();
@@ -1148,9 +1148,9 @@ grammar P6 is STD {
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
         # "CHECK" time...
+        $<LEX> = { $*CURLEX }
         {
             $¢.explain_mystery();
-            $¢.<LEX> = $*CURLEX;
             if @*WORRIES {
                 note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
             }
@@ -1266,7 +1266,7 @@ grammar P6 is STD {
         ]*
 
         [
-        | '{*}' <?{ $*MULTINESS eq 'proto' }> { $¢.<onlystar> = 1 }
+        | '{*}' <?{ $*MULTINESS eq 'proto' }> $<onlystar> = {1}
         | [
             '{'
             <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
@@ -4539,7 +4539,7 @@ grammar Regex is STD {
     token metachar:sym<{ }> {
         <?before '{'>
         <embeddedblock>
-        {{ $/<sym> := <{ }> }}
+        $<sym> = { <{ }> }
     }
 
     token metachar:mod {
@@ -4767,7 +4767,7 @@ grammar Regex is STD {
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:p6adv {
-        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] { $/<sym> = ':' ~ $<quotepair><k> }
+        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] $<sym> = {':' ~ $<quotepair><k>}
     }
 
     token mod_internal:oops { {} (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }
@@ -4836,7 +4836,6 @@ method newlex ($needsig = 0) {
     $*CURLEX.<!NEEDSIG> = 1 if $needsig;
     $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $ALL.{$id} = $*CURLEX;
-    self.<LEX> = $*CURLEX;
     $*DECLARAND<curlex> = $*CURLEX if $*DECLARAND;
     self;
 }
