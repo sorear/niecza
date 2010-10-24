@@ -1,6 +1,8 @@
 # vim: ft=perl6
 use MONKEY_TYPING;
 
+#use STD;
+
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
 
 augment class Cursor {
@@ -57,4 +59,10 @@ augment class Cursor {
     }
 
     method deb($str) { note $str }
+
+    method cursor_fresh($k = self) { Q:CgOp {
+        (ns (cursor_fresh (cast cursor (@ {self})) (@ {$k})))
+    } }
+
+    method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
 }

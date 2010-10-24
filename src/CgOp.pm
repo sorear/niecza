@@ -214,6 +214,7 @@ use warnings;
     sub cursor_O       { rawcall($_[0], 'O:m,Variable', $_[1]) }
     sub cursor_synthetic { rawnew('cursor', @_[0,1,2,3]) }
     sub cursor_synthcap{ rawcall($_[0], 'SynPushCapture:m,Void', @_[1,2]) }
+    sub cursor_fresh   { rawcall($_[0], 'FreshClass:m,Cursor', $_[1]) }
     sub rxstripcaps    { rawcall($_[0], 'StripCaps:m,Cursor') }
 
     sub fcclist_new    { rawnewarr('cc', @_) }

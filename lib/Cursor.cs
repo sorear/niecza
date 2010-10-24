@@ -407,6 +407,10 @@ public class Cursor : IP6 {
         return new Cursor(global, mo, nstate, xact, npos, null);
     }
 
+    public Cursor FreshClass(IP6 from) {
+        return new Cursor(global, from.mo, nstate, xact, pos, null);
+    }
+
     public Cursor StripCaps() {
         return new Cursor(global, save_klass, from, pos, null);
     }
