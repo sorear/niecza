@@ -916,7 +916,7 @@ public class LADMethod : LAD {
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
         LAD sub = pad.ResolveMethod(name);
 
-        if (pad.method_stack.Contains(name)) {
+        if (pad.method_stack.Contains(name) || sub == null) {
             len = 0; cont = false;
         } else {
             pad.method_stack.Add(name);
