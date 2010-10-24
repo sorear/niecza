@@ -861,10 +861,14 @@ sub Op::Use::begin {
     my $name = $self->unit;
     my $u2 = $unit->need_unit($self->unit);
 
-    my @can = @{ $u2->mainline->find_pkg(split /::/, $name) };
+    my @can = @{ $u2->mainline->find_pkg(['MY', split /::/, $name]) };
     my $exp = $unit->get_stash(@can, 'EXPORT', 'DEFAULT');
 
-    # XXX I am not sure how need binding should work
+    # XXX I am not sure how need binding should work in the :: case
+    if ($name !~ /::/) {
+        $opensubs[-1]->lexicals->{$name} =
+            Metamodel::Lexical::Stash->new(path => [@can]);
+    }
 
     for my $en (sort keys %{ $exp->zyg }) {
         my $uname = $en;
