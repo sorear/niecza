@@ -1,7 +1,7 @@
 # vim: ft=perl6
 use MONKEY_TYPING;
 
-#use STD;
+use STD;
 
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
 
@@ -66,3 +66,6 @@ augment class Cursor {
 
     method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
 }
+
+STD.parse("2 + 2");
+say "OK";

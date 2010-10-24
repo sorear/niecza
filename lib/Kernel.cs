@@ -1195,7 +1195,7 @@ slow:
             return sb.ToString();
         }
 
-        private static bool in_unhandled;
+        private static object in_unhandled;
 
         // exception processing goes in two stages
         // 1. find the correct place to unwind to, calling CATCH filters
@@ -1230,16 +1230,16 @@ slow:
                 Variable mp = (type == SubInfo.ON_DIE) ? ((Variable)payload) :
                     BoxAny("Unhandled control operator: " +
                             SubInfo.DescribeControl(type, tgt, lid, name), StrP);
-                if (in_unhandled) {
-                    Console.Error.WriteLine("Double fault {0}", type);
-                    DynObject dob = mp.Fetch() as DynObject;
-                    if (dob != null && dob.slots.Length != 0 &&
-                            dob.slots[0] is string) {
-                        Console.Error.WriteLine(dob.slots[0]);
-                    }
+                if (in_unhandled != null) {
+                    Console.Error.WriteLine("Double fault {0}", in_unhandled);
                     Environment.Exit(1);
                 }
                 in_unhandled = true;
+                DynObject dob = mp.Fetch() as DynObject;
+                if (dob != null && dob.slots.Length != 0 &&
+                        dob.slots[0] is string) {
+                    in_unhandled = dob.slots[0];
+                }
                 Frame r = th.MakeChild(null, UnhandledSI);
                 r.lex0 = mp;
                 return r;

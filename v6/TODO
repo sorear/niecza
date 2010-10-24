@@ -1,5 +1,3 @@
-Cursor.cursor_fresh
-Cursor.mixin
 Parcel.LISTSTORE
 Highwater stuff
 
@@ -19,6 +17,8 @@ token { $param-role-var }
 
 DONE:
 ~
+Cursor.cursor_fresh
+Cursor.mixin
 <?{ }>
 $/ and $¢ in subrule argument lists
 <after>
