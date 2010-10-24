@@ -423,6 +423,7 @@ sub regex_def { my ($cl, $M) = @_;
             returnable => 1,
             class => 'Regex',
             type  => 'regex',
+            name  => $name // 'ANONrx',
             signature => $sig->for_method,
             do => Op::RegexBody->new(pre => \@lift,
                 name => ($name // ''), rxop => $ast, canback => $mb)));
@@ -2403,7 +2404,7 @@ sub package_def { my ($cl, $M) = @_;
     if ($scope eq 'augment') {
         my $stmts = $M->{statementlist} // $M->{blockoid};
         $stmts = $stmts->{_ast};
-        my $cbody = $cl->sl_to_block($blocktype, $stmts, name => $name);
+        my $cbody = $cl->sl_to_block($blocktype, $stmts, name => $name, subname => "augment-" . $name // 'anon');
 
         $M->{_ast} = Op::Augment->new(
             node($M),
@@ -2420,7 +2421,7 @@ sub package_def { my ($cl, $M) = @_;
                 $stmts->{_ast} ]);
 
         my $cbody = $cl->sl_to_block($blocktype, $stmts,
-            name => $name);
+            name => $name, subname => ($::PKGDECL . '-' . ($name // 'anon')));
         $M->{_ast} = $optype->new(
             node($M),
             (($blocktype eq 'role' && $M->{signature}[0]) ?
