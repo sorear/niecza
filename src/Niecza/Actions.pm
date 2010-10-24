@@ -703,20 +703,17 @@ sub metachar__S_var { my ($cl, $M) = @_;
 }
 
 sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;
-    if (!$rxop->isa('RxOp::Subrule')) {
+    if (!$rxop->isa('RxOp::Capturing')) {
         # $<foo>=[...]
         $rxop = $cl->encapsulate_regex($M, $rxop, passcut => 1, passcap => 1);
     }
 
-    my @extra = map { $_ => $rxop->$_ } qw/zyg arglist method regex passcap _passcapzyg _passcapltm/;
-
     # $<foo>=(...)
     if (@{ $rxop->captures } == 1 && !defined($rxop->captures->[0])) {
-        return RxOp::Subrule->new(captures => [$name], @extra);
+        return ref($rxop)->new(%$rxop, captures => [$name]);
     }
 
-    return RxOp::Subrule->new(captures => [ $name, @{ $rxop->captures } ],
-        @extra);
+    return ref($rxop)->new(%$rxop, captures => [ $name, @{ $rxop->captures } ]);
 }
 
 sub do_cclass { my ($cl, $M) = @_;
@@ -745,10 +742,10 @@ sub do_cclass { my ($cl, $M) = @_;
 }
 
 sub decapturize { my ($cl, $M) = @_;
-    if (!$M->{assertion}{_ast}->isa('RxOp::Subrule')) {
+    if (!$M->{assertion}{_ast}->isa('RxOp::Capturing')) {
         return $M->{assertion}{_ast};
     }
-    RxOp::Subrule->new(%{ $M->{assertion}{_ast} }, captures => []);
+    ref($M->{assertion}{_ast})->new(%{ $M->{assertion}{_ast} }, captures => []);
 }
 
 sub cclass_elem {}
@@ -760,8 +757,7 @@ sub assertion__S_name { my ($cl, $M) = @_;
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
     } elsif ($name eq 'sym') {
-        $M->{_ast} = RxOp::Sym->new;
-        return;
+        $M->{_ast} = RxOp::Sym->new(captures => []);
     } elsif ($name eq 'before') {
         $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
         return;

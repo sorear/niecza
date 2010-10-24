@@ -39,19 +39,49 @@ use CgOp;
 }
 
 {
-    package RxOp::Sym;
+    package RxOp::Capturing;
     use Moose;
     extends 'RxOp';
 
+    has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
+
+    sub check {
+        my ($self) = @_;
+        for (@{ $self->captures }) {
+            if (!defined $_) {
+                $_ = $::paren++;
+            } elsif (/^[0-9]+$/) {
+                $::paren = $_ + 1;
+            }
+        }
+        $self->SUPER::check;
+    }
+
+    sub used_caps {
+        my ($self) = @_;
+        my $h = { map { $_ => $::in_quant ? 2 : 1 } @{ $self->captures } };
+        $h
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package RxOp::Sym;
+    use Moose;
+    extends 'RxOp::Capturing';
+
     has text => (isa => 'Str', is => 'rw');
-    sub check { $_[0]->text($::symtext) }
+
+    sub check { $_[0]->text($::symtext); $_[0]->SUPER::check; }
 
     sub code {
         my ($self, $body) = @_;
         my $t = $self->text;
         # We aren't going to make a real Match unless somebody comes up with
         # a good reason.
-        my $p = CgOp::rxpushcapture(CgOp::string_var($t), "sym");
+        my $p = CgOp::rxpushcapture(CgOp::string_var($t), @{ $self->captures });
         if (length($t) == 1) {
             $p, CgOp::rxbprim('ExactOne', CgOp::char($t));
         } else {
@@ -512,21 +542,18 @@ use CgOp;
     no Moose;
 }
 
-
 {
     package RxOp::Subrule;
     use Moose;
-    extends 'RxOp';
+    extends 'RxOp::Capturing';
 
     has method   => (isa => 'Maybe[Str]', is => 'ro');
     has regex    => (isa => 'Maybe[Op]', is => 'ro');
     has passcap  => (isa => 'Bool', is => 'ro', default => 0);
     has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'rw');
     has _passcapltm => (is => 'rw');
-    has captures => (isa => 'ArrayRef[Maybe[Str]]', is => 'ro', default => sub { [] });
     has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
-    has symtext  => (isa => 'Maybe[Str]', is => 'rw');
 
     sub opzyg { ($_[0]->regex ? ($_[0]->regex) : ()), @{ $_[0]->arglist // [] } }
 
@@ -542,14 +569,6 @@ use CgOp;
 
     sub check {
         my ($self) = @_;
-        for (@{ $self->captures }) {
-            if (!defined $_) {
-                $_ = $::paren++;
-            } elsif (/^[0-9]+$/) {
-                $::paren = $_ + 1;
-            }
-        }
-        $self->symtext($::symtext) if $self->method && $self->method eq 'sym';
         if ($self->_passcapzyg) {
             local $::paren = 0 unless $self->passcap;
             $self->_passcapzyg->check;
