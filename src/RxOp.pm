@@ -796,8 +796,8 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
-                    CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
-            CgOp::newscalar(CgOp::rxcall("MakeCursor"))))));
+                    CgOp::methodcall(CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
+            CgOp::newscalar(CgOp::rxcall("MakeCursor"))), "Bool"))));
     }
 
     sub lad {
