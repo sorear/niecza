@@ -607,6 +607,7 @@ use CgOp;
             push @code, CgOp::letn(
                 "kv", CgOp::get_first($callf),
                 "k", CgOp::fetch(CgOp::letvar("kv")),
+                $backf,
                 $updatef);
         } else {
             push @code, CgOp::rxcall("SetCursorList", CgOp::promote_to_list($callf));
