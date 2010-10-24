@@ -1410,6 +1410,7 @@ slow:
         private void checkgrow() {
             if (count == data.Length) {
                 Variable[] ndata = new Variable[data.Length * 2];
+                CopyToArray(ndata);
                 data = ndata;
                 head = 0;
             }
