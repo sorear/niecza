@@ -973,7 +973,7 @@ sub Op::Super::begin {
     $ns = $unit->deref($ns);
     die "superclass $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
-    $ns->add_super($unit->get_stash_obj(@{ $opensubs[-1]->find_pkg($self->name) }));
+    $ns->add_super($unit->get_stash_obj(@{ $opensubs[-1]->find_pkg([ @{ $self->path // ['MY'] }, $self->name ]) }));
 }
 
 sub Op::SubDef::begin {

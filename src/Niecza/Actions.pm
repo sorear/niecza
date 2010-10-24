@@ -2187,7 +2187,8 @@ sub process_package_traits { my ($cl, $M, $export, @tr) = @_;
 
     for (@tr) {
         if (exists $_->{_ast}{name}) {
-            push @r, Op::Super->new(node($M), name => $_->{_ast}{name});
+            push @r, Op::Super->new(node($M), name => $_->{_ast}{name},
+                path => $_->{_ast}{path});
         } elsif ($_->{_ast}{export}) {
             if ($export) {
                 push @$export, @{ $_->{_ast}{export} };
@@ -2446,7 +2447,7 @@ sub trait_mod__S_is { my ($cl, $M) = @_;
     my $noparm;
 
     if ($M->is_name($trait)) {
-        $M->{_ast} = { name => $trait };
+        $M->{_ast} = $cl->mangle_longname($M->{longname});
         $noparm = 'Superclasses cannot have parameters';
     } elsif ($trait eq 'export') {
         $M->{_ast} = { export => [ 'DEFAULT', 'ALL' ] };

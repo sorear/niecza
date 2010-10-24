@@ -732,6 +732,7 @@ use CgOp;
     extends 'Op';
 
     has name    => (isa => 'Str', is => 'ro');
+    has path    => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
 
     sub code {
         my ($self, $body) = @_;
