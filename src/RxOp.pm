@@ -708,12 +708,12 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::rxsetclass(CgOp::obj_llhow(CgOp::fetch(
-                    $self->expr->cgop($body))));
+                    CgOp::subcall(CgOp::fetch($self->expr->cgop($body)), CgOp::newscalar(CgOp::rxcall('MakeCursor'))))));
     }
 
     sub lad {
         my ($self) = @_;
-        [ 'Null' ];
+        [ 'Imp' ];
     }
 
     __PACKAGE__->meta->make_immutable;

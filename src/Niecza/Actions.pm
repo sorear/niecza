@@ -858,7 +858,7 @@ sub mod_internal__S_p6adv { my ($cl, $M) = @_;
     $v = $v->[0]{_ast};
 
     if ($k eq 'lang') {
-        $M->{_ast} = RxOp::SetLang->new(expr => $v);
+        $M->{_ast} = RxOp::SetLang->new(expr => $cl->transparent($M, $v, sig => Sig->simple('$¢')));
     } elsif ($k eq 'dba') {
         UNWRAP: {
             $v->isa('Op::Paren') && ($v = $v->inside, redo UNWRAP);
