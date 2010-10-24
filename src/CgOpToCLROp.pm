@@ -5,6 +5,8 @@ use utf8;
 
 package CgOpToCLROp;
 
+no warnings 'recursion';
+
 use CgOp;
 
 {

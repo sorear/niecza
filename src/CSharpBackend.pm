@@ -7,6 +7,8 @@ package CSharpBackend;
 
 use Scalar::Util 'blessed';
 
+my $VERBOSE = $ENV{NIECZA_CSHARP_VERBOSE};
+
 # Input:  A Metamodel::Unit object
 # Output: A CodeGenUnit object
 
@@ -56,6 +58,8 @@ sub run {
 
     local $Metamodel::unit = $unit;
 
+    say STDERR $unit->name if $VERBOSE;
+
     # 0s just set up variables
     # 1s set up subs
     # 2s set up objects
@@ -85,15 +89,18 @@ EOM
 
     unless ($libmode) {
         $unit->visit_units_preorder(sub {
+            say STDERR "UNIT2: ", $_->name if $VERBOSE;
             $_->visit_local_packages(\&pkg2);
             $_->visit_local_subs_preorder(\&sub2);
         });
         $unit->visit_units_preorder(sub {
+            say STDERR "UNIT3: ", $_->name if $VERBOSE;
             $unit->visit_local_stashes(\&stash3) if $_ == $unit;
             $_->visit_local_packages(\&pkg3);
             $_->visit_local_subs_preorder(\&sub3);
         });
         $unit->visit_units_preorder(sub {
+            say STDERR "UNIT4: ", $_->name if $VERBOSE;
             return if $_->bottom_ref;
 
             my $s = $_->setting;
@@ -127,6 +134,7 @@ EOM
 }
 
 sub stash2 {
+    say STDERR "stash2: ", join("::", @{ $_->path }) if $VERBOSE;
     my $p = $lpeers{$_} = gsym('IP6', join("_", @{ $_->path }));
     push @decls, $p;
     push @thaw, CgOp::rawsset($p, CgOp::fetch(CgOp::box(
@@ -139,6 +147,7 @@ sub stash2 {
 }
 
 sub stash3 {
+    say STDERR "stash3: ", join("::", @{ $_->path }) if $VERBOSE;
     my $p = $lpeers{$_};
     for my $k (sort keys %{ $_->zyg }) {
         my $ch = $_->zyg->{$k};
@@ -175,6 +184,7 @@ my %loopbacks = (
 );
 
 sub pkg0 {
+    say STDERR "pkg0: ", $_->name if $VERBOSE;
     return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role')
         || $_->isa('Metamodel::ParametricRole');
     my $p   = $_->{peer}{mo} = gsym($cl_ty, $_->name);
@@ -184,6 +194,7 @@ sub pkg0 {
 }
 
 sub pkg2 {
+    say STDERR "pkg2: ", $_->name if $VERBOSE;
     return unless $_->{peer};
     @_ = ($_->{peer}{mo}, $_->{peer}{what_ip6}, $_->{peer}{what_var});
     &pkg2_class if $_->isa('Metamodel::Class');
@@ -264,6 +275,7 @@ sub pkg2_class {
 }
 
 sub pkg3 {
+    say STDERR "pkg3: ", $_->name if $VERBOSE;
     return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role');
     my $p   = $_->{peer}{mo};
     for my $m (@{ $_->methods }) {
@@ -469,6 +481,7 @@ sub dynname { $_[0] =~ /^.?[*?]/ }
 # particular, bind to them
 # note: preorder
 sub sub0 {
+    say STDERR "sub0: ", $_->name if $VERBOSE;
     my $node = ($_->{peer} = {});
     push @decls, ($node->{si} = gsym($si_ty, $_->name));
     push @decls, ($node->{ps} = gsym('IP6', $_->name . 'PS'))
@@ -504,6 +517,7 @@ sub sub0 {
 }
 
 sub sub1 {
+    say STDERR "sub1: ", $_->name if $VERBOSE;
     my $node = $_->{peer};
     my $si = $node->{si};
 
@@ -517,6 +531,7 @@ sub sub1 {
 }
 
 sub sub2 {
+    say STDERR "sub2: ", $_->name if $VERBOSE;
     my $node = $_->{peer};
     my $si = $node->{si};
 
@@ -578,6 +593,7 @@ sub protolset {
 
 
 sub sub3 {
+    say STDERR "sub3: ", $_->name if $VERBOSE;
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
         my $frag;
