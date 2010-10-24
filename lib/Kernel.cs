@@ -1408,7 +1408,7 @@ slow:
         }
 
         private void checkgrow() {
-            if (count == data.Length - 1) {
+            if (count == data.Length) {
                 Variable[] ndata = new Variable[data.Length * 2];
                 data = ndata;
                 head = 0;
