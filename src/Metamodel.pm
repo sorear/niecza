@@ -718,6 +718,7 @@ our %units;
         for (keys %{ $u2->tdeps }) {
             $units{$_} //= CompilerDriver::metadata_for($_);
             $self->tdeps->{$_} //= $u2->tdeps->{$_};
+            $u2->tdeps->{$_} = $self->tdeps->{$_}; # save a bit of memory
         }
         our $rec; local $rec = sub {
             my (@path) = @_;

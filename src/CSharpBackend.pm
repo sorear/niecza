@@ -422,9 +422,13 @@ sub resolve_lex {
 sub codegen_sub {
     my @enter = enter_code($_);
     my $ops;
+    # XXX sub1 will only be done once per sub, and code is never introspected
+    # (it's in a sucky format anyway), so this is safe, and it makes dumps
+    # much smaller.
+    my $code = delete $_->{code};
     # TODO: Bind a return value here to catch non-ro sub use
     if ($_->gather_hack) {
-        $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop($_)),
+        $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
             CgOp::rawscall('Kernel.Take', CgOp::scopedlex('EMPTY')));
     } elsif ($_->parametric_role_hack) {
         my $obj = $unit->deref($_->parametric_role_hack);
@@ -449,7 +453,7 @@ sub codegen_sub {
                     CgOp::fetch(CgOp::scopedlex($b)));
             }
         }
-        $ops = CgOp::prog(@enter, CgOp::sink($_->code->cgop($_)),
+        $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
             CgOp::letn("!mo", CgOp::rawnew('clr:DynMetaObject',
                     CgOp::clr_string($obj->name)),
                 "!to", CgOp::rawnew('clr:DynObject', CgOp::letvar('!mo')),
@@ -462,10 +466,10 @@ sub codegen_sub {
     } elsif ($_->returnable) {
         $ops = CgOp::prog(@enter,
             CgOp::return(CgOp::span("rstart", "rend", 0,
-                    $_->code->cgop($_))),
+                    $code->cgop($_))),
             CgOp::ehspan(4, undef, 0, "rstart", "rend", "rend"));
     } else {
-        $ops = CgOp::prog(@enter, CgOp::return($_->code->cgop($_)));
+        $ops = CgOp::prog(@enter, CgOp::return($code->cgop($_)));
     }
 
     local %haslet;
