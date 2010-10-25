@@ -500,7 +500,7 @@ namespace Niecza {
                         k.subclasses.Remove(wr_this);
         }
 
-        private void Invalidate() {
+        public void Invalidate() {
             if (mro == null)
                 return;
             List<DynMetaObject> notify = new List<DynMetaObject>();
@@ -547,7 +547,6 @@ namespace Niecza {
 
         public void AddMethod(string name, IP6 code) {
             local[name] = code;
-            Invalidate();
         }
 
         public void AddPrivateMethod(string name, IP6 code) {
@@ -1069,6 +1068,7 @@ slow:
                 n.AddPrivateMethod(kv.Key, kv.Value);
             foreach (KeyValuePair<string, IP6> kv in role.local)
                 n.AddMethod(kv.Key, kv.Value);
+            n.Invalidate();
             if (role.multiregex != null)
                 foreach (KeyValuePair<string, List<DynObject>> kv
                         in role.multiregex)
@@ -1170,6 +1170,7 @@ slow:
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
             SubMO.FillProtoClass(new string[] { "outer", "info" });
             SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
+            SubMO.Invalidate();
 
             ScalarMO = new DynMetaObject("Scalar");
             ScalarMO.FillProtoClass(new string[] { "value" });

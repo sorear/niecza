@@ -27,6 +27,7 @@ my %typedata = (
           HasMRO       => [m => 'Boolean'],
           AddMultiRegex=> [m => 'Void'],
           AddMethod    => [m => 'Void'],
+          Invalidate   => [m => 'Void'],
           AddPrivateMethod => [m => 'Void'],
           GetPrivateMethod => [m => 'IP6'],
           typeObject   => [f => 'IP6'],

@@ -284,6 +284,7 @@ sub pkg3 {
             CgOp::clr_string($m->name),
             CgOp::rawsget($unit->deref($m->body)->{peer}{ps}));
     }
+    push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Invalidate');
     for my $k (sort keys %{ $_->multi_regex_lists }) {
         for my $b (@{ $_->multi_regex_lists->{$k} }) {
             push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddMultiRegex',
@@ -446,6 +447,7 @@ sub codegen_sub {
                 CgOp::clr_string($m->[0]),
                 CgOp::fetch(CgOp::scopedlex($m->[1])));
         }
+        push @build, CgOp::rawcall(CgOp::letvar('!mo'), 'Invalidate');
         for my $k (sort keys %{ $obj->multi_regex_lists }) {
             for my $b (@{ $obj->multi_regex_lists->{$k} }) {
                 push @build, CgOp::rawcall(CgOp::letvar('!mo'),
