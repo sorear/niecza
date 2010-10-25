@@ -234,7 +234,7 @@ sub compile {
         [ 'gmcs', sub {
             my @args;
             if ($args{selfcontained}) {
-                @args = ("gmcs",
+                @args = ("gmcs", "/debug",
                     "/out:" . $args{selfcontained},
                     (map { File::Spec->catfile($libdir, $_) }
                         "Kernel.cs", "Cursor.cs"),
@@ -242,7 +242,7 @@ sub compile {
                         (sort keys %{ $ast->tdeps })),
                     $csfile);
             } else {
-                @args = ("gmcs",
+                @args = ("gmcs", "/debug",
                     (defined($name) ? ("/target:library") : ()),
                     "/lib:$builddir",
                     "/r:Kernel.dll",
