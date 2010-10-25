@@ -325,7 +325,7 @@ regex stdstopper {
     | <?before <stopper> >
     | $                                 # unlikely, check last (normal LTM behavior)
     ]
-    { @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$¢.pos] || 1; }
+    { @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$¢.pos]<endstmt> || 1; }
 }
 
 token longname {
@@ -2745,7 +2745,8 @@ grammar P6 is STD {
             [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
             <trait>*
             [where <EXPR(item %item_assignment)> ]?    # (EXPR can parse multiple where clauses)
-        ] || <.panic: "Malformed subset">
+        || <.panic: "Malformed subset">
+        ]
     }
 
     token type_declarator:enum {
@@ -3112,30 +3113,31 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     }
 
     token infixish ($in_meta = $*IN_META) {
-        :my $infix;
+        :my ($infix, $O, $sym);
         :my $*IN_META = $in_meta;
         <!stdstopper>
         <!infixstopper>
         :dba('infix or meta-infix')
         [
-        | <colonpair> $<fake> = {1} $<sym> = {':'}
-            $<O> = { {:prec(%item_assignment<prec>), :assoc<unary>,
+        | <colonpair> $<fake> = {1} { $sym = ':' }
+            { $O = {:prec(%item_assignment<prec>), :assoc<unary>,
                 :dba<adverb> } }
                 # actual test is non-inclusive!
         |   [
-            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
-            | <infix=infix_circumfix_meta_operator> $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
-            | <infix=infix_prefix_meta_operator>    $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
-            | <infix>                               $<O> = {$<infix><O>} $<sym> = {$<infix><sym>}
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $O = $<infix><O>; $sym = $<infix><sym> }
+            | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
             | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
             | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
             ]
             [ <?before '='> <assign_meta_operator($<infix>)>
-                   $<O> = {$<assign_meta_operator>[0]<O>}
-                   $<sym> = {$<assign_meta_operator>[0]<sym>}
+                   {$O = $<assign_meta_operator>[0]<O>}
+                   {$sym = $<assign_meta_operator>[0]<sym>}
             ]?
 
         ]
+        $<O> = { $O } $<sym> = { $sym }
     }
 
     # NOTE: Do not add dotty ops beginning with anything other than dot!

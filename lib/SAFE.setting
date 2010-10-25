@@ -112,6 +112,7 @@ my class Str is Cool {
     has $!value;
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
+    method Bool () { self ne "" }
     method chars() { Q:CgOp {
         (box Num (cast num (str_length (unbox str (@ (l self))))))
     } }
@@ -390,6 +391,30 @@ my class Parcel is Cool {
         }
     }
 
+    method LISTSTORE(*@in) {
+        my @values = @in;
+
+        # TODO: proper (sized) handling of sub-parcels
+        Q:CgOp {
+            (rnull
+              (letn i    (i 0)
+                    tgts (unbox fvarlist (@ {self}))
+                    ntgt (fvarlist_length (l tgts))
+                    tgt  (null var)
+                (whileloop 0 0 (< (l i) (l ntgt))
+                  (prog
+                    (l tgt (fvarlist_item (l i) (l tgts)))
+                    (l i (+ (l i) (i 1)))
+                    (ternary (var_islist (l tgt))
+                      (prog
+                        (sink (methodcall (l tgt) LISTSTORE {@values.clone}))
+                        (sink {@values = ()}))
+                      (assign (l tgt) {@values ?? @values.shift !! Any}))))))
+        };
+
+        @in;
+    }
+
     method iterator() {
         my class ParcelIterator is Iterator {
             has $.reify;
@@ -657,6 +682,8 @@ my class Hash {
         gather { for self.keys -> $k { take ($k => self.at-key($k)) } }
     }
 
+    method Bool () { self.list.Bool }
+
     method kv() {
         gather { for self.keys -> $k { take $k; take self.at-key($k) } }
     }
@@ -754,7 +781,7 @@ sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
 
 sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {
     $exists ?? ($container.defined ?? $container.exists-key($key) !! False) !!
-    $delete ?? $container.delete-key($key) !!
+    $delete ?? ($container.defined ?? $container.delete-key($key) !! Any) !!
     $container.defined
         ?? $container.at-key($key)
         !! Any!Any::butWHENCE(sub (\$var) {
@@ -821,6 +848,19 @@ sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 # }}}
 # Regular expression support {{{
 my class Cursor {
+    method suppose($rx) {
+        my $*IN_SUPPOSE = True;
+        my $*FATALS = 0;
+        my @*WORRIES;
+        my %*WORRIES;
+        my $*HIGHWATER = -1;
+        my $*HIGHEXPECT = {};
+        try {
+            my @ret := $rx(self);
+            if (@ret) { return @( &infix:<,>(self) ) }
+        };
+        return ();
+    }
     method O (*%hash) {
         Q:CgOp { (cursor_O (cast cursor (@ {self}))
                            (unbox varhash (@ {%hash}))) }
@@ -872,6 +912,7 @@ my class Match {
         (cast cursor (@ {self}))))) } }
     method to() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
+    method pos() { self.to }
     method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method chars() { $.defined ?? $.to - $.from !! 0 }
