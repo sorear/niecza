@@ -222,8 +222,8 @@ sub warn($str) { Q:CgOp {
     )
 } }
 
-sub say($obj) { ($obj ~~ Cool) ?? $obj.say !! $obj.Str.say }
-sub note($text) { Q:CgOp { (rnull (note (unbox str (@ {$text})))) } }
+sub say(*@obj) { @obj.join('').say }
+sub note(*@text) { Q:CgOp { (rnull (note (unbox str (@ {@text.join('').Str})))) } }
 
 sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (unbox num (@ {$status})))])

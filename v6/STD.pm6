@@ -575,7 +575,7 @@ method peek_delimiters {
 
     my $rightbrack = %open2close{$char};
     if not defined $rightbrack {
-        return $char, $char;
+        return ($char, $char);
     }
     while substr(self.orig,$pos,1) eq $char {
         $pos++;
@@ -583,7 +583,7 @@ method peek_delimiters {
     my $len = $pos - $startpos;
     my $start = $char x $len;
     my $stop = $rightbrack x $len;
-    return $start, $stop;
+    return ($start, $stop);
 }
 
 role startstop[$start,$stop] {
@@ -651,7 +651,7 @@ token nibbler {
         [
         || <starter> <nibbler> <stopper>
                         {
-                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to(:$to), :method<Str>, :captures()) if $from != $to;
+                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
 
                             my $n = $<nibbler>[(+$<nibbler>)-1]<nibbles>;
                             my @n = @$n;
@@ -664,7 +664,7 @@ token nibbler {
                             $to = $from = $¢.pos;
                         }
         || <escape>     {
-                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to(:$to), :method<Str>, :captures()) if $from != $to;
+                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
                             push @nibbles, $<escape>[(+$<escape>)-1];
                             $text = '';
                             $to = $from = $¢.pos;
@@ -681,7 +681,7 @@ token nibbler {
         ]
     ]*
     {
-        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to(:$to), :method<Str>, :captures()) if $from != $to or !@nibbles;
+        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to or !@nibbles;
         $*LAST_NIBBLE = $¢;
         $*LAST_NIBBLE_MULTILINE = $¢ if $multiline;
     }
@@ -4131,7 +4131,7 @@ grammar Q is STD {
         token escape:sym<$> {
             :my $*QSIGIL ::= '$';
             <?before '$'>
-            [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> ] || <.panic: "Non-variable \$ must be backslashed">
+            [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> || <.panic: "Non-variable \$ must be backslashed"> ]
         }
     }
 

@@ -18,13 +18,14 @@ augment class STD::P6 {
         :my $*QSIGIL ::= 0;
         <!before <[\)\]\}]> >
         <!stopper>
+        <!before $>
 
         # this could either be a statement that follows a declaration
         # or a statement that is within the block of a code declaration
         :lang( %*LANG<MAIN> )
         <!!{ $*LASTSTATE = $¢.pos; True  }>
 
-        <!before $ >
+        # <!before $ >
 
         [
         | <label> <statement>
