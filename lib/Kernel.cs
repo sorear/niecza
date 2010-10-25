@@ -992,6 +992,16 @@ slow:
                 newstash["PARENT::"] = new BValue(NewROScalar(parent));
                 return (stash[name] = new BValue(BoxAny(newstash,
                                 StashP)));
+            } else if (name.StartsWith("@")) {
+                Frame nr = new Frame(null, null, ExitRunloopSI);
+                nr = ArrayP.InvokeMethod(nr, "new", new Variable[] { Kernel.NewROScalar(ArrayP) }, null);
+                RunCore(nr);
+                return (stash[name] = new BValue((Variable)nr.caller.resultSlot));
+            } else if (name.StartsWith("%")) {
+                Frame nr = new Frame(null, null, ExitRunloopSI);
+                nr = HashP.InvokeMethod(nr, "new", new Variable[] { Kernel.NewROScalar(HashP) }, null);
+                RunCore(nr);
+                return (stash[name] = new BValue((Variable)nr.caller.resultSlot));
             } else {
                 // TODO: @foo, %foo
                 return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
