@@ -113,11 +113,14 @@ public sealed class RxFrame {
             if (return_one) {
                 return Kernel.Take(th, Kernel.NewROScalar(EMPTYP));
             } else {
-                DynObject lst = new DynObject(ListMO);
-                lst.slots[0 /*items*/] = new VarDeque();
-                lst.slots[1 /*rest*/ ] = new VarDeque();
-                lst.slots[2 /*flat*/ ] = false;
-                th.caller.resultSlot = Kernel.NewRWListVar(lst);
+                if (EmptyList == null) {
+                    DynObject lst = new DynObject(ListMO);
+                    lst.slots[0 /*items*/] = new VarDeque();
+                    lst.slots[1 /*rest*/ ] = new VarDeque();
+                    lst.slots[2 /*flat*/ ] = false;
+                    EmptyList = Kernel.NewRWListVar(lst);
+                }
+                th.caller.resultSlot = EmptyList;
             }
 
             return th.caller;
@@ -311,15 +314,10 @@ public sealed class RxFrame {
     public static DynMetaObject ListMO;
     public static DynMetaObject GatherIteratorMO;
     public static IP6 EMPTYP;
+    public static Variable EmptyList;
 
     public Frame FinalEnd(Frame th) {
-        VarDeque ks = new VarDeque();
-        ks.Push(Kernel.NewROScalar(MakeMatch()));
-        DynObject lst = new DynObject(ListMO);
-        lst.slots[0 /*items*/] = ks;
-        lst.slots[1 /*rest*/ ] = new VarDeque();
-        lst.slots[2 /*flat*/ ] = false;
-        th.caller.resultSlot = Kernel.NewRWListVar(lst);
+        th.caller.resultSlot = Kernel.NewROScalar(MakeMatch());
         return th.caller;
     }
     public Frame End(Frame th) {
