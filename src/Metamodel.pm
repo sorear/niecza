@@ -519,6 +519,16 @@ our %units;
         return ($self->outer ? $self->outer->find_lex($name) : undef);
     }
 
+    sub delete_lex { my ($self, $name) = @_;
+        my $l = $self->lexicals->{$name};
+        if ($l) {
+            if ($l->isa('Metamodel::Lexical::Alias')) { $self->delete_lex($l->to) }
+            else { delete $self->lexicals->{$name} }
+        } else {
+            $self->outer && $self->outer->delete_lex($name);
+        }
+    }
+
     sub add_my_name { my ($self, $slot, @ops) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
     }
@@ -806,20 +816,13 @@ sub Body::begin {
         $metabody->signature($self->signature);
     }
 
+    if ($self->type && $self->type eq 'regex') {
+        $metabody->add_my_name('$*/');
+    }
+
     pop @opensubs if $self->transparent;
 
     my $do = $self->do;
-
-    if ($self->signature && @{ $self->signature->params } >= 1 &&
-            $self->signature->params->[0]->slot eq '$¢') {
-        $metabody->add_my_name('$*/');
-        $do = Op::StatementList->new(children => [
-                Op::CallSub->new(
-                    invocant => Op::Lexical->new(name => '&infix:<=>'),
-                    args => [ Op::Lexical->new(name => '$*/'),
-                              Op::Lexical->new(name => '$¢') ]),
-                $do]);
-    }
 
     $do->begin;
     $metabody->code($do);

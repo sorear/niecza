@@ -306,6 +306,20 @@ sub transparent { my ($cl, $M, $op, %args) = @_;
             do => $op))
 }
 
+sub rxembed { my ($cl, $M, $op, $trans) = @_;
+    Op::CallSub->new(node($M),
+        positionals => [ Op::MakeCursor->new(node($M)) ],
+        invocant => Op::SubDef->new(node($M),
+            var  => $cl->gensym,
+            once => 1,
+            body => Body->new(
+                transparent => $trans,
+                class => 'rxembedded',
+                type  => 'Sub',
+                signature => Sig->simple('$¢'),
+                do => $op)));
+}
+
 sub op_for_regex { my ($cl, $M, $rxop) = @_;
     my @lift = $rxop->oplift;
     {
@@ -334,6 +348,7 @@ sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
             pre => \@lift, passcut => $args{passcut}, passcap => $args{passcap},
             rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
         sig => Sig->simple->for_method);
+    $subop = Op::CallSub->new(node($M), invocant => $subop, positionals => [ Op::MakeCursor->new(node($M)) ]);
     return RxOp::Subrule->new(regex => $subop, passcap => $args{passcap},
         _passcapzyg => $nrxop, _passcapltm => $lad);
 }
@@ -566,6 +581,8 @@ sub metachar__S_Cur_Ly { my ($cl, $M) = @_;
     my $inv = $M->{embeddedblock}{_ast}->invocant;
     $inv->body->type('rxembedded');
     $inv->body->signature(Sig->simple('$¢'));
+    $inv->once(1);
+    $inv = Op::CallSub->new(node($M), invocant => $inv, positionals => [ Op::MakeCursor->new(node($M)) ]);
     $M->{_ast} = RxOp::VoidBlock->new(block => $inv);
 }
 
@@ -669,9 +686,8 @@ sub metachar__S_Single_Single { my ($cl, $M) = @_;
 
 sub metachar__S_Double_Double { my ($cl, $M) = @_;
     if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
-        $M->{_ast} = RxOp::VarString->new(thunk =>
-            $cl->transparent($M, $M->{quote}{_ast}, once => 1, sig =>
-                Sig->simple('$¢'), type => 'rxembedded'));
+        $M->{_ast} = RxOp::VarString->new(ops =>
+            $cl->rxembed($M, $M->{quote}{_ast}, 1));
         return;
     }
     $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
@@ -698,8 +714,8 @@ sub metachar__S_var { my ($cl, $M) = @_;
         $M->{_ast} = $cl->rxcapturize($M, $cid, $a);
         return;
     }
-    $M->{_ast} = RxOp::VarString->new(thunk =>
-        $cl->transparent($M, $cl->do_variable_reference($M, $M->{variable}{_ast}), once => 1, sig => Sig->simple('$¢'), type => 'rxembedded'));
+    $M->{_ast} = RxOp::VarString->new(ops => $cl->rxembed($M,
+            $cl->do_variable_reference($M, $M->{variable}{_ast}, 1)));
 }
 
 sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;
@@ -782,7 +798,7 @@ sub assertion__S_name { my ($cl, $M) = @_;
             name => $name,
             args => $args);
 
-        my $regex = $cl->transparent($M, $callop, sig => Sig->simple('$¢'));
+        my $regex = $cl->rxembed($M, $callop, 1);
 
         $M->{_ast} = RxOp::Subrule->new(regex => $regex);
     }
@@ -817,6 +833,8 @@ sub assertion__S_Cur_Ly { my ($cl, $M) = @_;
     my $inv = $M->{embeddedblock}{_ast}->invocant;
     $inv->body->type('rxembedded');
     $inv->body->signature(Sig->simple('$¢'));
+    $inv->once(1);
+    $inv = Op::CallSub->new(node($M), invocant => $inv, positionals => [ Op::MakeCursor->new(node($M)) ]);
     $M->{_ast} = RxOp::CheckBlock->new(block => $inv);
 }
 
@@ -858,7 +876,7 @@ sub mod_internal__S_p6adv { my ($cl, $M) = @_;
     $v = $v->[0]{_ast};
 
     if ($k eq 'lang') {
-        $M->{_ast} = RxOp::SetLang->new(expr => $cl->transparent($M, $v, sig => Sig->simple('$¢')));
+        $M->{_ast} = RxOp::SetLang->new(expr => $cl->rxembed($M, $v, 1));
     } elsif ($k eq 'dba') {
         UNWRAP: {
             $v->isa('Op::Paren') && ($v = $v->inside, redo UNWRAP);

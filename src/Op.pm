@@ -829,7 +829,7 @@ use CgOp;
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
     # Is candidate for beta-optimization.  Not compatible with method_too,
     # proto_too, exports, ltm
-    has once   => (isa => 'Bool', is => 'ro', default => 0);
+    has once   => (isa => 'Bool', is => 'rw', default => 0);
 
     sub code {
         my ($self, $body) = @_;
@@ -999,6 +999,24 @@ use CgOp;
         CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&_gather')),
             CgOp::newscalar(CgOp::startgather(
                     CgOp::fetch(CgOp::scopedlex($self->var)))));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+# the existance of these two complicates cross-sub inlining a bit
+{
+    package Op::MakeCursor;
+    use Moose;
+    extends 'Op';
+
+    sub code {
+        my ($self, $body) = @_;
+
+        CgOp::prog(
+            CgOp::scopedlex('$*/', CgOp::newscalar(CgOp::rxcall('MakeCursor'))),
+            CgOp::scopedlex('$*/'));
     }
 
     __PACKAGE__->meta->make_immutable;

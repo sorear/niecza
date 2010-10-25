@@ -133,12 +133,12 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
-    has thunk => (isa => 'Op', is => 'ro', required => 1);
-    sub opzyg { $_[0]->thunk }
+    has ops => (isa => 'Op', is => 'ro', required => 1);
+    sub opzyg { $_[0]->ops }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(CgOp::methodcall(CgOp::subcall(CgOp::fetch($self->thunk->cgop($body)), CgOp::newscalar(CgOp::rxcall('MakeCursor'))), "Str"))));
+        CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(CgOp::methodcall($self->ops->cgop($body), "Str"))));
     }
 
     sub lad { ['Imp'] }
@@ -553,10 +553,9 @@ use CgOp;
     has passcap  => (isa => 'Bool', is => 'ro', default => 0);
     has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'rw');
     has _passcapltm => (is => 'rw');
-    has arglist  => (isa => 'Maybe[ArrayRef[Op]]', is => 'ro');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
 
-    sub opzyg { ($_[0]->regex ? ($_[0]->regex) : ()), @{ $_[0]->arglist // [] } }
+    sub opzyg { ($_[0]->regex ? ($_[0]->regex) : ()) }
 
     sub used_caps {
         my ($self) = @_;
@@ -582,13 +581,10 @@ use CgOp;
         my $bt = $self->label;
         my $sk = $self->label;
 
-        my @args = Op::CallLike::parsearglist($body, @{ $self->arglist // [] });
-
         my $callf = $self->regex ?
-            CgOp::subcall(CgOp::fetch($self->regex->cgop($body)),
-                CgOp::newscalar(CgOp::rxcall("MakeCursor")), @args) :
+            $self->regex->cgop($body) :
             CgOp::methodcall(CgOp::newscalar(
-                CgOp::rxcall("MakeCursor")), $self->method, @args);
+                CgOp::rxcall("MakeCursor")), $self->method);
         my @pushcapf = (@{ $self->captures } == 0) ? () : ($self->passcap ?
             (CgOp::rxsetcapsfrom(CgOp::cast("cursor",
                     CgOp::letvar("k"))),
@@ -710,7 +706,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::rxsetclass(CgOp::obj_llhow(CgOp::fetch(
-                    CgOp::subcall(CgOp::fetch($self->expr->cgop($body)), CgOp::newscalar(CgOp::rxcall('MakeCursor'))))));
+                    $self->expr->cgop($body))));
     }
 
     sub lad {
@@ -797,8 +793,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
-                    CgOp::methodcall(CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
-            CgOp::newscalar(CgOp::rxcall("MakeCursor"))), "Bool"))));
+                    CgOp::methodcall($self->block->cgop($body), "Bool"))));
     }
 
     sub lad {
@@ -826,9 +821,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxpushcapture(CgOp::subcall(
-                CgOp::fetch($self->block->cgop($body)),
-            CgOp::newscalar(CgOp::rxcall("MakeCursor"))), $self->capid);
+        CgOp::rxpushcapture($self->block->cgop($body), $self->capid);
     }
 
     sub lad {
@@ -850,8 +843,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::sink(CgOp::subcall(CgOp::fetch($self->block->cgop($body)),
-            CgOp::newscalar(CgOp::rxcall("MakeCursor"))));
+        CgOp::sink($self->block->cgop($body));
     }
 
     sub lad {

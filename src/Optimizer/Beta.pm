@@ -28,7 +28,7 @@ sub run_optree {
     return unless $op->isa('Op::CallSub') && no_named_params($op);
     my $inv = $op->invocant;
     return unless $inv->isa('Op::SubDef') && $inv->once;
-    my $cbody = $body->lexicals->{$inv->var} or return;
+    my $cbody = $body->find_lex($inv->var) or return;
     $cbody = $cbody->body;
     return unless is_removable_body($cbody);
 
@@ -93,7 +93,7 @@ sub beta_optimize {
     # the function
     my @args = map { [ $_, Niecza::Actions->gensym ] } @{ $op->positionals };
 
-    delete $body->lexicals->{$inv->var};
+    $body->delete_lex($inv->var);
     $unit->xref->[$cbody->xref->[1]] = undef;
 
     my @pos = (map { Op::Lexical->new(name => $_->[1]) } @args);
