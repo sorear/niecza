@@ -519,7 +519,7 @@ public class Cursor : IP6 {
             ks.Push(Kernel.NewROScalar(At(p)));
         }
 
-        return Kernel.NewROScalar(lst);
+        return Kernel.NewRWListVar(lst);
     }
 }
 
@@ -646,6 +646,10 @@ public sealed class NFA {
 
         if (Lexer.LtmTrace && method != null)
             Console.WriteLine("+ Found method");
+
+        if (method == null) {
+            return method_cache[name] = new LADImp();
+        }
 
         sub = ((SubInfo)(((DynObject)method).GetSlot("info"))).ltm;
 
