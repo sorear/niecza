@@ -2,6 +2,187 @@
 use MONKEY_TYPING;
 
 use STD;
+use STDStash;
+
+# HACK
+augment class Any {
+    method delete-key($) { Any }
+}
+
+augment class STDStash {
+    method new(*@pairs) {
+        my $new = self.CREATE;
+        my %bits = @pairs;
+        $new!guts = %bits;
+        $new;
+    }
+}
+
+augment class Hash {
+    method Bool () { self.list.Bool }
+}
+
+augment class Match {
+    method pos () { self.to }
+}
+
+augment class Cursor {
+    method suppose($rx) {
+        my $*IN_SUPPOSE = True;
+        my $*FATALS = 0;
+        my @*WORRIES;
+        my %*WORRIES;
+        my $*HIGHWATER = -1;
+        my $*HIGHEXPECT = {};
+        try {
+            my @ret := $rx(self);
+            if (@ret) { return @( self, ) }
+        };
+        return ();
+    }
+}
+
+augment class Str {
+    method Bool () { self ne "" }
+}
+
+augment class Parcel {
+    method LISTSTORE(*@in) {
+        my @values = @in;
+
+        # TODO: proper (sized) handling of sub-parcels
+        Q:CgOp {
+            (rnull
+              (letn i    (i 0)
+                    tgts (unbox fvarlist (@ {self}))
+                    ntgt (fvarlist_length (l tgts))
+                    tgt  (null var)
+                (whileloop 0 0 (< (l i) (l ntgt))
+                  (prog
+                    (l tgt (fvarlist_item (l i) (l tgts)))
+                    (l i (+ (l i) (i 1)))
+                    (ternary (var_islist (l tgt))
+                      (prog
+                        (sink (methodcall (l tgt) LISTSTORE {@values.clone}))
+                        (sink {@values = Nil}))
+                      (assign (l tgt) {@values ?? @values.shift !! Any}))))))
+        };
+
+        @in;
+    }
+}
+
+augment class STD {
+    method panic($str) { die "$str at {self.pos}" }
+
+regex stdstopper {
+    :temp $*STUB = return self if @*MEMOS[self.pos]<endstmt> :exists;
+    :dba('standard stopper')
+    [
+    | <?terminator>
+    | <?unitstopper>
+    | <?before <stopper> >
+    | $                                 # unlikely, check last (normal LTM behavior)
+    ]
+    { @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$¢.pos]<endstmt> || 1; }
+}
+}
+
+augment class STD::P6 {
+my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+    token type_declarator:subset {
+        :my $*IN_DECL = 'subset';
+        :my $*DECLARAND;
+        <sym><.spacey> :s
+        [
+            [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
+            <trait>*
+            [where <EXPR(item %item_assignment)> ]?    # (EXPR can parse multiple where clauses)
+        || <.panic: "Malformed subset">
+        ]
+    }
+    token infixish ($in_meta = $*IN_META) {
+        :my ($infix, $O, $sym);
+        :my $*IN_META = $in_meta;
+        <!stdstopper>
+        <!infixstopper>
+        :dba('infix or meta-infix')
+        [
+        | <colonpair> $<fake> = {1} { $sym = ':' }
+            { $O = {:prec(%item_assignment<prec>), :assoc<unary>,
+                :dba<adverb> } }
+                # actual test is non-inclusive!
+        |   [
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $O = $<infix><O>; $sym = $<infix><sym> }
+            | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
+            | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
+            ]
+            [ <?before '='> <assign_meta_operator($<infix>)>
+                   {$O = $<assign_meta_operator>[0]<O>}
+                   {$sym = $<assign_meta_operator>[0]<sym>}
+            ]?
+
+        ]
+        $<O> = { $O } $<sym> = { $sym }
+    }
+    token statement {
+        :my $*endargs = -1;
+        :my $*QSIGIL ::= 0;
+        <!before <[\)\]\}]> >
+        <!stopper>
+
+        # this could either be a statement that follows a declaration
+        # or a statement that is within the block of a code declaration
+        :lang( %*LANG<MAIN> )
+        <!!{ $*LASTSTATE = $¢.pos; True  }>
+
+        <!before $ >
+
+        [
+        | <label> <statement>
+        | <statement_control>
+        | <EXPR>
+            :dba('statement end')
+            [
+            || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
+            ||
+                :dba('statement modifier')
+                <.ws>
+                [
+                | <statement_mod_loop>
+                    {{
+                        my $sp = $<EXPR><statement_prefix>;
+                        if $sp and $sp<sym> eq 'do' {
+                           my $s = $<statement_mod_loop>[0]<sym>;
+                           $¢.obs("do...$s" ,"repeat...$s");
+                        }
+                    }}
+                | <statement_mod_cond>
+                    :dba('statement modifier loop')
+                    [
+                    || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
+                    || <.ws> <statement_mod_loop>?
+                    ]
+                ]?
+            ]
+        | <?before ';'>
+        | <?before <stopper> >
+        | {} <.panic: "Bogus statement">
+        ]
+
+        # Is there more on same line after a block?
+        [ <?{ (@*MEMOS[@*MEMOS[$¢.pos]<ws>//$¢.pos]<endargs>//0) == 1 }>
+            \h*
+            <!before ';' | ')' | ']' | '}' >
+            <!infixstopper>
+            { $*HIGHWATER = $¢.pos = @*MEMOS[$¢.pos]<ws>//$¢.pos; }
+            <.panic: "Strange text after block (missing comma, semicolon, comment marker?)">
+        ]?
+    }
+}
 
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
 
@@ -65,7 +246,40 @@ augment class Cursor {
     } }
 
     method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
+
+    method load_lex($) {
+        # NYI
+        my $id = "MY:file<NULL.pad>:line(1):pos(0)";
+        my $core = STDStash.new('!id' => [$id], '!file' => 'NULL.pad',
+            '!line' => 1);
+        STDStash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
+            'SETTING' => $core, $id => $core);
+    }
+
+    method mark_sinks(@sl) {
+        #NYI
+        self
+    }
 }
 
-STD.parse("2 + 2");
+{
+    my $*SETTINGNAME = 'NULL';
+    my @*MEMOS;
+    my $*FILE = { name => '(eval)' };
+    my @*ACTIVE;
+    my $*HIGHWATER = 0;
+    my $*HIGHEXPECT = {};
+    my $*HIGHMESS = "";
+    my $*LASTSTATE = 0;
+    my $*IN_PANIC = 0;
+    my $*IN_SUPPOSE = 0;
+    my $*FATALS = 0;
+
+    my $*LAST_NIBBLE = Match.synthetic(:cursor(Cursor.new("")), :from(0), :to(0), :method(""), :captures());
+    my $*LAST_NIBBLE_MULTILINE = $*LAST_NIBBLE;
+    my $*GOAL = "(eof)";
+    my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
+    my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
+    STD.parse($*IN.slurp);
+}
 say "OK";

@@ -6,7 +6,7 @@ class NAME {
     has $.file;
     has $.line;
 
-    method new(:$name, :$xlex, :$olex, :$of, :$file, :$line) {
+    method new(:$name, :$xlex, :$olex, :$of, :$file, :$line, *%extras) {
         my $new = self.CREATE;
         $new!name = $name;
         $new!xlex = $xlex;

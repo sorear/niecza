@@ -18,6 +18,32 @@ augment class Cursor {
     }
 }
 
+augment class Parcel {
+    method LISTSTORE(*@in) {
+        my @values = @in;
+
+        # TODO: proper (sized) handling of sub-parcels
+        Q:CgOp {
+            (rnull
+              (letn i    (i 0)
+                    tgts (unbox fvarlist (@ {self}))
+                    ntgt (fvarlist_length (l tgts))
+                    tgt  (null var)
+                (whileloop 0 0 (< (l i) (l ntgt))
+                  (prog
+                    (l tgt (fvarlist_item (l i) (l tgts)))
+                    (l i (+ (l i) (i 1)))
+                    (ternary (var_islist (l tgt))
+                      (prog
+                        (sink (methodcall (l tgt) LISTSTORE {@values.clone}))
+                        (sink {@values = Nil}))
+                      (assign (l tgt) {@values ?? @values.shift !! Any}))))))
+        };
+
+        @in;
+    }
+}
+
 {
     my $m = "ab" ~~ / (.) <alpha> /;
     is (@$m)[0], "a", "Match.list returns positional captures";
@@ -72,6 +98,20 @@ augment class Cursor {
     rxtest / <after ':+'> X / , '<after ":+">X', (':+X', 'a:+X'), (':X','+:X');
     rxtest / <after \s> X / , '<after \s>X', (' X',), ('xX','X');
     rxtest / <after ab> X / , '<after ab>X', ('abX',), ('baX',);
+}
+
+{
+    my ($x) = (1, 2);
+    is $x, 1, "list assign takes first";
+    ($x, my $y) = (1, 2);
+    is "$x|$y", "1|2", "list assign takes both";
+    ($x, $y) = 1;
+    is $x, 1, "list assign takes what it can";
+    ok !$y.defined, "rest of list gets undef";
+    ($x, my @z, my @w) = (1, 2, 3);
+    is $x, 1, "scalar gets first";
+    is @z.join("|"), "2|3", "list gets rest";
+    is +@w, 0, "second list gets none";
 }
 
 # {

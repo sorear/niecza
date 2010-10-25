@@ -1,8 +1,9 @@
 class STDStash { # does Associative
     has $!guts;
 
-    method new(*%bits) {
+    method new(@pairs) {
         my $new = self.CREATE;
+        my %bits = @pairs;
         $new!guts = %bits;
         $new;
     }
