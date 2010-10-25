@@ -17,6 +17,7 @@ augment class STDStash {
     method hash() { unitem(self) }
     method keys() { $!guts.keys }
     method list() { $!guts.list }
+    method flat() { $!guts.flat }
 }
 
 augment class NAME {

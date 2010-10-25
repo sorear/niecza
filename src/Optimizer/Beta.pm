@@ -9,8 +9,10 @@ package Optimizer::Beta;
 # (-> $x { block })($y), due to control structures and regexes.  Try to clean
 # that up here.
 
+our $unit;
+
 sub run {
-    my ($unit) = @_;
+    (local $unit) = @_;
 
     # XXX enter and sigs need love
     $unit->visit_local_subs_postorder(sub { run_optree($_, $_->code) });
@@ -92,6 +94,7 @@ sub beta_optimize {
     my @args = map { [ $_, Niecza::Actions->gensym ] } @{ $op->positionals };
 
     delete $body->lexicals->{$inv->var};
+    $unit->xref->[$cbody->xref->[1]] = undef;
 
     my @pos = (map { Op::Lexical->new(name => $_->[1]) } @args);
 
