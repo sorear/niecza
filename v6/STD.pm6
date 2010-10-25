@@ -2019,7 +2019,7 @@ grammar P6 is STD {
         [
         || <?{ $*QSIGIL }>
             [
-            || <?{ $*QSIGIL eq '$' }> [ [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > || { $<POST> = [] } ]
+            || <?{ $*QSIGIL eq '$' }> [ [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > || <?> ]
             ||                          [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > 
             || { $*VAR = 0; }
             ]
@@ -2881,7 +2881,7 @@ grammar P6 is STD {
             {{
                 my $t = $<type_constraint>;
                 my @t = grep { substr($^tc.Str,0,2) ne '::' }, @$t;
-                @t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
+                +@t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
             }}
             [
             | '**' <param_var>   { $quant = '**'; $kind = '*'; }
@@ -4902,7 +4902,7 @@ method is_name ($n, $curlex = $*CURLEX) {
     my $curpkg = $*CURPKG;
     return True if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
-    if @components > 1 {
+    if +@components > 1 {
         return True if @components[0] eq 'COMPILING::';
         return True if @components[0] eq 'CALLER::';
         return True if @components[0] eq 'CONTEXT::';
@@ -4914,7 +4914,7 @@ method is_name ($n, $curlex = $*CURLEX) {
             self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
             $curpkg = $*GLOBAL;
         }
-        while @components > 1 {
+        while +@components > 1 {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
@@ -4953,7 +4953,7 @@ method find_stash ($n, $curlex = $*CURLEX) {
 
     return Any if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
-    if @components > 1 {
+    if +@components > 1 {
         return Any if @components[0] eq 'COMPILING::';
         return Any if @components[0] eq 'CALLER::';
         return Any if @components[0] eq 'CONTEXT::';
@@ -4965,7 +4965,7 @@ method find_stash ($n, $curlex = $*CURLEX) {
             self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
             $curlex = $*GLOBAL;
         }
-        while @components > 1 {
+        while +@components > 1 {
             my $lex = shift @components;
             $curlex = $curlex.{$lex};
             return Any unless $curlex;
@@ -5053,7 +5053,7 @@ method add_my_name ($n, $d?, $p?) {
     my $curstash = $*CURLEX;
     my @components = self.canonicalize_name($name);
     my $sid = $curstash.id // '???';
-    while @components > 1 {
+    while +@components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
         my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // STDStash.new(
@@ -5153,7 +5153,7 @@ method add_our_name ($n) {
     self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $DEBUG::symtab;
     $name = ($name ~~ /(.*?)\:[ver|auth]/).[0] // $name;
     my @components = self.canonicalize_name($name);
-    if @components > 1 {
+    if +@components > 1 {
         my $c = self.find_top_pkg(@components[0]);
         if $c {
             shift @components;
@@ -5161,7 +5161,7 @@ method add_our_name ($n) {
         }
     }
     my $sid = $curstash.id // '???';
-    while @components > 1 {
+    while +@components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
         my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // STDStash.new(
@@ -5278,21 +5278,21 @@ method explain_mystery() {
     }
     if %post_types {
         my @tmp = sort keys(%post_types);
-        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        $m ~= "Illegally post-declared type" ~ ('s' x (+@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %post_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_types {
         my @tmp = sort keys(%unk_types);
-        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        $m ~= "Undeclared name" ~ ('s' x (+@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %unk_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_routines {
         my @tmp = sort keys(%unk_routines);
-        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        $m ~= "Undeclared routine" ~ ('s' x (+@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %unk_routines{$_}.<line> ~ "\n";
         }
@@ -5325,7 +5325,7 @@ method is_known ($n, $curlex = $*CURLEX) {
     return False if $name ~~ /\:\:\(/;
     my $curpkg = $*CURPKG;
     my @components = self.canonicalize_name($name);
-    if @components > 1 {
+    if +@components > 1 {
         return True if @components[0] eq 'COMPILING::';
         return True if @components[0] eq 'CALLER::';
         return True if @components[0] eq 'CONTEXT::';
@@ -5337,7 +5337,7 @@ method is_known ($n, $curlex = $*CURLEX) {
             self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
             $curpkg = $*GLOBAL;
         }
-        while @components > 1 {
+        while +@components > 1 {
             my $pkg = shift @components;
             self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $DEBUG::symtab;
             $curpkg = $curpkg.{$pkg};
@@ -5923,7 +5923,7 @@ method panic (Str $s) {
 
     if $highvalid and %$*HIGHEXPECT {
         my @keys = sort keys %$*HIGHEXPECT;
-        if @keys > 1 {
+        if +@keys > 1 {
             $m ~= "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
         }
         else {

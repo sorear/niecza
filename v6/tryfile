@@ -8,7 +8,25 @@ augment class List {
     method shift() { self!fill(1) ?? self!shift-item !! Any }
 }
 
+augment class Regex {
+    method ACCEPTS($st) {
+        my $i = 0;
+        my $str = $st.Str;
+        my $mat;
+        my $C = Cursor.new($str);
+        while !$mat && ($i <= $str.chars) {
+            $mat = (self)($C.cursor($i++));
+        }
+        unitem($mat.head);
+    }
+}
+
+augment class Hash {
+    method hash() { unitem(self) }
+}
+
 augment class STD {
+    method getdecl() { self } # XXX
     method panic($str) { die "$str at {self.pos}" }
 }
 
@@ -77,6 +95,40 @@ augment class Cursor {
     our $GREEN  = "\e[32m";
     our $YELLOW = "\e[33m";
     our $CLEAR  = "\e[37m";
+
+    method canonicalize_name($n) {
+        my $M;
+        my $name = $n;
+        if $M = $name ~~ /^(< $ @ % & >)( \^ || \: <!before \:> )(.*)/ {
+            $name = $M[0] ~ $M[2];
+        }
+        if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {
+            $name = $name.substr(0, $name.chars - 2);
+        }
+        return $name unless $name ~~ /::/;
+        self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
+
+        if $M = $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::') (.*) $/ {
+            $name = $M[1] ~ "<" ~ $M[0] ~ $M[2] ~ ">";
+        }
+        my $vname;
+        if $M = $name ~~ /^(.*) '::<' (.*) '>' $/ {
+            $name = $M[0].Str;
+            $vname = $M[1].Str;
+        }
+        my @components;
+        while $M = $name ~~ / '::' / {
+            push @components, $name.substr(0, $M.to);
+            $name = substr($name, $M.to);
+        }
+        push @components, $name;
+        shift(@components) while @components and @components[0] eq '';
+        if (defined $vname) {
+            @components[+@components - 1] ~= '::' if @components and @components[+@components - 1] !~~ /\:\:$/;
+            push(@components, $vname) if defined $vname;
+        }
+        @components;
+    }
 
     method locmess () {
         my $pos = self.pos;
