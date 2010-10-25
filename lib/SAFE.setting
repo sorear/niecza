@@ -123,8 +123,8 @@ my class Str is Cool {
     } }
     method substr($from, $len) { Q:CgOp {
         (box Str (str_substring [unbox str (@ {self})]
-                    [cast int (unbox num (@ {$from}))]
-                    [cast int (unbox num (@ {$len}))]))
+                    [cast int (unbox num (@ {$from.Numeric}))]
+                    [cast int (unbox num (@ {$len.Numeric}))]))
     } }
     method dump() { '"' ~ self ~ '"' }
 }
@@ -177,43 +177,43 @@ sub infix:<~>(\|$bits) { Q:CgOp {
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
-    (box Num (+ (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Num (+ (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<->($l,$r) { Q:CgOp {
-    (box Num (- (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Num (- (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<*>($l,$r) { Q:CgOp {
-    (box Num (* (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Num (* (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:</>($l,$r) { Q:CgOp {
-    (box Num (/ (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Num (/ (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<< < >>($l,$r) { Q:CgOp {
-    (box Bool (< (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Bool (< (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<< > >>($l,$r) { Q:CgOp {
-    (box Bool (> (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Bool (> (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<< <= >>($l,$r) { Q:CgOp {
-    (box Bool (<= (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Bool (<= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<< >= >>($l,$r) { Q:CgOp {
-    (box Bool (>= (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Bool (>= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<< == >>($l,$r) { Q:CgOp {
-    (box Bool (== (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Bool (== (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub infix:<< != >>($l,$r) { Q:CgOp {
-    (box Bool (!= (unbox num (@ {$l})) (unbox num (@ {$r}))))
+    (box Bool (!= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
 
 sub warn($str) { Q:CgOp {
@@ -226,7 +226,7 @@ sub say(*@obj) { @obj.join('').say }
 sub note(*@text) { Q:CgOp { (rnull (note (unbox str (@ {@text.join('').Str})))) } }
 
 sub exit($status = 0) { Q:CgOp {
-    (rnull [exit (cast int (unbox num (@ {$status})))])
+    (rnull [exit (cast int (unbox num (@ {$status.Numeric})))])
 } }
 
 sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
@@ -243,10 +243,10 @@ sub defined($x) { $x.defined }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
-sub prefix:<-->($v is rw) { $v = ($v - 1); $v }
-sub prefix:<++>($v is rw) { $v = ($v + 1); $v }
-sub postfix:<-->($v is rw) { my $old = $v; $v = ($v - 1); $old }
-sub postfix:<++>($v is rw) { my $old = $v; $v = ($v + 1); $old }
+sub prefix:<-->($v is rw) { $v = (($v // 0) - 1); $v }
+sub prefix:<++>($v is rw) { $v = (($v // 0) + 1); $v }
+sub postfix:<-->($v is rw) { my $old = $v; $v = (($v // 0) - 1); $old }
+sub postfix:<++>($v is rw) { my $old = $v; $v = (($v // 0) + 1); $old }
 
 sub prefix:<~>($v) { $v.Str } # should be Stringy
 sub prefix:<?>($v) { $v.Bool }
@@ -924,8 +924,8 @@ my class Match {
         my $m = Q:CgOp {
             (newscalar (cursor_synthetic
                 (cast cursor (@ {$cursor})) (unbox str (@ {$method.Str}))
-                (cast int (unbox num (@ {$from})))
-                (cast int (unbox num (@ {$to})))))
+                (cast int (unbox num (@ {$from.Numeric})))
+                (cast int (unbox num (@ {$to.Numeric})))))
         };
         # this is wrong.  I need a better way to pass lists into primitives.
         for @captures -> $pair {
@@ -938,8 +938,9 @@ my class Match {
 }
 
 my class Regex is Sub {
-    method ACCEPTS($str) {
+    method ACCEPTS($st) {
         my $i = 0;
+        my $str = $st.Str;
         my $mat;
         my $C = Cursor.new($str);
         while !$mat && ($i <= $str.chars) {
