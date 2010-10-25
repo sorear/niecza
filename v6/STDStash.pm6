@@ -8,11 +8,9 @@ class STDStash { # does Associative
         $new;
     }
 
-    method at-key($str) { # is rw
-        $!guts.at-key($str)
-    }
-
-    # XXX delegate delete-key, exists-key
+    method at-key($str) { $!guts.at-key($str) }
+    method exists-key($str) { $!guts.exists-key($str) }
+    method delete-key($str) { $!guts.delete-key($str) }
 
     method id()    { $!guts.at-key('!id').at-pos(0) // '???' }
     method idref() { $!guts.at-key('!id') }

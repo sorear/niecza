@@ -1,19 +1,20 @@
 class NAME {
-    has $.name;
-    has $.xlex;
-    has $.olex;
-    has $.of;
-    has $.file;
-    has $.line;
+    has $!guts;
 
-    method new(:$name, :$xlex, :$olex, :$of, :$file, :$line, *%extras) {
+    method new(*%foo) {
         my $new = self.CREATE;
-        $new!name = $name;
-        $new!xlex = $xlex;
-        $new!olex = $olex;
-        $new!of = $of;
-        $new!file = $file;
-        $new!line = $line;
+        $new!guts = %foo;
         $new;
     }
+
+    method at-key($k) { self!guts.at-key($k) }
+    method delete-key($k) { self!guts.delete-key($k) }
+    method exists-key($k) { self!guts.exists-key($k) }
+
+    method name () { self.<name> }
+    method xlex () { self.<xlex> }
+    method olex () { self.<olex> }
+    method of   () { self.<of>   }
+    method file () { self.<file> }
+    method line () { self.<line> }
 }

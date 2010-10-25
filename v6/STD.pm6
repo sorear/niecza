@@ -1320,11 +1320,14 @@ grammar P6 is STD {
         :my $*QSIGIL ::= 0;
         <!before <[\)\]\}]> >
         <!stopper>
+        <!before $>
 
         # this could either be a statement that follows a declaration
         # or a statement that is within the block of a code declaration
         :lang( %*LANG<MAIN> )
-        <!!{ $*LASTSTATE = $¢.pos; }>
+        <!!{ $*LASTSTATE = $¢.pos; True  }>
+
+        # <!before $ >
 
         [
         | <label> <statement>
@@ -4871,8 +4874,9 @@ method getsig {
     else {
         $sig = $*CURLEX.<$?SIGNATURE>;
     }
-    self.<sig> = $sig;
-    self.<lex> = $*CURLEX.idref;
+    # NIECZA immutable cursors
+    # self.<sig> = $sig;
+    # self.<lex> = $*CURLEX.idref;
     if ($*DECLARAND<mult>//'') ne 'proto' {
         for keys %$*CURLEX {
             my $desc = $*CURLEX{$_};
@@ -4891,7 +4895,8 @@ method getsig {
 }
 
 method getdecl {
-    self.<decl> = $*DECLARAND;
+    # NIECZA immutable cursors
+    # self.<decl> = $*DECLARAND;
     self;
 }
 
@@ -5475,7 +5480,9 @@ method add_placeholder($name) {
 }
 
 method check_variable ($variable) {
+    return () unless defined $variable;
     my $name = $variable.Str;
+    my $here = self.cursor($variable.to);
     self.deb("check_variable $name") if $DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
     if $twigil eq '' {
@@ -5489,21 +5496,21 @@ method check_variable ($variable) {
             my $id = $name;
             ($id) = ($id ~~ /\W ** 0..2 (.*)/);
             if $name eq '@_' or $name eq '%_' {
-                $variable.add_placeholder($name);
+                $here.add_placeholder($name);
             }
             else {  # guaranteed fail now
                 if my $scope = @*MEMOS[$variable.from]<declend> {
-                    return $variable.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                    return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                 }
                 elsif $id !~~ /\:\:/ {
                     if self.is_known('@' ~ $id) {
-                        return $variable.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                        return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
                     }
                     elsif self.is_known('%' ~ $id) {
-                        return $variable.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                        return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
                     }
                 }
-                return $variable.sorry("Variable $name is not predeclared");
+                return $here.sorry("Variable $name is not predeclared");
             }
         }
         elsif $*CURLEX{$name} {
@@ -5512,11 +5519,11 @@ method check_variable ($variable) {
     }
     elsif $twigil eq '^' {
         my $*MULTINESS = 'multi';
-        $variable.add_placeholder($name);
+        $here.add_placeholder($name);
     }
     elsif $twigil eq ':' {
         my $*MULTINESS = 'multi';
-        $variable.add_placeholder($name);
+        $here.add_placeholder($name);
     }
     elsif $twigil eq '~' {
         return %*LANG.{substr($name,2,$name.chars - 2)};
@@ -5524,12 +5531,12 @@ method check_variable ($variable) {
     elsif $twigil eq '?' {
         if $name ~~ /\:\:/ {
             my ($first) = self.canonicalize_name($name);
-            $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+            $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
         }
         else {
             # search upward through languages to STD
-            my $v = $variable.lookup_compiler_var($name);
-            $variable.<value> = $v if $v;
+            my $v = $here.lookup_compiler_var($name);
+            # $variable.<value> = $v if $v; XXX IMMUTABLE MATCHES
         }
     }
     self;
