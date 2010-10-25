@@ -944,17 +944,15 @@ my class Regex is Sub {
         my $mat;
         my $C = Cursor.new($str);
         while !$mat && ($i <= $str.chars) {
-            $mat = (self)($C.cursor($i++));
+            $mat = flat((self)($C.cursor($i++))).head;
         }
-        unitem($mat.head);
+        $mat ?? unitem($mat) !! Any;
     }
 }
 
 my class Grammar is Cursor {
     method parse($text) {
-        my @results := self.new($text).TOP\
-            .grep({ $_.to == $text.chars });
-        @results ?? @results.shift !! Any; # TODO List.at-pos
+        flat(grep { $_.to == $text.chars }, self.new($text).TOP).head
     }
 }
 # }}}
