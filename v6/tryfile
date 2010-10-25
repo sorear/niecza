@@ -4,6 +4,10 @@ use MONKEY_TYPING;
 use STD;
 use STDStash;
 
+augment class List {
+    method shift() { self!fill(1) ?? self!shift-item !! Any }
+}
+
 augment class STD {
     method panic($str) { die "$str at {self.pos}" }
 }
