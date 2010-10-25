@@ -304,6 +304,7 @@ use CgOp;
     extends 'RxOp';
 
     sub check { goto &RxOp::Alt::check }
+    sub used_caps { goto &RxOp::Alt::used_caps }
     # zyg * N
 
     sub code {
