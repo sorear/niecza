@@ -1,0 +1,7 @@
+my @arr;
+my $i = 0;
+while ($i < 10000) { push @arr, $i; $i++ }
+for my $x (@arr) {
+    for my $y (@arr) {
+    }
+}
