@@ -181,6 +181,8 @@ my %loopbacks = (
     'PEMPTY', 'RxFrame.EMPTYP',
     'PHash', 'Kernel.HashP',
     'PStr', 'Kernel.StrP',
+    'PIterator', 'Kernel.IteratorP',
+    'MIterCursor', 'Kernel.IterCursorMO',
 );
 
 sub pkg0 {

@@ -953,6 +953,84 @@ namespace Niecza {
             return o.InvokeMethod(th, "list", new Variable[] { v }, null);
         }
 
+        public static Frame IterHasFlat(Frame caller, VarDeque iter) {
+            Frame n = caller.MakeChild(null, IHF_SI);
+            n.lex0 = iter;
+            return n;
+        }
+        private static SubInfo IHF_SI = new SubInfo("iter_has_flat", IHF_C);
+        private static Frame IHF_C(Frame th) {
+            VarDeque iter = (VarDeque) th.lex0;
+            Variable f;
+            IP6 ff;
+            switch (th.ip) {
+                case 0:
+                    if (iter.Count() == 0) {
+                        th.caller.resultSlot = false;
+                        return th.caller;
+                    }
+
+                    f = iter[0];
+
+                    if (f.islist) {
+                        th.ip = 1;
+                        iter.Shift();
+                        return f.Fetch().InvokeMethod(th, "iterator", new Variable[] { f }, null);
+                    }
+
+                    if ((ff = f.Fetch()).Isa(IterCursorMO)) {
+                        th.ip = 2;
+                        iter.Shift();
+                        return ff.InvokeMethod(th, "reify", new Variable[] { f }, null);
+                    }
+
+                    th.caller.resultSlot = true;
+                    return th.caller;
+
+                case 1:
+                    iter.UnshiftD((VarDeque) UnboxAny(((Variable)th.resultSlot).Fetch()));
+                    goto case 0;
+                case 2:
+                    iter.UnshiftN((Variable[])UnboxAny(((Variable)th.resultSlot).Fetch()));
+                    goto case 0;
+                default:
+                    return Die(th, "invalid IP");
+            }
+        }
+
+        // This is the crux of the "mostly eager" implementation
+        public static Frame IterFromParcel(Frame caller, Variable[] p, int ofs) {
+            Frame n = caller.MakeChild(null, IFP_SI);
+            n.pos = p;
+            n.lexi0 = ofs;
+            n.lex0 = new VarDeque();
+            return n;
+        }
+        private static SubInfo IFP_SI = new SubInfo("iter_fromparcel", IFP_C);
+        private static Frame IFP_C(Frame th) {
+            switch (th.ip) {
+                case 0:
+                    if (th.lexi0 == th.pos.Length) goto case 2;
+                    th.ip = 1;
+                    if (!th.pos[th.lexi0].islist) {
+                        ((VarDeque)th.lex0).Push(th.pos[th.lexi0++]);
+                        goto case 0;
+                    }
+                    return th.pos[th.lexi0].Fetch().InvokeMethod(th, "iterator", new Variable[] { th.pos[th.lexi0] }, null);
+                case 1:
+                    ((VarDeque)th.lex0).PushD((VarDeque)UnboxAny(((Variable)th.resultSlot).Fetch()));
+                    th.lexi0++;
+                    goto case 0;
+                case 2:
+                    th.caller.resultSlot = th.lex0;
+                    return th.caller;
+                default:
+                    return Die(th, "invalid IP");
+            }
+        }
+        public static IP6 IteratorP;
+        public static DynMetaObject IterCursorMO;
+
         public static Frame GetFirst(Frame th, Variable lst) {
             if (!lst.islist) {
                 th.resultSlot = lst;
@@ -1391,6 +1469,14 @@ slow:
             for (int i = vrs.Length - 1; i >= 0; i--)
                 Unshift(vrs[i]);
         }
+
+        public void PushN(Variable[] vrs) {
+            for (int i = 0; i < vrs.Length; i++)
+                Push(vrs[i]);
+        }
+
+        public void PushD(VarDeque vrs) { PushN(vrs.CopyAsArray()); }
+        public void UnshiftD(VarDeque vrs) { UnshiftN(vrs.CopyAsArray()); }
 
         public Variable Shift() {
             int index = head++;

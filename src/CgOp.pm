@@ -195,6 +195,7 @@ use warnings;
     sub vvarlist_unshift { rawcall($_[0], 'Unshift', $_[1]) }
     sub vvarlist_unshiftn { rawcall($_[0], 'UnshiftN', $_[1]) }
     sub vvarlist_push { rawcall($_[0], 'Push', $_[1]) }
+    sub vvarlist_append { rawcall($_[0], 'PushD:m,Void', $_[1]) }
     sub vvarlist_item { getindex($_[0], $_[1]) }
     sub vvarlist_sort { rawscall('Kernel.SortHelper', callframe(), $_[0], $_[1]) }
 
@@ -234,6 +235,9 @@ use warnings;
     sub promote_to_list{ rawscall('Kernel.PromoteToList:c,Variable', $_[0]) }
     sub instrole       { rawscall('Kernel.InstantiateRole', $_[0]) }
     sub role_apply     { rawscall('Kernel.RoleApply', $_[0], $_[1]) }
+    sub iter_hasflat { rawscall('Kernel.IterHasFlat:c,Boolean', $_[0]) }
+    sub iter_hasarg { rawscall('Kernel.IterHasArg:c,Boolean', $_[0]) }
+    sub iter_fromparcel { rawscall('Kernel.IterFromParcel:c,VarDeque', $_[0], $_[1]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
