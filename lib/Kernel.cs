@@ -977,14 +977,72 @@ namespace Niecza {
             list.SetSlot("rest", iter);
         }
 
-        public static Frame IterHasFlat(Frame caller, VarDeque iter) {
+        public static Frame IterFlatten(Frame caller, VarDeque iter) {
+            Frame n = caller.MakeChild(null, IF_SI);
+            n.lex0 = iter;
+            n.lex1 = new VarDeque();
+            return n;
+        }
+        private static SubInfo IF_SI = new SubInfo("iter_flatten", IF_C);
+        private static Frame IF_C(Frame th) {
+            VarDeque inq = (VarDeque) th.lex0;
+            VarDeque outq = (VarDeque) th.lex1;
+            Variable inq0v;
+            IP6 inq0;
+            switch (th.ip) {
+                case 0:
+                    if (inq.Count() == 0) {
+                        th.caller.resultSlot = outq;
+                        return th.caller;
+                    }
+                    inq0v = inq[0];
+                    inq0 = inq0v.Fetch();
+                    if (inq0v.islist) {
+                        th.ip = 1;
+                        return inq0.InvokeMethod(th, "iterator", new Variable[] { inq0v }, null);
+                    }
+                    if (inq0.Isa(IterCursorMO)) {
+                        th.MarkSharedChain();
+                        th.ip = 2;
+                        DynObject thunk = new DynObject(RxFrame.GatherIteratorMO);
+                        thunk.slots[0] = NewRWScalar(AnyMO, th);
+                        thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
+                        outq.Push(NewROScalar(thunk));
+                        th.caller.resultSlot = outq;
+                        return th.caller;
+                    }
+                    outq.Push(inq0v);
+                    inq.Shift();
+                    goto case 0;
+                case 1:
+                    outq.PushD((VarDeque) UnboxAny(((Variable) th.resultSlot).Fetch()));
+                    inq.Shift();
+                    goto case 0;
+                case 2:
+                    th.ip = 3;
+                    return IterHasFlat(th, inq, true);
+                case 3:
+                    th.ip = 2;
+                    if ((Boolean) th.resultSlot) {
+                        return Take(th, inq.Shift());
+                    } else {
+                        return Take(th, NewROScalar(RxFrame.EMPTYP));
+                    }
+                default:
+                    return Die(th, "invalid IP");
+            }
+        }
+
+        public static Frame IterHasFlat(Frame caller, VarDeque iter, bool flat) {
             Frame n = caller.MakeChild(null, IHF_SI);
             n.lex0 = iter;
+            n.lexi0 = flat ? 1 : 0;
             return n;
         }
         private static SubInfo IHF_SI = new SubInfo("iter_has_flat", IHF_C);
         private static Frame IHF_C(Frame th) {
             VarDeque iter = (VarDeque) th.lex0;
+            bool flat = th.lexi0 != 0;
             Variable f;
             IP6 ff;
             switch (th.ip) {
@@ -996,7 +1054,7 @@ namespace Niecza {
 
                     f = iter[0];
 
-                    if (f.islist) {
+                    if (f.islist && flat) {
                         th.ip = 1;
                         iter.Shift();
                         return f.Fetch().InvokeMethod(th, "iterator", new Variable[] { f }, null);
