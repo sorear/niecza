@@ -237,7 +237,7 @@ use warnings;
     sub role_apply     { rawscall('Kernel.RoleApply', $_[0], $_[1]) }
     sub iter_hasflat { rawscall('Kernel.IterHasFlat:c,Boolean', $_[0]) }
     sub iter_hasarg { rawscall('Kernel.IterHasArg:c,Boolean', $_[0]) }
-    sub iter_fromparcel { rawscall('Kernel.IterFromParcel:c,VarDeque', $_[0], $_[1]) }
+    sub iter_to_list { rawscall('Kernel.IterToList:m,Void', $_[0], $_[1]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),

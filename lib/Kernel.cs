@@ -953,6 +953,30 @@ namespace Niecza {
             return o.InvokeMethod(th, "list", new Variable[] { v }, null);
         }
 
+        // An Iterator is a VarDeque, where each element is either:
+        //   an IterCursor, representing work to be done lazily
+        //   a value with islist, representing a flattenable sublist
+        //   anything else, representing that value
+
+        // Laziness dictates that IterCursors not be reified until necessary,
+        // and any infinite or I/O-bearing tasks be wrapped in them.  Calls
+        // to List.iterator, however, may be assumed cheap and done eagerly.
+
+        public static void IterToList(IP6 list, VarDeque iter) {
+            VarDeque items = new VarDeque();
+            IP6 item;
+            while (iter.Count() != 0) {
+                item = iter[0].Fetch();
+                if (item.Isa(IterCursorMO)) {
+                    break;
+                } else {
+                    items.Push(iter.Shift());
+                }
+            }
+            list.SetSlot("items", items);
+            list.SetSlot("rest", iter);
+        }
+
         public static Frame IterHasFlat(Frame caller, VarDeque iter) {
             Frame n = caller.MakeChild(null, IHF_SI);
             n.lex0 = iter;
@@ -998,36 +1022,6 @@ namespace Niecza {
             }
         }
 
-        // This is the crux of the "mostly eager" implementation
-        public static Frame IterFromParcel(Frame caller, Variable[] p, int ofs) {
-            Frame n = caller.MakeChild(null, IFP_SI);
-            n.pos = p;
-            n.lexi0 = ofs;
-            n.lex0 = new VarDeque();
-            return n;
-        }
-        private static SubInfo IFP_SI = new SubInfo("iter_fromparcel", IFP_C);
-        private static Frame IFP_C(Frame th) {
-            switch (th.ip) {
-                case 0:
-                    if (th.lexi0 == th.pos.Length) goto case 2;
-                    th.ip = 1;
-                    if (!th.pos[th.lexi0].islist) {
-                        ((VarDeque)th.lex0).Push(th.pos[th.lexi0++]);
-                        goto case 0;
-                    }
-                    return th.pos[th.lexi0].Fetch().InvokeMethod(th, "iterator", new Variable[] { th.pos[th.lexi0] }, null);
-                case 1:
-                    ((VarDeque)th.lex0).PushD((VarDeque)UnboxAny(((Variable)th.resultSlot).Fetch()));
-                    th.lexi0++;
-                    goto case 0;
-                case 2:
-                    th.caller.resultSlot = th.lex0;
-                    return th.caller;
-                default:
-                    return Die(th, "invalid IP");
-            }
-        }
         public static IP6 IteratorP;
         public static DynMetaObject IterCursorMO;
 
