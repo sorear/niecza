@@ -253,7 +253,7 @@ sub take($p) { # should be \|$p
 
 {
     my $*stub;
-    my @arr := &infix:<,>((&infix:<,>("a","b")), "c");
-    say @arr.list.at-pos(1);
-    say @arr.list.flat.at-pos(1);
+
+    sub flar(*@x) { say @x.at-pos(1) }
+    flar "a", (&infix:<,>("b", "c"));
 }

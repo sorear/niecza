@@ -33,20 +33,13 @@ use 5.010;
                 CgOp::box('Hash', CgOp::letvar('!h')));
         }
 
-        CgOp::let(CgOp::rawnew('clr:DynObject', CgOp::getfield('mo',
-                    CgOp::cast('clr:DynObject', CgOp::fetch(CgOp::scopedlex('List'))))), sub {
-            my $do = shift;
+        CgOp::letn('!list', CgOp::obj_newblank(CgOp::class_ref('mo', 'List')),
             CgOp::prog(
-                CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('flat'),
-                    CgOp::bool(1)),
-                CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('items'),
-                    CgOp::rawnew('clr:VarDeque')),
-                CgOp::rawcall($do, 'SetSlot', CgOp::clr_string('rest'),
-                    CgOp::rawscall('Kernel.SlurpyHelper',
-                        CgOp::callframe, CgOp::letvar('!ix'))),
-                CgOp::scopedlex('!ix', CgOp::getfield('Length',
-                        CgOp::getfield('pos', CgOp::callframe))),
-                CgOp::newscalar($do))});
+                CgOp::iter_to_list(CgOp::letvar('!list'),
+                    CgOp::iter_flatten(CgOp::rawscall('Kernel.SlurpyHelper',
+                            CgOp::callframe, CgOp::letvar('!ix')))),
+                CgOp::letvar('!ix', CgOp::poscount),
+                CgOp::newscalar(CgOp::letvar('!list'))));
     }
 
     sub parcel_get {
