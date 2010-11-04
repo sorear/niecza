@@ -880,6 +880,13 @@ namespace Niecza {
             return lv;
         }
 
+        public static VarDeque IterCopyElems(VarDeque vals) {
+            VarDeque nv = new VarDeque();
+            for (int i = 0; i < vals.Count(); i++)
+                nv.Push(NewRWScalar(AnyMO, vals[i].Fetch()));
+            return nv;
+        }
+
         // TODO: Returning keys unboxed would be better.
         public static VarDeque KeysHelper(Dictionary<string,Variable> d) {
             VarDeque lv = new VarDeque();
@@ -941,7 +948,6 @@ namespace Niecza {
                 DynObject lst = new DynObject(RxFrame.ListMO);
                 lst.slots[0 /*items*/] = new VarDeque(new Variable[] { v });
                 lst.slots[1 /*rest*/ ] = new VarDeque();
-                lst.slots[2 /*flat*/ ] = false;
                 th.resultSlot = Kernel.NewRWListVar(lst);
                 return th;
             }

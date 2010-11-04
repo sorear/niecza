@@ -40,7 +40,8 @@ my class Any is Mu {
     method at-pos($ix) {
         ($ix == 0) ?? self !! die("Invalid index on non-list")
     }
-    method flat() { (self,).flat }
+    method flat() { (self,).list }
+    method list() { (self,).list }
 
     method sort($cmp = &infix:<leg>) { self.list.sort($cmp) }
 
@@ -52,25 +53,22 @@ my class Any is Mu {
 
 my class Cool {
     method grep($sm) {
-        my $itp = @(self).clone;
-        gather while $itp {
-            my $r = $itp.shift;
+        gather self.for(-> $r {
             take $r if $r ~~ $sm;
-        }
+        })
     }
     method map($func) {
-        my $itp = @(self).clone;
-        gather while $itp {
-            my $r = $itp.shift;
+        gather self.for(-> $r {
             take $func($r);
-        }
+        })
     }
-    method for($func) {
-        my $itp = @(self).clone;
-        while $itp {
-            my $r = $itp.shift;
-            $func($r);
-        }
+    method for (&cb) {
+        Q:CgOp {
+            (rnull (letn it (unbox vvarlist (@ {self.iterator}))
+                  cb (@ {&cb})
+              (whileloop 0 0 (iter_hasflat (l it))
+                (sink (subcall (l cb) (vvarlist_shift (l it)))))))
+        };
     }
 
     method say() { self.Str.say }
@@ -352,13 +350,32 @@ sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
 # autovivify, don't rebind or push/shift/etc
 # List: mutable list of boxes without much context.  accessing off end returns
 # undefined.  lazy.
-# Seq: mutable list of boxes which are taken to be read-only scalars. The .Seq
 # coercion makes the elements of a List read-only and maybe fetches them too.
 # Array: mutable list of read-write scalar boxes
 
 sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
 
 my class Iterator {
+    has $!value; # is vvarlist
+
+    method list () {
+        Q:CgOp {
+            (letn n (obj_newblank (class_ref mo List))
+              (iter_to_list (l n) (unbox vvarlist (@ {self})))
+              (newrwlistvar (l n)))
+        }
+    }
+
+    method flat () {
+        Q:CgOp {
+            (letn n (obj_newblank (class_ref mo List))
+              (iter_to_list (l n) (iter_flatten (unbox vvarlist (@ {self}))))
+              (newrwlistvar (l n)))
+        }
+    }
+}
+
+my class IterCursor {
     # subclasses must provide .reify, return parcel
 }
 
@@ -369,15 +386,20 @@ my class Whatever { }
 my class EMPTY { }
 
 my class List { ... }
-my class Seq { ... }
 my class Array { ... }
 
 my class Parcel is Cool {
     has $!value;
     # $!value -> Variable[]
 
-    method flat() { List.SETUP(True, self) }
-    method list() { List.SETUP(False, self) }
+    method flat() { self.iterator.flat }
+    method list() { self.iterator.list }
+
+    method iterator () {
+        Q:CgOp {
+            (box Iterator (vvarlist_from_fvarlist (unbox fvarlist (@ {self}))))
+        };
+    }
 
     method elems() { Q:CgOp {
         (box Num (cast num (fvarlist_length (unbox fvarlist (@ {self})))))
@@ -414,13 +436,6 @@ my class Parcel is Cool {
 
         @in;
     }
-
-    method iterator() {
-        my class ParcelIterator is Iterator {
-            has $.reify;
-        }
-        ParcelIterator.RAWCREATE("reify", self);
-    }
 }
 
 constant Nil = Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) };
@@ -429,35 +444,43 @@ my class List is Cool {
     has @!items;
     has @!rest;
     has $!flat;
+
+    method new() {
+        Q:CgOp {
+            (letn n (obj_newblank (obj_llhow (@ {self})))
+              (setslot items (l n) (vvarlist_new_empty))
+              (setslot rest  (l n) (vvarlist_new_empty))
+              (newrwlistvar (l n)))
+        };
+    }
+
+    method iterator () {
+        Q:CgOp {
+            (letn it (vvarlist_new_empty)
+              (vvarlist_append (l it) (getslot items vvarlist (@ {self})))
+              (vvarlist_append (l it) (getslot rest vvarlist (@ {self})))
+              (box Iterator (l it)))
+        };
+    }
+
     method flat() {
-        unitem(Q:CgOp { (box Bool (getslot flat bool (@ {self}))) }
-            ?? self !! self.SETUP(True, (&infix:<,>(self.iterator))));
+        self.iterator.flat
     }
     method list() { unitem(self) }
+
+    method Seq () {
+        Q:CgOp { (box Iterator (iter_copy_elems (unbox vvarlist (@ {self.eager.iterator})))) }.list
+    }
 
     method clone() { Q:CgOp {
         (letn selfo (@ {self})
               new (obj_newblank (obj_llhow (l selfo)))
-          (setslot flat (l new) (getslot flat bool (l selfo)))
           (setslot items (l new) (vvarlist_clone
               (getslot items vvarlist (l selfo))))
           (setslot rest (l new) (vvarlist_clone
               (getslot rest vvarlist (l selfo))))
           (newrwlistvar (l new)))
     } }
-
-    method SETUP($flat, $parcel) { Q:CgOp {
-        (letn new (obj_newblank (obj_llhow (@ {self})))
-          (setslot flat (l new) (unbox bool (@ {$flat.Bool})))
-          (setslot rest (l new) (vvarlist_from_fvarlist
-              (unbox fvarlist (@ {$parcel}))))
-          (setslot items (l new) (vvarlist_new_empty))
-          (newrwlistvar (l new)))
-    } }
-
-    method Seq() {
-        Seq.SETUP(True, (&infix:<,>(self.iterator)));
-    }
 
     method Capture () {
         Q:CgOp {
@@ -469,10 +492,6 @@ my class List is Cool {
     }
 
     method dump() { '[' ~ self.map(*.dump).join(', ') ~ ']' }
-
-    #| Takes an object and applies whatever semantics the List subclass
-    #| needs to apply on stuff out of the iterator stack
-    method _elem(\$x) { $x }
 
     method !count-items() { Q:CgOp {
         (box Num (cast num (vvarlist_count (getslot items vvarlist (@ {self})))))
@@ -502,25 +521,15 @@ my class List is Cool {
         (rnull (vvarlist_unshift (getslot items vvarlist (@ {self})) {$x}))
     } }
 
-    method !fill($nr) { Q:CgOp {
-        (letn  nr    (cast int (unbox num (@ {$nr})))
-               items (getslot items vvarlist (@ {self}))
-               rest  (getslot rest vvarlist (@ {self}))
-               flat  (getslot flat bool (@ {self}))
-               v     (null var)
-               ItMo  (obj_llhow (@ {Iterator}))
+    method !fill ($count) { Q:CgOp {
+        (letn ct (cast int (unbox num (@ {$count})))
+              items (getslot items vvarlist (@ {self}))
+              rest  (getslot rest  vvarlist (@ {self}))
           (whileloop 0 0
-            (ternary (< (vvarlist_count (l items)) (l nr))
-              (!= (vvarlist_count (l rest)) (i 0)) (b 0))
-            (prog
-              (l v (vvarlist_shift (l rest)))
-              (ternary (ternary (l flat) (var_islist (l v)) (b 0))
-                (vvarlist_unshift (l rest) (methodcall (l v) iterator))
-                (ternary (obj_isa (@ (l v)) (l ItMo))
-                  (vvarlist_unshiftn (l rest) (unbox fvarlist
-                      (@ (methodcall (l v) reify))))
-                  (vvarlist_push (l items) (methodcall {self} _elem (l v)))))))
-          (box Bool (>= (vvarlist_count (l items)) (l nr))))
+            (ternary (> (l ct) (vvarlist_count (l items)))
+              (iter_hasarg (l rest)) (b 0))
+            (vvarlist_push (l items) (vvarlist_shift (l rest))))
+          (box Bool (<= (l ct) (vvarlist_count (l items)))))
     } }
 
     method Bool() { self!fill(1) }
@@ -539,30 +548,11 @@ my class List is Cool {
     method elems() { self!fill(1000_000_000); self!count-items; }
     method Numeric () { self.elems }
 
-    method at-pos($i) {
-        self!fill($i + 1);
-        self!item-at-pos($i);
-    }
-
-    method iterator() {
-        my class ListIterator is Iterator {
-            has $!list;
-            has $!reify;
-            method reify() {
-                $!reify // ($!reify = (
-                    $!list ??
-                        ($!list.shift, ListIterator.RAWCREATE("list", $!list,
-                            "reify", Any)) !!
-                        &infix:<,>()));
-            }
-        }
-        my $itp = self.clone;
-        ListIterator.RAWCREATE("list", $itp, "reify", Any);
-    }
+    method at-pos($i) { self!fill($i + 1) ?? self!item-at-pos($i) !! Any }
 
     method join($sep) {
         my $t;
-        for self.flat -> $x {
+        for unitem(self) -> $x {
             $t = ($t.defined ?? ($t ~ ($sep ~ $x)) !! $x);
         }
         $t // '';
@@ -574,7 +564,6 @@ my class List is Cool {
         my $l = self.list.eager;
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {List})))
-              (setslot flat (l n) (bool 1))
               (setslot items (l n) (vvarlist_sort (@ {$cmp})
                   (getslot items vvarlist (@ {$l}))))
               (setslot rest (l n) (vvarlist_new_empty))
@@ -582,36 +571,40 @@ my class List is Cool {
         }
     }
 
-    method push(*@items) {
-        self!push-iterator(@items.Seq.eager.iterator)
+    method plan(*@items) {
+        Q:CgOp {
+            (rnull
+              (vvarlist_append (getslot rest vvarlist (@ {self}))
+                (unbox vvarlist (@ {@items.iterator}))))
+        }
     }
+
+    method push(*@items) {
+        @items.eager;
+        Q:CgOp {
+            (rnull
+              (vvarlist_append (getslot rest vvarlist (@ {self}))
+                (iter_copy_elems (unbox vvarlist (@ {@items.iterator})))))
+        }
+    }
+
     method pop() {
         self.eager;
         self!pop-item;
     }
 
     method unshift(*@a) {
-        for reverse(@a) -> $v { self!unshift-item($v) }
+        for reverse(@a) -> $v { self!unshift-item(anon $new = $v) }
     }
-}
-
-# exactly like List, but flattens, and with "is copy" semantics on stuff
-my class Seq is List {
-    method _elem($x) { my $y = $x; $y }
-    method Seq { self }
 }
 
 my class Array is List {
-    method new() {
-        Array.SETUP(True, &infix:<,>())
-    }
-
     method LISTSTORE(*@in) {
         # fetch everything NOW in case self is mentioned
-        my $inn := @in.Seq.eager;
+        my $inn = @in.eager.iterator;
 
         Q:CgOp { (rnull
-            (setslot items (@ {self}) (getslot items vvarlist (@ {$inn}))))
+            (setslot items (@ {self}) (iter_copy_elems (unbox vvarlist (@ {$inn})))))
         };
         unitem(self);
     }
@@ -667,7 +660,6 @@ my class Hash {
     method keys() {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {List})))
-              (setslot flat (l n) (bool 1))
               (setslot items (l n) (varhash_keys (unbox varhash (@ {self}))))
               (setslot rest (l n) (vvarlist_new_empty))
               (newrwlistvar (l n)))
@@ -695,7 +687,7 @@ my class Hash {
     }
 
     method LISTSTORE(*@in) {
-        my @r := @in.Seq.eager;
+        my @r := @in.eager.Seq;
 
         Q:CgOp { (rnull (varhash_clear (unbox varhash (@ {self})))) };
 
@@ -791,7 +783,7 @@ sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {
         });
 }
 
-my class GatherIterator is Iterator {
+my class GatherIterator is IterCursor {
     has $!frame;
     has $!reify;
 
@@ -810,8 +802,7 @@ my class GatherIterator is Iterator {
 }
 
 sub _gather($fr) {
-    List.SETUP(True, (&infix:<,>(GatherIterator.RAWCREATE("frame", $fr,
-        "reify", Any))));
+    &infix:<,>(GatherIterator.RAWCREATE("frame", $fr, "reify", Any)).list
 }
 
 sub take($p) { # should be \|$p

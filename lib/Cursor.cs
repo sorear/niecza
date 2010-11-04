@@ -117,7 +117,6 @@ public sealed class RxFrame {
                     DynObject lst = new DynObject(ListMO);
                     lst.slots[0 /*items*/] = new VarDeque();
                     lst.slots[1 /*rest*/ ] = new VarDeque();
-                    lst.slots[2 /*flat*/ ] = false;
                     EmptyList = Kernel.NewRWListVar(lst);
                 }
                 th.caller.resultSlot = EmptyList;
@@ -340,7 +339,6 @@ public sealed class RxFrame {
             DynObject lst = new DynObject(ListMO);
             lst.slots[0 /*items*/] = ks;
             lst.slots[1 /*rest*/ ] = iss;
-            lst.slots[2 /*flat*/ ] = false;
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
         }
         return th.caller;
@@ -419,7 +417,6 @@ public class Cursor : IP6 {
             DynObject l = new DynObject(RxFrame.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
-            l.slots[2 /*flat*/ ] = false;
             return Kernel.NewRWListVar(l);
         } else {
             return caps.Count() != 0 ? caps[0] :
@@ -487,7 +484,6 @@ public class Cursor : IP6 {
         DynObject lst = new DynObject(RxFrame.ListMO);
         lst.slots[0 /*items*/] = ks;
         lst.slots[1 /*rest*/ ] = new VarDeque();
-        lst.slots[2 /*flat*/ ] = false;
 
         ks.Push(Kernel.NewROScalar(nw));
         return Kernel.NewRWListVar(lst);
@@ -504,7 +500,6 @@ public class Cursor : IP6 {
         DynObject lst = new DynObject(RxFrame.ListMO);
         lst.slots[0 /*items*/] = ks;
         lst.slots[1 /*rest*/ ] = new VarDeque();
-        lst.slots[2 /*flat*/ ] = false;
 
         if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
                 CC.Word.Accepts(backing[p-1])) {
