@@ -1021,8 +1021,8 @@ namespace Niecza {
                     inq.Shift();
                     goto case 0;
                 case 1:
-                    outq.PushD((VarDeque) UnboxAny(((Variable) th.resultSlot).Fetch()));
                     inq.Shift();
+                    inq.UnshiftD((VarDeque) UnboxAny(((Variable) th.resultSlot).Fetch()));
                     goto case 0;
                 case 2:
                     th.ip = 3;
