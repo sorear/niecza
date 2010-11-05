@@ -5,7 +5,9 @@ syml
 VERSION
 t/spec
 perf/sample_*.json
-perf/STD.errors
-perf/*.exe
+v6/STD.errors
+*.mdb
+*.exe
+core
 perf/profile.txt
 perf/xdb.il
