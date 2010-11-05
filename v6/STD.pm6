@@ -7,7 +7,7 @@
 
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
-use STDStash;
+use Stash;
 use NAME;
 
 package DEBUG {
@@ -1133,7 +1133,7 @@ grammar P6 is STD {
             self.load_setting($*SETTINGNAME);
             my $oid = $*SETTING.id;
             my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-            $*CURLEX = STDStash.new(
+            $*CURLEX = Stash.new(
                 'OUTER::' => [$oid],
                 '!file' => $*FILE, '!line' => 0,
                 '!id' => [$id],
@@ -1260,7 +1260,7 @@ grammar P6 is STD {
         [ <quotepair> <.ws>
             {
                 my $kv = $<quotepair>[(+$<quotepair>)-1];
-                $lang = ($lang.tweak($kv.<k>, $kv.<v>)
+                $lang = ($lang.tweak(|($kv.<k>.Str => $kv.<v>))
                     or $lang.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
             }
         ]*
@@ -2566,7 +2566,7 @@ grammar P6 is STD {
         :my $qm;
         'qq'
         [
-        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak($qm => 1))>
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(|($qm => 1)))>
         | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
         ]
     }
@@ -2574,7 +2574,7 @@ grammar P6 is STD {
         :my $qm;
         'q'
         [
-        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak($qm => 1))>
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(|($qm => 1)))>
         | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
         ]
     }
@@ -2583,7 +2583,7 @@ grammar P6 is STD {
         :my $qm;
         'Q'
         [
-        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak($qm => 1))>
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(|($qm => 1)))>
         | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ))>
         ]
     }
@@ -4832,7 +4832,7 @@ method newlex ($needsig = 0) {
     }
     else {
         $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
-        $*CURLEX = STDStash.new(
+        $*CURLEX = Stash.new(
             'OUTER::' => [$oid],
             '!file' => $*FILE, '!line' => $line,
             '!id' => [$id],
@@ -5060,7 +5060,7 @@ method add_my_name ($n, $d?, $p?) {
     while +@components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // STDStash.new(
+        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // Stash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
@@ -5139,7 +5139,7 @@ method add_my_name ($n, $d?, $p?) {
             $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
-                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // STDStash.new(
+                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
                     'PARENT::' => $curstash.idref,
                     '!file' => $*FILE, '!line' => self.line,
                     '!id' => [$sid] ));
@@ -5168,7 +5168,7 @@ method add_our_name ($n) {
     while +@components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // STDStash.new(
+        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // Stash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
@@ -5230,7 +5230,7 @@ method add_our_name ($n) {
             $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $declaring;
             $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
-            $*NEWPKG = ($curstash.{$name ~ '::'} = $curstash.{$name ~ '::'} // STDStash.new(
+            $*NEWPKG = ($curstash.{$name ~ '::'} = $curstash.{$name ~ '::'} // Stash.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
                 '!id' => [$sid] ));
@@ -5314,7 +5314,7 @@ method load_setting ($setting) {
     $*SETTING = $ALL<SETTING>;
     $*CURLEX = $*SETTING;
 
-    $*GLOBAL = $*CORE.<GLOBAL::> = STDStash.new(
+    $*GLOBAL = $*CORE.<GLOBAL::> = Stash.new(
         '!file' => $*FILE, '!line' => 1,
         '!id' => ['GLOBAL'],
     );

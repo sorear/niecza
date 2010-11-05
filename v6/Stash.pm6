@@ -1,4 +1,4 @@
-class STDStash { # does Associative
+class Stash { # does Associative
     has $!guts;
 
     method new(*@pairs) {
@@ -7,6 +7,11 @@ class STDStash { # does Associative
         $new!guts = %bits;
         $new;
     }
+
+    method hash() { unitem(self) }
+    method keys() { $!guts.keys }
+    method list() { $!guts.list }
+    method flat() { $!guts.flat }
 
     method at-key($str) { $!guts.at-key($str) }
     method exists-key($str) { $!guts.exists-key($str) }

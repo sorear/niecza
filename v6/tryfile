@@ -2,7 +2,7 @@
 use MONKEY_TYPING;
 
 use STD;
-use STDStash;
+use Stash;
 use NAME;
 
 augment class List {
@@ -13,11 +13,7 @@ augment class Any {
     method list() { @( self, ) }
 }
 
-augment class STDStash {
-    method hash() { unitem(self) }
-    method keys() { $!guts.keys }
-    method list() { $!guts.list }
-    method flat() { $!guts.flat }
+augment class Stash {
 }
 
 augment class NAME {
@@ -428,9 +424,9 @@ augment class Cursor {
     method load_lex($) {
         # NYI
         my $id = "MY:file<NULL.pad>:line(1):pos(0)";
-        my $core = STDStash.new('!id' => [$id], '!file' => 'NULL.pad',
+        my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
             '!line' => 1);
-        STDStash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
+        Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
             'SETTING' => $core, $id => $core);
     }
 
