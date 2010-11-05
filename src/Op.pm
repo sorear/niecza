@@ -89,7 +89,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         my @ch = map { $_->cgop($body) } @{ $self->children };
-        my $end = @ch ? pop(@ch) : CgOp::scopedlex('Nil');
+        my $end = @ch ? pop(@ch) : CgOp::corelex('Nil');
 
         CgOp::prog((map { CgOp::sink($_) } @ch), $end);
     }
@@ -287,7 +287,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&infix:<=>>')),
+        CgOp::subcall(CgOp::fetch(CgOp::corelex('&infix:<=>>')),
             CgOp::string_var($self->key), $self->value->cgop($body));
     }
 
@@ -305,7 +305,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&infix:<,>')),
+        CgOp::subcall(CgOp::fetch(CgOp::corelex('&infix:<,>')),
             map { $_->cgop($body) } @{ $self->items });
     }
 
@@ -377,11 +377,11 @@ use CgOp;
 
         CgOp::prog(
             CgOp::subcall(
-                CgOp::fetch(CgOp::scopedlex("&warn")),
+                CgOp::fetch(CgOp::corelex("&warn")),
                 CgOp::string_var(">>>Stub code executed<<<")
             ),
             CgOp::subcall(
-                CgOp::fetch(CgOp::scopedlex("&exit")),
+                CgOp::fetch(CgOp::corelex("&exit")),
             ),
         );
     }
@@ -470,9 +470,9 @@ use CgOp;
                 CgOp::fetch(
                     CgOp::methodcall($self->check->cgop($body), "Bool"))),
             ($self->true ? $self->true->cgop($body) :
-                CgOp::scopedlex('Nil')),
+                CgOp::corelex('Nil')),
             ($self->false ? $self->false->cgop($body) :
-                CgOp::scopedlex('Nil')));
+                CgOp::corelex('Nil')));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -507,7 +507,7 @@ use CgOp;
                     CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
                     CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
             CgOp::label("last$id"),
-            CgOp::scopedlex('Nil'));
+            CgOp::corelex('Nil'));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -527,7 +527,7 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::methodcall(
-            CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&flat')),
+            CgOp::subcall(CgOp::fetch(CgOp::corelex('&flat')),
                 $self->source->cgop($body)), 'map', $self->sink->cgop($body));
     }
 
@@ -599,7 +599,7 @@ use CgOp;
             CgOp::unbox('bool',
                 CgOp::fetch(
                     CgOp::methodcall(CgOp::scopedlex($self->condvar), "Bool"))),
-            CgOp::scopedlex('Nil'),
+            CgOp::corelex('Nil'),
             CgOp::prog(
                 CgOp::assign(CgOp::scopedlex($self->condvar),
                     CgOp::box('Bool', CgOp::bool(1))),
@@ -773,7 +773,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::scopedlex('Nil');
+        CgOp::corelex('Nil');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -790,7 +790,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::scopedlex('Nil');
+        CgOp::corelex('Nil');
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -806,7 +806,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::methodcall(CgOp::scopedlex('Whatever'), "new");
+        CgOp::methodcall(CgOp::corelex('Whatever'), "new");
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -995,7 +995,7 @@ use CgOp;
 
     has unit => (isa => 'Str', is => 'ro', required => 1);
 
-    sub code { CgOp::scopedlex('Nil') }
+    sub code { CgOp::corelex('Nil') }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
@@ -1033,7 +1033,7 @@ use CgOp;
         # construct a GatherIterator with said frame
         # construct a List from the iterator
 
-        CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&_gather')),
+        CgOp::subcall(CgOp::fetch(CgOp::corelex('&_gather')),
             CgOp::newscalar(CgOp::startgather(
                     CgOp::fetch(CgOp::scopedlex($self->var)))));
     }

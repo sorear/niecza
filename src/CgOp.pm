@@ -105,7 +105,7 @@ use warnings;
     sub noop { prog() }
 
     sub rnull {
-        prog($_[0], scopedlex('Nil'));
+        prog($_[0], corelex('Nil'));
     }
 
     sub getattr {
@@ -132,7 +132,7 @@ use warnings;
         rawscall('Kernel.BoxAny', $_[1],
             blessed($_[0]) ? $_[0] :
             ($_[0] eq 'Str') ? rawsget('Kernel.StrP') :
-                fetch(scopedlex($_[0])));
+                fetch(corelex($_[0])));
     }
 
     sub obj_is_defined { rawcall($_[0], 'IsDefined') }
@@ -262,6 +262,14 @@ use warnings;
     sub scopedlex {
         my $n = shift;
         CgOp->new(op => [ scopelex => $n ], zyg => [ @_ ]);
+    }
+    sub corelex {
+        my $n = shift;
+        CgOp->new(op => [ corelex => $n ], zyg => [ @_ ]);
+    }
+    sub specificlex {
+        my ($ref, $n) = splice @_, 0, 2;
+        CgOp->new(op => [ specificlex => @$ref, $n ], zyg => [ @_ ]);
     }
 
     sub class_ref { CgOp->new(op => [ class_ref => @_ ]); }

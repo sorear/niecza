@@ -243,7 +243,8 @@ sub pkg2_prole {
 
 sub pkg2_class {
     my ($p, $wh6, $whv) = @_;
-    if ($unit->is_true_setting && ($_->name eq 'Scalar' ||
+    my $punit = $unit->get_unit($_->xref->[0]);
+    if ($punit->is_true_setting && ($_->name eq 'Scalar' ||
             $_->name eq 'Sub' || $_->name eq 'Stash')) {
         push @thaw, CgOp::rawsset($p,
             CgOp::rawsget("Kernel." . $_->name . "MO:f,$cl_ty"));
@@ -270,10 +271,10 @@ sub pkg2_class {
     create_type_object($_->{peer});
 
     push @thaw, CgOp::rawsset($loopbacks{'P' . $_->name}, CgOp::rawsget($wh6))
-        if $loopbacks{'P' . $_->name};
+        if $loopbacks{'P' . $_->name} && $punit->is_true_setting;
     push @thaw, CgOp::rawsset($loopbacks{'M' . $_->name}, CgOp::rawsget($p))
-        if $loopbacks{'M' . $_->name};
-    $classhow = $wh6 if $_->name eq 'ClassHOW';
+        if $loopbacks{'M' . $_->name} && $punit->is_true_setting;
+    $classhow = $wh6 if $_->name eq 'ClassHOW' && $punit->is_true_setting;
 }
 
 sub pkg3 {
@@ -312,20 +313,19 @@ sub enter_code {
             push @code, access_lex($body, $ln,
                 CgOp::newscalar(CgOp::rawscall('Kernel.MakeSub',
                         CgOp::rawsget($lx->body->{peer}{si}),
-                        CgOp::callframe)));
+                        CgOp::callframe)), 0);
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             my $frag;
             next if $lx->noinit;
             if ($lx->hash || $lx->list) {
-                # XXX should be SAFE::
-                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
+                my $imp = $_->true_setting->find_lex($lx->hash ? 'Hash' : 'Array')->path;
                 my $var = $unit->deref($unit->get_stash_obj(@$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {
                 $frag = CgOp::newblankrwscalar;
             }
-            push @code, access_lex($body, $ln, $frag);
+            push @code, access_lex($body, $ln, $frag, 0);
         }
     }
 novars:
@@ -337,15 +337,16 @@ novars:
 }
 
 sub access_lex {
-    my ($body, $name, $set_to) = @_;
+    my ($body, $name, $set_to, $core) = @_;
 
-    if ($haslet{$name}) {
+    if ($haslet{$name} && !$core) {
         return CgOp::letvar($name, $set_to);
     }
 
     my $bp = $body;
     my $order = 0;
     my $lex;
+    $bp = $bp->true_setting if $core;
     while ($bp) {
         $lex = $bp->lexicals->{$name};
         if (!$lex) {
@@ -400,8 +401,8 @@ sub resolve_lex {
     my ($body, $op) = @_;
 
     my ($opc, $arg, @rest) = @{ $op->op };
-    if ($opc eq 'scopelex') {
-        my $nn = access_lex($body, $arg, $op->zyg->[0]);
+    if ($opc eq 'scopelex' || $opc eq 'corelex') {
+        my $nn = access_lex($body, $arg, $op->zyg->[0], $opc eq 'corelex');
         #XXX
         %$op = %$nn;
         bless $op, ref($nn);
@@ -432,7 +433,7 @@ sub codegen_sub {
     # TODO: Bind a return value here to catch non-ro sub use
     if ($_->gather_hack) {
         $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
-            CgOp::rawscall('Kernel.Take', CgOp::scopedlex('EMPTY')));
+            CgOp::rawscall('Kernel.Take', CgOp::corelex('EMPTY')));
     } elsif ($_->parametric_role_hack) {
         my $obj = $unit->deref($_->parametric_role_hack);
         my @build;
@@ -546,7 +547,7 @@ sub sub2 {
     push @thaw, CgOp::rawsset($si, CgOp::rawnew("clr:$si_ty", @{ $node->{sictor} }));
 
     if ($_->class ne 'Sub') {
-        my $cl = $unit->deref($unit->get_stash_obj(@{ $_->find_lex_pkg($_->class) }));
+        my $cl = $unit->deref($unit->get_stash_obj(@{ $_->true_setting->find_lex_pkg($_->class) }));
         push @thaw, CgOp::setfield('mo', CgOp::rawsget($si), CgOp::rawsget($cl->{peer}{mo}));
     }
 
@@ -622,8 +623,7 @@ sub sub3 {
         } elsif ($lx->isa('Metamodel::Lexical::Simple')) {
             next unless $_->spad_exists;
             if ($lx->hash || $lx->list) {
-                # XXX should be SAFE::
-                my $imp = $_->find_lex($lx->hash ? 'Hash' : 'Array')->path;
+                my $imp = $_->true_setting->find_lex($lx->hash ? 'Hash' : 'Array')->path;
                 my $var = $unit->deref($unit->get_stash_obj(@$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');

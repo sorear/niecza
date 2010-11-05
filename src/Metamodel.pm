@@ -179,10 +179,10 @@ our %units;
 
     sub close {
         my ($self) = @_;
-        if ($self->name ne 'Mu' && $unit->is_true_setting
+        if (($self->name ne 'Mu' || !$unit->is_true_setting)
                 && !@{ $self->superclasses }) {
             $self->add_super($unit->get_stash_obj(
-                    @{ $opensubs[-1]->find_pkg($self->_defsuper) }));
+                    @{ $opensubs[-1]->true_setting->find_pkg($self->_defsuper) }));
         }
 
         my @merge;
@@ -217,7 +217,7 @@ our %units;
         $self->linearized_mro(\@mro);
     }
 
-    sub _defsuper { 'Any' } #XXX CORE::Any
+    sub _defsuper { 'Any' }
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -467,6 +467,14 @@ our %units;
         $_[0]{unit}->deref($v);
     }
 
+    sub true_setting {
+        my $cursor = $_[0];
+        while ($cursor && !$cursor->unit->is_true_setting) {
+            $cursor = $cursor->outer;
+        }
+        $cursor;
+    }
+
     sub children {
         map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
             values %{ $_[0]->lexicals };
@@ -607,8 +615,7 @@ our %units;
         default => sub { [] });
     has next_anon_stash => (isa => 'Int', is => 'rw', default => 0);
 
-    # XXX should be fed in perhaps from name, but this is good for testing
-    sub is_true_setting { 1 }
+    sub is_true_setting { $_[0]->name eq 'SAFE' || $_[0]->name eq 'CORE' }
 
     sub get_unit {
         my ($self, $name) = @_;
