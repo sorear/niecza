@@ -133,7 +133,7 @@ namespace Niecza {
             if (!rw) {
                 throw new NieczaException("Writing to readonly scalar");
             }
-            if (!v.Isa(type)) {
+            if (!v.mo.HasMRO(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
             }
             val = v;
@@ -542,7 +542,15 @@ namespace Niecza {
         }
 
         public bool HasMRO(DynMetaObject m) {
-            return isa.Contains(m);
+            int k = mro.Length;
+            if (k >= 20) {
+                return isa.Contains(m);
+            } else {
+                while (k != 0) {
+                    if (mro[--k] == m) return true;
+                }
+                return false;
+            }
         }
 
         public void AddMethod(string name, IP6 code) {
@@ -794,7 +802,7 @@ namespace Niecza {
 
             if (!rhs.rw) {
                 IP6 v = rhs.Fetch();
-                if (!v.Isa(type))
+                if (!v.mo.HasMRO(type))
                     return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
                 th.resultSlot = new SimpleVariable(false, islist, v.mo, null, v);
                 return th;
@@ -803,7 +811,7 @@ namespace Niecza {
             // whence != null
             if (ro) {
                 IP6 v = rhs.Fetch();
-                if (!v.Isa(type))
+                if (!v.mo.HasMRO(type))
                     return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
                 th.resultSlot = new SimpleVariable(false, islist, v.mo, null, rhs.Fetch());
                 return th;
@@ -952,7 +960,7 @@ namespace Niecza {
                 return th;
             }
             IP6 o = v.Fetch();
-            if (o.Isa(RxFrame.ListMO)) {
+            if (o.mo.HasMRO(RxFrame.ListMO)) {
                 th.resultSlot = v;
                 return th;
             }
@@ -973,7 +981,7 @@ namespace Niecza {
             IP6 item;
             while (iter.Count() != 0) {
                 item = iter[0].Fetch();
-                if (item.Isa(IterCursorMO)) {
+                if (item.mo.HasMRO(IterCursorMO)) {
                     break;
                 } else {
                     items.Push(iter.Shift());
@@ -1007,7 +1015,7 @@ namespace Niecza {
                         th.ip = 1;
                         return inq0.InvokeMethod(th, "iterator", new Variable[] { inq0v }, null);
                     }
-                    if (inq0.Isa(IterCursorMO)) {
+                    if (inq0.mo.HasMRO(IterCursorMO)) {
                         th.MarkSharedChain();
                         th.ip = 2;
                         DynObject thunk = new DynObject(RxFrame.GatherIteratorMO);
@@ -1045,7 +1053,7 @@ namespace Niecza {
                 return caller;
             }
             Variable i0 = iter[0];
-            if (!i0.islist && !i0.Fetch().Isa(IterCursorMO)) {
+            if (!i0.islist && !i0.Fetch().mo.HasMRO(IterCursorMO)) {
                 caller.resultSlot = true;
                 return caller;
             }
@@ -1075,7 +1083,7 @@ namespace Niecza {
                         return f.Fetch().InvokeMethod(th, "iterator", new Variable[] { f }, null);
                     }
 
-                    if ((ff = f.Fetch()).Isa(IterCursorMO)) {
+                    if ((ff = f.Fetch()).mo.HasMRO(IterCursorMO)) {
                         th.ip = 2;
                         iter.Shift();
                         return ff.InvokeMethod(th, "reify", new Variable[] { f }, null);
