@@ -521,7 +521,6 @@ use CgOp;
 
     has source => (isa => 'Op', is => 'ro', required => 1);
     has sink   => (isa => 'Op', is => 'ro', required => 1);
-    has immed  => (isa => 'Bool', is => 'ro', default => 0);
     sub zyg { $_[0]->source, $_[0]->sink }
 
     sub code {
@@ -529,15 +528,53 @@ use CgOp;
 
         CgOp::methodcall(
             CgOp::subcall(CgOp::fetch(CgOp::scopedlex('&flat')),
-                $self->source->cgop($body)),
-            ($self->immed ? 'for' : 'map'),
-            $self->sink->cgop($body));
+                $self->source->cgop($body)), 'map', $self->sink->cgop($body));
     }
 
     sub statement_level {
         my ($self) = @_;
-        Op::ForLoop->new(source => $self->source, sink => $self->sink,
-            immed => 1);
+        my $var = Niecza::Actions->gensym;
+        $self->sink->once(1);
+        Op::ImmedForLoop->new(source => $self->source, var => $var,
+            sink => Op::CallSub->new(invocant => $self->sink,
+                positionals => [ Op::LetVar->new(name => $var) ]));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::ImmedForLoop;
+    use Moose;
+    extends 'Op';
+
+    has var    => (isa => 'Str', is => 'ro', required => 1);
+    has source => (isa => 'Op', is => 'ro', required => 1);
+    has sink   => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->source, $_[0]->sink }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        my $id = Niecza::Actions->genid;
+
+        CgOp::rnull(CgOp::letn(
+            "!iter$id", CgOp::unbox('vvarlist', CgOp::fetch(CgOp::methodcall(
+                    $self->source->cgop($body), 'iterator'))),
+            $self->var, CgOp::null('var'),
+            CgOp::whileloop(0, 0,
+                CgOp::iter_hasflat(CgOp::letvar("!iter$id")),
+                CgOp::prog(
+                    CgOp::letvar($self->var,
+                        CgOp::vvarlist_shift(CgOp::letvar("!iter$id"))),
+                    CgOp::label("redo$id"),
+                    CgOp::sink($self->sink->cgop($body)),
+                    CgOp::label("next$id"),
+                    CgOp::ehspan(1, undef, 0, "redo$id", "next$id", "next$id"),
+                    CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
+                    CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
+            CgOp::label("last$id")));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -1005,7 +1042,7 @@ use CgOp;
     no Moose;
 }
 
-# the existance of these two complicates cross-sub inlining a bit
+# the existance of these complicates cross-sub inlining a bit
 {
     package Op::MakeCursor;
     use Moose;
@@ -1018,6 +1055,19 @@ use CgOp;
             CgOp::scopedlex('$*/', CgOp::newscalar(CgOp::rxcall('MakeCursor'))),
             CgOp::scopedlex('$*/'));
     }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
+    package Op::LetVar;
+    use Moose;
+    extends 'Op';
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code { CgOp::letvar($_[0]->name); }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
