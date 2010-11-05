@@ -15,6 +15,7 @@ use Body ();
 use Unit ();
 use Op ();
 use Optimizer::Beta ();
+use Optimizer::Simplifier ();
 use Metamodel ();
 use CSharpBackend ();
 use Storable;
@@ -216,6 +217,7 @@ sub compile {
                 actions => 'Niecza::Actions')->{_ast}; } ],
         [ 'begin', sub { $ast = $ast->begin } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
+        [ 'simpl', sub { Optimizer::Simplifier::run($ast) } ],
         [ 'csharp', sub { $ast = CSharpBackend::run($ast) } ],
         [ 'writecs', sub {
 

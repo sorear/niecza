@@ -1125,9 +1125,9 @@ grammar P6 is STD {
             %*LANG<MAIN>    = ::STD::P6 ;
             %*LANG<Q>       = ::STD::Q ;
             %*LANG<Quasi>   = ::STD::Quasi ;
-            %*LANG<Regex>   = ::STD::STDRegex ;
+            %*LANG<Regex>   = ::STD::Regex ;
             %*LANG<P5>      = ::STD::P5 ;
-            %*LANG<P5Regex> = ::STD::P5::STDRegex ;
+            %*LANG<P5Regex> = ::STD::P5::Regex ;
 
             @*WORRIES = ();
             self.load_setting($*SETTINGNAME);
@@ -4383,8 +4383,7 @@ grammar Quasi is STD::P6 {
 ## Regex #
 ##########
 
-# NIECZA shadowing CORE::Regex causes internal breakage
-grammar STDRegex is STD {
+grammar Regex is STD {
 
     method tweak(:Perl5(:$P5), :overlap(:$ov), :exhaustive(:$ex),
             :continue(:$c), :pos(:$p), :sigspace(:$s), :ratchet(:$r),

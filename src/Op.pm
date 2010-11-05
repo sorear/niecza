@@ -14,6 +14,10 @@ use CgOp;
     has line => (isa => 'Int', is => 'ro');
 
     sub zyg { }
+    # This should be a conservative approximation of nonvoid context for
+    # the optimizer; semantic contexts are very downplayed in Perl 6
+    # and we can live without them for a while.
+    sub ctxzyg { map { $_ => 1 } $_[0]->zyg }
 
     sub cgop {
         my ($self, $body) = @_;
@@ -85,6 +89,12 @@ use CgOp;
 
     has children => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
     sub zyg { @{ shift()->children } }
+    sub ctxzyg {
+        my ($self, $f) = shift;
+        my @r = map { $_ => 0 } @{ $self->children };
+        $r[-1] = $f if @r;
+        @r;
+    }
 
     sub code {
         my ($self, $body) = @_;
@@ -261,6 +271,7 @@ use CgOp;
 
     has inside => (isa => 'Op', is => 'ro', required => 1);
     sub zyg { $_[0]->inside }
+    sub ctxzyg { $_[0]->inside, $_[1] }
 
     sub code {
         my ($self, $body) = @_;
@@ -461,6 +472,10 @@ use CgOp;
     has false => (isa => 'Maybe[Op]', is => 'ro', required => 1);
 
     sub zyg { grep { defined } $_[0]->check, $_[0]->true, $_[0]->false }
+    sub ctxzyg {
+        $_[0]->check, 1,
+        map { defined($_) ? ($_, $_[1]) : () } $_[0]->true, $_[0]->false;
+    }
 
     sub code {
         my ($self, $body) = @_;
@@ -489,6 +504,7 @@ use CgOp;
     has once  => (isa => 'Bool', is => 'ro', required => 1);
     has until => (isa => 'Bool', is => 'ro', required => 1);
     sub zyg { $_[0]->check, $_[0]->body }
+    sub ctxzyg { $_[0]->check, 1, $_[0]->body, 0 }
 
     sub code {
         my ($self, $body) = @_;
@@ -553,6 +569,7 @@ use CgOp;
     has source => (isa => 'Op', is => 'ro', required => 1);
     has sink   => (isa => 'Op', is => 'ro', required => 1);
     sub zyg { $_[0]->source, $_[0]->sink }
+    sub ctxzyg { $_[0]->source, 1, $_[0]->sink, 0 }
 
     sub code {
         my ($self, $body) = @_;
@@ -591,6 +608,7 @@ use CgOp;
     has condvar => (isa => 'Str', is => 'ro', required => 1);
     has body => (isa => 'Op', is => 'ro', required => 1);
     sub zyg { $_[0]->body }
+    sub ctxzyg { $_[0]->body, $_[1] }
 
     sub code {
         my ($self, $body) = @_;
@@ -1148,6 +1166,23 @@ use CgOp;
     no Moose;
 }
 
+{
+    package Op::Assign;
+    use Moose;
+    extends 'Op';
+
+    has lhs => (isa => 'Op', is => 'ro', required => 1);
+    has rhs => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->lhs, $_[0]->rhs }
+
+    sub code {
+        my ($self, $body) = @_;
+        CgOp::rnull(CgOp::assign($self->lhs->cgop($body), $self->rhs->cgop($body)));
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
 {
     package Op::Let;
     use Moose;
