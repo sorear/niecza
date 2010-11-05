@@ -1040,6 +1040,15 @@ namespace Niecza {
         }
 
         public static Frame IterHasFlat(Frame caller, VarDeque iter, bool flat) {
+            if (iter.Count() == 0) {
+                caller.resultSlot = false;
+                return caller;
+            }
+            Variable i0 = iter[0];
+            if (!i0.islist && !i0.Fetch().Isa(IterCursorMO)) {
+                caller.resultSlot = true;
+                return caller;
+            }
             Frame n = caller.MakeChild(null, IHF_SI);
             n.lex0 = iter;
             n.lexi0 = flat ? 1 : 0;
