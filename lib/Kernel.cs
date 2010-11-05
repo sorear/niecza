@@ -730,6 +730,11 @@ namespace Niecza {
                 caller.flags &= ~Frame.MULTIPHASE;
                 return caller;
             } else {
+                if (i != caller.pos.Length)
+                    m += string.Format(", used {0} of {1} positionals",
+                            i, caller.pos.Length);
+                if (caller.named != null && caller.named.Count != 0)
+                    m += ", unused named " + JoinS(", ", caller.named.Keys);
                 return BindFail(caller, m);
             }
         }
