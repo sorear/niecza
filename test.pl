@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 608;
+plan 642;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1231,3 +1231,73 @@ rxtest / <alpha> / , '<alpha>', ('a', 'A', "\x4E00"), ("+", "1", " ");
 
 ok 1 !== 2, "infix_prefix_meta_operator:<!> works (T)";
 ok !(1 !== 1), "infix_prefix_meta_operator:<!> works (F)";
+
+{
+    my $m = "ab" ~~ / (.) <alpha> /;
+    is (@$m)[0], "a", "Match.list returns positional captures";
+    is (%$m)<alpha>, "b", "Match.hash returns named";
+    is ((-> $p, :$alpha { $p, $alpha })(|$m)).join("|"), "a|b", "Match.Capture returns both";
+    my @arr = "abc" ~~ / (.) (.) (.) /;
+    is @arr.join("|"), "a|b|c", "Regex.ACCEPTS in list context returns captures";
+    $m = "" ~~ / <O( foo => 2 )> /;
+    is $m<O><foo>, 2, "<O> is functional";
+
+    $m = (grammar {
+        proto token TOP {*}
+        token TOP:foo { <sym> }
+    }).parse("foo");
+    is $m<sym>, "foo", '$<sym> is functional';
+
+    ok !(try die "foo").defined, "try of an error is undef";
+    is $!, "foo", 'the error goes into $!';
+
+    {
+        my @*foo = 1, 2, 3;
+        {
+            temp @*foo;
+            push @*foo, 4;
+            is +@*foo, 4, '@*foo has 4 elements in temp scope';
+        }
+        is +@*foo, 3, '@*foo has 3 elements again after temp';
+    }
+
+    my @ar = [1, 2, 3];
+    is +@ar, 1, "array constructors are singular";
+    my $i = 0;
+    $i++ until $i == 10;
+    is $i, 10, "until loops functional";
+
+    ok "foo" !~~ / f <.suppose { die }> /, ".suppose works (F)";
+    ok "foo" ~~ / f <.suppose o> oo /, ".suppose works (T)";
+
+    ok "abcabc" ~~ /^ (\w+) $0 $/, '$/ in variable refs functional';
+    ok "abcabc" ~~ /^ (\w+) "$0" $/, '$/ in substrings functional';
+
+    (grammar {
+        method moo($cap) { is $cap<cap>, "hi", '$/ from subrule args works'; @( self, ) }
+        token TOP { $<cap>={"hi"} <moo($/)> }
+    }).parse("");
+
+    ok (grammar {
+        method moo() { self }
+        regex TOP { <.moo> }
+    }).parse(""), "simply returning self from a regex works";
+
+    rxtest / <after ':+'> X / , '<after ":+">X', (':+X', 'a:+X'), (':X','+:X');
+    rxtest / <after \s> X / , '<after \s>X', (' X',), ('xX','X');
+    rxtest / <after ab> X / , '<after ab>X', ('abX',), ('baX',);
+}
+
+{
+    my ($x) = (1, 2);
+    is $x, 1, "list assign takes first";
+    ($x, my $y) = (1, 2);
+    is "$x|$y", "1|2", "list assign takes both";
+    ($x, $y) = 1;
+    is $x, 1, "list assign takes what it can";
+    ok !$y.defined, "rest of list gets undef";
+    ($x, my @z, my @w) = (1, 2, 3);
+    is $x, 1, "scalar gets first";
+    is @z.join("|"), "2|3", "list gets rest";
+    is +@w, 0, "second list gets none";
+}
