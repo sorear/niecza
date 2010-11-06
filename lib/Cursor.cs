@@ -594,8 +594,20 @@ public sealed class CC {
 
             if (msk == 0)
                 continue;
+            while (ix + 2 < vec.Length &&
+                    (vec[ix+3] == MAll || vec[ix+3] == msk)) {
+                h = (ix + 4 < vec.Length) ? vec[ix+4] : 0x110000;
+
+                if (vec[ix+3] == MAll)
+                    clauses.Add(h == vec[ix+2] + 1 ?
+                        string.Format("({0:X4})", vec[ix+2]) :
+                        string.Format("({0:X4}..{1:X4})", vec[ix+2], h-1));
+                ix += 2;
+            }
             if (h != 0x110000 || l != 0 || ((msk & MAll) == MAll))
-                head = string.Format("({0:X4}..{1:X4})", l, h-1);
+                head = (h == l + 1) ?
+                    string.Format("({0:X4})", l) :
+                    string.Format("({0:X4}..{1:X4})", l, h-1);
             if ((msk & MAll) != MAll) {
                 List<string> vc = new List<string>();
                 for (int mix = 0; mix < masks.Length; mix++)
