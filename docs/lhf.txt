@@ -13,6 +13,7 @@
   - dir
   - IO::Socket
   - Buf stuff
+  - %*ENV
 
 * If you want to add base functionality like CATCH blocks, talk to me
   first; I have plans on these.  I don't think there are terribly many
