@@ -565,7 +565,19 @@ public sealed class CC {
     public static readonly CC None  = new CC(0);
     public static readonly CC AlNum = new CC(MAlNum);
 
-    private static readonly string[] categories = new string[] {
+    private static readonly int[] masks = new int[] {
+        MAll, (MAll & ~MOther), 0x71F,
+        0x1F, 0xE0, 0x700, 0x3800, 0x3C000, 0x1FC0000, 0x1E000000,
+
+        (1<<0),  (1<<1),  (1<<2),  (1<<3),   (1<<4),  (1<<5),  (1<<6),  (1<<7),
+        (1<<8),  (1<<9),  (1<<10), (1<<11),  (1<<12), (1<<13), (1<<14), (1<<15),
+        (1<<16), (1<<17), (1<<18), (1<<19),  (1<<20), (1<<21), (1<<22), (1<<23),
+        (1<<24), (1<<25), (1<<26), (1<<27),  (1<<28), (1<<29),
+    };
+    private static readonly string[] masknames = new string[] {
+        "ALL", "Assigned", "Alnum",
+        "Alpha", "Mark", "Num", "Space", "Control", "Punct", "Symbol",
+
         "Lu", "Ll", "Lt", "Lm",  "Lo", "Mn", "Mc", "Me",
         "Nd", "Nl", "No", "Zs",  "Zl", "Zp", "Cc", "Cf",
         "Cs", "Co", "Pc", "Pd",  "Ps", "Pe", "Pi", "Pf",
@@ -573,30 +585,29 @@ public sealed class CC {
     };
 
     public override string ToString() {
-        StringBuilder sb = new StringBuilder();
+        List<string> clauses = new List<string>();
         for (int ix = 0; ix < vec.Length; ix += 2) {
-            if (sb.Length != 0)
-                sb.Append(',');
+            string head = "";
             int l = vec[ix];
             int msk = vec[ix+1];
             int h = (ix + 2 < vec.Length) ? vec[ix+2] : 0x110000;
 
             if (msk == 0)
                 continue;
-            if (h != 0x110000 || l != 0)
-                sb.AppendFormat("({0:X4}..{1:X4})", l, h-1);
+            if (h != 0x110000 || l != 0 || ((msk & MAll) == MAll))
+                head = string.Format("({0:X4}..{1:X4})", l, h-1);
             if ((msk & MAll) != MAll) {
-                int used = 0;
-                for (int c = 0; c <= 29; c++) {
-                    if ((msk & (1 << c)) != 0) {
-                        if ((used++) != 0)
-                            sb.Append('+');
-                        sb.Append(categories[c]);
+                List<string> vc = new List<string>();
+                for (int mix = 0; mix < masks.Length; mix++)
+                    if ((msk & masks[mix]) == masks[mix]) {
+                        msk &= ~masks[mix];
+                        vc.Add(masknames[mix]);
                     }
-                }
-            }
+                clauses.Add(head + Kernel.JoinS("+", vc));
+            } else
+                clauses.Add(head);
         }
-        return sb.ToString();
+        return Kernel.JoinS(",", clauses);
     }
 }
 
