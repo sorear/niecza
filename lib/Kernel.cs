@@ -739,6 +739,16 @@ namespace Niecza {
             }
         }
 
+        public static IP6 SigSlurpCapture(Frame caller) {
+            IP6 nw = new DynObject(CaptureMO);
+            nw.SetSlot("positionals", caller.pos);
+            nw.SetSlot("named", caller.named);
+            caller.named = null;
+            return nw;
+        }
+
+        public static DynMetaObject CaptureMO;
+
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject ScalarMO;
         public static readonly DynMetaObject StashMO;

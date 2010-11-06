@@ -241,6 +241,8 @@ use warnings;
     sub iter_flatten { rawscall('Kernel.IterFlatten:c,VarDeque', $_[0]) }
     sub iter_copy_elems { rawscall('Kernel.IterCopyElems:m,VarDeque', $_[0]) }
 
+    sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }
+
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
             rawsget('Kernel.AnyMO'), $_[2]);

@@ -173,6 +173,7 @@ sub stash3 {
 my %loopbacks = (
     'MAny', 'Kernel.AnyMO',
     'MCallFrame', 'Kernel.CallFrameMO',
+    'MCapture', 'Kernel.CaptureMO',
     'MGatherIterator', 'RxFrame.GatherIteratorMO',
     'MList', 'RxFrame.ListMO',
     'MMatch', 'RxFrame.MatchMO',

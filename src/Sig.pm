@@ -9,6 +9,7 @@ use 5.010;
 
     has slot => (is => 'ro', isa => 'Maybe[Str]', required => 1);
     has slurpy => (is => 'ro', isa => 'Bool', default => 0);
+    has slurpycap => (is => 'ro', isa => 'Bool', default => 0);
     # rw binding to Mu that does not viv
     has rwtrans => (is => 'ro', isa => 'Bool', default => 0);
     has full_parcel => (is => 'ro', isa => 'Bool', default => 0);
@@ -40,6 +41,14 @@ use 5.010;
                             CgOp::callframe, CgOp::letvar('!ix')))),
                 CgOp::letvar('!ix', CgOp::poscount),
                 CgOp::newscalar(CgOp::letvar('!list'))));
+    }
+
+    sub slurpycap_get {
+        my ($self) = @_;
+
+        CgOp::letn('!cap', CgOp::sig_slurp_capture,
+            CgOp::letvar('!ix', CgOp::poscount),
+            CgOp::newscalar(CgOp::letvar('!cap')));
     }
 
     sub parcel_get {
@@ -120,6 +129,7 @@ use 5.010;
         my ($self, $body) = @_;
 
         my $get = $self->full_parcel ? $self->parcel_get :
+            $self->slurpycap ? $self->slurpycap_get :
             $self->slurpy ? $self->slurpy_get :
             $self->single_get($body);
 
@@ -135,6 +145,7 @@ use 5.010;
         my ($self, $body, $posr) = @_;
 
         my $get = $self->full_parcel ? $self->parcel_get_inline($posr) :
+            $self->slurpycap ? $self->slurpycap_get_inline($posr) :
             $self->slurpy ? $self->slurpy_get_inline($posr) :
             $self->single_get_inline($body, $posr);
 
