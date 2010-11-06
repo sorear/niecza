@@ -10,14 +10,14 @@ our %Gc = (map { $_ => ((state $i)++) } qw/ Lu Ll Lt Lm Lo
     Sc Sk So Cn /);
 
 our $Empty = bless [ ], 'CClass';
-our $Full  = bless [ 0, 0x1FFF_FFFF ], 'CClass';
+our $Full  = bless [ 0, 0x3FFF_FFFF ], 'CClass';
 
 sub range {
     my ($cl, $c1, $c2) = @_;
 
     return $Empty if $c1 gt $c2;
 
-    bless [ ord($c1), 0x1FFF_FFFF, ord($c2) + 1, 0 ], $cl;
+    bless [ ord($c1), 0x3FFF_FFFF, ord($c2) + 1, 0 ], $cl;
 }
 
 sub enum {
@@ -93,7 +93,7 @@ sub minus {
 
 sub negate {
     my ($self) = @_;
-    _binop(sub { 0x1FFF_FFFF & ~$_[0] }, $self, []);
+    _binop(sub { 0x3FFF_FFFF & ~$_[0] }, $self, []);
 }
 
 our $Word   = CClass->catm(qw< Lu Lt Ll Lm Lo Nd Nl No >)->plus('_');
