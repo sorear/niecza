@@ -63,6 +63,7 @@ sub do_assign {
 
 sub run_optree {
     my ($body, $op, $nv) = @_;
+    Carp::confess "WTF" if !defined $nv;
     my @kids = $op->ctxzyg($nv);
     while (my ($kc, $nvc) = splice @kids, 0, 2) {
         run_optree($body, $kc, $nvc);

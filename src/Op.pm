@@ -90,7 +90,7 @@ use CgOp;
     has children => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
     sub zyg { @{ shift()->children } }
     sub ctxzyg {
-        my ($self, $f) = shift;
+        my ($self, $f) = @_;
         my @r = map { $_ => 0 } @{ $self->children };
         $r[-1] = $f if @r;
         @r;
