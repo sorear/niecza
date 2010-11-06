@@ -4222,8 +4222,8 @@ grammar Q is STD {
         # in single quotes, keep backslash on random character by default
         token backslash:misc { {} (.) $<text> = {"\\" ~ $0.Str} }
 
-        # NIECZA multi methods NYI
-        method tweak(:single(:$q), :double(:$qq), :cclass(:$cc)) {
+        # NIECZA multi methods, interface consistency NYI
+        method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), *%_) {
             if    $q.defined  { self.panic("Too late for :q") }
             elsif $qq.defined { self.panic("Too late for :qq") }
             elsif $cc.defined { self.panic("Too late for :cc") }
@@ -4237,7 +4237,7 @@ grammar Q is STD {
         token backslash:misc { {} [ (\W) $<text> = {$0.Str} | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # NIECZA multi methods NYI
-        method tweak(:single(:$q), :double(:$qq), :cclass(:$cc)) {
+        method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), *%_) {
             if    $q.defined  { self.panic("Too late for :q") }
             elsif $qq.defined { self.panic("Too late for :qq") }
             elsif $cc.defined { self.panic("Too late for :cc") }
@@ -4298,7 +4298,7 @@ grammar Q is STD {
         token backslash:misc { {} [ (\W) $<text> = {$0.Str} | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # NIECZA multi methods NYI
-        method tweak(:single(:$q), :double(:$qq), :cclass(:$cc)) {
+        method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), *%_) {
             if    $q.defined  { self.panic("Too late for :q") }
             elsif $qq.defined { self.panic("Too late for :qq") }
             elsif $cc.defined { self.panic("Too late for :cc") }
@@ -4309,7 +4309,7 @@ grammar Q is STD {
     role p5 {
         # begin tweaks (DO NOT ERASE)
         # NIECZA multi methods NYI
-        method tweak(:$g, :$i, :$m, :$s, :$x, :$p, :$c) {
+        method tweak(:$g, :$i, :$m, :$s, :$x, :$p, :$c, *%_) {
             if    $g.defined { self }
             elsif $i.defined { self }
             elsif $m.defined { self }
@@ -4389,7 +4389,7 @@ grammar Regex is STD {
             :continue(:$c), :pos(:$p), :sigspace(:$s), :ratchet(:$r),
             :global(:$g), :ignorecase(:$i), :ignoreaccent(:$a), :samecase(:$ii),
             :sameaccent(:$aa), :th(:st(:nd(:rd(:$nth)))), :$x, :$bytes,
-            :$codes, :$graphs, :$chars, :$rw) {
+            :$codes, :$graphs, :$chars, :$rw, *%_) {
         if    $P5.defined { die("Autoloading NYI") }
         elsif $ov.defined { %*RX<ov> = $ov; self }
         elsif $ex.defined { %*RX<ex> = $ex; self }
