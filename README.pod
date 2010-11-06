@@ -38,10 +38,6 @@ STD, File::ShareDir, and YAML::XS from CPAN
     4
     $
 
-Note: Some versions of xbuild seem to ignore the ContinueOnError hint, and some
-builds of mono do not support C<--aot>.  If both factors combine, you will need
-to change C<UseAOT> to C<N> in Niecza.proj for the build to succeed.
-
 =head1 COPYRIGHT AND LICENSE
 
 Niecza is Copyright 2010 Stefan O'Rear et al.  It may be used and distributed
