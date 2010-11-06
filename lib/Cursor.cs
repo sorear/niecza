@@ -221,11 +221,11 @@ public sealed class RxFrame {
         int prev = (st.pos == 0) ? -1 : orig[st.pos-1];
         switch(type) {
             case 0:
-                return (next >= 0) && !char.IsWhiteSpace((char)next) &&
-                    ((prev < 0) || char.IsWhiteSpace((char)prev));
+                return (next >= 0) && CC.Word.Accepts((char)next) &&
+                    ((prev < 0) || !CC.Word.Accepts((char)prev));
             case 1:
-                return (prev >= 0) && !char.IsWhiteSpace((char)prev) &&
-                    ((next < 0) || char.IsWhiteSpace((char)next));
+                return (prev >= 0) && CC.Word.Accepts((char)prev) &&
+                    ((next < 0) || !CC.Word.Accepts((char)next));
             case 2:
                 return (prev == -1);
             case 3:

@@ -12,6 +12,9 @@ use MONKEY_TYPING;
     ok "x" ~~ /x/, "Regex shadowing doesn't cause problems";
 }
 
+ok "\x2FFF" ~~ /<-[ x ]>/, "Negated char classes match unassigned characters";
+ok "x:" ~~ /. >> ./, "Punctuation ends words";
+
 # {
 #     our role Stop4717[$a] {
 #         token foo { $a }
