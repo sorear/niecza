@@ -4227,7 +4227,7 @@ grammar Q is STD {
             if    $q.defined  { self.panic("Too late for :q") }
             elsif $qq.defined { self.panic("Too late for :qq") }
             elsif $cc.defined { self.panic("Too late for :cc") }
-            else { nextsame }
+            else { nextwith(self, |%_) }
         }
     }
 
@@ -4241,7 +4241,7 @@ grammar Q is STD {
             if    $q.defined  { self.panic("Too late for :q") }
             elsif $qq.defined { self.panic("Too late for :qq") }
             elsif $cc.defined { self.panic("Too late for :cc") }
-            else { nextsame }
+            else { nextwith(self, |%_) }
         }
     }
 
@@ -4302,7 +4302,7 @@ grammar Q is STD {
             if    $q.defined  { self.panic("Too late for :q") }
             elsif $qq.defined { self.panic("Too late for :qq") }
             elsif $cc.defined { self.panic("Too late for :cc") }
-            else { nextsame }
+            else { nextwith(self, |%_) }
         }
     }
 
@@ -4317,7 +4317,7 @@ grammar Q is STD {
             elsif $x.defined { self }
             elsif $p.defined { self }
             elsif $c.defined { self }
-            else             { nextsame }
+            else             { nextwith(self, |%_) }
         }
     }
 
@@ -4409,7 +4409,7 @@ grammar Regex is STD {
         elsif $graphs.defined { %*RX<graphs> = $graphs; self }
         elsif $chars.defined { %*RX<chars> = $chars; self }
         elsif $rw.defined { %*RX<rw> = $rw; self }
-        else { nextsame }
+        else { nextwith(self, |%_) }
     }
 
     token category:metachar { <sym> }
