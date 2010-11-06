@@ -335,6 +335,9 @@ sub return(\$obj) is return-pass {
 sub nextsame() {
     Q:CgOp { (control 9 (null frame) (int -1) (null str) (null obj)) }
 }
+sub nextwith(|$cap) {
+    Q:CgOp { (control 9 (null frame) (int -1) (null str) (@ {$cap})) }
+}
 
 sub assignop($fn) {
     anon sub _assign(\$lhs, \$rhs) {

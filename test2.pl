@@ -15,6 +15,12 @@ use MONKEY_TYPING;
 ok "\x2FFF" ~~ /<-[ x ]>/, "Negated char classes match unassigned characters";
 ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
+{
+    my class A { method foo(:$x) { $x * 2 } }
+    my class B is A { method foo() { nextwith( self, x => 5 ) } }
+    is B.foo, 10, "nextwith works";
+}
+
 # {
 #     our role Stop4717[$a] {
 #         token foo { $a }
