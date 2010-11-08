@@ -103,6 +103,7 @@ sub RxOp::Alt::rxsimp { my ($self, $cut) = @_;
     my @kids = map { $_->rxsimp($cut) } @{ $self->zyg };
     return RxOp::Alt->new(
         lads => [ map { Optimizer::RxSimple::run_lad($_) } @{ $self->lads } ],
+        dba => $self->dba,
         zyg => \@kids);
 }
 

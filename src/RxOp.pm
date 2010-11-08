@@ -303,6 +303,8 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
+    has dba    => (isa => 'Maybe[Str]', is => 'rw', required => 0);
+
     sub check { goto &RxOp::Alt::check }
     sub used_caps { goto &RxOp::Alt::used_caps }
     # zyg * N
@@ -512,7 +514,13 @@ use CgOp;
     extends 'RxOp';
 
     has closer => (isa => 'Str', is => 'ro', required => 1);
-    has dba    => (isa => 'Str', is => 'ro', required => 1);
+    has dba    => (isa => 'Maybe[Str]', is => 'rw', required => 1);
+
+    sub check {
+        my ($self) = @_;
+        $self->dba($self->dba // $::dba);
+        $self->SUPER::check;
+    }
 
     sub code {
         my ($self, $body) = @_;
@@ -723,9 +731,12 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
+    has dba => (isa => 'Maybe[Str]', is => 'rw');
+
     sub check {
         my ($self) = @_;
         my $maxparen = $::paren;
+        $self->dba($self->dba // $::dba // Carp::croak "wtf no dba");
 
         for (@{ $self->zyg }) {
             local $::paren = $::paren;
@@ -755,12 +766,15 @@ use CgOp;
         my @ls = map { $self->label } @{ $self->zyg };
         my $end = $self->label;
 
+        die "check screwed up on $self" unless defined $self->dba;
+
         my @code;
         push @code, CgOp::rxcall("LTMPushAlts",
             CgOp::rawscall('Lexer.GetLexer',
+                CgOp::callframe(),
                 CgOp::rxcall('GetClass'),
                 CgOp::const(CgOp::construct_lad($self->lads)),
-                CgOp::clr_string('')),
+                CgOp::clr_string($self->dba)),
             CgOp::const(CgOp::rawnewarr('int', map { CgOp::labelid($_) } @ls)));
         push @code, CgOp::goto('backtrack');
         for (my $i = 0; $i < @ls; $i++) {
@@ -883,6 +897,7 @@ use CgOp;
         # will probably break with complicated harnesses
         CgOp::letn(
           "fns", CgOp::rawscall('Lexer.RunProtoregex',
+            CgOp::callframe(),
             CgOp::fetch(CgOp::scopedlex('self')),
             CgOp::clr_string($self->name)),
           "i",   CgOp::int(0),

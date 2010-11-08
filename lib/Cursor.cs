@@ -1101,7 +1101,7 @@ public class Lexer {
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
-    public static Lexer GetLexer(DynMetaObject kl, LAD[] lads, string title) {
+    public static Lexer GetLexer(Frame fromf, DynMetaObject kl, LAD[] lads, string title) {
         LexerCache lc = kl.GetLexerCache();
         Lexer ret;
         if (lc.nfas.TryGetValue(lads, out ret))
@@ -1196,7 +1196,7 @@ public class Lexer {
         return uniqfates.ToArray();
     }
 
-    public static IP6[] RunProtoregex(IP6 cursor, string name) {
+    public static IP6[] RunProtoregex(Frame fromf, IP6 cursor, string name) {
         DynMetaObject kl = cursor.mo;
         LexerCache lc = kl.GetLexerCache();
         DynObject[] candidates = ResolveProtoregex(kl, name);

@@ -324,6 +324,7 @@ sub op_for_regex { my ($cl, $M, $rxop) = @_;
     my @lift = $rxop->oplift;
     {
         local $::paren = 0;
+        local $::dba = 'anonymous rule';
         $rxop->check
     }
     my ($orxop, $mb) = Optimizer::RxSimple::run($rxop);
@@ -424,6 +425,7 @@ sub regex_def { my ($cl, $M) = @_;
     {
         local $::paren = 0;
         local $::symtext = $symtext;
+        local $::dba = $name // 'anonymous regex';
         $ast->check;
     }
     my $lad = Optimizer::RxSimple::run_lad($ast->lad);
@@ -498,7 +500,7 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
         $inner = $cl->encapsulate_regex($M, $inner, passcut => 1,
             goal => $closer->text);
         $atom = RxOp::Sequence->new(zyg => [$atom,
-            RxOp::Tilde->new(closer => $closer->text, dba => $::RX{dba} // '?',
+            RxOp::Tilde->new(closer => $closer->text, dba => $::RX{dba},
                 zyg => [$inner])]); # TODO
     }
 
@@ -559,7 +561,7 @@ my %LISTrx_types = (
 sub LISTrx { my ($cl, $M) = @_;
     for (@{ $M->{list} }) { return unless $_->{_ast} }
     $M->{_ast} = $LISTrx_types{$M->{delims}[0]{sym}}->new(zyg =>
-        [ map { $_->{_ast} } @{ $M->{list} } ]);
+        [ map { $_->{_ast} } @{ $M->{list} } ], dba => $::RX{dba});
 }
 
 sub regex_infix {}
@@ -639,7 +641,7 @@ sub metachar__S_qw { my ($cl, $M) = @_;
     @words = map { $_->text } @words;
 
     $M->{_ast} = RxOp::Alt->new(zyg => [ map { RxOp::String->new(text => $_,
-            igcase => $::RX{i}, igmark => $::RX{a}) } @words ]);
+            igcase => $::RX{i}, igmark => $::RX{a}) } @words ], dba => $::RX{dba});
 }
 
 sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
