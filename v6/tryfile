@@ -418,6 +418,10 @@ augment class Cursor {
     method cursor_fresh($k = self) { Q:CgOp {
         (ns (cursor_fresh (cast cursor (@ {self})) (@ {$k})))
     } }
+    method cursor_force($pos) {
+        $*HIGHWATER = $pos;
+        self.cursor($pos);
+    }
 
     method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
 

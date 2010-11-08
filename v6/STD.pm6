@@ -3857,8 +3857,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
             }
         };
 
-        # NIECZA cursor_force was used here
-        $here.cursor($node<infix>.to).worryobs('.= as append operator', '~=') unless $ok;
+        $here.cursor_force($node<infix>.to).worryobs('.= as append operator', '~=') unless $ok;
         $node;
     }
 
