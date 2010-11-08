@@ -21,6 +21,15 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     is B.foo, 10, "nextwith works";
 }
 
+{
+    our role R6025[$x] {
+        method foo() { $x }
+    }
+
+    ok ((Any but OUR::R6025[True]).foo.^isa(Bool)),
+        "parameterized roles can store non-strings";
+}
+
 # {
 #     our role Stop4717[$a] {
 #         token foo { $a }

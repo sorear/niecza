@@ -1182,10 +1182,20 @@ slow:
                     {
                         string s = "";
                         th.lex0 = th.pos[0].Fetch().mo;
+                        Variable[] to_pass = new Variable[th.pos.Length - 1];
+                        bool cache_ok = true;
                         for (int i = 1; i < th.pos.Length; i++) {
-                            string p = (string)UnboxAny(th.pos[i].Fetch());
-                            s += new string((char)p.Length, 1);
-                            s += p;
+                            IP6 obj = th.pos[i].Fetch();
+                            to_pass[i-1] = NewROScalar(obj);
+                            if (obj.mo == StrP.mo) {
+                                string p = (string)UnboxAny(obj);
+                                s += new string((char)p.Length, 1);
+                                s += p;
+                            } else { cache_ok = false; }
+                        }
+                        if (!cache_ok) {
+                            return ((DynMetaObject) th.lex0).roleFactory.
+                                Invoke(th.caller, to_pass, null);
                         }
                         th.lex1 = s;
                         bool ok;
@@ -1198,8 +1208,6 @@ slow:
                             return th.caller;
                         }
                         th.ip = 1;
-                        Variable[] to_pass = new Variable[th.pos.Length - 1];
-                        Array.Copy(th.pos, 1, to_pass, 0, th.pos.Length - 1);
                         return ((DynMetaObject) th.lex0).roleFactory.
                             Invoke(th, to_pass, null);
                     }

@@ -1,6 +1,3 @@
-Highwater stuff
-
-NOT NEEDED FOR #phasers:
 Cursor.check_old_cclass
 Cursor.mark_sinks
 Cursor.trim_heredoc
@@ -71,3 +68,4 @@ given & when
 if not binding $_
 List.at-pos(WhateverCode)
 Mu.new(foo => $bar)
+Highwater stuff  # Going to punt porting since it's useless as designed
