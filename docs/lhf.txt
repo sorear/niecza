@@ -7,9 +7,6 @@
   - @*ARGS
   - $*ARGFILES
   - open/read/write/close
-  - $*IN needs to be using new StreamReader(Console.OpenStandardInput(),
-    Console.InputEncoding).  mike_f++, *very* LHF; $*OUT, $*ERR should
-    probably work similarly.
   - dir
   - IO::Socket
   - Buf stuff

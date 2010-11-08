@@ -179,7 +179,7 @@ use warnings;
     sub treader_getc    { rawcall($_[0], 'Read:m,Int32') }
     sub treader_slurp   { rawcall($_[0], 'ReadToEnd:m,String') }
     sub treader_getline { rawcall($_[0], 'ReadLine:m,String') }
-    sub treader_stdin   { rawsget('System.Console.In:f,System.IO.TextReader') }
+    sub treader_stdin   { rawscall('Kernel.OpenStdin:m,System.IO.TextReader') }
 
     sub fvarlist_length { getfield('Length', $_[0]) }
     sub fvarlist_new { rawnewarr('var', @_) }

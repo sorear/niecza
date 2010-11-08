@@ -1374,6 +1374,18 @@ slow:
             return sb.ToString();
         }
 
+        public static System.IO.TextReader OpenStdin() {
+            return new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
+        }
+
+        public static System.IO.TextWriter OpenStdout() {
+            return new System.IO.StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding);
+        }
+
+        public static System.IO.TextWriter OpenStderr() {
+            return new System.IO.StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
+        }
+
         private static object in_unhandled;
 
         // exception processing goes in two stages
