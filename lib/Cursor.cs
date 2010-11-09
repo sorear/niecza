@@ -866,6 +866,21 @@ public class LADImp : LAD {
     }
 }
 
+public class LADParam : LAD {
+    public readonly string name;
+    public LADParam(string name) { this.name = name; }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        int knot = pad.AddNode();
+        pad.nodes_l[knot].final = true;
+        pad.AddEdge(from, knot, null);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "param: " + name);
+    }
+}
+
 public class LADNull : LAD {
     public override void ToNFA(NFA pad, int from, int to) {
         pad.AddEdge(from, to, null);

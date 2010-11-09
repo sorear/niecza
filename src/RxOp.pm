@@ -133,6 +133,7 @@ use CgOp;
     use Moose;
     extends 'RxOp';
 
+    has param => (isa => 'Maybe[Str]', is => 'ro');
     has ops => (isa => 'Op', is => 'ro', required => 1);
     sub opzyg { $_[0]->ops }
 
@@ -141,7 +142,7 @@ use CgOp;
         CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(CgOp::methodcall($self->ops->cgop($body), "Str"))));
     }
 
-    sub lad { ['Imp'] }
+    sub lad { $_[0]->param ? ['Param', $_[0]->param] : ['Imp'] }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;

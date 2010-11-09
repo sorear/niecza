@@ -716,8 +716,8 @@ sub metachar__S_var { my ($cl, $M) = @_;
         $M->{_ast} = $cl->rxcapturize($M, $cid, $a);
         return;
     }
-    $M->{_ast} = RxOp::VarString->new(ops => $cl->rxembed($M,
-            $cl->do_variable_reference($M, $M->{variable}{_ast}, 1)));
+    $M->{_ast} = RxOp::VarString->new(param => $M->{variable}->Str,
+        ops => $cl->rxembed($M, $cl->do_variable_reference($M, $M->{variable}{_ast}, 1)));
 }
 
 sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;
