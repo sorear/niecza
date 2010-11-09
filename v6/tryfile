@@ -14,6 +14,7 @@ augment class Any {
 }
 
 augment class Stash {
+    method iterator () { self.list.iterator }
 }
 
 augment class NAME {
@@ -67,7 +68,7 @@ method heredoc () {
 method panic (Str $s) {
     die "Recursive panic" if $*IN_PANIC;
     $*IN_PANIC++;
-    my $m;
+    my $m = "";
     my $here = self;
 
     my $first = $here.lineof($*LAST_NIBBLE.from);

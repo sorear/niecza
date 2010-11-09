@@ -7,9 +7,9 @@ Cursor.gettrait
 Cursor.load_lex
 Cursor.add_categorical
 Action methods
-token { $param-role-var }
 
 DONE:
+token { $param-role-var }
 ~
 Cursor.canonicalize_name
 Parcel.LISTSTORE
