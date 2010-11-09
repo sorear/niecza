@@ -32,12 +32,130 @@ augment class Regex {
     }
 }
 
+augment class Match {
+    method trim_heredoc () { self } # NYI
+}
+
 augment class Hash {
     method hash() { unitem(self) }
 }
 
 augment class STD {
-    method panic($str) { die "$str at {self.pos}" }
+our @herestub_queue;
+
+method heredoc () {
+    my role herestop {
+        token stopper { ^^ {} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
+    }
+
+    my $here = self;
+    while my $herestub = shift @herestub_queue {
+        my $*DELIM = $herestub.delim;
+        my $lang = $herestub.lang.mixin( herestop );
+        my $doc;
+        if ($doc,) = $here.nibble($lang) {
+            $here = $doc.trim_heredoc();
+            # $herestub.orignode<doc> = $doc; NIECZA immutable matches
+        }
+        else {
+            self.panic("Ending delimiter $*DELIM not found");
+        }
+    }
+    return self.cursor($here.pos);  # return to initial type
+}
+
+method panic (Str $s) {
+    die "Recursive panic" if $*IN_PANIC;
+    $*IN_PANIC++;
+    my $m;
+    my $here = self;
+
+    my $first = $here.lineof($*LAST_NIBBLE.from);
+    my $last = $here.lineof($*LAST_NIBBLE.pos);
+    if $first != $last {
+        if $here.lineof($here.pos) == $last {
+            $m ~= "(Possible runaway string from line $first)\n";
+        }
+        else {
+            $first = $here.lineof($*LAST_NIBBLE_MULTILINE.from);
+            $last = $here.lineof($*LAST_NIBBLE_MULTILINE.pos);
+            # the bigger the string (in lines), the further back we suspect it
+            if $here.lineof($here.pos) - $last < $last - $first  {
+                $m ~= "(Possible runaway string from line $first to line $last)\n";
+            }
+        }
+    }
+
+    $m ~= $s;
+
+    if substr(self.orig,$here.pos,1) ~~ /\)|\]|\}|\»/ {
+        my $ma = ($m ~~ /(.*?)Confused(.*)/);
+        if ($ma) {
+            $m = $ma[0] ~ "Unexpected closing bracket" ~ $ma[1];
+        }
+    }
+
+    $m ~= $here.locmess;
+    $m ~= "\n" unless $m ~~ /\n$/;
+
+    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
+        my @t = $here.suppose( sub { $here.term } );
+        my $conf;
+        if @t {
+            my $endpos = $here.pos;
+            my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
+
+            if self.lineof($startpos) != self.lineof($endpos) {
+                $conf = "Two terms in a row (previous line missing its semicolon?)";
+            }
+            elsif @*MEMOS[$here.pos - 1]<baremeth> {
+                $conf = "Two terms in a row (method call requires colon or parens to take arguments)";
+            }
+            elsif @*MEMOS[$here.pos - 1]<arraycomp> {
+                $conf = "Two terms in a row (preceding is not a valid reduce operator)";
+            }
+            else {
+                $conf = "Two terms in a row";
+            }
+        }
+        elsif my $type = @*MEMOS[$here.pos - 1]<nodecl> {
+            my @t = $here.suppose( sub { $here.variable } );
+            if @t {
+                my $variable = @t[0].Str;
+                $conf = "Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'";
+            }
+        }
+        if $conf && my $ma = ($m ~~ /(.*?)Confused(.*)/) {
+            $m = $ma[0] ~ $conf ~ $ma[1];
+        }
+    }
+    elsif my $type = @*MEMOS[$here.pos - 1]<wasname> {
+        my @t = $here.suppose( sub { $here.identifier } );
+        my $name = @t[0].Str;
+        my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
+        my $d = $*IN_DECL;
+        $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
+        my ($a,$b) = $m ~~ /(.*?)Malformed block(.*)/;
+        defined($a) and $m = $a ~ "Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.$b";
+    }
+
+    if @*WORRIES {
+        $m ~= "Other potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+    }
+
+    $*IN_PANIC--;
+    die $m if $*IN_SUPPOSE;     # just throw the exception back to the supposer
+    $*IN_PANIC++;
+
+    note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
+        unless $*FATALS++;
+    note $m;
+    self.explain_mystery();
+
+    $*IN_PANIC--;
+    note "Parse failed\n";
+    exit 1;
+}
 constant $item_assignment_prec = 'i=';
 constant $methodcall_prec = 'y=';
 constant $LOOSEST = "a=!"; # XXX preceding line is busted
