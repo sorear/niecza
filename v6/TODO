@@ -7,7 +7,6 @@ Cursor.gettrait
 Cursor.load_lex
 Cursor.add_categorical
 Action methods
-Non-string parameterized role arguments
 token { $param-role-var }
 
 DONE:
@@ -60,6 +59,7 @@ temp $*FOO
 try
 token { :my $var = expr; $var }
 Write tests for EXPR
+Non-string parameterized role arguments
 
 AVERTED:
 

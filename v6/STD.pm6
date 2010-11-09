@@ -4346,7 +4346,7 @@ grammar Q is STD {
         elsif $w.defined  { self.mixin($w  ?? STD::Q::w1  !! STD::Q::w0) }
         elsif $ww.defined { self.mixin($ww ?? STD::Q::ww1 !! STD::Q::ww0) }
 
-        elsif $to.defined { self.truly($to, ':to'); STD::Q.mixin(STD::Q::herehead[self]) }
+        elsif $to.defined { self.truly($to, ':to'); self.cursor_fresh(STD::Q but STD::Q::herehead[self]) }
 
         elsif $regex.defined {
             %*LANG<Regex>
