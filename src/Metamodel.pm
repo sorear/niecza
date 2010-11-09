@@ -1073,6 +1073,7 @@ sub Op::PackageDef::begin {
         if ($pclass eq 'Metamodel::ParametricRole') {
             $unit->deref($obj)->builder($body->xref);
             $body->parametric_role_hack($obj);
+            $body->add_my_name('*params', noinit => 1);
             $body->create_static_pad;
         }
         $opensubs[-1]->add_my_sub($self->bodyvar, $body);

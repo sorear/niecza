@@ -22,9 +22,6 @@ my $VERBOSE = $ENV{NIECZA_CSHARP_VERBOSE};
 # Class     : DynMetaObject
 # Class     : (opt) HOW
 
-# deliberately omitted for now: the run_once optimization & lazy static pad
-# generation & indexification
-
 our $unit;
 our $nid = 0;
 our @decls;
@@ -459,11 +456,20 @@ sub codegen_sub {
                     CgOp::fetch(CgOp::scopedlex($b)));
             }
         }
+        if ($_->signature) {
+            for my $p (@{ $_->signature->params }) {
+                next unless $p->slot;
+                push @build, CgOp::varhash_setindex($p->slot,
+                    CgOp::letvar('!pa'), CgOp::scopedlex($p->slot));
+            }
+        }
         $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
             CgOp::letn("!mo", CgOp::rawnew('clr:DynMetaObject',
                     CgOp::clr_string($obj->name)),
                 "!to", CgOp::rawnew('clr:DynObject', CgOp::letvar('!mo')),
+                "!pa", CgOp::varhash_new(),
                 @build,
+                CgOp::scopedlex('*params', CgOp::letvar('!pa')),
                 CgOp::setfield('slots', CgOp::letvar('!to'),
                     CgOp::null('clr:object[]')),
                 CgOp::setfield('typeObject', CgOp::letvar('!mo'),
