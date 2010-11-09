@@ -652,28 +652,35 @@ public sealed class NFA {
 
     public DynMetaObject cursor_class;
     public HashSet<string> method_stack = new HashSet<string>();
+    public List<Frame> outer_stack = new List<Frame>();
     public Dictionary<string,LAD> method_cache = new Dictionary<string,LAD>();
+    public Dictionary<string,Frame> outer_cache = new Dictionary<string,Frame>();
 
-    public LAD ResolveMethod(string name) {
+    public LAD ResolveMethod(string name, out Frame outer) {
         LAD sub = null;
-        if (method_cache.TryGetValue(name, out sub))
+        if (method_cache.TryGetValue(name, out sub)) {
+            outer = outer_cache[name];
             return sub;
+        }
         IP6 method = cursor_class.Can(name);
 
         if (Lexer.LtmTrace && method != null)
             Console.WriteLine("+ Found method");
 
         if (method == null) {
+            outer = outer_cache[name] = null;
             return method_cache[name] = new LADImp();
         }
 
         sub = ((SubInfo)(((DynObject)method).GetSlot("info"))).ltm;
+        outer = ((Frame)(((DynObject)method).GetSlot("outer")));
 
         if (Lexer.LtmTrace)
             Console.WriteLine("+ {0} to sub-automaton",
                     (sub != null ? "Resolved" : "Failed to resolve"));
 
         method_cache[name] = sub;
+        outer_cache[name] = outer;
         return sub;
     }
 
@@ -871,6 +878,40 @@ public class LADParam : LAD {
     public LADParam(string name) { this.name = name; }
 
     public override void ToNFA(NFA pad, int from, int to) {
+        Frame outer = pad.outer_stack[pad.outer_stack.Count - 1];
+        string reason;
+
+        if (outer == null) {
+            reason = "no outer frame";
+            goto imp;
+        }
+
+        object o;
+
+        if (outer.lex == null || !outer.lex.TryGetValue("*params", out o)) {
+            reason = "no parameter block";
+            goto imp;
+        }
+
+        Variable p;
+        if (!((Dictionary<string,Variable>) o).TryGetValue(name, out p)) {
+            reason = "parameter not found";
+            goto imp;
+        }
+        IP6 i = p.Fetch();
+        if (i.mo != Kernel.StrP.mo) {
+            reason = "parameter is not a string";
+            goto imp;
+        }
+
+        string text = (string)Kernel.UnboxAny(i);
+        (new LADStr(text)).ToNFA(pad, from, to);
+        if (Lexer.LtmTrace)
+            Console.WriteLine("Resolved {0} to \"{1}\"", name, text);
+        return;
+imp:
+        if (Lexer.LtmTrace)
+            Console.WriteLine("No LTM for {0} because {1}", name, reason);
         int knot = pad.AddNode();
         pad.nodes_l[knot].final = true;
         pad.AddEdge(from, knot, null);
@@ -934,9 +975,12 @@ public class LADMethod : LAD {
             return;
         }
 
-        pad.method_stack.Add(name);
+        Frame outer;
+        LAD sub = pad.ResolveMethod(name, out outer);
 
-        LAD sub = pad.ResolveMethod(name);
+        pad.method_stack.Add(name);
+        pad.outer_stack.Add(outer);
+
         if (sub == null) {
             int knot = pad.AddNode();
             pad.AddEdge(from, knot, null);
@@ -946,17 +990,21 @@ public class LADMethod : LAD {
         }
 
         pad.method_stack.Remove(name);
+        pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
     }
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
-        LAD sub = pad.ResolveMethod(name);
+        Frame outer;
+        LAD sub = pad.ResolveMethod(name, out outer);
 
         if (pad.method_stack.Contains(name) || sub == null) {
             len = 0; cont = false;
         } else {
             pad.method_stack.Add(name);
+            pad.outer_stack.Add(outer);
             sub.QueryLiteral(pad, out len, out cont);
             pad.method_stack.Remove(name);
+            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
         }
     }
 
@@ -1121,13 +1169,14 @@ public class Lexer {
         Lexer ret;
         if (lc.nfas.TryGetValue(lads, out ret))
             return ret;
-        ret = new Lexer(kl, title, lads);
+        ret = new Lexer(fromf, kl, title, lads);
         lc.nfas[lads] = ret;
         return ret;
     }
 
-    public Lexer(DynMetaObject cmo, string tag, LAD[] alts) {
+    public Lexer(Frame outer, DynMetaObject cmo, string tag, LAD[] alts) {
         pad.cursor_class = cmo;
+        pad.outer_stack.Add(outer);
         this.alts = alts;
         this.tag = tag;
         int root = pad.AddNode();
@@ -1223,7 +1272,7 @@ public class Lexer {
             LAD[] branches = new LAD[candidates.Length];
             for (int i = 0; i < candidates.Length; i++)
                 branches[i] = ((SubInfo) candidates[i].GetSlot("info")).ltm;
-            lc.protorx_nfa[name] = l = new Lexer(cursor.mo, name, branches);
+            lc.protorx_nfa[name] = l = new Lexer(null, cursor.mo, name, branches);
         } else {
             if (LtmTrace)
                 Console.WriteLine("+ Protoregex lexer HIT on {0}.{1}",

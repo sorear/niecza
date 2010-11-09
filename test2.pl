@@ -30,18 +30,18 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
         "parameterized roles can store non-strings";
 }
 
-# {
-#     our role Stop4717[$a] {
-#         token foo { $a }
-#     }
-#
-#     grammar X {
-#         token TOP { [ <foo> | foo ]: x }
-#     }
-#
-#     ok (X but OUR::Stop4717["foobar"]).parse("foobarx"),
-#         "LTM works through parameterized role variables";
-# }
+{
+    our role Stop4717[$a] {
+        token foo { $a }
+    }
+
+    grammar X {
+        token TOP { [ <foo> | foo ]: x }
+    }
+
+    ok (X but OUR::Stop4717["foobar"]).parse("foobarx"),
+        "LTM works through parameterized role variables";
+}
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
