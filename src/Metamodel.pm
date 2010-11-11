@@ -249,6 +249,9 @@ our %units;
 
     sub add_method {
         my ($self, $type, $name, $var, $body) = @_;
+        if (blessed $name) {
+            die "Computed names are legal only in parametric roles";
+        }
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
             body => $body, private => ($type eq '!'));
     }

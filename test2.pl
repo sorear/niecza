@@ -7,7 +7,7 @@ use MONKEY_TYPING;
         regex ::($x) { foo }
     }
 
-    ok (Grammar but OUR::R5634["TOP"]).pars("foo"), "roles with dynamic regex names work";
+    ok (Grammar but OUR::R5634["TOP"]).parse("foo"), "roles with dynamic regex names work";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

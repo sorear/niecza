@@ -365,6 +365,13 @@ sub regex_block { my ($cl, $M) = @_;
 sub regex_def { my ($cl, $M) = @_;
     my ($name, $path) = $M->{deflongname}[0] ?
         @{ $cl->mangle_longname($M->{deflongname}[0]) }{'name', 'path'} : ();
+    my $cname;
+    if ($path && @$path == 0 && $name->isa('Op')) {
+        $cname = $name;
+        $name = $M->{deflongname}[0]->Str;
+        $path = undef;
+    }
+
     my $scope = (!defined($name)) ? "anon" : ($::SCOPE || "has");
 
     if (@{ $M->{signature} } > 1) {
@@ -372,14 +379,20 @@ sub regex_def { my ($cl, $M) = @_;
         return;
     }
 
+    if ($cname && $scope ne 'has') {
+        $M->sorry("Only has regexes may have computed names");
+        $M->{_ast} = Op::StatementList->new;
+        return;
+    }
+
     my $isproto;
     my $symtext =
-        !defined($name) ? undef :
+        ($cname || !defined($name)) ? undef :
         ($name =~ /:sym<(.*)>/) ? $1 :
         ($name =~ /:(\w+)/) ? $1 :
         undef; #XXX
     my $unsymtext =
-        !defined($name) ? undef :
+        ($cname || !defined($name)) ? undef :
         ($name =~ /(.*):sym<.*>/) ? $1 :
         ($name =~ /(.*):\w+/) ? $1 :
         undef;
@@ -433,7 +446,7 @@ sub regex_def { my ($cl, $M) = @_;
     ($ast, my $mb) = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
-        method_too => ($scope eq 'has' ? ['', $name] : undef),
+        method_too => ($scope eq 'has' ? ['', $cname // $name] : undef),
         proto_too => ($scope eq 'has' ? $unsymtext : undef),
         body => Body->new(
             ltm   => $lad,

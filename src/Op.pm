@@ -879,12 +879,15 @@ use CgOp;
 
     has var    => (isa => 'Str', is => 'ro', required => 1);
     has body   => (isa => 'Body', is => 'ro', required => 1);
-    has method_too => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
+    has method_too => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has proto_too => (isa => 'Maybe[Str]', is => 'ro', required => 0);
     has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
     # Is candidate for beta-optimization.  Not compatible with method_too,
     # proto_too, exports, ltm
     has once   => (isa => 'Bool', is => 'rw', default => 0);
+
+    sub zyg { ($_[0]->method_too && blessed $_[0]->method_too->[1]) ?
+        $_[0]->method_too->[1] : () }
 
     sub code {
         my ($self, $body) = @_;

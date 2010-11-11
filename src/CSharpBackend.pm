@@ -445,7 +445,9 @@ sub codegen_sub {
         for my $m (@{ $obj->methods }) {
             push @build, CgOp::rawcall(CgOp::letvar('!mo'),
                 ($m->[2] ? 'AddPrivateMethod' : 'AddMethod'),
-                CgOp::clr_string($m->[0]),
+                (ref($m->[0]) ?
+                    CgOp::unbox('str', CgOp::fetch($m->[0]->cgop($_))) :
+                    CgOp::clr_string($m->[0])),
                 CgOp::fetch(CgOp::scopedlex($m->[1])));
         }
         push @build, CgOp::rawcall(CgOp::letvar('!mo'), 'Invalidate');
