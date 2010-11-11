@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 642;
+plan 649;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1300,4 +1300,45 @@ ok !(1 !== 1), "infix_prefix_meta_operator:<!> works (F)";
     is $x, 1, "scalar gets first";
     is @z.join("|"), "2|3", "list gets rest";
     is +@w, 0, "second list gets none";
+}
+
+{
+    sub infix:<=>($x, $y) { $x ~ "|" ~ $y }
+    is (1 = 2), '1|2', 'can override infix:<=> in lexical scope';
+}
+
+{
+    my class Regex { }
+    ok "x" ~~ /x/, "Regex shadowing doesn't cause problems";
+}
+
+ok "\x2FFF" ~~ /<-[ x ]>/, "Negated char classes match unassigned characters";
+ok "x:" ~~ /. >> ./, "Punctuation ends words";
+
+{
+    my class A { method foo(:$x) { $x * 2 } }
+    my class B is A { method foo() { nextwith( self, x => 5 ) } }
+    is B.foo, 10, "nextwith works";
+}
+
+{
+    our role R6025[$x] {
+        method foo() { $x }
+    }
+
+    ok ((Any but OUR::R6025[True]).foo.^isa(Bool)),
+        "parameterized roles can store non-strings";
+}
+
+{
+    our role Stop4717[$a] {
+        token foo { $a }
+    }
+
+    grammar X {
+        token TOP { [ <foo> | foo ]: x }
+    }
+
+    ok (X but OUR::Stop4717["foobar"]).parse("foobarx"),
+        "LTM works through parameterized role variables";
 }
