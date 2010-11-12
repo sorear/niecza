@@ -230,7 +230,7 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
         token ::($name) () { $sym $<O>={$O} }
     }
     role bracket_categorical[$name,$sym1,$sym2,$O] {
-        token ::($name) () { $sym1 {}:s <semilist> [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} }
+        token ::($name) () { :my $*GOAL = $sym2; $sym1 {}:s [ :lang($¢.unbalanced($sym2)) <semilist> ] [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} }
     }
 
     method add_categorical($name) {
