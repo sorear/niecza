@@ -227,10 +227,10 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 
     # TODO: allow variable :dba()s
     role sym_categorical[$name,$sym,$O] {
-        rule ::($name) () { $sym $<O>={$O} }
+        token ::($name) () { $sym $<O>={$O} }
     }
     role bracket_categorical[$name,$sym1,$sym2,$O] {
-        rule ::($name) () { $sym1 {} <semilist> [ $sym2 || <.FAILGOAL($sym2, $name, self)> ] $<O>={$O} }
+        token ::($name) () { $sym1 {}:s <semilist> [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} }
     }
 
     method add_categorical($name) {
@@ -264,9 +264,11 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
             my $sym1 = $sym.substr(0, $M.from);
             my $sym2 = $sym.substr($M.to, $sym.chars - $M.to);
             my $cname = $cat ~ ":<$sym1 $sym2>";
+            say "Adding categorical handler $cname for $sym1 / $sym2";
             %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[$cname, $sym1, $sym2, $O];
         } else {
             my $cname = $cat ~ ":<$sym>";
+            say "Adding categorical handler $cname for $sym";
             %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[$cname, $sym, $O];
         }
         self.cursor_fresh(%*LANG<MAIN>);
@@ -350,7 +352,7 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
     method FAILGOAL ($stop, $name, $startpos) {
         my $s = "'$stop'";
         $s = '"\'"' if $s eq "'''";
-        self.panic("Unable to parse $name" ~ $startpos.locmess ~ "\nCouldn't find final $s; gave up");
+        self.panic("Unable to parse $name" ~ self.cursor($startpos).locmess ~ "\nCouldn't find final $s; gave up");
     }
 
     method deb(*@str) { note @str }
