@@ -1,6 +1,7 @@
 * Generally speaking, the setting is very incomplete.  Patches to add
   methods or subs to the setting, with tests, are welcome.
   - Series operators, stuff like that.
+  - split, comb, trans
   - Beware - multiple dispatch is NYI!
 
 * In particular, I/O is sorely lacking.

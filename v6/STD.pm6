@@ -736,11 +736,11 @@ method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
-        my $lang = $herestub.lang.mixin( STD::herestop );
+        my $lang = $herestub.lang.mixin( herestop );
         my $doc;
-        if ($doc) = $here.nibble($lang) {
+        if ($doc,) = $here.nibble($lang) {
             $here = $doc.trim_heredoc();
-            $herestub.orignode<doc> = $doc;
+            # $herestub.orignode<doc> = $doc; NIECZA immutable matches
         }
         else {
             self.panic("Ending delimiter $*DELIM not found");
@@ -5729,11 +5729,11 @@ method EXPR ($preclvl?) {
         $here.deb("Top of opstack is ", _top(@opstack).dump) if $DEBUG::EXPR;
         $*LEFTSIGIL = _top(@opstack)<O><prec> gt $item_assignment_prec
             ?? '@' !! '';     # XXX P6
-        my $term =
-            ($termish eq 'termish') ?? $here.termish.head !!
-            ($termish eq 'nulltermish') ?? $here.nulltermish.head !!
-            ($termish eq 'statement') ?? $here.statement.head !!
-            ($termish eq 'dottyopish') ?? $here.dottyopish.head !!
+        my ($term) =
+            ($termish eq 'termish') ?? $here.termish !!
+            ($termish eq 'nulltermish') ?? $here.nulltermish !!
+            ($termish eq 'statement') ?? $here.statement !!
+            ($termish eq 'dottyopish') ?? $here.dottyopish !!
             die "weird value of $termish";
 
         if not $term {
@@ -5782,8 +5782,9 @@ method EXPR ($preclvl?) {
     sub infixstate() { #OK
         $here.deb("Looking for an infix") if $DEBUG::EXPR;
         return 1 if (@*MEMOS[$here.pos]<endstmt> // 0) == 2;  # XXX P6
-        $here = $here.cursor($here.ws.head.to);
-        my $infix = $here.infixish.head;
+        my ($ws) = $here.ws;
+        $here = $here.cursor($ws.to);
+        my ($infix) = $here.infixish;
         return 1 unless $infix;
 
         my $inO = $infix<O>;
@@ -5803,7 +5804,8 @@ method EXPR ($preclvl?) {
         }
 
         $here = $here.cursor($infix.to);
-        $here = $here.cursor($here.ws.head.to);
+        ($ws,) = $here.ws;
+        $here = $here.cursor($ws.to);
 
         # substitute precedence for listops
         $inO<prec> = $inO<sub> if $inO<sub>;
@@ -5879,13 +5881,8 @@ method EXPR ($preclvl?) {
 method panic (Str $s) {
     die "Recursive panic" if $*IN_PANIC;
     $*IN_PANIC++;
-    my $m;
+    my $m = "";
     my $here = self;
-
-    # Have we backed off recently?
-    my $highvalid = self.pos <= $*HIGHWATER;
-
-    $here = self.cursor($*HIGHWATER) if $highvalid;
 
     my $first = $here.lineof($*LAST_NIBBLE.from);
     my $last = $here.lineof($*LAST_NIBBLE.pos);
@@ -5909,32 +5906,12 @@ method panic (Str $s) {
         my $ma = ($m ~~ /(.*?)Confused(.*)/);
         if ($ma) {
             $m = $ma[0] ~ "Unexpected closing bracket" ~ $ma[1];
-            $highvalid = False;
         }
-    }
-
-    if $highvalid {
-        $m ~= $*HIGHMESS if $*HIGHMESS;
-        $*HIGHMESS = $m;
-    }
-    else {
-        # not in backoff, so at "bleeding edge", as it were... therefore probably
-        # the exception will be caught and re-panicked later, so remember message
-        $*HIGHMESS ~= $s ~ "\n";
     }
 
     $m ~= $here.locmess;
     $m ~= "\n" unless $m ~~ /\n$/;
 
-    if $highvalid and %$*HIGHEXPECT {
-        my @keys = sort keys %$*HIGHEXPECT;
-        if +@keys > 1 {
-            $m ~= "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
-        }
-        else {
-            $m ~= "    expecting @keys\n" unless @keys[0] eq 'whitespace';
-        }
-    }
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
         my @t = $here.suppose( sub { $here.term } );
         my $conf;
@@ -5990,7 +5967,8 @@ method panic (Str $s) {
     self.explain_mystery();
 
     $*IN_PANIC--;
-    die "Parse failed\n";
+    note "Parse failed\n";
+    exit 1;
 }
 
 regex is_ok {
