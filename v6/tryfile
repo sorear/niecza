@@ -235,11 +235,11 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 
     method add_categorical($name) {
         # Signature extension, not categorical
-        if $name ~~ /^\w+:\(/ {
+        if $name ~~ /^\w+\:\(/ {
             self.add_my_name($name);
             return self;
         }
-        my $M = ($name ~~ /^(\w+): <?[ \< \« ]> /);
+        my $M = ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
         return self unless $M;
         my $cat = $M[0];
         my $sym = substr($name, $M.to+1, $name.chars-$M.to-2);
