@@ -391,11 +391,6 @@ sub regex_def { my ($cl, $M) = @_;
         ($name =~ /:sym<(.*)>/) ? $1 :
         ($name =~ /:(\w+)/) ? $1 :
         undef; #XXX
-    my $unsymtext =
-        ($cname || !defined($name)) ? undef :
-        ($name =~ /(.*):sym<.*>/) ? $1 :
-        ($name =~ /(.*):\w+/) ? $1 :
-        undef;
     if ($::MULTINESS eq 'proto') {
         if ($M->{signature}[0] || !$M->{regex_block}{onlystar} || $scope ne 'has') {
             $M->sorry("Only simple {*} protoregexes with no parameters are supported");
@@ -447,7 +442,6 @@ sub regex_def { my ($cl, $M) = @_;
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
         method_too => ($scope eq 'has' ? ['', $cname // $name] : undef),
-        proto_too => ($scope eq 'has' ? $unsymtext : undef),
         body => Body->new(
             ltm   => $lad,
             returnable => 1,

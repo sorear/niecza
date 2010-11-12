@@ -425,6 +425,8 @@ namespace Niecza {
             = new List<DynMetaObject>();
         public Dictionary<string, IP6> local
             = new Dictionary<string, IP6>();
+        public List<KeyValuePair<string, IP6>> ord_methods
+            = new List<KeyValuePair<string, IP6>>();
         public Dictionary<string, IP6> priv
             = new Dictionary<string, IP6>();
         public List<string> local_attr = new List<string>();
@@ -442,8 +444,6 @@ namespace Niecza {
             //Kernel.LogNameLookup(name);
             return slotMap[name];
         }
-
-        public Dictionary<string, List<DynObject>> multiregex;
 
         public DynMetaObject[] mro;
         public HashSet<DynMetaObject> isa;
@@ -471,7 +471,7 @@ namespace Niecza {
                 if (k.OnInvoke != null)
                     mro_OnInvoke = k.OnInvoke;
 
-                foreach (KeyValuePair<string,IP6> m in k.local) {
+                foreach (KeyValuePair<string,IP6> m in k.ord_methods) {
                     DispatchEnt de;
                     mro_methods.TryGetValue(m.Key, out de);
                     mro_methods[m.Key] = new DispatchEnt(de, m.Value);
@@ -512,17 +512,6 @@ namespace Niecza {
                     k.Revalidate();
         }
 
-        public void AddMultiRegex(string name, IP6 m) {
-            if (multiregex == null)
-                multiregex = new Dictionary<string, List<DynObject>>();
-            List<DynObject> dl;
-            if (! multiregex.TryGetValue(name, out dl)) {
-                dl = new List<DynObject>();
-                multiregex[name] = dl;
-            }
-            dl.Add((DynObject)m);
-        }
-
         public IP6 Can(string name) {
             DispatchEnt m;
             if (mro_methods.TryGetValue(name, out m))
@@ -555,6 +544,7 @@ namespace Niecza {
 
         public void AddMethod(string name, IP6 code) {
             local[name] = code;
+            ord_methods.Add(new KeyValuePair<string,IP6>(name, code));
         }
 
         public void AddPrivateMethod(string name, IP6 code) {
@@ -1242,14 +1232,9 @@ slow:
                     new DynMetaObject[] { b }, nmro);
             foreach (KeyValuePair<string, IP6> kv in role.priv)
                 n.AddPrivateMethod(kv.Key, kv.Value);
-            foreach (KeyValuePair<string, IP6> kv in role.local)
+            foreach (KeyValuePair<string, IP6> kv in role.ord_methods)
                 n.AddMethod(kv.Key, kv.Value);
             n.Invalidate();
-            if (role.multiregex != null)
-                foreach (KeyValuePair<string, List<DynObject>> kv
-                        in role.multiregex)
-                    foreach (DynObject dx in kv.Value)
-                        n.AddMultiRegex(kv.Key, dx);
 
             n.how = BoxAny(n, b.how).Fetch();
             n.typeObject = new DynObject(n);

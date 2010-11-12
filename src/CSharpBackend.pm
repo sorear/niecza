@@ -286,13 +286,6 @@ sub pkg3 {
             CgOp::rawsget($unit->deref($m->body)->{peer}{ps}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Invalidate');
-    for my $k (sort keys %{ $_->multi_regex_lists }) {
-        for my $b (@{ $_->multi_regex_lists->{$k} }) {
-            push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'AddMultiRegex',
-                CgOp::clr_string($k),
-                CgOp::rawsget($unit->deref($b)->{peer}{ps}));
-        }
-    }
     if ($classhow) {
         push @thaw, CgOp::setfield('how', CgOp::rawsget($p), CgOp::fetch(
                 CgOp::box(CgOp::rawsget($classhow), CgOp::rawsget($p))));
@@ -451,13 +444,6 @@ sub codegen_sub {
                 CgOp::fetch(CgOp::scopedlex($m->[1])));
         }
         push @build, CgOp::rawcall(CgOp::letvar('!mo'), 'Invalidate');
-        for my $k (sort keys %{ $obj->multi_regex_lists }) {
-            for my $b (@{ $obj->multi_regex_lists->{$k} }) {
-                push @build, CgOp::rawcall(CgOp::letvar('!mo'),
-                    'AddMultiRegex', CgOp::clr_string($k),
-                    CgOp::fetch(CgOp::scopedlex($b)));
-            }
-        }
         if ($_->signature) {
             for my $p (@{ $_->signature->params }) {
                 next unless $p->slot;

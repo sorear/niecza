@@ -1301,27 +1301,23 @@ public class Lexer {
                     cursor_class.name, name);
 
         IP6 proto = cursor_class.Can(name);
+        string filter = name + ":";
 
         List<DynObject> raword = new List<DynObject>();
 
         foreach (DynMetaObject k in cursor_class.mro) {
             if (proto != k.Can(name))
                 continue;
-            if (k.multiregex == null)
-                continue;
-            List<DynObject> locord;
-            if (k.multiregex.TryGetValue(name, out locord))
-                foreach (DynObject o in locord)
-                    raword.Add(o);
+            foreach (KeyValuePair<string,IP6> o in k.ord_methods) {
+                if (!o.Key.StartsWith(filter))
+                    continue;
+                if (cursor_class.Can(o.Key) == o.Value) {
+                    raword.Add((DynObject) o.Value);
+                }
+            }
         }
 
-        HashSet<IP6> unshadowed = cursor_class.AllMethodsSet();
-        List<DynObject> useord = new List<DynObject>();
-        foreach (DynObject o in raword)
-            if (unshadowed.Contains(o))
-                useord.Add(o);
-
-        ret = useord.ToArray();
+        ret = raword.ToArray();
         cursor_class.GetLexerCache().protorx_fns[name] = ret;
         return ret;
     }

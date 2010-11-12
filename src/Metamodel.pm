@@ -151,8 +151,6 @@ our %units;
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
-    has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
-        is => 'ro', lazy => 1, default => sub { +{} });
     has linearized_mro => (isa => 'ArrayRef[ArrayRef]', is => 'rw');
 
     sub add_attribute {
@@ -164,11 +162,6 @@ our %units;
         my ($self, $type, $name, $var, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
             body => $body, private => ($type eq '!'));
-    }
-
-    sub push_multi_regex {
-        my ($self, $name, $var, $body) = @_;
-        push @{ $self->multi_regex_lists->{$name} //= [] }, $body;
     }
 
     sub add_super {
@@ -239,8 +232,6 @@ our %units;
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
-    has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
-        is => 'ro', lazy => 1, default => sub { +{} });
 
     sub add_attribute {
         my ($self, $name) = @_;
@@ -254,11 +245,6 @@ our %units;
         }
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
             body => $body, private => ($type eq '!'));
-    }
-
-    sub push_multi_regex {
-        my ($self, $name, $var, $body) = @_;
-        push @{ $self->multi_regex_lists->{$name} //= [] }, $body;
     }
 
     sub add_super {
@@ -283,8 +269,6 @@ our %units;
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
-    has multi_regex_lists => (isa => 'HashRef[ArrayRef]',
-        is => 'ro', lazy => 1, default => sub { +{} });
 
     sub add_attribute {
         my ($self, $name) = @_;
@@ -294,11 +278,6 @@ our %units;
     sub add_method {
         my ($self, $type, $name, $var, $body) = @_;
         push @{ $self->methods }, [ $name, $var, ($type eq '!') ];
-    }
-
-    sub push_multi_regex {
-        my ($self, $name, $var, $body) = @_;
-        push @{ $self->multi_regex_lists->{$name} //= [] }, $var;
     }
 
     sub add_super {
@@ -999,8 +978,7 @@ sub Op::SubDef::begin {
     my $body = $self->body->begin(once => $self->once);
     $opensubs[-1]->add_my_sub($self->var, $body);
     my $r = $body->xref;
-    if (@{ $self->exports } || defined($self->method_too) ||
-            defined ($self->proto_too)) {
+    if (@{ $self->exports } || defined($self->method_too)) {
         $body->strong_used(1);
     }
     $opensubs[-1]->create_static_pad if $body->strong_used;
@@ -1010,14 +988,9 @@ sub Op::SubDef::begin {
             ->add_method(@{ $self->method_too }, $self->var, $r);
     }
 
-    if (defined($self->proto_too)) {
-        $unit->deref($opensubs[-1]->body_of)
-            ->push_multi_regex($self->proto_too, $self->var, $r);
-    }
-
     $opensubs[-1]->add_exports($unit, $self->var, $r, $self->exports);
 
-    delete $self->{$_} for (qw( body method_too proto_too exports ));
+    delete $self->{$_} for (qw( body method_too exports ));
 }
 
 sub Op::BareBlock::begin {
