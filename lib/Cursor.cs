@@ -659,9 +659,13 @@ public sealed class NFA {
     public LAD ResolveMethod(string name, out Frame outer) {
         LAD sub = null;
         if (method_cache.TryGetValue(name, out sub)) {
+            if (Lexer.LtmTrace)
+                Console.WriteLine("+ Method HIT for {0}", name);
             outer = outer_cache[name];
             return sub;
         }
+        if (Lexer.LtmTrace)
+            Console.WriteLine("+ Method MISS for {0}", name);
         IP6 method = cursor_class.Can(name);
 
         if (Lexer.LtmTrace && method != null)
@@ -718,12 +722,15 @@ public abstract class LAD {
     public virtual void QueryLiteral(NFA pad, out int len, out bool cont) {
         len = 0; cont = false;
     }
+
+    public abstract LAD Reify(NFA pad);
 }
 
 public class LADStr : LAD {
     public readonly string text;
     public LADStr(string text) { this.text = text; }
 
+    public override LAD Reify(NFA pad) { return this; }
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
         len = text.Length; cont = true;
     }
@@ -750,6 +757,7 @@ public class LADCC : LAD {
     public readonly CC cc;
     public LADCC(CC cc) { this.cc = cc; }
 
+    public override LAD Reify(NFA pad) { return this; }
     public override void ToNFA(NFA pad, int from, int to) {
         pad.AddEdge(from, to, cc);
     }
@@ -759,10 +767,60 @@ public class LADCC : LAD {
     }
 }
 
+public class LADImp : LAD {
+    public override LAD Reify(NFA pad) { return this; }
+    public override void ToNFA(NFA pad, int from, int to) {
+        int knot = pad.AddNode();
+        pad.nodes_l[knot].final = true;
+        pad.AddEdge(from, knot, null);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "imp");
+    }
+}
+
+public class LADNull : LAD {
+    public override LAD Reify(NFA pad) { return this; }
+    public override void ToNFA(NFA pad, int from, int to) {
+        pad.AddEdge(from, to, null);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "null");
+    }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        len = 0; cont = true;
+    }
+}
+
+public class LADNone : LAD {
+    public override LAD Reify(NFA pad) { return this; }
+    public override void ToNFA(NFA pad, int from, int to) {
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "none");
+    }
+}
+
+public class LADDot : LAD {
+    public override LAD Reify(NFA pad) { return this; }
+    public override void ToNFA(NFA pad, int from, int to) {
+        pad.AddEdge(from, to, CC.All);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "dot");
+    }
+}
+
 public class LADStar : LAD {
     public readonly LAD child;
     public LADStar(LAD child) { this.child = child; }
 
+    public override LAD Reify(NFA pad) { return new LADStar(child.Reify(pad)); }
     public override void ToNFA(NFA pad, int from, int to) {
         int knot = pad.AddNode();
         pad.AddEdge(from, knot, null);
@@ -778,6 +836,7 @@ public class LADStar : LAD {
 
 public class LADOpt : LAD {
     public readonly LAD child;
+    public override LAD Reify(NFA pad) { return new LADOpt(child.Reify(pad)); }
     public LADOpt(LAD child) { this.child = child; }
 
     public override void ToNFA(NFA pad, int from, int to) {
@@ -793,6 +852,7 @@ public class LADOpt : LAD {
 
 public class LADPlus : LAD {
     public readonly LAD child;
+    public override LAD Reify(NFA pad) { return new LADPlus(child.Reify(pad)); }
     public LADPlus(LAD child) { this.child = child; }
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
@@ -817,6 +877,12 @@ public class LADPlus : LAD {
 public class LADSequence : LAD {
     public readonly LAD[] args;
     public LADSequence(LAD[] args) { this.args = args; }
+    public override LAD Reify(NFA pad) {
+        LAD[] nc = new LAD[args.Length];
+        for (int i = 0; i < args.Length; i++)
+            nc[i] = args[i].Reify(pad);
+        return new LADSequence(nc);
+    }
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
         int i = 0;
@@ -848,6 +914,12 @@ public class LADSequence : LAD {
 public class LADAny : LAD {
     public readonly LAD[] zyg;
     public LADAny(LAD[] zyg) { this.zyg = zyg; }
+    public override LAD Reify(NFA pad) {
+        LAD[] nc = new LAD[zyg.Length];
+        for (int i = 0; i < zyg.Length; i++)
+            nc[i] = zyg[i].Reify(pad);
+        return new LADAny(nc);
+    }
 
     public override void ToNFA(NFA pad, int from, int to) {
         foreach (LAD k in zyg)
@@ -861,23 +933,20 @@ public class LADAny : LAD {
     }
 }
 
-public class LADImp : LAD {
-    public override void ToNFA(NFA pad, int from, int to) {
-        int knot = pad.AddNode();
-        pad.nodes_l[knot].final = true;
-        pad.AddEdge(from, knot, null);
-    }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "imp");
-    }
-}
-
 public class LADParam : LAD {
     public readonly string name;
     public LADParam(string name) { this.name = name; }
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override LAD Reify(NFA pad) {
+        string text = GetText(pad);
+        if (text != null) {
+            return new LADStr(text);
+        } else {
+            return new LADImp();
+        }
+    }
+
+    public string GetText(NFA pad) {
         Frame outer = pad.outer_stack[pad.outer_stack.Count - 1];
         string reason;
 
@@ -905,53 +974,25 @@ public class LADParam : LAD {
         }
 
         string text = (string)Kernel.UnboxAny(i);
-        (new LADStr(text)).ToNFA(pad, from, to);
         if (Lexer.LtmTrace)
             Console.WriteLine("Resolved {0} to \"{1}\"", name, text);
-        return;
+        return text;
 imp:
         if (Lexer.LtmTrace)
             Console.WriteLine("No LTM for {0} because {1}", name, reason);
-        int knot = pad.AddNode();
-        pad.nodes_l[knot].final = true;
-        pad.AddEdge(from, knot, null);
+        return null;
+    }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        throw new InvalidOperationException();
+    }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        throw new InvalidOperationException();
     }
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "param: " + name);
-    }
-}
-
-public class LADNull : LAD {
-    public override void ToNFA(NFA pad, int from, int to) {
-        pad.AddEdge(from, to, null);
-    }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "null");
-    }
-
-    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
-        len = 0; cont = true;
-    }
-}
-
-public class LADNone : LAD {
-    public override void ToNFA(NFA pad, int from, int to) {
-    }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "none");
-    }
-}
-
-public class LADDot : LAD {
-    public override void ToNFA(NFA pad, int from, int to) {
-        pad.AddEdge(from, to, CC.All);
-    }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "dot");
     }
 }
 
@@ -961,6 +1002,14 @@ public class LADMethod : LAD {
     public LADMethod(string name) { this.name = name; }
 
     public override void ToNFA(NFA pad, int from, int to) {
+        throw new InvalidOperationException();
+    }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        throw new InvalidOperationException();
+    }
+
+    public override LAD Reify(NFA pad) {
         if (Lexer.LtmTrace)
             Console.WriteLine("+ Processing subrule {0}", name);
 
@@ -969,10 +1018,7 @@ public class LADMethod : LAD {
             // declarative prefix.
             if (Lexer.LtmTrace)
                 Console.WriteLine("+ Pruning to avoid recursion");
-            int knot = pad.AddNode();
-            pad.AddEdge(from, knot, null);
-            pad.nodes_l[knot].final = true;
-            return;
+            return new LADImp();
         }
 
         Frame outer;
@@ -981,31 +1027,17 @@ public class LADMethod : LAD {
         pad.method_stack.Add(name);
         pad.outer_stack.Add(outer);
 
+        LAD ret;
         if (sub == null) {
-            int knot = pad.AddNode();
-            pad.AddEdge(from, knot, null);
-            pad.nodes_l[knot].final = true;
+            ret = new LADImp();
         } else {
-            sub.ToNFA(pad, from, to);
+            ret = sub.Reify(pad);
         }
 
         pad.method_stack.Remove(name);
         pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
-    }
 
-    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
-        Frame outer;
-        LAD sub = pad.ResolveMethod(name, out outer);
-
-        if (pad.method_stack.Contains(name) || sub == null) {
-            len = 0; cont = false;
-        } else {
-            pad.method_stack.Add(name);
-            pad.outer_stack.Add(outer);
-            sub.QueryLiteral(pad, out len, out cont);
-            pad.method_stack.Remove(name);
-            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
-        }
+        return ret;
     }
 
     public override void Dump(int indent) {
@@ -1019,9 +1051,24 @@ public class LADProtoRegex : LAD {
     public LADProtoRegex(string name) { this.name = name; }
 
     public override void ToNFA(NFA pad, int from, int to) {
-        foreach (DynObject cand in Lexer.ResolveProtoregex(pad.cursor_class, name)) {
-            ((SubInfo)cand.GetSlot("info")).ltm.ToNFA(pad, from, to);
+        throw new InvalidOperationException();
+    }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        throw new InvalidOperationException();
+    }
+
+    public override LAD Reify(NFA pad) {
+        DynObject[] cands = Lexer.ResolveProtoregex(pad.cursor_class, name);
+        LAD[] opts = new LAD[cands.Length];
+
+        for (int i = 0; i < opts.Length; i++) {
+            pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
+            opts[i] = ((SubInfo)cands[i].GetSlot("info")).ltm.Reify(pad);
+            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
         }
+
+        return new LADAny(opts);
     }
 
     public override void Dump(int indent) {
@@ -1155,7 +1202,7 @@ public class LexerCache {
 
 public class Lexer {
     public LAD[] alts;
-    public NFA pad = new NFA();
+    public NFA pad;
     public string tag;
 
     LexerState start;
@@ -1169,14 +1216,20 @@ public class Lexer {
         Lexer ret;
         if (lc.nfas.TryGetValue(lads, out ret))
             return ret;
-        ret = new Lexer(fromf, kl, title, lads);
+        NFA pad = new NFA();
+        pad.cursor_class = kl;
+        LAD[] lads_p = new LAD[lads.Length];
+        pad.outer_stack.Add(fromf);
+        for (int i = 0; i < lads_p.Length; i++)
+            lads_p[i] = lads[i].Reify(pad);
+
+        ret = new Lexer(pad, title, lads_p);
         lc.nfas[lads] = ret;
         return ret;
     }
 
-    public Lexer(Frame outer, DynMetaObject cmo, string tag, LAD[] alts) {
-        pad.cursor_class = cmo;
-        pad.outer_stack.Add(outer);
+    public Lexer(NFA pad, string tag, LAD[] alts) {
+        this.pad = pad;
         this.alts = alts;
         this.tag = tag;
         int root = pad.AddNode();
@@ -1211,7 +1264,10 @@ public class Lexer {
     public void Dump() {
         Console.WriteLine("--- LEXER ({0}) : Tree", tag);
         for (int ix = 0; ix < alts.Length; ix++) {
-            Console.WriteLine("{0}:", ix);
+            int j;
+            bool c;
+            alts[ix].QueryLiteral(pad, out j, out c);
+            Console.WriteLine("{0}: (lit. {1})", ix, j);
             alts[ix].Dump(0);
         }
         Console.WriteLine("--- NFA:");
@@ -1270,9 +1326,15 @@ public class Lexer {
                 Console.WriteLine("+ Protoregex lexer MISS on {0}.{1}",
                         kl.name, name);
             LAD[] branches = new LAD[candidates.Length];
-            for (int i = 0; i < candidates.Length; i++)
-                branches[i] = ((SubInfo) candidates[i].GetSlot("info")).ltm;
-            lc.protorx_nfa[name] = l = new Lexer(null, cursor.mo, name, branches);
+            NFA pad = new NFA();
+            pad.cursor_class = cursor.mo;
+            for (int i = 0; i < candidates.Length; i++) {
+                pad.outer_stack.Add((Frame) candidates[i].GetSlot("outer"));
+                branches[i] = (((SubInfo) candidates[i].GetSlot("info")).ltm).
+                    Reify(pad);
+                pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+            }
+            lc.protorx_nfa[name] = l = new Lexer(pad, name, branches);
         } else {
             if (LtmTrace)
                 Console.WriteLine("+ Protoregex lexer HIT on {0}.{1}",
