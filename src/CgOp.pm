@@ -243,6 +243,7 @@ use warnings;
 
     sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }
     sub to_jsync { rawscall('JsyncWriter.ToJsync:m,String', $_[0]) }
+    sub from_jsync { rawscall('JsyncReader.FromJsync:m,IP6', $_[0]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),

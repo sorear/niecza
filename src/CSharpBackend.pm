@@ -167,6 +167,7 @@ sub stash3 {
 }
 
 my %loopbacks = (
+    'MArray', 'Kernel.ArrayMO',
     'MAny', 'Kernel.AnyMO',
     'MBool', 'Kernel.BoolMO',
     'MCallFrame', 'Kernel.CallFrameMO',

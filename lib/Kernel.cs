@@ -745,6 +745,7 @@ namespace Niecza {
         public static DynMetaObject HashMO;
         public static DynMetaObject IterCursorMO;
         public static DynMetaObject ListMO;
+        public static DynMetaObject ArrayMO;
         public static DynMetaObject MatchMO;
         public static DynMetaObject NumMO;
         public static DynMetaObject StrMO;

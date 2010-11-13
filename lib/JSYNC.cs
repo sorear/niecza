@@ -3,6 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+// JSYNC01: The JSYNC spec is ambiguous on whether "&foo !bar" is allowed.
+//    I have resolved this as no, under the "ease of parsing" rule.
+// JSYNC02: (deleted)
+// JSYNC03: YAML associates directives with documents, but JSYNC can only
+//    associate them with the stream as a whole.
+// JSYNC04: Are "!" and "&" values dot-padded?
+// JSYNC05: The JSYNC spec says essentially nothing about how tags map
+//    onto the YAML model.
+
 public class JsyncWriter {
     StringBuilder o = new StringBuilder();
     Dictionary<object,int> anchors = new Dictionary<object,int>();
@@ -75,7 +84,7 @@ public class JsyncWriter {
 
         o.Append('{');
         o.AppendFormat("\"&\":{0},\"!\":", a);
-        WriteStr(false, "!perl6:" + mo.name);
+        WriteStr(false, mo.name);
 
         for (int i = 0; i < mo.nslots; i++) {
             o.Append(',');
@@ -157,5 +166,420 @@ public class JsyncWriter {
         JsyncWriter w = new JsyncWriter();
         w.WriteObj(obj);
         return w.o.ToString();
+    }
+}
+
+public class JsyncReader {
+    string from;
+    int ix = 0;
+    Dictionary<string,IP6> anchors = new Dictionary<string,IP6>();
+    Dictionary<string,List<Variable>> anchorrefs =
+        new Dictionary<string,List<Variable>>();
+
+    string s_tag;
+    string s_anchor;
+    string s_content;
+    int s_content_type;
+
+    const int NONE = 0;
+    const int SCALAR = 1;
+    const int ALIAS = 2;
+    const int DIRECTIVE = 3;
+
+    void SkipWhite(bool more) {
+        while (ix != from.Length) {
+            char ch = from[ix];
+            if (ch == ' ' || ch == '\r' || ch == '\t' || ch == '\n')
+                ix++;
+            else
+                break;
+        }
+        if (more && ix == from.Length)
+            Err("Unexpected end of text");
+    }
+
+    void Err(string s) {
+        throw new Exception(string.Format("{0} in JSYNC string at position {1}", s, ix));
+    }
+
+    void SkipToken(string s) {
+        if (ix + s.Length > from.Length || from.Substring(ix, s.Length) != s)
+            Err("Incomplete match of " + s);
+        ix += s.Length;
+    }
+
+    static Variable BoxRW(object o, DynMetaObject mo) {
+        DynObject dyo = new DynObject(mo);
+        dyo.slots[0] = o;
+        return Kernel.NewRWScalar(Kernel.AnyMO, dyo);
+    }
+
+    Variable GetObj() {
+        SkipWhite(true);
+        char first = from[ix];
+
+        switch(first) {
+            case '{':
+                return GetFromHash();
+            case '[':
+                return GetFromArray();
+            case '"':
+                GetString();
+                return GetFromString();
+            case 'n':
+                SkipToken("null");
+                return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+            case 't':
+                SkipToken("true");
+                return BoxRW(true, Kernel.BoolMO);
+            case 'f':
+                SkipToken("false");
+                return BoxRW(false, Kernel.BoolMO);
+            default:
+                return GetFromNumber();
+        }
+    }
+
+    string GetJsonString() {
+        SkipWhite(true);
+        SkipToken("\"");
+
+        StringBuilder sb = new StringBuilder();
+        while (true) {
+            if (ix == from.Length)
+                Err("Unterminated string");
+            char ch = from[ix++];
+            if (ch == '"')
+                return sb.ToString();
+            if ((ch & 0xFF7F) >= 32 && ch != '\\') {
+                sb.Append(ch);
+                continue;
+            }
+
+            if (ix == from.Length)
+                Err("Unexpected end of input in backslash escape");
+            ch = from[ix++];
+            switch(ch) {
+                case '/': break;
+                case '\\': break;
+                case '"': break;
+                case 'b': ch = '\b'; break;
+                case 'n': ch = '\n'; break;
+                case 'r': ch = '\r'; break;
+                case 't': ch = '\t'; break;
+                case 'f': ch = '\f'; break;
+                case 'u':
+                    if (ix + 4 > from.Length)
+                        Err("Unexpected end of input in hex escape");
+                    ch = '\0';
+                    for (int i = 0; i < 4; i++) {
+                        ch = (char) (((int)ch) << 4);
+                        char d = from[ix+i];
+                        if (d >= '0' && d <= '9')
+                            ch += (char)(d - '0');
+                        else if (d >= 'a' && d <= 'f')
+                            ch += (char)(d - 'a' + 10);
+                        else if (d >= 'A' && d <= 'F')
+                            ch += (char)(d - 'F' + 10);
+                        else
+                            Err("Invalid hex character");
+                    }
+                    ix += 4;
+                    break;
+                default:
+                    Err("Invalid backslash escape");
+                    break;
+            }
+            sb.Append(ch);
+        }
+    }
+
+    void AddAnchor(string anch, IP6 obj) {
+        if (anchors.ContainsKey(anch))
+            Err("Duplicate anchor " + anch);
+        anchors[anch] = obj;
+    }
+
+    string GetPiece(char tag, string block, ref int offs) {
+        if (offs >= block.Length)
+            return null;
+        if (block[offs] != tag)
+            return null;
+        int noffs = offs;
+        while (noffs != block.Length && block[noffs] != ' ')
+            noffs++;
+        string ret = block.Substring(offs+1, noffs-offs-1);
+        // this will put offs = length + 1 if there is no trailing
+        // space, which is used as a semipredicate
+        offs = noffs + 1;
+        return ret;
+    }
+
+    void GetString() {
+        string s = GetJsonString();
+        int offs = 0;
+        s_tag = GetPiece('!', s, ref offs);
+        s_anchor = GetPiece('&', s, ref offs);
+
+        //if (s_tag != null) {
+        //    int x = s_tag.IndexOf('!');
+        //    if (x >= 0 && s_tag != "!") {
+        //        string ns = s_tag.Substring(0, x);
+        //        string pfx;
+        //        if (!tagAliases.TryGetValue(ns, out pfx))
+        //            Err("Undefined tag alias namespace " + ns);
+        //        s_tag = pfx + s_tag.Substring(x+1);
+        //    }
+        //}
+
+        if (offs == s.Length + 1) {
+            s_content_type = NONE;
+            s_content = null;
+            return;
+        }
+
+        char first = (offs == s.Length) ? '\0' : s[offs];
+
+        s_content_type = SCALAR;
+        if (first == '%') {
+            s_content_type = DIRECTIVE;
+            offs++;
+        } else if (first == '*') {
+            s_content_type = ALIAS;
+            offs++;
+        } else if (first == '.') {
+            int noffs = offs;
+            while (noffs != s.Length && s[noffs] == '.') noffs++;
+            if (noffs != s.Length) {
+                first = s[noffs];
+                if (first == '!' || first == '&' || first == '*' || first == '%')
+                    offs++;
+            }
+        }
+
+        s_content = s.Substring(offs, s.Length - offs);
+
+        if (s_content_type != SCALAR && (s_tag != null || s_anchor != null))
+            Err("Tags and anchors cannot be used with directives or aliases");
+    }
+
+    Variable CreateAlias(string name) {
+        List<Variable> lv;
+        if (!anchorrefs.TryGetValue(name, out lv))
+            anchorrefs[name] = lv = new List<Variable>();
+        Variable n = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+        lv.Add(n);
+        return n;
+    }
+
+    Variable ParseScalar() {
+        if (s_tag == null) {
+            return BoxRW(s_content, Kernel.StrMO);
+        } else if (s_tag == "Num") {
+            double r;
+            if (!double.TryParse(s_content, out r))
+                Err("Num format error");
+            return BoxRW(r, Kernel.NumMO);
+        } else {
+            Err("Unhandled scalar tag " + s_tag);
+            return null;
+        }
+    }
+
+    Variable GetFromString() {
+        if (s_content_type == ALIAS)
+            return CreateAlias(s_content);
+        if (s_content_type != SCALAR)
+            Err("Found directive or sequence mark where scalar expected");
+
+        Variable obj = ParseScalar();
+        if (s_anchor != null) AddAnchor(s_anchor, obj.Fetch());
+        return obj;
+    }
+
+    Variable GetFromArray() {
+        SkipToken("[");
+        SkipWhite(true);
+        VarDeque kids = new VarDeque();
+        DynObject obj = new DynObject(Kernel.ArrayMO);
+        obj.SetSlot("items", kids);
+        obj.SetSlot("rest",  new VarDeque());
+        bool comma = false;
+        string a_tag = null;
+
+        if (from[ix] == '"') {
+            GetString();
+            comma = true;
+            SkipWhite(true);
+        }
+
+        if (comma) {
+            if (s_content_type == NONE) {
+                a_tag = s_tag;
+                if (s_anchor != null) AddAnchor(s_anchor, obj);
+            } else {
+                kids.Push(GetFromString());
+            }
+        }
+
+        while(true) {
+            if (from[ix] == ']') break;
+            if (comma) {
+                SkipToken(",");
+                SkipWhite(true);
+            }
+            kids.Push(GetObj());
+            SkipWhite(true);
+            comma = true;
+        }
+        SkipToken("]");
+        if (a_tag != null)
+            Err("Typed arrays are NYI in Niecza Perl 6");
+        return Kernel.NewRWScalar(Kernel.AnyMO, obj);
+    }
+
+    string GetSimpleStringValue() {
+        SkipToken(":");
+        SkipWhite(true);
+        if (from[ix] != '"')
+            Err("Expected a simple scalar");
+        GetString();
+        if (s_content_type != SCALAR || s_tag != null || s_anchor != null)
+            Err("Expected a simple scalar");
+        return s_content;
+    }
+
+    Variable GetFromHash() {
+        SkipToken("{");
+        // we can't make any assumptions about ordering here, as JSON
+        // emitters can blindly reorder hashes
+        string h_tag = null;
+        string h_anchor = null;
+        Dictionary<string,string> h_key_ind = null;
+        Dictionary<string,Variable> h_val_ind = null;
+        Dictionary<string,Variable> zyg = new Dictionary<string,Variable>();
+        bool comma = false;
+
+        while(true) {
+            SkipWhite(true);
+            if (from[ix] == '}') break;
+            if (comma) {
+                SkipToken(",");
+                SkipWhite(true);
+            }
+            comma = true;
+            GetString();
+            SkipWhite(true);
+            if (s_content_type == NONE && s_anchor == null && s_tag == "") {
+                if (h_tag != null)
+                    Err("Tag specified twice");
+                h_tag = GetSimpleStringValue();
+            } else if (s_content_type == NONE && s_tag == null && s_anchor == "") {
+                if (h_anchor != null)
+                    Err("Anchor specified twice");
+                h_anchor = GetSimpleStringValue();
+            } else if (s_content_type == NONE) {
+                if (s_anchor == null || s_tag != null)
+                    Err("Invalid hash key form");
+                string k1 = s_anchor;
+                if (h_key_ind == null) h_key_ind = new Dictionary<string,string>();
+                if (h_key_ind.ContainsKey(k1))
+                    Err("Key alias &" + k1 + " specified twice");
+                SkipToken(":");
+                SkipWhite(true);
+                if (from[ix] != '"')
+                    Err("Non-scalar hash keys NYI in Niecza Perl 6");
+                GetString();
+                if (s_tag != null || s_anchor != null || s_content_type != SCALAR)
+                    Err("Typed hash keys NYI in Niecza Perl 6");
+                h_key_ind[k1] = s_content;
+            } else if (s_content_type == ALIAS) {
+                string k1 = s_content;
+                if (h_val_ind == null) h_val_ind = new Dictionary<string,Variable>();
+                if (h_val_ind.ContainsKey(k1))
+                    Err("Key alias *" + k1 + " used twice");
+                SkipToken(":");
+                SkipWhite(true);
+                h_val_ind[k1] = GetObj();
+            } else if (s_content_type == DIRECTIVE) {
+                Err("Got directive in hash key position");
+            } else {
+                if (s_tag != null || s_anchor != null)
+                    Err("Typed hash keys NYI in Niecza Perl 6");
+                string k1 = s_content;
+                SkipToken(":");
+                SkipWhite(true);
+                zyg[k1] = GetObj();
+            }
+        }
+
+        SkipToken("}");
+
+        if (h_key_ind != null || h_val_ind != null) {
+            h_key_ind = h_key_ind ?? new Dictionary<string,string>();
+            h_val_ind = h_val_ind ?? new Dictionary<string,Variable>();
+
+            foreach (KeyValuePair<string,string> kv in h_key_ind) {
+                if (!h_val_ind.ContainsKey(kv.Key))
+                    Err("No value provided for indirect key *" + kv.Key);
+                Variable val = h_val_ind[kv.Key];
+                h_val_ind.Remove(kv.Key);
+                if (zyg.ContainsKey(kv.Value))
+                    Err("Indirect key &" + kv.Value + " collides with non-indirect key");
+                zyg[kv.Value] = val;
+            }
+
+            foreach (string k in h_val_ind.Keys) {
+                Err("Indirect key &" + k + " is unused");
+            }
+        }
+
+        if (h_tag != null)
+            Err("Loading of tagged hashes NYI");
+        Variable obj = BoxRW(zyg, Kernel.HashMO);
+        if (h_anchor != null)
+            AddAnchor(h_anchor, obj.Fetch());
+        return obj;
+    }
+
+    Variable GetFromNumber() {
+        StringBuilder s = new StringBuilder();
+        do {
+            if (from.Length == ix)
+                Err("Unexpected end of input in number");
+            char x = from[ix++];
+            if (x == ',' || x == ']' || x == '}' || x == ' ' || x == '\r' ||
+                    x == '\n' || x == '\t')
+                break;
+            s.Append(x);
+        } while (true);
+        ix--;
+        s_content = s.ToString();
+        s_tag = "Num";
+        return ParseScalar();
+    }
+
+    // TODO GetTopLevel
+
+    public static IP6 FromJsync(string inp) {
+        JsyncReader j = new JsyncReader();
+        j.from = inp;
+        j.SkipWhite(true);
+        Variable top = j.GetObj();
+
+
+        foreach (KeyValuePair<string, List<Variable>> da in j.anchorrefs) {
+            IP6 r;
+            if (!j.anchors.TryGetValue(da.Key, out r))
+                j.Err("Undefined anchor " + da.Key);
+            foreach (Variable to in da.Value)
+                to.Store(r);
+        }
+
+        j.SkipWhite(false);
+        if (j.ix != inp.Length)
+            j.Err("Trailing garbage after object");
+
+        return top.Fetch();
     }
 }
