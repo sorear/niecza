@@ -36,9 +36,9 @@
     </Target>
 
     <!-- Libraries -->
-    <Target Name="Kernel.dll" Inputs="lib\Kernel.cs;lib\Cursor.cs"
+    <Target Name="Kernel.dll" Inputs="lib\Kernel.cs;lib\Cursor.cs;lib/JSYNC.cs"
         Outputs="obj\Kernel.dll">
-        <Csc Sources="lib\Kernel.cs;lib\Cursor.cs" TargetType="library"
+        <Csc Sources="lib\Kernel.cs;lib\Cursor.cs;lib\JSYNC.cs" TargetType="library"
             OutputAssembly="obj\Kernel.dll"/>
     </Target>
 

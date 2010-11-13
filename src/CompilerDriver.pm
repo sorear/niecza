@@ -239,7 +239,7 @@ sub compile {
                 @args = ("gmcs", "/debug",
                     "/out:" . $args{selfcontained},
                     (map { File::Spec->catfile($libdir, $_) }
-                        "Kernel.cs", "Cursor.cs"),
+                        "Kernel.cs", "Cursor.cs", "JSYNC.cs"),
                     (map { build_file($_ . ".cs") }
                         (sort keys %{ $ast->tdeps })),
                     $csfile);

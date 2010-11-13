@@ -737,12 +737,26 @@ namespace Niecza {
             return nw;
         }
 
+        public static DynMetaObject AnyMO;
+        public static DynMetaObject BoolMO;
+        public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
-
-        public static readonly DynMetaObject SubMO;
+        public static DynMetaObject GatherIteratorMO;
+        public static DynMetaObject HashMO;
+        public static DynMetaObject IterCursorMO;
+        public static DynMetaObject ListMO;
+        public static DynMetaObject MatchMO;
+        public static DynMetaObject NumMO;
+        public static DynMetaObject StrMO;
+        public static IP6 AnyP;
+        public static IP6 ArrayP;
+        public static IP6 EMPTYP;
+        public static IP6 HashP;
+        public static IP6 IteratorP;
+        public static IP6 StrP;
         public static readonly DynMetaObject ScalarMO;
         public static readonly DynMetaObject StashMO;
-
+        public static readonly DynMetaObject SubMO;
         public static readonly IP6 StashP;
 
         public static bool TraceCont;
@@ -958,14 +972,14 @@ namespace Niecza {
 
         public static Frame PromoteToList(Frame th, Variable v) {
             if (!v.islist) {
-                DynObject lst = new DynObject(RxFrame.ListMO);
+                DynObject lst = new DynObject(Kernel.ListMO);
                 lst.slots[0 /*items*/] = new VarDeque(new Variable[] { v });
                 lst.slots[1 /*rest*/ ] = new VarDeque();
                 th.resultSlot = Kernel.NewRWListVar(lst);
                 return th;
             }
             IP6 o = v.Fetch();
-            if (o.mo.HasMRO(RxFrame.ListMO)) {
+            if (o.mo.HasMRO(Kernel.ListMO)) {
                 th.resultSlot = v;
                 return th;
             }
@@ -1023,7 +1037,7 @@ namespace Niecza {
                     if (inq0.mo.HasMRO(IterCursorMO)) {
                         th.MarkSharedChain();
                         th.ip = 2;
-                        DynObject thunk = new DynObject(RxFrame.GatherIteratorMO);
+                        DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
                         thunk.slots[0] = NewRWScalar(AnyMO, th);
                         thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
                         outq.Push(NewROScalar(thunk));
@@ -1045,7 +1059,7 @@ namespace Niecza {
                     if ((Boolean) th.resultSlot) {
                         return Take(th, inq.Shift());
                     } else {
-                        return Take(th, NewROScalar(RxFrame.EMPTYP));
+                        return Take(th, NewROScalar(Kernel.EMPTYP));
                     }
                 default:
                     return Die(th, "invalid IP");
@@ -1108,9 +1122,6 @@ namespace Niecza {
             }
         }
 
-        public static IP6 IteratorP;
-        public static DynMetaObject IterCursorMO;
-
         public static Frame GetFirst(Frame th, Variable lst) {
             if (!lst.islist) {
                 th.resultSlot = lst;
@@ -1118,7 +1129,7 @@ namespace Niecza {
             }
             DynObject dyl = lst.Fetch() as DynObject;
             if (dyl == null) goto slow;
-            if (dyl.mo != RxFrame.ListMO) goto slow;
+            if (dyl.mo != Kernel.ListMO) goto slow;
             VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
             if (itemsl.Count() == 0) goto slow;
             th.resultSlot = itemsl[0];
@@ -1128,13 +1139,6 @@ slow:
             return lst.Fetch().InvokeMethod(th, "head", new Variable[] {
                     lst }, null);
         }
-
-        public static DynMetaObject AnyMO;
-        public static IP6 AnyP;
-        public static IP6 ArrayP;
-        public static IP6 HashP;
-        public static IP6 StrP;
-        public static DynMetaObject CallFrameMO;
 
         public static BValue PackageLookup(IP6 parent, string name) {
             Dictionary<string,BValue> stash = (Dictionary<string,BValue>)

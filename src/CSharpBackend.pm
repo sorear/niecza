@@ -166,21 +166,24 @@ sub stash3 {
     }
 }
 
-# xxx check for SAFE::
 my %loopbacks = (
     'MAny', 'Kernel.AnyMO',
+    'MBool', 'Kernel.BoolMO',
     'MCallFrame', 'Kernel.CallFrameMO',
     'MCapture', 'Kernel.CaptureMO',
-    'MGatherIterator', 'RxFrame.GatherIteratorMO',
-    'MList', 'RxFrame.ListMO',
-    'MMatch', 'RxFrame.MatchMO',
+    'MGatherIterator', 'Kernel.GatherIteratorMO',
+    'MHash', 'Kernel.HashMO',
+    'MIterCursor', 'Kernel.IterCursorMO',
+    'MList', 'Kernel.ListMO',
+    'MMatch', 'Kernel.MatchMO',
+    'MNum', 'Kernel.NumMO',
+    'MStr', 'Kernel.StrMO',
     'PAny', 'Kernel.AnyP',
     'PArray', 'Kernel.ArrayP',
-    'PEMPTY', 'RxFrame.EMPTYP',
+    'PEMPTY', 'Kernel.EMPTYP',
     'PHash', 'Kernel.HashP',
-    'PStr', 'Kernel.StrP',
     'PIterator', 'Kernel.IteratorP',
-    'MIterCursor', 'Kernel.IterCursorMO',
+    'PStr', 'Kernel.StrP',
 );
 
 sub pkg0 {

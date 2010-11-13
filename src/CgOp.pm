@@ -242,6 +242,7 @@ use warnings;
     sub iter_copy_elems { rawscall('Kernel.IterCopyElems:m,VarDeque', $_[0]) }
 
     sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }
+    sub to_jsync { rawscall('JsyncWriter.ToJsync:m,String', $_[0]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
