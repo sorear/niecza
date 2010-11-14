@@ -91,7 +91,7 @@ public class JsyncWriter {
         o.Append('{');
         contUsed = true;
         o.AppendFormat("\"&\":\"A{0}\",\"!\":", a);
-        WriteStr(false, "!perl6/" + mo.name);
+        WriteStr(true, "!perl6/" + mo.name);
 
         for (int i = 0; i < mo.nslots; i++) {
             o.Append(',');
@@ -211,7 +211,7 @@ public class JsyncReader {
     }
 
     void Err(string s) {
-        throw new Exception(string.Format("{0} in JSYNC string at position {1}", s, ix));
+        throw new NieczaException(string.Format("{0} in JSYNC string at position {1}", s, ix));
     }
 
     void SkipToken(string s) {
