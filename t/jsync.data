@@ -1,0 +1,19 @@
+[[
+"JSYNC test vector file.",
+"",
+"This was written for Niecza Perl 6, but it is intended to be reusable.",
+"It is encoded in a subset of JSON; mapping nodes are not used, and the",
+"only string escapes used are the general Unicode kind.  The top sequence",
+"node of this file consists of a documentation node, then a sequence of",
+"tuples.  Each tuple has four elements, a short stable name, an input",
+"text, an output text, and a comment.",
+
+"The output text is written in a very canonical form.  Every mapping and",
+"sequence node has an anchor, which consists of an A followed by a",
+"decimal number increasing from 0.  Hash keys are in alphabetical order",
+"by semantic content, with & and ! at the beginning.  No whitespace is",
+"used between tokens, and all strings are encoded in the unique shortest",
+"form.  If the input text is erroneous, the output will be empty."
+]
+,["T000","","","Nothing is illegal"]
+]
