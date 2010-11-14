@@ -3,19 +3,20 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-// JSYNC01: The JSYNC spec is ambiguous on whether "&foo !bar" is allowed.
-//    I have resolved this as no, under the "ease of parsing" rule.
-// JSYNC02: (deleted)
-// JSYNC03: YAML associates directives with documents, but JSYNC can only
-//    associate them with the stream as a whole.
-// JSYNC04: Are "!" and "&" values dot-padded?
-// JSYNC05: The JSYNC spec says essentially nothing about how tags map
-//    onto the YAML model.
-
 public class JsyncWriter {
     StringBuilder o = new StringBuilder();
     Dictionary<object,int> anchors = new Dictionary<object,int>();
     int nextanchor = 0;
+
+    bool contUsed = false;
+    bool headerized = false;
+
+    void ScalarCheck() {
+        if (!contUsed) {
+            contUsed = headerized = true;
+            o.Append("[{\"%JSYNC\":\"1.0\"},");
+        }
+    }
 
     void WriteObj(IP6 obj) {
         int anchor;
@@ -39,6 +40,7 @@ public class JsyncWriter {
     }
 
     void WriteNull() {
+        ScalarCheck();
         o.Append("null");
     }
 
@@ -49,7 +51,8 @@ public class JsyncWriter {
         nr = obj.InvokeMethod(nr, "eager", new Variable[] { Kernel.NewROScalar(obj) }, null);
         Kernel.RunCore(nr);
 
-        o.AppendFormat("[\"&{0}\"", a);
+        o.AppendFormat("[\"&A{0}\"", a);
+        contUsed = true;
         VarDeque vd = (VarDeque) obj.GetSlot("items");
         for (int i = 0; i < vd.Count(); i++) {
             o.Append(',');
@@ -64,14 +67,17 @@ public class JsyncWriter {
         Dictionary<string,Variable> entries = (Dictionary<string,Variable>)
             Kernel.UnboxAny(obj);
         o.Append('{');
-        o.AppendFormat("\"&\":{0}", a);
-        foreach (KeyValuePair<string,Variable> kv in entries) {
+        contUsed = true;
+        o.AppendFormat("\"&\":\"A{0}\"", a);
+        List<string> keys = new List<string>(entries.Keys);
+        keys.Sort();
+        foreach (string key in keys) {
             o.Append(',');
 
             // no object keys in hashes yet
-            WriteStr(true, kv.Key);
+            WriteStr(true, key);
             o.Append(':');
-            WriteObj(kv.Value.Fetch());
+            WriteObj(entries[key].Fetch());
         }
         o.Append('}');
     }
@@ -83,8 +89,9 @@ public class JsyncWriter {
         DynMetaObject mo = dyo.mo;
 
         o.Append('{');
-        o.AppendFormat("\"&\":{0},\"!\":", a);
-        WriteStr(false, mo.name);
+        contUsed = true;
+        o.AppendFormat("\"&\":\"A{0}\",\"!\":", a);
+        WriteStr(false, "!perl6/" + mo.name);
 
         for (int i = 0; i < mo.nslots; i++) {
             o.Append(',');
@@ -107,6 +114,7 @@ public class JsyncWriter {
     }
 
     void WriteStr(bool esc, string s) {
+        ScalarCheck();
         o.Append('"');
         if (esc && NeedsEscape(s))
             o.Append('.');
@@ -120,7 +128,7 @@ public class JsyncWriter {
                     goto default;
                 default:
                     if ((ch & 0xFF7F) < 32) {
-                        o.AppendFormat("\\u{0:4X}", (int)ch);
+                        o.AppendFormat("\\u{0:X4}", (int)ch);
                     } else {
                         o.Append(ch);
                     }
@@ -151,20 +159,24 @@ public class JsyncWriter {
     }
 
     void WriteBool(bool x) {
+        ScalarCheck();
         o.Append(x ? "true" : "false");
     }
 
     void WriteNum(double x) {
+        ScalarCheck();
         o.Append(x);
     }
 
     void WriteAnchor(int i) {
-        o.AppendFormat("\"*{0}\"", i);
+        ScalarCheck();
+        o.AppendFormat("\"*A{0}\"", i);
     }
 
     public static string ToJsync(IP6 obj) {
         JsyncWriter w = new JsyncWriter();
         w.WriteObj(obj);
+        if (w.headerized) w.o.Append(']');
         return w.o.ToString();
     }
 }
