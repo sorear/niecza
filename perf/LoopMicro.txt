@@ -1,0 +1,23 @@
+All timings with Mono JIT compiler version 2.9 (master/78b8d38 Mon Nov  8 15:56:55 PST 2010)
+SGen not tested as neither stores of references nor allocation is involved
+
+runloop 0: delegates
+
+mono           13.593 ns (10^9 iter)
+mono LLVM      12.081 ns (10^9 iter; -0.100s baseline)
+
+runloop 1: virtual functions
+
+mono           11.405 ns (10^9)
+mono LLVM      10.069 ns (10^9; -0.100s baseline)
+
+runloop 2: ldftn / calli
+
+mono          715.200 ns (10^7)
+mono LLVM     718.000 ns (10^7)
+
+runloop 3: delegates + tail call
+runloop 4: callvirt + tail call
+runloop 5: ldftn / calli + tail call
+
+All of these blow the stack; I seem to have my tailcall handling wrong

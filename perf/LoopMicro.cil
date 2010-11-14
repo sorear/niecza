@@ -1,0 +1,494 @@
+.assembly extern mscorlib { }
+.assembly 'LoopMicro'
+{
+  .permissionset reqmin =  (
+  3C 00 50 00 65 00 72 00 6D 00 69 00 73 00 73 00   // <.P.e.r.m.i.s.s.
+  69 00 6F 00 6E 00 53 00 65 00 74 00 20 00 63 00   // i.o.n.S.e.t. .c.
+  6C 00 61 00 73 00 73 00 3D 00 22 00 53 00 79 00   // l.a.s.s.=.".S.y.
+  73 00 74 00 65 00 6D 00 2E 00 53 00 65 00 63 00   // s.t.e.m...S.e.c.
+  75 00 72 00 69 00 74 00 79 00 2E 00 50 00 65 00   // u.r.i.t.y...P.e.
+  72 00 6D 00 69 00 73 00 73 00 69 00 6F 00 6E 00   // r.m.i.s.s.i.o.n.
+  53 00 65 00 74 00 22 00 0A 00 76 00 65 00 72 00   // S.e.t."...v.e.r.
+  73 00 69 00 6F 00 6E 00 3D 00 22 00 31 00 22 00   // s.i.o.n.=.".1.".
+  3E 00 0A 00 3C 00 49 00 50 00 65 00 72 00 6D 00   // >...<.I.P.e.r.m.
+  69 00 73 00 73 00 69 00 6F 00 6E 00 20 00 63 00   // i.s.s.i.o.n. .c.
+  6C 00 61 00 73 00 73 00 3D 00 22 00 53 00 79 00   // l.a.s.s.=.".S.y.
+  73 00 74 00 65 00 6D 00 2E 00 53 00 65 00 63 00   // s.t.e.m...S.e.c.
+  75 00 72 00 69 00 74 00 79 00 2E 00 50 00 65 00   // u.r.i.t.y...P.e.
+  72 00 6D 00 69 00 73 00 73 00 69 00 6F 00 6E 00   // r.m.i.s.s.i.o.n.
+  73 00 2E 00 53 00 65 00 63 00 75 00 72 00 69 00   // s...S.e.c.u.r.i.
+  74 00 79 00 50 00 65 00 72 00 6D 00 69 00 73 00   // t.y.P.e.r.m.i.s.
+  73 00 69 00 6F 00 6E 00 2C 00 20 00 6D 00 73 00   // s.i.o.n.,. .m.s.
+  63 00 6F 00 72 00 6C 00 69 00 62 00 2C 00 20 00   // c.o.r.l.i.b.,. .
+  56 00 65 00 72 00 73 00 69 00 6F 00 6E 00 3D 00   // V.e.r.s.i.o.n.=.
+  32 00 2E 00 30 00 2E 00 30 00 2E 00 30 00 2C 00   // 2...0...0...0.,.
+  20 00 43 00 75 00 6C 00 74 00 75 00 72 00 65 00   //  .C.u.l.t.u.r.e.
+  3D 00 6E 00 65 00 75 00 74 00 72 00 61 00 6C 00   // =.n.e.u.t.r.a.l.
+  2C 00 20 00 50 00 75 00 62 00 6C 00 69 00 63 00   // ,. .P.u.b.l.i.c.
+  4B 00 65 00 79 00 54 00 6F 00 6B 00 65 00 6E 00   // K.e.y.T.o.k.e.n.
+  3D 00 62 00 37 00 37 00 61 00 35 00 63 00 35 00   // =.b.7.7.a.5.c.5.
+  36 00 31 00 39 00 33 00 34 00 65 00 30 00 38 00   // 6.1.9.3.4.e.0.8.
+  39 00 22 00 0A 00 76 00 65 00 72 00 73 00 69 00   // 9."...v.e.r.s.i.
+  6F 00 6E 00 3D 00 22 00 31 00 22 00 0A 00 46 00   // o.n.=.".1."...F.
+  6C 00 61 00 67 00 73 00 3D 00 22 00 53 00 6B 00   // l.a.g.s.=.".S.k.
+  69 00 70 00 56 00 65 00 72 00 69 00 66 00 69 00   // i.p.V.e.r.i.f.i.
+  63 00 61 00 74 00 69 00 6F 00 6E 00 22 00 2F 00   // c.a.t.i.o.n."./.
+  3E 00 0A 00 3C 00 2F 00 50 00 65 00 72 00 6D 00   // >...<./.P.e.r.m.
+  69 00 73 00 73 00 69 00 6F 00 6E 00 53 00 65 00   // i.s.s.i.o.n.S.e.
+  74 00 3E 00 0A 00                               ) // t.>...
+}
+
+.class public auto ansi sealed LoopDel
+    extends [mscorlib]System.MulticastDelegate
+{
+    .method public hidebysig specialname rtspecialname instance default
+        void '.ctor' (object A_1, native int A_2)  runtime managed {}
+    .method public virtual hidebysig newslot instance default
+        class FrameD Invoke (class FrameD f) runtime managed {}
+    .method public virtual hidebysig newslot instance default
+        class [mscorlib]System.IAsyncResult BeginInvoke
+        (class FrameD f, class [mscorlib]System.AsyncCallback callback,
+        object 'object') runtime managed {}
+    .method public virtual hidebysig newslot instance default
+        class FrameD EndInvoke (class [mscorlib]System.IAsyncResult result)
+        runtime managed {}
+}
+
+.class public auto ansi sealed beforefieldinit FrameD
+    extends [mscorlib]System.Object
+{
+    .field public class LoopDel dgt
+    .field public int32 lex
+
+    .method public hidebysig specialname rtspecialname
+           instance default void '.ctor' ()  cil managed
+    {
+        .maxstack 8
+        ldarg.0
+        call instance void object::'.ctor'()
+        ret
+    }
+}
+
+.class public auto ansi sealed beforefieldinit FrameI
+    extends [mscorlib]System.Object
+{
+    .field  public  method class FrameI *(class FrameI) dgt
+    .field  public  int32 lex
+
+    .method public hidebysig specialname rtspecialname
+           instance default void '.ctor' ()  cil managed
+    {
+        .maxstack 8
+        ldarg.0
+        call instance void object::'.ctor'()
+        ret
+    }
+}
+
+.class public auto ansi abstract beforefieldinit LoopCls
+    extends [mscorlib]System.Object
+{
+    .method family hidebysig specialname rtspecialname
+        instance default void '.ctor' ()  cil managed
+    {
+        .maxstack 8
+        ldarg.0
+        call instance void object::'.ctor'()
+        ret
+    }
+
+    .method public virtual hidebysig newslot abstract
+        instance default class FrameC Invoke (class FrameC f)  cil managed { }
+}
+
+.class public auto ansi sealed beforefieldinit FrameC
+      extends [mscorlib]System.Object
+{
+    .field  public  class LoopCls dgt
+    .field  public  int32 lex
+
+  .method public hidebysig specialname rtspecialname
+         instance default void '.ctor' ()  cil managed
+  {
+      .maxstack 8
+      ldarg.0
+      call instance void object::'.ctor'()
+      ret
+  }
+}
+
+.class auto ansi beforefieldinit Dgt1 extends LoopCls
+{
+
+  .method public hidebysig specialname rtspecialname
+         instance default void '.ctor' ()  cil managed
+  {
+      .maxstack 8
+      ldarg.0
+      call instance void class LoopCls::'.ctor'()
+      ret
+  }
+
+  .method public virtual hidebysig
+         instance default class FrameC Invoke (class FrameC f)  cil managed
+  {
+      .maxstack 5
+      ldarg.1
+      ldfld int32 FrameC::lex
+      brtrue noexit
+
+      ldc.i4.0
+      call void class [mscorlib]System.Environment::Exit(int32)
+noexit:
+      ldarg.1
+      dup
+      ldfld int32 FrameC::lex
+      ldc.i4.1
+      sub
+      stfld int32 FrameC::lex
+      ldarg.1
+      ret
+  }
+}
+
+.class auto ansi beforefieldinit Dgt4 extends LoopCls
+{
+
+  .method public hidebysig specialname rtspecialname
+         instance default void '.ctor' ()  cil managed
+  {
+      .maxstack 8
+      ldarg.0
+      call instance void class LoopCls::'.ctor'()
+      ret
+  }
+
+  .method public virtual hidebysig
+         instance default class FrameC Invoke (class FrameC f)  cil managed
+  {
+      .maxstack 5
+      ldarg.1
+      ldfld int32 FrameC::lex
+      brtrue noexit
+
+      ldc.i4.0
+      call void class [mscorlib]System.Environment::Exit(int32)
+noexit:
+      ldarg.1
+      dup
+      ldfld int32 FrameC::lex
+      ldc.i4.1
+      sub
+      stfld int32 FrameC::lex
+
+      ldarg.1
+      ldfld class LoopCls FrameC::dgt
+      ldarg.1
+      tail.
+      callvirt instance class FrameC class LoopCls::Invoke(class FrameC)
+      ret
+  }
+}
+
+.class public auto ansi beforefieldinit LoopMicro
+      extends [mscorlib]System.Object
+{
+  .method public hidebysig specialname rtspecialname
+         instance default void '.ctor' ()  cil managed
+  {
+      .maxstack 8
+      ldarg.0
+      call instance void object::'.ctor'()
+      ret
+  }
+
+  .method private static hidebysig
+         default class FrameD Dgt0 (class FrameD f)  cil managed
+  {
+      .maxstack 5
+      ldarg.0
+      ldfld int32 FrameD::lex
+      brtrue noexit
+
+      ldc.i4.0
+      call void class [mscorlib]System.Environment::Exit(int32)
+noexit:
+      ldarg.0
+      dup
+      ldfld int32 FrameD::lex
+      ldc.i4.1
+      sub
+      stfld int32 FrameD::lex
+      ldarg.0
+      ret
+  }
+
+  .method public static hidebysig
+         default void RunLoop0 (int32 itr)  cil managed
+  {
+      .maxstack 5
+      .locals init (
+              class FrameD    th)
+      newobj instance void class FrameD::'.ctor'()
+      stloc.0
+      ldloc.0
+      ldarg.0
+      stfld int32 FrameD::lex
+      ldloc.0
+      ldnull
+      ldftn class FrameD class LoopMicro::Dgt0(class FrameD)
+      newobj instance void class LoopDel::'.ctor'(object, native int)
+      stfld class LoopDel FrameD::dgt
+
+again:
+      ldloc.0
+      ldfld class LoopDel FrameD::dgt
+      ldloc.0
+      callvirt instance class FrameD class LoopDel::Invoke(class FrameD)
+      stloc.0
+      br again
+  }
+
+  .method public static hidebysig
+         default void RunLoop1 (int32 itr)  cil managed
+  {
+      .maxstack 3
+      .locals init (
+              class FrameC    V_0)
+      newobj instance void class FrameC::'.ctor'()
+      stloc.0
+      ldloc.0
+      ldarg.0
+      stfld int32 FrameC::lex
+      ldloc.0
+      newobj instance void class Dgt1::'.ctor'()
+      stfld class LoopCls FrameC::dgt
+
+again:
+      ldloc.0
+      ldfld class LoopCls FrameC::dgt
+      ldloc.0
+      callvirt instance class FrameC class LoopCls::Invoke(class FrameC)
+      stloc.0
+      br again
+
+  }
+
+  .method private static hidebysig
+         default class FrameI Dgt2 (class FrameI f)  cil managed
+  {
+      .maxstack 5
+      ldarg.0
+      ldfld int32 FrameI::lex
+      brtrue noexit
+
+      ldc.i4.0
+      call void class [mscorlib]System.Environment::Exit(int32)
+noexit:
+      ldarg.0
+      dup
+      ldfld int32 FrameI::lex
+      ldc.i4.1
+      sub
+      stfld int32 FrameI::lex
+      ldarg.0
+      ret
+  }
+
+  .method public static hidebysig
+         default void RunLoop2 (int32 itr)  cil managed
+  {
+      .maxstack 5
+      .locals init (
+              class FrameI    th)
+      newobj instance void class FrameI::'.ctor'()
+      stloc.0
+      ldloc.0
+      ldarg.0
+      stfld int32 FrameI::lex
+      ldloc.0
+      ldftn class FrameI class LoopMicro::Dgt2(class FrameI)
+      stfld method class FrameI *(class FrameI) FrameI::dgt
+
+again:
+      ldloc.0
+      ldloc.0
+      ldfld method class FrameI *(class FrameI) FrameI::dgt
+      calli class FrameI(class FrameI)
+      stloc.0
+      br again
+  }
+
+  .method private static hidebysig
+         default class FrameD Dgt3 (class FrameD f)  cil managed
+  {
+      .maxstack 5
+      ldarg.0
+      ldfld int32 FrameD::lex
+      brtrue noexit
+
+      ldc.i4.0
+      call void class [mscorlib]System.Environment::Exit(int32)
+noexit:
+      ldarg.0
+      dup
+      ldfld int32 FrameD::lex
+      ldc.i4.1
+      sub
+      stfld int32 FrameD::lex
+
+      ldarg.0
+      ldfld class LoopDel FrameD::dgt
+      ldarg.0
+      tail.
+      callvirt instance class FrameD class LoopDel::Invoke(class FrameD)
+      ret
+  }
+
+  .method public static hidebysig
+         default void RunLoop3 (int32 itr)  cil managed
+  {
+      .maxstack 5
+      .locals init (
+              class FrameD    th)
+      newobj instance void class FrameD::'.ctor'()
+      stloc.0
+      ldloc.0
+      ldarg.0
+      stfld int32 FrameD::lex
+      ldloc.0
+      ldnull
+      ldftn class FrameD class LoopMicro::Dgt3(class FrameD)
+      newobj instance void class LoopDel::'.ctor'(object, native int)
+      stfld class LoopDel FrameD::dgt
+
+again:
+      ldloc.0
+      ldfld class LoopDel FrameD::dgt
+      ldloc.0
+      callvirt instance class FrameD class LoopDel::Invoke(class FrameD)
+      stloc.0
+      br again
+  }
+
+  .method public static hidebysig
+         default void RunLoop4 (int32 itr)  cil managed
+  {
+      .maxstack 3
+      .locals init (
+              class FrameC    V_0)
+      newobj instance void class FrameC::'.ctor'()
+      stloc.0
+      ldloc.0
+      ldarg.0
+      stfld int32 FrameC::lex
+      ldloc.0
+      newobj instance void class Dgt4::'.ctor'()
+      stfld class LoopCls FrameC::dgt
+
+again:
+      ldloc.0
+      ldfld class LoopCls FrameC::dgt
+      ldloc.0
+      callvirt instance class FrameC class LoopCls::Invoke(class FrameC)
+      stloc.0
+      br again
+
+  }
+
+  .method private static hidebysig
+         default class FrameI Dgt5 (class FrameI f)  cil managed
+  {
+      .maxstack 5
+      ldarg.0
+      ldfld int32 FrameI::lex
+      brtrue noexit
+
+      ldc.i4.0
+      call void class [mscorlib]System.Environment::Exit(int32)
+noexit:
+      ldarg.0
+      dup
+      ldfld int32 FrameI::lex
+      ldc.i4.1
+      sub
+      stfld int32 FrameI::lex
+
+      ldarg.0
+      ldarg.0
+      ldfld method class FrameI *(class FrameI) FrameI::dgt
+      tail.
+      calli class FrameI(class FrameI)
+      ret
+  }
+
+  .method public static hidebysig
+         default void RunLoop5 (int32 itr)  cil managed
+  {
+      .maxstack 5
+      .locals init (
+              class FrameI    th)
+      newobj instance void class FrameI::'.ctor'()
+      stloc.0
+      ldloc.0
+      ldarg.0
+      stfld int32 FrameI::lex
+      ldloc.0
+      ldftn class FrameI class LoopMicro::Dgt5(class FrameI)
+      stfld method class FrameI *(class FrameI) FrameI::dgt
+
+again:
+      ldloc.0
+      ldloc.0
+      ldfld method class FrameI *(class FrameI) FrameI::dgt
+      calli class FrameI(class FrameI)
+      stloc.0
+      br again
+  }
+
+  .method private static hidebysig
+         default void Main (string[] args)  cil managed
+  {
+      .entrypoint
+      .maxstack 5
+      ldarg.0
+      ldc.i4.1
+      ldelem.ref
+      call int32 int32::Parse(string)
+      ldarg.0
+      ldc.i4.0
+      ldelem.ref
+      call int32 int32::Parse(string)
+      switch (l0, l1, l2, l3, l4, l5)
+      pop
+      ret
+
+l0:
+      call void class LoopMicro::RunLoop0(int32)
+      ret
+
+l1:
+      call void class LoopMicro::RunLoop1(int32)
+      ret
+
+l2:
+      call void class LoopMicro::RunLoop2(int32)
+      ret
+
+l3:
+      call void class LoopMicro::RunLoop3(int32)
+      ret
+
+l4:
+      call void class LoopMicro::RunLoop4(int32)
+      ret
+
+l5:
+      call void class LoopMicro::RunLoop5(int32)
+      ret
+  } // end of method LoopMicro::Main
+
+
+}
+
