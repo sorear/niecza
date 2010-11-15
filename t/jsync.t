@@ -8,13 +8,16 @@ class Bob { has $.abc; has $.def };
 
 # Test set 1: proper rendering of native data types
 
-sub t1($obj,$jsync,$name) {
-    my $r = to-jsync($obj);
-    if $r ne $jsync {
-        say "# got : $r";
-        say "# want: $jsync";
+sub myis($a,$b,$name) {
+    if $a ne $b {
+        say "# got : $a";
+        say "# want: $b";
     }
-    is $r, $jsync, $name;
+    is $a, $b, $name;
+}
+
+sub t1($obj,$jsync,$name) {
+    myis to-jsync($obj), $jsync, $name;
 }
 sub t2($obj,$jsync,$name) { t1($obj, '[{"%JSYNC":"1.0"},' ~ $jsync ~ ']', $name) }
 
@@ -68,11 +71,11 @@ for @$data -> $vector {
     my $result = "";
     try { $result = to-jsync(from-jsync($text)) }
 
-    if $result eq "" {
+    if $result eq "" && $canon ne "" {
         say "# $!";
     }
 
-    is $result, $canon, "($id) $comment";
+    myis $result, $canon, "($id) $comment";
 }
 
 done-testing;
