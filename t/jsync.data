@@ -2,18 +2,51 @@
 "JSYNC test vector file.",
 "",
 "This was written for Niecza Perl 6, but it is intended to be reusable.",
-"It is encoded in a subset of JSON; mapping nodes are not used, and the",
-"only string escapes used are the general Unicode kind.  The top sequence",
+"It is encoded in a subset of JSYNC; mapping nodes are not used, nor are",
+"anchors, tags, or stream encapsulation.  The top sequence",
 "node of this file consists of a documentation node, then a sequence of",
 "tuples.  Each tuple has four elements, a short stable name, an input",
 "text, an output text, and a comment.",
-
+"",
 "The output text is written in a very canonical form.  Every mapping and",
 "sequence node has an anchor, which consists of an A followed by a",
 "decimal number increasing from 0.  Hash keys are in alphabetical order",
 "by semantic content, with & and ! at the beginning.  No whitespace is",
 "used between tokens, and all strings are encoded in the unique shortest",
-"form.  If the input text is erroneous, the output will be empty."
+"form.  If the input text is erroneous, the output will be empty.",
+"",
+"This file is aimed primarily at 'pure' implementations of JSYNC, where",
+"tag resolution isn't done and scalars are manipulated as strings.  An",
+"implementation of JSYNC with an integrated composer will necessarily",
+"fail some of these tests."
 ]
-,["T000","","","Nothing is illegal"]
+,["TOP000","","","Nothing is illegal"]
+,["TOP001","  ","","Only whitespace is illegal"]
+,["TOP002","[][]","","Multiple objects are illegal"]
+,["TOP003","{}{}","","Multiple hashes are illegal"]
+,["TOP004","12","","Bare scalars are illegal (numeric)"]
+,["TOP005","\"foo\"","","Bare strings are illegal"]
+,["TOP006","true","","Bare true is illegal"]
+,["TOP007","false","","Bare false is illegal"]
+,["TOP008","null","","Bare null is illegal"]
+,["CAP000","[{\"%JSYNC\":\"1.0\"},5]","[{\"%JSYNC\":\"1.0\"},5]","Scalars are legal in a wrapper"]
+,["CAP001","[{\"%JSYNC\":\"2.0\"},null]","","JSYNC > 1.x is an error"]
+,["CAP002","[{\"%JSYNC\":\"1.0\"}]","","Encapsulation must carry a document"]
+,["CAP003","[{\"%JSYNC\":\"1.0\"},1,2]","","Encapsulation must only carry one document"]
+,["CAP004","[{\"%JSYNC\":\"1.0\",\"foo\":1},1]","","Non-directives are an error"]
+,["CAP005","[{\"%JSYNC\":\"1.0\",\"%FOO\":1},1]","","Undefined directives are an error"]
+,["CAP006","[{\"%JSYNC\":\"1.0\"},[]]","[\"&A0\"]","Encapsulation can be removed from aggregates"]
+,["CAP007","   [   {  \"%JSYNC\":\"1.0\"  }, []]","[\"&A0\"]","Encapsulation works with spaces"]
+,["CAP008","[{\"\\u0025\\u004A\\u0053\\u0059\\u004E\\u0043\":\"1.0\"},[]]","[\"&A0\"]","Encapsulation works with escapes"]
+,["WHT000"," []","[\"&A0\"]","SPACE is white space"]
+,["WHT001","\t[]","[\"&A0\"]","HT is white space"]
+,["WHT002","\r[]","[\"&A0\"]","CR is white space"]
+,["WHT003","\n[]","[\"&A0\"]","LF is white space"]
+,["WHT004","\u0000[]","","NUL is not white space at beginning"]
+,["WHT005","[]\u0000","","NUL is not white space at end"]
+,["WHT006","\u00A0[]","","U+0080 NO-BREAK SPACE is not space"]
+,["WHT007","\u1680[]","","U+1680 OGHAM SPACE MARK is not space"]
+,["WHT008","\u180E[]","","U+180E MONGOLIAN VOWEL SEPARATOR is not space"]
+,["WHT009","\u2000[]","","U+2000 EN QUAD is not space"]
+,["WHT010","\u3000[]","","U+3000 IDEOGRAPHIC SPACE is not space"]
 ]
