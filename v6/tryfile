@@ -4,6 +4,7 @@ use MONKEY_TYPING;
 use STD;
 use Stash;
 use NAME;
+use JSYNC;
 
 augment class List {
     method shift() { self!fill(1) ?? self!shift-item !! Any }
@@ -42,54 +43,6 @@ augment class Hash {
 }
 
 augment class STD {
-token nibbler {
-    :my $text = '';
-    :my $from = self.pos;
-    :my $to = $from;
-    :my @nibbles = ();
-    :my $multiline = 0;
-    [ <!before <stopper> >
-        [
-        || <starter> <nibbler> <stopper>
-                        {
-                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
-
-                            my $n = $<nibbler>[(+$<nibbler>)-1]<nibbles>;
-                            my @n = @$n;
-
-                            push @nibbles, $<starter>;
-                            push @nibbles, @n;
-                            push @nibbles, $<stopper>;
-
-                            $text = '';
-                            $to = $from = $¢.pos;
-                        }
-        || <escape>     {
-                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
-                            push @nibbles, $<escape>[(+$<escape>)-1];
-                            $text = '';
-                            $to = $from = $¢.pos;
-                        }
-        || .
-                        {{
-                            my $ch = substr(self.orig, $¢.pos-1, 1);
-                            $text ~= $ch;
-                            $to = $¢.pos;
-                            if $ch ~~ "\n" {
-                                $multiline++;
-                            }
-                        }}
-        ]
-    ]*
-    {
-        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to or !@nibbles;
-        $*LAST_NIBBLE = $¢.pos;
-        $*LAST_NIBBLE_START = self.pos;
-        $*LAST_NIBBLE_MULTILINE = $¢.pos if $multiline;
-        $*LAST_NIBBLE_MULTILINE_START = $¢.pos if $multiline;
-    }
-    $<nibbles> = {@nibbles}
-}
 
 method panic (Str $s) {
     die "Recursive panic" if $*IN_PANIC;
@@ -380,9 +333,11 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
         #NYI
         self
     }
+
+    method you_are_here() { $*YOU_WERE_HERE = $*CURLEX; self }
 }
 
-{
+sub compiler(:$filename, :$text) {
     my $*SETTINGNAME = 'NULL';
     my @*MEMOS;
     my $*FILE = { name => '(eval)' };
@@ -406,5 +361,25 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
     my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
     STD.parse($*IN.slurp);
+
+    my $all;
+
+    # setting?
+    if $*YOU_WERE_HERE {
+        $all = $STD::ALL;
+        $all<SETTING> = $*YOU_WERE_HERE;
+        $all<CORE> = $*YOU_WERE_HERE if $*UNIT<$?LONGNAME> eq 'CORE';
+    }
+    else {
+        $all = {};
+        for keys %( $STD::ALL ) -> $key {
+            next if $key ~~ /^MY\:file\<\w+\.setting\>/ or $key eq 'CORE' or $key eq 'SETTING';
+            $all{$key} = $STD::ALL{$key};
+        }
+    }
+
+    $all
 }
+
+spew "symbols", to-jsync(compiler(filename => '(eval)', text => $*IN.slurp));
 say "OK";

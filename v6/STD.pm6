@@ -682,8 +682,10 @@ token nibbler {
     ]*
     {
         push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to or !@nibbles;
-        $*LAST_NIBBLE = $¢;
-        $*LAST_NIBBLE_MULTILINE = $¢ if $multiline;
+        $*LAST_NIBBLE = $¢.pos;
+        $*LAST_NIBBLE_START = self.pos;
+        $*LAST_NIBBLE_MULTILINE = $¢.pos if $multiline;
+        $*LAST_NIBBLE_MULTILINE_START = $¢.pos if $multiline;
     }
     $<nibbles> = {@nibbles}
 }
@@ -1782,7 +1784,7 @@ grammar P6 is STD {
                 || <?{ $*begin_compunit }>
                     {{
                         $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                        $outer == $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
+                        $outer === $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
                         $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
                         my $shortname = $longname.<name>.Str;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
