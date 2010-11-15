@@ -577,13 +577,92 @@ public class JsyncReader {
         return ParseScalar();
     }
 
+    int VersionComponent(string dgs) {
+        foreach(char ch in dgs)
+            if (ch < '0' || ch > '9') Err("Invalid character in version component");
+        int r;
+        if (!int.TryParse(dgs, out r))
+            Err("Version component too big");
+        return r;
+    }
+
+    // the [ { and first directive have already been processed
+    void GetDirectiveBlock() {
+        bool first = true;
+        string version = null;
+
+        while (true) {
+            if (!first) {
+                SkipWhite(true);
+                if (from[ix] == '}')
+                    break;
+                SkipToken(",");
+                SkipWhite(true);
+                GetString();
+                if (s_content_type != DIRECTIVE)
+                    Err("Found non-directive in directives block");
+            }
+            first = false;
+            SkipWhite(true);
+
+            if (s_content == "JSYNC") {
+                if (version != null)
+                    Err("Version specified twice");
+                version = GetSimpleStringValue();
+            } else {
+                Err("Unknown directive " + s_content);
+            }
+        }
+        SkipToken("}");
+        SkipWhite(true);
+
+        if (version != null) {
+            int ixdot = version.IndexOf('.');
+            if (ixdot < 1 || ixdot > version.Length - 2)
+                Err("Version number must have a period in the middle");
+            VersionComponent(version.Substring(ixdot+1));
+            if (VersionComponent(version.Substring(0,ixdot)) != 1)
+                Err("Unsupported major version");
+        }
+    }
+
+    Variable GetTopLevel() {
+        SkipWhite(true);
+        if (from[ix] != '[') {
+            if (from[ix] != '{')
+                Err("Top level item must be an aggregate");
+            goto bare;
+        }
+        SkipToken("[");
+        SkipWhite(true);
+        if (from[ix] != '{') goto bare;
+        SkipToken("{");
+        SkipWhite(true);
+        if (from[ix] != '"') goto bare;
+        GetString();
+        if (s_content_type != DIRECTIVE) goto bare;
+
+        GetDirectiveBlock();
+        SkipWhite(true);
+        SkipToken(",");
+        Variable v = GetObj();
+        SkipWhite(true);
+        SkipToken("]");
+        return v;
+
+bare:
+        // backtracking, yes, but only once per document.
+        ix = 0;
+        return GetObj();
+    }
+
     // TODO GetTopLevel
 
     public static IP6 FromJsync(string inp) {
         JsyncReader j = new JsyncReader();
         j.from = inp;
         j.SkipWhite(true);
-        Variable top = j.GetObj();
+        Variable top = j.GetTopLevel();
 
 
         foreach (KeyValuePair<string, List<Variable>> da in j.anchorrefs) {
