@@ -307,6 +307,12 @@ public class JsyncReader {
     }
 
     void AddAnchor(string anch, IP6 obj) {
+        for (int i = 0; i < anch.Length; i++) {
+            char c = anch[i];
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) continue;
+            if (i != 0 && c >= '0' && c <= '9') continue;
+            Err("Invalid character " + c + " in anchor " + anch);
+        }
         if (anchors.ContainsKey(anch))
             Err("Duplicate anchor " + anch);
         anchors[anch] = obj;
