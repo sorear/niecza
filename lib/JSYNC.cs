@@ -292,7 +292,7 @@ public class JsyncReader {
                         else if (d >= 'a' && d <= 'f')
                             ch += (char)(d - 'a' + 10);
                         else if (d >= 'A' && d <= 'F')
-                            ch += (char)(d - 'F' + 10);
+                            ch += (char)(d - 'A' + 10);
                         else
                             Err("Invalid hex character");
                     }
