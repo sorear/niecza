@@ -26,7 +26,7 @@
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
         <Perl Code="compile(stopafter => 'writecs', file => 'test.pl');"/>
         <Csc Sources="obj\MAIN.cs" TargetType="exe" AdditionalLibPaths="obj"
-            OutputAssembly="obj\MAIN.exe"
+            OutputAssembly="obj\MAIN.exe" EmitDebugInformation="true"
             References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
         <Exec Command="prove -e mono obj/MAIN.exe"/>
     </Target>
@@ -39,7 +39,7 @@
     <Target Name="Kernel.dll" Inputs="lib\Kernel.cs;lib\Cursor.cs;lib/JSYNC.cs"
         Outputs="obj\Kernel.dll">
         <Csc Sources="lib\Kernel.cs;lib\Cursor.cs;lib\JSYNC.cs" TargetType="library"
-            OutputAssembly="obj\Kernel.dll"/>
+            OutputAssembly="obj\Kernel.dll" EmitDebugInformation="true"/>
     </Target>
 
     <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="SAFE.cs;Grammar;PerlTask">
@@ -61,19 +61,20 @@
     <Target Name="CORE.dll" Inputs="obj\CORE.cs;obj\SAFE.dll;obj\Kernel.dll" Outputs="obj\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
         <Csc Sources="obj\CORE.cs" TargetType="library"
             AdditionalLibPaths="obj" OutputAssembly="obj\CORE.dll"
-            References="SAFE.dll;Kernel.dll"/>
+            EmitDebugInformation="true" References="SAFE.dll;Kernel.dll"/>
     </Target>
 
     <Target Name="SAFE.dll" Inputs="obj\SAFE.cs;obj\Kernel.dll"
         Outputs="obj\SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
         <Csc Sources="obj\SAFE.cs" TargetType="library"
             AdditionalLibPaths="obj" OutputAssembly="obj\SAFE.dll"
-            References="Kernel.dll"/>
+            EmitDebugInformation="true" References="Kernel.dll"/>
     </Target>
 
     <Target Name="Test.dll" Inputs="obj\Test.cs;obj\CORE.dll;obj\Kernel.dll" Outputs="obj\Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
         <Csc Sources="obj\Test.cs" TargetType="library"
             AdditionalLibPaths="obj" OutputAssembly="obj\Test.dll"
+            EmitDebugInformation="true"
             References="CORE.dll;SAFE.dll;Kernel.dll"/>
     </Target>
 

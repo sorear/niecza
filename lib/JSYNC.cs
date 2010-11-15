@@ -552,9 +552,37 @@ public class JsyncReader {
             }
         }
 
-        if (h_tag != null)
-            Err("Loading of tagged hashes NYI");
-        Variable obj = BoxRW(zyg, Kernel.HashMO);
+        Variable obj;
+        if (h_tag != null) {
+            if (!h_tag.StartsWith("!perl6/"))
+                Err("Unsupported hash tag " + h_tag);
+            int s_cursor = 7;
+            IP6 p_cursor = Kernel.GlobalO;
+            while(s_cursor < h_tag.Length) {
+                int s_next = h_tag.IndexOf("::", s_cursor);
+                if (s_next < 0) s_next = h_tag.Length;
+                else s_next = s_next + 2;
+                string frag = h_tag.Substring(s_cursor, s_next - s_cursor);
+                s_cursor = s_next;
+
+                p_cursor = Kernel.PackageLookup(p_cursor, frag).v.Fetch();
+            }
+
+            DynObject dyo = new DynObject(p_cursor.mo);
+            for (int i = 0; i < dyo.mo.nslots; i++) {
+                string sn = dyo.mo.all_attr[i];
+                if (!zyg.ContainsKey(sn))
+                    Err("No value for attribute " + sn + " in thawed value of class " + dyo.mo.name);
+                dyo.slots[i] = zyg[sn];
+                zyg.Remove(sn);
+            }
+            foreach (string key in zyg.Keys) {
+                Err("Attribute " + key + " not present in " + dyo.mo.name);
+            }
+            obj = Kernel.NewRWScalar(Kernel.AnyMO, dyo);
+        } else {
+            obj = BoxRW(zyg, Kernel.HashMO);
+        }
         if (h_anchor != null)
             AddAnchor(h_anchor, obj.Fetch());
         return obj;

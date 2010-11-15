@@ -61,6 +61,9 @@ t1 do { my $obj = Bob.new; $obj.def = 15; $obj },
     '{"&":"A0","!":".!perl6/Bob","abc":null,"def":15}',
     'User-defined types with tags';
 
+my $obj = from-jsync('{"&":"A0","!":".!perl6/Bob","abc":"twelve","def":15}');
+ok $obj.def == 15 && $obj.abc eq 'twelve', "JSYNC thaws object";
+
 # Test set 2: parser
 
 my $data = from-jsync(slurp "jsync.data");
