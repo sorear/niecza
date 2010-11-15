@@ -1,8 +1,6 @@
 # vim: ft=perl6
 use Test;
-
-sub to-jsync($obj) { Q:CgOp { (box Str (to_jsync (@ {$obj}))) } }
-sub from-jsync($obj) { Q:CgOp { (ns (from_jsync (unbox str (@ {$obj})))) } }
+use JSYNC;
 
 class Bob { has $.abc; has $.def };
 
