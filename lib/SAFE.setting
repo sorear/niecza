@@ -8,6 +8,9 @@ my class Mu {
     }
     method head() { @(self).head }
     method Bool() { self.defined }
+    method typename() {  # should be ^name
+        Q:CgOp { (box Str (obj_typename (@ {self}))) }
+    }
     method Str() {
         my $tn := Q:CgOp { (box Str (obj_typename (@ {self}))) };
         if self.defined {
@@ -16,7 +19,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
-    method dump() { self.defined ?? "Unknown{self.Str}" !! "undef" }
+    method dump() { self.defined ?? "Unknown{self.typename}" !! "undef" }
     method item() { self }
     method so() { self.Bool }
     method not() { ! self.Bool }
@@ -51,6 +54,7 @@ my class Any is Mu {
     }
 }
 
+my class Cursor { ... }
 my class Cool {
     method grep($sm) {
         gather self.for(-> $r {
@@ -71,6 +75,21 @@ my class Cool {
         };
     }
 
+    method comb($rx) {
+        my $str = self.Str;
+        my $C = Cursor.new($str);
+        my $i = 0;
+        my @out;
+        while $i < $str.chars {
+            my $M = first($rx($C.cursor($i++)));
+            if $M {
+                $i max= $M.to;
+                push @out, $M.Str;
+            } else {
+            }
+        }
+        @out
+    }
     method say() { self.Str.say }
     method chars() { self.Str.chars }
     method substr($x,$y) { self.Str.substr($x,$y) }
@@ -213,6 +232,9 @@ sub infix:<< == >>($l,$r) { Q:CgOp {
 sub infix:<< != >>($l,$r) { Q:CgOp {
     (box Bool (!= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
 } }
+
+sub infix:<max>($a,$b) { $a < $b ?? $b !! $a }
+sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
 
 sub warn($str) { Q:CgOp {
     (prog [note (unbox str (@ {$str.Str}))]
@@ -357,6 +379,7 @@ sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
 # Array: mutable list of read-write scalar boxes
 
 sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
+sub first(\$x) { for $x -> $elt { return $elt }; Any }
 
 my class Iterator {
     has $!value; # is vvarlist
@@ -536,10 +559,7 @@ my class List is Cool {
     } }
 
     method Bool() { self!fill(1) }
-    method shift() {
-        self!fill(1);
-        self!shift-item;
-    }
+    method shift() { self!fill(1) ?? self!shift-item !! Any }
 
     method eager() {
         self!fill(1_000_000_000);
@@ -642,13 +662,11 @@ my class Hash {
         Q:CgOp {
             (letn d [unbox varhash (@ {self})]
                   k [unbox str (@ {$key.Str})]
-              [ternary (varhash_contains_key (l d) (l k))
-                (sink (die "Autovivification collision"))
-                (prog)]
               [varhash_setindex (l k) (l d) {$var}]
               [null var])
         };
     }
+    method hash() { unitem(self) }
 
     method Capture () {
         Q:CgOp {
@@ -938,7 +956,7 @@ my class Regex is Sub {
         my $mat;
         my $C = Cursor.new($str);
         while !$mat && ($i <= $str.chars) {
-            $mat = flat((self)($C.cursor($i++))).head;
+            $mat = first((self)($C.cursor($i++)));
         }
         $mat ?? unitem($mat) !! Any;
     }

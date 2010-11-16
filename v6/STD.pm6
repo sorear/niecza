@@ -1742,9 +1742,10 @@ grammar P6 is STD {
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWLEX;
-        :my $outer = $*CURLEX;
         :temp $*CURPKG;
         :temp $*CURLEX;
+        :temp $*SCOPE;
+        :my $outer = $*CURLEX;
         { $*SCOPE = $*SCOPE || 'our'; }
         [
             [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
@@ -5886,15 +5887,15 @@ method panic (Str $s) {
     my $m = "";
     my $here = self;
 
-    my $first = $here.lineof($*LAST_NIBBLE.from);
-    my $last = $here.lineof($*LAST_NIBBLE.pos);
+    my $first = $here.lineof($*LAST_NIBBLE_START);
+    my $last = $here.lineof($*LAST_NIBBLE);
     if $first != $last {
         if $here.lineof($here.pos) == $last {
             $m ~= "(Possible runaway string from line $first)\n";
         }
         else {
-            $first = $here.lineof($*LAST_NIBBLE_MULTILINE.from);
-            $last = $here.lineof($*LAST_NIBBLE_MULTILINE.pos);
+            $first = $here.lineof($*LAST_NIBBLE_MULTILINE_START);
+            $last = $here.lineof($*LAST_NIBBLE_MULTILINE);
             # the bigger the string (in lines), the further back we suspect it
             if $here.lineof($here.pos) - $last < $last - $first  {
                 $m ~= "(Possible runaway string from line $first to line $last)\n";
@@ -6052,4 +6053,216 @@ token term:sym<miscbad> {
     <!>
 }
 
+# TODO: allow variable :dba()s
+role sym_categorical[$name,$sym,$O] {
+    token ::($name) () { $sym $<O>={$O} }
+}
+role bracket_categorical[$name,$sym1,$sym2,$O] {
+    token ::($name) () { :my $*GOAL = $sym2; $sym1 {}:s [ :lang($¢.unbalanced($sym2)) <semilist> ] [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} }
+}
+
+method add_categorical($name) {
+    # Signature extension, not categorical
+    if $name ~~ /^\w+\:\(/ {
+        self.add_my_name($name);
+        return self;
+    }
+    my $M = ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
+    return self unless $M;
+    my $cat = $M[0];
+    my $sym = substr($name, $M.to+1, $name.chars-$M.to-2);
+
+    my $O;
+
+    if $cat eq 'infix'            { $O = %additive }
+    elsif $cat eq 'prefix'        {
+        $O = ($sym ~~ /^\W/) ?? %symbolic_unary !! %named_unary
+    }
+    elsif $cat eq 'postfix'       { $O = %methodcall }
+    elsif $cat eq 'circumfix'     { $O = %term }
+    elsif $cat eq 'postcircumfix' { $O = %methodcall }
+    elsif $cat eq 'term'          { $O = %term }
+    else {
+        self.sorry("Cannot extend category:$name with subs");
+        return self;
+    }
+
+    # XXX to do this right requires .comb and .trans
+    if $M = ($sym ~~ /\s+/) {
+        my $sym1 = $sym.substr(0, $M.from);
+        my $sym2 = $sym.substr($M.to, $sym.chars - $M.to);
+        my $cname = $cat ~ ":<$sym1 $sym2>";
+        say "Adding categorical handler $cname for $sym1 / $sym2";
+        %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[$cname, $sym1, $sym2, $O];
+    } else {
+        my $cname = $cat ~ ":<$sym>";
+        say "Adding categorical handler $cname for $sym";
+        %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[$cname, $sym, $O];
+    }
+    self.cursor_fresh(%*LANG<MAIN>);
+}
+
+method add_enum($type,$expr) {
+    return unless $type;
+    return unless $expr;
+    my $typename = $type.Str;
+    my $*IN_DECL ::= 'constant';
+    # XXX complete kludge, really need to eval EXPR
+    # $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
+    for $expr.comb(/ <[ a..z A..Z _ ]> \w* /) -> $n {
+        self.add_name($typename ~ "::$n");
+        self.add_name($n);
+    }
+    self
+}
+
+method canonicalize_name($n) {
+    my $M;
+    my $name = $n;
+    if $M = $name ~~ /^(< $ @ % & >)( \^ || \: <!before \:> )(.*)/ {
+        $name = $M[0] ~ $M[2];
+    }
+    if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {
+        $name = $name.substr(0, $name.chars - 2);
+    }
+    return $name unless $name ~~ /::/;
+    self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
+
+    if $M = $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::') (.*) $/ {
+        $name = $M[1] ~ "<" ~ $M[0] ~ $M[2] ~ ">";
+    }
+    my $vname;
+    if $M = $name ~~ /^(.*) '::<' (.*) '>' $/ {
+        $name = $M[0].Str;
+        $vname = $M[1].Str;
+    }
+    my @components;
+    while $M = $name ~~ / '::' / {
+        push @components, $name.substr(0, $M.to);
+        $name = substr($name, $M.to);
+    }
+    push @components, $name;
+    shift(@components) while @components and @components[0] eq '';
+    if (defined $vname) {
+        @components[+@components - 1] ~= '::' if @components and @components[+@components - 1] !~~ /\:\:$/;
+        push(@components, $vname) if defined $vname;
+    }
+    @components;
+}
+
+method locmess () {
+    my $pos = self.pos;
+    my $line = self.lineof($pos);
+
+    if $pos >= chars(self.orig) {
+        $line = $line ~ " (EOF)";
+    }
+
+    my $pre = substr(self.orig, 0, $pos);
+    my $prel = chars($pre) min 40;
+    $pre = substr($pre, chars($pre)-$prel, $prel);
+    if my $M = ($pre ~~ /^.*\n/) {
+        $pre = substr($pre, $M.to);
+    }
+    $pre = '<BOL>' if $pre eq '';
+    my $post = substr(self.orig, $pos, (chars(self.orig)-$pos) min 40);
+    if $M = ($post ~~ /\n/) {
+        $post = substr($post,0,$M.from);
+    }
+    $post = '<EOL>' if $post eq '';
+    " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~
+        $pre ~ $Cursor::YELLOW ~ "\x23CF" ~ $Cursor::RED ~ $post ~
+        $Cursor::CLEAR;
+}
+
+method line {
+    self.lineof(self.pos);
+}
+
+method lineof ($p) {
+    return 1 unless defined $p;
+    my $line = @*MEMOS[$p]<L>;
+    return $line if $line;
+    $line = 1; my $pos = 0;
+    self.orig ~~ / :r [ \n { @*MEMOS[$pos++]<L> = $line++ } ||
+                        .  { @*MEMOS[$pos++]<L> = $line } ]* /;
+    @*MEMOS[$pos++]<L> = $line;
+    return @*MEMOS[$p]<L> // 0;
+}
+
+method SETGOAL { }
+method FAILGOAL ($stop, $name, $startpos) {
+    my $s = "'$stop'";
+    $s = '"\'"' if $s eq "'''";
+    self.panic("Unable to parse $name" ~ self.cursor($startpos).locmess ~ "\nCouldn't find final $s; gave up");
+}
+
+method deb(*@str) { note @str }
+
+method cursor_fresh($k = self) { Q:CgOp {
+    (ns (cursor_fresh (cast cursor (@ {self})) (@ {$k})))
+} }
+method cursor_force($pos) {
+    $*HIGHWATER = $pos;
+    self.cursor($pos);
+}
+
+method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
+
+method load_lex($) {
+    # NYI
+    my $id = "MY:file<NULL.pad>:line(1):pos(0)";
+    my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
+        '!line' => 1);
+    Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
+        'SETTING' => $core, $id => $core);
+}
+
+method mark_sinks(@sl) {
+    #NYI
+    self
+}
+
+method gettrait($traitname,$param) {
+    my $text;
+    if @$param {
+        $text = $param.[0].Str;
+        # TODO get s/// working
+        # $text =~ s/^<(.*)>$/$1/ or
+        # $text =~ s/^\((.*)\)$/$1/;
+    }
+    if ($traitname eq 'export') {
+        # if (defined $text) {
+        #     $text =~ s/://g;
+        # }
+        # else {
+            $text = 'DEFAULT';
+        # }
+        self.set_export($text);
+        $text;
+    }
+    elsif (defined $text) {
+        $text;
+    }
+    else {
+        1;
+    }
+}
+
+method set_export($text) {
+    my $textpkg = $text ~ '::';
+    my $name = $*DECLARAND<name>;
+    my $xlex = $STD::ALL{ $*DECLARAND<inlex>[0] };
+    $*DECLARAND<export> = $text;
+    my $sid = $*CURLEX.idref;
+    my $x = $xlex<EXPORT::> // Stash.new( 'PARENT::' => $sid, '!id' => [$sid.[0] ~ '::EXPORT'] );
+    $xlex<EXPORT::> = $x;
+    $x{$textpkg} = $x{$textpkg} // Stash.new( 'PARENT::' => $x.idref, '!id' => [$sid.[0] ~ '::EXPORT::' ~ $text] );
+    $x{$textpkg}{$name} = $*DECLARAND;
+    $x{$textpkg}{'&'~$name} = $*DECLARAND
+            if $name ~~ /^\w/ and $*IN_DECL ne 'constant';
+    self;
+}
+
+method you_are_here() { $*YOU_WERE_HERE = $*CURLEX; self }
 ## vim: expandtab sw=4 ft=perl6
