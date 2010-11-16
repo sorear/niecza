@@ -8,9 +8,32 @@ public sealed class GState {
     public char[] orig_a;
     public string orig_s;
 
+    public int highwater;
+
     public GState(string orig) {
         orig_s = orig;
         orig_a = orig.ToCharArray();
+        highwater = (orig_a.Length < 100 || !Cursor.HwTrace) ?
+            int.MaxValue : 0;
+    }
+    public static string BailAt =
+        Environment.GetEnvironmentVariable("NIECZA_DIE_AT_PCT");
+    public static int BailAtI;
+    static GState() {
+        if (!int.TryParse(BailAt, out BailAtI))
+            BailAtI = 101;
+    }
+
+    public void IncHighwater(int to) {
+        int pct = to * 100 / orig_a.Length;
+        // cheat a bit: don't report highwater again until pct increases
+        // (pct+1) <= (new-to) * 100 / len
+        // (pct+1) * len <= (new-to) * 100
+        // ceil(((pct+1) * len) / 100) <= new-to
+        highwater = ((pct + 1) * orig_a.Length + 99) / 100;
+        Console.WriteLine("Parsed {0}% of {1} characters", pct, orig_a.Length);
+        if (pct == BailAtI)
+            throw new Exception("Backtrace at percent");
     }
 }
 
@@ -109,6 +132,8 @@ public sealed class RxFrame {
         // throw away cut or mark-only frames
         while (bt != rootf && (bt.ip < 0))
             bt = bt.prev;
+        if (st.pos > global.highwater)
+            global.IncHighwater(st.pos);
         if (bt == rootf) {
             if (return_one) {
                 return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
@@ -266,6 +291,8 @@ public sealed class RxFrame {
     }
 
     public void LTMPushAlts(Lexer lx, int[] addrs) {
+        if (st.pos > global.highwater)
+            global.IncHighwater(st.pos);
         PushCutGroup("LTM");
         int[] cases = lx.Run(global.orig_s, st.pos);
         for (int i = cases.Length - 1; i >= 0; i--) {
@@ -312,6 +339,8 @@ public sealed class RxFrame {
     public static Variable EmptyList;
 
     public Frame FinalEnd(Frame th) {
+        if (st.pos > global.highwater)
+            global.IncHighwater(st.pos);
         th.caller.resultSlot = Kernel.NewROScalar(MakeMatch());
         return th.caller;
     }
@@ -320,6 +349,8 @@ public sealed class RxFrame {
     }
     // currently just used for protoregex
     public Frame End(Frame th, Cursor m) {
+        if (st.pos > global.highwater)
+            global.IncHighwater(st.pos);
         if (return_one) {
             return Kernel.Take(th, Kernel.NewROScalar(m));
         } else {
@@ -349,6 +380,8 @@ public sealed class RxFrame {
 public class Cursor : IP6 {
     public static bool Trace =
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
+    public static bool HwTrace =
+        Environment.GetEnvironmentVariable("NIECZA_HIGHWATER_TRACE") != null;
 
     // common fields
     public GState global;
