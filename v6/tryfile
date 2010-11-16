@@ -67,6 +67,14 @@ augment class Match {
 }
 
 augment class Hash {
+    method !extend($key, \$var) {
+        Q:CgOp {
+            (letn d [unbox varhash (@ {self})]
+                  k [unbox str (@ {$key.Str})]
+              [varhash_setindex (l k) (l d) {$var}]
+              [null var])
+        };
+    }
     method hash() { unitem(self) }
 }
 
