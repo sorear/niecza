@@ -1,21 +1,32 @@
 # vim: ft=perl6
-use Test;
+use MONKEY_TYPING;
 
-sub to-jsync($obj) { Q:CgOp { (box Str (to_jsync (@ {$obj}))) } }
-sub from-jsync($obj) { Q:CgOp { (ns (from_jsync (unbox str (@ {$obj})))) } }
+sub first(\$x) { for $x -> $elt { return $elt }; Any }
+sub infix:<max>($a,$b) { $a < $b ?? $b !! $a }
 
-for $*IN.lines -> $jsync { say to-jsync(from-jsync($jsync)) }
+augment class Mu {
+    method typename() {  # should be ^name
+        Q:CgOp { (box Str (obj_typename (@ {self}))) }
+    }
+}
 
-# say to-jsync 1;
-# say to-jsync (1 / 2);
-# say to-jsync "foo";
-# say to-jsync [1,2,3];
-# say to-jsync { a => 5, b => 9 };
-# say to-jsync True;
-# say to-jsync '.&12';
-# my $obj = []; $obj.push($obj);
-# say to-jsync $obj;
-# class Bob { has $.foo };
-# $obj = Bob.new;
-# $obj.foo = 15;
-# say to-jsync $obj;
+augment class Cool {
+    method comb($rx) {
+        my $str = self.Str;
+        my $C = Cursor.new($str);
+        my $i = 0;
+        my @out;
+        while $i < $str.chars {
+            my $M = first($rx($C.cursor($i++)));
+            if $M {
+                $i max= $M.to;
+                push @out, $M.Str;
+            } else {
+            }
+        }
+        @out
+    }
+}
+
+say "a b c".comb(/./).dump;
+say "foo bar".comb(/\w+/).dump;
