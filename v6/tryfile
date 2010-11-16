@@ -71,6 +71,46 @@ augment class Hash {
 }
 
 augment class STD {
+method gettrait($traitname,$param) {
+    my $text;
+    if @$param {
+        $text = $param.[0].Str;
+        # TODO get s/// working
+        # $text =~ s/^<(.*)>$/$1/ or
+        # $text =~ s/^\((.*)\)$/$1/;
+    }
+    if ($traitname eq 'export') {
+        # if (defined $text) {
+        #     $text =~ s/://g;
+        # }
+        # else {
+            $text = 'DEFAULT';
+        # }
+        self.set_export($text);
+        $text;
+    }
+    elsif (defined $text) {
+        $text;
+    }
+    else {
+        1;
+    }
+}
+
+method set_export($text) {
+    my $textpkg = $text ~ '::';
+    my $name = $*DECLARAND<name>;
+    my $xlex = $STD::ALL{ $*DECLARAND<inlex>[0] };
+    $*DECLARAND<export> = $text;
+    my $sid = $*CURLEX.idref;
+    my $x = $xlex<EXPORT::> // Stash.new( 'PARENT::' => $sid, '!id' => [$sid.[0] ~ '::EXPORT'] );
+    $xlex<EXPORT::> = $x;
+    $x{$textpkg} = $x{$textpkg} // Stash.new( 'PARENT::' => $x.idref, '!id' => [$sid.[0] ~ '::EXPORT::' ~ $text] );
+    $x{$textpkg}{$name} = $*DECLARAND;
+    $x{$textpkg}{'&'~$name} = $*DECLARAND
+            if $name ~~ /^\w/ and $*IN_DECL ne 'constant';
+    self;
+}
 
 method panic (Str $s) {
     die "Recursive panic" if $*IN_PANIC;
