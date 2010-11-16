@@ -141,6 +141,74 @@ method panic (Str $s) {
 }
 
 augment class STD::P6 {
+    rule package_def {
+        :my $longname;
+        :my $*IN_DECL = 'package';
+        :my $*DECLARAND;
+        :my $*NEWPKG;
+        :my $*NEWLEX;
+        :my $outer = $*CURLEX;
+        :temp $*CURPKG;
+        :temp $*CURLEX;
+        :temp $*SCOPE;
+        { $*SCOPE = $*SCOPE || 'our'; }
+        [
+            [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
+            <.newlex>
+            [ :dba('generic role')
+                <?{ ($*PKGDECL//'') eq 'role' }>
+                '[' ~ ']' <signature>
+                { $*IN_DECL = ''; }
+            ]?
+            <trait>*
+            <.getdecl>
+            [
+            || <?before '{'>
+                [
+                {{
+                    # figure out the actual full package name (nested in outer package)
+                    if $longname and $*NEWPKG {
+                        my $shortname = $longname.<name>.Str;
+                        if $*SCOPE eq 'our' {
+                            $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+                            self.deb("added our " ~ $*CURPKG.id) if $DEBUG::symtab;
+                        }
+                        else {
+                            $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+                            self.deb("added my " ~ $*CURPKG.id) if $DEBUG::symtab;
+                        }
+                    }
+                    $*begin_compunit = 0;
+                    $*UNIT<$?LONGNAME> = $*UNIT<$?LONGNAME> || ($longname ?? $longname<name>.Str !! '');
+                }}
+                { $*IN_DECL = ''; }
+                <blockoid>
+                <.checkyada>
+                ]
+            || <?before ';'>
+                [
+                || <?{ $*begin_compunit }>
+                    {{
+                        $longname orelse $¢.panic("Compilation unit cannot be anonymous");
+                        $outer === $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
+                        $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
+                        my $shortname = $longname.<name>.Str;
+                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+                        $*begin_compunit = 0;
+
+                        # XXX throws away any role sig above
+                        $*CURLEX = $outer;
+
+                        $*UNIT<$?LONGNAME> = $longname<name>.Str;
+                    }}
+                    { $*IN_DECL = ''; }
+                    <statementlist>     # whole rest of file, presumably
+                || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
+                ]
+            || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
+            ]
+        ] || <.panic: "Malformed $*PKGDECL">
+    }
 }
 
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
