@@ -337,10 +337,10 @@ my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
     method you_are_here() { $*YOU_WERE_HERE = $*CURLEX; self }
 }
 
-sub compiler(:$filename, :$text) {
-    my $*SETTINGNAME = 'NULL';
+sub compiler(:$filename, :$text, :$settingname) {
+    my $*SETTINGNAME = $settingname;
     my @*MEMOS;
-    my $*FILE = { name => '(eval)' };
+    my $*FILE = { name => $filename };
     my @*ACTIVE;
     my $*HIGHWATER = 0;
     my $*HIGHEXPECT = {};
@@ -360,7 +360,7 @@ sub compiler(:$filename, :$text) {
     my $*GOAL = "(eof)";
     my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
-    STD.parse($*IN.slurp);
+    STD.parse($text);
 
     my $all;
 
@@ -381,5 +381,33 @@ sub compiler(:$filename, :$text) {
     $all
 }
 
-spew "symbols", to-jsync(compiler(filename => '(eval)', text => $*IN.slurp));
-say "OK";
+if !@*ARGS {
+    note "Usage: tryfile.exe [--symbols]? [--setting NAME]? [-e TEXT | FILENAME | -]";
+    exit 1;
+}
+
+my $symbols = False;
+my $setting = 'CORE';
+if @*ARGS[0] eq '--symbols' {
+    $symbols = True;
+    shift @*ARGS;
+}
+if @*ARGS[0] eq '--setting' {
+    shift @*ARGS;
+    $setting = shift @*ARGS;
+}
+
+my $out;
+if @*ARGS[0] eq '-' {
+    $out = compiler(filename => '(eval)', text => $*IN.slurp, settingname => $setting);
+} elsif @*ARGS[0] eq '-e' {
+    $out = compiler(filename => '(eval)', text => @*ARGS[1], settingname => $setting);
+} else {
+    $out = compiler(filename => @*ARGS[0], text => slurp(@*ARGS[0]), settingname => $setting);
+}
+
+if $symbols {
+    say to-jsync($out);
+} else {
+    say "OK"
+}
