@@ -78,7 +78,8 @@ using System.Collections.Generic;
 public class ${\ $unit->name } {
 EOH
     $mod .= <<EOM unless $libmode ;
-    public static void Main() {
+    public static void Main(string[] argv) {
+        Kernel.commandArgs = argv;
         Kernel.RunLoop(new SubInfo("boot", BOOT));
     }
 

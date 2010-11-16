@@ -176,6 +176,7 @@ use warnings;
     sub exit { rawscall('System.Environment.Exit', $_[0]) }
     sub slurp { rawscall('System.IO.File.ReadAllText', $_[0]) }
     sub spew { rawscall('System.IO.File.WriteAllText:m,Void', $_[0], $_[1]) }
+    sub getargv { rawscall('Kernel.ArgsHelper:m,Variable[]') }
 
     sub treader_getc    { rawcall($_[0], 'Read:m,Int32') }
     sub treader_slurp   { rawcall($_[0], 'ReadToEnd:m,String') }

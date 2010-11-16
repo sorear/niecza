@@ -924,6 +924,15 @@ namespace Niecza {
             return lv;
         }
 
+        public static string[] commandArgs;
+        public static Variable[] ArgsHelper() {
+            List<Variable> lv = new List<Variable>();
+            foreach (string s in commandArgs) {
+                lv.Add(BoxAny(s, StrP));
+            }
+            return lv.ToArray();
+        }
+
         public static VarDeque SortHelper(Frame th, IP6 cb, VarDeque from) {
             Variable[] tmp = from.CopyAsArray();
             Array.Sort(tmp, delegate (Variable v1, Variable v2) {
