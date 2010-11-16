@@ -681,6 +681,7 @@ public sealed class NFA {
 
     public DynMetaObject cursor_class;
     public HashSet<string> method_stack = new HashSet<string>();
+    public HashSet<string> used_methods = new HashSet<string>();
     public List<Frame> outer_stack = new List<Frame>();
     public Dictionary<string,LAD> method_cache = new Dictionary<string,LAD>();
     public Dictionary<string,Frame> outer_cache = new Dictionary<string,Frame>();
@@ -1041,6 +1042,7 @@ public class LADMethod : LAD {
     public override LAD Reify(NFA pad) {
         if (Lexer.LtmTrace)
             Console.WriteLine("+ Processing subrule {0}", name);
+        pad.used_methods.Add(name);
 
         if (pad.method_stack.Contains(name)) {
             // NFAs cannot be recursive, so treat this as the end of the
@@ -1088,8 +1090,9 @@ public class LADProtoRegex : LAD {
     }
 
     public override LAD Reify(NFA pad) {
-        DynObject[] cands = Lexer.ResolveProtoregex(pad.cursor_class, name);
+        DynObject[] cands = Lexer.ResolveProtoregex(pad.cursor_class.GetLexerCache(), name);
         LAD[] opts = new LAD[cands.Length];
+        pad.used_methods.Add(name);
 
         for (int i = 0; i < opts.Length; i++) {
             pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
@@ -1222,6 +1225,23 @@ public sealed class LexerState {
 }
 
 public class LexerCache {
+    public DynMetaObject mo;
+    public LexerCache parent;
+    public HashSet<string> repl_methods;
+
+    public LexerCache(DynMetaObject mo) {
+        this.mo = mo;
+        if (mo.superclasses.Count == 1) {
+            parent = mo.superclasses[0].GetLexerCache();
+            repl_methods = new HashSet<string>();
+            foreach (string mn in mo.local.Keys) {
+                int ix = mn.IndexOf(':');
+                if (ix >= 0) repl_methods.Add(mn.Substring(0,ix));
+                else repl_methods.Add(mn);
+            }
+        }
+    }
+
     public Dictionary<LAD[], Lexer> nfas = new Dictionary<LAD[], Lexer>();
     public Dictionary<string, DynObject[]> protorx_fns =
         new Dictionary<string, DynObject[]>();
@@ -1245,6 +1265,15 @@ public class Lexer {
         Lexer ret;
         if (lc.nfas.TryGetValue(lads, out ret))
             return ret;
+        if (lc.parent != null && lc.parent.mo.name != "Cursor" && lc.parent.mo.name != "Any") {
+            ret = GetLexer(fromf, lc.parent.mo, lads, title);
+            foreach (string u in ret.pad.used_methods) {
+                if (lc.repl_methods.Contains(u))
+                    goto anew;
+            }
+            return lc.nfas[lads] = ret;
+        }
+anew:
         NFA pad = new NFA();
         pad.cursor_class = kl;
         LAD[] lads_p = new LAD[lads.Length];
@@ -1345,43 +1374,76 @@ public class Lexer {
         return uniqfates.ToArray();
     }
 
-    public static IP6[] RunProtoregex(Frame fromf, IP6 cursor, string name) {
-        DynMetaObject kl = cursor.mo;
+    public static Lexer GetProtoregexLexer(DynMetaObject kl, string name) {
         LexerCache lc = kl.GetLexerCache();
-        DynObject[] candidates = ResolveProtoregex(kl, name);
+        DynObject[] candidates = ResolveProtoregex(lc, name);
         Lexer l;
-        if (!lc.protorx_nfa.TryGetValue(name, out l)) {
-            if (LtmTrace)
-                Console.WriteLine("+ Protoregex lexer MISS on {0}.{1}",
-                        kl.name, name);
-            LAD[] branches = new LAD[candidates.Length];
-            NFA pad = new NFA();
-            pad.cursor_class = cursor.mo;
-            for (int i = 0; i < candidates.Length; i++) {
-                pad.outer_stack.Add((Frame) candidates[i].GetSlot("outer"));
-                branches[i] = (((SubInfo) candidates[i].GetSlot("info")).ltm).
-                    Reify(pad);
-                pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
-            }
-            lc.protorx_nfa[name] = l = new Lexer(pad, name, branches);
-        } else {
+
+        if (lc.protorx_nfa.TryGetValue(name, out l)) {
             if (LtmTrace)
                 Console.WriteLine("+ Protoregex lexer HIT on {0}.{1}",
                         kl.name, name);
+            return l;
         }
+
+        if (LtmTrace)
+            Console.WriteLine("+ Protoregex lexer MISS on {0}.{1}",
+                    kl.name, name);
+
+        if (lc.parent != null && !lc.repl_methods.Contains(name)) {
+            if (LtmTrace)
+                Console.WriteLine("+ Trying to delegate to {0}",
+                        lc.parent.mo.name);
+            Lexer pl = GetProtoregexLexer(lc.parent.mo, name);
+
+            foreach (string used in pl.pad.used_methods) {
+                if (lc.repl_methods.Contains(used)) {
+                    if (LtmTrace)
+                        Console.WriteLine("+ Can't; {0} is overridden",
+                                used);
+                    goto anew;
+                }
+            }
+
+            if (LtmTrace)
+                Console.WriteLine("+ Success!");
+
+            return lc.protorx_nfa[name] = pl;
+        }
+anew:
+        LAD[] branches = new LAD[candidates.Length];
+        NFA pad = new NFA();
+        pad.used_methods.Add(name);
+        pad.cursor_class = kl;
+        for (int i = 0; i < candidates.Length; i++) {
+            pad.outer_stack.Add((Frame) candidates[i].GetSlot("outer"));
+            branches[i] = (((SubInfo) candidates[i].GetSlot("info")).ltm).
+                Reify(pad);
+            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+        }
+        return lc.protorx_nfa[name] = new Lexer(pad, name, branches);
+    }
+
+    public static IP6[] RunProtoregex(Frame fromf, IP6 cursor, string name) {
+        DynMetaObject kl = cursor.mo;
+
+        DynObject[] candidates = ResolveProtoregex(kl.GetLexerCache(), name);
+        Lexer l = GetProtoregexLexer(kl, name);
         Cursor c = (Cursor)cursor;
         int[] brnum = l.Run(c.global.orig_s, c.pos);
+
         IP6[] ret = new IP6[brnum.Length];
         for (int i = 0; i < brnum.Length; i++)
             ret[i] = candidates[brnum[i]];
+
         return ret;
     }
 
-    public static DynObject[] ResolveProtoregex(DynMetaObject cursor_class,
+    public static DynObject[] ResolveProtoregex(LexerCache lc,
             string name) {
         DynObject[] ret;
-        if (cursor_class.GetLexerCache().
-                protorx_fns.TryGetValue(name, out ret)) {
+        DynMetaObject cursor_class = lc.mo;
+        if (lc.protorx_fns.TryGetValue(name, out ret)) {
             if (LtmTrace)
                 Console.WriteLine("+ Protoregex method list HIT on {0}.{1}",
                         cursor_class.name, name);
@@ -1390,6 +1452,11 @@ public class Lexer {
         if (LtmTrace)
             Console.WriteLine("+ Protoregex method list MISS on {0}.{1}",
                     cursor_class.name, name);
+        if (lc.parent != null && !lc.repl_methods.Contains(name)) {
+            if (LtmTrace)
+                Console.WriteLine("+ Stealing from parent");
+            return lc.protorx_fns[name] = ResolveProtoregex(lc.parent, name);
+        }
 
         IP6 proto = cursor_class.Can(name);
         string filter = name + ":";

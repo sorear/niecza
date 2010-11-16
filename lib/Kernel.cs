@@ -407,7 +407,7 @@ namespace Niecza {
         public LexerCache lexcache;
         public LexerCache GetLexerCache() {
             if (lexcache == null)
-                lexcache = new LexerCache();
+                lexcache = new LexerCache(this);
             return lexcache;
         }
 
