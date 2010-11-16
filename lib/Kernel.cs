@@ -760,8 +760,6 @@ namespace Niecza {
         public static readonly DynMetaObject SubMO;
         public static readonly IP6 StashP;
 
-        public static bool TraceCont;
-
         public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(info.mo ?? SubMO);
             n.slots[0] = outer;
@@ -1280,7 +1278,19 @@ slow:
         }
 
         public static void RunLoop(SubInfo boot) {
-            Kernel.TraceCont = (Environment.GetEnvironmentVariable("NIECZA_TRACE") != null);
+            string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
+            if (trace != null) {
+                if (trace == "all") {
+                    TraceFlags = TRACE_CUR;
+                    TraceFreq = 1;
+                } else if (trace == "stat") {
+                    TraceFlags = TRACE_ALL;
+                    TraceFreq = 1000000;
+                } else {
+                    Console.Error.WriteLine("Unknown trace option {0}", trace);
+                }
+                TraceCount = TraceFreq;
+            }
             RunCore(new Frame(new Frame(null,null, ExitRunloopSI), null, boot));
         }
 
@@ -1291,13 +1301,31 @@ slow:
             throw new ExitRunloopException();
         }
 
+        public const int TRACE_CUR = 1;
+        public const int TRACE_ALL = 2;
+
+        public static int TraceFreq;
+        public static int TraceCount;
+        public static int TraceFlags;
+
+        private static void DoTrace(Frame cur) {
+            TraceCount = TraceFreq;
+            if ((TraceFlags & TRACE_CUR) != 0)
+                System.Console.WriteLine("{0}|{1} @ {2}",
+                        cur.DepthMark(), cur.info.name, cur.ip);
+            if ((TraceFlags & TRACE_ALL) != 0) {
+                Console.Error.WriteLine("Context:");
+                DoBacktrace(cur);
+            }
+        }
+
         public static void RunCore(Frame cur) {
             for(;;) {
                 try {
-                    if (TraceCont) {
+                    if (TraceCount != 0) {
                         for(;;) {
-                            System.Console.WriteLine("{0}|{1} @ {2}",
-                                    cur.DepthMark(), cur.info.name, cur.ip);
+                            if (--TraceCount == 0)
+                                DoTrace(cur);
                             cur = cur.code(cur);
                         }
                     } else {
@@ -1456,20 +1484,21 @@ slow:
                 case 1:
                     Console.Error.WriteLine("Unhandled exception: {0}",
                             (string) UnboxAny(((Variable)th.resultSlot).Fetch()));
-                    th.lex0 = th.caller;
-                    goto case 2;
-                case 2:
-                    if (th.lex0 == null)
-                        Environment.Exit(1);
-                    Frame f = (Frame) th.lex0;
-                    Console.Error.WriteLine("  at {0} line {1} ({2} @ {3})",
-                            new object[] {
-                                f.ExecutingFile(), f.ExecutingLine(),
-                                f.info.name, f.ip });
-                    th.lex0 = ((Frame) th.lex0).caller;
-                    goto case 2;
+                    DoBacktrace(th.caller);
+                    Environment.Exit(1);
+                    return null;
                 default:
                     return Kernel.Die(th, "Invalid IP");
+            }
+        }
+
+        public static void DoBacktrace(Frame from) {
+            while (from != null) {
+                Console.Error.WriteLine("  at {0} line {1} ({2} @ {3})",
+                        new object[] {
+                        from.ExecutingFile(), from.ExecutingLine(),
+                        from.info.name, from.ip });
+                from = from.caller;
             }
         }
 
