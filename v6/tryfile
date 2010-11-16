@@ -222,10 +222,10 @@ augment class STD::P6 {
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWLEX;
-        :my $outer = $*CURLEX;
         :temp $*CURPKG;
         :temp $*CURLEX;
         :temp $*SCOPE;
+        :my $outer = $*CURLEX;
         { $*SCOPE = $*SCOPE || 'our'; }
         [
             [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
