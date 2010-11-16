@@ -577,9 +577,10 @@ use CgOp;
         my $id = Niecza::Actions->genid;
 
         CgOp::rnull(CgOp::letn(
-            "!iter$id", CgOp::unbox('vvarlist', CgOp::fetch(CgOp::methodcall(
-                    $self->source->cgop($body), 'iterator'))),
+            "!iter$id", CgOp::vvarlist_new_empty(),
             $self->var, CgOp::null('var'),
+            CgOp::vvarlist_push(CgOp::letvar("!iter$id"),
+                $self->source->cgop($body)),
             CgOp::whileloop(0, 0,
                 CgOp::iter_hasflat(CgOp::letvar("!iter$id")),
                 CgOp::prog(
