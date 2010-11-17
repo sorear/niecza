@@ -56,6 +56,17 @@ augment class Hash {
 
 augment class STD {
     our $ALL;
+method load_lex($setting) {
+    if $setting eq 'NULL' {
+        my $id = "MY:file<NULL.pad>:line(1):pos(0)";
+        my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
+            '!line' => 1);
+        return Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
+            'SETTING' => $core, $id => $core);
+    }
+
+    return Stash.new(%( from-jsync(slurp($setting ~ ".syml")) ));
+}
 method gettrait($traitname,$param) {
     my $text;
     my $M;
