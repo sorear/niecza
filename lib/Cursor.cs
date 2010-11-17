@@ -1439,21 +1439,6 @@ anew:
         return ret;
     }
 
-    // s1 must not have embedded nuls
-    private static unsafe bool StartsWithInvariant(string s1, string s2) {
-        fixed (char* st1 = s1) {
-            char* p1 = st1;
-            fixed (char* st2 = s2) {
-                char* p2 = st2;
-                while (*p1 != '\0' && *p1 == *p2) {
-                    p1++;
-                    p2++;
-                }
-                return (*p1 == '\0');
-            }
-        }
-    }
-
     public static DynObject[] ResolveProtoregex(LexerCache lc,
             string name) {
         DynObject[] ret;
@@ -1482,7 +1467,7 @@ anew:
             if (proto != k.Can(name))
                 continue;
             foreach (KeyValuePair<string,IP6> o in k.ord_methods) {
-                if (!StartsWithInvariant(filter, o.Key))
+                if (!Utils.StartsWithInvariant(filter, o.Key))
                     continue;
                 if (cursor_class.Can(o.Key) == o.Value) {
                     raword.Add((DynObject) o.Value);
@@ -1493,5 +1478,22 @@ anew:
         ret = raword.ToArray();
         cursor_class.GetLexerCache().protorx_fns[name] = ret;
         return ret;
+    }
+}
+
+public class Utils {
+    // s1 must not have embedded nuls
+    public static unsafe bool StartsWithInvariant(string s1, string s2) {
+        fixed (char* st1 = s1) {
+            char* p1 = st1;
+            fixed (char* st2 = s2) {
+                char* p2 = st2;
+                while (*p1 != '\0' && *p1 == *p2) {
+                    p1++;
+                    p2++;
+                }
+                return (*p1 == '\0');
+            }
+        }
     }
 }

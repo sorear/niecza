@@ -205,7 +205,8 @@ public class JsyncReader {
     const int ALIAS = 2;
     const int DIRECTIVE = 3;
 
-    void SkipWhite(bool more) {
+    // most parsers are expected to skip white before
+    char SkipWhite(bool more) {
         while (ix != from.Length) {
             char ch = from[ix];
             if (ch == ' ' || ch == '\r' || ch == '\t' || ch == '\n')
@@ -213,8 +214,11 @@ public class JsyncReader {
             else
                 break;
         }
-        if (more && ix == from.Length)
-            Err("Unexpected end of text");
+        if (more) {
+            if (ix == from.Length)
+                Err("Unexpected end of text");
+            return from[ix];
+        } else { return '\0'; }
     }
 
     void Err(string s) {
@@ -227,6 +231,18 @@ public class JsyncReader {
         ix += s.Length;
     }
 
+    void SkipCharWS(char c) {
+        if (SkipWhite(true) != c)
+            Err("Missing token " + c);
+        ix++;
+    }
+
+    void SkipChar(char c) {
+        if (from[ix] != c)
+            Err("Missing token " + c);
+        ix++;
+    }
+
     static Variable BoxRW(object o, DynMetaObject mo) {
         DynObject dyo = new DynObject(mo);
         dyo.slots[0] = o;
@@ -234,10 +250,7 @@ public class JsyncReader {
     }
 
     Variable GetObj() {
-        SkipWhite(true);
-        char first = from[ix];
-
-        switch(first) {
+        switch(SkipWhite(true)) {
             case '{':
                 return GetFromHash();
             case '[':
@@ -260,8 +273,7 @@ public class JsyncReader {
     }
 
     string GetJsonString() {
-        SkipWhite(true);
-        SkipToken("\"");
+        SkipCharWS('"');
 
         StringBuilder sb = new StringBuilder();
         while (true) {
@@ -423,8 +435,7 @@ public class JsyncReader {
     }
 
     Variable GetFromArray() {
-        SkipToken("[");
-        SkipWhite(true);
+        SkipCharWS('[');
         VarDeque kids = new VarDeque();
         DynObject obj = new DynObject(Kernel.ArrayMO);
         obj.SetSlot("items", kids);
@@ -432,10 +443,9 @@ public class JsyncReader {
         bool comma = false;
         string a_tag = null;
 
-        if (from[ix] == '"') {
+        if (SkipWhite(true) == '"') {
             GetString();
             comma = true;
-            SkipWhite(true);
         }
 
         if (comma) {
@@ -448,25 +458,22 @@ public class JsyncReader {
         }
 
         while(true) {
-            if (from[ix] == ']') break;
+            if (SkipWhite(true) == ']') break;
             if (comma) {
-                SkipToken(",");
-                SkipWhite(true);
+                SkipChar(',');
             }
             kids.Push(GetObj());
-            SkipWhite(true);
             comma = true;
         }
-        SkipToken("]");
+        SkipCharWS(']');
         if (a_tag != null)
             Err("Typed arrays are NYI in Niecza Perl 6");
         return Kernel.NewRWScalar(Kernel.AnyMO, obj);
     }
 
     string GetSimpleStringValue() {
-        SkipToken(":");
-        SkipWhite(true);
-        if (from[ix] != '"')
+        SkipCharWS(':');
+        if (SkipWhite(true) != '"')
             Err("Expected a simple scalar");
         GetString();
         if (s_content_type != SCALAR || s_tag != null || s_anchor != null)
@@ -475,7 +482,7 @@ public class JsyncReader {
     }
 
     Variable GetFromHash() {
-        SkipToken("{");
+        SkipCharWS('{');
         // we can't make any assumptions about ordering here, as JSON
         // emitters can blindly reorder hashes
         string h_tag = null;
@@ -486,15 +493,13 @@ public class JsyncReader {
         bool comma = false;
 
         while(true) {
-            SkipWhite(true);
-            if (from[ix] == '}') break;
+            if (SkipWhite(true) == '}') break;
             if (comma) {
-                SkipToken(",");
-                SkipWhite(true);
+                SkipChar(',');
             }
             comma = true;
+            SkipWhite(false);
             GetString();
-            SkipWhite(true);
             if (s_content_type == NONE && s_anchor == null && s_tag == "") {
                 if (h_tag != null)
                     Err("Tag specified twice");
@@ -510,9 +515,8 @@ public class JsyncReader {
                 if (h_key_ind == null) h_key_ind = new Dictionary<string,string>();
                 if (h_key_ind.ContainsKey(k1))
                     Err("Key alias &" + k1 + " specified twice");
-                SkipToken(":");
-                SkipWhite(true);
-                if (from[ix] != '"')
+                SkipCharWS(':');
+                if (SkipWhite(true) != '"')
                     Err("Non-scalar hash keys NYI in Niecza Perl 6");
                 GetString();
                 if (s_tag != null || s_anchor != null || s_content_type != SCALAR)
@@ -523,8 +527,7 @@ public class JsyncReader {
                 if (h_val_ind == null) h_val_ind = new Dictionary<string,Variable>();
                 if (h_val_ind.ContainsKey(k1))
                     Err("Key alias *" + k1 + " used twice");
-                SkipToken(":");
-                SkipWhite(true);
+                SkipCharWS(':');
                 h_val_ind[k1] = GetObj();
             } else if (s_content_type == DIRECTIVE) {
                 Err("Got directive in hash key position");
@@ -532,13 +535,12 @@ public class JsyncReader {
                 if (s_tag != null || s_anchor != null)
                     Err("Typed hash keys NYI in Niecza Perl 6");
                 string k1 = s_content;
-                SkipToken(":");
-                SkipWhite(true);
+                SkipCharWS(':');
                 zyg[k1] = GetObj();
             }
         }
 
-        SkipToken("}");
+        SkipChar('}');
 
         if (h_key_ind != null || h_val_ind != null) {
             h_key_ind = h_key_ind ?? new Dictionary<string,string>();
@@ -561,7 +563,7 @@ public class JsyncReader {
 
         Variable obj;
         if (h_tag != null) {
-            if (!h_tag.StartsWith("!perl6/"))
+            if (!Utils.StartsWithInvariant("!perl6/", h_tag))
                 Err("Unsupported hash tag " + h_tag);
             int s_cursor = 7;
             IP6 p_cursor = Kernel.GlobalO;
@@ -662,27 +664,23 @@ public class JsyncReader {
     }
 
     Variable GetTopLevel() {
-        SkipWhite(true);
-        if (from[ix] != '[') {
-            if (from[ix] != '{')
+        char f = SkipWhite(true);
+        if (f != '[') {
+            if (f != '{')
                 Err("Top level item must be an aggregate");
             goto bare;
         }
-        SkipToken("[");
-        SkipWhite(true);
-        if (from[ix] != '{') goto bare;
-        SkipToken("{");
-        SkipWhite(true);
-        if (from[ix] != '"') goto bare;
+        ix++;
+        if (SkipWhite(true) != '{') goto bare;
+        ix++;
+        if (SkipWhite(true) != '"') goto bare;
         GetString();
         if (s_content_type != DIRECTIVE) goto bare;
 
         GetDirectiveBlock();
-        SkipWhite(true);
-        SkipToken(",");
+        SkipCharWS(',');
         Variable v = GetObj();
-        SkipWhite(true);
-        SkipToken("]");
+        SkipCharWS(']');
         return v;
 
 bare:
