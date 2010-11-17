@@ -39,6 +39,62 @@ augment class STD {
 }
 
 augment class STD::P6 {
+my %term            = (:dba('term')            , :prec<z=>);
+my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
+    token dotty:sym<.*> {
+        ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
+        $<sym> = {$0.Str}
+        <O(|%methodcall)>
+    }
+
+    token dotty:sym<.> {
+        <sym> <.unspacey> <dottyop>
+        <O(|%methodcall)>
+    }
+
+    token privop {
+        '!' <methodop>
+        <O(|%methodcall)>
+    }
+    token term:name
+    {
+        :my $name;
+        :my $pos;
+        <longname>
+        {
+            $name = $<longname>.Str;
+            $pos = $¢.pos;
+        }
+        [
+        ||  <?{
+                $¢.is_name($name) or substr($name,0,2) eq '::'
+            }>
+            { $¢.check_nodecl($name); }
+
+            # parametric type?
+            :dba('type parameter')
+            <.unsp>? [ <?before '['> <postcircumfix> ]?
+
+            :dba('namespace variable lookup')
+            [
+                <?after '::'>
+                <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
+                { $*VAR = Match.synthetic(:cursor($¢), :from(self.pos), :to($¢.pos), :captures(), :method<Str>) }
+            ]?
+
+        # unrecognized names are assumed to be post-declared listops.
+        || <args> { self.add_mystery($<longname>,$pos,'termish') unless $<args><invocant>; }
+            {{
+                if $*BORG and $*BORG.<block> {
+                    if not $*BORG.<name> {
+                        $*BORG.<culprit> = $<longname>.cursor($pos);
+                        $*BORG.<name> = $*BORG<name> // $name;
+                    }
+                }
+            }}
+        ]
+        <O(|%term)>
+    }
 }
 
 augment class Cursor {
