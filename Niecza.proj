@@ -39,7 +39,8 @@
     <Target Name="Kernel.dll" Inputs="lib\Kernel.cs;lib\Cursor.cs;lib/JSYNC.cs"
         Outputs="obj\Kernel.dll">
         <Csc Sources="lib\Kernel.cs;lib\Cursor.cs;lib\JSYNC.cs" TargetType="library"
-            OutputAssembly="obj\Kernel.dll" EmitDebugInformation="true"/>
+            OutputAssembly="obj\Kernel.dll" EmitDebugInformation="true"
+            AllowUnsafeBlocks="true"/>
     </Target>
 
     <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="SAFE.cs;Grammar;PerlTask">
