@@ -6,6 +6,25 @@ use Stash;
 use NAME;
 use JSYNC;
 
+sub _subst($M is rw, $text is rw, $regex, $repl) {
+    $text = $text.Str;
+    $M = ($text ~~ $regex);
+    if $M {
+        $text = $text.substr(0, $M.from) ~
+            (($repl ~~ Str) ?? $repl !! $repl()) ~
+                $text.substr($M.to, $text.chars - $M.to);
+    }
+    ?$M;
+}
+
+augment class Cool {
+    method lc() { Q:CgOp { (box Str (str_tolower (unbox str (@ {self.Str})))) }}
+    method uc() { Q:CgOp { (box Str (str_toupper (unbox str (@ {self.Str})))) }}
+}
+
+sub lc($s) { $s.Str.lc }
+sub uc($s) { $s.Str.uc }
+
 augment class List {
 }
 
@@ -36,6 +55,122 @@ augment class Hash {
 }
 
 augment class STD {
+    our $ALL;
+method find_stash ($n, $crlex = $*CURLEX) {
+    my $name = $n;
+    my $curlex = $crlex;
+    self.deb("find_stash $name") if $DEBUG::symtab;
+
+    return Any if $name ~~ /\:\:\(/;
+    my @components = self.canonicalize_name($name);
+    if +@components > 1 {
+        return Any if @components[0] eq 'COMPILING::';
+        return Any if @components[0] eq 'CALLER::';
+        return Any if @components[0] eq 'CONTEXT::';
+        if $curlex = self.find_top_pkg(@components[0]) {
+            self.deb("Found lexical package ", @components[0]) if $DEBUG::symtab;
+            shift @components;
+        }
+        else {
+            self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
+            $curlex = $*GLOBAL;
+        }
+        while +@components > 1 {
+            my $lex = shift @components;
+            $curlex = $curlex.{$lex};
+            return Any unless $curlex;
+            try {
+                my $outlexid = $curlex.[0];
+                return Any unless $outlexid;
+                $curlex = $ALL.{$outlexid};
+                return Any unless $curlex;
+            };
+            self.deb("Found $lex okay") if $DEBUG::symtab;
+        }
+    }
+    $name = shift(@components)//'';
+    return $curlex if $name eq '';
+
+    my $lex = $curlex;
+    my $old;
+    while $lex {
+        return $old if $old = $lex.{$name};
+        my $oid = $lex.<OUTER::>[0] || last;
+        $lex = $ALL.{$oid};
+    }
+    return $old if $old = $curlex.{$name};
+    return $old if $old = $*GLOBAL.{$name};
+    return Any;
+}
+method do_import($m, $args) { #, perl6.vim stupidity
+    my @imports;
+    my $module = $m.Str;
+    my $M;
+    if $M = ($module ~~ /(class|module|role|package)\s+(\S+)/) {
+        $module = $M[1];
+    }
+
+    my $pkg = self.find_stash($module);
+    if $pkg<really> {
+        $pkg = $pkg<really><UNIT>;
+    }
+    else {
+        $pkg = self.find_stash($module ~ '::');
+    }
+    if $args {
+        my $text = $args.Str;
+        return self unless $text;
+        while _subst($M, $text, /^\s*\:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?\<(.*?)\>\,?/, "") {
+            my $scope = lc($M[0] // 'my');
+            my $imports = $M[1].Str;
+            my $*SCOPE = $scope;
+            @imports = $imports.comb(/\S+/);
+            for @imports -> $i {
+                my $imp = $i;
+                if $pkg {
+                    if _subst($M, $imp, /^\:/, "") {
+                        my @tagimports;
+                        try { @tagimports = $pkg<EXPORT::>{$imp}.keys }
+                        self.do_import_aliases($pkg, @tagimports);
+                    }
+                    elsif $pkg{$imp}<export> {
+                        self.add_my_name($imp, $pkg{$imp});
+                    }
+                    elsif $pkg{'&'~$imp}<export> {
+                        $imp = '&' ~ $imp;
+                        self.add_my_name($imp, $pkg{$imp});
+                    }
+                    elsif $pkg{$imp} {
+                        self.worry("Can't import $imp because it's not exported by $module");
+                        next;
+                    }
+                }
+                else {
+                    self.add_my_name($imp);
+                }
+            }
+        }
+    }
+    else {
+        return self unless $pkg;
+        try { @imports = $pkg<EXPORT::><DEFAULT::>.keys };
+        my $*SCOPE = 'my';
+        self.do_import_aliases($pkg, @imports);
+    }
+
+    self;
+}
+method do_import_aliases($pkg, *@names) {
+#    say "attempting to import @names";
+    for @names -> $n {
+        next if $n ~~ /^\!/;
+        next if $n ~~ /^PARENT\:\:/;
+        next if $n ~~ /^OUTER\:\:/;
+        self.add_my_name($n, $pkg{$n});
+    }
+    self;
+}
+
 }
 
 augment class STD::P6 {
