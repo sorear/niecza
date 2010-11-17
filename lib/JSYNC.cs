@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Text;
 
 public class JsyncWriter {
+    static bool FailSoft =
+        Environment.GetEnvironmentVariable("NIECZA_JSYNC_WRITER_FAILSOFT") != null;
     StringBuilder o = new StringBuilder();
     Dictionary<object,int> anchors = new Dictionary<object,int>();
     int nextanchor = 0;
@@ -83,6 +85,11 @@ public class JsyncWriter {
     }
 
     void WriteGeneral(IP6 obj) {
+        if (FailSoft && !(obj is DynObject)) {
+            o.AppendFormat("\"UNSERIALIZABLE {0}\"", obj.mo.name);
+            return;
+        }
+
         int a = nextanchor++;
         anchors[obj] = a;
         DynObject dyo = (DynObject) obj;

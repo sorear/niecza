@@ -56,6 +56,31 @@ augment class Hash {
 
 augment class STD {
     our $ALL;
+method gettrait($traitname,$param) {
+    my $text;
+    my $M;
+    if @$param {
+        $text = $param.[0].Str;
+        _subst($M, $text, /^\<(.*)\>$/, { $M[0] }) or
+            _subst($M, $text, /^\((.*)\)$/, { $M[0] });
+    }
+    if ($traitname eq 'export') {
+        if (defined $text) {
+            while _subst($M, $text, /\:/, "") { }
+        }
+        else {
+            $text = 'DEFAULT';
+        }
+        self.set_export($text);
+        $text;
+    }
+    elsif (defined $text) {
+        $text;
+    }
+    else {
+        1;
+    }
+}
 method find_stash ($n, $crlex = $*CURLEX) {
     my $name = $n;
     my $curlex = $crlex;
@@ -176,6 +201,11 @@ method do_import_aliases($pkg, *@names) {
 augment class STD::P6 {
 my %term            = (:dba('term')            , :prec<z=>);
 my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
+    token trait_mod:of {
+        ['of'|'returns']:s <typename>
+        [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
+        { $*DECLARAND<of> = $<typename>.Str; }
+    }
     token dotty:sym<.*> {
         ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
         $<sym> = {$0.Str}
