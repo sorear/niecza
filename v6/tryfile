@@ -305,9 +305,79 @@ method do_import_aliases($pkg, *@names) {
 }
 
 augment class STD::P6 {
+    my %deftrap = (
+        :say, :print, :abs, :alarm, :chomp, :chop, :chr, :chroot, :cos,
+        :defined, :eval, :exp, :glob, :lc, :lcfirst, :log, :lstat, :mkdir,
+        :ord, :readlink, :readpipe, :require, :reverse, :rmdir, :sin,
+        :split, :sqrt, :stat, :uc, :ucfirst, :unlink,
+        :WHAT, :WHICH, :WHERE, :HOW, :WHENCE, :VAR,
+    );
+
 my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
 my %term            = (:dba('term')            , :prec<z=>);
 my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
+    token term:lambda {
+        <?before <.lambda> >
+        <pblock>
+        {{
+            if $*BORG {
+                $*BORG.<block> = self.cursor($<pblock>.to);
+            }
+        }}
+        <O(|%term)>
+    }
+
+    token circumfix:sym<{ }> {
+        <?before '{' >
+        <pblock>
+        {{
+            if $*BORG {
+                $*BORG.<block> = self.cursor($<pblock>.to);
+            }
+        }}
+        <O(|%term)>
+    }
+    token xblock {
+        :my $*GOAL ::= '{';
+        :my $*BORG = {};
+        <EXPR>
+        { $*BORG.<culprit> = $*BORG<culprit> // self }
+        <.ws>
+        <pblock>
+    }
+    token term:identifier
+    {
+        :my $name;
+        :my $pos;
+        :my $isname = 0;
+        <identifier> <?before [<unsp>|'(']? > <![:]>
+        {{
+            $name = $<identifier>.Str;
+            $pos = $¢.pos;
+            $isname = $¢.is_name($name);
+            $¢.check_nodecl($name) if $isname;
+        }}
+        <args($isname)>
+        { self.add_mystery($<identifier>,$pos,substr(self.orig,$pos,1)) unless $<args><invocant>; }
+        {{
+            if $*BORG and $*BORG.<block> {
+                if not $*BORG.<name> {
+                    $*BORG.<culprit> = self.cursor($pos);
+                    $*BORG.<name> = $name;
+                }
+            }
+            if %deftrap{$name} {
+                my $al = $<args><arglist>[0];
+                my $ok = 0;
+                $ok = 1 if $al and $al.from != $al.to;
+                $ok = 1 if $<args><semiarglist>;
+                if not $ok {
+                    $<identifier>.worryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
+                }
+            }
+        }}
+        <O(|%term)>
+    }
     token infixish ($in_meta = $*IN_META) {
         :my ($infix, $O, $sym);
         :my $*IN_META = $in_meta;
@@ -386,7 +456,7 @@ my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uass
             {{
                 if $*BORG and $*BORG.<block> {
                     if not $*BORG.<name> {
-                        $*BORG.<culprit> = $<longname>.cursor($pos);
+                        $*BORG.<culprit> = self.cursor($pos);
                         $*BORG.<name> = $*BORG<name> // $name;
                     }
                 }
