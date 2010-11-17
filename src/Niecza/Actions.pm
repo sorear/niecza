@@ -341,14 +341,17 @@ sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
     my @lift = $rxop->oplift;
     my ($nrxop, $mb) = Optimizer::RxSimple::run($rxop);
     my $lad = $rxop->lad;
-    unshift @lift, Op::Bind->new(readonly => 1,
-        lhs => Op::Lexical->new(name => '$*GOAL', declaring => 1),
-        rhs => Op::StringLiteral->new(text => $args{goal}))
-            if exists $args{goal};
+    # XXX do this in the signature so it won't be affected by transparent
+    my @parm = Sig::Parameter->new(slot => 'self', name => 'self', readonly => 1);
+    if (exists $args{goal}) {
+        push @parm, Sig::Parameter->new(slot => '$*GOAL', name => '$*GOAL',
+            readonly => 1, positional => 0, default =>
+                Op::StringLiteral->new(text => $args{goal}));
+    }
     my $subop = $cl->transparent($M, Op::RegexBody->new(canback => $mb,
             pre => \@lift, passcut => $args{passcut}, passcap => $args{passcap},
             rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
-        sig => Sig->simple->for_method);
+        sig => Sig->new(params => \@parm));
     $subop = Op::CallSub->new(node($M), invocant => $subop, positionals => [ Op::MakeCursor->new(node($M)) ]);
     return RxOp::Subrule->new(regex => $subop, passcap => $args{passcap},
         _passcapzyg => $nrxop, _passcapltm => $lad);
