@@ -1285,7 +1285,9 @@ slow:
                     TraceFreq = 1;
                 } else if (trace == "stat") {
                     TraceFlags = TRACE_ALL;
-                    TraceFreq = 1000000;
+                    string p = Environment.GetEnvironmentVariable("NIECZA_TRACE_PERIOD");
+                    if (!int.TryParse(p, out TraceFreq))
+                        TraceFreq = 1000000;
                 } else {
                     Console.Error.WriteLine("Unknown trace option {0}", trace);
                 }
