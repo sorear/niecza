@@ -167,8 +167,8 @@ method gettrait($traitname,$param) {
     my $M;
     if @$param {
         $text = $param.[0].Str;
-        _subst($M, $text, /^\<(.*)\>$/, { $M[0] }) or
-            _subst($M, $text, /^\((.*)\)$/, { $M[0] });
+        _subst($M, $text, /^\<(.*)\>$/, { $M[0].Str }) or
+            _subst($M, $text, /^\((.*)\)$/, { $M[0].Str });
     }
     if ($traitname eq 'export') {
         if (defined $text) {
@@ -302,9 +302,45 @@ method do_import_aliases($pkg, *@names) {
     self;
 }
 
+method newlex ($needsig = 0) {
+    my $oid = $*CURLEX.id;
+    $ALL.{$oid} === $*CURLEX or die "internal error: current lex id is invalid";
+    my $line = self.lineof(self.pos);
+    my $id;
+    if $*NEWLEX {
+        $*NEWLEX.<OUTER::> = $*CURLEX.idref;
+        $*CURLEX = $*NEWLEX;
+        $*NEWLEX = 0;
+        $id = $*CURLEX.id;
+    }
+    else {
+        $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
+        $*CURLEX = Stash.new(
+            'OUTER::' => [$oid],
+            '!file' => $*FILE, '!line' => $line,
+            '!id' => [$id],
+        );
+    }
+    $*CURLEX.<!NEEDSIG> = 1 if $needsig;
+    $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
+    $ALL.{$id} = $*CURLEX;
+    self;
+}
 }
 
 augment class STD::P6 {
+my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+    token type_constraint {
+        :my $*IN_DECL = '';
+        [
+        | <value>
+        | <typename>
+            [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
+            { $*DECLARAND<of> = $<typename>.Str; }
+        | where <.ws> <EXPR(item %item_assignment)>
+        ]
+        <.ws>
+    }
     my %deftrap = (
         :say, :print, :abs, :alarm, :chomp, :chop, :chr, :chroot, :cos,
         :defined, :eval, :exp, :glob, :lc, :lcfirst, :log, :lstat, :mkdir,
@@ -505,6 +541,20 @@ sub compiler(:$filename, :$text, :$settingname) {
         $all = $STD::ALL;
         $all<SETTING> = $*YOU_WERE_HERE;
         $all<CORE> = $*YOU_WERE_HERE if $*UNIT<$?LONGNAME> eq 'CORE';
+        my %keepname;
+        my $ptr = 'SETTING';
+        while $all{$ptr}:exists {
+            %keepname{$ptr} = True;
+            %keepname{$all{$ptr}.id} = True;
+            #say "Keeping $ptr";
+            $ptr = $all{$ptr}<OUTER::>[0];
+            #say "Moving cursor to $ptr";
+        }
+        for keys %$all -> $key {
+            if $key ~~ /^MY/ && $key !~~ /\:\:/ && !%keepname{$key} {
+                $all{$key}:delete;
+            }
+        }
     }
     else {
         $all = {};
