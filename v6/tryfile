@@ -499,7 +499,7 @@ augment class STD::P6 {
             $isname = $¢.is_name($name);
             $¢.check_nodecl($name) if $isname;
         }}
-        <args($isname)> { say $<args>.dump }
+        <args($isname)>
         { self.add_mystery($<identifier>,$pos,substr(self.orig,$pos,1)) unless $<args><invocant>; }
         {{
             if $*BORG and $*BORG.<block> {
@@ -520,7 +520,139 @@ augment class STD::P6 {
         }}
         <O(|%term)>
     }
+    token term:name
+    {
+        :my $name;
+        :my $pos;
+        <longname>
+        {
+            $name = $<longname>.Str;
+            $pos = $¢.pos;
+        }
+        [
+        ||  <?{
+                $¢.is_name($name) or substr($name,0,2) eq '::'
+            }>
+            { $¢.check_nodecl($name); }
 
+            # parametric type?
+            :dba('type parameter')
+            <.unsp>? [ <?before '['> <postcircumfix> ]?
+
+            :dba('namespace variable lookup')
+            [
+                <?after '::'>
+                <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
+                { $*VAR = Match.synthetic(:cursor($¢), :from(self.pos), :to($¢.pos), :captures(), :method<Str>) }
+            ]?
+
+        # unrecognized names are assumed to be post-declared listops.
+        || <args> { self.add_mystery($<longname>,$pos,'termish') unless $<args><invocant>; }
+            {{
+                if $*BORG and $*BORG.<block> {
+                    if not $*BORG.<name> {
+                        $*BORG.<culprit> = self.cursor($pos);
+                        $*BORG.<name> = $*BORG<name> // $name;
+                    }
+                }
+            }}
+        ]
+        <O(|%term)>
+    }
+    token arglist {
+        :my $inv_ok = $*INVOCANT_OK;
+        :my $*endargs = 0;
+        :my $*GOAL ::= 'endargs';
+        :my $*QSIGIL ::= '';
+        <.ws>
+        :dba('argument list')
+        [
+        | <?stdstopper>
+        | <EXPR(item %list_prefix)> {{
+                my $delims = $<EXPR><root><delims>;
+                for @$delims -> $d {
+                    if $d.<infix><wascolon> // '' {
+                        if $inv_ok {
+                            $*INVOCANT_IS = $<EXPR><root><list>[0];
+                        }
+                    }
+                }
+            }}
+        ]
+    }
+
+    method checkyada {
+        try {
+            my $statements = self.<blockoid><statementlist><statement>;
+            my $startsym = $statements[0]<EXPR><root><sym> // '';
+            if $startsym eq '...' { $*DECLARAND<stub> = 1 }
+            elsif $startsym eq '!!!' { $*DECLARAND<stub> = 1 }
+            elsif $startsym eq '???' { $*DECLARAND<stub> = 1 }
+            elsif $startsym eq '*' {
+                if $*MULTINESS eq 'proto' and $statements.elems == 1 {
+                    self.<blockoid>:delete;
+                    self.<onlystar> = 1;
+                }
+            }
+        }
+        return self;
+    }
+
+    token statement {
+        :my $*endargs = -1;
+        :my $*QSIGIL ::= 0;
+        <!before <[\)\]\}]> >
+        <!stopper>
+        <!before $>
+
+        # this could either be a statement that follows a declaration
+        # or a statement that is within the block of a code declaration
+        :lang( %*LANG<MAIN> )
+        <!!{ $*LASTSTATE = $¢.pos; True  }>
+
+        # <!before $ >
+
+        [
+        | <label> <statement>
+        | <statement_control>
+        | <EXPR>
+            :dba('statement end')
+            [
+            || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
+            ||
+                :dba('statement modifier')
+                <.ws>
+                [
+                | <statement_mod_loop>
+                    {{
+                        my $sp = $<EXPR><root><statement_prefix>;
+                        if $sp and $sp<sym> eq 'do' {
+                           my $s = $<statement_mod_loop>[0]<sym>;
+                           $¢.obs("do...$s" ,"repeat...$s");
+                        }
+                    }}
+                | <statement_mod_cond>
+                    :dba('statement modifier loop')
+                    [
+                    || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
+                    || <.ws> <statement_mod_loop>?
+                    ]
+                ]?
+            ]
+        | <?before ';'>
+        | <?before <stopper> >
+        | {} <.panic: "Bogus statement">
+        ]
+
+        # Is there more on same line after a block?
+        [ <?{ (@*MEMOS[@*MEMOS[$¢.pos]<ws>//$¢.pos]<endargs>//0) == 1 }>
+            \h*
+            <!before ';' | ')' | ']' | '}' >
+            <!infixstopper>
+            { $*HIGHWATER = $¢.pos = @*MEMOS[$¢.pos]<ws>//$¢.pos; }
+            <.panic: "Strange text after block (missing comma, semicolon, comment marker?)">
+        ]?
+    }
 }
 
 augment class Cursor {
