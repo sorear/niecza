@@ -594,13 +594,15 @@ use CgOp;
             $self->regex->cgop($body) :
             CgOp::methodcall(CgOp::newscalar(
                 CgOp::rxcall("MakeCursor")), $self->method);
-        my @pushcapf = (@{ $self->captures } == 0) ? () : ($self->passcap ?
-            (CgOp::rxsetcapsfrom(CgOp::cast("cursor",
-                    CgOp::letvar("k"))),
-                CgOp::rxpushcapture(CgOp::newscalar(CgOp::rxstripcaps(CgOp::cast("cursor", CgOp::letvar("k")))),
-                    @{ $self->captures })) :
-            (CgOp::rxpushcapture(CgOp::letvar("kv"),
-                @{ $self->captures })));
+        my @newcapf = (@{ $self->captures } == 0) ? () :
+            CgOp::rxpushcapture(
+                ($self->passcap ?
+                    CgOp::newscalar(CgOp::rxstripcaps(
+                            CgOp::cast("cursor", CgOp::letvar("k")))) :
+                    CgOp::letvar("kv")), @{ $self->captures });
+        my @pushcapf = (($self->passcap ?
+            (CgOp::rxsetcapsfrom(CgOp::cast("cursor", CgOp::letvar("k"))))
+                : ()), @newcapf);
         my $backf = CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k")));
         my $updatef = CgOp::prog(
             @pushcapf,

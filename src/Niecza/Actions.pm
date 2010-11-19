@@ -508,7 +508,7 @@ sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
             return;
         }
         $inner = $cl->encapsulate_regex($M, $inner, passcut => 1,
-            goal => $closer->text);
+            goal => $closer->text, passcap => 1);
         $atom = RxOp::Sequence->new(zyg => [$atom,
             RxOp::Tilde->new(closer => $closer->text, dba => $::RX{dba},
                 zyg => [$inner])]); # TODO

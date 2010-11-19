@@ -8,6 +8,13 @@ use MONKEY_TYPING;
     }
 
     ok (Grammar but OUR::R5634["TOP"]).parse("foo"), "roles with dynamic regex names work";
+
+    my $M;
+    my $t;
+    $M = ("a()" ~~ / <alpha> '(' ~ ')' { $t = $<alpha>.Str } /);
+    is $t, "a", "Inside of ~ can see captures";
+    $M = ("(a)" ~~ / '(' ~ ')' <alpha> /);
+    is $M<alpha>, "a", "Captures can escape from ~";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
