@@ -282,6 +282,10 @@ method EXPR ($preclvl?) {
     sub infixstate() { #OK
         $here.deb("Looking for an infix") if $DEBUG::EXPR;
         return 1 if (@*MEMOS[$here.pos]<endstmt> // 0) == 2;  # XXX P6
+        # If this isn't here, then "$foo.method" will try to parse
+        # .method as an infix, and panic.  No infix operator is
+        # tighter than this anyhow.
+        return 1 if $preclim ge $methodcall_prec;
         my ($ws) = $here.ws;
         $here = $here.cursor($ws.to);
         my ($infix) = $here.infixish;
@@ -675,6 +679,7 @@ sub compiler(:$filename, :$text, :$settingname) {
     my $*IN_SUPPOSE = 0;
     my $*FATALS = 0;
 
+    $DEBUG::EXPR = False;
     $STD::DEBUG::EXPR = False;
     $STD::DEBUG::symtab = False;
 
