@@ -89,6 +89,19 @@ augment class Hash {
 }
 
 augment class Cursor {
+    method suppose($rx) {
+        my $*IN_SUPPOSE = True;
+        my $*FATALS = 0;
+        my @*WORRIES;
+        my %*WORRIES;
+        my $*HIGHWATER = -1;
+        my $*HIGHEXPECT = {};
+        try {
+            my $ret = first($rx(self));
+            if ($ret) { return $ret }
+        };
+        return ();
+    }
 token alpha {
     <+INTERNAL::alpha+[_]> \w*
 }
