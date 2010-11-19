@@ -26,6 +26,17 @@ package DEBUG {
     our $use_color = False;
 }
 
+sub _subst($M is rw, $text is rw, $regex, $repl) {
+    $text = $text.Str;
+    $M = ($text ~~ $regex);
+    if $M {
+        $text = $text.substr(0, $M.from) ~
+            (($repl ~~ Str) ?? $repl !! $repl()) ~
+                $text.substr($M.to, $text.chars - $M.to);
+    }
+    ?$M;
+}
+
 our $ALL;
 
 =begin comment
@@ -1212,7 +1223,7 @@ grammar P6 is STD {
         :my $*GOAL ::= '{';
         :my $*BORG = {};
         <EXPR>
-        { $*BORG.<culprit> = $*BORG<culprit> // $<EXPR>.cursor(self.pos) }
+        { $*BORG.<culprit> = $*BORG<culprit> // self }
         <.ws>
         <pblock>
     }
@@ -1983,7 +1994,7 @@ grammar P6 is STD {
     token trait_mod:of {
         ['of'|'returns']:s <typename>
         [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
-        { $*DECLARAND<of> = $<typename>; }
+        { $*DECLARAND<of> = $<typename>.Str; }
     }
     token trait_mod:as      { <sym><.spacey>:s <typename> }
     token trait_mod:handles { <sym><.spacey>:s <term> }
@@ -2801,7 +2812,7 @@ grammar P6 is STD {
         | <value>
         | <typename>
             [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
-            { $*DECLARAND<of> = $<typename>; }
+            { $*DECLARAND<of> = $<typename>.Str; }
         | where <.ws> <EXPR(item %item_assignment)>
         ]
         <.ws>
@@ -3113,7 +3124,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
             $<O> = {$<prefix_circumfix_meta_operator><O>} $<sym> = {$<prefix_circumfix_meta_operator>.Str}
         ]
         # XXX assuming no precedence change
-        
+
         <prefix_postfix_meta_operator>*
         <.ws>
     }
@@ -3154,17 +3165,17 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     token dotty:sym<.*> {
         ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
         $<sym> = {$0.Str}
-        <O(%methodcall)>
+        <O(|%methodcall)>
     }
 
     token dotty:sym<.> {
         <sym> <.unspacey> <dottyop>
-        <O(%methodcall)>
+        <O(|%methodcall)>
     }
 
     token privop {
         '!' <methodop>
-        <O(%methodcall)>
+        <O(|%methodcall)>
     }
 
     token dottyopish {
@@ -3322,8 +3333,8 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         '='
         <.can_meta($op, "make assignment out of")>
         [ <!{ $op<O><diffy> }> || <.sorry("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
+        $<sym> = {$op<sym> ~ '='}
         {
-            $<sym> = $op<sym> ~ '=';
             if $op<O><prec> gt %comma<prec> {
                 %prec = %item_assignment;
             }
@@ -3424,7 +3435,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         <pblock>
         {{
             if $*BORG {
-                $*BORG.<block> = $<pblock>;
+                $*BORG.<block> = self.cursor($<pblock>.to);
             }
         }}
         <O(|%term)>
@@ -3435,7 +3446,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         <pblock>
         {{
             if $*BORG {
-                $*BORG.<block> = $<pblock>;
+                $*BORG.<block> = self.cursor($<pblock>.to);
             }
         }}
         <O(|%term)>
@@ -3939,7 +3950,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         {{
             if $*BORG and $*BORG.<block> {
                 if not $*BORG.<name> {
-                    $*BORG.<culprit> = $<identifier>.cursor($pos);
+                    $*BORG.<culprit> = self.cursor($pos);
                     $*BORG.<name> = $name;
                 }
             }
@@ -3949,7 +3960,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
                 $ok = 1 if $al and $al.from != $al.to;
                 $ok = 1 if $<args><semiarglist>;
                 if not $ok {
-                    $<identifier>.worryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
+                    self.cursor($<identifier>.to).worryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
                 }
             }
         }}
@@ -4010,13 +4021,13 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
             {{
                 if $*BORG and $*BORG.<block> {
                     if not $*BORG.<name> {
-                        $*BORG.<culprit> = $<longname>.cursor($pos);
+                        $*BORG.<culprit> = self.cursor($pos);
                         $*BORG.<name> = $*BORG<name> // $name;
                     }
                 }
             }}
         ]
-        <O(%term)>
+        <O(|%term)>
     }
 
     method check_nodecl($name) {
@@ -4843,7 +4854,6 @@ method newlex ($needsig = 0) {
     $*CURLEX.<!NEEDSIG> = 1 if $needsig;
     $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $ALL.{$id} = $*CURLEX;
-    $*DECLARAND<curlex> = $*CURLEX if $*DECLARAND;
     self;
 }
 
@@ -4953,8 +4963,9 @@ method is_name ($n, $curlex = $*CURLEX) {
     return False;
 }
 
-method find_stash ($n, $curlex = $*CURLEX) {
+method find_stash ($n, $crlex = $*CURLEX) {
     my $name = $n;
+    my $curlex = $crlex;
     self.deb("find_stash $name") if $DEBUG::symtab;
 
     return Any if $name ~~ /\:\:\(/;
@@ -5251,7 +5262,7 @@ method add_mystery ($token,$pos,$ctx) {
     else {
         self.deb("add_mystery $name $*CURLEX") if $DEBUG::symtab;
         %*MYSTERY{$name}.<lex> = $*CURLEX;
-        %*MYSTERY{$name}.<token> = $token;
+        %*MYSTERY{$name}.<token> = self.cursor($token.to);
         %*MYSTERY{$name}.<ctx> = $ctx;
         %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos);
@@ -5667,6 +5678,7 @@ method EXPR ($preclvl?) {
             else {
                 self.worry("Missing final term in '" ~ $sym ~ "' list");
             }
+            @list = grep *.defined, @list;
             my $endpos = @list[0].to;
             @list = reverse @list if (+@list) > 1;
             my $startpos = @list[0].from;
@@ -5776,7 +5788,7 @@ method EXPR ($preclvl?) {
         push @termstack, $term<term>;
         $here.deb("after push: " ~ (+@termstack)) if $DEBUG::EXPR;
 
-        say "methodcall break" if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
+        # say "methodcall break" if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
         $state = &infixstate;
         return 0;
     }
@@ -6092,11 +6104,9 @@ method add_categorical($name) {
         my $sym1 = $sym.substr(0, $M.from);
         my $sym2 = $sym.substr($M.to, $sym.chars - $M.to);
         my $cname = $cat ~ ":<$sym1 $sym2>";
-        say "Adding categorical handler $cname for $sym1 / $sym2";
         %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[$cname, $sym1, $sym2, $O];
     } else {
         my $cname = $cat ~ ":<$sym>";
-        say "Adding categorical handler $cname for $sym";
         %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[$cname, $sym, $O];
     }
     self.cursor_fresh(%*LANG<MAIN>);
@@ -6209,15 +6219,6 @@ method cursor_force($pos) {
 
 method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
 
-method load_lex($) {
-    # NYI
-    my $id = "MY:file<NULL.pad>:line(1):pos(0)";
-    my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
-        '!line' => 1);
-    Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
-        'SETTING' => $core, $id => $core);
-}
-
 method mark_sinks(@sl) {
     #NYI
     self
@@ -6225,19 +6226,19 @@ method mark_sinks(@sl) {
 
 method gettrait($traitname,$param) {
     my $text;
+    my $M;
     if @$param {
         $text = $param.[0].Str;
-        # TODO get s/// working
-        # $text =~ s/^<(.*)>$/$1/ or
-        # $text =~ s/^\((.*)\)$/$1/;
+        _subst($M, $text, /^\<(.*)\>$/, { $M[0].Str }) or
+            _subst($M, $text, /^\((.*)\)$/, { $M[0].Str });
     }
     if ($traitname eq 'export') {
-        # if (defined $text) {
-        #     $text =~ s/://g;
-        # }
-        # else {
+        if (defined $text) {
+            while _subst($M, $text, /\:/, "") { }
+        }
+        else {
             $text = 'DEFAULT';
-        # }
+        }
         self.set_export($text);
         $text;
     }
