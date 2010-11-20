@@ -15,6 +15,10 @@ use MONKEY_TYPING;
     is $t, "a", "Inside of ~ can see captures";
     $M = ("(a)" ~~ / '(' ~ ')' <alpha> /);
     is $M<alpha>, "a", "Captures can escape from ~";
+
+    my $died = 1;
+    try { $*NONEX = 1; $died = 0; }
+    ok $died, "Assignment to non-existing dynvar fails";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

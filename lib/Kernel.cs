@@ -954,14 +954,16 @@ namespace Niecza {
                 up--;
             }
             name = name.Remove(1,1);
-            Dictionary<string,BValue> gstash = (Dictionary<string,BValue>)
-                UnboxAny(GlobalO);
             BValue v;
 
-            if (gstash.TryGetValue(name, out v)) {
+            if (((Dictionary<string,BValue>) UnboxAny(GlobalO))
+                    .TryGetValue(name, out v)) {
+                return v.v;
+            } else if (((Dictionary<string,BValue>) UnboxAny(ProcessO))
+                    .TryGetValue(name, out v)) {
                 return v.v;
             } else {
-                return PackageLookup(ProcessO, name).v;
+                return NewROScalar(AnyP);
             }
         }
 
