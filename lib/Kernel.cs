@@ -851,6 +851,9 @@ namespace Niecza {
         public static readonly IP6 StashP;
         public static readonly IP6 StrP;
 
+        public static readonly Variable TrueV;
+        public static readonly Variable FalseV;
+
         public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(info.mo ?? SubMO);
             n.slots[0] = outer;
@@ -871,6 +874,12 @@ namespace Niecza {
             DynObject n = new DynObject(((DynObject)proto).mo);
             n.slots[0] = v;
             return NewROScalar(n);
+        }
+
+        public static IP6 BoxRaw(object v, DynMetaObject proto) {
+            DynObject n = new DynObject(proto);
+            n.slots[0] = v;
+            return n;
         }
 
         // check whence before calling
@@ -1459,11 +1468,22 @@ slow:
             StrMO = new DynMetaObject("Str");
             StrMO.FillProtoClass(new string[] { "value" });
             StrP = new DynObject(StrMO);
+            ((DynObject)StrP).slots = null;
 
             BoolMO = new DynMetaObject("Bool");
+            BoolMO.loc_Bool = new CtxReturnSelf();
+            BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
             BoolMO.FillProtoClass(new string[] { "value" });
+            DynObject TrueO = new DynObject(BoolMO);
+            DynObject FalseO = new DynObject(BoolMO);
+            TrueO.slots[0] = true;
+            FalseO.slots[0] = false;
+            TrueV = NewROScalar(TrueO);
+            FalseV = NewROScalar(FalseO);
 
             NumMO = new DynMetaObject("Num");
+            NumMO.loc_Numeric = new CtxReturnSelf();
+            NumMO.loc_raw_Numeric = new CtxJustUnbox<double>();
             NumMO.FillProtoClass(new string[] { "value" });
 
             MuMO = new DynMetaObject("Mu");

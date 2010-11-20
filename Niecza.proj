@@ -16,6 +16,7 @@
 
     <ItemGroup>
         <CompilerPerl Include="src\Body.pm;src\CClass.pm;src\CgOp.pm;src\CgOpToCLROp.pm;src\CLRTypes.pm;src\CSharpBackend.pm;src\CodeGen.pm;src\CompilerDriver.pm;src\Metamodel.pm;src\Op.pm;src\Optimizer\Beta.pm;src\Optimizer\RxSimple.pm;src\Optimizer\Simplifier.pm;src\RxOp.pm;src\Sig.pm;src\Unit.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc"/>
+        <RTS Include="lib\Kernel.cs;lib\JSYNC.cs;lib\Cursor.cs;lib\Builtins.cs"/>
     </ItemGroup>
 
     <!-- Meta targets -->
@@ -36,9 +37,8 @@
     </Target>
 
     <!-- Libraries -->
-    <Target Name="Kernel.dll" Inputs="lib\Kernel.cs;lib\Cursor.cs;lib/JSYNC.cs"
-        Outputs="obj\Kernel.dll">
-        <Csc Sources="lib\Kernel.cs;lib\Cursor.cs;lib\JSYNC.cs" TargetType="library"
+    <Target Name="Kernel.dll" Inputs="@(RTS)" Outputs="obj\Kernel.dll">
+        <Csc Sources="@(RTS)" TargetType="library"
             OutputAssembly="obj\Kernel.dll" EmitDebugInformation="true"
             AllowUnsafeBlocks="true"/>
     </Target>
