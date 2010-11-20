@@ -170,7 +170,6 @@ sub stash3 {
 my %loopbacks = (
     'MArray', 'Kernel.ArrayMO',
     'MAny', 'Kernel.AnyMO',
-    'MBool', 'Kernel.BoolMO',
     'MCallFrame', 'Kernel.CallFrameMO',
     'MCapture', 'Kernel.CaptureMO',
     'MGatherIterator', 'Kernel.GatherIteratorMO',
@@ -178,14 +177,11 @@ my %loopbacks = (
     'MIterCursor', 'Kernel.IterCursorMO',
     'MList', 'Kernel.ListMO',
     'MMatch', 'Kernel.MatchMO',
-    'MNum', 'Kernel.NumMO',
-    'MStr', 'Kernel.StrMO',
     'PAny', 'Kernel.AnyP',
     'PArray', 'Kernel.ArrayP',
     'PEMPTY', 'Kernel.EMPTYP',
     'PHash', 'Kernel.HashP',
     'PIterator', 'Kernel.IteratorP',
-    'PStr', 'Kernel.StrP',
 );
 
 sub pkg0 {
@@ -244,11 +240,11 @@ sub pkg2_prole {
     create_type_object($_->{peer});
 }
 
+my %bootcl = (map { $_, 1 } qw/ Scalar Sub Stash Mu Str Bool Num /);
 sub pkg2_class {
     my ($p, $wh6, $whv) = @_;
     my $punit = $unit->get_unit($_->xref->[0]);
-    if ($punit->is_true_setting && ($_->name eq 'Scalar' ||
-            $_->name eq 'Sub' || $_->name eq 'Stash')) {
+    if ($punit->is_true_setting && $bootcl{$_->name}) {
         push @thaw, CgOp::rawsset($p,
             CgOp::rawsget("Kernel." . $_->name . "MO:f,$cl_ty"));
     } else {

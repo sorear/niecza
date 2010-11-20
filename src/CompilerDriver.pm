@@ -236,7 +236,7 @@ sub compile {
         [ 'gmcs', sub {
             my @args;
             if ($args{selfcontained}) {
-                @args = ("gmcs", "/debug",
+                @args = ("gmcs", "/debug", "/unsafe+",
                     "/out:" . $args{selfcontained},
                     (map { File::Spec->catfile($libdir, $_) }
                         "Kernel.cs", "Cursor.cs", "JSYNC.cs"),

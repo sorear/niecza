@@ -391,9 +391,68 @@ namespace Niecza {
         public NieczaException() : base() {}
     }
 
+    public abstract class ContextHandler<T> {
+        public abstract T Get(Variable obj);
+
+    }
+
+    // TODO: find out if generic sharing is killing performance
+    class CtxCallMethodUnbox<T> : ContextHandler<T> {
+        string method;
+        public CtxCallMethodUnbox(string method) { this.method = method; }
+
+        public override T Get(Variable obj) {
+            Frame nr = new Frame(null, null, Kernel.ExitRunloopSI);
+            Kernel.RunCore(obj.Fetch().InvokeMethod(nr, method, new Variable[] { obj }, null));
+            Variable v = (Variable) nr.resultSlot;
+            return (T) Kernel.UnboxAny(v.Fetch());
+        }
+    }
+
+    class CtxCallMethod : ContextHandler<Variable> {
+        string method;
+        public CtxCallMethod(string method) { this.method = method; }
+
+        public override Variable Get(Variable obj) {
+            Frame nr = new Frame(null, null, Kernel.ExitRunloopSI);
+            Kernel.RunCore(obj.Fetch().InvokeMethod(nr, method, new Variable[] { obj }, null));
+            Variable v = (Variable) nr.resultSlot;
+            return v;
+        }
+    }
+
+    class CtxJustUnbox<T> : ContextHandler<T> {
+        public override T Get(Variable obj) {
+            return (T) Kernel.UnboxAny(obj.Fetch());
+        }
+    }
+
+    class CtxReturnSelf : ContextHandler<Variable> {
+        public override Variable Get(Variable obj) {
+            return Kernel.NewROScalar(obj.Fetch());
+        }
+    }
+
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
+        public static readonly ContextHandler<Variable> CallStr
+            = new CtxCallMethod("Str");
+        public static readonly ContextHandler<Variable> CallBool
+            = new CtxCallMethod("Bool");
+        public static readonly ContextHandler<Variable> CallNumeric
+            = new CtxCallMethod("Numeric");
+        public static readonly ContextHandler<Variable> CallDefined
+            = new CtxCallMethod("defined");
+        public static readonly ContextHandler<string> RawCallStr
+            = new CtxCallMethodUnbox<string>("Str");
+        public static readonly ContextHandler<bool> RawCallBool
+            = new CtxCallMethodUnbox<bool>("Bool");
+        public static readonly ContextHandler<double> RawCallNumeric
+            = new CtxCallMethodUnbox<double>("Numeric");
+        public static readonly ContextHandler<bool> RawCallDefined
+            = new CtxCallMethodUnbox<bool>("defined");
+
         public IP6 how;
         public IP6 typeObject;
         public string name;
@@ -413,6 +472,13 @@ namespace Niecza {
 
         public delegate Frame InvokeHandler(IP6 th, Frame c,
                 Variable[] pos, Dictionary<string, Variable> named);
+
+        public ContextHandler<Variable> mro_Str, loc_Str, mro_Numeric,
+                loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined;
+        public ContextHandler<bool> mro_raw_Bool, loc_raw_Bool, mro_raw_defined,
+                loc_raw_defined;
+        public ContextHandler<string> mro_raw_Str, loc_raw_Str;
+        public ContextHandler<double> mro_raw_Numeric, loc_raw_Numeric;
 
         public InvokeHandler OnInvoke;
 
@@ -468,14 +534,38 @@ namespace Niecza {
 
             for (int kx = mro.Length - 1; kx >= 0; kx--) {
                 DynMetaObject k = mro[kx];
-                if (k.OnInvoke != null)
-                    mro_OnInvoke = k.OnInvoke;
-
                 foreach (KeyValuePair<string,IP6> m in k.ord_methods) {
                     DispatchEnt de;
                     mro_methods.TryGetValue(m.Key, out de);
                     mro_methods[m.Key] = new DispatchEnt(de, m.Value);
+                    if (m.Key == "Numeric") {
+                        mro_Numeric = CallNumeric;
+                        mro_raw_Numeric = RawCallNumeric;
+                    }
+                    if (m.Key == "Bool") {
+                        mro_Bool = CallBool;
+                        mro_raw_Bool = RawCallBool;
+                    }
+                    if (m.Key == "Str") {
+                        mro_Str = CallStr;
+                        mro_raw_Str = RawCallStr;
+                    }
+                    if (m.Key == "defined") {
+                        mro_defined = CallDefined;
+                        mro_raw_defined = RawCallDefined;
+                    }
                 }
+
+                if (k.OnInvoke != null)
+                    mro_OnInvoke = k.OnInvoke;
+                if (k.loc_Numeric != null) mro_Numeric = k.loc_Numeric;
+                if (k.loc_defined != null) mro_defined = k.loc_defined;
+                if (k.loc_Bool != null) mro_Bool = k.loc_Bool;
+                if (k.loc_Str != null) mro_Str = k.loc_Str;
+                if (k.loc_raw_Numeric != null) mro_raw_Numeric = k.loc_raw_Numeric;
+                if (k.loc_raw_defined != null) mro_raw_defined = k.loc_raw_defined;
+                if (k.loc_raw_Bool != null) mro_raw_Bool = k.loc_raw_Bool;
+                if (k.loc_raw_Str != null) mro_raw_Str = k.loc_raw_Str;
             }
         }
 
@@ -738,7 +828,6 @@ namespace Niecza {
         }
 
         public static DynMetaObject AnyMO;
-        public static DynMetaObject BoolMO;
         public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
         public static DynMetaObject GatherIteratorMO;
@@ -747,18 +836,20 @@ namespace Niecza {
         public static DynMetaObject ListMO;
         public static DynMetaObject ArrayMO;
         public static DynMetaObject MatchMO;
-        public static DynMetaObject NumMO;
-        public static DynMetaObject StrMO;
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 EMPTYP;
         public static IP6 HashP;
         public static IP6 IteratorP;
-        public static IP6 StrP;
         public static readonly DynMetaObject ScalarMO;
         public static readonly DynMetaObject StashMO;
         public static readonly DynMetaObject SubMO;
+        public static readonly DynMetaObject StrMO;
+        public static readonly DynMetaObject NumMO;
+        public static readonly DynMetaObject BoolMO;
+        public static readonly DynMetaObject MuMO;
         public static readonly IP6 StashP;
+        public static readonly IP6 StrP;
 
         public static IP6 MakeSub(SubInfo info, Frame outer) {
             DynObject n = new DynObject(info.mo ?? SubMO);
@@ -1365,9 +1456,18 @@ slow:
         public static IP6 ProcessO;
 
         static Kernel() {
-            DynMetaObject pStrMO = new DynMetaObject("protoStr");
-            pStrMO.FillProtoClass(new string[] { "value" });
-            StrP = new DynObject(pStrMO);
+            StrMO = new DynMetaObject("Str");
+            StrMO.FillProtoClass(new string[] { "value" });
+            StrP = new DynObject(StrMO);
+
+            BoolMO = new DynMetaObject("Bool");
+            BoolMO.FillProtoClass(new string[] { "value" });
+
+            NumMO = new DynMetaObject("Num");
+            NumMO.FillProtoClass(new string[] { "value" });
+
+            MuMO = new DynMetaObject("Mu");
+            MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
             StashMO.FillProtoClass(new string[] { "value" });
