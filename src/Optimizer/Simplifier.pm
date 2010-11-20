@@ -39,6 +39,8 @@ sub is_simple_var {
 
 our %funcs = (
     '&infix:<=>' => \&do_assign,
+    '&infix:<==>' => \&do_numeq,
+    '&postfix:<++>' => \&do_postinc,
 );
 
 sub do_assign {
@@ -59,6 +61,18 @@ sub do_assign {
                         rhs => $args->[1]),
                     Op::LetVar->new(name => $id)]));
     }
+}
+
+sub do_postinc {
+    my ($body, $nv, $invname, $args) = @_;
+    return unless @$args == 1;
+    return Op::Builtin->new(name => 'postinc', args => $args);
+}
+
+sub do_numeq {
+    my ($body, $nv, $invname, $args) = @_;
+    return unless @$args == 2;
+    return Op::Builtin->new(name => 'numeq', args => $args);
 }
 
 sub run_optree {

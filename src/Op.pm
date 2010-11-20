@@ -1186,6 +1186,27 @@ use CgOp;
     __PACKAGE__->meta->make_immutable;
     no Moose;
 }
+
+{
+    package Op::Builtin;
+    use Moose;
+    extends 'Op';
+
+    has args => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+    has name => (isa => 'Str', is => 'ro', required => 1);
+    sub zyg { @{ $_[0]->args } }
+
+    sub code {
+        my ($self, $body) = @_;
+        no strict 'refs';
+        my $name = $self->name;
+        &{ "CgOp::bif_$name" }(map { $_->cgop($body) } @{ $self->args });
+    }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
 {
     package Op::Let;
     use Moose;
