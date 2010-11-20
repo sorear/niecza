@@ -411,20 +411,16 @@ use CgOp;
         my ($self, $sym, $o2) = @_;
         given ($self->kind) {
             when ("&&") {
-                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
-                        CgOp::methodcall($sym, 'Bool'))), $o2, $sym);
+                return CgOp::ternary(CgOp::obj_getbool($sym), $o2, $sym);
             }
             when ("||") {
-                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
-                        CgOp::methodcall($sym, 'Bool'))), $sym, $o2);
+                return CgOp::ternary(CgOp::obj_getbool($sym), $sym, $o2);
             }
             when ("andthen") {
-                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
-                        CgOp::methodcall($sym, 'defined'))), $o2, $sym);
+                return CgOp::ternary(CgOp::obj_getdef($sym), $o2, $sym);
             }
             when ("//") {
-                return CgOp::ternary(CgOp::unbox('bool', CgOp::fetch(
-                        CgOp::methodcall($sym, 'defined'))), $sym, $o2);
+                return CgOp::ternary(CgOp::obj_getdef($sym), $sym, $o2);
             }
             default {
                 die "That's not a sensible short circuit, now is it?";
@@ -481,9 +477,7 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::ternary(
-            CgOp::unbox('bool',
-                CgOp::fetch(
-                    CgOp::methodcall($self->check->cgop($body), "Bool"))),
+            CgOp::obj_getbool($self->check->cgop($body)),
             ($self->true ? $self->true->cgop($body) :
                 CgOp::corelex('Nil')),
             ($self->false ? $self->false->cgop($body) :
@@ -512,9 +506,7 @@ use CgOp;
 
         CgOp::prog(
             CgOp::whileloop($self->until, $self->once,
-                CgOp::unbox('bool',
-                    CgOp::fetch(
-                        CgOp::methodcall($self->check->cgop($body), "Bool"))),
+                CgOp::obj_getbool($self->check->cgop($body)),
                 CgOp::prog(
                     CgOp::label("redo$id"),
                     CgOp::sink($self->body->cgop($body)),
@@ -615,9 +607,7 @@ use CgOp;
         my ($self, $body) = @_;
 
         CgOp::ternary(
-            CgOp::unbox('bool',
-                CgOp::fetch(
-                    CgOp::methodcall(CgOp::scopedlex($self->condvar), "Bool"))),
+            CgOp::obj_getbool(CgOp::scopedlex($self->condvar)),
             CgOp::corelex('Nil'),
             CgOp::prog(
                 CgOp::assign(CgOp::scopedlex($self->condvar),
