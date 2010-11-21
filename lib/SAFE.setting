@@ -903,7 +903,7 @@ my class Cursor {
     token alpha { <+INTERNAL::alpha> }
 }
 
-my class Match {
+my class Match is Cool {
     method list () { @( self.Capture ) }
     method hash () { %( self.Capture ) }
     method flat () { @( self.Capture ) }
