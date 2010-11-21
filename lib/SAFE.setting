@@ -659,7 +659,7 @@ my class Hash {
     method !extend($key, \$var) {
         Q:CgOp {
             (letn d [unbox varhash (@ {self})]
-                  k [unbox str (@ {$key.Str})]
+                  k [obj_getstr {$key}]
               [varhash_setindex (l k) (l d) {$var}]
               [null var])
         };
@@ -716,13 +716,13 @@ my class Hash {
     }
 
     method exists-key($str) {
-        Q:CgOp { (box Bool (varhash_contains_key (unbox varhash (@ {self})) (unbox str (@ {$str.Str})))) }
+        Q:CgOp { (box Bool (varhash_contains_key (unbox varhash (@ {self})) (obj_getstr {$str}))) }
     }
 
     method delete-key($str) {
         Q:CgOp {
             (letn r   (unbox varhash (@ {self}))
-                  k   (unbox str (@ {$str.Str}))
+                  k   (obj_getstr {$str})
                   old (ternary (varhash_contains_key (l r) (l k))
                                (varhash_getindex (l k) (l r))
                                {Any})
@@ -738,10 +738,10 @@ my class Hash {
     method at-key($key) {
         Q:CgOp {
             (box Bool (varhash_contains_key [unbox varhash (@ {self})]
-                [unbox str (@ {$key.Str})]))
+                [obj_getstr {$key}]))
         }
             ?? Q:CgOp {
-                (varhash_getindex [unbox str (@ {$key.Str})]
+                (varhash_getindex [obj_getstr {$key}]
                   [unbox varhash (@ {self})])
             } !! Any!Any::butWHENCE(sub (\$var) {
                 self!extend($key, $var)
@@ -885,7 +885,7 @@ my class Cursor {
           (newscalar (l cap)))
     } }
     method new($str) { Q:CgOp { (ns (cursor_start
-        (@ {self}) (unbox str (@ {$str})))) } }
+        (@ {self}) (obj_getstr {$str}))) } }
     method pos() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
     method to() { Q:CgOp { (box Num (cast num (cursor_pos
@@ -897,7 +897,7 @@ my class Cursor {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method at-key($k) { Q:CgOp {
-        (cursor_item (cast cursor (@ {self})) (unbox str (@ {$k.Str})))
+        (cursor_item (cast cursor (@ {self})) (obj_getstr {$k}))
     } }
     method at-pos($i) { self.at-key($i) }
     token alpha { <+INTERNAL::alpha> }
@@ -914,7 +914,7 @@ my class Match {
           (newscalar (l cap)))
     } }
     method at-key($k) { Q:CgOp {
-        (cursor_item (cast cursor (@ {self})) (unbox str (@ {$k.Str})))
+        (cursor_item (cast cursor (@ {self})) (obj_getstr {$k}))
     } }
     method at-pos($i) { self.at-key($i) }
     method new($) { die "Match.new NYI" }
@@ -933,15 +933,15 @@ my class Match {
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
         my $m = Q:CgOp {
             (newscalar (cursor_synthetic
-                (cast cursor (@ {$cursor})) (unbox str (@ {$method.Str}))
-                (cast int (unbox num (@ {$from.Numeric})))
-                (cast int (unbox num (@ {$to.Numeric})))))
+                (cast cursor (@ {$cursor})) (obj_getstr {$method})
+                (cast int (obj_getnum {$from}))
+                (cast int (obj_getnum {$to}))))
         };
         # this is wrong.  I need a better way to pass lists into primitives.
         for @captures -> $pair {
             Q:CgOp { (rnull
                 (cursor_synthcap (cast cursor (@ {$m}))
-                  (unbox str (@ {$pair.key.Str})) (@ {$pair.value}))) };
+                  (obj_getstr {$pair.key}) (@ {$pair.value}))) };
         }
         $m
     }
