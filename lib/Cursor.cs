@@ -998,7 +998,7 @@ public class LADParam : LAD {
             goto imp;
         }
         IP6 i = p.Fetch();
-        if (i.mo != Kernel.StrP.mo) {
+        if (i.mo != Kernel.StrMO) {
             reason = "parameter is not a string";
             goto imp;
         }

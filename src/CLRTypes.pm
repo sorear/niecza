@@ -121,7 +121,6 @@ my %typedata = (
     'Kernel.ContextHelper' => [m => 'Variable'],
     'Kernel.InstantiateRole' => [c => 'Variable'],
     'Kernel.RoleApply'     => [m => 'DynMetaObject'],
-    'Kernel.StrP'          => [f => 'IP6'],
     'Kernel.CallFrameMO'   => [f => 'DynMetaObject'],
     'Kernel.Process'       => [f => 'Variable'],
     'Kernel.Global'        => [f => 'Variable'],

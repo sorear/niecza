@@ -129,10 +129,12 @@ use warnings;
     sub string_var { box('Str', clr_string($_[0])); }
 
     sub box {
-        rawscall('Kernel.BoxAny', $_[1],
-            blessed($_[0]) ? $_[0] :
-            ($_[0] eq 'Str') ? rawsget('Kernel.StrP') :
-                fetch(corelex($_[0])));
+        rawscall('Kernel.BoxAnyMO:m,Variable', $_[1],
+            blessed($_[0]) ? obj_llhow($_[0]) :
+            ($_[0] eq 'Str') ? rawsget('Kernel.StrMO:f,DynMetaObject') :
+            ($_[0] eq 'Bool') ? rawsget('Kernel.BoolMO:f,DynMetaObject') :
+            ($_[0] eq 'Num') ? rawsget('Kernel.NumMO:f,DynMetaObject') :
+                obj_llhow(fetch(corelex($_[0]))));
     }
 
     sub obj_is_defined { rawcall($_[0], 'IsDefined') }

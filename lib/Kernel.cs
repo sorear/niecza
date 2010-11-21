@@ -789,10 +789,8 @@ namespace Niecza {
         }
 
         public static Frame Die(Frame caller, string msg) {
-            DynObject n = new DynObject(((DynObject)StrP).mo);
-            n.slots[0] = msg;
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
-                    NewROScalar(n));
+                    BoxAnyMO(msg, StrMO));
         }
 
         public static Frame BindFail(Frame caller, string msg) {
@@ -861,7 +859,6 @@ namespace Niecza {
         public static readonly DynMetaObject BoolMO;
         public static readonly DynMetaObject MuMO;
         public static readonly IP6 StashP;
-        public static readonly IP6 StrP;
 
         public static readonly Variable TrueV;
         public static readonly Variable FalseV;
@@ -875,7 +872,7 @@ namespace Niecza {
         }
 
         public static DynObject MockBox(object v) {
-            DynObject n = new DynObject(StrP.mo);
+            DynObject n = new DynObject(StrMO);
             n.slots[0] = v;
             return n;
         }
@@ -884,6 +881,14 @@ namespace Niecza {
             if (v == null)
                 return NewROScalar(proto);
             DynObject n = new DynObject(((DynObject)proto).mo);
+            n.slots[0] = v;
+            return NewROScalar(n);
+        }
+
+        public static Variable BoxAnyMO(object v, DynMetaObject proto) {
+            if (v == null)
+                return NewROScalar(proto.typeObject);
+            DynObject n = new DynObject(proto);
             n.slots[0] = v;
             return NewROScalar(n);
         }
@@ -1029,7 +1034,7 @@ namespace Niecza {
         public static VarDeque KeysHelper(Dictionary<string,Variable> d) {
             VarDeque lv = new VarDeque();
             foreach (string s in d.Keys) {
-                lv.Push(BoxAny(s, StrP));
+                lv.Push(BoxAnyMO(s, StrMO));
             }
             return lv;
         }
@@ -1038,7 +1043,7 @@ namespace Niecza {
         public static Variable[] ArgsHelper() {
             List<Variable> lv = new List<Variable>();
             foreach (string s in commandArgs) {
-                lv.Add(BoxAny(s, StrP));
+                lv.Add(BoxAnyMO(s, StrMO));
             }
             return lv.ToArray();
         }
@@ -1303,7 +1308,7 @@ slow:
                         for (int i = 1; i < th.pos.Length; i++) {
                             IP6 obj = th.pos[i].Fetch();
                             to_pass[i-1] = NewROScalar(obj);
-                            if (obj.mo == StrP.mo) {
+                            if (obj.mo == StrMO) {
                                 string p = (string)UnboxAny(obj);
                                 s += new string((char)p.Length, 1);
                                 s += p;
@@ -1479,8 +1484,6 @@ slow:
         static Kernel() {
             StrMO = new DynMetaObject("Str");
             StrMO.FillProtoClass(new string[] { "value" });
-            StrP = new DynObject(StrMO);
-            ((DynObject)StrP).slots = null;
 
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
@@ -1592,8 +1595,8 @@ slow:
 
             if (unf == null) {
                 Variable mp = (type == SubInfo.ON_DIE) ? ((Variable)payload) :
-                    BoxAny("Unhandled control operator: " +
-                            SubInfo.DescribeControl(type, tgt, lid, name), StrP);
+                    BoxAnyMO("Unhandled control operator: " +
+                            SubInfo.DescribeControl(type, tgt, lid, name), StrMO);
                 if (in_unhandled != null) {
                     Console.Error.WriteLine("Double fault {0}", in_unhandled);
                     Environment.Exit(1);
