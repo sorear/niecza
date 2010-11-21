@@ -15,7 +15,8 @@ public class Builtins {
 
     public static Variable PostIncrement(Variable v) {
         IP6 o1 = v.Fetch();
-        double d = o1.mo.mro_raw_Numeric.Get(v);
+        double d = o1.mo.mro_raw_defined.Get(v) ?
+            o1.mo.mro_raw_Numeric.Get(v) : 0;
         v.Store(Kernel.BoxRaw(d + 1, Kernel.NumMO));
         return Kernel.NewROScalar(o1);
     }
