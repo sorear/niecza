@@ -131,7 +131,7 @@ my class Str is Cool {
     method ACCEPTS($t) { self eq $t }
     method Bool () { self ne "" }
     method chars() { Q:CgOp {
-        (box Num (cast num (str_length (unbox str (@ (l self))))))
+        (box Num (cast num (str_length (unbox str (@ {self})))))
     } }
     method say() { Q:CgOp {
         (prog [say (unbox str (@ {self}))]
@@ -140,8 +140,8 @@ my class Str is Cool {
     } }
     method substr($from, $len) { Q:CgOp {
         (box Str (str_substring [unbox str (@ {self})]
-                    [cast int (unbox num (@ {$from.Numeric}))]
-                    [cast int (unbox num (@ {$len.Numeric}))]))
+                    [cast int (obj_getnum {$from})]
+                    [cast int (obj_getnum {$len})]))
     } }
     method dump() { '"' ~ self ~ '"' }
 }
@@ -188,65 +188,65 @@ sub infix:<~>(\|$bits) { Q:CgOp {
           max (fvarlist_length (l ar))
       [whileloop 0 0 (< (l i) (l max)) (prog
           [strbuf_append (l buf)
-            (unbox str (@ (methodcall (fvarlist_item (l i) (l ar)) Str)))]
+            (obj_getstr (fvarlist_item (l i) (l ar)))]
           [l i (+ (l i) (int 1))])]
       [box Str (strbuf_seal (l buf))])
 } }
 
 sub infix:<+>($l,$r) { Q:CgOp {
-    (box Num (+ (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Num (+ (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<->($l,$r) { Q:CgOp {
-    (box Num (- (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Num (- (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<*>($l,$r) { Q:CgOp {
-    (box Num (* (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Num (* (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:</>($l,$r) { Q:CgOp {
-    (box Num (/ (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Num (/ (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<< < >>($l,$r) { Q:CgOp {
-    (box Bool (< (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Bool (< (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<< > >>($l,$r) { Q:CgOp {
-    (box Bool (> (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Bool (> (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<< <= >>($l,$r) { Q:CgOp {
-    (box Bool (<= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Bool (<= (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<< >= >>($l,$r) { Q:CgOp {
-    (box Bool (>= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Bool (>= (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<< == >>($l,$r) { Q:CgOp {
-    (box Bool (== (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Bool (== (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<< != >>($l,$r) { Q:CgOp {
-    (box Bool (!= (unbox num (@ {$l.Numeric})) (unbox num (@ {$r.Numeric}))))
+    (box Bool (!= (obj_getnum {$l}) (obj_getnum {$r})))
 } }
 
 sub infix:<max>($a,$b) { $a < $b ?? $b !! $a }
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
 
 sub warn($str) { Q:CgOp {
-    (prog [note (unbox str (@ {$str.Str}))]
+    (prog [note (obj_getstr {$str})]
           [box Bool (bool 1)]
     )
 } }
 
 sub say(*@obj) { @obj.join('').say }
-sub note(*@text) { Q:CgOp { (rnull (note (unbox str (@ {@text.join('').Str})))) } }
+sub note(*@text) { Q:CgOp { (rnull (note (obj_getstr {@text.join('')}))) } }
 
 sub exit($status = 0) { Q:CgOp {
-    (rnull [exit (cast int (unbox num (@ {$status.Numeric})))])
+    (rnull [exit (cast int (obj_getnum {$status}))])
 } }
 
 sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
@@ -258,8 +258,8 @@ sub substr($str, $start, $len = $str.chars - $start) {
 
 sub item($x) { $x }
 
-sub prefix:<not>($x) { $x.not }
-sub defined($x) { $x.defined }
+sub prefix:<not>($x) { $x ?? False !! True }
+sub defined($x) { Q:CgOp { (obj_asdef {$x}) } }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
@@ -268,10 +268,10 @@ sub prefix:<++>($v is rw) { $v = (($v // 0) + 1); $v }
 sub postfix:<-->($v is rw) { my $old = $v; $v = (($v // 0) - 1); $old }
 sub postfix:<++>($v is rw) { my $old = $v; $v = (($v // 0) + 1); $old }
 
-sub prefix:<~>($v) { $v.Str } # should be Stringy
-sub prefix:<?>($v) { $v.Bool }
+sub prefix:<~>($v) { Q:CgOp { (obj_asstr {$v}) } } # should be Stringy
+sub prefix:<?>($v) { Q:CgOp { (obj_asbool {$v}) } }
 sub prefix:<->($v) { 0 - $v }
-sub prefix:<+>($x) { $x.Numeric }
+sub prefix:<+>($x) { Q:CgOp { (obj_asnum {$x}) } }
 
 sub prefix:<!>($v) { $v ?? False !! True }
 
@@ -286,7 +286,7 @@ sub infix:<x>($str, $ct) {
 }
 
 sub infix:<leg>($s1, $s2) {
-    Q:CgOp { (box Num (cast num (strcmp (unbox str (@ {$s1.Str})) (unbox str (@ {$s2.Str}))))) }
+    Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }
 }
 
 sub infix:<ge>($s1, $s2) { ($s1 leg $s2) >= 0 }
@@ -295,12 +295,10 @@ sub infix:<le>($s1, $s2) { ($s1 leg $s2) <= 0 }
 sub infix:<lt>($s1, $s2) { ($s1 leg $s2) < 0  }
 
 sub infix:<eq>($l,$r) { Q:CgOp {
-    (box Bool (compare == (unbox str (@ {$l.Str}))
-      (unbox str (@ {$r.Str}))))
+    (box Bool (compare == (obj_getstr {$l}) (obj_getstr {$r})))
 } }
 sub infix:<ne>($l,$r) { Q:CgOp {
-    (box Bool (compare != (unbox str (@ {$l.Str}))
-      (unbox str (@ {$r.Str}))))
+    (box Bool (compare != (obj_getstr {$l}) (obj_getstr {$r})))
 } }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
@@ -322,18 +320,18 @@ my class CallFrame {
     method caller() { Q:CgOp {
         (letn c (frame_caller (cast frame (@ {self})))
           (ternary
-            (!= (letvar c) (null frame))
-            (ns (letvar c))
+            (!= (l c) (null frame))
+            (ns (l c))
             {Any}))
     } }
 
     method file() { Q:CgOp { (box Str (frame_file
-        (cast frame (@ (l self))))) } }
+        (cast frame (@ {self})))) } }
     method line() { Q:CgOp { (box Num (cast num (frame_line
-        (cast frame (@ (l self)))))) } }
+        (cast frame (@ {self}))))) } }
 
-    method hints($var) { Q:CgOp { (frame_hint (cast frame (@ (l self)))
-        (unbox str (@ (l $var)))) } }
+    method hints($var) { Q:CgOp { (frame_hint (cast frame (@ {self}))
+        (obj_getstr {$var})) } }
 }
 
 sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
@@ -528,7 +526,7 @@ my class List is Cool {
     } }
 
     method !item-at-pos($ix) { Q:CgOp {
-        (vvarlist_item (cast int (unbox num (@ {$ix}))) (getslot items vvarlist (@ {self})))
+        (vvarlist_item (cast int (obj_getnum {$ix})) (getslot items vvarlist (@ {self})))
     } }
 
     method !pop-item() { Q:CgOp {
@@ -548,7 +546,7 @@ my class List is Cool {
     } }
 
     method !fill ($count) { Q:CgOp {
-        (letn ct (cast int (unbox num (@ {$count})))
+        (letn ct (cast int (obj_getnum {$count}))
               items (getslot items vvarlist (@ {self}))
               rest  (getslot rest  vvarlist (@ {self}))
           (whileloop 0 0

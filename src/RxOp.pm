@@ -139,7 +139,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim('Exact', CgOp::unbox('str', CgOp::fetch(CgOp::methodcall($self->ops->cgop($body), "Str"))));
+        CgOp::rxbprim('Exact', CgOp::obj_getstr($self->ops->cgop($body)));
     }
 
     sub lad { $_[0]->param ? ['Param', $_[0]->param] : ['Imp'] }
@@ -809,8 +809,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
-                    CgOp::methodcall($self->block->cgop($body), "Bool"))));
+        CgOp::ncgoto('backtrack', CgOp::obj_getbool($self->block->cgop($body)));
     }
 
     sub lad {

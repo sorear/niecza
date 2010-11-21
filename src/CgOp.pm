@@ -260,10 +260,14 @@ use warnings;
                 "Get:m,$type", letvar('!var')));
     }
 
-    sub obj_getnum { _context('Double', 'raw_Numeric', $_[0]) }
+    sub obj_getnum  { _context('Double', 'raw_Numeric', $_[0]) }
     sub obj_getbool { _context('Boolean', 'raw_Bool', $_[0]) }
-    sub obj_getdef { _context('Boolean', 'raw_defined', $_[0]) }
-    sub obj_getstr { _context('String', 'raw_Str', $_[0]) }
+    sub obj_getdef  { _context('Boolean', 'raw_defined', $_[0]) }
+    sub obj_getstr  { _context('String', 'raw_Str', $_[0]) }
+    sub obj_asnum   { _context('Variable', 'Numeric', $_[0]) }
+    sub obj_asbool  { _context('Variable', 'Bool', $_[0]) }
+    sub obj_asdef   { _context('Variable', 'defined', $_[0]) }
+    sub obj_asstr   { _context('Variable', 'Str', $_[0]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
