@@ -451,7 +451,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::string_var($self->text);
+        CgOp::const(CgOp::string_var($self->text));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -651,7 +651,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::box('Num', CgOp::double($self->value));
+        CgOp::const(CgOp::box('Num', CgOp::double($self->value)));
     }
 
     __PACKAGE__->meta->make_immutable;
