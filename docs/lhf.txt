@@ -21,3 +21,7 @@
 
 * Contributions for perf/ are welcome and will be treated as challenges.
 
+* If you have Microsoft .NET, I'd like Niecza to work out of the box.
+  That means a little bit of logic to probe for it, and then adapting
+  CompilerDriver to invoke csc instead of gmcs.  Also niecza_eval
+  should run .exe files directly instead of "mono foo.exe".
