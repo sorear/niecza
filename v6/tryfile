@@ -109,6 +109,8 @@ token alpha {
 
 augment class STD {
     our $ALL;
+method lookup_dynvar($name) { Any } # NYI
+method check_old_cclass($text) { } # NYI
 method canonicalize_name($n) {
     my $M;
     my $name = $n;
