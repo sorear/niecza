@@ -109,6 +109,42 @@ token alpha {
 
 augment class STD {
     our $ALL;
+method canonicalize_name($n) {
+    my $M;
+    my $name = $n;
+    if $M = first(/(< $ @ % & >)( \^ || \: <!before \:> )/(Cursor.new($name))) {
+        $name = $M[0] ~ substr($name, $M.to);
+    }
+    if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {
+        $name = $name.substr(0, $name.chars - 2);
+    }
+    return $name unless $name ~~ /::/;
+    self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
+
+    if $M = $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
+        $name = $M[1] ~ "<" ~ $M[0] ~ substr($name, $M.to) ~ ">";
+    }
+    my $vname;
+    if $M = $name ~~ /'::<'/ && $name.substr($name.chars - 1, 1) eq '>' {
+        $name = substr($name, 0, $M.from);
+        $vname = substr($name, $M.to, $name.chars - $M.to - 1);
+    }
+    my @components;
+    while $M = $name ~~ / '::' / {
+        push @components, $name.substr(0, $M.to);
+        $name = substr($name, $M.to);
+    }
+    push @components, $name;
+    shift(@components) while @components and @components[0] eq '';
+    if (defined $vname) {
+        if @components {
+            my $last := @components[+@components - 1];
+            $last ~= '::' if $last.chars < 2 || $last.substr($last.chars - 2, 2) ne '::';
+        }
+        push(@components, $vname) if defined $vname;
+    }
+    @components;
+}
 method EXPR ($preclvl?) {
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $*LEFTSIGIL = '';        # XXX P6
