@@ -433,6 +433,18 @@ namespace Niecza {
         }
     }
 
+    class CtxRawNativeDefined : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            return obj.Fetch().IsDefined();
+        }
+    }
+
+    class CtxBoolNativeDefined : ContextHandler<Variable> {
+        public override Variable Get(Variable obj) {
+            return obj.Fetch().IsDefined() ? Kernel.TrueV : Kernel.FalseV;
+        }
+    }
+
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
@@ -1487,6 +1499,8 @@ slow:
             NumMO.FillProtoClass(new string[] { "value" });
 
             MuMO = new DynMetaObject("Mu");
+            MuMO.loc_Bool = MuMO.loc_defined = new CtxBoolNativeDefined();
+            MuMO.loc_raw_Bool = MuMO.loc_raw_defined = new CtxRawNativeDefined();
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
