@@ -1,8 +1,11 @@
 * Generally speaking, the setting is very incomplete.  Patches to add
   methods or subs to the setting, with tests, are welcome.
   - Series operators, stuff like that.
-  - split, trans
+  - split, trans; a lot of basic Str/Num operators are missing
   - Beware - multiple dispatch is NYI!
+
+* Control structures still have a lot of unimplemented cases.  loop
+  should be pretty straightforward, for instance.
 
 * In particular, I/O is sorely lacking.
   - $*ARGFILES
