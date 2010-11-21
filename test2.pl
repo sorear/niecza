@@ -19,6 +19,9 @@ use MONKEY_TYPING;
     my $died = 1;
     try { $*NONEX = 1; $died = 0; }
     ok $died, "Assignment to non-existing dynvar fails";
+
+    is "foo".substr(5,2), "", "substr starting off end works";
+    is "foo".substr(1,10), "oo", "substr ending off end works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
