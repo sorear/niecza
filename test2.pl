@@ -22,6 +22,9 @@ use MONKEY_TYPING;
 
     is "foo".substr(5,2), "", "substr starting off end works";
     is "foo".substr(1,10), "oo", "substr ending off end works";
+
+    rxtest /:i "abc"/, ':i "abc"',
+        ("abc","aBc","ABC"),("cba","ab");
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

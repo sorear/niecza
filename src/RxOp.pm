@@ -73,6 +73,8 @@ use CgOp;
     extends 'RxOp::Capturing';
 
     has text => (isa => 'Str', is => 'rw');
+    has igcase => (isa => 'Bool', is => 'ro');
+    has igmark => (isa => 'Bool', is => 'ro');
 
     sub check { $_[0]->text($::symtext); $_[0]->SUPER::check; }
 
@@ -82,10 +84,11 @@ use CgOp;
         # We aren't going to make a real Match unless somebody comes up with
         # a good reason.
         my $p = CgOp::rxpushcapture(CgOp::string_var($t), @{ $self->captures });
+        my $ic = $self->igcase ? "NoCase" : "";
         if (length($t) == 1) {
-            $p, CgOp::rxbprim('ExactOne', CgOp::char($t));
+            $p, CgOp::rxbprim("ExactOne$ic", CgOp::char($t));
         } else {
-            $p, CgOp::rxbprim('Exact', CgOp::clr_string($t));
+            $p, CgOp::rxbprim("Exact$ic", CgOp::clr_string($t));
         }
     }
 
@@ -106,14 +109,16 @@ use CgOp;
     extends 'RxOp';
 
     has text => (isa => 'Str', is => 'ro', required => 1);
+    has igcase => (isa => 'Bool', is => 'ro');
 
     sub code {
         my ($self, $body) = @_;
         my $t = $self->text;
+        my $ic = $self->igcase ? "NoCase" : "";
         if (length($t) == 1) {
-            CgOp::rxbprim('ExactOne', CgOp::char($t));
+            CgOp::rxbprim("ExactOne$ic", CgOp::char($t));
         } else {
-            CgOp::rxbprim('Exact', CgOp::clr_string($t));
+            CgOp::rxbprim("Exact$ic", CgOp::clr_string($t));
         }
     }
 

@@ -241,8 +241,27 @@ public sealed class RxFrame {
         return true;
     }
 
+    public bool ExactNoCase(string str) {
+        if (st.pos + str.Length > end)
+            return false;
+        foreach (char ch in str)
+            if (!CaselessEq(orig[st.pos++], ch))
+                return false;
+        return true;
+    }
+
+    // this is wrong, but it's good enough for now XXX
+    private static bool CaselessEq(char src, char tst) {
+        return src == char.ToLowerInvariant(tst) ||
+            src == char.ToUpperInvariant(tst);
+    }
+
     public bool ExactOne(char ch) {
         return !(st.pos == end || orig[st.pos++] != ch);
+    }
+
+    public bool ExactOneNoCase(char ch) {
+        return !(st.pos == end || !CaselessEq(orig[st.pos++], ch));
     }
 
     public bool AnyChar() {
