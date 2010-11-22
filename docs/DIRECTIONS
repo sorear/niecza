@@ -1,0 +1,76 @@
+Niecza: Where we are and where we're going
+==========================================
+
+This file is loosely modelled on "ROADMAP" from Rakudo.  However, that
+name sucks; a ROADMAP is strictly a spatial thing, and this is more of
+a temporal one.
+
+What we have
+============
+
+Data model: Containers are available for r/w parameter aliasing.  Most
+of the basic types are available, including Num, Str, Bool, Array,
+Hash, Sub, Regex, Cursor, Any, Mu, etc.
+
+The underlying infrastructure for active containers exists, but nothing
+like tie() is available at this time.  Lazy autovivification per S09 is
+supported, but using a Rakudo-like Any!Any::butWHENCE API.
+
+Int, Complex, Rat etc are *not* available at this time.  All numbers
+are forced to floating point representation.
+
+Control model: Coroutine control flow (gather / take) is supported.
+Control exceptions are available, and support lexotic and dynamic
+operation, although it is not possible to name loops at this time.
+Dynamically scoped dispatcher control is available via nextwith;
+callwith is not yet available.  There is no multiple dispatch.
+
+Type system: Nominal type checking for arguments and containers is
+available.  Type checking is based on superclasses only; runtime role
+checking is not available.  Role definitions are possible but can
+only be used for infix:<but> mixins; compile time composition is not
+available.  Roles can only be mixed in to type objects.  Roles may be
+parameterized using arbitrary objects, but caching is only available
+for string parameters.  C3 MRO generation is implemented and done at
+compile time.
+
+Operations: Primitive operations on numbers and strings (such as +,
+substr, etc) are available, but many holes exist in more complicated
+things, such as trans.
+
+Regexes: Very solid support; probably most complete of any current
+compiler.  Ratchet mode, grammars, :lang, embedded blocks, check
+blocks, cut operators, cross-rule cut operators, quantifiers
+including ~ setting $*GOAL, :dba, automaton-based LTM, variables,
+capture operators, etc.
+
+Notable missing features include <.SUPER::name>, <&name>, and :i.
+
+Syntax: Based on STD.pm6 as compiled by viv, so should be pretty solid.
+Unimplemented rules will give an error message.
+
+Odds and ends: A JSYNC loader/saver was created
+
+Future directions
+=================
+
+* Finish getting STD up and running
+
+  - STD already compiles but doesn't pass 96% of roast yet
+  - If nothing else, this is a good stress test
+
+* Solve the &eval problem
+
+  - This is a tricky one.  We need to somehow make the compiler
+    available at runtime, which means rewriting it off Perl 5.  I see
+    three options:
+    - Perl 6.  Pro: Cool.  Con: Slow to compile, slow to run.
+    - C#.  Pro: Fast to compile and run.  Con: Limits portability.
+    - Custom language.  Pro: Portable and fastish.  Con: Hard, and NQPlike.
+
+* Start passing lots of roast tests
+
+* World domination
+
+Tasks from lhf.txt do not fit into the timeline and can be done by anyone
+when tuits permit.
