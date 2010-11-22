@@ -167,7 +167,7 @@ method canonicalize_name($n) {
         $name = $M[1] ~ "<" ~ $M[0] ~ substr($name, $M.to) ~ ">";
     }
     my $vname;
-    if $M = $name ~~ /'::<'/ && $name.substr($name.chars - 1, 1) eq '>' {
+    if ($M = $name ~~ /'::<'/) && $name.substr($name.chars - 1, 1) eq '>' {
         $name = substr($name, 0, $M.from);
         $vname = substr($name, $M.to, $name.chars - $M.to - 1);
     }
