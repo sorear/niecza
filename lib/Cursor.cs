@@ -1057,6 +1057,8 @@ public class LADMethod : LAD {
     public override LAD Reify(NFA pad) {
         if (Lexer.LtmTrace)
             Console.WriteLine("+ Processing subrule {0}", name);
+        if (name == "ws")
+            return new LADImp();
         pad.used_methods.Add(name);
 
         if (pad.method_stack.Contains(name)) {
