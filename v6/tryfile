@@ -107,6 +107,46 @@ token alpha {
 }
 }
 
+package Niecza {
+    grammar Grammar is STD {
+        grammar CgOp is STD {
+            rule nibbler { <cgexp> }
+
+            token category:cgexp { <sym> }
+            proto token cgexp {*}
+
+            token cgopname { <-[ ' " ( ) { } \[ \] \s ]> + }
+
+            token cgexp:op { <[ ( \[ ]>:s {} <cgopname> [ <cgexp> ]* <[ ) \] ]> }
+            token cgexp:name { <cgopname> }
+            token cgexp:quote { <?before <[ ' " ]>> {} [ :lang(%*LANG<MAIN>) <quote> ] }
+            token cgexp:decint { <decint> }
+            token cgexp:p6exp { :lang(%*LANG<MAIN>) '{' ~ '}' <statementlist> }
+            token cgexp:bad { <!before <[ ) \] ]> > {}
+                [ <?stdstopper> <.panic "Missing cgop"> ]
+                <.panic: "Unparsable cgop">
+            }
+        }
+
+        grammar Q is STD::Q { #} {
+            method tweak(:$CgOp, *%_) {
+                if $CgOp.defined { self.cursor_fresh(Niecza::Grammar::CgOp) }
+                else { nextwith(self, |%_) }
+            }
+        }
+
+        grammar P6 is STD::P6 {
+            method unitstart() {
+                %*LANG<Q> = Niecza::Grammar::Q ;
+                %*LANG<MAIN> = Niecza::Grammar::P6 ;
+                self;
+            }
+        }
+
+        method p6class () { Niecza::Grammar::P6 }
+    }
+}
+
 augment class STD {
     our $ALL;
 method lookup_dynvar($name) { Any } # NYI
@@ -717,7 +757,7 @@ augment class Cursor {
     our $CLEAR  = "\e[37m";
 }
 
-sub compiler(:$filename, :$text, :$settingname) {
+sub compiler(:$filename, :$text, :$settingname, :$niecza) {
     my $*SETTINGNAME = $settingname;
     my @*MEMOS;
     my $*FILE = { name => $filename };
@@ -741,7 +781,7 @@ sub compiler(:$filename, :$text, :$settingname) {
     my $*GOAL = "(eof)";
     my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
-    STD.parse($text);
+    ($niecza ?? Niecza::Grammar !! STD).parse($text);
 
     my $all;
 
@@ -777,14 +817,19 @@ sub compiler(:$filename, :$text, :$settingname) {
 }
 
 if !@*ARGS {
-    note "Usage: tryfile.exe [--symbols]? [--setting NAME]? [-e TEXT | FILENAME | -]";
+    note "Usage: tryfile.exe [--symbols]? [--niecza]? [--setting NAME]? [-e TEXT | FILENAME | -]";
     exit 1;
 }
 
 my $symbols = False;
 my $setting = 'CORE';
+my $niecza = False;
 if @*ARGS[0] eq '--symbols' {
     $symbols = True;
+    shift @*ARGS;
+}
+if @*ARGS[0] eq '--niecza' {
+    $niecza = True;
     shift @*ARGS;
 }
 if @*ARGS[0] eq '--setting' {
@@ -794,11 +839,11 @@ if @*ARGS[0] eq '--setting' {
 
 my $out;
 if @*ARGS[0] eq '-' {
-    $out = compiler(filename => '(eval)', text => $*IN.slurp, settingname => $setting);
+    $out = compiler(filename => '(eval)', text => $*IN.slurp, settingname => $setting, niecza => $niecza);
 } elsif @*ARGS[0] eq '-e' {
-    $out = compiler(filename => '(eval)', text => @*ARGS[1], settingname => $setting);
+    $out = compiler(filename => '(eval)', text => @*ARGS[1], settingname => $setting, niecza => $niecza);
 } else {
-    $out = compiler(filename => @*ARGS[0], text => slurp(@*ARGS[0]), settingname => $setting);
+    $out = compiler(filename => @*ARGS[0], text => slurp(@*ARGS[0]), settingname => $setting, niecza => $niecza);
 }
 
 if $symbols {
