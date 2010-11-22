@@ -147,8 +147,19 @@ package Niecza {
     }
 }
 
+my class LABEL {
+    has $.file;
+    has $.pos;
+}
+
 augment class STD {
     our $ALL;
+    method label_id() {
+        my $l = LABEL.new;
+        $l.pos = self.pos;
+        $l.file = $*FILE<name>;
+        $l;
+    }
 method lookup_dynvar($name) { Any } # NYI
 method check_old_cclass($text) { } # NYI
 method canonicalize_name($n) {
@@ -575,6 +586,29 @@ method do_import_aliases($pkg, *@names) {
 
 augment class STD::P6 {
 
+    token infix_prefix_meta_operator:sym<X> {
+        :my %subO;
+        :my $sym = 'X';
+        X <?before \S> {}
+        [ <infixish('X')>
+            <.can_meta($<infixish>[0], "cross with")>
+            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $sym ~= $<infixish>[0].Str }
+        ]?
+        $<sym> = {$sym}
+        <O(|%list_infix, |%subO)>
+    }
+
+    token infix_prefix_meta_operator:sym<Z> {
+        :my %subO;
+        :my $sym = 'Z';
+        Z <?before \S> {}
+        [ <infixish('Z')>
+            <.can_meta($<infixish>[0], "zip with")>
+            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $sym ~= $<infixish>[0].Str }
+        ]?
+        $<sym> = {$sym}
+        <O(|%list_infix, |%subO)>
+    }
     my %deftrap = (
         :say, :print, :abs, :alarm, :chomp, :chop, :chr, :chroot, :cos,
         :defined, :eval, :exp, :glob, :lc, :lcfirst, :log, :lstat, :mkdir,
