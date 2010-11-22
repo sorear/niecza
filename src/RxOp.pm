@@ -327,7 +327,7 @@ use CgOp;
         @code;
     }
 
-    sub lad { [ 'Imp' ] }
+    sub lad { @{ $_[0]->zyg } ? ($_[0]->zyg->[0]->lad) : [ 'Imp' ] }
 
     __PACKAGE__->meta->make_immutable;
     no Moose;
