@@ -1289,6 +1289,10 @@ public class Lexer {
             return lc.nfas[lads] = ret;
         }
 anew:
+        if (LtmTrace) {
+            Console.WriteLine("Need new alternation lexer for {0} in {1}",
+                    title, kl.name);
+        }
         NFA pad = new NFA();
         pad.cursor_class = kl;
         LAD[] lads_p = new LAD[lads.Length];

@@ -103,7 +103,7 @@ augment class Cursor {
         return ();
     }
 token alpha {
-    <+INTERNAL::alpha+[_]> \w*
+    <+INTERNAL::alpha>
 }
 }
 

@@ -104,7 +104,7 @@ our $VSpace = CClass->enum("\r", "\cK", "\n");
 
 sub internal {
     my ($name) = @_;
-    ($name eq 'alpha') && return CClass->catm(qw< Lu Lt Ll Lm Lo >);
+    ($name eq 'alpha') && return CClass->catm(qw< Lu Lt Ll Lm Lo >)->plus('_');
     die "unknown internal cclass $name";
 }
 
