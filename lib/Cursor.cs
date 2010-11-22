@@ -110,6 +110,7 @@ public sealed class RxFrame {
     public char[] orig;
     // cache of orig.Length
     public int end;
+    public string name;
 
     // don't remove this on backtracking, and quit if we would back into it
     public readonly Choice rootf;
@@ -119,10 +120,15 @@ public sealed class RxFrame {
         orig = global.orig_a;
         end = orig.Length;
         rootf = bt = csr.xact;
+        this.name = name;
         st.ns = passcut ? csr.nstate :
             new NState(rootf, "RULE " + name, csr.nstate);
         if (passcap)
             st.captures = csr.captures;
+        if (Cursor.Trace) {
+            Console.WriteLine("Entering subrule {0} at {1}/{2}", name, csr.pos,
+                    end);
+        }
         st.ns.klass = csr.mo;
         st.pos = csr.pos;
         from = csr.pos;
@@ -136,8 +142,14 @@ public sealed class RxFrame {
             global.IncHighwater(st.pos);
         if (bt == rootf) {
             if (return_one) {
+                if (Cursor.Trace)
+                    Console.WriteLine("Failing {0}@{1} after no matches",
+                            name, from);
                 return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
             } else {
+                if (Cursor.Trace)
+                    Console.WriteLine("Failing {0}@{1} after some matches",
+                            name, from);
                 if (EmptyList == null) {
                     DynObject lst = new DynObject(Kernel.ListMO);
                     lst.slots[0 /*items*/] = new VarDeque();
@@ -333,6 +345,9 @@ public sealed class RxFrame {
     }
 
     public Cursor MakeMatch() {
+        if (Cursor.Trace)
+            Console.WriteLine("Matching {0} from {1} to {2}",
+                    name, from, st.pos);
         return new Cursor(global, st.ns.klass, from, st.pos, st.captures);
     }
 
