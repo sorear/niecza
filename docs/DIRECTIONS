@@ -42,9 +42,9 @@ Regexes: Very solid support; probably most complete of any current
 compiler.  Ratchet mode, grammars, :lang, embedded blocks, check
 blocks, cut operators, cross-rule cut operators, quantifiers
 including ~ setting $*GOAL, :dba, automaton-based LTM, variables,
-capture operators, etc.
+capture operators, :i on literals, etc.
 
-Notable missing features include <.SUPER::name>, <&name>, and :i.
+Notable missing features include <.SUPER::name> and <&name>.
 
 Syntax: Based on STD.pm6 as compiled by viv, so should be pretty solid.
 Unimplemented rules will give an error message.
