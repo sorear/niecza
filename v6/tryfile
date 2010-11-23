@@ -383,12 +383,12 @@ method EXPR ($preclvl?) {
         $here.deb("Top of opstack is ", _top(@opstack).dump) if $DEBUG::EXPR;
         $*LEFTSIGIL = _top(@opstack)<O><prec> gt $item_assignment_prec
             ?? '@' !! '';     # XXX P6
-        my ($term) =
+        my $term = first(
             ($termish eq 'termish') ?? $here.termish !!
             ($termish eq 'nulltermish') ?? $here.nulltermish !!
             ($termish eq 'statement') ?? $here.statement !!
             ($termish eq 'dottyopish') ?? $here.dottyopish !!
-            die "weird value of $termish";
+            die "weird value of $termish");
 
         if not $term {
             $here.deb("Didn't find it") if $DEBUG::EXPR;
@@ -439,11 +439,15 @@ method EXPR ($preclvl?) {
         # If this isn't here, then "$foo.method" will try to parse
         # .method as an infix, and panic.  No infix operator is
         # tighter than this anyhow.
-        return 1 if $preclim ge $methodcall_prec;
-        my ($ws) = $here.ws;
+        if $preclim ge $methodcall_prec {
+            $here.deb("Aborting; interpolational context") if $DEBUG::EXPR;
+            return 1;
+        }
+        my $ws = first($here.ws);
         $here = $here.cursor($ws.to);
-        my ($infix) = $here.infixish;
+        my $infix = first($here.infixish);
         return 1 unless $infix;
+        $here.deb("Got one! " ~ $infix<sym>) if $DEBUG::EXPR;
 
         my $inO = $infix<O>;
         my $inprec = $inO<prec>;
@@ -451,7 +455,8 @@ method EXPR ($preclvl?) {
             die "No prec given in infix!";
         }
 
-        if $inprec le $preclim {
+        if $inprec lt $preclim {
+            $here.deb("Precedence $inprec of operator is too low for $preclim context") if $DEBUG::EXPR;
             if $preclim ne $LOOSEST {
                 my $dba = $*prevlevel.<dba>;
                 my $h = $*HIGHEXPECT;
@@ -462,7 +467,7 @@ method EXPR ($preclvl?) {
         }
 
         $here = $here.cursor($infix.to);
-        ($ws,) = $here.ws;
+        $ws   = first($here.ws);
         $here = $here.cursor($ws.to);
 
         # substitute precedence for listops
