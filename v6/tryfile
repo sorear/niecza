@@ -154,6 +154,45 @@ my class LABEL {
 
 augment class STD {
     our $ALL;
+method add_placeholder($name) {
+    my $decl = $*CURLEX.<!IN_DECL> // '';
+    $decl = ' ' ~ $decl if $decl;
+    my $*IN_DECL = 'variable';
+
+    if $*SIGNUM {
+        return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
+    }
+    elsif my $siggy = $*CURLEX.<$?SIGNATURE> {
+        return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
+    }
+    if not $*CURLEX.<!NEEDSIG> {
+        if $*CURLEX === $*UNIT {
+            return self.sorry("Placeholder variable $name may not be used outside of a block");
+        }
+        return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
+    }
+    if $name ~~ /\:\:/ {
+        return self.sorry("Placeholder variable $name may not be package qualified");
+    }
+
+    my $varname = $name;
+    my $twigil = '';
+    my $signame;
+    my $M;
+    if _subst($M, $varname, /<[ ^ : ]>/, "") {
+        $twigil = $M.Str;
+        $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
+    }
+    return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
+
+    if $*CURLEX{$varname} {
+        return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
+    }
+
+    self.add_my_name($varname);
+    $*CURLEX{$varname}<used> = 1;
+    self;
+}
     method label_id() {
         my $l = LABEL.new;
         $l.pos = self.pos;
