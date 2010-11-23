@@ -96,7 +96,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        [ 'Str', $self->text ];
+        [ ($self->igcase ? 'StrNoCase' : 'Str'), $self->text ];
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -126,7 +126,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        [ 'Str', $self->text ];
+        [ ($self->igcase ? 'StrNoCase' : 'Str'), $self->text ];
     }
 
     __PACKAGE__->meta->make_immutable;

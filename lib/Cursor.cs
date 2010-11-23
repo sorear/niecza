@@ -588,6 +588,20 @@ public sealed class CC {
 
     public CC(char butyes) : this(new int[] { butyes, -1, butyes+1, 0 }) { }
     public CC(int catmask) : this(new int[] { 0, catmask }) { }
+    public CC(char butyes, bool nocase) {
+        if (nocase) {
+            char a = char.ToLowerInvariant(butyes);
+            char b = char.ToUpperInvariant(butyes);
+            if (a > b) { char t = a; a = b; b = t; }
+            if (a == b) {
+                vec = new int[] { a, -1, a+1, 0 };
+            } else {
+                vec = new int[] { a, -1, a+1, 0, b, -1, b+1, 0 };
+            }
+        } else {
+            vec = new int[] { butyes, -1, butyes+1, 0 };
+        }
+    }
 
     public bool Accepts(char ch) {
         int l = 0;
@@ -814,6 +828,33 @@ public class LADStr : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "str: " + text);
+    }
+}
+
+public class LADStrNoCase : LAD {
+    public readonly string text;
+    public LADStrNoCase(string text) { this.text = text; }
+
+    public override LAD Reify(NFA pad) { return this; }
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        len = text.Length; cont = true;
+    }
+
+    public override void ToNFA(NFA pad, int from, int to) {
+        if (text.Length == 0) {
+            pad.AddEdge(from, to, null);
+        } else {
+            int len = text.Length;
+            for (int c = 0; c < len; c++) {
+                int fromp = (c == len - 1) ? to : pad.AddNode();
+                pad.AddEdge(from, fromp, new CC(text[c], true));
+                from = fromp;
+            }
+        }
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "strnocase: " + text);
     }
 }
 

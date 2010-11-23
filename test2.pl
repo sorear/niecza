@@ -25,6 +25,13 @@ use MONKEY_TYPING;
 
     rxtest /:i "abc"/, ':i "abc"',
         ("abc","aBc","ABC"),("cba","ab");
+
+    my grammar G {
+        proto token TOP {*}
+        token TOP:foo { :i <sym> }
+    }
+
+    ok G.parse("fOo"), ":i <sym> works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

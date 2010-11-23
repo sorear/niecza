@@ -785,7 +785,7 @@ sub assertion__S_name { my ($cl, $M) = @_;
     if ($M->{assertion}[0]) {
         $M->{_ast} = $M->{assertion}[0]{_ast};
     } elsif ($name eq 'sym') {
-        $M->{_ast} = RxOp::Sym->new(captures => []);
+        $M->{_ast} = RxOp::Sym->new(captures => [], igcase => $::RX{i}, igmark => $::RX{a});
     } elsif ($name eq 'before') {
         $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
         return;
