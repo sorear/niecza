@@ -963,7 +963,7 @@ namespace Niecza {
         }
 
         // This isn't just a fetch and a store...
-        private static SubInfo AssignSI = new SubInfo("Assign", AssignC);
+        public static SubInfo AssignSI = new SubInfo("Assign", AssignC);
         private static Frame AssignC(Frame th) {
             switch (th.ip) {
                 case 0:

@@ -32,6 +32,9 @@ use MONKEY_TYPING;
     }
 
     ok G.parse("fOo"), ":i <sym> works";
+
+    my %h; %h<used>++;
+    is %h<used>, 1, "autoviv works with ++";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

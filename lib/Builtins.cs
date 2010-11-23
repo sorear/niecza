@@ -3,6 +3,19 @@ using System;
 using System.Collections.Generic;
 
 public class Builtins {
+    public static void AssignV(Variable lhs, IP6 rhs) {
+        if (lhs.whence == null && !lhs.islist) {
+            if (!lhs.rw)
+                throw new NieczaException("assigning to readonly value");
+
+            lhs.Store(rhs);
+        } else {
+            Frame n = new Frame(null, null, Kernel.ExitRunloopSI).MakeChild(null, Kernel.AssignSI);
+            n.pos = new Variable[2] { lhs, Kernel.NewROScalar(rhs) };
+            Kernel.RunCore(n);
+        }
+    }
+
     public static string LaxSubstring(string str, int from) {
         if (from <= 0)
             return str;
@@ -33,7 +46,7 @@ public class Builtins {
         IP6 o1 = v.Fetch();
         double d = o1.mo.mro_raw_defined.Get(v) ?
             o1.mo.mro_raw_Numeric.Get(v) : 0;
-        v.Store(Kernel.BoxRaw(d + 1, Kernel.NumMO));
+        AssignV(v, Kernel.BoxRaw(d + 1, Kernel.NumMO));
         return Kernel.NewROScalar(o1);
     }
 }
