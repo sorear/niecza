@@ -1504,6 +1504,10 @@ slow:
             MuMO = new DynMetaObject("Mu");
             MuMO.loc_Bool = MuMO.loc_defined = new CtxBoolNativeDefined();
             MuMO.loc_raw_Bool = MuMO.loc_raw_defined = new CtxRawNativeDefined();
+            MuMO.loc_Numeric = DynMetaObject.CallNumeric;
+            MuMO.loc_raw_Numeric = DynMetaObject.RawCallNumeric;
+            MuMO.loc_Str = DynMetaObject.CallStr;
+            MuMO.loc_raw_Str = DynMetaObject.RawCallStr;
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
