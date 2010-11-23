@@ -712,6 +712,53 @@ method do_import_aliases($pkg, *@names) {
 }
 
 augment class STD::P6 {
+    token param_var($named = 0) {
+        :dba('formal parameter')
+        [
+        | '[' ~ ']' <signature>
+        | '(' ~ ')' <signature>
+        | <sigil> <twigil>?
+            [
+                # Is it a longname declaration?
+            || <?{ $<sigil>.Str eq '&' }> <?ident> {}
+                <name=.sublongname>
+
+            ||  # Is it a shaped array or hash declaration?
+                <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
+                <name=.identifier>?
+                <?before <[ \< \( \[ \{ ]> >
+                <postcircumfix>
+
+                # ordinary parameter name
+            || <name=.identifier>
+            || <name=.decint> <.panic: "Can't declare a numeric parameter">
+            || $<name> = [<[/!]>]
+
+                # bare sigil?
+            ]?
+            {{
+                my $vname = $<sigil>.Str;
+                my $t = $<twigil>;
+                my $twigil = '';
+                $twigil = $t.[0].Str if @$t;
+                $vname ~= $twigil;
+                my $n = ($<name>[0] // '').Str;
+                $vname ~= $n;
+                if $twigil eq '' {
+                    self.add_my_name($vname) if $n ne '';
+                    # :$param is often used as a multi matcher without $param used in body
+                    #   so don't count as "declared but not used"
+                    $*CURLEX{$vname}<used> = 1 if $named and $n;
+                }
+                elsif $twigil eq '.' { }
+                elsif $twigil eq '!' { }
+                elsif $twigil eq '*' { }
+                else {
+                    self.panic("You may not use the $twigil twigil in a signature");
+                }
+            }}
+        ]
+    }
 
     token infix_prefix_meta_operator:sym<X> {
         :my %subO;
