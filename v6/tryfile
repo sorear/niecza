@@ -154,6 +154,20 @@ my class LABEL {
 
 augment class STD {
     our $ALL;
+# only used for error reporting
+method clean_id ($idx, $name) {
+    my $id = $idx;
+    my $file = $*FILE<name>;
+
+    $id ~= '::';
+    my $M;
+    _subst($id, $M, /^'MY:file<CORE.setting>'.*?'::'/, "CORE::");
+    _subst($id, $M, /^MY\:file\<\w+\.setting\>.*?\:\:/, "SETTING::");
+    _subst($id, $M, /^MY\:file\<$file\>$/, "UNIT");
+    _subst($id, $M, /\:pos\(\d+\)/, "");
+    $id ~= "<$name>";
+    $id;
+}
 method add_placeholder($name) {
     my $decl = $*CURLEX.<!IN_DECL> // '';
     $decl = ' ' ~ $decl if $decl;
