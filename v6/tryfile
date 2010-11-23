@@ -193,6 +193,19 @@ method add_placeholder($name) {
     $*CURLEX{$varname}<used> = 1;
     self;
 }
+method add_enum($type,$expr) {
+    return self unless $type;
+    return self unless $expr;
+    my $typename = $type.Str;
+    my $*IN_DECL ::= 'constant';
+    # XXX complete kludge, really need to eval EXPR
+    # $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
+    for $expr.comb(/ <[ a..z A..Z _ ]> \w* /) -> $n {
+        self.add_name($typename ~ "::$n");
+        self.add_name($n);
+    }
+    self
+}
     method label_id() {
         my $l = LABEL.new;
         $l.pos = self.pos;
