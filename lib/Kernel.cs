@@ -880,6 +880,8 @@ namespace Niecza {
         public static Variable BoxAny(object v, IP6 proto) {
             if (v == null)
                 return NewROScalar(proto);
+            if (proto == BoolMO.typeObject)
+                return ((bool) v) ? TrueV : FalseV;
             DynObject n = new DynObject(((DynObject)proto).mo);
             n.slots[0] = v;
             return NewROScalar(n);
@@ -888,6 +890,8 @@ namespace Niecza {
         public static Variable BoxAnyMO(object v, DynMetaObject proto) {
             if (v == null)
                 return NewROScalar(proto.typeObject);
+            if (proto == BoolMO)
+                return ((bool) v) ? TrueV : FalseV;
             DynObject n = new DynObject(proto);
             n.slots[0] = v;
             return NewROScalar(n);
