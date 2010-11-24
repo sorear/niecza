@@ -1274,14 +1274,14 @@ public sealed class LexerState {
         }
     }
 
-    public void CollectFates(NFA nf, Stack<int> f) {
+    public void CollectFates(NFA nf, Lexer l) {
         for (int i = nf.nodes.Length - 1; i >= 0; i--) {
             if ((nstates[i >> 5] & (1 << (i & 31))) != 0) {
                 NFA.Node n = nf.nodes[i];
                 if (n.final) {
                     if (Lexer.LtmTrace)
                         Console.WriteLine("+ Adding fate {0}", n.fate);
-                    f.Push(n.fate);
+                    l.NoteFate(n.fate);
                 }
             }
         }
@@ -1333,6 +1333,14 @@ public class Lexer {
 
     LexerState start;
     LexerState nil;
+
+    int nfates;
+    // 2*nfates+2 elements, arranged in linked list nodes of 2 values
+    // each, prev then next.  If prev == -1 this element is not in the
+    // list.  Element 0 is the header node; the list is maintained
+    // circular.
+    int[] fatebuffer;
+    int usedfates;
 
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
@@ -1387,6 +1395,11 @@ anew:
             pad.nodes_l[target].final = true;
             alts[alt_shuffle[ix]].ToNFA(pad, root, target);
         }
+        nfates = alts.Length;
+        fatebuffer = new int[nfates*2+2];
+        for (int i = 0; i < nfates*2+2; i++)
+            fatebuffer[i] = -1;
+        fatebuffer[0] = fatebuffer[1] = 0;
         pad.Complete();
         // now the NFA nodes are all in tiebreak order by lowest index
         if (LtmTrace) {
@@ -1414,16 +1427,39 @@ anew:
         Console.WriteLine("--- END");
     }
 
+    internal void NoteFate(int fate) {
+        fate++; // 0 is used as a sentinel
+        if (fatebuffer[fate * 2] == -1) {
+            usedfates++;
+        } else {
+            // next->prev = prev
+            fatebuffer[fatebuffer[fate * 2] * 2 + 1] =
+                fatebuffer[fate * 2 + 1];
+            fatebuffer[fatebuffer[fate * 2 + 1] * 2] =
+                fatebuffer[fate * 2];
+        }
+        fatebuffer[fate * 2] = fatebuffer[0];
+        fatebuffer[fate * 2 + 1] = 0;
+        fatebuffer[fatebuffer[0] * 2 + 1] = fate;
+        fatebuffer[0] = fate;
+    }
 
     public int[] Run(string from, int pos) {
         LexerState state = start;
-        Stack<int> fate = new Stack<int>();
+        // clear out any old fates
+        for (int i = fatebuffer[0]; i != 0; ) {
+            int j = fatebuffer[2*i];
+            fatebuffer[2*i] = -1;
+            i = j;
+        }
+        fatebuffer[0] = fatebuffer[1] = 0;
+        usedfates = 0;
 
         if (LtmTrace)
             Console.WriteLine("+ Trying lexer {0} at {1}", tag, pos);
 
         while (true) {
-            state.CollectFates(pad, fate);
+            state.CollectFates(pad, this);
 
             if (pos == from.Length || state == nil) break;
             char ch = from[pos++];
@@ -1439,20 +1475,16 @@ anew:
             state = next;
         }
 
-        List<int> uniqfates = new List<int>();
-        HashSet<int> usedfates = new HashSet<int>();
+        int[] uniqfates = new int[usedfates];
 
-        while (fate.Count != 0) {
-            int f = fate.Pop();
-            if (usedfates.Contains(f))
-                continue;
-            usedfates.Add(f);
+        int cursor = 0;
+        for (int i = 0; i < usedfates; i++) {
+            cursor = fatebuffer[cursor * 2];
+            uniqfates[i] = cursor - 1;
             if (LtmTrace)
-                Console.WriteLine("+ Useful fate: {0}", f);
-            uniqfates.Add(f);
+                Console.WriteLine("+ Useful fate: {0}", cursor - 1);
         }
-
-        return uniqfates.ToArray();
+        return uniqfates;
     }
 
     public static Lexer GetProtoregexLexer(DynMetaObject kl, string name) {
