@@ -445,6 +445,18 @@ namespace Niecza {
         }
     }
 
+    class CtxRawNativeNum2Str : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            return ((double) Kernel.UnboxAny(obj.Fetch())).ToString();
+        }
+    }
+
+    class CtxStrNativeNum2Str : ContextHandler<Variable> {
+        public override Variable Get(Variable obj) {
+            return Kernel.BoxAnyMO(((double) Kernel.UnboxAny(obj.Fetch())).ToString(), Kernel.StrMO);
+        }
+    }
+
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
@@ -1503,6 +1515,8 @@ slow:
             NumMO = new DynMetaObject("Num");
             NumMO.loc_Numeric = new CtxReturnSelf();
             NumMO.loc_raw_Numeric = new CtxJustUnbox<double>();
+            NumMO.loc_Str = new CtxStrNativeNum2Str();
+            NumMO.loc_raw_Str = new CtxRawNativeNum2Str();
             NumMO.FillProtoClass(new string[] { "value" });
 
             MuMO = new DynMetaObject("Mu");
