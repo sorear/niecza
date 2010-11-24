@@ -783,8 +783,36 @@ public sealed class NFA {
         }
     }
 
+    int[] greybuf;
+
+    public void Close(LexerState ls) {
+        int ngrey = 0;
+        for (int i = 0; i < ls.nstates.Length; i++) {
+            int bm = ls.nstates[i];
+            for (int j = 0; j < 32; j++) {
+                if ((bm & (1 << j)) != 0)
+                    greybuf[ngrey++] = 32*i + j;
+            }
+        }
+
+        while (ngrey != 0) {
+            int val = greybuf[--ngrey];
+            foreach (NFA.Edge e in nodes[val].edges) {
+                if (e.when == null) {
+                    int ix = e.to >> 5;
+                    int m = 1 << (e.to & 31);
+                    if ((ls.nstates[ix] & m) == 0) {
+                        ls.nstates[ix] |= m;
+                        greybuf[ngrey++] = e.to;
+                    }
+                }
+            }
+        }
+    }
+
     public void Complete() {
         nodes = nodes_l.ToArray();
+        greybuf = new int[nodes.Length];
         foreach (Node n in nodes)
             n.edges = n.edges_l.ToArray();
     }
@@ -1215,7 +1243,7 @@ public sealed class LexerState {
             }
         }
 
-        l.Close(nf);
+        nf.Close(l);
         LexerState cl;
 
         if (!nf.dfashare.TryGetValue(l, out cl)) {
@@ -1246,32 +1274,6 @@ public sealed class LexerState {
         for (int i = 0; i < nstates.Length; i++)
             o = o * 1342883 + nstates[i];
         return o;
-    }
-
-    public void Close(NFA nf) {
-        int[] grey = new int[nstates.Length * 32];
-        int ngrey = 0;
-        for (int i = 0; i < nstates.Length; i++) {
-            int bm = nstates[i];
-            for (int j = 0; j < 32; j++) {
-                if ((bm & (1 << j)) != 0)
-                    grey[ngrey++] = 32*i + j;
-            }
-        }
-
-        while (ngrey != 0) {
-            int val = grey[--ngrey];
-            foreach (NFA.Edge e in nf.nodes[val].edges) {
-                if (e.when == null) {
-                    int ix = e.to >> 5;
-                    int m = 1 << (e.to & 31);
-                    if ((nstates[ix] & m) == 0) {
-                        nstates[ix] |= m;
-                        grey[ngrey++] = e.to;
-                    }
-                }
-            }
-        }
     }
 
     public void CollectFates(NFA nf, Lexer l) {
@@ -1407,7 +1409,7 @@ anew:
         }
         start = new LexerState(pad);
         start.Add(0);
-        start.Close(pad);
+        pad.Close(start);
         nil = new LexerState(pad);
         pad.dfashare[nil] = nil;
         pad.dfashare[start] = start;
