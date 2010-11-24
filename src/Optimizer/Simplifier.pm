@@ -41,6 +41,8 @@ our %funcs = (
     '&infix:<=>' => \&do_assign,
     '&infix:<==>' => \&do_numeq,
     '&postfix:<++>' => \&do_postinc,
+    '&postcircumfix:<{ }>' => \&do_atkey,
+    '&postcircumfix:<[ ]>' => \&do_atpos,
 );
 
 sub do_assign {
@@ -73,6 +75,21 @@ sub do_numeq {
     my ($body, $nv, $invname, $args) = @_;
     return unless @$args == 2;
     return Op::Builtin->new(name => 'numeq', args => $args);
+}
+
+# TODO: similar conversion for :delete and :exists
+sub do_atkey {
+    my ($body, $nv, $invname, $args) = @_;
+    return unless @$args == 2;
+    return Op::CallSub->new(invocant => Op::Lexical->new(name => '&_at_key'),
+        positionals => $args);
+}
+
+sub do_atpos {
+    my ($body, $nv, $invname, $args) = @_;
+    return unless @$args == 2;
+    return Op::CallSub->new(invocant => Op::Lexical->new(name => '&_at_pos'),
+        positionals => $args);
 }
 
 sub run_optree {
