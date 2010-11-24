@@ -43,6 +43,7 @@ our %funcs = (
     '&postfix:<++>' => \&do_postinc,
     '&postcircumfix:<{ }>' => \&do_atkey,
     '&postcircumfix:<[ ]>' => \&do_atpos,
+    '&defined' => \&do_defined,
 );
 
 sub do_assign {
@@ -75,6 +76,12 @@ sub do_numeq {
     my ($body, $nv, $invname, $args) = @_;
     return unless @$args == 2;
     return Op::Builtin->new(name => 'numeq', args => $args);
+}
+
+sub do_defined {
+    my ($body, $nv, $invname, $args) = @_;
+    return unless @$args == 1;
+    return Op::Builtin->new(name => 'defined', args => $args);
 }
 
 # TODO: similar conversion for :delete and :exists

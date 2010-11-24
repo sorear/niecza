@@ -1190,7 +1190,11 @@ use CgOp;
         my ($self, $body) = @_;
         no strict 'refs';
         my $name = $self->name;
-        &{ "CgOp::bif_$name" }(map { $_->cgop($body) } @{ $self->args });
+        my @a = (map { $_->cgop($body) } @{ $self->args });
+        if ($name eq 'defined') {
+            return CgOp::obj_asdef($a[0]);
+        }
+        &{ "CgOp::bif_$name" }(@a);
     }
 
     __PACKAGE__->meta->make_immutable;

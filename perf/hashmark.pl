@@ -1,15 +1,15 @@
 # vim: ft=perl6
 sub _exists_key(\$container, $key) {
-    $container.defined ?? $container.exists-key($key) !! False
+    defined($container) ?? $container.exists-key($key) !! False
 }
 sub _delete_key(\$container, $key) {
-    $container.defined ?? $container.delete-key($key) !! Any
+    defined($container) ?? $container.delete-key($key) !! Any
 }
 sub _at_key(\$container, $key) {
-    $container.defined
+    defined($container)
         ?? $container.at-key($key)
         !! Any!Any::butWHENCE(sub (\$var) {
-            $container.defined && die("Autovivification collision");
+            defined($container) && die("Autovivification collision");
             $container = Hash.new;
             $container!Hash::extend($key, $var);
         });
@@ -17,4 +17,4 @@ sub _at_key(\$container, $key) {
 
 my $i = 0;
 my %hash;
-%hash{$i} = $i until ($i++) == 100000;
+%hash{$i} = $i until ($i++) == 1000000;
