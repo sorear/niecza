@@ -1531,6 +1531,8 @@ slow:
 
         static Kernel() {
             StrMO = new DynMetaObject("Str");
+            StrMO.loc_Str = new CtxReturnSelf();
+            StrMO.loc_raw_Str = new CtxJustUnbox<string>();
             StrMO.FillProtoClass(new string[] { "value" });
 
             BoolMO = new DynMetaObject("Bool");
