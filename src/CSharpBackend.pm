@@ -360,16 +360,12 @@ sub access_lex {
         if ($bp->run_once && !dynname($name)) {
             return $set_to ? CgOp::rawsset($lex->{peer}, $set_to) :
                 CgOp::rawsget($lex->{peer});
-        } elsif ((my $ix = $lex->{peer}) >= 0) {
+        } else {
+            my $ix = $lex->{peer};
             return $set_to ?
                 CgOp->new(op => [ rtpadputi => $order, $ix ],
                     zyg => [ $set_to ]) :
                 CgOp->new(op => [ rtpadgeti => 'Variable', $order, $ix ]);
-        } else {
-            return $set_to ?
-                CgOp->new(op => [ rtpadput => $order, $name ],
-                    zyg => [ $set_to ]) :
-                CgOp->new(op => [ rtpadget => 'Variable', $order, $name ]);
         }
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
@@ -422,6 +418,14 @@ sub codegen_sub {
     # (it's in a sucky format anyway), so this is safe, and it makes dumps
     # much smaller.
     my $code = delete $_->{code};
+    my @dynames;
+    my @dyixes;
+    for my $ln (sort keys %{ $_->lexicals }) {
+        next unless dynname($ln);
+        push @dynames, $ln;
+        push @dyixes, $_->lexicals->{$ln}{peer};
+    }
+
     # TODO: Bind a return value here to catch non-ro sub use
     if ($_->gather_hack) {
         $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
@@ -477,7 +481,7 @@ sub codegen_sub {
     resolve_lex($_, $ops);
     CodeGen->new(csname => $_->{peer}{cbase}, name => ($_->name eq 'ANON' ?
             $_->{peer}{cbase} : $_->name), ops => $ops,
-        usednamed => $_->{peer}{uname}, minlets => $_->{peer}{nlexn});
+        dynames => \@dynames, dyixes => \@dyixes, minlets => $_->{peer}{nlexn});
 }
 
 sub dynname { $_[0] =~ /^.?[*?]/ }
@@ -495,7 +499,7 @@ sub sub0 {
         if $_->spad_exists;
     @$node{'cref','cbase'} = gsym('DynBlockDelegate', $_->name . 'C');
 
-    my ($nlexn, $uname) = (0,0);
+    my ($nlexn) = (0);
 
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
@@ -507,10 +511,7 @@ sub sub0 {
 
         if ($lx->isa('Metamodel::Lexical::SubDef') ||
                 $lx->isa('Metamodel::Lexical::Simple')) {
-            if (dynname($ln)) {
-                $lx->{peer} = -1;
-                $uname = 1;
-            } elsif ($_->run_once) {
+            if ($_->run_once && !dynname($ln)) {
                 push @decls, ($lx->{peer} = gsym('Variable', $ln));
             } else {
                 $lx->{peer} = ($nlexn++);
@@ -518,7 +519,7 @@ sub sub0 {
         }
     }
 
-    @$node{'nlexn', 'uname'} = ($nlexn, $uname);
+    @$node{'nlexn'} = ($nlexn);
 }
 
 sub sub1 {
@@ -586,13 +587,9 @@ sub protolset {
         push @thaw, CgOp::setindex(CgOp::int($ix - 4),
             CgOp::getfield('lexn', CgOp::rawsget($body->{peer}{pp})),
             $frag);
-    } elsif ($ix >= 0) {
+    } else {
         push @thaw, CgOp::setfield("lex$ix",
             CgOp::rawsget($body->{peer}{pp}), $frag);
-    } else {
-        push @thaw, CgOp::setindex($lname,
-            CgOp::getfield('lex', CgOp::rawsget($body->{peer}{pp})),
-            $frag);
     }
 }
 

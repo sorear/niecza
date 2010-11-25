@@ -1090,7 +1090,7 @@ public class LADParam : LAD {
 
         object o;
 
-        if (outer.lex == null || !outer.lex.TryGetValue("*params", out o)) {
+        if (!outer.TryGetDynamic("*params", out o)) {
             reason = "no parameter block";
             goto imp;
         }

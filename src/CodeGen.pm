@@ -14,6 +14,8 @@ use CLRTypes;
     has csname    => (isa => 'Str', is => 'ro');
     has minlets   => (isa => 'Int', is => 'ro', default => 0);
     has usednamed => (isa => 'Bool', is => 'ro', default => 0);
+    has dynames   => (isa => 'ArrayRef[Str]', is => 'ro', default => sub{[]});
+    has dyixes    => (isa => 'ArrayRef[Int]', is => 'ro', default => sub{[]});
 
     has numlabels => (isa => 'Int', is => 'rw', default => 1);
     has numips    => (isa => 'Int', is => 'rw', default => 1);
@@ -203,16 +205,6 @@ use CLRTypes;
     sub hintget {
         my ($self, $type, $data, $name) = @_;
         $self->cast($type, "object", "$data.hints[" . qm($name) . "]");
-    }
-
-    sub rtpadget {
-        my ($self, $type, $order, $name) = @_;
-        $self->cast($type, "object", "th" . (".outer" x $order) . ".lex[" . qm($name) . "]");
-    }
-
-    sub rtpadput {
-        my ($self, $order, $name, $ty, $val) = @_;
-        $self->_emit("th" . (".outer" x $order) . ".lex[" . qm($name) . "] = $val");
     }
 
     sub rtpadgeti {
@@ -464,7 +456,13 @@ use CLRTypes;
          CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->ehspans }),
          (@{ $self->ehlabels } ? CgOp::rawnewarr('str',
               map { CgOp::clr_string($_) } @{ $self->ehlabels }) :
-              CgOp::null('clr:string[]')));
+              CgOp::null('clr:string[]')),
+         (@{ $self->dynames } ? (
+              CgOp::rawnewarr('str', map { CgOp::clr_string($_) } @{ $self->dynames }),
+              CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->dyixes })
+            ) : (
+              CgOp::null('clr:string[]'),
+              CgOp::null('clr:int[]'))));
     }
 
     sub csharp {

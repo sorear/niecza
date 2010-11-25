@@ -165,6 +165,7 @@ namespace Niecza {
         public Dictionary<string, object> hints;
         // maybe should be a hint
         public LAD ltm;
+        public Dictionary<string, int> dylex;
 
         // records: $start-ip, $end-ip, $type, $goto, $lid
         public const int ON_NEXT = 1;
@@ -227,7 +228,8 @@ namespace Niecza {
         }
 
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
-                SubInfo outer, LAD ltm, int[] edata, string[] label_names) {
+                SubInfo outer, LAD ltm, int[] edata, string[] label_names,
+                string[] dylexn, int[] dylexi) {
             this.lines = lines;
             this.code = code;
             this.outer = outer;
@@ -235,10 +237,15 @@ namespace Niecza {
             this.name = name;
             this.edata = edata;
             this.label_names = label_names;
+            if (dylexn != null) {
+                dylex = new Dictionary<string, int>();
+                for (int i = 0; i < dylexn.Length; i++)
+                    dylex[dylexn[i]] = dylexi[i];
+            }
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
-            this(name, null, code, null, null, new int[0], null) { }
+            this(name, null, code, null, null, new int[0], null, null, null) { }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -359,16 +366,42 @@ namespace Niecza {
             return "";
         }
 
+        public void SetDynamic(int ix, object v) {
+            switch(ix) {
+                case 0: lex0 = v; break;
+                case 1: lex1 = v; break;
+                case 2: lex2 = v; break;
+                case 3: lex3 = v; break;
+                default: lexn[ix-4] = v; break;
+            }
+        }
+
+        public bool TryGetDynamic(string name, out object v) {
+            v = null;
+            if (lex == null && info.dylex == null)
+                return false;
+            if (lex != null && lex.TryGetValue(name, out v))
+                return true;
+            int ix;
+            if (info.dylex == null || !info.dylex.TryGetValue(name, out ix))
+                return false;
+            switch(ix) {
+                case 0: v = lex0; break;
+                case 1: v = lex1; break;
+                case 2: v = lex2; break;
+                case 3: v = lex3; break;
+                default: v = lexn[ix-4]; break;
+            }
+            return true;
+        }
+
         public Variable LexicalFind(string name) {
             Frame csr = this;
             while (csr != null) {
                 object o;
-                if (csr.lex == null) {
-                    csr = csr.outer;
-                    continue;
-                }
-                if (csr.lex.TryGetValue(name, out o))
+                if (csr.TryGetDynamic(name, out o)) {
                     return (Variable)o;
+                }
                 csr = csr.outer;
             }
             return Kernel.NewROScalar(Kernel.AnyP);
@@ -759,7 +792,7 @@ namespace Niecza {
 
         public static Frame Take(Frame th, Variable payload) {
             Frame r = TakeReturnStack.Pop();
-            r.lex["$*nextframe"] = NewROScalar(th);
+            r.SetDynamic(r.info.dylex["$*nextframe"], NewROScalar(th));
             r.resultSlot = payload;
             th.resultSlot = payload;
             return r;
@@ -1079,8 +1112,7 @@ namespace Niecza {
         public static Variable ContextHelper(Frame th, string name, int up) {
             object rt;
             while (th != null) {
-                if (up <= 0 && th.lex != null &&
-                        th.lex.TryGetValue(name, out rt)) {
+                if (up <= 0 && th.TryGetDynamic(name, out rt)) {
                     return (Variable)rt;
                 }
                 th = th.caller;
