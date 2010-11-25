@@ -757,7 +757,13 @@ sub do_cclass { my ($cl, $M) = @_;
                 RxOp::CClassElem->new(cc => $_->{quibble}{_ast}) :
             RxOp::Subrule->new(captures => [], method => $_->{name}->Str);
 
-        if ($sign) {
+        if ($exp->isa('RxOp::CClassElem') && (!$rxop || $rxop->isa('RxOp::CClassElem'))) {
+            if ($sign) {
+                $rxop = $rxop ? RxOp::CClassElem->new(cc => $exp->cc->plus($rxop->cc)) : $exp;
+            } else {
+                $rxop = RxOp::CClassElem->new(cc => ($rxop ? $rxop->cc : $CClass::Full)->minus($exp->cc));
+            }
+        } elsif ($sign) {
             $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $exp;
         } else {
             $rxop = RxOp::Sequence->new(zyg => [
