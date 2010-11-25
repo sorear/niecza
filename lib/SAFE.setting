@@ -780,48 +780,48 @@ my class Pair is Enum {
 }
 # }}}
 # List utilities {{{
-sub _at_pos(\&container, $index) {
-    $container.defined
+sub _at_pos(\$container, $index) {
+    defined($container)
         ?? $container.at-pos($index)
         !! Any!Any::butWHENCE(sub (\$var) {
-            $container.defined && die("Autovivification collision");
+            defined($container) && die("Autovivification collision");
             $container = Array.new;
             $container!Array::extend($index, $var);
         });
 }
 sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
-    $container.defined
+    defined($container)
         ?? $container.at-pos($index)
         !! Any!Any::butWHENCE(sub (\$var) {
-            $container.defined && die("Autovivification collision");
+            defined($container) && die("Autovivification collision");
             $container = Array.new;
             $container!Array::extend($index, $var);
         });
 }
 
 sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {
-    $exists ?? ($container.defined ?? $container.exists-key($key) !! False) !!
-    $delete ?? ($container.defined ?? $container.delete-key($key) !! Any) !!
-    $container.defined
+    $exists ?? (defined($container) ?? $container.exists-key($key) !! False) !!
+    $delete ?? (defined($container) ?? $container.delete-key($key) !! Any) !!
+    defined($container)
         ?? $container.at-key($key)
         !! Any!Any::butWHENCE(sub (\$var) {
-            $container.defined && die("Autovivification collision");
+            defined($container) && die("Autovivification collision");
             $container = Hash.new;
             $container!Hash::extend($key, $var);
         });
 }
 
 sub _exists_key(\$container, $key) {
-    $container.defined ?? $container.exists-key($key) !! False
+    defined($container) ?? $container.exists-key($key) !! False
 }
 sub _delete_key(\$container, $key) {
-    $container.defined ?? $container.delete-key($key) !! Any
+    defined($container) ?? $container.delete-key($key) !! Any
 }
 sub _at_key(\$container, $key) {
-    $container.defined
+    defined($container)
         ?? $container.at-key($key)
         !! Any!Any::butWHENCE(sub (\$var) {
-            $container.defined && die("Autovivification collision");
+            defined($container) && die("Autovivification collision");
             $container = Hash.new;
             $container!Hash::extend($key, $var);
         });
