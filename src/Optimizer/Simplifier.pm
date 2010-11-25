@@ -29,6 +29,28 @@ sub no_named_params {
     return ($op->args // $op->positionals);
 }
 
+sub capture_params {
+    my $op = shift;
+
+    if (!$op->args) {
+        return ($op->positionals);
+    }
+
+    my @named;
+    my @pos;
+
+    for (@{ $op->args }) {
+        return () if ($_->isa('Op::Flatten'));
+        if ($_->isa('Op::SimplePair')) {
+            push @named, $_->key, $_->value;
+        } else {
+            push @pos, $_;
+        }
+    }
+
+    (\@pos, @named);
+}
+
 sub is_simple_var {
     my $op = shift;
     $op = $op->inner while $op->isa('Op::Paren');
@@ -47,7 +69,8 @@ our %funcs = (
 );
 
 sub do_assign {
-    my ($body, $nv, $invname, $args) = @_;
+    my ($body, $nv, $invname, $op) = @_;
+    return unless my $args = no_named_params($op);
     return unless @$args == 2;
 
     if (!$nv) {
@@ -67,33 +90,44 @@ sub do_assign {
 }
 
 sub do_postinc {
-    my ($body, $nv, $invname, $args) = @_;
+    my ($body, $nv, $invname, $op) = @_;
+    return unless my $args = no_named_params($op);
     return unless @$args == 1;
     return Op::Builtin->new(name => 'postinc', args => $args);
 }
 
 sub do_numeq {
-    my ($body, $nv, $invname, $args) = @_;
+    my ($body, $nv, $invname, $op) = @_;
+    return unless my $args = no_named_params($op);
     return unless @$args == 2;
     return Op::Builtin->new(name => 'numeq', args => $args);
 }
 
 sub do_defined {
-    my ($body, $nv, $invname, $args) = @_;
+    my ($body, $nv, $invname, $op) = @_;
+    return unless my $args = no_named_params($op);
     return unless @$args == 1;
     return Op::Builtin->new(name => 'defined', args => $args);
 }
 
-# TODO: similar conversion for :delete and :exists
 sub do_atkey {
-    my ($body, $nv, $invname, $args) = @_;
+    my ($body, $nv, $invname, $op) = @_;
+    return unless my ($args, %named) = capture_params($op);
     return unless @$args == 2;
-    return Op::CallSub->new(invocant => Op::Lexical->new(name => '&_at_key'),
+    my $delete = delete $named{delete};
+    my $exists = delete $named{exists};
+    return if %named;
+    return if $delete && (!$delete->isa('Op::Lexical') || $delete->name ne 'True');
+    return if $exists && (!$exists->isa('Op::Lexical') || $exists->name ne 'True');
+    return if $delete && $exists;
+    return Op::CallSub->new(invocant => Op::Lexical->new(name =>
+            ($delete ? '&_delete_key' : $exists ? '&_exists_key' : '&_at_key')),
         positionals => $args);
 }
 
 sub do_atpos {
-    my ($body, $nv, $invname, $args) = @_;
+    my ($body, $nv, $invname, $op) = @_;
+    return unless my $args = no_named_params($op);
     return unless @$args == 2;
     return Op::CallSub->new(invocant => Op::Lexical->new(name => '&_at_pos'),
         positionals => $args);
@@ -115,9 +149,8 @@ sub run_optree {
     return unless $inv_lex && $inv_lex->isa('Metamodel::Lexical::SubDef')
         && $inv_lex->body->unit->is_true_setting;
     return unless my $func = $funcs{$invname};
-    return unless my $pos = no_named_params($op);
 
-    my $r = $func->($body, $nv, $invname, $pos);
+    my $r = $func->($body, $nv, $invname, $op);
     if ($r) {
         %$op = %$r;
         bless $op, ref($r);
