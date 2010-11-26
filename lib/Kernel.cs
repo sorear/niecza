@@ -105,7 +105,7 @@ namespace Niecza {
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public abstract class Variable {
-        public IP6 whence;
+        public ViviHook whence;
 
         // these should be treated as ro for the life of the variable
         public DynMetaObject type;
@@ -120,10 +120,47 @@ namespace Niecza {
         public static readonly Variable[] None = new Variable[0];
     }
 
+    public abstract class ViviHook {
+        public abstract Frame Do(Frame th, Variable toviv);
+    }
+
+    public class SubViviHook : ViviHook {
+        IP6 sub;
+        public SubViviHook(IP6 sub) { this.sub = sub; }
+        public override Frame Do(Frame th, Variable toviv) {
+            return sub.Invoke(th, new Variable[] { toviv }, null);
+        }
+    }
+
+    public class HashViviHook : ViviHook {
+        IP6 hash;
+        string key;
+        public HashViviHook(IP6 hash, string key) { this.hash = hash; this.key = key; }
+        public override Frame Do(Frame th, Variable toviv) {
+            Dictionary<string,Variable> rh = (Dictionary<string,Variable>)
+                Kernel.UnboxAny(hash);
+            rh[key] = toviv;
+            return th;
+        }
+    }
+
+    public class ArrayViviHook : ViviHook {
+        IP6 ary;
+        int key;
+        public ArrayViviHook(IP6 ary, int key) { this.ary = ary; this.key = key; }
+        public override Frame Do(Frame th, Variable toviv) {
+            VarDeque vd = (VarDeque) ary.GetSlot("items");
+            while (vd.Count() <= key)
+                vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
+            vd[key] = toviv;
+            return th;
+        }
+    }
+
     public sealed class SimpleVariable: Variable {
         IP6 val;
 
-        public SimpleVariable(bool rw, bool islist, DynMetaObject type, IP6 whence, IP6 val) {
+        public SimpleVariable(bool rw, bool islist, DynMetaObject type, ViviHook whence, IP6 val) {
             this.val = val; this.whence = whence; this.rw = rw;
             this.islist = islist; this.type = type;
         }
@@ -950,9 +987,9 @@ namespace Niecza {
 
         // check whence before calling
         public static Frame Vivify(Frame th, Variable v) {
-            IP6 w = v.whence;
+            ViviHook w = v.whence;
             v.whence = null;
-            return w.Invoke(th, new Variable[1] { v }, null);
+            return w.Do(th, v);
         }
 
         private static SubInfo BindSI = new SubInfo("Bind/rw-viv", BindC);

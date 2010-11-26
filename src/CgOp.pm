@@ -160,7 +160,7 @@ use warnings;
     sub varhash_dup { rawnew('varhash', $_[0]) }
     sub varhash_new { rawnew('varhash') }
 
-    sub newgeneralvar { rawnew('clr:SimpleVariable', $_[0], $_[1], rawsget('Kernel.AnyMO'), $_[2], $_[3]) }
+    sub newvsubvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:SubViviHook', $_[1]), $_[2]) }
     sub poscount { getfield('Length', getfield('pos', callframe())) }
 
     sub num_to_string { rawcall($_[0], 'ToString') }

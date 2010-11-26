@@ -50,7 +50,7 @@ my class Any is Mu {
 
     method ACCEPTS($t) { self === $t }
     method !butWHENCE($cr) {
-        Q:CgOp { (newgeneralvar (bool 1) (bool 0) (@ {$cr}) (@ {self})) }
+        Q:CgOp { (newvsubvar (class_ref mo Any) (@ {$cr}) (@ {self})) }
     }
 }
 
