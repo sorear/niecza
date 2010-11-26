@@ -1,18 +1,25 @@
 # vim: ft=perl6
-sub _exists_key(\$container, $key) {
-    defined($container) ?? $container.exists-key($key) !! False
+use MONKEY_TYPING;
+augment class Hash {
+    method at-key($key) {
+        my $ks ::= Q:CgOp { (obj_asstr {$ks}) };
+        Q:CgOp {
+            (letn vh (unbox varhash (@ {self}))
+                  ky (unbox str (@ {$ks}))
+              (ternary (varhash_contains_key (l vh) (l ky))
+                (varhash_getindex (l ky) (l vh))
+                {Any!Any::butWHENCE(sub (\$var) {
+                  Q:CgOp {
+                      (letn d [unbox varhash (@ {self})]
+                            k [obj_getstr {$ks}]
+                        [varhash_setindex (l k) (l d) {$var}]
+                        [null var])
+                  }})}))
+        }
+    }
 }
-sub _delete_key(\$container, $key) {
-    defined($container) ?? $container.delete-key($key) !! Any
-}
-sub _at_key(\$container, $key) {
-    defined($container)
-        ?? $container.at-key($key)
-        !! Any!Any::butWHENCE(sub (\$var) {
-            defined($container) && die("Autovivification collision");
-            $container = Hash.new;
-            $container!Hash::extend($key, $var);
-        });
+
+augment class Array {
 }
 
 my $i = 0;
