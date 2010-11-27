@@ -1041,7 +1041,7 @@ namespace Niecza {
 
             th.resultSlot = rhs;
 
-            n = Vivify(th, rhs).MakeChild(null, BindSI);
+            n = Vivify(th.MakeChild(null, BindSI), rhs);
             return n;
         }
 

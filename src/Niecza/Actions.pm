@@ -1935,14 +1935,17 @@ sub signature { my ($cl, $M) = @_;
         return;
     }
 
+    my $exp = 0;
     for (@{ $M->{param_sep} }) {
-        if ($_->Str !~ /,/) {
+        if ($_->Str =~ /:/) {
+            $exp = 1;
+        } elsif ($_->Str !~ /[,:]/) {
             $M->sorry('Parameter separator ' . $_->Str . ' NYI');
             return;
         }
     }
 
-    $M->{_ast} = Sig->new(params =>
+    $M->{_ast} = Sig->new(explicit_inv => $exp, params =>
         [map { $_->{_ast} } @{ $M->{parameter} }]);
 }
 

@@ -35,6 +35,8 @@ use MONKEY_TYPING;
 
     my %h; %h<used>++;
     is %h<used>, 1, "autoviv works with ++";
+
+    is ((anon method retme ($x:) { $x })(53)), 53, "method definitions with explicit invocants work";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

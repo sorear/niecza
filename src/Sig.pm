@@ -166,9 +166,11 @@ use 5.010;
     use Moose;
 
     has params => (isa => 'ArrayRef[Sig::Parameter]', is => 'ro', required => 1);
+    has explicit_inv => (isa => 'Bool', is => 'ro', default => 0);
 
     sub for_method {
         my $self = shift;
+        return $self if $self->explicit_inv;
         my $sp = Sig::Parameter->new(slot => 'self', name => 'self',
             readonly => 1);
         Sig->new(params => [ $sp, @{ $self->params } ]);
