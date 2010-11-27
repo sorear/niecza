@@ -1,5 +1,9 @@
 # vim: ft=perl6
 use MONKEY_TYPING;
+
+augment class Any {
+}
+
 augment class Hash {
 }
 

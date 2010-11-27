@@ -120,9 +120,9 @@ sub do_atkey {
     return if $delete && (!$delete->isa('Op::Lexical') || $delete->name ne 'True');
     return if $exists && (!$exists->isa('Op::Lexical') || $exists->name ne 'True');
     return if $delete && $exists;
-    return Op::CallSub->new(invocant => Op::Lexical->new(name =>
-            ($delete ? '&_delete_key' : $exists ? '&_exists_key' : '&_at_key')),
-        positionals => $args);
+    return Op::CallMethod->new(name => ($delete ? 'delete-key' :
+            $exists ? 'exists-key' : 'at-key'), receiver => $args->[0],
+        positionals => [$args->[1]]);
 }
 
 sub do_atpos {

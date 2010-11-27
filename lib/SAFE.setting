@@ -1,5 +1,6 @@
 # vim: ft=perl6 fdm=marker
 my module SAFE;
+use MONKEY_TYPING;
 
 # Fundamental types {{{
 my class Mu {
@@ -716,33 +717,57 @@ my class Hash {
     }
 
     method exists-key($str) {
-        Q:CgOp { (box Bool (varhash_contains_key (unbox varhash (@ {self})) (obj_getstr {$str}))) }
+        Q:CgOp { (box Bool (ternary (obj_is_defined (@ {self})) (varhash_contains_key (unbox varhash (@ {self})) (obj_getstr {$str})) (bool 0))) }
     }
 
     method delete-key($str) {
         Q:CgOp {
-            (letn r   (unbox varhash (@ {self}))
-                  k   (obj_getstr {$str})
-                  old (ternary (varhash_contains_key (l r) (l k))
-                               (varhash_getindex (l k) (l r))
-                               {Any})
-              (varhash_delete_key (l r) (l k))
-              (l old))
+            (ternary (obj_is_defined (@ {self}))
+              (letn r   (unbox varhash (@ {self}))
+                    k   (obj_getstr {$str})
+                    old (ternary (varhash_contains_key (l r) (l k))
+                                 (varhash_getindex (l k) (l r))
+                                 {Any})
+                (varhash_delete_key (l r) (l k))
+                (l old))
+              {Any})
         };
     }
 
     method iterator () { self.list.iterator }
     method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
 
-    method at-key($key) {
+    method at-key(\$self: $key) {
         my $ks ::= Q:CgOp { (obj_asstr {$key}) };
         Q:CgOp {
-            (letn vh (unbox varhash (@ {self}))
-                  ky (unbox str (@ {$ks}))
-              (ternary (varhash_contains_key (l vh) (l ky))
-                (varhash_getindex (l ky) (l vh))
-                (newvhashvar (class_ref mo Any) (@ {self}) (l ky) (@ {Any}))))
-        }
+            (ternary (obj_is_defined (@ {$self}))
+              (letn vh (unbox varhash (@ {$self}))
+                    ky (unbox str (@ {$ks}))
+                (ternary (varhash_contains_key (l vh) (l ky))
+                  (varhash_getindex (l ky) (l vh))
+                  (newvhashvar (class_ref mo Any) (@ {$self}) (l ky) (@ {Any}))))
+              {Any!Any::butWHENCE(sub (\$var) {
+                   $self = Hash.new;
+                   $self!Hash::extend($key, $var);
+              })})
+        };
+    }
+}
+
+augment class Any {
+    method exists-key($) {
+        defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! False
+    }
+    method delete-key($key) {
+        defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! Any
+    }
+    method at-key(\$self: $key) {
+        defined($self) ??
+            die("Cannot use hash access on an object of type $self.typename()") !!
+            Any!Any::butWHENCE(sub (\$var) {
+                $self = Hash.new;
+                $self!Hash::extend($key, $var);
+            });
     }
 }
 
@@ -797,31 +822,9 @@ sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
 }
 
 sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {
-    $exists ?? (defined($container) ?? $container.exists-key($key) !! False) !!
-    $delete ?? (defined($container) ?? $container.delete-key($key) !! Any) !!
-    defined($container)
-        ?? $container.at-key($key)
-        !! Any!Any::butWHENCE(sub (\$var) {
-            defined($container) && die("Autovivification collision");
-            $container = Hash.new;
-            $container!Hash::extend($key, $var);
-        });
-}
-
-sub _exists_key(\$container, $key) {
-    defined($container) ?? $container.exists-key($key) !! False
-}
-sub _delete_key(\$container, $key) {
-    defined($container) ?? $container.delete-key($key) !! Any
-}
-sub _at_key(\$container, $key) {
-    defined($container)
-        ?? $container.at-key($key)
-        !! Any!Any::butWHENCE(sub (\$var) {
-            defined($container) && die("Autovivification collision");
-            $container = Hash.new;
-            $container!Hash::extend($key, $var);
-        });
+    $exists ?? $container.exists-key($key) !!
+    $delete ?? $container.delete-key($key) !!
+    $container.at-key($key)
 }
 
 my class GatherIterator is IterCursor {
