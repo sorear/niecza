@@ -1191,9 +1191,6 @@ use CgOp;
         no strict 'refs';
         my $name = $self->name;
         my @a = (map { $_->cgop($body) } @{ $self->args });
-        if ($name eq 'defined') {
-            return CgOp::obj_asdef($a[0]);
-        }
         &{ "CgOp::bif_$name" }(@a);
     }
 

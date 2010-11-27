@@ -255,6 +255,29 @@ use warnings;
 
     sub bif_postinc { rawscall('Builtins.PostIncrement:m,Variable', $_[0]) }
     sub bif_numeq { rawscall('Builtins.NumericEq:m,Variable', $_[0], $_[1]) }
+    sub bif_numne { rawscall('Builtins.NumericNe:m,Variable', $_[0], $_[1]) }
+    sub bif_numge { rawscall('Builtins.NumericGe:m,Variable', $_[0], $_[1]) }
+    sub bif_numgt { rawscall('Builtins.NumericGt:m,Variable', $_[0], $_[1]) }
+    sub bif_numle { rawscall('Builtins.NumericLe:m,Variable', $_[0], $_[1]) }
+    sub bif_numlt { rawscall('Builtins.NumericLt:m,Variable', $_[0], $_[1]) }
+    sub bif_streq { rawscall('Builtins.StringEq:m,Variable', $_[0], $_[1]) }
+    sub bif_strne { rawscall('Builtins.StringNe:m,Variable', $_[0], $_[1]) }
+    sub bif_strge { rawscall('Builtins.StringGe:m,Variable', $_[0], $_[1]) }
+    sub bif_strgt { rawscall('Builtins.StringGt:m,Variable', $_[0], $_[1]) }
+    sub bif_strle { rawscall('Builtins.StringLe:m,Variable', $_[0], $_[1]) }
+    sub bif_strlt { rawscall('Builtins.StringLt:m,Variable', $_[0], $_[1]) }
+    sub bif_plus { rawscall('Builtins.Plus:m,Variable', $_[0], $_[1]) }
+    sub bif_minus { rawscall('Builtins.Minus:m,Variable', $_[0], $_[1]) }
+    sub bif_mul { rawscall('Builtins.Mul:m,Variable', $_[0], $_[1]) }
+    sub bif_divide { rawscall('Builtins.Divide:m,Variable', $_[0], $_[1]) }
+    sub bif_not { rawscall('Builtins.Not:m,Variable', $_[0]) }
+    sub bif_negate { rawscall('Builtins.Negate:m,Variable', $_[0]) }
+    sub bif_chars { rawscall('Builtins.Chars:m,Variable', $_[0]) }
+    sub bif_substr3 { rawscall('Builtins.Substr3:m,Variable', @_) }
+    sub bif_defined { obj_asdef($_[0]) }
+    sub bif_num { obj_asnum($_[0]) }
+    sub bif_str { obj_asstr($_[0]) }
+    sub bif_bool { obj_asbool($_[0]) }
 
     sub _context {
         my ($type, $fun, $obj) = @_;

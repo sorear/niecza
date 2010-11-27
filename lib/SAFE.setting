@@ -2,13 +2,15 @@
 my module SAFE;
 use MONKEY_TYPING;
 
+# Note that a few of these functions are defined as themselves.  That
+# means that the true definitions are in the optimizer, and the subs
+# are only used for non-primitivizable cases.
+
 # Fundamental types {{{
 my class Mu {
-    method defined() {
-        Q:CgOp { (box Bool (obj_is_defined (@ {self}))) }
-    }
+    method defined() { defined(self) }
     method head() { @(self).head }
-    method Bool() { self.defined }
+    method Bool() { defined(self) }
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
@@ -20,10 +22,10 @@ my class Mu {
             $tn ~ "()"
         }
     }
-    method dump() { self.defined ?? "Unknown{self.typename}" !! "undef" }
+    method dump() { defined(self) ?? "Unknown{self.typename}" !! "undef" }
     method item() { self }
-    method so() { self.Bool }
-    method not() { ! self.Bool }
+    method so() { ?self }
+    method not() { !self }
     method RAWCREATE(\|$vars) { Q:CgOp {
         (letn ar  (unbox fvarlist (@ {$vars}))
               max (fvarlist_length (l ar))
@@ -94,8 +96,8 @@ my class Cool {
         @out
     }
     method say() { self.Str.say }
-    method chars() { self.Str.chars }
-    method substr($x,$y) { self.Str.substr($x,$y) }
+    method chars() { chars(self) }
+    method substr($x,$y) { substr(self,$x,$y) }
 
     method at-pos(\$self: $ix) {
         defined($self)
@@ -129,7 +131,7 @@ my class Num is Cool {
     } }
     method Numeric() { self }
     method ACCEPTS($t) { self == $t }
-    method dump() { self.Str }
+    method dump() { ~self }
 }
 
 my class Str is Cool {
@@ -137,19 +139,13 @@ my class Str is Cool {
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
     method Bool () { self ne "" }
-    method chars() { Q:CgOp {
-        (box Num (cast num (str_length (unbox str (@ {self})))))
-    } }
+    method chars() { chars(self) }
     method say() { Q:CgOp {
         (prog [say (unbox str (@ {self}))]
               [box Bool (bool 1)]
         )
     } }
-    method substr($from, $len) { Q:CgOp {
-        (box Str (str_substring [unbox str (@ {self})]
-                    [cast int (obj_getnum {$from})]
-                    [cast int (obj_getnum {$len})]))
-    } }
+    method substr($from, $len) { substr(self, $from, $len) }
     method dump() { '"' ~ self ~ '"' }
 }
 
@@ -200,45 +196,17 @@ sub infix:<~>(\|$bits) { Q:CgOp {
       [box Str (strbuf_seal (l buf))])
 } }
 
-sub infix:<+>($l,$r) { Q:CgOp {
-    (box Num (+ (obj_getnum {$l}) (obj_getnum {$r})))
-} }
+sub infix:<+>($l,$r) { $l + $r }
+sub infix:<->($l,$r) { $l - $r }
+sub infix:<*>($l,$r) { $l * $r }
+sub infix:</>($l,$r) { $l / $r }
 
-sub infix:<->($l,$r) { Q:CgOp {
-    (box Num (- (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<*>($l,$r) { Q:CgOp {
-    (box Num (* (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:</>($l,$r) { Q:CgOp {
-    (box Num (/ (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<< < >>($l,$r) { Q:CgOp {
-    (box Bool (< (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<< > >>($l,$r) { Q:CgOp {
-    (box Bool (> (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<< <= >>($l,$r) { Q:CgOp {
-    (box Bool (<= (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<< >= >>($l,$r) { Q:CgOp {
-    (box Bool (>= (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<< == >>($l,$r) { Q:CgOp {
-    (box Bool (== (obj_getnum {$l}) (obj_getnum {$r})))
-} }
-
-sub infix:<< != >>($l,$r) { Q:CgOp {
-    (box Bool (!= (obj_getnum {$l}) (obj_getnum {$r})))
-} }
+sub infix:<< < >>($l,$r)  { $l <  $r }
+sub infix:<< > >>($l,$r)  { $l >  $r }
+sub infix:<< <= >>($l,$r) { $l <= $r }
+sub infix:<< >= >>($l,$r) { $l >= $r }
+sub infix:<< == >>($l,$r) { $l == $r }
+sub infix:<< != >>($l,$r) { $l != $r }
 
 sub infix:<max>($a,$b) { $a < $b ?? $b !! $a }
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
@@ -258,15 +226,13 @@ sub exit($status = 0) { Q:CgOp {
 
 sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
 
-sub chars($str) { $str.chars }
-sub substr($str, $start, $len = $str.chars - $start) {
-    $str.substr($start, $len)
-}
+sub chars($str) { chars($str) }
+sub substr($str, $start, $len = $str.chars - $start) { substr($str, $start, $len) }
 
 sub item($x) { $x }
 
-sub prefix:<not>($x) { $x ?? False !! True }
-sub defined($x) { Q:CgOp { (obj_asdef {$x}) } }
+sub prefix:<not>($x) { not($x) }
+sub defined($x) { defined($x) }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
@@ -275,12 +241,13 @@ sub prefix:<++>($v is rw) { $v = (($v // 0) + 1); $v }
 sub postfix:<-->($v is rw) { my $old = $v; $v = (($v // 0) - 1); $old }
 sub postfix:<++>($v is rw) { my $old = $v; $v = (($v // 0) + 1); $old }
 
-sub prefix:<~>($v) { Q:CgOp { (obj_asstr {$v}) } } # should be Stringy
-sub prefix:<?>($v) { Q:CgOp { (obj_asbool {$v}) } }
-sub prefix:<->($v) { 0 - $v }
-sub prefix:<+>($x) { Q:CgOp { (obj_asnum {$x}) } }
+sub prefix:<~>($v) { ~$v }
+sub prefix:<?>($v) { ?$v }
+sub prefix:<->($v) { -$v }
+sub prefix:<+>($v) { +$v }
+sub prefix:<!>($v) { !$v }
 
-sub prefix:<!>($v) { $v ?? False !! True }
+sub not($v) { not($v) }
 
 sub infix:<x>($str, $ct) {
     my $i = +$ct;
@@ -296,17 +263,12 @@ sub infix:<leg>($s1, $s2) {
     Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }
 }
 
-sub infix:<ge>($s1, $s2) { ($s1 leg $s2) >= 0 }
-sub infix:<gt>($s1, $s2) { ($s1 leg $s2) > 0  }
-sub infix:<le>($s1, $s2) { ($s1 leg $s2) <= 0 }
-sub infix:<lt>($s1, $s2) { ($s1 leg $s2) < 0  }
-
-sub infix:<eq>($l,$r) { Q:CgOp {
-    (box Bool (compare == (obj_getstr {$l}) (obj_getstr {$r})))
-} }
-sub infix:<ne>($l,$r) { Q:CgOp {
-    (box Bool (compare != (obj_getstr {$l}) (obj_getstr {$r})))
-} }
+sub infix:<ge>($s1, $s2) { $s1 ge $s2 }
+sub infix:<gt>($s1, $s2) { $s1 gt $s2 }
+sub infix:<le>($s1, $s2) { $s1 le $s2 }
+sub infix:<lt>($s1, $s2) { $s1 lt $s2 }
+sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
+sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
@@ -595,7 +557,7 @@ my class List is Cool {
     method join($sep) {
         my $t;
         for unitem(self) -> $x {
-            $t = ($t.defined ?? ($t ~ ($sep ~ $x)) !! $x);
+            $t = (defined($t) ?? ($t ~ ($sep ~ $x)) !! $x);
         }
         $t // '';
     }

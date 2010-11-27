@@ -60,12 +60,36 @@ sub is_simple_var {
 }
 
 our %funcs = (
-    '&infix:<=>' => \&do_assign,
-    '&infix:<==>' => \&do_numeq,
-    '&postfix:<++>' => \&do_postinc,
+    '&chars'               => sub { do_builtin(chars => 1, @_) },
+    '&defined'             => sub { do_builtin(defined => 1, @_) },
+    '&infix:<=>'           => \&do_assign,
+    '&infix:<eq>'          => sub { do_builtin(streq => 2,   @_) },
+    '&infix:<ge>'          => sub { do_builtin(strge => 2,   @_) },
+    '&infix:<gt>'          => sub { do_builtin(strgt => 2,   @_) },
+    '&infix:<le>'          => sub { do_builtin(strle => 2,   @_) },
+    '&infix:<lt>'          => sub { do_builtin(strlt => 2,   @_) },
+    '&infix:<ne>'          => sub { do_builtin(strne => 2,   @_) },
+    '&infix:</>'           => sub { do_builtin(divide => 2,  @_) },
+    '&infix:<->'           => sub { do_builtin(minus => 2,   @_) },
+    '&infix:<*>'           => sub { do_builtin(mul => 2,     @_) },
+    '&infix:<==>'          => sub { do_builtin(numeq => 2,   @_) },
+    '&infix:<>=>'          => sub { do_builtin(numge => 2,   @_) },
+    '&infix:<>>'           => sub { do_builtin(numgt => 2,   @_) },
+    '&infix:<<=>'          => sub { do_builtin(numle => 2,   @_) },
+    '&infix:<<>'           => sub { do_builtin(numlt => 2,   @_) },
+    '&infix:<!=>'          => sub { do_builtin(numne => 2,   @_) },
+    '&infix:<+>'           => sub { do_builtin(plus => 2,    @_) },
+    '&not'                 => sub { do_builtin(not => 1, @_) },
     '&postcircumfix:<{ }>' => \&do_atkey,
     '&postcircumfix:<[ ]>' => \&do_atpos,
-    '&defined' => \&do_defined,
+    '&postfix:<++>'        => sub { do_builtin(postinc => 1, @_) },
+    '&prefix:<?>'          => sub { do_builtin(bool => 1, @_) },
+    '&prefix:<->'          => sub { do_builtin(negate => 1, @_) },
+    '&prefix:<!>'          => sub { do_builtin(not => 1, @_) },
+    '&prefix:<+>'          => sub { do_builtin(num => 1, @_) },
+    '&prefix:<~>'          => sub { do_builtin(str => 1, @_) },
+    '&so'                  => sub { do_builtin(bool => 1, @_) },
+    '&substr'              => sub { do_builtin(substr3 => 3, @_) },
 );
 
 sub do_assign {
@@ -89,25 +113,11 @@ sub do_assign {
     }
 }
 
-sub do_postinc {
-    my ($body, $nv, $invname, $op) = @_;
+sub do_builtin {
+    my ($name, $expect, $body, $nv, $invname, $op) = @_;
     return unless my $args = no_named_params($op);
-    return unless @$args == 1;
-    return Op::Builtin->new(name => 'postinc', args => $args);
-}
-
-sub do_numeq {
-    my ($body, $nv, $invname, $op) = @_;
-    return unless my $args = no_named_params($op);
-    return unless @$args == 2;
-    return Op::Builtin->new(name => 'numeq', args => $args);
-}
-
-sub do_defined {
-    my ($body, $nv, $invname, $op) = @_;
-    return unless my $args = no_named_params($op);
-    return unless @$args == 1;
-    return Op::Builtin->new(name => 'defined', args => $args);
+    return unless @$args == $expect;
+    return Op::Builtin->new(name => $name, args => $args);
 }
 
 sub do_atkey {
