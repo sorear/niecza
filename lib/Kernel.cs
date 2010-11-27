@@ -923,10 +923,7 @@ namespace Niecza {
         public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
         public static DynMetaObject GatherIteratorMO;
-        public static DynMetaObject HashMO;
         public static DynMetaObject IterCursorMO;
-        public static DynMetaObject ListMO;
-        public static DynMetaObject ArrayMO;
         public static DynMetaObject MatchMO;
         public static IP6 AnyP;
         public static IP6 ArrayP;
@@ -938,6 +935,9 @@ namespace Niecza {
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject StrMO;
         public static readonly DynMetaObject NumMO;
+        public static readonly DynMetaObject ArrayMO;
+        public static readonly DynMetaObject ListMO;
+        public static readonly DynMetaObject HashMO;
         public static readonly DynMetaObject BoolMO;
         public static readonly DynMetaObject MuMO;
         public static readonly IP6 StashP;
@@ -1601,6 +1601,15 @@ slow:
             StashMO = new DynMetaObject("Stash");
             StashMO.FillProtoClass(new string[] { "value" });
             StashP = new DynObject(StashMO);
+
+            ArrayMO = new DynMetaObject("Array");
+            ArrayMO.FillProtoClass(new string[] { "items", "rest" });
+
+            ListMO = new DynMetaObject("List");
+            ListMO.FillProtoClass(new string[] { "items", "rest" });
+
+            HashMO = new DynMetaObject("Hash");
+            HashMO.FillProtoClass(new string[] { "value" });
 
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
