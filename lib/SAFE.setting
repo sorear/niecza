@@ -734,18 +734,15 @@ my class Hash {
     method iterator () { self.list.iterator }
     method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
 
-    # TODO: We need something like pir:: notation for this to not suck
     method at-key($key) {
+        my $ks ::= Q:CgOp { (obj_asstr {$key}) };
         Q:CgOp {
-            (box Bool (varhash_contains_key [unbox varhash (@ {self})]
-                [obj_getstr {$key}]))
+            (letn vh (unbox varhash (@ {self}))
+                  ky (unbox str (@ {$ks}))
+              (ternary (varhash_contains_key (l vh) (l ky))
+                (varhash_getindex (l ky) (l vh))
+                (newvhashvar (class_ref mo Any) (@ {self}) (l ky) (@ {Any}))))
         }
-            ?? Q:CgOp {
-                (varhash_getindex [obj_getstr {$key}]
-                  [unbox varhash (@ {self})])
-            } !! Any!Any::butWHENCE(sub (\$var) {
-                self!extend($key, $var)
-            });
     }
 }
 

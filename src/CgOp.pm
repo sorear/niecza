@@ -161,6 +161,8 @@ use warnings;
     sub varhash_new { rawnew('varhash') }
 
     sub newvsubvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:SubViviHook', $_[1]), $_[2]) }
+    sub newvhashvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:HashViviHook', $_[1], $_[2]), $_[3]) }
+    sub newvarrayvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:ArrayViviHook', $_[1], $_[2]), $_[3]) }
     sub poscount { getfield('Length', getfield('pos', callframe())) }
 
     sub num_to_string { rawcall($_[0], 'ToString') }

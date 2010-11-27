@@ -992,13 +992,11 @@ namespace Niecza {
             return w.Do(th, v);
         }
 
+        // this exists purely to hide the return value
         private static SubInfo BindSI = new SubInfo("Bind/rw-viv", BindC);
         private static Frame BindC(Frame th) {
             switch (th.ip) {
                 case 0:
-                    th.ip = 1;
-                    return Vivify(th, th.pos[0]);
-                case 1:
                     return th.caller;
                 default:
                     return Kernel.Die(th, "IP invalid");
@@ -1043,8 +1041,7 @@ namespace Niecza {
 
             th.resultSlot = rhs;
 
-            n = th.MakeChild(null, BindSI);
-            n.pos = new Variable[1] { rhs };
+            n = Vivify(th, rhs).MakeChild(null, BindSI);
             return n;
         }
 
@@ -1056,7 +1053,9 @@ namespace Niecza {
                     if (th.pos[0].whence == null)
                         goto case 1;
                     th.ip = 1;
-                    return Vivify(th, th.pos[0]);
+                    Frame nth = Vivify(th, th.pos[0]);
+                    if (nth == th) goto case 1;
+                    return nth;
                 case 1:
                     if (th.pos[0].islist) {
                         return th.pos[0].Fetch().InvokeMethod(th.caller,
