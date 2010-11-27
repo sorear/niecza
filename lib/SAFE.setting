@@ -41,8 +41,10 @@ my class Mu {
 }
 
 my class Any is Mu {
-    method at-pos($ix) {
-        ($ix == 0) ?? self !! die("Invalid index on non-list")
+    method at-pos(\$self: $ix) {
+        defined($self)
+            ?? ($ix == 0 ?? $self !! die("Invalid index for non-array"))
+            !! _vivify_array_at_pos($self, $ix)
     }
     method flat() { (self,).list }
     method list() { (self,).list }
@@ -95,7 +97,11 @@ my class Cool {
     method chars() { self.Str.chars }
     method substr($x,$y) { self.Str.substr($x,$y) }
 
-    method at-pos($i) { self.flat.at-pos($i) }
+    method at-pos(\$self: $ix) {
+        defined($self)
+            ?? $self.list.at-pos($ix)
+            !! _vivify_array_at_pos($self, $ix)
+    }
     method elems() { self.flat.elems }
     method iterator() { self.flat.iterator }
     method join($sep) { self.flat.join($sep) }
@@ -570,7 +576,21 @@ my class List is Cool {
     method elems() { self!fill(1000_000_000); self!count-items; }
     method Numeric () { self.elems }
 
-    method at-pos($i) { self!fill($i + 1) ?? self!item-at-pos($i) !! Any }
+    method at-pos(\$self: $ix) {
+        Q:CgOp {
+            (letn self (@ {$self})
+                  ixn  (cast int (obj_getnum {$ix}))
+              (ternary (obj_is_defined (l self))
+                (letn items (getslot items vvarlist (l self))
+                      rest  (getslot rest  vvarlist (l self))
+                  (ternary (< (l ixn) (vvarlist_count (l items)))
+                    (vvarlist_item (l ixn) (l items))
+                    (ternary (== (i 0) (vvarlist_count (l rest)))
+                      {Any}
+                      {$self!List::fill($ix+1); $self.at-pos($ix)})))
+                {_vivify_array_at_pos($self,$ix)}))
+        };
+    }
 
     method join($sep) {
         my $t;
@@ -647,10 +667,20 @@ my class Array is List {
         };
     }
 
-    method at-pos($ix) {
-        self!List::fill($ix+1)
-            ?? self!List::item-at-pos($ix)
-            !! Any!Any::butWHENCE(sub (\$var) { self!extend($ix, $var); });
+    method at-pos(\$self: $ix) {
+        Q:CgOp {
+            (letn self (@ {$self})
+                  ixn  (cast int (obj_getnum {$ix}))
+              (ternary (obj_is_defined (l self))
+                (letn items (getslot items vvarlist (l self))
+                      rest  (getslot rest  vvarlist (l self))
+                  (ternary (< (l ixn) (vvarlist_count (l items)))
+                    (vvarlist_item (l ixn) (l items))
+                    (ternary (== (i 0) (vvarlist_count (l rest)))
+                      (newvarrayvar (class_ref mo Any) (l self) (l ixn) (@ {Any}))
+                      {$self!List::fill($ix+1); $self.at-pos($ix)})))
+                {_vivify_array_at_pos($self,$ix)}))
+        };
     }
 }
 
@@ -758,7 +788,7 @@ augment class Any {
     method exists-key($) {
         defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! False
     }
-    method delete-key($key) {
+    method delete-key($) {
         defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! Any
     }
     method at-key(\$self: $key) {
@@ -802,23 +832,15 @@ my class Pair is Enum {
 }
 # }}}
 # List utilities {{{
-sub _at_pos(\$container, $index) {
-    defined($container)
-        ?? $container.at-pos($index)
-        !! Any!Any::butWHENCE(sub (\$var) {
-            defined($container) && die("Autovivification collision");
-            $container = Array.new;
-            $container!Array::extend($index, $var);
-        });
+sub _vivify_array_at_pos(\$self, $ix) {
+    Any!Any::butWHENCE(sub (\$var) {
+        $self = Array.new;
+        $self!Array::extend($ix, $var);
+    });
 }
-sub postcircumfix:<[ ]>(\$container, $index) { # TODO: is rwtrans
-    defined($container)
-        ?? $container.at-pos($index)
-        !! Any!Any::butWHENCE(sub (\$var) {
-            defined($container) && die("Autovivification collision");
-            $container = Array.new;
-            $container!Array::extend($index, $var);
-        });
+
+sub postcircumfix:<[ ]>(\$container, $index) {
+    $container.at-pos($index)
 }
 
 sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {

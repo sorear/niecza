@@ -129,8 +129,8 @@ sub do_atpos {
     my ($body, $nv, $invname, $op) = @_;
     return unless my $args = no_named_params($op);
     return unless @$args == 2;
-    return Op::CallSub->new(invocant => Op::Lexical->new(name => '&_at_pos'),
-        positionals => $args);
+    return Op::CallMethod->new(name => 'at-pos', receiver => $args->[0],
+        positionals => [$args->[1]]);
 }
 
 sub run_optree {
