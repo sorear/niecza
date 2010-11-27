@@ -203,6 +203,8 @@ namespace Niecza {
         // maybe should be a hint
         public LAD ltm;
         public Dictionary<string, int> dylex;
+        public uint dylex_filter; // (32,1) Bloom on hash code
+        public const uint FILTER_SALT = 0x9e3779b9;
 
         // records: $start-ip, $end-ip, $type, $goto, $lid
         public const int ON_NEXT = 1;
@@ -264,6 +266,11 @@ namespace Niecza {
             }
         }
 
+        public static uint FilterForName(string name) {
+            uint hash = (uint)(name.GetHashCode() * FILTER_SALT);
+            return 1u << (int)(hash >> 27);
+        }
+
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
                 string[] dylexn, int[] dylexi) {
@@ -276,8 +283,10 @@ namespace Niecza {
             this.label_names = label_names;
             if (dylexn != null) {
                 dylex = new Dictionary<string, int>();
-                for (int i = 0; i < dylexn.Length; i++)
+                for (int i = 0; i < dylexn.Length; i++) {
                     dylex[dylexn[i]] = dylexi[i];
+                    dylex_filter |= FilterForName(dylexn[i]);
+                }
             }
         }
 
@@ -413,14 +422,14 @@ namespace Niecza {
             }
         }
 
-        public bool TryGetDynamic(string name, out object v) {
+        public bool TryGetDynamic(string name, uint mask, out object v) {
             v = null;
-            if (lex == null && info.dylex == null)
-                return false;
             if (lex != null && lex.TryGetValue(name, out v))
                 return true;
+            if ((info.dylex_filter & mask) == 0)
+                return false;
             int ix;
-            if (info.dylex == null || !info.dylex.TryGetValue(name, out ix))
+            if (!info.dylex.TryGetValue(name, out ix))
                 return false;
             switch(ix) {
                 case 0: v = lex0; break;
@@ -434,9 +443,10 @@ namespace Niecza {
 
         public Variable LexicalFind(string name) {
             Frame csr = this;
+            uint m = SubInfo.FilterForName(name);
             while (csr != null) {
                 object o;
-                if (csr.TryGetDynamic(name, out o)) {
+                if (csr.TryGetDynamic(name, m, out o)) {
                     return (Variable)o;
                 }
                 csr = csr.outer;
@@ -1147,8 +1157,9 @@ namespace Niecza {
 
         public static Variable ContextHelper(Frame th, string name, int up) {
             object rt;
+            uint m = SubInfo.FilterForName(name);
             while (th != null) {
-                if (up <= 0 && th.TryGetDynamic(name, out rt)) {
+                if (up <= 0 && th.TryGetDynamic(name, m, out rt)) {
                     return (Variable)rt;
                 }
                 th = th.caller;
