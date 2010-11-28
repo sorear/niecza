@@ -669,28 +669,13 @@ my class Hash {
         }
     }
 
-    method keys() {
-        Q:CgOp {
-            (letn n (obj_newblank (obj_llhow (@ {List})))
-              (setslot items (l n) (varhash_keys (unbox varhash (@ {self}))))
-              (setslot rest (l n) (vvarlist_new_empty))
-              (newrwlistvar (l n)))
-        }
-    }
-
-    method values() {
-        gather { for self.keys -> $k { take self.at-key($k) } }
-    }
-
-    method list() {
-        gather { for self.keys -> $k { take ($k => self.at-key($k)) } }
-    }
+    method keys()   { Q:CgOp { (bif_hash_keys   {self}) } }
+    method values() { Q:CgOp { (bif_hash_values {self}) } }
+    method pairs()  { Q:CgOp { (bif_hash_pairs  {self}) } }
+    method list()   { Q:CgOp { (bif_hash_pairs  {self}) } }
+    method kv()     { Q:CgOp { (bif_hash_kv     {self}) } }
 
     method Bool () { self.list.Bool }
-
-    method kv() {
-        gather { for self.keys -> $k { take $k; take self.at-key($k) } }
-    }
 
     method invert() {
         my %new;

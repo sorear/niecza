@@ -156,7 +156,6 @@ use warnings;
     sub varhash_contains_key { rawcall($_[0], 'ContainsKey', _str($_[1])) }
     sub varhash_delete_key { rawcall($_[0], 'Remove', _str($_[1])) }
     sub varhash_clear { rawcall($_[0], 'Clear') }
-    sub varhash_keys { rawscall('Kernel.KeysHelper', $_[0]) }
     sub varhash_dup { rawnew('varhash', $_[0]) }
     sub varhash_new { rawnew('varhash') }
 
@@ -274,6 +273,10 @@ use warnings;
     sub bif_negate { rawscall('Builtins.Negate:m,Variable', $_[0]) }
     sub bif_chars { rawscall('Builtins.Chars:m,Variable', $_[0]) }
     sub bif_substr3 { rawscall('Builtins.Substr3:m,Variable', @_) }
+    sub bif_hash_keys { rawscall('Builtins.HashIter:m,Variable', CgOp::int(0), @_) }
+    sub bif_hash_values { rawscall('Builtins.HashIter:m,Variable', CgOp::int(1), @_) }
+    sub bif_hash_kv { rawscall('Builtins.HashIter:m,Variable', CgOp::int(2), @_) }
+    sub bif_hash_pairs { rawscall('Builtins.HashIter:m,Variable', CgOp::int(3), @_) }
     sub bif_defined { obj_asdef($_[0]) }
     sub bif_num { obj_asnum($_[0]) }
     sub bif_str { obj_asstr($_[0]) }

@@ -231,4 +231,37 @@ public class Builtins {
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO(-r, Kernel.NumMO);
     }
+
+    public static Variable HashIter(int mode, Variable v) {
+        IP6 o = NominalCheck("$x", Kernel.AnyMO, v);
+        Dictionary<string,Variable> d =
+            (Dictionary<string,Variable>) Kernel.UnboxAny(o);
+
+        VarDeque lv = new VarDeque();
+
+        foreach (KeyValuePair<string,Variable> kv in d) {
+            switch (mode) {
+                case 0:
+                    lv.Push(Kernel.BoxAnyMO(kv.Key, Kernel.StrMO));
+                    break;
+                case 1:
+                    lv.Push(kv.Value);
+                    break;
+                case 2:
+                    lv.Push(Kernel.BoxAnyMO(kv.Key, Kernel.StrMO));
+                    lv.Push(kv.Value);
+                    break;
+                case 3:
+                    DynObject p = new DynObject(Kernel.PairMO);
+                    p.slots[0] = Kernel.BoxAnyMO(kv.Key, Kernel.StrMO);
+                    p.slots[1] = kv.Value;
+                    lv.Push(Kernel.NewROScalar(p));
+                    break;
+            }
+        }
+        DynObject l = new DynObject(Kernel.ListMO);
+        l.slots[0] = lv;
+        l.slots[1] = new VarDeque();
+        return Kernel.NewRWListVar(l);
+    }
 }

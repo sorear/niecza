@@ -930,6 +930,7 @@ namespace Niecza {
         }
 
         public static DynMetaObject AnyMO;
+        public static DynMetaObject PairMO;
         public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
         public static DynMetaObject GatherIteratorMO;
@@ -1123,15 +1124,6 @@ namespace Niecza {
             for (int i = 0; i < vals.Count(); i++)
                 nv.Push(NewRWScalar(AnyMO, vals[i].Fetch()));
             return nv;
-        }
-
-        // TODO: Returning keys unboxed would be better.
-        public static VarDeque KeysHelper(Dictionary<string,Variable> d) {
-            VarDeque lv = new VarDeque();
-            foreach (string s in d.Keys) {
-                lv.Push(BoxAnyMO(s, StrMO));
-            }
-            return lv;
         }
 
         public static string[] commandArgs;
