@@ -62,6 +62,22 @@ constant $methodcall_prec = 'y=';
 augment class List {
 }
 
+augment class Array {
+    method LISTSTORE(\$in) {
+        Q:CgOp {
+            (letn iter (vvarlist_new_empty)
+                  into (vvarlist_new_empty)
+                  sobj (@ {self})
+              (vvarlist_push (l iter) {$in})
+              (whileloop 0 0 (iter_hasflat (l iter))
+                (vvarlist_push (l into) (vvarlist_shift (l iter))))
+              (setslot items (l sobj) (iter_copy_elems (l into)))
+              (setslot rest  (l sobj) (l iter))
+              (newrwlistvar (l sobj)))
+        };
+    }
+}
+
 augment class Mu {
 }
 

@@ -192,6 +192,11 @@ sub do_primitive {
     my $type = type_infer(\$cps, $ops, map { $_->type } @args);
     my $const = $_const{$ops->[0]};
 
+    if (!defined $type) {
+        say(YAML::XS::Dump($ops, map { $_->type } @args));
+        die "Type inference returned undef";
+    }
+
     if ($type eq 'Void') {
         my $nhead = CLROp::Term->new(op => $ops, type => $type,
             zyg => [ @args ]);
