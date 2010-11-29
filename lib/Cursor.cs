@@ -65,7 +65,7 @@ public struct State {
     public CapInfo captures;
     public NState ns;
 
-    public Variable subrule_iter;
+    public object subrule_iter;
     public int pos;
 }
 
@@ -176,12 +176,16 @@ public sealed class RxFrame {
         st.captures = new CapInfo(st.captures, cn, cl);
     }
 
-    public void SetCursorList(Variable cl) {
+    public void SetCursorList(object cl) {
         st.subrule_iter = cl;
     }
 
     public Variable GetCursorList() {
-        return st.subrule_iter;
+        return (Variable)st.subrule_iter;
+    }
+
+    public VarDeque GetCursorIter() {
+        return (VarDeque)st.subrule_iter;
     }
 
     public void SetCapturesFrom(Cursor inp) {

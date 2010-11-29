@@ -196,6 +196,7 @@ use warnings;
     sub vvarlist_to_fvarlist { rawcall($_[0], 'CopyAsArray:m,Variable[]') }
     sub vvarlist_clone { rawnew('vvarlist', $_[0]) }
     sub vvarlist_new_empty { rawnew('vvarlist') }
+    sub vvarlist_new_singleton { rawnew('vvarlist', $_[0]) }
     sub vvarlist_shift { rawcall($_[0], 'Shift') }
     sub vvarlist_pop { rawcall($_[0], 'Pop') }
     sub vvarlist_count { rawcall($_[0], 'Count') }

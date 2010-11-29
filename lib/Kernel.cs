@@ -1325,19 +1325,27 @@ namespace Niecza {
         }
 
         public static Frame IterHasFlat(Frame caller, VarDeque iter, bool flat) {
-            if (iter.Count() == 0) {
-                caller.resultSlot = false;
-                return caller;
-            }
-            Variable i0 = iter[0];
-            if (!i0.islist && !i0.Fetch().mo.HasMRO(IterCursorMO)) {
+            while (true) {
+                if (iter.Count() == 0) {
+                    caller.resultSlot = false;
+                    return caller;
+                }
+                Variable i0 = iter[0];
+                if (i0.islist) {
+                    iter.Shift();
+                    iter.UnshiftD(i0.Fetch().mo.mro_raw_iterator.Get(i0));
+                    continue;
+                }
+                if (i0.Fetch().mo.HasMRO(IterCursorMO)) {
+                    Frame n = caller.MakeChild(null, IHF_SI);
+                    n.lex0 = iter;
+                    n.lexi0 = flat ? 1 : 0;
+                    return n;
+                }
+
                 caller.resultSlot = true;
                 return caller;
             }
-            Frame n = caller.MakeChild(null, IHF_SI);
-            n.lex0 = iter;
-            n.lexi0 = flat ? 1 : 0;
-            return n;
         }
         private static SubInfo IHF_SI = new SubInfo("iter_has_flat", IHF_C);
         private static Frame IHF_C(Frame th) {
@@ -1858,6 +1866,12 @@ slow:
             data = new Variable[cap];
             Array.Copy(parcel, 0, data, 0, parcel.Length);
             count = parcel.Length;
+        }
+
+        public VarDeque(Variable item) {
+            data = new Variable[8];
+            count = 1;
+            data[0] = item;
         }
 
         private int fixindex(int index) {

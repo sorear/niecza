@@ -623,16 +623,13 @@ use CgOp;
                 $backf,
                 $updatef);
         } else {
-            push @code, CgOp::rxcall("SetCursorList", CgOp::promote_to_list($callf));
-            push @code, CgOp::goto($sk);
+            push @code, CgOp::rxcall("SetCursorList", CgOp::vvarlist_new_singleton($callf));
             push @code, CgOp::label($bt);
-            push @code, CgOp::sink(CgOp::methodcall(CgOp::rxcall(
-                        "GetCursorList"), "shift"));
-            push @code, CgOp::label($sk);
+            push @code, CgOp::ncgoto("backtrack", CgOp::iter_hasflat(
+                    CgOp::rxcall("GetCursorIter")));
             push @code, CgOp::letn(
-                "kv", CgOp::get_first(CgOp::rxcall("GetCursorList")),
+                "kv", CgOp::vvarlist_shift(CgOp::rxcall("GetCursorIter")),
                 "k", CgOp::fetch(CgOp::letvar("kv")),
-                $backf,
                 CgOp::rxpushb("SUBRULE", $bt),
                 $updatef);
             push @code, CgOp::rxcall("SetCursorList", CgOp::null("var"));
@@ -909,6 +906,7 @@ use CgOp;
             CgOp::clr_string($self->name)),
           "i",   CgOp::int(0),
           "ks",  CgOp::null('var'),
+          "ki",  CgOp::null('vvarlist'),
           "k",   CgOp::null('obj'),
           CgOp::pushcut('LTM'),
           CgOp::label('nextfn'),
@@ -920,19 +918,17 @@ use CgOp;
                 CgOp::letvar("fns")), CgOp::newscalar(CgOp::rxcall(
                   'MakeCursor')))),
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
-          CgOp::letvar("k", CgOp::fetch(CgOp::get_first(
-                CgOp::letvar("ks")))),
+          CgOp::letvar("k", CgOp::fetch(CgOp::get_first(CgOp::letvar("ks")))),
           CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
           CgOp::rxcall('End', CgOp::cast('cursor', CgOp::letvar("k"))),
-          CgOp::letvar('ks', CgOp::methodcall(CgOp::promote_to_list(
-                CgOp::letvar('ks')), "clone")),
-          CgOp::sink(CgOp::methodcall(CgOp::letvar('ks'), 'shift')),
+          CgOp::letvar('ki', CgOp::vvarlist_new_singleton(CgOp::letvar('ks'))),
+          CgOp::sink(CgOp::iter_hasflat(CgOp::letvar('ki'))),
+          CgOp::sink(CgOp::vvarlist_shift(CgOp::letvar('ki'))),
           CgOp::label('nextcsr'),
-          CgOp::ncgoto('backtrack', CgOp::unbox('bool', CgOp::fetch(
-                CgOp::methodcall(CgOp::letvar('ks'), 'Bool')))),
+          CgOp::ncgoto('backtrack', CgOp::iter_hasflat(CgOp::letvar('ki'))),
           CgOp::rxpushb('SUBRULE', 'nextcsr'),
           CgOp::rxcall('End', CgOp::cast('cursor',
-              CgOp::fetch(CgOp::methodcall(CgOp::letvar('ks'), 'shift')))),
+              CgOp::fetch(CgOp::vvarlist_shift(CgOp::letvar('ki'))))),
           CgOp::goto('backtrack'));
     }
 

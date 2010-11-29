@@ -77,6 +77,7 @@ my %typedata = (
           PushCutGroup => [m => 'Void'],
           PopCutGroup  => [m => 'Void'],
           GetCursorList=> [m => 'Variable'],
+          GetCursorIter=> [m => 'VarDeque'],
           SetCursorList=> [m => 'Void'],
           LTMPushAlts  => [m => 'Void'],
           PushCapture  => [m => 'Void'],
