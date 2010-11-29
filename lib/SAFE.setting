@@ -875,7 +875,7 @@ my class Cursor {
         my $*HIGHEXPECT = {};
         try {
             my $ret = first($rx(self));
-            if ($ret) { return $ret }
+            if ($ret) { return self }
         };
         return ();
     }

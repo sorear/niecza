@@ -2,24 +2,6 @@
 use Test;
 use MONKEY_TYPING;
 
-augment class Cursor {
-    method suppose($rx) {
-        my $*IN_SUPPOSE = True;
-        my $*FATALS = 0;
-        my @*WORRIES;
-        my %*WORRIES;
-        my $*HIGHWATER = -1;
-        my $*HIGHEXPECT = {};
-        try {
-            my $ret = first($rx(self));
-            if ($ret) { return self }
-        };
-        return ();
-    }
-}
-
-    ok "foo" !~~ / f <.suppose { die }> /, ".suppose works (F)";
-    ok "foo" ~~ / f <.suppose o> oo /, ".suppose works (T)";
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
