@@ -136,6 +136,15 @@ sub RxOp::Sigspace::mayback { my ($self) = @_;
     return !$self->selfcut;
 }
 
+sub RxOp::Cut::mayback { 0 }
+sub RxOp::VoidBlock::mayback { 0 }
+sub RxOp::CheckBlock::mayback { 0 }
+sub RxOp::Sym::mayback { 0 }
+sub RxOp::VarString::mayback { 0 }
+sub RxOp::ConfineLang::mayback { $_[0]->zyg->[0]->mayback }
+sub RxOp::AfterCCs::mayback { 0 }
+sub RxOp::SaveValue::mayback { 0 }
+sub RxOp::Statement::mayback { 0 }
 sub RxOp::String::mayback { 0 }
 sub RxOp::Any::mayback { 0 }
 sub RxOp::None::mayback { 0 }

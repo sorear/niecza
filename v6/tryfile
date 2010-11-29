@@ -53,6 +53,36 @@ package Niecza {
 
 augment class STD {
     our $ALL;
+token ws {
+    :temp $*STUB = return self if @*MEMOS[self.pos]<ws> :exists;
+    :my $startpos = self.pos;
+
+    :dba('whitespace')
+    [ [
+        | \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+        | <?before \w> <?after \w> :::
+            { @*MEMOS[$startpos]<ws>:delete; }
+            <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
+    ]
+    ||
+    [
+    | <.unsp>
+    | <.vws> <.heredoc>
+    | <.unv>
+    # | $ { $¢.moreinput }  NIECZA break inf loop
+    ]* ]
+
+    {
+        if ($¢.pos == $startpos) {
+            @*MEMOS[$¢.pos]<ws>:delete;
+        }
+        else {
+            @*MEMOS[$¢.pos]<ws> = $startpos;
+            @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
+                if @*MEMOS[$startpos]<endstmt> :exists;
+        }
+    }
+}
 method lookup_dynvar($name) { Any } # NYI
 method check_old_cclass($text) { } # NYI
 method do_use($module,$args) {
