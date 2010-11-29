@@ -54,8 +54,9 @@ package Niecza {
 augment class STD {
     our $ALL;
 token ws {
-    :temp $*STUB = return self if @*MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
+    :my $startmemo = @*MEMOS[$startpos];
+    :my $stub = return self if $startmemo<ws> :exists; #OK
 
     :dba('whitespace')
     [ [
@@ -73,13 +74,14 @@ token ws {
     ]* ]
 
     {
-        if ($¢.pos == $startpos) {
-            @*MEMOS[$¢.pos]<ws>:delete;
+        my $pos = $¢.pos;
+        my $memo = @*MEMOS[$pos];
+        if ($pos == $startpos) {
+            $memo<ws>:delete;
         }
         else {
-            @*MEMOS[$¢.pos]<ws> = $startpos;
-            @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
-                if @*MEMOS[$startpos]<endstmt> :exists;
+            $memo<ws> = $startpos;
+            $memo<endstmt> = $startmemo<endstmt> if $startmemo<endstmt> :exists;
         }
     }
 }
