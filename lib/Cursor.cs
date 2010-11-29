@@ -1110,7 +1110,7 @@ public class LADParam : LAD {
             goto imp;
         }
 
-        string text = (string)Kernel.UnboxAny(i);
+        string text = Kernel.UnboxAny<string>(i);
         if (Lexer.LtmTrace)
             Console.WriteLine("Resolved {0} to \"{1}\"", name, text);
         return text;

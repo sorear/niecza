@@ -171,7 +171,7 @@ public class Builtins {
         string r1 = o1.mo.mro_raw_Str.Get(v1);
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
         int r3    = (int)o3.mo.mro_raw_Numeric.Get(v3);
-        return Kernel.BoxAnyMO(LaxSubstring2(r1, r2, r3), Kernel.StrMO);
+        return Kernel.BoxAnyMO<string>(LaxSubstring2(r1, r2, r3), Kernel.StrMO);
     }
 
     public static Variable Plus(Variable v1, Variable v2) {
@@ -179,7 +179,7 @@ public class Builtins {
         IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO(r1 + r2, Kernel.NumMO);
+        return Kernel.BoxAnyMO<double>(r1 + r2, Kernel.NumMO);
     }
 
     public static Variable Minus(Variable v1, Variable v2) {
@@ -187,7 +187,7 @@ public class Builtins {
         IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO(r1 - r2, Kernel.NumMO);
+        return Kernel.BoxAnyMO<double>(r1 - r2, Kernel.NumMO);
     }
 
     public static Variable Mul(Variable v1, Variable v2) {
@@ -195,7 +195,7 @@ public class Builtins {
         IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO(r1 * r2, Kernel.NumMO);
+        return Kernel.BoxAnyMO<double>(r1 * r2, Kernel.NumMO);
     }
 
     public static Variable Divide(Variable v1, Variable v2) {
@@ -203,14 +203,14 @@ public class Builtins {
         IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO(r1 / r2, Kernel.NumMO);
+        return Kernel.BoxAnyMO<double>(r1 / r2, Kernel.NumMO);
     }
 
     public static Variable PostIncrement(Variable v) {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double d = o1.mo.mro_raw_defined.Get(v) ?
             o1.mo.mro_raw_Numeric.Get(v) : 0;
-        AssignV(v, Kernel.BoxRaw(d + 1, Kernel.NumMO));
+        AssignV(v, Kernel.BoxRaw<double>(d + 1, Kernel.NumMO));
         return Kernel.NewROScalar(o1);
     }
 
@@ -229,31 +229,31 @@ public class Builtins {
     public static Variable Negate(Variable v) {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double r = o1.mo.mro_raw_Numeric.Get(v);
-        return Kernel.BoxAnyMO(-r, Kernel.NumMO);
+        return Kernel.BoxAnyMO<double>(-r, Kernel.NumMO);
     }
 
     public static VarDeque HashIterRaw(int mode, Variable v) {
         IP6 o = NominalCheck("$x", Kernel.AnyMO, v);
         Dictionary<string,Variable> d =
-            (Dictionary<string,Variable>) Kernel.UnboxAny(o);
+            Kernel.UnboxAny<Dictionary<string,Variable>>(o);
 
         VarDeque lv = new VarDeque();
 
         foreach (KeyValuePair<string,Variable> kv in d) {
             switch (mode) {
                 case 0:
-                    lv.Push(Kernel.BoxAnyMO(kv.Key, Kernel.StrMO));
+                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO));
                     break;
                 case 1:
                     lv.Push(kv.Value);
                     break;
                 case 2:
-                    lv.Push(Kernel.BoxAnyMO(kv.Key, Kernel.StrMO));
+                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO));
                     lv.Push(kv.Value);
                     break;
                 case 3:
                     DynObject p = new DynObject(Kernel.PairMO);
-                    p.slots[0] = Kernel.BoxAnyMO(kv.Key, Kernel.StrMO);
+                    p.slots[0] = Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO);
                     p.slots[1] = kv.Value;
                     lv.Push(Kernel.NewROScalar(p));
                     break;

@@ -137,8 +137,8 @@ namespace Niecza {
         string key;
         public HashViviHook(IP6 hash, string key) { this.hash = hash; this.key = key; }
         public override Frame Do(Frame th, Variable toviv) {
-            Dictionary<string,Variable> rh = (Dictionary<string,Variable>)
-                Kernel.UnboxAny(hash);
+            Dictionary<string,Variable> rh =
+                Kernel.UnboxAny<Dictionary<string,Variable>>(hash);
             rh[key] = toviv;
             return th;
         }
@@ -177,9 +177,7 @@ namespace Niecza {
         }
 
         public override IP6  GetVar()      {
-            DynObject d = new DynObject(Kernel.ScalarMO);
-            d.slots[0] = this;
-            return d;
+            return new BoxObject<SimpleVariable>(this, Kernel.ScalarMO);
         }
     }
 
@@ -483,7 +481,7 @@ namespace Niecza {
 
         public override T Get(Variable obj) {
             Variable v = (Variable)Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
-            return (T) Kernel.UnboxAny(v.Fetch());
+            return Kernel.UnboxAny<T>(v.Fetch());
         }
     }
 
@@ -498,7 +496,7 @@ namespace Niecza {
 
     class CtxJustUnbox<T> : ContextHandler<T> {
         public override T Get(Variable obj) {
-            return (T) Kernel.UnboxAny(obj.Fetch());
+            return Kernel.UnboxAny<T>(obj.Fetch());
         }
     }
 
@@ -516,13 +514,13 @@ namespace Niecza {
             this.box = box;
         }
         public override Variable Get(Variable obj) {
-            return Kernel.BoxAnyMO(inner.Get(obj), box);
+            return Kernel.BoxAnyMO<T>(inner.Get(obj), box);
         }
     }
 
     class CtxParcelIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
-            return new VarDeque((Variable[]) Kernel.UnboxAny(obj.Fetch()));
+            return new VarDeque(Kernel.UnboxAny<Variable[]>(obj.Fetch()));
         }
     }
 
@@ -555,13 +553,13 @@ namespace Niecza {
 
     class CtxRawNativeNum2Str : ContextHandler<string> {
         public override string Get(Variable obj) {
-            return ((double) Kernel.UnboxAny(obj.Fetch())).ToString();
+            return Kernel.UnboxAny<double>(obj.Fetch()).ToString();
         }
     }
 
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            return Kernel.BoxAnyMO(((double) Kernel.UnboxAny(obj.Fetch())).ToString(), Kernel.StrMO);
+            return Kernel.BoxAnyMO<string>(Kernel.UnboxAny<double>(obj.Fetch()).ToString(), Kernel.StrMO);
         }
     }
 
@@ -842,7 +840,7 @@ namespace Niecza {
 
         public DynObject(DynMetaObject klass) {
             this.mo = klass;
-            this.slots = new object[klass.nslots];
+            this.slots = (klass.nslots != 0) ? new object[klass.nslots] : null;
         }
 
         public override void SetSlot(string name, object obj) {
@@ -858,21 +856,18 @@ namespace Niecza {
         }
     }
 
+    public class BoxObject<T> : DynObject {
+        public T value;
+        public BoxObject(T x, DynMetaObject klass) : base(klass) { value = x; }
+    }
+
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
         public static DynBlockDelegate MainlineContinuation;
 
-        // Note: for classes without public .new, there's no way to get
-        // "interesting" user subclasses, so direct indexing is safe
-
-        public static object UnboxDO(DynObject o) {
-            return o.slots[0];
-        }
-
-        public static object UnboxAny(IP6 o) {
-            // TODO: Check for compatibility?
-            return UnboxDO((DynObject)o);
+        public static T UnboxAny<T>(IP6 o) {
+            return ((BoxObject<T>)o).value;
         }
 
         public static Stack<Frame> TakeReturnStack = new Stack<Frame>();
@@ -922,7 +917,7 @@ namespace Niecza {
 
         public static Frame Die(Frame caller, string msg) {
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
-                    BoxAnyMO(msg, StrMO));
+                    BoxAnyMO<string>(msg, StrMO));
         }
 
         public static Frame BindFail(Frame caller, string msg) {
@@ -1006,36 +1001,24 @@ namespace Niecza {
             return n;
         }
 
-        public static DynObject MockBox(object v) {
-            DynObject n = new DynObject(StrMO);
-            n.slots[0] = v;
-            return n;
-        }
-
-        public static Variable BoxAny(object v, IP6 proto) {
-            if (v == null)
-                return NewROScalar(proto);
+        public static Variable BoxAny<T>(T v, IP6 proto) {
             if (proto == BoolMO.typeObject)
-                return ((bool) v) ? TrueV : FalseV;
-            DynObject n = new DynObject(((DynObject)proto).mo);
-            n.slots[0] = v;
-            return NewROScalar(n);
+                return ((bool) (object) v) ? TrueV : FalseV;
+            return NewROScalar(new BoxObject<T>(v, ((DynObject)proto).mo));
         }
 
-        public static Variable BoxAnyMO(object v, DynMetaObject proto) {
-            if (v == null)
-                return NewROScalar(proto.typeObject);
+        public static void SetBox<T>(IP6 obj, T v) {
+            ((BoxObject<T>) obj).value = v;
+        }
+
+        public static Variable BoxAnyMO<T>(T v, DynMetaObject proto) {
             if (proto == BoolMO)
-                return ((bool) v) ? TrueV : FalseV;
-            DynObject n = new DynObject(proto);
-            n.slots[0] = v;
-            return NewROScalar(n);
+                return ((bool) (object) v) ? TrueV : FalseV;
+            return NewROScalar(new BoxObject<T>(v, proto));
         }
 
-        public static IP6 BoxRaw(object v, DynMetaObject proto) {
-            DynObject n = new DynObject(proto);
-            n.slots[0] = v;
-            return n;
+        public static IP6 BoxRaw<T>(T v, DynMetaObject proto) {
+            return new BoxObject<T>(v, proto);
         }
 
         // check whence before calling
@@ -1172,7 +1155,7 @@ namespace Niecza {
         public static Variable[] ArgsHelper() {
             List<Variable> lv = new List<Variable>();
             foreach (string s in commandArgs) {
-                lv.Add(BoxAnyMO(s, StrMO));
+                lv.Add(BoxAnyMO<string>(s, StrMO));
             }
             return lv.ToArray();
         }
@@ -1200,10 +1183,10 @@ namespace Niecza {
             name = name.Remove(1,1);
             BValue v;
 
-            if (((Dictionary<string,BValue>) UnboxAny(GlobalO))
+            if (UnboxAny<Dictionary<string,BValue>>(GlobalO)
                     .TryGetValue(name, out v)) {
                 return v.v;
-            } else if (((Dictionary<string,BValue>) UnboxAny(ProcessO))
+            } else if (UnboxAny<Dictionary<string,BValue>>(ProcessO)
                     .TryGetValue(name, out v)) {
                 return v.v;
             } else {
@@ -1371,7 +1354,7 @@ namespace Niecza {
                     return th.caller;
 
                 case 1:
-                    iter.UnshiftN((Variable[])UnboxAny(((Variable)th.resultSlot).Fetch()));
+                    iter.UnshiftN(UnboxAny<Variable[]>(((Variable)th.resultSlot).Fetch()));
                     goto case 0;
                 default:
                     return Die(th, "invalid IP");
@@ -1397,8 +1380,8 @@ slow:
         }
 
         public static BValue PackageLookup(IP6 parent, string name) {
-            Dictionary<string,BValue> stash = (Dictionary<string,BValue>)
-                UnboxAny(parent);
+            Dictionary<string,BValue> stash =
+                UnboxAny<Dictionary<string,BValue>>(parent);
             BValue v;
 
             if (stash.TryGetValue(name, out v)) {
@@ -1407,7 +1390,7 @@ slow:
                 Dictionary<string,BValue> newstash =
                     new Dictionary<string,BValue>();
                 newstash["PARENT::"] = new BValue(NewROScalar(parent));
-                return (stash[name] = new BValue(BoxAny(newstash,
+                return (stash[name] = new BValue(BoxAny<Dictionary<string,BValue>>(newstash,
                                 StashP)));
             } else if (name.StartsWith("@")) {
                 Variable n = RunInferior(ArrayP.InvokeMethod(GetInferiorRoot(),
@@ -1438,7 +1421,7 @@ slow:
                             IP6 obj = th.pos[i].Fetch();
                             to_pass[i-1] = NewROScalar(obj);
                             if (obj.mo == StrMO) {
-                                string p = (string)UnboxAny(obj);
+                                string p = UnboxAny<string>(obj);
                                 s += new string((char)p.Length, 1);
                                 s += p;
                             } else { cache_ok = false; }
@@ -1496,7 +1479,7 @@ slow:
                 n.AddMethod(kv.Key, kv.Value);
             n.Invalidate();
 
-            n.how = BoxAny(n, b.how).Fetch();
+            n.how = BoxAny<DynMetaObject>(n, b.how).Fetch();
             n.typeObject = new DynObject(n);
             ((DynObject)n.typeObject).slots = null;
 
@@ -1629,25 +1612,21 @@ slow:
             StrMO = new DynMetaObject("Str");
             StrMO.loc_Str = new CtxReturnSelf();
             StrMO.loc_raw_Str = new CtxJustUnbox<string>();
-            StrMO.FillProtoClass(new string[] { "value" });
+            StrMO.FillProtoClass(new string[] { });
 
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
             BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
-            BoolMO.FillProtoClass(new string[] { "value" });
-            DynObject TrueO = new DynObject(BoolMO);
-            DynObject FalseO = new DynObject(BoolMO);
-            TrueO.slots[0] = true;
-            FalseO.slots[0] = false;
-            TrueV = NewROScalar(TrueO);
-            FalseV = NewROScalar(FalseO);
+            BoolMO.FillProtoClass(new string[] { });
+            TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
+            FalseV = NewROScalar(BoxRaw<bool>(false, BoolMO));
 
             NumMO = new DynMetaObject("Num");
             NumMO.loc_Numeric = new CtxReturnSelf();
             NumMO.loc_raw_Numeric = new CtxJustUnbox<double>();
             NumMO.loc_Str = new CtxStrNativeNum2Str();
             NumMO.loc_raw_Str = new CtxRawNativeNum2Str();
-            NumMO.FillProtoClass(new string[] { "value" });
+            NumMO.FillProtoClass(new string[] { });
 
             MuMO = new DynMetaObject("Mu");
             MuMO.loc_Bool = MuMO.loc_defined = new CtxBoolNativeDefined();
@@ -1661,12 +1640,12 @@ slow:
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
-            StashMO.FillProtoClass(new string[] { "value" });
+            StashMO.FillProtoClass(new string[] { });
             StashP = new DynObject(StashMO);
 
             ParcelMO = new DynMetaObject("Parcel");
             ParcelMO.loc_raw_iterator = new CtxParcelIterator();
-            ParcelMO.FillProtoClass(new string[] { "value" });
+            ParcelMO.FillProtoClass(new string[] { });
 
             ArrayMO = new DynMetaObject("Array");
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
@@ -1677,7 +1656,7 @@ slow:
 
             HashMO = new DynMetaObject("Hash");
             HashMO.loc_raw_iterator = new CtxHashIterator();
-            HashMO.FillProtoClass(new string[] { "value" });
+            HashMO.FillProtoClass(new string[] { });
 
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
@@ -1686,7 +1665,7 @@ slow:
             SubMO.Invalidate();
 
             ScalarMO = new DynMetaObject("Scalar");
-            ScalarMO.FillProtoClass(new string[] { "value" });
+            ScalarMO.FillProtoClass(new string[] { });
         }
 
         public static Dictionary<string, int> usedNames = new Dictionary<string, int>();
@@ -1764,18 +1743,16 @@ slow:
 
             if (unf == null) {
                 Variable mp = (type == SubInfo.ON_DIE) ? ((Variable)payload) :
-                    BoxAnyMO("Unhandled control operator: " +
+                    BoxAnyMO<string>("Unhandled control operator: " +
                             SubInfo.DescribeControl(type, tgt, lid, name), StrMO);
                 if (in_unhandled != null) {
                     Console.Error.WriteLine("Double fault {0}", in_unhandled);
                     Environment.Exit(1);
                 }
                 in_unhandled = true;
-                DynObject dob = mp.Fetch() as DynObject;
-                if (dob != null && dob.slots.Length != 0 &&
-                        dob.slots[0] is string) {
-                    in_unhandled = dob.slots[0];
-                }
+                try {
+                    in_unhandled = UnboxAny<string>(mp.Fetch());
+                } catch (Exception) {}
                 Frame r = th.MakeChild(null, UnhandledSI);
                 r.lex0 = mp;
                 return r;
@@ -1793,7 +1770,7 @@ slow:
                             new Variable[1] { (Variable)th.lex0 }, null);
                 case 1:
                     Console.Error.WriteLine("Unhandled exception: {0}",
-                            (string) UnboxAny(((Variable)th.resultSlot).Fetch()));
+                            UnboxAny<string>(((Variable)th.resultSlot).Fetch()));
                     DoBacktrace(th.caller);
                     Environment.Exit(1);
                     return null;

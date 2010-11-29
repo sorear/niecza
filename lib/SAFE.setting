@@ -125,7 +125,6 @@ my class Capture {
 # }}}
 # Scalar types {{{
 my class Num is Cool {
-    has $!value;
     method Str () { Q:CgOp {
         (box Str (num_to_string (unbox num (@ {self}))))
     } }
@@ -138,7 +137,6 @@ my class Num is Cool {
 }
 
 my class Str is Cool {
-    has $!value;
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
     method Bool () { self ne "" }
@@ -153,7 +151,6 @@ my class Str is Cool {
 }
 
 my class Scalar {
-    has $!value;
 }
 
 my class Sub {
@@ -165,7 +162,6 @@ my class Sub {
 }
 
 my class ClassHOW {
-    has $!value;
     method isa($obj, $type) { Q:CgOp {
         (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))
     } }
@@ -174,7 +170,6 @@ my class ClassHOW {
 
 my class EnumType is Cool { }
 my class Bool is EnumType {
-    has $!value;
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Bool() { self }
     method ACCEPTS($) { self }
@@ -354,8 +349,6 @@ sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
 sub first(\$x) { for $x -> $elt { return $elt }; Any }
 
 my class Iterator {
-    has $!value; # is vvarlist
-
     method list () {
         Q:CgOp {
             (letn n (obj_newblank (class_ref mo List))
@@ -387,9 +380,6 @@ my class List { ... }
 my class Array { ... }
 
 my class Parcel is Cool {
-    has $!value;
-    # $!value -> Variable[]
-
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
 
@@ -656,7 +646,6 @@ my class Array is List {
 }
 
 my class Hash {
-    has $!value;
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
     method !extend($key, \$var) {
         Q:CgOp {
@@ -702,7 +691,7 @@ my class Hash {
                 (letn elt (vvarlist_shift (l iter))
                   (varhash_setindex (obj_getstr (methodcall (l elt) key))
                     (l into) (nsw (@ (methodcall (l elt) value))))))
-              (setslot value (l sobj) (l into))
+              (setbox (l sobj) (l into))
               (newrwlistvar (l sobj)))
         };
     }

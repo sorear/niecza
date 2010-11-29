@@ -31,11 +31,11 @@ public class JsyncWriter {
         } else if (obj.Isa(Kernel.HashMO)) {
             WriteHash(obj);
         } else if (obj.Isa(Kernel.BoolMO)) {
-            WriteBool((bool) Kernel.UnboxAny(obj));
+            WriteBool(Kernel.UnboxAny<bool>(obj));
         } else if (obj.Isa(Kernel.StrMO)) {
-            WriteStr(true, (string) Kernel.UnboxAny(obj));
+            WriteStr(true, Kernel.UnboxAny<string>(obj));
         } else if (obj.Isa(Kernel.NumMO)) {
-            WriteNum((double) Kernel.UnboxAny(obj));
+            WriteNum(Kernel.UnboxAny<double>(obj));
         } else {
             WriteGeneral(obj);
         }
@@ -65,8 +65,8 @@ public class JsyncWriter {
     void WriteHash(IP6 obj) {
         int a = nextanchor++;
         anchors[obj] = a;
-        Dictionary<string,Variable> entries = (Dictionary<string,Variable>)
-            Kernel.UnboxAny(obj);
+        Dictionary<string,Variable> entries =
+            Kernel.UnboxAny<Dictionary<string,Variable>>(obj);
         o.Append('{');
         contUsed = true;
         o.AppendFormat("\"&\":\"A{0}\"", a);
@@ -242,9 +242,8 @@ public class JsyncReader {
         ix++;
     }
 
-    static Variable BoxRW(object o, DynMetaObject mo) {
-        DynObject dyo = new DynObject(mo);
-        dyo.slots[0] = o;
+    static Variable BoxRW<T>(T o, DynMetaObject mo) {
+        DynObject dyo = new BoxObject<T>(o, mo);
         return Kernel.NewRWScalar(Kernel.AnyMO, dyo);
     }
 
@@ -262,10 +261,10 @@ public class JsyncReader {
                 return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
             case 't':
                 SkipToken("true");
-                return BoxRW(true, Kernel.BoolMO);
+                return BoxRW<bool>(true, Kernel.BoolMO);
             case 'f':
                 SkipToken("false");
-                return BoxRW(false, Kernel.BoolMO);
+                return BoxRW<bool>(false, Kernel.BoolMO);
             default:
                 return GetFromNumber();
         }
@@ -410,12 +409,12 @@ public class JsyncReader {
 
     Variable ParseScalar() {
         if (s_tag == null) {
-            return BoxRW(s_content, Kernel.StrMO);
+            return BoxRW<string>(s_content, Kernel.StrMO);
         } else if (s_tag == "Num") {
             double r;
             if (!double.TryParse(s_content, out r))
                 Err("Num format error");
-            return BoxRW(r, Kernel.NumMO);
+            return BoxRW<double>(r, Kernel.NumMO);
         } else {
             Err("Unhandled scalar tag " + s_tag);
             return null;
@@ -589,7 +588,7 @@ public class JsyncReader {
             }
             obj = Kernel.NewRWScalar(Kernel.AnyMO, dyo);
         } else {
-            obj = BoxRW(zyg, Kernel.HashMO);
+            obj = BoxRW<Dictionary<string,Variable>>(zyg, Kernel.HashMO);
         }
         if (h_anchor != null)
             AddAnchor(h_anchor, obj.Fetch());

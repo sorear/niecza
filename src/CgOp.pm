@@ -63,6 +63,7 @@ use warnings;
     sub getslot { cast($_[1], rawcall($_[2], 'GetSlot', _str($_[0]))); }
 
     sub setslot { rawcall($_[1], 'SetSlot', _str($_[0]), $_[2]); }
+    sub setbox  { rawscall('Kernel.SetBox:m,Void', $_[0], $_[1]); }
 
     sub cast {
         CgOp->new(op => [ 'cast', CLRTypes->mapt($_[0]) ], zyg => [ $_[1] ]);
@@ -95,7 +96,8 @@ use warnings;
     sub bool { CgOp->new(op => [ 'clr_bool', $_[0] ]); }
 
     sub unbox {
-        cast($_[0], rawscall('Kernel.UnboxAny', $_[1]));
+        my $t = CLRTypes->mapt($_[0]);
+        rawscall("Kernel.UnboxAny<$t>:m,$t", $_[1]);
     }
 
     # begin smarter constructors

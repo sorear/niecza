@@ -7,12 +7,14 @@ sub slurp($path) { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
 sub spew($path,$text) { Q:CgOp { (rnull (spew (unbox str (@ {$path.Str})) (unbox str (@ {$text.Str})))) } }
 
 my class IO is Cool {
-    has $!value;
 }
 
 my class TextReader is IO {
     method get() {
-        Q:CgOp { (box Str (treader_getline (unbox treader (@ {self})))) }
+        Q:CgOp {
+            (letn line (treader_getline (unbox treader (@ {self})))
+              (ternary (== (l line) (null str)) {Str} (box Str (l line))))
+        };
     }
 
     method slurp() {
