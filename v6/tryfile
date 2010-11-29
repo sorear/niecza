@@ -17,6 +17,28 @@ sub _subst($M is rw, $text is rw, $regex, $repl) {
     ?$M;
 }
 
+augment class Regex {
+    method ACCEPTS($st) {
+        Q:CgOp {
+            (letn ix   (i 0)
+                  str  (obj_getstr {$st})
+                  max  (str_length (l str))
+                  incr (cursor_start (@ {Cursor}) (l str))
+                  csr  (null cursor)
+                  iter (null vvarlist)
+              (whileloop 0 0 (<= (l ix) (l max)) (prog
+                (l csr (cursor_butpos (l incr) (l ix)))
+                (l ix (+ (l ix) (i 1)))
+                (l iter (vvarlist_new_singleton
+                    (subcall (@ {self}) (ns (l csr)))))
+                (ternary (iter_hasflat (l iter))
+                  (return (newrwlistvar (@ (vvarlist_shift (l iter)))))
+                  (prog))))
+              {Any})
+        };
+    }
+}
+
 augment class Cool {
     method lc() { Q:CgOp { (box Str (str_tolower (unbox str (@ {self.Str})))) }}
     method uc() { Q:CgOp { (box Str (str_toupper (unbox str (@ {self.Str})))) }}
