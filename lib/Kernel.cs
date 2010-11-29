@@ -482,9 +482,7 @@ namespace Niecza {
         public CtxCallMethodUnbox(string method) { this.method = method; }
 
         public override T Get(Variable obj) {
-            Frame nr = new Frame(null, null, Kernel.ExitRunloopSI);
-            Kernel.RunCore(obj.Fetch().InvokeMethod(nr, method, new Variable[] { obj }, null));
-            Variable v = (Variable) nr.resultSlot;
+            Variable v = (Variable)Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
             return (T) Kernel.UnboxAny(v.Fetch());
         }
     }
@@ -494,10 +492,7 @@ namespace Niecza {
         public CtxCallMethod(string method) { this.method = method; }
 
         public override Variable Get(Variable obj) {
-            Frame nr = new Frame(null, null, Kernel.ExitRunloopSI);
-            Kernel.RunCore(obj.Fetch().InvokeMethod(nr, method, new Variable[] { obj }, null));
-            Variable v = (Variable) nr.resultSlot;
-            return v;
+            return (Variable)Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
         }
     }
 
@@ -1185,11 +1180,9 @@ namespace Niecza {
         public static VarDeque SortHelper(Frame th, IP6 cb, VarDeque from) {
             Variable[] tmp = from.CopyAsArray();
             Array.Sort(tmp, delegate (Variable v1, Variable v2) {
-                Frame end  = th.MakeChild(null, ExitRunloopSI);
-                Frame call = cb.Invoke(end, new Variable[] { v1, v2 }, null);
-                RunCore(call);
-                return (int)(double)UnboxAny(
-                    ((Variable)end.resultSlot).Fetch());
+                Variable v = RunInferior(cb.Invoke(GetInferiorRoot(),
+                        new Variable[] { v1, v2 }, null));
+                return (int)v.Fetch().mo.mro_raw_Numeric.Get(v);
             });
             return new VarDeque(tmp);
         }
@@ -1417,15 +1410,15 @@ slow:
                 return (stash[name] = new BValue(BoxAny(newstash,
                                 StashP)));
             } else if (name.StartsWith("@")) {
-                Frame nr = new Frame(null, null, ExitRunloopSI);
-                nr = ArrayP.InvokeMethod(nr, "new", new Variable[] { Kernel.NewROScalar(ArrayP) }, null);
-                RunCore(nr);
-                return (stash[name] = new BValue((Variable)nr.caller.resultSlot));
+                Variable n = RunInferior(ArrayP.InvokeMethod(GetInferiorRoot(),
+                            "new", new Variable[] {Kernel.NewROScalar(ArrayP)},
+                            null));
+                return (stash[name] = new BValue(n));
             } else if (name.StartsWith("%")) {
-                Frame nr = new Frame(null, null, ExitRunloopSI);
-                nr = HashP.InvokeMethod(nr, "new", new Variable[] { Kernel.NewROScalar(HashP) }, null);
-                RunCore(nr);
-                return (stash[name] = new BValue((Variable)nr.caller.resultSlot));
+                Variable n = RunInferior(HashP.InvokeMethod(GetInferiorRoot(),
+                            "new", new Variable[] {Kernel.NewROScalar(HashP)},
+                            null));
+                return (stash[name] = new BValue(n));
             } else {
                 // TODO: @foo, %foo
                 return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
@@ -1576,6 +1569,7 @@ slow:
             }
         }
 
+        [ThreadStatic] private static Frame lastFrame;
         public static void RunCore(Frame cur) {
             for(;;) {
                 try {
@@ -1583,18 +1577,32 @@ slow:
                         for(;;) {
                             if (--TraceCount == 0)
                                 DoTrace(cur);
-                            cur = cur.code(cur);
+                            lastFrame = cur = cur.code(cur);
                         }
                     } else {
                         for(;;)
-                            cur = cur.code(cur);
+                            lastFrame = cur = cur.code(cur);
                     }
                 } catch (ExitRunloopException) {
                     return;
                 } catch (Exception ex) {
-                    cur = Kernel.Die(cur, ex.ToString());
+                    lastFrame = cur = Kernel.Die(cur, ex.ToString());
                 }
             }
+        }
+
+        public static Frame GetInferiorRoot() {
+            Frame l = lastFrame;
+            return (l == null ? new Frame(null, null, ExitRunloopSI)
+                    : l.MakeChild(null, ExitRunloopSI));
+        }
+
+        public static Variable RunInferior(Frame f) {
+            RunCore(f);
+            Frame l = lastFrame;
+            object r = l.resultSlot;
+            lastFrame = l.caller;
+            return (Variable)r;
         }
 
         public static void AddCap(List<Variable> p,

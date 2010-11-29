@@ -49,9 +49,8 @@ public class JsyncWriter {
     void WriteArray(IP6 obj) {
         int a = nextanchor++;
         anchors[obj] = a;
-        Frame nr = new Frame(null, null, Kernel.ExitRunloopSI);
-        nr = obj.InvokeMethod(nr, "eager", new Variable[] { Kernel.NewROScalar(obj) }, null);
-        Kernel.RunCore(nr);
+        Kernel.RunInferior(obj.InvokeMethod(Kernel.GetInferiorRoot(), "eager",
+                new Variable[] { Kernel.NewROScalar(obj) }, null));
 
         o.AppendFormat("[\"&A{0}\"", a);
         contUsed = true;

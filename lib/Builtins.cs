@@ -18,9 +18,9 @@ public class Builtins {
 
             lhs.Store(rhs);
         } else {
-            Frame n = new Frame(null, null, Kernel.ExitRunloopSI).MakeChild(null, Kernel.AssignSI);
+            Frame n = Kernel.GetInferiorRoot().MakeChild(null, Kernel.AssignSI);
             n.pos = new Variable[2] { lhs, Kernel.NewROScalar(rhs) };
-            Kernel.RunCore(n);
+            Kernel.RunInferior(n);
         }
     }
 
