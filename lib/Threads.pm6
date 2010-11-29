@@ -24,7 +24,7 @@ sub lock($m,$f) is export { $m.lock($f); }
 my class Thread is export {
     has $!value;
     method new($func) {
-        Q:CgOp { (box Thread (rawscall
+        Q:CgOp { (box (@ {Thread}) (rawscall
             Kernel.StartP6Thread:c,System.Threading.Thread (@ {$func}))) }
     }
 
