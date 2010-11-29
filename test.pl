@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 649;
+plan 663;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1341,4 +1341,41 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
     ok (X but OUR::Stop4717["foobar"]).parse("foobarx"),
         "LTM works through parameterized role variables";
+}
+
+{
+    our role R5634[$x] {
+        regex ::($x) { foo }
+    }
+
+    ok (Grammar but OUR::R5634["TOP"]).parse("foo"), "roles with dynamic regex names work";
+
+    my $M;
+    my $t;
+    $M = ("a()" ~~ / <alpha> '(' ~ ')' { $t = $<alpha>.Str } /);
+    is $t, "a", "Inside of ~ can see captures";
+    $M = ("(a)" ~~ / '(' ~ ')' <alpha> /);
+    is $M<alpha>, "a", "Captures can escape from ~";
+
+    my $died = 1;
+    try { $*NONEX = 1; $died = 0; }
+    ok $died, "Assignment to non-existing dynvar fails";
+
+    is "foo".substr(5,2), "", "substr starting off end works";
+    is "foo".substr(1,10), "oo", "substr ending off end works";
+
+    rxtest /:i "abc"/, ':i "abc"',
+        ("abc","aBc","ABC"),("cba","ab");
+
+    my grammar G {
+        proto token TOP {*}
+        token TOP:foo { :i <sym> }
+    }
+
+    ok G.parse("fOo"), ":i <sym> works";
+
+    my %h; %h<used>++;
+    is %h<used>, 1, "autoviv works with ++";
+
+    is ((anon method retme ($x:) { $x })(53)), 53, "method definitions with explicit invocants work";
 }

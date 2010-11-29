@@ -98,6 +98,9 @@ my class Cool {
     method say() { self.Str.say }
     method chars() { chars(self) }
     method substr($x,$y) { substr(self,$x,$y) }
+    method lc() { Q:CgOp { (box Str (str_tolower (obj_getstr {self.Str}))) }}
+    method uc() { Q:CgOp { (box Str (str_toupper (obj_getstr {self.Str}))) }}
+
 
     method at-pos(\$self: $ix) {
         defined($self)
@@ -269,6 +272,8 @@ sub infix:<le>($s1, $s2) { $s1 le $s2 }
 sub infix:<lt>($s1, $s2) { $s1 lt $s2 }
 sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
 sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
+sub lc($s) { (~$s).lc }
+sub uc($s) { (~$s).uc }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
@@ -603,14 +608,18 @@ my class List is Cool {
 }
 
 my class Array is List {
-    method LISTSTORE(*@in) {
-        # fetch everything NOW in case self is mentioned
-        my $inn = @in.eager.iterator;
-
-        Q:CgOp { (rnull
-            (setslot items (@ {self}) (iter_copy_elems (unbox vvarlist (@ {$inn})))))
+    method LISTSTORE(\$in) {
+        Q:CgOp {
+            (letn iter (vvarlist_new_empty)
+                  into (vvarlist_new_empty)
+                  sobj (@ {self})
+              (vvarlist_push (l iter) {$in})
+              (whileloop 0 0 (iter_hasflat (l iter))
+                (vvarlist_push (l into) (vvarlist_shift (l iter))))
+              (setslot items (l sobj) (iter_copy_elems (l into)))
+              (setslot rest  (l sobj) (l iter))
+              (newrwlistvar (l sobj)))
         };
-        unitem(self);
     }
 
     method !extend($ix, \$var) {
@@ -683,14 +692,19 @@ my class Hash {
         %new
     }
 
-    method LISTSTORE(*@in) {
-        my @r := @in.eager.Seq;
-
-        Q:CgOp { (rnull (varhash_clear (unbox varhash (@ {self})))) };
-
-        for @r -> $p { self.{$p.key} = $p.value }
-
-        unitem(self);
+    method LISTSTORE(\$in) {
+        Q:CgOp {
+            (letn iter (vvarlist_new_empty)
+                  into (varhash_new)
+                  sobj (@ {self})
+              (vvarlist_push (l iter) {$in})
+              (whileloop 0 0 (iter_hasflat (l iter))
+                (letn elt (vvarlist_shift (l iter))
+                  (varhash_setindex (obj_getstr (methodcall (l elt) key))
+                    (l into) (nsw (@ (methodcall (l elt) value))))))
+              (setslot value (l sobj) (l into))
+              (newrwlistvar (l sobj)))
+        };
     }
 
     method exists-key($str) {
@@ -860,8 +874,8 @@ my class Cursor {
         my $*HIGHWATER = -1;
         my $*HIGHEXPECT = {};
         try {
-            my @ret := $rx(self);
-            if (@ret) { return @( &infix:<,>(self) ) }
+            my $ret = first($rx(self));
+            if ($ret) { return $ret }
         };
         return ();
     }
@@ -943,15 +957,36 @@ my class Match is Cool {
 
 my class Regex is Sub {
     method ACCEPTS($st) {
-        my $i = 0;
-        my $str = $st.Str;
-        my $mat;
-        my $C = Cursor.new($str);
-        while !$mat && ($i <= $str.chars) {
-            $mat = first((self)($C.cursor($i++)));
-        }
-        $mat ?? unitem($mat) !! Any;
+        Q:CgOp {
+            (letn ix   (i 0)
+                  str  (obj_getstr {$st})
+                  max  (str_length (l str))
+                  incr (cursor_start (@ {Cursor}) (l str))
+                  csr  (null cursor)
+                  iter (null vvarlist)
+              (whileloop 0 0 (<= (l ix) (l max)) (prog
+                (l csr (cursor_butpos (l incr) (l ix)))
+                (l ix (+ (l ix) (i 1)))
+                (l iter (vvarlist_new_singleton
+                    (subcall (@ {self}) (ns (l csr)))))
+                (ternary (iter_hasflat (l iter))
+                  (return (newrwlistvar (@ (vvarlist_shift (l iter)))))
+                  (prog))))
+              {Any})
+        };
     }
+}
+
+# used in a few parts of STD until s/// is working
+sub _subst($M is rw, $text is rw, $regex, $repl) {
+    $text = $text.Str;
+    $M = ($text ~~ $regex);
+    if $M {
+        $text = $text.substr(0, $M.from) ~
+            (($repl ~~ Str) ?? $repl !! $repl()) ~
+                $text.substr($M.to, ($text.chars - $M.to));
+    }
+    ?$M;
 }
 
 my class Grammar is Cursor {

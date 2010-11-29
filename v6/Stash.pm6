@@ -12,6 +12,7 @@ class Stash { # does Associative
     method keys() { $!guts.keys }
     method list() { $!guts.list }
     method flat() { $!guts.flat }
+    method iterator () { self.list.iterator }
 
     method at-key($str) { $!guts.at-key($str) }
     method exists-key($str) { $!guts.exists-key($str) }

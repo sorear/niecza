@@ -2,42 +2,24 @@
 use Test;
 use MONKEY_TYPING;
 
-{
-    our role R5634[$x] {
-        regex ::($x) { foo }
+augment class Cursor {
+    method suppose($rx) {
+        my $*IN_SUPPOSE = True;
+        my $*FATALS = 0;
+        my @*WORRIES;
+        my %*WORRIES;
+        my $*HIGHWATER = -1;
+        my $*HIGHEXPECT = {};
+        try {
+            my $ret = first($rx(self));
+            if ($ret) { return self }
+        };
+        return ();
     }
-
-    ok (Grammar but OUR::R5634["TOP"]).parse("foo"), "roles with dynamic regex names work";
-
-    my $M;
-    my $t;
-    $M = ("a()" ~~ / <alpha> '(' ~ ')' { $t = $<alpha>.Str } /);
-    is $t, "a", "Inside of ~ can see captures";
-    $M = ("(a)" ~~ / '(' ~ ')' <alpha> /);
-    is $M<alpha>, "a", "Captures can escape from ~";
-
-    my $died = 1;
-    try { $*NONEX = 1; $died = 0; }
-    ok $died, "Assignment to non-existing dynvar fails";
-
-    is "foo".substr(5,2), "", "substr starting off end works";
-    is "foo".substr(1,10), "oo", "substr ending off end works";
-
-    rxtest /:i "abc"/, ':i "abc"',
-        ("abc","aBc","ABC"),("cba","ab");
-
-    my grammar G {
-        proto token TOP {*}
-        token TOP:foo { :i <sym> }
-    }
-
-    ok G.parse("fOo"), ":i <sym> works";
-
-    my %h; %h<used>++;
-    is %h<used>, 1, "autoviv works with ++";
-
-    is ((anon method retme ($x:) { $x })(53)), 53, "method definitions with explicit invocants work";
 }
+
+    ok "foo" !~~ / f <.suppose { die }> /, ".suppose works (F)";
+    ok "foo" ~~ / f <.suppose o> oo /, ".suppose works (T)";
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

@@ -824,7 +824,6 @@ token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
 token ws {
     :temp $*STUB = return self if @*MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
-    :my $*HIGHEXPECT = {};
 
     :dba('whitespace')
     [
@@ -1355,7 +1354,7 @@ grammar P6 is STD {
                 [
                 | <statement_mod_loop>
                     {{
-                        my $sp = $<EXPR><statement_prefix>;
+                        my $sp = $<EXPR><root><statement_prefix>;
                         if $sp and $sp<sym> eq 'do' {
                            my $s = $<statement_mod_loop>[0]<sym>;
                            $¢.obs("do...$s" ,"repeat...$s");
@@ -1865,7 +1864,7 @@ grammar P6 is STD {
     method checkyada {
         try {
             my $statements = self.<blockoid><statementlist><statement>;
-            my $startsym = $statements[0]<EXPR><sym> // '';
+            my $startsym = $statements[0]<EXPR><root><sym> // '';
             if $startsym eq '...' { $*DECLARAND<stub> = 1 }
             elsif $startsym eq '!!!' { $*DECLARAND<stub> = 1 }
             elsif $startsym eq '???' { $*DECLARAND<stub> = 1 }
@@ -2869,7 +2868,7 @@ grammar P6 is STD {
                 my $twigil = '';
                 $twigil = $t.[0].Str if @$t;
                 $vname ~= $twigil;
-                my $n = try { $<name>[0].Str } // '';
+                my $n = ($<name>[0] // '').Str;
                 $vname ~= $n;
                 if $twigil eq '' {
                     self.add_my_name($vname) if $n ne '';
@@ -3290,21 +3289,25 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
 
     token infix_prefix_meta_operator:sym<X> {
         :my %subO;
-        <sym> <?before \S> {}
+        :my $sym = 'X';
+        X <?before \S> {}
         [ <infixish('X')>
             <.can_meta($<infixish>[0], "cross with")>
-            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $<sym> ~= $<infixish>[0].Str }
+            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $sym ~= $<infixish>[0].Str }
         ]?
+        $<sym> = {$sym}
         <O(|%list_infix, |%subO)>
     }
 
     token infix_prefix_meta_operator:sym<Z> {
         :my %subO;
-        <sym> <?before \S> {}
+        :my $sym = 'Z';
+        Z <?before \S> {}
         [ <infixish('Z')>
             <.can_meta($<infixish>[0], "zip with")>
-            { %subO = %( $<infixish><O> ); %subO<prec>:delete; $<sym> ~= $<infixish>[0].Str }
+            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $sym ~= $<infixish>[0].Str }
         ]?
+        $<sym> = {$sym}
         <O(|%list_infix, |%subO)>
     }
 
@@ -3418,11 +3421,11 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         [
         | <?stdstopper>
         | <EXPR(item %list_prefix)> {{
-                my $delims = $<EXPR><delims>;
+                my $delims = $<EXPR><root><delims>;
                 for @$delims -> $d {
                     if $d.<infix><wascolon> // '' {
                         if $inv_ok {
-                            $*INVOCANT_IS = $<EXPR><list>[0];
+                            $*INVOCANT_IS = $<EXPR><root><list>[0];
                         }
                     }
                 }
@@ -4891,7 +4894,7 @@ method getsig {
     if ($*DECLARAND<mult>//'') ne 'proto' {
         for keys %$*CURLEX {
             my $desc = $*CURLEX{$_};
-            next unless $_ ~~ /(\$|\@|\%|\&)\w/;
+            next unless $_ ~~ /<[\$\@\%\&]>\w/;
             next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
             next if $desc<used>;
             next if $desc<rebind>;
@@ -5473,19 +5476,19 @@ method add_placeholder($name) {
     }
 
     my $varname = $name;
-    my $twigil;
+    my $twigil = '';
     my $signame;
-    my @r = ($varname ~~ /(.*?)(<[ ^ : ]>?)(.*)/);
-    $twigil = @r[1];
-    $signame = @r[1] eq ':' ?? ':' !! '';
-    $varname = @r[0] ~ @r[2];
-    $signame ~= $varname;
+    my $M;
+    if _subst($M, $varname, /<[ ^ : ]>/, "") {
+        $twigil = $M.Str;
+        $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
+    }
     return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
 
     if $*CURLEX{$varname} {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
- 
+
     self.add_my_name($varname);
     $*CURLEX{$varname}<used> = 1;
     self;
@@ -5734,7 +5737,7 @@ method EXPR ($preclvl?) {
 #           self.deb(_top(@termstack).dump) if $DEBUG::EXPR;
             my $ck;
             if $ck = $op<O><_reducecheck> {
-                _top(@termstack) = $ck(_top(@termstack));
+                _top(@termstack) = $ck(self,_top(@termstack));
             }
         }
     }
@@ -5744,12 +5747,12 @@ method EXPR ($preclvl?) {
         $here.deb("Top of opstack is ", _top(@opstack).dump) if $DEBUG::EXPR;
         $*LEFTSIGIL = _top(@opstack)<O><prec> gt $item_assignment_prec
             ?? '@' !! '';     # XXX P6
-        my ($term) =
+        my $term = first(
             ($termish eq 'termish') ?? $here.termish !!
             ($termish eq 'nulltermish') ?? $here.nulltermish !!
             ($termish eq 'statement') ?? $here.statement !!
             ($termish eq 'dottyopish') ?? $here.dottyopish !!
-            die "weird value of $termish";
+            die "weird value of $termish");
 
         if not $term {
             $here.deb("Didn't find it") if $DEBUG::EXPR;
@@ -5797,10 +5800,18 @@ method EXPR ($preclvl?) {
     sub infixstate() { #OK
         $here.deb("Looking for an infix") if $DEBUG::EXPR;
         return 1 if (@*MEMOS[$here.pos]<endstmt> // 0) == 2;  # XXX P6
-        my ($ws) = $here.ws;
+        # If this isn't here, then "$foo.method" will try to parse
+        # .method as an infix, and panic.  No infix operator is
+        # tighter than this anyhow.
+        if $preclim ge $methodcall_prec {
+            $here.deb("Aborting; interpolational context") if $DEBUG::EXPR;
+            return 1;
+        }
+        my $ws = first($here.ws);
         $here = $here.cursor($ws.to);
-        my ($infix) = $here.infixish;
+        my $infix = first($here.infixish);
         return 1 unless $infix;
+        $here.deb("Got one! " ~ $infix<sym>) if $DEBUG::EXPR;
 
         my $inO = $infix<O>;
         my $inprec = $inO<prec>;
@@ -5808,7 +5819,8 @@ method EXPR ($preclvl?) {
             die "No prec given in infix!";
         }
 
-        if $inprec le $preclim {
+        if $inprec lt $preclim {
+            $here.deb("Precedence $inprec of operator is too low for $preclim context") if $DEBUG::EXPR;
             if $preclim ne $LOOSEST {
                 my $dba = $*prevlevel.<dba>;
                 my $h = $*HIGHEXPECT;
@@ -5819,7 +5831,7 @@ method EXPR ($preclvl?) {
         }
 
         $here = $here.cursor($infix.to);
-        ($ws,) = $here.ws;
+        $ws   = first($here.ws);
         $here = $here.cursor($ws.to);
 
         # substitute precedence for listops
@@ -6082,7 +6094,19 @@ method add_categorical($name) {
     my $M = ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
     return self unless $M;
     my $cat = $M[0];
-    my $sym = substr($name, $M.to+1, $name.chars-$M.to-2);
+    my $sym = substr($name, $M.to);
+    if $sym ~~ /^\<\< .*: <?after \>\>>$/ {
+        $sym = substr($sym, 2, $sym.chars - 4);
+    }
+    elsif $sym ~~ /^\< .*: <?after \>>$/ {
+        $sym = substr($sym, 1, $sym.chars - 2);
+    }
+    elsif $sym ~~ /^\« .*: <?after \»>$/ {
+        $sym = substr($sym, 1, $sym.chars - 2);
+    }
+
+    _subst($M, $sym, /^\s*/, "");
+    _subst($M, $sym, /\s*$/, "");
 
     my $O;
 
@@ -6113,8 +6137,8 @@ method add_categorical($name) {
 }
 
 method add_enum($type,$expr) {
-    return unless $type;
-    return unless $expr;
+    return self unless $type;
+    return self unless $expr;
     my $typename = $type.Str;
     my $*IN_DECL ::= 'constant';
     # XXX complete kludge, really need to eval EXPR
@@ -6129,8 +6153,8 @@ method add_enum($type,$expr) {
 method canonicalize_name($n) {
     my $M;
     my $name = $n;
-    if $M = $name ~~ /^(< $ @ % & >)( \^ || \: <!before \:> )(.*)/ {
-        $name = $M[0] ~ $M[2];
+    if $M = first(/(< $ @ % & >)( \^ || \: <!before \:> )/(Cursor.new($name))) {
+        $name = $M[0] ~ substr($name, $M.to);
     }
     if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {
         $name = $name.substr(0, $name.chars - 2);
@@ -6138,13 +6162,13 @@ method canonicalize_name($n) {
     return $name unless $name ~~ /::/;
     self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
 
-    if $M = $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::') (.*) $/ {
-        $name = $M[1] ~ "<" ~ $M[0] ~ $M[2] ~ ">";
+    if $M = $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
+        $name = $M[1] ~ "<" ~ $M[0] ~ substr($name, $M.to) ~ ">";
     }
     my $vname;
-    if $M = $name ~~ /^(.*) '::<' (.*) '>' $/ {
-        $name = $M[0].Str;
-        $vname = $M[1].Str;
+    if ($M = $name ~~ /'::<'/) && $name.substr($name.chars - 1, 1) eq '>' {
+        $name = substr($name, 0, $M.from);
+        $vname = substr($name, $M.to, $name.chars - $M.to - 1);
     }
     my @components;
     while $M = $name ~~ / '::' / {
@@ -6154,7 +6178,10 @@ method canonicalize_name($n) {
     push @components, $name;
     shift(@components) while @components and @components[0] eq '';
     if (defined $vname) {
-        @components[+@components - 1] ~= '::' if @components and @components[+@components - 1] !~~ /\:\:$/;
+        if @components {
+            my $last := @components[+@components - 1];
+            $last ~= '::' if $last.chars < 2 || $last.substr($last.chars - 2, 2) ne '::';
+        }
         push(@components, $vname) if defined $vname;
     }
     @components;
@@ -6262,6 +6289,102 @@ method set_export($text) {
     $x{$textpkg}{$name} = $*DECLARAND;
     $x{$textpkg}{'&'~$name} = $*DECLARAND
             if $name ~~ /^\w/ and $*IN_DECL ne 'constant';
+    self;
+}
+
+# only used for error reporting
+method clean_id ($idx, $name) {
+    my $id = $idx;
+    my $file = $*FILE<name>;
+
+    $id ~= '::';
+    my $M;
+    _subst($id, $M, /^'MY:file<CORE.setting>'.*?'::'/, "CORE::");
+    _subst($id, $M, /^MY\:file\<\w+\.setting\>.*?\:\:/, "SETTING::");
+    _subst($id, $M, /^MY\:file\<$file\>$/, "UNIT");
+    _subst($id, $M, /\:pos\(\d+\)/, "");
+    $id ~= "<$name>";
+    $id;
+}
+
+class LABEL {
+    has $.file;
+    has $.pos;
+}
+
+method label_id() {
+    my $l = LABEL.new;
+    $l.pos = self.pos;
+    $l.file = $*FILE<name>;
+    $l;
+}
+
+method do_import($m, $args) { #, perl6.vim stupidity
+    my @imports;
+    my $module = $m.Str;
+    my $M;
+    if $M = ($module ~~ /(class|module|role|package)\s+(\S+)/) {
+        $module = $M[1];
+    }
+
+    my $pkg = self.find_stash($module);
+    if $pkg<really> {
+        $pkg = $pkg<really><UNIT>;
+    }
+    else {
+        $pkg = self.find_stash($module ~ '::');
+    }
+    if $args {
+        my $text = $args.Str;
+        return self unless $text;
+        while _subst($M, $text, /^\s*\:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?\<(.*?)\>\,?/, "") {
+            my $scope = lc($M[0] // 'my');
+            my $imports = $M[1].Str;
+            my $*SCOPE = $scope;
+            @imports = $imports.comb(/\S+/);
+            for @imports -> $i {
+                my $imp = $i;
+                if $pkg {
+                    if _subst($M, $imp, /^\:/, "") {
+                        my @tagimports;
+                        try { @tagimports = $pkg<EXPORT::>{$imp}.keys }
+                        self.do_import_aliases($pkg, @tagimports);
+                    }
+                    elsif $pkg{$imp}<export> {
+                        self.add_my_name($imp, $pkg{$imp});
+                    }
+                    elsif $pkg{'&'~$imp}<export> {
+                        $imp = '&' ~ $imp;
+                        self.add_my_name($imp, $pkg{$imp});
+                    }
+                    elsif $pkg{$imp} {
+                        self.worry("Can't import $imp because it's not exported by $module");
+                        next;
+                    }
+                }
+                else {
+                    self.add_my_name($imp);
+                }
+            }
+        }
+    }
+    else {
+        return self unless $pkg;
+        try { @imports = $pkg<EXPORT::><DEFAULT::>.keys };
+        my $*SCOPE = 'my';
+        self.do_import_aliases($pkg, @imports);
+    }
+
+    self;
+}
+method do_import_aliases($pkg, *@names) {
+#    say "attempting to import @names";
+    for @names -> $n {
+        next if $n ~~ /^\!/;
+        next if $n ~~ /^PARENT\:\:/;
+        next if $n ~~ /^OUTER\:\:/;
+        self.add_my_name($n, $pkg{$n});
+    }
     self;
 }
 
