@@ -232,7 +232,7 @@ public class Builtins {
         return Kernel.BoxAnyMO(-r, Kernel.NumMO);
     }
 
-    public static Variable HashIter(int mode, Variable v) {
+    public static VarDeque HashIterRaw(int mode, Variable v) {
         IP6 o = NominalCheck("$x", Kernel.AnyMO, v);
         Dictionary<string,Variable> d =
             (Dictionary<string,Variable>) Kernel.UnboxAny(o);
@@ -259,6 +259,10 @@ public class Builtins {
                     break;
             }
         }
+        return lv;
+    }
+    public static Variable HashIter(int mode, Variable v) {
+        VarDeque lv = HashIterRaw(mode, v);
         DynObject l = new DynObject(Kernel.ListMO);
         l.slots[0] = lv;
         l.slots[1] = new VarDeque();

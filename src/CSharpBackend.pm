@@ -169,6 +169,7 @@ sub stash3 {
 
 my %loopbacks = (
     'MAny', 'Kernel.AnyMO',
+    'MIterator', 'Kernel.IteratorMO',
     'MPair', 'Kernel.PairMO',
     'MCallFrame', 'Kernel.CallFrameMO',
     'MCapture', 'Kernel.CaptureMO',
@@ -238,7 +239,7 @@ sub pkg2_prole {
     create_type_object($_->{peer});
 }
 
-my %bootcl = (map { $_, 1 } qw/ Scalar Sub Stash Mu Str Bool Num Array Hash List /);
+my %bootcl = (map { $_, 1 } qw/ Scalar Sub Stash Mu Str Bool Num Array Hash List Parcel /);
 sub pkg2_class {
     my ($p, $wh6, $whv) = @_;
     my $punit = $unit->get_unit($_->xref->[0]);

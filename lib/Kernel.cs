@@ -513,6 +513,39 @@ namespace Niecza {
         }
     }
 
+    class CtxBoxify<T> : ContextHandler<Variable> {
+        ContextHandler<T> inner;
+        DynMetaObject box;
+        public CtxBoxify(ContextHandler<T> inner, DynMetaObject box) {
+            this.inner = inner;
+            this.box = box;
+        }
+        public override Variable Get(Variable obj) {
+            return Kernel.BoxAnyMO(inner.Get(obj), box);
+        }
+    }
+
+    class CtxParcelIterator : ContextHandler<VarDeque> {
+        public override VarDeque Get(Variable obj) {
+            return new VarDeque((Variable[]) Kernel.UnboxAny(obj.Fetch()));
+        }
+    }
+
+    class CtxListIterator : ContextHandler<VarDeque> {
+        public override VarDeque Get(Variable obj) {
+            DynObject d = (DynObject) obj.Fetch();
+            VarDeque r = new VarDeque( (VarDeque) d.slots[0] );
+            r.PushD((VarDeque) d.slots[1]);
+            return r;
+        }
+    }
+
+    class CtxHashIterator : ContextHandler<VarDeque> {
+        public override VarDeque Get(Variable obj) {
+            return Builtins.HashIterRaw(3, obj);
+        }
+    }
+
     class CtxRawNativeDefined : ContextHandler<bool> {
         public override bool Get(Variable obj) {
             return obj.Fetch().IsDefined();
@@ -548,6 +581,8 @@ namespace Niecza {
             = new CtxCallMethod("Numeric");
         public static readonly ContextHandler<Variable> CallDefined
             = new CtxCallMethod("defined");
+        public static readonly ContextHandler<Variable> CallIterator
+            = new CtxCallMethod("defined");
         public static readonly ContextHandler<string> RawCallStr
             = new CtxCallMethodUnbox<string>("Str");
         public static readonly ContextHandler<bool> RawCallBool
@@ -556,6 +591,8 @@ namespace Niecza {
             = new CtxCallMethodUnbox<double>("Numeric");
         public static readonly ContextHandler<bool> RawCallDefined
             = new CtxCallMethodUnbox<bool>("defined");
+        public static readonly ContextHandler<VarDeque> RawCallIterator
+            = new CtxCallMethodUnbox<VarDeque>("iterator");
 
         public IP6 how;
         public IP6 typeObject;
@@ -578,11 +615,13 @@ namespace Niecza {
                 Variable[] pos, Dictionary<string, Variable> named);
 
         public ContextHandler<Variable> mro_Str, loc_Str, mro_Numeric,
-                loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined;
+                loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined,
+                mro_iterator, loc_iterator;
         public ContextHandler<bool> mro_raw_Bool, loc_raw_Bool, mro_raw_defined,
                 loc_raw_defined;
         public ContextHandler<string> mro_raw_Str, loc_raw_Str;
         public ContextHandler<double> mro_raw_Numeric, loc_raw_Numeric;
+        public ContextHandler<VarDeque> mro_raw_iterator, loc_raw_iterator;
 
         public InvokeHandler OnInvoke;
 
@@ -658,6 +697,10 @@ namespace Niecza {
                         mro_defined = CallDefined;
                         mro_raw_defined = RawCallDefined;
                     }
+                    if (m.Key == "iterator") {
+                        mro_iterator = CallIterator;
+                        mro_raw_iterator = RawCallIterator;
+                    }
                 }
 
                 if (k.OnInvoke != null)
@@ -666,10 +709,12 @@ namespace Niecza {
                 if (k.loc_defined != null) mro_defined = k.loc_defined;
                 if (k.loc_Bool != null) mro_Bool = k.loc_Bool;
                 if (k.loc_Str != null) mro_Str = k.loc_Str;
+                if (k.loc_iterator != null) mro_iterator = k.loc_iterator;
                 if (k.loc_raw_Numeric != null) mro_raw_Numeric = k.loc_raw_Numeric;
                 if (k.loc_raw_defined != null) mro_raw_defined = k.loc_raw_defined;
                 if (k.loc_raw_Bool != null) mro_raw_Bool = k.loc_raw_Bool;
                 if (k.loc_raw_Str != null) mro_raw_Str = k.loc_raw_Str;
+                if (k.loc_raw_iterator != null) mro_raw_iterator = k.loc_raw_iterator;
             }
         }
 
@@ -933,6 +978,7 @@ namespace Niecza {
         public static DynMetaObject PairMO;
         public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
+        public static DynMetaObject IteratorMO;
         public static DynMetaObject GatherIteratorMO;
         public static DynMetaObject IterCursorMO;
         public static DynMetaObject MatchMO;
@@ -947,6 +993,7 @@ namespace Niecza {
         public static readonly DynMetaObject StrMO;
         public static readonly DynMetaObject NumMO;
         public static readonly DynMetaObject ArrayMO;
+        public static readonly DynMetaObject ParcelMO;
         public static readonly DynMetaObject ListMO;
         public static readonly DynMetaObject HashMO;
         public static readonly DynMetaObject BoolMO;
@@ -1245,12 +1292,13 @@ namespace Niecza {
                     inq0v = inq[0];
                     inq0 = inq0v.Fetch();
                     if (inq0v.islist) {
-                        th.ip = 1;
-                        return inq0.InvokeMethod(th, "iterator", new Variable[] { inq0v }, null);
+                        inq.Shift();
+                        inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
+                        goto case 0;
                     }
                     if (inq0.mo.HasMRO(IterCursorMO)) {
                         th.MarkSharedChain();
-                        th.ip = 2;
+                        th.ip = 1;
                         DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
                         thunk.slots[0] = NewRWScalar(AnyMO, th);
                         thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
@@ -1262,14 +1310,10 @@ namespace Niecza {
                     inq.Shift();
                     goto case 0;
                 case 1:
-                    inq.Shift();
-                    inq.UnshiftD((VarDeque) UnboxAny(((Variable) th.resultSlot).Fetch()));
-                    goto case 0;
-                case 2:
-                    th.ip = 3;
-                    return IterHasFlat(th, inq, true);
-                case 3:
                     th.ip = 2;
+                    return IterHasFlat(th, inq, true);
+                case 2:
+                    th.ip = 1;
                     if ((Boolean) th.resultSlot) {
                         return Take(th, inq.Shift());
                     } else {
@@ -1311,13 +1355,13 @@ namespace Niecza {
                     f = iter[0];
 
                     if (f.islist && flat) {
-                        th.ip = 1;
                         iter.Shift();
-                        return f.Fetch().InvokeMethod(th, "iterator", new Variable[] { f }, null);
+                        iter.UnshiftD(f.Fetch().mo.mro_raw_iterator.Get(f));
+                        goto case 0;
                     }
 
                     if ((ff = f.Fetch()).mo.HasMRO(IterCursorMO)) {
-                        th.ip = 2;
+                        th.ip = 1;
                         iter.Shift();
                         return ff.InvokeMethod(th, "reify", new Variable[] { f }, null);
                     }
@@ -1326,9 +1370,6 @@ namespace Niecza {
                     return th.caller;
 
                 case 1:
-                    iter.UnshiftD((VarDeque) UnboxAny(((Variable)th.resultSlot).Fetch()));
-                    goto case 0;
-                case 2:
                     iter.UnshiftN((Variable[])UnboxAny(((Variable)th.resultSlot).Fetch()));
                     goto case 0;
                 default:
@@ -1599,19 +1640,27 @@ slow:
             MuMO.loc_raw_Numeric = DynMetaObject.RawCallNumeric;
             MuMO.loc_Str = DynMetaObject.CallStr;
             MuMO.loc_raw_Str = DynMetaObject.RawCallStr;
+            MuMO.loc_iterator = DynMetaObject.CallIterator;
+            MuMO.loc_raw_iterator = DynMetaObject.RawCallIterator;
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
             StashMO.FillProtoClass(new string[] { "value" });
             StashP = new DynObject(StashMO);
 
+            ParcelMO = new DynMetaObject("Parcel");
+            ParcelMO.loc_raw_iterator = new CtxParcelIterator();
+            ParcelMO.FillProtoClass(new string[] { "value" });
+
             ArrayMO = new DynMetaObject("Array");
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
 
             ListMO = new DynMetaObject("List");
+            ListMO.loc_raw_iterator = new CtxListIterator();
             ListMO.FillProtoClass(new string[] { "items", "rest" });
 
             HashMO = new DynMetaObject("Hash");
+            HashMO.loc_raw_iterator = new CtxHashIterator();
             HashMO.FillProtoClass(new string[] { "value" });
 
             SubMO = new DynMetaObject("Sub");
