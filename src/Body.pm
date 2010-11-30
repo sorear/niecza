@@ -9,7 +9,7 @@ use CgOp ();
     package Body;
     use Moose;
 
-    has name      => (isa => 'Str', is => 'rw', default => "anon");
+    has name      => (isa => 'Str', is => 'rw', default => "ANON");
     has uid       => (isa => 'Int', is => 'ro', default => sub { ++(state $i) });
     has do        => (isa => 'Op', is => 'rw');
     has signature => (isa => 'Maybe[Sig]', is => 'rw');

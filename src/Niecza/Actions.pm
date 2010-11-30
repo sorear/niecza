@@ -2449,7 +2449,7 @@ sub package_def { my ($cl, $M) = @_;
     if ($scope eq 'augment') {
         my $stmts = $M->{statementlist} // $M->{blockoid};
         $stmts = $stmts->{_ast};
-        my $cbody = $cl->sl_to_block($blocktype, $stmts, name => $name, subname => "augment-" . $name // 'anon');
+        my $cbody = $cl->sl_to_block($blocktype, $stmts, name => $name, subname => "augment-" . $name // 'ANON');
 
         $M->{_ast} = Op::Augment->new(
             node($M),
@@ -2466,7 +2466,7 @@ sub package_def { my ($cl, $M) = @_;
                 $stmts->{_ast} ]);
 
         my $cbody = $cl->sl_to_block($blocktype, $stmts,
-            name => $name, subname => ($::PKGDECL . '-' . ($name // 'anon')));
+            name => $name, subname => ($::PKGDECL . '-' . ($name // 'ANON')));
         $M->{_ast} = $optype->new(
             node($M),
             (($blocktype eq 'role' && $M->{signature}[0]) ?
