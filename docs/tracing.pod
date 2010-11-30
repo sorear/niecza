@@ -23,6 +23,12 @@ infinite loops, C<stat> is more useful; C<stat> can also be used as a
 primitive profiler, though its utility is limited by the fact that it
 does not count real time.
 
+=head2 C<NIECZA_TRACE_CALLS>
+
+This dumps all edges in the callgraph for profiling purposes.  The
+C<perf/call-log-analyze.pl> script transforms the output into a
+more readable form.
+
 =head2 C<NIECZA_TRACE_PERIOD>
 
 This sets the display interval for C<NIECZA_TRACE=stat>.  Defaults to
