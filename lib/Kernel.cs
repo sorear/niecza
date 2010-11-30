@@ -121,14 +121,15 @@ namespace Niecza {
     }
 
     public abstract class ViviHook {
-        public abstract Frame Do(Frame th, Variable toviv);
+        public abstract void Do(Variable toviv);
     }
 
     public class SubViviHook : ViviHook {
         IP6 sub;
         public SubViviHook(IP6 sub) { this.sub = sub; }
-        public override Frame Do(Frame th, Variable toviv) {
-            return sub.Invoke(th, new Variable[] { toviv }, null);
+        public override void Do(Variable toviv) {
+            Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
+                        new Variable[] { toviv }, null));
         }
     }
 
@@ -136,11 +137,10 @@ namespace Niecza {
         IP6 hash;
         string key;
         public HashViviHook(IP6 hash, string key) { this.hash = hash; this.key = key; }
-        public override Frame Do(Frame th, Variable toviv) {
+        public override void Do(Variable toviv) {
             Dictionary<string,Variable> rh =
                 Kernel.UnboxAny<Dictionary<string,Variable>>(hash);
             rh[key] = toviv;
-            return th;
         }
     }
 
@@ -148,10 +148,10 @@ namespace Niecza {
         Variable hashv;
         string key;
         public NewHashViviHook(Variable hashv, string key) { this.hashv = hashv; this.key = key; }
-        public override Frame Do(Frame th, Variable toviv) {
+        public override void Do(Variable toviv) {
             Dictionary<string,Variable> rh = new Dictionary<string,Variable>();
             rh[key] = toviv;
-            return Kernel.Assign(th, hashv, Kernel.BoxAnyMO<Dictionary<string,Variable>>(rh, Kernel.HashMO));
+            hashv.Store(Kernel.BoxRaw(rh, Kernel.HashMO));
         }
     }
 
@@ -159,12 +159,11 @@ namespace Niecza {
         IP6 ary;
         int key;
         public ArrayViviHook(IP6 ary, int key) { this.ary = ary; this.key = key; }
-        public override Frame Do(Frame th, Variable toviv) {
+        public override void Do(Variable toviv) {
             VarDeque vd = (VarDeque) ary.GetSlot("items");
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
             vd[key] = toviv;
-            return th;
         }
     }
 
@@ -172,7 +171,7 @@ namespace Niecza {
         Variable ary;
         int key;
         public NewArrayViviHook(Variable ary, int key) { this.ary = ary; this.key = key; }
-        public override Frame Do(Frame th, Variable toviv) {
+        public override void Do(Variable toviv) {
             VarDeque vd = new VarDeque();
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
@@ -180,7 +179,7 @@ namespace Niecza {
             DynObject d = new DynObject(Kernel.ArrayMO);
             d.slots[0] = vd;
             d.slots[1] = new VarDeque();
-            return Kernel.Assign(th, ary, Kernel.NewROScalar(d));
+            ary.Store(d);
         }
     }
 
@@ -199,6 +198,11 @@ namespace Niecza {
             }
             if (!v.mo.HasMRO(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
+            }
+            if (whence != null) {
+                ViviHook vh = whence;
+                whence = null;
+                vh.Do(this);
             }
             val = v;
         }
@@ -1053,26 +1057,14 @@ namespace Niecza {
         }
 
         // check whence before calling
-        public static Frame Vivify(Frame th, Variable v) {
+        public static void Vivify(Variable v) {
             ViviHook w = v.whence;
             v.whence = null;
-            return w.Do(th, v);
-        }
-
-        // this exists purely to hide the return value
-        private static SubInfo BindSI = new SubInfo("Bind/rw-viv", BindC);
-        private static Frame BindC(Frame th) {
-            switch (th.ip) {
-                case 0:
-                    return th.caller;
-                default:
-                    return Kernel.Die(th, "IP invalid");
-            }
+            w.Do(v);
         }
 
         public static Frame NewBoundVar(Frame th, bool ro, bool islist,
                 DynMetaObject type, Variable rhs) {
-            Frame n;
             if (islist) ro = true;
             if (!rhs.rw) ro = true;
             // fast path
@@ -1106,40 +1098,13 @@ namespace Niecza {
             if (!rhs.type.HasMRO(type))
                 return Kernel.Die(th, "Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
 
+            Vivify(rhs);
             th.resultSlot = rhs;
-
-            n = Vivify(th.MakeChild(null, BindSI), rhs);
-            return n;
-        }
-
-        // This isn't just a fetch and a store...
-        public static SubInfo AssignSI = new SubInfo("Assign", AssignC);
-        private static Frame AssignC(Frame th) {
-            switch (th.ip) {
-                case 0:
-                    if (th.pos[0].whence == null)
-                        goto case 1;
-                    th.ip = 1;
-                    Frame nth = Vivify(th, th.pos[0]);
-                    if (nth == th) goto case 1;
-                    return nth;
-                case 1:
-                    if (th.pos[0].islist) {
-                        return th.pos[0].Fetch().InvokeMethod(th.caller,
-                                "LISTSTORE", th.pos, null);
-                    } else if (!th.pos[0].rw) {
-                        return Kernel.Die(th.caller, "assigning to readonly value");
-                    } else {
-                        th.pos[0].Store(th.pos[1].Fetch());
-                    }
-                    return th.caller;
-                default:
-                    return Kernel.Die(th, "Invalid IP");
-            }
+            return th;
         }
 
         public static Frame Assign(Frame th, Variable lhs, Variable rhs) {
-            if (lhs.whence == null && !lhs.islist) {
+            if (!lhs.islist) {
                 if (!lhs.rw) {
                     return Kernel.Die(th, "assigning to readonly value");
                 }
@@ -1148,9 +1113,8 @@ namespace Niecza {
                 return th;
             }
 
-            Frame n = th.MakeChild(null, AssignSI);
-            n.pos = new Variable[2] { lhs, rhs };
-            return n;
+            return lhs.Fetch().InvokeMethod(th, "LISTSTORE", new Variable[2] { lhs, rhs }, null);
+
         }
 
         // ro, not rebindable

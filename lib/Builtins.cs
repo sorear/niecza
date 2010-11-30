@@ -12,14 +12,12 @@ public class Builtins {
     }
 
     public static void AssignV(Variable lhs, IP6 rhs) {
-        if (lhs.whence == null && !lhs.islist) {
-            if (!lhs.rw)
-                throw new NieczaException("assigning to readonly value");
-
+        if (!lhs.islist) {
             lhs.Store(rhs);
         } else {
-            Frame n = Kernel.GetInferiorRoot().MakeChild(null, Kernel.AssignSI);
-            n.pos = new Variable[2] { lhs, Kernel.NewROScalar(rhs) };
+            Frame n = lhs.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
+                    "LISTSTORE",
+                    new Variable[2] { lhs, Kernel.NewROScalar(rhs) }, null);
             Kernel.RunInferior(n);
         }
     }
