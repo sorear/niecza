@@ -339,11 +339,15 @@ namespace Niecza {
 
         public Frame() { mo = Kernel.CallFrameMO; }
 
+        public static readonly bool TraceCalls =
+            Environment.GetEnvironmentVariable("NIECZA_TRACE_CALLS") != null;
         public Frame MakeChild(Frame outer, SubInfo info) {
             if (reusable_child == null) {
                 reusable_child = new Frame();
                 reusable_child.reuser = this;
             }
+            if (TraceCalls)
+                Console.WriteLine("{0}\t{1}", this.info.name, info.name);
             reusable_child.ip = 0;
             reusable_child.resultSlot = null;
             reusable_child.lexn = null;
