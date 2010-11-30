@@ -1,0 +1,54 @@
+   Announce: Niecza Perl 6
+
+I am happy to make the first general announcement of Niecza Perl 6[1], a Perl 6
+compiler project focusing on optimization research.
+
+I have been tinkering with this for about 6 months now and I feel I finally
+have something worth sharing.
+
+While other Perl 6 compilers have focused on exploration of semantic issues,
+Niecza is exploring implementation efficiency issues.  The goal of this project
+is to have fun while learning about how to make a fast Perl 6; if we
+accidentally make a fast Perl 6 in the process, so much the better.
+
+Niecza is written in Perl (currently version 5) and generates code to run on
+a backend.  The only currently implemented backend targets the Common Language
+Runtime (.NET or Mono).  You will, therefore, need Perl 5, several modules,
+and Mono to run Niecza; see the README for details.  .NET support is expected
+to be easy to add.
+
+Rather than bore you with a long list of features that are not yet implemented,
+here are some of the things that are not not yet implemented:
+
+* Basic data types (Num, Str, Array, Hash, Sub, etc) and basic operations
+
+* Control flow operators
+
+* Regexes, including full LTM and cut operator support
+
+* Lazy lists under the 'mostly eager' paradigm, supporting gather/take
+
+* Separately compiled modules with distinct GLOBALs
+
+* Classes, including C3 MRO computed at compile time, and nextsame
+
+And a very small set of extensions:
+
+* Low-level coding facilities (mostly for bootstrapping, but also for speed)
+
+* Built-in support for JSYNC to save data structures
+
+* Low-level access to threading facilities
+
+Runtime performance is generally between one and two orders of magnitude slower
+than Perl 5, depending on the level of tuning.  In very few cases Niecza is
+faster than Perl 5.  There are assorted benchmarks in perf/ in the source tree;
+any specific measurements would be unfair as these benchmarks have all received
+heavy tuning.
+
+If any of this sounds like fun to you, contact me via the Reply-To address or
+'sorear' on irc.freenode.net #perl6.
+
+No release schedule has been decided at this time.
+
+[1] https://github.com/sorear/niecza
