@@ -10,6 +10,83 @@ augment class Match {
     method trim_heredoc () { self } # NYI
 }
 
+augment class Hash {
+    method at-key(\$self: $key) {
+        Q:CgOp {
+            (letn ky (obj_getstr {$key})
+              (ternary (obj_is_defined (@ {$self}))
+                (letn vh (unbox varhash (@ {$self}))
+                  (ternary (varhash_contains_key (l vh) (l ky))
+                    (varhash_getindex (l ky) (l vh))
+                    (newvhashvar (class_ref mo Any) (@ {$self}) (l ky) (@ {Any}))))
+                (newvnewhashvar (class_ref mo Any) {$self} (l ky) (@ {Any}))))
+        };
+    }
+}
+
+sub _vivify_array_at_pos(\$self, $ix) {
+    Q:CgOp { (newvnewarrayvar (class_ref mo Any) {$self} (cast int (obj_getnum {$ix})) (@ {Any})) };
+}
+
+augment class Any {
+    method at-key(\$self: $key) {
+        defined($self) ??
+            die("Cannot use hash access on an object of type $self.typename()") !!
+            Q:CgOp { (newvnewhashvar (class_ref mo Any) {$self} (obj_getstr {$key}) (@ {Any})) };
+    }
+
+    method at-pos(\$self: $ix) {
+        defined($self)
+            ?? ($ix == 0 ?? $self !! die("Invalid index for non-array"))
+            !! _vivify_array_at_pos($self, $ix)
+    }
+}
+
+augment class Cool {
+    method at-pos(\$self: $ix) {
+        defined($self)
+            ?? $self.list.at-pos($ix)
+            !! _vivify_array_at_pos($self, $ix)
+    }
+}
+
+augment class List {
+    method at-pos(\$self: $ix) {
+        Q:CgOp {
+            (letn self (@ {$self})
+                  ixn  (cast int (obj_getnum {$ix}))
+              (ternary (obj_is_defined (l self))
+                (letn items (getslot items vvarlist (l self))
+                      rest  (getslot rest  vvarlist (l self))
+                  (ternary (< (l ixn) (vvarlist_count (l items)))
+                    (vvarlist_item (l ixn) (l items))
+                    (ternary (== (i 0) (vvarlist_count (l rest)))
+                      {Any}
+                      {$self!List::fill($ix+1); $self.at-pos($ix)})))
+                {_vivify_array_at_pos($self,$ix)}))
+        };
+    }
+}
+
+augment class Array {
+    method at-pos(\$self: $ix) {
+        Q:CgOp {
+            (letn self (@ {$self})
+                  ixn  (cast int (obj_getnum {$ix}))
+              (ternary (obj_is_defined (l self))
+                (letn items (getslot items vvarlist (l self))
+                      rest  (getslot rest  vvarlist (l self))
+                  (ternary (< (l ixn) (vvarlist_count (l items)))
+                    (vvarlist_item (l ixn) (l items))
+                    (ternary (== (i 0) (vvarlist_count (l rest)))
+                      (newvarrayvar (class_ref mo Any) (l self) (l ixn) (@ {Any}))
+                      {$self!List::fill($ix+1); $self.at-pos($ix)})))
+                {_vivify_array_at_pos($self,$ix)}))
+        };
+    }
+}
+
+
 package Niecza {
     grammar Grammar is STD {
         grammar CgOp is STD {

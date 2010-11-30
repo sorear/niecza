@@ -144,6 +144,17 @@ namespace Niecza {
         }
     }
 
+    public class NewHashViviHook : ViviHook {
+        Variable hashv;
+        string key;
+        public NewHashViviHook(Variable hashv, string key) { this.hashv = hashv; this.key = key; }
+        public override Frame Do(Frame th, Variable toviv) {
+            Dictionary<string,Variable> rh = new Dictionary<string,Variable>();
+            rh[key] = toviv;
+            return Kernel.Assign(th, hashv, Kernel.BoxAnyMO<Dictionary<string,Variable>>(rh, Kernel.HashMO));
+        }
+    }
+
     public class ArrayViviHook : ViviHook {
         IP6 ary;
         int key;
@@ -154,6 +165,22 @@ namespace Niecza {
                 vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
             vd[key] = toviv;
             return th;
+        }
+    }
+
+    public class NewArrayViviHook : ViviHook {
+        Variable ary;
+        int key;
+        public NewArrayViviHook(Variable ary, int key) { this.ary = ary; this.key = key; }
+        public override Frame Do(Frame th, Variable toviv) {
+            VarDeque vd = new VarDeque();
+            while (vd.Count() <= key)
+                vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
+            vd[key] = toviv;
+            DynObject d = new DynObject(Kernel.ArrayMO);
+            d.slots[0] = vd;
+            d.slots[1] = new VarDeque();
+            return Kernel.Assign(th, ary, Kernel.NewROScalar(d));
         }
     }
 
