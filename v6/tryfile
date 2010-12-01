@@ -282,7 +282,7 @@ sub compiler(:$filename, :$text, :$settingname, :$niecza) {
     else {
         $all = {};
         for keys %( $STD::ALL ) -> $key {
-            next if $key ~~ /^MY\:file\<\w+\.setting\>/ or $key eq 'CORE' or $key eq 'SETTING';
+            next if (/MY\:file\<\w+:\.setting\>/)(Cursor.new($key)) or $key eq 'CORE' or $key eq 'SETTING';
             $all{$key} = $STD::ALL{$key};
         }
     }
