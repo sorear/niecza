@@ -611,6 +611,31 @@ namespace Niecza {
         }
     }
 
+    class CtxListBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            IP6 o = obj.Fetch();
+            if (!o.IsDefined()) return false;
+            DynObject dob = (DynObject) o;
+            VarDeque items = (VarDeque) dob.slots[0];
+            if (items.Count() != 0) return true;
+            VarDeque rest = (VarDeque) dob.slots[1];
+            if (rest.Count() == 0) return false;
+            return DynMetaObject.RawCallBool.Get(obj);
+        }
+    }
+
+    class CtxListNum : ContextHandler<double> {
+        public override double Get(Variable obj) {
+            IP6 o = obj.Fetch();
+            if (!o.IsDefined()) return 0;
+            DynObject dob = (DynObject) o;
+            VarDeque items = (VarDeque) dob.slots[0];
+            VarDeque rest = (VarDeque) dob.slots[1];
+            if (rest.Count() == 0) return items.Count();
+            return DynMetaObject.RawCallNumeric.Get(obj);
+        }
+    }
+
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             return Kernel.BoxAnyMO<string>(Kernel.UnboxAny<double>(obj.Fetch()).ToString(), Kernel.StrMO);
@@ -1792,6 +1817,10 @@ slow:
             ListMO = new DynMetaObject("List");
             ListMO.loc_raw_iterator = new CtxListIterator();
             ListMO.loc_at_pos = new IxListAtPos(false);
+            ListMO.loc_raw_Bool = new CtxListBool();
+            ListMO.loc_raw_Numeric = new CtxListNum();
+            ListMO.loc_Bool = new CtxBoxify<bool>(ListMO.loc_raw_Bool, BoolMO);
+            ListMO.loc_Numeric = new CtxBoxify<double>(ListMO.loc_raw_Numeric, NumMO);
             ListMO.FillProtoClass(new string[] { "items", "rest" });
 
             HashMO = new DynMetaObject("Hash");
