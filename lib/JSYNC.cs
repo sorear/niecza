@@ -70,6 +70,12 @@ public class JsyncWriter {
         o.Append('{');
         contUsed = true;
         o.AppendFormat("\"&\":\"A{0}\"", a);
+        if (obj.mo != Kernel.HashMO) {
+            if (obj.mo.nslots != 0)
+                throw new NieczaException("Cannot serialize subclasses of Hash  that add attributes");
+            o.Append(",\"!\":");
+            WriteStr(true, "!perl6/" + obj.mo.name);
+        }
         List<string> keys = new List<string>(entries.Keys);
         keys.Sort();
         foreach (string key in keys) {
@@ -575,18 +581,24 @@ public class JsyncReader {
                 p_cursor = Kernel.PackageLookup(p_cursor, frag).v.Fetch();
             }
 
-            DynObject dyo = new DynObject(p_cursor.mo);
-            for (int i = 0; i < dyo.mo.nslots; i++) {
-                string sn = dyo.mo.all_attr[i];
-                if (!zyg.ContainsKey(sn))
-                    Err("No value for attribute " + sn + " in thawed value of class " + dyo.mo.name);
-                dyo.slots[i] = zyg[sn];
-                zyg.Remove(sn);
+            if (p_cursor.Isa(Kernel.HashMO)) {
+                if (p_cursor.mo.nslots != 0)
+                    Err("Cannot thaw Hash subclass " + p_cursor.mo.name + "; it has attributes");
+                obj = BoxRW<Dictionary<string,Variable>>(zyg, p_cursor.mo);
+            } else {
+                DynObject dyo = new DynObject(p_cursor.mo);
+                for (int i = 0; i < dyo.mo.nslots; i++) {
+                    string sn = dyo.mo.all_attr[i];
+                    if (!zyg.ContainsKey(sn))
+                        Err("No value for attribute " + sn + " in thawed value of class " + dyo.mo.name);
+                    dyo.slots[i] = zyg[sn];
+                    zyg.Remove(sn);
+                }
+                foreach (string key in zyg.Keys) {
+                    Err("Attribute " + key + " not present in " + dyo.mo.name);
+                }
+                obj = Kernel.NewRWScalar(Kernel.AnyMO, dyo);
             }
-            foreach (string key in zyg.Keys) {
-                Err("Attribute " + key + " not present in " + dyo.mo.name);
-            }
-            obj = Kernel.NewRWScalar(Kernel.AnyMO, dyo);
         } else {
             obj = BoxRW<Dictionary<string,Variable>>(zyg, Kernel.HashMO);
         }
