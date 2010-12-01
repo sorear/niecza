@@ -636,6 +636,15 @@ namespace Niecza {
         }
     }
 
+    class CtxMatchStr : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            IP6 o = obj.Fetch();
+            if (!o.IsDefined()) return "";
+            Cursor c = (Cursor) o;
+            return c.GetBacking().Substring(c.from, c.pos - c.from);
+        }
+    }
+
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             return Kernel.BoxAnyMO<string>(Kernel.UnboxAny<double>(obj.Fetch()).ToString(), Kernel.StrMO);
@@ -1842,6 +1851,8 @@ slow:
             MatchMO = new DynMetaObject("Match");
             MatchMO.loc_at_key = CursorMO.loc_at_key;
             MatchMO.loc_at_pos = CursorMO.loc_at_pos;
+            MatchMO.loc_raw_Str = new CtxMatchStr();
+            MatchMO.loc_Str = new CtxBoxify<string>(MatchMO.loc_raw_Str, StrMO);
             MatchMO.FillProtoClass(new string[] { });
 
             SubMO = new DynMetaObject("Sub");
