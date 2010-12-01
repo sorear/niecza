@@ -605,6 +605,11 @@ namespace Niecza {
             return Kernel.UnboxAny<double>(obj.Fetch()).ToString();
         }
     }
+    class CtxNum2Bool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            return Kernel.UnboxAny<double>(obj.Fetch()) != 0;
+        }
+    }
 
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
@@ -1753,6 +1758,8 @@ slow:
             NumMO.loc_raw_Numeric = new CtxJustUnbox<double>();
             NumMO.loc_Str = new CtxStrNativeNum2Str();
             NumMO.loc_raw_Str = new CtxRawNativeNum2Str();
+            NumMO.loc_raw_Bool = new CtxNum2Bool();
+            NumMO.loc_Bool = new CtxBoxify<bool>(NumMO.loc_raw_Bool, BoolMO);
             NumMO.FillProtoClass(new string[] { });
 
             MuMO = new DynMetaObject("Mu");
