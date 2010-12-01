@@ -1,15 +1,9 @@
-class NAME {
-    has $!guts;
-
+class NAME is Hash {
     method new(*%foo) {
-        my $new = self.CREATE;
-        $new!guts = %foo;
+        my $new = Q:CgOp { (box (@ {NAME}) (varhash_new)) };
+        unitem($new) = unitem(%foo);
         $new;
     }
-
-    method at-key($k) { self!guts.at-key($k) }
-    method delete-key($k) { self!guts.delete-key($k) }
-    method exists-key($k) { self!guts.exists-key($k) }
 
     method name () { self.<name> }
     method xlex () { self.<xlex> }
