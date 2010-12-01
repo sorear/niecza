@@ -6,6 +6,27 @@ use Stash;
 use NAME;
 use JSYNC;
 
+augment class List {
+    method head() { Q:CgOp {
+        (letn items (getslot items vvarlist (@ {self}))
+              rest  (getslot rest  vvarlist (@ {self}))
+          (ternary (!= (i 0) (vvarlist_count (l items)))
+            (vvarlist_item (i 0) (l items))
+            (ternary (iter_hasarg (l rest))
+              (prog
+                (vvarlist_push (l items) (vvarlist_shift (l rest)))
+                (vvarlist_item (i 0) (l items)))
+              {Any})))
+    } }
+    method eager() { Q:CgOp {
+        (letn items (getslot items vvarlist (@ {self}))
+              rest  (getslot rest  vvarlist (@ {self}))
+          (whileloop 0 0 (iter_hasarg (l rest))
+            (vvarlist_push (l items) (vvarlist_shift (l rest))))
+          {self})
+    } }
+}
+
 augment class Match {
     method trim_heredoc () { self } # NYI
 }
