@@ -130,17 +130,15 @@ sub do_atkey {
     return if $delete && (!$delete->isa('Op::Lexical') || $delete->name ne 'True');
     return if $exists && (!$exists->isa('Op::Lexical') || $exists->name ne 'True');
     return if $delete && $exists;
-    return Op::CallMethod->new(name => ($delete ? 'delete-key' :
-            $exists ? 'exists-key' : 'at-key'), receiver => $args->[0],
-        positionals => [$args->[1]]);
+    return Op::Builtin->new(name => ($delete ? 'delete_key' :
+            $exists ? 'exists_key' : 'at_key'), args => $args);
 }
 
 sub do_atpos {
     my ($body, $nv, $invname, $op) = @_;
     return unless my $args = no_named_params($op);
     return unless @$args == 2;
-    return Op::CallMethod->new(name => 'at-pos', receiver => $args->[0],
-        positionals => [$args->[1]]);
+    return Op::Builtin->new(name => 'at_pos', args => $args);
 }
 
 sub run_optree {

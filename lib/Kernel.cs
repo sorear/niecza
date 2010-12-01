@@ -506,7 +506,21 @@ namespace Niecza {
 
     public abstract class ContextHandler<T> {
         public abstract T Get(Variable obj);
+    }
 
+    public abstract class IndexHandler {
+        public abstract Variable Get(Variable obj, Variable key);
+
+        public static Variable ViviHash(Variable obj, Variable key) {
+            return new SimpleVariable(true, false, Kernel.AnyMO,
+                    new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),
+                    Kernel.AnyP);
+        }
+        public static Variable ViviArray(Variable obj, Variable key) {
+            return new SimpleVariable(true, false, Kernel.AnyMO,
+                    new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
+                    Kernel.AnyP);
+        }
     }
 
     // TODO: find out if generic sharing is killing performance
@@ -598,6 +612,100 @@ namespace Niecza {
         }
     }
 
+    class IxCallMethod : IndexHandler {
+        string name;
+        public IxCallMethod(string name) { this.name = name; }
+        public override Variable Get(Variable obj, Variable key) {
+            return (Variable) Kernel.RunInferior(
+                    obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), name,
+                        new Variable[] { obj, key }, null));
+        }
+    }
+
+    class IxAnyAtKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            IP6 os = obj.Fetch();
+            if (!os.IsDefined())
+                return IndexHandler.ViviHash(obj, key);
+            throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
+        }
+    }
+    class IxAnyAtPos : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            IP6 os = obj.Fetch();
+            if (!os.IsDefined())
+                return IndexHandler.ViviArray(obj, key);
+            int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
+            if (ix == 0) return obj;
+            throw new NieczaException("Invalid index for non-array");
+        }
+    }
+
+    class IxCursorAtKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            Cursor os = (Cursor)obj.Fetch();
+            return os.GetKey(key.Fetch().mo.mro_raw_Str.Get(key));
+        }
+    }
+    class IxCursorAtPos : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            Cursor os = (Cursor)obj.Fetch();
+            return os.GetKey(key.Fetch().mo.mro_raw_Numeric.Get(key).ToString());
+        }
+    }
+
+    class IxHashAtKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            IP6 os = obj.Fetch();
+            if (!os.IsDefined())
+                return IndexHandler.ViviHash(obj, key);
+            string ks = key.Fetch().mo.mro_raw_Str.Get(key);
+            Dictionary<string,Variable> h =
+                Kernel.UnboxAny<Dictionary<string,Variable>>(os);
+            Variable r;
+            if (h.TryGetValue(ks, out r))
+                return r;
+            return new SimpleVariable(true, false, Kernel.AnyMO, new HashViviHook(os, ks), Kernel.AnyP);
+        }
+    }
+    class IxHashExistsKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            IP6 os = obj.Fetch();
+            if (!os.IsDefined()) return Kernel.FalseV;
+            string ks = key.Fetch().mo.mro_raw_Str.Get(key);
+            Dictionary<string,Variable> h =
+                Kernel.UnboxAny<Dictionary<string,Variable>>(os);
+            return h.ContainsKey(ks) ? Kernel.TrueV : Kernel.FalseV;
+        }
+    }
+
+    class IxListAtPos : IndexHandler {
+        bool extend;
+        public IxListAtPos(bool extend) { this.extend = extend; }
+        public override Variable Get(Variable obj, Variable key) {
+            IP6 os = obj.Fetch();
+            if (!os.IsDefined())
+                return IndexHandler.ViviArray(obj, key);
+            int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
+            DynObject dos = (DynObject) os;
+            VarDeque items = (VarDeque) dos.slots[0];
+            VarDeque rest  = (VarDeque) dos.slots[1];
+            if (items.Count() <= ix && rest.Count() != 0) {
+                Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                            "eager", new Variable[] { obj }, null));
+            }
+            if (items.Count() <= ix) {
+                if (extend) {
+                    return new SimpleVariable(true, false, Kernel.AnyMO,
+                            new ArrayViviHook(os, ix), Kernel.AnyP);
+                } else {
+                    return Kernel.NewROScalar(Kernel.AnyP);
+                }
+            }
+            return items[ix];
+        }
+    }
+
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
@@ -621,6 +729,14 @@ namespace Niecza {
             = new CtxCallMethodUnbox<bool>("defined");
         public static readonly ContextHandler<VarDeque> RawCallIterator
             = new CtxCallMethodUnbox<VarDeque>("iterator");
+        public static readonly IndexHandler CallAtPos
+            = new IxCallMethod("at-pos");
+        public static readonly IndexHandler CallAtKey
+            = new IxCallMethod("at-key");
+        public static readonly IndexHandler CallExistsKey
+            = new IxCallMethod("exists-key");
+        public static readonly IndexHandler CallDeleteKey
+            = new IxCallMethod("delete-key");
 
         public IP6 how;
         public IP6 typeObject;
@@ -650,6 +766,9 @@ namespace Niecza {
         public ContextHandler<string> mro_raw_Str, loc_raw_Str;
         public ContextHandler<double> mro_raw_Numeric, loc_raw_Numeric;
         public ContextHandler<VarDeque> mro_raw_iterator, loc_raw_iterator;
+        public IndexHandler mro_at_pos, mro_at_key, mro_exists_key,
+               mro_delete_key, loc_at_pos, loc_at_key, loc_exists_key,
+               loc_delete_key;
 
         public InvokeHandler OnInvoke;
 
@@ -729,6 +848,14 @@ namespace Niecza {
                         mro_iterator = CallIterator;
                         mro_raw_iterator = RawCallIterator;
                     }
+                    if (m.Key == "at-key")
+                        mro_at_key = CallAtKey;
+                    if (m.Key == "at-pos")
+                        mro_at_pos = CallAtPos;
+                    if (m.Key == "delete-key")
+                        mro_delete_key = CallDeleteKey;
+                    if (m.Key == "exists-key")
+                        mro_exists_key = CallExistsKey;
                 }
 
                 if (k.OnInvoke != null)
@@ -743,6 +870,10 @@ namespace Niecza {
                 if (k.loc_raw_Bool != null) mro_raw_Bool = k.loc_raw_Bool;
                 if (k.loc_raw_Str != null) mro_raw_Str = k.loc_raw_Str;
                 if (k.loc_raw_iterator != null) mro_raw_iterator = k.loc_raw_iterator;
+                if (k.loc_at_pos != null) mro_at_pos = k.loc_at_pos;
+                if (k.loc_at_key != null) mro_at_key = k.loc_at_key;
+                if (k.loc_exists_key != null) mro_exists_key = k.loc_exists_key;
+                if (k.loc_delete_key != null) mro_delete_key = k.loc_delete_key;
             }
         }
 
@@ -999,25 +1130,26 @@ namespace Niecza {
             return nw;
         }
 
-        public static DynMetaObject AnyMO;
         public static DynMetaObject PairMO;
         public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
         public static DynMetaObject IteratorMO;
         public static DynMetaObject GatherIteratorMO;
         public static DynMetaObject IterCursorMO;
-        public static DynMetaObject MatchMO;
         public static IP6 AnyP;
         public static IP6 ArrayP;
         public static IP6 EMPTYP;
         public static IP6 HashP;
         public static IP6 IteratorP;
+        public static readonly DynMetaObject AnyMO;
         public static readonly DynMetaObject ScalarMO;
         public static readonly DynMetaObject StashMO;
         public static readonly DynMetaObject SubMO;
         public static readonly DynMetaObject StrMO;
         public static readonly DynMetaObject NumMO;
         public static readonly DynMetaObject ArrayMO;
+        public static readonly DynMetaObject CursorMO;
+        public static readonly DynMetaObject MatchMO;
         public static readonly DynMetaObject ParcelMO;
         public static readonly DynMetaObject ListMO;
         public static readonly DynMetaObject HashMO;
@@ -1632,6 +1764,10 @@ slow:
             MuMO.loc_raw_Str = DynMetaObject.RawCallStr;
             MuMO.loc_iterator = DynMetaObject.CallIterator;
             MuMO.loc_raw_iterator = DynMetaObject.RawCallIterator;
+            MuMO.loc_at_pos = DynMetaObject.CallAtPos;
+            MuMO.loc_at_key = DynMetaObject.CallAtKey;
+            MuMO.loc_delete_key = DynMetaObject.CallDeleteKey;
+            MuMO.loc_exists_key = DynMetaObject.CallExistsKey;
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
@@ -1643,15 +1779,34 @@ slow:
             ParcelMO.FillProtoClass(new string[] { });
 
             ArrayMO = new DynMetaObject("Array");
+            ArrayMO.loc_at_pos = new IxListAtPos(true);
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
 
             ListMO = new DynMetaObject("List");
             ListMO.loc_raw_iterator = new CtxListIterator();
+            ListMO.loc_at_pos = new IxListAtPos(false);
             ListMO.FillProtoClass(new string[] { "items", "rest" });
 
             HashMO = new DynMetaObject("Hash");
             HashMO.loc_raw_iterator = new CtxHashIterator();
+            HashMO.loc_at_key = new IxHashAtKey();
+            HashMO.loc_exists_key = new IxHashExistsKey();
             HashMO.FillProtoClass(new string[] { });
+
+            AnyMO = new DynMetaObject("Any");
+            AnyMO.loc_at_key = new IxAnyAtKey();
+            AnyMO.loc_at_pos = new IxAnyAtPos();
+            AnyMO.FillProtoClass(new string[] { });
+
+            CursorMO = new DynMetaObject("Cursor");
+            CursorMO.loc_at_key = new IxCursorAtKey();
+            CursorMO.loc_at_pos = new IxCursorAtPos();
+            CursorMO.FillProtoClass(new string[] { });
+
+            MatchMO = new DynMetaObject("Match");
+            MatchMO.loc_at_key = CursorMO.loc_at_key;
+            MatchMO.loc_at_pos = CursorMO.loc_at_pos;
+            MatchMO.FillProtoClass(new string[] { });
 
             SubMO = new DynMetaObject("Sub");
             SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);

@@ -286,23 +286,47 @@ use warnings;
     sub bif_num { obj_asnum($_[0]) }
     sub bif_str { obj_asstr($_[0]) }
     sub bif_bool { obj_asbool($_[0]) }
+    sub bif_at_key { obj_at_key(@_) }
+    sub bif_at_pos { obj_at_pos(@_) }
+    sub bif_delete_key { obj_delete_key(@_) }
+    sub bif_exists_key { obj_exists_key(@_) }
 
     sub _context {
-        my ($type, $fun, $obj) = @_;
+        my ($type, $mo, $fun, $obj) = @_;
         letn('!var', $obj,
             rawcall(getfield("mro_$fun:f,ContextHelper<$type>",
-                    getfield("mo:f,DynMetaObject", fetch(letvar('!var')))),
+                    $mo//getfield("mo:f,DynMetaObject", fetch(letvar('!var')))),
                 "Get:m,$type", letvar('!var')));
     }
 
-    sub obj_getnum  { _context('Double', 'raw_Numeric', $_[0]) }
-    sub obj_getbool { _context('Boolean', 'raw_Bool', $_[0]) }
-    sub obj_getdef  { _context('Boolean', 'raw_defined', $_[0]) }
-    sub obj_getstr  { _context('String', 'raw_Str', $_[0]) }
-    sub obj_asnum   { _context('Variable', 'Numeric', $_[0]) }
-    sub obj_asbool  { _context('Variable', 'Bool', $_[0]) }
-    sub obj_asdef   { _context('Variable', 'defined', $_[0]) }
-    sub obj_asstr   { _context('Variable', 'Str', $_[0]) }
+    sub _indexer {
+        my ($mo, $fun, $obj, $key) = @_;
+        letn('!var', $obj,
+            rawcall(getfield("mro_$fun:f,IndexHandler",
+                    $mo//getfield("mo:f,DynMetaObject", fetch(letvar('!var')))),
+                "Get:m,Variable", letvar('!var'), $key));
+    }
+
+    sub obj_getnum  { _context('Double',   undef, 'raw_Numeric', $_[0]) }
+    sub obj_getbool { _context('Boolean',  undef, 'raw_Bool', $_[0]) }
+    sub obj_getdef  { _context('Boolean',  undef, 'raw_defined', $_[0]) }
+    sub obj_getstr  { _context('String',   undef, 'raw_Str', $_[0]) }
+    sub obj_asnum   { _context('Variable', undef, 'Numeric', $_[0]) }
+    sub obj_asbool  { _context('Variable', undef, 'Bool', $_[0]) }
+    sub obj_asdef   { _context('Variable', undef, 'defined', $_[0]) }
+    sub obj_asstr   { _context('Variable', undef, 'Str', $_[0]) }
+    sub obj_vasnum  { _context('Variable', $_[0], 'Numeric', $_[1]) }
+    sub obj_vasbool { _context('Variable', $_[0], 'Bool', $_[1]) }
+    sub obj_vasdef  { _context('Variable', $_[0], 'defined', $_[1]) }
+    sub obj_vasstr  { _context('Variable', $_[0], 'Str', $_[1]) }
+    sub obj_at_pos      { _indexer(undef, 'at_pos',     $_[0], $_[1]) }
+    sub obj_at_key      { _indexer(undef, 'at_key',     $_[0], $_[1]) }
+    sub obj_exists_key  { _indexer(undef, 'exists_key', $_[0], $_[1]) }
+    sub obj_delete_key  { _indexer(undef, 'delete_key', $_[0], $_[1]) }
+    sub obj_vat_pos     { _indexer($_[0], 'at_pos',     $_[1], $_[2]) }
+    sub obj_vat_key     { _indexer($_[0], 'at_key',     $_[1], $_[2]) }
+    sub obj_vexists_key { _indexer($_[0], 'exists_key', $_[1], $_[2]) }
+    sub obj_vdelete_key { _indexer($_[0], 'delete_key', $_[1], $_[2]) }
 
     sub newboundvar {
         rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
