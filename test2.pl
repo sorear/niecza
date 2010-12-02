@@ -2,6 +2,11 @@
 use Test;
 use MONKEY_TYPING;
 
+{
+    # GH-3
+    my class A { method Numeric { 42 } }
+    is A.new + 23, 65, '+ calls user-written .Numeric';
+}
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
