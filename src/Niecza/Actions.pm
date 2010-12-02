@@ -85,6 +85,9 @@ sub nofun { }
 sub curlycheck { }
 sub pod_comment { }
 sub infixstopper { }
+sub vnum { }
+sub version { }
+sub version__S_v { }
 
 sub category { }
 sub category__S_category { }
@@ -2388,6 +2391,10 @@ sub statement_control__S_for { my ($cl, $M) = @_;
 }
 
 sub statement_control__S_use { my ($cl, $M) = @_;
+    if ($M->{version}) {
+        return;
+    }
+
     my $name = $M->{module_name}{_ast}{name};
     my $args = $M->{arglist} ? $M->{arglist}{_ast} : [];
 
