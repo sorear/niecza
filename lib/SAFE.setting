@@ -215,8 +215,9 @@ sub warn($str) { Q:CgOp {
     )
 } }
 
-sub say(*@obj) { @obj.join('').say }
-sub note(*@text) { Q:CgOp { (rnull (note (obj_getstr {@text.join('')}))) } }
+sub say(*@text)   { Q:CgOp { (rnull (say   (obj_getstr {@text.join('')}))) } }
+sub print(*@text) { Q:CgOp { (rnull (print (obj_getstr {@text.join('')}))) } }
+sub note(*@text)  { Q:CgOp { (rnull (note  (obj_getstr {@text.join('')}))) } }
 
 sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])

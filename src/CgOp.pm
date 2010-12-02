@@ -181,6 +181,7 @@ use warnings;
     sub strbuf_seal { rawcall($_[0], 'ToString') }
 
     sub say { rawscall('Console.WriteLine', $_[0]) }
+    sub print { rawscall('Console.Write:m,Void', $_[0]) }
     sub note { rawscall('Console.Error.WriteLine', $_[0]) }
     sub exit { rawscall('System.Environment.Exit', $_[0]) }
     sub slurp { rawscall('System.IO.File.ReadAllText', $_[0]) }
