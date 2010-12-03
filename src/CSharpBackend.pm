@@ -399,6 +399,12 @@ sub resolve_lex {
         my $nn = CgOp::rawsget($cl->{peer}{$arg});
         %$op = %$nn;
         bless $op, ref($nn);
+    } elsif ($opc eq 'call_uncloned_sub') {
+        my $sr = $unit->deref([ $arg, @rest ]);
+        my $nn = CgOp::subcall(CgOp::rawscall('Kernel.MakeSub',
+                CgOp::rawsget($sr->{peer}{si}), CgOp::callframe()));
+        %$op = %$nn;
+        bless $op, ref($nn);
     } elsif ($opc eq 'let') {
         local $haslet{$arg} = 1;
 

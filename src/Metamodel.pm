@@ -458,8 +458,12 @@ our %units;
     }
 
     sub children {
-        map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
-            values %{ $_[0]->lexicals };
+        my @extra;
+        if ($_[0]->signature) {
+            @extra = grep { defined } map { $_->mdefault } @{ $_[0]->signature->params };
+        }
+        (map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
+            values %{ $_[0]->lexicals }), @extra;
     }
 
     sub create_static_pad {
@@ -833,7 +837,10 @@ sub Sig::Parameter::begin {
 
     $opensubs[-1]->add_my_name($self->slot, list => $self->list,
         hash => $self->hash, noinit => 1) if defined $self->slot;
-    $self->default->begin if defined($self->default);
+    if (defined ($self->default)) {
+        $self->mdefault($self->default->begin);
+        delete $self->{default};
+    }
 }
 
 sub Op::begin {

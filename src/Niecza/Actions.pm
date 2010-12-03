@@ -348,10 +348,13 @@ sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
     my @parm = Sig::Parameter->new(slot => 'self', name => 'self', readonly => 1);
     if (exists $args{goal}) {
         push @parm, Sig::Parameter->new(slot => '$*GOAL', name => '$*GOAL',
-            readonly => 1, positional => 0, default =>
-                Op::StringLiteral->new(text => $args{goal}));
+            readonly => 1, positional => 0, optional => 1);
+        unshift @lift, Op::Bind->new(node($M), readonly => 1,
+            lhs => Op::Lexical->new(name => '$*GOAL'),
+            rhs => Op::StringLiteral->new(text => $args{goal}));
     }
-    my $subop = $cl->transparent($M, Op::RegexBody->new(canback => $mb,
+    my $subop = $cl->transparent($M,
+        Op::RegexBody->new(canback => $mb,
             pre => \@lift, passcut => $args{passcut}, passcap => $args{passcap},
             rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
         sig => Sig->new(params => \@parm));
@@ -2253,7 +2256,8 @@ sub modifier_expr { my ($cl, $M) = @_;
     $M->{_ast} = $M->{EXPR}{_ast};
 }
 sub default_value { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{EXPR}{_ast};
+    $M->{_ast} = Body->new(transparent => 1, name => 'ANON',
+        do => $M->{EXPR}{_ast});
 }
 
 sub arglist { my ($cl, $M) = @_;

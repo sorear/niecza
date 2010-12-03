@@ -361,6 +361,7 @@ use warnings;
     }
 
     sub class_ref { CgOp->new(op => [ class_ref => @_ ]); }
+    sub call_uncloned_sub { CgOp->new(op => [ call_uncloned_sub => @_ ]); }
 
     sub _process_arglist {
         my $ar = shift;

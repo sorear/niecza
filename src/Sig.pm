@@ -14,7 +14,8 @@ use 5.010;
     has rwtrans => (is => 'ro', isa => 'Bool', default => 0);
     has full_parcel => (is => 'ro', isa => 'Bool', default => 0);
     has optional => (is => 'ro', isa => 'Bool', default => 0);
-    has default => (is => 'ro', isa => 'Maybe[Op]', default => undef);
+    has default => (is => 'ro', isa => 'Maybe[Body]', default => undef);
+    has mdefault => (is => 'rw', isa => 'Maybe[Metamodel::StaticSub]');
     has positional => (is => 'ro', isa => 'Bool', default => 1);
     has readonly => (is => 'ro', isa => 'Bool', default => 0);
     has names => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
@@ -62,9 +63,8 @@ use 5.010;
     sub _default_get {
         my ($self, $body) = @_;
 
-        if (defined $self->default) {
-            # the default code itself was generated in decls
-            return $self->default->code($body);
+        if (defined $self->mdefault) {
+            return CgOp::call_uncloned_sub(@{ $self->mdefault->xref });
         } elsif ($self->optional) {
             if ($self->type eq 'Any') {
                 return CgOp::newscalar(CgOp::rawsget('Kernel.AnyP'));
