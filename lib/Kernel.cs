@@ -1527,10 +1527,9 @@ namespace Niecza {
             }
         }
 
-        public static Frame GetFirst(Frame th, Variable lst) {
+        public static Variable GetFirst(Variable lst) {
             if (!lst.islist) {
-                th.resultSlot = lst;
-                return th;
+                return lst;
             }
             DynObject dyl = lst.Fetch() as DynObject;
             if (dyl == null) { goto slow; }
@@ -1539,17 +1538,15 @@ namespace Niecza {
             if (itemsl.Count() == 0) {
                 VarDeque restl = (VarDeque) dyl.GetSlot("rest");
                 if (restl.Count() == 0) {
-                    th.resultSlot = NewROScalar(AnyP);
-                    return th;
+                    return NewROScalar(AnyP);
                 }
                 goto slow;
             }
-            th.resultSlot = itemsl[0];
-            return th;
+            return itemsl[0];
 
 slow:
-            return lst.Fetch().InvokeMethod(th, "head", new Variable[] {
-                    lst }, null);
+            return (Variable) RunInferior(lst.Fetch().InvokeMethod(
+                        GetInferiorRoot(), "head", new Variable[] {lst}, null));
         }
 
         public static BValue PackageLookup(IP6 parent, string name) {

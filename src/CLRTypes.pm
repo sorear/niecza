@@ -116,7 +116,7 @@ my %typedata = (
     'Kernel.BindFail'      => [c => 'Variable'],
     'Kernel.CheckArgEnd'   => [c => 'Void'],
     'Kernel.CoTake'        => [c => 'Variable'],
-    'Kernel.GetFirst'      => [c => 'Variable'],
+    'Kernel.GetFirst'      => [m => 'Variable'],
     'Kernel.Take'          => [c => 'Variable'],
     'Kernel.GatherHelper'  => [c => 'Frame'],
     'Kernel.ContextHelper' => [m => 'Variable'],
