@@ -568,6 +568,8 @@ use CgOp;
     has _passcapzyg => (isa => 'Maybe[RxOp]', is => 'rw');
     has _passcapltm => (is => 'rw');
     has selfcut  => (isa => 'Bool', is => 'ro', default => 0);
+    has zerowidth => (isa => 'Bool', is => 'ro');
+    has negative  => (isa => 'Bool', is => 'ro');
 
     sub opzyg { ($_[0]->regex ? ($_[0]->regex) : ()) }
 
@@ -608,11 +610,12 @@ use CgOp;
         my @pushcapf = (($self->passcap ?
             (CgOp::rxsetcapsfrom(CgOp::cast("cursor", CgOp::letvar("k"))))
                 : ()), @newcapf);
-        my $backf = CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k")));
+        my $backf = ($self->negative ? \&CgOp::cgoto : \&CgOp::ncgoto)->('backtrack', CgOp::obj_is_defined(CgOp::letvar("k")));
         my $updatef = CgOp::prog(
             @pushcapf,
             CgOp::rxsetpos(CgOp::cursor_pos(CgOp::cast("cursor",
                         CgOp::letvar("k")))));
+        $updatef = CgOp::prog() if $self->zerowidth;
 
         my @code;
 

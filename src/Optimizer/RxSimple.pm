@@ -169,6 +169,9 @@ sub RxOp::Before::rxsimp { my ($self, $cut) = @_;
     if ($z->isa('RxOp::String')) {
         return RxOp::BeforeString->new(str => $z->text);
     }
+    if ($z->isa('RxOp::Subrule')) {
+        return RxOp::Subrule->new(%$z, zerowidth => 1);
+    }
     return RxOp::Before->new(zyg => [ $z ]);
 }
 sub RxOp::NotBefore::mayback { 0 }
@@ -182,6 +185,9 @@ sub RxOp::NotBefore::rxsimp { my ($self, $cut) = @_;
     }
     if ($z->isa('RxOp::String')) {
         return RxOp::NotBeforeString->new(str => $z->text);
+    }
+    if ($z->isa('RxOp::Subrule')) {
+        return RxOp::Subrule->new(%$z, zerowidth => 1, negative => !$z->negative);
     }
     return RxOp::NotBefore->new(zyg => [ $z ]);
 }
