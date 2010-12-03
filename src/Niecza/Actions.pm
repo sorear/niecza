@@ -805,7 +805,7 @@ sub assertion__S_name { my ($cl, $M) = @_;
             $M->{_ast} = RxOp::Sequence->new;
             return;
         }
-        $M->{_ast} = RxOp::AfterCCs->new(ccs => \@l);
+        $M->{_ast} = RxOp::ZeroWidthCCs->new(neg => 0, after => 1, ccs => \@l);
         return;
     } elsif (!$M->{nibbler}[0] && !$M->{arglist}[0]) {
         $M->{_ast} = RxOp::Subrule->new(method => $name);

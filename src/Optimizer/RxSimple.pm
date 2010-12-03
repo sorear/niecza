@@ -142,7 +142,7 @@ sub RxOp::CheckBlock::mayback { 0 }
 sub RxOp::Sym::mayback { 0 }
 sub RxOp::VarString::mayback { 0 }
 sub RxOp::ConfineLang::mayback { $_[0]->zyg->[0]->mayback }
-sub RxOp::AfterCCs::mayback { 0 }
+sub RxOp::ZeroWidthCCs::mayback { 0 }
 sub RxOp::SaveValue::mayback { 0 }
 sub RxOp::Statement::mayback { 0 }
 sub RxOp::String::mayback { 0 }
@@ -172,6 +172,12 @@ sub RxOp::Before::rxsimp { my ($self, $cut) = @_;
     if ($z->isa('RxOp::Subrule')) {
         return RxOp::Subrule->new(%$z, zerowidth => 1);
     }
+    if ($z->isa('RxOp::ZeroWidthCCs')) {
+        return $z;
+    }
+    if ($z->isa('RxOp::CClassElem')) {
+        return RxOp::ZeroWidthCCs->new(ccs => [$z->cc], after => 0, neg => 0);
+    }
     return RxOp::Before->new(zyg => [ $z ]);
 }
 sub RxOp::NotBefore::mayback { 0 }
@@ -188,6 +194,13 @@ sub RxOp::NotBefore::rxsimp { my ($self, $cut) = @_;
     }
     if ($z->isa('RxOp::Subrule')) {
         return RxOp::Subrule->new(%$z, zerowidth => 1, negative => !$z->negative);
+    }
+    if ($z->isa('RxOp::ZeroWidthCCs')) {
+        return RxOp::ZeroWidthCCs->new(ccs => $z->ccs, after => $z->after,
+            neg => !$z->neg);
+    }
+    if ($z->isa('RxOp::CClassElem')) {
+        return RxOp::ZeroWidthCCs->new(ccs => [$z->cc], after => 0, neg => 1);
     }
     return RxOp::NotBefore->new(zyg => [ $z ]);
 }

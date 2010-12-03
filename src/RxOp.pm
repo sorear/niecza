@@ -409,17 +409,20 @@ use CgOp;
 }
 
 {
-    package RxOp::AfterCCs;
+    package RxOp::ZeroWidthCCs;
     use Moose;
     extends 'RxOp';
 
     has ccs => (is => 'ro', isa => 'ArrayRef[CClass]', required => 1);
+    has after => (is => 'ro', isa => 'Bool', required => 1);
+    has neg => (is => 'ro', isa => 'Bool', required => 1);
 
     sub lad { ['Null'] }
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim('AfterCCs', CgOp::const(CgOp::fcclist_new(
+        CgOp::rxbprim(($self->after ? 'AfterCCs' : 'BeforeCCs'),
+            CgOp::bool($self->neg), CgOp::const(CgOp::fcclist_new(
                     map { CgOp::cc_expr($_) } @{ $self->ccs })));
     }
 

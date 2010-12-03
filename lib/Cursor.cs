@@ -306,13 +306,21 @@ public sealed class RxFrame {
         return (not != ok);
     }
 
-    public bool AfterCCs(CC[] vec) {
+    public bool AfterCCs(bool neg, CC[] vec) {
         int offs = st.pos - vec.Length;
-        if (offs < 0) return false;
+        if (offs < 0) return neg;
         for (int i = 0; i < vec.Length; i++)
             if (!vec[i].Accepts(orig[offs + i]))
-                return false;
-        return true;
+                return neg;
+        return !neg;
+    }
+
+    public bool BeforeCCs(bool neg, CC[] vec) {
+        if (end - st.pos < vec.Length) return neg;
+        for (int i = 0; i < vec.Length; i++)
+            if (!vec[i].Accepts(orig[st.pos + i]))
+                return neg;
+        return !neg;
     }
 
     public bool ScanCClass(int min, int max, CC x) {
