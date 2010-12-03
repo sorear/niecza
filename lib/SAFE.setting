@@ -16,7 +16,7 @@ my class Mu {
     }
     method Str() {
         my $tn := Q:CgOp { (box Str (obj_typename (@ {self}))) };
-        if self.defined {
+        if defined(self) {
             $tn ~ "()<instance>"
         } else {
             $tn ~ "()"
@@ -81,25 +81,25 @@ my class Cool {
     }
 
     method comb($rx) {
-        my $str = self.Str;
+        my $str = ~self;
         my $C = Cursor.new($str);
         my $i = 0;
         my @out;
-        while $i < $str.chars {
+        while $i < chars $str {
             my $M = first($rx($C.cursor($i++)));
             if $M {
                 $i max= $M.to;
-                push @out, $M.Str;
+                push @out, ~$M;
             } else {
             }
         }
         @out
     }
-    method say() { self.Str.say }
+    method say() { (~self).say }
     method chars() { chars(self) }
     method substr($x,$y) { substr(self,$x,$y) }
-    method lc() { Q:CgOp { (box Str (str_tolower (obj_getstr {self.Str}))) }}
-    method uc() { Q:CgOp { (box Str (str_toupper (obj_getstr {self.Str}))) }}
+    method lc() { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
+    method uc() { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
 
 
     method at-pos(\$self: $ix) {
@@ -226,7 +226,7 @@ sub exit($status = 0) { Q:CgOp {
 sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
 
 sub chars($str) { chars($str) }
-sub substr($str, $start, $len = $str.chars - $start) { substr($str, $start, $len) }
+sub substr($str, $start, $len = chars($str) - $start) { substr($str, $start, $len) }
 
 sub item($x) { $x }
 
@@ -283,7 +283,7 @@ sub infix:<but>($obj, $role) { Q:CgOp {
     (ns (stab_what (role_apply (obj_llhow (@ {$obj})) (obj_llhow (@ {$role})))))
 } }
 
-sub infix:<~~>($t,$m) { ($m.defined) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
+sub infix:<~~>($t,$m) { defined($m) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
 # }}}
 # Flow inspection and control {{{
 my class CallFrame {
@@ -674,7 +674,7 @@ my class Hash {
     method list()   { Q:CgOp { (bif_hash_pairs  {self}) } }
     method kv()     { Q:CgOp { (bif_hash_kv     {self}) } }
 
-    method Bool () { self.list.Bool }
+    method Bool () { ?(self.list) }
 
     method invert() {
         my %new;
@@ -762,7 +762,7 @@ my class Enum is Cool {
                   d (varhash_new)
               (setslot positionals (l n) (fvarlist_new))
               (setslot named (l n) (l d))
-              (varhash_setindex (unbox str (@ {$!key.Str}))
+              (varhash_setindex (obj_getstr {$!key})
                 (l d) {$!value})
               (ns (l n)))
         }
@@ -923,8 +923,8 @@ my class Match is Cool {
     method pos() { self.to }
     method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
-    method chars() { $.defined ?? $.to - $.from !! 0 }
-    method Str() { $.defined ?? $.orig.substr($.from, $.chars) !! "" }
+    method chars() { defined(self) ?? $.to - $.from !! 0 }
+    method Str() { defined(self) ?? $.orig.substr($.from, $.chars) !! "" }
     method dump() {
         "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
     }
@@ -969,19 +969,19 @@ my class Regex is Sub {
 
 # used in a few parts of STD until s/// is working
 sub _subst($M is rw, $text is rw, $regex, $repl) {
-    $text = $text.Str;
+    $text = ~$text;
     $M = ($text ~~ $regex);
     if $M {
-        $text = $text.substr(0, $M.from) ~
+        $text = substr($text, 0, $M.from) ~
             (($repl ~~ Str) ?? $repl !! $repl()) ~
-                $text.substr($M.to, ($text.chars - $M.to));
+                substr($text, $M.to, (chars($text) - $M.to));
     }
     ?$M;
 }
 
 my class Grammar is Cursor {
     method parse($text) {
-        flat(grep { $_.to == $text.chars }, self.new($text).TOP).head
+        flat(grep { $_.to == chars $text }, self.new($text).TOP).head
     }
 }
 # }}}
