@@ -1533,10 +1533,17 @@ namespace Niecza {
                 return th;
             }
             DynObject dyl = lst.Fetch() as DynObject;
-            if (dyl == null) goto slow;
-            if (dyl.mo != Kernel.ListMO) goto slow;
+            if (dyl == null) { goto slow; }
+            if (dyl.mo != Kernel.ListMO) { goto slow; }
             VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
-            if (itemsl.Count() == 0) goto slow;
+            if (itemsl.Count() == 0) {
+                VarDeque restl = (VarDeque) dyl.GetSlot("rest");
+                if (restl.Count() == 0) {
+                    th.resultSlot = NewROScalar(AnyP);
+                    return th;
+                }
+                goto slow;
+            }
             th.resultSlot = itemsl[0];
             return th;
 
