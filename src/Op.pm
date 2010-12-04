@@ -946,7 +946,9 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::context_get(CgOp::clr_string($self->name), CgOp::int($self->uplevel));
+        my @a = (CgOp::clr_string($self->name), CgOp::int($self->uplevel));
+        ($self->name eq '$*/' || $self->name eq '$*!') ?
+            CgOp::status_get(@a) : CgOp::context_get(@a);
     }
 
     __PACKAGE__->meta->make_immutable;

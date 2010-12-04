@@ -340,14 +340,14 @@ sub codegen {
     local %lettypes;
     local $spill = 0;
 
-    #say(YAML::XS::Dump($root));
+    #say(YAML::XS::Dump($root)) if $cg->csname eq 'G256ACCEPTSC';
     my @stmts = cvt($root)->stmts_result;
-    #say(YAML::XS::Dump(@stmts));
+    #say(YAML::XS::Dump(@stmts)) if $cg->csname eq 'G256ACCEPTSC';
 
     for (@stmts) {
         codegen_term($cg, $_)
             if !$cg->unreach || $_->op->[0] eq 'ehspan' ||
-                $_->op->[0] eq 'labelhere';
+                $_->op->[0] eq 'labelhere' || $_->op->[0] eq 'drop_let';
     }
 }
 

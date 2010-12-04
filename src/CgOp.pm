@@ -243,6 +243,8 @@ use warnings;
     sub control        { rawscall('Kernel.SearchForHandler', CgOp::int(shift()),
             @_) }
     sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0], $_[1]) }
+    sub status_get    { rawscall('Kernel.StatusHelper:m,Variable', callframe(), $_[0], $_[1]) }
+    sub set_status    { rawscall('Kernel.SetStatus:m,Void', callframe(), $_[0], $_[1]) }
     sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
     sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
     sub promote_to_list{ rawscall('Kernel.PromoteToList:c,Variable', $_[0]) }

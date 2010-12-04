@@ -8,6 +8,16 @@ use MONKEY_TYPING;
     is A.new + 23, 65, '+ calls user-written .Numeric';
 }
 
+{
+    "abc" ~~ /. (.) ./;
+    is $0, 'b', 'Regex matches set $/';
+}
+
+{
+    "abc" ~~ /de(.)/;
+    ok !defined($/), 'Failed regex matches clear $/';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

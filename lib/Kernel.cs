@@ -1509,6 +1509,36 @@ bound: ;
             }
         }
 
+        public static void SetStatus(Frame th, string name, Variable v) {
+            th = th.caller;
+            while (true) {
+                string n = th.info.name;
+                // Mega-Hack: These functions wrap stuff and should
+                // propagate $/
+                if (n == "SAFE infix:<~~>") {
+                    th = th.caller;
+                    continue;
+                }
+                break;
+            }
+            if (th.lex == null)
+                th.lex = new Dictionary<string,object>();
+            th.lex[name] = v;
+        }
+
+        public static Variable StatusHelper(Frame th, string name, int up) {
+            object rt;
+            uint m = SubInfo.FilterForName(name);
+            while (th != null) {
+                if (up <= 0 && th.TryGetDynamic(name, m, out rt)) {
+                    return (Variable)rt;
+                }
+                th = th.outer;
+                up--;
+            }
+            return NewROScalar(AnyP);
+        }
+
         public static Variable DefaultNew(IP6 proto) {
             DynObject n = new DynObject(((DynObject)proto).mo);
             DynMetaObject[] mro = n.mo.mro;

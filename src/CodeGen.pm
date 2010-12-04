@@ -124,7 +124,9 @@ use CLRTypes;
 
     sub drop_let {
         my ($self, $which) = @_;
-        die "Let consistency error" if $which ne $self->letstack->[-1][0];
+        if ($which ne $self->letstack->[-1][0]) {
+            Carp::confess "Let consistency error: $which, " . YAML::XS::Dump($self->letstack);
+        }
         my $r = pop @{ $self->letstack };
         $self->letused->{ $r->[4] } = 0;
     }

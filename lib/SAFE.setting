@@ -960,8 +960,11 @@ my class Regex is Sub {
                 (l iter (vvarlist_new_singleton
                     (subcall (@ {self}) (ns (l csr)))))
                 (ternary (iter_hasflat (l iter))
-                  (return (newrwlistvar (@ (vvarlist_shift (l iter)))))
+                  (letn val (vvarlist_shift (l iter))
+                    (set_status (s $*/) (l val))
+                    (return (newrwlistvar (@ (l val)))))
                   (prog))))
+              (set_status (s $*/) {Match})
               {Any})
         };
     }
