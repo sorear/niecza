@@ -6,6 +6,8 @@ use Stash;
 use NAME;
 use JSYNC;
 
+my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+
 augment class List {
     method head() { Q:CgOp {
         (letn items (getslot items vvarlist (@ {self}))
@@ -222,6 +224,34 @@ method load_lex($setting) {
 }
 
 augment class STD::P6 {
+    token infixish ($in_meta?) {
+        :my ($infix, $O, $sym);
+        :temp $*IN_META;
+        :my $stub = ($*IN_META = $*IN_META // $in_meta); #OK not used
+        <!stdstopper>
+        <!infixstopper>
+        :dba('infix or meta-infix')
+        [
+        | <colonpair> $<fake> = {1} { $sym = ':' }
+            { $O = {:prec(%item_assignment<prec>), :assoc<unary>,
+                :dba<adverb> } }
+                # actual test is non-inclusive!
+        |   [
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $O = $<infix><O>; $sym = $<infix><sym> }
+            | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
+            | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
+            ]
+            [ <?before '='> <assign_meta_operator($<infix>)>
+                   {$O = $<assign_meta_operator>[0]<O>}
+                   {$sym = $<assign_meta_operator>[0]<sym>}
+            ]?
+
+        ]
+        $<O> = { $O } $<sym> = { $sym }
+    }
 }
 
 augment class Cursor {

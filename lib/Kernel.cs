@@ -46,9 +46,8 @@ namespace Niecza {
             DispatchEnt m;
             //Kernel.LogNameLookup(name);
             if (mo.mro_methods.TryGetValue(name, out m)) {
-                Frame nf = caller.MakeChild(m.outer, m.info);
-                nf.pos = pos;
-                nf.named = named;
+                Frame nf = m.info.Binder(caller.MakeChild(m.outer, m.info),
+                        pos, named);
                 nf.curDisp = m;
                 return nf;
             }
@@ -231,8 +230,39 @@ namespace Niecza {
         public Dictionary<string, object> hints;
         // maybe should be a hint
         public LAD ltm;
+        public int nspill;
         public Dictionary<string, int> dylex;
         public uint dylex_filter; // (32,1) Bloom on hash code
+        public int[] sig_i;
+        public object[] sig_r;
+
+        public const int SIG_I_RECORD  = 3;
+        public const int SIG_I_FLAGS   = 0;
+        public const int SIG_I_SLOT    = 1;
+        public const int SIG_I_NNAMES  = 2;
+
+        // R records are variable size, but contain canonical name,
+        // usable names (in order), default SubInfo (if present),
+        // type DynMetaObject (if present)
+
+        // Value processing
+        public const int SIG_F_HASTYPE    = 1; // else Kernel.AnyMO
+
+        // Value binding
+        public const int SIG_F_READWRITE  = 2;
+        public const int SIG_F_COPY       = 4;
+        public const int SIG_F_RWTRANS    = 8;
+        public const int SIG_F_BINDLIST   = 16;
+
+        // Value source
+        public const int SIG_F_HASDEFAULT = 32;
+        public const int SIG_F_OPTIONAL   = 64;
+        public const int SIG_F_POSITIONAL = 128;
+        public const int SIG_F_SLURPY_POS = 256;
+        public const int SIG_F_SLURPY_NAM = 512;
+        public const int SIG_F_SLURPY_CAP = 1024;
+        public const int SIG_F_SLURPY_PCL = 2048;
+
         public const uint FILTER_SALT = 0x9e3779b9;
 
         // records: $start-ip, $end-ip, $type, $goto, $lid
@@ -278,6 +308,151 @@ namespace Niecza {
             return -1;
         }
 
+        private string PName(int rbase) {
+            return ((string)sig_r[rbase]) + " in " + name;
+        }
+        public Frame Binder(Frame th, Variable[] pos, Dictionary<string,Variable> named) {
+            th.pos = pos;
+            th.named = named;
+            // XXX I don't fully understand how this works, but it's
+            // necessary for inferior runloops from here to work.  Critical
+            // section blah blah.
+            Kernel.lastFrame = th;
+            if (sig_i == null) return th;
+            int posc = 0;
+            HashSet<string> namedc = null;
+            if (named != null)
+                namedc = new HashSet<string>(named.Keys);
+            int ic = 0;
+            int rc = 0;
+            int sigend = sig_i.Length;
+
+            while (ic < sigend) {
+                int flags = sig_i[ic++];
+                int slot  = sig_i[ic++];
+                int names = sig_i[ic++];
+                int rbase = rc;
+                rc += (1 + names);
+                if ((flags & SIG_F_HASDEFAULT) != 0) rc++;
+                DynMetaObject type = Kernel.AnyMO;
+                if ((flags & SIG_F_HASTYPE) != 0)
+                    type = (DynMetaObject)sig_r[rc++];
+
+                Variable src = null;
+                if ((flags & SIG_F_SLURPY_PCL) != 0) {
+                    src = Kernel.BoxAnyMO(pos, Kernel.ParcelMO);
+                    posc  = pos.Length;
+                    goto gotit;
+                }
+                if ((flags & SIG_F_SLURPY_CAP) != 0) {
+                    IP6 nw = new DynObject(Kernel.CaptureMO);
+                    nw.SetSlot("positionals", pos);
+                    nw.SetSlot("named", named);
+                    src = Kernel.NewROScalar(nw);
+                    named = null; namedc = null; posc = pos.Length;
+                    goto gotit;
+                }
+                if ((flags & SIG_F_SLURPY_POS) != 0) {
+                    IP6 l = new DynObject(Kernel.ListMO);
+                    Kernel.IterToList(l, Kernel.IterFlatten(
+                                Kernel.SlurpyHelper(th, posc)));
+                    src = Kernel.NewRWListVar(l);
+                    posc = pos.Length;
+                    goto gotit;
+                }
+                if ((flags & SIG_F_SLURPY_NAM) != 0) {
+                    Dictionary<string,Variable> nh
+                        = new Dictionary<string,Variable>();
+                    if (named != null) {
+                        foreach (KeyValuePair<string,Variable> kv in named)
+                            if (namedc.Contains(kv.Key))
+                                nh[kv.Key] = kv.Value;
+                        named = null;
+                        namedc = null;
+                    }
+                    src = Kernel.BoxAnyMO(nh, Kernel.HashMO);
+                    goto gotit;
+                }
+                if (names != 0 && named != null) {
+                    for (int ni = 1; ni <= names; ni++) {
+                        string n = (string)sig_r[rbase+ni];
+                        if (namedc.Contains(n)) {
+                            namedc.Remove(n);
+                            src = named[n];
+                            goto gotit;
+                        }
+                    }
+                }
+                if ((flags & SIG_F_POSITIONAL) != 0 && posc != pos.Length) {
+                    src = pos[posc++];
+                    goto gotit;
+                }
+                if ((flags & SIG_F_HASDEFAULT) != 0) {
+                    // We can't use RunInferior here because we're in the
+                    // critical section where a new frame is being pushed,
+                    // and there are some reentrancy issues; the new
+                    // ExitRunloop frame winds up replacing the current frame
+                    Frame thn = th.MakeChild(null, Kernel.ExitRunloopSI)
+                        .MakeChild(th, (SubInfo) sig_r[rbase + 1 + names]);
+                    Kernel.RunCore(thn);
+                    src = (Variable) thn.caller.resultSlot;
+                    goto gotit;
+                }
+                if ((flags & SIG_F_OPTIONAL) != 0) {
+                    src = Kernel.NewROScalar(type.typeObject);
+                    goto gotit;
+                }
+                return Kernel.Die(th, "No value for parameter " + PName(rbase));
+gotit:
+                if ((flags & SIG_F_RWTRANS) != 0) {
+                } else {
+                    bool islist = ((flags & SIG_F_BINDLIST) != 0);
+                    bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
+
+                    // XXX $_ stupidity
+                    if (rw && !src.rw)
+                        rw = false;
+                        //return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
+                    // fast path
+                    if (rw == src.rw && islist == src.islist) {
+                        if (!src.type.HasMRO(type))
+                            return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + src.type.name + ", needed " + type.name);
+                        if (src.whence != null)
+                            Kernel.Vivify(src);
+                        goto bound;
+                    }
+                    // rw = false and rhs.rw = true OR
+                    // rw = false and islist = false and rhs.islist = true OR
+                    // rw = false and islist = true and rhs.islist = false
+                    IP6 srco = src.Fetch();
+                    if (!srco.mo.HasMRO(type))
+                        return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
+                    src = new SimpleVariable(false, islist, srco.mo, null, srco);
+bound: ;
+                }
+                switch (slot + 1) {
+                    case 0: break;
+                    case 1: th.lex0 = src; break;
+                    case 2: th.lex1 = src; break;
+                    case 3: th.lex2 = src; break;
+                    case 4: th.lex3 = src; break;
+                    default: th.lexn[slot - 4] = src; break;
+                }
+            }
+
+            if (posc != pos.Length || namedc != null && namedc.Count != 0) {
+                string m = "Excess arguments to " + name;
+                if (posc != pos.Length)
+                    m += string.Format(", used {0} of {1} positionals",
+                            posc, pos.Length);
+                if (namedc != null && namedc.Count != 0)
+                    m += ", unused named " + Kernel.JoinS(", ", namedc);
+                return Kernel.Die(th, m);
+            }
+
+            return th;
+        }
+
         public void PutHint(string name, object val) {
             if (hints == null)
                 hints = new Dictionary<string,object>();
@@ -302,7 +477,7 @@ namespace Niecza {
 
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
-                string[] dylexn, int[] dylexi) {
+                int nspill, string[] dylexn, int[] dylexi) {
             this.lines = lines;
             this.code = code;
             this.outer = outer;
@@ -310,6 +485,7 @@ namespace Niecza {
             this.name = name;
             this.edata = edata;
             this.label_names = label_names;
+            this.nspill = nspill;
             if (dylexn != null) {
                 dylex = new Dictionary<string, int>();
                 for (int i = 0; i < dylexn.Length; i++) {
@@ -320,7 +496,7 @@ namespace Niecza {
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
-            this(name, null, code, null, null, new int[0], null, null, null) { }
+            this(name, null, code, null, null, new int[0], null, 0, null, null) { }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -355,8 +531,6 @@ namespace Niecza {
 
         // after MakeSub, GatherHelper
         public const int SHARED = 1;
-        // nextsame; on binder failure
-        public const int MULTIPHASE = 2;
         public int flags;
 
         public Frame(Frame caller_, Frame outer_,
@@ -381,7 +555,7 @@ namespace Niecza {
                 Console.WriteLine("{0}\t{1}", this.info.name, info.name);
             reusable_child.ip = 0;
             reusable_child.resultSlot = null;
-            reusable_child.lexn = null;
+            reusable_child.lexn = (info.nspill != 0) ? new object[info.nspill] : null;
             reusable_child.lex = null;
             reusable_child.lex0 = null;
             reusable_child.lex1 = null;
@@ -529,7 +703,7 @@ namespace Niecza {
         public CtxCallMethodUnbox(string method) { this.method = method; }
 
         public override T Get(Variable obj) {
-            Variable v = (Variable)Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
+            Variable v = Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
             return Kernel.UnboxAny<T>(v.Fetch());
         }
     }
@@ -539,7 +713,7 @@ namespace Niecza {
         public CtxCallMethod(string method) { this.method = method; }
 
         public override Variable Get(Variable obj) {
-            return (Variable)Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
+            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
         }
     }
 
@@ -1094,6 +1268,7 @@ namespace Niecza {
             DynObject dyo = (DynObject) sub;
             Frame n = th.MakeChild((Frame) dyo.slots[0],
                     (SubInfo) dyo.slots[1]);
+            n = n.info.Binder(n, Variable.None, null);
             n.MarkSharedChain();
             th.resultSlot = n;
             return th;
@@ -1106,8 +1281,7 @@ namespace Niecza {
             SubInfo info = (SubInfo) dyo.slots[1];
 
             Frame n = caller.MakeChild(outer, info);
-            n.pos = pos;
-            n.named = named;
+            n = n.info.Binder(n, pos, named);
 
             return n;
         }
@@ -1123,42 +1297,6 @@ namespace Niecza {
         public static Frame Die(Frame caller, string msg) {
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
                     BoxAnyMO<string>(msg, StrMO));
-        }
-
-        public static Frame BindFail(Frame caller, string msg) {
-            // TODO: Junctional failover goes here
-            if ((caller.flags & Frame.MULTIPHASE) != 0) {
-                // TODO: Figure out how .*foo fits in here.
-                Variable[] p = caller.pos;
-                Dictionary<string,Variable> n = caller.named;
-                DispatchEnt de = caller.curDisp.next;
-                if (de == null) {
-                    return Die(caller.caller, "Multiple dispatch failed to find a candidate");
-                }
-                caller = caller.caller.MakeChild(de.outer, de.info);
-                caller.pos = p;
-                caller.named = n;
-                caller.curDisp = de;
-                caller.flags |= Frame.MULTIPHASE;
-                return caller;
-            }
-            return Die(caller, msg);
-        }
-
-        public static Frame CheckArgEnd(Frame caller, int i, string m) {
-            // TODO: checking for SigCheckOnly goes here
-            if (i == caller.pos.Length &&
-                    (caller.named == null || caller.named.Count == 0)) {
-                caller.flags &= ~Frame.MULTIPHASE;
-                return caller;
-            } else {
-                if (i != caller.pos.Length)
-                    m += string.Format(", used {0} of {1} positionals",
-                            i, caller.pos.Length);
-                if (caller.named != null && caller.named.Count != 0)
-                    m += ", unused named " + JoinS(", ", caller.named.Keys);
-                return BindFail(caller, m);
-            }
         }
 
         public static IP6 SigSlurpCapture(Frame caller) {
@@ -1413,49 +1551,44 @@ namespace Niecza {
             list.SetSlot("rest", iter);
         }
 
-        public static Frame IterFlatten(Frame caller, VarDeque iter) {
-            Frame n = caller.MakeChild(null, IF_SI);
-            n.lex0 = iter;
-            n.lex1 = new VarDeque();
-            return n;
+        public static VarDeque IterFlatten(VarDeque inq) {
+            VarDeque outq = new VarDeque();
+            Variable inq0v;
+            IP6 inq0;
+
+again:
+            if (inq.Count() == 0)
+                return outq;
+            inq0v = inq[0];
+            inq0 = inq0v.Fetch();
+            if (inq0v.islist) {
+                inq.Shift();
+                inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
+                goto again;
+            }
+            if (inq0.mo.HasMRO(IterCursorMO)) {
+                Frame th = new Frame(null, null, IF_SI);
+                th.lex0 = inq;
+                DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                thunk.slots[0] = NewRWScalar(AnyMO, th);
+                thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
+                outq.Push(NewROScalar(thunk));
+                return outq;
+            }
+            outq.Push(inq0v);
+            inq.Shift();
+            goto again;
         }
+
         private static SubInfo IF_SI = new SubInfo("iter_flatten", IF_C);
         private static Frame IF_C(Frame th) {
             VarDeque inq = (VarDeque) th.lex0;
-            VarDeque outq = (VarDeque) th.lex1;
-            Variable inq0v;
-            IP6 inq0;
             switch (th.ip) {
                 case 0:
-                    if (inq.Count() == 0) {
-                        th.caller.resultSlot = outq;
-                        return th.caller;
-                    }
-                    inq0v = inq[0];
-                    inq0 = inq0v.Fetch();
-                    if (inq0v.islist) {
-                        inq.Shift();
-                        inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
-                        goto case 0;
-                    }
-                    if (inq0.mo.HasMRO(IterCursorMO)) {
-                        th.MarkSharedChain();
-                        th.ip = 1;
-                        DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
-                        thunk.slots[0] = NewRWScalar(AnyMO, th);
-                        thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
-                        outq.Push(NewROScalar(thunk));
-                        th.caller.resultSlot = outq;
-                        return th.caller;
-                    }
-                    outq.Push(inq0v);
-                    inq.Shift();
-                    goto case 0;
-                case 1:
-                    th.ip = 2;
-                    return IterHasFlat(th, inq, true);
-                case 2:
                     th.ip = 1;
+                    return IterHasFlat(th, inq, true);
+                case 1:
+                    th.ip = 0;
                     if ((Boolean) th.resultSlot) {
                         return Take(th, inq.Shift());
                     } else {
@@ -1545,7 +1678,7 @@ namespace Niecza {
             return itemsl[0];
 
 slow:
-            return (Variable) RunInferior(lst.Fetch().InvokeMethod(
+            return RunInferior(lst.Fetch().InvokeMethod(
                         GetInferiorRoot(), "head", new Variable[] {lst}, null));
         }
 
@@ -1627,7 +1760,7 @@ slow:
         }
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
             Frame n = th.MakeChild(null, IRSI);
-            n.pos = pcl;
+            n = n.info.Binder(n, pcl, null);
             return n;
         }
 
@@ -1722,7 +1855,7 @@ slow:
             }
         }
 
-        [ThreadStatic] private static Frame lastFrame;
+        [ThreadStatic] internal static Frame lastFrame;
         public static void RunCore(Frame cur) {
             for(;;) {
                 try {
@@ -2001,17 +2134,13 @@ slow:
                 if (de != null) {
                     Variable[] p = tf.pos;
                     Dictionary<string, Variable> n = tf.named;
-                    int fl = tf.flags & Frame.MULTIPHASE;
                     tf = tf.caller.MakeChild(de.outer, de.info);
                     if (o != null) {
-                        tf.pos = (Variable[]) o.slots[0];
-                        tf.named = o.slots[1] as Dictionary<string,Variable>;
-                    } else {
-                        tf.pos = p;
-                        tf.named = n;
+                        p = (Variable[]) o.slots[0];
+                        n = o.slots[1] as Dictionary<string,Variable>;
                     }
+                    tf = tf.info.Binder(tf, p, n);
                     tf.curDisp = de;
-                    tf.flags |= fl;
                     return tf;
                 } else {
                     tf.caller.resultSlot = Kernel.NewROScalar(Kernel.AnyP);

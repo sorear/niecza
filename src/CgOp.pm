@@ -251,7 +251,7 @@ use warnings;
     sub iter_hasflat { rawscall('Kernel.IterHasFlat:c,Boolean', $_[0], bool(1)) }
     sub iter_hasarg { rawscall('Kernel.IterHasFlat:c,Boolean', $_[0], bool(0)) }
     sub iter_to_list { rawscall('Kernel.IterToList:m,Void', $_[0], $_[1]) }
-    sub iter_flatten { rawscall('Kernel.IterFlatten:c,VarDeque', $_[0]) }
+    sub iter_flatten { rawscall('Kernel.IterFlatten:m,VarDeque', $_[0]) }
     sub iter_copy_elems { rawscall('Kernel.IterCopyElems:m,VarDeque', $_[0]) }
 
     sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }

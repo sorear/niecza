@@ -457,6 +457,7 @@ use CLRTypes;
          (@{ $self->ehlabels } ? CgOp::rawnewarr('str',
               map { CgOp::clr_string($_) } @{ $self->ehlabels }) :
               CgOp::null('clr:string[]')),
+         CgOp::int($self->lexnsize),
          (@{ $self->dynames } ? (
               CgOp::rawnewarr('str', map { CgOp::clr_string($_) } @{ $self->dynames }),
               CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->dyixes })
@@ -475,9 +476,6 @@ use CLRTypes;
         }
         $t .= " " x 8 . "switch (th.ip) {\n";
         $t .= " " x 12 . "case 0:\n";
-        if ($self->lexnsize > 0) {
-            $t .= " " x 16 . "th.lexn = new object[" . $self->lexnsize . "];\n";
-        }
         if ($self->usednamed) {
             $t .= " " x 16 . "if (th.lex == null) th.lex = new Dictionary<string,object>();\n";
         }

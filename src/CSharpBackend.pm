@@ -319,9 +319,6 @@ sub enter_code {
     }
 novars:
 
-    if (defined $body->signature) {
-        push @code, $body->signature->binder($body);
-    }
     @code;
 }
 
@@ -487,7 +484,7 @@ sub codegen_sub {
         dynames => \@dynames, dyixes => \@dyixes, minlets => $_->{peer}{nlexn});
 }
 
-sub dynname { $_[0] =~ /^.?[*?]/ }
+sub dynname { $_[0] eq '$_' || $_[0] =~ /^.?[*?]/ }
 # lumped under a sub are all the static-y lexicals
 # protopads and proto-sub-instances need to exist early because methods, in
 # particular, bind to them
@@ -596,9 +593,46 @@ sub protolset {
     }
 }
 
+sub encode_parameter {
+    my ($b, $p, $i, $r) = @_;
+    my $fl = 0;
+    push @$r, CgOp::clr_string($p->name);
+    push @$r, map { CgOp::clr_string($_) } @{ $p->names };
+
+    # Keep in sync with SIG_F_XXX defines
+    # TODO type constraints
+    if ($p->rwtrans) {
+        $fl |= 8;
+    } elsif (!$p->readonly) {
+        $fl |= 2;
+    }
+    $fl |= 16 if ($p->hash || $p->list);
+    if (defined $p->mdefault) {
+        $fl |= 32;
+        push @$r, CgOp::rawsget($p->mdefault->{peer}{si});
+    }
+    $fl |= 64 if $p->optional;
+    $fl |= 128 if $p->positional;
+    $fl |= 256 if $p->slurpy && !$p->hash;
+    $fl |= 512 if $p->slurpy && $p->hash;
+    $fl |= 1024 if $p->slurpycap;
+    $fl |= 2048 if $p->full_parcel;
+
+    push @$i, $fl;
+    push @$i, defined($p->slot) ? $b->lexicals->{$p->slot}{peer} : -1;
+    push @$i, scalar(@{ $p->names });
+}
 
 sub sub3 {
     say STDERR "sub3: ", $_->name if $VERBOSE;
+    if (defined $_->signature) {
+        my @i; my @r; my $b = $_;
+        for (@{ $_->signature->params }) { encode_parameter($b, $_, \@i, \@r); }
+        push @thaw, CgOp::setfield("sig_i", CgOp::rawsget($_->{peer}{si}),
+            CgOp::rawnewarr('int', map { CgOp::int($_) } @i));
+        push @thaw, CgOp::setfield("sig_r", CgOp::rawsget($_->{peer}{si}),
+            CgOp::rawnewarr('clr:object', @r));
+    }
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
         my $frag;
