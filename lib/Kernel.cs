@@ -761,6 +761,11 @@ bound: ;
             return Builtins.HashIterRaw(3, obj);
         }
     }
+    class CtxHashBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            return Kernel.UnboxAny<Dictionary<string,Variable>>(obj.Fetch()).Count != 0;
+        }
+    }
 
     class CtxRawNativeDefined : ContextHandler<bool> {
         public override bool Get(Variable obj) {
@@ -782,6 +787,12 @@ bound: ;
     class CtxNum2Bool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
             return Kernel.UnboxAny<double>(obj.Fetch()) != 0;
+        }
+    }
+
+    class CtxStrBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            return Kernel.UnboxAny<string>(obj.Fetch()) != "";
         }
     }
 
@@ -1912,17 +1923,19 @@ slow:
         public static IP6 ProcessO;
 
         static Kernel() {
-            StrMO = new DynMetaObject("Str");
-            StrMO.loc_Str = new CtxReturnSelf();
-            StrMO.loc_raw_Str = new CtxJustUnbox<string>();
-            StrMO.FillProtoClass(new string[] { });
-
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
             BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
             BoolMO.FillProtoClass(new string[] { });
             TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
             FalseV = NewROScalar(BoxRaw<bool>(false, BoolMO));
+
+            StrMO = new DynMetaObject("Str");
+            StrMO.loc_Str = new CtxReturnSelf();
+            StrMO.loc_raw_Str = new CtxJustUnbox<string>();
+            StrMO.loc_raw_Bool = new CtxStrBool();
+            StrMO.loc_Bool = new CtxBoxify<bool>(StrMO.loc_raw_Bool, BoolMO);
+            StrMO.FillProtoClass(new string[] { });
 
             NumMO = new DynMetaObject("Num");
             NumMO.loc_Numeric = new CtxReturnSelf();
@@ -1973,6 +1986,8 @@ slow:
             HashMO.loc_raw_iterator = new CtxHashIterator();
             HashMO.loc_at_key = new IxHashAtKey();
             HashMO.loc_exists_key = new IxHashExistsKey();
+            HashMO.loc_raw_Bool = new CtxHashBool();
+            HashMO.loc_Bool = new CtxBoxify<bool>(HashMO.loc_raw_Bool, BoolMO);
             HashMO.FillProtoClass(new string[] { });
 
             AnyMO = new DynMetaObject("Any");
