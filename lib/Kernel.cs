@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Collections.Generic;
 using System.Threading;
 using System.Runtime.InteropServices;
@@ -309,7 +310,7 @@ namespace Niecza {
             // XXX I don't fully understand how this works, but it's
             // necessary for inferior runloops from here to work.  Critical
             // section blah blah.
-            Kernel.lastFrame = th;
+            Kernel.SetTopFrame(th);
             if (sig_i == null) return th;
             int posc = 0;
             HashSet<string> namedc = null;
@@ -380,14 +381,9 @@ namespace Niecza {
                     goto gotit;
                 }
                 if ((flags & SIG_F_HASDEFAULT) != 0) {
-                    // We can't use RunInferior here because we're in the
-                    // critical section where a new frame is being pushed,
-                    // and there are some reentrancy issues; the new
-                    // ExitRunloop frame winds up replacing the current frame
-                    Frame thn = th.MakeChild(null, Kernel.ExitRunloopSI)
+                    Frame thn = Kernel.GetInferiorRoot()
                         .MakeChild(th, (SubInfo) sig_r[rbase + 1 + names]);
-                    Kernel.RunCore(thn);
-                    src = (Variable) thn.caller.resultSlot;
+                    src = Kernel.RunInferior(thn);
                     goto gotit;
                 }
                 if ((flags & SIG_F_OPTIONAL) != 0) {
@@ -1850,9 +1846,10 @@ slow:
         public static Frame StartP6Thread(Frame th, IP6 sub) {
             th.MarkSharedChain();
             Thread thr = new Thread(delegate () {
-                    Frame mark = new Frame(th, null, ExitRunloopSI);
-                    Frame cur = sub.Invoke(mark, Variable.None, null);
-                    RunCore(cur);
+                    rlstack = new LastFrameNode();
+                    rlstack.cur = th;
+                    RunInferior(sub.Invoke(GetInferiorRoot(),
+                            Variable.None, null));
                 });
             thr.Start();
             th.resultSlot = thr;
@@ -1875,14 +1872,22 @@ slow:
                 }
                 TraceCount = TraceFreq;
             }
-            RunCore(new Frame(new Frame(null,null, ExitRunloopSI), null, boot));
+            try {
+                RunInferior(new Frame(GetInferiorRoot(), null, boot));
+            } catch (NieczaException n) {
+                Console.Error.WriteLine("Unhandled exception: {0}", n);
+                Environment.Exit(1);
+            }
         }
 
-        class ExitRunloopException : Exception { }
+        class ExitRunloopException : Exception {
+            public string payload;
+            public ExitRunloopException(string p) { payload = p; }
+        }
         public static SubInfo ExitRunloopSI =
             new SubInfo("ExitRunloop", ExitRunloopC);
         private static Frame ExitRunloopC(Frame th) {
-            throw new ExitRunloopException();
+            throw new ExitRunloopException(th.lex0 as string);
         }
 
         public const int TRACE_CUR = 1;
@@ -1895,48 +1900,79 @@ slow:
         private static void DoTrace(Frame cur) {
             TraceCount = TraceFreq;
             if ((TraceFlags & TRACE_CUR) != 0)
-                System.Console.WriteLine("{0}|{1} @ {2}",
+                Console.WriteLine("{0}|{1} @ {2}",
                         cur.DepthMark(), cur.info.name, cur.ip);
             if ((TraceFlags & TRACE_ALL) != 0) {
-                Console.Error.WriteLine("Context:");
-                DoBacktrace(cur);
+                Console.WriteLine("Context:" + DescribeBacktrace(cur, null));
             }
         }
 
-        [ThreadStatic] internal static Frame lastFrame;
-        public static void RunCore(Frame cur) {
+        public static void RunCore(ref Frame cur) {
             for(;;) {
                 try {
                     if (TraceCount != 0) {
                         for(;;) {
                             if (--TraceCount == 0)
                                 DoTrace(cur);
-                            lastFrame = cur = cur.code(cur);
+                            cur = cur.code(cur);
                         }
                     } else {
                         for(;;)
-                            lastFrame = cur = cur.code(cur);
+                            cur = cur.code(cur);
                     }
-                } catch (ExitRunloopException) {
+                } catch (ExitRunloopException ere) {
+                    // XXX Stringifying all exceptions isn't very nice.
+                    if (ere.payload != null)
+                        throw new NieczaException(ere.payload);
                     return;
                 } catch (Exception ex) {
-                    lastFrame = cur = Kernel.Die(cur, ex.ToString());
+                    cur = Kernel.Die(cur, ex.ToString());
                 }
             }
         }
 
+        // we like to make refs to these, so moving arrays is untenable
+        class LastFrameNode {
+            public LastFrameNode next, prev;
+            public Frame cur;
+        }
+        [ThreadStatic] static LastFrameNode rlstack;
+        public static void SetTopFrame(Frame f) {
+            rlstack.cur = f;
+        }
+
+        // it is an error to throw an exception between GetInferiorRoot
+        // and RunInferior
         public static Frame GetInferiorRoot() {
-            Frame l = lastFrame;
-            return (l == null ? new Frame(null, null, ExitRunloopSI)
-                    : l.MakeChild(null, ExitRunloopSI));
+            LastFrameNode lfn = rlstack;
+            if (lfn == null)
+                lfn = rlstack = new LastFrameNode();
+            if (lfn.next == null) {
+                lfn.next = new LastFrameNode();
+                lfn.next.prev = lfn;
+            }
+            Frame l = lfn.cur;
+            rlstack = lfn.next;
+            return lfn.next.cur = ((l == null ?
+                        new Frame(null, null, ExitRunloopSI) :
+                        l.MakeChild(null, ExitRunloopSI)));
         }
 
         public static Variable RunInferior(Frame f) {
-            RunCore(f);
-            Frame l = lastFrame;
-            object r = l.resultSlot;
-            lastFrame = l.caller;
-            return (Variable)r;
+            LastFrameNode newlfn = rlstack;
+            rlstack = newlfn;
+            Variable result;
+
+            try {
+                Frame nroot = newlfn.cur;
+                newlfn.cur = f;
+                RunCore(ref newlfn.cur);
+                result = (Variable) nroot.resultSlot;
+            } finally {
+                rlstack = newlfn.prev;
+            }
+
+            return result;
         }
 
         public static void AddCap(List<Variable> p,
@@ -2097,20 +2133,39 @@ slow:
             return new System.IO.StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
         }
 
-        private static object in_unhandled;
+        private static string DescribeException(int type, Frame tgt, int lid,
+                string name, object payload) {
+            if (type != SubInfo.ON_DIE)
+                return "Illegal control operator: " +
+                    SubInfo.DescribeControl(type, tgt, lid, name);
+            try {
+                Variable v = (Variable) payload;
+                return v.Fetch().mo.mro_raw_Str.Get(v);
+            } catch (Exception ex) {
+                return "(stringificiation failed: " + ex + ")";
+            }
+        }
 
         // exception processing goes in two stages
         // 1. find the correct place to unwind to, calling CATCH filters
         // 2. unwind, calling LEAVE functions
         public static Frame SearchForHandler(Frame th, int type, Frame tgt,
                 int lid, string name, object payload) {
-            // no CONTROL/CATCH yet, so we don't need to CPS the scanloop
             Frame csr;
 
             Frame unf = null;
             int unip = 0;
 
-            for (csr = th; csr != null; csr = csr.caller) {
+            for (csr = th; ; csr = csr.caller) {
+                if (csr == null)
+                    throw new Exception("Corrupt call chain");
+                if (csr.info == ExitRunloopSI) {
+                    // when this exception reaches the outer runloop,
+                    // more frames will be added
+                    csr.lex0 = DescribeException(type, tgt, lid, name,
+                            payload) + DescribeBacktrace(th, csr.caller);
+                    return csr;
+                }
                 if (type == SubInfo.ON_NEXTDISPATCH) {
                     if (csr.curDisp != null) {
                         unf = csr;
@@ -2128,52 +2183,24 @@ slow:
                 }
             }
 
-            if (unf == null) {
-                Variable mp = (type == SubInfo.ON_DIE) ? ((Variable)payload) :
-                    BoxAnyMO<string>("Unhandled control operator: " +
-                            SubInfo.DescribeControl(type, tgt, lid, name), StrMO);
-                if (in_unhandled != null) {
-                    Console.Error.WriteLine("Double fault {0}", in_unhandled);
-                    Environment.Exit(1);
-                }
-                in_unhandled = true;
+            return Unwind(th, type, unf, unip, payload);
+        }
+
+        public static string DescribeBacktrace(Frame from, Frame upto) {
+            StringBuilder sb = new StringBuilder();
+            while (from != upto) {
+                sb.Append(Console.Out.NewLine);
                 try {
-                    in_unhandled = UnboxAny<string>(mp.Fetch());
-                } catch (Exception) {}
-                Frame r = th.MakeChild(null, UnhandledSI);
-                r.lex0 = mp;
-                return r;
-            } else {
-                return Unwind(th, type, unf, unip, payload);
-            }
-        }
-
-        private static SubInfo UnhandledSI = new SubInfo("Unhandled", UnhandledC);
-        private static Frame UnhandledC(Frame th) {
-            switch(th.ip) {
-                case 0:
-                    th.ip = 1;
-                    return ((Variable)th.lex0).Fetch().InvokeMethod(th, "Str",
-                            new Variable[1] { (Variable)th.lex0 }, null);
-                case 1:
-                    Console.Error.WriteLine("Unhandled exception: {0}",
-                            UnboxAny<string>(((Variable)th.resultSlot).Fetch()));
-                    DoBacktrace(th.caller);
-                    Environment.Exit(1);
-                    return null;
-                default:
-                    return Kernel.Die(th, "Invalid IP");
-            }
-        }
-
-        public static void DoBacktrace(Frame from) {
-            while (from != null) {
-                Console.Error.WriteLine("  at {0} line {1} ({2} @ {3})",
-                        new object[] {
-                        from.ExecutingFile(), from.ExecutingLine(),
-                        from.info.name, from.ip });
+                    sb.AppendFormat("  at {0} line {1} ({2} @ {3})",
+                            new object[] {
+                            from.ExecutingFile(), from.ExecutingLine(),
+                            from.info.name, from.ip });
+                } catch (Exception ex) {
+                    sb.AppendFormat("  (frame display failed: {0})", ex);
+                }
                 from = from.caller;
             }
+            return sb.ToString();
         }
 
         public static Frame Unwind(Frame th, int type, Frame tf, int tip,
