@@ -72,15 +72,7 @@ namespace Niecza {
 
         public Frame Invoke(Frame c, Variable[] p,
                 Dictionary<string, Variable> n) {
-            DynMetaObject.InvokeHandler ih = mo.mro_OnInvoke;
-            if (ih != null) {
-                return ih(this, c, p, n);
-            } else {
-                Variable[] np = new Variable[p.Length + 1];
-                Array.Copy(p, 0, np, 1, p.Length);
-                np[0] = Kernel.NewROScalar(this);
-                return InvokeMethod(c, "INVOKE", np, n);
-            }
+            return mo.mro_INVOKE.Invoke(this, c, p, n);
         }
     }
 
@@ -682,6 +674,10 @@ bound: ;
         public abstract T Get(Variable obj);
     }
 
+    public abstract class InvokeHandler {
+        public abstract Frame Invoke(IP6 obj, Frame th, Variable[] pos, Dictionary<string,Variable> named);
+    }
+
     public abstract class IndexHandler {
         public abstract Variable Get(Variable obj, Variable key);
 
@@ -694,6 +690,30 @@ bound: ;
             return new SimpleVariable(true, false, Kernel.AnyMO,
                     new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
                     Kernel.AnyP);
+        }
+    }
+
+    class InvokeSub : InvokeHandler {
+        public override Frame Invoke(IP6 th, Frame caller,
+                Variable[] pos, Dictionary<string,Variable> named) {
+            DynObject dyo = ((DynObject) th);
+            Frame outer = (Frame) dyo.slots[0];
+            SubInfo info = (SubInfo) dyo.slots[1];
+
+            Frame n = caller.MakeChild(outer, info);
+            n = n.info.Binder(n, pos, named);
+
+            return n;
+        }
+    }
+
+    class InvokeCallMethod : InvokeHandler {
+        public override Frame Invoke(IP6 th, Frame caller,
+                Variable[] pos, Dictionary<string,Variable> named) {
+            Variable[] np = new Variable[pos.Length + 1];
+            Array.Copy(pos, 0, np, 1, pos.Length);
+            np[0] = Kernel.NewROScalar(th);
+            return th.InvokeMethod(caller, "INVOKE", np, named);
         }
     }
 
@@ -961,6 +981,8 @@ bound: ;
             = new IxCallMethod("exists-key");
         public static readonly IndexHandler CallDeleteKey
             = new IxCallMethod("delete-key");
+        public static readonly InvokeHandler CallINVOKE
+            = new InvokeCallMethod();
 
         public IP6 how;
         public IP6 typeObject;
@@ -979,9 +1001,6 @@ bound: ;
             return lexcache;
         }
 
-        public delegate Frame InvokeHandler(IP6 th, Frame c,
-                Variable[] pos, Dictionary<string, Variable> named);
-
         public ContextHandler<Variable> mro_Str, loc_Str, mro_Numeric,
                 loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined,
                 mro_iterator, loc_iterator;
@@ -994,9 +1013,8 @@ bound: ;
                mro_delete_key, loc_at_pos, loc_at_key, loc_exists_key,
                loc_delete_key;
 
-        public InvokeHandler OnInvoke;
+        public InvokeHandler loc_INVOKE, mro_INVOKE;
 
-        public InvokeHandler mro_OnInvoke;
         public Dictionary<string, DispatchEnt> mro_methods;
 
         public DynMetaObject[] local_does;
@@ -1038,7 +1056,6 @@ bound: ;
         }
 
         private void Revalidate() {
-            mro_OnInvoke = null;
             mro_methods = new Dictionary<string,DispatchEnt>();
 
             if (mro == null)
@@ -1080,10 +1097,11 @@ bound: ;
                         mro_delete_key = CallDeleteKey;
                     if (m.Key == "exists-key")
                         mro_exists_key = CallExistsKey;
+                    if (m.Key == "INVOKE")
+                        mro_INVOKE = CallINVOKE;
                 }
 
-                if (k.OnInvoke != null)
-                    mro_OnInvoke = k.OnInvoke;
+                if (k.loc_INVOKE != null) mro_INVOKE = k.loc_INVOKE;
                 if (k.loc_Numeric != null) mro_Numeric = k.loc_Numeric;
                 if (k.loc_defined != null) mro_defined = k.loc_defined;
                 if (k.loc_Bool != null) mro_Bool = k.loc_Bool;
@@ -1285,24 +1303,13 @@ bound: ;
             return th;
         }
 
-        private static Frame SubInvoke(IP6 th, Frame caller,
-                Variable[] pos, Dictionary<string,Variable> named) {
-            DynObject dyo = ((DynObject) th);
-            Frame outer = (Frame) dyo.slots[0];
-            SubInfo info = (SubInfo) dyo.slots[1];
-
-            Frame n = caller.MakeChild(outer, info);
-            n = n.info.Binder(n, pos, named);
-
-            return n;
-        }
         private static SubInfo SubInvokeSubSI = new SubInfo("Sub.INVOKE", SubInvokeSubC);
         private static Frame SubInvokeSubC(Frame th) {
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-            return SubInvoke((DynObject)th.pos[0].Fetch(), th.caller,
-                    post, th.named);
+            return SubMO.mro_INVOKE.Invoke((DynObject)th.pos[0].Fetch(),
+                    th.caller, post, th.named);
         }
 
         public static Frame Die(Frame caller, string msg) {
@@ -1989,6 +1996,7 @@ slow:
             MuMO.loc_at_key = DynMetaObject.CallAtKey;
             MuMO.loc_delete_key = DynMetaObject.CallDeleteKey;
             MuMO.loc_exists_key = DynMetaObject.CallExistsKey;
+            MuMO.loc_INVOKE = DynMetaObject.CallINVOKE;
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");
@@ -2038,7 +2046,7 @@ slow:
             MatchMO.FillProtoClass(new string[] { });
 
             SubMO = new DynMetaObject("Sub");
-            SubMO.OnInvoke = new DynMetaObject.InvokeHandler(SubInvoke);
+            SubMO.loc_INVOKE = new InvokeSub();
             SubMO.FillProtoClass(new string[] { "outer", "info" });
             SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
             SubMO.Invalidate();
