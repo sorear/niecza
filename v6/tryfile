@@ -9,6 +9,18 @@ use JSYNC;
 my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
 
 augment class List {
+    method push(\|$args) { Q:CgOp {
+        (letn iter (vvarlist_from_fvarlist (unbox fvarlist (@ {$args})))
+              targ (getslot rest vvarlist (@ {self}))
+          (vvarlist_shift (l iter))
+          (ternary (== (i 0) (vvarlist_count (l targ)))
+            (l targ (getslot items vvarlist (@ {self})))
+            (prog))
+          (whileloop 0 0 (iter_hasflat (l iter))
+            (vvarlist_push (l targ) (vvarlist_shift (l iter))))
+          {Nil})
+    } }
+
     method head() { Q:CgOp {
         (letn items (getslot items vvarlist (@ {self}))
               rest  (getslot rest  vvarlist (@ {self}))
