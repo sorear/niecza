@@ -1268,7 +1268,7 @@ ok !(1 !== 1), "infix_prefix_meta_operator:<!> works (F)";
     is $i, 10, "until loops functional";
 
     ok "foo" !~~ / f <.suppose { die }> /, ".suppose works (F)";
-    ok "foo" ~~ / f <.suppose o> oo /, ".suppose works (T)";
+    ok "fox" ~~ / f <.suppose o> x /, ".suppose works (T)";
 
     ok "abcabc" ~~ /^ (\w+) $0 $/, '$/ in variable refs functional';
     ok "abcabc" ~~ /^ (\w+) "$0" $/, '$/ in substrings functional';
