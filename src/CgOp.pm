@@ -294,6 +294,8 @@ use warnings;
     sub bif_delete_key { obj_delete_key(@_) }
     sub bif_exists_key { obj_exists_key(@_) }
 
+    sub foreign_class { rawscall('NieczaCLR.GetClass:m,Variable', $_[0], $_[1]) }
+
     sub _context {
         my ($type, $mo, $fun, $obj) = @_;
         letn('!var', $obj,
