@@ -9,6 +9,8 @@ use CLRTypes;
     package CodeGen;
     use Moose;
 
+    our $verbose;
+
     has ops       => (is => 'ro', required => 1);
     has name    => (isa => 'Str', is => 'ro');
     has csname    => (isa => 'Str', is => 'ro');
@@ -104,6 +106,8 @@ use CLRTypes;
     sub push_let {
         my ($self, $which, $ty, $v) = @_;
 
+        say "before push_let($which, $ty, $v): \n",
+            YAML::XS::Dump($self->letstack) if $verbose;
         my $ls = $self->letstack;
         my $lu = $self->letused;
         my $i;
@@ -119,12 +123,14 @@ use CLRTypes;
         push @$ls, [ $which, $ph, $pht, $ty, $i ];
         $lu->{$i} = 1;
 
-        $self->_emit("$ph = $v");
+        $self->_emit("$ph = $v") unless $self->unreach;
     }
 
     sub drop_let {
         my ($self, $which) = @_;
-        if ($which ne $self->letstack->[-1][0]) {
+        say "before drop_let($which): \n", YAML::XS::Dump($self->letstack)
+            if $verbose;
+        if (!@{ $self->letstack } || $which ne $self->letstack->[-1][0]) {
             Carp::confess "Let consistency error: $which, " . YAML::XS::Dump($self->letstack);
         }
         my $r = pop @{ $self->letstack };
@@ -133,6 +139,8 @@ use CLRTypes;
 
     sub peek_let {
         my ($self, $which) = @_;
+        say "before peek_let($which): \n", YAML::XS::Dump($self->letstack)
+            if $verbose;
         my $i = @{ $self->letstack } - 1;
         while ($i >= 0 && $self->letstack->[$i][0] ne $which) { $i-- }
         my $k = $self->letstack->[$i];
@@ -141,6 +149,8 @@ use CLRTypes;
 
     sub poke_let {
         my ($self, $which, $ty, $v) = @_;
+        say "before poke_let($which): \n", YAML::XS::Dump($self->letstack)
+            if $verbose;
         my $i = @{ $self->letstack } - 1;
         while ($i >= 0 && $self->letstack->[$i][0] ne $which) { $i-- }
         $self->_emit($self->letstack->[$i][1] . " = $v");

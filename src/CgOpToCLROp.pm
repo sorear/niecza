@@ -335,19 +335,22 @@ sub cvt {
     }
 }
 
+my $_trap = $ENV{NIECZA_VERBOSE_METHOD} // 'ZZZ';
 sub codegen {
     my ($cg, $root) = @_;
     local %lettypes;
     local $spill = 0;
+    local $CodeGen::verbose = $cg->csname =~ /^G\d+$_trap$/o;
 
-    #say(YAML::XS::Dump($root)) if $cg->csname eq 'G256ACCEPTSC';
+    say(YAML::XS::Dump($root)) if $CodeGen::verbose;
     my @stmts = cvt($root)->stmts_result;
-    #say(YAML::XS::Dump(@stmts)) if $cg->csname eq 'G256ACCEPTSC';
+    say(YAML::XS::Dump(@stmts)) if $CodeGen::verbose;
 
     for (@stmts) {
         codegen_term($cg, $_)
             if !$cg->unreach || $_->op->[0] eq 'ehspan' ||
-                $_->op->[0] eq 'labelhere' || $_->op->[0] eq 'drop_let';
+                $_->op->[0] eq 'labelhere' || $_->op->[0] eq 'drop_let' ||
+                $_->op->[0] eq 'push_let';
     }
 }
 
@@ -356,3 +359,5 @@ sub codegen_term {
     my ($op, @args) = @{ $term->op };
     $cg->$op(@args, map { codegen_term($cg, $_) } @{ $term->zyg });
 }
+
+1;

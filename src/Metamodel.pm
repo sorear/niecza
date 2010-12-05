@@ -463,7 +463,7 @@ our %units;
             @extra = grep { defined } map { $_->mdefault } @{ $_[0]->signature->params };
         }
         (map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
-            values %{ $_[0]->lexicals }), @extra;
+            @{ $_[0]->lexicals }{ sort keys %{ $_[0]->lexicals } }), @extra;
     }
 
     sub create_static_pad {
