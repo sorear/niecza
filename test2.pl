@@ -18,6 +18,15 @@ use MONKEY_TYPING;
     ok !defined($/), 'Failed regex matches clear $/';
 }
 
+{
+    my @foo = 1, 2, 3, 4, 5;
+
+    is @foo[2,3].join('|'), '3|4', 'slicing works';
+    is @foo[{ $^x / 2 }], 3, 'code indexes work';
+    is @foo[*-1], 5, 'WhateverCode indexes work';
+    is @foo[[1,4]].join('|'), 3, 'items do not slice';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
