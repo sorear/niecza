@@ -241,7 +241,7 @@ token ws {
     :my $stub = return self if $startmemo<ws> :exists; #OK
 
     :dba('whitespace')
-    [ [
+    [
         | \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
         | <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws>:delete; }
@@ -253,8 +253,10 @@ token ws {
     | <.vws> <.heredoc>
     | <.unv>
     # | $ { $¢.moreinput }  NIECZA break inf loop
-    ]* ]
+    ]*
 
+    # NOTE that this is only used in the slow path!  The || above is the
+    # top level separator.
     {
         my $pos = $¢.pos;
         my $memo = @*MEMOS[$pos];
