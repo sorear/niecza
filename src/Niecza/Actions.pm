@@ -1424,12 +1424,10 @@ sub semilist_to_args { my ($cl, $M) = @_;
 }
 
 sub postcircumfix__S_Bra_Ket { my ($cl, $M) = @_;
-    $M->{_ast} = { postcircumfix => '[ ]',
-        args => $cl->semilist_to_args($M->{semilist}) };
+    $M->{_ast} = { postcircumfix => '[ ]', args => $M->{semilist}{_ast} };
 }
 sub postcircumfix__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = { postcircumfix => '{ }',
-        args => $cl->semilist_to_args($M->{semilist}) };
+    $M->{_ast} = { postcircumfix => '{ }', args => $M->{semilist}{_ast} };
 }
 sub postcircumfix__S_Lt_Gt { my ($cl, $M) = @_;
     $cl->circumfix__S_Lt_Gt($M); #XXX
