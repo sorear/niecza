@@ -1005,6 +1005,7 @@ bound: ;
         public ContextHandler<string> mro_raw_Str, loc_raw_Str;
         public ContextHandler<double> mro_raw_Numeric, loc_raw_Numeric;
         public ContextHandler<VarDeque> mro_raw_iterator, loc_raw_iterator;
+        public ContextHandler<object> mro_to_clr, loc_to_clr;
         public IndexHandler mro_at_pos, mro_at_key, mro_exists_key,
                mro_delete_key, loc_at_pos, loc_at_key, loc_exists_key,
                loc_delete_key;
@@ -1097,6 +1098,7 @@ bound: ;
                         mro_INVOKE = CallINVOKE;
                 }
 
+                if (k.loc_to_clr != null) mro_to_clr = k.loc_to_clr;
                 if (k.loc_INVOKE != null) mro_INVOKE = k.loc_INVOKE;
                 if (k.loc_Numeric != null) mro_Numeric = k.loc_Numeric;
                 if (k.loc_defined != null) mro_defined = k.loc_defined;
@@ -2033,6 +2035,7 @@ slow:
             MuMO.loc_delete_key = DynMetaObject.CallDeleteKey;
             MuMO.loc_exists_key = DynMetaObject.CallExistsKey;
             MuMO.loc_INVOKE = DynMetaObject.CallINVOKE;
+            MuMO.loc_to_clr = new MuToCLR();
             MuMO.FillProtoClass(new string[] { });
 
             StashMO = new DynMetaObject("Stash");

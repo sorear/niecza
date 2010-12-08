@@ -9,6 +9,20 @@ class NieczaCLROpts {
         Environment.GetEnvironmentVariable("NIECZA_CLR_TRACE") != null;
 }
 
+class MuToCLR : ContextHandler<object> {
+    public override object Get(Variable v) {
+        throw new NieczaException(v.Fetch().mo.name + " is not usable as a CLR object");
+    }
+}
+
+class CLRToCLR : ContextHandler<object> {
+    public static readonly CLRToCLR Instance = new CLRToCLR();
+    public override object Get(Variable v) {
+        IP6 i = v.Fetch();
+        return i.IsDefined() ? Kernel.UnboxAny<object>(i) : null;
+    }
+}
+
 public class NieczaCLR {
     static Dictionary<Type, DynMetaObject> wrapper_cache
         = new Dictionary<Type, DynMetaObject>();
@@ -25,20 +39,20 @@ public class NieczaCLR {
     // XXX: We don't use the standard binder because we need multiple
     // dispatch capability.
     // TODO: Use binders from the DLR once moritz et al upgrade to Mono 2.8
-    static DynBlockDelegate BindAmbiguous(Type ty, string n) {
+    static DynBlockDelegate BindAmbiguous(string siname, Type ty, string n) {
         return delegate (Frame f) {
-            return Kernel.Die(f, "Ambiguous binding type");
+            return Kernel.Die(f, "Ambiguous binding type in " + siname);
         };
     }
 
-    static DynBlockDelegate BindMethodGroup(Type ty, string name,
+    static DynBlockDelegate BindMethodGroup(string siname, Type ty, string name,
             List<MethodInfo> ms) {
-        return BindAmbiguous(ty, name);
+        return BindAmbiguous(siname, ty, name);
     }
 
-    static DynBlockDelegate BindPropertyGroup(Type ty, string name,
+    static DynBlockDelegate BindPropertyGroup(string sin, Type ty, string name,
             List<PropertyInfo> ps) {
-        return BindAmbiguous(ty, name);
+        return BindAmbiguous(sin, ty, name);
     }
 
     static void MultiAdd<T>(Dictionary<string,List<T>> d, string n, T v) {
@@ -57,6 +71,7 @@ public class NieczaCLR {
         mro[0] = m;
         m.FillClass(new string[] { }, new string[] { },
                 new DynMetaObject[] { pm }, mro);
+        m.loc_to_clr = CLRToCLR.Instance;
         if (NieczaCLROpts.Debug)
             Console.WriteLine("Setting up wrapper for {0}", t.FullName);
 
@@ -100,15 +115,15 @@ public class NieczaCLR {
 
             switch (handlers.Count == 1 ? handlers[0] : 0) {
                 case 0:
-                    method = BindAmbiguous(t, n);
+                    method = BindAmbiguous(siname, t, n);
                     break;
 
                 case 1:
-                    method = BindMethodGroup(t, n, allMethods[n]);
+                    method = BindMethodGroup(siname, t, n, allMethods[n]);
                     break;
 
                 case 2:
-                    method = BindPropertyGroup(t, n, allProperties[n]);
+                    method = BindPropertyGroup(siname, t, n, allProperties[n]);
                     break;
             }
 
