@@ -724,6 +724,17 @@ noparams:
                     new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
                     Kernel.AnyP);
         }
+
+        protected Variable Slice(Variable obj, Variable key) {
+            VarDeque iter = new VarDeque(key);
+            List<Variable> items = new List<Variable>();
+            while (Kernel.IterHasFlat(iter, true))
+                items.Add(Get(obj, iter.Shift()));
+            // TODO: 1-element slices should be deparceled.  Requires
+            // LISTSTORE improvements though.
+            return Kernel.NewRWListVar(Kernel.BoxRaw<Variable[]>(
+                        items.ToArray(), Kernel.ParcelMO));
+        }
     }
 
     class InvokeSub : InvokeHandler {
@@ -901,6 +912,10 @@ noparams:
 
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
             IP6 os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
@@ -909,6 +924,10 @@ noparams:
     }
     class IxAnyAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
             IP6 os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
@@ -920,12 +939,20 @@ noparams:
 
     class IxCursorAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
             Cursor os = (Cursor)obj.Fetch();
             return os.GetKey(key.Fetch().mo.mro_raw_Str.Get(key));
         }
     }
     class IxCursorAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
             Cursor os = (Cursor)obj.Fetch();
             return os.GetKey(key.Fetch().mo.mro_raw_Numeric.Get(key).ToString());
         }
@@ -933,6 +960,10 @@ noparams:
 
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
             IP6 os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
@@ -959,14 +990,21 @@ noparams:
     class IxListAtPos : IndexHandler {
         bool extend;
         public IxListAtPos(bool extend) { this.extend = extend; }
+
         public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
             IP6 os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
-            int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
+
             DynObject dos = (DynObject) os;
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
+
+            int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
             if (items.Count() <= ix && rest.Count() != 0) {
                 Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                             "eager", new Variable[] { obj }, null));
