@@ -241,12 +241,10 @@ token ws {
     :my $stub = return self if $startmemo<ws> :exists; #OK
 
     :dba('whitespace')
-    [
-        | \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
-        | <?before \w> <?after \w> :::
+    \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+    || <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws>:delete; }
             <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
-    ]
     ||
     [
     | <.unsp>
