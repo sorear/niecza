@@ -9,6 +9,9 @@ use CLRTypes;
     package CodeGen;
     use Moose;
 
+    use constant NRINLINE => 10;
+    use constant NRINT32  => 2;
+
     our $verbose;
 
     has ops       => (is => 'ro', required => 1);
@@ -83,7 +86,8 @@ use CLRTypes;
 
     sub _lexn {
         my ($which) = @_;
-        ($which < 4) ? ("th.lex$which") : ("th.lexn[" . ($which - 4) . "]");
+        ($which < NRINLINE) ? ("th.lex$which") :
+            ("th.lexn[" . ($which - NRINLINE) . "]");
     }
 
     sub push_line {
@@ -99,7 +103,7 @@ use CLRTypes;
     sub lexnsize {
         my ($self) = @_;
         my $i = 0;
-        for (keys %{ $self->letused }) { $i++ if $_ >= 6 }
+        for (keys %{ $self->letused }) { $i++ if $_ >= (NRINLINE + NRINT32) }
         $i;
     }
 
@@ -114,11 +118,11 @@ use CLRTypes;
 
         for ($i = 0; ; $i++) {
             last if !$lu->{$i} &&
-                ($i >= 2 || $ty eq 'Int32' || $ty eq 'System.Int32');
+                ($i >= NRINT32 || $ty eq 'Int32' || $ty eq 'System.Int32');
         }
 
-        my $ph = ($i < 2) ? "th.lexi$i" : _lexn($i-2);
-        my $pht = ($i < 2) ? $ty : "object";
+        my $ph  = ($i < NRINT32) ? "th.lexi$i" : _lexn($i-(NRINT32));
+        my $pht = ($i < NRINT32) ? $ty : "object";
 
         push @$ls, [ $which, $ph, $pht, $ty, $i ];
         $lu->{$i} = 1;
@@ -221,13 +225,13 @@ use CLRTypes;
 
     sub rtpadgeti {
         my ($self, $type, $order, $name) = @_;
-        my $tag = $name < 4 ? "lex$name" : ("lexn[" . ($name - 4) . "]");
+        my $tag = $name < NRINLINE ? "lex$name" : ("lexn[" . ($name - NRINLINE) . "]");
         $self->cast($type, "object", "th" . (".outer" x $order) . ".$tag");
     }
 
     sub rtpadputi {
         my ($self, $order, $name, $type, $val) = @_;
-        my $tag = $name < 4 ? "lex$name" : ("lexn[" . ($name - 4) . "]");
+        my $tag = $name < NRINLINE ? "lex$name" : ("lexn[" . ($name - NRINLINE) . "]");
         $self->_emit("th" . (".outer" x $order) . ".$tag = $val");
     }
 
@@ -509,7 +513,7 @@ use CLRTypes;
         my $self = shift;
 
         for (my $i = 0; $i < $self->minlets; $i++) {
-            $self->letused->{$i + 2} = 1;
+            $self->letused->{$i + NRINT32} = 1;
         }
 
         CgOpToCLROp::codegen($self, $self->ops);

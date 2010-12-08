@@ -424,11 +424,17 @@ bound: ;
                 }
                 switch (slot + 1) {
                     case 0: break;
-                    case 1: th.lex0 = src; break;
-                    case 2: th.lex1 = src; break;
-                    case 3: th.lex2 = src; break;
-                    case 4: th.lex3 = src; break;
-                    default: th.lexn[slot - 4] = src; break;
+                    case 1:  th.lex0 = src; break;
+                    case 2:  th.lex1 = src; break;
+                    case 3:  th.lex2 = src; break;
+                    case 4:  th.lex3 = src; break;
+                    case 5:  th.lex4 = src; break;
+                    case 6:  th.lex5 = src; break;
+                    case 7:  th.lex6 = src; break;
+                    case 8:  th.lex7 = src; break;
+                    case 9:  th.lex8 = src; break;
+                    case 10: th.lex9 = src; break;
+                    default: th.lexn[slot - 10] = src; break;
                 }
             }
             }
@@ -506,11 +512,18 @@ noparams:
         public int ip = 0;
         public DynBlockDelegate code;
         public Dictionary<string, object> lex;
-        // statistically, most subs have between 1 and 4 anonymous lexicals
+        // statistically, most subs have few lexicals; since Frame objects
+        // are reused, bloating them doesn't hurt much
         public object lex0;
         public object lex1;
         public object lex2;
         public object lex3;
+        public object lex4;
+        public object lex5;
+        public object lex6;
+        public object lex7;
+        public object lex8;
+        public object lex9;
 
         public int lexi0;
         public int lexi1;
@@ -555,6 +568,12 @@ noparams:
             reusable_child.lex1 = null;
             reusable_child.lex2 = null;
             reusable_child.lex3 = null;
+            reusable_child.lex4 = null;
+            reusable_child.lex5 = null;
+            reusable_child.lex6 = null;
+            reusable_child.lex7 = null;
+            reusable_child.lex8 = null;
+            reusable_child.lex9 = null;
             reusable_child.curDisp = null;
             reusable_child.caller = this;
             reusable_child.outer = outer;
@@ -619,7 +638,13 @@ noparams:
                 case 1: lex1 = v; break;
                 case 2: lex2 = v; break;
                 case 3: lex3 = v; break;
-                default: lexn[ix-4] = v; break;
+                case 4: lex4 = v; break;
+                case 5: lex5 = v; break;
+                case 6: lex6 = v; break;
+                case 7: lex7 = v; break;
+                case 8: lex8 = v; break;
+                case 9: lex9 = v; break;
+                default: lexn[ix-10] = v; break;
             }
         }
 
@@ -637,7 +662,13 @@ noparams:
                 case 1: v = lex1; break;
                 case 2: v = lex2; break;
                 case 3: v = lex3; break;
-                default: v = lexn[ix-4]; break;
+                case 4: v = lex4; break;
+                case 5: v = lex5; break;
+                case 6: v = lex6; break;
+                case 7: v = lex7; break;
+                case 8: v = lex8; break;
+                case 9: v = lex9; break;
+                default: v = lexn[ix-10]; break;
             }
             return true;
         }

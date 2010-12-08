@@ -5,6 +5,8 @@ use utf8;
 
 package CSharpBackend;
 
+use constant NRINLINE => 10;
+
 use Scalar::Util 'blessed';
 
 my $VERBOSE = $ENV{NIECZA_CSHARP_VERBOSE};
@@ -558,9 +560,9 @@ sub sub2 {
             push @thaw, CgOp::setfield('lex', CgOp::rawsget($pp),
                 CgOp::rawnew('clr:Dictionary<string,object>'));
         }
-        if ($node->{nlexn} > 4) {
+        if ($node->{nlexn} > NRINLINE) {
             push @thaw, CgOp::setfield('lexn', CgOp::rawsget($pp),
-                CgOp::rawnewzarr('clr:object', CgOp::int($node->{nlexn} - 4)));
+                CgOp::rawnewzarr('clr:object', CgOp::int($node->{nlexn} - NRINLINE)));
         }
     }
 
@@ -583,8 +585,8 @@ sub protolset {
 
     if ($body->run_once && !dynname($lname)) {
         push @thaw, CgOp::rawsset($lex->{peer}, $frag);
-    } elsif ((my $ix = $lex->{peer}) >= 4) {
-        push @thaw, CgOp::setindex(CgOp::int($ix - 4),
+    } elsif ((my $ix = $lex->{peer}) >= NRINLINE) {
+        push @thaw, CgOp::setindex(CgOp::int($ix - NRINLINE),
             CgOp::getfield('lexn', CgOp::rawsget($body->{peer}{pp})),
             $frag);
     } else {
