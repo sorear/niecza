@@ -22,9 +22,21 @@ use MONKEY_TYPING;
     my @foo = 1, 2, 3, 4, 5;
 
     is @foo[2,3].join('|'), '3|4', 'slicing works';
-    is @foo[{ $^x / 2 }], 3, 'code indexes work';
-    is @foo[*-1], 5, 'WhateverCode indexes work';
     is @foo[[1,4]].join('|'), 3, 'items do not slice';
+    ok !defined(@foo[4,5,6][1]), 'slices off end work';
+    @foo[1,2,3] = 5,6,7;
+    is @foo.join('|'), '1|5|6|7|5', 'can assign to slices';
+    @foo[4,5,6] = 1,2,3;
+    is @foo.join('|'), '1|5|6|7|1|2|3', 'can assign to slices off end';
+
+    my %quux;
+    %quux<a b c> = (1, 2, 3);
+    is %quux<b>, 2, 'can assign to hash slices';
+    is %quux<c b>.join('|'), '3|2', 'can read from hash slices';
+
+    my @bar = 1, 2, 3, 4, 5;
+    is @bar[{ $^x / 2 }], 3, 'code indexes work';
+    is @bar[*-1], 5, 'WhateverCode indexes work';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
