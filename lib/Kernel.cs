@@ -969,6 +969,8 @@ bound: ;
             = new CtxCallMethodUnbox<bool>("defined");
         public static readonly ContextHandler<VarDeque> RawCallIterator
             = new CtxCallMethodUnbox<VarDeque>("iterator");
+        public static readonly ContextHandler<Variable[]> RawCallReify
+            = new CtxCallMethodUnbox<Variable[]>("reify");
         public static readonly IndexHandler CallAtPos
             = new IxCallMethod("at-pos");
         public static readonly IndexHandler CallAtKey
@@ -1005,6 +1007,7 @@ bound: ;
         public ContextHandler<string> mro_raw_Str, loc_raw_Str;
         public ContextHandler<double> mro_raw_Numeric, loc_raw_Numeric;
         public ContextHandler<VarDeque> mro_raw_iterator, loc_raw_iterator;
+        public ContextHandler<Variable[]> mro_raw_reify, loc_raw_reify;
         public ContextHandler<object> mro_to_clr, loc_to_clr;
         public IndexHandler mro_at_pos, mro_at_key, mro_exists_key,
                mro_delete_key, loc_at_pos, loc_at_key, loc_exists_key,
@@ -1096,8 +1099,11 @@ bound: ;
                         mro_exists_key = CallExistsKey;
                     if (m.Key == "INVOKE")
                         mro_INVOKE = CallINVOKE;
+                    if (m.Key == "reify")
+                        mro_raw_reify = RawCallReify;
                 }
 
+                if (k.loc_raw_reify != null) mro_raw_reify = k.loc_raw_reify;
                 if (k.loc_to_clr != null) mro_to_clr = k.loc_to_clr;
                 if (k.loc_INVOKE != null) mro_INVOKE = k.loc_INVOKE;
                 if (k.loc_Numeric != null) mro_Numeric = k.loc_Numeric;
@@ -1629,80 +1635,31 @@ again:
         private static SubInfo IF_SI = new SubInfo("iter_flatten", IF_C);
         private static Frame IF_C(Frame th) {
             VarDeque inq = (VarDeque) th.lex0;
-            switch (th.ip) {
-                case 0:
-                    th.ip = 1;
-                    return IterHasFlat(th, inq, true);
-                case 1:
-                    th.ip = 0;
-                    if ((Boolean) th.resultSlot) {
-                        return Take(th, inq.Shift());
-                    } else {
-                        return Take(th, NewROScalar(Kernel.EMPTYP));
-                    }
-                default:
-                    return Die(th, "invalid IP");
+            if (IterHasFlat(inq, true)) {
+                return Take(th, inq.Shift());
+            } else {
+                return Take(th, NewROScalar(Kernel.EMPTYP));
             }
         }
 
-        public static Frame IterHasFlat(Frame caller, VarDeque iter, bool flat) {
+        public static bool IterHasFlat(VarDeque iter, bool flat) {
             while (true) {
-                if (iter.Count() == 0) {
-                    caller.resultSlot = false;
-                    return caller;
-                }
+                if (iter.Count() == 0)
+                    return false;
                 Variable i0 = iter[0];
-                if (i0.islist) {
+                if (i0.islist && flat) {
                     iter.Shift();
                     iter.UnshiftD(i0.Fetch().mo.mro_raw_iterator.Get(i0));
                     continue;
                 }
-                if (i0.Fetch().mo.HasMRO(IterCursorMO)) {
-                    Frame n = caller.MakeChild(null, IHF_SI);
-                    n.lex0 = iter;
-                    n.lexi0 = flat ? 1 : 0;
-                    return n;
+                IP6 i0v = i0.Fetch();
+                if (i0v.mo.HasMRO(IterCursorMO)) {
+                    iter.Shift();
+                    iter.UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
+                    continue;
                 }
 
-                caller.resultSlot = true;
-                return caller;
-            }
-        }
-        private static SubInfo IHF_SI = new SubInfo("iter_has_flat", IHF_C);
-        private static Frame IHF_C(Frame th) {
-            VarDeque iter = (VarDeque) th.lex0;
-            bool flat = th.lexi0 != 0;
-            Variable f;
-            IP6 ff;
-            switch (th.ip) {
-                case 0:
-                    if (iter.Count() == 0) {
-                        th.caller.resultSlot = false;
-                        return th.caller;
-                    }
-
-                    f = iter[0];
-
-                    if (f.islist && flat) {
-                        iter.Shift();
-                        iter.UnshiftD(f.Fetch().mo.mro_raw_iterator.Get(f));
-                        goto case 0;
-                    }
-
-                    if ((ff = f.Fetch()).mo.HasMRO(IterCursorMO)) {
-                        th.ip = 1;
-                        iter.Shift();
-                        return ff.InvokeMethod(th, "reify", new Variable[] { f }, null);
-                    }
-
-                    th.caller.resultSlot = true;
-                    return th.caller;
-
-                case 1:
-                    iter.UnshiftN(UnboxAny<Variable[]>(((Variable)th.resultSlot).Fetch()));
-                    goto case 0;
-                default:
-                    return Die(th, "invalid IP");
+                return true;
             }
         }
 
@@ -2035,6 +1992,7 @@ slow:
             MuMO.loc_delete_key = DynMetaObject.CallDeleteKey;
             MuMO.loc_exists_key = DynMetaObject.CallExistsKey;
             MuMO.loc_INVOKE = DynMetaObject.CallINVOKE;
+            MuMO.loc_raw_reify = DynMetaObject.RawCallReify;
             MuMO.loc_to_clr = new MuToCLR();
             MuMO.FillProtoClass(new string[] { });
 
