@@ -793,7 +793,7 @@ sub Body::begin {
         cur_pkg    => $args{cur_pkg} // (@opensubs ? $opensubs[-1]->cur_pkg :
             [ 'GLOBAL' ]), # cur_pkg does NOT propagate down from settings
         augmenting => $args{augmenting},
-        name       => $self->name,
+        name       => ($args{prefix} // '') . $self->name,
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
         class      => $self->class,
@@ -982,7 +982,11 @@ sub Op::Super::begin {
 
 sub Op::SubDef::begin {
     my $self = shift;
-    my $body = $self->body->begin(once => $self->once);
+    my $prefix;
+    if (defined $self->method_too) {
+        $prefix = $unit->deref($opensubs[-1]->body_of)->name . ".";
+    }
+    my $body = $self->body->begin(once => $self->once, prefix => $prefix);
     $opensubs[-1]->add_my_sub($self->var, $body);
     my $r = $body->xref;
     if (@{ $self->exports } || defined($self->method_too)) {
