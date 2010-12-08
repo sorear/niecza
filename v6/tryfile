@@ -181,6 +181,45 @@ package Niecza {
 
 augment class STD {
     our $ALL;
+method getsig {
+    my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
+    my $sig;
+    if $*CURLEX.<!NEEDSIG>:delete {
+        if $pv {
+            my $h_ = $pv.<%_>:delete;
+            my $a_ = $pv.<@_>:delete;
+            $sig = join ', ', (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) });
+            $sig ~= ', *@_' if $a_;
+            $sig ~= ', *%_' if $h_;
+        }
+        else {
+            $sig = '$_ is ref = OUTER::<$_>';
+        }
+        $*CURLEX.<$?SIGNATURE> = $sig;
+    }
+    else {
+        $sig = $*CURLEX.<$?SIGNATURE>;
+    }
+    # NIECZA immutable cursors
+    # self.<sig> = $sig;
+    # self.<lex> = $*CURLEX.idref;
+    if ($*DECLARAND<mult>//'') ne 'proto' {
+        for keys %$*CURLEX {
+            my $desc = $*CURLEX{$_};
+            next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
+            next if $desc !~~ Hash;
+            next if $desc<used>;
+            next if $desc<rebind>;
+            next if $desc<dynamic>;
+            next if $desc<scope> eq 'state';
+            next if $desc<stub>;
+            next unless $_ ~~ /<[\$\@\%\&]>\w/;
+            my $pos = $desc<declaredat> // self.pos;
+            self.cursor($pos).worry("$_ is declared but not used");
+        }
+    }
+    self;
+}
 token ws {
     :my $startpos = self.pos;
     :my $startmemo = @*MEMOS[$startpos];
