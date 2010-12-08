@@ -304,32 +304,36 @@ namespace Niecza {
         private string PName(int rbase) {
             return ((string)sig_r[rbase]) + " in " + name;
         }
-        public Frame Binder(Frame th, Variable[] pos, Dictionary<string,Variable> named) {
+        public unsafe Frame Binder(Frame th, Variable[] pos, Dictionary<string,Variable> named) {
             th.pos = pos;
             th.named = named;
             // XXX I don't fully understand how this works, but it's
             // necessary for inferior runloops from here to work.  Critical
             // section blah blah.
             Kernel.SetTopFrame(th);
-            if (sig_i == null) return th;
+            int[] ibuf = sig_i;
+            if (ibuf == null) return th;
             int posc = 0;
             HashSet<string> namedc = null;
             if (named != null)
                 namedc = new HashSet<string>(named.Keys);
-            int ic = 0;
+            if (ibuf.Length == 0) goto noparams;
+            fixed (int* ibase = ibuf) {
+            int* ic = ibase;
+            int* iend = ic + (ibuf.Length - 2);
+            object[] rbuf = sig_r;
             int rc = 0;
-            int sigend = sig_i.Length;
 
-            while (ic < sigend) {
-                int flags = sig_i[ic++];
-                int slot  = sig_i[ic++];
-                int names = sig_i[ic++];
+            while (ic < iend) {
+                int flags = *(ic++);
+                int slot  = *(ic++);
+                int names = *(ic++);
                 int rbase = rc;
                 rc += (1 + names);
                 if ((flags & SIG_F_HASDEFAULT) != 0) rc++;
                 DynMetaObject type = Kernel.AnyMO;
                 if ((flags & SIG_F_HASTYPE) != 0)
-                    type = (DynMetaObject)sig_r[rc++];
+                    type = (DynMetaObject)rbuf[rc++];
 
                 Variable src = null;
                 if ((flags & SIG_F_SLURPY_PCL) != 0) {
@@ -368,7 +372,7 @@ namespace Niecza {
                 }
                 if (names != 0 && named != null) {
                     for (int ni = 1; ni <= names; ni++) {
-                        string n = (string)sig_r[rbase+ni];
+                        string n = (string)rbuf[rbase+ni];
                         if (namedc.Contains(n)) {
                             namedc.Remove(n);
                             src = named[n];
@@ -382,7 +386,7 @@ namespace Niecza {
                 }
                 if ((flags & SIG_F_HASDEFAULT) != 0) {
                     Frame thn = Kernel.GetInferiorRoot()
-                        .MakeChild(th, (SubInfo) sig_r[rbase + 1 + names]);
+                        .MakeChild(th, (SubInfo) rbuf[rbase + 1 + names]);
                     src = Kernel.RunInferior(thn);
                     goto gotit;
                 }
@@ -427,6 +431,8 @@ bound: ;
                     default: th.lexn[slot - 4] = src; break;
                 }
             }
+            }
+noparams:
 
             if (posc != pos.Length || namedc != null && namedc.Count != 0) {
                 string m = "Excess arguments to " + name;
