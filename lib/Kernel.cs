@@ -1004,6 +1004,16 @@ noparams:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
+            IP6 ks = key.Fetch();
+            if (ks.mo != Kernel.NumMO && ks.mo.HasMRO(Kernel.SubMO)) {
+                if (rest.Count() != 0)
+                    Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                                "eager", new Variable[] { obj }, null));
+                return Get(obj, Kernel.RunInferior(ks.Invoke(
+                    Kernel.GetInferiorRoot(),
+                    new Variable[] { Kernel.BoxAnyMO<double>(items.Count(), Kernel.NumMO) }, null)));
+            }
+
             int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
             if (items.Count() <= ix && rest.Count() != 0) {
                 Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
@@ -1968,7 +1978,7 @@ slow:
         // we like to make refs to these, so moving arrays is untenable
         class LastFrameNode {
             public LastFrameNode next, prev;
-            public Frame cur;
+            public Frame cur, root;
         }
         [ThreadStatic] static LastFrameNode rlstack;
         public static void SetTopFrame(Frame f) {
@@ -1987,7 +1997,7 @@ slow:
             }
             Frame l = lfn.cur;
             rlstack = lfn.next;
-            return lfn.next.cur = ((l == null ?
+            return lfn.next.cur = lfn.next.root = ((l == null ?
                         new Frame(null, null, ExitRunloopSI) :
                         l.MakeChild(null, ExitRunloopSI)));
         }
@@ -1998,9 +2008,13 @@ slow:
             Variable result;
 
             try {
-                Frame nroot = newlfn.cur;
+                Frame nroot = newlfn.root;
                 newlfn.cur = f;
                 RunCore(ref newlfn.cur);
+                if (newlfn.cur != nroot) {
+                    Console.Error.WriteLine("WRONG ExitRunloop TAKEN:" + DescribeBacktrace(newlfn.cur, null));
+                    Console.Error.WriteLine("Correct:" + DescribeBacktrace(nroot, null));
+                }
                 result = (Variable) nroot.resultSlot;
             } finally {
                 rlstack = newlfn.prev;
