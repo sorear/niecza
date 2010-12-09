@@ -620,6 +620,19 @@ use CgOp;
 }
 
 {
+    package Op::VoidPhaser;
+    use Moose;
+    extends 'Op';
+
+    has body => (isa => 'Body', is => 'ro', required => 1);
+
+    sub code { CgOp::corelex('Nil') }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Try;
     use Moose;
     extends 'Op';

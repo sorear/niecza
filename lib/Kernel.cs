@@ -1361,7 +1361,18 @@ noparams:
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
-        public static DynBlockDelegate MainlineContinuation;
+        private static VarDeque[] PhaserBanks;
+
+        public static void AddPhaser(int i, IP6 v) {
+            PhaserBanks[i].Push(NewROScalar(v));
+        }
+
+        public static void FirePhasers(int i, bool lifo) {
+            while (PhaserBanks[i].Count() != 0)
+                RunInferior((lifo ? PhaserBanks[i].Pop() :
+                            PhaserBanks[i].Shift()).Fetch().Invoke(
+                            GetInferiorRoot(), Variable.None, null));
+        }
 
         public static T UnboxAny<T>(IP6 o) {
             return ((BoxObject<T>)o).value;
@@ -2044,6 +2055,8 @@ slow:
         public static IP6 ProcessO;
 
         static Kernel() {
+            PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque() };
+
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
             BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();

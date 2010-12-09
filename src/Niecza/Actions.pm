@@ -2755,6 +2755,20 @@ sub statement_prefix__S_START { my ($cl, $M) = @_;
         $cl->block_to_immediate($M, 'phaser', $M->{blast}{_ast}));
 }
 
+# TODO: retain and return a value
+sub statement_prefix__S_INIT { my ($cl, $M) = @_;
+    $M->{blast}{_ast}->type('init');
+    $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
+}
+# XXX 'As soon as possible' isn't quite soon enough here
+*statement_prefix__S_CHECK = *statement_prefix__S_INIT;
+*statement_prefix__S_BEGIN = *statement_prefix__S_INIT;
+
+sub statement_prefix__S_END { my ($cl, $M) = @_;
+    $M->{blast}{_ast}->type('end');
+    $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
+}
+
 sub comp_unit { my ($cl, $M) = @_;
     my $body;
     my $sl = $M->{statementlist}{_ast};

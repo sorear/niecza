@@ -99,6 +99,8 @@ EOM
             $_->visit_local_packages(\&pkg3);
             $_->visit_local_subs_preorder(\&sub3);
         });
+        push @thaw, CgOp::rawscall('Kernel.FirePhasers:m,Void',
+            CgOp::int(0), CgOp::bool(0));
         $unit->visit_units_preorder(sub {
             say STDERR "UNIT4: ", $_->name if $VERBOSE;
             return if $_->bottom_ref;
@@ -634,6 +636,10 @@ sub sub3 {
             CgOp::rawnewarr('int', map { CgOp::int($_) } @i));
         push @thaw, CgOp::setfield("sig_r", CgOp::rawsget($_->{peer}{si}),
             CgOp::rawnewarr('clr:object', @r));
+    }
+    if (defined $_->is_phaser) {
+        push @thaw, CgOp::rawscall('Kernel.AddPhaser:m,Void',
+            CgOp::int($_->is_phaser), CgOp::rawsget($_->{peer}{ps}));
     }
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};

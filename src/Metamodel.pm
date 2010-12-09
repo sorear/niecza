@@ -433,6 +433,7 @@ our %units;
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
     # inject a role constructor
     has parametric_role_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
+    has is_phaser => (isa => 'Maybe[Int]', is => 'rw', default => undef);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has in_class => (isa => 'Maybe[ArrayRef]', is => 'ro');
@@ -459,6 +460,7 @@ our %units;
         $cursor;
     }
 
+    sub add_child { push @{ $_[0]->zyg }, $_[1] }
     sub children { @{ $_[0]->zyg } }
 
     sub create_static_pad {
@@ -542,7 +544,7 @@ our %units;
     }
 
     sub add_my_sub { my ($self, $slot, $body) = @_;
-        push @{ $self->zyg }, $body;
+        $self->add_child($body);
         $self->lexicals->{$slot} = Metamodel::Lexical::SubDef->new(
             body => $body);
     }
@@ -792,6 +794,7 @@ sub Body::begin {
         name       => ($args{prefix} // '') . $self->name,
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
+        is_phaser  => ($self->type eq 'init' ? 0 : $self->type eq 'end' ? 1 : undef),
         class      => $self->class,
         ltm        => $self->ltm,
         run_once   => $args{once} && (!@opensubs || $rtop->run_once));
@@ -835,7 +838,7 @@ sub Sig::Parameter::begin {
         hash => $self->hash, noinit => 1) if defined $self->slot;
     if (defined ($self->default)) {
         $self->mdefault($self->default->begin);
-        push @{ $opensubs[-1]->zyg }, $self->mdefault;
+        $opensubs[-1]->add_child($self->mdefault);
         delete $self->{default};
     }
 }
@@ -999,6 +1002,14 @@ sub Op::SubDef::begin {
     $opensubs[-1]->add_exports($unit, $self->var, $r, $self->exports);
 
     delete $self->{$_} for (qw( body method_too exports ));
+}
+
+sub Op::VoidPhaser::begin {
+    my $self = shift;
+    my $body = $self->body->begin;
+    $opensubs[-1]->create_static_pad;
+    $opensubs[-1]->add_child($body);
+    delete $self->{body};
 }
 
 sub Op::BareBlock::begin {
