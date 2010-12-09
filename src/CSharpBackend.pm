@@ -434,6 +434,18 @@ sub codegen_sub {
     if ($_->gather_hack) {
         $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
             CgOp::rawscall('Kernel.Take', CgOp::corelex('EMPTY')));
+    } elsif ($_->augment_hack) {
+        my @prg;
+        my ($class, @tuples) = @{ $_->augment_hack };
+        for my $tuple (@tuples) {
+            push @prg, CgOp::rawcall(CgOp::letvar('!mo'),
+                ($tuple->[0] ? 'AddPrivateMethod' : 'AddMethod'),
+                CgOp::clr_string($tuple->[1]),
+                CgOp::scopedlex($tuple->[2]));
+        }
+        $ops = CgOp::letn('!mo', CgOp::class_ref('mo', @$class),
+            @prg, CgOp::rawcall(CgOp::letvar('!mo'), 'Invalidate'),
+            CgOp::return);
     } elsif ($_->parametric_role_hack) {
         my $obj = $unit->deref($_->parametric_role_hack);
         my @build;

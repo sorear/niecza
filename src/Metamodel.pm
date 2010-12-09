@@ -433,6 +433,8 @@ our %units;
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
     # inject a role constructor
     has parametric_role_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
+    # some tuples for method definitions; munged into a phaser
+    has augment_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
     has is_phaser => (isa => 'Maybe[Int]', is => 'rw', default => undef);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
@@ -995,8 +997,16 @@ sub Op::SubDef::begin {
     $opensubs[-1]->create_static_pad if $body->strong_used;
 
     if (defined($self->method_too)) {
-        $unit->deref($opensubs[-1]->body_of)
-            ->add_method(@{ $self->method_too }, $self->var, $r);
+        if ($opensubs[-1]->augment_hack) {
+            if (blessed $self->method_too->[1]) {
+                die "Computed names are legal only in parametric roles";
+            }
+            push @{ $opensubs[-1]->augment_hack },
+                @{ $self->method_too }, $self->var, $r;
+        } else {
+            $unit->deref($opensubs[-1]->body_of)
+                ->add_method(@{ $self->method_too }, $self->var, $r);
+        }
     }
 
     $opensubs[-1]->add_exports($unit, $self->var, $r, $self->exports);
@@ -1087,12 +1097,25 @@ sub Op::Augment::begin {
     if ($dso->isa('Metamodel::Role')) {
         die "illegal augment of a role";
     }
-    if ($so->[0] ne $unit->name && $unit->name ne 'MAIN') {
-        die "illegal cross-module augment";
-    }
-    my $body = $self->body->begin(body_of => $unit->get_stash_obj(@$pkg),
+    my @ah = $so;
+    my $body = $self->body->begin(augment_hack => \@ah,
+        body_of => $unit->get_stash_obj(@$pkg),
         augmenting => 1, once => 1, cur_pkg => $pkg);
+    delete $body->{augment_hack};
     $opensubs[-1]->add_my_sub($self->bodyvar, $body);
+
+    my $ph = Metamodel::StaticSub->new(
+        unit       => $unit,
+        outer      => $body,
+        cur_pkg    => [ 'GLOBAL' ],
+        name       => 'ANON',
+        is_phaser  => 0,
+        augment_hack => \@ah,
+        class      => 'Sub',
+        code       => Op::StatementList->new(children => []),
+        run_once   => $body->run_once);
+    $body->create_static_pad;
+    $body->add_child($ph);
 
     delete $self->{$_} for (qw(name body pkg));
 }

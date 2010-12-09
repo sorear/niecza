@@ -39,6 +39,14 @@ use MONKEY_TYPING;
     is @bar[*-1], 5, 'WhateverCode indexes work';
 }
 
+{
+    my $str = '';
+    $str ~= 1;
+    INIT $str ~= 2;
+    $str ~= 3;
+    INIT $str ~= 4;
+    is $str, '2413', 'INIT blocks run in correct order';
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
