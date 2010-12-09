@@ -426,6 +426,8 @@ our %units;
         default => sub { +{} });
     has code     => (isa => 'Op', is => 'rw');
     has signature=> (isa => 'Maybe[Sig]', is => 'rw');
+    has zyg      => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
+        default => sub { [] });
 
     # inject a take EMPTY
     has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
@@ -457,14 +459,7 @@ our %units;
         $cursor;
     }
 
-    sub children {
-        my @extra;
-        if ($_[0]->signature) {
-            @extra = grep { defined } map { $_->mdefault } @{ $_[0]->signature->params };
-        }
-        (map { $_->body } grep { $_->isa('Metamodel::Lexical::SubDef') }
-            @{ $_[0]->lexicals }{ sort keys %{ $_[0]->lexicals } }), @extra;
-    }
+    sub children { @{ $_[0]->zyg } }
 
     sub create_static_pad {
         my ($self) = @_;
@@ -547,6 +542,7 @@ our %units;
     }
 
     sub add_my_sub { my ($self, $slot, $body) = @_;
+        push @{ $self->zyg }, $body;
         $self->lexicals->{$slot} = Metamodel::Lexical::SubDef->new(
             body => $body);
     }
@@ -839,6 +835,7 @@ sub Sig::Parameter::begin {
         hash => $self->hash, noinit => 1) if defined $self->slot;
     if (defined ($self->default)) {
         $self->mdefault($self->default->begin);
+        push @{ $opensubs[-1]->zyg }, $self->mdefault;
         delete $self->{default};
     }
 }
