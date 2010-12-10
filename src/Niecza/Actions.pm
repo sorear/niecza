@@ -317,8 +317,8 @@ sub rxembed { my ($cl, $M, $op, $trans) = @_;
             once => 1,
             body => Body->new(
                 transparent => $trans,
-                class => 'rxembedded',
-                type  => 'Sub',
+                type  => 'rxembedded',
+                class => 'Sub',
                 signature => Sig->simple('$¢'),
                 do => $op)));
 }

@@ -64,7 +64,7 @@ sub run {
     # 2s set up objects
     # 3s set up relationships
 
-    $unit->visit_local_stashes(\&stash2) unless $libmode; #XXX weird timing
+    $unit->ns->visit_stashes(\&stash2) unless $libmode; #XXX weird timing
 
     $unit->visit_local_packages(\&pkg0);
     $unit->visit_local_subs_preorder(\&sub0);
@@ -95,7 +95,7 @@ EOM
         });
         $unit->visit_units_preorder(sub {
             say STDERR "UNIT3: ", $_->name if $VERBOSE;
-            $unit->visit_local_stashes(\&stash3) if $_ == $unit;
+            $unit->ns->visit_stashes(\&stash3) if $_ == $unit;
             $_->visit_local_packages(\&pkg3);
             $_->visit_local_subs_preorder(\&sub3);
         });
@@ -136,39 +136,41 @@ EOM
 }
 
 sub stash2 {
-    say STDERR "stash2: ", join("::", @{ $_->path }) if $VERBOSE;
-    my $p = $lpeers{$_} = gsym('IP6', join("_", @{ $_->path }));
+    my ($path) = @_;
+    say STDERR "stash2: @$path" if $VERBOSE;
+    my $p = $lpeers{join "\0", @$path} = gsym('IP6', join('_',@$path));
     push @decls, $p;
     push @thaw, CgOp::rawsset($p, CgOp::fetch(CgOp::box(
             CgOp::rawsget('Kernel.StashP'),
             CgOp::rawnew('clr:Dictionary<string,BValue>'))));
-    if (@{ $_->path } == 1 && $_->path->[0] =~ /^(?:GLOBAL|PROCESS)$/) {
-        push @thaw, CgOp::rawsset('Kernel.' . ucfirst(lc($_->path->[0])) .
+    if (@$path == 1 && $path->[0] =~ /^(?:GLOBAL|PROCESS)$/) {
+        push @thaw, CgOp::rawsset('Kernel.' . ucfirst(lc($path->[0])) .
             'O', CgOp::rawsget($p));
     }
 }
 
 sub stash3 {
-    say STDERR "stash3: ", join("::", @{ $_->path }) if $VERBOSE;
-    my $p = $lpeers{$_};
-    for my $k (sort keys %{ $_->zyg }) {
-        my $ch = $_->zyg->{$k};
-        my $bit;
+    my ($path) = @_;
+    say STDERR "stash3: @$path" if $VERBOSE;
+    #my $p = $lpeers{join "\0", @$path};
+    #for my $tup ($unit->ns->list_stash(@$path)) {
+    #    my $ch = $_->zyg->{$k};
+    #    my $bit;
 
-        if (blessed($ch)) {
-            $bit = CgOp::newscalar(CgOp::rawsget($lpeers{$ch}));
-        } else {
-            my $chd = $unit->deref($ch);
-            if ($chd->isa('Metamodel::Package') &&
-                    defined $chd->{peer}{what_var}) {
-                $bit = CgOp::rawsget($chd->{peer}{what_var});
-            }
-        }
+    #    if ($tup->[1] eq 'pkg') {
+    #        $bit = CgOp::newscalar(CgOp::rawsget($lpeers{join "\0", @$path, $tup->[0]}));
+    #    } else {
+    #        my $chd = $unit->deref($ch);
+    #        if ($chd->isa('Metamodel::Package') &&
+    #                defined $chd->{peer}{what_var}) {
+    #            $bit = CgOp::rawsget($chd->{peer}{what_var});
+    #        }
+    #    }
 
-        next unless $bit;
-        push @thaw, CgOp::bset(CgOp::rawscall('Kernel.PackageLookup',
-                CgOp::rawsget($p), CgOp::clr_string($k)), $bit);
-    }
+    #    next unless $bit;
+    #    push @thaw, CgOp::bset(CgOp::rawscall('Kernel.PackageLookup',
+    #            CgOp::rawsget($p), CgOp::clr_string($k)), $bit);
+    #}
 }
 
 my %loopbacks = (
@@ -279,7 +281,18 @@ sub pkg2_class {
 
 sub pkg3 {
     say STDERR "pkg3: ", $_->name if $VERBOSE;
-    return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role');
+    return unless $_->isa('Metamodel::Class') || $_->isa('Metamodel::Role')
+        || $_->isa('Metamodel::ParametricRole');
+    for my $t (@{ $_->exports // []}) {
+        my ($real, $n) = $unit->ns->stash_cname(@$t);
+        if (!$lpeers{join "\0", @$real}) {
+            Carp::confess "Stash peer has vanished: @$t / @$real $n";
+        }
+        push @thaw, CgOp::bset(CgOp::rawscall('Kernel.PackageLookup',
+                CgOp::rawsget($lpeers{join "\0", @$real}),
+                CgOp::clr_string($n)), CgOp::rawsget($_->{peer}{what_var}));
+    }
+    return if $_->isa('Metamodel::ParametricRole');
     my $p   = $_->{peer}{mo};
     for my $m (@{ $_->methods }) {
         push @thaw, CgOp::rawcall(CgOp::rawsget($p),
@@ -312,7 +325,7 @@ sub enter_code {
             next if $lx->noinit;
             if ($lx->hash || $lx->list) {
                 my $imp = $_->true_setting->find_lex($lx->hash ? 'Hash' : 'Array')->path;
-                my $var = $unit->deref($unit->get_stash_obj(@$imp))
+                my $var = $unit->deref($unit->get_item(@$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {
@@ -367,7 +380,7 @@ sub access_lex {
         }
     } elsif ($lex->isa('Metamodel::Lexical::Stash')) {
         die "cannot rebind stashes" if $set_to;
-        my $ref = $unit->get_stash_obj(@{ $lex->path });
+        my $ref = $unit->get_item(@{ $lex->path });
         my $obj = $ref && $unit->deref($ref);
         return $obj->{peer} ? CgOp::rawsget($obj->{peer}{what_var}) :
             CgOp::null('var');
@@ -375,9 +388,6 @@ sub access_lex {
         return $set_to ?
             CgOp::bset(CgOp::rawsget($lex->{peer}), $set_to) :
             CgOp::bget(CgOp::rawsget($lex->{peer}));
-    } elsif ($lex->isa('Metamodel::Lexical::SubImport')) {
-        die "cannot rebind imported subs" if $set_to;
-        return CgOp::newscalar(CgOp::rawsget($unit->deref($lex->ref)->{peer}{ps}));
     } else {
         die "unhandled $lex";
     }
@@ -396,7 +406,7 @@ sub resolve_lex {
         resolve_lex($body, $_) for @{ $op->zyg };
     } elsif ($opc eq 'class_ref') {
         my $cl = (@rest > 1) ? $unit->deref([ @rest ]) :
-            $unit->deref($unit->get_stash_obj(@{$body->find_lex(@rest)->path}));
+            $unit->deref($unit->get_item(@{$body->find_lex(@rest)->path}));
         my $nn = CgOp::rawsget($cl->{peer}{$arg});
         %$op = %$nn;
         bless $op, ref($nn);
@@ -560,7 +570,9 @@ sub sub2 {
     push @thaw, CgOp::rawsset($si, CgOp::rawnew("clr:$si_ty", @{ $node->{sictor} }));
 
     if ($_->class ne 'Sub') {
-        my $cl = $unit->deref($unit->get_stash_obj(@{ $_->true_setting->find_lex_pkg($_->class) }));
+        my $pkg = $_->true_setting->find_lex_pkg($_->class) //
+            Carp::confess("Cannot resolve sub type " . $_->class . " for " . $_->name);
+        my $cl = $unit->deref($unit->get_item(@$pkg));
         push @thaw, CgOp::setfield('mo', CgOp::rawsget($si), CgOp::rawsget($cl->{peer}{mo}));
     }
 
@@ -653,19 +665,25 @@ sub sub3 {
         push @thaw, CgOp::rawscall('Kernel.AddPhaser:m,Void',
             CgOp::int($_->is_phaser), CgOp::rawsget($_->{peer}{ps}));
     }
+    for my $t (@{ $_->exports // []}) {
+        my ($real, $n) = $unit->ns->stash_cname(@$t);
+        push @thaw, CgOp::bset(CgOp::rawscall('Kernel.PackageLookup',
+                CgOp::rawsget($lpeers{join "\0", @$real}),
+                CgOp::clr_string($n)), CgOp::newscalar(CgOp::rawsget($_->{peer}{ps})));
+    }
     for my $ln (sort keys %{ $_->lexicals }) {
         my $lx = $_->lexicals->{$ln};
         my $frag;
 
         if ($lx->isa('Metamodel::Lexical::Common')) {
-            my $stash = $unit->get_stash(@{ $lx->path });
-            if (!$lpeers{$stash}) {
-                Carp::confess("Peer for " . join("::", @{ $stash->path }) . " has gone missing!");
+            my ($stash, $final) = $unit->ns->stash_cname(@{ $lx->path }, $lx->name);
+            if (!$lpeers{join "\0", @$stash}) {
+                Carp::confess("Peer for " . join("::", @{ $stash }) . " has gone missing!");
             }
             push @thaw, CgOp::rawsset($lx->{peer},
                 CgOp::rawscall('Kernel.PackageLookup',
-                    CgOp::rawsget($lpeers{$stash}),
-                    CgOp::clr_string($lx->name)));
+                    CgOp::rawsget($lpeers{join "\0", @$stash}),
+                    CgOp::clr_string($final)));
         } elsif ($lx->isa('Metamodel::Lexical::SubDef')) {
             next unless $_->spad_exists;
             protolset($_, $ln, $lx,
@@ -674,7 +692,7 @@ sub sub3 {
             next unless $_->spad_exists;
             if ($lx->hash || $lx->list) {
                 my $imp = $_->true_setting->find_lex($lx->hash ? 'Hash' : 'Array')->path;
-                my $var = $unit->deref($unit->get_stash_obj(@$imp))
+                my $var = $unit->deref($unit->get_item(@$imp))
                     ->{peer}{what_var};
                 $frag = CgOp::methodcall(CgOp::rawsget($var), 'new');
             } else {

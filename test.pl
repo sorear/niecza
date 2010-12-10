@@ -478,13 +478,13 @@ EOC
 }
 
 {
-    sub postcircumfix:<[ ]>($a, $b, $c) { $a ~ "|" ~ $b ~ "|" ~ $c }
-    is 1[2,3], "1|2|3", "can call postcircumfix [ ]";
+    sub postcircumfix:<[ ]>($a, $b) { $a ~ "|" ~ $b }
+    is 1[2], "1|2", "can call postcircumfix [ ]";
 }
 
 {
-    sub postcircumfix:<{ }>($a, $b, $c) { $a ~ "|" ~ $b ~ "|" ~ $c }
-    is 1{2,3}, "1|2|3", 'can call postcircumfix { }';
+    sub postcircumfix:<{ }>($a, $b) { $a ~ "|" ~ $b }
+    is 1{2}, "1|2", 'can call postcircumfix { }';
 }
 
 {

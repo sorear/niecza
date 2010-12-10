@@ -42,7 +42,7 @@ sub metadata_for {
 }
 
 sub get_perl6lib {
-    $libdir, File::Spec->curdir
+    File::Spec->curdir, $libdir
 }
 
 sub find_module {
