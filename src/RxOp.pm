@@ -88,7 +88,7 @@ use CgOp;
         if (length($t) == 1) {
             $p, CgOp::rxbprim("ExactOne$ic", CgOp::char($t));
         } else {
-            $p, CgOp::rxbprim("Exact$ic", CgOp::clr_string($t));
+            $p, CgOp::rxbprim("Exact$ic", CgOp::str($t));
         }
     }
 
@@ -118,7 +118,7 @@ use CgOp;
         if (length($t) == 1) {
             CgOp::rxbprim("ExactOne$ic", CgOp::char($t));
         } else {
-            CgOp::rxbprim("Exact$ic", CgOp::clr_string($t));
+            CgOp::rxbprim("Exact$ic", CgOp::str($t));
         }
     }
 
@@ -376,7 +376,7 @@ use CgOp;
         my @code;
         push @code, CgOp::pushcut("CUTGRP");
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rxcommitgroup(CgOp::clr_string("CUTGRP"));
+        push @code, CgOp::rxcommitgroup(CgOp::str("CUTGRP"));
         push @code, CgOp::popcut();
 
         @code;
@@ -400,8 +400,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim('BeforeStr', CgOp::bool(0),
-            CgOp::clr_string($self->str));
+        CgOp::rxbprim('BeforeStr', CgOp::bool(0), CgOp::str($self->str));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -439,8 +438,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxbprim('BeforeStr', CgOp::bool(1),
-            CgOp::clr_string($self->str));
+        CgOp::rxbprim('BeforeStr', CgOp::bool(1), CgOp::str($self->str));
     }
 
     __PACKAGE__->meta->make_immutable;
@@ -500,7 +498,7 @@ use CgOp;
         push @code, CgOp::pushcut("NOTBEFORE");
         push @code, CgOp::rxpushb("NOTBEFORE", $pass);
         push @code, $self->zyg->[0]->code($body);
-        push @code, CgOp::rxcall('CommitGroup', CgOp::clr_string("NOTBEFORE"));
+        push @code, CgOp::rxcall('CommitGroup', CgOp::str("NOTBEFORE"));
         push @code, CgOp::goto('backtrack');
         push @code, CgOp::label($pass);
         push @code, CgOp::popcut;
@@ -541,7 +539,7 @@ use CgOp;
         push @code, CgOp::rxsetquant(CgOp::rxgetpos);
         push @code, $self->zyg->[0]->code($body);
         push @code, CgOp::rxpushb("TILDE", $fail);
-        push @code, CgOp::rxbprim('Exact', CgOp::clr_string($self->closer));
+        push @code, CgOp::rxbprim('Exact', CgOp::str($self->closer));
         push @code, CgOp::goto($pass);
         push @code, CgOp::label($fail);
         push @code, CgOp::sink(CgOp::methodcall(CgOp::newscalar(
@@ -683,7 +681,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rxcall('CommitGroup', CgOp::clr_string("LTM"))
+        CgOp::rxcall('CommitGroup', CgOp::str("LTM"))
     }
 
     sub lad {
@@ -785,7 +783,7 @@ use CgOp;
                 CgOp::callframe(),
                 CgOp::rxcall('GetClass'),
                 CgOp::const(CgOp::construct_lad($self->lads)),
-                CgOp::clr_string($self->dba)),
+                CgOp::str($self->dba)),
             CgOp::const(CgOp::rawnewarr('int', map { CgOp::labelid($_) } @ls)));
         push @code, CgOp::goto('backtrack');
         for (my $i = 0; $i < @ls; $i++) {
@@ -909,7 +907,7 @@ use CgOp;
           "fns", CgOp::rawscall('Lexer.RunProtoregex',
             CgOp::callframe(),
             CgOp::fetch(CgOp::scopedlex('self')),
-            CgOp::clr_string($self->name)),
+            CgOp::str($self->name)),
           "i",   CgOp::int(0),
           "ks",  CgOp::null('var'),
           "ki",  CgOp::null('vvarlist'),

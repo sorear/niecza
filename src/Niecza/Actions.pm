@@ -1990,7 +1990,7 @@ my %opshortcut = (
     'l',   [ 'scopedlex' ],
     'ns',  [ 'newscalar' ],
     'nsw', [ 'newrwscalar' ],
-    's',   [ 'clr_string' ],
+    's',   [ 'str' ],
     'i',   [ 'int' ],
     'b',   [ 'bool' ],
     'd',   [ 'double' ],

@@ -101,7 +101,7 @@ use warnings;
     }
 
     # begin smarter constructors
-    sub _str { blessed($_[0]) ? $_[0] : clr_string($_[0]) }
+    sub _str { blessed($_[0]) ? $_[0] : str($_[0]) }
     sub _int { blessed($_[0]) ? $_[0] : CgOp::int($_[0]) }
 
     sub noop { prog() }
@@ -128,7 +128,7 @@ use warnings;
                 fetch(methodcall(newscalar(rawsget('Kernel.HashP')), 'new')));
     }
 
-    sub string_var { box('Str', clr_string($_[0])); }
+    sub string_var { box('Str', str($_[0])); }
 
     sub box {
         rawscall('Kernel.BoxAnyMO:m,Variable', $_[1],
@@ -259,7 +259,7 @@ use warnings;
     sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }
     sub to_jsync { rawscall('JsyncWriter.ToJsync:m,String', $_[0]) }
     sub from_jsync { rawscall('JsyncReader.FromJsync:m,IP6', $_[0]) }
-    sub do_require { rawscall('Kernel.DoRequire:m,Void', clr_string($_[0])) }
+    sub do_require { rawscall('Kernel.DoRequire:m,Void', str($_[0])) }
 
     sub bif_postinc { rawscall('Builtins.PostIncrement:m,Variable', $_[0]) }
     sub bif_numeq { rawscall('Builtins.NumericEq:m,Variable', $_[0], $_[1]) }
@@ -402,7 +402,7 @@ use warnings;
 
     sub rxframe { getfield('rx', callframe) }
     sub rxcall { rawcall(rxframe, @_) }
-    sub pushcut { rxcall('PushCutGroup', clr_string($_[0])) }
+    sub pushcut { rxcall('PushCutGroup', str($_[0])) }
     sub popcut { rxcall('PopCutGroup') }
 
     sub rxinit {
@@ -412,7 +412,7 @@ use warnings;
     sub rxpushcapture {
         my $c = shift;
         rxcall('PushCapture', const(rawnewarr('str',
-                    map { clr_string($_) } @_)), $c);
+                    map { str($_) } @_)), $c);
     }
     sub rxend         { rxcall('End') }
     sub rxfinalend    { rxcall('FinalEnd') }
@@ -434,7 +434,7 @@ use warnings;
         my ($l) = @_;
         my $r = ref $l;
         if (!$r) {
-            return CgOp::clr_string($l);
+            return CgOp::str($l);
         } elsif ($r eq 'ARRAY') {
             if (!@$l || ref ($l->[0])) {
                 return fladlist_new(map { construct_lad($_) } @$l);
@@ -453,8 +453,8 @@ use warnings;
             CgOp->new(op => [ 'peek_let', $_[0] ]);
     }
 
-    sub clr_string {
-        Carp::confess "invalid undef in clr_string" unless defined $_[0];
+    sub str {
+        Carp::confess "invalid undef in str" unless defined $_[0];
         CgOp->new(op => [ 'clr_string', $_[0] ]); }
 
     sub char { CgOp->new(op => [ 'clr_char', $_[0] ]); }
@@ -543,7 +543,7 @@ use warnings;
             rawscall('Kernel.SearchForHandler', &int(5), null('clr:Niecza.Frame'),
                 &int(-1), null('str'), newscalar($msg));
         } else {
-            rawscall('Kernel.Die', clr_string($msg));
+            rawscall('Kernel.Die', str($msg));
         }
     }
 

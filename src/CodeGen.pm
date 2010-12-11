@@ -465,17 +465,17 @@ use CLRTypes;
         for (@{ $self->buffer }, @{ $self->consttab }, @{ $self->ehspans }) {
             s/\@\@L(\w+)/$self->labelname->{$1}/eg;
         }
-        (CgOp::clr_string("$::UNITNAME " . $self->name),
+        (CgOp::str("$::UNITNAME " . $self->name),
          CgOp::rawnewarr('int', map { CgOp::int($_//0) } @{ $self->lineinfo }),
          CgOp::rawsget($::UNITNAME . '.' . $self->csname . ':f,DynBlockDelegate'),
          $outersi, $ltm,
          CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->ehspans }),
          (@{ $self->ehlabels } ? CgOp::rawnewarr('str',
-              map { CgOp::clr_string($_) } @{ $self->ehlabels }) :
+              map { CgOp::str($_) } @{ $self->ehlabels }) :
               CgOp::null('clr:string[]')),
          CgOp::int($self->lexnsize),
          (@{ $self->dynames } ? (
-              CgOp::rawnewarr('str', map { CgOp::clr_string($_) } @{ $self->dynames }),
+              CgOp::rawnewarr('str', map { CgOp::str($_) } @{ $self->dynames }),
               CgOp::rawnewarr('int', map { CgOp::int($_) } @{ $self->dyixes })
             ) : (
               CgOp::null('clr:string[]'),

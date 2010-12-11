@@ -35,7 +35,7 @@ use 5.010;
         } else {
             return CgOp::die(
                 "No value in " . $body->name . " available for parameter " .
-                $self->name));
+                $self->name);
         }
     }
 

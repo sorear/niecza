@@ -75,7 +75,7 @@ EOM
 
     for my $u2 (sort keys %{ $unit->tdeps }) {
         push @thaw, CgOp::rawscall("Kernel.BootModule:m,Void",
-            CgOp::clr_string($u2), CgOp::rawsget("$u2.BOOT:f,DynBlockDelegate"));
+            CgOp::str($u2), CgOp::rawsget("$u2.BOOT:f,DynBlockDelegate"));
     }
 
     $unit->visit_local_packages(\&pkg0);
@@ -123,7 +123,7 @@ EOM
 }
 
 sub _stringarr {
-    CgOp::rawnewarr('str', map { CgOp::clr_string($_) } @_);
+    CgOp::rawnewarr('str', map { CgOp::str($_) } @_);
 }
 
 sub stash_log {
@@ -189,10 +189,9 @@ sub create_type_object {
 sub pkg2_role {
     my ($p, $wh6, $whv) = @_;
     push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
-            CgOp::clr_string($_->name)));
+            CgOp::str($_->name)));
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'FillRole',
-        CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
-            @{ $_->attributes }),
+        _stringarr(@{ $_->attributes }),
         CgOp::rawnewarr('clr:DynMetaObject',
             map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
                 @{ $_->superclasses }),
@@ -204,7 +203,7 @@ sub pkg2_role {
 sub pkg2_prole {
     my ($p, $wh6, $whv) = @_;
     push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
-            CgOp::clr_string($_->name)));
+            CgOp::str($_->name)));
 
     create_type_object($_->{peer});
 }
@@ -218,17 +217,16 @@ sub pkg2_class {
             CgOp::rawsget("Kernel." . $_->name . "MO:f,$cl_ty"));
     } else {
         push @thaw, CgOp::rawsset($p, CgOp::rawnew("clr:$cl_ty",
-                CgOp::clr_string($_->name)));
+                CgOp::str($_->name)));
     }
     my $abase;
     for (@{ $_->linearized_mro }) {
         $abase += scalar @{ $unit->deref($_)->attributes };
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'FillClass',
-        CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
-            @{ $_->attributes }),
-        CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
-            map { @{ $unit->deref($_)->attributes } } @{ $_->linearized_mro }),
+        _stringarr(@{ $_->attributes }),
+        _stringarr(map { @{ $unit->deref($_)->attributes } }
+            @{ $_->linearized_mro }),
         CgOp::rawnewarr('clr:DynMetaObject',
             map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
                 @{ $_->superclasses }),
@@ -258,7 +256,7 @@ sub pkg3 {
     for my $m (@{ $_->methods }) {
         push @thaw, CgOp::rawcall(CgOp::rawsget($p),
             ($m->private ? 'AddPrivateMethod' : 'AddMethod'),
-            CgOp::clr_string($m->name),
+            CgOp::str($m->name),
             CgOp::rawsget($unit->deref($m->body)->{peer}{ps}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Invalidate');
@@ -414,7 +412,7 @@ sub codegen_sub {
         for my $tuple (@tuples) {
             push @prg, CgOp::rawcall(CgOp::letvar('!mo'),
                 ($tuple->[0] ? 'AddPrivateMethod' : 'AddMethod'),
-                CgOp::clr_string($tuple->[1]),
+                CgOp::str($tuple->[1]),
                 CgOp::fetch(CgOp::scopedlex($tuple->[2])));
         }
         $ops = CgOp::letn('!mo', CgOp::class_ref('mo', @$class),
@@ -424,8 +422,7 @@ sub codegen_sub {
         my $obj = $unit->deref($_->parametric_role_hack);
         my @build;
         push @build, CgOp::rawcall(CgOp::letvar('!mo'), "FillRole",
-            CgOp::rawnewarr('str', map { CgOp::clr_string($_) }
-                @{ $obj->attributes }),
+            _stringarr(@{ $obj->attributes }),
             CgOp::rawnewarr('clr:DynMetaObject',
                 map { CgOp::rawsget($unit->deref($_)->{peer}{mo}) }
                 @{ $obj->superclasses }),
@@ -435,7 +432,7 @@ sub codegen_sub {
                 ($m->[2] ? 'AddPrivateMethod' : 'AddMethod'),
                 (ref($m->[0]) ?
                     CgOp::unbox('str', CgOp::fetch($m->[0]->cgop($_))) :
-                    CgOp::clr_string($m->[0])),
+                    CgOp::str($m->[0])),
                 CgOp::fetch(CgOp::scopedlex($m->[1])));
         }
         push @build, CgOp::rawcall(CgOp::letvar('!mo'), 'Invalidate');
@@ -448,7 +445,7 @@ sub codegen_sub {
         }
         $ops = CgOp::prog(@enter, CgOp::sink($code->cgop($_)),
             CgOp::letn("!mo", CgOp::rawnew('clr:DynMetaObject',
-                    CgOp::clr_string($obj->name)),
+                    CgOp::str($obj->name)),
                 "!to", CgOp::rawnew('clr:DynObject', CgOp::letvar('!mo')),
                 "!pa", CgOp::varhash_new(),
                 @build,
@@ -589,8 +586,8 @@ sub protolset {
 sub encode_parameter {
     my ($b, $p, $i, $r) = @_;
     my $fl = 0;
-    push @$r, CgOp::clr_string($p->name);
-    push @$r, map { CgOp::clr_string($_) } @{ $p->names };
+    push @$r, CgOp::str($p->name);
+    push @$r, map { CgOp::str($_) } @{ $p->names };
 
     # Keep in sync with SIG_F_XXX defines
     # TODO type constraints

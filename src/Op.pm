@@ -188,7 +188,7 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         # this should be a little fancier so closure can work
-        CgOp::subcall(CgOp::fetch(CgOp::context_get(CgOp::clr_string(
+        CgOp::subcall(CgOp::fetch(CgOp::context_get(CgOp::str(
                         '*resume_' . $self->unitname), CgOp::int(0))));
     }
 
@@ -213,7 +213,7 @@ use CgOp;
         if ($self->private) {
             CgOp::subcall(CgOp::stab_privatemethod(
                     CgOp::class_ref('mo', @{ $self->pclass }),
-                    CgOp::clr_string($self->name)),
+                    CgOp::str($self->name)),
                 $self->receiver->cgop($body), $self->argblock($body));
         } else {
             CgOp::methodcall($self->receiver->cgop($body),
@@ -959,7 +959,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        my @a = (CgOp::clr_string($self->name), CgOp::int($self->uplevel));
+        my @a = (CgOp::str($self->name), CgOp::int($self->uplevel));
         ($self->name eq '$*/' || $self->name eq '$*!') ?
             CgOp::status_get(@a) : CgOp::context_get(@a);
     }
@@ -1141,7 +1141,7 @@ use CgOp;
 
         CgOp::prog(
             @pre,
-            CgOp::rxinit(CgOp::clr_string($self->name),
+            CgOp::rxinit(CgOp::str($self->name),
                     CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('self'))),
                     $self->passcap, $self->passcut),
             ($self->passcap ? () :
