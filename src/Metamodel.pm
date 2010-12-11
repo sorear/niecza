@@ -54,16 +54,17 @@ our %units;
     # root points to a graph of hashes each representing one package.
     # Each such hash has keys for each member; the values are arrayrefs:
     # ["graft", [@path]]: A graft
-    # ["var"]: A common variable
-    # ["pkg", $meta, $sub]: A package or stub package.
-    #
-    # "var" types are used to mark they existance of exports; they are in
-    # no way exhaustive of common vars available at runtime.  Also, vars
-    # cannot be merged with grafts or pkgs (yet?).
+    # ["var", $meta, $sub]: A common variable and/or subpackage; either
+    # field may be undef.
     #
     # Paths do not start from GLOBAL; they start from an unnamed package
     # which contains GLOBAL, and also lexical namespaces (MAIN 15 etc).
     has root => (is => 'rw', default => sub { +{} });
+
+    # Records *local* operations, so they may be stored and used to
+    # set up the runtime stashes.  Read-only log access is part of the
+    # public API.
+    has log => (is => 'ro', default => sub { [] });
 
     # These are transitional things
     sub stash_cname {
@@ -80,7 +81,7 @@ our %units;
         my ($node, $cb, @path) = @_;
         $cb->(\@path);
         for my $k (sort keys %$node) {
-            if ($node->{$k}[0] eq 'pkg') {
+            if ($node->{$k}[0] eq 'var' && $node->{$k}[2]) {
                 _visitor($node->{$k}[2], $cb, @path, $k);
             }
         }
@@ -109,11 +110,11 @@ our %units;
                 die "Grafts cannot be merged " . join(" ", @path, $k)
                     unless join("\0", @{ $i1->[1] }) eq join("\0", @{ $i2->[1] });
             }
-            if ($i1->[0] eq 'pkg') {
+            if ($i1->[0] eq 'var') {
                 die "Non-stub packages cannot be merged " . join(" ", @path, $k)
                     if $i1->[1] && $i2->[1] && $i1->[1][0] ne $i2->[1][0] &&
                         $i1->[1][1] != $i2->[1][1];
-                $rinto->{$k} = ['pkg', $i1->[1] // $i2->[1],
+                $rinto->{$k} = ['var', $i1->[1] // $i2->[1],
                     ($i1->[2] && $i2->[2]) ? _merge($i1->[2], $i2->[2], @path, $k) :
                     ($i1->[2] // $i2->[2])];
             }
@@ -126,15 +127,18 @@ our %units;
         my $cursor = $self->root;
         while (@path > 1) {
             my $k = shift @path;
-            my $i = $cursor->{$k} //= ['pkg',undef,{}];
-            if ($i->[0] eq 'pkg') {
-                $cursor = $i->[2];
-                push @$used, $k;
-            } elsif ($i->[0] eq 'graft') {
-                ($cursor, $used) = _lookup_common($self, [], @{$i->[1]}, '');
-            } else {
-                die "$k is not a subpackage";
+            if ($cursor->{$k} && $cursor->{$k}[0] eq 'graft') {
+                ($cursor, $used) = _lookup_common($self, [], @{$cursor->{$k}[1]}, '');
+                next;
             }
+
+            $cursor->{$k} //= ['var',undef,undef];
+            if (!$cursor->{$k}[2]) {
+                push @{ $self->log }, ['pkg',[@$used, $k]];
+                $cursor->{$k}[2] = {};
+            }
+            $cursor = $cursor->{$k}[2];
+            push @$used, $k;
         }
         ($cursor, $used, @path);
     }
@@ -149,22 +153,27 @@ our %units;
     sub create_var {
         my ($self, @path) = @_;
         my ($c,$u,$n) = _lookup_common($self, [], @path);
-        if (($c->{$n} //= ['var'])->[0] ne 'var') {
+        my $i = $c->{$n} //= ['var',undef,undef];
+        if ($i->[0] ne 'var') {
             die "Collision with non-variable on @path";
+        }
+        if (!$i->[1]) {
+            push @{ $self->log }, [ 'var', [ @$u,$n ] ];
+            $i->[1] = ['',0];
+        } elsif ($i->[1][0] ne '' || $i->[1][1] != 0) {
+            die "collision with meta-object on @path";
         }
     }
 
-    # Lookup by name; returns undef if not found or stub
+    # Lookup by name; returns undef if not found
     sub get_item {
         my ($self, @path) = @_;
         my ($c,$u,$n) = _lookup_common($self, [], @path);
         my $i = $c->{$n} or return undef;
         if ($i->[0] eq 'graft') {
             return $self->get_item(@{ $i->[1] });
-        } elsif ($i->[0] eq 'pkg') {
+        } elsif ($i->[0] eq 'var') {
             return $i->[1];
-        } else {
-            return 1;
         }
     }
 
@@ -172,8 +181,8 @@ our %units;
     sub bind_item {
         my ($self, $path, $item) = @_;
         my ($c,$u,$n) = _lookup_common($self, [], @$path);
-        my $i = $c->{$n} //= ['pkg',undef,{}];
-        if ($i->[0] ne 'pkg' || $i->[1]) {
+        my $i = $c->{$n} //= ['var',undef,undef];
+        if ($i->[0] ne 'var' || $i->[1]) {
             die "Collision installing pkg @$path";
         }
         $i->[1] = $item;
@@ -186,6 +195,7 @@ our %units;
         if ($c->{$n}) {
             die "Collision installing graft @$path1 -> @$path2";
         }
+        push @{ $self->log }, [ 'graft', [ @$u, $n ], $path2 ];
         $c->{$n} = ['graft', $path2];
     }
 
@@ -194,6 +204,7 @@ our %units;
     sub list_stash {
         my ($self, @path) = @_;
         my ($c) = _lookup_common($self, [], @path, '');
+        my @out;
         map { [ $_, @{ $c->{$_} } ] } sort keys %$c;
     }
 
@@ -909,11 +920,13 @@ sub Op::Use::begin {
         my $uname = $tup->[0];
         my $lex;
         if ($tup->[1] eq 'var') {
-            $lex = Metamodel::Lexical::Common->new(path => [@exp], name => $uname);
+            if ($tup->[2] && !$tup->[2][0]) {
+                $lex = Metamodel::Lexical::Common->new(path => [@exp], name => $uname);
+            } elsif ($tup->[2]) {
+                $lex = Metamodel::Lexical::Stash->new(path => [@exp, $uname]);
+            }
         } elsif ($tup->[1] eq 'graft') {
             $lex = Metamodel::Lexical::Stash->new(path => $tup->[2]);
-        } elsif ($tup->[1] eq 'pkg') {
-            $lex = Metamodel::Lexical::Stash->new(path => [@exp, $uname]);
         } else {
             die "weird return";
         }
@@ -1093,6 +1106,7 @@ sub Op::PackageDef::begin {
         ($unit->anon_stash);
     my $n = pop(@ns);
 
+    $unit->create_stash(@ns, $n);
     $opensubs[-1]->add_my_stash($self->var, [ @ns, $n ]);
     $opensubs[-1]->add_pkg_exports($unit, $self->var, [ @ns, $n ], $self->exports);
     if (!$self->stub) {
