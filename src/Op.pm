@@ -1028,6 +1028,19 @@ use CgOp;
 }
 
 {
+    package Op::Require;
+    use Moose;
+    extends 'Op';
+
+    has unit => (isa => 'Str', is => 'ro', required => 1);
+
+    sub code { CgOp::rnull(CgOp::do_require($_[0]->unit)) }
+
+    __PACKAGE__->meta->make_immutable;
+    no Moose;
+}
+
+{
     package Op::Take;
     use Moose;
     extends 'Op';

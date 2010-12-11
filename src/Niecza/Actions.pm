@@ -2223,6 +2223,14 @@ sub package_declarator__S_also { my ($cl, $M) = @_;
         $cl->process_package_traits($M, undef, @{ $M->{trait} }));
 }
 
+sub package_declarator__S_require { my ($cl, $M) = @_;
+    if ($M->{EXPR}[0]) {
+        $M->sorry('Expressional forms of require NYI');
+        return;
+    }
+    $M->{_ast} = Op::Require->new(node($M), unit => $M->{module_name}->Str);
+}
+
 sub process_package_traits { my ($cl, $M, $export, @tr) = @_;
     my @r;
 

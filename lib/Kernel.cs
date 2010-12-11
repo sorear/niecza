@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Runtime.InteropServices;
 namespace Niecza {
@@ -1389,6 +1390,19 @@ noparams:
                         new SubInfo("boot-" + name, dgt)));
             ModulesFinished.Add(name);
             ModulesStarted.Remove(name);
+        }
+
+        public static void DoRequire(string name) {
+            if (ModulesFinished.Contains(name))
+                return;
+            Assembly a = Assembly.Load(name);
+            Type t = a.GetType(name);
+            if (t == null) throw new NieczaException("Load module must have a type of the same name");
+            MethodInfo mi = t.GetMethod("BOOT");
+            if (mi == null) throw new NieczaException("Load module must have a BOOT method");
+            BootModule(name, delegate (Frame fr) {
+                return (Frame) mi.Invoke(null, new object[] { fr });
+            });
         }
 
         public static T UnboxAny<T>(IP6 o) {

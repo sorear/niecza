@@ -259,6 +259,7 @@ use warnings;
     sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }
     sub to_jsync { rawscall('JsyncWriter.ToJsync:m,String', $_[0]) }
     sub from_jsync { rawscall('JsyncReader.FromJsync:m,IP6', $_[0]) }
+    sub do_require { rawscall('Kernel.DoRequire:m,Void', clr_string($_[0])) }
 
     sub bif_postinc { rawscall('Builtins.PostIncrement:m,Variable', $_[0]) }
     sub bif_numeq { rawscall('Builtins.NumericEq:m,Variable', $_[0], $_[1]) }
