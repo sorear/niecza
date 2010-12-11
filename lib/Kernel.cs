@@ -1781,6 +1781,21 @@ slow:
                         GetInferiorRoot(), "head", new Variable[] {lst}, null));
         }
 
+        // TODO: Runtime access to grafts
+        public static void CreatePath(string[] path) {
+            IP6 cursor = RootO;
+            foreach (string n in path)
+                cursor = PackageLookup(cursor, n + "::").v.Fetch();
+        }
+
+        public static BValue GetVar(string[] path) {
+            IP6 cursor = RootO;
+            for (int i = 0; i < path.Length - 1; i++) {
+                cursor = PackageLookup(cursor, path[i] + "::").v.Fetch();
+            }
+            return PackageLookup(cursor, path[path.Length - 1]);
+        }
+
         public static BValue PackageLookup(IP6 parent, string name) {
             Dictionary<string,BValue> stash =
                 UnboxAny<Dictionary<string,BValue>>(parent);
@@ -1792,8 +1807,7 @@ slow:
                 Dictionary<string,BValue> newstash =
                     new Dictionary<string,BValue>();
                 newstash["PARENT::"] = new BValue(NewROScalar(parent));
-                return (stash[name] = new BValue(BoxAny<Dictionary<string,BValue>>(newstash,
-                                StashP)));
+                return (stash[name] = new BValue(BoxAny<Dictionary<string,BValue>>(newstash, StashP)));
             } else if (name.StartsWith("@")) {
                 Variable n = RunInferior(ArrayP.InvokeMethod(GetInferiorRoot(),
                             "new", new Variable[] {Kernel.NewROScalar(ArrayP)},
@@ -1805,7 +1819,6 @@ slow:
                             null));
                 return (stash[name] = new BValue(n));
             } else {
-                // TODO: @foo, %foo
                 return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
             }
         }
@@ -2050,6 +2063,7 @@ slow:
             }
         }
 
+        public static IP6 RootO;
         // used as the fallbacks for $*FOO
         public static IP6 GlobalO;
         public static IP6 ProcessO;
@@ -2152,6 +2166,10 @@ slow:
 
             ScalarMO = new DynMetaObject("Scalar");
             ScalarMO.FillProtoClass(new string[] { });
+
+            RootO = BoxRaw(new Dictionary<string,BValue>(), StashMO);
+            GlobalO = PackageLookup(RootO, "GLOBAL::").v.Fetch();
+            ProcessO = PackageLookup(RootO, "PROCESS::").v.Fetch();
         }
 
         public static Dictionary<string, int> usedNames = new Dictionary<string, int>();
