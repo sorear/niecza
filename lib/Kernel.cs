@@ -1847,11 +1847,18 @@ slow:
                     {
                         string s = "";
                         th.lex0 = th.pos[0].Fetch().mo;
-                        Variable[] to_pass = new Variable[th.pos.Length - 1];
                         bool cache_ok = true;
-                        for (int i = 1; i < th.pos.Length; i++) {
-                            IP6 obj = th.pos[i].Fetch();
-                            to_pass[i-1] = NewROScalar(obj);
+                        Variable[] args;
+                        IP6 argv = th.pos[1].Fetch();
+                        if (argv.mo == Kernel.ParcelMO) {
+                            args = UnboxAny<Variable[]>(argv);
+                        } else {
+                            args = new Variable[] { th.pos[1] };
+                        }
+                        Variable[] to_pass = new Variable[args.Length];
+                        for (int i = 0; i < args.Length; i++) {
+                            IP6 obj = args[i].Fetch();
+                            to_pass[i] = NewROScalar(obj);
                             if (obj.mo == StrMO) {
                                 string p = UnboxAny<string>(obj);
                                 s += new string((char)p.Length, 1);
