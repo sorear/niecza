@@ -415,7 +415,7 @@ sub codegen_sub {
             push @prg, CgOp::rawcall(CgOp::letvar('!mo'),
                 ($tuple->[0] ? 'AddPrivateMethod' : 'AddMethod'),
                 CgOp::clr_string($tuple->[1]),
-                CgOp::scopedlex($tuple->[2]));
+                CgOp::fetch(CgOp::scopedlex($tuple->[2])));
         }
         $ops = CgOp::letn('!mo', CgOp::class_ref('mo', @$class),
             @prg, CgOp::rawcall(CgOp::letvar('!mo'), 'Invalidate'),

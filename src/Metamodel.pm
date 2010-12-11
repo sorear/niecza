@@ -839,6 +839,7 @@ sub Body::begin {
         name       => ($args{prefix} // '') . $self->name,
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
+        augment_hack=> $args{augment_hack},
         is_phaser  => ($type eq 'init' ? 0 : $type eq 'end' ? 1 : undef),
         class      => $self->class,
         ltm        => $self->ltm,
@@ -1041,7 +1042,7 @@ sub Op::SubDef::begin {
                 die "Computed names are legal only in parametric roles";
             }
             push @{ $opensubs[-1]->augment_hack },
-                @{ $self->method_too }, $self->var, $r;
+                [ @{ $self->method_too }, $self->var, $r ];
         } else {
             $unit->deref($opensubs[-1]->body_of)
                 ->add_method(@{ $self->method_too }, $self->var, $r);
