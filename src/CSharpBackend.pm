@@ -30,8 +30,6 @@ our @decls;
 our @thaw;
 our @cgs;
 our %haslet;
-our $classhow;
-our $libmode;
 
 sub gsym {
     my ($type, $desc) = @_;
@@ -46,26 +44,14 @@ my $si_ty = 'SubInfo';
 
 sub run {
     local $unit = shift;
-    local $libmode = $unit->name ne 'MAIN';
     local $nid = 0;
     local @thaw;
     local @decls;
     local @cgs;
-    local $classhow;
 
     local $Metamodel::unit = $unit;
 
     say STDERR $unit->name if $VERBOSE;
-
-    # 0s just set up variables
-    # 1s set up subs
-    # 2s set up objects
-    # 3s set up relationships
-
-    $unit->visit_local_packages(\&pkg0);
-    $unit->visit_local_subs_preorder(\&sub0);
-
-    $unit->visit_local_subs_preorder(\&sub1);
 
     my $mod = '';
     $mod .= <<EOH ;
@@ -75,46 +61,54 @@ using System.Collections.Generic;
 
 public class ${\ $unit->name } {
 EOH
-    $mod .= <<EOM unless $libmode ;
+    $mod .= <<EOM if $unit->name eq 'MAIN' ;
     public static void Main(string[] argv) {
-        Kernel.commandArgs = argv;
-        Kernel.RunLoop(new SubInfo("boot", BOOT));
+        Kernel.RunLoop(argv, BOOT);
     }
 
 EOM
 
-    unless ($libmode) {
-        $unit->visit_units_preorder(sub {
-            say STDERR "UNIT: ", $_->name if $VERBOSE;
-            stash_log($_);
-            $_->visit_local_packages(\&pkg2);
-            $_->visit_local_subs_preorder(\&sub2);
-            $_->visit_local_packages(\&pkg3);
-            $_->visit_local_subs_preorder(\&sub3);
-        });
-        push @thaw, CgOp::rawscall('Kernel.FirePhasers:m,Void',
-            CgOp::int(0), CgOp::bool(0));
-        $unit->visit_units_preorder(sub {
-            say STDERR "UNIT4: ", $_->name if $VERBOSE;
-            return if $_->bottom_ref;
+    # 0s just set up variables
+    # 1s set up subs
+    # 2s set up objects
+    # 3s set up relationships
 
-            my $s = $_->setting;
-            my $m = $_->mainline;
-            while ($s) {
-                my $su = $unit->get_unit($s);
-                push @thaw, CgOp::setindex("*resume_$s",
-                    CgOp::getfield("lex", CgOp::callframe),
-                    CgOp::newscalar(CgOp::rawsget($m->{peer}{ps})));
-                $s = $su->setting;
-                $m = $su->mainline;
-            }
-            push @thaw, CgOp::sink(CgOp::subcall(CgOp::rawsget($m->{peer}{ps})));
-        });
-        push @thaw, CgOp::return;
-
-        push @cgs, CodeGen->new(csname => 'BOOT', name => 'BOOT',
-            usednamed => 1, ops => CgOp::prog(@thaw))->csharp;
+    for my $u2 (sort keys %{ $unit->tdeps }) {
+        push @thaw, CgOp::rawscall("Kernel.BootModule:m,Void",
+            CgOp::clr_string($u2), CgOp::rawsget("$u2.BOOT:f,DynBlockDelegate"));
     }
+
+    $unit->visit_local_packages(\&pkg0);
+    $unit->visit_local_subs_preorder(\&sub0);
+
+    $unit->visit_local_subs_preorder(\&sub1);
+
+    say STDERR "UNIT: ", $unit->name if $VERBOSE;
+    stash_log($unit);
+    $unit->visit_local_packages(\&pkg2);
+    $unit->visit_local_subs_preorder(\&sub2);
+    $unit->visit_local_packages(\&pkg3);
+    $unit->visit_local_subs_preorder(\&sub3);
+    push @thaw, CgOp::rawscall('Kernel.FirePhasers:m,Void',
+        CgOp::int(0), CgOp::bool(0)) if $unit->name eq 'MAIN';
+
+    if (!$unit->bottom_ref) {
+        my $s = $unit->setting;
+        my $m = $unit->mainline;
+        while ($s) {
+            my $su = $unit->get_unit($s);
+            push @thaw, CgOp::setindex("*resume_$s",
+                CgOp::getfield("lex", CgOp::callframe),
+                CgOp::newscalar(CgOp::rawsget($m->{peer}{ps})));
+            $s = $su->setting;
+            $m = $su->mainline;
+        }
+        push @thaw, CgOp::sink(CgOp::subcall(CgOp::rawsget($m->{peer}{ps})));
+    }
+    push @thaw, CgOp::return;
+
+    push @cgs, CodeGen->new(csname => 'BOOT', name => 'BOOT',
+        usednamed => 1, ops => CgOp::prog(@thaw))->csharp;
 
     for (@decls) {
         /(?:.*?\.)?(.*):f,(.*)/;
@@ -248,7 +242,6 @@ sub pkg2_class {
         if $loopbacks{'P' . $_->name} && $punit->is_true_setting;
     push @thaw, CgOp::rawsset($loopbacks{'M' . $_->name}, CgOp::rawsget($p))
         if $loopbacks{'M' . $_->name} && $punit->is_true_setting;
-    $classhow = $wh6 if $_->name eq 'ClassHOW' && $punit->is_true_setting;
 }
 
 sub pkg3 {
@@ -269,10 +262,13 @@ sub pkg3 {
             CgOp::rawsget($unit->deref($m->body)->{peer}{ps}));
     }
     push @thaw, CgOp::rawcall(CgOp::rawsget($p), 'Invalidate');
-    if ($classhow) {
-        push @thaw, CgOp::setfield('how', CgOp::rawsget($p), CgOp::fetch(
-                CgOp::box(CgOp::rawsget($classhow), CgOp::rawsget($p))));
-    }
+
+    my $set      = ($unit->bottom_ref ? $unit->deref($unit->bottom_ref) :
+        $unit->mainline)->true_setting;
+    my $imp      = $unit->get_item(@{ $set->find_lex('ClassHOW')->path });
+    my $classhow = $unit->deref($imp)->{peer}{what_ip6};
+    push @thaw, CgOp::setfield('how', CgOp::rawsget($p), CgOp::fetch(
+            CgOp::box(CgOp::rawsget($classhow), CgOp::rawsget($p))));
 }
 
 sub enter_code {
@@ -536,6 +532,7 @@ sub sub2 {
     my $si = $node->{si};
 
     push @thaw, CgOp::rawsset($si, CgOp::rawnew("clr:$si_ty", @{ $node->{sictor} }));
+    delete $node->{sictor};
 
     if ($_->class ne 'Sub') {
         my $pkg = $_->true_setting->find_lex_pkg($_->class) //

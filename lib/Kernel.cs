@@ -1374,6 +1374,23 @@ noparams:
                             GetInferiorRoot(), Variable.None, null));
         }
 
+        private static HashSet<string> ModulesStarted;
+        private static HashSet<string> ModulesFinished;
+
+        public static void BootModule(string name, DynBlockDelegate dgt) {
+            if (ModulesStarted == null) ModulesStarted = new HashSet<string>();
+            if (ModulesFinished == null) ModulesFinished = new HashSet<string>();
+            if (ModulesFinished.Contains(name))
+                return;
+            if (ModulesStarted.Contains(name))
+                throw new NieczaException("Recursive module graph detected at " + name + ": " + JoinS(" ", ModulesStarted));
+            ModulesStarted.Add(name);
+            Kernel.RunInferior(Kernel.GetInferiorRoot().MakeChild(null,
+                        new SubInfo("boot-" + name, dgt)));
+            ModulesFinished.Add(name);
+            ModulesStarted.Remove(name);
+        }
+
         public static T UnboxAny<T>(IP6 o) {
             return ((BoxObject<T>)o).value;
         }
@@ -1924,7 +1941,8 @@ slow:
             return th;
         }
 
-        public static void RunLoop(SubInfo boot) {
+        public static void RunLoop(string[] args, DynBlockDelegate boot) {
+            commandArgs = args;
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
                 if (trace == "all") {
@@ -1941,7 +1959,7 @@ slow:
                 TraceCount = TraceFreq;
             }
             try {
-                RunInferior(new Frame(GetInferiorRoot(), null, boot));
+                BootModule("MAIN", boot);
             } catch (NieczaException n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
                 Environment.Exit(1);
