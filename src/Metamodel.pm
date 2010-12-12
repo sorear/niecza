@@ -217,9 +217,10 @@ our %units;
     use Moose;
 
     has xref => (isa => 'ArrayRef', is => 'rw');
+    has name => (isa => 'Str', is => 'ro', default => 'ANON');
 
     sub BUILD {
-        $_[0]->xref([ $unit->name, scalar(@{ $unit->xref }) ]);
+        $_[0]->xref([ $unit->name, scalar(@{ $unit->xref }), $_[0]->name ]);
         push @{ $unit->xref }, $_[0];
     }
 
@@ -232,8 +233,6 @@ our %units;
     use Moose;
     extends 'Metamodel::RefTarget';
 
-    # an intrinsic name, even if anonymous
-    has name => (isa => 'Str', is => 'ro', default => 'ANON');
     has exports => (is => 'rw', isa => 'ArrayRef[ArrayRef[Str]]');
 
     sub BUILD { push @{ $unit->packages }, $_[0] }
@@ -559,7 +558,6 @@ our %units;
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has in_class => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has cur_pkg  => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
-    has name     => (isa => 'Str', is => 'ro', default => 'ANON');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
     has augmenting => (isa => 'Bool', is => 'ro', default => 1);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
