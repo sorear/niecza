@@ -15,7 +15,7 @@ use 5.010;
     has full_parcel => (is => 'ro', isa => 'Bool', default => 0);
     has optional => (is => 'ro', isa => 'Bool', default => 0);
     has default => (is => 'ro', isa => 'Maybe[Body]', default => undef);
-    has mdefault => (is => 'rw', isa => 'Maybe[Metamodel::StaticSub]');
+    has mdefault => (is => 'rw', isa => 'Maybe[ArrayRef]');
     has positional => (is => 'ro', isa => 'Bool', default => 1);
     has readonly => (is => 'ro', isa => 'Bool', default => 0);
     has names => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
@@ -29,7 +29,7 @@ use 5.010;
         my ($self, $body) = @_;
 
         if (defined $self->mdefault) {
-            return CgOp::call_uncloned_sub(@{ $self->mdefault->xref });
+            return CgOp::call_uncloned_sub(@{ $self->mdefault });
         } elsif ($self->optional) {
             return CgOp::scopedlex($self->type);
         } else {

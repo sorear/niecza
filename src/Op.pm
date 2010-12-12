@@ -511,9 +511,9 @@ use CgOp;
                     CgOp::label("redo$id"),
                     CgOp::sink($self->body->cgop($body)),
                     CgOp::label("next$id"),
-                    CgOp::ehspan(1, undef, 0, "redo$id", "next$id", "next$id"),
-                    CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
-                    CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
+                    CgOp::ehspan(1, '', 0, "redo$id", "next$id", "next$id"),
+                    CgOp::ehspan(2, '', 0, "redo$id", "next$id", "last$id"),
+                    CgOp::ehspan(3, '', 0, "redo$id", "next$id", "redo$id"))),
             CgOp::label("last$id"),
             CgOp::corelex('Nil'));
     }
@@ -581,9 +581,9 @@ use CgOp;
                     CgOp::label("redo$id"),
                     CgOp::sink($self->sink->cgop($body)),
                     CgOp::label("next$id"),
-                    CgOp::ehspan(1, undef, 0, "redo$id", "next$id", "next$id"),
-                    CgOp::ehspan(2, undef, 0, "redo$id", "next$id", "last$id"),
-                    CgOp::ehspan(3, undef, 0, "redo$id", "next$id", "redo$id"))),
+                    CgOp::ehspan(1, '', 0, "redo$id", "next$id", "next$id"),
+                    CgOp::ehspan(2, '', 0, "redo$id", "next$id", "last$id"),
+                    CgOp::ehspan(3, '', 0, "redo$id", "next$id", "redo$id"))),
             CgOp::label("last$id")));
     }
 
@@ -646,7 +646,7 @@ use CgOp;
         my $id = Niecza::Actions->genid;
 
         CgOp::prog(
-            CgOp::ehspan(5, undef, 0, "start$id", "end$id", "end$id"),
+            CgOp::ehspan(5, '', 0, "start$id", "end$id", "end$id"),
             CgOp::span("start$id", "end$id", 1, $self->body->cgop($body)));
     }
 

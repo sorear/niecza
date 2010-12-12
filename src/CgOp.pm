@@ -3,579 +3,149 @@ use strict;
 use warnings;
 
 {
-    package CgOp;
-    use Moose;
-
-    has op  => (isa => 'ArrayRef',       is => 'ro', required => 1);
-    has zyg => (isa => 'ArrayRef[CgOp]', is => 'ro', default => sub { [] });
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
+    package CgOpNode;
 }
 
-{
-    package CgOp;
-    use Scalar::Util 'blessed';
+package CgOp;
+use Scalar::Util 'blessed';
 
-    # really primitive
-
-    sub prog {
-        CgOp->new(op => ['seq'], zyg => [ @_ ]);
+sub _cgop {
+    if (grep { !defined } @_) {
+        Carp::confess "Illegal undef in cgop $_[0]";
     }
+    bless [@_], 'CgOpNode'
+}
 
-    sub span {
-        my ($ls,$le,$sy,@r) = @_;
-        CgOp->new(op => [span => $ls, $le, $sy], zyg => [prog(@r)]);
+BEGIN {
+    no warnings 'qw';
+    my @names = qw<
+        getfield, getindex, rawcall, rawnew, rawnewarr, rawnewzarr,
+        rawscall, rawsget, rawsset, setfield, setindex,
+
+        ann, arith, assign, bget, bif_at_key, bif_at_pos, bif_bool,
+        bif_chars, bif_defined, bif_delete_key, bif_divide,
+        bif_exists_key, bif_hash_keys, bif_hash_kv, bif_hash_pairs,
+        bif_hash_values, bif_minus, bif_mul, bif_negate, bif_not,
+        bif_num, bif_numeq, bif_numge, bif_numgt, bif_numle,
+        bif_numlt, bif_numne, bif_plus, bif_postinc, bif_str,
+        bif_streq, bif_strge, bif_strgt, bif_strle, bif_strlt,
+        bif_strne, bif_substr3, bool, box, bset, callframe,
+        call_uncloned_sub, cast, cgoto, char, class_ref, compare,
+        const, context_get, control, corelex, cotake,
+        cursor_backing, cursor_butpos, cursor_dows, cursor_fresh,
+        cursor_from, cursor_item, cursor_O, cursor_pos,
+        cursor_start, cursor_synthcap, cursor_synthetic,
+        cursor_unpackcaps, default_new, die, do_require, double,
+        ehspan, exit, fcclist_new, fetch, fladlist_new,
+        foreign_class, frame_caller, frame_file, frame_hint,
+        frame_line, from_jsync, fvarlist_item, fvarlist_length,
+        fvarlist_new, getargv, get_first, getslot, goto, how,
+        instrole, int, iter_copy_elems, iter_flatten, iter_hasarg,
+        iter_hasflat, iter_to_list, label, labelid, letn, letvar,
+        llhow_name, ncgoto, newblankrwscalar, newboundvar,
+        newrwlistvar, newrwscalar, newscalar, newvarrayvar,
+        newvhashvar, newvnewarrayvar, newvnewhashvar, newvsubvar,
+        note, null, num_to_string, obj_asbool, obj_asdef, obj_asnum,
+        obj_asstr, obj_at_key, obj_at_pos, obj_delete_key, obj_does,
+        obj_exists_key, obj_getbool, obj_getdef, obj_getnum,
+        obj_getstr, obj_isa, obj_is_defined, obj_llhow,
+        obj_newblank, obj_typename, obj_vasbool, obj_vasdef,
+        obj_vasnum, obj_vasstr, obj_vat_key, obj_vat_pos,
+        obj_vdelete_key, obj_vexists_key, obj_what, popcut, print,
+        prog, promote_to_list, pushcut, return, role_apply,
+        rxbacktrack, rxbprim, rxcall, rxclosequant, rxcommitgroup,
+        rxend, rxfinalend, rxframe, rxgetpos, rxgetquant,
+        rxincquant, rxinit, rxopenquant, rxpushb, rxpushcapture,
+        rxsetcapsfrom, rxsetclass, rxsetpos, rxsetquant,
+        rxstripcaps, say, scopedlex, setbox, setslot, set_status,
+        sig_slurp_capture, sink, slurp, span, specificlex, spew,
+        stab_privatemethod, stab_what, startgather, status_get, str,
+        strbuf_append, strbuf_new, strbuf_seal, str_chr, strcmp,
+        str_length, str_substring, str_tolower, str_toupper, take,
+        ternary, to_jsync, treader_getc, treader_getline,
+        treader_slurp, treader_stdin, unbox, varhash_clear,
+        varhash_contains_key, varhash_delete_key, varhash_dup,
+        varhash_getindex, varhash_new, varhash_setindex, var_islist,
+        vvarlist_append, vvarlist_clone, vvarlist_count,
+        vvarlist_from_fvarlist, vvarlist_item, vvarlist_new_empty,
+        vvarlist_new_singleton, vvarlist_pop, vvarlist_push,
+        vvarlist_shift, vvarlist_sort, vvarlist_to_fvarlist,
+        vvarlist_unshift, vvarlist_unshiftn, whileloop,
+    >;
+
+    my $code;
+    for my $n (@names) {
+        chop $n;
+        $code .= "sub $n { _cgop(\"$n\", \@_) }\n";
     }
-
-    sub null {
-        CgOp->new(op => [ push_null => CLRTypes->mapt($_[0]) ]);
-    }
-
-    sub ehspan { CgOp->new(op => [ ehspan => @_ ]); }
-
-    sub sink { CgOp->new(op => ['drop'], zyg => [ $_[0] ]); }
-    sub sync { CgOp->new(op => ['cpssync']) }
-
-    sub fetch { rawcall($_[0], 'Fetch'); }
-
-    sub how { rawcall($_[0], "HOW"); }
-
-    sub getfield {
-        CgOp->new(op => [ 'clr_field_get', $_[0] ], zyg => [ $_[1] ]);
-    }
-
-    sub setfield {
-        CgOp->new(op => [ 'clr_field_set', $_[0] ],
-            zyg => [ $_[1], $_[2] ]);
-    }
-
-    sub getindex {
-        CgOp->new(op => [ 'clr_index_get' ],
-            zyg => [ _str($_[0]), $_[1] ]);
-    }
-
-    sub setindex {
-        CgOp->new(op  => [ 'clr_index_set' ],
-            zyg => [ _str($_[0]), $_[1], $_[2] ]);
-    }
-
-    sub getslot { cast($_[1], rawcall($_[2], 'GetSlot', _str($_[0]))); }
-
-    sub setslot { rawcall($_[1], 'SetSlot', _str($_[0]), $_[2]); }
-    sub setbox  { rawscall('Kernel.SetBox:m,Void', $_[0], $_[1]); }
-
-    sub cast {
-        CgOp->new(op => [ 'cast', CLRTypes->mapt($_[0]) ], zyg => [ $_[1] ]);
-    }
-
-    sub const {
-        CgOp->new(op => [ 'const' ], zyg => [ $_[0] ]);
-    }
-
-    sub newscalar {
-        rawscall('Kernel.NewROScalar', $_[0]);
-    }
-
-    sub newblankrwscalar {
-        rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyMO'),
-            rawsget('Kernel.AnyP'));
-    }
-
-    sub newrwscalar { rawscall('Kernel.NewRWScalar', rawsget('Kernel.AnyMO'),
-            $_[0]); }
-
-    sub newrwlistvar { rawscall('Kernel.NewRWListVar', $_[0]); }
-
-    sub double { CgOp->new(op => [ 'clr_double', $_[0] ]); }
-
-    sub labelid { CgOp->new(op => [ 'labelid', $_[0] ]) }
-
-    sub int { CgOp->new(op => [ 'clr_int', $_[0] ]); }
-
-    sub bool { CgOp->new(op => [ 'clr_bool', $_[0] ]); }
-
-    sub unbox {
-        my $t = CLRTypes->mapt($_[0]);
-        rawscall("Kernel.UnboxAny<$t>:m,$t", $_[1]);
-    }
-
-    # begin smarter constructors
-    sub _str { blessed($_[0]) ? $_[0] : str($_[0]) }
-    sub _int { blessed($_[0]) ? $_[0] : CgOp::int($_[0]) }
-
-    sub noop { prog() }
-
-    sub rnull {
-        prog($_[0], corelex('Nil'));
-    }
-
-    sub getattr {
-        fetch(varattr($_[0], $_[1]));
-    }
-
-    sub varattr { getslot($_[0], 'var', $_[1]); }
-
-    sub newblanklist {
-        newrwlistvar(ternary(
-                compare('==', rawsget('Kernel.ArrayP'), null('obj')),
-                null('obj'),
-                fetch(methodcall(newscalar(rawsget('Kernel.ArrayP')), 'new'))));
-    }
-
-    sub newblankhash {
-        newrwlistvar(
-                fetch(methodcall(newscalar(rawsget('Kernel.HashP')), 'new')));
-    }
-
-    sub string_var { box('Str', str($_[0])); }
-
-    sub box {
-        rawscall('Kernel.BoxAnyMO:m,Variable', $_[1],
-            blessed($_[0]) ? obj_llhow($_[0]) :
-            ($_[0] eq 'Str') ? rawsget('Kernel.StrMO:f,DynMetaObject') :
-            ($_[0] eq 'Bool') ? rawsget('Kernel.BoolMO:f,DynMetaObject') :
-            ($_[0] eq 'Num') ? rawsget('Kernel.NumMO:f,DynMetaObject') :
-                obj_llhow(fetch(corelex($_[0]))));
-    }
-
-    sub obj_is_defined { rawcall($_[0], 'IsDefined') }
-    sub obj_typename { rawcall($_[0], 'GetTypeName') }
-    sub obj_what { rawcall($_[0], 'GetTypeObject') }
-    sub obj_llhow { getfield('mo', $_[0]) }
-    sub obj_isa { rawcall($_[0], 'Isa', $_[1]) }
-    sub obj_does { rawcall($_[0], 'Does', $_[1]) }
-    sub obj_newblank { rawnew('clr:DynObject', $_[0]) }
-
-    sub var_islist { getfield('islist', $_[0]) }
-
-    sub llhow_name { getfield('name', $_[0]) }
-    sub stab_privatemethod { rawcall($_[0], 'GetPrivateMethod', $_[1]) }
-    sub stab_what { getfield('typeObject', $_[0]) }
-
-    sub varhash_setindex { setindex(@_) }
-    sub varhash_getindex { getindex(@_) }
-    sub varhash_contains_key { rawcall($_[0], 'ContainsKey', _str($_[1])) }
-    sub varhash_delete_key { rawcall($_[0], 'Remove', _str($_[1])) }
-    sub varhash_clear { rawcall($_[0], 'Clear') }
-    sub varhash_dup { rawnew('varhash', $_[0]) }
-    sub varhash_new { rawnew('varhash') }
-
-    sub newvsubvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:SubViviHook', $_[1]), $_[2]) }
-    sub newvhashvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:HashViviHook', $_[1], $_[2]), $_[3]) }
-    sub newvarrayvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:ArrayViviHook', $_[1], $_[2]), $_[3]) }
-    sub newvnewhashvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:NewHashViviHook', $_[1], $_[2]), $_[3]) }
-    sub newvnewarrayvar { rawnew('clr:SimpleVariable', bool(1), bool(0), $_[0], rawnew('clr:NewArrayViviHook', $_[1], $_[2]), $_[3]) }
-    sub poscount { getfield('Length', getfield('pos', callframe())) }
-
-    sub num_to_string { rawcall($_[0], 'ToString') }
-    sub str_length { getfield('Length', $_[0]) }
-    sub str_substring { rawscall('Builtins.LaxSubstring2:m,String', @_) }
-    sub str_chr { rawnew('str', cast('clr:System.Char', $_[0]), CgOp::int(1)) }
-    sub strcmp { rawscall('String.CompareOrdinal', $_[0], $_[1]) }
-    sub str_tolower { rawcall($_[0], 'ToLowerInvariant:m,String') }
-    sub str_toupper { rawcall($_[0], 'ToUpperInvariant:m,String') }
-
-    sub strbuf_new { rawnew('strbuf') }
-    sub strbuf_append { rawcall($_[0], 'Append', $_[1]) }
-    sub strbuf_seal { rawcall($_[0], 'ToString') }
-
-    sub say { rawscall('Console.WriteLine', $_[0]) }
-    sub print { rawscall('Console.Write:m,Void', $_[0]) }
-    sub note { rawscall('Console.Error.WriteLine', $_[0]) }
-    sub exit { rawscall('System.Environment.Exit', $_[0]) }
-    sub slurp { rawscall('System.IO.File.ReadAllText', $_[0]) }
-    sub spew { rawscall('System.IO.File.WriteAllText:m,Void', $_[0], $_[1]) }
-    sub getargv { rawscall('Kernel.ArgsHelper:m,Variable[]') }
-
-    sub treader_getc    { rawcall($_[0], 'Read:m,Int32') }
-    sub treader_slurp   { rawcall($_[0], 'ReadToEnd:m,String') }
-    sub treader_getline { rawcall($_[0], 'ReadLine:m,String') }
-    sub treader_stdin   { rawscall('Kernel.OpenStdin:m,System.IO.TextReader') }
-
-    sub fvarlist_length { getfield('Length', $_[0]) }
-    sub fvarlist_new { rawnewarr('var', @_) }
-    sub fvarlist_item { getindex($_[0], $_[1]) }
-
-    sub vvarlist_from_fvarlist { rawnew('vvarlist', $_[0]) }
-    sub vvarlist_to_fvarlist { rawcall($_[0], 'CopyAsArray:m,Variable[]') }
-    sub vvarlist_clone { rawnew('vvarlist', $_[0]) }
-    sub vvarlist_new_empty { rawnew('vvarlist') }
-    sub vvarlist_new_singleton { rawnew('vvarlist', $_[0]) }
-    sub vvarlist_shift { rawcall($_[0], 'Shift') }
-    sub vvarlist_pop { rawcall($_[0], 'Pop') }
-    sub vvarlist_count { rawcall($_[0], 'Count') }
-    sub vvarlist_unshift { rawcall($_[0], 'Unshift', $_[1]) }
-    sub vvarlist_unshiftn { rawcall($_[0], 'UnshiftN', $_[1]) }
-    sub vvarlist_push { rawcall($_[0], 'Push', $_[1]) }
-    sub vvarlist_append { rawcall($_[0], 'PushD:m,Void', $_[1]) }
-    sub vvarlist_item { getindex($_[0], $_[1]) }
-    sub vvarlist_sort { rawscall('Kernel.SortHelper', callframe(), $_[0], $_[1]) }
-
-    sub frame_caller { getfield('caller', $_[0]) }
-    sub frame_file { rawcall($_[0], 'ExecutingFile') }
-    sub frame_line { rawcall($_[0], 'ExecutingLine') }
-    sub frame_hint { rawcall($_[0], 'LexicalFind', $_[1]) }
-
-    sub cursor_start   { rawnew('cursor', $_[0], $_[1]) }
-    sub cursor_pos     { getfield('pos', $_[0]) }
-    sub cursor_from    { getfield('from', $_[0]) }
-    sub cursor_butpos  { rawcall($_[0], 'At', $_[1]) }
-    sub cursor_backing { rawcall($_[0], 'GetBacking:m,String') }
-    sub cursor_dows    { rawcall($_[0], 'SimpleWS') }
-    sub cursor_item    { rawcall($_[0], 'GetKey', $_[1]) }
-    sub cursor_unpackcaps { rawcall($_[0], 'UnpackCaps:m,Void', $_[1]) }
-    sub cursor_O       { rawcall($_[0], 'O:m,Variable', $_[1]) }
-    sub cursor_synthetic { rawnew('cursor', @_[0,1,2,3]) }
-    sub cursor_synthcap{ rawcall($_[0], 'SynPushCapture:m,Void', @_[1,2]) }
-    sub cursor_fresh   { rawcall($_[0], 'FreshClass:m,Cursor', $_[1]) }
-    sub rxstripcaps    { rawcall($_[0], 'StripCaps:m,Cursor') }
-
-    sub fcclist_new    { rawnewarr('cc', @_) }
-    sub fladlist_new   { rawnewarr('lad', @_) }
-
-    sub bget { getfield('v', $_[0]) }
-    sub bset { setfield('v', $_[0], $_[1]) }
-
-    sub default_new    { rawscall('Kernel.DefaultNew', $_[0]) }
-    sub cotake         { rawscall('Kernel.CoTake', $_[0]) }
-    sub take           { rawscall('Kernel.Take', $_[0]) }
-    sub control        { rawscall('Kernel.SearchForHandler', CgOp::int(shift()),
-            @_) }
-    sub context_get    { rawscall('Kernel.ContextHelper', callframe(), $_[0], $_[1]) }
-    sub status_get    { rawscall('Kernel.StatusHelper:m,Variable', callframe(), $_[0], $_[1]) }
-    sub set_status    { rawscall('Kernel.SetStatus:m,Void', callframe(), $_[0], $_[1]) }
-    sub startgather    { rawscall('Kernel.GatherHelper', $_[0]) }
-    sub get_first      { rawscall('Kernel.GetFirst', $_[0]) }
-    sub promote_to_list{ rawscall('Kernel.PromoteToList:c,Variable', $_[0]) }
-    sub instrole       { rawscall('Kernel.InstantiateRole', $_[0]) }
-    sub role_apply     { rawscall('Kernel.RoleApply', $_[0], $_[1]) }
-    sub iter_hasflat { rawscall('Kernel.IterHasFlat:m,Boolean', $_[0], bool(1)) }
-    sub iter_hasarg { rawscall('Kernel.IterHasFlat:m,Boolean', $_[0], bool(0)) }
-    sub iter_to_list { rawscall('Kernel.IterToList:m,Void', $_[0], $_[1]) }
-    sub iter_flatten { rawscall('Kernel.IterFlatten:m,VarDeque', $_[0]) }
-    sub iter_copy_elems { rawscall('Kernel.IterCopyElems:m,VarDeque', $_[0]) }
-
-    sub sig_slurp_capture { rawscall('Kernel.SigSlurpCapture:m,IP6', callframe()) }
-    sub to_jsync { rawscall('JsyncWriter.ToJsync:m,String', $_[0]) }
-    sub from_jsync { rawscall('JsyncReader.FromJsync:m,IP6', $_[0]) }
-    sub do_require { rawscall('Kernel.DoRequire:m,Void', str($_[0])) }
-
-    sub bif_postinc { rawscall('Builtins.PostIncrement:m,Variable', $_[0]) }
-    sub bif_numeq { rawscall('Builtins.NumericEq:m,Variable', $_[0], $_[1]) }
-    sub bif_numne { rawscall('Builtins.NumericNe:m,Variable', $_[0], $_[1]) }
-    sub bif_numge { rawscall('Builtins.NumericGe:m,Variable', $_[0], $_[1]) }
-    sub bif_numgt { rawscall('Builtins.NumericGt:m,Variable', $_[0], $_[1]) }
-    sub bif_numle { rawscall('Builtins.NumericLe:m,Variable', $_[0], $_[1]) }
-    sub bif_numlt { rawscall('Builtins.NumericLt:m,Variable', $_[0], $_[1]) }
-    sub bif_streq { rawscall('Builtins.StringEq:m,Variable', $_[0], $_[1]) }
-    sub bif_strne { rawscall('Builtins.StringNe:m,Variable', $_[0], $_[1]) }
-    sub bif_strge { rawscall('Builtins.StringGe:m,Variable', $_[0], $_[1]) }
-    sub bif_strgt { rawscall('Builtins.StringGt:m,Variable', $_[0], $_[1]) }
-    sub bif_strle { rawscall('Builtins.StringLe:m,Variable', $_[0], $_[1]) }
-    sub bif_strlt { rawscall('Builtins.StringLt:m,Variable', $_[0], $_[1]) }
-    sub bif_plus { rawscall('Builtins.Plus:m,Variable', $_[0], $_[1]) }
-    sub bif_minus { rawscall('Builtins.Minus:m,Variable', $_[0], $_[1]) }
-    sub bif_mul { rawscall('Builtins.Mul:m,Variable', $_[0], $_[1]) }
-    sub bif_divide { rawscall('Builtins.Divide:m,Variable', $_[0], $_[1]) }
-    sub bif_not { rawscall('Builtins.Not:m,Variable', $_[0]) }
-    sub bif_negate { rawscall('Builtins.Negate:m,Variable', $_[0]) }
-    sub bif_chars { rawscall('Builtins.Chars:m,Variable', $_[0]) }
-    sub bif_substr3 { rawscall('Builtins.Substr3:m,Variable', @_) }
-    sub bif_hash_keys { rawscall('Builtins.HashIter:m,Variable', CgOp::int(0), @_) }
-    sub bif_hash_values { rawscall('Builtins.HashIter:m,Variable', CgOp::int(1), @_) }
-    sub bif_hash_kv { rawscall('Builtins.HashIter:m,Variable', CgOp::int(2), @_) }
-    sub bif_hash_pairs { rawscall('Builtins.HashIter:m,Variable', CgOp::int(3), @_) }
-    sub bif_defined { obj_asdef($_[0]) }
-    sub bif_num { obj_asnum($_[0]) }
-    sub bif_str { obj_asstr($_[0]) }
-    sub bif_bool { obj_asbool($_[0]) }
-    sub bif_at_key { obj_at_key(@_) }
-    sub bif_at_pos { obj_at_pos(@_) }
-    sub bif_delete_key { obj_delete_key(@_) }
-    sub bif_exists_key { obj_exists_key(@_) }
-
-    sub foreign_class { rawscall('NieczaCLR.GetClass:m,Variable', $_[0], $_[1]) }
-
-    sub _context {
-        my ($type, $mo, $fun, $obj) = @_;
-        letn('!var', $obj,
-            rawcall(getfield("mro_$fun:f,ContextHelper<$type>",
-                    $mo//getfield("mo:f,DynMetaObject", fetch(letvar('!var')))),
-                "Get:m,$type", letvar('!var')));
-    }
-
-    sub _indexer {
-        my ($mo, $fun, $obj, $key) = @_;
-        letn('!var', $obj,
-            rawcall(getfield("mro_$fun:f,IndexHandler",
-                    $mo//getfield("mo:f,DynMetaObject", fetch(letvar('!var')))),
-                "Get:m,Variable", letvar('!var'), $key));
-    }
-
-    sub obj_getnum  { _context('Double',   undef, 'raw_Numeric', $_[0]) }
-    sub obj_getbool { _context('Boolean',  undef, 'raw_Bool', $_[0]) }
-    sub obj_getdef  { _context('Boolean',  undef, 'raw_defined', $_[0]) }
-    sub obj_getstr  { _context('String',   undef, 'raw_Str', $_[0]) }
-    sub obj_asnum   { _context('Variable', undef, 'Numeric', $_[0]) }
-    sub obj_asbool  { _context('Variable', undef, 'Bool', $_[0]) }
-    sub obj_asdef   { _context('Variable', undef, 'defined', $_[0]) }
-    sub obj_asstr   { _context('Variable', undef, 'Str', $_[0]) }
-    sub obj_vasnum  { _context('Variable', $_[0], 'Numeric', $_[1]) }
-    sub obj_vasbool { _context('Variable', $_[0], 'Bool', $_[1]) }
-    sub obj_vasdef  { _context('Variable', $_[0], 'defined', $_[1]) }
-    sub obj_vasstr  { _context('Variable', $_[0], 'Str', $_[1]) }
-    sub obj_at_pos      { _indexer(undef, 'at_pos',     $_[0], $_[1]) }
-    sub obj_at_key      { _indexer(undef, 'at_key',     $_[0], $_[1]) }
-    sub obj_exists_key  { _indexer(undef, 'exists_key', $_[0], $_[1]) }
-    sub obj_delete_key  { _indexer(undef, 'delete_key', $_[0], $_[1]) }
-    sub obj_vat_pos     { _indexer($_[0], 'at_pos',     $_[1], $_[2]) }
-    sub obj_vat_key     { _indexer($_[0], 'at_key',     $_[1], $_[2]) }
-    sub obj_vexists_key { _indexer($_[0], 'exists_key', $_[1], $_[2]) }
-    sub obj_vdelete_key { _indexer($_[0], 'delete_key', $_[1], $_[2]) }
-
-    sub newboundvar {
-        rawscall('Kernel.NewBoundVar', bool($_[0] || $_[1]), bool($_[1]),
-            rawsget('Kernel.AnyMO'), $_[2]);
-    }
-
-    sub assign {
-        rawscall('Kernel.Assign', $_[0], $_[1]);
-    }
-
-    sub compare {
-        CgOp->new(op => [ 'clr_compare', $_[0] ], zyg => [ $_[1], $_[2] ]);
-    }
-
-    sub arith {
-        CgOp->new(op => [ 'clr_arith', $_[0] ], zyg => [ $_[1], $_[2] ]);
-    }
-
-    # Not a CgOp function, rewritten by the resolve_lex pass
-    sub scopedlex {
-        my $n = shift;
-        CgOp->new(op => [ scopelex => $n ], zyg => [ @_ ]);
-    }
-    sub corelex {
-        my $n = shift;
-        CgOp->new(op => [ corelex => $n ], zyg => [ @_ ]);
-    }
-    sub specificlex {
-        my ($ref, $n) = splice @_, 0, 2;
-        CgOp->new(op => [ specificlex => @$ref, $n ], zyg => [ @_ ]);
-    }
-
-    sub class_ref { CgOp->new(op => [ class_ref => @_ ]); }
-    sub call_uncloned_sub { CgOp->new(op => [ call_uncloned_sub => @_ ]); }
-
-    sub _process_arglist {
-        my $ar = shift;
-        my @sig;
-        my $j = 0;
-        for (my $i = 0; $i < @$ar; ) {
-            if (blessed($ar->[$i])) {
-                push @sig, '';
-            } else {
-                push @sig, $ar->[$i++];
-            }
-            $ar->[$j++] = $ar->[$i++];
-        }
-        $#$ar = $j - 1;
-        @sig;
-    }
-
-    sub subcall {
-        my ($sub, @args) = @_;
-        my @sig = _process_arglist(\@args);
-        CgOp->new(op => [ 'call_sub', \@sig ], zyg => [ $sub, @args ]);
-    }
-
-    sub methodcall {
-        my ($obj, $name, @args) = @_;
-        my @sig = _process_arglist(\@args);
-        let($obj, sub {
-            CgOp->new(op => [ 'call_method', $name, ['', @sig] ],
-                zyg => [ fetch($_[0]), $_[0], @args ])});
-    }
-
-    sub callframe { CgOp->new(op => [ 'callframe' ]); }
-
-    sub rxframe { getfield('rx', callframe) }
-    sub rxcall { rawcall(rxframe, @_) }
-    sub pushcut { rxcall('PushCutGroup', str($_[0])) }
-    sub popcut { rxcall('PopCutGroup') }
-
-    sub rxinit {
-        setfield('rx', callframe(), rawnew('clr:RxFrame', $_[0], $_[1],
-                bool($_[2]), bool($_[3])))
-    }
-    sub rxpushcapture {
-        my $c = shift;
-        rxcall('PushCapture', const(rawnewarr('str',
-                    map { str($_) } @_)), $c);
-    }
-    sub rxend         { rxcall('End') }
-    sub rxfinalend    { rxcall('FinalEnd') }
-    sub rxbacktrack   { rxcall('Backtrack') }
-    sub rxgetquant    { rxcall('GetQuant') }
-    sub rxsetquant    { rxcall('SetQuant:m,Void', $_[0]) }
-    sub rxopenquant   { rxcall('OpenQuant') }
-    sub rxclosequant  { rxcall('CloseQuant') }
-    sub rxincquant    { rxcall('IncQuant') }
-    sub rxsetclass    { rxcall('SetClass', $_[0]) }
-    sub rxsetpos      { rxcall('SetPos', $_[0]) }
-    sub rxsetcapsfrom { rxcall('SetCapturesFrom:m,Void', $_[0]) }
-    sub rxgetpos      { rxcall('GetPos:m,Int32') }
-    sub rxcommitgroup { rxcall('CommitGroup', $_[0]) }
-
-    sub cc_expr { rawnew('cc', rawnewarr('int',
-                map { CgOp::int($_) } @{ $_[0] })) }
-    sub construct_lad {
-        my ($l) = @_;
-        my $r = ref $l;
-        if (!$r) {
-            return CgOp::str($l);
-        } elsif ($r eq 'ARRAY') {
-            if (!@$l || ref ($l->[0])) {
-                return fladlist_new(map { construct_lad($_) } @$l);
-            } else {
-                my ($h,@r) = @$l;
-                return CgOp::rawnew("clr:LAD$h", map { construct_lad($_) } @r);
-            }
+    eval $code;
+}
+
+sub _str { blessed($_[0]) ? $_[0] : str($_[0]) }
+sub _int { blessed($_[0]) ? $_[0] : CgOp::int($_[0]) }
+
+sub newblanklist { methodcall(corelex('Array'), 'new') }
+sub newblankhash { methodcall(corelex('Hash'), 'new') }
+sub string_var { box('Str', str($_[0])); }
+sub noop { prog() }
+sub rnull { prog($_[0], corelex('Nil')); }
+sub getattr { fetch(varattr($_[0], $_[1])); }
+sub varattr { getslot($_[0], 'var', $_[1]); }
+
+my $nextlet = 0;
+sub let {
+    my ($head, $bodyf) = @_;
+    my $v = ($nextlet++);
+    letn($v, $head, $bodyf->(letvar($v)));
+}
+
+sub cc_expr { _cgop('newcc', @{ $_[0] }) }
+sub construct_lad {
+    my ($l) = @_;
+    my $r = ref $l;
+    if (!$r) {
+        return CgOp::str($l);
+    } elsif ($r eq 'ARRAY') {
+        if (!@$l || ref ($l->[0])) {
+            return fladlist_new(map { construct_lad($_) } @$l);
         } else {
-            return $l;
+            my ($h,@r) = @$l;
+            return _cgop("ladnew$h", map { construct_lad($_) } @r);
         }
+    } else {
+        return $l;
     }
+}
 
-    sub letvar {
-        $_[1] ?
-            CgOp->new(op => [ 'poke_let', $_[0] ], zyg => [ $_[1] ]):
-            CgOp->new(op => [ 'peek_let', $_[0] ]);
-    }
-
-    sub str {
-        Carp::confess "invalid undef in str" unless defined $_[0];
-        CgOp->new(op => [ 'clr_string', $_[0] ]); }
-
-    sub char { CgOp->new(op => [ 'clr_char', $_[0] ]); }
-
-    sub withtypes {
-        if (blessed($_[0])) {
-            prog(@_);
+sub _process_arglist {
+    my $ar = shift;
+    my $sig = '';
+    my $j = 0;
+    for (my $i = 0; $i < @$ar; ) {
+        my $o = $ar->[$i];
+        if (blessed($o)) {
+            $sig .= "\0";
         } else {
-            my $n = shift;
-            my $t = shift;
-            letn($n, null($t), withtypes(@_));
+            $sig .= chr(length($o)) . $o;
+            $i++;
         }
+        $ar->[$j++] = $ar->[$i++];
     }
+    $#$ar = $j - 1;
+    $sig;
+}
 
-    sub return {
-        $_[0] ?
-            CgOp->new(op => [ 'return', 1 ], zyg => [ $_[0] ]) :
-            CgOp->new(op => [ return => 0]);
-    }
+sub subcall {
+    my ($sub, @args) = @_;
+    my $sig = _process_arglist(\@args);
+    _cgop('subcall', $sig, $sub, @args);
+}
 
-    sub rawscall {
-        my ($name, @args) = @_;
-        CgOp->new(op => [ 'clr_call_direct', $name ], zyg => [ @args ]);
-    }
-
-    sub rawcall {
-        my ($inv, $name, @args) = @_;
-        CgOp->new(op => [ 'clr_call_virt', $name ], zyg => [ $inv, @args ]);
-    }
-
-    sub label { CgOp->new(op => [ 'labelhere', $_[0] ]); }
-
-    sub goto {
-        my ($name) = @_;
-        CgOp->new(op => [ 'goto', $name ]);
-    }
-
-    sub cgoto { CgOp->new(op => [ 'cgoto', $_[0] ], zyg => [ $_[1] ]); }
-
-    sub ncgoto { CgOp->new(op => [ 'ncgoto', $_[0] ], zyg => [ $_[1] ]); }
-
-    sub rxpushb {
-        my ($tag, $lbl) = @_;
-        CgOp->new(op => [ 'rxpushb', $tag, $lbl ]);
-    }
-
-    sub rxbprim {
-        my ($name, @args) = @_;
-        CgOp->new(op => [ 'rxbprim', $name ], zyg => [ @args ]);
-    }
-
-    sub rawsget {
-        Carp::confess "Undefined name in rawsget" unless defined $_[0];
-        CgOp->new(op => [ 'clr_sfield_get', $_[0] ]);
-    }
-
-    sub rawsset {
-        Carp::confess "Undefined name in rawsset" unless defined $_[0];
-        CgOp->new(op => [ 'clr_sfield_set', $_[0] ], zyg => [ $_[1] ]);
-    }
-
-    sub rawnew {
-        my ($name, @args) = @_;
-        CgOp->new(op => [ 'clr_new', CLRTypes->mapt($name) ], zyg => \@args);
-    }
-
-    sub rawnewarr {
-        my ($name, @args) = @_;
-        CgOp->new(op => [ 'clr_new_arr', CLRTypes->mapt($name) ],
-            zyg => \@args);
-    }
-
-    sub rawnewzarr {
-        my ($name, $ni) = @_;
-        CgOp->new(op => [ 'clr_new_zarr', CLRTypes->mapt($name) ], zyg => [ $ni ]);
-    }
-
-    sub ann {
-        my ($file, $line, $stuff) = @_;
-        CgOp->new(op => [ 'ann', $line ], zyg => [$stuff]);
-    }
-
-    sub die {
-        my ($msg) = @_;
-        if (blessed($msg)) {
-            rawscall('Kernel.SearchForHandler', &int(5), null('clr:Niecza.Frame'),
-                &int(-1), null('str'), newscalar($msg));
-        } else {
-            rawscall('Kernel.Die', str($msg));
-        }
-    }
-
-    sub letn {
-        my (@stuff) = @_;
-        if (blessed($stuff[0])) {
-            @stuff;
-        } else {
-            if (!@stuff) {
-                Carp::confess "Invalid letn protocol";
-            }
-            my ($name, $value) = splice @stuff, 0, 2;
-            CgOp->new(op => ['let', $name], zyg => [ $value, letn(@stuff) ]);
-        }
-    }
-
-    sub pos { CgOp->new(op => [ 'pos' ], zyg => [ _int($_[0]) ]); }
-
-    sub ternary {
-        CgOp->new(op => ['ternary'], zyg => [ $_[0], $_[1], $_[2] ]);
-    }
-
-    sub whileloop {
-        CgOp->new(op => ['while', $_[0], $_[1]], zyg => [ $_[2], $_[3] ]);
-    }
-
-    my $nextlet = 0;
-    sub let {
-        my ($head, $bodyf) = @_;
-        my $v = ($nextlet++);
-        letn($v, $head, $bodyf->(letvar($v)));
-    }
+sub methodcall {
+    my ($obj, $name, @args) = @_;
+    my $sig = _process_arglist(\@args);
+    let($obj, sub {
+        _cgop('methodcall', $name, $sig, fetch($_[0]), $_[0], @args)});
 }
 
 1;

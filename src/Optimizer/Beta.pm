@@ -66,6 +66,9 @@ sub is_removable_body {
         return 0;
     }
 
+    my @z = $body->children;
+    return 0 if @z;
+
     # We can't currently handle the possibility of outer references to the
     # frame we're mangling
     for my $lname (keys %{ $body->lexicals }) {
@@ -95,6 +98,12 @@ sub beta_optimize {
 
     $body->delete_lex($inv->var);
     $unit->xref->[$cbody->xref->[1]] = undef;
+    {
+        my $c = $cbody->outer->zyg;
+        my $i;
+        for ($i = 0; $i < @$c && $c->[$i] != $cbody; $i++) {}
+        splice @$c, $i, 1;
+    }
 
     my @pos = (map { Op::Lexical->new(name => $_->[1]) } @args);
 

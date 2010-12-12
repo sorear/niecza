@@ -559,7 +559,7 @@ our %units;
     has in_class => (isa => 'Maybe[ArrayRef]', is => 'ro');
     has cur_pkg  => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
     has returnable => (isa => 'Bool', is => 'ro', default => 0);
-    has augmenting => (isa => 'Bool', is => 'ro', default => 1);
+    has augmenting => (isa => 'Bool', is => 'ro', default => 0);
     has class    => (isa => 'Str', is => 'ro', default => 'Sub');
     has ltm      => (is => 'rw');
     has exports  => (is => 'rw');
@@ -820,9 +820,8 @@ sub Body::begin {
     my $self = shift;
     my %args = @_;
 
-    my $top = @opensubs ? $opensubs[-1] : $args{top};
-    my $rtop = !$top ? $top : Scalar::Util::blessed($top) ? $top :
-        $unit->deref($top);
+    my $top = @opensubs ? $opensubs[-1]->xref : $args{top};
+    my $rtop = !$top ? $top : $unit->deref($top);
 
     my $type = $self->type // '';
     my $metabody = Metamodel::StaticSub->new(
@@ -881,8 +880,9 @@ sub Sig::Parameter::begin {
     $opensubs[-1]->add_my_name($self->slot, list => $self->list,
         hash => $self->hash, noinit => 1) if defined $self->slot;
     if (defined ($self->default)) {
-        $self->mdefault($self->default->begin);
-        $opensubs[-1]->add_child($self->mdefault);
+        my $mdefault = $self->default->begin;
+        $self->mdefault($mdefault->xref);
+        $opensubs[-1]->add_child($mdefault);
         delete $self->{default};
     }
 }
@@ -998,8 +998,10 @@ sub Op::Attribute::begin {
         returnable => 0,
         class      => 'Sub',
         run_once   => 0,
+        signature  => Sig->simple('self'),
         code       => Op::GetSlot->new(name => $self->name,
-            object => Op::CgOp->new(optree => [ pos => 0 ])));
+            object => Op::Lexical->new(name => 'self')));
+    $nb->add_my_name('self', noinit => 1);
     $opensubs[-1]->create_static_pad; # for protosub instance
     $nb->strong_used(1);
     $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
