@@ -10,86 +10,142 @@ our $unit;
 sub run {
     local $unit = shift;
 
-    [ header(),
-      stashlog(),
-      objects() ]
+    $unit->visit_local_subs_postorder(\&nam_sub);
+
+    $unit->to_nam;
 }
 
-sub header {
-    [ $unit->mainline->xref,
-      $unit->name,
-      $unit->setting,
-      $unit->bottom_ref,
-      $unit->tdeps,
-      $unit->modtime,
-      $unit->filename ]
+sub nam_sub {
+    my $s = shift;
+    $s->{nam} = $s->code->cgop($s);
+    if ($s->parametric_role_hack) {
+        for (@{ $unit->deref($s->parametric_role_hack)->methods }) {
+            if (ref $_->[0]) {
+                $_->[0] = $_->[0]->cgop($s);
+            }
+        }
+    }
+    delete $s->{code};
 }
 
-sub stashlog {
-    $unit->ns->log;
-}
-
-sub objects {
-    map { defined($_) ? $_->nam_object : [] } @{ $unit->xref };
-}
-
-sub Metamodel::StaticSub::nam_object {
-    my ($self) = @_;
-    [ $self->outer,
-      $self->name,
-      $self->run_once,
-      $self->spad_exists,
-      $self->signature,
-      $self->lexicals,
-      $self->code->cgop($self),
-      [ map { $_->xref->[1] } @{ $self->zyg } ],
-      $self->gather_hack,
-      $self->parametric_role_hack,
-      $self->augment_hack,
-      $self->is_phaser // -1,
-      $self->body_of,
-      $self->in_class,
-      $self->cur_pkg,
-      $self->returnable,
-      $self->augmenting,
-      $self->class,
-      $self->ltm,
-      $self->exports ]
-}
-
-sub Metamodel::Package::nam_object {
+sub Metamodel::Unit::to_nam {
     my $self = shift;
-    [ $self->name,
-      $self->exports ]
+    [
+        $self->mainline->xref,
+        $self->name,
+        $self->ns->log,
+        $self->setting,
+        $self->bottom_ref,
+        [ map { $_ && $_->to_nam } @{ $self->xref } ],
+        [ map { [$_, @{ $self->tdeps->{$_} }] } sort keys %{ $self->tdeps } ],
+    ]
 }
 
-sub Metamodel::Class::nam_object {
+sub Metamodel::StaticSub::to_nam {
     my $self = shift;
-    [ $self->name,
-      $self->exports,
-      $self->attributes,
-      $self->methods,
-      $self->superclasses,
-      $self->linearized_mro ]
+    my $flags = 0;
+    $flags |= 1 if $self->run_once;
+    $flags |= 2 if $self->spad_exists;
+    $flags |= 4 if $self->gather_hack;
+    $flags |= 8 if $self->strong_used;
+    $flags |= 16 if $self->returnable;
+    $flags |= 32 if $self->augmenting;
+    [
+        $self->name,
+        $self->{outer}, # get the raw xref
+        $flags,
+        [ map { $_->xref->[1] } @{ $self->zyg } ],
+        $self->parametric_role_hack,
+        $self->augment_hack,
+        $self->is_phaser,
+        $self->body_of,
+        $self->in_class,
+        $self->cur_pkg,
+        $self->class,
+        $self->ltm,
+        $self->exports,
+        ($self->signature && [ map { $_->to_nam } @{ $self->signature->params } ]),
+        [ map { [ $_, @{ $self->lexicals->{$_}->to_nam } ] }
+            sort keys %{ $self->lexicals } ],
+        $self->{nam}->to_nam,
+    ]
 }
 
-sub Metamodel::Role::nam_object {
+sub Metamodel::Package::to_nam {
     my $self = shift;
-    [ $self->name,
-      $self->exports,
-      $self->attributes,
-      $self->methods,
-      $self->superclasses ]
+    [
+        substr(lc(ref($self)),11),
+        $self->name,
+        @_
+    ]
 }
 
-sub Metamodel::ParametricRole::nam_object {
+sub Metamodel::Class::to_nam {
     my $self = shift;
-    [ $self->name,
-      $self->exports,
-      $self->builder,
-      $self->attributes,
-      $self->methods,
-      $self->superclasses ]
+    $self->Metamodel::Package::to_nam(
+        $self->attributes,
+        [ map { $_->to_nam } @{ $self->methods } ],
+        $self->superclasses,
+        $self->linearized_mro,
+    );
+}
+
+sub Metamodel::Role::to_nam {
+    my $self = shift;
+    $self->Metamodel::Package::to_nam(
+        $self->attributes,
+        [ map { $_->to_nam } @{ $self->methods } ],
+        $self->superclasses,
+    );
+}
+
+sub Metamodel::ParametricRole::to_nam {
+    my $self = shift;
+    $self->Metamodel::Package::to_nam(
+        $self->attributes,
+        $self->methods,
+        $self->superclasses,
+    );
+}
+
+sub Metamodel::Method::to_nam {
+    [ $_[0]->name, ($_[0]->private ? 1 : 0), $_[0]->body ]
+}
+
+sub Sig::Parameter::to_nam {
+    my $self = shift;
+    my $flags = 0;
+    $flags |= 1 if $self->slurpy;
+    $flags |= 2 if $self->slurpycap;
+    $flags |= 4 if $self->rwtrans;
+    $flags |= 8 if $self->full_parcel;
+    $flags |= 16 if $self->optional;
+    $flags |= 32 if $self->positional;
+    $flags |= 64 if $self->readonly;
+    $flags |= 128 if $self->list;
+    $flags |= 256 if $self->hash;
+
+    [
+        $self->name,
+        $flags,
+        $self->slot,
+        $self->names,
+        $self->mdefault
+    ]
+}
+
+
+sub Metamodel::Lexical::Simple::to_nam {
+    ['simple', ($_[0]->noinit ? 4 : 0) + ($_[0]->list ? 2 : 0) +
+        ($_[0]->hash ? 1 : 0)]
+}
+sub Metamodel::Lexical::Common::to_nam { ['common', @{$_[0]->path}, $_[0]->name ] }
+sub Metamodel::Lexical::Alias::to_nam {  ['alias', $_[0]->to] }
+sub Metamodel::Lexical::SubDef::to_nam { ['sub', @{ $_[0]->body->xref } ] }
+sub Metamodel::Lexical::Stash::to_nam {  ['stash', @{ $_[0]->path } ] }
+
+sub CgOpNode::to_nam {
+    [ map { Scalar::Util::blessed($_) ? $_->to_nam : $_ } @{ $_[0] } ]
 }
 
 1;

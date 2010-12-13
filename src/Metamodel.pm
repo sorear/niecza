@@ -235,8 +235,6 @@ our %units;
 
     has exports => (is => 'rw', isa => 'ArrayRef[ArrayRef[Str]]');
 
-    sub BUILD { push @{ $unit->packages }, $_[0] }
-
     sub add_attribute {
         my ($self, $name) = @_;
         die "attribute $name defined in a lowly package";
@@ -390,7 +388,6 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has builder => (isa => 'ArrayRef', is => 'rw');
     has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
         default => sub { [] });
     has methods => (isa => 'ArrayRef', is => 'ro',
@@ -705,17 +702,13 @@ our %units;
     has bottom_ref => (is => 'rw');
 
     has xref     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has tdeps    => (isa => 'HashRef[Metamodel::Unit]', is => 'ro',
+    has tdeps    => (isa => 'HashRef[ArrayRef]', is => 'ro',
         default => sub { +{} });
 
     has filename => (isa => 'Str', is => 'rw');
     has modtime  => (isa => 'Num', is => 'rw');
     has syml     => (is => 'rw');
 
-    # we like to delete staticsubs in the optimizer, so visiting them is
-    # a tad harder
-    has packages => (isa => 'ArrayRef[Metamodel::Package]', is => 'ro',
-        default => sub { [] });
     has next_anon_stash => (isa => 'Int', is => 'rw', default => 0);
 
     sub is_true_setting { $_[0]->name eq 'SAFE' || $_[0]->name eq 'CORE' }
@@ -754,7 +747,9 @@ our %units;
 
     sub visit_local_packages {
         my ($self, $cb) = @_;
-        $cb->($_) for @{ $self->packages };
+        for (@{ $self->xref }) {
+            $cb->($_) if defined($_) && $_->isa('Metamodel::Package');
+        }
     }
 
     sub visit_local_subs_postorder {
@@ -782,7 +777,6 @@ our %units;
         for (keys %{ $u2->tdeps }) {
             $units{$_} //= CompilerDriver::metadata_for($_);
             $self->tdeps->{$_} //= $u2->tdeps->{$_};
-            $u2->tdeps->{$_} = $self->tdeps->{$_}; # save a bit of memory
         }
         $self->ns->add_from($u2name);
         $u2;
@@ -992,7 +986,7 @@ sub Op::Attribute::begin {
     $ns->add_attribute($self->name);
     my $nb = Metamodel::StaticSub->new(
         unit       => $unit,
-        outer      => $opensubs[-1],
+        outer      => $opensubs[-1]->xref,
         name       => $self->name,
         cur_pkg    => $opensubs[-1]->cur_pkg,
         returnable => 0,
@@ -1122,7 +1116,6 @@ sub Op::PackageDef::begin {
                     @{ $self->exports } ]);
 
         if ($pclass eq 'Metamodel::ParametricRole') {
-            $unit->deref($obj)->builder($body->xref);
             $body->parametric_role_hack($obj);
             $body->add_my_name('*params', noinit => 1);
             $body->create_static_pad;
@@ -1151,7 +1144,7 @@ sub Op::Augment::begin {
 
     my $ph = Metamodel::StaticSub->new(
         unit       => $unit,
-        outer      => $body,
+        outer      => $body->xref,
         cur_pkg    => [ 'GLOBAL' ],
         name       => 'ANON',
         is_phaser  => 0,

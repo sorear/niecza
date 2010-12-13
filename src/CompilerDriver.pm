@@ -216,7 +216,13 @@ sub compile {
         [ 'parse', sub {
             $ast = Niecza::Grammar->$m($a, setting => $lang,
                 actions => 'Niecza::Actions')->{_ast}; } ],
-        [ 'begin', sub { $ast = $ast->begin } ],
+        [ 'begin', sub {
+            $ast = $ast->begin;
+            if (defined $name) {
+                $ast->filename($filename);
+                $ast->modtime($modtime);
+            }
+        } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'simpl', sub { Optimizer::Simplifier::run($ast) } ],
         [ 'nam', sub { $ast = NAMBackend::run($ast) } ],
@@ -228,8 +234,6 @@ sub compile {
             close $fh;
             if (defined $name) {
                 $ast->syml($::niecza_mod_symbols);
-                $ast->filename($filename);
-                $ast->modtime($modtime);
                 store $ast, File::Spec->catfile($builddir, "$basename.store");
             }
         } ],

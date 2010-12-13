@@ -1002,7 +1002,7 @@ use CgOp;
 
     sub lad {
         my ($self) = @_;
-        [ 'CC', CgOp::cc_expr($self->cc) ];
+        [ 'CC', @{ $self->cc } ];
     }
 
     __PACKAGE__->meta->make_immutable;
