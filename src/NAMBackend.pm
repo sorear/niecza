@@ -6,13 +6,22 @@ use warnings;
 package NAMBackend;
 
 our $unit;
+use JSON;
 
 sub run {
     local $unit = shift;
 
     $unit->visit_local_subs_postorder(\&nam_sub);
+    my $nam = $unit->to_nam;
 
-    $unit->to_nam;
+    eval {
+        $nam = encode_json $nam;
+    };
+    if ($@) {
+        say ($@);
+        say (YAML::XS::Dump $nam);
+    }
+    return $nam;
 }
 
 sub nam_sub {
@@ -21,7 +30,7 @@ sub nam_sub {
     if ($s->parametric_role_hack) {
         for (@{ $unit->deref($s->parametric_role_hack)->methods }) {
             if (ref $_->[0]) {
-                $_->[0] = $_->[0]->cgop($s);
+                $_->[0] = $_->[0]->cgop($s)->to_nam;
             }
         }
     }

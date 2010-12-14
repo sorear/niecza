@@ -10,7 +10,6 @@ use Sub::Exporter -setup => {
 use Time::HiRes 'time';
 use File::Basename;
 use autodie ':all';
-use JSON;
 
 use Body ();
 use Unit ();
@@ -226,7 +225,7 @@ sub compile {
         } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'simpl', sub { Optimizer::Simplifier::run($ast) } ],
-        [ 'nam', sub { $ast = [$ast, encode_json(NAMBackend::run($ast))] } ],
+        [ 'nam', sub { $ast = [$ast, NAMBackend::run($ast)] } ],
         [ 'writenam', sub {
             open my $fh, ">", $namfile;
             print $fh $ast->[1];

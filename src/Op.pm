@@ -923,7 +923,7 @@ use CgOp;
     sub code_bvalue {
         my ($self, $body, $ro, $rhscg) = @_;
         CgOp::prog(
-            CgOp::scopedlex($self->name, CgOp::newboundvar($ro, $self->list || $self->hash, $rhscg)),
+            CgOp::scopedlex($self->name, CgOp::newboundvar($ro, (($self->list || $self->hash) ? 1 : 0), $rhscg)),
             CgOp::scopedlex($self->name));
     }
 
@@ -1143,7 +1143,7 @@ use CgOp;
             @pre,
             CgOp::rxinit(CgOp::str($self->name),
                     CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('self'))),
-                    $self->passcap, $self->passcut),
+                    ($self->passcap?1:0), ($self->passcut?1:0)),
             ($self->passcap ? () :
                 CgOp::rxpushcapture(CgOp::null('cursor'), @mcaps)),
             $self->rxop->code($body),
