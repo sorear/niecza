@@ -10,6 +10,7 @@ use Sub::Exporter -setup => {
 use Time::HiRes 'time';
 use File::Basename;
 use autodie ':all';
+use JSON;
 
 use Body ();
 use Unit ();
@@ -208,7 +209,7 @@ sub compile {
 
     my $ast;
     my $basename = $::UNITNAME;
-    my $csfile = File::Spec->catfile($builddir, "$basename.cs");
+    my $namfile = File::Spec->catfile($builddir, "$basename.nam");
     my $outfile = File::Spec->catfile($builddir,
         $basename . (defined($name) ? ".dll" : ".exe"));
 
@@ -225,13 +226,12 @@ sub compile {
         } ],
         [ 'beta', sub { Optimizer::Beta::run($ast) } ],
         [ 'simpl', sub { Optimizer::Simplifier::run($ast) } ],
-        [ 'nam', sub { $ast = NAMBackend::run($ast) } ],
+        [ 'nam', sub { $ast = [$ast, encode_json(NAMBackend::run($ast))] } ],
         [ 'writenam', sub {
-            open my $fh, ">", $csfile;
-            binmode $fh, ":utf8";
-            print $fh $ast->{mod};
-            delete $ast->{mod};
+            open my $fh, ">", $namfile;
+            print $fh $ast->[1];
             close $fh;
+            $ast = $ast->[0];
             if (defined $name) {
                 $ast->syml($::niecza_mod_symbols);
                 store $ast, File::Spec->catfile($builddir, "$basename.store");
@@ -246,7 +246,7 @@ sub compile {
                         "Kernel.cs", "Cursor.cs", "JSYNC.cs", "Builtins.cs", "NieczaCLR.cs"),
                     (map { build_file($_ . ".cs") }
                         (sort keys %{ $ast->tdeps })),
-                    $csfile);
+                    $namfile);
             } else {
                 @args = ("gmcs", "/debug",
                     (defined($name) ? ("/target:library") : ()),
@@ -254,7 +254,7 @@ sub compile {
                     "/r:Kernel.dll",
                     (map { "/r:$_.dll" } sort keys %{ $ast->tdeps }),
                     "/out:$outfile",
-                    $csfile);
+                    $namfile);
             }
             print STDERR "@args\n" if $args{stagetime};
             system @args;
@@ -272,7 +272,7 @@ sub compile {
         printf "%-20s: %gs\n", "$basename " . $p->[0],
             $t2 - $t1 if $args{stagetime};
         if ($args{stopafter} && $args{stopafter} eq $p->[0]) {
-            if ($ast && $args{stopafter} ne 'writecs') {
+            if ($ast && $args{stopafter} ne 'writenam') {
                 print STDERR YAML::XS::Dump($ast);
             }
             return;
