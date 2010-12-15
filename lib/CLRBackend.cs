@@ -16,6 +16,7 @@ namespace Niecza.CLRBackend {
         string text;
         double val;
         bool has_val;
+
         public JScalar(string txt) { text = txt; }
         public string str { get { return text; } }
         public double num {
@@ -116,11 +117,73 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class Unit {
+        public static object[] mainline_ref(object[] u) { return (object[])u[0]; }
+        public static string name(object[] u) { return ((JScalar)u[1]).str; }
+        public static object[] log(object[] u) { return (object[])u[2]; }
+        public static string setting(object[] u) { return u[3] as string; }
+        public static object[] bottom_ref(object[] u) { return u[4] as object[]; }
+        public static object[] xref(object[] u) { return u[5] as object[]; }
+        public static object[] tdeps(object[] u) { return u[6] as object[]; }
+    }
+
+    // Extra info needed beyond what ILGenerator alone provides.  Note
+    // that switch generation is done in another pass.
+    class CgContext {
+        public ILGenerator il;
+        public int next_case;
+        public Label[] cases;
+        public string[] let_names;
+        public Type[] let_types;
+    }
+
+    // This are expressional CLR operators.  This is lower level than the
+    // CPS stuff; if NumCases is nonzero, Returns must be void.  Thus,
+    // there is no need to handle argument spills.
+    abstract class ClrOp {
+        public int NumCases;
+        public Type Returns;
+        public abstract void CodeGen(CgContext cx);
+
+        protected static void TypeCheck(Type sub, Type super, string msg) {
+            if (!super.IsAssignableFrom(sub))
+                throw new Exception(msg + " " + sub + " not subtype of " + super);
+        }
+    }
+
+    class ClrMethodCall : ClrOp {
+        public readonly MethodInfo Method;
+        public readonly ClrOp[] Zyg;
+        public override void CodeGen(CgContext cx) {
+        }
+        public ClrMethodCall(MethodInfo mi, ClrOp[] zyg) {
+            Method = mi;
+            Zyg = zyg;
+            Returns = mi.ReturnType;
+            NumCases = 0;
+            ParameterInfo[] ps = mi.GetParameters();
+            if (zyg.Length != ps.Length + (mi.IsStatic ? 0 : 1))
+                throw new Exception("argument list length mismatch");
+
+            int sh = 0;
+            if (!mi.IsStatic) {
+                sh = 1;
+                TypeCheck(zyg[0].Returns, mi.DeclaringType, "invocant");
+                NumCases += zyg[0].NumCases;
+            }
+
+            for (int i = 0; i < ps.Length; i++) {
+                TypeCheck(zyg[i+sh].Returns, ps[i].ParameterType, "arg");
+                NumCases += zyg[i+sh].NumCases;
+            }
+        }
+    }
+
     public class MainClass {
         public static void Main() {
             string tx = (new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding)).ReadToEnd();
             object[] root = (object[])Reader.Read(tx);
-            object[] xref = (object[])(root[5]);
+            object[] xref = Unit.xref(root);
 
             for (int i = 0; i < xref.Length; i++) {
                 object[] o = xref[i] as object[];
