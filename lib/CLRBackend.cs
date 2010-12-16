@@ -162,11 +162,71 @@ namespace Niecza.CLRBackend {
                     break;
             }
         }
+
+        public void EmitPreSetlex(int ix) {
+            if (ix >= (Tokens.NumInt32 + Tokens.NumInline)) {
+                il.Emit(OpCodes.Ldfld, Tokens.Frame_lexn);
+                EmitInt(ix - (Tokens.NumInt32 + Tokens.NumInline));
+            }
+        }
+
+        public void EmitSetlex(int ix, Type t) {
+            if (ix >= Tokens.NumInt32 && t.IsValueType)
+                il.Emit(OpCodes.Box, t);
+
+            if (ix >= (Tokens.NumInt32 + Tokens.NumInline)) {
+                il.Emit(OpCodes.Stelem_Ref);
+            } else if (ix >= Tokens.NumInt32) {
+                il.Emit(OpCodes.Stfld,
+                        Tokens.Frame_lexobj[ix - Tokens.NumInt32]);
+            } else {
+                il.Emit(OpCodes.Stfld, Tokens.Frame_lexi32[ix]);
+            }
+        }
+
+        public void EmitGetlex(int ix, Type t) {
+            if (ix >= (Tokens.NumInt32 + Tokens.NumInline)) {
+                il.Emit(OpCodes.Ldfld, Tokens.Frame_lexn);
+                EmitInt(ix - (Tokens.NumInt32 + Tokens.NumInline));
+                il.Emit(OpCodes.Ldelem_Ref);
+            } else if (ix >= Tokens.NumInt32) {
+                il.Emit(OpCodes.Ldfld,
+                        Tokens.Frame_lexobj[ix - Tokens.NumInt32]);
+            } else {
+                il.Emit(OpCodes.Ldfld, Tokens.Frame_lexi32[ix]);
+            }
+
+            if (ix >= Tokens.NumInt32) {
+                il.Emit(OpCodes.Unbox_Any, t);
+            }
+        }
     }
 
     sealed class Tokens {
+        public static readonly Type Void = typeof(void);
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
+        public static readonly FieldInfo Frame_lexn =
+            typeof(Frame).GetField("lexn");
+        public static readonly FieldInfo[] Frame_lexi32 = new FieldInfo[] {
+            typeof(Frame).GetField("lexi0"),
+            typeof(Frame).GetField("lexi1")
+        };
+        public static readonly FieldInfo[] Frame_lexobj = new FieldInfo[] {
+            typeof(Frame).GetField("lex0"),
+            typeof(Frame).GetField("lex1"),
+            typeof(Frame).GetField("lex2"),
+            typeof(Frame).GetField("lex3"),
+            typeof(Frame).GetField("lex4"),
+            typeof(Frame).GetField("lex5"),
+            typeof(Frame).GetField("lex6"),
+            typeof(Frame).GetField("lex7"),
+            typeof(Frame).GetField("lex8"),
+            typeof(Frame).GetField("lex9")
+        };
+
+        public const int NumInt32 = 2;
+        public const int NumInline = 10;
     }
 
     // This are expressional CLR operators.  This is lower level than the
@@ -218,7 +278,7 @@ namespace Niecza.CLRBackend {
         public ClrMethodCall(bool cps, MethodInfo mi, ClrOp[] zyg) {
             Method = mi;
             Zyg = zyg;
-            Returns = cps ? typeof(void) : mi.ReturnType;
+            Returns = cps ? Tokens.Void : mi.ReturnType;
             HasCases = cps;
 
             List<Type> ts = new List<Type>();
@@ -238,6 +298,133 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < ts.Count; i++) {
                 TypeCheck(zyg[i].Returns, ts[i], "arg");
             }
+        }
+    }
+
+    class ClrNoop : ClrOp {
+        private ClrNoop() {
+            Returns = Tokens.Void;
+            HasCases = false;
+        }
+        public override void ListCases(CgContext cx) { }
+        public override void CodeGen(CgContext cx) { }
+        public static ClrNoop Instance = new ClrNoop();
+    }
+
+    class ClrPushLet : ClrOp {
+        string Name;
+        // Initial must not have a net let-stack effect (how to enforce?)
+        ClrOp Initial;
+        public ClrPushLet(string name, ClrOp initial) {
+            Initial = initial;
+            Name = name;
+            Returns = Tokens.Void;
+        }
+        public override void ListCases(CgContext cx) { }
+        public override void CodeGen(CgContext cx) {
+            // indexes 0-1 can only be used by ints
+            int ix = (Initial.Returns == typeof(int)) ? 0 : Tokens.NumInt32;
+            while (ix < cx.let_types.Length && cx.let_types[ix] != null)
+                ix++;
+
+            cx.EmitPreSetlex(ix);
+
+            // Initial must not have a net effect on cx.let_types
+            Initial.CodeGen(cx);
+
+            // let_types.Length tracks the highest index used.
+            if (ix >= cx.let_types.Length) {
+                Array.Resize(ref cx.let_types, ix+1);
+                Array.Resize(ref cx.let_names, ix+1);
+            }
+
+            cx.let_types[ix] = Initial.Returns;
+            cx.let_names[ix] = Name;
+
+            cx.EmitSetlex(ix, Initial.Returns);
+        }
+    }
+
+    class ClrPokeLet : ClrOp {
+        string Name;
+        ClrOp Value;
+        public ClrPokeLet(string name, ClrOp value) {
+            Value = value;
+            Name = name;
+            Returns = Tokens.Void;
+        }
+        public override void ListCases(CgContext cx) { }
+        public override void CodeGen(CgContext cx) {
+            int ix = cx.let_names.Length - 1;
+            while (ix >= 0 && cx.let_names[ix] != Name)
+                ix--;
+
+            if (ix == cx.let_names.Length)
+                throw new Exception("let " + Name + " not found");
+
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.EmitPreSetlex(ix);
+
+            // Initial must not have a net effect on cx.let_types
+            Value.CodeGen(cx);
+
+            cx.EmitSetlex(ix, Value.Returns);
+        }
+    }
+
+    class ClrPeekLet : ClrOp {
+        string Name;
+        public ClrPeekLet(string name, Type letType) {
+            Name = name;
+            Returns = letType;
+        }
+        public override void ListCases(CgContext cx) { }
+        public override void CodeGen(CgContext cx) {
+            int ix = cx.let_names.Length - 1;
+            while (ix >= 0 && cx.let_names[ix] != Name)
+                ix--;
+
+            if (ix == cx.let_names.Length)
+                throw new Exception("let " + Name + " not found");
+
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.EmitGetlex(ix, Returns);
+        }
+    }
+
+    class ClrDropLet : ClrOp {
+        string Name;
+        public ClrDropLet(string name) {
+            Name = name;
+            Returns = Tokens.Void;
+        }
+        public override void ListCases(CgContext cx) { }
+        public override void CodeGen(CgContext cx) {
+            int ix = cx.let_names.Length - 1;
+            while (ix >= 0 && cx.let_names[ix] != Name)
+                ix--;
+
+            if (ix == cx.let_names.Length)
+                throw new Exception("let " + Name + " not found");
+
+            cx.let_names[ix] = null;
+            cx.let_types[ix] = null;
+        }
+    }
+
+    // CpsOps are rather higher level, and can support operations that
+    // both return to the trampoline and return a value.
+    class CpsOp {
+        // each statement MUST return void
+        public ClrOp[] stmts;
+        // the head MUST NOT have cases
+        public ClrOp head;
+
+        private static CpsOp Primitive(Func<ClrOp,ClrOp[]> raw, CpsOp[] zyg) {
+            return null;
+        }
+        public static CpsOp MethodCall(MethodInfo tk, ClrOp[] zyg) {
+            return null;
         }
     }
 
