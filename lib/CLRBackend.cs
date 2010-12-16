@@ -9,6 +9,8 @@ using System.Reflection.Emit;
 using System.Collections.Generic;
 using System.Text;
 
+using Niecza;
+
 namespace Niecza.CLRBackend {
     // The portable format is a subset of JSON, and is current read
     // into a matching internal form.
@@ -133,17 +135,48 @@ namespace Niecza.CLRBackend {
         public ILGenerator il;
         public int next_case;
         public Label[] cases;
+        public int num_cases;
+        public Dictionary<string,int> named_cases;
         public string[] let_names;
         public Type[] let_types;
+
+        // logic stolen from mcs
+        public void EmitInt(int i) {
+            switch (i) {
+                case -1: il.Emit(OpCodes.Ldc_I4_M1); break;
+                case 0: il.Emit(OpCodes.Ldc_I4_0); break;
+                case 1: il.Emit(OpCodes.Ldc_I4_1); break;
+                case 2: il.Emit(OpCodes.Ldc_I4_2); break;
+                case 3: il.Emit(OpCodes.Ldc_I4_3); break;
+                case 4: il.Emit(OpCodes.Ldc_I4_4); break;
+                case 5: il.Emit(OpCodes.Ldc_I4_5); break;
+                case 6: il.Emit(OpCodes.Ldc_I4_6); break;
+                case 7: il.Emit(OpCodes.Ldc_I4_7); break;
+                case 8: il.Emit(OpCodes.Ldc_I4_8); break;
+                default:
+                    if (i >= -128 && i < 127) {
+                        il.Emit(OpCodes.Ldc_I4_S, (sbyte) i);
+                    } else {
+                        il.Emit(OpCodes.Ldc_I4, i);
+                    }
+                    break;
+            }
+        }
+    }
+
+    sealed class Tokens {
+        public static readonly FieldInfo Frame_ip =
+            typeof(Frame).GetField("ip");
     }
 
     // This are expressional CLR operators.  This is lower level than the
-    // CPS stuff; if NumCases is nonzero, Returns must be void.  Thus,
+    // CPS stuff; if HasCases is true, Returns must be void.  Thus,
     // there is no need to handle argument spills.
     abstract class ClrOp {
-        public int NumCases;
+        public bool HasCases;
         public Type Returns;
         public abstract void CodeGen(CgContext cx);
+        public abstract void ListCases(CgContext cx);
 
         protected static void TypeCheck(Type sub, Type super, string msg) {
             if (!super.IsAssignableFrom(sub))
@@ -154,27 +187,56 @@ namespace Niecza.CLRBackend {
     class ClrMethodCall : ClrOp {
         public readonly MethodInfo Method;
         public readonly ClrOp[] Zyg;
+
         public override void CodeGen(CgContext cx) {
+            if (HasCases) {
+                cx.il.Emit(OpCodes.Ldarg_0);
+                cx.EmitInt(cx.next_case);
+                cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
+            }
+            int i = 0;
+            foreach (ClrOp o in Zyg) {
+                if (HasCases && i == (Method.IsStatic ? 0 : 1)) {
+                    // this needs to come AFTER the invocant
+                    cx.il.Emit(OpCodes.Ldarg_0);
+                }
+                o.CodeGen(cx);
+            }
+            cx.il.Emit(OpCodes.Callvirt, Method); // XXX C#
+            if (HasCases) {
+                cx.il.Emit(OpCodes.Ret);
+                cx.il.MarkLabel(cx.cases[cx.next_case++]);
+            }
         }
-        public ClrMethodCall(MethodInfo mi, ClrOp[] zyg) {
+
+        public override void ListCases(CgContext cx) {
+            // it is not legal for any of out children to have cases to list
+            if (HasCases)
+                cx.num_cases++;
+        }
+
+        public ClrMethodCall(bool cps, MethodInfo mi, ClrOp[] zyg) {
             Method = mi;
             Zyg = zyg;
-            Returns = mi.ReturnType;
-            NumCases = 0;
-            ParameterInfo[] ps = mi.GetParameters();
-            if (zyg.Length != ps.Length + (mi.IsStatic ? 0 : 1))
-                throw new Exception("argument list length mismatch");
+            Returns = cps ? typeof(void) : mi.ReturnType;
+            HasCases = cps;
 
-            int sh = 0;
-            if (!mi.IsStatic) {
-                sh = 1;
-                TypeCheck(zyg[0].Returns, mi.DeclaringType, "invocant");
-                NumCases += zyg[0].NumCases;
+            List<Type> ts = new List<Type>();
+
+            if (!mi.IsStatic)
+                ts.Add(mi.DeclaringType);
+
+            bool skip = cps;
+            foreach (ParameterInfo pi in mi.GetParameters()) {
+                if (skip) { skip = false; continue; }
+                ts.Add(pi.ParameterType);
             }
 
-            for (int i = 0; i < ps.Length; i++) {
-                TypeCheck(zyg[i+sh].Returns, ps[i].ParameterType, "arg");
-                NumCases += zyg[i+sh].NumCases;
+            if (zyg.Length != ts.Count)
+                throw new Exception("argument list length mismatch");
+
+            for (int i = 0; i < ts.Count; i++) {
+                TypeCheck(zyg[i].Returns, ts[i], "arg");
             }
         }
     }
