@@ -205,6 +205,11 @@ namespace Niecza.CLRBackend {
 
     sealed class Tokens {
         public static readonly Type Void = typeof(void);
+        public static readonly Type String = typeof(string);
+        public static readonly Type Boolean = typeof(bool);
+        public static readonly Type Int32 = typeof(int);
+        public static readonly Type Double = typeof(double);
+        public static readonly Type Frame = typeof(Frame);
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
         public static readonly FieldInfo Frame_ip =
@@ -245,7 +250,7 @@ namespace Niecza.CLRBackend {
         public bool HasCases;
         public Type Returns;
         public abstract void CodeGen(CgContext cx);
-        public abstract void ListCases(CgContext cx);
+        public virtual void ListCases(CgContext cx) { }
 
         protected static void TypeCheck(Type sub, Type super, string msg) {
             if (!super.IsAssignableFrom(sub))
@@ -315,7 +320,6 @@ namespace Niecza.CLRBackend {
             Returns = Tokens.Void;
             HasCases = false;
         }
-        public override void ListCases(CgContext cx) { }
         public override void CodeGen(CgContext cx) { }
         public static ClrNoop Instance = new ClrNoop();
     }
@@ -329,7 +333,6 @@ namespace Niecza.CLRBackend {
             Name = name;
             Returns = Tokens.Void;
         }
-        public override void ListCases(CgContext cx) { }
         public override void CodeGen(CgContext cx) {
             // indexes 0-1 can only be used by ints
             int ix = (Initial.Returns == typeof(int)) ? 0 : Tokens.NumInt32;
@@ -362,7 +365,6 @@ namespace Niecza.CLRBackend {
             Name = name;
             Returns = Tokens.Void;
         }
-        public override void ListCases(CgContext cx) { }
         public override void CodeGen(CgContext cx) {
             int ix = cx.let_names.Length - 1;
             while (ix >= 0 && cx.let_names[ix] != Name)
@@ -387,7 +389,6 @@ namespace Niecza.CLRBackend {
             Name = name;
             Returns = letType;
         }
-        public override void ListCases(CgContext cx) { }
         public override void CodeGen(CgContext cx) {
             int ix = cx.let_names.Length - 1;
             while (ix >= 0 && cx.let_names[ix] != Name)
@@ -407,7 +408,6 @@ namespace Niecza.CLRBackend {
             Name = name;
             Returns = Tokens.Void;
         }
-        public override void ListCases(CgContext cx) { }
         public override void CodeGen(CgContext cx) {
             int ix = cx.let_names.Length - 1;
             while (ix >= 0 && cx.let_names[ix] != Name)
@@ -426,7 +426,6 @@ namespace Niecza.CLRBackend {
         public ClrCpsReturn(ClrOp child) {
             this.child = child;
         }
-        public override void ListCases(CgContext cx) { }
         public override void CodeGen(CgContext cx) {
             if (child != null) {
                 cx.il.Emit(OpCodes.Ldarg_0);
@@ -437,6 +436,42 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Ldarg_0);
             cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_caller);
             cx.il.Emit(OpCodes.Ret);
+        }
+    }
+
+    class ClrStringLiteral : ClrOp {
+        string data;
+        public ClrStringLiteral(string data) {
+            this.data = data;
+            Returns = Tokens.String;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldstr, data);
+        }
+    }
+
+    // Because the CLR has no evaluation stack types narrower than int32, this
+    // node does duty both for int and bool.  When sized types are added, it
+    // will also handle int8, int16, and unsigned versions thereof.
+    class ClrIntLiteral : ClrOp {
+        int data;
+        public ClrIntLiteral(Type ty, int data) {
+            this.data = data;
+            Returns = ty;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.EmitInt(data);
+        }
+    }
+
+    class ClrNumLiteral : ClrOp {
+        double data;
+        public ClrNumLiteral(double data) {
+            this.data = data;
+            Returns = Tokens.Double;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldc_R8, data);
         }
     }
 
