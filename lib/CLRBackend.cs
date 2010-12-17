@@ -429,20 +429,34 @@ namespace Niecza.CLRBackend {
     }
 
     public class MainClass {
-        public static void Main() {
-            string tx = (new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding)).ReadToEnd();
-            object[] root = (object[])Reader.Read(tx);
-            object[] xref = Unit.xref(root);
+        //public static void Main() {
+        //    string tx = (new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding)).ReadToEnd();
+        //    object[] root = (object[])Reader.Read(tx);
+        //    object[] xref = Unit.xref(root);
 
-            for (int i = 0; i < xref.Length; i++) {
-                object[] o = xref[i] as object[];
-                if (o == null)
-                    Console.WriteLine("Empty slot");
-                else if (o.Length > 6)
-                    Console.WriteLine("sub {0}", ((JScalar)o[0]).str);
-                else
-                    Console.WriteLine("{0} {1}", ((JScalar)o[0]).str, ((JScalar)o[1]).str);
-            }
+        //    for (int i = 0; i < xref.Length; i++) {
+        //        object[] o = xref[i] as object[];
+        //        if (o == null)
+        //            Console.WriteLine("Empty slot");
+        //        else if (o.Length > 6)
+        //            Console.WriteLine("sub {0}", ((JScalar)o[0]).str);
+        //        else
+        //            Console.WriteLine("{0} {1}", ((JScalar)o[0]).str, ((JScalar)o[1]).str);
+        //    }
+        //}
+
+        public static void Main() {
+            AssemblyName an = new AssemblyName("test");
+            AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(
+                    an, AssemblyBuilderAccess.Save, "obj");
+            ModuleBuilder mb = ab.DefineDynamicModule("test","test.dll");
+
+            TypeBuilder tb = mb.DefineType("test", TypeAttributes.Public |
+                    TypeAttributes.Sealed | TypeAttributes.Abstract |
+                    TypeAttributes.Class);
+            tb.CreateType();
+
+            ab.Save("test.dll");
         }
     }
 }
