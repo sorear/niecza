@@ -211,8 +211,14 @@ namespace Niecza.CLRBackend {
         public static readonly Type Double = typeof(double);
         public static readonly Type Frame = typeof(Frame);
 
+        public static readonly ConstructorInfo DynBlockDelegate_ctor =
+            typeof(DynBlockDelegate).GetConstructor(new Type[] {
+                    typeof(object), typeof(IntPtr) });
+
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
+        public static readonly MethodInfo Kernel_RunLoop =
+            typeof(Kernel).GetMethod("RunLoop");
         public static readonly MethodInfo Console_WriteLine =
             typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
         public static readonly MethodInfo Console_Write =
@@ -285,7 +291,8 @@ namespace Niecza.CLRBackend {
                 }
                 o.CodeGen(cx);
             }
-            cx.il.Emit(OpCodes.Callvirt, Method); // XXX C#
+            cx.il.Emit((Method.IsStatic ? OpCodes.Call : OpCodes.Callvirt),
+                    Method); // XXX C#
             if (HasCases) {
                 cx.il.Emit(OpCodes.Ret);
                 cx.il.MarkLabel(cx.cases[cx.next_case++]);
@@ -586,7 +593,7 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    public class MainClass {
+    public class CLRBackend {
         //public static void Main() {
         //    string tx = (new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding)).ReadToEnd();
         //    object[] root = (object[])Reader.Read(tx);
@@ -603,8 +610,28 @@ namespace Niecza.CLRBackend {
         //    }
         //}
 
-        static MethodInfo DefineCpsMethod(TypeBuilder tb, string name, bool pub,
-                CpsOp body) {
+        AssemblyBuilder ab;
+        ModuleBuilder mob;
+        TypeBuilder tb;
+
+        CLRBackend(string dir, string mobname, string filename) {
+            AssemblyName an = new AssemblyName(mobname);
+            ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
+                    AssemblyBuilderAccess.Save, dir);
+            mob = ab.DefineDynamicModule(mobname, filename);
+
+            tb = mob.DefineType(mobname, TypeAttributes.Public |
+                    TypeAttributes.Sealed | TypeAttributes.Abstract |
+                    TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
+        }
+
+        void Finish(string filename) {
+            tb.CreateType();
+
+            ab.Save(filename);
+        }
+
+        MethodInfo DefineCpsMethod(string name, bool pub, CpsOp body) {
             MethodBuilder mb = tb.DefineMethod(name, MethodAttributes.Static |
                     (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
@@ -636,25 +663,33 @@ namespace Niecza.CLRBackend {
             return mb;
         }
 
+        void DefineMainMethod(MethodInfo boot) {
+            MethodBuilder mb = tb.DefineMethod("Main", MethodAttributes.Static |
+                    MethodAttributes.Public, typeof(void),
+                    new Type[] { typeof(string[]) });
+            ILGenerator il = mb.GetILGenerator();
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Ldftn, boot);
+            il.Emit(OpCodes.Newobj, Tokens.DynBlockDelegate_ctor);
+            il.Emit(OpCodes.Call, Tokens.Kernel_RunLoop);
+            il.Emit(OpCodes.Ret);
+
+            ab.SetEntryPoint(mb);
+        }
+
         public static void Main() {
-            AssemblyName an = new AssemblyName("test");
-            AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(
-                    an, AssemblyBuilderAccess.Save, "obj");
-            ModuleBuilder mb = ab.DefineDynamicModule("test","test.dll");
+            CLRBackend c = new CLRBackend("obj", "test", "test.exe");
 
-            TypeBuilder tb = mb.DefineType("test", TypeAttributes.Public |
-                    TypeAttributes.Sealed | TypeAttributes.Abstract |
-                    TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
-
-            DefineCpsMethod(tb, "BOOT", true,
+            MethodInfo boot = c.DefineCpsMethod("BOOT", true,
                 CpsOp.Sequence(new CpsOp[] {
                     CpsOp.MethodCall(false, Tokens.Console_WriteLine,
                         new CpsOp[] { CpsOp.StringLiteral("Hello, world") }),
                     CpsOp.CpsReturn(new CpsOp[0]) }));
+            c.DefineMainMethod(boot);
 
-            tb.CreateType();
-
-            ab.Save("test.dll");
+            c.Finish("test.exe");
         }
     }
 }
