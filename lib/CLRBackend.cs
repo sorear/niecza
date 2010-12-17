@@ -136,9 +136,10 @@ namespace Niecza.CLRBackend {
         public int next_case;
         public Label[] cases;
         public int num_cases;
-        public Dictionary<string,int> named_cases;
-        public string[] let_names;
-        public Type[] let_types;
+        public Dictionary<string,int> named_cases
+            = new Dictionary<string,int>();
+        public string[] let_names = new string[0];
+        public Type[] let_types = new Type[0];
 
         // logic stolen from mcs
         public void EmitInt(int i) {
@@ -204,8 +205,16 @@ namespace Niecza.CLRBackend {
 
     sealed class Tokens {
         public static readonly Type Void = typeof(void);
+        public static readonly MethodInfo Kernel_Die =
+            typeof(Kernel).GetMethod("Die");
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
+        public static readonly FieldInfo Frame_caller =
+            typeof(Frame).GetField("caller");
+        public static readonly FieldInfo Frame_outer =
+            typeof(Frame).GetField("outer");
+        public static readonly FieldInfo Frame_resultSlot =
+            typeof(Frame).GetField("resultSlot");
         public static readonly FieldInfo Frame_lexn =
             typeof(Frame).GetField("lexn");
         public static readonly FieldInfo[] Frame_lexi32 = new FieldInfo[] {
@@ -412,6 +421,25 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrCpsReturn : ClrOp {
+        ClrOp child;
+        public ClrCpsReturn(ClrOp child) {
+            this.child = child;
+        }
+        public override void ListCases(CgContext cx) { }
+        public override void CodeGen(CgContext cx) {
+            if (child != null) {
+                cx.il.Emit(OpCodes.Ldarg_0);
+                cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_caller);
+                child.CodeGen(cx);
+                cx.il.Emit(OpCodes.Stfld, Tokens.Frame_resultSlot);
+            }
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_caller);
+            cx.il.Emit(OpCodes.Ret);
+        }
+    }
+
     // CpsOps are rather higher level, and can support operations that
     // both return to the trampoline and return a value.
     class CpsOp {
@@ -419,6 +447,17 @@ namespace Niecza.CLRBackend {
         public ClrOp[] stmts;
         // the head MUST NOT have cases
         public ClrOp head;
+
+        public CpsOp(ClrOp head) : this(new ClrOp[0], head) { }
+        public CpsOp(ClrOp[] stmts, ClrOp head) {
+            if (head.HasCases)
+                throw new Exception("head must not have cases");
+            foreach (ClrOp s in stmts)
+                if (s.Returns != Tokens.Void)
+                    throw new Exception("stmts must return void");
+            this.head = head;
+            this.stmts = stmts;
+        }
 
         private static CpsOp Primitive(Func<ClrOp,ClrOp[]> raw, CpsOp[] zyg) {
             return null;
@@ -445,6 +484,39 @@ namespace Niecza.CLRBackend {
         //    }
         //}
 
+        static MethodInfo DefineCpsMethod(TypeBuilder tb, string name, bool pub,
+                CpsOp body) {
+            MethodBuilder mb = tb.DefineMethod(name, MethodAttributes.Static |
+                    (pub ? MethodAttributes.Public : 0),
+                    typeof(Frame), new Type[] { typeof(Frame) });
+            CgContext cx = new CgContext();
+            cx.num_cases = 1;
+            foreach (ClrOp s in body.stmts)
+                s.ListCases(cx);
+            body.head.ListCases(cx);
+
+            cx.il = mb.GetILGenerator();
+            cx.cases = new Label[cx.num_cases];
+            for (int i = 0; i < cx.num_cases; i++)
+                cx.cases[i] = cx.il.DefineLabel();
+
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_ip);
+            cx.il.Emit(OpCodes.Switch, cx.cases);
+
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldstr, "Invalid IP");
+            cx.il.Emit(OpCodes.Call, Tokens.Kernel_Die);
+            cx.il.Emit(OpCodes.Ret);
+
+            cx.il.MarkLabel(cx.cases[cx.next_case++]);
+            foreach (ClrOp s in body.stmts)
+                s.CodeGen(cx);
+            body.head.CodeGen(cx);
+
+            return mb;
+        }
+
         public static void Main() {
             AssemblyName an = new AssemblyName("test");
             AssemblyBuilder ab = AppDomain.CurrentDomain.DefineDynamicAssembly(
@@ -454,6 +526,9 @@ namespace Niecza.CLRBackend {
             TypeBuilder tb = mb.DefineType("test", TypeAttributes.Public |
                     TypeAttributes.Sealed | TypeAttributes.Abstract |
                     TypeAttributes.Class);
+
+            DefineCpsMethod(tb, "BOOT", true, new CpsOp(new ClrCpsReturn(null)));
+
             tb.CreateType();
 
             ab.Save("test.dll");
