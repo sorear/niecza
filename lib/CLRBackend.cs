@@ -205,6 +205,12 @@ namespace Niecza.CLRBackend {
     }
 
     class StaticSub {
+        public const int RUN_ONCE = 1;
+        public const int SPAD_EXISTS = 2;
+        public const int GATHER_HACK = 4;
+        public const int STRONG_USED = 8;
+        public const int RETURNABLE = 16;
+        public const int AUGMENTING = 32;
         public readonly string name;
         public readonly Xref outer;
         public readonly int flags;
@@ -221,7 +227,7 @@ namespace Niecza.CLRBackend {
         public FieldInfo protosub;
         public FieldInfo subinfo;
         public FieldInfo protopad;
-        public int numlexn;
+        public int nlexn;
 
         public StaticSub(object[] s) {
             name = ((JScalar)s[0]).str;
@@ -269,12 +275,25 @@ namespace Niecza.CLRBackend {
             subinfo  = binder(Unit.SharedName('I', ix, name), Tokens.SubInfo);
             protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
             protosub = binder(Unit.SharedName('S', ix, name), Tokens.IP6);
+
+            nlexn = 0;
+            for (int i = 0; i < lexicals.Count; i++)
+                if (lexicals[i].Value != null) // XXX
+                    lexicals[i].Value.BindFields(ix, i, this,
+                            lexicals[i].Key, binder);
         }
     }
 
     abstract class Lexical {
-        public virtual void BindFields(int six, int lix,
-                Func<string,Type,FieldInfo> binder) { }
+        public virtual void BindFields(int six, int lix, StaticSub sub,
+                string name, Func<string,Type,FieldInfo> binder) { }
+        protected static bool IsDynamicName(string name) {
+            if (name == "$_") return true;
+            if (name.Length < 2) return false;
+            if (name[0] == '*' || name[0] == '?') return true;
+            if (name[1] == '*' || name[1] == '?') return true;
+            return false;
+        }
     }
 
     class LexSimple : Lexical {
@@ -282,17 +301,36 @@ namespace Niecza.CLRBackend {
         public const int LIST = 2;
         public const int HASH = 1;
         public readonly int flags;
+
+        public int index;
+        public FieldInfo stg;
+
         public LexSimple(object[] l) {
             flags = (int)((JScalar)l[2]).num;
+        }
+        public override void BindFields(int six, int lix, StaticSub sub,
+                string name, Func<string,Type,FieldInfo> binder) {
+            if (IsDynamicName(name) || (sub.flags & StaticSub.RUN_ONCE) == 0) {
+                index = sub.nlexn++;
+            } else {
+                index = -1;
+                stg = binder(Unit.SharedName('L', six, name), Tokens.Variable);
+                sub.nlexn++;
+            }
         }
     }
 
     class LexCommon : Lexical {
         public readonly string[] path;
+        public FieldInfo stg;
         public LexCommon(object[] l) {
             path = new string[l.Length - 2];
             for (int i = 2; i < l.Length; i++)
                 path[i-2] = ((JScalar)l[i]).str;
+        }
+        public override void BindFields(int six, int lix, StaticSub sub,
+                string name, Func<string,Type,FieldInfo> binder) {
+            stg = binder(Unit.SharedName('B', six, name), Tokens.BValue);
         }
     }
 
@@ -300,6 +338,20 @@ namespace Niecza.CLRBackend {
         public readonly Xref def;
         public LexSub(object[] l) {
             def = new Xref(l, 2);
+        }
+
+        public int index;
+        public FieldInfo stg;
+
+        public override void BindFields(int six, int lix, StaticSub sub,
+                string name, Func<string,Type,FieldInfo> binder) {
+            if (IsDynamicName(name) || (sub.flags & StaticSub.RUN_ONCE) == 0) {
+                index = sub.nlexn++;
+            } else {
+                index = -1;
+                stg = binder(Unit.SharedName('L', six, name), Tokens.Variable);
+                sub.nlexn++;
+            }
         }
     }
 
@@ -389,6 +441,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type SubInfo = typeof(SubInfo);
         public static readonly Type IP6 = typeof(IP6);
         public static readonly Type Variable = typeof(Variable);
+        public static readonly Type BValue = typeof(BValue);
         public static readonly Type DynMetaObject = typeof(DynMetaObject);
 
         public static readonly ConstructorInfo DynBlockDelegate_ctor =
