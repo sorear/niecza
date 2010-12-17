@@ -340,6 +340,23 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrOperator : ClrOp {
+        public readonly OpCode op;
+        public readonly ClrOp[] zyg;
+
+        public override void CodeGen(CgContext cx) {
+            foreach (ClrOp c in zyg)
+                c.CodeGen(cx);
+            cx.il.Emit(op);
+        }
+
+        public ClrOperator(Type ret, OpCode op, ClrOp[] zyg) {
+            Returns = ret;
+            this.op = op;
+            this.zyg = zyg;
+        }
+    }
+
     class ClrNoop : ClrOp {
         private ClrNoop() {
             Returns = Tokens.Void;
@@ -660,6 +677,12 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrOp[] { new ClrLabel(name, case_too) },
                     ClrNoop.Instance);
         }
+
+        public static CpsOp Operator(Type rt, OpCode op, CpsOp[] zyg) {
+            return Primitive(zyg, delegate(ClrOp[] heads) {
+                return new ClrOperator(rt, op, heads);
+            });
+        }
     }
 
     public class CLRBackend {
@@ -759,7 +782,7 @@ namespace Niecza.CLRBackend {
                     CpsOp.Label("again", true),
                     CpsOp.MethodCall(false, Tokens.Console_WriteLine, new CpsOp[] {
                         CpsOp.MethodCall(false, Tokens.Object_ToString, new CpsOp[] {
-                            CpsOp.IntLiteral(42) }) }),
+                            CpsOp.Operator(Tokens.Int32, OpCodes.Add, new CpsOp[] { CpsOp.IntLiteral(42), CpsOp.IntLiteral(13) }) }) }),
                     CpsOp.Goto("again", false, new CpsOp[0]),
                     CpsOp.CpsReturn(new CpsOp[0]) }));
             c.DefineMainMethod(boot);
