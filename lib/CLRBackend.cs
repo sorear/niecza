@@ -121,6 +121,8 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    // Because this is the *CLR* backend's Unit object, it's always
+    // associated with either an Assembly or an AssemblyBuilder.
     class Unit {
         public readonly Xref mainline_ref;
         public readonly string name;
@@ -158,6 +160,32 @@ namespace Niecza.CLRBackend {
                 DoVisitSubsPostorder(z, cb);
             cb(ix,s);
         }
+
+        public static string SharedName(char type, int ix, string name) {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(type);
+            sb.Append(ix);
+            sb.Append('_');
+            foreach (char c in name) {
+                if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')
+                        || (c >= 'A' && c <= 'Z')) {
+                    sb.Append(c);
+                } else if (c == '_') {
+                    sb.Append("__");
+                } else if (c <= (char)255) {
+                    sb.AppendFormat("_{0:X2}", (int)c);
+                } else {
+                    sb.AppendFormat("_U{0:X4}", (int)c);
+                }
+            }
+            return sb.ToString();
+        }
+
+        public void BindFields(Func<string,Type,FieldInfo> binder) {
+            VisitSubsPostorder(delegate(int ix, StaticSub sub) {
+                sub.BindFields(ix, binder);
+            });
+        }
     }
 
     class Xref {
@@ -187,8 +215,13 @@ namespace Niecza.CLRBackend {
         public readonly Xref body_of;
         public readonly Xref in_class;
         public readonly string[] cur_pkg;
-        public readonly List<KeyValuePair<string,object>> lexicals;
-        public Dictionary<string,object> l_lexicals;
+        public readonly List<KeyValuePair<string,Lexical>> lexicals;
+        public readonly Dictionary<string,Lexical> l_lexicals;
+
+        public FieldInfo protosub;
+        public FieldInfo subinfo;
+        public FieldInfo protopad;
+        public int numlexn;
 
         public StaticSub(object[] s) {
             name = ((JScalar)s[0]).str;
@@ -211,13 +244,13 @@ namespace Niecza.CLRBackend {
                 cur_pkg[i] = ((JScalar) r_cur_pkg[i]).str;
 
             object[] r_lexicals = s[14] as object[];
-            lexicals = new List<KeyValuePair<string,object>>();
-            l_lexicals = new Dictionary<string,object>();
+            lexicals = new List<KeyValuePair<string,Lexical>>();
+            l_lexicals = new Dictionary<string,Lexical>();
             for (int i = 0; i < r_lexicals.Length; i++) {
                 object[] bl = r_lexicals[i] as object[];
                 string lname = ((JScalar)bl[0]).str;
                 string type = ((JScalar)bl[1]).str;
-                object obj = null;
+                Lexical obj = null;
 
                 if (type == "simple") {
                     obj = new LexSimple(bl);
@@ -227,13 +260,24 @@ namespace Niecza.CLRBackend {
                     obj = new LexSub(bl);
                 }
 
-                lexicals.Add(new KeyValuePair<string,object>(lname, obj));
+                lexicals.Add(new KeyValuePair<string,Lexical>(lname, obj));
                 l_lexicals[lname] = obj;
             }
         }
+
+        public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
+            subinfo  = binder(Unit.SharedName('I', ix, name), Tokens.SubInfo);
+            protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
+            protosub = binder(Unit.SharedName('S', ix, name), Tokens.IP6);
+        }
     }
 
-    class LexSimple {
+    abstract class Lexical {
+        public virtual void BindFields(int six, int lix,
+                Func<string,Type,FieldInfo> binder) { }
+    }
+
+    class LexSimple : Lexical {
         public const int NOINIT = 4;
         public const int LIST = 2;
         public const int HASH = 1;
@@ -243,7 +287,7 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    class LexCommon {
+    class LexCommon : Lexical {
         public readonly string[] path;
         public LexCommon(object[] l) {
             path = new string[l.Length - 2];
@@ -252,7 +296,7 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    class LexSub {
+    class LexSub : Lexical {
         public readonly Xref def;
         public LexSub(object[] l) {
             def = new Xref(l, 2);
@@ -847,20 +891,6 @@ namespace Niecza.CLRBackend {
 
         Unit unit;
 
-        // holds FieldBuilder and MethodBuilder for the various thingies
-        // required
-        object[][] irefs;
-
-        const int S_PROTOSUB = 0; // IP6 FieldBuilder
-        const int S_PROTOPAD = 1; // Frame FieldBuilder
-        const int S_SUBINFO  = 2; // SubInfo FieldBuilder
-        const int S_BODY     = 3; // MethodBuilder
-        const int S_LEXICALS = 4; // Variable/BValue FieldBuilder[]
-
-        const int P_METAOBJ  = 0; // DynMetaObject FieldBuilder
-        const int P_TYPEOBJ  = 1; // IP6 FieldBuilder
-        const int P_TYPEVAR  = 2; // Variable FieldBuilder
-
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
             ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
@@ -872,44 +902,12 @@ namespace Niecza.CLRBackend {
                     TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
         }
 
-        string SharedName(char type, int ix, string name) {
-            StringBuilder sb = new StringBuilder();
-            sb.Append(type);
-            sb.Append(ix);
-            sb.Append('_');
-            foreach (char c in name) {
-                if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')
-                        || (c >= 'A' && c <= 'Z')) {
-                    sb.Append(c);
-                } else if (c == '_') {
-                    sb.Append("__");
-                } else if (c <= (char)255) {
-                    sb.AppendFormat("_{0:X2}", (int)c);
-                } else {
-                    sb.AppendFormat("_U{0:X4}", (int)c);
-                }
-            }
-            return sb.ToString();
-        }
-
         void Process(Unit unit) {
             this.unit = unit;
-            irefs = new object[unit.xref.Length][];
 
-            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
-                string n = obj.name;
-                irefs[ix] = new object[ S_LEXICALS + obj.lexicals.Count ];
-                irefs[ix][S_SUBINFO] = tb.DefineField(SharedName('I', ix, n),
-                    Tokens.SubInfo, FieldAttributes.Public |
+            unit.BindFields(delegate(string name, Type type) {
+                return tb.DefineField(name, type, FieldAttributes.Public |
                     FieldAttributes.Static);
-                irefs[ix][S_PROTOPAD] = tb.DefineField(SharedName('P', ix, n),
-                    Tokens.Frame, FieldAttributes.Public |
-                    FieldAttributes.Static);
-                irefs[ix][S_PROTOSUB] = tb.DefineField(SharedName('S', ix, n),
-                    Tokens.IP6, FieldAttributes.Public |
-                    FieldAttributes.Static);
-
-                // TODO create stuff for lexicals here
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
