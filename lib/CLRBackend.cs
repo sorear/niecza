@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 
 using Niecza;
 
@@ -127,6 +128,64 @@ namespace Niecza.CLRBackend {
         public static object[] bottom_ref(object[] u) { return u[4] as object[]; }
         public static object[] xref(object[] u) { return u[5] as object[]; }
         public static object[] tdeps(object[] u) { return u[6] as object[]; }
+
+        public static object[] xref_obj(object[] u, int ix) {
+            return xref(u)[ix] as object[];
+        }
+        public static bool xref_is_sub(object[] u, int ix) {
+            return xref_obj(u,ix).Length > 6;
+        }
+
+        public static void VisitSubsPostorder(object[] unit,
+                Action<int,object[]> cb) {
+            DoVisitSubsPostorder(unit, Xref.index(mainline_ref(unit)), cb);
+        }
+
+        private static void DoVisitSubsPostorder(object[] unit, int ix,
+                Action<int,object[]> cb) {
+            object[] s = xref_obj(unit, ix);
+            foreach (int z in StaticSub.zyg(s))
+                DoVisitSubsPostorder(unit, z, cb);
+            cb(ix,s);
+        }
+    }
+
+    class Xref {
+        public static string unit(object[] x) { return ((JScalar)x[0]).str; }
+        public static int index(object[] x) { return (int)((JScalar)x[1]).num; }
+        public static string name(object[] x) { return ((JScalar)x[2]).str; }
+    }
+
+    class StaticSub {
+        public static string name(object[] s) { return ((JScalar)s[0]).str; }
+        public static object[] outer(object[] s) { return s[1] as object[]; }
+        public static int flags(object[] s) { return (int)((JScalar)s[2]).num; }
+        public static int[] zyg(object[] s) {
+            object[] oz = s[3] as object[];
+            int[] ix = new int[oz.Length];
+            for (int i = 0; i < oz.Length; i++)
+                ix[i] = (int) ((JScalar) oz[i]).num;
+            return ix;
+        }
+        public static object parametric_role_hack(object[] s) { return s[4]; }
+        public static object augment_hack(object[] s) { return s[5]; }
+        public static int is_phaser(object[] s) { return s[6] == null ? -1 : (int) ((JScalar) s[6]).num; }
+        public static object[] body_of(object[] s) { return s[7] as object[]; } // Xref
+        public static object[] in_class(object[] s) { return s[8] as object[]; }
+        public static string[] cur_pkg(object[] s) {
+            object[] oz = s[9] as object[];
+            string[] sx = new string[oz.Length];
+            for (int i = 0; i < oz.Length; i++)
+                sx[i] = ((JScalar) oz[i]).str;
+            return sx;
+        }
+        public static object[][] lexicals(object[] s) {
+            object[] oz = s[15] as object[];
+            object[][] ax = new object[oz.Length][];
+            for (int i = 0; i < oz.Length; i++)
+                ax[i] = oz[i] as object[];
+            return ax;
+        }
     }
 
     // Extra info needed beyond what ILGenerator alone provides.  Note
@@ -212,6 +271,10 @@ namespace Niecza.CLRBackend {
         public static readonly Type Int32 = typeof(int);
         public static readonly Type Double = typeof(double);
         public static readonly Type Frame = typeof(Frame);
+        public static readonly Type SubInfo = typeof(SubInfo);
+        public static readonly Type IP6 = typeof(IP6);
+        public static readonly Type Variable = typeof(Variable);
+        public static readonly Type DynMetaObject = typeof(DynMetaObject);
 
         public static readonly ConstructorInfo DynBlockDelegate_ctor =
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
@@ -707,25 +770,25 @@ namespace Niecza.CLRBackend {
     }
 
     public class CLRBackend {
-        //public static void Main() {
-        //    string tx = (new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding)).ReadToEnd();
-        //    object[] root = (object[])Reader.Read(tx);
-        //    object[] xref = Unit.xref(root);
-
-        //    for (int i = 0; i < xref.Length; i++) {
-        //        object[] o = xref[i] as object[];
-        //        if (o == null)
-        //            Console.WriteLine("Empty slot");
-        //        else if (o.Length > 6)
-        //            Console.WriteLine("sub {0}", ((JScalar)o[0]).str);
-        //        else
-        //            Console.WriteLine("{0} {1}", ((JScalar)o[0]).str, ((JScalar)o[1]).str);
-        //    }
-        //}
-
         AssemblyBuilder ab;
         ModuleBuilder mob;
         TypeBuilder tb;
+
+        object[] unit;
+
+        // holds FieldBuilder and MethodBuilder for the various thingies
+        // required
+        object[][] irefs;
+
+        const int S_PROTOSUB = 0; // IP6 FieldBuilder
+        const int S_PROTOPAD = 1; // Frame FieldBuilder
+        const int S_SUBINFO  = 2; // SubInfo FieldBuilder
+        const int S_BODY     = 3; // MethodBuilder
+        const int S_LEXICALS = 4; // Variable/BValue FieldBuilder[]
+
+        const int P_METAOBJ  = 0; // DynMetaObject FieldBuilder
+        const int P_TYPEOBJ  = 1; // IP6 FieldBuilder
+        const int P_TYPEVAR  = 2; // Variable FieldBuilder
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
@@ -736,6 +799,61 @@ namespace Niecza.CLRBackend {
             tb = mob.DefineType(mobname, TypeAttributes.Public |
                     TypeAttributes.Sealed | TypeAttributes.Abstract |
                     TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
+        }
+
+        string SharedName(char type, int ix, string name) {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(type);
+            sb.Append(ix);
+            sb.Append('_');
+            foreach (char c in name) {
+                if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')
+                        || (c >= 'A' && c <= 'Z')) {
+                    sb.Append(c);
+                } else if (c == '_') {
+                    sb.Append("__");
+                } else if (c <= (char)255) {
+                    sb.AppendFormat("_{0:X2}", (int)c);
+                } else {
+                    sb.AppendFormat("_U{0:X4}", (int)c);
+                }
+            }
+            return sb.ToString();
+        }
+
+        void Process(object[] unit) {
+            this.unit = unit;
+            irefs = new object[Unit.xref(unit).Length][];
+
+            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+                string n = StaticSub.name(obj);
+                irefs[ix] = new object[ S_LEXICALS + StaticSub.lexicals(obj).Length ];
+                irefs[ix][S_SUBINFO] = tb.DefineField(SharedName('I', ix, n),
+                    Tokens.SubInfo, FieldAttributes.Public |
+                    FieldAttributes.Static);
+                irefs[ix][S_PROTOPAD] = tb.DefineField(SharedName('P', ix, n),
+                    Tokens.Frame, FieldAttributes.Public |
+                    FieldAttributes.Static);
+                irefs[ix][S_PROTOSUB] = tb.DefineField(SharedName('S', ix, n),
+                    Tokens.IP6, FieldAttributes.Public |
+                    FieldAttributes.Static);
+
+                // TODO create stuff for lexicals here
+            });
+
+            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+                // TODO generate code here
+            });
+
+            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+                // TODO append chunks to Thaw here for sub2 stuff
+            });
+
+            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+                // TODO append chunks to Thaw here for sub3 stuff
+            });
+
+            // TODO generate BOOT method here
         }
 
         void Finish(string filename) {
@@ -796,28 +914,15 @@ namespace Niecza.CLRBackend {
         }
 
         public static void Main() {
-            CLRBackend c = new CLRBackend("obj", "test", "test.exe");
+            Directory.SetCurrentDirectory("obj");
+            CLRBackend c = new CLRBackend(null, "SAFE", "SAFE.dll");
 
-            MethodInfo boot = c.DefineCpsMethod("BOOT", true,
-                CpsOp.Let("ctr",
-                    CpsOp.IntLiteral(0),
-                    CpsOp.Sequence(new CpsOp[] {
-                        CpsOp.Label("again", true),
-                        CpsOp.MethodCall(false, Tokens.Console_WriteLine, new CpsOp[] {
-                            CpsOp.MethodCall(false, Tokens.Object_ToString, new CpsOp[] {
-                                CpsOp.PeekLet("ctr", Tokens.Int32) }) }),
-                        CpsOp.PokeLet("ctr", new CpsOp[] {
-                            CpsOp.Operator(Tokens.Int32, OpCodes.Add, new CpsOp[] {
-                                CpsOp.PeekLet("ctr", Tokens.Int32),
-                                CpsOp.IntLiteral(1) }) }),
-                        CpsOp.Goto("again", false, new CpsOp[] {
-                            CpsOp.Operator(Tokens.Boolean, OpCodes.Clt, new CpsOp[] {
-                                CpsOp.PeekLet("ctr", Tokens.Int32),
-                                CpsOp.IntLiteral(100) }) }),
-                        CpsOp.CpsReturn(new CpsOp[0]) })));
-            c.DefineMainMethod(boot);
+            string tx = File.ReadAllText("SAFE.nam");
+            object[] root = (object[])Reader.Read(tx);
 
-            c.Finish("test.exe");
+            c.Process(root);
+
+            c.Finish("SAFE.dll");
         }
     }
 }
