@@ -43,6 +43,13 @@
             AllowUnsafeBlocks="true"/>
     </Target>
 
+    <Target Name="CLRBackend.exe" DependsOnTargets="Kernel.dll"
+        Inputs="lib\Kernel.dll;lib\CLRBackend.cs" Outputs="obj\CLRBackend.exe">
+        <Csc Sources="lib\CLRBackend.cs" TargetType="exe"
+            References="Kernel.dll" OutputAssembly="obj\CLRBackend.exe"
+            EmitDebugInformation="true" AdditionalLibPaths="obj"/>
+    </Target>
+
     <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="SAFE.cs;Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', setting => 1, name => 'CORE');"/>
     </Target>
