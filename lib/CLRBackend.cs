@@ -210,8 +210,16 @@ namespace Niecza.CLRBackend {
         public static readonly Type Int32 = typeof(int);
         public static readonly Type Double = typeof(double);
         public static readonly Type Frame = typeof(Frame);
+
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
+        public static readonly MethodInfo Console_WriteLine =
+            typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
+        public static readonly MethodInfo Console_Write =
+            typeof(Console).GetMethod("Write", new Type[] { typeof(string) });
+        public static readonly MethodInfo Environment_Exit =
+            typeof(Console).GetMethod("Exit");
+
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
         public static readonly FieldInfo Frame_caller =
@@ -248,6 +256,7 @@ namespace Niecza.CLRBackend {
     // there is no need to handle argument spills.
     abstract class ClrOp {
         public bool HasCases;
+        public bool Constant; // if this returns a value, can it be reordered?
         public Type Returns;
         public abstract void CodeGen(CgContext cx);
         public virtual void ListCases(CgContext cx) { }
@@ -404,11 +413,19 @@ namespace Niecza.CLRBackend {
 
     class ClrDropLet : ClrOp {
         string Name;
-        public ClrDropLet(string name) {
+        ClrOp Inner;
+        public ClrDropLet(string name, ClrOp inner) {
             Name = name;
-            Returns = Tokens.Void;
+            Inner = inner;
+            Returns = inner.Returns;
+            HasCases = inner.HasCases;
+        }
+        public override void ListCases(CgContext cx) {
+            Inner.ListCases(cx);
         }
         public override void CodeGen(CgContext cx) {
+            Inner.CodeGen(cx);
+
             int ix = cx.let_names.Length - 1;
             while (ix >= 0 && cx.let_names[ix] != Name)
                 ix--;
@@ -418,6 +435,7 @@ namespace Niecza.CLRBackend {
 
             cx.let_names[ix] = null;
             cx.let_types[ix] = null;
+            // XXX We probably should null reference-valued lets here
         }
     }
 
@@ -444,6 +462,7 @@ namespace Niecza.CLRBackend {
         public ClrStringLiteral(string data) {
             this.data = data;
             Returns = Tokens.String;
+            Constant = true;
         }
         public override void CodeGen(CgContext cx) {
             cx.il.Emit(OpCodes.Ldstr, data);
@@ -458,6 +477,7 @@ namespace Niecza.CLRBackend {
         public ClrIntLiteral(Type ty, int data) {
             this.data = data;
             Returns = ty;
+            Constant = true;
         }
         public override void CodeGen(CgContext cx) {
             cx.EmitInt(data);
@@ -469,6 +489,7 @@ namespace Niecza.CLRBackend {
         public ClrNumLiteral(double data) {
             this.data = data;
             Returns = Tokens.Double;
+            Constant = true;
         }
         public override void CodeGen(CgContext cx) {
             cx.il.Emit(OpCodes.Ldc_R8, data);
@@ -494,11 +515,74 @@ namespace Niecza.CLRBackend {
             this.stmts = stmts;
         }
 
-        private static CpsOp Primitive(Func<ClrOp,ClrOp[]> raw, CpsOp[] zyg) {
-            return null;
+        // XXX only needs to be unique per sub
+        [ThreadStatic] private static int nextunique = 0;
+        // this particular use of a delegate feels wrong
+        private static CpsOp Primitive(CpsOp[] zyg, Func<ClrOp[],ClrOp> raw) {
+            List<ClrOp> stmts = new List<ClrOp>();
+            List<ClrOp> args = new List<ClrOp>();
+            List<string> pop = new List<string>();
+
+            for (int i = 0; i < zyg.Length; i++) {
+                foreach (ClrOp s in zyg[i].stmts)
+                    stmts.Add(s);
+
+                bool more_stmts = false;
+                for (int j = i + 1; j < zyg.Length; j++)
+                    if (zyg[j].stmts.Length != 0)
+                        more_stmts = true;
+
+                if (!more_stmts || zyg[i].head.Constant) {
+                    args.Add(zyg[i].head);
+                } else {
+                    string ln = "!spill" + (nextunique++);
+                    args.Add(new ClrPeekLet(ln, zyg[i].head.Returns));
+                    stmts.Add(new ClrPushLet(ln, zyg[i].head));
+                    pop.Add(ln);
+                }
+            }
+
+            ClrOp head = raw(args.ToArray());
+            for (int i = pop.Count - 1; i >= 0; i--)
+                head = new ClrDropLet(pop[i], head);
+            return new CpsOp(stmts.ToArray(), head);
         }
-        public static CpsOp MethodCall(MethodInfo tk, ClrOp[] zyg) {
-            return null;
+
+        public static CpsOp Sequence(CpsOp[] terms) {
+            if (terms.Length == 0) return new CpsOp(ClrNoop.Instance);
+
+            List<ClrOp> stmts = new List<ClrOp>();
+            for (int i = 0; i < terms.Length - 1; i++) {
+                if (terms[i].head.Returns != Tokens.Void)
+                    throw new Exception("Non-void expression used in nonfinal sequence position");
+                foreach (ClrOp s in terms[i].stmts)
+                    stmts.Add(s);
+                stmts.Add(terms[i].head);
+            }
+
+            foreach (ClrOp s in terms[terms.Length - 1].stmts)
+                stmts.Add(s);
+            return new CpsOp(stmts.ToArray(), terms[terms.Length - 1].head);
+        }
+
+        public static CpsOp MethodCall(bool cps, MethodInfo tk, CpsOp[] zyg) {
+            return Primitive(zyg, delegate (ClrOp[] heads) {
+                return new ClrMethodCall(cps, tk, heads);
+            });
+        }
+
+        public static CpsOp CpsReturn(CpsOp[] zyg) {
+            return Primitive(zyg, delegate (ClrOp[] heads) {
+                return new ClrCpsReturn(heads.Length > 0 ? heads[0] : null);
+            });
+        }
+
+        public static CpsOp StringLiteral(string s) {
+            return new CpsOp(new ClrStringLiteral(s));
+        }
+
+        public static CpsOp IntLiteral(int x) {
+            return new CpsOp(new ClrIntLiteral(Tokens.Int32, x));
         }
     }
 
@@ -560,9 +644,13 @@ namespace Niecza.CLRBackend {
 
             TypeBuilder tb = mb.DefineType("test", TypeAttributes.Public |
                     TypeAttributes.Sealed | TypeAttributes.Abstract |
-                    TypeAttributes.Class);
+                    TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
 
-            DefineCpsMethod(tb, "BOOT", true, new CpsOp(new ClrCpsReturn(null)));
+            DefineCpsMethod(tb, "BOOT", true,
+                CpsOp.Sequence(new CpsOp[] {
+                    CpsOp.MethodCall(false, Tokens.Console_WriteLine,
+                        new CpsOp[] { CpsOp.StringLiteral("Hello, world") }),
+                    CpsOp.CpsReturn(new CpsOp[0]) }));
 
             tb.CreateType();
 
