@@ -138,6 +138,8 @@ namespace Niecza.CLRBackend {
         public int num_cases;
         public Dictionary<string,int> named_cases
             = new Dictionary<string,int>();
+        public Dictionary<string,Label> named_labels
+            = new Dictionary<string,Label>();
         public string[] let_names = new string[0];
         public Type[] let_types = new Type[0];
 
@@ -225,6 +227,8 @@ namespace Niecza.CLRBackend {
             typeof(Console).GetMethod("Write", new Type[] { typeof(string) });
         public static readonly MethodInfo Environment_Exit =
             typeof(Console).GetMethod("Exit");
+        public static readonly MethodInfo Object_ToString =
+            typeof(object).GetMethod("ToString", new Type[0]);
 
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
@@ -290,6 +294,11 @@ namespace Niecza.CLRBackend {
                     cx.il.Emit(OpCodes.Ldarg_0);
                 }
                 o.CodeGen(cx);
+
+                // XXX this doesn't work quite right if the method is
+                // defined on the value type itself
+                if (i == 0 && o.Returns.IsValueType && !Method.IsStatic)
+                    cx.il.Emit(OpCodes.Box, o.Returns);
             }
             cx.il.Emit((Method.IsStatic ? OpCodes.Call : OpCodes.Callvirt),
                     Method); // XXX C#
@@ -446,6 +455,50 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    // TODO Investigate DLR-style labels with arguments
+    class ClrLabel : ClrOp {
+        string name;
+        bool case_too;
+        public ClrLabel(string name, bool case_too) {
+            this.name = name;
+            this.case_too = case_too;
+            Returns = Tokens.Void;
+            HasCases = true;
+        }
+        public override void ListCases(CgContext cx) {
+            cx.named_labels[name] = cx.il.DefineLabel();
+            if (case_too)
+                cx.named_cases[name] = cx.num_cases++;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.MarkLabel(cx.named_labels[name]);
+            if (case_too)
+                cx.il.MarkLabel(cx.cases[cx.named_cases[name]]);
+        }
+    }
+
+    class ClrGoto : ClrOp {
+        string name;
+        bool iffalse;
+        ClrOp inner;
+        public ClrGoto(string name, bool iffalse, ClrOp inner) {
+            this.name = name;
+            this.iffalse = iffalse;
+            this.inner = inner;
+            Returns = Tokens.Void;
+        }
+        public override void CodeGen(CgContext cx) {
+            // TODO: peephole optimize ceq/brtrue and similar forms
+            Label l = cx.named_labels[name];
+            if (inner != null) {
+                inner.CodeGen(cx);
+                cx.il.Emit(iffalse ? OpCodes.Brfalse : OpCodes.Brtrue, l);
+            } else {
+                cx.il.Emit(OpCodes.Br, l);
+            }
+        }
+    }
+
     class ClrCpsReturn : ClrOp {
         ClrOp child;
         public ClrCpsReturn(ClrOp child) {
@@ -584,12 +637,28 @@ namespace Niecza.CLRBackend {
             });
         }
 
+        public static CpsOp Goto(string label, bool iffalse, CpsOp[] zyg) {
+            return Primitive(zyg, delegate (ClrOp[] heads) {
+                return new ClrGoto(label, iffalse,
+                    heads.Length > 0 ? heads[0] : null);
+            });
+        }
+
         public static CpsOp StringLiteral(string s) {
             return new CpsOp(new ClrStringLiteral(s));
         }
 
         public static CpsOp IntLiteral(int x) {
             return new CpsOp(new ClrIntLiteral(Tokens.Int32, x));
+        }
+
+        public static CpsOp BoolLiteral(int x) {
+            return new CpsOp(new ClrIntLiteral(Tokens.Boolean, x));
+        }
+
+        public static CpsOp Label(string name, bool case_too) {
+            return new CpsOp(new ClrOp[] { new ClrLabel(name, case_too) },
+                    ClrNoop.Instance);
         }
     }
 
@@ -636,12 +705,15 @@ namespace Niecza.CLRBackend {
                     (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
             CgContext cx = new CgContext();
+            // ListCases may want to define labels, so this needs to come
+            // early
+            cx.il = mb.GetILGenerator();
             cx.num_cases = 1;
+
             foreach (ClrOp s in body.stmts)
                 s.ListCases(cx);
             body.head.ListCases(cx);
 
-            cx.il = mb.GetILGenerator();
             cx.cases = new Label[cx.num_cases];
             for (int i = 0; i < cx.num_cases; i++)
                 cx.cases[i] = cx.il.DefineLabel();
@@ -684,8 +756,11 @@ namespace Niecza.CLRBackend {
 
             MethodInfo boot = c.DefineCpsMethod("BOOT", true,
                 CpsOp.Sequence(new CpsOp[] {
-                    CpsOp.MethodCall(false, Tokens.Console_WriteLine,
-                        new CpsOp[] { CpsOp.StringLiteral("Hello, world") }),
+                    CpsOp.Label("again", true),
+                    CpsOp.MethodCall(false, Tokens.Console_WriteLine, new CpsOp[] {
+                        CpsOp.MethodCall(false, Tokens.Object_ToString, new CpsOp[] {
+                            CpsOp.IntLiteral(42) }) }),
+                    CpsOp.Goto("again", false, new CpsOp[0]),
                     CpsOp.CpsReturn(new CpsOp[0]) }));
             c.DefineMainMethod(boot);
 
