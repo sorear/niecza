@@ -381,6 +381,7 @@ namespace Niecza.CLRBackend {
             while (ix < cx.let_types.Length && cx.let_types[ix] != null)
                 ix++;
 
+            cx.il.Emit(OpCodes.Ldarg_0);
             cx.EmitPreSetlex(ix);
 
             // Initial must not have a net effect on cx.let_types
@@ -683,6 +684,26 @@ namespace Niecza.CLRBackend {
                 return new ClrOperator(rt, op, heads);
             });
         }
+
+        public static CpsOp PokeLet(string name, CpsOp[] zyg) {
+            return Primitive(zyg, delegate(ClrOp[] heads) {
+                return new ClrPokeLet(name, heads[0]);
+            });
+        }
+
+        public static CpsOp PeekLet(string name, Type rt) {
+            return new CpsOp(new ClrPeekLet(name, rt));
+        }
+
+        public static CpsOp Let(string name, CpsOp head, CpsOp tail) {
+            List<ClrOp> stmts = new List<ClrOp>();
+            foreach (ClrOp c in head.stmts)
+                stmts.Add(c);
+            stmts.Add(new ClrPushLet(name, head.head));
+            foreach (ClrOp c in tail.stmts)
+                stmts.Add(c);
+            return new CpsOp(stmts.ToArray(), new ClrDropLet(name, tail.head));
+        }
     }
 
     public class CLRBackend {
@@ -778,13 +799,22 @@ namespace Niecza.CLRBackend {
             CLRBackend c = new CLRBackend("obj", "test", "test.exe");
 
             MethodInfo boot = c.DefineCpsMethod("BOOT", true,
-                CpsOp.Sequence(new CpsOp[] {
-                    CpsOp.Label("again", true),
-                    CpsOp.MethodCall(false, Tokens.Console_WriteLine, new CpsOp[] {
-                        CpsOp.MethodCall(false, Tokens.Object_ToString, new CpsOp[] {
-                            CpsOp.Operator(Tokens.Int32, OpCodes.Add, new CpsOp[] { CpsOp.IntLiteral(42), CpsOp.IntLiteral(13) }) }) }),
-                    CpsOp.Goto("again", false, new CpsOp[0]),
-                    CpsOp.CpsReturn(new CpsOp[0]) }));
+                CpsOp.Let("ctr",
+                    CpsOp.IntLiteral(0),
+                    CpsOp.Sequence(new CpsOp[] {
+                        CpsOp.Label("again", true),
+                        CpsOp.MethodCall(false, Tokens.Console_WriteLine, new CpsOp[] {
+                            CpsOp.MethodCall(false, Tokens.Object_ToString, new CpsOp[] {
+                                CpsOp.PeekLet("ctr", Tokens.Int32) }) }),
+                        CpsOp.PokeLet("ctr", new CpsOp[] {
+                            CpsOp.Operator(Tokens.Int32, OpCodes.Add, new CpsOp[] {
+                                CpsOp.PeekLet("ctr", Tokens.Int32),
+                                CpsOp.IntLiteral(1) }) }),
+                        CpsOp.Goto("again", false, new CpsOp[] {
+                            CpsOp.Operator(Tokens.Boolean, OpCodes.Clt, new CpsOp[] {
+                                CpsOp.PeekLet("ctr", Tokens.Int32),
+                                CpsOp.IntLiteral(100) }) }),
+                        CpsOp.CpsReturn(new CpsOp[0]) })));
             c.DefineMainMethod(boot);
 
             c.Finish("test.exe");
