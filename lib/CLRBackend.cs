@@ -30,6 +30,7 @@ namespace Niecza.CLRBackend {
                 return val;
             }
         }
+        public override string ToString() { return text; }
     }
 
     class Reader {
@@ -121,70 +122,140 @@ namespace Niecza.CLRBackend {
     }
 
     class Unit {
-        public static object[] mainline_ref(object[] u) { return (object[])u[0]; }
-        public static string name(object[] u) { return ((JScalar)u[1]).str; }
-        public static object[] log(object[] u) { return (object[])u[2]; }
-        public static string setting(object[] u) { return u[3] as string; }
-        public static object[] bottom_ref(object[] u) { return u[4] as object[]; }
-        public static object[] xref(object[] u) { return u[5] as object[]; }
-        public static object[] tdeps(object[] u) { return u[6] as object[]; }
+        public readonly Xref mainline_ref;
+        public readonly string name;
+        public readonly object[] log;
+        public readonly string setting;
+        public readonly Xref bottom_ref;
+        public readonly object[] xref;
+        public readonly object[] tdeps;
 
-        public static object[] xref_obj(object[] u, int ix) {
-            return xref(u)[ix] as object[];
-        }
-        public static bool xref_is_sub(object[] u, int ix) {
-            return xref_obj(u,ix).Length > 6;
+        public Unit(object[] from) {
+            mainline_ref = new Xref(from[0] as object[]);
+            name = ((JScalar) from[1]).str;
+            log = from[2] as object[];
+            setting = from[3] == null ? null : ((JScalar) from[3]).str;
+            bottom_ref = Xref.from(from[4] as object[]);
+            xref = from[5] as object[];
+            for (int i = 0; i < xref.Length; i++) {
+                if (xref[i] == null) continue;
+                object[] xr = (object[]) xref[i];
+                if (xr.Length > 6) {
+                    xref[i] = new StaticSub(xr);
+                } else {
+                }
+            }
+            tdeps = from[6] as object[];
         }
 
-        public static void VisitSubsPostorder(object[] unit,
-                Action<int,object[]> cb) {
-            DoVisitSubsPostorder(unit, Xref.index(mainline_ref(unit)), cb);
+        public void VisitSubsPostorder(Action<int,StaticSub> cb) {
+            DoVisitSubsPostorder(mainline_ref.index, cb);
         }
 
-        private static void DoVisitSubsPostorder(object[] unit, int ix,
-                Action<int,object[]> cb) {
-            object[] s = xref_obj(unit, ix);
-            foreach (int z in StaticSub.zyg(s))
-                DoVisitSubsPostorder(unit, z, cb);
+        private void DoVisitSubsPostorder(int ix, Action<int,StaticSub> cb) {
+            StaticSub s = xref[ix] as StaticSub;
+            foreach (int z in s.zyg)
+                DoVisitSubsPostorder(z, cb);
             cb(ix,s);
         }
     }
 
     class Xref {
-        public static string unit(object[] x) { return ((JScalar)x[0]).str; }
-        public static int index(object[] x) { return (int)((JScalar)x[1]).num; }
-        public static string name(object[] x) { return ((JScalar)x[2]).str; }
+        public readonly string unit;
+        public readonly int index;
+        public readonly string name;
+
+        public static Xref from(object[] x) {
+            return (x == null) ? null : new Xref(x);
+        }
+        public Xref(object[] from) : this(from, 0) {}
+        public Xref(object[] from, int ofs) {
+            unit  = ((JScalar)from[ofs+0]).str;
+            index = (int)((JScalar)from[ofs+1]).num;
+            name  = ((JScalar)from[ofs+2]).str;
+        }
     }
 
     class StaticSub {
-        public static string name(object[] s) { return ((JScalar)s[0]).str; }
-        public static object[] outer(object[] s) { return s[1] as object[]; }
-        public static int flags(object[] s) { return (int)((JScalar)s[2]).num; }
-        public static int[] zyg(object[] s) {
-            object[] oz = s[3] as object[];
-            int[] ix = new int[oz.Length];
-            for (int i = 0; i < oz.Length; i++)
-                ix[i] = (int) ((JScalar) oz[i]).num;
-            return ix;
+        public readonly string name;
+        public readonly Xref outer;
+        public readonly int flags;
+        public readonly int[] zyg;
+        public readonly object parametric_role_hack;
+        public readonly object augment_hack;
+        public readonly int is_phaser;
+        public readonly Xref body_of;
+        public readonly Xref in_class;
+        public readonly string[] cur_pkg;
+        public readonly List<KeyValuePair<string,object>> lexicals;
+        public Dictionary<string,object> l_lexicals;
+
+        public StaticSub(object[] s) {
+            name = ((JScalar)s[0]).str;
+            outer = Xref.from(s[1] as object[]);
+            flags = (int) ((JScalar)s[2]).num;
+            object[] r_zyg = s[3] as object[];
+            parametric_role_hack = s[4];
+            augment_hack = s[5];
+            is_phaser = s[6] == null ? -1 : (int) ((JScalar) s[6]).num;
+            body_of = Xref.from(s[7] as object[]);
+            in_class = Xref.from(s[8] as object[]);
+            object[] r_cur_pkg = s[9] as object[];
+
+            zyg = new int[ r_zyg.Length ];
+            for (int i = 0; i < r_zyg.Length; i++)
+                zyg[i] = (int) ((JScalar) r_zyg[i]).num;
+
+            cur_pkg = new string[ r_cur_pkg.Length ];
+            for (int i = 0; i < r_cur_pkg.Length; i++)
+                cur_pkg[i] = ((JScalar) r_cur_pkg[i]).str;
+
+            object[] r_lexicals = s[14] as object[];
+            lexicals = new List<KeyValuePair<string,object>>();
+            l_lexicals = new Dictionary<string,object>();
+            for (int i = 0; i < r_lexicals.Length; i++) {
+                object[] bl = r_lexicals[i] as object[];
+                string lname = ((JScalar)bl[0]).str;
+                string type = ((JScalar)bl[1]).str;
+                object obj = null;
+
+                if (type == "simple") {
+                    obj = new LexSimple(bl);
+                } else if (type == "common") {
+                    obj = new LexCommon(bl);
+                } else if (type == "sub") {
+                    obj = new LexSub(bl);
+                }
+
+                lexicals.Add(new KeyValuePair<string,object>(lname, obj));
+                l_lexicals[lname] = obj;
+            }
         }
-        public static object parametric_role_hack(object[] s) { return s[4]; }
-        public static object augment_hack(object[] s) { return s[5]; }
-        public static int is_phaser(object[] s) { return s[6] == null ? -1 : (int) ((JScalar) s[6]).num; }
-        public static object[] body_of(object[] s) { return s[7] as object[]; } // Xref
-        public static object[] in_class(object[] s) { return s[8] as object[]; }
-        public static string[] cur_pkg(object[] s) {
-            object[] oz = s[9] as object[];
-            string[] sx = new string[oz.Length];
-            for (int i = 0; i < oz.Length; i++)
-                sx[i] = ((JScalar) oz[i]).str;
-            return sx;
+    }
+
+    class LexSimple {
+        public const int NOINIT = 4;
+        public const int LIST = 2;
+        public const int HASH = 1;
+        public readonly int flags;
+        public LexSimple(object[] l) {
+            flags = (int)((JScalar)l[2]).num;
         }
-        public static object[][] lexicals(object[] s) {
-            object[] oz = s[15] as object[];
-            object[][] ax = new object[oz.Length][];
-            for (int i = 0; i < oz.Length; i++)
-                ax[i] = oz[i] as object[];
-            return ax;
+    }
+
+    class LexCommon {
+        public readonly string[] path;
+        public LexCommon(object[] l) {
+            path = new string[l.Length - 2];
+            for (int i = 2; i < l.Length; i++)
+                path[i-2] = ((JScalar)l[i]).str;
+        }
+    }
+
+    class LexSub {
+        public readonly Xref def;
+        public LexSub(object[] l) {
+            def = new Xref(l, 2);
         }
     }
 
@@ -774,7 +845,7 @@ namespace Niecza.CLRBackend {
         ModuleBuilder mob;
         TypeBuilder tb;
 
-        object[] unit;
+        Unit unit;
 
         // holds FieldBuilder and MethodBuilder for the various thingies
         // required
@@ -821,13 +892,13 @@ namespace Niecza.CLRBackend {
             return sb.ToString();
         }
 
-        void Process(object[] unit) {
+        void Process(Unit unit) {
             this.unit = unit;
-            irefs = new object[Unit.xref(unit).Length][];
+            irefs = new object[unit.xref.Length][];
 
-            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
-                string n = StaticSub.name(obj);
-                irefs[ix] = new object[ S_LEXICALS + StaticSub.lexicals(obj).Length ];
+            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
+                string n = obj.name;
+                irefs[ix] = new object[ S_LEXICALS + obj.lexicals.Count ];
                 irefs[ix][S_SUBINFO] = tb.DefineField(SharedName('I', ix, n),
                     Tokens.SubInfo, FieldAttributes.Public |
                     FieldAttributes.Static);
@@ -841,15 +912,15 @@ namespace Niecza.CLRBackend {
                 // TODO create stuff for lexicals here
             });
 
-            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
                 // TODO generate code here
             });
 
-            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
                 // TODO append chunks to Thaw here for sub2 stuff
             });
 
-            Unit.VisitSubsPostorder(unit, delegate(int ix, object[] obj) {
+            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
                 // TODO append chunks to Thaw here for sub3 stuff
             });
 
@@ -918,7 +989,7 @@ namespace Niecza.CLRBackend {
             CLRBackend c = new CLRBackend(null, "SAFE", "SAFE.dll");
 
             string tx = File.ReadAllText("SAFE.nam");
-            object[] root = (object[])Reader.Read(tx);
+            Unit root = new Unit((object[])Reader.Read(tx));
 
             c.Process(root);
 
