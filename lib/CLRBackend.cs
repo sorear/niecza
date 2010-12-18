@@ -145,6 +145,7 @@ namespace Niecza.CLRBackend {
                 if (xr.Length > 6) {
                     xref[i] = new StaticSub(xr);
                 } else {
+                    xref[i] = Package.From(xr);
                 }
             }
             tdeps = from[6] as object[];
@@ -152,6 +153,14 @@ namespace Niecza.CLRBackend {
 
         public void VisitSubsPostorder(Action<int,StaticSub> cb) {
             DoVisitSubsPostorder(mainline_ref.index, cb);
+        }
+
+        public void VisitPackages(Action<int,Package> cb) {
+            for (int i = 0; i < xref.Length; i++) {
+                Package p = xref[i] as Package;
+                if (p != null)
+                    cb(i, p);
+            }
         }
 
         private void DoVisitSubsPostorder(int ix, Action<int,StaticSub> cb) {
@@ -185,6 +194,9 @@ namespace Niecza.CLRBackend {
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
+            VisitPackages(delegate(int ix, Package pkg) {
+                pkg.BindFields(ix, binder);
+            });
         }
     }
 
@@ -203,6 +215,95 @@ namespace Niecza.CLRBackend {
             name  = ((JScalar)from[ofs+2]).str;
         }
         public object Resolve() { return CLRBackend.Resolve(this); }
+    }
+
+    class Package {
+        public readonly string name;
+        public readonly string type;
+
+        public Package(object[] p) {
+            type = ((JScalar)p[0]).str;
+            name = ((JScalar)p[1]).str;
+        }
+
+        public virtual void BindFields(int ix,
+                Func<string,Type,FieldInfo> binder) { }
+
+        public static Package From(object[] p) {
+            string type = ((JScalar)p[0]).str;
+            if (type == "parametricrole")
+                return new ParametricRole(p);
+            else if (type == "role")
+                return new Role(p);
+            else if (type == "class")
+                return new Class(p);
+            else if (type == "grammar")
+                return new Grammar(p);
+            else if (type == "module")
+                return new Module(p);
+            else if (type == "package")
+                return new Package(p);
+            else
+                throw new Exception("unknown package type " + p);
+        }
+    }
+
+    class Module: Package {
+        public Module(object[] p) : base(p) { }
+    }
+
+    class ModuleWithTypeObject: Module {
+        public FieldInfo typeObject;
+        public FieldInfo typeVar;
+        public FieldInfo metaObject;
+
+        public override void BindFields(int ix,
+                Func<string,Type,FieldInfo> binder) {
+            typeObject = binder(Unit.SharedName('T', ix, name), Tokens.IP6);
+            typeVar    = binder(Unit.SharedName('V', ix, name), Tokens.Variable);
+            metaObject = binder(Unit.SharedName('M', ix, name), Tokens.DynMetaObject);
+        }
+
+        public ModuleWithTypeObject(object[] p) : base(p) { }
+    }
+
+    class Class: ModuleWithTypeObject {
+        public readonly object attributes;
+        public readonly object methods;
+        public readonly object superclasses;
+        public readonly object linearized_mro;
+        public Class(object[] p) : base(p) {
+            attributes = p[2];
+            methods = p[3];
+            superclasses = p[4];
+            linearized_mro = p[5];
+        }
+    }
+
+    class Grammar: Class {
+        public Grammar(object[] p) : base(p) { }
+    }
+
+    class Role: ModuleWithTypeObject {
+        public readonly object attributes;
+        public readonly object methods;
+        public readonly object superclasses;
+        public Role(object[] p) : base(p) {
+            attributes = p[2];
+            methods = p[3];
+            superclasses = p[4];
+        }
+    }
+
+    class ParametricRole: ModuleWithTypeObject {
+        public readonly object attributes;
+        public readonly object methods;
+        public readonly object superclasses;
+        public ParametricRole(object[] p) : base(p) {
+            attributes = p[2];
+            methods = p[3];
+            superclasses = p[4];
+        }
     }
 
     class StaticSub {
