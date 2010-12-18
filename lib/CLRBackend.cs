@@ -202,6 +202,7 @@ namespace Niecza.CLRBackend {
             index = (int)((JScalar)from[ofs+1]).num;
             name  = ((JScalar)from[ofs+2]).str;
         }
+        public object Resolve() { return CLRBackend.Resolve(this); }
     }
 
     class StaticSub {
@@ -273,8 +274,11 @@ namespace Niecza.CLRBackend {
 
         public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
             subinfo  = binder(Unit.SharedName('I', ix, name), Tokens.SubInfo);
-            protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
-            protosub = binder(Unit.SharedName('S', ix, name), Tokens.IP6);
+            if ((flags & SPAD_EXISTS) != 0)
+                protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
+            if (outer == null || (((StaticSub)outer.Resolve()).flags
+                        & SPAD_EXISTS) != 0)
+                protosub = binder(Unit.SharedName('S', ix, name), Tokens.IP6);
 
             nlexn = 0;
             for (int i = 0; i < lexicals.Count; i++)
@@ -1035,12 +1039,19 @@ namespace Niecza.CLRBackend {
             ab.SetEntryPoint(mb);
         }
 
+        [ThreadStatic] static Dictionary<string, Unit> used_units;
+        internal static object Resolve(Xref x) {
+            return used_units[x.unit].xref[x.index];
+        }
+
         public static void Main() {
             Directory.SetCurrentDirectory("obj");
             CLRBackend c = new CLRBackend(null, "SAFE", "SAFE.dll");
 
             string tx = File.ReadAllText("SAFE.nam");
             Unit root = new Unit((object[])Reader.Read(tx));
+            used_units = new Dictionary<string, Unit>();
+            used_units["SAFE"] = root;
 
             c.Process(root);
 
