@@ -325,6 +325,7 @@ namespace Niecza.CLRBackend {
         public readonly string[] cur_pkg;
         public readonly List<KeyValuePair<string,Lexical>> lexicals;
         public readonly Dictionary<string,Lexical> l_lexicals;
+        public readonly object body;
 
         public FieldInfo protosub;
         public FieldInfo subinfo;
@@ -352,6 +353,7 @@ namespace Niecza.CLRBackend {
                 cur_pkg[i] = ((JScalar) r_cur_pkg[i]).str;
 
             object[] r_lexicals = s[14] as object[];
+            body = s[15];
             lexicals = new List<KeyValuePair<string,Lexical>>();
             l_lexicals = new Dictionary<string,Lexical>();
             for (int i = 0; i < r_lexicals.Length; i++) {
@@ -1042,6 +1044,36 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class NamProcessor {
+        StaticSub sub;
+
+        public NamProcessor(StaticSub sub) {
+            this.sub = sub;
+        }
+
+        static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
+
+        static NamProcessor() {
+            handlers = new Dictionary<string, Func<NamProcessor,object[],CpsOp>>();
+        }
+
+        public CpsOp MakeBody() { return Scan(WrapBody()); }
+
+        object WrapBody() {
+            // XXX returnable, enter code, etc etc
+            return sub.body;
+        }
+
+        CpsOp Scan(object node) {
+            object[] rnode = (object[]) node;
+            string tag = ((JScalar)rnode[0]).str;
+            Func<NamProcessor, object[], CpsOp> handler;
+            if (!handlers.TryGetValue(tag, out handler))
+                throw new Exception("Unhandled nam operator " + tag);
+            return handler(this, rnode);
+        }
+    }
+
     public class CLRBackend {
         AssemblyBuilder ab;
         ModuleBuilder mob;
@@ -1069,7 +1101,10 @@ namespace Niecza.CLRBackend {
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
-                // TODO generate code here
+                NamProcessor np = new NamProcessor(obj);
+                MethodInfo mi = DefineCpsMethod(
+                    Unit.SharedName('C', ix, obj.name), false,
+                    np.MakeBody());
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
