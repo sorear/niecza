@@ -677,6 +677,10 @@ namespace Niecza.CLRBackend {
             IP6.GetMethod("InvokeMethod");
         public static readonly MethodInfo IP6_Invoke =
             IP6.GetMethod("Invoke");
+        public static readonly MethodInfo IP6_SetSlot =
+            IP6.GetMethod("SetSlot");
+        public static readonly MethodInfo IP6_GetSlot =
+            IP6.GetMethod("GetSlot");
         public static readonly MethodInfo Variable_Fetch =
             Variable.GetMethod("Fetch");
         public static readonly MethodInfo Kernel_Die =
@@ -685,6 +689,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("RunLoop");
         public static readonly MethodInfo Kernel_NewROScalar =
             typeof(Kernel).GetMethod("NewROScalar");
+        public static readonly MethodInfo Kernel_NewRWScalar =
+            typeof(Kernel).GetMethod("NewRWScalar");
         public static readonly MethodInfo Kernel_NewBoundVar =
             typeof(Kernel).GetMethod("NewBoundVar");
         public static readonly MethodInfo Console_WriteLine =
@@ -1768,6 +1774,12 @@ namespace Niecza.CLRBackend {
             return CpsOp.SubyCall(mname, sig, args);
         }
 
+        static string FixStr(object z) { return ((JScalar)z).str; }
+        CpsOp AnyStr(object z) {
+            return (z is JScalar) ? CpsOp.StringLiteral(FixStr(z))
+                : Scan(z);
+        }
+
         static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
         static Dictionary<string, Type> namtypes;
 
@@ -1803,8 +1815,11 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
             handlers["compare"] = handlers["arith"] =
                 delegate(NamProcessor th, object[] zyg) {
-                    return CpsOp.PolyOp(((JScalar)zyg[1]).str,
+                    return CpsOp.PolyOp(FixStr(zyg[1]),
                             th.Scan(zyg[2]), th.Scan(zyg[3])); };
+            handlers["setslot"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.MethodCall(null, Tokens.IP6_SetSlot, new CpsOp[] {
+                    th.Scan(zyg[2]), th.AnyStr(zyg[1]), th.Scan(zyg[3]) }); };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
                 if (zyg[1] is JScalar) {
@@ -1886,6 +1901,10 @@ namespace Niecza.CLRBackend {
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
                     new CpsOp[] { z[1], z[0] }); };
+            thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
+            thandlers["newrwscalar"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar, new CpsOp[]{
+                    CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0] }); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["obj_llhow"] = FieldGet(Tokens.IP6, "mo");
