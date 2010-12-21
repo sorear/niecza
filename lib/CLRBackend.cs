@@ -679,6 +679,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("RunLoop");
         public static readonly MethodInfo Kernel_NewROScalar =
             typeof(Kernel).GetMethod("NewROScalar");
+        public static readonly MethodInfo Kernel_NewBoundVar =
+            typeof(Kernel).GetMethod("NewBoundVar");
         public static readonly MethodInfo Console_WriteLine =
             typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
         public static readonly MethodInfo Console_Write =
@@ -692,6 +694,8 @@ namespace Niecza.CLRBackend {
             IP6.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
+        public static readonly FieldInfo Kernel_AnyMO =
+            Kernel.GetField("AnyMO");
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
         public static readonly FieldInfo Frame_caller =
@@ -1411,8 +1415,8 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrIntLiteral(Tokens.Int32, x));
         }
 
-        public static CpsOp BoolLiteral(int x) {
-            return new CpsOp(new ClrIntLiteral(Tokens.Boolean, x));
+        public static CpsOp BoolLiteral(bool x) {
+            return new CpsOp(new ClrIntLiteral(Tokens.Boolean, x ? 1 : 0));
         }
 
         public static CpsOp Label(string name, bool case_too) {
@@ -1476,6 +1480,10 @@ namespace Niecza.CLRBackend {
             return Primitive(new CpsOp[1] { zyg }, delegate(ClrOp[] heads) {
                 return new CpsOp(new ClrGetField(fi, heads[0]));
             });
+        }
+
+        public static CpsOp GetSField(FieldInfo fi) {
+            return new CpsOp(new ClrGetSField(fi));
         }
 
         public static CpsOp Sink(CpsOp zyg) {
@@ -1569,6 +1577,17 @@ namespace Niecza.CLRBackend {
                 }
                 CpsOp boxee = th.Scan(zyg[2]);
                 return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), new CpsOp[2] { boxee, mo });
+            };
+            handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
+                CpsOp rhs = th.Scan(zyg[3]);
+                bool ro   = ((JScalar)zyg[1]).num != 0;
+                bool list = ((JScalar)zyg[2]).num != 0;
+                return CpsOp.MethodCall(Tokens.Variable,
+                        Tokens.Kernel_NewBoundVar, new CpsOp[] {
+                            CpsOp.BoolLiteral(ro),
+                            CpsOp.BoolLiteral(list),
+                            CpsOp.GetSField(Tokens.Kernel_AnyMO),
+                            rhs });
             };
             handlers["scopedlex"] =
             handlers["letvar"] =
