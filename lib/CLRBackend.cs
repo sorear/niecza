@@ -554,8 +554,11 @@ namespace Niecza.CLRBackend {
     class LexStash : Lexical {
         public readonly Unit unit;
         public readonly string[] path;
+        public Package GetPackage() {
+            return unit.GetPackage(path, 0, path.Length);
+        }
         public override ClrOp GetCode(int up) {
-            ModuleWithTypeObject p = (ModuleWithTypeObject) unit.GetPackage(path, 0, path.Length);
+            ModuleWithTypeObject p = (ModuleWithTypeObject) GetPackage();
             return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
                     new ClrOp[] { new ClrGetSField(p.typeObject) });
         }
@@ -672,6 +675,19 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo DynObject_ctor =
             typeof(DynObject).GetConstructor(new Type[] {
                     DynMetaObject });
+        public static readonly ConstructorInfo SV_ctor =
+            typeof(SimpleVariable).GetConstructor(new Type[] {
+                    Boolean, Boolean, DynMetaObject, typeof(ViviHook), IP6 });
+        public static readonly ConstructorInfo SubViviHook_ctor =
+            typeof(SubViviHook).GetConstructor(new Type[] { IP6 });
+        public static readonly ConstructorInfo HashViviHook_ctor =
+            typeof(HashViviHook).GetConstructor(new Type[] { IP6, String });
+        public static readonly ConstructorInfo ArrayViviHook_ctor =
+            typeof(ArrayViviHook).GetConstructor(new Type[] { IP6, Int32 });
+        public static readonly ConstructorInfo NewHashViviHook_ctor =
+            typeof(NewHashViviHook).GetConstructor(new Type[] { Variable, String });
+        public static readonly ConstructorInfo NewArrayViviHook_ctor =
+            typeof(NewArrayViviHook).GetConstructor(new Type[] { Variable, Int32 });
 
         public static readonly MethodInfo IP6_InvokeMethod =
             IP6.GetMethod("InvokeMethod");
@@ -1860,6 +1876,21 @@ namespace Niecza.CLRBackend {
                 bool until = ((JScalar)z[1]).num != 0;
                 bool once  = ((JScalar)z[2]).num != 0;
                 return CpsOp.While(until, once, th.Scan(z[3]), th.Scan(z[4])); };
+            handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
+                string kind = FixStr(z[1]);
+                ModuleWithTypeObject m;
+                if (z.Length == 3) {
+                    int uplevel;
+                    LexStash ls = (LexStash)th.ResolveLex(FixStr(z[2]),
+                            out uplevel, true);
+                    m = (ModuleWithTypeObject)ls.GetPackage();
+                } else {
+                    m = (ModuleWithTypeObject) (new Xref(z, 2)).Resolve();
+                }
+                if (kind != "mo")
+                    throw new NotImplementedException();
+                return CpsOp.GetSField(m.metaObject);
+            };
             handlers["scopedlex"] =
             handlers["letvar"] =
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
@@ -1911,6 +1942,31 @@ namespace Niecza.CLRBackend {
             thandlers["newrwscalar"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar, new CpsOp[]{
                     CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0] }); };
+            thandlers["newvsubvar"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                    CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
+                    CpsOp.ConstructorCall(Tokens.SubViviHook_ctor, new CpsOp[] {
+                        z[1] }), z[2] }); };
+            thandlers["newvhashvar"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                    CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
+                    CpsOp.ConstructorCall(Tokens.HashViviHook_ctor, new CpsOp[] {
+                        z[1], z[2] }), z[3] }); };
+            thandlers["newvarrayvar"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                    CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
+                    CpsOp.ConstructorCall(Tokens.ArrayViviHook_ctor, new CpsOp[] {
+                        z[1], z[2] }), z[3] }); };
+            thandlers["newvnewhashvar"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                    CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
+                    CpsOp.ConstructorCall(Tokens.NewHashViviHook_ctor, new CpsOp[] {
+                        z[1], z[2] }), z[3] }); };
+            thandlers["newvnewarrayvar"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                    CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
+                    CpsOp.ConstructorCall(Tokens.NewArrayViviHook_ctor, new CpsOp[] {
+                        z[1], z[2] }), z[3] }); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["obj_llhow"] = FieldGet(Tokens.IP6, "mo");
