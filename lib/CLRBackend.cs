@@ -733,9 +733,34 @@ namespace Niecza.CLRBackend {
         public abstract void CodeGen(CgContext cx);
         public virtual void ListCases(CgContext cx) { }
 
+        public virtual ClrOp Sink() {
+            throw (Returns == Tokens.Void)
+                ? (Exception)new ArgumentException()
+                : new NotImplementedException();
+        }
+
         protected static void TypeCheck(Type sub, Type super, string msg) {
             if (!super.IsAssignableFrom(sub))
                 throw new Exception(msg + " " + sub + " not subtype of " + super);
+        }
+    }
+
+    // NOT FOR GENERAL USE: only in implementing Sink for Clr*** with
+    // irreducable operations
+    class ClrSink : ClrOp {
+        public readonly ClrOp zyg;
+        public override void ListCases(CgContext cx) {
+            zyg.ListCases(cx);
+        }
+        public override void CodeGen(CgContext cx) {
+            zyg.CodeGen(cx);
+            cx.il.Emit(OpCodes.Pop);
+        }
+        public ClrSink(ClrOp zyg) {
+            if (zyg.Returns == Tokens.Void)
+                throw new ArgumentException();
+            this.zyg = zyg;
+            Returns = Tokens.Void;
         }
     }
 
@@ -743,6 +768,9 @@ namespace Niecza.CLRBackend {
         public readonly MethodInfo Method;
         public readonly ClrOp[] Zyg;
 
+        public override ClrOp Sink() {
+            return new ClrSink(this);
+        }
         public override void CodeGen(CgContext cx) {
             if (HasCases) {
                 cx.il.Emit(OpCodes.Ldarg_0);
@@ -807,6 +835,11 @@ namespace Niecza.CLRBackend {
         public readonly MethodInfo inv;
         public readonly FieldInfo thing;
 
+        // This could be avoided in some cases, but probably +$customobj;
+        // shouldn't be optimized out
+        public override ClrOp Sink() {
+            return new ClrSink(this);
+        }
         public override void CodeGen(CgContext cx) {
             zyg[0].CodeGen(cx);
             cx.make_ospill();
@@ -833,6 +866,13 @@ namespace Niecza.CLRBackend {
         public readonly OpCode op;
         public readonly ClrOp[] zyg;
 
+        public override ClrOp Sink() {
+            ClrOp[] szyg = new ClrOp[zyg.Length];
+            for (int i = 0; i < szyg.Length; i++)
+                szyg[i] = zyg[i].Sink();
+            return new ClrSeq(szyg);
+        }
+
         public override void CodeGen(CgContext cx) {
             foreach (ClrOp c in zyg)
                 c.CodeGen(cx);
@@ -850,6 +890,11 @@ namespace Niecza.CLRBackend {
         public readonly FieldInfo f;
         public readonly ClrOp zyg;
 
+        // Not strictly right, but Perl 6 code never sees CLR nulls, and
+        // this is a major win for some cases
+        public override ClrOp Sink() {
+            return zyg.Sink();
+        }
         public override void CodeGen(CgContext cx) {
             zyg.CodeGen(cx);
             cx.il.Emit(OpCodes.Ldfld, f);
@@ -884,6 +929,7 @@ namespace Niecza.CLRBackend {
     class ClrGetSField : ClrOp {
         public readonly FieldInfo f;
 
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public override void CodeGen(CgContext cx) {
             cx.il.Emit(OpCodes.Ldsfld, f);
         }
@@ -914,6 +960,7 @@ namespace Niecza.CLRBackend {
         public readonly int up;
         public readonly int index;
 
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public override void CodeGen(CgContext cx) {
             cx.il.Emit(OpCodes.Ldarg_0);
             for (int i = 0; i < up; i++)
@@ -957,6 +1004,20 @@ namespace Niecza.CLRBackend {
         }
         public override void CodeGen(CgContext cx) { }
         public static ClrNoop Instance = new ClrNoop();
+    }
+
+    // only used in ClrOperator.Sink, and assumes it in the HasCases=false
+    class ClrSeq : ClrOp {
+        readonly ClrOp[] zyg;
+        public ClrSeq(ClrOp[] zyg) {
+            Returns = Tokens.Void;
+            HasCases = false;
+            this.zyg = zyg;
+        }
+        public override void CodeGen(CgContext cx) {
+            foreach(ClrOp z in zyg)
+                z.CodeGen(cx);
+        }
     }
 
     class ClrSubyCall : ClrOp {
@@ -1078,6 +1139,7 @@ namespace Niecza.CLRBackend {
 
     class ClrPeekLet : ClrOp {
         string Name;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrPeekLet(string name, Type letType) {
             Name = name;
             Returns = letType;
@@ -1099,6 +1161,7 @@ namespace Niecza.CLRBackend {
         public ClrResult(Type letType) {
             Returns = letType;
         }
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public override void CodeGen(CgContext cx) {
             if (Returns == Tokens.Void)
                 return;
@@ -1111,6 +1174,9 @@ namespace Niecza.CLRBackend {
     class ClrDropLet : ClrOp {
         string Name;
         ClrOp Inner;
+        public override ClrOp Sink() {
+            return new ClrDropLet(Name, Inner.Sink());
+        }
         public ClrDropLet(string name, ClrOp inner) {
             Name = name;
             Inner = inner;
@@ -1200,6 +1266,7 @@ namespace Niecza.CLRBackend {
 
     class ClrStringLiteral : ClrOp {
         string data;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrStringLiteral(string data) {
             this.data = data;
             Returns = Tokens.String;
@@ -1215,6 +1282,7 @@ namespace Niecza.CLRBackend {
     // will also handle int8, int16, and unsigned versions thereof.
     class ClrIntLiteral : ClrOp {
         int data;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrIntLiteral(Type ty, int data) {
             this.data = data;
             Returns = ty;
@@ -1227,6 +1295,7 @@ namespace Niecza.CLRBackend {
 
     class ClrNumLiteral : ClrOp {
         double data;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrNumLiteral(double data) {
             this.data = data;
             Returns = Tokens.Double;
@@ -1408,6 +1477,10 @@ namespace Niecza.CLRBackend {
                 return new CpsOp(new ClrGetField(fi, heads[0]));
             });
         }
+
+        public static CpsOp Sink(CpsOp zyg) {
+            return new CpsOp(zyg.stmts, zyg.head.Sink());
+        }
     }
 
     class NamProcessor {
@@ -1528,12 +1601,15 @@ namespace Niecza.CLRBackend {
                 return bit;
             };
 
+            thandlers["sink"] = delegate(CpsOp[] z) {
+                return CpsOp.Sink(z[0]); };
             thandlers["prog"] = CpsOp.Sequence;
             thandlers["bif_defined"] = Contexty("mro_defined");
             thandlers["bif_bool"] = Contexty("mro_Bool");
             thandlers["bif_num"] = Contexty("mro_Numeric");
             thandlers["bif_str"] = Contexty("mro_Str");
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
+            thandlers["obj_typename"] = Methody(null, Tokens.IP6.GetMethod("GetTypeName"));
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {
@@ -1618,6 +1694,7 @@ namespace Niecza.CLRBackend {
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
+                Console.WriteLine(obj.name);
                 NamProcessor np = new NamProcessor(obj);
                 MethodInfo mi = DefineCpsMethod(
                     Unit.SharedName('C', ix, obj.name), false,
