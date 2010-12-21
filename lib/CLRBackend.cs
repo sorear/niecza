@@ -929,6 +929,50 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrCompare : ClrOp {
+        public readonly string op;
+        public readonly ClrOp[] zyg;
+
+        public override ClrOp Sink() {
+            ClrOp[] szyg = new ClrOp[zyg.Length];
+            for (int i = 0; i < szyg.Length; i++)
+                szyg[i] = zyg[i].Sink();
+            return new ClrSeq(szyg);
+        }
+
+        public override void CodeGen(CgContext cx) {
+            foreach (ClrOp c in zyg)
+                c.CodeGen(cx);
+            bool flt = zyg[0].Returns == Tokens.Double;
+            OpCode ilop;
+            bool not = false;
+            if (op == "<") { ilop = OpCodes.Clt; }
+            else if (op == ">") { ilop = OpCodes.Cgt; }
+            else if (op == ">=") {
+                ilop = flt ? OpCodes.Clt_Un : OpCodes.Clt;
+                not = true;
+            }
+            else if (op == "<=") {
+                ilop = flt ? OpCodes.Cgt_Un : OpCodes.Cgt;
+                not = true;
+            }
+            else if (op == "==") { ilop = OpCodes.Ceq; }
+            else if (op == "!=") { ilop = OpCodes.Ceq; not = true; }
+            else throw new ArgumentException(op + " as polyop");
+            cx.il.Emit(ilop);
+            if (not) {
+                cx.il.Emit(OpCodes.Ldc_I4_0);
+                cx.il.Emit(OpCodes.Ceq);
+            }
+        }
+
+        public ClrCompare(string op, ClrOp[] zyg) {
+            Returns = Tokens.Boolean;
+            this.op = op;
+            this.zyg = zyg;
+        }
+    }
+
     class ClrGetField : ClrOp {
         public readonly FieldInfo f;
         public readonly ClrOp zyg;
@@ -1588,6 +1632,25 @@ namespace Niecza.CLRBackend {
             });
         }
 
+        // this is a stupid interface.
+        public static CpsOp PolyOp(string txt, CpsOp a, CpsOp b) {
+            return Primitive(new CpsOp[] { a, b }, delegate(ClrOp[] heads) {
+                if (heads[0].Returns != heads[1].Returns)
+                    throw new ArgumentException("Arguments to " + txt + " must have same type");
+                if (heads[0].Returns != Tokens.Int32 &&
+                        heads[0].Returns != Tokens.Double)
+                    throw new NotImplementedException();
+                OpCode op;
+                if (txt == "+") { op = OpCodes.Add; }
+                else if (txt == "-") { op = OpCodes.Sub; }
+                else if (txt == "*") { op = OpCodes.Mul; }
+                else if (txt == "/") { op = OpCodes.Div; }
+                else return new CpsOp(new ClrCompare(txt, heads));
+
+                return new CpsOp(new ClrOperator(heads[0].Returns, op, heads));
+            });
+        }
+
         public static CpsOp PokeLet(string name, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
                 return new CpsOp(new ClrPokeLet(name, heads[0]));
@@ -1738,6 +1801,10 @@ namespace Niecza.CLRBackend {
                 return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
+            handlers["compare"] = handlers["arith"] =
+                delegate(NamProcessor th, object[] zyg) {
+                    return CpsOp.PolyOp(((JScalar)zyg[1]).str,
+                            th.Scan(zyg[2]), th.Scan(zyg[3])); };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
                 if (zyg[1] is JScalar) {
