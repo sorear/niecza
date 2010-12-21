@@ -1507,6 +1507,28 @@ namespace Niecza.CLRBackend {
                     new ClrResult(ty));
         }
 
+        // this is simplified a bit since body is always void
+        public static CpsOp While(bool until, bool once, CpsOp cond, CpsOp body) {
+            string l1 = "!again" + (nextunique++);
+            string l2 = "!check" + (nextunique++);
+
+            List<ClrOp> stmts = new List<ClrOp>();
+
+            if (!once)
+                stmts.Add(new ClrGoto(l2, false, null));
+            stmts.Add(new ClrLabel(l1, false));
+            foreach(ClrOp c in body.stmts)
+                stmts.Add(c);
+            stmts.Add(body.head);
+            if (!once)
+                stmts.Add(new ClrLabel(l2, false));
+            foreach(ClrOp c in cond.stmts)
+                stmts.Add(c);
+            stmts.Add(new ClrGoto(l1, until, cond.head));
+
+            return new CpsOp(stmts.ToArray(), ClrNoop.Instance);
+        }
+
         public static CpsOp MethodCall(Type cps, MethodInfo tk, CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return (cps != null) ?
@@ -1746,6 +1768,10 @@ namespace Niecza.CLRBackend {
                             CpsOp.GetSField(Tokens.Kernel_AnyMO),
                             rhs });
             };
+            handlers["whileloop"] = delegate(NamProcessor th, object[] z) {
+                bool until = ((JScalar)z[1]).num != 0;
+                bool once  = ((JScalar)z[2]).num != 0;
+                return CpsOp.While(until, once, th.Scan(z[3]), th.Scan(z[4])); };
             handlers["scopedlex"] =
             handlers["letvar"] =
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
