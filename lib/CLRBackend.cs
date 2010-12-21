@@ -668,6 +668,12 @@ namespace Niecza.CLRBackend {
         public static readonly Type BValue = typeof(BValue);
         public static readonly Type DynObject = typeof(DynObject);
         public static readonly Type DynMetaObject = typeof(DynMetaObject);
+        public static readonly Type VarHash = typeof(Dictionary<string,Variable>);
+        public static readonly Type VVarList = typeof(VarDeque);
+        public static readonly Type FVarList = typeof(Variable[]);
+        public static readonly Type Cursor = typeof(Cursor);
+        public static readonly Type CC = typeof(CC);
+        public static readonly Type LAD = typeof(LAD);
 
         public static readonly ConstructorInfo DynBlockDelegate_ctor =
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
@@ -709,6 +715,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewRWScalar");
         public static readonly MethodInfo Kernel_NewBoundVar =
             typeof(Kernel).GetMethod("NewBoundVar");
+        public static readonly MethodInfo Kernel_IterHasFlat =
+            typeof(Kernel).GetMethod("IterHasFlat");
         public static readonly MethodInfo Console_WriteLine =
             typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
         public static readonly MethodInfo Console_Write =
@@ -854,10 +862,11 @@ namespace Niecza.CLRBackend {
             }
 
             if (zyg.Length != ts.Count)
-                throw new Exception("argument list length mismatch");
+                throw new Exception("argument list length mismatch for " + mi +
+                        " got " + zyg.Length + " need " + ts.Count);
 
             for (int i = 0; i < ts.Count; i++) {
-                TypeCheck(zyg[i].Returns, ts[i], "arg");
+                TypeCheck(zyg[i].Returns, ts[i], "arg" + i + " of " + mi);
             }
         }
     }
@@ -890,7 +899,7 @@ namespace Niecza.CLRBackend {
                 throw new Exception("argument list length mismatch");
 
             for (int i = 0; i < ts.Count; i++) {
-                TypeCheck(zyg[i].Returns, ts[i], "arg");
+                TypeCheck(zyg[i].Returns, ts[i], "arg" + i + " of " + mi);
             }
         }
     }
@@ -1939,6 +1948,12 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
                     new CpsOp[] { z[1], z[0] }); };
             thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
+            thandlers["iter_hasflat"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_IterHasFlat,
+                    new CpsOp[] { z[0], CpsOp.BoolLiteral(true) }); };
+            thandlers["iter_hasarg"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_IterHasFlat,
+                    new CpsOp[] { z[0], CpsOp.BoolLiteral(false) }); };
             thandlers["newrwscalar"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar, new CpsOp[]{
                     CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0] }); };
@@ -1969,13 +1984,33 @@ namespace Niecza.CLRBackend {
                         z[1], z[2] }), z[3] }); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
+            thandlers["llhow_name"] = FieldGet(Tokens.DynMetaObject, "name");
+            thandlers["stab_what"] = FieldGet(Tokens.DynMetaObject, "typeObject");
             thandlers["obj_llhow"] = FieldGet(Tokens.IP6, "mo");
+            thandlers["varhash_clear"] = Methody(null, Tokens.VarHash.GetMethod("Clear"));
+            thandlers["num_to_string"] = Methody(null, Tokens.Object_ToString);
+            thandlers["str_length"] = Methody(null, Tokens.String.GetMethod("get_Length"));
+            thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
+            thandlers["str_tolower"] = Methody(null, Tokens.String.GetMethod("ToLowerInvariant"));
+            thandlers["str_toupper"] = Methody(null, Tokens.String.GetMethod("ToUpperInvariant"));
+            thandlers["vvarlist_to_fvarlist"] = Methody(null, Tokens.VVarList.GetMethod("CopyAsArray"));
+            thandlers["vvarlist_shift"] = Methody(null, Tokens.VVarList.GetMethod("Shift"));
+            thandlers["vvarlist_pop"] = Methody(null, Tokens.VVarList.GetMethod("Pop"));
+            thandlers["vvarlist_count"] = Methody(null, Tokens.VVarList.GetMethod("Count"));
+            thandlers["vvarlist_unshift"] = Methody(null, Tokens.VVarList.GetMethod("Unshift"));
+            thandlers["vvarlist_unshiftn"] = Methody(null, Tokens.VVarList.GetMethod("UnshiftN"));
+            thandlers["vvarlist_append"] = Methody(null, Tokens.VVarList.GetMethod("PushD"));
+            thandlers["vvarlist_push"] = Methody(null, Tokens.VVarList.GetMethod("Push"));
+            thandlers["vvarlist_new_empty"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { }));
+            thandlers["vvarlist_new_singleton"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.Variable }));
+            thandlers["vvarlist_from_fvarlist"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.FVarList }));
+            thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
+            thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
             thandlers["obj_what"] = Methody(null, Tokens.IP6.GetMethod("GetTypeObject"));
             thandlers["obj_isa"] = Methody(null, Tokens.IP6.GetMethod("Isa"));
             thandlers["obj_does"] = Methody(null, Tokens.IP6.GetMethod("Does"));
-            thandlers["obj_newblank"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.DynObject_ctor, z); };
+            thandlers["obj_newblank"] = Constructy(Tokens.DynObject_ctor);
 
             thandlers["prog"] = CpsOp.Sequence;
 
@@ -2017,12 +2052,13 @@ namespace Niecza.CLRBackend {
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");
             thandlers["default_new"] = Methody(null, Tokens.Kernel.GetMethod("DefaultNew"));
-            thandlers["cotake"] = Methody(null, Tokens.Kernel.GetMethod("CoTake"));
-            thandlers["take"] = Methody(null, Tokens.Kernel.GetMethod("Take"));
-            thandlers["startgather"] = Methody(null, Tokens.Kernel.GetMethod("GatherHelper"));
+            thandlers["assign"] = Methody(Tokens.Void, Tokens.Kernel.GetMethod("Assign"));
+            thandlers["cotake"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("CoTake"));
+            thandlers["take"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("Take"));
+            thandlers["startgather"] = Methody(Tokens.Frame, Tokens.Kernel.GetMethod("GatherHelper"));
             thandlers["get_first"] = Methody(null, Tokens.Kernel.GetMethod("GetFirst"));
             thandlers["promote_to_list"] = Methody(null, Tokens.Kernel.GetMethod("PromoteToList"));
-            thandlers["instrole"] = Methody(null, Tokens.Kernel.GetMethod("InstantiateRole"));
+            thandlers["instrole"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("InstantiateRole"));
             thandlers["role_apply"] = Methody(null, Tokens.Kernel.GetMethod("RoleApply"));
             thandlers["iter_to_list"] = Methody(null, Tokens.Kernel.GetMethod("IterToList"));
             thandlers["iter_flatten"] = Methody(null, Tokens.Kernel.GetMethod("IterFlatten"));
@@ -2048,6 +2084,11 @@ namespace Niecza.CLRBackend {
         static Func<CpsOp[], CpsOp> Methody(Type cps, MethodInfo mi) {
             return delegate(CpsOp[] cpses) {
                 return CpsOp.MethodCall(cps, mi, cpses); };
+        }
+
+        static Func<CpsOp[], CpsOp> Constructy(ConstructorInfo mi) {
+            return delegate(CpsOp[] cpses) {
+                return CpsOp.ConstructorCall(mi, cpses); };
         }
 
         static Func<CpsOp[], CpsOp> FieldGet(Type t, string name) {
