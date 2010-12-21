@@ -1610,6 +1610,10 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrStringLiteral(s));
         }
 
+        public static CpsOp DoubleLiteral(double d) {
+            return new CpsOp(new ClrNumLiteral(d));
+        }
+
         public static CpsOp IntLiteral(int x) {
             return new CpsOp(new ClrIntLiteral(Tokens.Int32, x));
         }
@@ -1809,6 +1813,8 @@ namespace Niecza.CLRBackend {
                 return CpsOp.StringLiteral(((JScalar)zyg[1]).str); };
             handlers["int"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.IntLiteral((int) ((JScalar)zyg[1]).num); };
+            handlers["double"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.DoubleLiteral(((JScalar)zyg[1]).num); };
             handlers["bool"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
@@ -1953,6 +1959,21 @@ namespace Niecza.CLRBackend {
             thandlers["obj_getstr"] = Contexty("mro_raw_Str");
             thandlers["obj_typename"] = Methody(null, Tokens.IP6.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
+            thandlers["bget"] = FieldGet(Tokens.BValue, "v");
+            thandlers["default_new"] = Methody(null, Tokens.Kernel.GetMethod("DefaultNew"));
+            thandlers["cotake"] = Methody(null, Tokens.Kernel.GetMethod("CoTake"));
+            thandlers["take"] = Methody(null, Tokens.Kernel.GetMethod("Take"));
+            thandlers["startgather"] = Methody(null, Tokens.Kernel.GetMethod("GatherHelper"));
+            thandlers["get_first"] = Methody(null, Tokens.Kernel.GetMethod("GetFirst"));
+            thandlers["promote_to_list"] = Methody(null, Tokens.Kernel.GetMethod("PromoteToList"));
+            thandlers["instrole"] = Methody(null, Tokens.Kernel.GetMethod("InstantiateRole"));
+            thandlers["role_apply"] = Methody(null, Tokens.Kernel.GetMethod("RoleApply"));
+            thandlers["iter_to_list"] = Methody(null, Tokens.Kernel.GetMethod("IterToList"));
+            thandlers["iter_flatten"] = Methody(null, Tokens.Kernel.GetMethod("IterFlatten"));
+            thandlers["iter_copy_elems"] = Methody(null, Tokens.Kernel.GetMethod("IterCopyElems"));
+            thandlers["to_jsync"] = Methody(null, typeof(JsyncWriter).GetMethod("ToJsync"));
+            thandlers["from_jsync"] = Methody(null, typeof(JsyncReader).GetMethod("FromJsync"));
+            thandlers["do_require"] = Methody(null, Tokens.Kernel.GetMethod("DoRequire"));
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {
