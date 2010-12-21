@@ -622,6 +622,10 @@ namespace Niecza.CLRBackend {
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
                     typeof(object), typeof(IntPtr) });
 
+        public static readonly MethodInfo IP6_InvokeMethod =
+            IP6.GetMethod("InvokeMethod");
+        public static readonly MethodInfo IP6_Invoke =
+            IP6.GetMethod("Invoke");
         public static readonly MethodInfo Variable_Fetch =
             Variable.GetMethod("Fetch");
         public static readonly MethodInfo Kernel_Die =
@@ -908,6 +912,63 @@ namespace Niecza.CLRBackend {
         public static ClrNoop Instance = new ClrNoop();
     }
 
+    class ClrSubyCall : ClrOp {
+        public readonly string mname;
+        public readonly string sig;
+        public readonly ClrOp[] zyg;
+
+        // generates the argument list, from the all-but-1st element of zyg
+        void GenArgList(CgContext cx) {
+            int sp = 0;
+            int ct = 0;
+            for (int i = 1; i < zyg.Length; i++) {
+                if (sig[sp++] != '\0')
+                    throw new NotImplementedException();
+                ct++;
+            }
+            cx.EmitInt(ct);
+            cx.il.Emit(OpCodes.Newarr, Tokens.Variable);
+            for (int i = 1; i < zyg.Length; i++) {
+                cx.il.Emit(OpCodes.Dup);
+                cx.EmitInt(i - 1);
+                zyg[i].CodeGen(cx);
+                cx.il.Emit(OpCodes.Stelem_Ref);
+            }
+            cx.il.Emit(OpCodes.Ldnull);
+        }
+
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.EmitInt(cx.next_case);
+            cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
+
+            zyg[0].CodeGen(cx);
+            cx.il.Emit(OpCodes.Ldarg_0);
+            if (mname != null)
+                cx.il.Emit(OpCodes.Ldstr, mname);
+
+            GenArgList(cx);
+
+            cx.il.Emit(OpCodes.Callvirt, (mname != null) ?
+                    Tokens.IP6_InvokeMethod : Tokens.IP6_Invoke);
+            cx.il.Emit(OpCodes.Ret);
+            cx.il.MarkLabel(cx.cases[cx.next_case++]);
+        }
+
+        public override void ListCases(CgContext cx) {
+            cx.num_cases++;
+        }
+
+        public ClrSubyCall(string mname, string sig, ClrOp[] zyg) {
+            if (mname != null) sig = "\0" + sig;
+            this.mname = mname;
+            this.sig = sig;
+            this.zyg = zyg;
+            this.Returns = Tokens.Void;
+            this.HasCases = true;
+        }
+    }
+
     class ClrPushLet : ClrOp {
         string Name;
         // Initial must not have a net let-stack effect (how to enforce?)
@@ -984,6 +1045,19 @@ namespace Niecza.CLRBackend {
 
             cx.il.Emit(OpCodes.Ldarg_0);
             cx.EmitGetlex(ix, Returns);
+        }
+    }
+
+    class ClrResult : ClrOp {
+        public ClrResult(Type letType) {
+            Returns = letType;
+        }
+        public override void CodeGen(CgContext cx) {
+            if (Returns == Tokens.Void)
+                return;
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_resultSlot);
+            cx.il.Emit(OpCodes.Unbox_Any, Returns);
         }
     }
 
@@ -1135,10 +1209,14 @@ namespace Niecza.CLRBackend {
             this.stmts = stmts;
         }
 
+        public static CpsOp Cps(ClrOp nothead, Type ty) {
+            return new CpsOp(new ClrOp[] { nothead }, new ClrResult(ty));
+        }
+
         // XXX only needs to be unique per sub
         [ThreadStatic] private static int nextunique = 0;
         // this particular use of a delegate feels wrong
-        private static CpsOp Primitive(CpsOp[] zyg, Func<ClrOp[],ClrOp> raw) {
+        private static CpsOp Primitive(CpsOp[] zyg, Func<ClrOp[],CpsOp> raw) {
             List<ClrOp> stmts = new List<ClrOp>();
             List<ClrOp> args = new List<ClrOp>();
             List<string> pop = new List<string>();
@@ -1162,7 +1240,10 @@ namespace Niecza.CLRBackend {
                 }
             }
 
-            ClrOp head = raw(args.ToArray());
+            CpsOp rval = raw(args.ToArray());
+            foreach (ClrOp c in rval.stmts)
+                stmts.Add(c);
+            ClrOp head = rval.head;
             for (int i = pop.Count - 1; i >= 0; i--)
                 head = new ClrDropLet(pop[i], head);
             return new CpsOp(stmts.ToArray(), head);
@@ -1185,22 +1266,24 @@ namespace Niecza.CLRBackend {
             return new CpsOp(stmts.ToArray(), terms[terms.Length - 1].head);
         }
 
-        public static CpsOp MethodCall(bool cps, MethodInfo tk, CpsOp[] zyg) {
+        public static CpsOp MethodCall(Type cps, MethodInfo tk, CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
-                return new ClrMethodCall(cps, tk, heads);
+                return (cps != null) ?
+                    Cps(new ClrMethodCall(true, tk, heads), cps) :
+                    new CpsOp(new ClrMethodCall(false, tk, heads));
             });
         }
 
         public static CpsOp CpsReturn(CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
-                return new ClrCpsReturn(heads.Length > 0 ? heads[0] : null);
+                return new CpsOp(new ClrCpsReturn(heads.Length > 0 ? heads[0] : null));
             });
         }
 
         public static CpsOp Goto(string label, bool iffalse, CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
-                return new ClrGoto(label, iffalse,
-                    heads.Length > 0 ? heads[0] : null);
+                return new CpsOp(new ClrGoto(label, iffalse,
+                    heads.Length > 0 ? heads[0] : null));
             });
         }
 
@@ -1217,8 +1300,7 @@ namespace Niecza.CLRBackend {
         }
 
         public static CpsOp Label(string name, bool case_too) {
-            return new CpsOp(new ClrOp[] { new ClrLabel(name, case_too) },
-                    ClrNoop.Instance);
+            return CpsOp.Cps(new ClrLabel(name, case_too), Tokens.Void);
         }
 
         // A previous niecza backend had this stuff tie into the
@@ -1227,19 +1309,19 @@ namespace Niecza.CLRBackend {
         public static CpsOp Contexty(FieldInfo thing, MethodInfo inv,
                 CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
-                return new ClrContexty(thing, inv, heads);
+                return new CpsOp(new ClrContexty(thing, inv, heads));
             });
         }
 
         public static CpsOp Operator(Type rt, OpCode op, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
-                return new ClrOperator(rt, op, heads);
+                return new CpsOp(new ClrOperator(rt, op, heads));
             });
         }
 
         public static CpsOp PokeLet(string name, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
-                return new ClrPokeLet(name, heads[0]);
+                return new CpsOp(new ClrPokeLet(name, heads[0]));
             });
         }
 
@@ -1263,8 +1345,14 @@ namespace Niecza.CLRBackend {
 
         public static CpsOp LexAccess(Lexical l, int up, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
-                return (heads.Length >= 1) ? l.SetCode(up, heads[0]) :
-                    l.GetCode(up);
+                return new CpsOp((heads.Length >= 1) ? l.SetCode(up, heads[0]) :
+                    l.GetCode(up));
+            });
+        }
+
+        public static CpsOp SubyCall(string mname, string sig, CpsOp[] zyg) {
+            return Primitive(zyg, delegate(ClrOp[] heads) {
+                return CpsOp.Cps(new ClrSubyCall(mname, sig, heads), Tokens.Variable);
             });
         }
     }
@@ -1315,6 +1403,16 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        CpsOp SubyCall(bool ismethod, object[] zyg) {
+            string mname = ismethod ? (((JScalar)zyg[1]).str) : null;
+            int sh = ismethod ? 3 : 2;
+            string sig = ((JScalar) zyg[sh-1]).str;
+            CpsOp[] args = new CpsOp[zyg.Length - sh];
+            for (int i = 0; i < args.Length; i++)
+                args[i] = Scan(zyg[i+sh]);
+            return CpsOp.SubyCall(mname, sig, args);
+        }
+
         static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
 
         static NamProcessor() {
@@ -1331,6 +1429,10 @@ namespace Niecza.CLRBackend {
                 return th.AccessLex(false, zyg); };
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
                 return th.AccessLex(true, zyg); };
+            handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
+                return th.SubyCall(true, zyg); };
+            handlers["subcall"] = delegate (NamProcessor th, object[] zyg) {
+                return th.SubyCall(false, zyg); };
             handlers["letn"] = delegate(NamProcessor th, object[] zyg) {
                 int i = 1;
                 Dictionary<string,Type> old =
