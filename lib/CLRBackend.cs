@@ -1161,6 +1161,21 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrSetResult : ClrOp {
+        ClrOp zyg;
+        public ClrSetResult(ClrOp zyg) {
+            Returns = Tokens.Void;
+            this.zyg = zyg;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+            zyg.CodeGen(cx);
+            if (zyg.Returns.IsValueType)
+                cx.il.Emit(OpCodes.Box, zyg.Returns);
+            cx.il.Emit(OpCodes.Stfld, Tokens.Frame_resultSlot);
+        }
+    }
+
     class ClrResult : ClrOp {
         public ClrResult(Type letType) {
             Returns = letType;
@@ -1176,8 +1191,8 @@ namespace Niecza.CLRBackend {
     }
 
     class ClrDropLet : ClrOp {
-        string Name;
-        ClrOp Inner;
+        public string Name;
+        public ClrOp Inner;
         public override ClrOp Sink() {
             return new ClrDropLet(Name, Inner.Sink());
         }
@@ -1384,6 +1399,62 @@ namespace Niecza.CLRBackend {
             foreach (ClrOp s in terms[terms.Length - 1].stmts)
                 stmts.Add(s);
             return new CpsOp(stmts.ToArray(), terms[terms.Length - 1].head);
+        }
+
+        static ClrOp StripResult(ClrOp it) {
+            if (it is ClrResult)
+                return ClrNoop.Instance;
+            if (it is ClrDropLet) {
+                ClrDropLet cit = (ClrDropLet) it;
+                string n = cit.Name;
+                it = StripResult(cit.Inner);
+                if (it != null)
+                    return new ClrDropLet(n, it);
+            }
+            return null;
+        }
+
+        static void Resultify(ref ClrOp[] stmts, ref ClrOp head) {
+            if (head.Returns == Tokens.Void) return;
+            ClrOp head_s = StripResult(head);
+            if (head_s == null) {
+                head_s = ClrNoop.Instance;
+                Array.Resize(ref stmts, stmts.Length + 1);
+                stmts[stmts.Length - 1] = new ClrSetResult(head);
+            }
+            head = head_s;
+        }
+
+        public static CpsOp Ternary(CpsOp cond, CpsOp iftrue, CpsOp iffalse) {
+            ClrOp iftrue_h = iftrue.head;
+            ClrOp iffalse_h = iffalse.head;
+            ClrOp[] iftrue_s = iftrue.stmts;
+            ClrOp[] iffalse_s = iffalse.stmts;
+
+            Resultify(ref iftrue_s, ref iftrue_h);
+            Resultify(ref iffalse_s, ref iffalse_h);
+
+            string l1 = "!else" + (nextunique++);
+            string l2 = "!endif" + (nextunique++);
+
+            List<ClrOp> stmts = new List<ClrOp>();
+            foreach (ClrOp c in cond.stmts)
+                stmts.Add(c);
+            stmts.Add(new ClrGoto(l1, true, cond.head));
+            foreach (ClrOp c in iftrue_s)
+                stmts.Add(c);
+            stmts.Add(iftrue_h);
+            stmts.Add(new ClrGoto(l2, false, null));
+            stmts.Add(new ClrLabel(l1, false));
+            foreach (ClrOp c in iffalse_s)
+                stmts.Add(c);
+            stmts.Add(iffalse_h);
+            stmts.Add(new ClrLabel(l2, false));
+
+            Type ty = iffalse.head.Returns;
+            return new CpsOp(stmts.ToArray(),
+                    (ty == Tokens.Void) ? (ClrOp)ClrNoop.Instance :
+                    new ClrResult(ty));
         }
 
         public static CpsOp MethodCall(Type cps, MethodInfo tk, CpsOp[] zyg) {
@@ -1620,6 +1691,8 @@ namespace Niecza.CLRBackend {
                 return bit;
             };
 
+            thandlers["ternary"] = delegate(CpsOp[] z) {
+                return CpsOp.Ternary(z[0], z[1], z[2]); };
             thandlers["sink"] = delegate(CpsOp[] z) {
                 return CpsOp.Sink(z[0]); };
             thandlers["prog"] = CpsOp.Sequence;
