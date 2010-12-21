@@ -475,6 +475,12 @@ namespace Niecza.CLRBackend {
             = new Dictionary<string,Label>();
         public string[] let_names = new string[0];
         public Type[] let_types = new Type[0];
+        public LocalBuilder ospill;
+
+        public void make_ospill() {
+            if (ospill == null)
+                ospill = il.DeclareLocal(Tokens.Variable);
+        }
 
         // logic stolen from mcs
         public void EmitInt(int i) {
@@ -555,6 +561,8 @@ namespace Niecza.CLRBackend {
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
                     typeof(object), typeof(IntPtr) });
 
+        public static readonly MethodInfo Variable_Fetch =
+            Variable.GetMethod("Fetch");
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_RunLoop =
@@ -568,6 +576,8 @@ namespace Niecza.CLRBackend {
         public static readonly MethodInfo Object_ToString =
             typeof(object).GetMethod("ToString", new Type[0]);
 
+        public static readonly FieldInfo IP6_mo =
+            IP6.GetField("mo");
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
         public static readonly FieldInfo Frame_caller =
@@ -675,6 +685,33 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < ts.Count; i++) {
                 TypeCheck(zyg[i].Returns, ts[i], "arg");
             }
+        }
+    }
+
+    class ClrContexty : ClrOp {
+        public readonly ClrOp[] zyg;
+        public readonly MethodInfo inv;
+        public readonly FieldInfo thing;
+
+        public override void CodeGen(CgContext cx) {
+            zyg[0].CodeGen(cx);
+            cx.make_ospill();
+            cx.il.Emit(OpCodes.Stloc, cx.ospill);
+            cx.il.Emit(OpCodes.Ldloc, cx.ospill);
+            cx.il.Emit(OpCodes.Callvirt, Tokens.Variable_Fetch);
+            cx.il.Emit(OpCodes.Ldfld, Tokens.IP6_mo);
+            cx.il.Emit(OpCodes.Ldfld, thing);
+            cx.il.Emit(OpCodes.Ldfld, cx.ospill);
+            for (int i = 1; i < zyg.Length; i++)
+                zyg[i].CodeGen(cx);
+            cx.il.Emit(OpCodes.Callvirt, inv);
+        }
+
+        public ClrContexty(FieldInfo thing, MethodInfo inv, ClrOp[] zyg) {
+            this.thing = thing;
+            this.inv = inv;
+            this.zyg = zyg;
+            Returns = inv.ReturnType;
         }
     }
 
@@ -1017,6 +1054,16 @@ namespace Niecza.CLRBackend {
                     ClrNoop.Instance);
         }
 
+        // A previous niecza backend had this stuff tie into the
+        // lifter, such that var->obj predictably happened as the
+        // beginning.  But TimToady says that's not needed.
+        public static CpsOp Contexty(FieldInfo thing, MethodInfo inv,
+                CpsOp[] zyg) {
+            return Primitive(zyg, delegate(ClrOp[] heads) {
+                return new ClrContexty(thing, inv, heads);
+            });
+        }
+
         public static CpsOp Operator(Type rt, OpCode op, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
                 return new ClrOperator(rt, op, heads);
@@ -1042,6 +1089,10 @@ namespace Niecza.CLRBackend {
                 stmts.Add(c);
             return new CpsOp(stmts.ToArray(), new ClrDropLet(name, tail.head));
         }
+
+        public static CpsOp Annotate(int line, CpsOp body) {
+            return body; // TODO: implement me
+        }
     }
 
     class NamProcessor {
@@ -1055,6 +1106,53 @@ namespace Niecza.CLRBackend {
 
         static NamProcessor() {
             handlers = new Dictionary<string, Func<NamProcessor,object[],CpsOp>>();
+            Dictionary<string, Func<CpsOp[], CpsOp>>
+                thandlers = new Dictionary<string, Func<CpsOp[], CpsOp>>();
+            Dictionary<string, Func<object[], object>> mhandlers =
+                new Dictionary<string, Func<object[], object>>();
+
+
+            handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
+
+            thandlers["prog"] = CpsOp.Sequence;
+            thandlers["bif_defined"] = Contexty("mro_defined");
+            thandlers["bif_bool"] = Contexty("mro_Bool");
+            thandlers["bif_num"] = Contexty("mro_Numeric");
+            thandlers["bif_str"] = Contexty("mro_Str");
+
+            foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
+                    in thandlers) {
+                handlers[kv.Key] = MakeTotalHandler(kv.Value);
+            }
+            foreach (KeyValuePair<string, Func<object[], object>> kv
+                    in mhandlers) {
+                handlers[kv.Key] = MakeMacroHandler(kv.Value);
+            }
+        }
+
+        static Func<CpsOp[], CpsOp> Contexty(string name) {
+            FieldInfo f = Tokens.DynMetaObject.GetField(name);
+            MethodInfo g = f.FieldType.GetMethod("Get");
+            return delegate(CpsOp[] cpses) {
+                return CpsOp.Contexty(f, g, cpses);
+            };
+        }
+
+        static Func<NamProcessor, object[], CpsOp> MakeTotalHandler(
+                Func<CpsOp[], CpsOp> real) {
+            return delegate (NamProcessor th, object[] zyg) {
+                CpsOp[] zco = new CpsOp[zyg.Length - 1];
+                for (int i = 0; i < zco.Length; i++)
+                    zco[i] = th.Scan(zyg[i+1]);
+                return real(zco);
+            };
+        }
+
+        static Func<NamProcessor, object[], CpsOp> MakeMacroHandler(
+                Func<object[], object> real) {
+            return delegate (NamProcessor th, object[] zyg) {
+                return th.Scan(real(zyg)); };
         }
 
         public CpsOp MakeBody() { return Scan(WrapBody()); }
