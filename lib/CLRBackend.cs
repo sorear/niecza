@@ -143,7 +143,7 @@ namespace Niecza.CLRBackend {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
                 if (xr.Length > 6) {
-                    xref[i] = new StaticSub(xr);
+                    xref[i] = new StaticSub(this, xr);
                 } else {
                     xref[i] = Package.From(xr);
                 }
@@ -314,6 +314,7 @@ namespace Niecza.CLRBackend {
         public const int RETURNABLE = 16;
         public const int AUGMENTING = 32;
         public readonly string name;
+        public readonly Unit unit;
         public readonly Xref outer;
         public readonly int flags;
         public readonly int[] zyg;
@@ -332,7 +333,8 @@ namespace Niecza.CLRBackend {
         public FieldInfo protopad;
         public int nlexn;
 
-        public StaticSub(object[] s) {
+        public StaticSub(Unit unit, object[] s) {
+            this.unit = unit;
             name = ((JScalar)s[0]).str;
             outer = Xref.from(s[1] as object[]);
             flags = (int) ((JScalar)s[2]).num;
@@ -368,11 +370,22 @@ namespace Niecza.CLRBackend {
                     obj = new LexCommon(bl);
                 } else if (type == "sub") {
                     obj = new LexSub(bl);
+                } else if (type == "alias") {
+                    obj = new LexAlias(bl);
+                } else if (type == "stash") {
+                    obj = new LexStash(bl);
+                } else {
+                    throw new Exception("unknown lex type " + type);
                 }
 
                 lexicals.Add(new KeyValuePair<string,Lexical>(lname, obj));
                 l_lexicals[lname] = obj;
             }
+        }
+
+        public bool IsCore() {
+            string s = unit.name;
+            return (s == "SAFE" || s == "CORE");
         }
 
         public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
@@ -394,6 +407,10 @@ namespace Niecza.CLRBackend {
     abstract class Lexical {
         public virtual void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) { }
+        public virtual ClrOp SetCode(int up, ClrOp head) {
+            throw new Exception("Lexicals of type " + this + " cannot be bound");
+        }
+        public abstract ClrOp GetCode(int up);
         protected static bool IsDynamicName(string name) {
             if (name == "$_") return true;
             if (name.Length < 2) return false;
@@ -415,6 +432,17 @@ namespace Niecza.CLRBackend {
         public LexSimple(object[] l) {
             flags = (int)((JScalar)l[2]).num;
         }
+
+        public override ClrOp GetCode(int up) {
+            return (index >= 0) ? (ClrOp)new ClrPadGet(up, index)
+                                : new ClrGetSField(stg);
+        }
+
+        public override ClrOp SetCode(int up, ClrOp to) {
+            return (index >= 0) ? (ClrOp)new ClrPadSet(up, index, to)
+                                : new ClrSetSField(stg, to);
+        }
+
         public override void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) {
             if (IsDynamicName(name) || (sub.flags & StaticSub.RUN_ONCE) == 0) {
@@ -435,6 +463,14 @@ namespace Niecza.CLRBackend {
             for (int i = 2; i < l.Length; i++)
                 path[i-2] = ((JScalar)l[i]).str;
         }
+        public override ClrOp GetCode(int up) {
+            return new ClrGetField(Tokens.BValue_v,
+                    new ClrGetSField(stg));
+        }
+        public override ClrOp SetCode(int up, ClrOp to) {
+            return new ClrSetField(Tokens.BValue_v,
+                    new ClrGetSField(stg), to);
+        }
         public override void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) {
             stg = binder(Unit.SharedName('B', six, name), Tokens.BValue);
@@ -450,6 +486,11 @@ namespace Niecza.CLRBackend {
         public int index;
         public FieldInfo stg;
 
+        public override ClrOp GetCode(int up) {
+            return (index >= 0) ? (ClrOp)new ClrPadGet(up, index)
+                                : new ClrGetSField(stg);
+        }
+
         public override void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) {
             if (IsDynamicName(name) || (sub.flags & StaticSub.RUN_ONCE) == 0) {
@@ -459,6 +500,26 @@ namespace Niecza.CLRBackend {
                 stg = binder(Unit.SharedName('L', six, name), Tokens.Variable);
                 sub.nlexn++;
             }
+        }
+    }
+
+    class LexAlias : Lexical {
+        public readonly string to;
+        public LexAlias(object[] l) {
+            to = ((JScalar)l[2]).str;
+        }
+        public override ClrOp GetCode(int up) { throw new NotImplementedException(); }
+    }
+
+    class LexStash : Lexical {
+        public readonly string[] path;
+        public override ClrOp GetCode(int up) {
+            throw new NotImplementedException();
+        }
+        public LexStash(object[] l) {
+            path = new string[l.Length - 2];
+            for (int i = 0; i < path.Length; i++)
+                path[i] = ((JScalar)l[i+2]).str;
         }
     }
 
@@ -578,6 +639,8 @@ namespace Niecza.CLRBackend {
 
         public static readonly FieldInfo IP6_mo =
             IP6.GetField("mo");
+        public static readonly FieldInfo BValue_v =
+            BValue.GetField("v");
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
         public static readonly FieldInfo Frame_caller =
@@ -729,6 +792,110 @@ namespace Niecza.CLRBackend {
             Returns = ret;
             this.op = op;
             this.zyg = zyg;
+        }
+    }
+
+    class ClrGetField : ClrOp {
+        public readonly FieldInfo f;
+        public readonly ClrOp zyg;
+
+        public override void CodeGen(CgContext cx) {
+            zyg.CodeGen(cx);
+            cx.il.Emit(OpCodes.Ldfld, f);
+        }
+
+        public ClrGetField(FieldInfo f, ClrOp zyg) {
+            Returns = f.FieldType;
+            this.f = f;
+            this.zyg = zyg;
+        }
+    }
+
+    class ClrSetField : ClrOp {
+        public readonly FieldInfo f;
+        public readonly ClrOp zyg1;
+        public readonly ClrOp zyg2;
+
+        public override void CodeGen(CgContext cx) {
+            zyg1.CodeGen(cx);
+            zyg2.CodeGen(cx);
+            cx.il.Emit(OpCodes.Stfld, f);
+        }
+
+        public ClrSetField(FieldInfo f, ClrOp zyg1, ClrOp zyg2) {
+            Returns = Tokens.Void;
+            this.f = f;
+            this.zyg1 = zyg1;
+            this.zyg2 = zyg2;
+        }
+    }
+
+    class ClrGetSField : ClrOp {
+        public readonly FieldInfo f;
+
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldsfld, f);
+        }
+
+        public ClrGetSField(FieldInfo f) {
+            Returns = f.FieldType;
+            this.f = f;
+        }
+    }
+
+    class ClrSetSField : ClrOp {
+        public readonly FieldInfo f;
+        public readonly ClrOp zyg;
+
+        public override void CodeGen(CgContext cx) {
+            zyg.CodeGen(cx);
+            cx.il.Emit(OpCodes.Stsfld, f);
+        }
+
+        public ClrSetSField(FieldInfo f, ClrOp zyg) {
+            Returns = Tokens.Void;
+            this.f = f;
+            this.zyg = zyg;
+        }
+    }
+
+    class ClrPadGet : ClrOp {
+        public readonly int up;
+        public readonly int index;
+
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+            for (int i = 0; i < up; i++)
+                cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_outer);
+            cx.EmitGetlex(index, Tokens.Variable);
+        }
+
+        public ClrPadGet(int up, int index) {
+            Returns = Tokens.Variable;
+            this.up = up;
+            this.index = index;
+        }
+    }
+
+    class ClrPadSet : ClrOp {
+        public readonly int up;
+        public readonly int index;
+        public readonly ClrOp zyg;
+
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+            for (int i = 0; i < up; i++)
+                cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_outer);
+            cx.EmitPreSetlex(index);
+            zyg.CodeGen(cx);
+            cx.EmitSetlex(index, Tokens.Variable);
+        }
+
+        public ClrPadSet(int up, int index, ClrOp zyg) {
+            Returns = Tokens.Void;
+            this.zyg = zyg;
+            this.up = up;
+            this.index = index;
         }
     }
 
@@ -1093,6 +1260,13 @@ namespace Niecza.CLRBackend {
         public static CpsOp Annotate(int line, CpsOp body) {
             return body; // TODO: implement me
         }
+
+        public static CpsOp LexAccess(Lexical l, int up, CpsOp[] zyg) {
+            return Primitive(zyg, delegate(ClrOp[] heads) {
+                return (heads.Length >= 1) ? l.SetCode(up, heads[0]) :
+                    l.GetCode(up);
+            });
+        }
     }
 
     class NamProcessor {
@@ -1100,6 +1274,37 @@ namespace Niecza.CLRBackend {
 
         public NamProcessor(StaticSub sub) {
             this.sub = sub;
+        }
+
+        CpsOp AccessLex(bool core, object[] zyg) {
+            string name = ((JScalar)zyg[1]).str;
+            CpsOp set_to = (zyg.Length > 2) ? Scan(zyg[2]) : null;
+            int uplevel;
+            Lexical lex = ResolveLex(name, out uplevel, core);
+
+            return CpsOp.LexAccess(lex, uplevel,
+                set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
+        }
+
+        Lexical ResolveLex(string name, out int uplevel, bool core) {
+            uplevel = 0;
+            StaticSub csr = sub;
+
+            while (true) {
+                Lexical r;
+                if ((!core || csr.IsCore()) &&
+                        csr.l_lexicals.TryGetValue(name, out r)) {
+                    if (r is LexAlias) {
+                        name = (r as LexAlias).to;
+                    } else {
+                        return r;
+                    }
+                }
+                if (csr.outer == null)
+                    throw new Exception("Unable to find lexical " + name + " in " + sub.name);
+                csr = (StaticSub) csr.outer.Resolve();
+                uplevel++;
+            }
         }
 
         static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
@@ -1114,6 +1319,10 @@ namespace Niecza.CLRBackend {
 
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
+            handlers["scopedlex"] = delegate(NamProcessor th, object[] zyg) {
+                return th.AccessLex(false, zyg); };
+            handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
+                return th.AccessLex(true, zyg); };
 
             thandlers["prog"] = CpsOp.Sequence;
             thandlers["bif_defined"] = Contexty("mro_defined");
