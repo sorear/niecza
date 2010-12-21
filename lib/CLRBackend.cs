@@ -654,18 +654,24 @@ namespace Niecza.CLRBackend {
         public static readonly Type String = typeof(string);
         public static readonly Type Boolean = typeof(bool);
         public static readonly Type Int32 = typeof(int);
+        public static readonly Type IntPtr = typeof(IntPtr);
         public static readonly Type Double = typeof(double);
         public static readonly Type Frame = typeof(Frame);
         public static readonly Type Kernel = typeof(Kernel);
+        public static readonly Type Builtins = typeof(Builtins);
         public static readonly Type SubInfo = typeof(SubInfo);
         public static readonly Type IP6 = typeof(IP6);
         public static readonly Type Variable = typeof(Variable);
         public static readonly Type BValue = typeof(BValue);
+        public static readonly Type DynObject = typeof(DynObject);
         public static readonly Type DynMetaObject = typeof(DynMetaObject);
 
         public static readonly ConstructorInfo DynBlockDelegate_ctor =
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
                     typeof(object), typeof(IntPtr) });
+        public static readonly ConstructorInfo DynObject_ctor =
+            typeof(DynObject).GetConstructor(new Type[] {
+                    DynMetaObject });
 
         public static readonly MethodInfo IP6_InvokeMethod =
             IP6.GetMethod("InvokeMethod");
@@ -822,6 +828,39 @@ namespace Niecza.CLRBackend {
             bool skip = cps;
             foreach (ParameterInfo pi in mi.GetParameters()) {
                 if (skip) { skip = false; continue; }
+                ts.Add(pi.ParameterType);
+            }
+
+            if (zyg.Length != ts.Count)
+                throw new Exception("argument list length mismatch");
+
+            for (int i = 0; i < ts.Count; i++) {
+                TypeCheck(zyg[i].Returns, ts[i], "arg");
+            }
+        }
+    }
+
+    class ClrConstructorCall : ClrOp {
+        public readonly ConstructorInfo Method;
+        public readonly ClrOp[] Zyg;
+
+        public override ClrOp Sink() {
+            return new ClrSink(this);
+        }
+        public override void CodeGen(CgContext cx) {
+            foreach (ClrOp o in Zyg) {
+                o.CodeGen(cx);
+            }
+            cx.il.Emit(OpCodes.Newobj, Method);
+        }
+
+        public ClrConstructorCall(ConstructorInfo mi, ClrOp[] zyg) {
+            Method = mi;
+            Zyg = zyg;
+            Returns = mi.DeclaringType;
+            List<Type> ts = new List<Type>();
+
+            foreach (ParameterInfo pi in mi.GetParameters()) {
                 ts.Add(pi.ParameterType);
             }
 
@@ -1296,6 +1335,17 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrNullLiteral : ClrOp {
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        public ClrNullLiteral(Type ty) {
+            Returns = ty;
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldnull);
+        }
+    }
+
     // Because the CLR has no evaluation stack types narrower than int32, this
     // node does duty both for int and bool.  When sized types are added, it
     // will also handle int8, int16, and unsigned versions thereof.
@@ -1465,6 +1515,12 @@ namespace Niecza.CLRBackend {
             });
         }
 
+        public static CpsOp ConstructorCall(ConstructorInfo tk, CpsOp[] zyg) {
+            return Primitive(zyg, delegate (ClrOp[] heads) {
+                return new CpsOp(new ClrConstructorCall(tk, heads));
+            });
+        }
+
         public static CpsOp CpsReturn(CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return new CpsOp(new ClrCpsReturn(heads.Length > 0 ? heads[0] : null));
@@ -1560,6 +1616,10 @@ namespace Niecza.CLRBackend {
         public static CpsOp Sink(CpsOp zyg) {
             return new CpsOp(zyg.stmts, zyg.head.Sink());
         }
+
+        public static CpsOp Null(Type ty) {
+            return new CpsOp(new ClrNullLiteral(ty));
+        }
     }
 
     class NamProcessor {
@@ -1624,8 +1684,21 @@ namespace Niecza.CLRBackend {
         }
 
         static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
+        static Dictionary<string, Type> namtypes;
 
         static NamProcessor() {
+            namtypes = new Dictionary<string, Type>();
+            namtypes["str"] = Tokens.String;
+            namtypes["num"] = Tokens.Double;
+            namtypes["int"] = Tokens.Int32;
+            namtypes["var"] = Tokens.Variable;
+            namtypes["obj"] = Tokens.IP6;
+            namtypes["fvarlist"] = typeof(Variable[]);
+            namtypes["vvarlist"] = typeof(VarDeque);
+            namtypes["varhash"] = typeof(Dictionary<string,Variable>);
+            namtypes["frame"] = Tokens.Frame;
+            namtypes["cursor"] = typeof(Cursor);
+
             handlers = new Dictionary<string, Func<NamProcessor,object[],CpsOp>>();
             Dictionary<string, Func<CpsOp[], CpsOp>>
                 thandlers = new Dictionary<string, Func<CpsOp[], CpsOp>>();
@@ -1633,6 +1706,14 @@ namespace Niecza.CLRBackend {
                 new Dictionary<string, Func<object[], object>>();
 
 
+            handlers["null"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.Null(namtypes[((JScalar)zyg[1]).str]); };
+            handlers["str"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.StringLiteral(((JScalar)zyg[1]).str); };
+            handlers["int"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.IntLiteral((int) ((JScalar)zyg[1]).num); };
+            handlers["bool"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
@@ -1648,6 +1729,11 @@ namespace Niecza.CLRBackend {
                 }
                 CpsOp boxee = th.Scan(zyg[2]);
                 return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), new CpsOp[2] { boxee, mo });
+            };
+            handlers["unbox"] = delegate(NamProcessor th, object[] zyg) {
+                Type t = namtypes[((JScalar)zyg[1]).str];
+                CpsOp unboxee = th.Scan(zyg[2]);
+                return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("UnboxAny").MakeGenericMethod(t), new CpsOp[1] { unboxee });
             };
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp rhs = th.Scan(zyg[3]);
@@ -1691,17 +1777,70 @@ namespace Niecza.CLRBackend {
                 return bit;
             };
 
+            // TODO: implement
+            thandlers["const"] = delegate(CpsOp[] z) { return z[0]; };
             thandlers["ternary"] = delegate(CpsOp[] z) {
                 return CpsOp.Ternary(z[0], z[1], z[2]); };
             thandlers["sink"] = delegate(CpsOp[] z) {
                 return CpsOp.Sink(z[0]); };
+            // yuck.
+            thandlers["fvarlist_length"] = delegate(CpsOp[] z) {
+                return CpsOp.Operator(Tokens.Int32, OpCodes.Conv_I4,
+                    new CpsOp[] { CpsOp.Operator(Tokens.IntPtr, OpCodes.Ldlen,
+                        z) });
+            };
+            // XXX - wrong order - problem?
+            thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
+                return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
+                    new CpsOp[] { z[1], z[0] }); };
+
+            thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
+            thandlers["obj_llhow"] = FieldGet(Tokens.IP6, "mo");
+            thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
+            thandlers["obj_what"] = Methody(null, Tokens.IP6.GetMethod("GetTypeObject"));
+            thandlers["obj_isa"] = Methody(null, Tokens.IP6.GetMethod("Isa"));
+            thandlers["obj_does"] = Methody(null, Tokens.IP6.GetMethod("Does"));
+            thandlers["obj_newblank"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(Tokens.DynObject_ctor, z); };
+
             thandlers["prog"] = CpsOp.Sequence;
+
+            thandlers["bif_postinc"] = SimpleB("PostIncrement");
+            thandlers["bif_numeq"] = SimpleB("NumericEq");
+            thandlers["bif_numne"] = SimpleB("NumericNe");
+            thandlers["bif_numle"] = SimpleB("NumericLe");
+            thandlers["bif_numlt"] = SimpleB("NumericLt");
+            thandlers["bif_numge"] = SimpleB("NumericGe");
+            thandlers["bif_numgt"] = SimpleB("NumericGt");
+            thandlers["bif_streq"] = SimpleB("StringEq");
+            thandlers["bif_strne"] = SimpleB("StringNe");
+            thandlers["bif_strle"] = SimpleB("StringLe");
+            thandlers["bif_strlt"] = SimpleB("StringLt");
+            thandlers["bif_strge"] = SimpleB("StringGe");
+            thandlers["bif_strgt"] = SimpleB("StringGt");
+            thandlers["bif_plus"] = SimpleB("Plus");
+            thandlers["bif_minus"] = SimpleB("Minus");
+            thandlers["bif_mul"] = SimpleB("Mul");
+            thandlers["bif_divide"] = SimpleB("Divide");
+            thandlers["bif_not"] = SimpleB("Not");
+            thandlers["bif_negate"] = SimpleB("Negate");
+            thandlers["bif_chars"] = SimpleB("Chars");
+            thandlers["bif_substr3"] = SimpleB("Substr3");
+
             thandlers["bif_defined"] = Contexty("mro_defined");
             thandlers["bif_bool"] = Contexty("mro_Bool");
             thandlers["bif_num"] = Contexty("mro_Numeric");
             thandlers["bif_str"] = Contexty("mro_Str");
-            thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
+            thandlers["obj_asdef"] = Contexty("mro_defined");
+            thandlers["obj_asbool"] = Contexty("mro_Bool");
+            thandlers["obj_asnum"] = Contexty("mro_Numeric");
+            thandlers["obj_asstr"] = Contexty("mro_Str");
+            thandlers["obj_getbool"] = Contexty("mro_raw_Bool");
+            thandlers["obj_getdef"] = Contexty("mro_raw_defined");
+            thandlers["obj_getnum"] = Contexty("mro_raw_Numeric");
+            thandlers["obj_getstr"] = Contexty("mro_raw_Str");
             thandlers["obj_typename"] = Methody(null, Tokens.IP6.GetMethod("GetTypeName"));
+            thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {
@@ -1713,9 +1852,19 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        static Func<CpsOp[], CpsOp> SimpleB(string name) {
+            return Methody(null, Tokens.Builtins.GetMethod(name));
+        }
+
         static Func<CpsOp[], CpsOp> Methody(Type cps, MethodInfo mi) {
             return delegate(CpsOp[] cpses) {
                 return CpsOp.MethodCall(cps, mi, cpses); };
+        }
+
+        static Func<CpsOp[], CpsOp> FieldGet(Type t, string name) {
+            FieldInfo f = t.GetField(name);
+            return delegate(CpsOp[] cpses) {
+                return CpsOp.GetField(f, cpses[0]); };
         }
 
         static Func<CpsOp[], CpsOp> Contexty(string name) {
@@ -1788,7 +1937,7 @@ namespace Niecza.CLRBackend {
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
                 Console.WriteLine(obj.name);
                 NamProcessor np = new NamProcessor(obj);
-                MethodInfo mi = DefineCpsMethod(
+                DefineCpsMethod(
                     Unit.SharedName('C', ix, obj.name), false,
                     np.MakeBody());
             });
