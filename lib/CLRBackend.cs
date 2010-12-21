@@ -132,6 +132,8 @@ namespace Niecza.CLRBackend {
         public readonly object[] xref;
         public readonly object[] tdeps;
 
+        public readonly Dictionary<string, Package> exp_pkg;
+
         public Unit(object[] from) {
             mainline_ref = new Xref(from[0] as object[]);
             name = ((JScalar) from[1]).str;
@@ -139,16 +141,25 @@ namespace Niecza.CLRBackend {
             setting = from[3] == null ? null : ((JScalar) from[3]).str;
             bottom_ref = Xref.from(from[4] as object[]);
             xref = from[5] as object[];
+            exp_pkg = new Dictionary<string,Package>();
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
-                if (xr.Length > 6) {
+                if (xr.Length > 7) {
                     xref[i] = new StaticSub(this, xr);
                 } else {
                     xref[i] = Package.From(xr);
+                    (xref[i] as Package).NoteExports(exp_pkg);
                 }
             }
             tdeps = from[6] as object[];
+            foreach (object x in tdeps) {
+                string n = ((JScalar)(((object[]) x)[0])).str;
+                if (n == name) continue;
+                Unit o = CLRBackend.GetUnit(n);
+                foreach (KeyValuePair<string,Package> kv in o.exp_pkg)
+                    exp_pkg[kv.Key] = kv.Value;
+            }
         }
 
         public void VisitSubsPostorder(Action<int,StaticSub> cb) {
@@ -168,6 +179,19 @@ namespace Niecza.CLRBackend {
             foreach (int z in s.zyg)
                 DoVisitSubsPostorder(z, cb);
             cb(ix,s);
+        }
+
+        public Package GetPackage(string[] strs, int f, int l) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < l; i++) {
+                string rxes = strs[i+f];
+                sb.Append((char)(rxes.Length >> 16));
+                sb.Append((char)(rxes.Length & 0xFFFF));
+                sb.Append(rxes);
+            }
+            Package p;
+            exp_pkg.TryGetValue(sb.ToString(), out p);
+            return p;
         }
 
         public static string SharedName(char type, int ix, string name) {
@@ -220,10 +244,26 @@ namespace Niecza.CLRBackend {
     class Package {
         public readonly string name;
         public readonly string type;
+        public readonly object[] exports;
 
         public Package(object[] p) {
             type = ((JScalar)p[0]).str;
             name = ((JScalar)p[1]).str;
+            exports = (object[]) p[2];
+        }
+
+        internal void NoteExports(Dictionary<string,Package> dp) {
+            foreach (object x in exports) {
+                object[] rx = (object[]) x;
+                StringBuilder sb = new StringBuilder();
+                foreach (object rxe in rx) {
+                    string rxes = ((JScalar) rxe).str;
+                    sb.Append((char)(rxes.Length >> 16));
+                    sb.Append((char)(rxes.Length & 0xFFFF));
+                    sb.Append(rxes);
+                }
+                dp[sb.ToString()] = this;
+            }
         }
 
         public virtual void BindFields(int ix,
@@ -273,10 +313,10 @@ namespace Niecza.CLRBackend {
         public readonly object superclasses;
         public readonly object linearized_mro;
         public Class(object[] p) : base(p) {
-            attributes = p[2];
-            methods = p[3];
-            superclasses = p[4];
-            linearized_mro = p[5];
+            attributes = p[3];
+            methods = p[4];
+            superclasses = p[5];
+            linearized_mro = p[6];
         }
     }
 
@@ -289,9 +329,9 @@ namespace Niecza.CLRBackend {
         public readonly object methods;
         public readonly object superclasses;
         public Role(object[] p) : base(p) {
-            attributes = p[2];
-            methods = p[3];
-            superclasses = p[4];
+            attributes = p[3];
+            methods = p[4];
+            superclasses = p[5];
         }
     }
 
@@ -300,9 +340,9 @@ namespace Niecza.CLRBackend {
         public readonly object methods;
         public readonly object superclasses;
         public ParametricRole(object[] p) : base(p) {
-            attributes = p[2];
-            methods = p[3];
-            superclasses = p[4];
+            attributes = p[3];
+            methods = p[4];
+            superclasses = p[5];
         }
     }
 
@@ -373,7 +413,7 @@ namespace Niecza.CLRBackend {
                 } else if (type == "alias") {
                     obj = new LexAlias(bl);
                 } else if (type == "stash") {
-                    obj = new LexStash(bl);
+                    obj = new LexStash(unit, bl);
                 } else {
                     throw new Exception("unknown lex type " + type);
                 }
@@ -512,11 +552,15 @@ namespace Niecza.CLRBackend {
     }
 
     class LexStash : Lexical {
+        public readonly Unit unit;
         public readonly string[] path;
         public override ClrOp GetCode(int up) {
-            throw new NotImplementedException();
+            ModuleWithTypeObject p = (ModuleWithTypeObject) unit.GetPackage(path, 0, path.Length);
+            return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
+                    new ClrOp[] { new ClrGetSField(p.typeObject) });
         }
-        public LexStash(object[] l) {
+        public LexStash(Unit u, object[] l) {
+            unit = u;
             path = new string[l.Length - 2];
             for (int i = 0; i < path.Length; i++)
                 path[i] = ((JScalar)l[i+2]).str;
@@ -612,6 +656,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type Int32 = typeof(int);
         public static readonly Type Double = typeof(double);
         public static readonly Type Frame = typeof(Frame);
+        public static readonly Type Kernel = typeof(Kernel);
         public static readonly Type SubInfo = typeof(SubInfo);
         public static readonly Type IP6 = typeof(IP6);
         public static readonly Type Variable = typeof(Variable);
@@ -632,6 +677,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_RunLoop =
             typeof(Kernel).GetMethod("RunLoop");
+        public static readonly MethodInfo Kernel_NewROScalar =
+            typeof(Kernel).GetMethod("NewROScalar");
         public static readonly MethodInfo Console_WriteLine =
             typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
         public static readonly MethodInfo Console_Write =
@@ -1355,6 +1402,12 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Cps(new ClrSubyCall(mname, sig, heads), Tokens.Variable);
             });
         }
+
+        public static CpsOp GetField(FieldInfo fi, CpsOp zyg) {
+            return Primitive(new CpsOp[1] { zyg }, delegate(ClrOp[] heads) {
+                return new CpsOp(new ClrGetField(fi, heads[0]));
+            });
+        }
     }
 
     class NamProcessor {
@@ -1365,8 +1418,11 @@ namespace Niecza.CLRBackend {
             this.sub = sub;
         }
 
-        CpsOp AccessLex(bool core, object[] zyg) {
+        CpsOp AccessLex(object[] zyg) {
+            string type = ((JScalar)zyg[0]).str;
             string name = ((JScalar)zyg[1]).str;
+            bool core = (type == "corelex");
+            bool letonly = (type == "letvar");
             CpsOp set_to = (zyg.Length > 2) ? Scan(zyg[2]) : null;
 
             Type t;
@@ -1374,6 +1430,8 @@ namespace Niecza.CLRBackend {
                 return (set_to == null) ? CpsOp.PeekLet(name, t) :
                     CpsOp.PokeLet(name, new CpsOp[1] { set_to });
             }
+            if (letonly)
+                throw new Exception("No such let " + name);
 
             int uplevel;
             Lexical lex = ResolveLex(name, out uplevel, core);
@@ -1425,10 +1483,24 @@ namespace Niecza.CLRBackend {
 
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
-            handlers["scopedlex"] = delegate(NamProcessor th, object[] zyg) {
-                return th.AccessLex(false, zyg); };
+            handlers["box"] = delegate(NamProcessor th, object[] zyg) {
+                CpsOp mo;
+                if (zyg[1] is JScalar) {
+                    string name = ((JScalar)zyg[1]).str;
+                    int uplevel;
+                    LexStash lx = (LexStash)th.ResolveLex(name, out uplevel, true);
+                    Class p = (Class)th.sub.unit.GetPackage(lx.path, 0, lx.path.Length);
+                    mo = new CpsOp(new ClrGetSField(p.metaObject));
+                } else {
+                    mo = CpsOp.GetField(Tokens.IP6_mo, th.Scan(zyg[1]));
+                }
+                CpsOp boxee = th.Scan(zyg[2]);
+                return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), new CpsOp[2] { boxee, mo });
+            };
+            handlers["scopedlex"] =
+            handlers["letvar"] =
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
-                return th.AccessLex(true, zyg); };
+                return th.AccessLex(zyg); };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
                 return th.SubyCall(true, zyg); };
             handlers["subcall"] = delegate (NamProcessor th, object[] zyg) {
@@ -1461,6 +1533,7 @@ namespace Niecza.CLRBackend {
             thandlers["bif_bool"] = Contexty("mro_Bool");
             thandlers["bif_num"] = Contexty("mro_Numeric");
             thandlers["bif_str"] = Contexty("mro_Str");
+            thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {
@@ -1470,6 +1543,11 @@ namespace Niecza.CLRBackend {
                     in mhandlers) {
                 handlers[kv.Key] = MakeMacroHandler(kv.Value);
             }
+        }
+
+        static Func<CpsOp[], CpsOp> Methody(Type cps, MethodInfo mi) {
+            return delegate(CpsOp[] cpses) {
+                return CpsOp.MethodCall(cps, mi, cpses); };
         }
 
         static Func<CpsOp[], CpsOp> Contexty(string name) {
@@ -1618,6 +1696,7 @@ namespace Niecza.CLRBackend {
         internal static object Resolve(Xref x) {
             return used_units[x.unit].xref[x.index];
         }
+        internal static Unit GetUnit(string name) { return used_units[name]; }
 
         public static void Main() {
             Directory.SetCurrentDirectory("obj");

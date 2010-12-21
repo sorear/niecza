@@ -85,6 +85,7 @@ sub Metamodel::Package::to_nam {
     [
         substr(lc(ref($self)),11),
         $self->name,
+        $self->exports,
         @_
     ]
 }
