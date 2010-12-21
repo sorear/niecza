@@ -15,7 +15,7 @@ using Niecza;
 namespace Niecza.CLRBackend {
     // The portable format is a subset of JSON, and is current read
     // into a matching internal form.
-    class JScalar {
+    sealed class JScalar {
         string text;
         double val;
         bool has_val;
@@ -1271,6 +1271,7 @@ namespace Niecza.CLRBackend {
 
     class NamProcessor {
         StaticSub sub;
+        Dictionary<string, Type> let_types = new Dictionary<string, Type>();
 
         public NamProcessor(StaticSub sub) {
             this.sub = sub;
@@ -1279,6 +1280,13 @@ namespace Niecza.CLRBackend {
         CpsOp AccessLex(bool core, object[] zyg) {
             string name = ((JScalar)zyg[1]).str;
             CpsOp set_to = (zyg.Length > 2) ? Scan(zyg[2]) : null;
+
+            Type t;
+            if (!core && let_types.TryGetValue(name, out t)) {
+                return (set_to == null) ? CpsOp.PeekLet(name, t) :
+                    CpsOp.PokeLet(name, new CpsOp[1] { set_to });
+            }
+
             int uplevel;
             Lexical lex = ResolveLex(name, out uplevel, core);
 
@@ -1323,6 +1331,28 @@ namespace Niecza.CLRBackend {
                 return th.AccessLex(false, zyg); };
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
                 return th.AccessLex(true, zyg); };
+            handlers["letn"] = delegate(NamProcessor th, object[] zyg) {
+                int i = 1;
+                Dictionary<string,Type> old =
+                    new Dictionary<string,Type>(th.let_types);
+                List<KeyValuePair<string,CpsOp>> lvec =
+                    new List<KeyValuePair<string,CpsOp>>();
+                while (zyg.Length - i >= 3 && zyg[i] is JScalar) {
+                    string name = ((JScalar)zyg[i]).str;
+                    CpsOp  init = th.Scan(zyg[i+1]);
+                    th.let_types[name] = init.head.Returns;
+                    lvec.Add(new KeyValuePair<string,CpsOp>(name, init));
+                    i += 2;
+                }
+                List<CpsOp> rest = new List<CpsOp>();
+                while (i < zyg.Length)
+                    rest.Add(th.Scan(zyg[i++]));
+                CpsOp bit = CpsOp.Sequence(rest.ToArray());
+                for (int j = lvec.Count - 1; j >= 0; j--)
+                    bit = CpsOp.Let(lvec[j].Key, lvec[j].Value, bit);
+                th.let_types = old;
+                return bit;
+            };
 
             thandlers["prog"] = CpsOp.Sequence;
             thandlers["bif_defined"] = Contexty("mro_defined");
