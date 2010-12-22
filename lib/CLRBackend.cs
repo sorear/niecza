@@ -2075,9 +2075,11 @@ namespace Niecza.CLRBackend {
         public readonly TypeBuilder tb;
         public readonly MethodBuilder mb;
         public readonly CgContext cx;
+        public readonly CLRBackend module;
 
-        public CpsBuilder(TypeBuilder tb, string clrname, bool pub) {
-            this.tb = tb;
+        public CpsBuilder(CLRBackend module, string clrname, bool pub) {
+            this.module = module;
+            this.tb = module.tb;
             mb = tb.DefineMethod(clrname, MethodAttributes.Static |
                     (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
@@ -2169,8 +2171,15 @@ namespace Niecza.CLRBackend {
             }
         }
 
-        // TODO implement me
-        CpsOp Constant(CpsOp val) { return val; }
+        CpsOp Constant(CpsOp val) {
+            if (val.stmts.Length != 0 || val.head.HasCases)
+                throw new ArgumentException();
+            FieldBuilder fb =
+                cpb.tb.DefineField("K" + cpb.module.constants++,
+                        val.head.Returns, FieldAttributes.Static);
+            cpb.module.constantInit.Add(CpsOp.SetSField(fb, val));
+            return CpsOp.GetSField(fb);
+        }
 
         CpsOp SubyCall(bool ismethod, object[] zyg) {
             string mname = ismethod ? (((JScalar)zyg[1]).str) : null;
@@ -2855,9 +2864,12 @@ namespace Niecza.CLRBackend {
     public class CLRBackend {
         AssemblyBuilder ab;
         ModuleBuilder mob;
-        TypeBuilder tb;
+        internal TypeBuilder tb;
 
         Unit unit;
+
+        internal int constants;
+        internal List<CpsOp> constantInit = new List<CpsOp>();
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
@@ -2880,13 +2892,13 @@ namespace Niecza.CLRBackend {
 
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
-                CpsBuilder cpb = new CpsBuilder(tb,
+                CpsBuilder cpb = new CpsBuilder(this,
                     Unit.SharedName('C', ix, obj.name), false);
                 NamProcessor np = aux[ix] = new NamProcessor(cpb, obj);
                 np.MakeBody();
             });
 
-            List<CpsOp> thaw = new List<CpsOp>();
+            List<CpsOp> thaw = new List<CpsOp>(constantInit);
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
                 // TODO append chunks to Thaw here for sub2 stuff
@@ -2896,7 +2908,7 @@ namespace Niecza.CLRBackend {
                 // TODO append chunks to Thaw here for sub3 stuff
             });
 
-            CpsBuilder boot = new CpsBuilder(tb, "BOOT", true);
+            CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
             thaw.Add(CpsOp.CpsReturn(new CpsOp[0]));
             boot.Build(CpsOp.Sequence(thaw.ToArray()));
         }
