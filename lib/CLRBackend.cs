@@ -451,7 +451,7 @@ namespace Niecza.CLRBackend {
             throw new Exception("Lexicals of type " + this + " cannot be bound");
         }
         public abstract ClrOp GetCode(int up);
-        protected static bool IsDynamicName(string name) {
+        public static bool IsDynamicName(string name) {
             if (name == "$_") return true;
             if (name.Length < 2) return false;
             if (name[0] == '*' || name[0] == '?') return true;
@@ -529,6 +529,11 @@ namespace Niecza.CLRBackend {
         public override ClrOp GetCode(int up) {
             return (index >= 0) ? (ClrOp)new ClrPadGet(up, index)
                                 : new ClrGetSField(stg);
+        }
+
+        public override ClrOp SetCode(int up, ClrOp to) {
+            return (index >= 0) ? (ClrOp)new ClrPadSet(up, index, to)
+                                : new ClrSetSField(stg, to);
         }
 
         public override void BindFields(int six, int lix, StaticSub sub,
@@ -705,6 +710,8 @@ namespace Niecza.CLRBackend {
             IP6.GetMethod("GetSlot");
         public static readonly MethodInfo Variable_Fetch =
             Variable.GetMethod("Fetch");
+        public static readonly MethodInfo Kernel_MakeSub =
+            typeof(Kernel).GetMethod("MakeSub");
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_RunLoop =
@@ -732,6 +739,8 @@ namespace Niecza.CLRBackend {
             BValue.GetField("v");
         public static readonly FieldInfo Kernel_AnyMO =
             Kernel.GetField("AnyMO");
+        public static readonly FieldInfo Kernel_AnyP =
+            Kernel.GetField("AnyP");
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
         public static readonly FieldInfo Frame_caller =
@@ -1124,6 +1133,39 @@ namespace Niecza.CLRBackend {
         public static ClrNoop Instance = new ClrNoop();
     }
 
+    class ClrEhSpan : ClrOp {
+        public readonly int kls;
+        public readonly string tag;
+        public readonly int lid;
+        public readonly string ls;
+        public readonly string le;
+        public readonly string lg;
+
+        public ClrEhSpan(int kls, string tag, int lid, string ls, string le,
+                string lg) {
+            Returns = Tokens.Void;
+            HasCases = false;
+            this.kls = kls; this.tag = tag; this.ls = ls; this.le = le;
+            this.lg = lg; this.lid = lid;
+        }
+        public override void CodeGen(CgContext cx) { }
+    }
+
+    class ClrSync : ClrOp {
+        private ClrSync() {
+            Returns = Tokens.Void;
+            HasCases = true;
+        }
+        public override void ListCases(CgContext cx) { cx.num_cases++; }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.EmitInt(cx.next_case);
+            cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
+            cx.il.MarkLabel(cx.cases[cx.next_case++]);
+        }
+        public static ClrSync Instance = new ClrSync();
+    }
+
     // only used in ClrOperator.Sink, and assumes it in the HasCases=false
     class ClrSeq : ClrOp {
         readonly ClrOp[] zyg;
@@ -1352,8 +1394,10 @@ namespace Niecza.CLRBackend {
         }
         public override void CodeGen(CgContext cx) {
             cx.il.MarkLabel(cx.named_labels[name]);
-            if (case_too)
+            if (case_too) {
                 cx.il.MarkLabel(cx.cases[cx.named_cases[name]]);
+                cx.next_case++;
+            }
         }
     }
 
@@ -1383,6 +1427,7 @@ namespace Niecza.CLRBackend {
         ClrOp child;
         public ClrCpsReturn(ClrOp child) {
             this.child = child;
+            this.Returns = Tokens.Void;
         }
         public override void CodeGen(CgContext cx) {
             if (child != null) {
@@ -1410,6 +1455,17 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrCpsFrame : ClrOp {
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        private ClrCpsFrame() {
+            Returns = Tokens.Frame;
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+        }
+        public static ClrCpsFrame Instance = new ClrCpsFrame();
+    }
     class ClrNullLiteral : ClrOp {
         public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrNullLiteral(Type ty) {
@@ -1550,6 +1606,22 @@ namespace Niecza.CLRBackend {
             head = head_s;
         }
 
+        public static CpsOp Span(string l1, string l2, bool sync, CpsOp body) {
+            ClrOp body_h = body.head;
+            ClrOp[] body_s = body.stmts;
+            Resultify(ref body_s, ref body_h);
+            List<ClrOp> stmts = new List<ClrOp>();
+
+            stmts.Add(new ClrLabel(l1, true));
+            if (sync) stmts.Add(ClrSync.Instance);
+            foreach (ClrOp c in body_s) stmts.Add(c);
+            stmts.Add(body_h);
+            if (sync) stmts.Add(ClrSync.Instance);
+            stmts.Add(new ClrLabel(l2, true));
+
+            return new CpsOp(stmts.ToArray(), new ClrResult(body.head.Returns));
+        }
+
         public static CpsOp Ternary(CpsOp cond, CpsOp iftrue, CpsOp iffalse) {
             ClrOp iftrue_h = iftrue.head;
             ClrOp iffalse_h = iffalse.head;
@@ -1622,6 +1694,11 @@ namespace Niecza.CLRBackend {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return new CpsOp(new ClrCpsReturn(heads.Length > 0 ? heads[0] : null));
             });
+        }
+
+        public static CpsOp EhSpan(int kls, string tag, int lid,
+                string ls, string le, string lg) {
+            return new CpsOp(new ClrEhSpan(kls, tag, lid, ls, le, lg));
         }
 
         public static CpsOp Goto(string label, bool iffalse, CpsOp[] zyg) {
@@ -1740,6 +1817,10 @@ namespace Niecza.CLRBackend {
         public static CpsOp Null(Type ty) {
             return new CpsOp(new ClrNullLiteral(ty));
         }
+
+        public static CpsOp CallFrame() {
+            return new CpsOp(ClrCpsFrame.Instance);
+        }
     }
 
     class NamProcessor {
@@ -1804,6 +1885,9 @@ namespace Niecza.CLRBackend {
         }
 
         static string FixStr(object z) { return ((JScalar)z).str; }
+        static double FixNum(object z) { return ((JScalar)z).num; }
+        static int FixInt(object z) { return (int)FixNum(z); }
+        static bool FixBool(object z) { return FixNum(z) != 0; }
         CpsOp AnyStr(object z) {
             return (z is JScalar) ? CpsOp.StringLiteral(FixStr(z))
                 : Scan(z);
@@ -1844,6 +1928,17 @@ namespace Niecza.CLRBackend {
                 return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
+            handlers["ehspan"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.EhSpan(FixInt(z[1]), FixStr(z[2]), FixInt(z[3]),
+                    FixStr(z[4]), FixStr(z[5]), FixStr(z[6]));
+            };
+            handlers["label"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.Label(FixStr(z[1]), true);
+            };
+            handlers["span"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.Span(FixStr(z[1]), FixStr(z[2]), FixBool(z[3]),
+                    th.Scan(z[4]));
+            };
             handlers["compare"] = handlers["arith"] =
                 delegate(NamProcessor th, object[] zyg) {
                     return CpsOp.PolyOp(FixStr(zyg[1]),
@@ -1885,6 +1980,10 @@ namespace Niecza.CLRBackend {
                 bool until = ((JScalar)z[1]).num != 0;
                 bool once  = ((JScalar)z[2]).num != 0;
                 return CpsOp.While(until, once, th.Scan(z[3]), th.Scan(z[4])); };
+            handlers["_makesub"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_MakeSub, new CpsOp[]{
+                    CpsOp.GetSField(((StaticSub)z[1]).subinfo),
+                    CpsOp.CallFrame() }); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
                 string kind = FixStr(z[1]);
                 ModuleWithTypeObject m;
@@ -1933,6 +2032,7 @@ namespace Niecza.CLRBackend {
 
             // TODO: implement
             thandlers["const"] = delegate(CpsOp[] z) { return z[0]; };
+            thandlers["return"] = CpsOp.CpsReturn;
             thandlers["ternary"] = delegate(CpsOp[] z) {
                 return CpsOp.Ternary(z[0], z[1], z[2]); };
             thandlers["sink"] = delegate(CpsOp[] z) {
@@ -1943,6 +2043,10 @@ namespace Niecza.CLRBackend {
                     new CpsOp[] { CpsOp.Operator(Tokens.IntPtr, OpCodes.Ldlen,
                         z) });
             };
+            thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar,
+                    new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyMO),
+                        CpsOp.GetSField(Tokens.Kernel_AnyP) }); };
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
@@ -2123,9 +2227,67 @@ namespace Niecza.CLRBackend {
 
         public CpsOp MakeBody() { return Scan(WrapBody()); }
 
+        void EnterCode(List<object> frags) {
+            foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
+                if ((sub.flags & StaticSub.RUN_ONCE) != 0 &&
+                        (sub.flags & StaticSub.SPAD_EXISTS) != 0 &&
+                        !Lexical.IsDynamicName(kv.Key))
+                    continue;
+
+                if (kv.Value is LexSub) {
+                    LexSub ls = (LexSub) kv.Value;
+                    frags.Add(new object[] { new JScalar("scopedlex"),
+                        new JScalar(kv.Key),
+                        new object[] { new JScalar("newscalar"),
+                            new object[] { new JScalar("_makesub"),
+                                ls.def.Resolve() } } });
+                } else if (kv.Value is LexSimple) {
+                    int f = ((LexSimple) kv.Value).flags;
+                    if ((f & LexSimple.NOINIT) != 0) continue;
+
+                    object bit;
+                    if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
+                        string s = ((f & LexSimple.HASH) != 0) ? "Hash" : "Array";
+                        bit = new object[] { new JScalar("methodcall"),
+                            "new", "", new object[] { new JScalar("corelex"), new JScalar(s) },
+                            new object[] { new JScalar("fetch"), new object[] { new JScalar("corelex"), new JScalar(s) } } };
+                    } else {
+                        bit = new object[] { new JScalar("newblankrwscalar") };
+                    }
+                    frags.Add(new object[] { new JScalar("scopedlex"),
+                        new JScalar(kv.Key), bit });
+                }
+            }
+        }
+
         object WrapBody() {
-            // XXX returnable, enter code, etc etc
-            return sub.body;
+            object b = sub.body;
+            List<object> enter = new List<object>();
+            EnterCode(enter);
+
+            if ((sub.flags & StaticSub.GATHER_HACK) != 0)
+                throw new NotImplementedException();
+            else if (sub.augment_hack != null)
+                throw new NotImplementedException();
+            else if (sub.parametric_role_hack != null)
+                throw new NotImplementedException();
+            else if ((sub.flags & StaticSub.RETURNABLE) != 0) {
+                enter.Add(new object[] { new JScalar("return"),
+                    new object[] { new JScalar("span"),
+                        new JScalar("rstart"), new JScalar("rend"),
+                        new JScalar("0"), b } });
+                enter.Add(new object[] { new JScalar("ehspan"),
+                    new JScalar("4"), new JScalar(""), new JScalar("0"),
+                    new JScalar("rstart"), new JScalar("rend"), new JScalar("rend") });
+                enter.Insert(0, new JScalar("prog"));
+                b = enter.ToArray();
+            } else {
+                enter.Insert(0, new JScalar("prog"));
+                enter.Add(new object[] { new JScalar("return"), b });
+                b = enter.ToArray();
+            }
+
+            return b;
         }
 
         CpsOp Scan(object node) {
