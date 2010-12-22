@@ -605,10 +605,16 @@ namespace Niecza.CLRBackend {
         public string[] let_names = new string[0];
         public Type[] let_types = new Type[0];
         public LocalBuilder ospill;
+        public List<int> lineStack = new List<int>();
+        public List<int> lineBuffer = new List<int>();
 
         public void make_ospill() {
             if (ospill == null)
                 ospill = il.DeclareLocal(Tokens.Variable);
+        }
+
+        public void save_line() {
+            lineBuffer.Add(lineStack.Count == 0 ? 0 : lineStack[lineStack.Count - 1]);
         }
 
         // logic stolen from mcs
@@ -901,6 +907,7 @@ namespace Niecza.CLRBackend {
             if (HasCases) {
                 cx.il.Emit(OpCodes.Ret);
                 cx.il.MarkLabel(cx.cases[cx.next_case++]);
+                cx.save_line();
             }
         }
 
@@ -1208,6 +1215,29 @@ namespace Niecza.CLRBackend {
         public override void CodeGen(CgContext cx) { }
     }
 
+    class ClrPushLine : ClrOp {
+        public readonly int line;
+
+        public ClrPushLine(int line) {
+            this.line = line;
+            Returns = Tokens.Void;
+            HasCases = false;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.lineStack.Add(line);
+        }
+    }
+
+    class ClrPopLine : ClrOp {
+        public ClrPopLine() {
+            Returns = Tokens.Void;
+            HasCases = false;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.lineStack.RemoveAt(cx.lineStack.Count - 1);
+        }
+    }
+
     class ClrSync : ClrOp {
         private ClrSync() {
             Returns = Tokens.Void;
@@ -1219,6 +1249,7 @@ namespace Niecza.CLRBackend {
             cx.EmitInt(cx.next_case);
             cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
             cx.il.MarkLabel(cx.cases[cx.next_case++]);
+            cx.save_line();
         }
         public static ClrSync Instance = new ClrSync();
     }
@@ -1278,6 +1309,7 @@ namespace Niecza.CLRBackend {
                     Tokens.IP6_InvokeMethod : Tokens.IP6_Invoke);
             cx.il.Emit(OpCodes.Ret);
             cx.il.MarkLabel(cx.cases[cx.next_case++]);
+            cx.save_line();
         }
 
         public override void ListCases(CgContext cx) {
@@ -1454,6 +1486,7 @@ namespace Niecza.CLRBackend {
             if (case_too) {
                 cx.il.MarkLabel(cx.cases[cx.named_cases[name]]);
                 cx.next_case++;
+                cx.save_line();
             }
         }
     }
@@ -1938,7 +1971,12 @@ namespace Niecza.CLRBackend {
         }
 
         public static CpsOp Annotate(int line, CpsOp body) {
-            return body; // TODO: implement me
+            if (body.stmts.Length == 0) return body;
+            List<ClrOp> stmts = new List<ClrOp>();
+            stmts.Add(new ClrPushLine(line));
+            foreach (ClrOp c in body.stmts) stmts.Add(c);
+            stmts.Add(new ClrPopLine());
+            return new CpsOp(stmts.ToArray(), body.head);
         }
 
         public static CpsOp LexAccess(Lexical l, int up, CpsOp[] zyg) {
@@ -2055,6 +2093,7 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Ret);
 
             cx.il.MarkLabel(cx.cases[cx.next_case++]);
+            cx.save_line();
             foreach (ClrOp s in body.stmts)
                 s.CodeGen(cx);
             body.head.CodeGen(cx);
@@ -2667,7 +2706,7 @@ namespace Niecza.CLRBackend {
         public CpsOp SubInfoCtor() {
             CpsOp[] args = new CpsOp[10];
             args[0] = CpsOp.StringLiteral(sub.name);
-            args[1] = CpsOp.NewIntArray( new int[] { 50 } ); /* TODO lines */
+            args[1] = CpsOp.NewIntArray(cpb.cx.lineBuffer.ToArray());
             args[2] = CpsOp.DBDLiteral(cpb.mb);
             args[3] = (sub.outer != null) ?
                 CpsOp.GetSField(((StaticSub)sub.outer.Resolve()).subinfo) :
