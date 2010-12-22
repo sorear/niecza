@@ -607,6 +607,8 @@ namespace Niecza.CLRBackend {
         public LocalBuilder ospill;
         public List<int> lineStack = new List<int>();
         public List<int> lineBuffer = new List<int>();
+        public List<int> ehspanBuffer = new List<int>();
+        public List<string> ehlabelBuffer = new List<string>();
 
         public void make_ospill() {
             if (ospill == null)
@@ -1212,7 +1214,18 @@ namespace Niecza.CLRBackend {
             this.kls = kls; this.tag = tag; this.ls = ls; this.le = le;
             this.lg = lg; this.lid = lid;
         }
-        public override void CodeGen(CgContext cx) { }
+        public override void CodeGen(CgContext cx) {
+            int lidn = -1;
+            if (tag != "") {
+                lidn = cx.ehlabelBuffer.Count;
+                cx.ehlabelBuffer.Add(tag);
+            }
+            cx.ehspanBuffer.Add(cx.named_cases[ls]);
+            cx.ehspanBuffer.Add(cx.named_cases[le]);
+            cx.ehspanBuffer.Add(kls);
+            cx.ehspanBuffer.Add(cx.named_cases[lg]);
+            cx.ehspanBuffer.Add(lidn);
+        }
     }
 
     class ClrPushLine : ClrOp {
@@ -1657,6 +1670,8 @@ namespace Niecza.CLRBackend {
     class ClrNewIntArray : ClrOp {
         readonly int[] vec;
         public ClrNewIntArray(int[] vec) {
+            if (vec.Length >= 0xfc000)
+                throw new ArgumentException();
             Returns = typeof(int[]);
             this.vec = vec;
             Constant = true;
@@ -1664,24 +1679,25 @@ namespace Niecza.CLRBackend {
         public override ClrOp Sink() { return ClrNoop.Instance; }
         [ThreadStatic] private static int next_array;
         public override void CodeGen(CgContext cx) {
-            byte[] buf = new byte[vec.Length * 4];
-            int r = 0;
-            for (int i = 0; i < vec.Length; i++) {
-                uint d = (uint) vec[i];
-                buf[r++] = (byte)((d >>  0) & 0xFF);
-                buf[r++] = (byte)((d >>  8) & 0xFF);
-                buf[r++] = (byte)((d >> 16) & 0xFF);
-                buf[r++] = (byte)((d >> 24) & 0xFF);
-            }
-            FieldBuilder fb = cx.tb.DefineInitializedData("A" + (next_array++),
-                    buf, 0);
-
             cx.EmitInt(vec.Length);
             // the mono JIT checks for this exact sequence
             cx.il.Emit(OpCodes.Newarr, Tokens.Int32);
-            cx.il.Emit(OpCodes.Dup);
-            cx.il.Emit(OpCodes.Ldtoken, fb);
-            cx.il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
+            if (vec.Length != 0) {
+                byte[] buf = new byte[vec.Length * 4];
+                int r = 0;
+                for (int i = 0; i < vec.Length; i++) {
+                    uint d = (uint) vec[i];
+                    buf[r++] = (byte)((d >>  0) & 0xFF);
+                    buf[r++] = (byte)((d >>  8) & 0xFF);
+                    buf[r++] = (byte)((d >> 16) & 0xFF);
+                    buf[r++] = (byte)((d >> 24) & 0xFF);
+                }
+                FieldBuilder fb = cx.tb.DefineInitializedData(
+                        "A" + (next_array++), buf, 0);
+                cx.il.Emit(OpCodes.Dup);
+                cx.il.Emit(OpCodes.Ldtoken, fb);
+                cx.il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
+            }
         }
     }
 
@@ -2712,8 +2728,8 @@ namespace Niecza.CLRBackend {
                 CpsOp.GetSField(((StaticSub)sub.outer.Resolve()).subinfo) :
                 CpsOp.Null(Tokens.SubInfo);
             args[4] = CpsOp.Null(Tokens.LAD); /* TODO LTM */
-            args[5] = CpsOp.NewIntArray( new int[] { 1 } ); /* TODO ehspan */
-            args[6] = CpsOp.StringArray( new string[] { } );
+            args[5] = CpsOp.NewIntArray( cpb.cx.ehspanBuffer.ToArray() );
+            args[6] = CpsOp.StringArray( cpb.cx.ehlabelBuffer.ToArray() );
             args[7] = CpsOp.IntLiteral( 0 );
             List<string> dylexn = new List<string>();
             List<int> dylexi = new List<int>();
