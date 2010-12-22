@@ -798,6 +798,8 @@ namespace Niecza.CLRBackend {
             IP6.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
+        public static readonly FieldInfo Kernel_NumMO =
+            Kernel.GetField("NumMO");
         public static readonly FieldInfo Kernel_StrMO =
             Kernel.GetField("StrMO");
         public static readonly FieldInfo Kernel_AnyMO =
@@ -2299,10 +2301,18 @@ namespace Niecza.CLRBackend {
                 CpsOp mo;
                 if (zyg[1] is JScalar) {
                     string name = ((JScalar)zyg[1]).str;
-                    int uplevel;
-                    LexStash lx = (LexStash)th.ResolveLex(name, out uplevel, true);
-                    Class p = (Class)th.sub.unit.GetPackage(lx.path, 0, lx.path.Length);
-                    mo = new CpsOp(new ClrGetSField(p.metaObject));
+                    // these might need to happen *early*, before user classes
+                    // are set up
+                    if (name == "Str") {
+                        mo = CpsOp.GetSField(Tokens.Kernel_StrMO);
+                    } else if (name == "Num") {
+                        mo = CpsOp.GetSField(Tokens.Kernel_NumMO);
+                    } else {
+                        int uplevel;
+                        LexStash lx = (LexStash)th.ResolveLex(name, out uplevel, true);
+                        Class p = (Class)th.sub.unit.GetPackage(lx.path, 0, lx.path.Length);
+                        mo = new CpsOp(new ClrGetSField(p.metaObject));
+                    }
                 } else {
                     mo = CpsOp.GetField(Tokens.IP6_mo, th.Scan(zyg[1]));
                 }
