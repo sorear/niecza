@@ -710,14 +710,20 @@ namespace Niecza.CLRBackend {
             IP6.GetMethod("GetSlot");
         public static readonly MethodInfo Variable_Fetch =
             Variable.GetMethod("Fetch");
+        public static readonly MethodInfo VVarList_Item =
+            VVarList.GetMethod("get_Item");
         public static readonly MethodInfo Kernel_MakeSub =
             typeof(Kernel).GetMethod("MakeSub");
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
+        public static readonly MethodInfo Kernel_SFH =
+            typeof(Kernel).GetMethod("SearchForHandler");
         public static readonly MethodInfo Kernel_RunLoop =
             typeof(Kernel).GetMethod("RunLoop");
         public static readonly MethodInfo Kernel_NewROScalar =
             typeof(Kernel).GetMethod("NewROScalar");
+        public static readonly MethodInfo Kernel_NewRWListVar =
+            typeof(Kernel).GetMethod("NewRWListVar");
         public static readonly MethodInfo Kernel_NewRWScalar =
             typeof(Kernel).GetMethod("NewRWScalar");
         public static readonly MethodInfo Kernel_NewBoundVar =
@@ -743,6 +749,8 @@ namespace Niecza.CLRBackend {
             IP6.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
+        public static readonly FieldInfo Kernel_StrMO =
+            Kernel.GetField("StrMO");
         public static readonly FieldInfo Kernel_AnyMO =
             Kernel.GetField("AnyMO");
         public static readonly FieldInfo Kernel_AnyP =
@@ -1769,8 +1777,11 @@ namespace Niecza.CLRBackend {
             return Primitive(new CpsOp[] { a, b }, delegate(ClrOp[] heads) {
                 if (heads[0].Returns != heads[1].Returns)
                     throw new ArgumentException("Arguments to " + txt + " must have same type");
-                if (heads[0].Returns != Tokens.Int32 &&
-                        heads[0].Returns != Tokens.Double)
+                if (heads[0].Returns == Tokens.Int32 ||
+                        heads[0].Returns == Tokens.Double) {
+                } else if (!heads[0].Returns.IsValueType &&
+                    (txt == "==" || txt == "!=")) {
+                } else
                     throw new NotImplementedException();
                 OpCode op;
                 if (txt == "+") { op = OpCodes.Add; }
@@ -1995,6 +2006,25 @@ namespace Niecza.CLRBackend {
                     throw new NotImplementedException("cast " + fty + " -> " + tty);
                 }
             };
+            handlers["die"] = delegate(NamProcessor th, object[] zyg) {
+                if (zyg[1] is JScalar) {
+                    return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_Die,
+                        new CpsOp[] { CpsOp.StringLiteral(FixStr(zyg[1])) });
+                } else {
+                    return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_SFH,
+                        new CpsOp[] { CpsOp.IntLiteral(SubInfo.ON_DIE),
+                        CpsOp.Null(Tokens.Frame), CpsOp.IntLiteral(-1),
+                        CpsOp.Null(Tokens.String), CpsOp.MethodCall(null,
+                            Tokens.Kernel_NewROScalar, new CpsOp[] { th.Scan(zyg[1]) }) });
+                }
+            };
+            handlers["control"] = delegate(NamProcessor th, object[] zyg) {
+                CpsOp[] z = new CpsOp[5];
+                for (int i = 1; i < 5; i++)
+                    z[i] = th.Scan(zyg[i+1]);
+                z[0] = CpsOp.IntLiteral(FixInt(zyg[1]));
+                return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_SFH, z);
+            };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
                 if (zyg[1] is JScalar) {
@@ -2017,7 +2047,8 @@ namespace Niecza.CLRBackend {
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp rhs = th.Scan(zyg[3]);
                 bool ro   = ((JScalar)zyg[1]).num != 0;
-                bool list = ((JScalar)zyg[2]).num != 0;
+                bool list = ((JScalar)zyg[2]).str != "" &&
+                    ((JScalar)zyg[2]).num != 0; // XXX manifests in &first
                 return CpsOp.MethodCall(Tokens.Variable,
                         Tokens.Kernel_NewBoundVar, new CpsOp[] {
                             CpsOp.BoolLiteral(ro),
@@ -2086,6 +2117,7 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Ternary(z[0], z[1], z[2]); };
             thandlers["sink"] = delegate(CpsOp[] z) {
                 return CpsOp.Sink(z[0]); };
+            thandlers["callframe"] = delegate(CpsOp[] z) { return CpsOp.CallFrame(); };
             // yuck.
             thandlers["fvarlist_length"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Int32, OpCodes.Conv_I4,
@@ -2100,7 +2132,11 @@ namespace Niecza.CLRBackend {
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
                     new CpsOp[] { z[1], z[0] }); };
+            thandlers["vvarlist_item"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.VVarList_Item, new CpsOp[]{
+                    z[1], z[0] }); };
             thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
+            thandlers["newrwlistvar"] = Methody(null, Tokens.Kernel_NewRWListVar);
             thandlers["iter_hasflat"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_IterHasFlat,
                     new CpsOp[] { z[0], CpsOp.BoolLiteral(true) }); };
@@ -2152,6 +2188,7 @@ namespace Niecza.CLRBackend {
             thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
             thandlers["str_tolower"] = Methody(null, Tokens.String.GetMethod("ToLowerInvariant"));
             thandlers["str_toupper"] = Methody(null, Tokens.String.GetMethod("ToUpperInvariant"));
+            thandlers["strcmp"] = Methody(null, Tokens.String.GetMethod("CompareOrdinal", new Type[] { Tokens.String, Tokens.String }));
             thandlers["strbuf_new"] = Constructy(typeof(StringBuilder).GetConstructor(new Type[0]));
             thandlers["strbuf_seal"] = Methody(null, Tokens.Object_ToString);
             thandlers["say"] = Methody(null, Tokens.Console_WriteLine);
@@ -2174,6 +2211,7 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
             thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
+            thandlers["how"] = Methody(Tokens.IP6, Tokens.IP6.GetMethod("HOW"));
             thandlers["obj_what"] = Methody(null, Tokens.IP6.GetMethod("GetTypeObject"));
             thandlers["obj_isa"] = Methody(null, Tokens.IP6.GetMethod("Isa"));
             thandlers["obj_does"] = Methody(null, Tokens.IP6.GetMethod("Does"));
@@ -2233,6 +2271,10 @@ namespace Niecza.CLRBackend {
             thandlers["to_jsync"] = Methody(null, typeof(JsyncWriter).GetMethod("ToJsync"));
             thandlers["from_jsync"] = Methody(null, typeof(JsyncReader).GetMethod("FromJsync"));
             thandlers["do_require"] = Methody(null, Tokens.Kernel.GetMethod("DoRequire"));
+            thandlers["frame_caller"] = FieldGet(Tokens.Frame, "caller");
+            thandlers["frame_file"] = Methody(null, Tokens.Frame.GetMethod("ExecutingFile"));
+            thandlers["frame_line"] = Methody(null, Tokens.Frame.GetMethod("ExecutingLine"));
+            thandlers["frame_hint"] = Methody(null, Tokens.Frame.GetMethod("LexicalFind"));
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {
