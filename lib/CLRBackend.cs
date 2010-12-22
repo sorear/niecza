@@ -166,6 +166,10 @@ namespace Niecza.CLRBackend {
             DoVisitSubsPostorder(mainline_ref.index, cb);
         }
 
+        public void VisitSubsPreorder(Action<int,StaticSub> cb) {
+            DoVisitSubsPreorder(mainline_ref.index, cb);
+        }
+
         public void VisitPackages(Action<int,Package> cb) {
             for (int i = 0; i < xref.Length; i++) {
                 Package p = xref[i] as Package;
@@ -179,6 +183,13 @@ namespace Niecza.CLRBackend {
             foreach (int z in s.zyg)
                 DoVisitSubsPostorder(z, cb);
             cb(ix,s);
+        }
+
+        private void DoVisitSubsPreorder(int ix, Action<int,StaticSub> cb) {
+            StaticSub s = xref[ix] as StaticSub;
+            cb(ix,s);
+            foreach (int z in s.zyg)
+                DoVisitSubsPreorder(z, cb);
         }
 
         public Package GetPackage(string[] strs, int f, int l) {
@@ -677,6 +688,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type Variable = typeof(Variable);
         public static readonly Type BValue = typeof(BValue);
         public static readonly Type DynObject = typeof(DynObject);
+        public static readonly Type DynBlockDelegate = typeof(DynBlockDelegate);
         public static readonly Type DynMetaObject = typeof(DynMetaObject);
         public static readonly Type VarHash = typeof(Dictionary<string,Variable>);
         public static readonly Type VVarList = typeof(VarDeque);
@@ -686,6 +698,11 @@ namespace Niecza.CLRBackend {
         public static readonly Type CC = typeof(CC);
         public static readonly Type LAD = typeof(LAD);
 
+        public static readonly ConstructorInfo SubInfo_ctor =
+            SubInfo.GetConstructor(new Type[] {
+                    String, typeof(int[]), typeof(DynBlockDelegate),
+                    SubInfo, LAD, typeof(int[]), typeof(string[]),
+                    Int32, typeof(string[]), typeof(int[]) });
         public static readonly ConstructorInfo DynBlockDelegate_ctor =
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
                     typeof(object), typeof(IntPtr) });
@@ -1531,6 +1548,21 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrDBDLiteral : ClrOp {
+        readonly MethodInfo body;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        public ClrDBDLiteral(MethodInfo body) {
+            this.body = body;
+            Returns = Tokens.DynBlockDelegate;
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldnull);
+            cx.il.Emit(OpCodes.Ldftn, body);
+            cx.il.Emit(OpCodes.Newobj, Tokens.DynBlockDelegate_ctor);
+        }
+    }
+
     // Because the CLR has no evaluation stack types narrower than int32, this
     // node does duty both for int and bool.  When sized types are added, it
     // will also handle int8, int16, and unsigned versions thereof.
@@ -1839,6 +1871,10 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrIntLiteral(Tokens.Boolean, x ? 1 : 0));
         }
 
+        public static CpsOp DBDLiteral(MethodInfo x) {
+            return new CpsOp(new ClrDBDLiteral(x));
+        }
+
         public static CpsOp Label(string name, bool case_too) {
             return CpsOp.Cps(new ClrLabel(name, case_too), Tokens.Void);
         }
@@ -1968,14 +2004,71 @@ namespace Niecza.CLRBackend {
         public static CpsOp NewIntArray(int[] vec) {
             return new CpsOp(new ClrNewIntArray(vec));
         }
+
+        public static CpsOp StringArray(string[] vec) {
+            if (vec.Length == 0) {
+                return Null(typeof(string[]));
+            } else {
+                CpsOp[] tmp = new CpsOp[vec.Length];
+                for (int i = 0; i < vec.Length; i++)
+                    tmp[i] = CpsOp.StringLiteral(vec[i]);
+                return NewArray(Tokens.String, tmp);
+            }
+        }
+    }
+
+    class CpsBuilder {
+        public readonly TypeBuilder tb;
+        public readonly MethodBuilder mb;
+        public readonly CgContext cx;
+
+        public CpsBuilder(TypeBuilder tb, string clrname, bool pub) {
+            this.tb = tb;
+            mb = tb.DefineMethod(clrname, MethodAttributes.Static |
+                    (pub ? MethodAttributes.Public : 0),
+                    typeof(Frame), new Type[] { typeof(Frame) });
+            cx = new CgContext();
+            cx.tb = tb;
+        }
+
+        public void Build(CpsOp body) {
+            // ListCases may want to define labels, so this needs to come
+            // early
+            cx.il = mb.GetILGenerator();
+            cx.num_cases = 1;
+
+            foreach (ClrOp s in body.stmts)
+                s.ListCases(cx);
+            body.head.ListCases(cx);
+
+            cx.cases = new Label[cx.num_cases];
+            for (int i = 0; i < cx.num_cases; i++)
+                cx.cases[i] = cx.il.DefineLabel();
+
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_ip);
+            cx.il.Emit(OpCodes.Switch, cx.cases);
+
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldstr, "Invalid IP");
+            cx.il.Emit(OpCodes.Call, Tokens.Kernel_Die);
+            cx.il.Emit(OpCodes.Ret);
+
+            cx.il.MarkLabel(cx.cases[cx.next_case++]);
+            foreach (ClrOp s in body.stmts)
+                s.CodeGen(cx);
+            body.head.CodeGen(cx);
+        }
     }
 
     class NamProcessor {
         StaticSub sub;
+        CpsBuilder cpb;
         Dictionary<string, Type> let_types = new Dictionary<string, Type>();
 
-        public NamProcessor(StaticSub sub) {
+        public NamProcessor(CpsBuilder cpb, StaticSub sub) {
             this.sub = sub;
+            this.cpb = cpb;
         }
 
         CpsOp AccessLex(object[] zyg) {
@@ -2567,7 +2660,46 @@ namespace Niecza.CLRBackend {
                 return th.Scan(real(zyg)); };
         }
 
-        public CpsOp MakeBody() { return Scan(WrapBody()); }
+        public void MakeBody() {
+            cpb.Build(Scan(WrapBody()));
+        }
+
+        public CpsOp SubInfoCtor() {
+            CpsOp[] args = new CpsOp[10];
+            args[0] = CpsOp.StringLiteral(sub.name);
+            args[1] = CpsOp.NewIntArray( new int[] { 50 } ); /* TODO lines */
+            args[2] = CpsOp.DBDLiteral(cpb.mb);
+            args[3] = (sub.outer != null) ?
+                CpsOp.GetSField(((StaticSub)sub.outer.Resolve()).subinfo) :
+                CpsOp.Null(Tokens.SubInfo);
+            args[4] = CpsOp.Null(Tokens.LAD); /* TODO LTM */
+            args[5] = CpsOp.NewIntArray( new int[] { 1 } ); /* TODO ehspan */
+            args[6] = CpsOp.StringArray( new string[] { } );
+            args[7] = CpsOp.IntLiteral( 0 );
+            List<string> dylexn = new List<string>();
+            List<int> dylexi = new List<int>();
+            foreach (KeyValuePair<string, Lexical> kv in sub.lexicals) {
+                if (Lexical.IsDynamicName(kv.Key)) {
+                    int index =
+                        (kv.Value is LexSimple) ? ((LexSimple)kv.Value).index :
+                        (kv.Value is LexSub) ? ((LexSub)kv.Value).index :
+                        -1;
+                    if (index >= 0) {
+                        dylexn.Add(kv.Key);
+                        dylexi.Add(index);
+                    }
+                }
+            }
+            if (dylexn.Count > 0) {
+                args[8] = CpsOp.StringArray(dylexn.ToArray());
+                args[9] = CpsOp.NewIntArray(dylexi.ToArray());
+            } else {
+                args[8] = CpsOp.Null(typeof(string[]));
+                args[9] = CpsOp.Null(typeof(int[]));
+            }
+
+            return CpsOp.ConstructorCall(Tokens.SubInfo_ctor, args);
+        }
 
         void EnterCode(List<object> frags) {
             foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
@@ -2691,15 +2823,17 @@ namespace Niecza.CLRBackend {
                     FieldAttributes.Static);
             });
 
-            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
-                Console.WriteLine(obj.name);
-                NamProcessor np = new NamProcessor(obj);
-                DefineCpsMethod(
-                    Unit.SharedName('C', ix, obj.name), false,
-                    np.MakeBody());
+            NamProcessor[] aux = new NamProcessor[unit.xref.Length];
+            unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
+                CpsBuilder cpb = new CpsBuilder(tb,
+                    Unit.SharedName('C', ix, obj.name), false);
+                NamProcessor np = aux[ix] = new NamProcessor(cpb, obj);
+                np.MakeBody();
             });
 
-            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
+            List<CpsOp> thaw = new List<CpsOp>();
+            unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
+                thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
                 // TODO append chunks to Thaw here for sub2 stuff
             });
 
@@ -2707,49 +2841,15 @@ namespace Niecza.CLRBackend {
                 // TODO append chunks to Thaw here for sub3 stuff
             });
 
-            // TODO generate BOOT method here
+            CpsBuilder boot = new CpsBuilder(tb, "BOOT", true);
+            thaw.Add(CpsOp.CpsReturn(new CpsOp[0]));
+            boot.Build(CpsOp.Sequence(thaw.ToArray()));
         }
 
         void Finish(string filename) {
             tb.CreateType();
 
             ab.Save(filename);
-        }
-
-        MethodInfo DefineCpsMethod(string name, bool pub, CpsOp body) {
-            MethodBuilder mb = tb.DefineMethod(name, MethodAttributes.Static |
-                    (pub ? MethodAttributes.Public : 0),
-                    typeof(Frame), new Type[] { typeof(Frame) });
-            CgContext cx = new CgContext();
-            cx.tb = tb;
-            // ListCases may want to define labels, so this needs to come
-            // early
-            cx.il = mb.GetILGenerator();
-            cx.num_cases = 1;
-
-            foreach (ClrOp s in body.stmts)
-                s.ListCases(cx);
-            body.head.ListCases(cx);
-
-            cx.cases = new Label[cx.num_cases];
-            for (int i = 0; i < cx.num_cases; i++)
-                cx.cases[i] = cx.il.DefineLabel();
-
-            cx.il.Emit(OpCodes.Ldarg_0);
-            cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_ip);
-            cx.il.Emit(OpCodes.Switch, cx.cases);
-
-            cx.il.Emit(OpCodes.Ldarg_0);
-            cx.il.Emit(OpCodes.Ldstr, "Invalid IP");
-            cx.il.Emit(OpCodes.Call, Tokens.Kernel_Die);
-            cx.il.Emit(OpCodes.Ret);
-
-            cx.il.MarkLabel(cx.cases[cx.next_case++]);
-            foreach (ClrOp s in body.stmts)
-                s.CodeGen(cx);
-            body.head.CodeGen(cx);
-
-            return mb;
         }
 
         void DefineMainMethod(MethodInfo boot) {
