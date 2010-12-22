@@ -563,7 +563,11 @@ namespace Niecza.CLRBackend {
             return unit.GetPackage(path, 0, path.Length);
         }
         public override ClrOp GetCode(int up) {
-            ModuleWithTypeObject p = (ModuleWithTypeObject) GetPackage();
+            ModuleWithTypeObject p = GetPackage() as ModuleWithTypeObject;
+            if (p == null) {
+                return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
+                        new ClrOp[] { new ClrGetSField(Tokens.Kernel_AnyP) });
+            }
             return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
                     new ClrOp[] { new ClrGetSField(p.typeObject) });
         }
@@ -744,6 +748,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("IterHasFlat");
         public static readonly MethodInfo Kernel_ContextHelper =
             typeof(Kernel).GetMethod("ContextHelper");
+        public static readonly MethodInfo Kernel_SetStatus =
+            typeof(Kernel).GetMethod("SetStatus");
         public static readonly MethodInfo Kernel_SortHelper =
             typeof(Kernel).GetMethod("SortHelper");
         public static readonly MethodInfo RxFrame_PushCapture =
@@ -2283,6 +2289,9 @@ namespace Niecza.CLRBackend {
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
             thandlers["context_get"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_ContextHelper,
+                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+            thandlers["set_status"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_SetStatus,
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
             thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
             thandlers["newrwlistvar"] = Methody(null, Tokens.Kernel_NewRWListVar);
