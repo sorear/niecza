@@ -2249,7 +2249,8 @@ namespace Niecza.CLRBackend {
                     if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
                         string s = ((f & LexSimple.HASH) != 0) ? "Hash" : "Array";
                         bit = new object[] { new JScalar("methodcall"),
-                            "new", "", new object[] { new JScalar("corelex"), new JScalar(s) },
+                            new JScalar("new"), new JScalar(""),
+                            new object[] { new JScalar("corelex"), new JScalar(s) },
                             new object[] { new JScalar("fetch"), new object[] { new JScalar("corelex"), new JScalar(s) } } };
                     } else {
                         bit = new object[] { new JScalar("newblankrwscalar") };
@@ -2265,9 +2266,14 @@ namespace Niecza.CLRBackend {
             List<object> enter = new List<object>();
             EnterCode(enter);
 
-            if ((sub.flags & StaticSub.GATHER_HACK) != 0)
-                throw new NotImplementedException();
-            else if (sub.augment_hack != null)
+            // TODO: bind a ro container around return values
+            if ((sub.flags & StaticSub.GATHER_HACK) != 0) {
+                enter.Insert(0, new JScalar("prog"));
+                enter.Add(new object[] { new JScalar("sink"), b });
+                enter.Add(new object[] { new JScalar("take"),
+                    new object[] { new JScalar("corelex"), new JScalar("EMPTY") } });
+                b = enter.ToArray();
+            } else if (sub.augment_hack != null)
                 throw new NotImplementedException();
             else if (sub.parametric_role_hack != null)
                 throw new NotImplementedException();
