@@ -712,6 +712,10 @@ namespace Niecza.CLRBackend {
             Variable.GetMethod("Fetch");
         public static readonly MethodInfo VVarList_Item =
             VVarList.GetMethod("get_Item");
+        public static readonly MethodInfo VarHash_get_Item =
+            VarHash.GetMethod("get_Item");
+        public static readonly MethodInfo VarHash_set_Item =
+            VarHash.GetMethod("set_Item");
         public static readonly MethodInfo Kernel_MakeSub =
             typeof(Kernel).GetMethod("MakeSub");
         public static readonly MethodInfo Kernel_Die =
@@ -730,6 +734,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewBoundVar");
         public static readonly MethodInfo Kernel_IterHasFlat =
             typeof(Kernel).GetMethod("IterHasFlat");
+        public static readonly MethodInfo Kernel_SortHelper =
+            typeof(Kernel).GetMethod("SortHelper");
         public static readonly MethodInfo Console_WriteLine =
             typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
         public static readonly MethodInfo Console_Write =
@@ -1534,6 +1540,35 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrNewArray : ClrOp {
+        readonly ClrOp[] zyg;
+        public ClrNewArray(Type r, ClrOp[] zyg) {
+            Returns = r.MakeArrayType();
+            if (r.IsValueType)
+                throw new ArgumentException();
+            foreach(ClrOp c in zyg)
+                TypeCheck(c.Returns, r, "array element");
+            HasCases = false;
+            this.zyg = zyg;
+        }
+        public override ClrOp Sink() {
+            ClrOp[] szyg = new ClrOp[zyg.Length];
+            for (int i = 0; i < szyg.Length; i++)
+                szyg[i] = zyg[i].Sink();
+            return new ClrSeq(szyg);
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Newarr, Returns.GetElementType());
+            for (int i = 0; i < zyg.Length; i++) {
+                cx.il.Emit(OpCodes.Dup);
+                cx.EmitInt(i);
+                zyg[i].CodeGen(cx);
+                cx.il.Emit(OpCodes.Stelem_Ref);
+            }
+        }
+    }
+
+
     // CpsOps are rather higher level, and can support operations that
     // both return to the trampoline and return a value.
     class CpsOp {
@@ -1858,6 +1893,13 @@ namespace Niecza.CLRBackend {
         public static CpsOp CallFrame() {
             return new CpsOp(ClrCpsFrame.Instance);
         }
+
+        // only use this for reference types
+        public static CpsOp NewArray(Type ty, CpsOp[] zyg) {
+            return Primitive(zyg, delegate (ClrOp[] h) {
+                return new CpsOp(new ClrNewArray(ty, h));
+            });
+        }
     }
 
     class NamProcessor {
@@ -2118,6 +2160,11 @@ namespace Niecza.CLRBackend {
             thandlers["sink"] = delegate(CpsOp[] z) {
                 return CpsOp.Sink(z[0]); };
             thandlers["callframe"] = delegate(CpsOp[] z) { return CpsOp.CallFrame(); };
+            thandlers["fvarlist_new"] = delegate(CpsOp[] z) {
+                return CpsOp.NewArray(Tokens.Variable, z); };
+            thandlers["setbox"] = delegate(CpsOp[] z) {
+                MethodInfo mi = typeof(Kernel).GetMethod("SetBox").MakeGenericMethod(z[1].head.Returns);
+                return CpsOp.MethodCall(null, mi, z); };
             // yuck.
             thandlers["fvarlist_length"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Int32, OpCodes.Conv_I4,
@@ -2135,6 +2182,15 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.VVarList_Item, new CpsOp[]{
                     z[1], z[0] }); };
+            thandlers["varhash_getindex"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.VarHash_get_Item, new CpsOp[]{
+                    z[1], z[0] }); };
+            thandlers["varhash_setindex"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.VarHash_set_Item, new CpsOp[]{
+                    z[1], z[0], z[2] }); };
+            thandlers["vvarlist_sort"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_SortHelper,
+                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
             thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
             thandlers["newrwlistvar"] = Methody(null, Tokens.Kernel_NewRWListVar);
             thandlers["iter_hasflat"] = delegate(CpsOp[] z) {
@@ -2177,12 +2233,29 @@ namespace Niecza.CLRBackend {
                 return CpsOp.MethodCall(null, Tokens.TW_WriteLine, new CpsOp[]{
                     CpsOp.MethodCall(null, Tokens.Console_get_Error, new CpsOp[0]),
                     z[0] }); };
+            MethodInfo itcommon = Tokens.Builtins.GetMethod("HashIter");
+            thandlers["bif_hash_keys"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
+                    CpsOp.IntLiteral(0), z[0] }); };
+            thandlers["bif_hash_values"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
+                    CpsOp.IntLiteral(1), z[0] }); };
+            thandlers["bif_hash_kv"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
+                    CpsOp.IntLiteral(2), z[0] }); };
+            thandlers["bif_hash_pairs"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
+                    CpsOp.IntLiteral(3), z[0] }); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["llhow_name"] = FieldGet(Tokens.DynMetaObject, "name");
             thandlers["stab_what"] = FieldGet(Tokens.DynMetaObject, "typeObject");
             thandlers["obj_llhow"] = FieldGet(Tokens.IP6, "mo");
             thandlers["varhash_clear"] = Methody(null, Tokens.VarHash.GetMethod("Clear"));
+            thandlers["varhash_new"] = Constructy(Tokens.VarHash.GetConstructor(new Type[0]));
+            thandlers["varhash_dup"] = Constructy(Tokens.VarHash.GetConstructor(new Type[]{ Tokens.VarHash }));
+            thandlers["varhash_contains_key"] = Methody(null, Tokens.VarHash.GetMethod("ContainsKey"));
+            thandlers["varhash_delete_key"] = Methody(null, Tokens.VarHash.GetMethod("Remove"));
             thandlers["num_to_string"] = Methody(null, Tokens.Object_ToString);
             thandlers["str_length"] = Methody(null, Tokens.String.GetMethod("get_Length"));
             thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
@@ -2253,6 +2326,10 @@ namespace Niecza.CLRBackend {
             thandlers["obj_getdef"] = Contexty("mro_raw_defined");
             thandlers["obj_getnum"] = Contexty("mro_raw_Numeric");
             thandlers["obj_getstr"] = Contexty("mro_raw_Str");
+            thandlers["bif_at_key"] = thandlers["obj_at_key"] = Contexty("mro_at_key");
+            thandlers["bif_at_pos"] = thandlers["obj_at_pos"] = Contexty("mro_at_pos");
+            thandlers["bif_exists_key"] = thandlers["obj_exists_key"] = Contexty("mro_exists_key");
+            thandlers["bif_delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
             thandlers["obj_typename"] = Methody(null, Tokens.IP6.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");
