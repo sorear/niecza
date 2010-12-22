@@ -579,6 +579,7 @@ namespace Niecza.CLRBackend {
     // that switch generation is done in another pass.
     class CgContext {
         public ILGenerator il;
+        public TypeBuilder tb;
         public int next_case;
         public Label[] cases;
         public int num_cases;
@@ -677,6 +678,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type VVarList = typeof(VarDeque);
         public static readonly Type FVarList = typeof(Variable[]);
         public static readonly Type Cursor = typeof(Cursor);
+        public static readonly Type RxFrame = typeof(RxFrame);
         public static readonly Type CC = typeof(CC);
         public static readonly Type LAD = typeof(LAD);
 
@@ -686,6 +688,8 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo DynObject_ctor =
             typeof(DynObject).GetConstructor(new Type[] {
                     DynMetaObject });
+        public static readonly ConstructorInfo RxFrame_ctor =
+            RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean, Boolean });
         public static readonly ConstructorInfo SV_ctor =
             typeof(SimpleVariable).GetConstructor(new Type[] {
                     Boolean, Boolean, DynMetaObject, typeof(ViviHook), IP6 });
@@ -699,6 +703,8 @@ namespace Niecza.CLRBackend {
             typeof(NewHashViviHook).GetConstructor(new Type[] { Variable, String });
         public static readonly ConstructorInfo NewArrayViviHook_ctor =
             typeof(NewArrayViviHook).GetConstructor(new Type[] { Variable, Int32 });
+        public static readonly ConstructorInfo CC_ctor =
+            CC.GetConstructor(new Type[] { typeof(int[]) });
 
         public static readonly MethodInfo IP6_InvokeMethod =
             IP6.GetMethod("InvokeMethod");
@@ -712,6 +718,8 @@ namespace Niecza.CLRBackend {
             Variable.GetMethod("Fetch");
         public static readonly MethodInfo VVarList_Item =
             VVarList.GetMethod("get_Item");
+        public static readonly MethodInfo VarHash_Remove =
+            VarHash.GetMethod("Remove");
         public static readonly MethodInfo VarHash_get_Item =
             VarHash.GetMethod("get_Item");
         public static readonly MethodInfo VarHash_set_Item =
@@ -734,8 +742,12 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewBoundVar");
         public static readonly MethodInfo Kernel_IterHasFlat =
             typeof(Kernel).GetMethod("IterHasFlat");
+        public static readonly MethodInfo Kernel_ContextHelper =
+            typeof(Kernel).GetMethod("ContextHelper");
         public static readonly MethodInfo Kernel_SortHelper =
             typeof(Kernel).GetMethod("SortHelper");
+        public static readonly MethodInfo RxFrame_PushCapture =
+            typeof(RxFrame).GetMethod("PushCapture");
         public static readonly MethodInfo Console_WriteLine =
             typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
         public static readonly MethodInfo Console_Write =
@@ -761,6 +773,8 @@ namespace Niecza.CLRBackend {
             Kernel.GetField("AnyMO");
         public static readonly FieldInfo Kernel_AnyP =
             Kernel.GetField("AnyP");
+        public static readonly FieldInfo Frame_rx =
+            typeof(Frame).GetField("rx");
         public static readonly FieldInfo Frame_ip =
             typeof(Frame).GetField("ip");
         public static readonly FieldInfo Frame_caller =
@@ -1558,6 +1572,7 @@ namespace Niecza.CLRBackend {
             return new ClrSeq(szyg);
         }
         public override void CodeGen(CgContext cx) {
+            cx.EmitInt(zyg.Length);
             cx.il.Emit(OpCodes.Newarr, Returns.GetElementType());
             for (int i = 0; i < zyg.Length; i++) {
                 cx.il.Emit(OpCodes.Dup);
@@ -1565,6 +1580,37 @@ namespace Niecza.CLRBackend {
                 zyg[i].CodeGen(cx);
                 cx.il.Emit(OpCodes.Stelem_Ref);
             }
+        }
+    }
+
+    class ClrNewIntArray : ClrOp {
+        readonly int[] vec;
+        public ClrNewIntArray(int[] vec) {
+            Returns = typeof(int[]);
+            this.vec = vec;
+            Constant = true;
+        }
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        [ThreadStatic] private static int next_array;
+        public override void CodeGen(CgContext cx) {
+            byte[] buf = new byte[vec.Length * 4];
+            int r = 0;
+            for (int i = 0; i < vec.Length; i++) {
+                uint d = (uint) vec[i];
+                buf[r++] = (byte)((d >>  0) & 0xFF);
+                buf[r++] = (byte)((d >>  8) & 0xFF);
+                buf[r++] = (byte)((d >> 16) & 0xFF);
+                buf[r++] = (byte)((d >> 24) & 0xFF);
+            }
+            FieldBuilder fb = cx.tb.DefineInitializedData("A" + (next_array++),
+                    buf, 0);
+
+            cx.EmitInt(vec.Length);
+            // the mono JIT checks for this exact sequence
+            cx.il.Emit(OpCodes.Newarr, Tokens.Int32);
+            cx.il.Emit(OpCodes.Dup);
+            cx.il.Emit(OpCodes.Ldtoken, fb);
+            cx.il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
         }
     }
 
@@ -1876,6 +1922,18 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrGetSField(fi));
         }
 
+        public static CpsOp SetField(FieldInfo fi, CpsOp za, CpsOp zb) {
+            return Primitive(new CpsOp[2] { za, zb }, delegate(ClrOp[] heads) {
+                return new CpsOp(new ClrSetField(fi, heads[0], heads[1]));
+            });
+        }
+
+        public static CpsOp SetSField(FieldInfo fi, CpsOp zyg) {
+            return Primitive(new CpsOp[1] { zyg }, delegate(ClrOp[] heads) {
+                return new CpsOp(new ClrSetSField(fi, heads[0]));
+            });
+        }
+
         public static CpsOp Sink(CpsOp zyg) {
             return new CpsOp(zyg.stmts, zyg.head.Sink());
         }
@@ -1899,6 +1957,10 @@ namespace Niecza.CLRBackend {
             return Primitive(zyg, delegate (ClrOp[] h) {
                 return new CpsOp(new ClrNewArray(ty, h));
             });
+        }
+
+        public static CpsOp NewIntArray(int[] vec) {
+            return new CpsOp(new ClrNewIntArray(vec));
         }
     }
 
@@ -1952,6 +2014,9 @@ namespace Niecza.CLRBackend {
                 uplevel++;
             }
         }
+
+        // TODO implement me
+        CpsOp Constant(CpsOp val) { return val; }
 
         CpsOp SubyCall(bool ismethod, object[] zyg) {
             string mname = ismethod ? (((JScalar)zyg[1]).str) : null;
@@ -2151,9 +2216,34 @@ namespace Niecza.CLRBackend {
                 th.let_types = old;
                 return bit;
             };
+            handlers["newcc"] = delegate(NamProcessor th, object[] z) {
+                int[] vec = new int[z.Length - 1];
+                for (int i = 0; i < vec.Length; i++)
+                    vec[i] = FixInt(z[i+1]);
+                return CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
+                    CpsOp.NewIntArray(vec) });
+            };
+            handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
+                CpsOp[] strs = new CpsOp[z.Length - 2];
+                for(int i = 0; i < strs.Length; i++)
+                    strs[i] = CpsOp.StringLiteral(FixStr(z[i+2]));
+                CpsOp vec = th.Constant(CpsOp.NewArray(Tokens.String, strs));
+                return CpsOp.MethodCall(null, Tokens.RxFrame_PushCapture, new CpsOp[] {
+                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()), vec,
+                    th.Scan(z[1]) });
+            };
+            handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
+                CpsOp[] args = new CpsOp[z.Length - 1];
+                for(int i = 0; i < z.Length - 2; i++)
+                    args[i+1] = th.Scan(z[i+2]);
+                args[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
+                CpsOp call = CpsOp.MethodCall(null,
+                        Tokens.RxFrame.GetMethod(FixStr(z[1])), args);
+                return CpsOp.Goto("backtrack", true, new CpsOp[] { call });
+            };
+            handlers["const"] = delegate(NamProcessor th, object[] z) {
+                return th.Constant(th.Scan(z[1])); };
 
-            // TODO: implement
-            thandlers["const"] = delegate(CpsOp[] z) { return z[0]; };
             thandlers["return"] = CpsOp.CpsReturn;
             thandlers["ternary"] = delegate(CpsOp[] z) {
                 return CpsOp.Ternary(z[0], z[1], z[2]); };
@@ -2190,6 +2280,9 @@ namespace Niecza.CLRBackend {
                     z[1], z[0], z[2] }); };
             thandlers["vvarlist_sort"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_SortHelper,
+                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+            thandlers["context_get"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_ContextHelper,
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
             thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
             thandlers["newrwlistvar"] = Methody(null, Tokens.Kernel_NewRWListVar);
@@ -2229,6 +2322,8 @@ namespace Niecza.CLRBackend {
                         z[1], z[2] }), z[3] }); };
             thandlers["strbuf_append"] = delegate(CpsOp[] z) {
                 return CpsOp.Sink(CpsOp.MethodCall(null, Tokens.StringBuilder_Append_String, z)); };
+            thandlers["varhash_delete_key"] = delegate(CpsOp[] z) {
+                return CpsOp.Sink(CpsOp.MethodCall(null, Tokens.VarHash_Remove, z)); };
             thandlers["note"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.TW_WriteLine, new CpsOp[]{
                     CpsOp.MethodCall(null, Tokens.Console_get_Error, new CpsOp[0]),
@@ -2246,6 +2341,37 @@ namespace Niecza.CLRBackend {
             thandlers["bif_hash_pairs"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
                     CpsOp.IntLiteral(3), z[0] }); };
+            Func<CpsOp[], CpsOp> real_pushcut = RxCall(null, "PushCutGroup");
+            handlers["pushcut"] = delegate(NamProcessor th, object[] z) {
+                return real_pushcut(new CpsOp[] { CpsOp.StringLiteral(FixStr(z[1])) }); };
+            thandlers["rxframe"] = delegate(CpsOp[] z) {
+                return CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()); };
+            handlers["rxcall"] = delegate(NamProcessor th, object[] z) {
+                CpsOp[] x = new CpsOp[z.Length - 1];
+                for (int i = 2; i < z.Length; i++)
+                    x[i-1] = th.Scan(z[i]);
+                x[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
+                return CpsOp.MethodCall(null, Tokens.RxFrame.GetMethod(FixStr(z[1])), x); };
+            handlers["rxinit"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.SetField(Tokens.Frame_rx, CpsOp.CallFrame(),
+                    CpsOp.ConstructorCall(Tokens.RxFrame_ctor, new CpsOp[] {
+                        th.Scan(z[1]), th.Scan(z[2]),
+                        CpsOp.BoolLiteral(FixBool(z[3])),
+                        CpsOp.BoolLiteral(FixBool(z[4])) })); };
+            thandlers["popcut"] = RxCall(null, "PopCutGroup");
+            thandlers["rxend"] = RxCall(Tokens.Void, "End");
+            thandlers["rxfinalend"] = RxCall(Tokens.Void, "FinalEnd");
+            thandlers["rxbacktrack"] = RxCall(Tokens.Void, "Backtrack");
+            thandlers["rxgetquant"] = RxCall(null, "GetQuant");
+            thandlers["rxsetquant"] = RxCall(null, "SetQuant");
+            thandlers["rxopenquant"] = RxCall(null, "OpenQuant");
+            thandlers["rxclosequant"] = RxCall(null, "CloseQuant");
+            thandlers["rxincquant"] = RxCall(null, "IncQuant");
+            thandlers["rxsetclass"] = RxCall(null, "SetClass");
+            thandlers["rxsetpos"] = RxCall(null, "SetPos");
+            thandlers["rxsetcapsfrom"] = RxCall(null, "SetCapturesFrom");
+            thandlers["rxgetpos"] = RxCall(null, "GetPos");
+            thandlers["rxcommitgroup"] = RxCall(null, "CommitGroup");
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["llhow_name"] = FieldGet(Tokens.DynMetaObject, "name");
@@ -2255,7 +2381,6 @@ namespace Niecza.CLRBackend {
             thandlers["varhash_new"] = Constructy(Tokens.VarHash.GetConstructor(new Type[0]));
             thandlers["varhash_dup"] = Constructy(Tokens.VarHash.GetConstructor(new Type[]{ Tokens.VarHash }));
             thandlers["varhash_contains_key"] = Methody(null, Tokens.VarHash.GetMethod("ContainsKey"));
-            thandlers["varhash_delete_key"] = Methody(null, Tokens.VarHash.GetMethod("Remove"));
             thandlers["num_to_string"] = Methody(null, Tokens.Object_ToString);
             thandlers["str_length"] = Methody(null, Tokens.String.GetMethod("get_Length"));
             thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
@@ -2283,12 +2408,28 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_from_fvarlist"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.FVarList }));
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
             thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
+            thandlers["_addprivatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("AddPrivateMethod"));
+            thandlers["_addmethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("AddMethod"));
+            thandlers["_invalidate"] = Methody(null, Tokens.DynMetaObject.GetMethod("Invalidate"));
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
             thandlers["how"] = Methody(Tokens.IP6, Tokens.IP6.GetMethod("HOW"));
             thandlers["obj_what"] = Methody(null, Tokens.IP6.GetMethod("GetTypeObject"));
             thandlers["obj_isa"] = Methody(null, Tokens.IP6.GetMethod("Isa"));
             thandlers["obj_does"] = Methody(null, Tokens.IP6.GetMethod("Does"));
             thandlers["obj_newblank"] = Constructy(Tokens.DynObject_ctor);
+            thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.IP6, Tokens.String }));
+            thandlers["cursor_pos"] = FieldGet(Tokens.Cursor, "pos");
+            thandlers["cursor_from"] = FieldGet(Tokens.Cursor, "from");
+            thandlers["cursor_butpos"] = Methody(null, Tokens.Cursor.GetMethod("At"));
+            thandlers["cursor_backing"] = Methody(null, Tokens.Cursor.GetMethod("GetBacking"));
+            thandlers["cursor_dows"] = Methody(null, Tokens.Cursor.GetMethod("SimpleWS"));
+            thandlers["cursor_item"] = Methody(null, Tokens.Cursor.GetMethod("GetKey"));
+            thandlers["cursor_unpackcaps"] = Methody(null, Tokens.Cursor.GetMethod("UnpackCaps"));
+            thandlers["cursor_O"] = Methody(null, Tokens.Cursor.GetMethod("O"));
+            thandlers["cursor_synthetic"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.Cursor, Tokens.String, Tokens.Int32, Tokens.Int32 }));
+            thandlers["cursor_synthcap"] = Methody(null, Tokens.Cursor.GetMethod("SynPushCapture"));
+            thandlers["cursor_fresh"] = Methody(null, Tokens.Cursor.GetMethod("FreshClass"));
+            thandlers["rxstripcaps"] = Methody(null, Tokens.Cursor.GetMethod("StripCaps"));
 
             thandlers["prog"] = CpsOp.Sequence;
 
@@ -2371,6 +2512,15 @@ namespace Niecza.CLRBackend {
             if (mi == null) throw new ArgumentException();
             return delegate(CpsOp[] cpses) {
                 return CpsOp.MethodCall(cps, mi, cpses); };
+        }
+
+        static Func<CpsOp[], CpsOp> RxCall(Type cps, string name) {
+            MethodInfo mi = Tokens.RxFrame.GetMethod(name);
+            return delegate(CpsOp[] cpses) {
+                CpsOp[] n = new CpsOp[cpses.Length + 1];
+                Array.Copy(cpses, 0, n, 1, cpses.Length);
+                n[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
+                return CpsOp.MethodCall(cps, mi, n); };
         }
 
         static Func<CpsOp[], CpsOp> Constructy(ConstructorInfo mi) {
@@ -2456,10 +2606,27 @@ namespace Niecza.CLRBackend {
                 enter.Add(new object[] { new JScalar("take"),
                     new object[] { new JScalar("corelex"), new JScalar("EMPTY") } });
                 b = enter.ToArray();
-            } else if (sub.augment_hack != null)
-                throw new NotImplementedException();
-            else if (sub.parametric_role_hack != null)
-                throw new NotImplementedException();
+            } else if (sub.augment_hack != null) {
+                enter = new List<object>();
+                object[] tuples = (object[]) sub.augment_hack;
+                for (int i = 1; i < tuples.Length; i++) {
+                    object[] t = (object[]) tuples[i];
+                    enter.Add(new object[] {
+                        new JScalar( ((JScalar)t[0]).str != "" ? "_addprivatemethod" : "_addmethod" ),
+                        new object[] { new JScalar("letvar"), new JScalar("!mo") },
+                        new object[] { new JScalar("str"), t[1] },
+                        new object[] { new JScalar("fetch"), new object[] { new JScalar("scopedlex"), t[2] } } });
+                }
+                enter.Add(new object[] { new JScalar("_invalidate"), new object[] { new JScalar("letvar"), new JScalar("!mo") } });
+                enter.Add(new object[] { new JScalar("return") });
+                enter.Insert(0, new JScalar("prog"));
+                object[] t0 = (object[]) tuples[0];
+                b = new object[] { new JScalar("letn"), new JScalar("!mo"),
+                    new object[] { new JScalar("class_ref"), new JScalar("mo"),
+                        t0[0], t0[1], t0[2] },
+                    enter.ToArray() };
+            } else if (sub.parametric_role_hack != null)
+                throw new NotImplementedException("param_role_hack");
             else if ((sub.flags & StaticSub.RETURNABLE) != 0) {
                 enter.Add(new object[] { new JScalar("return"),
                     new object[] { new JScalar("span"),
@@ -2545,6 +2712,7 @@ namespace Niecza.CLRBackend {
                     (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
             CgContext cx = new CgContext();
+            cx.tb = tb;
             // ListCases may want to define labels, so this needs to come
             // early
             cx.il = mb.GetILGenerator();

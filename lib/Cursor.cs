@@ -391,10 +391,10 @@ public sealed class RxFrame {
         return th.caller;
     }
     public Frame End(Frame th) {
-        return End(th, MakeMatch());
+        return EndWith(th, MakeMatch());
     }
     // currently just used for protoregex
-    public Frame End(Frame th, Cursor m) {
+    public Frame EndWith(Frame th, Cursor m) {
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
         if (return_one) {

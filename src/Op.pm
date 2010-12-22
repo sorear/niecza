@@ -1145,7 +1145,7 @@ use CgOp;
                     CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('self'))),
                     ($self->passcap?1:0), ($self->passcut?1:0)),
             ($self->passcap ? () :
-                CgOp::rxpushcapture(CgOp::null('cursor'), @mcaps)),
+                CgOp::rxpushcapture(CgOp::null('var'), @mcaps)),
             $self->rxop->code($body),
             ($self->canback ? CgOp::rxend() : CgOp::rxfinalend()),
             CgOp::label('backtrack'),

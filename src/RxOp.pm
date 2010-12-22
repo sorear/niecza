@@ -924,7 +924,7 @@ use CgOp;
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
           CgOp::letvar("k", CgOp::fetch(CgOp::get_first(CgOp::letvar("ks")))),
           CgOp::ncgoto('backtrack', CgOp::obj_is_defined(CgOp::letvar("k"))),
-          CgOp::rxcall('End', CgOp::cast('cursor', CgOp::letvar("k"))),
+          CgOp::rxcall('EndWith', CgOp::cast('cursor', CgOp::letvar("k"))),
           CgOp::letvar('ki', CgOp::vvarlist_new_singleton(CgOp::letvar('ks'))),
           CgOp::sink(CgOp::iter_hasflat(CgOp::letvar('ki'))),
           CgOp::sink(CgOp::vvarlist_shift(CgOp::letvar('ki'))),
