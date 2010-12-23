@@ -150,6 +150,9 @@ namespace Niecza.CLRBackend {
 
         public readonly Dictionary<string, Package> exp_pkg;
 
+        public Assembly clrAssembly;
+        public Type clrType;
+
         public Unit(object[] from) {
             mainline_ref = new Xref(from[0] as object[]);
             name = ((JScalar) from[1]).str;
@@ -785,6 +788,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_SFH =
             typeof(Kernel).GetMethod("SearchForHandler");
+        public static readonly MethodInfo Kernel_BootModule =
+            typeof(Kernel).GetMethod("BootModule");
         public static readonly MethodInfo Kernel_RunLoop =
             typeof(Kernel).GetMethod("RunLoop");
         public static readonly MethodInfo Kernel_NewROScalar =
@@ -3070,6 +3075,13 @@ namespace Niecza.CLRBackend {
                     FieldAttributes.Static);
             });
 
+            foreach (object o in unit.tdeps) {
+                string dp = JScalar.S(((object[])o)[0]);
+                if (dp == unit.name) continue;
+                thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_BootModule, new CpsOp[] {
+                    CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")) }));
+            }
+
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 CpsBuilder cpb = new CpsBuilder(this,
@@ -3364,10 +3376,10 @@ namespace Niecza.CLRBackend {
             foreach (Unit u in used_units.Values) {
                 u.BindDepends();
                 if (u != root) {
-                    Assembly da = Assembly.Load(u.name);
-                    Type dt = da.GetType(u.name);
+                    u.clrAssembly = Assembly.Load(u.name);
+                    u.clrType = u.clrAssembly.GetType(u.name);
                     u.BindFields(delegate(string fn, Type t) {
-                        return dt.GetField(fn);
+                        return u.clrType.GetField(fn);
                     });
                 }
             }
