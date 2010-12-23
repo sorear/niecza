@@ -44,6 +44,8 @@ namespace Niecza.CLRBackend {
                 r[i] = (int)((JScalar)arr[i+cut]).num;
             return r;
         }
+        public static int I(object x) { return (int)((JScalar)x).num; }
+        public static string S(object x) { return x == null ? null : ((JScalar)x).str; }
         public override string ToString() { return text; }
     }
 
@@ -859,6 +861,10 @@ namespace Niecza.CLRBackend {
             BValue.GetField("v");
         public static readonly FieldInfo SubInfo_mo =
             SubInfo.GetField("mo");
+        public static readonly FieldInfo SubInfo_sig_i =
+            SubInfo.GetField("sig_i");
+        public static readonly FieldInfo SubInfo_sig_r =
+            SubInfo.GetField("sig_r");
         public static readonly FieldInfo DynObject_slots =
             DynObject.GetField("slots");
         public static readonly FieldInfo DMO_typeObject =
@@ -1227,7 +1233,7 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Ldarg_0);
             for (int i = 0; i < up; i++)
                 cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_outer);
-            cx.EmitGetlex(index, Tokens.Variable);
+            cx.EmitGetlex(index + Tokens.NumInt32, Tokens.Variable);
         }
 
         public ClrPadGet(int up, int index) {
@@ -1246,9 +1252,9 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Ldarg_0);
             for (int i = 0; i < up; i++)
                 cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_outer);
-            cx.EmitPreSetlex(index);
+            cx.EmitPreSetlex(index + Tokens.NumInt32);
             zyg.CodeGen(cx);
-            cx.EmitSetlex(index, Tokens.Variable);
+            cx.EmitSetlex(index + Tokens.NumInt32, Tokens.Variable);
         }
 
         public ClrPadSet(int up, int index, ClrOp zyg) {
@@ -2259,7 +2265,7 @@ namespace Niecza.CLRBackend {
             FieldBuilder fb =
                 cpb.tb.DefineField("K" + cpb.module.constants++,
                         val.head.Returns, FieldAttributes.Static);
-            cpb.module.constantInit.Add(CpsOp.SetSField(fb, val));
+            cpb.module.thaw.Add(CpsOp.SetSField(fb, val));
             return CpsOp.GetSField(fb);
         }
 
@@ -2972,7 +2978,7 @@ namespace Niecza.CLRBackend {
         Unit unit;
 
         internal int constants;
-        internal List<CpsOp> constantInit = new List<CpsOp>();
+        internal List<CpsOp> thaw = new List<CpsOp>();
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
@@ -2983,6 +2989,49 @@ namespace Niecza.CLRBackend {
             tb = mob.DefineType(mobname, TypeAttributes.Public |
                     TypeAttributes.Sealed | TypeAttributes.Abstract |
                     TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
+        }
+
+        void EncodeSignature(List<CpsOp> thaw, StaticSub obj) {
+            if (obj.sig == null) return;
+            List<int> sig_i   = new List<int>();
+            List<CpsOp> sig_r = new List<CpsOp>();
+            object[] rsig = (object[]) obj.sig;
+            foreach (object p in rsig) {
+                object[] param = (object[]) p;
+                string   name  = JScalar.S(param[0]);
+                int      flags = JScalar.I(param[1]);
+                string   slot  = JScalar.S(param[2]);
+                string[] names = JScalar.SA(0, param[3]);
+                Xref     deflt = Xref.from(param[4] as object[]);
+
+                sig_r.Add(CpsOp.StringLiteral(name));
+                foreach (string n in names)
+                    sig_r.Add(CpsOp.StringLiteral(n));
+                int ufl = 0;
+                if ((flags & 4) != 0) ufl |= SubInfo.SIG_F_RWTRANS;
+                else if ((flags & 64) == 0) ufl |= SubInfo.SIG_F_READWRITE;
+
+                if ((flags & 384) != 0) ufl |= SubInfo.SIG_F_BINDLIST;
+                if (deflt != null) {
+                    ufl |= SubInfo.SIG_F_HASDEFAULT;
+                    sig_r.Add(CpsOp.GetSField(((StaticSub)deflt.Resolve()).subinfo));
+                }
+                if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
+                if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;
+                if ((flags & 1) != 0 && (flags & 256) != 0)
+                    ufl |= SubInfo.SIG_F_SLURPY_NAM;
+                if ((flags & 1) != 0 && (flags & 256) == 0)
+                    ufl |= SubInfo.SIG_F_SLURPY_POS;
+                if ((flags & 2) != 0) ufl |= SubInfo.SIG_F_SLURPY_CAP;
+                if ((flags & 8) != 0) ufl |= SubInfo.SIG_F_SLURPY_PCL;
+                sig_i.Add(ufl);
+                sig_i.Add(slot == null ? -1 : ((LexSimple)obj.l_lexicals[slot]).index);
+                sig_i.Add(names.Length);
+            }
+            thaw.Add(CpsOp.SetField(Tokens.SubInfo_sig_i,
+                CpsOp.GetSField(obj.subinfo), CpsOp.NewIntArray(sig_i.ToArray())));
+            thaw.Add(CpsOp.SetField(Tokens.SubInfo_sig_r,
+                CpsOp.GetSField(obj.subinfo), CpsOp.NewArray(typeof(object), sig_r.ToArray())));
         }
 
         void Process(Unit unit) {
@@ -3000,8 +3049,6 @@ namespace Niecza.CLRBackend {
                 NamProcessor np = aux[ix] = new NamProcessor(cpb, obj);
                 np.MakeBody();
             });
-
-            List<CpsOp> thaw = new List<CpsOp>(constantInit);
 
             foreach (object le in unit.log) {
                 object[] lea = (object[]) le;
@@ -3149,7 +3196,7 @@ namespace Niecza.CLRBackend {
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
-                // TODO append chunks to Thaw here for sub3 stuff
+                EncodeSignature(thaw, obj);
             });
 
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
