@@ -969,6 +969,7 @@ namespace Niecza.CLRBackend {
                 // defined on the value type itself
                 if (i == 0 && o.Returns.IsValueType && !Method.IsStatic)
                     cx.il.Emit(OpCodes.Box, o.Returns);
+                i++;
             }
             cx.il.Emit((Method.IsStatic ? OpCodes.Call : OpCodes.Callvirt),
                     Method); // XXX C#
@@ -1424,6 +1425,9 @@ namespace Niecza.CLRBackend {
 
         public ClrSubyCall(string mname, string sig, ClrOp[] zyg) {
             if (mname != null) sig = "\0" + sig;
+            TypeCheck(zyg[0].Returns, Tokens.IP6);
+            for (int i = 1; i < zyg.Length; i++)
+                TypeCheck(zyg[i].Returns, Tokens.Variable);
             this.mname = mname;
             this.sig = sig;
             this.zyg = zyg;
@@ -2930,8 +2934,8 @@ namespace Niecza.CLRBackend {
                         string s = ((f & LexSimple.HASH) != 0) ? "Hash" : "Array";
                         bit = new object[] { new JScalar("methodcall"),
                             new JScalar("new"), new JScalar(""),
-                            new object[] { new JScalar("corelex"), new JScalar(s) },
-                            new object[] { new JScalar("fetch"), new object[] { new JScalar("corelex"), new JScalar(s) } } };
+                            new object[] { new JScalar("fetch"), new object[] { new JScalar("corelex"), new JScalar(s) } },
+                            new object[] { new JScalar("corelex"), new JScalar(s) } };
                     } else {
                         bit = new object[] { new JScalar("newblankrwscalar") };
                     }
