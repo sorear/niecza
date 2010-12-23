@@ -262,7 +262,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok 42.ACCEPTS(42), "accepts can match stuff";
     ok 12 ~~ "12", "strings match string value";
     ok "Hi" ~~ Str, "types match identity";
-    ok (?0) ~~ (?1), "bools are a constant";
+    ok (?0) ~~ (?1), "Bool.ACCEPTS ignores its argument";
 }
 
 {
