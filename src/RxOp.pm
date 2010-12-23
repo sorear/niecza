@@ -784,7 +784,7 @@ use CgOp;
                 CgOp::rxcall('GetClass'),
                 CgOp::const(CgOp::construct_lad($self->lads)),
                 CgOp::str($self->dba)),
-            CgOp::const(CgOp::rawnewarr('int', map { CgOp::labelid($_) } @ls)));
+            CgOp::const(CgOp::label_table(@ls)));
         push @code, CgOp::goto('backtrack');
         for (my $i = 0; $i < @ls; $i++) {
             push @code, CgOp::label($ls[$i]);
@@ -916,9 +916,9 @@ use CgOp;
           CgOp::label('nextfn'),
           CgOp::cgoto('backtrack',
             CgOp::compare('>=', CgOp::letvar("i"),
-              CgOp::getfield("Length", CgOp::letvar("fns")))),
+              CgOp::mrl_count(CgOp::letvar("fns")))),
           CgOp::rxpushb('LTM', 'nextfn'),
-          CgOp::letvar("ks", CgOp::subcall(CgOp::getindex(CgOp::letvar("i"),
+          CgOp::letvar("ks", CgOp::subcall(CgOp::mrl_index(CgOp::letvar("i"),
                 CgOp::letvar("fns")), CgOp::newscalar(CgOp::rxcall(
                   'MakeCursor')))),
           CgOp::letvar("i", CgOp::arith('+', CgOp::letvar("i"), CgOp::int(1))),
@@ -931,7 +931,7 @@ use CgOp;
           CgOp::label('nextcsr'),
           CgOp::ncgoto('backtrack', CgOp::iter_hasflat(CgOp::letvar('ki'))),
           CgOp::rxpushb('SUBRULE', 'nextcsr'),
-          CgOp::rxcall('End', CgOp::cast('cursor',
+          CgOp::rxcall('EndWith', CgOp::cast('cursor',
               CgOp::fetch(CgOp::vvarlist_shift(CgOp::letvar('ki'))))),
           CgOp::goto('backtrack'));
     }
