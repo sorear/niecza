@@ -169,6 +169,9 @@ namespace Niecza.CLRBackend {
                 }
             }
             tdeps = from[6] as object[];
+        }
+
+        public void BindDepends() {
             foreach (object x in tdeps) {
                 string n = ((JScalar)(((object[]) x)[0])).str;
                 if (n == name) continue;
@@ -2591,6 +2594,13 @@ namespace Niecza.CLRBackend {
                 return CpsOp.MethodCall(null, Tokens.TW_WriteLine, new CpsOp[]{
                     CpsOp.MethodCall(null, Tokens.Console_get_Error, new CpsOp[0]),
                     z[0] }); };
+            ConstructorInfo string_ctor = Tokens.String.GetConstructor(new Type[] {
+                    typeof(char), Tokens.Int32 });
+            thandlers["str_chr"] = delegate(CpsOp[] z) {
+                return CpsOp.ConstructorCall(string_ctor, new CpsOp[] {
+                    CpsOp.Operator(typeof(char), OpCodes.Conv_U2, z),
+                    CpsOp.IntLiteral(1) });
+            };
             MethodInfo itcommon = Tokens.Builtins.GetMethod("HashIter");
             thandlers["bif_hash_keys"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
@@ -2756,6 +2766,10 @@ namespace Niecza.CLRBackend {
             thandlers["frame_file"] = Methody(null, Tokens.Frame.GetMethod("ExecutingFile"));
             thandlers["frame_line"] = Methody(null, Tokens.Frame.GetMethod("ExecutingLine"));
             thandlers["frame_hint"] = Methody(null, Tokens.Frame.GetMethod("LexicalFind"));
+            thandlers["treader_getc"] = Methody(null, typeof(TextReader).GetMethod("Read", new Type[0]));
+            thandlers["treader_slurp"] = Methody(null, typeof(TextReader).GetMethod("ReadToEnd"));
+            thandlers["treader_getline"] = Methody(null, typeof(TextReader).GetMethod("ReadLine"));
+            thandlers["treader_stdin"] = Methody(null, typeof(Kernel).GetMethod("OpenStdin"));
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {
@@ -3291,18 +3305,45 @@ namespace Niecza.CLRBackend {
         }
         internal static Unit GetUnit(string name) { return used_units[name]; }
 
-        public static void Main() {
-            Directory.SetCurrentDirectory("obj");
-            CLRBackend c = new CLRBackend(null, "SAFE", "SAFE.dll");
-
-            string tx = File.ReadAllText("SAFE.nam");
+        public static void Main(string[] args) {
+            if (args.Length != 4) {
+                Console.Error.WriteLine("usage : CLRBackend DIR UNITFILE OUTFILE ISMAIN");
+                return;
+            }
+            string dir      = args[0];
+            string unitfile = args[1];
+            string outfile  = args[2];
+            bool   ismain   = args[3] == "1";
+            Directory.SetCurrentDirectory(dir);
+            string tx = File.ReadAllText(unitfile);
             Unit root = new Unit((object[])Reader.Read(tx));
+            CLRBackend c = new CLRBackend(null, root.name, outfile);
+
             used_units = new Dictionary<string, Unit>();
-            used_units["SAFE"] = root;
+            used_units[root.name] = root;
+
+            foreach (object x in root.tdeps) {
+                object[] dn = (object[]) x;
+                string name = JScalar.S(dn[0]);
+                if (name == root.name) continue;
+                string dtx = File.ReadAllText(name + ".nam");
+                used_units[name] = new Unit((object[])Reader.Read(dtx));
+            }
+
+            foreach (Unit u in used_units.Values) {
+                u.BindDepends();
+                if (u != root) {
+                    Assembly da = Assembly.Load(u.name);
+                    Type dt = da.GetType(u.name);
+                    u.BindFields(delegate(string fn, Type t) {
+                        return dt.GetField(fn);
+                    });
+                }
+            }
 
             c.Process(root);
 
-            c.Finish("SAFE.dll");
+            c.Finish(outfile);
         }
     }
 }
