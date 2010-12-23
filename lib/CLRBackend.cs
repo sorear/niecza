@@ -30,6 +30,20 @@ namespace Niecza.CLRBackend {
                 return val;
             }
         }
+        public static string[] SA(int cut, object x) {
+            object[] arr = (object[]) x;
+            string[] r = new string[ arr.Length - cut ];
+            for (int i = 0; i < r.Length; i++)
+                r[i] = ((JScalar)arr[i+cut]).str;
+            return r;
+        }
+        public static int[] IA(int cut, object x) {
+            object[] arr = (object[]) x;
+            int[] r = new int[ arr.Length - cut ];
+            for (int i = 0; i < r.Length; i++)
+                r[i] = (int)((JScalar)arr[i+cut]).num;
+            return r;
+        }
         public override string ToString() { return text; }
     }
 
@@ -319,15 +333,15 @@ namespace Niecza.CLRBackend {
     }
 
     class Class: ModuleWithTypeObject {
-        public readonly object attributes;
-        public readonly object methods;
-        public readonly object superclasses;
-        public readonly object linearized_mro;
+        public readonly string[] attributes;
+        public readonly object[] methods;
+        public readonly object[] superclasses;
+        public readonly object[] linearized_mro;
         public Class(object[] p) : base(p) {
-            attributes = p[3];
-            methods = p[4];
-            superclasses = p[5];
-            linearized_mro = p[6];
+            attributes = JScalar.SA(0, p[3]);
+            methods = p[4] as object[];
+            superclasses = p[5] as object[];
+            linearized_mro = p[6] as object[];
         }
     }
 
@@ -336,24 +350,24 @@ namespace Niecza.CLRBackend {
     }
 
     class Role: ModuleWithTypeObject {
-        public readonly object attributes;
-        public readonly object methods;
-        public readonly object superclasses;
+        public readonly string[] attributes;
+        public readonly object[] methods;
+        public readonly object[] superclasses;
         public Role(object[] p) : base(p) {
-            attributes = p[3];
-            methods = p[4];
-            superclasses = p[5];
+            attributes = JScalar.SA(0,p[3]);
+            methods = p[4] as object[];
+            superclasses = p[5] as object[];
         }
     }
 
     class ParametricRole: ModuleWithTypeObject {
-        public readonly object attributes;
-        public readonly object methods;
-        public readonly object superclasses;
+        public readonly object[] attributes;
+        public readonly object[] methods;
+        public readonly object[] superclasses;
         public ParametricRole(object[] p) : base(p) {
-            attributes = p[3];
-            methods = p[4];
-            superclasses = p[5];
+            attributes = p[3] as object[];
+            methods = p[4] as object[];
+            superclasses = p[5] as object[];
         }
     }
 
@@ -735,6 +749,8 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo DynObject_ctor =
             typeof(DynObject).GetConstructor(new Type[] {
                     DynMetaObject });
+        public static readonly ConstructorInfo DMO_ctor =
+            DynMetaObject.GetConstructor(new Type[] { String });
         public static readonly ConstructorInfo RxFrame_ctor =
             RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean, Boolean });
         public static readonly ConstructorInfo Frame_ctor =
@@ -801,6 +817,10 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("SortHelper");
         public static readonly MethodInfo DMO_FillParametricRole =
             typeof(DynMetaObject).GetMethod("FillParametricRole");
+        public static readonly MethodInfo DMO_FillRole =
+            typeof(DynMetaObject).GetMethod("FillRole");
+        public static readonly MethodInfo DMO_FillClass =
+            typeof(DynMetaObject).GetMethod("FillClass");
         public static readonly MethodInfo RxFrame_PushCapture =
             typeof(RxFrame).GetMethod("PushCapture");
         public static readonly MethodInfo Console_WriteLine =
@@ -824,6 +844,10 @@ namespace Niecza.CLRBackend {
             BValue.GetField("v");
         public static readonly FieldInfo SubInfo_mo =
             SubInfo.GetField("mo");
+        public static readonly FieldInfo DynObject_slots =
+            DynObject.GetField("slots");
+        public static readonly FieldInfo DMO_typeObject =
+            DynMetaObject.GetField("typeObject");
         public static readonly FieldInfo Kernel_NumMO =
             Kernel.GetField("NumMO");
         public static readonly FieldInfo Kernel_StrMO =
@@ -2087,8 +2111,8 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrNewIntArray(vec));
         }
 
-        public static CpsOp StringArray(string[] vec) {
-            if (vec.Length == 0) {
+        public static CpsOp StringArray(bool omit, string[] vec) {
+            if (vec.Length == 0 && omit) {
                 return Null(typeof(string[]));
             } else {
                 CpsOp[] tmp = new CpsOp[vec.Length];
@@ -2800,7 +2824,7 @@ namespace Niecza.CLRBackend {
             args[4] = (sub.ltm != null) ? ProcessLAD(sub.ltm) :
                 CpsOp.Null(Tokens.LAD);
             args[5] = CpsOp.NewIntArray( cpb.cx.ehspanBuffer.ToArray() );
-            args[6] = CpsOp.StringArray( cpb.cx.ehlabelBuffer.ToArray() );
+            args[6] = CpsOp.StringArray( true, cpb.cx.ehlabelBuffer.ToArray() );
             args[7] = CpsOp.IntLiteral( cpb.Spills() );
             List<string> dylexn = new List<string>();
             List<int> dylexi = new List<int>();
@@ -2817,7 +2841,7 @@ namespace Niecza.CLRBackend {
                 }
             }
             if (dylexn.Count > 0) {
-                args[8] = CpsOp.StringArray(dylexn.ToArray());
+                args[8] = CpsOp.StringArray(true, dylexn.ToArray());
                 args[9] = CpsOp.NewIntArray(dylexi.ToArray());
             } else {
                 args[8] = CpsOp.Null(typeof(string[]));
@@ -2961,6 +2985,76 @@ namespace Niecza.CLRBackend {
             });
 
             List<CpsOp> thaw = new List<CpsOp>(constantInit);
+
+            unit.VisitPackages(delegate(int ix, Package pkg) {
+                if (!(pkg is ModuleWithTypeObject))
+                    return;
+                ModuleWithTypeObject m = (ModuleWithTypeObject) pkg;
+                FieldInfo km = null;
+                FieldInfo kp = null;
+                bool existing_mo = false;
+                if (unit.name == "SAFE" || unit.name == "CORE") {
+                    km = Tokens.Kernel.GetField(m.name + "MO");
+                    kp = Tokens.Kernel.GetField(m.name + "P");
+                    existing_mo = km != null && km.IsInitOnly;
+                }
+                thaw.Add(CpsOp.SetSField(m.metaObject, existing_mo ?
+                        CpsOp.GetSField(km) :
+                        CpsOp.ConstructorCall(Tokens.DMO_ctor,
+                            new CpsOp[] { CpsOp.StringLiteral(m.name) })));
+
+                if (m is Role) {
+                    Role r = (Role) m;
+                    CpsOp[] super = new CpsOp[ r.superclasses.Length ];
+                    for (int i = 0; i < super.Length; i++)
+                        super[i] = CpsOp.GetSField( ((Class)Xref.from((object[])r.superclasses[i]).Resolve()).metaObject );
+
+                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
+                        CpsOp.GetSField(r.metaObject),
+                        CpsOp.StringArray(false, r.attributes),
+                        CpsOp.NewArray(Tokens.DynMetaObject, super),
+                        CpsOp.NewArray(Tokens.DynMetaObject, new CpsOp[0]) }));
+                } else if (m is ParametricRole) {
+                    // The heavy lifting is done in WrapBody
+                } else if (m is Class) {
+                    Class r = (Class) m;
+                    List<string> all_attr = new List<string>();
+                    CpsOp[] super = new CpsOp[ r.superclasses.Length ];
+                    CpsOp[] mro   = new CpsOp[ r.linearized_mro.Length ];
+                    for (int i = 0; i < super.Length; i++)
+                        super[i] = CpsOp.GetSField( ((Class)Xref.from((object[])r.superclasses[i]).Resolve()).metaObject );
+                    for (int i = 0; i < mro.Length; i++) {
+                        Class p = (Class) Xref.from((object[]) r.linearized_mro[i]).Resolve();
+                        mro[i] = CpsOp.GetSField(p.metaObject);
+                        foreach (string a in p.attributes)
+                            all_attr.Add(a);
+                    }
+
+                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillClass, new CpsOp[] {
+                        CpsOp.GetSField(r.metaObject),
+                        CpsOp.StringArray(false, r.attributes),
+                        CpsOp.StringArray(false, all_attr.ToArray()),
+                        CpsOp.NewArray(Tokens.DynMetaObject, super),
+                        CpsOp.NewArray(Tokens.DynMetaObject, mro) }));
+                }
+
+                thaw.Add(CpsOp.SetSField(m.typeObject,
+                    CpsOp.ConstructorCall(Tokens.DynObject_ctor, new CpsOp[] {
+                        CpsOp.GetSField(m.metaObject) })));
+                thaw.Add(CpsOp.SetField(Tokens.DynObject_slots,
+                    CpsOp.GetSField(m.typeObject), CpsOp.Null(typeof(object[]))));
+                thaw.Add(CpsOp.SetField(Tokens.DMO_typeObject,
+                    CpsOp.GetSField(m.metaObject), CpsOp.GetSField(m.typeObject)));
+                thaw.Add(CpsOp.SetSField(m.typeVar, CpsOp.MethodCall(null,
+                    Tokens.Kernel_NewROScalar, new CpsOp[] {
+                        CpsOp.GetSField(m.typeObject) })));
+
+                if (kp != null)
+                    thaw.Add(CpsOp.SetSField(kp, CpsOp.GetSField(m.typeObject)));
+                if (km != null && !km.IsInitOnly)
+                    thaw.Add(CpsOp.SetSField(km, CpsOp.GetSField(m.metaObject)));
+            });
+
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
                 if (obj.sclass != "Sub") {
