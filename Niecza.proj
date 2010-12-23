@@ -44,7 +44,7 @@
     </Target>
 
     <Target Name="CLRBackend.exe" DependsOnTargets="Kernel.dll"
-        Inputs="lib\Kernel.dll;lib\CLRBackend.cs" Outputs="obj\CLRBackend.exe">
+        Inputs="obj\Kernel.dll;lib\CLRBackend.cs" Outputs="obj\CLRBackend.exe">
         <Csc Sources="lib\CLRBackend.cs" TargetType="exe"
             References="Kernel.dll" OutputAssembly="obj\CLRBackend.exe"
             EmitDebugInformation="true" AdditionalLibPaths="obj"/>

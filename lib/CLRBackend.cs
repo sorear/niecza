@@ -627,7 +627,7 @@ namespace Niecza.CLRBackend {
             = new Dictionary<string,Label>();
         public string[] let_names = new string[0];
         public Type[] let_types = new Type[0];
-        public LocalBuilder ospill;
+        public LocalBuilder ospill, pspill, nspill;
         public List<int> lineStack = new List<int>();
         public List<int> lineBuffer = new List<int>();
         public List<int> ehspanBuffer = new List<int>();
@@ -1427,22 +1427,59 @@ namespace Niecza.CLRBackend {
 
         // generates the argument list, from the all-but-1st element of zyg
         void GenArgList(CgContext cx) {
-            int sp = 0;
-            int ct = 0;
-            for (int i = 1; i < zyg.Length; i++) {
-                if (sig[sp++] != '\0')
-                    throw new NotImplementedException();
-                ct++;
+            bool general = false;
+            for (int i = 1; i < zyg.Length; i++)
+                if (sig[i - 1] != '\0')
+                    general = true;
+            if (!general) {
+                cx.EmitInt(zyg.Length - 1);
+                cx.il.Emit(OpCodes.Newarr, Tokens.Variable);
+                for (int i = 1; i < zyg.Length; i++) {
+                    cx.il.Emit(OpCodes.Dup);
+                    cx.EmitInt(i - 1);
+                    zyg[i].CodeGen(cx);
+                    cx.il.Emit(OpCodes.Stelem_Ref);
+                }
+                cx.il.Emit(OpCodes.Ldnull);
+            } else {
+                if (cx.pspill == null) cx.pspill = cx.il.DeclareLocal(typeof(List<Variable>));
+                if (cx.nspill == null) cx.nspill = cx.il.DeclareLocal(Tokens.VarHash);
+                cx.il.Emit(OpCodes.Newobj, typeof(List<Variable>).GetConstructor(new Type[0]));
+                cx.il.Emit(OpCodes.Stloc, cx.pspill);
+                cx.il.Emit(OpCodes.Newobj, Tokens.VarHash.GetConstructor(new Type[0]));
+                cx.il.Emit(OpCodes.Stloc, cx.nspill);
+
+                int csr = 0;
+                int ix  = 1;
+
+                while (csr != sig.Length) {
+                    int len = (int)sig[csr];
+                    string tok = sig.Substring(csr+1, len);
+                    csr += (len + 1);
+
+                    if (tok == "") {
+                        cx.il.Emit(OpCodes.Ldloc, cx.pspill);
+                        zyg[ix++].CodeGen(cx);
+                        cx.il.Emit(OpCodes.Call, typeof(List<Variable>).GetMethod("Add"));
+                    } else if (tok == "flatcap") {
+                        cx.il.Emit(OpCodes.Ldloc, cx.pspill);
+                        cx.il.Emit(OpCodes.Ldloc, cx.nspill);
+                        zyg[ix++].CodeGen(cx);
+                        cx.il.Emit(OpCodes.Call, Tokens.Kernel.GetMethod("AddCap"));
+                    } else if (tok[0] == ':') {
+                        cx.il.Emit(OpCodes.Ldloc, cx.nspill);
+                        cx.il.Emit(OpCodes.Ldstr, tok.Substring(1));
+                        zyg[ix++].CodeGen(cx);
+                        cx.il.Emit(OpCodes.Call, Tokens.VarHash_set_Item);
+                    } else {
+                        throw new ArgumentException(tok);
+                    }
+                }
+
+                cx.il.Emit(OpCodes.Ldloc, cx.pspill);
+                cx.il.Emit(OpCodes.Call, typeof(List<Variable>).GetMethod("ToArray"));
+                cx.il.Emit(OpCodes.Ldloc, cx.nspill);
             }
-            cx.EmitInt(ct);
-            cx.il.Emit(OpCodes.Newarr, Tokens.Variable);
-            for (int i = 1; i < zyg.Length; i++) {
-                cx.il.Emit(OpCodes.Dup);
-                cx.EmitInt(i - 1);
-                zyg[i].CodeGen(cx);
-                cx.il.Emit(OpCodes.Stelem_Ref);
-            }
-            cx.il.Emit(OpCodes.Ldnull);
         }
 
         public override void CodeGen(CgContext cx) {
