@@ -815,6 +815,10 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("SetStatus");
         public static readonly MethodInfo Kernel_SortHelper =
             typeof(Kernel).GetMethod("SortHelper");
+        public static readonly MethodInfo Kernel_GetVar =
+            typeof(Kernel).GetMethod("GetVar");
+        public static readonly MethodInfo Kernel_CreatePath =
+            typeof(Kernel).GetMethod("CreatePath");
         public static readonly MethodInfo DMO_FillParametricRole =
             typeof(DynMetaObject).GetMethod("FillParametricRole");
         public static readonly MethodInfo DMO_FillRole =
@@ -2985,6 +2989,19 @@ namespace Niecza.CLRBackend {
             });
 
             List<CpsOp> thaw = new List<CpsOp>(constantInit);
+
+            foreach (object le in unit.log) {
+                object[] lea = (object[]) le;
+                string t = ((JScalar)lea[0]).str;
+                if (t == "pkg" || t == "var") {
+                    CpsOp[] sa = new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0, lea[1])) };
+                    if (t == "pkg") {
+                        thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_CreatePath, sa));
+                    } else {
+                        thaw.Add(CpsOp.Sink(CpsOp.MethodCall(null, Tokens.Kernel_GetVar, sa)));
+                    }
+                }
+            }
 
             unit.VisitPackages(delegate(int ix, Package pkg) {
                 if (!(pkg is ModuleWithTypeObject))
