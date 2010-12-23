@@ -100,22 +100,7 @@ sub let {
 }
 
 sub cc_expr { _cgop('newcc', @{ $_[0] }) }
-sub construct_lad {
-    my ($l) = @_;
-    my $r = ref $l;
-    if (!$r) {
-        return CgOp::str($l);
-    } elsif ($r eq 'ARRAY') {
-        if (!@$l || ref ($l->[0])) {
-            return fladlist_new(map { construct_lad($_) } @$l);
-        } else {
-            my ($h,@r) = @$l;
-            return _cgop("ladnew$h", map { construct_lad($_) } @r);
-        }
-    } else {
-        return $l;
-    }
-}
+sub construct_lad { _cgop('ladconstruct', @_) }
 
 sub _process_arglist {
     my $ar = shift;

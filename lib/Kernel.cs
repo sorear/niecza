@@ -548,6 +548,7 @@ noparams:
             code = info_.code;
             info = info_;
             mo = Kernel.CallFrameMO;
+            lexn = (info_.nspill > 0) ? new object[info_.nspill] : null;
         }
 
         public Frame() { mo = Kernel.CallFrameMO; }

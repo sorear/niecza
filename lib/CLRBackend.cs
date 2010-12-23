@@ -375,6 +375,10 @@ namespace Niecza.CLRBackend {
         public readonly Xref body_of;
         public readonly Xref in_class;
         public readonly string[] cur_pkg;
+        public readonly string sclass;
+        public readonly object ltm;
+        public readonly object[] exports;
+        public readonly object sig;
         public readonly List<KeyValuePair<string,Lexical>> lexicals;
         public readonly Dictionary<string,Lexical> l_lexicals;
         public readonly object body;
@@ -396,6 +400,10 @@ namespace Niecza.CLRBackend {
             body_of = Xref.from(s[7] as object[]);
             in_class = Xref.from(s[8] as object[]);
             object[] r_cur_pkg = s[9] as object[];
+            sclass = ((JScalar)s[10]).str;
+            ltm = s[11];
+            exports = (object[]) s[12];
+            sig = s[13];
 
             zyg = new int[ r_zyg.Length ];
             for (int i = 0; i < r_zyg.Length; i++)
@@ -452,6 +460,16 @@ namespace Niecza.CLRBackend {
                 if (lexicals[i].Value != null) // XXX
                     lexicals[i].Value.BindFields(ix, i, this,
                             lexicals[i].Key, binder);
+        }
+
+        public Package GetCorePackage(string name) {
+            StaticSub csr = this;
+            while (csr.unit.name != "SAFE" && csr.unit.name != "CORE")
+                csr = (StaticSub) csr.outer.Resolve();
+            while (!csr.l_lexicals.ContainsKey(name))
+                csr = (StaticSub) csr.outer.Resolve();
+            LexStash lx = (LexStash)csr.l_lexicals[name];
+            return unit.GetPackage(lx.path, 0, lx.path.Length);
         }
     }
 
@@ -719,6 +737,8 @@ namespace Niecza.CLRBackend {
                     DynMetaObject });
         public static readonly ConstructorInfo RxFrame_ctor =
             RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean, Boolean });
+        public static readonly ConstructorInfo Frame_ctor =
+            Frame.GetConstructor(new Type[] { Frame, Frame, SubInfo });
         public static readonly ConstructorInfo SV_ctor =
             typeof(SimpleVariable).GetConstructor(new Type[] {
                     Boolean, Boolean, DynMetaObject, typeof(ViviHook), IP6 });
@@ -734,6 +754,8 @@ namespace Niecza.CLRBackend {
             typeof(NewArrayViviHook).GetConstructor(new Type[] { Variable, Int32 });
         public static readonly ConstructorInfo CC_ctor =
             CC.GetConstructor(new Type[] { typeof(int[]) });
+        public static readonly ConstructorInfo LADCC_ctor =
+            typeof(LADCC).GetConstructor(new Type[] { CC });
 
         public static readonly MethodInfo IP6_InvokeMethod =
             IP6.GetMethod("InvokeMethod");
@@ -777,6 +799,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("SetStatus");
         public static readonly MethodInfo Kernel_SortHelper =
             typeof(Kernel).GetMethod("SortHelper");
+        public static readonly MethodInfo DMO_FillParametricRole =
+            typeof(DynMetaObject).GetMethod("FillParametricRole");
         public static readonly MethodInfo RxFrame_PushCapture =
             typeof(RxFrame).GetMethod("PushCapture");
         public static readonly MethodInfo Console_WriteLine =
@@ -798,6 +822,8 @@ namespace Niecza.CLRBackend {
             IP6.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
+        public static readonly FieldInfo SubInfo_mo =
+            SubInfo.GetField("mo");
         public static readonly FieldInfo Kernel_NumMO =
             Kernel.GetField("NumMO");
         public static readonly FieldInfo Kernel_StrMO =
@@ -2089,6 +2115,19 @@ namespace Niecza.CLRBackend {
             cx.tb = tb;
         }
 
+        public void ReserveLex(int ct) {
+            Array.Resize(ref cx.let_types, ct + Tokens.NumInt32);
+            Array.Resize(ref cx.let_names, ct + Tokens.NumInt32);
+            for (int i = 0; i < ct; i++) {
+                cx.let_types[i+ Tokens.NumInt32] = Tokens.Variable;
+            }
+        }
+
+        public int Spills() {
+            int ix = cx.let_types.Length - Tokens.NumInt32 - Tokens.NumInline;
+            return (ix > 0) ? ix : 0;
+        }
+
         public void Build(CpsOp body) {
             // ListCases may want to define labels, so this needs to come
             // early
@@ -2122,7 +2161,7 @@ namespace Niecza.CLRBackend {
 
     class NamProcessor {
         StaticSub sub;
-        CpsBuilder cpb;
+        public readonly CpsBuilder cpb;
         Dictionary<string, Type> let_types = new Dictionary<string, Type>();
 
         public NamProcessor(CpsBuilder cpb, StaticSub sub) {
@@ -2308,9 +2347,7 @@ namespace Niecza.CLRBackend {
                     } else if (name == "Num") {
                         mo = CpsOp.GetSField(Tokens.Kernel_NumMO);
                     } else {
-                        int uplevel;
-                        LexStash lx = (LexStash)th.ResolveLex(name, out uplevel, true);
-                        Class p = (Class)th.sub.unit.GetPackage(lx.path, 0, lx.path.Length);
+                        Class p = (Class)th.sub.GetCorePackage(name);
                         mo = new CpsOp(new ClrGetSField(p.metaObject));
                     }
                 } else {
@@ -2348,10 +2385,7 @@ namespace Niecza.CLRBackend {
                 string kind = FixStr(z[1]);
                 ModuleWithTypeObject m;
                 if (z.Length == 3) {
-                    int uplevel;
-                    LexStash ls = (LexStash)th.ResolveLex(FixStr(z[2]),
-                            out uplevel, true);
-                    m = (ModuleWithTypeObject)ls.GetPackage();
+                    m = (ModuleWithTypeObject)th.sub.GetCorePackage(FixStr(z[2]));
                 } else {
                     m = (ModuleWithTypeObject) (new Xref(z, 2)).Resolve();
                 }
@@ -2735,7 +2769,24 @@ namespace Niecza.CLRBackend {
         }
 
         public void MakeBody() {
+            cpb.ReserveLex(sub.nlexn);
             cpb.Build(Scan(WrapBody()));
+        }
+
+        CpsOp ProcessLAD(object lad) {
+            object[] body = (object[]) lad;
+            string head = FixStr(body[0]);
+
+            if (head == "CC") {
+                int[] ccs = new int[body.Length - 1];
+                for (int i = 0; i < ccs.Length; i++)
+                    ccs[i] = FixInt(body[i+1]);
+                return CpsOp.ConstructorCall(Tokens.LADCC_ctor, new CpsOp[] {
+                    CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
+                        CpsOp.NewIntArray(ccs) }) });
+            }
+
+            throw new NotImplementedException("ProcessLAD " + head);
         }
 
         public CpsOp SubInfoCtor() {
@@ -2746,10 +2797,11 @@ namespace Niecza.CLRBackend {
             args[3] = (sub.outer != null) ?
                 CpsOp.GetSField(((StaticSub)sub.outer.Resolve()).subinfo) :
                 CpsOp.Null(Tokens.SubInfo);
-            args[4] = CpsOp.Null(Tokens.LAD); /* TODO LTM */
+            args[4] = (sub.ltm != null) ? ProcessLAD(sub.ltm) :
+                CpsOp.Null(Tokens.LAD);
             args[5] = CpsOp.NewIntArray( cpb.cx.ehspanBuffer.ToArray() );
             args[6] = CpsOp.StringArray( cpb.cx.ehlabelBuffer.ToArray() );
-            args[7] = CpsOp.IntLiteral( 0 );
+            args[7] = CpsOp.IntLiteral( cpb.Spills() );
             List<string> dylexn = new List<string>();
             List<int> dylexi = new List<int>();
             foreach (KeyValuePair<string, Lexical> kv in sub.lexicals) {
@@ -2911,7 +2963,38 @@ namespace Niecza.CLRBackend {
             List<CpsOp> thaw = new List<CpsOp>(constantInit);
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
-                // TODO append chunks to Thaw here for sub2 stuff
+                if (obj.sclass != "Sub") {
+                    Class c = (Class) obj.GetCorePackage(obj.sclass);
+                    thaw.Add(CpsOp.SetField(Tokens.SubInfo_mo,
+                        CpsOp.GetSField(obj.subinfo),
+                        CpsOp.GetSField(c.metaObject)));
+                }
+
+                if (obj.protopad != null) {
+                    thaw.Add(CpsOp.SetSField(obj.protopad,
+                        CpsOp.ConstructorCall(Tokens.Frame_ctor, new CpsOp[] {
+                            CpsOp.Null(Tokens.Frame),
+                            (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
+                                CpsOp.GetSField(((StaticSub)obj.outer.Resolve()).protopad)),
+                            CpsOp.GetSField(obj.subinfo) })));
+                }
+
+                if (obj.protosub != null) {
+                    thaw.Add(CpsOp.SetSField(obj.protosub,
+                        CpsOp.MethodCall(null, Tokens.Kernel_MakeSub, new CpsOp[] {
+                            CpsOp.GetSField(obj.subinfo),
+                            (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
+                                CpsOp.GetSField(((StaticSub)obj.outer.Resolve()).protopad))
+                            })));
+
+                    if (obj.parametric_role_hack != null) {
+                        ParametricRole pr = (ParametricRole)
+                            (new Xref((object[])obj.parametric_role_hack)).Resolve();
+                        thaw.Add(CpsOp.MethodCall(null,Tokens.DMO_FillParametricRole,
+                            new CpsOp[] { CpsOp.GetSField(pr.metaObject),
+                                CpsOp.GetSField(obj.protosub) }));
+                    }
+                }
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
