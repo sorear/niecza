@@ -918,6 +918,7 @@ namespace Niecza.CLRBackend {
                 : new NotImplementedException();
         }
 
+        protected static void TypeCheck(Type sub, Type super) { TypeCheck(sub,super,""); }
         protected static void TypeCheck(Type sub, Type super, string msg) {
             if (!super.IsAssignableFrom(sub))
                 throw new Exception(msg + " " + sub + " not subtype of " + super);
@@ -1159,6 +1160,7 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrGetField(FieldInfo f, ClrOp zyg) {
+            TypeCheck(zyg.Returns, f.DeclaringType);
             Returns = f.FieldType;
             this.f = f;
             this.zyg = zyg;
@@ -1177,6 +1179,8 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrSetField(FieldInfo f, ClrOp zyg1, ClrOp zyg2) {
+            TypeCheck(zyg1.Returns, f.DeclaringType);
+            TypeCheck(zyg2.Returns, f.FieldType);
             Returns = Tokens.Void;
             this.f = f;
             this.zyg1 = zyg1;
@@ -1208,6 +1212,7 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrSetSField(FieldInfo f, ClrOp zyg) {
+            TypeCheck(zyg.Returns, f.FieldType);
             Returns = Tokens.Void;
             this.f = f;
             this.zyg = zyg;
@@ -1248,6 +1253,7 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrPadSet(int up, int index, ClrOp zyg) {
+            TypeCheck(zyg.Returns, Tokens.Variable);
             Returns = Tokens.Void;
             this.zyg = zyg;
             this.up = up;
@@ -1268,6 +1274,8 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrProtoSet(int ix, ClrOp zyg1, ClrOp zyg2) {
+            TypeCheck(zyg1.Returns, Tokens.Frame);
+            TypeCheck(zyg2.Returns, Tokens.Variable);
             Returns = Tokens.Void;
             this.ix = ix;
             this.zyg1 = zyg1;
@@ -3159,7 +3167,8 @@ namespace Niecza.CLRBackend {
                     CpsOp.ConstructorCall(Tokens.DynObject_ctor, new CpsOp[] {
                         CpsOp.GetSField(m.metaObject) })));
                 thaw.Add(CpsOp.SetField(Tokens.DynObject_slots,
-                    CpsOp.GetSField(m.typeObject), CpsOp.Null(typeof(object[]))));
+                    CpsOp.UnboxAny(Tokens.DynObject, CpsOp.GetSField(m.typeObject)),
+                        CpsOp.Null(typeof(object[]))));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_typeObject,
                     CpsOp.GetSField(m.metaObject), CpsOp.GetSField(m.typeObject)));
                 thaw.Add(CpsOp.SetSField(m.typeVar, CpsOp.MethodCall(null,
@@ -3232,7 +3241,7 @@ namespace Niecza.CLRBackend {
                 thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate,
                     new CpsOp [] { CpsOp.GetSField(m.metaObject) }));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
-                    CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(Tokens.DynMetaObject), new CpsOp[] { CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject ) })));
+                    CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.DynMetaObject), new CpsOp[] { CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject ) })));
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
