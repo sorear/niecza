@@ -809,6 +809,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("CreatePath");
         public static readonly MethodInfo Kernel_AddPhaser =
             typeof(Kernel).GetMethod("AddPhaser");
+        public static readonly MethodInfo Kernel_FirePhasers =
+            typeof(Kernel).GetMethod("FirePhasers");
         public static readonly MethodInfo DMO_AddPrivateMethod =
             typeof(DynMetaObject).GetMethod("AddPrivateMethod");
         public static readonly MethodInfo DMO_AddMethod =
@@ -2989,11 +2991,11 @@ namespace Niecza.CLRBackend {
     }
 
     public class CLRBackend {
-        AssemblyBuilder ab;
-        ModuleBuilder mob;
+        internal AssemblyBuilder ab;
+        internal ModuleBuilder mob;
         internal TypeBuilder tb;
 
-        Unit unit;
+        internal Unit unit;
 
         internal int constants;
         internal List<CpsOp> thaw = new List<CpsOp>();
@@ -3060,7 +3062,7 @@ namespace Niecza.CLRBackend {
                     CpsOp.GetSField(obj.protopad), init));
         }
 
-        void Process(Unit unit) {
+        void Process(Unit unit, bool asmain) {
             this.unit = unit;
 
             unit.BindFields(delegate(string name, Type type) {
@@ -3272,9 +3274,38 @@ namespace Niecza.CLRBackend {
                 }
             });
 
+            if (asmain)
+                thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_FirePhasers,
+                    new CpsOp[] { CpsOp.IntLiteral(0), CpsOp.BoolLiteral(false) }));
+            // settings are incomplete modules and have no mainline to run
+            if (unit.bottom_ref == null) {
+                Type dty = typeof(Dictionary<string,Object>);
+                FieldInfo lex = Tokens.Frame.GetField("lex");
+                MethodInfo set = dty.GetMethod("set_Item");
+                thaw.Add(CpsOp.SetField(lex, CpsOp.CallFrame(),
+                    CpsOp.ConstructorCall(dty.GetConstructor(new Type[0]), new CpsOp[0])));
+                string s = unit.setting;
+                StaticSub m = (StaticSub) unit.mainline_ref.Resolve();
+                while (s != null) {
+                    thaw.Add(CpsOp.MethodCall(null, set, new CpsOp[] {
+                        CpsOp.GetField(lex, CpsOp.CallFrame()),
+                        CpsOp.StringLiteral("*resume_" + s),
+                        CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar, new CpsOp[] {
+                            CpsOp.GetSField(m.protosub) }) }));
+                    Unit su = CLRBackend.GetUnit(s);
+                    s = su.setting;
+                    m = (StaticSub) su.mainline_ref.Resolve();
+                }
+                thaw.Add(CpsOp.Sink(CpsOp.SubyCall(null, "",
+                    new CpsOp[] { CpsOp.GetSField(m.protosub) })));
+            }
+
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
             thaw.Add(CpsOp.CpsReturn(new CpsOp[0]));
             boot.Build(CpsOp.Sequence(thaw.ToArray()));
+
+            if (asmain)
+                DefineMainMethod(boot.mb);
         }
 
         void Finish(string filename) {
@@ -3341,7 +3372,7 @@ namespace Niecza.CLRBackend {
                 }
             }
 
-            c.Process(root);
+            c.Process(root, ismain);
 
             c.Finish(outfile);
         }
