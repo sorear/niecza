@@ -779,7 +779,7 @@ use CgOp;
 
         my @code;
         push @code, CgOp::rxcall("LTMPushAlts",
-            CgOp::rawscall('Lexer.GetLexer',
+            CgOp::get_lexer(
                 CgOp::callframe(),
                 CgOp::rxcall('GetClass'),
                 CgOp::const(CgOp::construct_lad($self->lads)),
@@ -904,7 +904,7 @@ use CgOp;
         my ($self, $body) = @_;
         # will probably break with complicated harnesses
         CgOp::letn(
-          "fns", CgOp::rawscall('Lexer.RunProtoregex',
+          "fns", CgOp::run_protoregex(
             CgOp::callframe(),
             CgOp::fetch(CgOp::scopedlex('self')),
             CgOp::str($self->name)),

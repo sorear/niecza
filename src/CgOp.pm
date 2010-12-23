@@ -71,6 +71,7 @@ BEGIN {
         vvarlist_new_singleton, vvarlist_pop, vvarlist_push,
         vvarlist_shift, vvarlist_sort, vvarlist_to_fvarlist,
         vvarlist_unshift, vvarlist_unshiftn, whileloop,
+        get_lexer, run_protoregex,
     >;
 
     my $code;
