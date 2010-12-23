@@ -219,6 +219,11 @@ namespace Niecza.CLRBackend {
             return p;
         }
 
+        public Package GetCorePackage(string name) {
+            StaticSub r = (StaticSub) (bottom_ref ?? mainline_ref).Resolve();
+            return r.GetCorePackage(name);
+        }
+
         public static string SharedName(char type, int ix, string name) {
             StringBuilder sb = new StringBuilder();
             sb.Append(type);
@@ -819,6 +824,12 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("GetVar");
         public static readonly MethodInfo Kernel_CreatePath =
             typeof(Kernel).GetMethod("CreatePath");
+        public static readonly MethodInfo DMO_AddPrivateMethod =
+            typeof(DynMetaObject).GetMethod("AddPrivateMethod");
+        public static readonly MethodInfo DMO_AddMethod =
+            typeof(DynMetaObject).GetMethod("AddMethod");
+        public static readonly MethodInfo DMO_Invalidate =
+            typeof(DynMetaObject).GetMethod("Invalidate");
         public static readonly MethodInfo DMO_FillParametricRole =
             typeof(DynMetaObject).GetMethod("FillParametricRole");
         public static readonly MethodInfo DMO_FillRole =
@@ -852,6 +863,8 @@ namespace Niecza.CLRBackend {
             DynObject.GetField("slots");
         public static readonly FieldInfo DMO_typeObject =
             DynMetaObject.GetField("typeObject");
+        public static readonly FieldInfo DMO_how =
+            DynMetaObject.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
             Kernel.GetField("NumMO");
         public static readonly FieldInfo Kernel_StrMO =
@@ -2646,8 +2659,8 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_from_fvarlist"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.FVarList }));
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
             thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
-            thandlers["_addprivatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("AddPrivateMethod"));
-            thandlers["_addmethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("AddMethod"));
+            thandlers["_addprivatemethod"] = Methody(null, Tokens.DMO_AddPrivateMethod);
+            thandlers["_addmethod"] = Methody(null, Tokens.DMO_AddMethod);
             thandlers["_invalidate"] = Methody(null, Tokens.DynMetaObject.GetMethod("Invalidate"));
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
             thandlers["how"] = Methody(Tokens.IP6, Tokens.IP6.GetMethod("HOW"));
@@ -3106,6 +3119,33 @@ namespace Niecza.CLRBackend {
                                 CpsOp.GetSField(obj.protosub) }));
                     }
                 }
+            });
+
+            unit.VisitPackages(delegate(int ix, Package p) {
+                ModuleWithTypeObject m = p as ModuleWithTypeObject;
+                if (m == null) return;
+                foreach (object o in m.exports) {
+                    thaw.Add(CpsOp.SetField(Tokens.BValue_v,
+                        CpsOp.MethodCall(null, Tokens.Kernel_GetVar,
+                            new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0,o)) }),
+                        CpsOp.GetSField(m.typeVar)));
+                }
+                if (m is ParametricRole) return;
+                object[] methods = (m is Class) ? ((Class)m).methods :
+                    ((Role)m).methods;
+                foreach (object me in methods) {
+                    object[] mes = (object[]) me;
+                    MethodInfo mi = ((JScalar)mes[1]).num != 0 ?
+                        Tokens.DMO_AddPrivateMethod : Tokens.DMO_AddMethod;
+                    thaw.Add(CpsOp.MethodCall(null, mi, new CpsOp[] {
+                        CpsOp.GetSField(m.metaObject),
+                        CpsOp.StringLiteral(((JScalar)mes[0]).str),
+                        CpsOp.GetSField(((StaticSub)Xref.from((object[])mes[2]).Resolve()).protosub) }));
+                }
+                thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate,
+                    new CpsOp [] { CpsOp.GetSField(m.metaObject) }));
+                thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
+                    CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(Tokens.DynMetaObject), new CpsOp[] { CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject ) })));
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
