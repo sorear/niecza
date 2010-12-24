@@ -47,6 +47,11 @@ use MONKEY_TYPING;
     INIT $str ~= 4;
     is $str, '2413', 'INIT blocks run in correct order';
 
+    my @arr;
+    my $ix = -1;
+    ok !(defined @arr[$ix]), "can index before arrays to get undef";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

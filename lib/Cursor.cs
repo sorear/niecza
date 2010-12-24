@@ -1370,6 +1370,9 @@ public class Lexer {
                 if (lc.repl_methods.Contains(u))
                     goto anew;
             }
+            if (LtmTrace)
+                Console.WriteLine("Reused {0} alternation lexer for {1} in {2}",
+                        title, lc.parent.mo.name, kl.name);
             return lc.nfas[lads] = ret;
         }
 anew:

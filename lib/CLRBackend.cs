@@ -109,6 +109,7 @@ namespace Niecza.CLRBackend {
                             switch (input[ix+1]) {
                                 case '/': i = '/'; break;
                                 case '\\': i = '\\'; break;
+                                case '"': i = '"'; break;
                                 case 't': i = '\t'; break;
                                 case 'r': i = '\r'; break;
                                 case 'n': i = '\n'; break;
@@ -798,7 +799,7 @@ namespace Niecza.CLRBackend {
             n["Str"] = typeof(LADStr).GetConstructor(new Type[] { String });
             n["Param"] = typeof(LADParam).GetConstructor(new Type[] { String });
             n["Method"] = typeof(LADMethod).GetConstructor(new Type[] { String });
-            n["ProtoRegex"] = typeof(LADStr).GetConstructor(new Type[] { String });
+            n["ProtoRegex"] = typeof(LADProtoRegex).GetConstructor(new Type[] { String });
             n["StrNoCase"] = typeof(LADStrNoCase).GetConstructor(new Type[] { String });
             n["Imp"] = typeof(LADImp).GetConstructor(new Type[] { });
             n["Dot"] = typeof(LADDot).GetConstructor(new Type[] { });

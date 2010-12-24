@@ -1021,6 +1021,8 @@ noparams:
                 Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                             "eager", new Variable[] { obj }, null));
             }
+            if (ix < 0)
+                return Kernel.NewROScalar(Kernel.AnyP);
             if (items.Count() <= ix) {
                 if (extend) {
                     return new SimpleVariable(true, false, Kernel.AnyMO,
