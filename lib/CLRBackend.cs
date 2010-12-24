@@ -490,9 +490,8 @@ namespace Niecza.CLRBackend {
 
             nlexn = 0;
             for (int i = 0; i < lexicals.Count; i++)
-                if (lexicals[i].Value != null) // XXX
-                    lexicals[i].Value.BindFields(ix, i, this,
-                            lexicals[i].Key, binder);
+                lexicals[i].Value.BindFields(ix, i, this,
+                        lexicals[i].Key, binder);
         }
 
         public Package GetCorePackage(string name) {
@@ -2576,9 +2575,8 @@ namespace Niecza.CLRBackend {
             };
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp rhs = th.Scan(zyg[3]);
-                bool ro   = ((JScalar)zyg[1]).num != 0;
-                bool list = ((JScalar)zyg[2]).str != "" &&
-                    ((JScalar)zyg[2]).num != 0; // XXX manifests in &first
+                bool ro   = JScalar.B(zyg[1]);
+                bool list = JScalar.B(zyg[2]);
                 return CpsOp.MethodCall(Tokens.Variable,
                         Tokens.Kernel_NewBoundVar, new CpsOp[] {
                             CpsOp.BoolLiteral(ro),
@@ -3187,8 +3185,10 @@ namespace Niecza.CLRBackend {
             if ((sub.flags & StaticSub.GATHER_HACK) != 0) {
                 enter.Insert(0, new JScalar("prog"));
                 enter.Add(new object[] { new JScalar("sink"), b });
-                enter.Add(new object[] { new JScalar("take"),
-                    new object[] { new JScalar("corelex"), new JScalar("EMPTY") } });
+                enter.Add(new object[] { new JScalar("sink"),
+                        new object[] { new JScalar("take"),
+                    new object[] { new JScalar("corelex"), new JScalar("EMPTY") } } });
+                enter.Add(new object[] { new JScalar("return") });
                 b = enter.ToArray();
             } else if (sub.augment_hack != null) {
                 enter = new List<object>();
