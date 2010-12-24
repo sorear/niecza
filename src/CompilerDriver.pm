@@ -236,25 +236,11 @@ sub compile {
                 store $ast, File::Spec->catfile($builddir, "$basename.store");
             }
         } ],
-        [ 'gmcs', sub {
-            my @args;
-            if ($args{selfcontained}) {
-                @args = ("gmcs", "/debug", "/unsafe+",
-                    "/out:" . $args{selfcontained},
-                    (map { File::Spec->catfile($libdir, $_) }
-                        "Kernel.cs", "Cursor.cs", "JSYNC.cs", "Builtins.cs", "NieczaCLR.cs"),
-                    (map { build_file($_ . ".cs") }
-                        (sort keys %{ $ast->tdeps })),
-                    $namfile);
-            } else {
-                @args = ("gmcs", "/debug",
-                    (defined($name) ? ("/target:library") : ()),
-                    "/lib:$builddir",
-                    "/r:Kernel.dll",
-                    (map { "/r:$_.dll" } sort keys %{ $ast->tdeps }),
-                    "/out:$outfile",
-                    $namfile);
-            }
+        [ 'codegen', sub {
+            my @args = ("mono",
+                File::Spec->catfile($builddir, "CLRBackend.exe"), $builddir,
+                "$basename.nam", (defined($name) ? ("$basename.dll", "0") :
+                    ("$basename.exe", "1")));
             print STDERR "@args\n" if $args{stagetime};
             system @args;
             $ast = undef;

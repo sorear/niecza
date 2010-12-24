@@ -21,7 +21,6 @@ my $aot;
 my $lang = 'CORE';
 my $setting;
 my $safe;
-my $genapp;
 
 sub usage {
     my ($fh, $ex) = @_;
@@ -35,7 +34,6 @@ usage: niecza -e 'code'      # run a one-liner
 
 general options:
    -L --language=NAME        # select your setting
-      --gen-app=EXEFILE      # make self-contained binary (not with -c)
       --setting              # precompile target is a setting
    -v --stage-stats          # detailed timing info
       --stop-after=STAGE     # stop after STAGE and dump AST
@@ -46,7 +44,7 @@ EOM
 }
 
 GetOptions('evaluate|e=s' => \@evaluate, 'aot' => \$aot,
-        'gen-app=s' => \$genapp, 'compile|c' => \$module,
+        'compile|c' => \$module,
         'language|L=s' => \$lang, 'stage-stats|v' => \$stagestats,
         'stop-after=s' => \$stopafter, 'safe' => \$safe, 'setting' => \$setting)
     or usage(\*STDERR, 1);
@@ -58,18 +56,14 @@ if ($excl > 1 || $module && !@ARGV || $safe && ($lang ne 'CORE')) {
     usage(\*STDERR, 1);
 }
 
-if (defined($genapp) && $module) {
-    usage(\*STDERR, 1);
-}
-
 $lang = 'SAFE' if $safe;
 
 sub run {
-    compile(stopafter => $stopafter, aot => $aot, selfcontained => $genapp,
+    compile(stopafter => $stopafter, aot => $aot,
         stagetime => $stagestats, lang => $lang, safe => $safe,
         setting => $setting, @_);
     system 'mono', CompilerDriver::build_file('MAIN.exe')
-        if !({@_}->{name}) && !$stopafter && !$genapp;
+        if !({@_}->{name}) && !$stopafter;
 }
 
 if ($module) {
