@@ -538,7 +538,7 @@ public class Cursor : IP6 {
             it = it.prev;
         }
 
-        Dictionary<string,Variable> nam = new Dictionary<string,Variable>();
+        VarHash nam = new VarHash();
         Variable[] pos = new Variable[posr.Count];
 
         foreach (KeyValuePair<string, VarDeque> kv in namr)
@@ -550,7 +550,7 @@ public class Cursor : IP6 {
         into.SetSlot("named", nam);
     }
 
-    public Variable O(Dictionary<string,Variable> caps) {
+    public Variable O(VarHash caps) {
         Cursor nw = At(pos);
         foreach (KeyValuePair<string,Variable> kv in caps)
             nw.captures = new CapInfo(nw.captures, new string[] { kv.Key }, kv.Value);
@@ -1108,7 +1108,7 @@ public class LADParam : LAD {
         }
 
         Variable p;
-        if (!((Dictionary<string,Variable>) o).TryGetValue(name, out p)) {
+        if (!((VarHash) o).TryGetValue(name, out p)) {
             reason = "parameter not found";
             goto imp;
         }

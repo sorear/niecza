@@ -65,8 +65,8 @@ public class JsyncWriter {
     void WriteHash(IP6 obj) {
         int a = nextanchor++;
         anchors[obj] = a;
-        Dictionary<string,Variable> entries =
-            Kernel.UnboxAny<Dictionary<string,Variable>>(obj);
+        VarHash entries =
+            Kernel.UnboxAny<VarHash>(obj);
         o.Append('{');
         contUsed = true;
         o.AppendFormat("\"&\":\"A{0}\"", a);
@@ -492,8 +492,8 @@ public class JsyncReader {
         string h_tag = null;
         string h_anchor = null;
         Dictionary<string,string> h_key_ind = null;
-        Dictionary<string,Variable> h_val_ind = null;
-        Dictionary<string,Variable> zyg = new Dictionary<string,Variable>();
+        VarHash h_val_ind = null;
+        VarHash zyg = new VarHash();
         bool comma = false;
 
         while(true) {
@@ -528,7 +528,7 @@ public class JsyncReader {
                 h_key_ind[k1] = s_content;
             } else if (s_content_type == ALIAS) {
                 string k1 = s_content;
-                if (h_val_ind == null) h_val_ind = new Dictionary<string,Variable>();
+                if (h_val_ind == null) h_val_ind = new VarHash();
                 if (h_val_ind.ContainsKey(k1))
                     Err("Key alias *" + k1 + " used twice");
                 SkipCharWS(':');
@@ -548,7 +548,7 @@ public class JsyncReader {
 
         if (h_key_ind != null || h_val_ind != null) {
             h_key_ind = h_key_ind ?? new Dictionary<string,string>();
-            h_val_ind = h_val_ind ?? new Dictionary<string,Variable>();
+            h_val_ind = h_val_ind ?? new VarHash();
 
             foreach (KeyValuePair<string,string> kv in h_key_ind) {
                 if (!h_val_ind.ContainsKey(kv.Key))
@@ -584,7 +584,7 @@ public class JsyncReader {
             if (p_cursor.Isa(Kernel.HashMO)) {
                 if (p_cursor.mo.nslots != 0)
                     Err("Cannot thaw Hash subclass " + p_cursor.mo.name + "; it has attributes");
-                obj = BoxRW<Dictionary<string,Variable>>(zyg, p_cursor.mo);
+                obj = BoxRW<VarHash>(zyg, p_cursor.mo);
             } else {
                 DynObject dyo = new DynObject(p_cursor.mo);
                 for (int i = 0; i < dyo.mo.nslots; i++) {
@@ -600,7 +600,7 @@ public class JsyncReader {
                 obj = Kernel.NewRWScalar(Kernel.AnyMO, dyo);
             }
         } else {
-            obj = BoxRW<Dictionary<string,Variable>>(zyg, Kernel.HashMO);
+            obj = BoxRW<VarHash>(zyg, Kernel.HashMO);
         }
         if (h_anchor != null)
             AddAnchor(h_anchor, obj.Fetch());

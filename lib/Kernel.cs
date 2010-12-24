@@ -14,7 +14,7 @@ namespace Niecza {
     // Only call other functions in Continue, not in the CallableDelegate or
     // equivalent!
     public delegate Frame CallableDelegate(Frame caller,
-            Variable[] pos, Dictionary<string, Variable> named);
+            Variable[] pos, VarHash named);
     // Used by DynFrame to plug in code
     public delegate Frame DynBlockDelegate(Frame frame);
 
@@ -44,7 +44,7 @@ namespace Niecza {
         // include the invocant in the positionals!  it will not usually be
         // this, rather a container of this
         public virtual Frame InvokeMethod(Frame caller, string name,
-                Variable[] pos, Dictionary<string, Variable> named) {
+                Variable[] pos, VarHash named) {
             DispatchEnt m;
             //Kernel.LogNameLookup(name);
             if (mo.mro_methods.TryGetValue(name, out m)) {
@@ -72,8 +72,7 @@ namespace Niecza {
             return this.mo.HasMRO(mo);
         }
 
-        public Frame Invoke(Frame c, Variable[] p,
-                Dictionary<string, Variable> n) {
+        public Frame Invoke(Frame c, Variable[] p, VarHash n) {
             return mo.mro_INVOKE.Invoke(this, c, p, n);
         }
     }
@@ -131,8 +130,7 @@ namespace Niecza {
         string key;
         public HashViviHook(IP6 hash, string key) { this.hash = hash; this.key = key; }
         public override void Do(Variable toviv) {
-            Dictionary<string,Variable> rh =
-                Kernel.UnboxAny<Dictionary<string,Variable>>(hash);
+            VarHash rh = Kernel.UnboxAny<VarHash>(hash);
             rh[key] = toviv;
         }
     }
@@ -142,7 +140,7 @@ namespace Niecza {
         string key;
         public NewHashViviHook(Variable hashv, string key) { this.hashv = hashv; this.key = key; }
         public override void Do(Variable toviv) {
-            Dictionary<string,Variable> rh = new Dictionary<string,Variable>();
+            VarHash rh = new VarHash();
             rh[key] = toviv;
             hashv.Store(Kernel.BoxRaw(rh, Kernel.HashMO));
         }
@@ -305,7 +303,7 @@ namespace Niecza {
         private string PName(int rbase) {
             return ((string)sig_r[rbase]) + " in " + name;
         }
-        public unsafe Frame Binder(Frame th, Variable[] pos, Dictionary<string,Variable> named) {
+        public unsafe Frame Binder(Frame th, Variable[] pos, VarHash named) {
             th.pos = pos;
             th.named = named;
             // XXX I don't fully understand how this works, but it's
@@ -359,8 +357,7 @@ namespace Niecza {
                     goto gotit;
                 }
                 if ((flags & SIG_F_SLURPY_NAM) != 0) {
-                    Dictionary<string,Variable> nh
-                        = new Dictionary<string,Variable>();
+                    VarHash nh = new VarHash();
                     if (named != null) {
                         foreach (KeyValuePair<string,Variable> kv in named)
                             if (namedc.Contains(kv.Key))
@@ -535,7 +532,7 @@ noparams:
         public RxFrame rx;
 
         public Variable[] pos;
-        public Dictionary<string, Variable> named;
+        public VarHash named;
 
         // after MakeSub, GatherHelper
         public const int SHARED = 1;
@@ -710,7 +707,7 @@ noparams:
     }
 
     public abstract class InvokeHandler {
-        public abstract Frame Invoke(IP6 obj, Frame th, Variable[] pos, Dictionary<string,Variable> named);
+        public abstract Frame Invoke(IP6 obj, Frame th, Variable[] pos, VarHash named);
     }
 
     public abstract class IndexHandler {
@@ -741,7 +738,7 @@ noparams:
 
     class InvokeSub : InvokeHandler {
         public override Frame Invoke(IP6 th, Frame caller,
-                Variable[] pos, Dictionary<string,Variable> named) {
+                Variable[] pos, VarHash named) {
             DynObject dyo = ((DynObject) th);
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
@@ -755,7 +752,7 @@ noparams:
 
     class InvokeCallMethod : InvokeHandler {
         public override Frame Invoke(IP6 th, Frame caller,
-                Variable[] pos, Dictionary<string,Variable> named) {
+                Variable[] pos, VarHash named) {
             Variable[] np = new Variable[pos.Length + 1];
             Array.Copy(pos, 0, np, 1, pos.Length);
             np[0] = Kernel.NewROScalar(th);
@@ -829,7 +826,7 @@ noparams:
     }
     class CtxHashBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
-            return Kernel.UnboxAny<Dictionary<string,Variable>>(obj.Fetch()).Count != 0;
+            return Kernel.UnboxAny<VarHash>(obj.Fetch()).IsNonEmpty;
         }
     }
 
@@ -970,8 +967,7 @@ noparams:
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
             string ks = key.Fetch().mo.mro_raw_Str.Get(key);
-            Dictionary<string,Variable> h =
-                Kernel.UnboxAny<Dictionary<string,Variable>>(os);
+            VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
             if (h.TryGetValue(ks, out r))
                 return r;
@@ -983,8 +979,8 @@ noparams:
             IP6 os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.FalseV;
             string ks = key.Fetch().mo.mro_raw_Str.Get(key);
-            Dictionary<string,Variable> h =
-                Kernel.UnboxAny<Dictionary<string,Variable>>(os);
+            VarHash h =
+                Kernel.UnboxAny<VarHash>(os);
             return h.ContainsKey(ks) ? Kernel.TrueV : Kernel.FalseV;
         }
     }
@@ -2090,16 +2086,16 @@ slow:
         }
 
         public static void AddCap(List<Variable> p,
-                Dictionary<string,Variable> n, IP6 cap) {
+                VarHash n, IP6 cap) {
             Variable[] fp = cap.GetSlot("positionals") as Variable[];
-            Dictionary<string,Variable> fn = cap.GetSlot("named")
-                as Dictionary<string,Variable>;
+            VarHash fn = cap.GetSlot("named")
+                as VarHash;
             p.AddRange(fp);
             if (fn != null) AddMany(n, fn);
         }
 
-        public static void AddMany(Dictionary<string,Variable> d1,
-                Dictionary<string,Variable> d2) {
+        public static void AddMany(VarHash d1,
+                VarHash d2) {
             foreach (KeyValuePair<string,Variable> kv in d2) {
                 d1[kv.Key] = kv.Value;
             }
@@ -2336,11 +2332,11 @@ slow:
                 DynObject o = td as DynObject;
                 if (de != null) {
                     Variable[] p = tf.pos;
-                    Dictionary<string, Variable> n = tf.named;
+                    VarHash n = tf.named;
                     tf = tf.caller.MakeChild(de.outer, de.info);
                     if (o != null) {
                         p = (Variable[]) o.slots[0];
-                        n = o.slots[1] as Dictionary<string,Variable>;
+                        n = o.slots[1] as VarHash;
                     }
                     tf = tf.info.Binder(tf, p, n);
                     tf.curDisp = de;
@@ -2476,5 +2472,309 @@ slow:
                 head = 0;
             }
         }
+    }
+
+    struct VarHashLink {
+        internal string key;
+        internal Variable value;
+        internal int next;
+    }
+
+    public sealed class VarHash : IEnumerable<KeyValuePair<string,Variable>> {
+        int hfree;
+        int count;
+        VarHashLink[] heap;
+        int[] htab;
+
+        const int INITIAL = 5;
+        const int THRESHOLD = 11;
+
+        static int[] grow = new int[] {
+            5, 11, 17, 37, 67, 131, 257, 521, 1031, 2053, 4099, 8209, 16411,
+            32771, 65537, 131101, 262147, 524309, 1048583, 2097169, 4194319,
+            8388617, 16777259, 33554467, 67108879, 134217757, 268435459,
+            536870923, 1073741827
+        };
+
+        public VarHash() { Clear(); }
+
+        public VarHash(VarHash from) {
+            hfree = from.hfree;
+            count = from.count;
+            int l = from.heap.Length;
+            if (from.htab != null) {
+                htab  = new int[l];
+                Array.Copy(from.htab, 0, htab, 0, l);
+            } else {
+                htab = null;
+            }
+            heap  = new VarHashLink[l];
+            Array.Copy(from.heap, 0, heap, 0, l);
+        }
+
+        public Variable this[string key] {
+            get {
+                Variable d;
+                if (TryGetValue(key, out d))
+                    return d;
+                else
+                    throw new KeyNotFoundException(key);
+            }
+            set {
+                if (hfree < 0) rehash(+1);
+
+                if (htab == null) {
+                    for (int i = 0; i < count; i++) {
+                        if (heap[i].key == key) {
+                            heap[i].value = value;
+                            return;
+                        }
+                    }
+                    heap[count].key = key;
+                    heap[count].value = value;
+                    count++; hfree--;
+                    return;
+                }
+
+                int bkt = (int)(((uint) key.GetHashCode()) %
+                        ((uint) htab.Length));
+                int ptr = htab[bkt];
+
+                if (ptr < 0) {
+                    int n = hfree;
+                    hfree = heap[n].next;
+                    heap[n].next = ptr;
+                    heap[n].key = key;
+                    heap[n].value = value;
+                    htab[bkt] = n;
+                    count++;
+                    return;
+                }
+
+                if (heap[ptr].key == key) {
+                    heap[ptr].value = value;
+                    return;
+                }
+
+                bkt = ptr;
+                ptr = heap[bkt].next;
+                while (true) {
+                    if (ptr < 0) {
+                        int n = hfree;
+                        hfree = heap[n].next;
+                        heap[n].next = ptr;
+                        heap[n].key = key;
+                        heap[n].value = value;
+                        heap[bkt].next = n;
+                        count++;
+                        return;
+                    }
+
+                    if (heap[ptr].key == key) {
+                        heap[ptr].value = value;
+                        return;
+                    }
+
+                    bkt = ptr;
+                    ptr = heap[bkt].next;
+                }
+            }
+        }
+
+        public bool ContainsKey(string key) {
+            Variable scratch;
+            return TryGetValue(key, out scratch);
+        }
+
+        void rehash(int ordel) {
+            int rank = 0;
+            while (heap.Length != grow[rank]) rank++;
+            rank += ordel;
+
+            VarHashLink[] oheap = heap;
+            init(grow[rank]);
+
+            foreach (VarHashLink vhl in oheap)
+                if (vhl.key != null)
+                    this[vhl.key] = vhl.value;
+        }
+
+        public bool Remove(string key) {
+            if (count < (heap.Length >> 2) && heap.Length != INITIAL)
+                rehash(-1);
+
+            if (htab == null) {
+                for (int i = 0; i < count; i++) {
+                    if (heap[i].key == key) {
+                        if (i != count - 1) {
+                            heap[i].key = heap[count - 1].key;
+                            heap[i].value = heap[count - 1].value;
+                        }
+                        heap[count - 1].key = null;
+                        heap[count - 1].value = null;
+                        count--; hfree++;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            int bkt = (int)(((uint) key.GetHashCode()) % ((uint) htab.Length));
+            int ptr = htab[bkt];
+
+            if (ptr < 0)
+                return false;
+
+            if (heap[ptr].key == key) {
+                int n = heap[ptr].next;
+                heap[ptr].next = hfree;
+                htab[bkt] = n;
+                heap[ptr].key = null;
+                heap[ptr].value = null;
+                hfree = ptr;
+                count--;
+                return true;
+            }
+
+            bkt = ptr;
+            ptr = heap[bkt].next;
+            while (ptr >= 0) {
+                if (heap[ptr].key == key) {
+                    int n = heap[ptr].next;
+                    heap[ptr].next = hfree;
+                    heap[bkt].next = n;
+                    heap[ptr].key = null;
+                    heap[ptr].value = null;
+                    hfree = ptr;
+                    count--;
+                    return true;
+                }
+
+                bkt = ptr;
+                ptr = heap[bkt].next;
+            }
+
+            return false;
+        }
+
+        void init(int size) {
+            hfree = size - 1;
+            count = 0;
+            heap = new VarHashLink[size];
+            if (size > THRESHOLD) {
+                htab = new int[size];
+                for (int i = 0; i < size; i++) {
+                    heap[i].next = i - 1;
+                    htab[i] = -1;
+                }
+            } else {
+                htab = null;
+            }
+        }
+
+        public void Clear() { init(INITIAL); }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() {
+            return GetEnumerator();
+        }
+
+        public IEnumerator<KeyValuePair<string,Variable>> GetEnumerator() {
+            return new Enum(heap);
+        }
+
+        public bool IsNonEmpty {
+            get { return count != 0; }
+        }
+
+        public bool TryGetValue(string key, out Variable value) {
+            if (htab == null) {
+                for (int i = 0; i < count; i++) {
+                    if (heap[i].key == key) {
+                        value = heap[i].value;
+                        return true;
+                    }
+                }
+                value = null;
+                return false;
+            }
+
+            int ptr = htab[((uint) key.GetHashCode()) % ((uint) htab.Length)];
+
+            while (ptr >= 0) {
+                if (heap[ptr].key == key) {
+                    value = heap[ptr].value;
+                    return true;
+                }
+
+                ptr = heap[ptr].next;
+            }
+
+            value = null;
+            return false;
+        }
+
+        public class Enum : IEnumerator<KeyValuePair<string, Variable>> {
+            int cursor;
+            VarHashLink[] pool;
+            internal Enum(VarHashLink[] p) { cursor = -1; pool = p; }
+            void Scan() {
+                if (cursor != pool.Length) cursor++;
+                while (cursor != pool.Length && pool[cursor].key == null)
+                    cursor++;
+            }
+            public void Reset() { cursor = -1; }
+            public bool MoveNext() {
+                Scan();
+                return (cursor != pool.Length);
+            }
+            public KeyValuePair<string,Variable> Current {
+                get {
+                    return new KeyValuePair<string,Variable>(
+                        pool[cursor].key, pool[cursor].value);
+                }
+            }
+            object System.Collections.IEnumerator.Current {
+                get { return Current; }
+            }
+            public void Dispose() { }
+        }
+
+        public struct VarHashKeys : IEnumerable<string> {
+            VarHash th;
+            internal VarHashKeys(VarHash x) { th = x; }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() {
+                return GetEnumerator();
+            }
+
+            public struct KEnum : IEnumerator<string> {
+                int cursor;
+                VarHashLink[] pool;
+                internal KEnum(VarHashLink[] p) { cursor = -1; pool = p; }
+                void Scan() {
+                    if (cursor != pool.Length) cursor++;
+                    while (cursor != pool.Length && pool[cursor].key == null)
+                        cursor++;
+                }
+                public void Reset() { cursor = -1; }
+                public bool MoveNext() {
+                    Scan();
+                    return (cursor != pool.Length);
+                }
+                public string Current {
+                    get { return pool[cursor].key; }
+                }
+                object System.Collections.IEnumerator.Current {
+                    get { return Current; }
+                }
+                public void Dispose() { }
+            }
+
+            public IEnumerator<string> GetEnumerator() {
+                return new KEnum(th.heap);
+            }
+        }
+
+        public VarHashKeys Keys { get { return new VarHashKeys(this); } }
     }
 }

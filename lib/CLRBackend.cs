@@ -753,7 +753,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type DynObject = typeof(DynObject);
         public static readonly Type DynBlockDelegate = typeof(DynBlockDelegate);
         public static readonly Type DynMetaObject = typeof(DynMetaObject);
-        public static readonly Type VarHash = typeof(Dictionary<string,Variable>);
+        public static readonly Type VarHash = typeof(VarHash);
         public static readonly Type VVarList = typeof(VarDeque);
         public static readonly Type FVarList = typeof(Variable[]);
         public static readonly Type Cursor = typeof(Cursor);

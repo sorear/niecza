@@ -232,8 +232,7 @@ public class Builtins {
 
     public static VarDeque HashIterRaw(int mode, Variable v) {
         IP6 o = NominalCheck("$x", Kernel.AnyMO, v);
-        Dictionary<string,Variable> d =
-            Kernel.UnboxAny<Dictionary<string,Variable>>(o);
+        VarHash d = Kernel.UnboxAny<VarHash>(o);
 
         VarDeque lv = new VarDeque();
 
