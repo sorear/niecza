@@ -25,10 +25,8 @@
     <Target Name="SafeMode" DependsOnTargets="SAFE.dll;WriteVersion"/>
 
     <Target Name="Test" DependsOnTargets="CORE.dll;Test.dll;WriteVersion;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', file => 'test.pl');"/>
-        <Csc Sources="obj\MAIN.cs" TargetType="exe" AdditionalLibPaths="obj"
-            OutputAssembly="obj\MAIN.exe" EmitDebugInformation="true"
-            References="Test.dll;SAFE.dll;CORE.dll;Kernel.dll"/>
+        <Perl Code="compile(stopafter => 'writenam', file => 'test.pl');"/>
+        <Exec Command="mono obj/CLRBackend.exe obj MAIN.nam MAIN.exe 1"/>
         <Exec Command="prove -e mono obj/MAIN.exe"/>
     </Target>
 
@@ -50,40 +48,33 @@
             EmitDebugInformation="true" AdditionalLibPaths="obj"/>
     </Target>
 
-    <Target Name="CORE.cs" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.cs;obj\CORE.store" DependsOnTargets="SAFE.cs;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'SAFE', setting => 1, name => 'CORE');"/>
+    <Target Name="CORE.nam" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.nam;obj\CORE.store" DependsOnTargets="SAFE.nam;Grammar;PerlTask">
+        <Perl Code="compile(stopafter => 'writenam', lang => 'SAFE', setting => 1, name => 'CORE');"/>
     </Target>
 
-    <Target Name="SAFE.cs" Inputs="@(CompilerPerl);lib\SAFE.setting"
-        Outputs="obj\SAFE.cs;obj\SAFE.store"
+    <Target Name="SAFE.nam" Inputs="@(CompilerPerl);lib\SAFE.setting"
+        Outputs="obj\SAFE.nam;obj\SAFE.store"
         DependsOnTargets="Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', lang => 'NULL', setting => 1, name => 'SAFE');"/>
+        <Perl Code="compile(stopafter => 'writenam', lang => 'NULL', setting => 1, name => 'SAFE');"/>
     </Target>
 
-    <Target Name="Test.cs" Inputs="@(CompilerPerl);obj\CORE.store;lib\Test.pm6"
-        Outputs="obj\Test.cs;obj\Test.store"
-        DependsOnTargets="CORE.cs;Grammar;PerlTask">
-        <Perl Code="compile(stopafter => 'writecs', name => 'Test');"/>
+    <Target Name="Test.nam" Inputs="@(CompilerPerl);obj\CORE.store;lib\Test.pm6"
+        Outputs="obj\Test.nam;obj\Test.store"
+        DependsOnTargets="CORE.nam;Grammar;PerlTask">
+        <Perl Code="compile(stopafter => 'writenam', name => 'Test');"/>
     </Target>
 
-    <Target Name="CORE.dll" Inputs="obj\CORE.cs;obj\SAFE.dll;obj\Kernel.dll" Outputs="obj\CORE.dll" DependsOnTargets="CORE.cs;SAFE.dll;Kernel.dll">
-        <Csc Sources="obj\CORE.cs" TargetType="library"
-            AdditionalLibPaths="obj" OutputAssembly="obj\CORE.dll"
-            EmitDebugInformation="true" References="SAFE.dll;Kernel.dll"/>
+    <Target Name="CORE.dll" Inputs="obj\CORE.nam;obj\SAFE.dll;obj\Kernel.dll" Outputs="obj\CORE.dll" DependsOnTargets="CORE.nam;SAFE.dll;Kernel.dll">
+        <Exec Command="mono obj/CLRBackend.exe obj CORE.nam CORE.dll 0"/>
     </Target>
 
-    <Target Name="SAFE.dll" Inputs="obj\SAFE.cs;obj\Kernel.dll"
-        Outputs="obj\SAFE.dll" DependsOnTargets="SAFE.cs;Kernel.dll">
-        <Csc Sources="obj\SAFE.cs" TargetType="library"
-            AdditionalLibPaths="obj" OutputAssembly="obj\SAFE.dll"
-            EmitDebugInformation="true" References="Kernel.dll"/>
+    <Target Name="SAFE.dll" Inputs="obj\SAFE.nam;obj\Kernel.dll"
+        Outputs="obj\SAFE.dll" DependsOnTargets="SAFE.nam;Kernel.dll;CLRBackend.exe">
+        <Exec Command="mono obj/CLRBackend.exe obj SAFE.nam SAFE.dll 0"/>
     </Target>
 
-    <Target Name="Test.dll" Inputs="obj\Test.cs;obj\CORE.dll;obj\Kernel.dll" Outputs="obj\Test.dll" DependsOnTargets="Test.cs;CORE.dll;Kernel.dll">
-        <Csc Sources="obj\Test.cs" TargetType="library"
-            AdditionalLibPaths="obj" OutputAssembly="obj\Test.dll"
-            EmitDebugInformation="true"
-            References="CORE.dll;SAFE.dll;Kernel.dll"/>
+    <Target Name="Test.dll" Inputs="obj\Test.nam;obj\CORE.dll;obj\Kernel.dll" Outputs="obj\Test.dll" DependsOnTargets="Test.nam;CORE.dll;Kernel.dll">
+        <Exec Command="mono obj/CLRBackend.exe obj Test.nam Test.dll 0"/>
     </Target>
 
     <!-- Proper compiler bits -->
