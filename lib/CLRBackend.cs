@@ -44,6 +44,12 @@ namespace Niecza.CLRBackend {
                 r[i] = (int)((JScalar)arr[i+cut]).num;
             return r;
         }
+        public static bool B(object x) {
+            string s = S(x);
+            if (s == "1")  return true;
+            if (s == "0" || s == "") return false;
+            throw new ArgumentException(s);
+        }
         public static int I(object x) { return (int)((JScalar)x).num; }
         public static string S(object x) { return x == null ? null : ((JScalar)x).str; }
         public override string ToString() { return text; }
@@ -847,6 +853,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("IterHasFlat");
         public static readonly MethodInfo Kernel_ContextHelper =
             typeof(Kernel).GetMethod("ContextHelper");
+        public static readonly MethodInfo Kernel_StatusHelper =
+            typeof(Kernel).GetMethod("StatusHelper");
         public static readonly MethodInfo Kernel_SetStatus =
             typeof(Kernel).GetMethod("SetStatus");
         public static readonly MethodInfo Kernel_SortHelper =
@@ -1299,7 +1307,6 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrPadSet(int up, int index, ClrOp zyg) {
-            TypeCheck(zyg.Returns, Tokens.Variable);
             Returns = Tokens.Void;
             this.zyg = zyg;
             this.up = up;
@@ -1321,7 +1328,6 @@ namespace Niecza.CLRBackend {
 
         public ClrProtoSet(int ix, ClrOp zyg1, ClrOp zyg2) {
             TypeCheck(zyg1.Returns, Tokens.Frame);
-            TypeCheck(zyg2.Returns, Tokens.Variable);
             Returns = Tokens.Void;
             this.ix = ix;
             this.zyg1 = zyg1;
@@ -1508,8 +1514,13 @@ namespace Niecza.CLRBackend {
         public ClrSubyCall(string mname, string sig, ClrOp[] zyg) {
             if (mname != null) sig = "\0" + sig;
             TypeCheck(zyg[0].Returns, Tokens.IP6);
-            for (int i = 1; i < zyg.Length; i++)
-                TypeCheck(zyg[i].Returns, Tokens.Variable);
+            int i = 1;
+            int j = 0;
+            while (j < sig.Length) {
+                string s = sig.Substring(j+1, sig[j]);
+                j += (1 + s.Length);
+                TypeCheck(zyg[i++].Returns, (s == "flatcap") ? Tokens.IP6 : Tokens.Variable);
+            }
             this.mname = mname;
             this.sig = sig;
             this.zyg = zyg;
@@ -1805,30 +1816,34 @@ namespace Niecza.CLRBackend {
     }
 
     class ClrLabelLiteral : ClrOp {
+        CgContext tcx;
         string name;
         public override ClrOp Sink() { return ClrNoop.Instance; }
-        public ClrLabelLiteral(string name) {
+        public ClrLabelLiteral(CgContext tcx, string name) {
             this.name = name;
+            this.tcx = tcx;
             Returns = Tokens.Int32;
             Constant = true;
         }
         public override void CodeGen(CgContext cx) {
-            cx.EmitInt(cx.named_cases[name]);
+            cx.EmitInt(tcx.named_cases[name]);
         }
     }
 
     class ClrLabelArray : ClrOp {
+        CgContext tcx;
         string[] names;
         public override ClrOp Sink() { return ClrNoop.Instance; }
-        public ClrLabelArray(string[] names) {
+        public ClrLabelArray(CgContext tcx, string[] names) {
             this.names = names;
+            this.tcx = tcx;
             Returns = typeof(int[]);
             Constant = true;
         }
         public override void CodeGen(CgContext cx) {
             int[] vec = new int[names.Length];
             for (int i = 0; i < vec.Length; i++)
-                vec[i] = cx.named_cases[names[i]];
+                vec[i] = tcx.named_cases[names[i]];
             cx.EmitIntArray(vec);
         }
     }
@@ -2086,12 +2101,12 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrEhSpan(kls, tag, lid, ls, le, lg));
         }
 
-        public static CpsOp LabelId(string label) {
-            return new CpsOp(new ClrLabelLiteral(label));
+        public static CpsOp LabelId(CgContext tcx, string label) {
+            return new CpsOp(new ClrLabelLiteral(tcx, label));
         }
 
-        public static CpsOp LabelTable(string[] labels) {
-            return new CpsOp(new ClrLabelArray(labels));
+        public static CpsOp LabelTable(CgContext tcx, string[] labels) {
+            return new CpsOp(new ClrLabelArray(tcx, labels));
         }
 
         public static CpsOp Goto(string label, bool iffalse, CpsOp[] zyg) {
@@ -2349,11 +2364,13 @@ namespace Niecza.CLRBackend {
         }
 
         CpsOp AccessLex(object[] zyg) {
-            string type = ((JScalar)zyg[0]).str;
-            string name = ((JScalar)zyg[1]).str;
+            return RawAccessLex( JScalar.S(zyg[0]), JScalar.S(zyg[1]),
+                (zyg.Length > 2 ? Scan(zyg[2]) : null) );
+        }
+
+        CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
             bool core = (type == "corelex");
             bool letonly = (type == "letvar");
-            CpsOp set_to = (zyg.Length > 2) ? Scan(zyg[2]) : null;
 
             Type t;
             if (!core && let_types.TryGetValue(name, out t)) {
@@ -2649,6 +2666,8 @@ namespace Niecza.CLRBackend {
             thandlers["callframe"] = delegate(CpsOp[] z) { return CpsOp.CallFrame(); };
             thandlers["fvarlist_new"] = delegate(CpsOp[] z) {
                 return CpsOp.NewArray(Tokens.Variable, z); };
+            thandlers["fcclist_new"] = delegate(CpsOp[] z) {
+                return CpsOp.NewArray(Tokens.CC, z); };
             thandlers["setbox"] = delegate(CpsOp[] z) {
                 MethodInfo mi = typeof(Kernel).GetMethod("SetBox").MakeGenericMethod(z[1].head.Returns);
                 return CpsOp.MethodCall(null, mi, z); };
@@ -2683,6 +2702,9 @@ namespace Niecza.CLRBackend {
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
             thandlers["context_get"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_ContextHelper,
+                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+            thandlers["status_get"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_StatusHelper,
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
             thandlers["set_status"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_SetStatus,
@@ -2772,9 +2794,9 @@ namespace Niecza.CLRBackend {
             handlers["rxpushb"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(null, Tokens.RxFrame_PushBacktrack, new CpsOp[] {
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                    CpsOp.LabelId(JScalar.S(z[2])) }); };
+                    CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2])) }); };
             handlers["label_table"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.LabelTable(JScalar.SA(1,z)); };
+                return CpsOp.LabelTable(th.cpb.cx, JScalar.SA(1,z)); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
             thandlers["rxend"] = RxCall(Tokens.Void, "End");
             thandlers["rxfinalend"] = RxCall(Tokens.Void, "FinalEnd");
@@ -2830,6 +2852,7 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
             thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
             thandlers["_addprivatemethod"] = Methody(null, Tokens.DMO_AddPrivateMethod);
+            handlers["_parametricrole"] = delegate(NamProcessor th, object[] z) { return th.FillParamRole(); };
             thandlers["_addmethod"] = Methody(null, Tokens.DMO_AddMethod);
             thandlers["_invalidate"] = Methody(null, Tokens.DynMetaObject.GetMethod("Invalidate"));
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
@@ -3095,6 +3118,60 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        CpsOp FillParamRole() {
+            ParametricRole pr = (ParametricRole)
+                Xref.from((object[])sub.parametric_role_hack).Resolve();
+            CpsOp mo = CpsOp.PeekLet("!mo", Tokens.DynMetaObject);
+            CpsOp to = CpsOp.PeekLet("!to", Tokens.DynObject);
+            CpsOp pa = CpsOp.PeekLet("!pa", Tokens.VarHash);
+
+            List<CpsOp> build = new List<CpsOp>();
+
+            CpsOp[] supers = new CpsOp[pr.superclasses.Length];
+            for (int i = 0; i < supers.Length; i++)
+                supers[i] = CpsOp.GetSField(((Class)Xref.from((object[])pr.superclasses[i]).Resolve()).metaObject);
+
+            build.Add( CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
+                mo, CpsOp.StringArray(false, JScalar.SA(0, pr.attributes)),
+                CpsOp.NewArray(Tokens.DynMetaObject, supers),
+                CpsOp.NewArray(Tokens.DynMetaObject, new CpsOp[0]) }) );
+
+            foreach (object m in pr.methods) {
+                object[] mx = (object[]) m;
+                CpsOp name = (mx[0] is JScalar) ? CpsOp.StringLiteral(
+                    JScalar.S(mx[0])) : Scan(new object[] { new JScalar("obj_getstr"), mx[0] });
+                CpsOp var  = RawAccessLex("scopedlex", JScalar.S(mx[1]), null);
+                MethodInfo a = JScalar.B(mx[2]) ?
+                    Tokens.DMO_AddPrivateMethod : Tokens.DMO_AddMethod;
+
+                build.Add(CpsOp.MethodCall(null, a, new CpsOp[] { mo, name,
+                    CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { var }) }));
+            }
+
+            build.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate, new CpsOp[] { mo }));
+            if (sub.sig != null) {
+                object[] rsig = (object[]) sub.sig;
+                foreach (object se in rsig) {
+                    string slot = JScalar.S( ((object[])se)[2] );
+                    if (slot != null)
+                        build.Add(CpsOp.MethodCall(null, Tokens.VarHash_set_Item, new CpsOp[] { pa, CpsOp.StringLiteral(slot), RawAccessLex("scopedlex", slot, null) }));
+                }
+            }
+
+            build.Add(RawAccessLex("scopedlex", "*params", pa));
+            build.Add(CpsOp.SetField(Tokens.DynObject_slots, to,
+                        CpsOp.Null(typeof(object[]))));
+            build.Add(CpsOp.SetField(Tokens.DMO_typeObject, mo, to));
+            build.Add(CpsOp.CpsReturn(new CpsOp[] { CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar, new CpsOp[] { to })}));
+
+            return CpsOp.Let("!mo", CpsOp.ConstructorCall(Tokens.DMO_ctor,
+                        new CpsOp[] { CpsOp.StringLiteral(pr.name) }),
+                    CpsOp.Let("!to", CpsOp.ConstructorCall(Tokens.DynObject_ctor,
+                            new CpsOp[] { mo }),
+                        CpsOp.Let("!pa", CpsOp.ConstructorCall(Tokens.VarHash.GetConstructor(new Type[0]), new CpsOp[0]),
+                            CpsOp.Sequence(build.ToArray()))));
+        }
+
         object WrapBody() {
             object b = sub.body;
             List<object> enter = new List<object>();
@@ -3126,9 +3203,12 @@ namespace Niecza.CLRBackend {
                     new object[] { new JScalar("class_ref"), new JScalar("mo"),
                         t0[0], t0[1], t0[2] },
                     enter.ToArray() };
-            } else if (sub.parametric_role_hack != null)
-                throw new NotImplementedException("param_role_hack");
-            else if ((sub.flags & StaticSub.RETURNABLE) != 0) {
+            } else if (sub.parametric_role_hack != null) {
+                enter.Insert(0, new JScalar("prog"));
+                enter.Add(new object[] { new JScalar("sink"), b });
+                enter.Add(new object[] { new JScalar("_parametricrole") });
+                b = enter.ToArray();
+            } else if ((sub.flags & StaticSub.RETURNABLE) != 0) {
                 enter.Add(new object[] { new JScalar("return"),
                     new object[] { new JScalar("span"),
                         new JScalar("rstart"), new JScalar("rend"),
@@ -3166,6 +3246,9 @@ namespace Niecza.CLRBackend {
 
         internal int constants;
         internal List<CpsOp> thaw = new List<CpsOp>();
+
+        public static int Verbose =
+            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") != null ? 1 : 0;
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
@@ -3246,6 +3329,7 @@ namespace Niecza.CLRBackend {
 
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
+                if (Verbose > 0) Console.WriteLine("sub1 {0}", obj.name);
                 CpsBuilder cpb = new CpsBuilder(this,
                     Unit.SharedName('C', ix, obj.name), false);
                 NamProcessor np = aux[ix] = new NamProcessor(cpb, obj);
@@ -3266,6 +3350,7 @@ namespace Niecza.CLRBackend {
             }
 
             unit.VisitPackages(delegate(int ix, Package pkg) {
+                if (Verbose > 0) Console.WriteLine("pkg2 {0}", pkg.name);
                 if (!(pkg is ModuleWithTypeObject))
                     return;
                 ModuleWithTypeObject m = (ModuleWithTypeObject) pkg;
@@ -3336,6 +3421,7 @@ namespace Niecza.CLRBackend {
             });
 
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
+                if (Verbose > 0) Console.WriteLine("sub2 {0}", obj.name);
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
                 if (obj.sclass != "Sub") {
                     Class c = (Class) obj.GetCorePackage(obj.sclass);
@@ -3372,6 +3458,7 @@ namespace Niecza.CLRBackend {
             });
 
             unit.VisitPackages(delegate(int ix, Package p) {
+                if (Verbose > 0) Console.WriteLine("pkg3 {0}", p.name);
                 ModuleWithTypeObject m = p as ModuleWithTypeObject;
                 if (m == null) return;
                 foreach (object o in m.exports) {
@@ -3399,6 +3486,7 @@ namespace Niecza.CLRBackend {
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
+                if (Verbose > 0) Console.WriteLine("sub3 {0}", obj.name);
                 EncodeSignature(thaw, obj);
 
                 if (obj.is_phaser >= 0)
