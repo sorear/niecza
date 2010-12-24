@@ -1,4 +1,4 @@
-"Low" hanging fruit - stuff that doesn't fit into a specific
+"Low hanging fruit" - stuff that doesn't fit into a specific
 point in the timeline, and anybody can pick up whenever they
 feel like it.  Not all of it is necessarily easy; I know some
 of you like big projects.
@@ -43,14 +43,9 @@ of you like big projects.
 * Parallel hyperops!  Read the Cilk papers, they seem to have a data
   parallelism model most similar to what Perl 6 needs.
 
-* Non-CLR backends would be great.  I haven't completely made up my
-  mind how these should work, so you'll have design work to do.  In
-  particular, a portable method for initializing metaobject trees
-  needs to be created.
+* Non-CLR backends would be great.  There will probably be some changes
+  needed first, but in general the CLR dependencies are all in .cs
+  files.
 
 * Niecza is probably the ideal platform for prototyping a concurrency
   system which will whirlpool back into the synopses.
-
-* The builtin function optimization should be extended to cover most of
-  the basic operations; &char, &infix:<+>, that kind of stuff.  No need
-  to handle &gethostbyname as a builtin though.
