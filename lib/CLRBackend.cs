@@ -1011,18 +1011,20 @@ namespace Niecza.CLRBackend {
                 cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
             }
             int i = 0;
-            foreach (ClrOp o in Zyg) {
-                if (HasCases && i == (Method.IsStatic ? 0 : 1)) {
-                    // this needs to come AFTER the invocant
-                    cx.il.Emit(OpCodes.Ldarg_0);
-                }
+            if (!Method.IsStatic) {
+                ClrOp o = Zyg[i++];
                 o.CodeGen(cx);
-
                 // XXX this doesn't work quite right if the method is
                 // defined on the value type itself
-                if (i == 0 && o.Returns.IsValueType && !Method.IsStatic)
+                if (o.Returns.IsValueType && !Method.IsStatic)
                     cx.il.Emit(OpCodes.Box, o.Returns);
-                i++;
+            }
+            // this needs to come AFTER the invocant
+            if (HasCases)
+                cx.il.Emit(OpCodes.Ldarg_0);
+
+            for (; i < Zyg.Length; i++) {
+                Zyg[i].CodeGen(cx);
             }
             cx.il.Emit((Method.IsStatic ? OpCodes.Call : OpCodes.Callvirt),
                     Method); // XXX C#
@@ -1049,6 +1051,10 @@ namespace Niecza.CLRBackend {
 
             if (!mi.IsStatic)
                 ts.Add(mi.DeclaringType);
+            if (cps && mi.GetParameters()[0].ParameterType != Tokens.Frame)
+                throw new ArgumentException("CPS method not taking a frame");
+            if (cps && mi.ReturnType != Tokens.Frame)
+                throw new ArgumentException("CPS method not returning a frame");
 
             bool skip = cps;
             foreach (ParameterInfo pi in mi.GetParameters()) {
