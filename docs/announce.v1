@@ -1,0 +1,65 @@
+    Announce: Niecza Perl 6 v1
+
+To mark one month since the first announcement of Niecza, to be known
+retroactively as v0, this is another announcement, to be known as v1.
+Further announcements will occur at intervals on the last Monday of
+each month.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementabilty of Perl 6 features.  It currently targets
+the Common Language Runtime in the form of Mono.
+
+    List of changes
+
+* The code generation backend has been rewritten to generate CLR
+  bytecode directly, instead of going through the C# compiler.  This is
+  quite a bit faster, and also generates slightly better code (due to
+  structural restructions on C# code that spaghetti bytecode lacks).
+  Also, it means that Niecza no longer depends on a C# compiler after
+  installation.
+
+* Call graph generation. Set NIECZA_TRACE_CALLS=1 in the environment,
+  then pass the output into perf/call-log-analyze.pl to see what your
+  most used functions are.
+
+* The included JSYNC interface can now save subclasses of Hash.
+
+* &print is now available.
+
+* use v6; is now recognized and ignored.
+
+* --gen-app is no longer available; it was deeply tied to the C# use.
+
+* The binder has been redesigned and made data-driven, shrinking DLLs
+  and making signature introspection possible.
+
+* Regex matches now set $/.
+
+* Exceptions now propagate out of inner loop contexts correctly (e.g.
+  if a Str overload dies when an object is stringified)
+
+* Array and hash slices are now supported.
+
+* Relative array indexing (@foo[*-1]) is now supported.
+
+* INIT blocks are now supported.
+
+* In stack traces, method names now include the class.
+
+* 'augment' now takes effect at INIT time, not BEGIN.  This allows
+  augments to be used in precompiled modules.
+
+* Bootstrap code is now properly distributed between modules, rather
+  than having all of it bloat MAIN.exe.
+
+* require declarations are now supported.
+
+* Minor optimizations have been done on: storage of boxed values,
+  autovivification, postcircumfix operators, contextual conversions,
+  zero width assertions, list iteration.
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also see docs/lhf.txt for a list of things that need to
+be done in no particular order.
