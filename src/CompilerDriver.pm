@@ -17,7 +17,6 @@ use Op ();
 use Optimizer::Beta ();
 use Optimizer::Simplifier ();
 use Metamodel ();
-# use CSharpBackend ();
 use NAMBackend ();
 use Storable;
 

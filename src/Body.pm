@@ -2,7 +2,6 @@ use strict;
 use warnings;
 use 5.010;
 use utf8;
-use CodeGen ();
 use CgOp ();
 
 {
