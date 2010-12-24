@@ -195,6 +195,18 @@ package Niecza {
 
 
 augment class STD {
+method lineof ($p) {
+    return 1 unless defined $p;
+    my $line = @*LINEMEMOS[$p];
+    return $line if $line;
+    $line = 1; my $pos = 0;
+    my $lm = @*LINEMEMOS;
+    self.orig ~~ / :r [ \n { $lm[$pos++] = $line++ } ||
+                        .  { $lm[$pos++] = $line } ]* /;
+    $lm[$pos++] = $line;
+    return $lm[$p] // 0;
+}
+
     our $ALL;
 method getsig {
     my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
@@ -237,8 +249,7 @@ method getsig {
 }
 token ws {
     :my $startpos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {self}))))) };
-    :my $startmemo = @*MEMOS[$startpos];
-    :my $stub = return self if $startmemo<ws> :exists; #OK
+    :my $stub = return self if @*MEMOS[$startpos]<ws> :exists; #OK
 
     :dba('whitespace')
     \h+ <![\#\s\\]> { @*MEMOS[ Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) } ]<ws> = $startpos; }   # common case
@@ -257,13 +268,13 @@ token ws {
     # top level separator.
     {
         my $pos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) };
-        my $memo = @*MEMOS[$pos];
         if ($pos == $startpos) {
-            $memo<ws>:delete;
+            @*MEMOS[$pos]<ws>:delete;
         }
         else {
-            $memo<ws> = $startpos;
-            $memo<endstmt> = $startmemo<endstmt> if $startmemo<endstmt> :exists;
+            @*MEMOS[$pos]<ws> = $startpos;
+            @*MEMOS[$pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
+                if @*MEMOS[$startpos]<endstmt> :exists;
         }
     }
 }
@@ -346,6 +357,7 @@ augment class Cursor {
 sub compiler(:$filename, :$text, :$settingname, :$niecza) {
     my $*SETTINGNAME = $settingname;
     my @*MEMOS;
+    my @*LINEMEMOS;
     my $*FILE = { name => $filename };
     my @*ACTIVE;
     my $*HIGHWATER = 0;
