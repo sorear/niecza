@@ -56,7 +56,7 @@ namespace Niecza.CLRBackend {
     }
 
     class Reader {
-        static char GetHexQuad(string s, int ix) {
+        static char GetHexQuad(char[] s, int ix) {
             int acc = 0;
             for (int i = 0; i < 4; i++) {
                 acc <<= 4;
@@ -68,11 +68,13 @@ namespace Niecza.CLRBackend {
             return (char)acc;
         }
 
-        public static object Read(string input) {
+        public static object Read(string inputx) {
+            char[] input = inputx.ToCharArray();
+            int ilen = input.Length;
+            int start, write;
             int ix = 0;
             List<List<object>> containers = new List<List<object>>();
             char i;
-            StringBuilder sb;
             while (true) {
                 i = input[ix];
                 if (i == '\t' || i == ' ' || i == '\r' || i == '\n' ||
@@ -93,7 +95,7 @@ namespace Niecza.CLRBackend {
                     ix++;
                     continue;
                 }
-                if (i == 'n' && input.Length >= ix + 4 &&
+                if (i == 'n' && ilen >= ix + 4 &&
                         input[ix+1] == 'u' && input[ix+2] == 'l' &&
                         input[ix+3] == 'l') {
                     containers[containers.Count - 1].Add(null);
@@ -101,8 +103,9 @@ namespace Niecza.CLRBackend {
                     continue;
                 }
                 if (i == '"') {
-                    sb = new StringBuilder();
                     ix++;
+                    start = ix;
+                    write = ix;
                     while (true) {
                         i = input[ix];
                         if (i == '\\') {
@@ -118,28 +121,27 @@ namespace Niecza.CLRBackend {
                                 case 'u': i = GetHexQuad(input, ix+2); ix += 4; break;
                             }
                             ix += 2;
-                            sb.Append(i);
+                            input[write++] = i;
                         } else if (i == '"') {
                             break;
                         } else {
-                            sb.Append(i);
+                            input[write++] = i;
                             ix++;
                         }
                     }
                     ix++;
-                    containers[containers.Count - 1].Add(new JScalar(sb.ToString()));
+                    containers[containers.Count - 1].Add(new JScalar(new string(input, start, write - start)));
                     continue;
                 }
-                sb = new StringBuilder();
+                start = ix;
                 while (true) {
                     i = input[ix];
                     if (i == ',' || i == '\r' || i == '\t' || i == '\n' ||
                             i == ' ' || i == ']')
                         break;
-                    sb.Append(i);
                     ix++;
                 }
-                containers[containers.Count - 1].Add(new JScalar(sb.ToString()));
+                containers[containers.Count - 1].Add(new JScalar(new string(input, start, ix - start)));
             }
         }
     }
@@ -971,10 +973,13 @@ namespace Niecza.CLRBackend {
                 : new NotImplementedException();
         }
 
-        protected static void TypeCheck(Type sub, Type super) { TypeCheck(sub,super,""); }
-        protected static void TypeCheck(Type sub, Type super, string msg) {
+        protected static void TypeCheck(Type sub, Type super) {
             if (!super.IsAssignableFrom(sub))
-                throw new Exception(msg + " " + sub + " not subtype of " + super);
+                throw new Exception(sub + " not subtype of " + super);
+        }
+        protected static void TypeCheck(Type sub, Type super, object c) {
+            if (!super.IsAssignableFrom(sub))
+                throw new Exception(sub + " not subtype of " + super + ":" + c);
         }
     }
 
@@ -1067,7 +1072,7 @@ namespace Niecza.CLRBackend {
                         " got " + zyg.Length + " need " + ts.Count);
 
             for (int i = 0; i < ts.Count; i++) {
-                TypeCheck(zyg[i].Returns, ts[i], "arg" + i + " of " + mi);
+                TypeCheck(zyg[i].Returns, ts[i], mi);
             }
         }
     }
@@ -1100,7 +1105,7 @@ namespace Niecza.CLRBackend {
                 throw new Exception("argument list length mismatch");
 
             for (int i = 0; i < ts.Count; i++) {
-                TypeCheck(zyg[i].Returns, ts[i], "arg" + i + " of " + mi);
+                TypeCheck(zyg[i].Returns, ts[i]);
             }
         }
     }
@@ -1874,7 +1879,7 @@ namespace Niecza.CLRBackend {
             if (r.IsValueType)
                 throw new ArgumentException();
             foreach(ClrOp c in zyg)
-                TypeCheck(c.Returns, r, "array element");
+                TypeCheck(c.Returns, r);
             HasCases = false;
             this.zyg = zyg;
         }
@@ -3636,8 +3641,12 @@ namespace Niecza.CLRBackend {
                 if (u != root) {
                     u.clrAssembly = Assembly.Load(u.name);
                     u.clrType = u.clrAssembly.GetType(u.name);
+                    Dictionary<string,FieldInfo> df =
+                        new Dictionary<string,FieldInfo>();
+                    foreach (FieldInfo fi in u.clrType.GetFields())
+                        df[fi.Name] = fi;
                     u.BindFields(delegate(string fn, Type t) {
-                        return u.clrType.GetField(fn);
+                        return df[fn];
                     });
                 }
             }
