@@ -796,8 +796,8 @@ namespace Niecza.CLRBackend {
                 new Dictionary<string,ConstructorInfo>();
             n["CC"] = typeof(LADCC).GetConstructor(new Type[] { CC });
             n["Str"] = typeof(LADStr).GetConstructor(new Type[] { String });
-            n["Param"] = typeof(LADStr).GetConstructor(new Type[] { String });
-            n["Method"] = typeof(LADStr).GetConstructor(new Type[] { String });
+            n["Param"] = typeof(LADParam).GetConstructor(new Type[] { String });
+            n["Method"] = typeof(LADMethod).GetConstructor(new Type[] { String });
             n["ProtoRegex"] = typeof(LADStr).GetConstructor(new Type[] { String });
             n["StrNoCase"] = typeof(LADStrNoCase).GetConstructor(new Type[] { String });
             n["Imp"] = typeof(LADImp).GetConstructor(new Type[] { });
