@@ -241,7 +241,7 @@ token ws {
     :my $stub = return self if $startmemo<ws> :exists; #OK
 
     :dba('whitespace')
-    \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+    \h+ <![\#\s\\]> { @*MEMOS[ Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) } ]<ws> = $startpos; }   # common case
     || <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws>:delete; }
             <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
@@ -256,7 +256,7 @@ token ws {
     # NOTE that this is only used in the slow path!  The || above is the
     # top level separator.
     {
-        my $pos = $¢.pos;
+        my $pos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) };
         my $memo = @*MEMOS[$pos];
         if ($pos == $startpos) {
             $memo<ws>:delete;
