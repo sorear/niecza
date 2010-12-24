@@ -6,7 +6,7 @@ Further announcements will occur at intervals on the last Monday of
 each month.
 
 Niecza is a Perl 6 compiler project studying questions about the
-efficient implementabilty of Perl 6 features.  It currently targets
+efficient implementability of Perl 6 features.  It currently targets
 the Common Language Runtime in the form of Mono.
 
     List of changes
@@ -14,7 +14,7 @@ the Common Language Runtime in the form of Mono.
 * The code generation backend has been rewritten to generate CLR
   bytecode directly, instead of going through the C# compiler.  This is
   quite a bit faster, and also generates slightly better code (due to
-  structural restructions on C# code that spaghetti bytecode lacks).
+  structural restrictions on C# code that spaghetti bytecode lacks).
   Also, it means that Niecza no longer depends on a C# compiler after
   installation.
 
