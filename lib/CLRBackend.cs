@@ -729,7 +729,8 @@ namespace Niecza.CLRBackend {
                 il.Emit(OpCodes.Ldfld, Tokens.Frame_lexi32[ix]);
             }
 
-            if (ix >= Tokens.NumInt32) {
+            if (ix >= Tokens.NumInt32 &&
+                    (CLRBackend.Verifiable || t.IsValueType)) {
                 il.Emit(OpCodes.Unbox_Any, t);
             }
         }
@@ -1031,8 +1032,8 @@ namespace Niecza.CLRBackend {
             for (; i < Zyg.Length; i++) {
                 Zyg[i].CodeGen(cx);
             }
-            cx.il.Emit((Method.IsStatic ? OpCodes.Call : OpCodes.Callvirt),
-                    Method); // XXX C#
+            cx.il.Emit(((Method.IsStatic || !Method.IsVirtual) ?
+                        OpCodes.Call : OpCodes.Callvirt), Method);
             if (HasCases) {
                 cx.il.Emit(OpCodes.Ret);
                 cx.il.MarkLabel(cx.cases[cx.next_case++]);
@@ -1645,7 +1646,8 @@ namespace Niecza.CLRBackend {
                 return;
             cx.il.Emit(OpCodes.Ldarg_0);
             cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_resultSlot);
-            cx.il.Emit(OpCodes.Unbox_Any, Returns);
+            if (CLRBackend.Verifiable || Returns.IsValueType)
+                cx.il.Emit(OpCodes.Unbox_Any, Returns);
         }
     }
 
@@ -3261,6 +3263,8 @@ namespace Niecza.CLRBackend {
 
         public static int Verbose =
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") != null ? 1 : 0;
+        public static bool Verifiable =
+            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_VERIFIABLE") != null ? true : false;
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
