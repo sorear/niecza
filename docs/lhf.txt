@@ -6,7 +6,7 @@ of you like big projects.
 * Generally speaking, the setting is very incomplete.  Patches to add
   methods or subs to the setting, with tests, are welcome.
   - Series operators, stuff like that.
-  - split, trans; a lot of basic Str/Num operators are missing
+  - chop, trans, etc; a lot of basic Str/Num operators are missing
   - Beware - multiple dispatch is NYI!
 
 * Control structures still have a lot of unimplemented cases.  loop
@@ -14,7 +14,7 @@ of you like big projects.
 
 * In particular, I/O is sorely lacking.
   - $*ARGFILES
-  - open/read/write/close
+  - open for writing; close
   - dir
   - IO::Socket
   - Buf stuff
@@ -28,8 +28,18 @@ of you like big projects.
 
 * If you have Microsoft .NET, I'd like Niecza to work out of the box.
   That means a little bit of logic to probe for it, and then adapting
-  CompilerDriver to invoke csc instead of gmcs.  Also niecza_eval
-  should run .exe files directly instead of "mono foo.exe".
+  niecza_eval to run .exe files directly instead of "mono foo.exe".
+
+  diakopter took a crack at this and failed; his results:
+
+   - Microsoft .NET 2.0 lacks HashSet, so you need to change ToolsVersion
+     to 4.0 or copy in HashSet.
+
+   - MSBuild doesn't like periods in rule names; rename them.
+
+   - There's something wrong with the generated code which causes
+     InvalidProgramExceptions to be thrown, although mono
+     --security=verifiable has no problem with it.
 
 * Junctions should work.  You'll need to add some slightly tricky code
   on the slow path of nominal type checks.  You will also need to fix
