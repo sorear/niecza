@@ -11,6 +11,8 @@ use MONKEY_TYPING;
     my $f = Any; $f andthen= 4; is $f, Any, 'andthen= works (U)';
     my $g = 0; $g //= 4; is $g, 0, '//= works (D)';
     my $h = Any; $h //= 4; is $h, 4, '//= works (U)';
+
+    is 2.&not, False, '.& notation works';
 }
 
 {

@@ -1349,6 +1349,10 @@ sub POSTFIX { my ($cl, $M) = @_;
             ppath    => $op->{path},
             name     => $op->{name},
             args     => $op->{args} // []);
+    } elsif ($op->{ref}) { # $obj.&foo
+        $M->{_ast} = Op::CallSub->new(node($M),
+            invocant => $op->{ref},
+            args     => [ $arg, @{ $op->{args} // [] } ]);
     } elsif ($op->{postcall}) {
         if (@{ $op->{postcall} } > 1) {
             $M->sorry("Slicels NYI");
@@ -1366,6 +1370,7 @@ sub POSTFIX { my ($cl, $M) = @_;
         }
     } else {
         say join(" ", %$M);
+        say(YAML::XS::Dump($op));
         $M->sorry("Unhandled postop type");
     }
     $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
