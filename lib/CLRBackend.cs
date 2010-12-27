@@ -3062,7 +3062,7 @@ namespace Niecza.CLRBackend {
 
         public CpsOp SubInfoCtor() {
             CpsOp[] args = new CpsOp[10];
-            args[0] = CpsOp.StringLiteral(sub.name);
+            args[0] = CpsOp.StringLiteral(sub.unit.name + " " + sub.name);
             args[1] = CpsOp.NewIntArray(cpb.cx.lineBuffer.ToArray());
             args[2] = CpsOp.DBDLiteral(cpb.mb);
             args[3] = (sub.outer != null) ?
