@@ -32,7 +32,7 @@ class Builder {
 
     method ok($bool, $tag) {
         my $not = $bool ?? "" !! "not ";
-        self!output($not ~ "ok " ~ $.current-test++ ~ " - " ~ $tag);
+        self!output($not ~ "ok " ~ $.current-test++ ~ " - " ~ $tag.split("\n").join("\n#"));
         if !$bool { self.note(self.blame); }
     }
 
