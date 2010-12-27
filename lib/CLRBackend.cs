@@ -1918,6 +1918,21 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrWiden : ClrOp {
+        readonly ClrOp z;
+        public ClrWiden(Type to, ClrOp z) {
+            TypeCheck(z.Returns, to);
+            Returns = to;
+            this.z = z;
+            this.Constant = z.Constant;
+        }
+        public override void ListCases(CgContext cx) { z.ListCases(cx); }
+        public override ClrOp Sink() { return z.Sink(); }
+        public override void CodeGen(CgContext cx) {
+            z.CodeGen(cx);
+        }
+    }
+
 
     // CpsOps are rather higher level, and can support operations that
     // both return to the trampoline and return a value.
@@ -2303,6 +2318,10 @@ namespace Niecza.CLRBackend {
                     tmp[i] = CpsOp.StringLiteral(vec[i]);
                 return NewArray(Tokens.String, tmp);
             }
+        }
+
+        public static CpsOp Widen(Type to, CpsOp z) {
+            return new CpsOp(z.stmts, new ClrWiden(to, z.head));
         }
     }
 
@@ -2953,6 +2972,10 @@ namespace Niecza.CLRBackend {
             thandlers["treader_slurp"] = Methody(null, typeof(TextReader).GetMethod("ReadToEnd"));
             thandlers["treader_getline"] = Methody(null, typeof(TextReader).GetMethod("ReadLine"));
             thandlers["treader_stdin"] = Methody(null, typeof(Kernel).GetMethod("OpenStdin"));
+            ConstructorInfo treader_open = typeof(StreamReader).GetConstructor(new Type[1] { Tokens.String });
+            thandlers["treader_open"] = delegate(CpsOp[] z) {
+                return CpsOp.Widen(typeof(TextReader),
+                    CpsOp.ConstructorCall(treader_open, z)); };
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {

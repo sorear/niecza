@@ -35,6 +35,10 @@ my class TextReader is IO {
     }
 }
 
+sub open($filename) {
+    Q:CgOp { (box TextReader (treader_open (obj_getstr {$filename}))) }
+}
+
 $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
 @PROCESS::ARGS ::= [ unitem(Q:CgOp { (box Parcel (getargv)) }) ];
 
