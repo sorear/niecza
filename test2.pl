@@ -2,8 +2,10 @@
 use Test;
 use MONKEY_TYPING;
 
+augment class Cool {
+}
+
 {
-    # GH-3
     my class A { method Numeric { 42 } }
     is A.new + 23, 65, '+ calls user-written .Numeric';
 }
@@ -40,16 +42,44 @@ use MONKEY_TYPING;
 }
 
 {
+    my @arr;
+    my $ix = -1;
+    ok !(defined @arr[$ix]), "can index before arrays to get undef";
+}
+
+{
+    is ("foo bar baz".split(/\s/).join('|')), 'foo|bar|baz', 'basic split';
+    is ("foo bar baz".split(' ').join('|')), 'foo|bar|baz', 'split with string';
+    is ("foo bar baz".split(' ', 2).join('|')), 'foo|bar baz',
+        'split with a limit';
+    is ("  foo bar".split(' ').join('|')), '||foo|bar',
+        'split with leading empty fields';
+    is ("foo bar  ".split(' ').join('|')), 'foo|bar||',
+        'split with trailing empty fields';
+    try { "foo bar".split };
+    ok $!, 'split requires an argument';
+    is ("ax+by*cz".split(/\W/, :all).join('|')), 'ax|+|by|*|cz',
+        'split :all';
+
+    is "hello world".index('l'), 2, ".index";
+    is "hello world".index('l',5), 9, ".index with restart point";
+    ok (!defined("hello world".index('x'))), ".index off end";
+    is "hello world".rindex('l'), 9, ".rindex";
+    is "hello world".rindex('l', 6), 3, ".rindex with restart point";
+    ok (!defined("hello world".rindex('x'))), ".rindex off end";
+
+    is ("abc".comb.join('|')), 'a|b|c', 'comb with default matcher';
+    is ("abc".comb(/./, 2).join('|')), 'a|b', 'comb with limit';
+    is ("A1 B2 C3".comb(/(\w)(\d)/, :match).[2].[1]), 3, 'comb :match';
+}
+
+{
     my $str = '';
     $str ~= 1;
     INIT $str ~= 2;
     $str ~= 3;
     INIT $str ~= 4;
     is $str, '2413', 'INIT blocks run in correct order';
-
-    my @arr;
-    my $ix = -1;
-    ok !(defined @arr[$ix]), "can index before arrays to get undef";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

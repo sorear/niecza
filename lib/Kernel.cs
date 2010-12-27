@@ -386,6 +386,8 @@ namespace Niecza {
                     Frame thn = Kernel.GetInferiorRoot()
                         .MakeChild(th, (SubInfo) rbuf[rbase + 1 + names]);
                     src = Kernel.RunInferior(thn);
+                    if (src == null)
+                        throw new Exception("Improper null return from sub default for " + PName(rbase));
                     goto gotit;
                 }
                 if ((flags & SIG_F_OPTIONAL) != 0) {
