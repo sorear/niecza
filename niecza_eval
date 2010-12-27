@@ -28,7 +28,7 @@ sub usage {
 niecza -- a command line wrapper for Niecza
 
 usage: niecza -e 'code'      # run a one-liner
-   OR: niecza file.pl        # run a program
+   OR: niecza file.pl [args] # run a program
    OR: niecza -c My::Module  # precompile a module
    OR: niecza                # interactive shell
 
@@ -62,7 +62,7 @@ sub run {
     compile(stopafter => $stopafter, aot => $aot,
         stagetime => $stagestats, lang => $lang, safe => $safe,
         setting => $setting, @_);
-    system 'mono', CompilerDriver::build_file('MAIN.exe')
+    system 'mono', CompilerDriver::build_file('MAIN.exe'), @ARGV
         if !({@_}->{name}) && !$stopafter;
 }
 
@@ -72,9 +72,7 @@ if ($module) {
     }
 } elsif (@ARGV) {
     require File::Slurp;
-    for (@ARGV) {
-        run(file => $_);
-    }
+    run(file => shift(@ARGV));
 } elsif (@evaluate) {
     for (@evaluate) {
         run(code => $_);
