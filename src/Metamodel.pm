@@ -278,6 +278,7 @@ our %units;
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
     has linearized_mro => (isa => 'ArrayRef[ArrayRef]', is => 'rw');
+    has _closing => (isa => 'Bool', is => 'rw');
 
     sub add_attribute {
         my ($self, $name) = @_;
@@ -298,6 +299,13 @@ our %units;
 
     sub close {
         my ($self) = @_;
+
+        return if $self->linearized_mro;
+        if ($self->_closing) {
+            die "Class hierarchy circularty detected at ", $self->name, "\n";
+        }
+        $self->_closing(1);
+
         if (($self->name ne 'Mu' || !$unit->is_true_setting)
                 && !@{ $self->superclasses }) {
             $self->add_super($unit->get_item(
