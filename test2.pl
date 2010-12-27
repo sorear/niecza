@@ -3,6 +3,17 @@ use Test;
 use MONKEY_TYPING;
 
 {
+    my $a = 3; $a &&= 4; is $a, 4, '&&= works (T)';
+    my $b = 0; $b &&= 4; is $b, 0, '&&= works (F)';
+    my $c = 3; $c ||= 4; is $c, 3, '||= works (T)';
+    my $d = 0; $d ||= 4; is $d, 4, '||= works (F)';
+    my $e = 0; $e andthen= 4; is $e, 4, 'andthen= works (D)';
+    my $f = Any; $f andthen= 4; is $f, Any, 'andthen= works (U)';
+    my $g = 0; $g //= 4; is $g, 0, '//= works (D)';
+    my $h = Any; $h //= 4; is $h, 4, '//= works (U)';
+}
+
+{
     my $str = '';
     $str ~= 1;
     INIT $str ~= 2;

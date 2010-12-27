@@ -443,6 +443,43 @@ use CgOp;
 }
 
 {
+    package Op::ShortCircuitAssign;
+    use Moose;
+    extends 'Op';
+
+    has kind => (isa => 'Str', is => 'ro', required => 1);
+    has lhs  => (isa => 'Op', is => 'ro', required => 1);
+    has rhs  => (isa => 'Op', is => 'ro', required => 1);
+    sub zyg { $_[0]->lhs, $_[0]->rhs }
+
+    sub code {
+        my ($self, $body) = @_;
+
+        my $sym   = Niecza::Actions->gensym;
+        my $assn  = CgOp::assign(CgOp::letvar($sym), $self->rhs->cgop($body));
+        my $cond  = CgOp::letvar($sym);
+        my $cassn;
+
+        given ($self->kind) {
+            when ("&&") {
+                $cassn = CgOp::ternary(CgOp::obj_getbool($cond), $assn, CgOp::noop);
+            }
+            when ("||") {
+                $cassn = CgOp::ternary(CgOp::obj_getbool($cond), CgOp::noop, $assn);
+            }
+            when ("andthen") {
+                $cassn = CgOp::ternary(CgOp::obj_getdef($cond), $assn, CgOp::noop);
+            }
+            when ("//") {
+                $cassn = CgOp::ternary(CgOp::obj_getdef($cond), CgOp::noop, $assn);
+            }
+        }
+
+        CgOp::letn($sym, $self->lhs->code($body), $cassn, $cond);
+    }
+}
+
+{
     package Op::StringLiteral;
     use Moose;
     extends 'Op';

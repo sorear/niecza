@@ -1208,9 +1208,16 @@ sub infixish { my ($cl, $M) = @_;
     }
 }
 
+my %loose2tight = (
+    '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
+    'orelse' => '//', 'and' => '&&', 'or' => '||',
+);
+
 sub INFIX { my ($cl, $M) = @_;
     my $fn = $M->{infix}{_ast};
-    my $s = $fn->isa('Op::Lexical') ? $fn->name : '';
+    my $s = $fn->isa('Op::Lexical') ? $fn->name :
+        ($fn->isa('Op::CallSub') && $fn->invocant->isa('Op::Lexical')) ?
+            $fn->invocant->name : '';
     my ($st,$l,$r) = $cl->whatever_precheck($s, $M->{left}{_ast},
         $M->{right}{_ast});
 
@@ -1229,21 +1236,28 @@ sub INFIX { my ($cl, $M) = @_;
         push @r, $l->isa('Op::SimpleParcel') ? @{ $l->items } : ($l);
         push @r, $r->isa('Op::SimpleParcel') ? @{ $r->items } : ($r);
         $M->{_ast} = Op::SimpleParcel->new(items => \@r);
+    } elsif ($s eq '&assignop' && $fn->args->[0]->isa('Op::Lexical') &&
+            ($fn->args->[0]->name =~ /&infix:<(.*)>/) &&
+            $loose2tight{$1}) {
+        $M->{_ast} = Op::ShortCircuitAssign->new(node($M),
+            kind => $loose2tight{$1}, lhs => $l, rhs => $r);
     } else {
         $M->{_ast} = Op::CallSub->new(node($M), invocant => $fn,
             positionals => [ $l, $r ]);
 
-        if ($s eq '&infix:<=>' && $l->isa('Op::Lexical') && $l->state_decl) {
-            # Assignments (and assign metaops, but we don't do that yet) to has
-            # and state declarators are rewritten into an appropriate phaser
-            my $cv = $cl->gensym;
-            $M->{_ast} = Op::StatementList->new(node($M), children => [
-                Op::Start->new(condvar => $cv, body => $M->{_ast}),
-                Op::Lexical->new(name => $l->name)]);
-        }
-        elsif ($s eq '&infix:<=>' && $l->isa('Op::ConstantDecl') && !$l->init) {
-            $l->init($r);
-            $M->{_ast} = $l;
+        if ($s eq '&infix:<=>' || $s eq '&assignop') {
+            # Assignments to has and state declarators are rewritten into
+            # an appropriate phaser
+            if ($l->isa('Op::Lexical') && $l->state_decl) {
+                my $cv = $cl->gensym;
+                $M->{_ast} = Op::StatementList->new(node($M), children => [
+                    Op::Start->new(condvar => $cv, body => $M->{_ast}),
+                    Op::Lexical->new(name => $l->name)]);
+            }
+            elsif ($l->isa('Op::ConstantDecl') && !$l->init) {
+                $l->init($r);
+                $M->{_ast} = $l;
+            }
         }
     }
     $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
@@ -1276,10 +1290,6 @@ sub CHAIN { my ($cl, $M) = @_;
     $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
 }
 
-my %loose2tight = (
-    '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
-    'orelse' => '//', 'and' => '&&', 'or' => '||',
-);
 sub LIST { my ($cl, $M) = @_;
     if ($M->isa('STD::Regex')) {
         goto &LISTrx;
