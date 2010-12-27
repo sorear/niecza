@@ -119,7 +119,7 @@ sub Metamodel::ParametricRole::to_nam {
 }
 
 sub Metamodel::Method::to_nam {
-    [ $_[0]->name, ($_[0]->private ? 1 : 0), $_[0]->body ]
+    [ $_[0]->name, $_[0]->kind, $_[0]->body ]
 }
 
 sub Sig::Parameter::to_nam {

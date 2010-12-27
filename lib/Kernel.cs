@@ -1114,6 +1114,8 @@ noparams:
             = new List<KeyValuePair<string, IP6>>();
         public Dictionary<string, IP6> priv
             = new Dictionary<string, IP6>();
+        public Dictionary<string, IP6> submethods
+            = new Dictionary<string, IP6>();
         public List<string> local_attr = new List<string>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
@@ -1208,6 +1210,12 @@ noparams:
                 if (k.loc_exists_key != null) mro_exists_key = k.loc_exists_key;
                 if (k.loc_delete_key != null) mro_delete_key = k.loc_delete_key;
             }
+
+            foreach (KeyValuePair<string,IP6> m in submethods) {
+                DispatchEnt de;
+                mro_methods.TryGetValue(m.Key, out de);
+                mro_methods[m.Key] = new DispatchEnt(de, m.Value);
+            }
         }
 
         private void SetMRO(DynMetaObject[] arr) {
@@ -1280,6 +1288,10 @@ noparams:
 
         public void AddPrivateMethod(string name, IP6 code) {
             priv[name] = code;
+        }
+
+        public void AddSubMethod(string name, IP6 code) {
+            submethods[name] = code;
         }
 
         public IP6 GetPrivateMethod(string name) {

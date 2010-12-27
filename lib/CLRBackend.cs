@@ -870,10 +870,16 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("AddPhaser");
         public static readonly MethodInfo Kernel_FirePhasers =
             typeof(Kernel).GetMethod("FirePhasers");
-        public static readonly MethodInfo DMO_AddPrivateMethod =
-            typeof(DynMetaObject).GetMethod("AddPrivateMethod");
-        public static readonly MethodInfo DMO_AddMethod =
-            typeof(DynMetaObject).GetMethod("AddMethod");
+        public static readonly Dictionary<string,MethodInfo> DMO_AddFooMethod
+            = _FooMethod();
+        private static Dictionary<string,MethodInfo> _FooMethod() {
+            Dictionary<string,MethodInfo> n =
+                new Dictionary<string,MethodInfo>();
+            n["normal"] = DynMetaObject.GetMethod("AddMethod");
+            n["private"] = DynMetaObject.GetMethod("AddPrivateMethod");
+            n["sub"] = DynMetaObject.GetMethod("AddSubMethod");
+            return n;
+        }
         public static readonly MethodInfo DMO_Invalidate =
             typeof(DynMetaObject).GetMethod("Invalidate");
         public static readonly MethodInfo DMO_FillParametricRole =
@@ -2882,9 +2888,9 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_from_fvarlist"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.FVarList }));
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
             thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
-            thandlers["_addprivatemethod"] = Methody(null, Tokens.DMO_AddPrivateMethod);
             handlers["_parametricrole"] = delegate(NamProcessor th, object[] z) { return th.FillParamRole(); };
-            thandlers["_addmethod"] = Methody(null, Tokens.DMO_AddMethod);
+            handlers["_addmethod"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.MethodCall(null, Tokens.DMO_AddFooMethod[JScalar.S(z[1])], new CpsOp[] { th.Scan(z[2]), th.Scan(z[3]), th.Scan(z[4]) }); };
             thandlers["_invalidate"] = Methody(null, Tokens.DynMetaObject.GetMethod("Invalidate"));
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
             thandlers["how"] = Methody(Tokens.IP6, Tokens.IP6.GetMethod("HOW"));
@@ -3177,8 +3183,7 @@ namespace Niecza.CLRBackend {
                 CpsOp name = (mx[0] is JScalar) ? CpsOp.StringLiteral(
                     JScalar.S(mx[0])) : Scan(new object[] { new JScalar("obj_getstr"), mx[0] });
                 CpsOp var  = RawAccessLex("scopedlex", JScalar.S(mx[1]), null);
-                MethodInfo a = JScalar.B(mx[2]) ?
-                    Tokens.DMO_AddPrivateMethod : Tokens.DMO_AddMethod;
+                MethodInfo a = Tokens.DMO_AddFooMethod[JScalar.S(mx[2])];
 
                 build.Add(CpsOp.MethodCall(null, a, new CpsOp[] { mo, name,
                     CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { var }) }));
@@ -3228,7 +3233,8 @@ namespace Niecza.CLRBackend {
                 for (int i = 1; i < tuples.Length; i++) {
                     object[] t = (object[]) tuples[i];
                     enter.Add(new object[] {
-                        new JScalar( ((JScalar)t[0]).str != "" ? "_addprivatemethod" : "_addmethod" ),
+                        new JScalar( "_addmethod" ),
+                        t[0],
                         new object[] { new JScalar("letvar"), new JScalar("!mo") },
                         new object[] { new JScalar("str"), t[1] },
                         new object[] { new JScalar("fetch"), new object[] { new JScalar("scopedlex"), t[2] } } });
@@ -3512,8 +3518,8 @@ namespace Niecza.CLRBackend {
                     ((Role)m).methods;
                 foreach (object me in methods) {
                     object[] mes = (object[]) me;
-                    MethodInfo mi = ((JScalar)mes[1]).num != 0 ?
-                        Tokens.DMO_AddPrivateMethod : Tokens.DMO_AddMethod;
+                    MethodInfo mi =
+                        Tokens.DMO_AddFooMethod[((JScalar)mes[1]).str];
                     thaw.Add(CpsOp.MethodCall(null, mi, new CpsOp[] {
                         CpsOp.GetSField(m.metaObject),
                         CpsOp.StringLiteral(((JScalar)mes[0]).str),

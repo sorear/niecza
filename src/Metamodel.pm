@@ -241,7 +241,7 @@ our %units;
     }
 
     sub add_method {
-        my ($self, $type, $name, $var, $body) = @_;
+        my ($self, $kind, $name, $var, $body) = @_;
         die "method $name defined in a lowly package";
     }
 
@@ -286,9 +286,9 @@ our %units;
     }
 
     sub add_method {
-        my ($self, $type, $name, $var, $body) = @_;
+        my ($self, $kind, $name, $var, $body) = @_;
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
-            body => $body, private => ($type eq '!'));
+            body => $body, kind => $kind);
     }
 
     sub add_super {
@@ -373,12 +373,12 @@ our %units;
     }
 
     sub add_method {
-        my ($self, $type, $name, $var, $body) = @_;
+        my ($self, $kind, $name, $var, $body) = @_;
         if (blessed $name) {
             die "Computed names are legal only in parametric roles";
         }
         push @{ $self->methods }, Metamodel::Method->new(name => $name,
-            body => $body, private => ($type eq '!'));
+            body => $body, kind => $kind);
     }
 
     sub add_super {
@@ -409,8 +409,8 @@ our %units;
     }
 
     sub add_method {
-        my ($self, $type, $name, $var, $body) = @_;
-        push @{ $self->methods }, [ $name, $var, ($type eq '!') ];
+        my ($self, $kind, $name, $var, $body) = @_;
+        push @{ $self->methods }, [ $name, $var, $kind ];
     }
 
     sub add_super {
@@ -440,7 +440,8 @@ our %units;
     use Moose;
 
     has name => (isa => 'Str', is => 'ro', required => 1);
-    has private => (isa => 'Bool', is => 'ro', required => 1);
+    # normal, private, meta, sub
+    has kind => (isa => 'Str', is => 'ro', required => 1);
     has body => (is => 'ro', required => 1);
 
     no Moose;
@@ -1007,9 +1008,9 @@ sub Op::Attribute::begin {
     $opensubs[-1]->create_static_pad; # for protosub instance
     $nb->strong_used(1);
     $opensubs[-1]->add_my_sub($self->name . '!a', $nb);
-    $ns->add_method('!', $self->name, $self->name . '!a', $nb->xref);
+    $ns->add_method('private', $self->name, $self->name . '!a', $nb->xref);
     if ($self->accessor) {
-        $ns->add_method('', $self->name, $self->name . '!a', $nb->xref);
+        $ns->add_method('normal', $self->name, $self->name . '!a', $nb->xref);
     }
 }
 

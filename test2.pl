@@ -13,6 +13,17 @@ use MONKEY_TYPING;
     my $h = Any; $h //= 4; is $h, 4, '//= works (U)';
 
     is 2.&not, False, '.& notation works';
+
+    my class X1 {
+        submethod foo { 1 }
+    }
+
+    my class X2 is X1 {
+    }
+
+    is X1.foo, 1, "can call submethods";
+    my $i; try { X2.foo; $i = True }
+    ok !$i, "submethods are not inherited";
 }
 
 {

@@ -450,7 +450,7 @@ sub regex_def { my ($cl, $M) = @_;
     ($ast, my $mb) = Optimizer::RxSimple::run($ast);
     $M->{_ast} = Op::SubDef->new(
         var  => $var,
-        method_too => ($scope eq 'has' ? ['', $cname // $name] : undef),
+        method_too => ($scope eq 'has' ? ['normal', $cname // $name] : undef),
         body => Body->new(
             ltm   => $lad,
             returnable => 1,
@@ -2562,6 +2562,15 @@ sub routine_declarator__S_sub { my ($cl, $M) = @_;
 sub routine_declarator__S_method { my ($cl, $M) = @_;
     $M->{_ast} = $M->{method_def}{_ast};
 }
+sub routine_declarator__S_submethod { my ($cl, $M) = @_;
+    $M->{_ast} = $M->{method_def}{_ast};
+    if ($M->{_ast}->method_too->[0] ne 'normal') {
+        $M->sorry("Call pattern decorators cannot be used with submethod");
+        $M->{_ast} = undef;
+        return;
+    }
+    $M->{_ast}->method_too->[0] = 'sub';
+}
 
 my $next_anon_id = 0;
 sub gensym { 'anon_' . ($next_anon_id++) }
@@ -2683,6 +2692,13 @@ sub routine_def { my ($cl, $M) = @_;
 sub method_def { my ($cl, $M) = @_;
     my $scope = $::SCOPE // 'has';
     my $type = $M->{type} ? $M->{type}->Str : '';
+    $type = ($type eq ''  ? 'normal' :
+             $type eq '^' ? 'meta' :
+             $type eq '!' ? 'private' :
+             do {
+                 $M->sorry("Unhandled method decoration $type");
+                 return;
+             });
     $scope = 'anon' if !$M->{longname};
     my $name = $M->{longname} ? $cl->unqual_longname($M->{longname},
         "Qualified method definitions not understood") : undef; #XXX
@@ -2691,7 +2707,7 @@ sub method_def { my ($cl, $M) = @_;
         $M->sorry("Method sgils NYI");
         return;
     }
-    if ($type eq '^') {
+    if ($type eq 'meta') {
         $M->sorry("Metamethod mixins NYI");
         return;
     }
