@@ -4,6 +4,7 @@ constant $?TRANSPARENT = 1;
 
 class Builder {
     has $.current-test;
+    has $!set-plan;
 
     method new() {
         $*TEST-BUILDER;
@@ -42,6 +43,7 @@ class Builder {
 
     # XXX multi!
     method plan($x) {
+        $!set-plan = 1;
         if $x ~~ Num {
             self.expected-tests($x);
         } elsif $x ~~ Whatever {
@@ -52,7 +54,9 @@ class Builder {
     }
 
     method done-testing {
-        self!output("1.." ~ ($.current-test - 1));
+        if !($!set-plan) {
+            self!output("1.." ~ ($.current-test - 1));
+        }
     }
 }
 
