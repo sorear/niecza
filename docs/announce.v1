@@ -79,3 +79,12 @@ the Common Language Runtime in the form of Mono.
 Contact sorear in irc.freenode.net #perl6 or via the sender address of
 this mailing.  Also see docs/lhf.txt for a list of things that need to
 be done in no particular order.
+
+    Future directions
+
+To simplify deployment and make &eval easier to implement, I'd like to
+take Perl 5 out of the loop.  Therefore I am engineering a way to allow
+the compiler to be moved to Perl 6; this will probably be finished by
+v2 or v3.  After that, expect lots of spectest work.
+
+[1] https://github.com/sorear/niecza/zipball/v1

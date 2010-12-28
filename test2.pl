@@ -3,7 +3,8 @@ use Test;
 use MONKEY_TYPING;
 
 {
-    my $str = '';
+    my $str;
+    INIT $str = '';
     $str ~= 1;
     INIT $str ~= 2;
     $str ~= 3;
