@@ -1245,7 +1245,7 @@ sub INFIX { my ($cl, $M) = @_;
         $M->{_ast} = Op::CallSub->new(node($M), invocant => $fn,
             positionals => [ $l, $r ]);
 
-        if ($s eq '&infix:<=>' || $s eq '&assignop') {
+        if ($s eq '&infix:<=>') {
             # Assignments to has and state declarators are rewritten into
             # an appropriate phaser
             if ($l->isa('Op::Lexical') && $l->state_decl) {
@@ -1253,6 +1253,12 @@ sub INFIX { my ($cl, $M) = @_;
                 $M->{_ast} = Op::StatementList->new(node($M), children => [
                     Op::Start->new(condvar => $cv, body => $M->{_ast}),
                     Op::Lexical->new(name => $l->name)]);
+            }
+            elsif ($l->isa('Op::Attribute') && !$l->initializer) {
+                $l->initializer(
+                    $cl->sl_to_block('bare', $r, subname => $l->name . " init")
+                );
+                $M->{_ast} = $l;
             }
             elsif ($l->isa('Op::ConstantDecl') && !$l->init) {
                 $l->init($r);

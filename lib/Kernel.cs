@@ -1036,6 +1036,12 @@ noparams:
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
+        public struct AttrInfo {
+            public string name;
+            public IP6 init;
+            public bool publ;
+        }
+
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -1116,11 +1122,11 @@ noparams:
             = new Dictionary<string, IP6>();
         public Dictionary<string, IP6> submethods
             = new Dictionary<string, IP6>();
-        public List<string> local_attr = new List<string>();
+        public List<AttrInfo> local_attr = new List<AttrInfo>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
-        public string[] all_attr;
+        public string[] all_slot;
 
         private WeakReference wr_this;
         // protected by static lock
@@ -1294,6 +1300,14 @@ noparams:
             submethods[name] = code;
         }
 
+        public void AddAttribute(string name, bool publ, IP6 init) {
+            AttrInfo ai;
+            ai.name = name;
+            ai.publ = publ;
+            ai.init = init;
+            local_attr.Add(ai);
+        }
+
         public IP6 GetPrivateMethod(string name) {
             IP6 code = priv[name];
             if (code == null) { throw new NieczaException("private method lookup failed for " + name + " in class " + this.name); }
@@ -1301,32 +1315,30 @@ noparams:
         }
 
 
-        public void FillProtoClass(string[] attr) {
-            FillClass(attr, attr, new DynMetaObject[] {},
+        public void FillProtoClass(string[] slots) {
+            FillClass(slots, new DynMetaObject[] {},
                     new DynMetaObject[] { this });
         }
 
-        public void FillClass(string[] local_attr, string[] all_attr,
-                DynMetaObject[] superclasses, DynMetaObject[] mro) {
+        public void FillClass(string[] all_slot, DynMetaObject[] superclasses,
+                DynMetaObject[] mro) {
             this.superclasses = new List<DynMetaObject>(superclasses);
             SetMRO(mro);
-            this.local_attr = new List<string>(local_attr);
             this.butCache = new Dictionary<DynMetaObject, DynMetaObject>();
-            this.all_attr = all_attr;
+            this.all_slot = all_slot;
             this.local_does = new DynMetaObject[0];
 
             nslots = 0;
-            foreach (string an in all_attr) {
+            foreach (string an in all_slot) {
                 slotMap[an] = nslots++;
             }
 
             Invalidate();
         }
 
-        public void FillRole(string[] attr, DynMetaObject[] superclasses,
+        public void FillRole(DynMetaObject[] superclasses,
                 DynMetaObject[] cronies) {
             this.superclasses = new List<DynMetaObject>(superclasses);
-            this.local_attr = new List<string>(attr);
             this.local_does = cronies;
             this.isRole = true;
             Revalidate(); // need to call directly as we aren't in any mro list
@@ -1690,13 +1702,16 @@ noparams:
             return NewROScalar(AnyP);
         }
 
-        public static Variable DefaultNew(IP6 proto) {
+        public static Variable DefaultNew(IP6 proto, VarHash args) {
             DynObject n = new DynObject(((DynObject)proto).mo);
             DynMetaObject[] mro = n.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
-                foreach (string s in mro[i].local_attr) {
-                    n.SetSlot(s, NewRWScalar(AnyMO, AnyP));
+                foreach (DynMetaObject.AttrInfo a in mro[i].local_attr) {
+                    IP6 val = a.init == null ? AnyP :
+                        RunInferior(a.init.Invoke(GetInferiorRoot(),
+                                Variable.None, null)).Fetch();
+                    n.SetSlot(a.name, NewRWScalar(AnyMO, val));
                 }
             }
 
@@ -1937,10 +1952,11 @@ slow:
             DynMetaObject[] nmro = new DynMetaObject[b.mro.Length + 1];
             Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
             nmro[0] = n;
-            n.FillClass(b.local_attr.ToArray(), b.all_attr,
-                    new DynMetaObject[] { b }, nmro);
+            n.FillClass(b.all_slot, new DynMetaObject[] { b }, nmro);
             foreach (KeyValuePair<string, IP6> kv in role.priv)
                 n.AddPrivateMethod(kv.Key, kv.Value);
+            foreach (DynMetaObject.AttrInfo ai in role.local_attr)
+                n.AddAttribute(ai.name, ai.publ, ai.init);
             foreach (KeyValuePair<string, IP6> kv in role.ord_methods)
                 n.AddMethod(kv.Key, kv.Value);
             n.Invalidate();

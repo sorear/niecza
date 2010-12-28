@@ -69,8 +69,7 @@ public class NieczaCLR {
         DynMetaObject[] mro = new DynMetaObject[pm.mro.Length + 1];
         Array.Copy(pm.mro, 0, mro, 1, pm.mro.Length);
         mro[0] = m;
-        m.FillClass(new string[] { }, new string[] { },
-                new DynMetaObject[] { pm }, mro);
+        m.FillClass(new string[] { }, new DynMetaObject[] { pm }, mro);
         m.loc_to_clr = CLRToCLR.Instance;
         if (NieczaCLROpts.Debug)
             Console.WriteLine("Setting up wrapper for {0}", t.FullName);

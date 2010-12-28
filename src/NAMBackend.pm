@@ -124,7 +124,7 @@ sub Metamodel::Method::to_nam {
 }
 
 sub Metamodel::Attribute::to_nam {
-    [ $_[0]->name ]
+    [ $_[0]->name, $_[0]->public, $_[0]->ivar, $_[0]->ibody ]
 }
 
 sub Sig::Parameter::to_nam {

@@ -107,7 +107,7 @@ public class JsyncWriter {
 
         for (int i = 0; i < mo.nslots; i++) {
             o.Append(',');
-            WriteStr(true, mo.all_attr[i]);
+            WriteStr(true, mo.all_slot[i]);
             o.Append(':');
             WriteObj(((Variable)dyo.slots[i]).Fetch());
         }
@@ -588,7 +588,7 @@ public class JsyncReader {
             } else {
                 DynObject dyo = new DynObject(p_cursor.mo);
                 for (int i = 0; i < dyo.mo.nslots; i++) {
-                    string sn = dyo.mo.all_attr[i];
+                    string sn = dyo.mo.all_slot[i];
                     if (!zyg.ContainsKey(sn))
                         Err("No value for attribute " + sn + " in thawed value of class " + dyo.mo.name);
                     dyo.slots[i] = zyg[sn];

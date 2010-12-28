@@ -13,7 +13,7 @@ using System.IO;
 using Niecza;
 
 namespace Niecza.CLRBackend {
-    // The portable format is a subset of JSON, and is current read
+    // The portable format is a subset of JSON, and is currently read
     // into a matching internal form.
     sealed class JScalar {
         string text;
@@ -387,9 +387,15 @@ namespace Niecza.CLRBackend {
 
     class Attribute {
         public readonly string name;
+        public readonly bool   publ;
+        public readonly string ivar;
+        public readonly Xref   ibody;
 
         public Attribute(object[] x) {
-            name = JScalar.S(x[0]);
+            name  = JScalar.S(x[0]);
+            publ  = JScalar.B(x[1]);
+            ivar  = JScalar.S(x[2]);
+            ibody = Xref.from(x[3]);
         }
 
         public static Attribute[] fromArray(object x) {
@@ -912,6 +918,8 @@ namespace Niecza.CLRBackend {
             n["sub"] = DynMetaObject.GetMethod("AddSubMethod");
             return n;
         }
+        public static readonly MethodInfo DMO_AddAttribute =
+            typeof(DynMetaObject).GetMethod("AddAttribute");
         public static readonly MethodInfo DMO_Invalidate =
             typeof(DynMetaObject).GetMethod("Invalidate");
         public static readonly MethodInfo DMO_FillParametricRole =
@@ -3204,13 +3212,8 @@ namespace Niecza.CLRBackend {
             CpsOp[] supers = new CpsOp[pr.superclasses.Length];
             for (int i = 0; i < supers.Length; i++)
                 supers[i] = CpsOp.GetSField(pr.superclasses[i].Resolve<Class>().metaObject);
-            string[] anames = new string[pr.attributes.Length];
-            for (int i = 0; i < anames.Length; i++)
-                anames[i] = pr.attributes[i].name;
-
             build.Add( CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
-                mo, CpsOp.StringArray(false, anames),
-                CpsOp.NewArray(Tokens.DynMetaObject, supers),
+                mo, CpsOp.NewArray(Tokens.DynMetaObject, supers),
                 CpsOp.NewArray(Tokens.DynMetaObject, new CpsOp[0]) }) );
 
             foreach (Method m in pr.methods) {
@@ -3221,6 +3224,15 @@ namespace Niecza.CLRBackend {
 
                 build.Add(CpsOp.MethodCall(null, a, new CpsOp[] { mo, name,
                     CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { var }) }));
+            }
+
+            foreach (Attribute a in pr.attributes) {
+                CpsOp name = CpsOp.StringLiteral(a.name);
+                CpsOp publ = CpsOp.BoolLiteral(a.publ);
+                CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.IP6) :
+                    RawAccessLex("scopedlex", a.ivar, null);
+                build.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
+                    new CpsOp[] { mo, name, publ, init }));
             }
 
             build.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate, new CpsOp[] { mo }));
@@ -3449,26 +3461,19 @@ namespace Niecza.CLRBackend {
 
                 if (m is Role) {
                     Role r = (Role) m;
-                    string[] anames = new string[r.attributes.Length];
-                    for (int i = 0; i < anames.Length; i++)
-                        anames[i] = r.attributes[i].name;
                     CpsOp[] super = new CpsOp[ r.superclasses.Length ];
                     for (int i = 0; i < super.Length; i++)
                         super[i] = CpsOp.GetSField(r.superclasses[i].Resolve<Class>().metaObject);
 
                     thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
                         CpsOp.GetSField(r.metaObject),
-                        CpsOp.StringArray(false, anames),
                         CpsOp.NewArray(Tokens.DynMetaObject, super),
                         CpsOp.NewArray(Tokens.DynMetaObject, new CpsOp[0]) }));
                 } else if (m is ParametricRole) {
                     // The heavy lifting is done in WrapBody
                 } else if (m is Class) {
                     Class r = (Class) m;
-                    List<string> all_attr = new List<string>();
-                    string[] anames = new string[r.attributes.Length];
-                    for (int i = 0; i < anames.Length; i++)
-                        anames[i] = r.attributes[i].name;
+                    List<string> all_slot = new List<string>();
                     CpsOp[] super = new CpsOp[ r.superclasses.Length ];
                     CpsOp[] mro   = new CpsOp[ r.linearized_mro.Length ];
                     for (int i = 0; i < super.Length; i++)
@@ -3477,13 +3482,12 @@ namespace Niecza.CLRBackend {
                         Class p = r.linearized_mro[i].Resolve<Class>();
                         mro[i] = CpsOp.GetSField(p.metaObject);
                         foreach (Attribute a in p.attributes)
-                            all_attr.Add(a.name);
+                            all_slot.Add(a.name);
                     }
 
                     thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillClass, new CpsOp[] {
                         CpsOp.GetSField(r.metaObject),
-                        CpsOp.StringArray(false, anames),
-                        CpsOp.StringArray(false, all_attr.ToArray()),
+                        CpsOp.StringArray(false, all_slot.ToArray()),
                         CpsOp.NewArray(Tokens.DynMetaObject, super),
                         CpsOp.NewArray(Tokens.DynMetaObject, mro) }));
                 }
@@ -3556,6 +3560,8 @@ namespace Niecza.CLRBackend {
                 if (m is ParametricRole) return;
                 Method[] methods = (m is Class) ? ((Class)m).methods :
                     ((Role)m).methods;
+                Attribute[] attrs = (m is Class) ? ((Class)m).attributes :
+                    ((Role)m).attributes;
                 foreach (Method me in methods) {
                     MethodInfo mi = Tokens.DMO_AddFooMethod[me.kind];
                     thaw.Add(CpsOp.MethodCall(null, mi, new CpsOp[] {
@@ -3563,6 +3569,14 @@ namespace Niecza.CLRBackend {
                         CpsOp.StringLiteral(me.name),
                         CpsOp.GetSField(me.body.Resolve<StaticSub>().protosub)
                     }));
+                }
+                foreach (Attribute a in attrs) {
+                    CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.IP6) :
+                        CpsOp.GetSField(a.ibody.Resolve<StaticSub>().protosub);
+                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
+                        new CpsOp[] { CpsOp.GetSField(m.metaObject),
+                        CpsOp.StringLiteral(a.name),
+                        CpsOp.BoolLiteral(a.publ), init }));
                 }
                 thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate,
                     new CpsOp [] { CpsOp.GetSField(m.metaObject) }));

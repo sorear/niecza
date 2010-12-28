@@ -27,6 +27,19 @@ use MONKEY_TYPING;
 }
 
 {
+    my class X1 {
+        has $.a = 123;
+        has $.b;
+    }
+
+    my $x = X1.new;
+    ok !defined($x.b), "without initializer, attr is undefined";
+    is $x.a, 123, "initializers work";
+    $x.a = 456;
+    is $x.a, 456, "initialized attrs can still be reset";
+}
+
+{
     my $str = '';
     $str ~= 1;
     INIT $str ~= 2;

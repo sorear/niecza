@@ -236,7 +236,7 @@ our %units;
     has exports => (is => 'rw', isa => 'ArrayRef[ArrayRef[Str]]');
 
     sub add_attribute {
-        my ($self, $name) = @_;
+        my ($self, $name, $public, $ivar, $ibody) = @_;
         die "attribute $name defined in a lowly package";
     }
 
@@ -281,8 +281,9 @@ our %units;
     has _closing => (isa => 'Bool', is => 'rw');
 
     sub add_attribute {
-        my ($self, $name) = @_;
-        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name);
+        my ($self, $name, $public, $ivar, $ibody) = @_;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name,
+            public => $public, ivar => $ivar, ibody => $ibody);
     }
 
     sub add_method {
@@ -368,8 +369,9 @@ our %units;
         default => sub { [] });
 
     sub add_attribute {
-        my ($self, $name) = @_;
-        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name);
+        my ($self, $name, $public, $ivar, $ibody) = @_;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name,
+            public => $public, ivar => $ivar, ibody => $ibody);
     }
 
     sub add_method {
@@ -404,8 +406,9 @@ our %units;
         default => sub { [] });
 
     sub add_attribute {
-        my ($self, $name) = @_;
-        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name);
+        my ($self, $name, $public, $ivar, $ibody) = @_;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name,
+            public => $public, ivar => $ivar, ibody => $ibody);
     }
 
     sub add_method {
@@ -455,7 +458,10 @@ our %units;
     package Metamodel::Attribute;
     use Moose;
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
+    has name  => (isa => 'Str', is => 'ro', required => 1);
+    has public => (isa => 'Bool', is => 'ro');
+    has ivar  => (isa => 'Maybe[Str]', is => 'ro');
+    has ibody => (isa => 'Maybe[ArrayRef]', is => 'ro');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -1004,8 +1010,15 @@ sub Op::Attribute::begin {
         " declared outside of any class");
     die "attribute $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
+    my ($ibref, $ibvar);
+    if ($self->initializer) {
+        my $ibody = $self->initializer->begin;
+        $ibvar = Niecza::Actions->gensym;
+        $opensubs[-1]->add_my_sub($ibvar, $ibody);
+        $ibref = $ibody->xref;
+    }
     $ns = $unit->deref($ns);
-    $ns->add_attribute($self->name);
+    $ns->add_attribute($self->name, ($self->accessor ? 1 : 0), $ibvar, $ibref);
     my $nb = Metamodel::StaticSub->new(
         unit       => $unit,
         outer      => $opensubs[-1]->xref,
