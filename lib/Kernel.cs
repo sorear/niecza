@@ -459,6 +459,10 @@ noparams:
             return hints[name] = new BValue(Kernel.NewROScalar(Kernel.AnyP));
         }
 
+        public void SetStringHint(string name, string value) {
+            AddHint(name).v = Kernel.BoxAnyMO<string>(value, Kernel.StrMO);
+        }
+
         public bool GetLocalHint(string name, out BValue val) {
             return (hints != null && hints.TryGetValue(name, out val));
         }

@@ -58,6 +58,7 @@ namespace Niecza.CLRBackend {
             throw new ArgumentException(s);
         }
         public static int I(object x) { return (int)((JScalar)x).num; }
+        public static double N(object x) { return ((JScalar)x).num; }
         public static int IN(object x) { return x == null ? -1 : (int)((JScalar)x).num; }
         public static string S(object x) { return x == null ? null : ((JScalar)x).str; }
         public override string ToString() { return text; }
@@ -162,6 +163,8 @@ namespace Niecza.CLRBackend {
         public readonly object[] log;
         public readonly string setting;
         public readonly Xref bottom_ref;
+        public readonly string filename;
+        public readonly double modtime;
         public readonly object[] xref;
         public readonly object[] tdeps;
 
@@ -176,7 +179,9 @@ namespace Niecza.CLRBackend {
             log = from[2] as object[];
             setting = JScalar.S(from[3]);
             bottom_ref = Xref.from(from[4]);
-            xref = from[5] as object[];
+            filename = JScalar.S(from[5]);
+            modtime = from[6] == null ? 0 : JScalar.N(from[6]);
+            xref = from[7] as object[];
             exp_pkg = new Dictionary<string,Package>();
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
@@ -188,7 +193,7 @@ namespace Niecza.CLRBackend {
                     (xref[i] as Package).NoteExports(exp_pkg);
                 }
             }
-            tdeps = from[6] as object[];
+            tdeps = from[8] as object[];
         }
 
         public void BindDepends() {
@@ -3677,6 +3682,9 @@ namespace Niecza.CLRBackend {
                 }
             });
 
+            thaw.Add(CpsOp.MethodCall(null, Tokens.SubInfo.GetMethod("SetStringHint"), new CpsOp[] {
+                CpsOp.GetSField(unit.mainline_ref.Resolve<StaticSub>().subinfo),
+                CpsOp.StringLiteral("$?FILE"), CpsOp.StringLiteral(unit.filename ?? "(eval)") }));
             thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_FirePhasers,
                 new CpsOp[] { CpsOp.IntLiteral(2), CpsOp.BoolLiteral(false) }));
             if (asmain)

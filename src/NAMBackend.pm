@@ -45,6 +45,8 @@ sub Metamodel::Unit::to_nam {
         $self->ns->log,
         $self->setting,
         $self->bottom_ref,
+        $self->filename,
+        $self->modtime,
         [ map { $_ && $_->to_nam } @{ $self->xref } ],
         [ map { [$_, @{ $self->tdeps->{$_} }] } sort keys %{ $self->tdeps } ],
     ]
