@@ -5,6 +5,13 @@ retroactively as v0, this is another announcement, to be known as v1.
 Further announcements will occur at intervals on the last Monday of
 each month.
 
+You have my assurance that the 'v1' tag, available at [1], passes all
+of the current tests and has a bunch of cool features.  What you will
+not necessarily have is an easy time installing it; Niecza depends on
+several non-pure-Perl modules from CPAN, which you'll need to set up
+in order to be able to use Niecza.  I recommend trying cpanminus
+first.
+
 Niecza is a Perl 6 compiler project studying questions about the
 efficient implementability of Perl 6 features.  It currently targets
 the Common Language Runtime in the form of Mono.
@@ -24,8 +31,6 @@ the Common Language Runtime in the form of Mono.
 
 * The included JSYNC interface can now save subclasses of Hash.
 
-* &print is now available.
-
 * use v6; is now recognized and ignored.
 
 * --gen-app is no longer available; it was deeply tied to the C# use.
@@ -35,14 +40,23 @@ the Common Language Runtime in the form of Mono.
 
 * Regex matches now set $/.
 
+* New methods: Cool: split, index, rindex, lines, split, comb improved
+
+* New operators: &&=, ||=, //=, andthen=
+
+* New top-level functions: open, print.  say returns True on success
+  per spec.
+
+* pmurias added &skip to Test and fixed escaping of debug clauses.
+
+* New keywords supported: INIT, require, submethod
+
 * Exceptions now propagate out of inner loop contexts correctly (e.g.
   if a Str overload dies when an object is stringified)
 
 * Array and hash slices are now supported.
 
 * Relative array indexing (@foo[*-1]) is now supported.
-
-* INIT blocks are now supported.
 
 * In stack traces, method names now include the class.
 
@@ -52,7 +66,9 @@ the Common Language Runtime in the form of Mono.
 * Bootstrap code is now properly distributed between modules, rather
   than having all of it bloat MAIN.exe.
 
-* require declarations are now supported.
+* @*ARGS works properly with compile-and-run mode.
+
+* Attribute default values are implemented.
 
 * Minor optimizations have been done on: storage of boxed values,
   autovivification, postcircumfix operators, contextual conversions,
