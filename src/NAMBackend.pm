@@ -67,6 +67,7 @@ sub Metamodel::StaticSub::to_nam {
         [ map { $_->xref->[1] } @{ $self->zyg } ],
         $self->parametric_role_hack,
         $self->augment_hack,
+        $self->hint_hack,
         $self->is_phaser,
         $self->body_of,
         $self->in_class,
@@ -156,6 +157,7 @@ sub Metamodel::Lexical::Simple::to_nam {
 }
 sub Metamodel::Lexical::Common::to_nam { ['common', @{$_[0]->path}, $_[0]->name ] }
 sub Metamodel::Lexical::Alias::to_nam {  ['alias', $_[0]->to] }
+sub Metamodel::Lexical::Hint::to_nam {  ['hint'] }
 sub Metamodel::Lexical::SubDef::to_nam { ['sub', @{ $_[0]->body->xref } ] }
 sub Metamodel::Lexical::Stash::to_nam {  ['stash', @{ $_[0]->path } ] }
 

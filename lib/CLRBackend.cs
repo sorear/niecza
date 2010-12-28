@@ -58,6 +58,7 @@ namespace Niecza.CLRBackend {
             throw new ArgumentException(s);
         }
         public static int I(object x) { return (int)((JScalar)x).num; }
+        public static int IN(object x) { return x == null ? -1 : (int)((JScalar)x).num; }
         public static string S(object x) { return x == null ? null : ((JScalar)x).str; }
         public override string ToString() { return text; }
     }
@@ -457,6 +458,7 @@ namespace Niecza.CLRBackend {
         public readonly int[] zyg;
         public readonly Xref parametric_role_hack;
         public readonly object augment_hack;
+        public readonly object[] hint_hack;
         public readonly int is_phaser;
         public readonly Xref body_of;
         public readonly Xref in_class;
@@ -482,17 +484,18 @@ namespace Niecza.CLRBackend {
             zyg = JScalar.IA(0, s[4]);
             parametric_role_hack = Xref.from(s[5]);
             augment_hack = s[6];
-            is_phaser = s[7] == null ? -1 : (int) ((JScalar) s[7]).num;
-            body_of = Xref.from(s[8]);
-            in_class = Xref.from(s[9]);
-            cur_pkg = JScalar.SA(0, s[10]);
-            sclass = JScalar.S(s[11]);
-            ltm = s[12];
-            exports = (object[]) s[13];
-            sig = s[14];
+            hint_hack = s[7] as object[];
+            is_phaser = JScalar.IN(s[8]);
+            body_of = Xref.from(s[9]);
+            in_class = Xref.from(s[10]);
+            cur_pkg = JScalar.SA(0, s[11]);
+            sclass = JScalar.S(s[12]);
+            ltm = s[13];
+            exports = (object[]) s[14];
+            sig = s[15];
 
-            object[] r_lexicals = s[15] as object[];
-            body = s[16];
+            object[] r_lexicals = s[16] as object[];
+            body = s[17];
             lexicals = new List<KeyValuePair<string,Lexical>>();
             l_lexicals = new Dictionary<string,Lexical>();
             for (int i = 0; i < r_lexicals.Length; i++) {
@@ -505,6 +508,8 @@ namespace Niecza.CLRBackend {
                     obj = new LexSimple(bl);
                 } else if (type == "common") {
                     obj = new LexCommon(bl);
+                } else if (type == "hint") {
+                    obj = new LexHint(bl);
                 } else if (type == "sub") {
                     obj = new LexSub(bl);
                 } else if (type == "alias") {
@@ -600,6 +605,19 @@ namespace Niecza.CLRBackend {
 
         public LexSimple(object[] l) {
             flags = JScalar.I(l[2]);
+        }
+    }
+
+    class LexHint : Lexical {
+        public FieldInfo stg;
+        public LexHint(object[] l) {}
+        public override ClrOp GetCode(int up) {
+            return new ClrGetField(Tokens.BValue_v,
+                    new ClrGetSField(stg));
+        }
+        public override void BindFields(int six, int lix, StaticSub sub,
+                string name, Func<string,Type,FieldInfo> binder) {
+            stg = binder(Unit.SharedName('B', six, name), Tokens.BValue);
         }
     }
 
@@ -862,6 +880,8 @@ namespace Niecza.CLRBackend {
             IP6.GetMethod("SetSlot");
         public static readonly MethodInfo IP6_GetSlot =
             IP6.GetMethod("GetSlot");
+        public static readonly MethodInfo SubInfo_AddHint =
+            SubInfo.GetMethod("AddHint");
         public static readonly MethodInfo Variable_Fetch =
             Variable.GetMethod("Fetch");
         public static readonly MethodInfo VVarList_Item =
@@ -888,6 +908,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewRWListVar");
         public static readonly MethodInfo Kernel_NewRWScalar =
             typeof(Kernel).GetMethod("NewRWScalar");
+        public static readonly MethodInfo Kernel_Decontainerize =
+            typeof(Kernel).GetMethod("Decontainerize");
         public static readonly MethodInfo Kernel_NewBoundVar =
             typeof(Kernel).GetMethod("NewBoundVar");
         public static readonly MethodInfo Kernel_IterHasFlat =
@@ -2685,6 +2707,13 @@ namespace Niecza.CLRBackend {
                 return th.SubyCall(true, zyg); };
             handlers["subcall"] = delegate (NamProcessor th, object[] zyg) {
                 return th.SubyCall(false, zyg); };
+            handlers["_hintset"] = delegate (NamProcessor th, object[] zyg) {
+                int d;
+                Lexical lx = th.ResolveLex(JScalar.S(zyg[1]), out d, false);
+                FieldInfo peer = (lx is LexCommon) ? ((LexCommon)lx).stg :
+                    ((LexHint)lx).stg;
+                return CpsOp.SetField(Tokens.BValue_v, CpsOp.GetSField(peer),
+                    CpsOp.MethodCall(null, Tokens.Kernel_Decontainerize, new CpsOp[] { th.Scan(zyg[2]) })); };
             handlers["letn"] = delegate(NamProcessor th, object[] zyg) {
                 int i = 1;
                 Dictionary<string,Type> old =
@@ -3273,6 +3302,12 @@ namespace Niecza.CLRBackend {
                     new object[] { new JScalar("corelex"), new JScalar("EMPTY") } } });
                 enter.Add(new object[] { new JScalar("return") });
                 b = enter.ToArray();
+            } else if (sub.hint_hack != null) {
+                enter.Insert(0, new JScalar("prog"));
+                enter.Add(new object[] { new JScalar("_hintset"),
+                    sub.hint_hack[1], b });
+                enter.Add(new object[] { new JScalar("return") });
+                b = enter.ToArray();
             } else if (sub.augment_hack != null) {
                 enter = new List<object>();
                 object[] tuples = (object[]) sub.augment_hack;
@@ -3609,6 +3644,12 @@ namespace Niecza.CLRBackend {
                         thaw.Add(CpsOp.SetSField(lx.stg,
                             CpsOp.MethodCall(null, Tokens.Kernel_GetVar, new CpsOp[] {
                                 CpsOp.StringArray(false, lx.path) })));
+                    } else if (l.Value is LexHint) {
+                        LexHint lx = (LexHint)l.Value;
+                        thaw.Add(CpsOp.SetSField(lx.stg,
+                            CpsOp.MethodCall(null, Tokens.SubInfo_AddHint,
+                                new CpsOp[] { CpsOp.GetSField(obj.subinfo),
+                                    CpsOp.StringLiteral(l.Key) })));
                     } else if (l.Value is LexSub) {
                         LexSub lx = (LexSub)l.Value;
                         if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
@@ -3636,6 +3677,8 @@ namespace Niecza.CLRBackend {
                 }
             });
 
+            thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_FirePhasers,
+                new CpsOp[] { CpsOp.IntLiteral(2), CpsOp.BoolLiteral(false) }));
             if (asmain)
                 thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_FirePhasers,
                     new CpsOp[] { CpsOp.IntLiteral(0), CpsOp.BoolLiteral(false) }));

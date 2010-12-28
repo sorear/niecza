@@ -980,7 +980,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rnull(CgOp::scopedlex($self->name, $self->init->cgop($body)));
+        CgOp::scopedlex($self->name);
     }
 
     __PACKAGE__->meta->make_immutable;

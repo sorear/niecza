@@ -2806,8 +2806,11 @@ sub statement_prefix__S_INIT { my ($cl, $M) = @_;
     $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
 }
 # XXX 'As soon as possible' isn't quite soon enough here
-*statement_prefix__S_CHECK = *statement_prefix__S_INIT;
-*statement_prefix__S_BEGIN = *statement_prefix__S_INIT;
+sub statement_prefix__S_BEGIN { my ($cl, $M) = @_;
+    $M->{blast}{_ast}->type('begin');
+    $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
+}
+*statement_prefix__S_CHECK = *statement_prefix__S_BEGIN;
 
 sub statement_prefix__S_END { my ($cl, $M) = @_;
     $M->{blast}{_ast}->type('end');

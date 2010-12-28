@@ -492,6 +492,17 @@ our %units;
     __PACKAGE__->meta->make_immutable;
 }
 
+# These are used for $?foo et al, and should be inaccessible until assigned,
+# although the current code won't enforce that well.
+{
+    package Metamodel::Lexical::Hint;
+    use Moose;
+    extends 'Metamodel::Lexical';
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
 # our...
 {
     package Metamodel::Lexical::Common;
@@ -578,6 +589,8 @@ our %units;
     has parametric_role_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
     # some tuples for method definitions; munged into a phaser
     has augment_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
+    # emit code to assign to a hint; [ $subref, $name ]
+    has hint_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
     has is_phaser => (isa => 'Maybe[Int]', is => 'rw', default => undef);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
@@ -665,6 +678,10 @@ our %units;
 
     sub add_my_name { my ($self, $slot, @ops) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
+    }
+
+    sub add_hint { my ($self, $slot) = @_;
+        $self->lexicals->{$slot} = Metamodel::Lexical::Hint->new;
     }
 
     sub add_common_name { my ($self, $slot, $path, $name) = @_;
@@ -838,6 +855,8 @@ sub Unit::begin {
     $unit;
 }
 
+my %type2phaser = ( init => 0, end => 1, begin => 2 );
+
 sub Body::begin {
     my $self = shift;
     my %args = @_;
@@ -859,7 +878,7 @@ sub Body::begin {
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
         augment_hack=> $args{augment_hack},
-        is_phaser  => ($type eq 'init' ? 0 : $type eq 'end' ? 1 : undef),
+        is_phaser  => $type2phaser{$type},
         class      => $self->class,
         ltm        => $self->ltm,
         run_once   => $args{once} && (!@opensubs || $rtop->run_once));
@@ -990,8 +1009,25 @@ sub Op::ConstantDecl::begin {
         $opensubs[-1]->add_common_name($self->name,
             $opensubs[-1]->find_pkg($self->path), $self->name);
     } else {
-        $opensubs[-1]->add_my_name($self->name);
+        $opensubs[-1]->add_hint($self->name);
     }
+
+    if (!$self->init) {
+        die "Malformed constant decl";
+    }
+
+    my $nb = Metamodel::StaticSub->new(
+        unit       => $unit,
+        outer      => $opensubs[-1]->xref,
+        name       => $self->name,
+        cur_pkg    => $opensubs[-1]->cur_pkg,
+        class      => 'Sub',
+        run_once   => 0,
+        is_phaser  => 2,
+        hint_hack  => [ $opensubs[-1]->xref, $self->name ],
+        code       => $self->init);
+    $opensubs[-1]->create_static_pad; # for protosub instance
+    $opensubs[-1]->add_child($nb);
 }
 
 sub Op::PackageVar::begin {
