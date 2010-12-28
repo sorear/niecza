@@ -1708,9 +1708,16 @@ noparams:
 
             for (int i = mro.Length - 1; i >= 0; i--) {
                 foreach (DynMetaObject.AttrInfo a in mro[i].local_attr) {
-                    IP6 val = a.init == null ? AnyP :
-                        RunInferior(a.init.Invoke(GetInferiorRoot(),
-                                Variable.None, null)).Fetch();
+                    IP6 val;
+                    Variable vx;
+                    if (a.publ && args.TryGetValue(a.name, out vx)) {
+                        val = vx.Fetch();
+                    } else if (a.init == null) {
+                        val = AnyP;
+                    } else {
+                        val = RunInferior(a.init.Invoke(GetInferiorRoot(),
+                                    Variable.None, null)).Fetch();
+                    }
                     n.SetSlot(a.name, NewRWScalar(AnyMO, val));
                 }
             }

@@ -12,6 +12,14 @@ use MONKEY_TYPING;
     is $str, '2413', 'INIT blocks run in correct order';
 }
 
+{
+    my class X3 {
+        has $.a;
+    }
+    my $x = X3.new(a => 5);
+    is $x.a, 5, 'Attribute values can be passed in constructors';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
