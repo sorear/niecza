@@ -271,7 +271,7 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+    has attributes => (isa => 'ArrayRef[Metamodel::Attribute]', is => 'ro',
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
@@ -282,7 +282,7 @@ our %units;
 
     sub add_attribute {
         my ($self, $name) = @_;
-        push @{ $self->attributes }, $name;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name);
     }
 
     sub add_method {
@@ -360,7 +360,7 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+    has attributes => (isa => 'ArrayRef[Metamodel::Attribute]', is => 'ro',
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
@@ -369,7 +369,7 @@ our %units;
 
     sub add_attribute {
         my ($self, $name) = @_;
-        push @{ $self->attributes }, $name;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name);
     }
 
     sub add_method {
@@ -396,21 +396,22 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+    has attributes => (isa => 'ArrayRef[Metamodel::Attribute]', is => 'ro',
         default => sub { [] });
-    has methods => (isa => 'ArrayRef', is => 'ro',
+    has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
 
     sub add_attribute {
         my ($self, $name) = @_;
-        push @{ $self->attributes }, $name;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name);
     }
 
     sub add_method {
         my ($self, $kind, $name, $var, $body) = @_;
-        push @{ $self->methods }, [ $name, $var, $kind ];
+        push @{ $self->methods }, Metamodel::Method->new(name => $name,
+            var => $var, kind => $kind);
     }
 
     sub add_super {
@@ -439,10 +440,22 @@ our %units;
     package Metamodel::Method;
     use Moose;
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
+    # normally a Str, but may be Op for param roles
+    has name => (is => 'ro', required => 1);
     # normal, private, meta, sub
     has kind => (isa => 'Str', is => 'ro', required => 1);
-    has body => (is => 'ro', required => 1);
+    has var => (isa => 'Str', is => 'ro');
+    has body => (isa => 'ArrayRef', is => 'ro');
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package Metamodel::Attribute;
+    use Moose;
+
+    has name => (isa => 'Str', is => 'ro', required => 1);
 
     no Moose;
     __PACKAGE__->meta->make_immutable;

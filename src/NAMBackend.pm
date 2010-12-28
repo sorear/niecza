@@ -29,8 +29,8 @@ sub nam_sub {
     $s->{nam} = $s->code->cgop($s);
     if ($s->parametric_role_hack) {
         for (@{ $unit->deref($s->parametric_role_hack)->methods }) {
-            if (ref $_->[0]) {
-                $_->[0] = $_->[0]->cgop($s)->to_nam;
+            if (ref $_->name) {
+                $_->{name} = $_->name->cgop($s)->to_nam;
             }
         }
     }
@@ -60,6 +60,7 @@ sub Metamodel::StaticSub::to_nam {
     $flags |= 16 if $self->returnable;
     $flags |= 32 if $self->augmenting;
     [
+        'sub',
         $self->name,
         $self->{outer}, # get the raw xref
         $flags,
@@ -93,7 +94,7 @@ sub Metamodel::Package::to_nam {
 sub Metamodel::Class::to_nam {
     my $self = shift;
     $self->Metamodel::Package::to_nam(
-        $self->attributes,
+        [ map { $_->to_nam } @{ $self->attributes } ],
         [ map { $_->to_nam } @{ $self->methods } ],
         $self->superclasses,
         $self->linearized_mro,
@@ -103,7 +104,7 @@ sub Metamodel::Class::to_nam {
 sub Metamodel::Role::to_nam {
     my $self = shift;
     $self->Metamodel::Package::to_nam(
-        $self->attributes,
+        [ map { $_->to_nam } @{ $self->attributes } ],
         [ map { $_->to_nam } @{ $self->methods } ],
         $self->superclasses,
     );
@@ -112,14 +113,18 @@ sub Metamodel::Role::to_nam {
 sub Metamodel::ParametricRole::to_nam {
     my $self = shift;
     $self->Metamodel::Package::to_nam(
-        $self->attributes,
-        $self->methods,
+        [ map { $_->to_nam } @{ $self->attributes } ],
+        [ map { $_->to_nam } @{ $self->methods } ],
         $self->superclasses,
     );
 }
 
 sub Metamodel::Method::to_nam {
-    [ $_[0]->name, $_[0]->kind, $_[0]->body ]
+    [ $_[0]->name, $_[0]->kind, $_[0]->var, $_[0]->body ]
+}
+
+sub Metamodel::Attribute::to_nam {
+    [ $_[0]->name ]
 }
 
 sub Sig::Parameter::to_nam {
