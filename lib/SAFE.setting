@@ -197,6 +197,17 @@ my class Num is Cool {
     method dump() { ~self }
 }
 
+#TODO use a power from the standard library
+sub infix:<**>($num,$power) {
+    my $ret = 1;
+    my $p = $power;
+    while ($p > 0) {
+        $ret *= $num;
+        $p--;
+    }
+    $ret;
+}
+
 my class Str is Cool {
     method Str () { self }
     method ACCEPTS($t) { self eq $t }
