@@ -64,7 +64,18 @@ $GLOBAL::TEST-BUILDER = Builder.CREATE;
 $GLOBAL::TEST-BUILDER.reset;
 
 sub ok($bool, $tag) is export { $*TEST-BUILDER.ok($bool, $tag) }
-sub is($a, $b, $tag) is export { $*TEST-BUILDER.ok($a eq $b, $tag) }
+sub is($got, $expected, $tag) is export {
+
+    # avoid comparing twice
+    my $equal = $got eq $expected;
+
+    $*TEST-BUILDER.ok($equal, $tag);
+    if !$equal {
+        $*TEST-BUILDER.note('   Failed test');
+        $*TEST-BUILDER.note('          got: '~$got);
+        $*TEST-BUILDER.note('     expected: '~$expected);
+    }
+}
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done-testing() is export { $*TEST-BUILDER.done-testing }
 sub done_testing() is export { $*TEST-BUILDER.done-testing }
