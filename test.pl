@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 692;
+plan 706;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1446,4 +1446,41 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     is ("abc".comb.join('|')), 'a|b|c', 'comb with default matcher';
     is ("abc".comb(/./, 2).join('|')), 'a|b', 'comb with limit';
     is ("A1 B2 C3".comb(/(\w)(\d)/, :match).[2].[1]), 3, 'comb :match';
+}
+
+{
+    my $a = 3; $a &&= 4; is $a, 4, '&&= works (T)';
+    my $b = 0; $b &&= 4; is $b, 0, '&&= works (F)';
+    my $c = 3; $c ||= 4; is $c, 3, '||= works (T)';
+    my $d = 0; $d ||= 4; is $d, 4, '||= works (F)';
+    my $e = 0; $e andthen= 4; is $e, 4, 'andthen= works (D)';
+    my $f = Any; $f andthen= 4; is $f, Any, 'andthen= works (U)';
+    my $g = 0; $g //= 4; is $g, 0, '//= works (D)';
+    my $h = Any; $h //= 4; is $h, 4, '//= works (U)';
+
+    is 2.&not, False, '.& notation works';
+
+    my class X1 {
+        submethod foo { 1 }
+    }
+
+    my class X2 is X1 {
+    }
+
+    is X1.foo, 1, "can call submethods";
+    my $i; try { X2.foo; $i = True }
+    ok !$i, "submethods are not inherited";
+}
+
+{
+    my class X1 {
+        has $.a = 123;
+        has $.b;
+    }
+
+    my $x = X1.new;
+    ok !defined($x.b), "without initializer, attr is undefined";
+    is $x.a, 123, "initializers work";
+    $x.a = 456;
+    is $x.a, 456, "initialized attrs can still be reset";
 }

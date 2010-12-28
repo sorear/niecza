@@ -29,8 +29,8 @@ sub nam_sub {
     $s->{nam} = $s->code->cgop($s);
     if ($s->parametric_role_hack) {
         for (@{ $unit->deref($s->parametric_role_hack)->methods }) {
-            if (ref $_->[0]) {
-                $_->[0] = $_->[0]->cgop($s)->to_nam;
+            if (ref $_->name) {
+                $_->{name} = $_->name->cgop($s)->to_nam;
             }
         }
     }
@@ -45,6 +45,8 @@ sub Metamodel::Unit::to_nam {
         $self->ns->log,
         $self->setting,
         $self->bottom_ref,
+        $self->filename,
+        $self->modtime,
         [ map { $_ && $_->to_nam } @{ $self->xref } ],
         [ map { [$_, @{ $self->tdeps->{$_} }] } sort keys %{ $self->tdeps } ],
     ]
@@ -60,12 +62,14 @@ sub Metamodel::StaticSub::to_nam {
     $flags |= 16 if $self->returnable;
     $flags |= 32 if $self->augmenting;
     [
+        'sub',
         $self->name,
         $self->{outer}, # get the raw xref
         $flags,
         [ map { $_->xref->[1] } @{ $self->zyg } ],
         $self->parametric_role_hack,
         $self->augment_hack,
+        $self->hint_hack,
         $self->is_phaser,
         $self->body_of,
         $self->in_class,
@@ -93,7 +97,7 @@ sub Metamodel::Package::to_nam {
 sub Metamodel::Class::to_nam {
     my $self = shift;
     $self->Metamodel::Package::to_nam(
-        $self->attributes,
+        [ map { $_->to_nam } @{ $self->attributes } ],
         [ map { $_->to_nam } @{ $self->methods } ],
         $self->superclasses,
         $self->linearized_mro,
@@ -103,7 +107,7 @@ sub Metamodel::Class::to_nam {
 sub Metamodel::Role::to_nam {
     my $self = shift;
     $self->Metamodel::Package::to_nam(
-        $self->attributes,
+        [ map { $_->to_nam } @{ $self->attributes } ],
         [ map { $_->to_nam } @{ $self->methods } ],
         $self->superclasses,
     );
@@ -112,14 +116,18 @@ sub Metamodel::Role::to_nam {
 sub Metamodel::ParametricRole::to_nam {
     my $self = shift;
     $self->Metamodel::Package::to_nam(
-        $self->attributes,
-        $self->methods,
+        [ map { $_->to_nam } @{ $self->attributes } ],
+        [ map { $_->to_nam } @{ $self->methods } ],
         $self->superclasses,
     );
 }
 
 sub Metamodel::Method::to_nam {
-    [ $_[0]->name, $_[0]->kind, $_[0]->body ]
+    [ $_[0]->name, $_[0]->kind, $_[0]->var, $_[0]->body ]
+}
+
+sub Metamodel::Attribute::to_nam {
+    [ $_[0]->name, $_[0]->public, $_[0]->ivar, $_[0]->ibody ]
 }
 
 sub Sig::Parameter::to_nam {
@@ -151,6 +159,7 @@ sub Metamodel::Lexical::Simple::to_nam {
 }
 sub Metamodel::Lexical::Common::to_nam { ['common', @{$_[0]->path}, $_[0]->name ] }
 sub Metamodel::Lexical::Alias::to_nam {  ['alias', $_[0]->to] }
+sub Metamodel::Lexical::Hint::to_nam {  ['hint'] }
 sub Metamodel::Lexical::SubDef::to_nam { ['sub', @{ $_[0]->body->xref } ] }
 sub Metamodel::Lexical::Stash::to_nam {  ['stash', @{ $_[0]->path } ] }
 

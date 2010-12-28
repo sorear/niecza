@@ -38,8 +38,8 @@ my class Mu {
               [l i (+ (l i) (int 2))])]
           [ns (l obj)])
     } }
-    method CREATE() { Q:CgOp { (default_new (@ (l self))) } }
-    method new() { Q:CgOp { (default_new (@ {self})) } }
+    method CREATE(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
+    method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
 }
 
 my class Any is Mu {

@@ -236,7 +236,7 @@ our %units;
     has exports => (is => 'rw', isa => 'ArrayRef[ArrayRef[Str]]');
 
     sub add_attribute {
-        my ($self, $name) = @_;
+        my ($self, $name, $public, $ivar, $ibody) = @_;
         die "attribute $name defined in a lowly package";
     }
 
@@ -271,7 +271,7 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+    has attributes => (isa => 'ArrayRef[Metamodel::Attribute]', is => 'ro',
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
@@ -281,8 +281,9 @@ our %units;
     has _closing => (isa => 'Bool', is => 'rw');
 
     sub add_attribute {
-        my ($self, $name) = @_;
-        push @{ $self->attributes }, $name;
+        my ($self, $name, $public, $ivar, $ibody) = @_;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name,
+            public => $public, ivar => $ivar, ibody => $ibody);
     }
 
     sub add_method {
@@ -360,7 +361,7 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+    has attributes => (isa => 'ArrayRef[Metamodel::Attribute]', is => 'ro',
         default => sub { [] });
     has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
@@ -368,8 +369,9 @@ our %units;
         default => sub { [] });
 
     sub add_attribute {
-        my ($self, $name) = @_;
-        push @{ $self->attributes }, $name;
+        my ($self, $name, $public, $ivar, $ibody) = @_;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name,
+            public => $public, ivar => $ivar, ibody => $ibody);
     }
 
     sub add_method {
@@ -396,21 +398,23 @@ our %units;
     use Moose;
     extends 'Metamodel::Module';
 
-    has attributes => (isa => 'ArrayRef[Str]', is => 'ro',
+    has attributes => (isa => 'ArrayRef[Metamodel::Attribute]', is => 'ro',
         default => sub { [] });
-    has methods => (isa => 'ArrayRef', is => 'ro',
+    has methods => (isa => 'ArrayRef[Metamodel::Method]', is => 'ro',
         default => sub { [] });
     has superclasses => (isa => 'ArrayRef', is => 'ro',
         default => sub { [] });
 
     sub add_attribute {
-        my ($self, $name) = @_;
-        push @{ $self->attributes }, $name;
+        my ($self, $name, $public, $ivar, $ibody) = @_;
+        push @{ $self->attributes }, Metamodel::Attribute->new(name => $name,
+            public => $public, ivar => $ivar, ibody => $ibody);
     }
 
     sub add_method {
         my ($self, $kind, $name, $var, $body) = @_;
-        push @{ $self->methods }, [ $name, $var, $kind ];
+        push @{ $self->methods }, Metamodel::Method->new(name => $name,
+            var => $var, kind => $kind);
     }
 
     sub add_super {
@@ -439,10 +443,25 @@ our %units;
     package Metamodel::Method;
     use Moose;
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
+    # normally a Str, but may be Op for param roles
+    has name => (is => 'ro', required => 1);
     # normal, private, meta, sub
     has kind => (isa => 'Str', is => 'ro', required => 1);
-    has body => (is => 'ro', required => 1);
+    has var => (isa => 'Str', is => 'ro');
+    has body => (isa => 'ArrayRef', is => 'ro');
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+{
+    package Metamodel::Attribute;
+    use Moose;
+
+    has name  => (isa => 'Str', is => 'ro', required => 1);
+    has public => (isa => 'Bool', is => 'ro');
+    has ivar  => (isa => 'Maybe[Str]', is => 'ro');
+    has ibody => (isa => 'Maybe[ArrayRef]', is => 'ro');
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -468,6 +487,17 @@ our %units;
     has list   => (isa => 'Bool', is => 'ro', default => 0);
     has hash   => (isa => 'Bool', is => 'ro', default => 0);
     has noinit => (isa => 'Bool', is => 'ro', default => 0);
+
+    no Moose;
+    __PACKAGE__->meta->make_immutable;
+}
+
+# These are used for $?foo et al, and should be inaccessible until assigned,
+# although the current code won't enforce that well.
+{
+    package Metamodel::Lexical::Hint;
+    use Moose;
+    extends 'Metamodel::Lexical';
 
     no Moose;
     __PACKAGE__->meta->make_immutable;
@@ -559,6 +589,8 @@ our %units;
     has parametric_role_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
     # some tuples for method definitions; munged into a phaser
     has augment_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
+    # emit code to assign to a hint; [ $subref, $name ]
+    has hint_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
     has is_phaser => (isa => 'Maybe[Int]', is => 'rw', default => undef);
     has strong_used => (isa => 'Bool', is => 'rw', default => 0);
     has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
@@ -646,6 +678,10 @@ our %units;
 
     sub add_my_name { my ($self, $slot, @ops) = @_;
         $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
+    }
+
+    sub add_hint { my ($self, $slot) = @_;
+        $self->lexicals->{$slot} = Metamodel::Lexical::Hint->new;
     }
 
     sub add_common_name { my ($self, $slot, $path, $name) = @_;
@@ -819,6 +855,8 @@ sub Unit::begin {
     $unit;
 }
 
+my %type2phaser = ( init => 0, end => 1, begin => 2 );
+
 sub Body::begin {
     my $self = shift;
     my %args = @_;
@@ -840,7 +878,7 @@ sub Body::begin {
         returnable => $self->returnable,
         gather_hack=> $args{gather_hack},
         augment_hack=> $args{augment_hack},
-        is_phaser  => ($type eq 'init' ? 0 : $type eq 'end' ? 1 : undef),
+        is_phaser  => $type2phaser{$type},
         class      => $self->class,
         ltm        => $self->ltm,
         run_once   => $args{once} && (!@opensubs || $rtop->run_once));
@@ -971,8 +1009,25 @@ sub Op::ConstantDecl::begin {
         $opensubs[-1]->add_common_name($self->name,
             $opensubs[-1]->find_pkg($self->path), $self->name);
     } else {
-        $opensubs[-1]->add_my_name($self->name);
+        $opensubs[-1]->add_hint($self->name);
     }
+
+    if (!$self->init) {
+        die "Malformed constant decl";
+    }
+
+    my $nb = Metamodel::StaticSub->new(
+        unit       => $unit,
+        outer      => $opensubs[-1]->xref,
+        name       => $self->name,
+        cur_pkg    => $opensubs[-1]->cur_pkg,
+        class      => 'Sub',
+        run_once   => 0,
+        is_phaser  => 2,
+        hint_hack  => [ $opensubs[-1]->xref, $self->name ],
+        code       => $self->init);
+    $opensubs[-1]->create_static_pad; # for protosub instance
+    $opensubs[-1]->add_child($nb);
 }
 
 sub Op::PackageVar::begin {
@@ -991,8 +1046,15 @@ sub Op::Attribute::begin {
         " declared outside of any class");
     die "attribute $self->name declared in an augment"
         if $opensubs[-1]->augmenting;
+    my ($ibref, $ibvar);
+    if ($self->initializer) {
+        my $ibody = $self->initializer->begin;
+        $ibvar = Niecza::Actions->gensym;
+        $opensubs[-1]->add_my_sub($ibvar, $ibody);
+        $ibref = $ibody->xref;
+    }
     $ns = $unit->deref($ns);
-    $ns->add_attribute($self->name);
+    $ns->add_attribute($self->name, ($self->accessor ? 1 : 0), $ibvar, $ibref);
     my $nb = Metamodel::StaticSub->new(
         unit       => $unit,
         outer      => $opensubs[-1]->xref,

@@ -219,7 +219,7 @@ namespace Niecza {
         // for inheriting hints
         public SubInfo outer;
         public string name;
-        public Dictionary<string, object> hints;
+        public Dictionary<string, BValue> hints;
         // maybe should be a hint
         public LAD ltm;
         public int nspill;
@@ -453,21 +453,26 @@ noparams:
             return th;
         }
 
-        public void PutHint(string name, object val) {
+        public BValue AddHint(string name) {
             if (hints == null)
-                hints = new Dictionary<string,object>();
-            hints[name] = val;
+                hints = new Dictionary<string,BValue>();
+            return hints[name] = new BValue(Kernel.NewROScalar(Kernel.AnyP));
         }
 
-        public bool GetLocalHint<T>(string name, out T val) where T: class {
-            object o;
-            if (hints != null && hints.TryGetValue(name, out o)) {
-                val = o as T;
-                return true;
-            } else {
-                val = null;
-                return false;
-            }
+        public void SetStringHint(string name, string value) {
+            AddHint(name).v = Kernel.BoxAnyMO<string>(value, Kernel.StrMO);
+        }
+
+        public bool GetLocalHint(string name, out BValue val) {
+            return (hints != null && hints.TryGetValue(name, out val));
+        }
+
+        public bool GetHint(string name, out BValue val) {
+            for (SubInfo s = this; s != null; s = s.outer)
+                if (s.GetLocalHint(name, out val))
+                    return true;
+            val = null;
+            return false;
         }
 
         public static uint FilterForName(string name) {
@@ -622,14 +627,10 @@ noparams:
         }
 
         public string ExecutingFile() {
-            string l;
+            BValue l;
             SubInfo i = info;
-            while (i != null) {
-                // possibly, using $?FILE and Fetch would be better
-                if (i.GetLocalHint("?file", out l))
-                    return l;
-                i = i.outer;
-            }
+            if (i.GetHint("$?FILE", out l))
+                return l.v.Fetch().mo.mro_raw_Str.Get(l.v);
             return "";
         }
 
@@ -676,6 +677,13 @@ noparams:
 
         public Variable LexicalFind(string name) {
             Frame csr = this;
+            if (name.Length >= 2 && name[1] == '?') {
+                BValue b;
+                if (info.GetHint(name, out b))
+                    return b.v;
+                else
+                    return Kernel.NewROScalar(Kernel.AnyP);
+            }
             uint m = SubInfo.FilterForName(name);
             while (csr != null) {
                 object o;
@@ -1036,6 +1044,12 @@ noparams:
     // NOT IP6; these things should only be exposed through a ClassHOW-like
     // façade
     public class DynMetaObject {
+        public struct AttrInfo {
+            public string name;
+            public IP6 init;
+            public bool publ;
+        }
+
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -1116,11 +1130,11 @@ noparams:
             = new Dictionary<string, IP6>();
         public Dictionary<string, IP6> submethods
             = new Dictionary<string, IP6>();
-        public List<string> local_attr = new List<string>();
+        public List<AttrInfo> local_attr = new List<AttrInfo>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
-        public string[] all_attr;
+        public string[] all_slot;
 
         private WeakReference wr_this;
         // protected by static lock
@@ -1294,6 +1308,14 @@ noparams:
             submethods[name] = code;
         }
 
+        public void AddAttribute(string name, bool publ, IP6 init) {
+            AttrInfo ai;
+            ai.name = name;
+            ai.publ = publ;
+            ai.init = init;
+            local_attr.Add(ai);
+        }
+
         public IP6 GetPrivateMethod(string name) {
             IP6 code = priv[name];
             if (code == null) { throw new NieczaException("private method lookup failed for " + name + " in class " + this.name); }
@@ -1301,32 +1323,30 @@ noparams:
         }
 
 
-        public void FillProtoClass(string[] attr) {
-            FillClass(attr, attr, new DynMetaObject[] {},
+        public void FillProtoClass(string[] slots) {
+            FillClass(slots, new DynMetaObject[] {},
                     new DynMetaObject[] { this });
         }
 
-        public void FillClass(string[] local_attr, string[] all_attr,
-                DynMetaObject[] superclasses, DynMetaObject[] mro) {
+        public void FillClass(string[] all_slot, DynMetaObject[] superclasses,
+                DynMetaObject[] mro) {
             this.superclasses = new List<DynMetaObject>(superclasses);
             SetMRO(mro);
-            this.local_attr = new List<string>(local_attr);
             this.butCache = new Dictionary<DynMetaObject, DynMetaObject>();
-            this.all_attr = all_attr;
+            this.all_slot = all_slot;
             this.local_does = new DynMetaObject[0];
 
             nslots = 0;
-            foreach (string an in all_attr) {
+            foreach (string an in all_slot) {
                 slotMap[an] = nslots++;
             }
 
             Invalidate();
         }
 
-        public void FillRole(string[] attr, DynMetaObject[] superclasses,
+        public void FillRole(DynMetaObject[] superclasses,
                 DynMetaObject[] cronies) {
             this.superclasses = new List<DynMetaObject>(superclasses);
-            this.local_attr = new List<string>(attr);
             this.local_does = cronies;
             this.isRole = true;
             Revalidate(); // need to call directly as we aren't in any mro list
@@ -1534,6 +1554,12 @@ noparams:
             w.Do(v);
         }
 
+        public static Variable Decontainerize(Variable rhs) {
+            if (!rhs.rw) return rhs;
+            IP6 v = rhs.Fetch();
+            return new SimpleVariable(false, rhs.islist, v.mo, null, v);
+        }
+
         public static Frame NewBoundVar(Frame th, bool ro, bool islist,
                 DynMetaObject type, Variable rhs) {
             if (islist) ro = true;
@@ -1690,13 +1716,23 @@ noparams:
             return NewROScalar(AnyP);
         }
 
-        public static Variable DefaultNew(IP6 proto) {
+        public static Variable DefaultNew(IP6 proto, VarHash args) {
             DynObject n = new DynObject(((DynObject)proto).mo);
             DynMetaObject[] mro = n.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
-                foreach (string s in mro[i].local_attr) {
-                    n.SetSlot(s, NewRWScalar(AnyMO, AnyP));
+                foreach (DynMetaObject.AttrInfo a in mro[i].local_attr) {
+                    IP6 val;
+                    Variable vx;
+                    if (a.publ && args.TryGetValue(a.name, out vx)) {
+                        val = vx.Fetch();
+                    } else if (a.init == null) {
+                        val = AnyP;
+                    } else {
+                        val = RunInferior(a.init.Invoke(GetInferiorRoot(),
+                                    Variable.None, null)).Fetch();
+                    }
+                    n.SetSlot(a.name, NewRWScalar(AnyMO, val));
                 }
             }
 
@@ -1937,10 +1973,11 @@ slow:
             DynMetaObject[] nmro = new DynMetaObject[b.mro.Length + 1];
             Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
             nmro[0] = n;
-            n.FillClass(b.local_attr.ToArray(), b.all_attr,
-                    new DynMetaObject[] { b }, nmro);
+            n.FillClass(b.all_slot, new DynMetaObject[] { b }, nmro);
             foreach (KeyValuePair<string, IP6> kv in role.priv)
                 n.AddPrivateMethod(kv.Key, kv.Value);
+            foreach (DynMetaObject.AttrInfo ai in role.local_attr)
+                n.AddAttribute(ai.name, ai.publ, ai.init);
             foreach (KeyValuePair<string, IP6> kv in role.ord_methods)
                 n.AddMethod(kv.Key, kv.Value);
             n.Invalidate();
@@ -2121,7 +2158,8 @@ slow:
         public static IP6 ProcessO;
 
         static Kernel() {
-            PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque() };
+            PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque(),
+                new VarDeque() };
 
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();

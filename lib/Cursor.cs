@@ -492,7 +492,7 @@ public class Cursor : IP6 {
             DynObject l = new DynObject(Kernel.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
-            return Kernel.NewRWListVar(l);
+            return Kernel.NewROScalar(l);
         } else {
             return caps.Count() != 0 ? caps[0] :
                 Kernel.NewROScalar(Kernel.AnyP);

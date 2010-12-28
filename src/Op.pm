@@ -846,6 +846,7 @@ use CgOp;
 
     has name => (isa => 'Str', is => 'ro');
     has accessor => (isa => 'Bool', is => 'ro');
+    has initializer => (isa => 'Maybe[Body]', is => 'rw');
 
     sub code {
         my ($self, $body) = @_;
@@ -979,7 +980,7 @@ use CgOp;
 
     sub code {
         my ($self, $body) = @_;
-        CgOp::rnull(CgOp::scopedlex($self->name, $self->init->cgop($body)));
+        CgOp::scopedlex($self->name);
     }
 
     __PACKAGE__->meta->make_immutable;
