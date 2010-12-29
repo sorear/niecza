@@ -33,7 +33,13 @@ class Builder {
 
     method ok($bool, $tag) {
         my $not = $bool ?? "" !! "not ";
-        self!output($not ~ "ok " ~ $.current-test++ ~ " - " ~ $tag.split("\n").join("\n#"));
+        my $desc;
+        if $tag {
+            $desc = " - " ~ $tag.split("\n").join("\n#");
+        } else {
+            $desc = '';
+        }
+        self!output($not ~ "ok " ~ $.current-test++ ~ $desc);
         if !$bool { self.note(self.blame); }
     }
 
@@ -63,8 +69,10 @@ class Builder {
 $GLOBAL::TEST-BUILDER = Builder.CREATE;
 $GLOBAL::TEST-BUILDER.reset;
 
-sub ok($bool, $tag) is export { $*TEST-BUILDER.ok($bool, $tag) }
-sub is($got, $expected, $tag) is export {
+sub ok($bool, $tag?) is export { $*TEST-BUILDER.ok($bool, $tag) }
+sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag) }
+sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
+sub is($got, $expected, $tag?) is export {
 
     # avoid comparing twice
     my $equal = $got eq $expected;
