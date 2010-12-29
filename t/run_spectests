@@ -1,0 +1,2 @@
+#!/bin/sh
+prove -e 't/fudgeandrun' ../roast/S32-num/power.t

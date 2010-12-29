@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 706;
+plan 709;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1483,4 +1483,23 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     is $x.a, 123, "initializers work";
     $x.a = 456;
     is $x.a, 456, "initialized attrs can still be reset";
+}
+
+{
+    my $called = 1;
+    sub called {
+        $called++;
+        "foo";
+    }
+    if called() -> $a {
+        is $a,"foo","the condition in an if is passed to the block as an argument";
+    }
+    is $called,2,"the if condition only gets called once";
+
+    my $false_branch = 0;
+    if 0 -> $a {
+       1+$a;
+       $false_branch = 1; 
+    }
+    is $false_branch,0,"a branch of an if with a false condition doesn't get called";
 }
