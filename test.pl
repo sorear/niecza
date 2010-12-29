@@ -1499,7 +1499,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     my $false_branch = 0;
     if 0 -> $a {
        1+$a;
-       $false_branch = 1; 
+       $false_branch = 1;
     }
     is $false_branch,0,"a branch of an if with a false condition doesn't get called";
 }

@@ -1110,7 +1110,7 @@ sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
         # syntactic specialization, since they're required for grouping
         $M->{_ast} = $kids[0];
     } else {
-        $M->{_ast} = Op::StatementList->new(node($M), children => 
+        $M->{_ast} = Op::StatementList->new(node($M), children =>
             [ map { Op::Paren->new(inside => $_) } @kids ]);
     }
 }
@@ -1122,7 +1122,7 @@ sub circumfix__S_Bra_Ket { my ($cl, $M) = @_;
     }
     $M->{_ast} = Op::CallSub->new(node($M),
         invocant => Op::Lexical->new(node($M), name => '&_array_constructor'),
-        args => [Op::StatementList->new(node($M), children => 
+        args => [Op::StatementList->new(node($M), children =>
                 [ map { Op::Paren->new(inside => $_) } @kids ])]);
 }
 
@@ -2371,7 +2371,7 @@ sub statement_mod_loop__S_for {}
 sub statement_mod_loop__S_given {}
 
 sub statementlist { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StatementList->new(node($M), children => 
+    $M->{_ast} = Op::StatementList->new(node($M), children =>
         [ map { $_->statement_level } grep { defined }
             map { $_->{_ast} } @{ $M->{statement} } ]);
 }
@@ -2399,14 +2399,11 @@ sub statement_control__S_if { my ($cl, $M) = @_;
             false => $else);
     }
 
-
-
     # XXX cargo cult from block_to_immediate
     # $blk->type($type);
 
     my $true_block = $cl->block_to_closure($M, $M->{xblock}{_ast}[1] , once => 1);
     if (@{$true_block->body->signature->params}) {
-
         $M->{_ast} = Op::Helpers::let($M->{xblock}{_ast}[0] => sub {
             my $cond = shift;
             my $true = Op::CallSub->new(node($M),
@@ -2417,10 +2414,7 @@ sub statement_control__S_if { my ($cl, $M) = @_;
                 true => $true,
                 false => $else);
         });
-
     } else {
-         
-
         $M->{_ast} = Op::Conditional->new(node($M), check => $M->{xblock}{_ast}[0],
             true => $cl->block_to_immediate($M, 'cond', $M->{xblock}{_ast}[1]),
             false => $else);
