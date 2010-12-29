@@ -746,7 +746,7 @@ our %units;
         handles => [qw/ bind_item bind_graft create_stash create_var
             list_stash get_item /]);
 
-    has setting  => (isa => 'Str', is => 'ro');
+    has setting  => (isa => 'Maybe[Str]', is => 'ro');
     # ref to parent of Op::YouAreHere
     has bottom_ref => (is => 'rw');
 
@@ -754,8 +754,8 @@ our %units;
     has tdeps    => (isa => 'HashRef[ArrayRef]', is => 'ro',
         default => sub { +{} });
 
-    has filename => (isa => 'Str', is => 'rw');
-    has modtime  => (isa => 'Num', is => 'rw');
+    has filename => (isa => 'Maybe[Str]', is => 'rw');
+    has modtime  => (isa => 'Maybe[Num]', is => 'rw');
 
     has next_anon_stash => (isa => 'Int', is => 'rw', default => 0);
 

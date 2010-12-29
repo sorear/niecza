@@ -18,7 +18,6 @@ use Optimizer::Beta ();
 use Optimizer::Simplifier ();
 use Metamodel ();
 use NAMBackend ();
-use Storable;
 
 use Niecza::Grammar ();
 use Niecza::Actions ();
@@ -34,18 +33,27 @@ File::Path::make_path($builddir);
 
 sub build_file { File::Spec->catfile($builddir, $_[0]) }
 
+sub slurp {
+    my ($name) = @_;
+    open my $text, "<", $name;
+    local $/;
+    my $bits = <$text>;
+    close $text;
+    $bits;
+}
+
 sub metadata_for {
     my ($unit) = @_;
     $unit =~ s/::/./g;
 
-    Storable::retrieve(File::Spec->catfile($builddir, "$unit.store"))
+    NAMBackend::load(slurp(build_file("$unit.nam")));
 }
 
 sub syml_for {
     my ($module, $file) = @_;
     local %Metamodel::units;
     my $meta = $Metamodel::units{$module} =
-        Storable::retrieve($file);
+        NAMBackend::load(slurp($file));
 
     if ($meta->name ne $module) {
         Carp::cluck("syml_for incoherence");
@@ -116,14 +124,14 @@ sub find_module {
 
         my $csmod = $module;
         $csmod =~ s/::/./g;
-        my ($storefile) = File::Spec->catfile($builddir, "$csmod.store");
+        my ($namfile) = CompilerDriver::build_file("$csmod.nam");
         my ($modfile) = CompilerDriver::find_module($module, 0) or do {
             $self->sorry("Cannot locate module $module");
             return undef;
         };
 
         REUSE: {
-            last REUSE unless -f $storefile;
+            last REUSE unless -f $namfile;
             my $meta = CompilerDriver::metadata_for($module);
 
             for my $dmod ($module, keys %{ $meta->tdeps }) {
@@ -149,11 +157,11 @@ sub find_module {
                 }
             }
 
-            return CompilerDriver::syml_for($module, $storefile);
+            return CompilerDriver::syml_for($module, $namfile);
         }
 
-        $self->sys_compile_module($module, $storefile, $modfile);
-        CompilerDriver::syml_for($module, $storefile);
+        $self->sys_compile_module($module, $namfile, $modfile);
+        CompilerDriver::syml_for($module, $namfile);
     }
 
     sub load_lex {
@@ -170,7 +178,7 @@ sub find_module {
                 'SETTING' => $core, $id => $core);
         }
 
-        my $astf = File::Spec->catfile($builddir, "$settingx.store");
+        my $astf = File::Spec->catfile($builddir, "$settingx.nam");
         if (-e $astf) {
             return CompilerDriver::syml_for($setting, $astf);
         }
@@ -245,10 +253,7 @@ sub compile {
             open my $fh, ">", $namfile;
             print $fh $ast->[1];
             close $fh;
-            $ast = $ast->[0];
-            if (defined $name) {
-                store $ast, File::Spec->catfile($builddir, "$basename.store");
-            }
+            $ast = undef;
         } ],
         [ 'codegen', sub {
             my @args = ("mono",
