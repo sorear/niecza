@@ -95,6 +95,12 @@ A reference to a call frame.  Currently a subtype of obj.
 
 =head1 Operations
 
+=head2 Annotations
+
+=head3 ann($file,$line_number,$operation)
+
+Sets the $file and $line_numer for the $operation.
+
 =head2 Aritmetic and logical operations
 
 =head2 Sequence control
