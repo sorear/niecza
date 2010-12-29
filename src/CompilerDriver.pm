@@ -41,6 +41,24 @@ sub metadata_for {
     Storable::retrieve(File::Spec->catfile($builddir, "$unit.store"))
 }
 
+sub syml_for {
+    my ($module, $file) = @_;
+    local %Metamodel::units;
+    my $meta = $Metamodel::units{$module} =
+        Storable::retrieve($file);
+
+    if ($meta->name ne $module) {
+        Carp::cluck("syml_for incoherence");
+    }
+
+    for my $dmod (keys %{ $meta->tdeps }) {
+        next if $dmod eq $module;
+        $Metamodel::units{$dmod} = CompilerDriver::metadata_for($dmod);
+    }
+
+    return $meta->create_syml;
+}
+
 sub get_perl6lib {
     File::Spec->curdir, $libdir
 }
@@ -81,7 +99,6 @@ sub find_module {
 
     sub sys_save_syml {
         my ($self, $all) = @_;
-        $::niecza_mod_symbols = $all;
     }
 
     sub sys_do_compile_module {
@@ -99,14 +116,14 @@ sub find_module {
 
         my $csmod = $module;
         $csmod =~ s/::/./g;
-        my ($symlfile) = File::Spec->catfile($builddir, "$csmod.store");
+        my ($storefile) = File::Spec->catfile($builddir, "$csmod.store");
         my ($modfile) = CompilerDriver::find_module($module, 0) or do {
             $self->sorry("Cannot locate module $module");
             return undef;
         };
 
         REUSE: {
-            last REUSE unless -f $symlfile;
+            last REUSE unless -f $storefile;
             my $meta = CompilerDriver::metadata_for($module);
 
             for my $dmod ($module, keys %{ $meta->tdeps }) {
@@ -132,11 +149,11 @@ sub find_module {
                 }
             }
 
-            return $meta->syml;
+            return CompilerDriver::syml_for($module, $storefile);
         }
 
-        $self->sys_compile_module($module, $symlfile, $modfile);
-        return Storable::retrieve($symlfile)->{'syml'};
+        $self->sys_compile_module($module, $storefile, $modfile);
+        CompilerDriver::syml_for($module, $storefile);
     }
 
     sub load_lex {
@@ -155,7 +172,7 @@ sub find_module {
 
         my $astf = File::Spec->catfile($builddir, "$settingx.store");
         if (-e $astf) {
-            return Storable::retrieve($astf)->syml;
+            return CompilerDriver::syml_for($setting, $astf);
         }
 
         $self->sorry("Unable to load setting $setting.");
@@ -186,7 +203,6 @@ sub compile {
     local %Metamodel::units;
     local $::stagetime = $args{stagetime};
     local $::SETTING_UNIT;
-    local $::niecza_mod_symbols;
     local $::YOU_WERE_HERE;
     local $::UNITNAME = $name // 'MAIN';
     $::UNITNAME =~ s/::/./g;
@@ -231,7 +247,6 @@ sub compile {
             close $fh;
             $ast = $ast->[0];
             if (defined $name) {
-                $ast->syml($::niecza_mod_symbols);
                 store $ast, File::Spec->catfile($builddir, "$basename.store");
             }
         } ],

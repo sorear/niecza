@@ -66,10 +66,15 @@ our %units;
     # public API.
     has log => (is => 'ro', default => sub { [] });
 
-    # These are transitional things
     sub stash_cname {
         my ($self, @path) = @_;
         (_lookup_common($self, [], @path))[1,2];
+    }
+
+    sub stash_canon {
+        my ($self, @path) = @_;
+        my ($npath, $nhead) = $self->stash_cname(@path);
+        @$npath, $nhead;
     }
 
     sub visit_stashes {
@@ -160,8 +165,6 @@ our %units;
         if (!$i->[1]) {
             push @{ $self->log }, [ 'var', [ @$u,$n ] ];
             $i->[1] = ['',0];
-        } elsif ($i->[1][0] ne '' || $i->[1][1] != 0) {
-            die "collision with meta-object on @path";
         }
     }
 
@@ -686,6 +689,7 @@ our %units;
 
     sub add_common_name { my ($self, $slot, $path, $name) = @_;
         $unit->create_stash(@$path);
+        $unit->create_var(@$path, $name);
         $self->lexicals->{$slot} = Metamodel::Lexical::Common->new(
             path => $path, name => $name);
     }
@@ -752,7 +756,6 @@ our %units;
 
     has filename => (isa => 'Str', is => 'rw');
     has modtime  => (isa => 'Num', is => 'rw');
-    has syml     => (is => 'rw');
 
     has next_anon_stash => (isa => 'Int', is => 'rw', default => 0);
 
@@ -825,6 +828,86 @@ our %units;
         }
         $self->ns->add_from($u2name);
         $u2;
+    }
+
+    # STD-based frontend wants a slightly different representation.
+    sub _syml_myname {
+        my ($xr) = @_;
+        "MY:unit<" . $xr->[0] . ">:xid<" . $xr->[1] . ">";
+    }
+
+    sub create_syml {
+        my ($self) = @_;
+        my $all = {};
+        my %subt;
+
+        if ($self->get_unit($self->name) != $self) {
+            Carp::confess "Local unit cache inconsistant";
+        }
+
+        $self->ns->visit_stashes(sub {
+            my @path = @{ $_[0] };
+            return unless @path;
+            my $tag = join("", map { $_ . "::" } @path);
+            my $st = $all->{$tag} = bless { '!id' => $tag }, 'Stash';
+            my @ppath = @path;
+            my $name = pop @ppath;
+            my $ptag = join("", map { $_ . "::" } @ppath);
+            if ($ptag ne '') {
+                $st->{'PARENT::'} = [ $ptag ];
+                $all->{$ptag}{$name . '::'} = $st;
+            }
+            for my $tok ($self->ns->list_stash(@path)) {
+                if ($tok->[1] eq 'var') {
+                    my $name = $tok->[0];
+                    $st->{$name} = bless { name => $name }, 'NAME';
+                    $st->{'&' . $name} = $st->{$name} if $name !~ /^[\$\@\%\&]/;
+                }
+            }
+        });
+
+        my $top = $self->deref($self->bottom_ref // $self->mainline->xref);
+        #say STDERR "Top = $top";
+        for (my $cursor = $top; $cursor; $cursor = $cursor->outer) {
+            my $id = _syml_myname($cursor->xref);
+            #say STDERR "Creating $cursor [$id]";
+            $subt{$cursor} = $all->{$id} = bless { '!id' => [ $id ] }, 'Stash';
+        }
+
+        for (my $cursor = $top; $cursor; $cursor = $cursor->outer) {
+            my $st = $subt{$cursor};
+            #say STDERR "Populating $cursor";
+            for my $name (sort keys %{ $cursor->lexicals }) {
+                my $lx = $cursor->lexicals->{$name};
+                $st->{$name} = bless { name => $name }, 'NAME';
+                $st->{'&' . $name} = $st->{$name} if $name !~ /^[\$\@\%\&]/;
+
+                if ($lx->isa('Metamodel::Lexical::Stash')) {
+                    my @cpath = $self->ns->stash_canon(@{ $lx->path });
+                    $st->{$name . '::'} = $all->{join "", map { $_ . "::" }
+                        $self->ns->stash_canon(@cpath)};
+                }
+            }
+            $st->{'OUTER::'} = $cursor->outer ? $subt{$cursor->outer}{'!id'} :
+                [];
+            if ($cursor->unit->bottom_ref && $cursor->unit->name eq 'CORE') {
+                $all->{'CORE'} //= $st;
+            }
+            if ($cursor->unit->bottom_ref) {
+                $all->{'SETTING'} //= $st;
+            }
+        }
+        #say STDERR "UNIT ", $self->mainline;
+        #$all->{'UNIT'} = $subt{$self->mainline};
+        {
+            my @nbits = @{ $self->mainline->find_pkg(['MY', split '::', $self->name]) };
+            @nbits = $self->ns->stash_canon(@nbits);
+            # XXX wrong, but makes STD importing work
+            # say STDERR (YAML::XS::Dump @nbits);
+            $all->{'UNIT'} = $all->{join "", map { $_ . '::' } @nbits};
+        }
+        # say STDERR (YAML::XS::Dump("Regenerated syml for " . $self->name, $all));
+        $all;
     }
 
     no Moose;
