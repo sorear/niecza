@@ -589,6 +589,10 @@ use CgOp;
     no Moose;
 }
 
+# A for-loop which must be run immediately because it is at statement
+# level, as contrasted with a ForLoop, which turns into a map call.
+# ForLoops turn into this at statement level; if a ForLoop is in any
+# other context, it is regarded as a lazy comprehension.
 {
     package Op::ImmedForLoop;
     use Moose;
@@ -1137,6 +1141,9 @@ use CgOp;
     no Moose;
 }
 
+# Provides access to a variable with a scope smaller than the sub.  Used
+# internally in a few places; should not be exposed to the user, because
+# these can't be closed over.
 {
     package Op::LetVar;
     use Moose;
