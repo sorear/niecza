@@ -44,15 +44,16 @@ sub slurp {
 
 sub metadata_for {
     my ($unit) = @_;
-    $unit =~ s/::/./g;
+    my $file = "$unit.nam";
+    $file =~ s/::/./g;
 
-    NAMBackend::load(slurp(build_file("$unit.nam")));
+    $Metamodel::units{$unit} //= NAMBackend::load(slurp(build_file($file)));
 }
 
 sub syml_for {
     my ($module, $file) = @_;
     local %Metamodel::units;
-    my $meta = $Metamodel::units{$module} =
+    my $meta = $Metamodel::units{$module} //=
         NAMBackend::load(slurp($file));
 
     if ($meta->name ne $module) {
