@@ -4,6 +4,8 @@ use 5.010;
 use utf8;
 use CgOp ();
 
+# NOTE: most of this is dead.  The real Body is Metamodel::StaticSub
+
 {
     package Body;
     use Moose;
@@ -14,7 +16,8 @@ use CgOp ();
     has signature => (isa => 'Maybe[Sig]', is => 'rw');
     has mainline  => (isa => 'Bool', is => 'ro', lazy => 1,
             builder => 'is_mainline');
-    # '' for incorrectly contextualized {p,x,}block, blast
+    # voidbare, init, end, regex are still used; see Metamodel.pm
+    # this field is on the way out
     has type      => (isa => 'Str', is => 'rw');
     has returnable=> (isa => 'Bool', is => 'rw');
 
