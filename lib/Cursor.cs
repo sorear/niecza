@@ -404,6 +404,8 @@ public sealed class RxFrame {
             return_one = true;
             VarDeque ks = new VarDeque();
             ks.Push(Kernel.NewROScalar(m));
+            th.lex = new Dictionary<string,object>();
+            th.lex["!return"] = null;
             DynObject it  = new DynObject(Kernel.GatherIteratorMO);
             it.slots[0 /*frame*/] = Kernel.NewRWScalar(Kernel.AnyMO, th);
             it.slots[1 /*reify*/] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
