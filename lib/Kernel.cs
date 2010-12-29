@@ -695,6 +695,12 @@ noparams:
             return Kernel.NewROScalar(Kernel.AnyP);
         }
 
+        public Frame DynamicCaller() {
+            if (lex == null || !lex.ContainsKey("!return"))
+                return caller;
+            return (Frame) lex["!return"];
+        }
+
         private static List<string> spacey = new List<string>();
         public string DepthMark() {
             Frame f = this;
@@ -1442,10 +1448,15 @@ noparams:
             return ((BoxObject<T>)o).value;
         }
 
-        public static Stack<Frame> TakeReturnStack = new Stack<Frame>();
-
         public static Frame Take(Frame th, Variable payload) {
-            Frame r = TakeReturnStack.Pop();
+            Frame c = th;
+            while (c != null && (c.lex == null || !c.lex.ContainsKey("!return")))
+                c = c.caller;
+            if (c == null)
+                return Kernel.Die(th, "used take outside of a coroutine");
+
+            Frame r = (Frame) c.lex["!return"];
+            c.lex["!return"] = null;
             r.SetDynamic(r.info.dylex["$*nextframe"], NewROScalar(th));
             r.resultSlot = payload;
             th.resultSlot = payload;
@@ -1453,7 +1464,13 @@ noparams:
         }
 
         public static Frame CoTake(Frame th, Frame from) {
-            TakeReturnStack.Push(th);
+            Frame c = from;
+            while (c != null && (c.lex == null || !c.lex.ContainsKey("!return")))
+                c = c.caller;
+            if (c.lex["!return"] != null)
+                return Kernel.Die(th, "Attempted to re-enter abnormally exitted or running coroutine");
+            c.lex["!return"] = th;
+
             return from;
         }
 
@@ -1463,6 +1480,8 @@ noparams:
                     (SubInfo) dyo.slots[1]);
             n = n.info.Binder(n, Variable.None, null);
             n.MarkSharedChain();
+            n.lex = new Dictionary<string,object>();
+            n.lex["!return"] = null;
             th.resultSlot = n;
             return th;
         }
@@ -1798,6 +1817,8 @@ again:
                 Frame th = new Frame(null, null, IF_SI);
                 th.lex0 = inq;
                 DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                th.lex = new Dictionary<string,object>();
+                th.lex["!return"] = null;
                 thunk.slots[0] = NewRWScalar(AnyMO, th);
                 thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
                 outq.Push(NewROScalar(thunk));
@@ -2327,7 +2348,7 @@ slow:
             Frame unf = null;
             int unip = 0;
 
-            for (csr = th; ; csr = csr.caller) {
+            for (csr = th; ; csr = csr.DynamicCaller()) {
                 if (csr == null)
                     throw new Exception("Corrupt call chain");
                 if (csr.info == ExitRunloopSI) {
@@ -2369,7 +2390,7 @@ slow:
                 } catch (Exception ex) {
                     sb.AppendFormat("  (frame display failed: {0})", ex);
                 }
-                from = from.caller;
+                from = from.DynamicCaller();
             }
             return sb.ToString();
         }
