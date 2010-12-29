@@ -6,6 +6,7 @@ use utf8;
 use Scalar::Util 'blessed';
 
 use Op;
+use Op::Helpers;
 use RxOp;
 use Body;
 use Unit;
@@ -2397,9 +2398,34 @@ sub statement_control__S_if { my ($cl, $M) = @_;
             true => $cl->block_to_immediate($M, 'cond', $_->{_ast}[1]),
             false => $else);
     }
-    $M->{_ast} = Op::Conditional->new(node($M), check => $M->{xblock}{_ast}[0],
-        true => $cl->block_to_immediate($M, 'cond', $M->{xblock}{_ast}[1]),
-        false => $else);
+
+
+
+    # XXX cargo cult from block_to_immediate
+    # $blk->type($type);
+
+    my $true_block = $cl->block_to_closure($M, $M->{xblock}{_ast}[1] , once => 1);
+    if (@{$true_block->body->signature->params}) {
+
+        $M->{_ast} = Op::Helpers::let($M->{xblock}{_ast}[0] => sub {
+            my $cond = shift;
+            my $true = Op::CallSub->new(node($M),
+                invocant => $true_block,
+                positionals => [$cond]
+            );
+            Op::Conditional->new(node($M), check=>$cond,
+                true => $true,
+                false => $else);
+        });
+
+    } else {
+         
+
+        $M->{_ast} = Op::Conditional->new(node($M), check => $M->{xblock}{_ast}[0],
+            true => $cl->block_to_immediate($M, 'cond', $M->{xblock}{_ast}[1]),
+            false => $else);
+    }
+
 }
 
 sub statement_control__S_while { my ($cl, $M) = @_;
