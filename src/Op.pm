@@ -202,22 +202,30 @@ use CgOp;
     extends 'Op::CallLike';
 
     has receiver    => (isa => 'Op', is => 'ro', required => 1);
-    has name        => (isa => 'Str', is => 'ro', required => 1);
+    has name        => (is => 'ro', required => 1); # Str | Op
     has private     => (isa => 'Bool', is => 'ro', default => 0);
     has ppath       => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
     has pclass      => (isa => 'ArrayRef', is => 'rw');
-    sub zyg { $_[0]->receiver, $_[0]->SUPER::zyg }
+    has ismeta      => (isa => 'Bool', is => 'ro', default => 0);
+    sub zyg { $_[0]->receiver, (blessed($_[0]->name) ? $_[0]->name : ()),
+        $_[0]->SUPER::zyg }
 
     sub code {
         my ($self, $body) = @_;
+        my $name = $self->name;
+        $name = CgOp::obj_getstr($name->cgop($body)) if blessed($name);
         if ($self->private) {
             CgOp::subcall(CgOp::stab_privatemethod(
                     CgOp::class_ref('mo', @{ $self->pclass }),
-                    CgOp::str($self->name)),
+                    (blessed($name) ? $name : CgOp::str($name))),
                 $self->receiver->cgop($body), $self->argblock($body));
+        } elsif ($self->ismeta) {
+            CgOp::let($self->receiver->cgop($body), sub {
+                CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
+                    $name, $_[0], $self->argblock($body))});
         } else {
             CgOp::methodcall($self->receiver->cgop($body),
-                $self->name, $self->argblock($body));
+                $name, $self->argblock($body));
         }
     }
 
@@ -237,27 +245,6 @@ use CgOp;
     sub code {
         my ($self, $body) = @_;
         CgOp::varattr($self->name, CgOp::fetch($self->object->cgop($body)));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-# or maybe we should provide Op::Let and let Actions do the desugaring?
-{
-    package Op::CallMetaMethod;
-    use Moose;
-    extends 'Op::CallLike';
-
-    has receiver    => (isa => 'Op', is => 'ro', required => 1);
-    has name        => (isa => 'Str', is => 'ro', required => 1);
-    sub zyg { $_[0]->receiver, $_[0]->SUPER::zyg }
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::let($self->receiver->cgop($body), sub {
-            CgOp::methodcall(CgOp::newscalar(CgOp::how(CgOp::fetch($_[0]))),
-                $self->name, $_[0], $self->argblock($body))});
     }
 
     __PACKAGE__->meta->make_immutable;

@@ -1342,8 +1342,9 @@ sub POSTFIX { my ($cl, $M) = @_;
             receiver => $arg,
             name => $op->{name});
     } elsif ($op->{metamethod}) {
-        $M->{_ast} = Op::CallMetaMethod->new(node($M),
+        $M->{_ast} = Op::CallMethod->new(node($M),
             receiver => $arg,
+            ismeta => 1,
             name => $op->{metamethod},
             args => $op->{args} // []);
     } elsif ($op->{name}) {
@@ -1355,6 +1356,12 @@ sub POSTFIX { my ($cl, $M) = @_;
             private  => $op->{private},
             ppath    => $op->{path},
             name     => $op->{name},
+            args     => $op->{args} // []);
+    } elsif ($op->{quote}) {
+        $M->{_ast} = Op::CallMethod->new(node($M),
+            receiver => $arg,
+            private  => $op->{private},
+            name     => $op->{quote},
             args     => $op->{args} // []);
     } elsif ($op->{ref}) { # $obj.&foo
         $M->{_ast} = Op::CallSub->new(node($M),

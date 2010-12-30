@@ -21,6 +21,16 @@ use MONKEY_TYPING;
 
     sub foo($/) { $<a> }
     is foo({ a => 5 }), 5, 'Can bind $/ in signature';
+
+    my class X4 {
+        method foo { 13 }
+        method !bar { 17 }
+        method sam($x) { self!"$x"() }
+    }
+
+    is X4."foo"(), 13, 'indirect method calls work'; #OK
+    is X4."{ "fo" ~ "o" }"(), 13, 'indirect calls work with interpolation';
+    is X4.sam("bar"), 17, "indirect private method calls work";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
