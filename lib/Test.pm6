@@ -52,8 +52,6 @@ class Builder {
         $!set-plan = 1;
         if $x ~~ Num {
             self.expected-tests($x);
-        } elsif $x ~~ Whatever {
-            # no effect
         } else {
             die "Invalid argument to plan";
         }
