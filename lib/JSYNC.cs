@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 
 public class JsyncWriter {
-    static bool FailSoft =
+    internal static bool FailSoft =
         Environment.GetEnvironmentVariable("NIECZA_JSYNC_WRITER_FAILSOFT") != null;
     StringBuilder o = new StringBuilder();
     Dictionary<object,int> anchors = new Dictionary<object,int>();
@@ -130,44 +130,48 @@ public class JsyncWriter {
         o.Append('"');
         if (esc && NeedsEscape(s))
             o.Append('.');
+        AddStringContents(o, s);
+        o.Append('"');
+    }
+
+    internal static void AddStringContents(StringBuilder sb, string s) {
         foreach (char ch in s) {
             switch(ch) {
                 case '\\':
-                    o.Append('\\');
+                    sb.Append('\\');
                     goto default;
                 case '\"':
-                    o.Append('\\');
+                    sb.Append('\\');
                     goto default;
                 default:
                     if ((ch & 0xFF7F) < 32) {
-                        o.AppendFormat("\\u{0:X4}", (int)ch);
+                        sb.AppendFormat("\\u{0:X4}", (int)ch);
                     } else {
-                        o.Append(ch);
+                        sb.Append(ch);
                     }
                     break;
                 case '\b':
-                    o.Append('\\');
-                    o.Append('b');
+                    sb.Append('\\');
+                    sb.Append('b');
                     break;
                 case '\f':
-                    o.Append('\\');
-                    o.Append('f');
+                    sb.Append('\\');
+                    sb.Append('f');
                     break;
                 case '\t':
-                    o.Append('\\');
-                    o.Append('t');
+                    sb.Append('\\');
+                    sb.Append('t');
                     break;
                 case '\r':
-                    o.Append('\\');
-                    o.Append('r');
+                    sb.Append('\\');
+                    sb.Append('r');
                     break;
                 case '\n':
-                    o.Append('\\');
-                    o.Append('n');
+                    sb.Append('\\');
+                    sb.Append('n');
                     break;
             }
         }
-        o.Append('"');
     }
 
     void WriteBool(bool x) {
@@ -326,6 +330,67 @@ public class JsyncReader {
                     break;
             }
             sb.Append(ch);
+        }
+    }
+
+    Variable GetFromJson(bool top_level) {
+        char look = SkipWhite(true);
+        if (look == '[') {
+            VarDeque q = new VarDeque();
+            SkipChar('[');
+            while (true) {
+                look = SkipWhite(true);
+                if (look == ']')
+                    break;
+                if (q.Count() != 0)
+                    SkipChar(',');
+                q.Push(GetFromJson(false));
+            }
+            SkipWhite(true);
+            SkipChar(']');
+            IP6 i = new DynObject(Kernel.ArrayMO);
+            i.SetSlot("items", q);
+            i.SetSlot("rest", new VarDeque());
+            return Kernel.NewROScalar(i);
+        } else if (look == '{') {
+            VarHash q = new VarHash();
+            int ct = 0;
+            SkipChar('{');
+            while (true) {
+                look = SkipWhite(true);
+                if (look == '}')
+                    break;
+                if (ct != 0)
+                    SkipCharWS(',');
+                ct++;
+                string key = GetJsonString();
+                SkipWhite(true);
+                SkipChar(':');
+                q[key] = GetFromJson(false);
+            }
+            SkipWhite(true);
+            SkipChar('}');
+            return BoxRW<VarHash>(q, Kernel.HashMO);
+        } else if (top_level) {
+            Err("Top-level scalar found");
+            return null;
+        } else if (look == '"') {
+            return BoxRW<string>(GetJsonString(), Kernel.StrMO);
+        } else if (look == 'n') {
+            SkipToken("null");
+            return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+        } else if (look == 't') {
+            SkipToken("true");
+            return BoxRW<bool>(true, Kernel.BoolMO);
+        } else if (look == 'f') {
+            SkipToken("false");
+            return BoxRW<bool>(false, Kernel.BoolMO);
+        } else {
+            double d;
+            string tx = GetJsonNumber();
+            if (!double.TryParse(tx, out d))
+                Err("Unparsable number " + tx);
+            return BoxRW<double>(d, Kernel.NumMO);
         }
     }
 
@@ -608,6 +673,12 @@ public class JsyncReader {
     }
 
     Variable GetFromNumber() {
+        s_content = GetJsonNumber();
+        s_tag = "Num";
+        return ParseScalar();
+    }
+
+    string GetJsonNumber() {
         StringBuilder s = new StringBuilder();
         do {
             if (from.Length == ix)
@@ -619,9 +690,7 @@ public class JsyncReader {
             s.Append(x);
         } while (true);
         ix--;
-        s_content = s.ToString();
-        s_tag = "Num";
-        return ParseScalar();
+        return s.ToString();
     }
 
     int VersionComponent(string dgs) {
@@ -701,6 +770,18 @@ bare:
 
     // TODO GetTopLevel
 
+    public static IP6 FromJson(string inp) {
+        JsyncReader j = new JsyncReader();
+        j.from = inp;
+        j.SkipWhite(true);
+        Variable top = j.GetFromJson(true);
+        j.SkipWhite(false);
+        if (j.ix != inp.Length)
+            j.Err("Trailing garbage after object");
+
+        return top.Fetch();
+    }
+
     public static IP6 FromJsync(string inp) {
         JsyncReader j = new JsyncReader();
         j.from = inp;
@@ -721,5 +802,64 @@ bare:
             j.Err("Trailing garbage after object");
 
         return top.Fetch();
+    }
+}
+
+public class JsonWriter {
+    StringBuilder o = new StringBuilder();
+
+    void WriteVal(IP6 obj) {
+        if (!obj.IsDefined()) {
+            o.Append("null");
+        } else if (obj.Isa(Kernel.BoolMO)) {
+            o.Append(Kernel.UnboxAny<bool>(obj) ? "true" : "false");
+        } else if (obj.Isa(Kernel.NumMO)) {
+            o.Append(Kernel.UnboxAny<double>(obj));
+        } else if (obj.Isa(Kernel.StrMO)) {
+            o.Append('"');
+            JsyncWriter.AddStringContents(o, Kernel.UnboxAny<string>(obj));
+            o.Append('"');
+        } else {
+            WriteObj(obj);
+        }
+    }
+
+    void WriteObj(IP6 obj) {
+        bool comma = false;
+        bool def = obj.IsDefined();
+        if (def && obj.Isa(Kernel.HashMO)) {
+            VarHash vh = Kernel.UnboxAny<VarHash>(obj);
+            o.Append('{');
+            foreach(KeyValuePair<string,Variable> kv in vh) {
+                if (comma) o.Append(',');
+                comma = true;
+                o.Append('"');
+                JsyncWriter.AddStringContents(o, kv.Key);
+                o.Append('"');
+                o.Append(':');
+                WriteVal(kv.Value.Fetch());
+            }
+            o.Append('}');
+        } else if (def && obj.Isa(Kernel.ListMO)) {
+            VarDeque iter = new VarDeque(Kernel.NewRWListVar(obj));
+            o.Append('[');
+            while (Kernel.IterHasFlat(iter, true)) {
+                if (comma) o.Append(',');
+                comma = true;
+                WriteVal(iter.Shift().Fetch());
+            }
+            o.Append(']');
+        } else if (JsyncWriter.FailSoft) {
+            o.Append("\"*UNSERIALIZABLE*\"");
+        } else {
+            throw new NieczaException("JSON writer encountered value of type " +
+                    obj.mo.name);
+        }
+    }
+
+    public static string ToJson(IP6 obj) {
+        JsonWriter w = new JsonWriter();
+        w.WriteObj(obj);
+        return w.o.ToString();
     }
 }

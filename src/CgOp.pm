@@ -72,7 +72,7 @@ BEGIN {
         vvarlist_shift, vvarlist_sort, vvarlist_to_fvarlist,
         vvarlist_unshift, vvarlist_unshiftn, whileloop,
         get_lexer, run_protoregex, label_table, mrl_count, mrl_index,
-        treader_open, bif_make, cursor_ast,
+        treader_open, bif_make, cursor_ast, to_json, from_json,
     >;
 
     my $code;

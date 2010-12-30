@@ -3057,6 +3057,8 @@ namespace Niecza.CLRBackend {
             thandlers["iter_copy_elems"] = Methody(null, Tokens.Kernel.GetMethod("IterCopyElems"));
             thandlers["to_jsync"] = Methody(null, typeof(JsyncWriter).GetMethod("ToJsync"));
             thandlers["from_jsync"] = Methody(null, typeof(JsyncReader).GetMethod("FromJsync"));
+            thandlers["to_json"] = Methody(null, typeof(JsonWriter).GetMethod("ToJson"));
+            thandlers["from_json"] = Methody(null, typeof(JsyncReader).GetMethod("FromJson"));
             thandlers["do_require"] = Methody(null, Tokens.Kernel.GetMethod("DoRequire"));
             thandlers["frame_caller"] = FieldGet(Tokens.Frame, "caller");
             thandlers["frame_file"] = Methody(null, Tokens.Frame.GetMethod("ExecutingFile"));
