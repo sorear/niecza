@@ -18,6 +18,9 @@ use MONKEY_TYPING;
     }
     my $x = X3.new(a => 5);
     is $x.a, 5, 'Attribute values can be passed in constructors';
+
+    sub foo($/) { $<a> }
+    is foo({ a => 5 }), 5, 'Can bind $/ in signature';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
