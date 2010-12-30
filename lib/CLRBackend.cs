@@ -935,6 +935,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("AddPhaser");
         public static readonly MethodInfo Kernel_FirePhasers =
             typeof(Kernel).GetMethod("FirePhasers");
+        public static readonly MethodInfo Builtins_Make =
+            typeof(Builtins).GetMethod("Make");
         public static readonly Dictionary<string,MethodInfo> DMO_AddFooMethod
             = _FooMethod();
         private static Dictionary<string,MethodInfo> _FooMethod() {
@@ -2814,6 +2816,9 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_sort"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_SortHelper,
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+            thandlers["bif_make"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(null, Tokens.Builtins_Make,
+                    new CpsOp[] { CpsOp.CallFrame(), z[0] }); };
             thandlers["context_get"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_ContextHelper,
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
@@ -2980,6 +2985,7 @@ namespace Niecza.CLRBackend {
             thandlers["cursor_from"] = FieldGet(Tokens.Cursor, "from");
             thandlers["cursor_butpos"] = Methody(null, Tokens.Cursor.GetMethod("At"));
             thandlers["cursor_backing"] = Methody(null, Tokens.Cursor.GetMethod("GetBacking"));
+            thandlers["cursor_ast"] = Methody(null, Tokens.Cursor.GetMethod("AST"));
             thandlers["cursor_dows"] = Methody(null, Tokens.Cursor.GetMethod("SimpleWS"));
             thandlers["cursor_item"] = Methody(null, Tokens.Cursor.GetMethod("GetKey"));
             thandlers["cursor_unpackcaps"] = Methody(null, Tokens.Cursor.GetMethod("UnpackCaps"));

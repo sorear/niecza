@@ -31,7 +31,7 @@
     </Target>
 
     <Target Name="WriteVersion">
-        <Exec Command="git describe --always &gt; VERSION"/>
+        <Exec Command="git describe --tags &gt; VERSION"/>
     </Target>
 
     <!-- Libraries -->
@@ -48,19 +48,17 @@
             EmitDebugInformation="true" AdditionalLibPaths="obj"/>
     </Target>
 
-    <Target Name="CORE.nam" Inputs="@(CompilerPerl);obj\SAFE.store;lib\CORE.setting" Outputs="obj\CORE.nam;obj\CORE.store" DependsOnTargets="SAFE.nam;Grammar;PerlTask">
+    <Target Name="CORE.nam" Inputs="@(CompilerPerl);obj\SAFE.nam;lib\CORE.setting" Outputs="obj\CORE.nam" DependsOnTargets="SAFE.nam;Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writenam', lang => 'SAFE', setting => 1, name => 'CORE');"/>
     </Target>
 
     <Target Name="SAFE.nam" Inputs="@(CompilerPerl);lib\SAFE.setting"
-        Outputs="obj\SAFE.nam;obj\SAFE.store"
-        DependsOnTargets="Grammar;PerlTask">
+        Outputs="obj\SAFE.nam" DependsOnTargets="Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writenam', lang => 'NULL', setting => 1, name => 'SAFE');"/>
     </Target>
 
-    <Target Name="Test.nam" Inputs="@(CompilerPerl);obj\CORE.store;lib\Test.pm6"
-        Outputs="obj\Test.nam;obj\Test.store"
-        DependsOnTargets="CORE.nam;Grammar;PerlTask">
+    <Target Name="Test.nam" Inputs="@(CompilerPerl);obj\CORE.nam;lib\Test.pm6"
+        Outputs="obj\Test.nam" DependsOnTargets="CORE.nam;Grammar;PerlTask">
         <Perl Code="compile(stopafter => 'writenam', name => 'Test');"/>
     </Target>
 

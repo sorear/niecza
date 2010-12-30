@@ -230,6 +230,14 @@ public class Builtins {
         return Kernel.BoxAnyMO<double>(-r, Kernel.NumMO);
     }
 
+    public static Variable Make(Frame fr, Variable v) {
+        if (fr.info.name == "SAFE make")
+            fr = fr.caller;
+        Cursor c = (Cursor) Kernel.StatusHelper(fr, "$*/", 0).Fetch();
+        c.Make(v);
+        return v;
+    }
+
     public static VarDeque HashIterRaw(int mode, Variable v) {
         IP6 o = NominalCheck("$x", Kernel.AnyMO, v);
         VarHash d = Kernel.UnboxAny<VarHash>(o);

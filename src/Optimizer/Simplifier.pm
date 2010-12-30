@@ -79,6 +79,7 @@ our %funcs = (
     '&infix:<<>'           => sub { do_builtin(numlt => 2,   @_) },
     '&infix:<!=>'          => sub { do_builtin(numne => 2,   @_) },
     '&infix:<+>'           => sub { do_builtin(plus => 2,    @_) },
+    '&make'                => sub { do_builtin(make => 1, @_) },
     '&not'                 => sub { do_builtin(not => 1, @_) },
     '&postcircumfix:<{ }>' => \&do_atkey,
     '&postcircumfix:<[ ]>' => \&do_atpos,

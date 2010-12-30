@@ -105,6 +105,10 @@ public sealed class RxFrame {
     // .from in matches
     public int from;
 
+    // these go into the match but currently aren't scoped by backtrack
+    // control in any way
+    public IP6 ast;
+
     public GState global;
     // our backing string, in a cheap to index form
     public char[] orig;
@@ -372,14 +376,14 @@ public sealed class RxFrame {
     }
 
     public Cursor MakeCursor() {
-        return new Cursor(global, st.ns.klass, st.ns, bt, st.pos, st.captures);
+        return new Cursor(global, st.ns.klass, this, st.ns, bt, st.pos, st.captures);
     }
 
     public Cursor MakeMatch() {
         if (Cursor.Trace)
             Console.WriteLine("Matching {0} from {1} to {2}",
                     name, from, st.pos);
-        return new Cursor(global, st.ns.klass, from, st.pos, st.captures);
+        return new Cursor(global, st.ns.klass, from, st.pos, st.captures, ast);
     }
 
     public static Variable EmptyList;
@@ -437,7 +441,9 @@ public class Cursor : IP6 {
     // Cursor only
     public Choice xact;
     public NState nstate;
+    public RxFrame feedback;
     // Match only
+    public IP6 ast;
     public int from;
     public CapInfo captures;
     public DynMetaObject save_klass;
@@ -445,28 +451,30 @@ public class Cursor : IP6 {
     public string GetBacking() { return global.orig_s; }
 
     public Cursor(IP6 proto, string text)
-        : this(new GState(text), proto.mo, null, null, 0, null) { }
+        : this(new GState(text), proto.mo, null, null, null, 0, null) { }
 
-    public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures) {
+    public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures, IP6 ast) {
         this.global = g;
         this.captures = captures;
         this.pos = pos;
+        this.ast = ast;
         this.from = from;
         this.mo = Kernel.MatchMO;
         this.save_klass = klass;
     }
 
-    public Cursor(GState g, DynMetaObject klass, NState ns, Choice xact, int pos, CapInfo captures) {
+    public Cursor(GState g, DynMetaObject klass, RxFrame feedback, NState ns, Choice xact, int pos, CapInfo captures) {
         this.mo = klass;
         this.xact = xact;
         this.nstate = ns;
+        this.feedback = feedback;
         this.global = g;
         this.pos = pos;
         this.captures = captures;
     }
 
     public Cursor(Cursor parent, string method, int from, int to)
-        : this(parent.global, parent.mo, from, to, null) { }
+        : this(parent.global, parent.mo, from, to, null, null) { }
     public void SynPushCapture(string name, IP6 obj) {
         captures = new CapInfo(captures, new string[] { name },
                 Kernel.NewROScalar(obj));
@@ -477,15 +485,15 @@ public class Cursor : IP6 {
     }
 
     public Cursor At(int npos) {
-        return new Cursor(global, mo, nstate, xact, npos, null);
+        return new Cursor(global, mo, feedback, nstate, xact, npos, null);
     }
 
     public Cursor FreshClass(IP6 from) {
-        return new Cursor(global, from.mo, nstate, xact, pos, null);
+        return new Cursor(global, from.mo, feedback, nstate, xact, pos, null);
     }
 
     public Cursor StripCaps() {
-        return new Cursor(global, save_klass, from, pos, null);
+        return new Cursor(global, save_klass, from, pos, null, ast);
     }
 
     private Variable FixupList(VarDeque caps) {
@@ -499,6 +507,21 @@ public class Cursor : IP6 {
             return caps.Count() != 0 ? caps[0] :
                 Kernel.NewROScalar(Kernel.AnyP);
         }
+    }
+
+    public void Make(Variable itm) {
+        if (feedback != null)
+            feedback.ast = itm.Fetch();
+        else
+            ast = itm.Fetch();
+    }
+
+    public IP6 AST() {
+        IP6 a = (feedback != null) ? feedback.ast : ast;
+        if (a != null)
+            return a;
+        else
+            return Kernel.BoxRaw<string>(GetBacking().Substring(from, pos - from), Kernel.StrMO);
     }
 
     // TODO: cache generated lists

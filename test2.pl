@@ -33,6 +33,21 @@ use MONKEY_TYPING;
     is X4.sam("bar"), 17, "indirect private method calls work";
 }
 
+{
+    "foo" ~~ /oo/;
+    is $/.ast, 'oo', '.ast defaults to .Str';
+    "foo" ~~ /oo { make 15 }/;
+    is $/.ast, 15, 'make can change .ast';
+    "foo" ~~ /{make 30} oo/;
+    is $/.ast, 30, 'make works in the middle';
+
+    my grammar X5 {
+        proto token TOP {*}
+        token TOP:x { foo { make 45 } }
+    }
+    is X5.parse("foo").ast, 45, 'make works in multiregexes';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
