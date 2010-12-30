@@ -2934,6 +2934,12 @@ namespace Niecza.CLRBackend {
             thandlers["run_protoregex"] = Methody(null, typeof(Lexer).GetMethod("RunProtoregex"));
             handlers["ladconstruct"] = delegate(NamProcessor th, object[] z) {
                 return th.ProcessLADArr(z[1]); };
+            handlers["rawscall"] = delegate(NamProcessor th, object[] z) {
+                string name = JScalar.S(z[1]);
+                int ix = name.LastIndexOf('.');
+                MethodInfo mi = Type.GetType(name.Substring(0, ix))
+                    .GetMethod(name.Substring(ix+1));
+                return CpsOp.MethodCall(null, mi, JScalar.A(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["llhow_name"] = FieldGet(Tokens.DynMetaObject, "name");
