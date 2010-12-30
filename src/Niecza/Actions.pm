@@ -2398,37 +2398,41 @@ sub module_name__S_normal { my ($cl, $M) = @_;
 }
 
 sub statement_control { }
-sub statement_control__S_if { my ($cl, $M) = @_;
-    my $else = $M->{else}[0] ?
-        $cl->block_to_immediate($M, 'cond', $M->{else}[0]{_ast}) : undef;
-    my @elsif;
-    for (reverse @{ $M->{elsif} }) {
-        $else = Op::Conditional->new(node($M), check => $_->{_ast}[0],
-            true => $cl->block_to_immediate($M, 'cond', $_->{_ast}[1]),
-            false => $else);
+
+
+# passes the $cond to the $block if it accepts a parameter, otherwise just runs it
+sub _if_block {
+    my ($cl,$M,$cond,$block) = @_;
+    if (defined $block->{lambda}) {
+        my $true_block = $cl->block_to_closure($block, $block->{_ast} , once => 1);
+        Op::CallSub->new(node($M),
+            invocant => $true_block,
+            positionals => [$cond]
+        );
+    } else {
+        $cl->block_to_immediate($M, 'cond', $block->{_ast}),
     }
 
-    # XXX cargo cult from block_to_immediate
-    # $blk->type($type);
+}
 
-    my $true_block = $cl->block_to_closure($M, $M->{xblock}{_ast}[1] , once => 1);
-    if (@{$true_block->body->signature->params}) {
-        $M->{_ast} = Op::Helpers::let($M->{xblock}{_ast}[0] => sub {
+# handles all the if branches
+sub _if_branches {
+    my ($cl,$M,$previous_cond,$branch,@other_branches) = @_;
+    if ($branch) {
+        Op::Helpers::let($branch->{_ast}[0] => sub {
             my $cond = shift;
-            my $true = Op::CallSub->new(node($M),
-                invocant => $true_block,
-                positionals => [$cond]
-            );
-            Op::Conditional->new(node($M), check=>$cond,
-                true => $true,
-                false => $else);
+            Op::Conditional->new(node($M), check => $cond,
+                true => _if_block($cl,$M,$cond,$branch->{pblock}),
+                false => _if_branches($cl,$M,$cond,@other_branches));
         });
     } else {
-        $M->{_ast} = Op::Conditional->new(node($M), check => $M->{xblock}{_ast}[0],
-            true => $cl->block_to_immediate($M, 'cond', $M->{xblock}{_ast}[1]),
-            false => $else);
+        $M->{else}[0] ? _if_block($cl,$M,$previous_cond,$M->{else}[0]) : undef;
     }
+}
 
+sub statement_control__S_if {
+    my ($cl, $M) = @_;
+    $M->{_ast} = _if_branches($cl,$M,undef,$M->{xblock},@{$M->{elsif}});
 }
 
 sub statement_control__S_while { my ($cl, $M) = @_;
