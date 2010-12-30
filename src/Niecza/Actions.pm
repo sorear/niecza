@@ -1882,12 +1882,14 @@ sub param_var { my ($cl, $M) = @_;
     }
     my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]->Str : '';
     my $sigil = $M->{sigil}->Str;
+    my $name = $M->{name}[0] ? $M->{name}[0]->Str : undef;
+    $twigil = '*' if $name && ($name eq '/' || $name eq '!');
 
     my $slot;
     if ($twigil eq '') {
-        $slot = $M->{name}[0] ? ($sigil . $M->{name}[0]->Str) : undef;
+        $slot = defined($name) ? ($sigil . $name) : undef;
     } elsif ($twigil eq '*') {
-        $slot = "$sigil*" . $M->{name}[0]->Str;
+        $slot = "$sigil*" . "$name";
     } else {
         $M->sorry("Unhandled parameter twigil $twigil");
         return;

@@ -1717,6 +1717,11 @@ noparams:
                 }
                 break;
             }
+            int ix;
+            if (th.info.dylex != null &&
+                    th.info.dylex.TryGetValue(name, out ix)) {
+                th.SetDynamic(ix, v);
+            }
             if (th.lex == null)
                 th.lex = new Dictionary<string,object>();
             th.lex[name] = v;
