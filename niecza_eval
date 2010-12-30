@@ -83,7 +83,7 @@ if ($module) {
     while (defined ($_ = $term->readline("> ")) ) {
         /^\s*[^\s#]/ or next;
         eval {
-            run(code => "say do $_");
+            run(code => "say ($_)");
         };
         say $@ if $@;
         $term->addhistory($_) if /\S/;
