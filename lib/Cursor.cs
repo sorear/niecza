@@ -10,7 +10,30 @@ public sealed class GState {
 
     public int highwater;
 
-    public GState(string orig) {
+    public Variable actions;
+
+    internal void CallAction(string name, Cursor match) {
+        if (Cursor.Trace)
+            Console.WriteLine("To call action {0}", name);
+        if (actions == null || name == "" || name == null)
+            return;
+        DispatchEnt m;
+        IP6 actions_p = actions.Fetch();
+        if (!actions_p.mo.mro_methods.TryGetValue(name, out m)
+                && !actions_p.mo.mro_methods.TryGetValue("FALLBACK", out m))
+            return;
+
+        Variable[] pos = new Variable[] {
+            actions, Kernel.NewROScalar(match) };
+        Frame nf = m.info.Binder(Kernel.GetInferiorRoot()
+                .MakeChild(m.outer, m.info), pos, null);
+        nf.curDisp = m;
+        Kernel.RunInferior(nf);
+    }
+
+    public GState(string orig, IP6 actions) {
+        this.actions = (actions == Kernel.AnyP) ? null :
+            Kernel.NewROScalar(actions);
         orig_s = orig;
         orig_a = orig.ToCharArray();
         highwater = (orig_a.Length < 100 || !Cursor.HwTrace) ?
@@ -383,7 +406,7 @@ public sealed class RxFrame {
         if (Cursor.Trace)
             Console.WriteLine("Matching {0} from {1} to {2}",
                     name, from, st.pos);
-        return new Cursor(global, st.ns.klass, from, st.pos, st.captures, ast);
+        return new Cursor(global, st.ns.klass, from, st.pos, st.captures, ast, name);
     }
 
     public static Variable EmptyList;
@@ -443,6 +466,7 @@ public class Cursor : IP6 {
     public NState nstate;
     public RxFrame feedback;
     // Match only
+    public string reduced;
     public IP6 ast;
     public int from;
     public CapInfo captures;
@@ -450,10 +474,10 @@ public class Cursor : IP6 {
 
     public string GetBacking() { return global.orig_s; }
 
-    public Cursor(IP6 proto, string text)
-        : this(new GState(text), proto.mo, null, null, null, 0, null) { }
+    public Cursor(IP6 proto, string text, IP6 actions)
+        : this(new GState(text, actions), proto.mo, null, null, null, 0, null) { }
 
-    public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures, IP6 ast) {
+    public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures, IP6 ast, string reduced) {
         this.global = g;
         this.captures = captures;
         this.pos = pos;
@@ -461,10 +485,14 @@ public class Cursor : IP6 {
         this.from = from;
         this.mo = Kernel.MatchMO;
         this.save_klass = klass;
+        this.reduced = reduced;
+
+        if (reduced != null)
+            g.CallAction(reduced, this);
     }
 
     public Cursor(GState g, DynMetaObject klass, RxFrame feedback, NState ns, Choice xact, int pos, CapInfo captures) {
-        this.mo = klass;
+        this.mo = this.save_klass = klass;
         this.xact = xact;
         this.nstate = ns;
         this.feedback = feedback;
@@ -473,11 +501,19 @@ public class Cursor : IP6 {
         this.captures = captures;
     }
 
-    public Cursor(Cursor parent, string method, int from, int to)
-        : this(parent.global, parent.mo, from, to, null, null) { }
-    public void SynPushCapture(string name, IP6 obj) {
-        captures = new CapInfo(captures, new string[] { name },
-                Kernel.NewROScalar(obj));
+    public static Cursor Synthetic(Cursor parent, string method, int from,
+            int to, Variable caplist) {
+        VarDeque iter = new VarDeque(caplist);
+        CapInfo ci = null;
+        while (Kernel.IterHasFlat(iter, true)) {
+            IP6 pair = iter.Shift().Fetch();
+            Variable k = (Variable)pair.GetSlot("key");
+            Variable v = (Variable)pair.GetSlot("value");
+            ci = new CapInfo(ci, new string[] {
+                    k.Fetch().mo.mro_raw_Str.Get(k) }, v);
+        }
+        return new Cursor(parent.global, parent.save_klass, from, to, ci,
+                null, method);
     }
 
     public override bool IsDefined() {
@@ -493,7 +529,7 @@ public class Cursor : IP6 {
     }
 
     public Cursor StripCaps() {
-        return new Cursor(global, save_klass, from, pos, null, ast);
+        return new Cursor(global, save_klass, from, pos, null, ast, reduced);
     }
 
     private Variable FixupList(VarDeque caps) {
@@ -516,6 +552,7 @@ public class Cursor : IP6 {
             ast = itm.Fetch();
     }
 
+    public string Reduced() { return reduced; }
     public IP6 AST() {
         IP6 a = (feedback != null) ? feedback.ast : ast;
         if (a != null)

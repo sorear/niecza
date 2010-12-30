@@ -2980,7 +2980,7 @@ namespace Niecza.CLRBackend {
             thandlers["obj_isa"] = Methody(null, Tokens.IP6.GetMethod("Isa"));
             thandlers["obj_does"] = Methody(null, Tokens.IP6.GetMethod("Does"));
             thandlers["obj_newblank"] = Constructy(Tokens.DynObject_ctor);
-            thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.IP6, Tokens.String }));
+            thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.IP6, Tokens.String, Tokens.IP6 }));
             thandlers["cursor_pos"] = FieldGet(Tokens.Cursor, "pos");
             thandlers["cursor_from"] = FieldGet(Tokens.Cursor, "from");
             thandlers["cursor_butpos"] = Methody(null, Tokens.Cursor.GetMethod("At"));
@@ -2990,8 +2990,7 @@ namespace Niecza.CLRBackend {
             thandlers["cursor_item"] = Methody(null, Tokens.Cursor.GetMethod("GetKey"));
             thandlers["cursor_unpackcaps"] = Methody(null, Tokens.Cursor.GetMethod("UnpackCaps"));
             thandlers["cursor_O"] = Methody(null, Tokens.Cursor.GetMethod("O"));
-            thandlers["cursor_synthetic"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.Cursor, Tokens.String, Tokens.Int32, Tokens.Int32 }));
-            thandlers["cursor_synthcap"] = Methody(null, Tokens.Cursor.GetMethod("SynPushCapture"));
+            thandlers["cursor_synthetic"] = Methody(null, Tokens.Cursor.GetMethod("Synthetic"));
             thandlers["cursor_fresh"] = Methody(null, Tokens.Cursor.GetMethod("FreshClass"));
             thandlers["rxstripcaps"] = Methody(null, Tokens.Cursor.GetMethod("StripCaps"));
 

@@ -48,6 +48,29 @@ use MONKEY_TYPING;
     is X5.parse("foo").ast, 45, 'make works in multiregexes';
 }
 
+{
+    my grammar X6 {
+        token a { <?> }
+        proto token b {*}
+        token b:x { <?> }
+        proto token c {*}
+        token c:x { <?> }
+    }
+
+    my class A6 {
+        method a($/) { make 1 }
+        method b($/) { make 2 }
+        method c:x ($/) { make 3 }
+    }
+
+    is X6.parse("", :actions(A6), :rule<a>).ast, 1,
+        'action methods work (simple rule)';
+    #is X6.parse("", :actions(A6), :rule<b>).ast, 2,
+    #   'action methods work (proto rule)';
+    is X6.parse("", :actions(A6), :rule<c>).ast, 3,
+        'action methods work (candidate rule)';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

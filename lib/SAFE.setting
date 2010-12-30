@@ -923,8 +923,6 @@ sub sort(*@bits) { @bits.sort }
 
 sub _array_constructor(\$parcel) { my $r := (anon @new = $parcel);  $r }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
-
-sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 # }}}
 # Regular expression support {{{
 my class Cursor {
@@ -955,8 +953,8 @@ my class Cursor {
           (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
           (newscalar (l cap)))
     } }
-    method new($str) { Q:CgOp { (ns (cursor_start
-        (@ {self}) (obj_getstr {$str}))) } }
+    method new($str, $act?) { Q:CgOp { (ns (cursor_start
+        (@ {self}) (obj_getstr {$str}) (@ {$act}))) } }
     method pos() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
     method to() { Q:CgOp { (box Num (cast num (cursor_pos
@@ -1003,19 +1001,13 @@ my class Match is Cool {
         "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
     }
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
-        my $m = Q:CgOp {
+        Q:CgOp {
             (newscalar (cursor_synthetic
                 (cast cursor (@ {$cursor})) (obj_getstr {$method})
                 (cast int (obj_getnum {$from}))
-                (cast int (obj_getnum {$to}))))
+                (cast int (obj_getnum {$to}))
+                {@captures}))
         };
-        # this is wrong.  I need a better way to pass lists into primitives.
-        for @captures -> $pair {
-            Q:CgOp { (rnull
-                (cursor_synthcap (cast cursor (@ {$m}))
-                  (obj_getstr {$pair.key}) (@ {$pair.value}))) };
-        }
-        $m
     }
 }
 
@@ -1025,7 +1017,7 @@ my class Regex is Sub {
             (letn ix   (i 0)
                   str  (obj_getstr {$st})
                   max  (str_length (l str))
-                  incr (cursor_start (@ {Cursor}) (l str))
+                  incr (cursor_start (@ {Cursor}) (l str) (@ {Any}))
                   csr  (null cursor)
                   iter (null vvarlist)
               (whileloop 0 0 (<= (l ix) (l max)) (prog
@@ -1059,10 +1051,14 @@ sub _subst($M is rw, $text is rw, $regex, $repl) {
 sub make($x) { make $x }
 
 my class Grammar is Cursor {
-    method parse($text) {
-        flat(grep { $_.to == chars $text }, self.new($text).TOP).head
+    method parse($text, :$rule = "TOP", :$actions) {
+        flat(grep { $_.to == chars $text }, self.new($text, $actions)."$rule"()).head
     }
 }
 # }}}
+
+# this needs to be at the end because it screws up the parsing of everything
+# after it.
+sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 
 {YOU_ARE_HERE}
