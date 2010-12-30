@@ -386,7 +386,7 @@ namespace Niecza.CLRBackend {
         }
 
         public static Method[] fromArray(object x) {
-            return JScalar.A(0, x, delegate (object o) {
+            return JScalar.A<Method>(0, x, delegate (object o) {
                 return new Method(o as object[]); });
         }
     }
@@ -405,7 +405,7 @@ namespace Niecza.CLRBackend {
         }
 
         public static Attribute[] fromArray(object x) {
-            return JScalar.A(0, x, delegate (object o) {
+            return JScalar.A<Attribute>(0, x, delegate (object o) {
                 return new Attribute(o as object[]); });
         }
     }
@@ -418,8 +418,8 @@ namespace Niecza.CLRBackend {
         public Class(object[] p) : base(p) {
             attributes     = Attribute.fromArray(p[3]);
             methods        = Method.fromArray(p[4]);
-            superclasses   = JScalar.A(0, p[5], Xref.from);
-            linearized_mro = JScalar.A(0, p[6], Xref.from);
+            superclasses   = JScalar.A<Xref>(0, p[5], Xref.from);
+            linearized_mro = JScalar.A<Xref>(0, p[6], Xref.from);
         }
     }
 
@@ -434,7 +434,7 @@ namespace Niecza.CLRBackend {
         public Role(object[] p) : base(p) {
             attributes = Attribute.fromArray(p[3]);
             methods    = Method.fromArray(p[4]);
-            superclasses = JScalar.A(0, p[5], Xref.from);
+            superclasses = JScalar.A<Xref>(0, p[5], Xref.from);
         }
     }
 
@@ -445,7 +445,7 @@ namespace Niecza.CLRBackend {
         public ParametricRole(object[] p) : base(p) {
             attributes = Attribute.fromArray(p[3]);
             methods    = Method.fromArray(p[4]);
-            superclasses = JScalar.A(0, p[5], Xref.from);
+            superclasses = JScalar.A<Xref>(0, p[5], Xref.from);
         }
     }
 
@@ -2939,7 +2939,7 @@ namespace Niecza.CLRBackend {
                 int ix = name.LastIndexOf('.');
                 MethodInfo mi = Type.GetType(name.Substring(0, ix))
                     .GetMethod(name.Substring(ix+1));
-                return CpsOp.MethodCall(null, mi, JScalar.A(2, z, th.Scan)); };
+                return CpsOp.MethodCall(null, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["llhow_name"] = FieldGet(Tokens.DynMetaObject, "name");
