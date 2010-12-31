@@ -12,8 +12,9 @@ sub prefix:<< +^ >>($x) { Q:CgOp { (rawscall Builtins,Kernel.NumCompl {$x}) } }
 
 has $.terms;
 
+my $nclass = 0;
 our %Gc = < Lu Ll Lt Lm Lo Mn Ms Me Nd Nl No Zs Zl Zp Cc Cf Cs Co Pc
-    Pd Ps Pc Pi Pf Po Sm Sc Sk So Cn >.map({ $_ => ((state $i)++) });
+    Pd Ps Pc Pi Pf Po Sm Sc Sk So Cn >.map(-> $n { $n => ($nclass++) });
 
 our $Empty = CClass.new(terms => [ ]);
 our $Full  = CClass.new(terms => [ 0, 0x3FFF_FFFF ]);
@@ -36,7 +37,7 @@ method catm(*@bits) {
 }
 
 sub _binop($func, $alr, $blr) {
-    my $bl = ($blr ~~ CClass) ?? $blr.terms !! CClass.range($bl, $bl).terms;
+    my $bl = ($blr ~~ CClass) ?? $blr.terms !! CClass.range($blr, $blr).terms;
     my $al = $alr.terms;
     my ($alix, $alcur) = (0, 0);
     my ($blix, $blcur) = (0, 0);
@@ -78,7 +79,7 @@ sub _binop($func, $alr, $blr) {
 
 method plus($other) { _binop(* +| *, self, $other); }
 method minus($other) { _binop(* +& +^*, self, $other); }
-method negate() { _binop( 0x3FFF_FFFF +& +^*, self, CClass.new(terms => [])) }
+method negate() { _binop(-> $a, $b { 0x3FFF_FFFF +& +^$a }, self, $Empty) }
 
 our $Word   = CClass.catm(< Lu Lt Ll Lm Lo Nd Nl No >).plus('_');
 our $Digit  = CClass.catm(< Nd Nl No >);

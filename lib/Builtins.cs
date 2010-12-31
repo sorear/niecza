@@ -290,6 +290,14 @@ public class Builtins {
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
     }
 
+    // used in cclass.t; maybe worth exposing
+    public static Variable UniCat(Variable v) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        char c = (char) o1.mo.mro_raw_Numeric.Get(v);
+        int ix = (int) char.GetUnicodeCategory(c);
+        return Kernel.BoxAnyMO((double)ix, Kernel.NumMO);
+    }
+
     public static Variable Make(Frame fr, Variable v) {
         if (fr.info.name == "SAFE make")
             fr = fr.caller;

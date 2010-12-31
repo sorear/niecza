@@ -1,0 +1,6 @@
+These things were noticed during translation, but to fix them now would
+only slow me down...
+
+* sprintf, in particular, the ability to make numbers hex
+* hash initialization idioms don't work
+* no qw< >
