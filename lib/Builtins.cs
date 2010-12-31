@@ -228,6 +228,22 @@ public class Builtins {
         return Kernel.BoxAnyMO<double>((double)(r1 ^ r2), Kernel.NumMO);
     }
 
+    public static Variable NumLShift(Variable v1, Variable v2) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
+        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
+        return Kernel.BoxAnyMO<double>((double)(r1 << r2), Kernel.NumMO);
+    }
+
+    public static Variable NumRShift(Variable v1, Variable v2) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
+        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
+        return Kernel.BoxAnyMO<double>((double)(r1 >> r2), Kernel.NumMO);
+    }
+
     public static Variable NumCompl(Variable v1) {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
@@ -271,7 +287,7 @@ public class Builtins {
     public static Variable Chr(Variable v) {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double r = o1.mo.mro_raw_Numeric.Get(v);
-        return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.NumMO);
+        return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
     }
 
     public static Variable Make(Frame fr, Variable v) {

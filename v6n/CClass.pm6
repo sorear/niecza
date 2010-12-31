@@ -1,6 +1,14 @@
 # 28f112a757ef2d6f553d144dd8f8b9a1de17c71b
 class CClass;
 
+sub ord($x) { Q:CgOp { (rawscall Builtins.Ord {$x}) } }
+sub chr($x) { Q:CgOp { (rawscall Builtins.Chr {$x}) } }
+sub infix:<+&>($x, $y) { Q:CgOp { (rawscall Builtins.NumAnd {$x} {$y}) } }
+sub infix:<+|>($x, $y) { Q:CgOp { (rawscall Builtins.NumOr {$x} {$y}) } }
+sub infix:<+^>($x, $y) { Q:CgOp { (rawscall Builtins.NumXor {$x} {$y}) } }
+sub infix:<< +< >>($x, $y) { Q:CgOp { (rawscall Builtins.NumLShift {$x} {$y}) } }
+sub infix:<< +> >>($x, $y) { Q:CgOp { (rawscall Builtins.NumRShift {$x} {$y}) } }
+
 has $.terms;
 
 our %Gc = < Lu Ll Lt Lm Lo Mn Ms Me Nd Nl No Zs Zl Zp Cc Cf Cs Co Pc
@@ -11,7 +19,7 @@ our $Full  = CClass.new(terms => [ 0, 0x3FFF_FFFF ]);
 
 method range($c1, $c2) {
     ($c1 gt $c2) ?? $Empty !!
-        self.new(terms => [ $*Cheats.ord($c1), 0x3FFF_FFFF, $*Cheats.ord($c2) + 1, 0 ]);
+        self.new(terms => [ ord($c1), 0x3FFF_FFFF, ord($c2) + 1, 0 ]);
 }
 
 method enum(*@cs) {

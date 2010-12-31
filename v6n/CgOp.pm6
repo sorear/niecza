@@ -2,6 +2,8 @@
 
 class CgOp;
 
+sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
+
 method _cgop($name, *@bits) {
     for @bits { $_ // die "Illegal undef in cgop $name" }
     $( @bits );
@@ -281,7 +283,7 @@ method _process_arglist(*@araw) {
             push @aout, $o;
             $sig = $sig ~ "\0";
         } else {
-            $sig = $sig ~ $*Cheats.chr(chars $o) ~ $o;
+            $sig = $sig ~ chr(chars $o) ~ $o;
             push @aout, @araw.shift;
         }
     }
