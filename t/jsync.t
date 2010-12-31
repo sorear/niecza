@@ -79,4 +79,4 @@ for @$data -> $vector {
     myis $result, $canon, "($id) $comment";
 }
 
-done-testing;
+done;

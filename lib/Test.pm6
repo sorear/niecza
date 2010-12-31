@@ -57,7 +57,7 @@ class Builder {
         }
     }
 
-    method done-testing {
+    method done {
         if !($!set-plan) {
             self!output("1.." ~ ($.current-test - 1));
         }
@@ -83,8 +83,6 @@ sub is($got, $expected, $tag?) is export {
     }
 }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
-sub done-testing() is export { $*TEST-BUILDER.done-testing }
-sub done_testing() is export { $*TEST-BUILDER.done-testing }
 sub done() is export { $*TEST-BUILDER.done-testing }
 sub skip($number,$reason) is export {
     my $i = 0;

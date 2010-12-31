@@ -87,4 +87,4 @@ cctest '$CClass::Word', $CClass::Word,
     [< _ 0 9 A Z a z >, "\x4E00"],
     [' ', ',', '-', "\n"];
 
-done_testing;
+done;

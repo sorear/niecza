@@ -98,4 +98,4 @@ use MONKEY_TYPING;
 #     }
 # }
 
-done-testing;
+done;
