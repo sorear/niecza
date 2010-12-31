@@ -204,6 +204,36 @@ public class Builtins {
         return Kernel.BoxAnyMO<double>(r1 / r2, Kernel.NumMO);
     }
 
+    public static Variable NumAnd(Variable v1, Variable v2) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
+        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
+        return Kernel.BoxAnyMO<double>((double)(r1 & r2), Kernel.NumMO);
+    }
+
+    public static Variable NumOr(Variable v1, Variable v2) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
+        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
+        return Kernel.BoxAnyMO<double>((double)(r1 | r2), Kernel.NumMO);
+    }
+
+    public static Variable NumXor(Variable v1, Variable v2) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
+        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
+        return Kernel.BoxAnyMO<double>((double)(r1 ^ r2), Kernel.NumMO);
+    }
+
+    public static Variable NumCompl(Variable v1) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
+        return Kernel.BoxAnyMO<double>((double)(~r1), Kernel.NumMO);
+    }
+
     public static Variable PostIncrement(Variable v) {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double d = o1.mo.mro_raw_defined.Get(v) ?
@@ -228,6 +258,20 @@ public class Builtins {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO<double>(-r, Kernel.NumMO);
+    }
+
+    public static Variable Ord(Variable v) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        string r = o1.mo.mro_raw_Str.Get(v);
+        // XXX Failure
+        if (r.Length == 0) return Kernel.NewROScalar(Kernel.AnyP);
+        return Kernel.BoxAnyMO((double)r[0], Kernel.NumMO);
+    }
+
+    public static Variable Chr(Variable v) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        double r = o1.mo.mro_raw_Numeric.Get(v);
+        return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.NumMO);
     }
 
     public static Variable Make(Frame fr, Variable v) {
