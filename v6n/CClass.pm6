@@ -1,13 +1,14 @@
 # 28f112a757ef2d6f553d144dd8f8b9a1de17c71b
 class CClass;
 
-sub ord($x) { Q:CgOp { (rawscall Builtins.Ord {$x}) } }
-sub chr($x) { Q:CgOp { (rawscall Builtins.Chr {$x}) } }
-sub infix:<+&>($x, $y) { Q:CgOp { (rawscall Builtins.NumAnd {$x} {$y}) } }
-sub infix:<+|>($x, $y) { Q:CgOp { (rawscall Builtins.NumOr {$x} {$y}) } }
-sub infix:<+^>($x, $y) { Q:CgOp { (rawscall Builtins.NumXor {$x} {$y}) } }
-sub infix:<< +< >>($x, $y) { Q:CgOp { (rawscall Builtins.NumLShift {$x} {$y}) } }
-sub infix:<< +> >>($x, $y) { Q:CgOp { (rawscall Builtins.NumRShift {$x} {$y}) } }
+sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
+sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
+sub infix:<+&>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumAnd {$x} {$y}) } }
+sub infix:<+|>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumOr {$x} {$y}) } }
+sub infix:<+^>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumXor {$x} {$y}) } }
+sub infix:<< +< >>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumLShift {$x} {$y}) } }
+sub infix:<< +> >>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumRShift {$x} {$y}) } }
+sub prefix:<< +^ >>($x) { Q:CgOp { (rawscall Builtins,Kernel.NumCompl {$x}) } }
 
 has $.terms;
 
@@ -30,76 +31,62 @@ method enum(*@cs) {
 
 method catm(*@bits) {
     my $m = 0;
-    for @bits { $m = $m +| (1 +< $Gc{$_}) }
+    for @bits { $m = $m +| (1 +< %Gc{$_}) }
     $m ?? self.new(terms => [ 0, $m ]) !! $Empty;
 }
 
-sub _binop($func, $al, $blr) {
-    my $bl = ($blr ~~ CClass) ?? $blr !! CClass.range($bl, $bl);
+sub _binop($func, $alr, $blr) {
+    my $bl = ($blr ~~ CClass) ?? $blr.terms !! CClass.range($bl, $bl).terms;
+    my $al = $alr.terms;
     my ($alix, $alcur) = (0, 0);
     my ($blix, $blcur) = (0, 0);
     my @o;
     my $pos = 0;
-    my $ocur = $func->(0, 0);
-    if ($ocur != 0) {
+    my $ocur = $func(0, 0);
+    if $ocur != 0 {
         push @o, 0, $ocur;
     }
 
-    while ($pos != 1e7) {
-        my $ata = $alix < @$al && $al->[$alix] == $pos;
-        my $atb = $blix < @$bl && $bl->[$blix] == $pos;
+    while $pos != 10_000_000 {
+        my $ata = $alix < @$al && $al[$alix] == $pos;
+        my $atb = $blix < @$bl && $bl[$blix] == $pos;
 
-        if ($ata) {
-            $alcur = $al->[$alix+1];
-            $alix += 2;
+        if $ata {
+            $alcur = $al[$alix+1];
+            $alix = $alix + 2;
         }
 
-        if ($atb) {
-            $blcur = $bl->[$blix+1];
-            $blix += 2;
+        if $atb {
+            $blcur = $bl[$blix+1];
+            $blix = $blix + 2;
         }
 
-        my $onew = $func->($alcur, $blcur);
-        if ($onew != $ocur) {
+        my $onew = $func($alcur, $blcur);
+        if $onew != $ocur {
             push @o, $pos, $onew;
             $ocur = $onew;
         }
 
-        my $toa = $alix < @$al ? $al->[$alix] : 1e7;
-        my $tob = $blix < @$bl ? $bl->[$blix] : 1e7;
+        my $toa = $alix < @$al ?? $al[$alix] !! 10_000_000;
+        my $tob = $blix < @$bl ?? $bl[$blix] !! 10_000_000;
 
-        $pos = ($toa < $tob) ? $toa : $tob;
+        $pos = $toa < $tob ?? $toa !! $tob;
     }
 
-    bless \@o, 'CClass';
+    CClass.new(terms => @o);
 }
 
-sub plus {
-    my ($self, $other) = @_;
-    _binop(sub { $_[0] | $_[1] }, $self, $other);
-}
+method plus($other) { _binop(* +| *, self, $other); }
+method minus($other) { _binop(* +& +^*, self, $other); }
+method negate() { _binop( 0x3FFF_FFFF +& +^*, self, CClass.new(terms => [])) }
 
-sub minus {
-    my ($self, $other) = @_;
-    _binop(sub { $_[0] & ~$_[1] }, $self, $other);
-}
+our $Word   = CClass.catm(< Lu Lt Ll Lm Lo Nd Nl No >).plus('_');
+our $Digit  = CClass.catm(< Nd Nl No >);
+our $Space  = CClass.enum(' ', "\t", "\r", "\x0B", "\n", "\x3000"); # TODO
+our $HSpace = CClass.enum("\t", " ", "\x3000");
+our $VSpace = CClass.enum("\r", "\x0B", "\n");
 
-sub negate {
-    my ($self) = @_;
-    _binop(sub { 0x3FFF_FFFF & ~$_[0] }, $self, []);
-}
-
-our $Word   = CClass->catm(qw< Lu Lt Ll Lm Lo Nd Nl No >)->plus('_');
-our $Digit  = CClass->catm(qw< Nd Nl No >);
-our $Space  = CClass->enum(' ', "\t", "\r", "\cK", "\n", "\x{3000}"); # TODO
-our $HSpace = CClass->enum("\t", " ", "\x{3000}");
-our $VSpace = CClass->enum("\r", "\cK", "\n");
-
-sub internal {
-    my ($name) = @_;
-    ($name eq 'alpha') && return CClass->catm(qw< Lu Lt Ll Lm Lo >)->plus('_');
+our &internal = sub ($name) {
+    ($name eq 'alpha') && return CClass.catm(< Lu Lt Ll Lm Lo >).plus('_');
     die "unknown internal cclass $name";
 }
-
-1;
-
