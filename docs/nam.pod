@@ -149,6 +149,8 @@ Sets the $file and $line_numer for the $operation.
 
 =head3 sink
 
+Evaluate and throw away the argument
+
 =head3 cast
 
 =head2 Object model
