@@ -83,7 +83,7 @@ sub is($got, $expected, $tag?) is export {
     }
 }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
-sub done() is export { $*TEST-BUILDER.done-testing }
+sub done() is export { $*TEST-BUILDER.done }
 sub skip($number,$reason) is export {
     my $i = 0;
     while ($i < $number) {

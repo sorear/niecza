@@ -6,7 +6,7 @@ sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
 method _cgop($name, *@bits) {
     for @bits { $_ // die "Illegal undef in cgop $name" }
-    $( @bits );
+    [ $name, @bits ];
 }
 
 method getfield (*@_) { self._cgop("getfield", @_) }

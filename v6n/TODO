@@ -4,3 +4,4 @@ only slow me down...
 * sprintf, in particular, the ability to make numbers hex
 * hash initialization idioms don't work
 * no qw< >
+* Any strificatrion/numification warnings would be useful
