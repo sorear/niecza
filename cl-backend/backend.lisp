@@ -13,6 +13,9 @@
   )
 )
 
+(setq core (make-hash-table :test #'equal))
+(setf (gethash "&say" core) (lambda (thing) (format t "~A~%" thing)))
+
 ;(defmacro nam-sub (name body) `(defun ,(to-symbol name) () body))
 ; for easier development
 (defmacro nam-sub (name body) body)
@@ -21,16 +24,16 @@
 (defmacro nam-prog (&body ops) `(progn ,@ops))
 (defun nam-sink (argument) nil)
 
-; TODO
-(defun nam-scopedlex (var) nil)
-(defun nam-scopedlex (var) nil)
-(defun nam-subcall (thing &rest args) (format t "calling sub~%"))
-(defun nam-fetch (thing) nil)
-(defun nam-const (thing) nil)
-(defun nam-double (number) nil)
-(defun nam-str (string) nil)
-(defun nam-box (type thing) nil)
-(defun nam-box (type thing) nil)
+(defun nam-str (string) string)
+(defun nam-double (number) number)
+
+; ???
+(defun nam-const (thing) thing)
+(defun nam-box (type thing) thing)
+(defun nam-fetch (thing) thing)
+(defun nam-scopedlex (var) (gethash var core))
+(defun nam-subcall (dunno-what-that-is thing &rest args) (apply thing args))
+
 
 (defun compile-sub (sub)
   (fare-matcher:match sub 
@@ -65,7 +68,8 @@
 (let (
       (compiled-unit (first-string-to-symbol (first (compile-unit (json:decode-json (open "test.nam"))))))
     )
-    (format t "~a~%" compiled-unit)
+    (format t "~a~%~%~%" compiled-unit)
 ;    (format t "expanded: ~a~%" (macroexpand compiled-unit))
+;
     (eval compiled-unit)
 )
