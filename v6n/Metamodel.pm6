@@ -3,6 +3,9 @@
 
 module Metamodel;
 
+use NAME;
+use Stash;
+
 ### NIECZA COMPILER METAMODEL
 # The metamodel exists to create a timeline inside the compiler.  Previously,
 # the compiler operated as a pure tree transformer with no conception of how
@@ -429,88 +432,77 @@ class Lexical {
 # figure out how post-declared lexicals should interact with codegen
 # std accepts:  sub foo() { bar }; BEGIN { foo }; sub bar() { }
 # DONE: TimToady says bar can be compiled to a runtime search
-{
-    package Metamodel::StaticSub;
-    use Moose;
-    extends 'Metamodel::RefTarget';
-
-    has unit => (isa => 'Metamodel::Unit', is => 'ro', weak_ref => 1);
-    has outer => (is => 'bare');
-    has run_once => (isa => 'Bool', is => 'ro', default => 0);
-    has spad_exists => (isa => 'Bool', is => 'rw', default => 0);
-
-    has lexicals => (isa => 'HashRef[Metamodel::Lexical]', is => 'ro',
-        default => sub { +{} });
-    has code     => (isa => 'Op', is => 'rw');
-    has signature=> (isa => 'Maybe[Sig]', is => 'rw');
-    has zyg      => (isa => 'ArrayRef[Metamodel::StaticSub]', is => 'ro',
-        default => sub { [] });
+class StaticSub is RefTarget {
+    has $.unit; # Metamodel::Unit
+    has $.outerx; # Xref
+    has $.run_once = False; # Bool
+    has $.spad_exists = False; # Bool
+    has $.lexicals = {};
+    has $.code; # Op, is rw
+    has $.signature; # Sig, is rw
+    has $.zyg = []; # Array of Metamodel::StaticSub
 
     # inject a take EMPTY
-    has gather_hack => (isa => 'Bool', is => 'ro', default => 0);
+    has $.gather_hack = False; # Bool
     # inject a role constructor
-    has parametric_role_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
+    has $.parametric_role_hack; # Xref, is rw
     # some tuples for method definitions; munged into a phaser
-    has augment_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
+    has $.augment_hack; # Array, is rw
     # emit code to assign to a hint; [ $subref, $name ]
-    has hint_hack => (isa => 'Maybe[ArrayRef]', is => 'rw');
-    has is_phaser => (isa => 'Maybe[Int]', is => 'rw', default => undef);
-    has strong_used => (isa => 'Bool', is => 'rw', default => 0);
-    has body_of  => (isa => 'Maybe[ArrayRef]', is => 'ro');
-    has in_class => (isa => 'Maybe[ArrayRef]', is => 'ro');
-    has cur_pkg  => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
-    has returnable => (isa => 'Bool', is => 'ro', default => 0);
-    has augmenting => (isa => 'Bool', is => 'ro', default => 0);
-    has class    => (isa => 'Str', is => 'ro', default => 'Sub');
-    has ltm      => (is => 'rw');
-    has exports  => (is => 'rw');
+    has $.hint_hack; # Array, is rw
 
-    sub outer {
-        my $v = $_[0]{outer};
-        return $v if !$v or blessed($v);
-        $_[0]{unit}->deref($v);
-    }
+    has $.is_phaser; # Int, is rw
+    has $.strong_used = False; # Bool, is rw; prevents elision
+    has $.body_of; # Xref of Package
+    has $.in_class; # Xref of Package
+    has $.cur_pkg; # Array of Str
+    has $.returnable = False; # Bool; catches &return
+    has $.augmenting = False; # Bool; traps add_attribute
+    has $.class = 'Sub'; # Str
+    has $.ltm; # is rw
+    has $.exports; # is rw
 
-    sub true_setting {
-        my $cursor = $_[0];
-        while ($cursor && !$cursor->unit->is_true_setting) {
-            $cursor = $cursor->outer;
+    method outer() { $!outerx ?? $*unit.deref($!outerx) !! StaticSub }
+
+    method true_setting() {
+        my $cursor = self;
+        while $cursor && !$cursor.unit.is_true_setting {
+            $cursor = $cursor.outer;
         }
         $cursor;
     }
 
-    sub add_child { push @{ $_[0]->zyg }, $_[1] }
-    sub children { @{ $_[0]->zyg } }
+    method add_child($z) { push $.zyg, $z }
+    method children() { @$.zyg }
 
-    sub create_static_pad {
-        my ($self) = @_;
-
-        return if $self->spad_exists;
-        $self->spad_exists(1);
-        $self->outer->create_static_pad if $self->outer;
+    method create_static_pad() {
+        return Nil if $.spad_exists;
+        $.spad_exists = True;
+        $.outer.create_static_pad if $.outer;
     }
 
-    sub find_lex_pkg { my ($self, $name) = @_;
-        my $toplex = $self->find_lex($name) // return undef;
-        if (!$toplex->isa('Metamodel::Lexical::Stash')) {
+    method find_lex_pkg($name) {
+        my $toplex = self.find_lex($name) // return Array;
+        if !$toplex.^isa(Metamodel::Lexical::Stash) {
             die "$name is declared as a non-package";
         }
-        $toplex->path;
+        $toplex.path;
     }
 
-    sub find_pkg { my ($self, $names) = @_;
-        my @names = ref($names) ? @$names : ('MY', $names);
-        $_ =~ s/::$// for (@names); #XXX
+    method find_pkg($names) {
+        my @names = $names ~~ Str ?? ('MY', $names) !! @$names;
+        for @names { $_ = substr($_, 0, chars($_)-2) if chars($_) >= 2 && substr($_, chars($_)-2, 2) eq '::' } # XXX
         my @tp;
-        if ($names[0] eq 'OUR') {
-            @tp = @{ $self->cur_pkg };
+        if @names[0] eq 'OUR' {
+            @tp = @$.cur_pkg;
             shift @names;
-        } elsif ($names[0] eq 'PROCESS' or $names[0] eq 'GLOBAL') {
-            @tp = shift(@names);
-        } elsif ($names[0] eq 'MY') {
-            @tp = @{ $self->find_lex_pkg($names[1]) };
-            splice @names, 0, 2;
-        } elsif (my $p = $self->find_lex_pkg($names->[0])) {
+        } elsif @names[0] eq 'PROCESS' or @names[0] eq 'GLOBAL' {
+            @tp = shift @names;
+        } elsif @names[0] eq 'MY' {
+            @tp = @( self.find_lex_pkg(@names[1]) );
+            shift @names;
+            shift @names;
+        } elsif my $p = self.find_lex_pkg(@$names[0]) {
             @tp = @$p;
             shift @names;
         } else {
@@ -520,256 +512,226 @@ class Lexical {
         [ @tp, @names ];
     }
 
-    sub find_lex { my ($self, $name) = @_;
-        my $l = $self->lexicals->{$name};
-        if ($l) {
-            return $l->isa('Metamodel::Lexical::Alias') ?
-                $self->find_lex($l->to) : $l;
+    method find_lex($name) {
+        my $l = $.lexicals{$name};
+        if $l {
+            return $l.^isa(Metamodel::Lexical::Alias) ??
+                self.find_lex($l.to) !! $l;
         }
-        return ($self->outer ? $self->outer->find_lex($name) : undef);
+        return ($.outer ?? $.outer.find_lex($name) !! Metamodel::Lexical);
     }
 
-    sub delete_lex { my ($self, $name) = @_;
-        my $l = $self->lexicals->{$name};
-        if ($l) {
-            if ($l->isa('Metamodel::Lexical::Alias')) { $self->delete_lex($l->to) }
-            else { delete $self->lexicals->{$name} }
+    method delete_lex($name) {
+        my $l = $.lexicals{$name};
+        if $l {
+            if $l.^isa(Metamodel::Lexical::Alias) { self.delete_lex($l.to) }
+            else { $.lexicals{$name}:delete }
         } else {
-            $self->outer && $self->outer->delete_lex($name);
+            $.outer && $.outer.delete_lex($name);
         }
     }
 
-    sub add_my_name { my ($self, $slot, @ops) = @_;
-        $self->lexicals->{$slot} = Metamodel::Lexical::Simple->new(@ops);
+    method add_my_name($slot, *%param) {
+        $.lexicals{$slot} = Metamodel::Lexical::Simple.new(|%param);
     }
 
-    sub add_hint { my ($self, $slot) = @_;
-        $self->lexicals->{$slot} = Metamodel::Lexical::Hint->new;
+    method add_hint($slot) {
+        $.lexicals{$slot} = Metamodel::Lexical::Hint.new;
     }
 
-    sub add_common_name { my ($self, $slot, $path, $name) = @_;
-        $unit->create_stash(@$path);
-        $unit->create_var(@$path, $name);
-        $self->lexicals->{$slot} = Metamodel::Lexical::Common->new(
-            path => $path, name => $name);
+    method add_common_name($slot, $path, $name) {
+        $*unit.create_stash($path);
+        $*unit.create_var([ @$path, $name ]);
+        $.lexicals{$slot} = Metamodel::Lexical::Common.new(:$path, :$name);
     }
 
-    sub add_state_name { my ($self, $slot, $back, @ops) = @_;
+    method add_state_name($slot, $back, *%param) {
         # outermost sub isn't cloned so a fallback to my is safe
-        my $up = $self->outer // $self;
-        $up->lexicals->{$back} = Metamodel::Lexical::Simple->new(@ops);
-        $self->lexicals->{$slot} = Metamodel::Lexical::Alias->new($back)
+        my $up = $.outer // self;
+        $up.lexicals{$back} = Metamodel::Lexical::Simple.new(|%param);
+        $.lexicals{$slot} = Metamodel::Lexical::Alias.new($back)
             if defined($slot);
     }
 
-    sub add_my_stash { my ($self, $slot, $path) = @_;
-        $self->lexicals->{$slot} = Metamodel::Lexical::Stash->new(
-            path => $path);
+    method add_my_stash($slot, $path) {
+        $.lexicals{$slot} = Metamodel::Lexical::Stash.new(:$path);
     }
 
-    sub add_my_sub { my ($self, $slot, $body) = @_;
-        $self->add_child($body);
-        $self->lexicals->{$slot} = Metamodel::Lexical::SubDef->new(
-            body => $body);
+    method add_my_sub($slot, $body) {
+        self.add_child($body);
+        $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
     }
 
-    sub add_pkg_exports { my ($self, $unit, $name, $path2, $tags) = @_;
-        for my $tag (@$tags) {
-            $unit->bind_graft([@{ $self->cur_pkg }, 'EXPORT', $tag, $name],
-                $path2);
+    method add_pkg_export($unit, $name, $path2, $tags) {
+        for @$tags -> $tag {
+            $*unit.bind_graft([@$.cur_pkg, 'EXPORT', $tag, $name], $path2);
         }
-        scalar @$tags;
+        +$tags;
     }
 
     # NOTE: This only marks the variables as used.  The code generator
     # still has to spit out assignments for these!
-    sub add_exports { my ($self, $unit, $name, $tags) = @_;
-        for my $tag (@$tags) {
-            $unit->create_var(@{ $self->cur_pkg }, 'EXPORT', $tag, $name);
+    method add_exports($unit, $name, $tags) {
+        for @$tags -> $tag {
+            $*unit.create_var([ @$.cur_pkg, 'EXPORT', $tag, $name ]);
         }
-        scalar @$tags;
+        +$tags;
     }
 
-    sub close { }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
+    method close() { }
 }
 
-{
-    package Metamodel::Unit;
-    use Moose;
+class Unit {
+    has $.mainline; # Metamodel::StaticSub, is rw
+    has $.name; # Str
+    has $.ns; # Metamodel::Namespace
+    has $.setting; # Str
+    has $.bottom_ref; # is rw
+    has $.xref = [];
+    has $.tdeps = {};
+    has $.filename; # is rw, Str
+    has $.modtime; # is rw, Numeric
+    has $.next_anon_stash = 0; # is rw, Int
 
-    has mainline => (isa => 'Metamodel::StaticSub', is => 'rw');
-    has name     => (isa => 'Str', is => 'ro');
-    has ns       => (isa => 'Metamodel::Namespace', is => 'ro',
-        handles => [qw/ bind_item bind_graft create_stash create_var
-            list_stash get_item /]);
+    method bind_item($path,$item)    { $!ns.bind_item($path,$item) }
+    method bind_graft($path1,$path2) { $!ns.bind_graph($path1,$path2) }
+    method create_stash(@path)       { $!ns.create_stash(@path) }
+    method create_var(@path)         { $!ns.create_var(@path) }
+    method list_stash(@path)         { $!ns.list_stash(@path) }
+    method get_item(@path)           { $!ns.get_item(@path) }
 
-    has setting  => (isa => 'Maybe[Str]', is => 'ro');
-    # ref to parent of Op::YouAreHere
-    has bottom_ref => (is => 'rw');
+    method is_true_setting() { $.name eq 'SAFE' || $.name eq 'CORE' }
 
-    has xref     => (isa => 'ArrayRef', is => 'ro', default => sub { [] });
-    has tdeps    => (isa => 'HashRef[ArrayRef]', is => 'ro',
-        default => sub { +{} });
+    method get_unit($name) { %*units{$name} }
 
-    has filename => (isa => 'Maybe[Str]', is => 'rw');
-    has modtime  => (isa => 'Maybe[Num]', is => 'rw');
+    method anon_stash() { "{$.name}:{$.next_anon_stash++}" }
 
-    has next_anon_stash => (isa => 'Int', is => 'rw', default => 0);
-
-    sub is_true_setting { $_[0]->name eq 'SAFE' || $_[0]->name eq 'CORE' }
-
-    sub get_unit {
-        my ($self, $name) = @_;
-        $units{$name};
+    method deref($thing) {
+        die "trying to dereference null" unless $thing;
+        self.get_unit($thing[0]).xref[$thing[1]] // die "invalid ref @$thing";
     }
 
-    sub anon_stash {
-        my $i = $_[0]->next_anon_stash;
-        $_[0]->next_anon_stash($i+1);
-        $_[0]->name . ":" . $i;
-    }
-
-    sub deref {
-        my ($self, $thing) = @_;
-        Carp::confess "trying to dereference null" unless $thing;
-        return $self->get_unit($thing->[0])->xref->[$thing->[1]] //
-            Carp::confess "invalid ref @$thing";
-    }
-
-    sub visit_units_preorder {
-        my ($self, $cb) = @_;
+    method visit_units_preorder($cb) {
         my %seen;
-        our $rec; local $rec = sub {
-            return if $seen{$_};
-            $seen{$_} = 1;
-            for (sort keys %{ $self->get_unit($_)->tdeps }) {
-                $rec->();
-            }
-            $cb->($_) for ($self->get_unit($_));
-        };
-        $rec->() for ($self->name);
+        sub rec {
+            return Nil if %seen{$_};
+            %seen{$_} = True;
+            for sort keys self.get_unit($_).tdeps { rec($_) }
+            $cb(self.get_unit($_));
+        }
+        rec($.name);
     }
 
-    sub visit_local_packages {
-        my ($self, $cb) = @_;
-        for (@{ $self->xref }) {
-            $cb->($_) if defined($_) && $_->isa('Metamodel::Package');
+    method visit_local_packages($cb) {
+        for @$.xref -> $x {
+            $cb($x) if defined($x) && $x.^isa(Metamodel::Package);
         }
     }
 
-    sub visit_local_subs_postorder {
-        my ($self, $cb) = @_;
-        our $rec; local $rec = sub {
-            for ($_->children) { $rec->(); }
-            $cb->($_);
-        };
-        for ($self->mainline) { $rec->(); }
+    method visit_local_subs_postorder($cb) {
+        sub rec {
+            for $_.children { rec($_) }
+            $cb($_);
+        }
+        rec($.mainline);
     }
 
-    sub visit_local_subs_preorder {
-        my ($self, $cb) = @_;
-        our $rec; local $rec = sub {
-            $cb->($_);
-            for ($_->children) { $rec->(); }
-        };
-        for ($self->mainline) { $rec->(); }
+    method visit_local_subs_preorder($cb) {
+        sub rec {
+            $cb($_);
+            for $_.children { rec($_) }
+        }
+        rec($.mainline);
     }
 
-    sub need_unit {
+    method need_unit($u2name) {
         my ($self, $u2name) = @_;
-        my $u2 = $units{$u2name} //= CompilerDriver::metadata_for($u2name);
-        $self->tdeps->{$u2name} = [ $u2->filename, $u2->modtime ];
-        for (keys %{ $u2->tdeps }) {
-            $units{$_} //= CompilerDriver::metadata_for($_);
-            $self->tdeps->{$_} //= $u2->tdeps->{$_};
+        my $u2 = %*units{$u2name} //=
+            GLOBAL::CompilerDriver.metadata_for($u2name);
+        $.tdeps{$u2name} = [ $u2.filename, $u2.modtime ];
+        for keys $u2.tdeps -> $k {
+            %*units{$k} //= GLOBAL::CompilerDriver.metadata_for($k);
+            $.tdeps{$k} //= $u2.tdeps{$k};
         }
-        $self->ns->add_from($u2name);
+        $.ns.add_from($u2name);
         $u2;
     }
 
     # STD-based frontend wants a slightly different representation.
-    sub _syml_myname {
-        my ($xr) = @_;
-        "MY:unit<" . $xr->[0] . ">:xid<" . $xr->[1] . ">";
-    }
+    sub _syml_myname($xr) { "MY:unit<$xr[0]>:xid<$xr[1]>" }
 
-    sub create_syml {
-        my ($self) = @_;
+    method create_syml() {
         my $all = {};
         my %subt;
 
-        if ($self->get_unit($self->name) != $self) {
-            Carp::confess "Local unit cache inconsistant";
+        if (self.get_unit($.name) !=== self) {
+            die "Local unit cache inconsistant";
         }
 
-        $self->ns->visit_stashes(sub {
-            my @path = @{ $_[0] };
+        $.ns.visit_stashes(-> @path {
             return unless @path;
-            my $tag = join("", map { $_ . "::" } @path);
-            my $st = $all->{$tag} = bless { '!id' => $tag }, 'Stash';
+            my $tag = join("", map { $_ ~ "::" }, @path);
+            my $st = $all{$tag} = Stash.new('!id' => $tag);
             my @ppath = @path;
             my $name = pop @ppath;
-            my $ptag = join("", map { $_ . "::" } @ppath);
-            if ($ptag ne '') {
-                $st->{'PARENT::'} = [ $ptag ];
-                $all->{$ptag}{$name . '::'} = $st;
+            my $ptag = join("", map { $_ ~ "::" } @ppath);
+            if $ptag ne '' {
+                $st<PARENT::> = [ $ptag ];
+                $all{$ptag}{$name ~ '::'} = $st;
             }
-            for my $tok ($self->ns->list_stash(@path)) {
-                if ($tok->[1] eq 'var') {
-                    my $name = $tok->[0];
-                    $st->{$name} = bless { name => $name }, 'NAME';
-                    $st->{'&' . $name} = $st->{$name} if $name !~ /^[\$\@\%\&]/;
+            for self.list_stash(@path) -> $tok {
+                if $tok[1] eq 'var' {
+                    my $name = $tok[0];
+                    $st{$name} = NAME.new( name => $name );
+                    $st{'&' ~ $name} = $st{$name} if $name !~~ /^<[\$\@\%\&]>/;
                 }
             }
         });
 
-        my $top = $self->deref($self->bottom_ref // $self->mainline->xref);
+        my $top = self.deref($.bottom_ref // $.mainline.xref);
         #say STDERR "Top = $top";
-        for (my $cursor = $top; $cursor; $cursor = $cursor->outer) {
-            my $id = _syml_myname($cursor->xref);
+        my $cursor = $top;
+        while $cursor {
+            my $id = _syml_myname($cursor.xref);
             #say STDERR "Creating $cursor [$id]";
-            $subt{$cursor} = $all->{$id} = bless { '!id' => [ $id ] }, 'Stash';
+            $all{$id} = Stash.new( '!id' => [ $id ] );
+            $cursor = $cursor.outer;
         }
 
-        for (my $cursor = $top; $cursor; $cursor = $cursor->outer) {
-            my $st = $subt{$cursor};
+        $cursor = $top;
+        while $cursor {
+            my $st = $all{_syml_myname($cursor.xref)};
             #say STDERR "Populating $cursor";
-            for my $name (sort keys %{ $cursor->lexicals }) {
-                my $lx = $cursor->lexicals->{$name};
-                $st->{$name} = bless { name => $name }, 'NAME';
-                $st->{'&' . $name} = $st->{$name} if $name !~ /^[\$\@\%\&]/;
+            for sort keys $cursor.lexicals -> $name {
+                my $lx = $cursor.lexicals{$name};
+                $st{$name} = NAME.new( name => $name );
+                $st{'&' ~ $name} = $st{$name} if $name !~~ /^<[\$\@\%\&]>/;
 
-                if ($lx->isa('Metamodel::Lexical::Stash')) {
-                    my @cpath = $self->ns->stash_canon(@{ $lx->path });
-                    $st->{$name . '::'} = $all->{join "", map { $_ . "::" }
-                        $self->ns->stash_canon(@cpath)};
+                if $lx.^isa(Metamodel::Lexical::Stash) {
+                    my @cpath = $.ns.stash_canon($lx.path);
+                    $st{$name ~ '::'} = $all{join "", map { $_ ~ "::" }
+                        $.ns.stash_canon(@cpath)};
                 }
             }
-            $st->{'OUTER::'} = $cursor->outer ? $subt{$cursor->outer}{'!id'} :
-                [];
-            if ($cursor->unit->bottom_ref && $cursor->unit->name eq 'CORE') {
-                $all->{'CORE'} //= $st;
+            $st<OUTER::> = $cursor.outer ?? $all{_syml_myname($cursor.outerx)}<!id> !! [];
+            if ($cursor.unit.bottom_ref && $cursor.unit.name eq 'CORE') {
+                $all<CORE> //= $st;
             }
-            if ($cursor->unit->bottom_ref) {
-                $all->{'SETTING'} //= $st;
+            if ($cursor.unit.bottom_ref) {
+                $all<SETTING> //= $st;
             }
+            $cursor = $cursor.outer;
         }
         #say STDERR "UNIT ", $self->mainline;
         #$all->{'UNIT'} = $subt{$self->mainline};
         {
-            my @nbits = @{ $self->mainline->find_pkg(['MY', split '::', $self->name]) };
-            @nbits = $self->ns->stash_canon(@nbits);
+            my @nbits = @( $.mainline.find_pkg(['MY', split '::', $.name]) );
+            @nbits = $.ns.stash_canon(@nbits);
             # XXX wrong, but makes STD importing work
             # say STDERR (YAML::XS::Dump @nbits);
-            $all->{'UNIT'} = $all->{join "", map { $_ . '::' } @nbits};
+            $all<UNIT> = $all{join "", map { $_ ~ '::' } @nbits};
         }
         # say STDERR (YAML::XS::Dump("Regenerated syml for " . $self->name, $all));
         $all;
     }
-
-    no Moose;
-    __PACKAGE__->meta->make_immutable;
 }
