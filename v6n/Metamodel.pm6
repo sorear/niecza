@@ -3,6 +3,8 @@
 
 module Metamodel;
 
+our $driver; # delicious dependency injection
+
 use NAME;
 use Stash;
 
@@ -78,7 +80,7 @@ class Namespace {
     }
 
     method stash_cname(@path) {
-        self!lookup_common([], @path))[1,2];
+        self!lookup_common([], @path)[1,2];
     }
 
     method stash_canon(@path) {
@@ -95,12 +97,11 @@ class Namespace {
                 }
             }
         }
-        _visitor($.root, []);
+        visitor($.root, []);
     }
 
     # Add a new unit set to the from-set and checks mergability
     method add_from($from) {
-        my ($self, $from) = @_;
         $!root = _merge($!root, %*units{$from}.ns.root, []);
     }
 
@@ -118,7 +119,7 @@ class Namespace {
             }
             if $i1[0] eq 'graft' {
                 die "Grafts cannot be merged " ~ join(" ", @path, $k)
-                    unless join("\0", @($i1[1])) eq join("\0", @($i2->[1]));
+                    unless join("\0", @($i1[1])) eq join("\0", @($i2[1]));
             }
             if $i1[0] eq 'var' {
                 die "Non-stub packages cannot be merged " ~ join(" ", @path, $k)
@@ -152,7 +153,7 @@ class Namespace {
 
     # Lookup by name; returns undef if not found
     method get_item(@path) {
-        my ($c,$u,$n) = self!lookup_common([], @path);
+        my ($c,$u,$n) = self!lookup_common([], @path); #OK not used
         my $i = $c{$n} or return Any;
         if $i[0] eq 'graft' {
             self.get_item($i[1]);
@@ -163,7 +164,7 @@ class Namespace {
 
     # Bind an unmergable thing (non-stub package) into a stash.
     method bind_item($path, $item) {
-        my ($c,$u,$n) = self!lookup_common([], $path);
+        my ($c,$u,$n) = self!lookup_common([], $path); #OK not used
         my $i = $c{$n} //= ['var',Any,Any];
         if $i[0] ne 'var' || $i[1] {
             die "Collision installing pkg $path";
@@ -177,7 +178,7 @@ class Namespace {
         if $c{$n} {
             die "Collision installing graft $path1 -> $path2";
         }
-        push $self.log, [ 'graft', [ @$u, $n ], $path2 ];
+        push $.log, [ 'graft', [ @$u, $n ], $path2 ];
         $c{$n} = ['graft', $path2];
     }
 
@@ -205,11 +206,11 @@ class RefTarget {
 class Package is RefTarget {
     has $.exports; # is rw
 
-    method add_attribute($name, $public, $ivar, $ibody) {
+    method add_attribute($name, $public, $ivar, $ibody) { #OK not used
         die "attribute $name defined in a lowly package";
     }
 
-    method add_method($kind, $name, $var, $body) {
+    method add_method($kind, $name, $var, $body) { #OK not used
         die "method $name defined in a lowly package";
     }
 
@@ -251,7 +252,7 @@ class Class is Module {
             :$public, :$ivar, :$ibody);
     }
 
-    method add_method($kind, $name, $var, $body) {
+    method add_method($kind, $name, $var, $body) { #OK not used
         push $.methods, Metamodel::Method.new(:$name, :$body, :$kind);
     }
 
@@ -291,7 +292,6 @@ class Class is Module {
         my $bad = False;
         for @lists -> $l { $bad ||= $l }
         if $bad {
-            my @hrl;
             my @hrl = @lists.grep(*.Bool).map(
                 { $^l.map({ $*unit.deref($^i).name }).join(" <- ") });
             die "C3-MRO wedged! @hrl.join(" | ")";
@@ -319,7 +319,7 @@ class Class is Module {
             push @merge, [ @( $d.linearized_mro ) ];
         }
         my @mro;
-        c3merge(@mro, @mergs);
+        c3merge(@mro, @merge);
         $.linearized_mro = @mro;
     }
 
@@ -564,7 +564,7 @@ class StaticSub is RefTarget {
 
     method add_pkg_export($unit, $name, $path2, $tags) {
         for @$tags -> $tag {
-            $*unit.bind_graft([@$.cur_pkg, 'EXPORT', $tag, $name], $path2);
+            $unit.bind_graft([@$.cur_pkg, 'EXPORT', $tag, $name], $path2);
         }
         +$tags;
     }
@@ -573,7 +573,7 @@ class StaticSub is RefTarget {
     # still has to spit out assignments for these!
     method add_exports($unit, $name, $tags) {
         for @$tags -> $tag {
-            $*unit.create_var([ @$.cur_pkg, 'EXPORT', $tag, $name ]);
+            $unit.create_var([ @$.cur_pkg, 'EXPORT', $tag, $name ]);
         }
         +$tags;
     }
@@ -645,12 +645,10 @@ class Unit {
     }
 
     method need_unit($u2name) {
-        my ($self, $u2name) = @_;
-        my $u2 = %*units{$u2name} //=
-            GLOBAL::CompilerDriver.metadata_for($u2name);
+        my $u2 = %*units{$u2name} //= $driver.metadata_for($u2name);
         $.tdeps{$u2name} = [ $u2.filename, $u2.modtime ];
         for keys $u2.tdeps -> $k {
-            %*units{$k} //= GLOBAL::CompilerDriver.metadata_for($k);
+            %*units{$k} //= $driver.metadata_for($k);
             $.tdeps{$k} //= $u2.tdeps{$k};
         }
         $.ns.add_from($u2name);
@@ -662,7 +660,6 @@ class Unit {
 
     method create_syml() {
         my $all = {};
-        my %subt;
 
         if (self.get_unit($.name) !=== self) {
             die "Local unit cache inconsistant";
@@ -674,7 +671,7 @@ class Unit {
             my $st = $all{$tag} = Stash.new('!id' => $tag);
             my @ppath = @path;
             my $name = pop @ppath;
-            my $ptag = join("", map { $_ ~ "::" } @ppath);
+            my $ptag = join("", map { $_ ~ "::" }, @ppath);
             if $ptag ne '' {
                 $st<PARENT::> = [ $ptag ];
                 $all{$ptag}{$name ~ '::'} = $st;
@@ -709,7 +706,7 @@ class Unit {
 
                 if $lx.^isa(Metamodel::Lexical::Stash) {
                     my @cpath = $.ns.stash_canon($lx.path);
-                    $st{$name ~ '::'} = $all{join "", map { $_ ~ "::" }
+                    $st{$name ~ '::'} = $all{join "", map { $_ ~ "::" },
                         $.ns.stash_canon(@cpath)};
                 }
             }
@@ -725,11 +722,11 @@ class Unit {
         #say STDERR "UNIT ", $self->mainline;
         #$all->{'UNIT'} = $subt{$self->mainline};
         {
-            my @nbits = @( $.mainline.find_pkg(['MY', split '::', $.name]) );
+            my @nbits = @( $.mainline.find_pkg(['MY', $.name.split('::')]) );
             @nbits = $.ns.stash_canon(@nbits);
             # XXX wrong, but makes STD importing work
             # say STDERR (YAML::XS::Dump @nbits);
-            $all<UNIT> = $all{join "", map { $_ ~ '::' } @nbits};
+            $all<UNIT> = $all{join "", map { $_ ~ '::' }, @nbits};
         }
         # say STDERR (YAML::XS::Dump("Regenerated syml for " . $self->name, $all));
         $all;
