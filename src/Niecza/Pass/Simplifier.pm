@@ -1,7 +1,7 @@
 package Niecza::Pass::Simplifier;
 use Optimizer::Simplifier;
 use Moose;
-sub run {
+sub invoke {
     my ($self,$ast) = @_;
     Optimizer::Simplifier::run($ast);
     $ast;

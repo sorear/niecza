@@ -1,7 +1,7 @@
 package Niecza::Pass::Beta;
 use Optimizer::Beta;
 use Moose;
-sub run {
+sub invoke {
     my ($self,$ast) = @_;
     Optimizer::Beta::run($ast);
     $ast;

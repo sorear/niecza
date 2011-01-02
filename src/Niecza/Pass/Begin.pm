@@ -1,6 +1,6 @@
 package Niecza::Pass::Begin;
 use Moose;
-sub run {
+sub invoke {
     my ($self,$ast) = @_;
     $ast->begin;
 }

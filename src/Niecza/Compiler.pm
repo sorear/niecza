@@ -7,7 +7,7 @@ sub compile {
     my ($self,$input,$filename,$output) = @_;
     my $ast = $self->frontend->parse($input,$filename);
     for my $pass (@{$self->passes}) {
-        $ast = $pass->run($ast);
+        $ast = $pass->invoke($ast);
     }
     $self->backend->compile($ast,$output);
 }
