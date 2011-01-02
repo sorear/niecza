@@ -1,17 +1,28 @@
 #!/usr/bin/perl
-#my $compiler = Niecza::Compiler->new(
-#    frontend=>Niecza::Frontend::STD->new()
-#);
 
 use lib 'src';
 use Niecza::Frontend::STD;
 use Niecza::Backend::NAM;
+use Niecza::Pass::Beta;
+use Niecza::Pass::Simplifier;
+use Niecza::Pass::Begin;
+use Niecza::Compiler;
 use Metamodel;
 
 my $parser = Niecza::Frontend::STD->new(lang=>'CORE');
+
+my $begin = Niecza::Pass::Begin->new();
+my $beta = Niecza::Pass::Beta->new();
+my $simplifier = Niecza::Pass::Simplifier->new();
+
 my $backend = Niecza::Backend::NAM->new();
-my $ast = $parser->parse('123');
-$ast = $ast->begin;
-$backend->compile($ast,'file.nam');
+
+my $compiler = Niecza::Compiler->new(
+    frontend =>$parser,
+    passes  => [$begin,$beta,$simplifier],
+    backend => $backend
+);
+
+$compiler->compile('1','foo.p6','file.nam');
 
 
