@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+#my $compiler = Niecza::Compiler->new(
+#    frontend=>Niecza::Frontend::STD->new()
+#);
+
+use lib 'src';
+use Niecza::Frontend::STD;
+use Niecza::Backend::NAM;
+use Metamodel;
+
+my $parser = Niecza::Frontend::STD->new(lang=>'CORE');
+my $backend = Niecza::Backend::NAM->new();
+my $ast = $parser->parse('123');
+$ast = $ast->begin;
+$backend->compile($ast,'file.nam');
+
+
