@@ -23,6 +23,6 @@ my $compiler = Niecza::Compiler->new(
     backend => $backend
 );
 
-$compiler->compile('1','foo.p6','file.nam');
+$compiler->compile(source=>'1',filename=>'foo.p6',output=>'file.nam');
 
 
