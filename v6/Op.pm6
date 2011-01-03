@@ -531,153 +531,83 @@ class Attribute is Op {
     method code($) { CgOp.corelex('Nil') }
 }
 
-{
-    package Op::Whatever;
-    use Moose;
-    extends 'Op';
+class Whatever is Op {
+    has $.slot = die "Whatever.slot required"; # Str
 
-    has slot => (isa => 'Str', is => 'ro', required => 1);
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::methodcall(CgOp::corelex('Whatever'), "new");
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($) { CgOp.methodcall(CgOp.corelex('Whatever'), 'new') }
 }
 
-{
-    package Op::WhateverCode;
-    use Moose;
-    extends 'Op';
+class WhateverCode is Op {
+    has $.ops = die "WhateverCode.ops required"; # Op
+    has $.vars = die "WhateverCode.vars required"; # Array of Str
+    has $.slot = die "WhateverCode.slot required"; # Str
 
-    has ops  => (isa => 'Op', is => 'ro', required => 1);
-    has vars => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
-    has slot => (isa => 'Str', is => 'ro', required => 1);
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::scopedlex($self->slot);
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($) { CgOp.scopedlex($.slot) }
 }
 
-{
-    package Op::BareBlock;
-    use Moose;
-    extends 'Op';
+class BareBlock is Op {
+    has $.var = die "BareBlock.var required"; # Str
+    has $.body = die "BareBlock.body required"; # Body
 
-    has var    => (isa => 'Str', is => 'ro', required => 1);
-    has body   => (isa => 'Body', is => 'ro', required => 1);
+    method code($) { CgOp.scopedlex($.var) }
 
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::scopedlex($self->var);
+    method statement_level() {
+        $.body.type = 'voidbare';
+        ::Op::CallSub.new(invocant => ::Op::SubDef->new(var => $.var,
+                body => $.body, once => True));
     }
-
-    sub statement_level {
-        $_[0]->body->type('voidbare');
-        Op::CallSub->new(invocant => Op::SubDef->new(var => $_[0]->var,
-                body => $_[0]->body, once => 1));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::SubDef;
-    use Moose;
-    extends 'Op';
-
-    has var    => (isa => 'Str', is => 'ro', required => 1);
-    has body   => (isa => 'Body', is => 'ro', required => 1);
-    has method_too => (isa => 'Maybe[ArrayRef]', is => 'ro');
-    has exports => (isa => 'ArrayRef[Str]', is => 'ro', default => sub { [] });
+class SubDef is Op {
+    has $.var = die "SubDef.var required"; # Str
+    has $.body = die "SubDef.body required"; # Body
+    has $.method_too; # Array
+    has $.exports = []; # Array of Str
     # Is candidate for beta-optimization.  Not compatible with method_too,
     # exports, ltm
-    has once   => (isa => 'Bool', is => 'rw', default => 0);
+    has $.once = False; # is rw, Bool
 
-    sub zyg { ($_[0]->method_too && blessed $_[0]->method_too->[1]) ?
-        $_[0]->method_too->[1] : () }
+    method zyg() { ($.method_too && ($.method_too[1] ~~ Op)) ?? $.method_too[1] !! () }
 
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::scopedlex($self->var);
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($) { CgOp.scopedlex($.var) }
 }
 
-{
-    package Op::Lexical;
-    use Moose;
-    extends 'Op';
+class Lexical is Op {
+    has $.name = die "Lexical.name required"; # Str
+    has $.state_decl = False; # Bool
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
-    has state_decl => (isa => 'Bool', is => 'ro', default => 0);
+    has $.declaring; # Bool
+    has $.list; # Bool
+    has $.hash; # Bool
 
-    has declaring => (isa => 'Bool', is => 'ro');
-    has list => (isa => 'Bool', is => 'ro');
-    has hash => (isa => 'Bool', is => 'ro');
+    has $.state_backing; # Str
 
-    has state_backing => (isa => 'Str', is => 'ro');
+    method code($) { CgOp.scopedlex($.name) }
 
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::scopedlex($self->name);
+    method code_bvalue($body, $ro, $rhscg) {
+        CgOp.prog(
+            CgOp.scopedlex($.name, CgOp.newboundvar($ro, +($.list || $.hash), $rhscg)),
+            CgOp.scopedlex($.name));
     }
-
-    sub code_bvalue {
-        my ($self, $body, $ro, $rhscg) = @_;
-        CgOp::prog(
-            CgOp::scopedlex($self->name, CgOp::newboundvar($ro, (($self->list || $self->hash) ? 1 : 0), $rhscg)),
-            CgOp::scopedlex($self->name));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::ConstantDecl;
-    use Moose;
-    extends 'Op';
+class ConstantDecl is Op {
+    has $.name = die "ConstantDecl.name required"; # Str
+    has $.init; # Op, is rw
+    has $.path; # Array
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
-    has init => (isa => 'Op', is => 'rw');
-    has path => (isa => 'Maybe[ArrayRef]', is => 'ro');
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::scopedlex($self->name);
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($ ) { CgOp.scopedlex($.name) }
 }
 
-{
-    package Op::ContextVar;
-    use Moose;
-    extends 'Op';
+class ContextVar is Op {
+    has $.name = die "ContextVar.name required"; # Str
+    has $.uplevel = 0; # Int
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
-    has uplevel => (isa => 'Int', is => 'ro', default => 0);
-
-    sub code {
-        my ($self, $body) = @_;
-        my @a = (CgOp::str($self->name), CgOp::int($self->uplevel));
-        ($self->name eq '$*/' || $self->name eq '$*!') ?
-            CgOp::status_get(@a) : CgOp::context_get(@a);
+    method code($ ) {
+        my @a = (CgOp.str($.name), CgOp.int($.uplevel));
+        ($.name eq '$*/' || $.name eq '$*!') ??
+            CgOp.status_get(|@a) !! CgOp.context_get(|@a);
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 {
