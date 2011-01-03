@@ -729,12 +729,14 @@ class Herestub {
     has $.delim;
     has $.orignode;
     has $.lang;
+    has $.writeback;
 
-    method new(:$delim, :$orignode, :$lang) {
+    method new(:$delim, :$orignode, :$lang, :$writeback) {
         my $new = self.CREATE;
         $new!delim = $delim;
         $new!orignode = $orignode;
         $new!lang = $lang;
+        $new!writeback = $writeback;
         $new;
     }
 }
@@ -753,6 +755,7 @@ method heredoc () {
         my $doc;
         if ($doc,) = $here.nibble($lang) {
             $here = $doc.trim_heredoc();
+            $herestub.writeback.[0] = $doc;
             # $herestub.orignode<doc> = $doc; NIECZA immutable matches
         }
         else {
@@ -762,7 +765,7 @@ method heredoc () {
     return self.cursor($here.pos);  # return to initial type
 }
 
-method herelang () { Any }
+method hereinfo () { [] }
 
 token quibble ($l) {
     :my ($lang, $start, $stop);
@@ -772,12 +775,13 @@ token quibble ($l) {
     $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
     {
-        if $lang.herelang {
+        if $lang.hereinfo.[0] {
             push @herestub_queue,
                 Herestub.new(
                     delim => $<nibble><nibbles>[0]<TEXT>,
                     orignode => $¢,
-                    lang => $lang.herelang,
+                    writeback => $lang.hereinfo.[1],
+                    lang => $lang.hereinfo.[0],
                 );
         }
     }
@@ -4337,8 +4341,8 @@ grammar Q is STD {
         }
     }
 
-    role herehead[$lang] {
-        method herelang() { $lang }
+    role herehead[$info] {
+        method hereinfo() { $info }
     }
 
     method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), :backslash(:$b),
@@ -4363,7 +4367,7 @@ grammar Q is STD {
         elsif $w.defined  { self.mixin($w  ?? STD::Q::w1  !! STD::Q::w0) }
         elsif $ww.defined { self.mixin($ww ?? STD::Q::ww1 !! STD::Q::ww0) }
 
-        elsif $to.defined { self.truly($to, ':to'); self.cursor_fresh(STD::Q but STD::Q::herehead[self]) }
+        elsif $to.defined { self.truly($to, ':to'); self.cursor_fresh(STD::Q but STD::Q::herehead[ [self, []] ]) }
 
         elsif $regex.defined {
             %*LANG<Regex>
