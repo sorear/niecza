@@ -1,6 +1,9 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use Getopt::Long qw(GetOptionsFromArray);
+use utf8;
+use v5.10;
 use File::Basename;
 use File::Slurp qw(slurp);
 use Encode;
@@ -17,11 +20,6 @@ use Niecza::Pass::Backend;
 use Niecza::Compiler;
 use Metamodel;
 
-use Getopt::Long qw(GetOptionsFromArray);
-use Encode;
-use lib 'lib';
-use utf8;
-use v5.10;
 
 # print the help message
 sub help {
@@ -111,9 +109,9 @@ if ($C and $B) {
     die "You can't specify both -C and -B.\n";
 }
 
-if ($B) {
-    $compiler->run(source=>decode('utf-8',$source),filename=>$filename);
-} elsif ($C) {
+if ($C) {
     $compiler->compile(source=>$source,filename=>$filename,output=>$output);
+} else {
+    $compiler->run(source=>decode('utf-8',$source),filename=>$filename);
 }
 
