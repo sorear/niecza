@@ -1,28 +1,51 @@
 #!/usr/bin/perl
+use strict;
+use warnings;
+use File::Basename;
+use File::Slurp qw(slurp);
+use Encode;
 
 use lib 'src';
 use Niecza::Frontend::STD;
 use Niecza::Backend::NAM;
+use Niecza::Backend::Mono;
 use Niecza::Pass::Beta;
 use Niecza::Pass::Simplifier;
 use Niecza::Pass::Begin;
+use Niecza::Pass::Backend;
 use Niecza::Compiler;
 use Metamodel;
 
+use File::Temp ();
+my $tmp_file = sub {
+    File::Temp::tmpnam();
+};
 my $parser = Niecza::Frontend::STD->new(lang=>'CORE');
 
-my $begin = Niecza::Pass::Begin->new();
+my $begin = Niecza::Pass::Begin->new(lang=>'CORE');
 my $beta = Niecza::Pass::Beta->new();
 my $simplifier = Niecza::Pass::Simplifier->new();
 
-my $backend = Niecza::Backend::NAM->new();
+my $write_nam = Niecza::Pass::Backend->new(backend=>Niecza::Backend::NAM->new(),tmp_file=>$tmp_file);
+
+my $backend = Niecza::Backend::Mono->new(is_main=>1,build_dir=>'obj',tmp_file=>$tmp_file);
 
 my $compiler = Niecza::Compiler->new(
     frontend =>$parser,
-    passes  => [$begin,$beta,$simplifier],
+    passes  => [$begin,$beta,$simplifier,$write_nam],
     backend => $backend
 );
 
-$compiler->compile(source=>'1',filename=>'foo.p6',output=>'file.nam');
 
+my $source;
+my $filename;
+if (!@ARGV) {
+    die "no input file";
+} else {
+    $filename = shift(@ARGV);
+    $source = slurp($filename);
+}
+
+$compiler->run(source=>decode('utf-8',$source),filename=>$filename);
+#$compiler->compile(source=>$source,filename=>$filename,output=>'foobaz.exe');
 
