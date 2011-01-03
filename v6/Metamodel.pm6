@@ -3,8 +3,6 @@
 
 module Metamodel;
 
-our $driver; # delicious dependency injection
-
 use NAME;
 use Stash;
 
@@ -341,7 +339,7 @@ class Role is Module {
             :$public, :$ivar, :$ibody);
     }
 
-    method add_method($kind, $name, $var, $body) {
+    method add_method($kind, $name, $var, $body) { #OK not used
         if $name !~~ Str {
             die "Computed names are legal only in parametric roles";
         }
@@ -364,7 +362,7 @@ class ParametricRole is Module {
             :$public, :$ivar, :$ibody);
     }
 
-    method add_method($kind, $name, $var, $body) {
+    method add_method($kind, $name, $var, $body) { #OK not used
         push $.methods, Metamodel::Method.new(:$name, :$body, :$kind);
     }
 
@@ -645,10 +643,10 @@ class Unit {
     }
 
     method need_unit($u2name) {
-        my $u2 = %*units{$u2name} //= $driver.metadata_for($u2name);
+        my $u2 = %*units{$u2name} //= ::GLOBAL::CompilerDriver.metadata_for($u2name);
         $.tdeps{$u2name} = [ $u2.filename, $u2.modtime ];
         for keys $u2.tdeps -> $k {
-            %*units{$k} //= $driver.metadata_for($k);
+            %*units{$k} //= ::GLOBAL::CompilerDriver.metadata_for($k);
             $.tdeps{$k} //= $u2.tdeps{$k};
         }
         $.ns.add_from($u2name);

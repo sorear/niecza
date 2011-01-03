@@ -35,7 +35,7 @@ method code_bvalue($body, $ro, $rhscg) { #OK not used
 
 method statement_level() { self }
 
-class RawCgOp is Op {
+{ class CgOp is Op {
     has $.op;
     has $.optree;
 
@@ -58,7 +58,7 @@ class RawCgOp is Op {
         }
         rec($.optree);
     }
-}
+}; }
 
 class StatementList is Op {
     has $.children = []; # Array of Op
@@ -73,7 +73,7 @@ class StatementList is Op {
         my @ch = map { $_.cgop($body) }, @$.children;
         my $end = @ch ?? pop(@ch) !! CgOp.corelex('Nil');
 
-        CgOp::prog((map { CgOp.sink($_) }, @ch), $end);
+        CgOp.prog((map { CgOp.sink($_) }, @ch), $end);
     }
 }
 
@@ -301,13 +301,13 @@ class ShortCircuitAssign is Op {
             $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $assn, CgOp.noop);
         }
         elsif $.kind eq '||' {
-            $cassn = CgOp.ternary(CgOp::obj_getbool($cond), CgOp::noop, $assn);
+            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), CgOp.noop, $assn);
         }
         elsif $.kind eq 'andthen' {
-            $cassn = CgOp.ternary(CgOp::obj_getdef($cond), $assn, CgOp::noop);
+            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $assn, CgOp.noop);
         }
         elsif $.kind eq '//' {
-            $cassn = CgOp.ternary(CgOp::obj_getdef($cond), CgOp::noop, $assn);
+            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), CgOp.noop, $assn);
         }
 
         CgOp.letn($sym, $.lhs.cgop($body), $cassn, $cond);
@@ -366,305 +366,169 @@ class WhileLoop is Op {
 }
 
 class ForLoop is Op {
-    package Op::ForLoop;
-    use Moose;
-    extends 'Op';
+    has $.source = die "ForLoop.source required"; # Op
+    has $.sink = die "ForLoop.sink required"; # Op
+    method zyg() { $.source, $.sink }
 
-    has source => (isa => 'Op', is => 'ro', required => 1);
-    has sink   => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->source, $_[0]->sink }
-
-    sub code {
-        my ($self, $body) = @_;
-
-        CgOp::methodcall(
-            CgOp::subcall(CgOp::fetch(CgOp::corelex('&flat')),
-                $self->source->cgop($body)), 'map', $self->sink->cgop($body));
+    method code($body) {
+        CgOp.methodcall(
+            CgOp.subcall(CgOp.fetch(CgOp.corelex('&flat')),
+                $.source.cgop($body)), 'map', $.sink.cgop($body));
     }
 
-    sub statement_level {
-        my ($self) = @_;
-        my $var = Niecza::Actions->gensym;
-        $self->sink->once(1);
-        Op::ImmedForLoop->new(source => $self->source, var => $var,
-            sink => Op::CallSub->new(invocant => $self->sink,
-                positionals => [ Op::LetVar->new(name => $var) ]));
+    method statement_level() {
+        my $var = ::NieczaActions.gensym;
+        $.sink.once = True;
+        ::Op::ImmedForLoop.new(source => $.source, var => $var,
+            sink => ::Op::CallSub.new(invocant => $.sink,
+                positionals => [ ::Op::LetVar.new(name => $var) ]));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 # A for-loop which must be run immediately because it is at statement
 # level, as contrasted with a ForLoop, which turns into a map call.
 # ForLoops turn into this at statement level; if a ForLoop is in any
 # other context, it is regarded as a lazy comprehension.
-{
-    package Op::ImmedForLoop;
-    use Moose;
-    extends 'Op';
+class ImmedForLoop is Op {
+    has $.var = die "ImmedForLoop.source required"; # Str
+    has $.source = die "ImmedForLoop.source required"; # Op
+    has $.sink = die "ImmedForLoop.sink required"; # Op
 
-    has var    => (isa => 'Str', is => 'ro', required => 1);
-    has source => (isa => 'Op', is => 'ro', required => 1);
-    has sink   => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->source, $_[0]->sink }
-    sub ctxzyg { $_[0]->source, 1, $_[0]->sink, 0 }
+    method zyg() { $.source, $.sink }
+    method ctxzyg($) { $.source, 1, $.sink, 0 }
 
-    sub code {
-        my ($self, $body) = @_;
+    method code($body) {
+        my $id = ::NieczaActions.genid;
 
-        my $id = Niecza::Actions->genid;
-
-        CgOp::rnull(CgOp::letn(
-            "!iter$id", CgOp::vvarlist_new_empty(),
-            $self->var, CgOp::null('var'),
-            CgOp::vvarlist_push(CgOp::letvar("!iter$id"),
-                $self->source->cgop($body)),
-            CgOp::whileloop(0, 0,
-                CgOp::iter_hasflat(CgOp::letvar("!iter$id")),
-                CgOp::prog(
-                    CgOp::letvar($self->var,
-                        CgOp::vvarlist_shift(CgOp::letvar("!iter$id"))),
-                    CgOp::label("redo$id"),
-                    CgOp::sink($self->sink->cgop($body)),
-                    CgOp::label("next$id"),
-                    CgOp::ehspan(1, '', 0, "redo$id", "next$id", "next$id"),
-                    CgOp::ehspan(2, '', 0, "redo$id", "next$id", "last$id"),
-                    CgOp::ehspan(3, '', 0, "redo$id", "next$id", "redo$id"))),
-            CgOp::label("last$id")));
+        CgOp.rnull(CgOp.letn(
+            "!iter$id", CgOp.vvarlist_new_empty,
+            $.var, CgOp.null('var'),
+            CgOp.vvarlist_push(CgOp.letvar("!iter$id"),
+                $.source.cgop($body)),
+            CgOp.whileloop(0, 0,
+                CgOp.iter_hasflat(CgOp.letvar("!iter$id")),
+                CgOp.prog(
+                    CgOp.letvar($.var,
+                        CgOp.vvarlist_shift(CgOp.letvar("!iter$id"))),
+                    CgOp.label("redo$id"),
+                    CgOp.sink($.sink.cgop($body)),
+                    CgOp.label("next$id"),
+                    CgOp.ehspan(1, '', 0, "redo$id", "next$id", "next$id"),
+                    CgOp.ehspan(2, '', 0, "redo$id", "next$id", "last$id"),
+                    CgOp.ehspan(3, '', 0, "redo$id", "next$id", "redo$id"))),
+            CgOp.label("last$id")));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 # only for state $x will start and START{} in void context, yet
-{
-    package Op::Start;
-    use Moose;
-    extends 'Op';
-
+class Start is Op {
     # possibly should use a raw boolean somehow
-    has condvar => (isa => 'Str', is => 'ro', required => 1);
-    has body => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->body }
-    sub ctxzyg { $_[0]->body, $_[1] }
+    has $.condvar = die "Start.condvar required"; # Str
+    has $.body = die "Start.body required"; # Op
+    method zyg() { $.body }
+    method ctxzyg($f) { $.body, $f }
 
-    sub code {
-        my ($self, $body) = @_;
-
-        CgOp::ternary(
-            CgOp::obj_getbool(CgOp::scopedlex($self->condvar)),
-            CgOp::corelex('Nil'),
-            CgOp::prog(
-                CgOp::assign(CgOp::scopedlex($self->condvar),
-                    CgOp::box('Bool', CgOp::bool(1))),
-                $self->body->cgop($body)));
+    method code($body) {
+        CgOp.ternary(
+            CgOp.obj_getbool(CgOp.scopedlex($.condvar)),
+            CgOp.corelex('Nil'),
+            CgOp.prog(
+                CgOp.assign(CgOp.scopedlex($.condvar),
+                    CgOp.box('Bool', CgOp.bool(1))),
+                $.body.cgop($body)));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::VoidPhaser;
-    use Moose;
-    extends 'Op';
+class VoidPhaser is Op {
+    has $.body = die "VoidPhaser.body required"; # Body
 
-    has body => (isa => 'Body', is => 'ro', required => 1);
-
-    sub code { CgOp::corelex('Nil') }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($body) { CgOp.corelex('Nil') }
 }
 
-{
-    package Op::Try;
-    use Moose;
-    extends 'Op';
+class Try is Op {
+    has $.body = die "Try.body required"; # Op
+    method zyg() { $.body }
 
-    has body => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->body }
+    method code($body) {
+        my $id = ::NieczaActions.genid;
 
-    sub code {
-        my ($self, $body) = @_;
-
-        my $id = Niecza::Actions->genid;
-
-        CgOp::prog(
-            CgOp::ehspan(5, '', 0, "start$id", "end$id", "end$id"),
-            CgOp::span("start$id", "end$id", 1, $self->body->cgop($body)));
+        CgOp.prog(
+            CgOp.ehspan(5, '', 0, "start$id", "end$id", "end$id"),
+            CgOp.span("start$id", "end$id", 1, $.body.cgop($body)));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
+{ class Num is Op {
+    has $.value = die "Num.value required"; # Numeric
 
-{
-    package Op::Num;
-    use Moose;
-    extends 'Op';
+    method code($) { CgOp.const(CgOp.box('Num', CgOp.double($.value))) }
+}; }
 
-    has value => (isa => 'Num', is => 'ro', required => 1);
+class Bind is Op {
+    has $.readonly = die "Bind.readonly required"; #Bool
+    has $.lhs      = die "Bind.lhs required"; #Op
+    has $.rhs      = die "Bind.rhs required"; #Op
+    method zyg() { $.lhs, $.rhs }
 
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::const(CgOp::box('Num', CgOp::double($self->value)));
+    method code($body) {
+        $.lhs.code_bvalue($body, $.readonly, $.rhs.cgop($body))
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::Bind;
-    use Moose;
-    extends 'Op';
+class Augment is Op {
+    has $.name; # Str
+    has $.bodyvar; # Str
+    has $.body; # Body
+    has $.pkg; # Array of Str
 
-    has lhs => (isa => 'Op', is => 'ro', required => 1);
-    has rhs => (isa => 'Op', is => 'ro', required => 1);
-    has readonly => (isa => 'Bool', is => 'ro', required => 1);
-    sub zyg { $_[0]->lhs, $_[0]->rhs }
-
-    sub code {
-        my ($self, $body) = @_;
-        $self->lhs->code_bvalue($body, $self->readonly, $self->rhs->cgop($body))
+    method code($body) {
+        CgOp.subcall(CgOp.fetch(CgOp.scopedlex($.bodyvar)));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::Augment;
-    use Moose;
-    extends 'Op';
+class PackageDef is Op {
+    has $.name; # Str
+    has $.var = die "PackageDef.var required"; # Str
+    has $.bodyvar; # Str
+    has $.stub = False; # Bool
+    has $.body; # Body
+    has $.exports = []; # Array of Str
+    has $.ourpkg; # Array of Str
 
-    has name => (is => 'ro', isa => 'Str');
-    has bodyvar => (is => 'ro', isa => 'Str');
-    has body => (is => 'ro', isa => 'Body');
-    has pkg => (is => 'ro', isa => 'ArrayRef[Str]');
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::subcall(CgOp::fetch(CgOp::scopedlex($self->bodyvar)));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Op::PackageDef;
-    use Moose;
-    extends 'Op';
-
-    has name => (is => 'ro', isa => 'Str', predicate => 'has_name');
-    has var  => (is => 'ro', isa => 'Str', required => 1);
-    has bodyvar => (is => 'ro', isa => 'Str');
-    has stub => (is => 'ro', isa => 'Bool', default => 0);
-    has body => (is => 'ro', isa => 'Body');
-    has exports => (is => 'ro', isa => 'ArrayRef[Str]', default => sub { [] });
-    has ourpkg => (is => 'ro', isa => 'Maybe[ArrayRef[Str]]');
-
-    sub code {
-        my ($self, $body) = @_;
-        if ($self->stub) {
-            CgOp::scopedlex($self->var);
+    method code($body) {
+        if $.stub {
+            CgOp.scopedlex($.var);
         } else {
-            CgOp::prog(
-                CgOp::sink(CgOp::subcall(CgOp::fetch(
-                            CgOp::scopedlex($self->bodyvar)))),
-                CgOp::scopedlex($self->var));
+            CgOp.prog(
+                CgOp.sink(CgOp.subcall(CgOp.fetch(
+                            CgOp.scopedlex($.bodyvar)))),
+                CgOp.scopedlex($.var));
         }
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::ModuleDef;
-    use Moose;
-    extends 'Op::PackageDef';
+class ModuleDef is PackageDef { }
+class RoleDef is ModuleDef {
+    has $.signature; # Sig
 
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($body) { $.signature ?? CgOp.scopedlex($.var) !! nextsame }
+}
+class ClassDef is ModuleDef { }
+class GrammarDef is ClassDef { }
+
+class Super is Op {
+    has $.name; # Str
+    has $.path; # Array of Str
+
+    method code($) { CgOp.corelex('Nil') }
 }
 
-{
-    package Op::RoleDef;
-    use Moose;
-    extends 'Op::ModuleDef';
+class Attribute is Op {
+    has $.name; # Str
+    has $.accessor; # Bool
+    has $.initializer; # Body, is rw
 
-    has signature => (isa => 'Sig', is => 'ro');
-
-    sub code {
-        my ($self, $body) = @_;
-        if ($self->signature) {
-            CgOp::scopedlex($self->var);
-        } else {
-            $self->SUPER::code($body);
-        }
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Op::ClassDef;
-    use Moose;
-    extends 'Op::ModuleDef';
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Op::GrammarDef;
-    use Moose;
-    extends 'Op::ClassDef';
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Op::Super;
-    use Moose;
-    extends 'Op';
-
-    has name    => (isa => 'Str', is => 'ro');
-    has path    => (isa => 'Maybe[ArrayRef[Str]]', is => 'ro');
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::corelex('Nil');
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
-}
-
-{
-    package Op::Attribute;
-    use Moose;
-    extends 'Op';
-
-    has name => (isa => 'Str', is => 'ro');
-    has accessor => (isa => 'Bool', is => 'ro');
-    has initializer => (isa => 'Maybe[Body]', is => 'rw');
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::corelex('Nil');
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($) { CgOp.corelex('Nil') }
 }
 
 {
