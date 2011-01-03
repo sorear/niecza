@@ -1,71 +1,12 @@
-Cursor.check_old_cclass
-Cursor.mark_sinks
-Cursor.trim_heredoc
-Cursor.do_import
-Cursor.do_use
-Cursor.gettrait
-Cursor.load_lex
-Cursor.add_categorical
-Action methods
+These things were noticed during translation, but to fix them now would
+only slow me down...
 
-DONE:
-token { $param-role-var }
-~
-Cursor.canonicalize_name
-Parcel.LISTSTORE
-Cursor.cursor_fresh
-Cursor.mixin
-<?{ }>
-$/ and $¢ in subrule argument lists
-<after>
-Change STD to use $<foo> = { 1 }
-circumfix:<[ ]>
-Cursor.deb
-Cursor.lineof
-Cursor.suppose
-Cursor.O
-hash literals
-() being Nil
-Bool.Numeric
-&chars
-Cursor.alpha
-defined($thing)
-:delete
-:exists
-$*FOO as a parameter
-self in regexes
-func(|($key => $value))
-gt, lt, leg, etc
-$*GOAL handling
-Make sure / (\w+) $0 / works
-Hash.keys &keys
-Hash.LISTSTORE
-infix:<x>
-invert(%hash)
-&item
-&join
-Match.iterator should return numbered captures
-Match.synthetic
-not($bool)
-&note
-pop(@array)
-push(@array, $thing)
-&reverse
-shift(@array)
-&sort
-substr($str,$from,$len)
-$<sym>
-temp $*FOO
-try
-token { :my $var = expr; $var }
-Write tests for EXPR
-Non-string parameterized role arguments
-
-AVERTED:
-
-//=, ||=, &&=, etc
-given & when
-if not binding $_
-List.at-pos(WhateverCode)
-Mu.new(foo => $bar)
-Highwater stuff  # Going to punt porting since it's useless as designed
+* sprintf, in particular, the ability to make numbers hex
+* hash initialization idioms don't work
+* no qw< >
+* Any strificatrion/numification warnings would be useful
+* no is rw on attributes and methods
+* &split
+* &callsame
+* BUILD
+* given/when

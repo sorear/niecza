@@ -365,7 +365,7 @@ class WhileLoop is Op {
     }
 }
 
-{
+class ForLoop is Op {
     package Op::ForLoop;
     use Moose;
     extends 'Op';
