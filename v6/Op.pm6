@@ -54,7 +54,7 @@ method statement_level() { self }
             return $node.cgop($body) if $node ~~ Op;
             return $node if $node !~~ List;
             my ($cmd, @vals) = @$node;
-            CgOp."$cmd"(|(map &rec, @vals));
+            ::GLOBAL::CgOp."$cmd"(|(map &rec, @vals));
         }
         rec($.optree);
     }
@@ -113,7 +113,7 @@ class CallLike is Op {
 
 class CallSub is CallLike {
     has $.invocant = die "CallSub.invocant required"; # Op
-    sub zyg { $.invocant, @( $.args // $.positionals ) } # XXX callsame
+    method zyg() { $.invocant, @( $.args // $.positionals ) } # XXX callsame
 
     method adverb($adv) {
         Op::CallSub.new(invocant => $.invocant, args => [ self.getargs, $adv ])
@@ -127,7 +127,7 @@ class CallSub is CallLike {
 class YouAreHere is Op {
     has $.unitname; # Str
 
-    method code($body) {
+    method code($ ) {
         # this should be a little fancier so closure can work
         CgOp.subcall(CgOp.fetch(CgOp.context_get(CgOp.str(
                         '*resume_' ~ $.unitname), CgOp.int(0))));
@@ -247,7 +247,7 @@ class HereStub is Op {
 class Yada is Op {
     has $.kind = die "Yada.kind required"; #Str
 
-    method code($body) { CgOp.die(">>>Stub code executed") }
+    method code($ ) { CgOp.die(">>>Stub code executed") }
 }
 
 class ShortCircuit is Op {
@@ -292,7 +292,7 @@ class ShortCircuitAssign is Op {
     method zyg() { $.lhs, $.rhs }
 
     method code($body) {
-        my $sym   = ::NieczaActions.gensym;
+        my $sym   = ::GLOBAL::NieczaActions.gensym;
         my $assn  = CgOp.assign(CgOp.letvar($sym), $.rhs.cgop($body));
         my $cond  = CgOp.letvar($sym);
         my $cassn;
@@ -348,7 +348,7 @@ class WhileLoop is Op {
     method ctxzyg($) { $.check, 1, $.body, 0 }
 
     method code($body) {
-        my $id = ::NieczaActions.genid;
+        my $id = ::GLOBAL::NieczaActions.genid;
 
         CgOp.prog(
             CgOp.whileloop(+$.until, +$.once,
@@ -377,7 +377,7 @@ class ForLoop is Op {
     }
 
     method statement_level() {
-        my $var = ::NieczaActions.gensym;
+        my $var = ::GLOBAL::NieczaActions.gensym;
         $.sink.once = True;
         ::Op::ImmedForLoop.new(source => $.source, var => $var,
             sink => ::Op::CallSub.new(invocant => $.sink,
@@ -398,7 +398,7 @@ class ImmedForLoop is Op {
     method ctxzyg($) { $.source, 1, $.sink, 0 }
 
     method code($body) {
-        my $id = ::NieczaActions.genid;
+        my $id = ::GLOBAL::NieczaActions.genid;
 
         CgOp.rnull(CgOp.letn(
             "!iter$id", CgOp.vvarlist_new_empty,
@@ -442,7 +442,7 @@ class Start is Op {
 class VoidPhaser is Op {
     has $.body = die "VoidPhaser.body required"; # Body
 
-    method code($body) { CgOp.corelex('Nil') }
+    method code($ ) { CgOp.corelex('Nil') }
 }
 
 class Try is Op {
@@ -450,7 +450,7 @@ class Try is Op {
     method zyg() { $.body }
 
     method code($body) {
-        my $id = ::NieczaActions.genid;
+        my $id = ::GLOBAL::NieczaActions.genid;
 
         CgOp.prog(
             CgOp.ehspan(5, '', 0, "start$id", "end$id", "end$id"),
@@ -481,7 +481,7 @@ class Augment is Op {
     has $.body; # Body
     has $.pkg; # Array of Str
 
-    method code($body) {
+    method code($ ) {
         CgOp.subcall(CgOp.fetch(CgOp.scopedlex($.bodyvar)));
     }
 }
@@ -495,7 +495,7 @@ class PackageDef is Op {
     has $.exports = []; # Array of Str
     has $.ourpkg; # Array of Str
 
-    method code($body) {
+    method code($ ) {
         if $.stub {
             CgOp.scopedlex($.var);
         } else {
@@ -511,7 +511,7 @@ class ModuleDef is PackageDef { }
 class RoleDef is ModuleDef {
     has $.signature; # Sig
 
-    method code($body) { $.signature ?? CgOp.scopedlex($.var) !! nextsame }
+    method code($ ) { $.signature ?? CgOp.scopedlex($.var) !! nextsame }
 }
 class ClassDef is ModuleDef { }
 class GrammarDef is ClassDef { }
@@ -553,7 +553,7 @@ class BareBlock is Op {
 
     method statement_level() {
         $.body.type = 'voidbare';
-        ::Op::CallSub.new(invocant => ::Op::SubDef->new(var => $.var,
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(var => $.var,
                 body => $.body, once => True));
     }
 }
@@ -584,7 +584,7 @@ class Lexical is Op {
 
     method code($) { CgOp.scopedlex($.name) }
 
-    method code_bvalue($body, $ro, $rhscg) {
+    method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
             CgOp.scopedlex($.name, CgOp.newboundvar($ro, +($.list || $.hash), $rhscg)),
             CgOp.scopedlex($.name));
@@ -610,196 +610,111 @@ class ContextVar is Op {
     }
 }
 
-{
-    package Op::PackageVar;
-    use Moose;
-    extends 'Op';
+class PackageVar is Op {
+    has $.name = die "PackageVar.name required"; # Str
+    has $.slot = die "PackageVar.slot required"; # Str
+    has $.path = die "PackageVar.path required"; # Array of Str
+    has $.list = False; # Bool
+    has $.hash = False; # Bool
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
-    has slot => (isa => 'Str', is => 'ro', required => 1);
-    has path => (isa => 'ArrayRef[Str]', is => 'ro', required => 1);
-    has list => (isa => 'Bool', is => 'ro', default => 0);
-    has hash => (isa => 'Bool', is => 'ro', default => 0);
+    # TODO: Design and reimplement dynamic-ish $CALLER::, $MY::
 
-    sub looks_static {
-        my ($self) = @_;
-        my $v = $self->path->[0];
-        if (!defined($v) || $v eq 'MY' || $v eq 'CALLER' || $v eq 'OUTER'
-                || $v eq 'DYNAMIC') {
-            return 0;
-        } else {
-            return 1;
-        }
+    method code($ ) { CgOp.scopedlex($.slot) }
+
+    method code_bvalue($ , $ro, $rhscg) {
+        CgOp.prog(
+            CgOp.scopedlex($.slot,
+                CgOp.newboundvar($ro, +($.list || $.hash), $rhscg)),
+            CgOp.scopedlex($.slot));
     }
-
-    sub code {
-        my ($self, $body) = @_;
-        $self->looks_static ? CgOp::scopedlex($self->slot) :
-            CgOp::bget(($body->lookup_var($self->name, @{ $self->path }))[1]);
-    }
-
-    sub code_bvalue {
-        my ($self, $body, $ro, $rhscg) = @_;
-        $self->looks_static ?
-            CgOp::prog(
-                CgOp::scopedlex($self->slot,
-                    CgOp::newboundvar($ro, $self->list || $self->hash, $rhscg)),
-                CgOp::scopedlex($self->slot)) :
-            CgOp::letn('!bv', ($body->lookup_var($self->name,
-                        @{ $self->path }))[1],
-                CgOp::bset(CgOp::letvar('!bv'), CgOp::newboundvar($ro,
-                        $self->list || $self->hash, $rhscg)),
-                CgOp::bget(CgOp::letvar('!bv')));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::Use;
-    use Moose;
-    extends 'Op';
+class Use is Op {
+    has $.unit = die "Use.unit required"; # Str
 
-    has unit => (isa => 'Str', is => 'ro', required => 1);
-
-    sub code { CgOp::corelex('Nil') }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($ ) { CgOp.corelex('Nil') }
 }
 
-{
-    package Op::Require;
-    use Moose;
-    extends 'Op';
+class Require is Op {
+    has $.unit = die "Require.unit required"; # Str
 
-    has unit => (isa => 'Str', is => 'ro', required => 1);
-
-    sub code { CgOp::rnull(CgOp::do_require($_[0]->unit)) }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($ ) { CgOp.rnull(CgOp.do_require($.unit)) }
 }
 
-{
-    package Op::Take;
-    use Moose;
-    extends 'Op';
+class Take is Op {
+    has $.value = die "Take.value required"; # Op
+    method zyg() { $.value }
 
-    has value => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->value }
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::take($self->value->cgop($body));
-    }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($body) { CgOp.take($.value.cgop($body)) }
 }
 
-{
-    package Op::Gather;
-    use Moose;
-    extends 'Op';
+class Gather is Op {
+    has $.body = die "Gather.body required"; # Body
+    has $.var  = die "Gather.var required"; # Str
 
-    has body => (isa => 'Body', is => 'ro', required => 1);
-    has var  => (isa => 'Str',  is => 'ro', required => 1);
-
-    sub code {
-        my ($self, $body) = @_;
-
+    method code($ ) {
         # construct a frame for our sub ip=0
         # construct a GatherIterator with said frame
         # construct a List from the iterator
 
-        CgOp::subcall(CgOp::fetch(CgOp::corelex('&_gather')),
-            CgOp::newscalar(CgOp::startgather(
-                    CgOp::fetch(CgOp::scopedlex($self->var)))));
+        CgOp.subcall(CgOp.fetch(CgOp.corelex('&_gather')),
+            CgOp.newscalar(CgOp.startgather(
+                    CgOp.fetch(CgOp.scopedlex($.var)))));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-# the existance of these complicates cross-sub inlining a bit
-{
-    package Op::MakeCursor;
-    use Moose;
-    extends 'Op';
-
-    sub code {
-        my ($self, $body) = @_;
-
-        CgOp::prog(
-            CgOp::scopedlex('$*/', CgOp::newscalar(CgOp::rxcall('MakeCursor'))),
-            CgOp::scopedlex('$*/'));
+class MakeCursor is Op {
+    method code($ ) {
+        CgOp.prog(
+            CgOp.scopedlex('$*/', CgOp.newscalar(CgOp.rxcall('MakeCursor'))),
+            CgOp.scopedlex('$*/'));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 # Provides access to a variable with a scope smaller than the sub.  Used
 # internally in a few places; should not be exposed to the user, because
 # these can't be closed over.
-{
-    package Op::LetVar;
-    use Moose;
-    extends 'Op';
+# the existance of these complicates cross-sub inlining a bit
+class LetVar is Op {
+    has $.name = die "LetVar.name required"; # Str
 
-    has name => (isa => 'Str', is => 'ro', required => 1);
-
-    sub code { CgOp::letvar($_[0]->name); }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
+    method code($ ) { CgOp.letvar($.name) }
 }
 
-{
-    package Op::RegexBody;
-    use Moose;
-    extends 'Op';
+class RegexBody is Op {
+    has $.rxop = die "RegexBody.rxop required"; # RxOp
+    has $.name = '';
+    has $.passcap = False;
+    has $.passcut = False;
+    has $.pre = []; # Array of Op
+    has $.canback = True;
 
-    has rxop => (isa => 'RxOp', is => 'ro', required => 1);
-    has name => (isa => 'Str', is => 'ro', default => '');
-    has passcap => (isa => 'Bool', is => 'ro', default => 0);
-    has passcut => (isa => 'Bool', is => 'ro', default => 0);
-    has pre => (isa => 'ArrayRef[Op]', is => 'ro', default => sub { [] });
-    has canback => (isa => 'Bool', is => 'ro', default => 1);
+    method zyg() { @$.pre, $.rxop.opzyg }
 
-    sub zyg { @{ $_[0]->pre }, $_[0]->rxop->opzyg }
-
-    sub code {
-        my ($self, $body) = @_;
-
+    method code($body) {
         my @mcaps;
-        local $::in_quant = 0;
-        if (!$self->passcap) {
-            my $u = $self->rxop->used_caps;
-            for (keys %$u) {
-                push @mcaps, $_ if $u->{$_} >= 2;
+        my $*in_quant = False;
+        if !$.passcap {
+            my $u = $.rxop.used_caps;
+            for keys $u {
+                push @mcaps, $_ if $u{$_} >= 2;
             }
         }
-        my @pre = map { CgOp::sink($_->code($body)) } @{ $self->pre };
+        my @pre = map { CgOp.sink($_.cgop($body)) }, @$.pre;
 
-        CgOp::prog(
+        CgOp.prog(
             @pre,
-            CgOp::rxinit(CgOp::str($self->name),
-                    CgOp::cast('cursor', CgOp::fetch(CgOp::scopedlex('self'))),
-                    ($self->passcap?1:0), ($self->passcut?1:0)),
-            ($self->passcap ? () :
-                CgOp::rxpushcapture(CgOp::null('var'), @mcaps)),
-            $self->rxop->code($body),
-            ($self->canback ? CgOp::rxend() : CgOp::rxfinalend()),
-            CgOp::label('backtrack'),
-            CgOp::rxbacktrack(),
-            CgOp::null('var'));
+            CgOp.rxinit(CgOp.str($.name),
+                    CgOp.cast('cursor', CgOp.fetch(CgOp.scopedlex('self'))),
+                    +$.passcap, +$.passcut),
+            ($.passcap ?? () !!
+                CgOp.rxpushcapture(CgOp.null('var'), @mcaps)),
+            $.rxop.code($body),
+            ($.canback ?? CgOp.rxend !! CgOp.rxfinalend),
+            CgOp.label('backtrack'),
+            CgOp.rxbacktrack,
+            CgOp.null('var'));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
 ### BEGIN DESUGARING OPS
@@ -807,92 +722,53 @@ class ContextVar is Op {
 # useful structure.
 
 # used after β-reductions
-{
-    package Op::SigBind;
-    use Moose;
-    extends 'Op';
-
-    has signature   => (isa => 'Sig', is => 'ro', required => 1);
+class SigBind is Op {
+    has $.signature = die "SigBind.signature required"; # Sig
     # positionals *really* should be a bunch of gensym Lexical's, or else
     # you risk shadowing hell.  this needs to be handled at a different level
-    has positionals => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
+    has $.positionals = die "SigBind.positionals required"; # Array of Op
 
-    sub zyg { @{ $_[0]->positionals } }
+    method zyg() { @$.positionals }
 
-    sub code {
-        my ($self, $body) = @_;
-
-        CgOp::prog(
-            $self->signature->bind_inline($body,
-                map { $_->cgop($body) } @{ $self->positionals }),
-            CgOp::null('var'));
+    method code($body) {
+        CgOp.prog(
+            $.signature.bind_inline($body,
+                map { $_.cgop($body) }, @$.positionals),
+            CgOp.null('var'));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::Assign;
-    use Moose;
-    extends 'Op';
+class Assign is Op {
+    has $.lhs = die "Assign.lhs required"; # Op
+    has $.rhs = die "Assign.rhs required"; # Op
+    method zyg() { $.lhs, $.rhs }
 
-    has lhs => (isa => 'Op', is => 'ro', required => 1);
-    has rhs => (isa => 'Op', is => 'ro', required => 1);
-    sub zyg { $_[0]->lhs, $_[0]->rhs }
-
-    sub code {
-        my ($self, $body) = @_;
-        CgOp::rnull(CgOp::assign($self->lhs->cgop($body), $self->rhs->cgop($body)));
+    method code($body) {
+        CgOp.rnull(CgOp.assign($.lhs.cgop($body), $.rhs.cgop($body)));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::Builtin;
-    use Moose;
-    extends 'Op';
+class Builtin is Op {
+    has $.args = die "Builtin.args required"; # Array of Op
+    has $.name = die "Builtin.name required"; # Str
+    method zyg() { @$.args }
 
-    has args => (isa => 'ArrayRef[Op]', is => 'ro', required => 1);
-    has name => (isa => 'Str', is => 'ro', required => 1);
-    sub zyg { @{ $_[0]->args } }
-
-    sub code {
-        my ($self, $body) = @_;
-        no strict 'refs';
-        my $name = $self->name;
-        my @a = (map { $_->cgop($body) } @{ $self->args });
-        &{ "CgOp::bif_$name" }(@a);
+    method code($body) {
+        my @a = (map { $_.cgop($body) }, @$.args);
+        CgOp."bif_$.name"(|@a);
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
 
-{
-    package Op::Let;
-    use Moose;
-    extends 'Op';
+class Let is Op {
+    has $.var = die "Let.var required"; # Str
+    has $.type; # Str
+    has $.to; # Op
+    has $.in = die "Let.in required"; # Op
 
-    has var  => (isa => 'Str', is => 'ro', required => 1);
-    has type => (isa => 'Str', is => 'ro');
-    has to   => (isa => 'Op',  is => 'ro');
-    has in   => (isa => 'Op',  is => 'ro', required => 1);
+    method zyg() { ($.to // Nil), $.in }
 
-    sub zyg { ($_[0]->to ? ($_[0]->to) : ()), $_[0]->in }
-
-    sub code {
-        my ($self, $body) = @_;
-
-        CgOp::letn($self->var,
-            ($self->to ? $self->to->cgop($body) : CgOp::null($self->type)),
-            $self->in->cgop($body));
+    method code($body) {
+        CgOp.letn($.var, ($.to ?? $.to.cgop($body) !! CgOp.null($.type)),
+            $.in.cgop($body));
     }
-
-    __PACKAGE__->meta->make_immutable;
-    no Moose;
 }
-
-1;
