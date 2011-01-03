@@ -98,10 +98,10 @@ my $filename;
 if ($e) {
     $source = $e;
     $filename = '-e';
-} elsif (!@ARGV) {
+} elsif (!@args) {
     die "no input file";
 } else {
-    $filename = shift(@ARGV);
+    $filename = shift(@args);
     $source = slurp($filename);
 }
 
