@@ -2980,6 +2980,9 @@ namespace Niecza.CLRBackend {
             handlers["_addmethod"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(null, Tokens.DMO_AddFooMethod[JScalar.S(z[1])], new CpsOp[] { th.Scan(z[2]), th.Scan(z[3]), th.Scan(z[4]) }); };
             thandlers["_invalidate"] = Methody(null, Tokens.DynMetaObject.GetMethod("Invalidate"));
+            handlers["do_require"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("DoRequire"),
+                    new CpsOp[] { CpsOp.StringLiteral(JScalar.S(z[1])) }); };
             thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
             thandlers["how"] = Methody(Tokens.IP6, Tokens.IP6.GetMethod("HOW"));
             thandlers["obj_what"] = Methody(null, Tokens.IP6.GetMethod("GetTypeObject"));
@@ -3059,7 +3062,6 @@ namespace Niecza.CLRBackend {
             thandlers["from_jsync"] = Methody(null, typeof(JsyncReader).GetMethod("FromJsync"));
             thandlers["to_json"] = Methody(null, typeof(JsonWriter).GetMethod("ToJson"));
             thandlers["from_json"] = Methody(null, typeof(JsyncReader).GetMethod("FromJson"));
-            thandlers["do_require"] = Methody(null, Tokens.Kernel.GetMethod("DoRequire"));
             thandlers["frame_caller"] = FieldGet(Tokens.Frame, "caller");
             thandlers["frame_file"] = Methody(null, Tokens.Frame.GetMethod("ExecutingFile"));
             thandlers["frame_line"] = Methody(null, Tokens.Frame.GetMethod("ExecutingLine"));
