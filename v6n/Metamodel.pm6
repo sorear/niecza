@@ -668,7 +668,7 @@ class Unit {
         $.ns.visit_stashes(-> @path {
             return unless @path;
             my $tag = join("", map { $_ ~ "::" }, @path);
-            my $st = $all{$tag} = Stash.new('!id' => $tag);
+            my $st = $all{$tag} = Stash.new('!id' => [$tag]);
             my @ppath = @path;
             my $name = pop @ppath;
             my $ptag = join("", map { $_ ~ "::" }, @ppath);

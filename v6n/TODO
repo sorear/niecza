@@ -6,3 +6,7 @@ only slow me down...
 * no qw< >
 * Any strificatrion/numification warnings would be useful
 * no is rw on attributes and methods
+* &split
+* &callsame
+* BUILD
+* given/when

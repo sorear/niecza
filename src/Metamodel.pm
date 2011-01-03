@@ -117,8 +117,8 @@ our %units;
             }
             if ($i1->[0] eq 'var') {
                 die "Non-stub packages cannot be merged " . join(" ", @path, $k)
-                    if $i1->[1] && $i2->[1] && $i1->[1][0] ne $i2->[1][0] &&
-                        $i1->[1][1] != $i2->[1][1];
+                    if $i1->[1] && $i2->[1] && ($i1->[1][0] ne $i2->[1][0] ||
+                        $i1->[1][1] != $i2->[1][1]) && $i1->[1][0] && $i2->[1][0];
                 $rinto->{$k} = ['var', $i1->[1] // $i2->[1],
                     ($i1->[2] && $i2->[2]) ? _merge($i1->[2], $i2->[2], @path, $k) :
                     ($i1->[2] // $i2->[2])];
@@ -185,7 +185,7 @@ our %units;
         my ($self, $path, $item) = @_;
         my ($c,$u,$n) = _lookup_common($self, [], @$path);
         my $i = $c->{$n} //= ['var',undef,undef];
-        if ($i->[0] ne 'var' || $i->[1]) {
+        if ($i->[0] ne 'var' || ($i->[1] && $i->[1][0])) {
             die "Collision installing pkg @$path";
         }
         $i->[1] = $item;
@@ -849,7 +849,7 @@ our %units;
             my @path = @{ $_[0] };
             return unless @path;
             my $tag = join("", map { $_ . "::" } @path);
-            my $st = $all->{$tag} = bless { '!id' => $tag }, 'Stash';
+            my $st = $all->{$tag} = bless { '!id' => [$tag] }, 'Stash';
             my @ppath = @path;
             my $name = pop @ppath;
             my $ptag = join("", map { $_ . "::" } @ppath);
