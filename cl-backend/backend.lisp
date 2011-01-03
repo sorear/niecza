@@ -65,11 +65,11 @@
     ((list mainline-xref name log setting bottom-ref filename modtime x-ref t-deps root-stash) (mapcar #'compile-sub x-ref))
   )
 )
+
 (let (
-      (compiled-unit (first-string-to-symbol (first (compile-unit (json:decode-json (open "test.nam"))))))
+      (compiled-unit (first-string-to-symbol (first (compile-unit (json:decode-json (open (first *args*)))))))
     )
     (format t "~a~%~%~%" compiled-unit)
-;    (format t "expanded: ~a~%" (macroexpand compiled-unit))
 ;
     (eval compiled-unit)
 )

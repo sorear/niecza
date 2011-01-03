@@ -9,12 +9,65 @@ use lib 'src';
 use Niecza::Frontend::STD;
 use Niecza::Backend::NAM;
 use Niecza::Backend::Mono;
+use Niecza::Backend::CLisp;
 use Niecza::Pass::Beta;
 use Niecza::Pass::Simplifier;
 use Niecza::Pass::Begin;
 use Niecza::Pass::Backend;
 use Niecza::Compiler;
 use Metamodel;
+
+use Getopt::Long qw(GetOptionsFromArray);
+use Encode;
+use lib 'lib';
+use utf8;
+use v5.10;
+
+# print the help message
+sub help {
+print <<'HELP';
+Usage: mildew [switches] [--] [programfile] [arguments]
+  -B<backend>     execute using the <backend> backend
+  -C<backend>     compile using the <backend> backend
+                  (valid backends are: clisp,mono)
+  -F<frontend>      use the <frontend> frontend
+                  (valid frontends are: STD)
+  -e
+  -o <file>       Place the output into <file>
+HELP
+exit;
+}
+
+# get command line options
+my ($C,$B,$F,$help,$e,$output);
+my @args;
+my %args;
+my $subsystem;
+my $level;
+for (@ARGV) {
+    if (/\+\+ (\+*) (\w+)/x) {
+        $level = $1;
+        $subsystem = $2;
+        $args{$subsystem} = [];
+    } elsif ($subsystem && /\+\+ \Q$level\E \/ \Q$subsystem\E/x) {
+        $level = $subsystem = undef;
+    } elsif ($subsystem) {
+        push(@{$args{$subsystem}},$_);
+    } else {
+        push(@args,$_);
+    }
+}
+Getopt::Long::Configure(qw(bundling no_ignore_case pass_through require_order));
+GetOptionsFromArray(
+    \@args,
+    "C=s" => \$C,
+    "B=s" => \$B,
+    "F=s" => \$F,
+    'h|help' => \$help,
+    'e=s' => \$e,
+    'o=s' => \$output
+) || help;
+help if $help;
 
 use File::Temp ();
 my $tmp_file = sub {
@@ -28,7 +81,12 @@ my $simplifier = Niecza::Pass::Simplifier->new();
 
 my $write_nam = Niecza::Pass::Backend->new(backend=>Niecza::Backend::NAM->new(),tmp_file=>$tmp_file);
 
-my $backend = Niecza::Backend::Mono->new(is_main=>1,build_dir=>'obj',tmp_file=>$tmp_file);
+my $backend = $B // $C // 'mono';
+if ($backend eq 'mono') {
+    $backend = Niecza::Backend::Mono->new(is_main=>1,build_dir=>'obj',tmp_file=>$tmp_file);
+} else {
+    $backend = Niecza::Backend::CLisp->new();
+}
 
 my $compiler = Niecza::Compiler->new(
     frontend =>$parser,
@@ -39,13 +97,23 @@ my $compiler = Niecza::Compiler->new(
 
 my $source;
 my $filename;
-if (!@ARGV) {
+if ($e) {
+    $source = $e;
+    $filename = '-e';
+} elsif (!@ARGV) {
     die "no input file";
 } else {
     $filename = shift(@ARGV);
     $source = slurp($filename);
 }
 
-$compiler->run(source=>decode('utf-8',$source),filename=>$filename);
-#$compiler->compile(source=>$source,filename=>$filename,output=>'foobaz.exe');
+if ($C and $B) {
+    die "You can't specify both -C and -B.\n";
+}
+
+if ($B) {
+    $compiler->run(source=>decode('utf-8',$source),filename=>$filename);
+} elsif ($C) {
+    $compiler->compile(source=>$source,filename=>$filename,output=>$output);
+}
 
