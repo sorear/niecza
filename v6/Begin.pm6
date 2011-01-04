@@ -95,7 +95,7 @@ augment class Sig::Parameter { method begin() { #OK exist
 } }
 
 augment class Op {
-    method begin() { for @$.zyg { $_.begin } }
+    method begin() { for self.zyg { $_.begin } }
 }
 
 augment class Op::YouAreHere { #OK exist
@@ -153,7 +153,7 @@ augment class Op::Lexical { #OK exist
 
 augment class Op::CallMethod { #OK exist
     method begin() {
-        for @$.zyg { $_.begin } # XXX callsame
+        for self.zyg { $_.begin } # XXX callsame
         if $.private {
             if $.ppath {
                 $.pclass = $*unit.get_item(@*opensubs[*-1].find_pkg($.ppath));
@@ -320,7 +320,7 @@ augment class Op::WhateverCode { #OK exist
 augment class Op::Start { #OK exist
     method begin() {
         @*opensubs[*-1].add_state_name(Str, $.condvar);
-        for @$.zyg { $_.begin } # XXX callsame
+        for self.zyg { $_.begin } # XXX callsame
     }
 }
 

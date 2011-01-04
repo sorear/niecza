@@ -1,0 +1,17 @@
+use Metamodel;
+use Op;
+use Body;
+use Unit;
+use Begin;
+use JSYNC;
+
+my $ast = Unit.new(
+    name => "MAIN",
+    mainline => Body.new(
+        do => ::Op::CgOp.new(optree => ['prog', ['say', ['str', 'Hello, world']], ['null', 'var']]),
+        returnable => False));
+
+my %*units;
+my $mm = $ast.begin;
+
+say to-jsync($mm);
