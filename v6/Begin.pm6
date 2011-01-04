@@ -7,6 +7,7 @@ use Unit;
 use Sig;
 use Body;
 use Op;
+use Metamodel;
 
 ### Code goes here to build up the metamodel from an Op tree
 # We should eventually wire this to the parser, so that metamodel stuff can

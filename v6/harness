@@ -4,14 +4,31 @@ use Body;
 use Unit;
 use Begin;
 use JSYNC;
+use NAMOutput;
 
 my $ast = Unit.new(
-    name => "MAIN",
+    name => "CORE",
     mainline => Body.new(
-        do => ::Op::CgOp.new(optree => ['prog', ['say', ['str', 'Hello, world']], ['null', 'var']]),
+        do => ::Op::StatementList.new(children => [
+            ::Op::ClassDef.new(name => 'Mu', var => 'Mu', bodyvar => '!0',
+                body => Body.new(do => ::Op::StatementList.new(children => [
+                ]))),
+            ::Op::ClassDef.new(name => 'Any', var => 'Any', bodyvar => '!1',
+                body => Body.new(do => ::Op::StatementList.new(children => [
+                    ::Op::Super.new(name => 'Mu'),
+                ]))),
+            ::Op::ClassDef.new(name => 'Nil', var => 'Nil', bodyvar => '!2',
+                body => Body.new(do => ::Op::StatementList.new(children => [
+                ]))),
+            ::Op::ClassDef.new(name => 'ClassHOW', var => 'ClassHOW', bodyvar => '!3',
+                body => Body.new(do => ::Op::StatementList.new(children => [
+                ]))),
+            ::Op::CgOp.new(optree => ['prog', ['say', ['str', 'Hello, world']], ['null', 'var']]),
+        ]),
         returnable => False));
 
 my %*units;
 my $mm = $ast.begin;
+my $nstr = NAMOutput.run($mm);
 
-say to-jsync($mm);
+say $nstr;
