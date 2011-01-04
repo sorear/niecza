@@ -11,3 +11,4 @@ only slow me down...
 * BUILD
 * given/when
 * non-$ attributes
+* :$.foo is broken
