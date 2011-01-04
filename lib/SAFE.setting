@@ -894,7 +894,7 @@ sub _gather($fr) {
     &infix:<,>(GatherIterator.RAWCREATE("frame", $fr, "reify", Any)).list
 }
 
-sub take($p) { # should be \|$p
+sub take(\$p) { # should be \|$p
     Q:CgOp { (take (l $p)) }
 }
 
