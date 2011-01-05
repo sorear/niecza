@@ -19,12 +19,17 @@ public sealed class GState {
             return;
         DispatchEnt m;
         IP6 actions_p = actions.Fetch();
-        if (!actions_p.mo.mro_methods.TryGetValue(name, out m)
-                && !actions_p.mo.mro_methods.TryGetValue("FALLBACK", out m))
+        Variable[] pos;
+        if (actions_p.mo.mro_methods.TryGetValue(name, out m)) {
+            pos = new Variable[] { actions, Kernel.NewROScalar(match) };
+        } else if (actions_p.mo.mro_methods.TryGetValue("FALLBACK", out m)) {
+            pos = new Variable[] { actions,
+                Kernel.BoxAnyMO<string>(name, Kernel.StrMO),
+                Kernel.NewROScalar(match) };
+        } else {
             return;
+        }
 
-        Variable[] pos = new Variable[] {
-            actions, Kernel.NewROScalar(match) };
         Frame nf = m.info.Binder(Kernel.GetInferiorRoot()
                 .MakeChild(m.outer, m.info), pos, null);
         nf.curDisp = m;
@@ -522,6 +527,10 @@ public class Cursor : IP6 {
 
     public Cursor At(int npos) {
         return new Cursor(global, mo, feedback, nstate, xact, npos, null);
+    }
+
+    public Cursor UnMatch() {
+        return new Cursor(global, save_klass, null, null, null, pos, null);
     }
 
     public Cursor FreshClass(IP6 from) {

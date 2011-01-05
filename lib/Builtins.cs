@@ -341,4 +341,11 @@ public class Builtins {
         l.slots[1] = new VarDeque();
         return Kernel.NewRWListVar(l);
     }
+    /* TODO make these Cursor ops */
+    public static IP6 MatchToCursor(IP6 csr) {
+        return ((Cursor)csr).UnMatch();
+    }
+    public static IP6 MatchToReduced(IP6 csr) {
+        return Kernel.BoxRaw<string>(((Cursor)csr).Reduced(), Kernel.StrMO);
+    }
 }

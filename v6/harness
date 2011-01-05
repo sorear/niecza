@@ -6,6 +6,12 @@ use Begin;
 use JSYNC;
 use NAMOutput;
 
+use MONKEY_TYPING;
+augment class Match {
+    method CURSOR() { Q:CgOp { (ns (rawscall Builtins,Kernel.MatchToCursor (@ {self}))) } }
+    method reduced() { Q:CgOp { (ns (rawscall Builtins,Kernel.MatchToReduced (@ {self}))) } }
+}
+
 my $ast = Unit.new(
     name => "CORE",
     mainline => Body.new(
