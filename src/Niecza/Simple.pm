@@ -1,4 +1,7 @@
 package Niecza::Simple;
+use v5.10;
+use strict;
+use warnings;
 use Niecza::Frontend::STD;
 use Niecza::Backend::NAM;
 use Niecza::Backend::Mono;
@@ -11,28 +14,41 @@ use Niecza::Compiler;
 use Metamodel;
 sub create_compiler {
     my %args = @_;
+    my $lang = $args{lang} // 'CORE';
     use File::Temp ();
     my $tmp_file = sub {
         File::Temp::tmpnam();
     };
-    my $parser = Niecza::Frontend::STD->new(lang=>'CORE');
+    my $parser = Niecza::Frontend::STD->new(lang=>$lang,UNITNAME=>$args{UNITNAME});
     
-    my $begin = Niecza::Pass::Begin->new(lang=>'CORE');
-    my $beta = Niecza::Pass::Beta->new();
-    my $simplifier = Niecza::Pass::Simplifier->new();
+    my @passes;
     
-    my $write_nam = Niecza::Pass::Backend->new(backend=>Niecza::Backend::NAM->new(),tmp_file=>$tmp_file);
+    push @passes,Niecza::Pass::Begin->new(lang=>$lang);
+    push @passes,Niecza::Pass::Beta->new();
+    push @passes,Niecza::Pass::Simplifier->new();
     
-    my $backend;
-    if ($args{backend} eq 'mono') {
-        $backend = Niecza::Backend::Mono->new(is_main=>1,build_dir=>'obj',tmp_file=>$tmp_file);
-    } elsif ($args{backend} eq 'clisp') {
-        $backend = Niecza::Backend::CLisp->new();
+    if ($args{backend} ne 'nam') {
+        push @passes,Niecza::Pass::Backend->new(backend=>Niecza::Backend::NAM->new(),tmp_file=>$tmp_file);
     }
     
+    my %backends = (
+        mono => sub {
+            Niecza::Backend::Mono->new(is_main=>1,build_dir=>'obj',tmp_file=>$tmp_file)
+        },
+        clisp => sub {
+            Niecza::Backend::CLisp->new();
+        },
+        nam => sub {
+            Niecza::Backend::NAM->new();
+        },
+    );
+
+    my $backend = $backends{$args{backend}}->();
+
+
     Niecza::Compiler->new(
         frontend =>$parser,
-        passes  => [$begin,$beta,$simplifier,$write_nam],
+        passes  => \@passes,
         backend => $backend
     );
 }
