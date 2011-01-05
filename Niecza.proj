@@ -15,8 +15,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <CompilerPerl Include="src\NAMWriter.pm"/>
-        <RTS Include="lib\Kernel.cs;lib\JSYNC.cs;lib\Cursor.cs;lib\Builtins.cs;lib\NieczaCLR.cs"/>
+        <CompilerPerl Include="src/**/*.pm"/>
+        <RTS Include="lib/*.cs"/>
     </ItemGroup>
 
     <!-- Meta targets -->
