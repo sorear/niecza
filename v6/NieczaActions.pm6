@@ -14,12 +14,24 @@ use OptRxSimple;
 sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
 sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
-# XXX Niecza  Needs improvement
-method FALLBACK($meth, $/) {
-    $/.cursor.sorry("Action method $meth not yet implemented");
+sub node($M) { file => $*FILE<name>, line => $M.cursor.lineof($M.to) }
+
+sub mkcall($/, $name, *@positionals) {
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
 
-sub node($M) { file => $*FILE<name>, line => $M.cursor.lineof($M.to) }
+# XXX Niecza  Needs improvement
+method FALLBACK($meth, $/) {
+    if substr($meth,0,7) eq 'prefix:' {
+    } elsif substr($meth,0,8) eq 'postfix:' {
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $<sym> ~ '>');
+        return Nil;
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
+}
 
 method ws($ ) { }
 method is_ok($ ) { }
@@ -660,7 +672,7 @@ method assertion:name ($/) {
         return Nil;
     } elsif $name eq 'after' {
         my @l = $<nibbler>[0].ast.tocclist;
-        if grep { !defined $_ } @l {
+        if grep { !defined $_ }, @l {
             $/.CURSOR.sorry("Unsuppored elements in after list");
             make ::RxOp::Sequence.new;
             return Nil;
@@ -833,7 +845,80 @@ method escape:ws ($/) { make "" }
 my class RangeSymbol { };
 method escape:sym<..> ($/) { make RangeSymbol }
 
+# XXX I probably shouldn't have used "Str" for this action method name
+method Str($match?) { "NieczaActions" } #OK not used
+method process_nibble($/, @bits) {
+    my @acc;
+    for @bits -> $n {
+        my $ast = $n.ast;
+
+        if $ast ~~ CClass {
+            $n.CURSOR.sorry("Cannot use a character class in a string");
+            $ast = "";
+        }
+
+        $ast = ::Op::StringLiteral.new(|node($/), text => $ast) if $ast !~~ Op;
+
+        # this *might* belong in an optimization pass
+        if @acc && @acc[*-1] ~~ ::Op::StringLiteral &&
+                $ast ~~ ::Op::StringLiteral {
+            @acc[*-1] = ::Op::StringLiteral.new(|node($/),
+                text => (@acc[*-1].text ~ $ast.text));
+        } else {
+            push @acc, $ast;
+        }
+    }
+    make do @acc == 0 ?? ::Op::StringLiteral.new(|node($/), text => "") !!
+            @acc == 1 ?? @acc[0] !!
+            mkcall($/, '&infix:<~>', @acc);
+}
+
+method process_tribble(@bits) {
+    my @cstack;
+    my @mstack;
+    for @bits -> $b {
+        if $b.ast.^isa(Str) {
+            next if $b.ast eq "";
+            if chars($b.ast) > 1 {
+                $b.CURSOR.sorry("Cannot use >1 character strings as cclass elements");
+                return $CClass::Empty;
+            }
+        }
+        push @mstack, $b.CURSOR;
+        push @cstack, $b.ast;
+        if @cstack >= 2 && @cstack[*-2] ~~ RangeSymbol {
+            if @cstack == 2 {
+                @mstack[0].sorry(".. requires a left endpoint");
+                return $CClass::Empty;
+            }
+            for 1, 3 -> $i {
+                if @cstack[*-$i] !~~ Str {
+                    @mstack[*-$i].sorry(".. endpoint must be a single character");
+                    return $CClass::Empty;
+                }
+            }
+            my $new = CClass.range(@cstack[*-3], @cstack[*-1]);
+            pop(@cstack); pop(@cstack); pop(@cstack); push(@cstack, $new);
+            pop(@mstack); pop(@mstack);
+        }
+    }
+    if @cstack && @cstack[*-1] ~~ RangeSymbol {
+        @mstack[*-1].sorry(".. requires a right endpoint");
+        return $CClass::Empty;
+    }
+    my $ret = $CClass::Empty;
+    for @mstack { $ret = $ret.plus($_) }
+    $ret;
+}
+
 method nibbler($/) {
+    sub iscclass($cur) {
+        my $*CCSTATE = '';
+        my $ok = False;
+        # XXX XXX
+        try { $cur.ccstate(".."); $ok = True };
+        $ok
+    }
     if $/.CURSOR.^isa(::STD::Regex) {
         make $<EXPR>.ast;
     } elsif $/.CURSOR.isa(::NieczaGrammar::CgOp) {
@@ -843,199 +928,119 @@ method nibbler($/) {
             return Nil;
         }
         make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
-    } elsif ($M->can('ccstate')) { #XXX XXX try to catch cclasses
-        my @nib = @{ $M->{nibbles} };
-        my @bits = map { $_->{_ast} } @nib;
-
-        for (my $i = 0; $i < @bits; $i++) {
-            my $t = ref($bits[$i]);
-            if (!$t) {
-                if (length($bits[$i]) > 1) {
-                    $nib[$i]->sorry("Cannot use a string in a character class");
-                    $bits[$i] = "";
-                }
-            } elsif ($t eq 'SCALAR') {
-                # .. hack
-            } elsif ($t eq 'CClass') {
-                # also ok
-            } else {
-                $nib[$i]->sorry("Cannot use an interpolation in a character class");
-                $bits[$i] = "";
-            }
-
-            if ($bits[$i] eq "") {
-                splice @bits, $i, 1;
-                splice @nib, $i, 1;
-                $i--;
-            }
-        }
-
-        for (my $i = 0; $i < @bits; $i++) {
-            next unless ref($bits[$i]) && ref($bits[$i]) eq 'SCALAR';
-
-            for ($i-1, $i + 1) {
-                if (ref($bits[$_])) {
-                    $nib[$_]->sorry("Bad range endpoint");
-                    $bits[$_] = "\0";
-                }
-            }
-
-            splice @bits, $i-1, 3, CClass->range($bits[$i-1], $bits[$i+1]);
-            splice @nib, $i-1, 2;
-            $i--;
-        }
-        $M->{_ast} = $CClass::Empty;
-        $M->{_ast} = $M->{_ast}->plus($_) for @bits;
+    } elsif iscclass($/) {
+        make self.process_tribble($<nibbles>);
     } else {
-        # garden variety nibbler
-        my @bits;
-        for my $n (@{ $M->{nibbles} }) {
-            my $bit = $n->isa('Str') ? $n->{TEXT} : $n->{_ast};
-
-            if (ref($bit) && ref($bit) eq 'CClass') {
-                $n->sorry("Tried to use a character class in a string");
-                $bit = "";
-            }
-
-            # this *might* belong in an optimization pass
-            if (!blessed($bit) && @bits && !blessed($bits[-1])) {
-                $bits[-1] .= $bit;
-            } else {
-                push @bits, $bit;
-            }
-        }
-        push @bits, '' unless @bits;
-        @bits = map { blessed($_) ? $_ : Op::StringLiteral->new(node($M),
-                text => $_) } @bits;
-        $M->{_ast} = (@bits == 1) ? $bits[0] :
-            Op::CallSub->new(node($M),
-                invocant => Op::Lexical->new(name => '&infix:<~>'),
-                positionals => \@bits);
+        make self.process_nibble($/, $<nibbles>);
     }
 }
 
-sub circumfix { }
-sub circumfix__S_Lt_Gt { my ($cl, $M) = @_;
-    my $sl = $M->{nibble}{_ast};
+method split_circumfix ($/) {
+    my $sl = $<nibble>.ast;
 
-    if (!$sl->isa('Op::StringLiteral')) {
-        $M->sorry("Runtime word splitting NYI");
-        return;
+    if !$sl.^isa(::Op::StringLiteral) {
+        make ::Op::CallMethod.new(|node($/), name => "words", receiver => $sl);
+        return Nil;
     }
 
-    my @tok = split ' ', $sl->text;
-    @tok = map { Op::StringLiteral->new(node($M), text => $_) } @tok;
+    my @tok = $sl.text.words;
+    @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
 
-    $M->{_ast} = (@tok == 1) ? $tok[0] :
-        Op::SimpleParcel->new(node($M), items => \@tok);
-    $M->{qpvalue} = '<' . join(" ", map { $_->text } @tok) . '>'; # XXX what if there are spaces or >
+    make ((@tok == 1) ?? @tok[0] !!
+        ::Op::SimpleParcel.new(|node($/), items => @tok));
 }
-sub circumfix__S_LtLt_GtGt { goto &circumfix__S_Lt_Gt }
-sub circumfix__S_Fre_Nch { goto &circumfix__S_Lt_Gt }
+method circumfix:«< >» ($/) { self.split_circumfix($/) }
+method circumfix:«<< >>» ($/) { self.split_circumfix($/) }
+method circumfix:<« »> ($/) { self.split_circumfix($/) }
 
-sub circumfix__S_Paren_Thesis { my ($cl, $M) = @_;
-    my @kids = grep { defined } @{ $M->{semilist}{_ast} };
-    if (@kids == 1 && $kids[0]->isa('Op::WhateverCode')) {
+method circumfix:<( )> ($/) {
+    my @kids = @( $<semilist>.ast );
+    if @kids == 1 && @kids[0].^isa(::Op::WhateverCode) {
         # XXX in cases like * > (2 + *), we *don't* want the parens to disable
         # syntactic specialization, since they're required for grouping
-        $M->{_ast} = $kids[0];
+        make @kids[0];
     } else {
-        $M->{_ast} = Op::StatementList->new(node($M), children =>
-            [ map { Op::Paren->new(inside => $_) } @kids ]);
+        make ::Op::StatementList.new(|node($/), children => @kids);
     }
 }
 
-sub circumfix__S_Bra_Ket { my ($cl, $M) = @_;
-    my @kids = grep { defined } @{ $M->{semilist}{_ast} };
-    if (! grep { !$_->isa('Op::StringLiteral') } @kids) {
-        $M->{qpvalue} = "<" . join(" ", map { $_->text } @kids) . ">";
-    }
-    $M->{_ast} = Op::CallSub->new(node($M),
-        invocant => Op::Lexical->new(node($M), name => '&_array_constructor'),
-        args => [Op::StatementList->new(node($M), children =>
-                [ map { Op::Paren->new(inside => $_) } @kids ])]);
+method circumfix:<[ ]> ($/) {
+    my @kids = @( $<semilist>.ast );
+    make mkcall($/, '&_array_constructor',
+        ::Op::StatementList.new(|node($/), children => @kids));
 }
 
-sub check_hash { my ($cl, $M) = @_;
-    my $do = $M->{pblock}{_ast}->do;
+# XXX This fails to catch {; ... } because it runs after empty statement
+# elimination.
+method check_hash($/) {
+    my $do = $<pblock>.ast.do;
 
-    return 0 unless $do->isa('Op::StatementList');
-    return 1 if @{ $do->children } == 0;
-    return 0 if @{ $do->children } > 1;
+    return False unless $do.^isa(::Op::StatementList);
+    return True if $do.children == 0;
+    return False if $do.children > 1;
 
-    $do = $do->children->[0];
-    my @bits = $do->isa('Op::SimpleParcel') ? @{ $do->items } : ($do);
+    $do = $do.children[0];
+    my @bits = $do.^isa(::Op::SimpleParcel) ?? @( $do.items ) !! $do;
 
-    return 1 if $bits[0]->isa('Op::SimplePair');
+    return True if @bits[0].^isa(::Op::SimplePair);
 
-    if ($bits[0]->isa('Op::CallSub') &&
-            $bits[0]->invocant->isa('Op::Lexical') &&
-            $bits[0]->invocant->name eq '&infix:<=>>') {
-        return 1;
+    if @bits[0].^isa(::Op::CallSub) &&
+            @bits[0].invocant.^isa(::Op::Lexical) &&
+            @bits[0].invocant.name eq '&infix:<=>>' {
+        return True;
     }
 
-    if ($bits[0]->isa('Op::Lexical') && substr($bits[0]->name,0,1) eq '%') {
-        return 1;
+    if @bits[0].^isa('Op::Lexical') && substr(@bits[0].name,0,1) eq '%' {
+        return True;
     }
 
-    return 0;
+    return False;
 }
 
-sub circumfix__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{pblock}{_ast}->type('bare');
-    $M->{_ast} = Op::BareBlock->new(node($M), var => $cl->gensym,
-        body => $M->{pblock}{_ast});
+method circumfix:sym<{ }> ($/) {
+    $<pblock>.ast.type = 'bare';
+    make ::Op::BareBlock.new(|node($/), var => self.gensym,
+        body => $<pblock>.ast);
 
-    if ($cl->check_hash($M)) {
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(node($M), name => '&_hash_constructor'),
-            args => [Op::CallSub->new(node($M), invocant =>
-                    $cl->block_to_closure($M, $M->{pblock}{_ast}, once => 1))]);
+    if self.check_hash($/) {
+        make mkcall($/, '&_hash_constructor',
+            ::Op::CallSub.new(|node($/), invocant =>
+                    self.block_to_closure($/, $<pblock>.ast, once => True)));
     }
 }
 
-sub circumfix__S_sigil { my ($cl, $M) = @_;
-    circumfix__S_Paren_Thesis($cl, $M); # XXX
-    $M->{_ast} = $cl->docontext($M, $M->{sigil}->Str, $M->{_ast});
+method circumfix:sigil ($/) {
+    self.circumfix:sym<( )>($/); # XXX
+    make self.docontext($/, ~$<sigil>, $/.ast);
 }
 
-sub infix_prefix_meta_operator { }
-sub infix_prefix_meta_operator__S_Bang { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&notop'),
-        args => [ $M->{infixish}{infix}{_ast} ]);
+method infix_prefix_meta_operator:sym<!> ($/) {
+    make mkcall($/, '&notop', $<infixish><infix>.ast);
 }
-sub infix_prefix_meta_operator__S_R { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&reverseop'),
-        args => [ $M->{infixish}{infix}{_ast} ]);
+method infix_prefix_meta_operator:sym<R> ($/) {
+    make mkcall($/, '&reverseop', $<infixish><infix>.ast);
 }
-sub infix_prefix_meta_operator__S_Z { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&zipop'),
-        args => [ $M->{infixish}{infix}{_ast} ]);
+method infix_prefix_meta_operator:sym<S> ($/) {
+    make mkcall($/, '&zipop', $<infixish><infix>.ast);
 }
-sub infix_prefix_meta_operator__S_S { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&seqop'),
-        args => [ $M->{infixish}{infix}{_ast} ]);
+method infix_prefix_meta_operator:sym<X> ($/) {
+    make mkcall($/, '&seqop', $<infixish><infix>.ast);
 }
-sub infix_prefix_meta_operator__S_X { my ($cl, $M) = @_;
-    $M->{_ast} = Op::CallSub->new(
-        invocant => Op::Lexical->new(name => '&crossop'),
-        args => [ $M->{infixish}{_ast} ]);
+method infix_prefix_meta_operator:sym<Z> ($/) {
+    make mkcall($/, '&crossop', $<infixish><infix>.ast);
 }
 
-sub infixish { my ($cl, $M) = @_;
-    if ($M->{colonpair}) {
-        return; # handled in POST
+method infixish($/) {
+    if $<colonpair> {
+        return Nil; # handled in POST
     }
 
-    if ($M->{infix_postfix_meta_operator}[0]) {
+    if $<assign_meta_operator> {
         # TODO: there should probably be at least a potential for others
-        $M->{infix}{_ast} = Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&assignop'),
-            args => [ $M->{infix}{_ast} ]);
+
+        make mkcall($/, '&assignop', $<infix>.ast);
+    } else {
+        make $<infix>.ast;
     }
 }
 
@@ -1044,231 +1049,207 @@ my %loose2tight = (
     'orelse' => '//', 'and' => '&&', 'or' => '||',
 );
 
-sub INFIX { my ($cl, $M) = @_;
-    my $fn = $M->{infix}{_ast};
-    my $s = $fn->isa('Op::Lexical') ? $fn->name :
-        ($fn->isa('Op::CallSub') && $fn->invocant->isa('Op::Lexical')) ?
-            $fn->invocant->name : '';
-    my ($st,$l,$r) = $cl->whatever_precheck($s, $M->{left}{_ast},
-        $M->{right}{_ast});
-
-    if ($s eq '&infix:<?? !!>') { # XXX macro
-        $M->{_ast} = Op::Conditional->new(node($M), check => $l,
-            true => $M->{middle}{_ast}, false => $r);
-    } elsif ($s eq '&infix:<:=>') {
-        $M->{_ast} = Op::Bind->new(node($M), readonly => 0, lhs => $l,
-            rhs => $r);
-    } elsif ($s eq '&infix:<::=>') {
-        $M->{_ast} = Op::Bind->new(node($M), readonly => 1, lhs => $l,
-            rhs => $r);
-    } elsif ($s eq '&infix:<,>') {
-        #XXX STD bug causes , in setting to be parsed as left assoc
-        my @r;
-        push @r, $l->isa('Op::SimpleParcel') ? @{ $l->items } : ($l);
-        push @r, $r->isa('Op::SimpleParcel') ? @{ $r->items } : ($r);
-        $M->{_ast} = Op::SimpleParcel->new(items => \@r);
-    } elsif ($s eq '&assignop' && $fn->args->[0]->isa('Op::Lexical') &&
-            ($fn->args->[0]->name =~ /&infix:<(.*)>/) &&
-            $loose2tight{$1}) {
-        $M->{_ast} = Op::ShortCircuitAssign->new(node($M),
-            kind => $loose2tight{$1}, lhs => $l, rhs => $r);
-    } else {
-        $M->{_ast} = Op::CallSub->new(node($M), invocant => $fn,
-            positionals => [ $l, $r ]);
-
-        if ($s eq '&infix:<=>') {
-            # Assignments to has and state declarators are rewritten into
-            # an appropriate phaser
-            if ($l->isa('Op::Lexical') && $l->state_decl) {
-                my $cv = $cl->gensym;
-                $M->{_ast} = Op::StatementList->new(node($M), children => [
-                    Op::Start->new(condvar => $cv, body => $M->{_ast}),
-                    Op::Lexical->new(name => $l->name)]);
-            }
-            elsif ($l->isa('Op::Attribute') && !$l->initializer) {
-                $l->initializer(
-                    $cl->sl_to_block('bare', $r, subname => $l->name . " init")
-                );
-                $M->{_ast} = $l;
-            }
-            elsif ($l->isa('Op::ConstantDecl') && !$l->init) {
-                $l->init($r);
-                $M->{_ast} = $l;
-            }
-        }
-    }
-    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
+sub _isinfix($out is rw, $str) {
+    $str ~~ /'&infix:<'(.*)'>'/ && ($out = $0; True)
 }
 
-sub CHAIN { my ($cl, $M) = @_;
-    my @args;
-    my @ops;
-    for my $i (0 .. scalar @{ $M->{chain} }) {
-        if ($i % 2) {
-            push @ops, $M->{chain}[$i]{infix}{_ast};
-        } else {
-            push @args, $M->{chain}[$i]{_ast};
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my $s = $fn.^isa(::Op::Lexical) ?? $fn.name !!
+        ($fn.^isa(::Op::CallSub) && $fn.invocant.^isa(::Op::Lexical)) ??
+            $fn.invocant.name !! '';
+    my ($st,$lhs,$rhs) = self.whatever_precheck($s, $<left>.ast, $<right>.ast);
+    my $n;
+
+    if $s eq '&infix:<?? !!>' { # XXX macro
+        make ::Op::Conditional.new(|node($/), check => $lhs,
+            true => $<infix><infix><EXPR>.ast, false => $rhs);
+    } elsif $s eq '&infix:<:=>' {
+        make ::Op::Bind.new(|node($/), :!readonly, :$lhs, :$rhs);
+    } elsif $s eq '&infix:<::=>' {
+        make ::Op::Bind.new(|node($/), :readonly, :$lhs, :$rhs);
+    } elsif $s eq '&infix:<,>' {
+        #XXX STD buglet causes , in setting to be parsed as left assoc
+        my @r;
+        push @r, $lhs.^isa(::Op::SimpleParcel) ?? @( $lhs.items ) !! $lhs;
+        push @r, $rhs.^isa(::Op::SimpleParcel) ?? @( $rhs.items ) !! $rhs;
+        make ::Op::SimpleParcel.new(|node($/), items => @r);
+    } elsif $s eq '&assignop' && $fn.args[0].^isa(::Op::Lexical) &&
+            _isinfix($n, $fn.args[0].name) && %loose2tight{$n} {
+        make ::Op::ShortCircuitAssign.new(|node($/),
+            kind => %loose2tight{$n}, :$lhs, :$rhs);
+    } else {
+        make ::Op::CallSub.new(|node($/), invocant => $fn,
+            positionals => [ $lhs, $rhs ]);
+
+        if $s eq '&infix:<=>' {
+            # Assignments to has and state declarators are rewritten into
+            # an appropriate phaser
+            if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+                my $cv = self.gensym;
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::Start.new(condvar => $cv, body => $/.ast),
+                    ::Op::Lexical.new(name => $lhs.name)]);
+            }
+            elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+                $lhs.initializer = self.sl_to_block('bare', $rhs,
+                    subname => $lhs.name ~ " init");
+                make $lhs;
+            }
+            elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+                $lhs.init = $rhs;
+                make $lhs;
+            }
         }
     }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
 
-    my ($st, @vargs) = $cl->whatever_precheck('', @args);
+method CHAIN($/) {
+    my @args;
+    my @ops;
+    my $i = 0;
+    while True {
+        push @args, $<chain>[$i++].ast;
+        last if $i == $<chain>;
+        push @ops,  $<chain>[$i++]<infix>.ast;
+    }
+
+    my ($st, @vargs) = self.whatever_precheck('', @args);
 
     my @pairwise;
-    while (@vargs >= 2) {
-        push @pairwise, Op::CallSub->new(node($M),
+    while @vargs >= 2 {
+        push @pairwise, ::Op::CallSub.new(|node($/),
                 invocant => shift(@ops),
-                positionals => [ $vargs[0], $vargs[1] ]);
+                positionals => [ @vargs[0], @vargs[1] ]);
         shift @vargs;
     }
 
-    $M->{_ast} = (@pairwise > 1) ?  Op::ShortCircuit->new(node($M),
-        kind => '&&', args => \@pairwise) : $pairwise[0];
+    make ((@pairwise > 1) ?? ::Op::ShortCircuit.new(|node($/),
+        kind => '&&', args => @pairwise) !! @pairwise[0]);
 
-    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
+    make self.whatever_postcheck($/, $st, $/.ast);
 }
 
-sub LIST { my ($cl, $M) = @_;
-    if ($M->isa('STD::Regex')) {
-        goto &LISTrx;
+method LIST($/) {
+    if $/.CURSOR.^isa(::STD::Regex) {
+        self.LISTrx($/);
+        return Nil;
     }
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
-    my $op  = $M->{delims}[0]{sym};
-    my ($st, @pos) = $cl->whatever_precheck("&infix:<$op>",
-        grep { defined } map { $_->{_ast} } @{ $M->{list} });
+    my $op  = ~$<delims>[0]<sym>;
+    my ($st, @pos) = self.whatever_precheck("&infix:<$op>",
+        grep *.&defined, map *.ast, @( $<list> ));
 
-    if ($op eq ',') {
-        $M->{_ast} = Op::SimpleParcel->new(node($M), items => \@pos);
-    } elsif ($loose2tight{$op}) {
-        $M->{_ast} = Op::ShortCircuit->new(node($M), kind => $loose2tight{$op},
-            args => \@pos);
+    if $op eq ',' {
+        make ::Op::SimpleParcel.new(|node($/), items => @pos);
+    } elsif %loose2tight{$op} {
+        make ::Op::ShortCircuit.new(|node($/), kind => %loose2tight{$op},
+            args => @pos);
     } else {
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(name => "&infix:<$op>"),
-            positionals => \@pos);
+        make mkcall($/, "\&infix:<$op>", @pos);
     }
-    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
+    make self.whatever_postcheck($/, $st, $/.ast);
 }
 
-sub POSTFIX { my ($cl, $M) = @_;
-    my $op = $M->{_ast};
-    my ($st, $arg) = $cl->whatever_precheck('', $M->{arg}{_ast});
-    if ($op->{postfix}) {
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(name => '&postfix:<' . $op->{postfix} . '>'),
-            positionals => [ $arg ]);
-    } elsif ($op->{postcircumfix}) {
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(name => '&postcircumfix:<' .
-                $op->{postcircumfix} . '>'),
-            positionals => [ $arg, @{ $op->{args} } ]);
-    } elsif ($op->{name} && $op->{name} =~ /^(?:HOW|WHAT)$/) {
-        if ($op->{args}) {
-            $M->sorry("Interrogative operator " . $op->{name} .
-                " does not take arguments");
-            return;
+method POSTFIX($/) {
+    my $op = $<op>.ast;
+    my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
+    if $op<postfix> {
+        make mkcall($/, "\&postfix:<{$op<postfix>}>", $arg);
+    } elsif $op<postcircumfix> {
+        make mkcall($/, "\&postcircumfix:<{$op<postcircumfix>}>", $arg,
+            @( $op<args> ));
+    } elsif $op<name> && ($op<name> eq 'HOW' || $op<name> eq 'WHAT') {
+        if $op<args> {
+            $/.CURSOR.sorry("Interrogative operator {$op<name>} does not take arguments");
+            make ::Op::StatementList.new;
+            return Nil;
         }
-        $M->{_ast} = Op::Interrogative->new(node($M),
+        make ::Op::Interrogative.new(|node($/), receiver => $arg,
+            name => $op<name>);
+    } elsif $op<metamethod> {
+        make ::Op::CallMethod.new(||node($/),
             receiver => $arg,
-            name => $op->{name});
-    } elsif ($op->{metamethod}) {
-        $M->{_ast} = Op::CallMethod->new(node($M),
-            receiver => $arg,
-            ismeta => 1,
-            name => $op->{metamethod},
-            args => $op->{args} // []);
-    } elsif ($op->{name}) {
-        if ($op->{path} && !$op->{private}) {
-            $M->sorry("Qualified references to non-private methods NYI");
+            ismeta => True,
+            name => $op<metamethod>,
+            args => $op<args> // []);
+    } elsif $op<name> {
+        if $op<path> && !$op<private> {
+            $/.CURSOR.sorry("Qualified references to non-private methods NYI");
         }
-        $M->{_ast} = Op::CallMethod->new(node($M),
+        make ::Op::CallMethod.new(|node($/),
             receiver => $arg,
-            private  => $op->{private},
-            ppath    => $op->{path},
-            name     => $op->{name},
-            args     => $op->{args} // []);
-    } elsif ($op->{quote}) {
-        $M->{_ast} = Op::CallMethod->new(node($M),
+            private  => $op<private>,
+            ppath    => $op<path>,
+            name     => $op<name>,
+            args     => $op<args> // []);
+    } elsif $op<quote> {
+        make ::Op::CallMethod.new(|node($/),
             receiver => $arg,
-            private  => $op->{private},
-            name     => $op->{quote},
-            args     => $op->{args} // []);
-    } elsif ($op->{ref}) { # $obj.&foo
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => $op->{ref},
-            args     => [ $arg, @{ $op->{args} // [] } ]);
-    } elsif ($op->{postcall}) {
-        if (@{ $op->{postcall} } > 1) {
-            $M->sorry("Slicels NYI");
-            return;
+            private  => $op<private>,
+            name     => $op<quote>,
+            args     => $op<args> // []);
+    } elsif $op<ref> { # $obj.&foo
+        make ::Op::CallSub.new(|node($/),
+            invocant => $op<ref>,
+            args     => [ $arg, @( $op<args> // [] } ]);
+    } elsif $op<postcall> {
+        if $op<postcall> > 1 {
+            $/.CURSOR.sorry("Slicels NYI");
+            make ::Op::StatementList.new;
+            return Nil;
         }
-        $M->{_ast} = Op::CallSub->new(node($M),
+        make ::Op::CallSub.new(|node($/),
             invocant => $arg,
-            args => ($op->{postcall}[0] // []));
-    } elsif ($M->{colonpair}) {
-        if ($arg->isa('Op::CallLike')) {
-            $M->{_ast} = $arg->adverb($M->{colonpair}{_ast}{term});
+            args => ($op<postcall>[0] // []));
+    } elsif $<colonpair> {
+        if $arg.^isa(::Op::CallLike) {
+            make $arg.adverb($<colonpair>.ast<term>);
         } else {
-            $M->sorry("You can't adverb that");
-            return;
+            $/.CURSOR.sorry("You can't adverb that");
+            make ::Op::StatementList.new;
+            return Nil;
         }
     } else {
-        say join(" ", %$M);
-        $M->sorry("Unhandled postop type");
+        $/.CURSOR.sorry("Unhandled postop type");
+        make ::Op::StatementList.new;
     }
-    $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
+    make self.whatever_postcheck($/, $st, $/.ast);
 }
 
-sub PREFIX { my ($cl, $M) = @_;
-    my $op = '&prefix:<' . $M->{sym} . '>';
-    my $rarg = $M->{arg}{_ast};
+method PREFIX($/) {
+    my $op = "\&prefix:<$<sym>>";
+    my $rarg = $<arg>.ast;
 
     # Macros
-    if ($op eq '&prefix:<temp>') {
-        if (!$rarg->isa('Op::ContextVar') || $rarg->uplevel) {
-            $M->sorry('Non-contextual case of temp NYI');
-            $M->{_ast} = Op::StatementList->new;
-            return;
+    if $op eq '&prefix:<temp>' {
+        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
+            $/.CURSOR.sorry('Non-contextual case of temp NYI');
+            make ::Op::StatementList.new;
+            return Nil;
         }
-        $M->{_ast} = Op::CallSub->new(
-            invocant => Op::Lexical->new(name => '&infix:<=>'),
-            args => [ Op::Lexical->new(name => $rarg->name, declaring => 1,
-                        hash => scalar($rarg->name =~ /^%/),
-                        list => scalar($rarg->name =~ /^@/)),
-                      Op::ContextVar->new(name => $rarg->name, uplevel => 1) ]);
-        return;
+        make mkcall($/, '&infix:<=>',
+            ::Op::Lexical.new(name => $rarg.name, declaring => True,
+                        hash => substr($rarg.name,0,1) eq '%',
+                        list => substr($rarg.name,0,1) eq '@'),
+            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+        return Nil;
     }
 
-    my ($st, $arg) = $cl->whatever_precheck($op, $rarg);
-    $M->{_ast} = $cl->whatever_postcheck($M, $st, Op::CallSub->new(node($M),
-        invocant => Op::Lexical->new(name => $op),
-        positionals => [ $M->{arg}{_ast} ]));
+    my ($st, $arg) = self.whatever_precheck($op, $rarg);
+    make self.whatever_postcheck($/, $st, mkcall($/, $op, $<arg>.ast));
 }
 
-sub infix { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Lexical->new(name => '&infix:<' . $M->{sym} . '>');
-}
-sub infix__S_ANY { }
+method assign_meta_operator($ ) {}
 
-# hacked in infixish - = is the only one
-sub infix_postfix_meta_operator { }
-sub infix_postfix_meta_operator__S_Equal { }
+method postcircumfix:sym<( )> ($/) { make { postcall => $<semiarglist>.ast }; }
 
-sub prefix { }
-sub prefix__S_ANY { }
-
-sub postfix { }
-sub postfix__S_ANY { }
-
-sub postcircumfix { }
-sub postcircumfix__S_Paren_Thesis { my ($cl, $M) = @_;
-    $M->{_ast} = { postcall => $M->{semiarglist}{_ast} };
-}
-
-sub semilist_to_args { my ($cl, $M) = @_;
-    if (@{ $M->{_ast} } > 1) {
-        $M->sorry('Slice lookups NYI');
-        return;
+method semilist_to_args($/) {
+    if $/.ast > 1 {
+        $/.CURSOR.sorry('Slice lookups NYI');
+        return [];
     }
     my ($al) = @{ $M->{_ast} };
 
@@ -1355,6 +1336,8 @@ sub coloncircumfix { my ($cl, $M) = @_;
     $M->{qpvalue} = $M->{circumfix}{qpvalue};
 }
 
+sub qpvalue { ... }
+
 sub colonpair { my ($cl, $M) = @_;
     my $k = $M->{k};
     # STD seems to think term:name is term:sym<name>.  Needs speccy
@@ -1362,8 +1345,8 @@ sub colonpair { my ($cl, $M) = @_;
     my $n;
     if (!ref $M->{v}) {
         $n = ":" . ($M->{v} ? '' : '!') . $M->{k};
-    } elsif (defined $M->{v}{qpvalue}) {
-        $n = ":" . $M->{k} . $M->{v}{qpvalue};
+    } else {
+        $n = ":" . $M->{k} . qpvalue($M->{v});
     }
     my $tv = ref($M->{v}) ? $M->{v}{_ast} :
         Op::Lexical->new(name => $M->{v} ? 'True' : 'False');
