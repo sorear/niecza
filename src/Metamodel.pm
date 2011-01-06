@@ -12,9 +12,6 @@ use Sig;
 use YAML::XS;
 use Scalar::Util 'blessed';
 
-# TODO remove
-use CompilerDriver;
-
 ### NIECZA COMPILER METAMODEL
 # The metamodel exists to create a timeline inside the compiler.  Previously,
 # the compiler operated as a pure tree transformer with no conception of how
