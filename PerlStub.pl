@@ -3,10 +3,11 @@ open my $realstderr, ">&STDERR";
 open STDERR, ">&STDOUT";
 
 use lib 'src';
-use NAMWriter;
 
 while(1) {
     my $line = <STDIN>;
+    require CompilerDriver;
+    CompilerDriver->import(':all');
     last unless defined($line) && length($line);
     eval $line;
     if ($@) {
