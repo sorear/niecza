@@ -12,6 +12,7 @@ method oplift() { map *.oplift, @$!zyg }
 method uncut()  { self }
 
 method check()  { map *.check, @$!zyg }
+method tocclist() { CClass }
 
 # all that matters is 0-1-infty; $*in_quant valid here
 method used_caps() {
@@ -52,6 +53,11 @@ class Sym is Capturing {
     has $.text; # Str, is rw
     has $.igcase; # Bool
     has $.igmark; # Bool
+
+    method clone(:$captures) {
+        self.WHAT.new(text => $.text, igcase => $.igcase, igmark => $.igmark,
+            :$captures);
+    }
 
     method check() { $.text = $*symtext; nextsame }
 
@@ -429,6 +435,13 @@ class Subrule is Capturing {
     has $.selfcut = False; # Bool
     has $.zerowidth; # Bool
     has $.negative; # Bool
+
+    method clone(:$captures) {
+        self.WHAT.new(method => $!method, regex => $!regex,
+            passcap => $!passcap, _passcapltm => $!_passcapltm,
+            _passcapzyg => $!_passcapzyg, selfcut => $!selfcut,
+            zerowidth => $!zerowidth, negative => $!negative, :$captures);
+    }
 
     method opzyg() { $!regex // Nil }
 

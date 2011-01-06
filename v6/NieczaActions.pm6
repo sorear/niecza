@@ -12,6 +12,7 @@ use CClass;
 use OptRxSimple;
 
 sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
+sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
@@ -393,7 +394,6 @@ method atom($/) {
 
 method quantified_atom($/) { # :: RxOp
     my $atom = $<atom>.ast;
-    my $ns   = $<normspace>[0];
     my $q    = $<quantifier> ?? $<quantifier>[0].ast !! Any;
 
     return Nil unless $atom;
@@ -449,7 +449,7 @@ method quantifier:sym<**> ($/) {
         $1 ?? { min => +~$0[0], max => +~$1[0] } !!
         ($0 && defined($/.index('..'))) ?? { min => +~$0 } !!
         $0 ?? { min => +~$0, max => +~$0 } !!
-        $<embeddedblock> ? { min => 0, cond => $<embeddedblock>.ast } !!
+        $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
         { min => 1, sep => $<quantified_atom>.ast };
     $h<mod> = $<quantmod>.ast;
     make $h;
@@ -458,7 +458,7 @@ method quantifier:sym<**> ($/) {
 method quantmod($/) {
     my $t = ~$/;
     if $t eq '' { make Any; return Nil }
-    if substr($t,0,1) eq ':' { t = substr($t,1,chars($t)-1) }
+    if substr($t,0,1) eq ':' { $t = substr($t,1,chars($t)-1) }
     if $t eq '+' {
         $/.CURSOR.sorry('STD parses + as a quantmod but there is nothing at all in S05 to explain what it should _do_'); #XXX
         make Any;
@@ -468,7 +468,7 @@ method quantmod($/) {
 }
 
 method quant_atom_list($/) {
-    make ::RxOp::Sequence->new(zyg => [ map *.ast, @( $<quantified_atom> ) ]);
+    make ::RxOp::Sequence.new(zyg => [ map *.ast, @( $<quantified_atom> ) ]);
 }
 
 my %LISTrx_types = (
@@ -478,10 +478,9 @@ my %LISTrx_types = (
     '||' => ::RxOp::SeqAlt,
 );
 
-method LISTrx($/)
 sub LISTrx($/) {
     make %LISTrx_types{$<delims>[0]<sym>}.new(zyg =>
-        [ map *.ast, @( $M<list> ) ], dba => %*RX<dba>);
+        [ map *.ast, @( $<list> ) ], dba => %*RX<dba>);
 }
 
 method regex_infix:sym<|> {}
@@ -505,407 +504,345 @@ method metachar:sym<{ }> ($/) {
 
 method metachar:mod ($/) {
     # most of these have only parse-time effects
-    $M->{_ast} = $M->{mod_internal}{_ast} // RxOp::Sequence->new;
+    make (($<mod_internal>.ast ~~ RxOp) ?? $<mod_internal>.ast !! ::RxOp::Sequence.new);
 }
 
-sub metachar__S_ColonColon { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::CutLTM->new;
+method metachar:sym<::> ($/) { make ::RxOp::CutLTM.new }
+method metachar:sym«::>» ($/) { make ::RxOp::CutBrack.new }
+method metachar:sym<:::> ($/) { make ::RxOp::CutRule.new }
+
+method metachar:sym<[ ]> ($/) {
+    make ::RxOp::ConfineLang.new(zyg => [$<nibbler>.ast]);
 }
 
-sub metachar__S_ColonColonColon { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::CutRule->new;
+method metachar:sym<( )> ($/) {
+    make self.rxcapturize($/, Any, self.encapsulate_regex($/, $<nibbler>.ast,
+            passcut => True));
 }
 
-sub metachar__S_Bra_Ket { my ($cl, $M) = @_;
-    return unless $M->{nibbler}{_ast};
-    $M->{_ast} = RxOp::ConfineLang->new(zyg => [$M->{nibbler}{_ast}]);
+method metachar:sym« <( » ($/) { make ::RxOp::MarkFrom.new }
+method metachar:sym« )> » ($/) { make ::RxOp::MarkTo.new }
+method metachar:sym« << » ($/) { make ::RxOp::ZeroWidth.new(type => '<<') }
+method metachar:sym« >> » ($/) { make ::RxOp::ZeroWidth.new(type => '>>') }
+method metachar:sym< « > ($/) { make ::RxOp::ZeroWidth.new(type => '<<') }
+method metachar:sym< » > ($/) { make ::RxOp::ZeroWidth.new(type => '>>') }
+
+method metachar:qw ($/) {
+    my $cif = $<circumfix>.ast;
+    my @words = $cif.^isa(::Op::SimpleParcel) ?? @( $cif.items ) !! $cif;
+    @words = map *.text, @words;
+
+    make ::RxOp::Alt.new(zyg => [ map { ::RxOp::String.new(text => $_,
+            igcase => %*RX<i>, igmark => %*RX<a>) }, @words ], dba => %*RX<dba>);
 }
 
-sub metachar__S_Paren_Thesis { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->rxcapturize($M, undef,
-        $cl->encapsulate_regex($M, $M->{nibbler}{_ast}, passcut => 1));
+method metachar:sym«< >» ($/) { make $<assertion>.ast }
+method metachar:sym<\\> ($/) {
+    my $cc = $<backslash>.ast;
+    make ($cc.^isa(CClass) ??
+        ::RxOp::CClassElem.new(cc => $cc,
+            igcase => %*RX<i>, igmark => %*RX<a>) !!
+        ::RxOp::String.new(text => $cc,
+            igcase => %*RX<i>, igmark => %*RX<a>));
 }
 
-sub metachar__S_LtParen { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::MarkFrom->new;
-}
+method metachar:sym<.> ($/) { make ::RxOp::Any.new }
+method metachar:sym<^> ($/) { make ::RxOp::ZeroWidth.new(type => '^'); }
+method metachar:sym<^^> ($/) { make ::RxOp::ZeroWidth.new(type => '^^'); }
+method metachar:sym<$> ($/) { make ::RxOp::ZeroWidth.new(type => '$'); }
+method metachar:sym<$$> ($/) { make ::RxOp::ZeroWidth.new(type => '$$'); }
 
-sub metachar__S_ThesisGt { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::MarkTo->new;
-}
-
-sub metachar__S_LtLt { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '<<');
-}
-
-sub metachar__S_GtGt { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '>>');
-}
-
-sub metachar__S_Fre { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '<<');
-}
-
-sub metachar__S_Nch { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '>>');
-}
-
-sub metachar__S_qw { my ($cl, $M) = @_;
-    my $cif = $M->{circumfix}{_ast};
-    my @words = ($cif->isa('Op::SimpleParcel')) ? @{ $cif->items } : $cif;
-    @words = map { $_->text } @words;
-
-    $M->{_ast} = RxOp::Alt->new(zyg => [ map { RxOp::String->new(text => $_,
-            igcase => $::RX{i}, igmark => $::RX{a}) } @words ], dba => $::RX{dba});
-}
-
-sub metachar__S_Lt_Gt { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{assertion}{_ast};
-}
-
-sub metachar__S_Back { my ($cl, $M) = @_;
-    my $cc = $M->{backslash}{_ast};
-    $M->{_ast} = ref($cc) ?
-        RxOp::CClassElem->new(cc => $cc,
-            igcase => $::RX{i}, igmark => $::RX{a}) :
-        RxOp::String->new(text => $cc,
-            igcase => $::RX{i}, igmark => $::RX{a});
-}
-
-sub metachar__S_Dot { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::Any->new;
-}
-
-sub metachar__S_Caret { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '^');
-}
-
-sub metachar__S_CaretCaret { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '^^');
-}
-
-sub metachar__S_Dollar { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '$');
-}
-
-sub metachar__S_DollarDollar { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::ZeroWidth->new(type => '$$');
-}
-
-sub metachar__S_Single_Single { my ($cl, $M) = @_;
-    if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
-        $M->sorry("Interpolating strings in regexes NYI");
-        return;
+method metachar:sym<' '> ($/) {
+    if ! $<quote>.ast.^isa(::Op::StringLiteral) {
+        make ::RxOp::VarString.new(ops => self.rxembed($/, $<quote>.ast, True));
+        return Nil;
     }
-    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
-        igcase => $::RX{i}, igmark => $::RX{a});
+    make ::RxOp::String.new(text => $<quote>.ast.text, igcase => %*RX<i>,
+        igmark => %*RX<a>);
 }
 
-sub metachar__S_Double_Double { my ($cl, $M) = @_;
-    if (! $M->{quote}{_ast}->isa('Op::StringLiteral')) {
-        $M->{_ast} = RxOp::VarString->new(ops =>
-            $cl->rxembed($M, $M->{quote}{_ast}, 1));
-        return;
+method metachar:sym<" "> ($/) {
+    if ! $<quote>.ast.^isa(::Op::StringLiteral) {
+        make ::RxOp::VarString.new(ops => self.rxembed($/, $<quote>.ast, True));
+        return Nil;
     }
-    $M->{_ast} = RxOp::String->new(text => $M->{quote}{_ast}->text,
-        igcase => $::RX{i}, igmark => $::RX{a});
+    make ::RxOp::String.new(text => $<quote>.ast.text, igcase => %*RX<i>,
+        igmark => %*RX<a>);
 }
 
-sub metachar__S_var { my ($cl, $M) = @_;
-    if ($M->{binding}) {
-        my $a = $M->{binding}{quantified_atom}{_ast}->uncut;
-        my $cid = $M->{variable}{_ast}{capid};
+method metachar:var ($/) {
+    if $<binding> {
+        my $a = $<binding><quantified_atom>.ast.uncut;
+        my $cid = $<variable>.ast.<capid>;
 
-        if (!defined $cid) {
-            $M->sorry("Non-Match bindings NYI");
-            $M->{_ast} = RxOp::Sequence->new;
-            return;
+        if !defined $cid {
+            $/.CURSOR.sorry("Non-Match bindings NYI");
+            make ::RxOp::Sequence.new;
+            return Nil;
         }
 
-        if ($a->isa('RxOp::VoidBlock')) {
-            $M->{_ast} = RxOp::SaveValue->new(capid => $cid,
-                block => $a->block);
-            return;
+        if $a.^isa(::RxOp::VoidBlock) {
+            make ::RxOp::SaveValue.new(capid => $cid, block => $a.block);
+            return Nil;
         }
 
-        $M->{_ast} = $cl->rxcapturize($M, $cid, $a);
-        return;
+        make self.rxcapturize($/, $cid, $a);
+        return Nil;
     }
-    $M->{_ast} = RxOp::VarString->new(param => $M->{variable}->Str,
-        ops => $cl->rxembed($M, $cl->do_variable_reference($M, $M->{variable}{_ast}, 1)));
+    make ::RxOp::VarString.new(param => ~$<variable>,
+        ops => self.rxembed($/, self.do_variable_reference($/, $<variable>.ast), True));
 }
 
-sub rxcapturize { my ($cl, $M, $name, $rxop) = @_;
-    if (!$rxop->isa('RxOp::Capturing')) {
+method rxcapturize($/, $name, $_rxop) {
+    my $rxop = $_rxop;
+    if !$rxop.^isa(::RxOp::Capturing) {
         # $<foo>=[...]
-        $rxop = $cl->encapsulate_regex($M, $rxop, passcut => 1, passcap => 1);
+        $rxop = self.encapsulate_regex($/, $rxop, passcut => True,
+            passcap => True);
     }
 
     # $<foo>=(...)
-    if (@{ $rxop->captures } == 1 && !defined($rxop->captures->[0])) {
-        return ref($rxop)->new(%$rxop, captures => [$name]);
+    if +$rxop.captures == 1 && !defined($rxop.captures.[0]) {
+        return $rxop.clone(captures => [$name]);
     }
 
-    return ref($rxop)->new(%$rxop, captures => [ $name, @{ $rxop->captures } ]);
+    return $rxop.clone(captures => [ $name, @( $rxop.captures ) ]);
 }
 
-sub do_cclass { my ($cl, $M) = @_;
-    my @cce = @{ $M->{cclass_elem} };
+method do_cclass($/) {
+    my @cce = @( $<cclass_elem> );
 
     my $rxop;
-    for (@cce) {
-        my $sign = $_->{sign}->Str ne '-';
+    for @cce {
+        my $sign = $_.<sign> ne '-';
         my $exp =
-            ($_->{name} && $_->{name}->Str =~ /^INTERNAL::(.*)/) ?
-                RxOp::CClassElem->new(cc => CClass::internal($1)) :
-            $_->{quibble} ?
-                RxOp::CClassElem->new(cc => $_->{quibble}{_ast}) :
-            RxOp::Subrule->new(captures => [], method => $_->{name}->Str);
+            ($_.<name> && substr($_.<name>,0,10) eq 'INTERNAL::') ??
+                ::RxOp::CClassElem.new(cc => CClass.internal(substr($_.<name>,10))) !!
+            $_.<quibble> ??
+                ::RxOp::CClassElem.new(cc => $_.<quibble>.ast) !!
+            ::RxOp::Subrule.new(captures => [], method => ~$_.<name>);
 
-        if ($exp->isa('RxOp::CClassElem') && (!$rxop || $rxop->isa('RxOp::CClassElem'))) {
-            if ($sign) {
-                $rxop = $rxop ? RxOp::CClassElem->new(cc => $exp->cc->plus($rxop->cc)) : $exp;
+        if $exp.^isa(::RxOp::CClassElem) && (!$rxop || $rxop.^isa(::RxOp::CClassElem)) {
+            if $sign {
+                $rxop = $rxop ?? ::RxOp::CClassElem.new(cc => $exp.cc.plus($rxop.cc)) !! $exp;
             } else {
-                $rxop = RxOp::CClassElem->new(cc => ($rxop ? $rxop->cc : $CClass::Full)->minus($exp->cc));
+                $rxop = ::RxOp::CClassElem.new(cc => ($rxop ?? $rxop.cc !! $CClass::Full).minus($exp.cc));
             }
-        } elsif ($sign) {
-            $rxop = $rxop ? RxOp::SeqAlt->new(zyg => [ $exp, $rxop ]) : $exp;
+        } elsif $sign {
+            $rxop = $rxop ?? ::RxOp::SeqAlt.new(zyg => [ $exp, $rxop ]) !! $exp;
         } else {
-            $rxop = RxOp::Sequence->new(zyg => [
-                RxOp::NotBefore->new(zyg => [ $exp ]),
-                $rxop // RxOp::Any->new]);
+            $rxop = ::RxOp::Sequence.new(zyg => [
+                ::RxOp::NotBefore.new(zyg => [ $exp ]),
+                $rxop // ::RxOp::Any.new]);
         }
     }
 
-    $M->{_ast} = $rxop;
+    make $rxop;
 }
 
-sub decapturize { my ($cl, $M) = @_;
-    if (!$M->{assertion}{_ast}->isa('RxOp::Capturing')) {
-        return $M->{assertion}{_ast};
+method decapturize($/) {
+    if !$<assertion>.ast.^isa(::RxOp::Capturing) {
+        return $<assertion>.ast;
     }
-    ref($M->{assertion}{_ast})->new(%{ $M->{assertion}{_ast} }, captures => []);
+    $<assertion>.ast.clone(captures => []);
 }
 
-sub cclass_elem {}
+method cclass_elem($ ) {}
 
-sub assertion {}
-sub assertion__S_name { my ($cl, $M) = @_;
-    my $name = $cl->unqual_longname($M->{longname},
-        "Qualified method calls NYI");
-    if ($M->{assertion}[0]) {
-        $M->{_ast} = $M->{assertion}[0]{_ast};
-    } elsif ($name eq 'sym') {
-        $M->{_ast} = RxOp::Sym->new(captures => [], igcase => $::RX{i}, igmark => $::RX{a});
-    } elsif ($name eq 'before') {
-        $M->{_ast} = RxOp::Before->new(zyg => [$M->{nibbler}[0]{_ast}]);
-        return;
-    } elsif ($name eq 'after') {
-        my @l = $M->{nibbler}[0]{_ast}->tocclist;
-        if (grep { !defined } @l) {
-            $M->sorry("Unsuppored elements in after list");
-            $M->{_ast} = RxOp::Sequence->new;
-            return;
+method assertion:name ($/) {
+    my $name = self.unqual_longname($<longname>, "Qualified method calls NYI");
+    if $<assertion> {
+        make $<assertion>[0].ast;
+    } elsif $name eq 'sym' {
+        make ::RxOp::Sym.new(igcase => %*RX<i>, igmark => %*RX<a>);
+    } elsif $name eq 'before' {
+        make ::RxOp::Before.new(zyg => [$<nibbler>[0].ast]);
+        return Nil;
+    } elsif $name eq 'after' {
+        my @l = $<nibbler>[0].ast.tocclist;
+        if grep { !defined $_ } @l {
+            $/.CURSOR.sorry("Unsuppored elements in after list");
+            make ::RxOp::Sequence.new;
+            return Nil;
         }
-        $M->{_ast} = RxOp::ZeroWidthCCs->new(neg => 0, after => 1, ccs => \@l);
-        return;
-    } elsif (!$M->{nibbler}[0] && !$M->{arglist}[0]) {
-        $M->{_ast} = RxOp::Subrule->new(method => $name);
+        make ::RxOp::ZeroWidthCCs.new(neg => False, after => True, ccs => @l);
+        return Nil;
+    } elsif !$<nibbler>[0] && !$<arglist>[0] {
+        make ::RxOp::Subrule.new(method => $name);
     } else {
-        my $args = $M->{nibbler}[0] ?
-            [ $cl->op_for_regex($M, $M->{nibbler}[0]{_ast}) ] :
-            $M->{arglist}[0]{_ast};
+        my $args = $<nibbler> ??
+            [ self.op_for_regex($/, $<nibbler>[0].ast) ] !!
+            $<arglist>[0].ast;
 
-        my $callop = Op::CallMethod->new(
-            receiver => Op::Lexical->new(name => '$¢'),
+        my $callop = ::Op::CallMethod.new(|node($/),
+            receiver => ::Op::Lexical.new(name => '$¢'),
             name => $name,
             args => $args);
 
-        my $regex = $cl->rxembed($M, $callop, 1);
+        my $regex = self.rxembed($/, $callop, True);
 
-        $M->{_ast} = RxOp::Subrule->new(regex => $regex);
+        make ::RxOp::Subrule.new(regex => $regex);
     }
-    $M->{_ast} = $cl->rxcapturize($M, $name, $M->{_ast});
+    make self.rxcapturize($/, $name, $/.ast);
 }
 
-sub assertion__S_method { my ($cl, $M) = @_;
-    if ($M->{dottyop}) {
-        $M->sorry("Dottyop assertions NYI");
-        return;
+method assertion:method ($/) {
+    if $<dottyop> {
+        $/.CURSOR.sorry("Dottyop assertions NYI");
+        make ::RxOp::None.new;
+        return Nil;
     }
-    $M->{_ast} = $cl->decapturize($M);
+    make self.decapturize($/);
 }
 
-sub assertion__S_Question { my ($cl, $M) = @_;
-    if ($M->{assertion}) {
-        $M->{_ast} = RxOp::Before->new(zyg => [$cl->decapturize($M)]);
+method assertion:sym<?> ($/) {
+    if $<assertion> {
+        make ::RxOp::Before.new(zyg => [self.decapturize($/)]);
     } else {
-        $M->{_ast} = RxOp::Sequence->new;
+        make ::RxOp::Sequence.new;
     }
 }
 
-sub assertion__S_Bang { my ($cl, $M) = @_;
-    if ($M->{assertion}) {
-        $M->{_ast} = RxOp::NotBefore->new(zyg => [$cl->decapturize($M)]);
+method assertion:sym<!> ($/) {
+    if $<assertion> {
+        make ::RxOp::NotBefore.new(zyg => [self.decapturize($/)]);
     } else {
-        $M->{_ast} = RxOp::None->new;
+        make ::RxOp::None.new;
     }
 }
 
-sub assertion__S_Cur_Ly { my ($cl, $M) = @_;
-    my $inv = $M->{embeddedblock}{_ast}->invocant;
-    $inv->body->type('rxembedded');
-    $inv->body->signature(Sig->simple('$¢'));
-    $inv->once(1);
-    $inv = Op::CallSub->new(node($M), invocant => $inv, positionals => [ Op::MakeCursor->new(node($M)) ]);
-    $M->{_ast} = RxOp::CheckBlock->new(block => $inv);
+method assertion:sym<{ }> ($/) {
+    my $inv = $<embeddedblock>.ast.invocant;
+    $inv.body.type = 'rxembedded';
+    $inv.body.signature = Sig.simple('$¢');
+    $inv.once = True;
+    $inv = ::Op::CallSub.new(|node($/), invocant => $inv, positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
+    make ::RxOp::CheckBlock.new(block => $inv);
 }
 
-*assertion__S_Bra   = \&do_cclass;
-*assertion__S_Minus = \&do_cclass;
-*assertion__S_Plus  = \&do_cclass;
+method assertion:sym<[> ($/) { self.do_cclass($/) }
+method assertion:sym<-> ($/) { self.do_cclass($/) }
+method assertion:sym<+> ($/) { self.do_cclass($/) }
 
-# These have effects only in the parser, so undef ast is correct.
-sub mod_value {}
-sub mod_internal {}
-sub mod_internal__S_Coloni {}
-sub mod_internal__S_ColonBangi {}
-sub mod_internal__S_ColoniParen_Thesis {}
-sub mod_internal__S_Colon0i {}
-sub mod_internal__S_Colons {}
-sub mod_internal__S_ColonBangs {}
-sub mod_internal__S_ColonsParen_Thesis {}
-sub mod_internal__S_Colon0s {}
-sub mod_internal__S_Colonr {}
-sub mod_internal__S_ColonBangr {}
-sub mod_internal__S_ColonrParen_Thesis {}
-sub mod_internal__S_Colon0r {}
-sub mod_internal__S_Colona {}
-sub mod_internal__S_ColonBanga {}
-sub mod_internal__S_ColonaParen_Thesis {}
-sub mod_internal__S_Colon0a {}
+# These have effects only in the parser, so no ast is correct.
+method mod_value($ ) {}
+method mod_internal:sym<:i> ($ ) {}
+method mod_internal:sym<:!i> ($ ) {}
+method mod_internal:sym<:i( )> ($ ) {}
+method mod_internal:sym<:0i> ($ ) {}
+method mod_internal:sym<:s> ($ ) {}
+method mod_internal:sym<:!s> ($ ) {}
+method mod_internal:sym<:s( )> ($ ) {}
+method mod_internal:sym<:0s> ($ ) {}
+method mod_internal:sym<:r> ($ ) {}
+method mod_internal:sym<:!r> ($ ) {}
+method mod_internal:sym<:r( )> ($ ) {}
+method mod_internal:sym<:0r> ($ ) {}
+method mod_internal:sym<:a> ($ ) {}
+method mod_internal:sym<:!a> ($ ) {}
+method mod_internal:sym<:a( )> ($ ) {}
+method mod_internal:sym<:0a> ($ ) {}
 
-sub mod_internal__S_Colonmy { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::Statement->new(stmt => $M->{statement}{_ast} );
+method mod_internal:sym<:my> ($/) {
+    make ::RxOp::Statement.new(stmt => $<statement>.ast );
 }
 
-sub mod_internal__S_p6adv { my ($cl, $M) = @_;
-    my ($k, $v) = @{ $M->{quotepair} }{"k", "v"};
+method mod_internal:p6adv ($/) {
+    my ($k, $v) = $<quotepair><k v>;
 
-    if (!ref ($v)) {
-        $M->sorry(":$k requires an expression argument");
-        return:
+    if !$v.^isa(Match) {
+        $/.CURSOR.sorry(":$k requires an expression argument");
+        make ::RxOp::None.new;
+        return Nil;
     }
-    $v = $v->[0]{_ast};
+    $v = $v[0].ast;
 
-    if ($k eq 'lang') {
-        $M->{_ast} = RxOp::SetLang->new(expr => $cl->rxembed($M, $v, 1));
-    } elsif ($k eq 'dba') {
-        UNWRAP: {
-            $v->isa('Op::Paren') && ($v = $v->inside, redo UNWRAP);
-            $v->isa('Op::StatementList') && @{ $v->children } == 1 &&
-                ($v = $v->children->[0], redo UNWRAP);
+    if $k eq 'lang' {
+        make ::RxOp::SetLang.new(expr => self.rxembed($/, $v, True));
+    } elsif $k eq 'dba' {
+        while True {
+            if $v.^isa(::Op::Paren) { $v = $v.inside; redo }
+            if $v.^isa(::Op::StatementList) && +$v.children == 1
+                { $v = $v.children.[0]; redo }
+            last;
         }
-        if (! $v->isa('Op::StringLiteral')) {
-            say (YAML::XS::Dump($v));
-            $M->sorry(":dba requires a literal string");
-            return;
+        if !$v.isa(::Op::StringLiteral) {
+            $/.CURSOR.sorry(":dba requires a literal string");
+            make ::RxOp::None.new;
+            return Nil;
         }
-        $::RX{dba} = $v->text;
+        %*RX<dba> = $v.text;
     }
 }
 
-sub backslash { my ($cl, $M) = @_;
-    if ($M->Str =~ /^[A-Z]$/ && $M->{sym} =~ /^[a-z]$/) {
-        if (!ref($M->{_ast}) && length($M->{_ast}) != 1) {
-            $M->sorry("Improper attempt to negate a string");
-            return;
+sub post_backslash($/) {
+    # XXX confine $/ resetting
+    sub _isupper { $_ ~~ /^<[ A .. Z ]>$/ }
+    sub _islower { $_ ~~ /^<[ a .. z ]>$/ }
+    if _isupper($/) && _islower($<sym>) {
+        if $/.ast.^isa(Str) && chars($/.ast) != 1 {
+            $/.CURSOR.sorry("Improper attempt to negate a string");
+            return Nil;
         }
-        $M->{_ast} = CClass->enum($M->{_ast}) unless blessed $M->{_ast};
-        $M->{_ast} = $M->{_ast}->negate;
+        make CClass.enum($/.ast) if $/.ast.^isa(Str);
+        make $/.ast.negate;
     }
 }
-sub backslash__S_x { my ($cl, $M) = @_;
-    if ($M->{hexint}) {
-        $M->{_ast} = chr($M->{hexint}{_ast});
+method backslash:x ($/) {
+    if $<hexint> {
+        make chr($<hexint>.ast);
     } else {
-        $M->{_ast} = join "", map { chr } @{ $M->{hexints}{_ast} };
+        make (join "", map *.&chr, @( $<hexints>.ast ));
     }
+    post_backslash($/);
 }
-sub backslash__S_o { my ($cl, $M) = @_;
-    if ($M->{octint}) {
-        $M->{_ast} = chr($M->{octint}{_ast});
+method backslash:o ($/) {
+    if $<octint> {
+        make chr($<octint>.ast);
     } else {
-        $M->{_ast} = join "", map { chr } @{ $M->{octints}{_ast} };
+        make (join "", map *.&chr, @( $<octints>.ast ));
     }
+    post_backslash($/);
 }
-sub backslash__S_Back { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{text}->Str;
-}
-sub backslash__S_stopper { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{text}->Str;
-}
-sub backslash__S_unspace { my ($cl, $M) = @_;
-    $M->{_ast} = "";
-}
-sub backslash__S_misc { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{text} // $M->{litchar}->Str;
-}
+method backslash:sym<\\> ($/) { make ~$<text> }
+method backslash:stopper ($/) { make ~$<text> }
+method backslash:unspace ($/) { make "" }
+method backslash:misc ($/) { make ($<text> // ~$<litchar>) }
 # XXX h, v, s, needs spec clarification
-sub backslash__S_0 { my ($cl, $M) = @_; $M->{_ast} = "\0" }
-sub backslash__S_a { my ($cl, $M) = @_; $M->{_ast} = "\a" }
-sub backslash__S_b { my ($cl, $M) = @_; $M->{_ast} = "\b" }
-sub backslash__S_d { my ($cl, $M) = @_; $M->{_ast} = $CClass::Digit }
-sub backslash__S_e { my ($cl, $M) = @_; $M->{_ast} = "\e" }
-sub backslash__S_f { my ($cl, $M) = @_; $M->{_ast} = "\f" }
-sub backslash__S_h { my ($cl, $M) = @_; $M->{_ast} = $CClass::HSpace }
-sub backslash__S_n { my ($cl, $M) = @_; $M->{_ast} = "\n" }
-sub backslash__S_r { my ($cl, $M) = @_; $M->{_ast} = "\r" }
-sub backslash__S_s { my ($cl, $M) = @_; $M->{_ast} = $CClass::Space }
-sub backslash__S_t { my ($cl, $M) = @_; $M->{_ast} = "\t" }
-sub backslash__S_v { my ($cl, $M) = @_; $M->{_ast} = $CClass::VSpace }
-sub backslash__S_w { my ($cl, $M) = @_; $M->{_ast} = $CClass::Word }
+method backslash:sym<0> ($/) { make "\0" }
+method backslash:a ($/) { make "\a"; post_backslash($/) }
+method backslash:b ($/) { make "\b"; post_backslash($/) }
+method backslash:d ($/) { make $CClass::Digit; post_backslash($/) }
+method backslash:e ($/) { make "\e"; post_backslash($/) }
+method backslash:f ($/) { make "\f"; post_backslash($/) }
+method backslash:h ($/) { make $CClass::HSpace; post_backslash($/) }
+method backslash:n ($/) { make "\n"; post_backslash($/) }
+method backslash:r ($/) { make "\r"; post_backslash($/) }
+method backslash:s ($/) { make $CClass::Space; post_backslash($/) }
+method backslash:t ($/) { make "\t"; post_backslash($/) }
+method backslash:v ($/) { make $CClass::VSpace; post_backslash($/) }
+method backslash:w ($/) { make $CClass::Word; post_backslash($/) }
 
-sub escape {}
-sub escape__S_Back { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{item}{_ast};
-}
-sub escape__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{embeddedblock}{_ast};
-}
-sub escape__S_Dollar { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{EXPR}{_ast};
-}
-sub escape__S_At { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{EXPR}{_ast};
-}
-sub escape__S_Percent { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{EXPR}{_ast};
-}
-sub escape__S_ch { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{ch}->Str;
-}
-sub escape__S_ws { my ($cl, $M) = @_;
-    $M->{_ast} = "";
-}
-sub escape__S_DotDot { my ($cl, $M) = @_;
-    $M->{_ast} = \"DotDot";  #yuck
-}
+method escape:sym<\\> ($/) { make $<item>.ast }
+method escape:sym<{ }> ($/) { make $<embeddedblock>.ast }
+method escape:sym<$> ($/) { make $<EXPR>.ast }
+method escape:sym<@> ($/) { make $<EXPR>.ast }
+method escape:sym<%> ($/) { make $<EXPR>.ast }
+method escape:ch ($/) { make ~$<ch> }
+method escape:ws ($/) { make "" }
+my class RangeSymbol { };
+method escape:sym<..> ($/) { make RangeSymbol }
 
-sub nibbler { my ($cl, $M) = @_;
-    if ($M->isa('STD::Regex')) {
-        $M->{_ast} = $M->{EXPR}{_ast};
-    } elsif ($M->isa('Niecza::Grammar::CgOp')) {
-        # XXX We don't interpret the code, so we can't tell if it's actually
-        # using variables, but still, it probably is.
-        if ($::SAFEMODE) {
-            $M->sorry('Q:CgOp not allowed in safe mode');
-            return;
+method nibbler($/) {
+    if $/.CURSOR.^isa(::STD::Regex) {
+        make $<EXPR>.ast;
+    } elsif $/.CURSOR.isa(::NieczaGrammar::CgOp) {
+        if $*SAFEMODE {
+            $/.CURSOR.sorry('Q:CgOp not allowed in safe mode');
+            make ::Op::StatementList.new;
+            return Nil;
         }
-        for my $k (keys %$::CURLEX) {
-            $::CURLEX->{$k}{used} = 1 if $k =~ /^[\@\%\&\$]\w/;
-        }
-        $M->{_ast} = Op::CgOp->new(node($M), optree => $M->{cgexp}{_ast});
+        make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
     } elsif ($M->can('ccstate')) { #XXX XXX try to catch cclasses
         my @nib = @{ $M->{nibbles} };
         my @bits = map { $_->{_ast} } @nib;
@@ -949,15 +886,10 @@ sub nibbler { my ($cl, $M) = @_;
         }
         $M->{_ast} = $CClass::Empty;
         $M->{_ast} = $M->{_ast}->plus($_) for @bits;
-        #say(YAML::XS::Dump($M->{_ast}));
     } else {
         # garden variety nibbler
         my @bits;
         for my $n (@{ $M->{nibbles} }) {
-            if (!blessed($n)) {
-                say(STDERR YAML::XS::Dump($n));
-                next;
-            }
             my $bit = $n->isa('Str') ? $n->{TEXT} : $n->{_ast};
 
             if (ref($bit) && ref($bit) eq 'CClass') {
@@ -1282,7 +1214,6 @@ sub POSTFIX { my ($cl, $M) = @_;
         }
     } else {
         say join(" ", %$M);
-        say(YAML::XS::Dump($op));
         $M->sorry("Unhandled postop type");
     }
     $M->{_ast} = $cl->whatever_postcheck($M, $st, $M->{_ast});
