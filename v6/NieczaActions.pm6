@@ -11,7 +11,7 @@ use Sig;
 use CClass;
 use OptRxSimple;
 
-my %carped;
+sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
 
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
@@ -219,315 +219,291 @@ method quote:qq ($/) { make $<quibble>.ast }
 method quote:q ($/) { make $<quibble>.ast }
 method quote:Q ($/) { make $<quibble>.ast }
 
-sub transparent { my ($cl, $M, $op, %args) = @_;
-    Op::SubDef->new(node($M),
-        var  => $cl->gensym,
-        once => $args{once},
-        body => Body->new(
-            transparent => 1,
-            ltm => $args{ltm},
-            class => $args{class} // 'Sub',
-            type  => $args{type} // 'sub',
-            signature => $args{sig} // Sig->simple,
-            do => $op))
+method transparent($/, $op, :$once = False, :$ltm, :$class = 'Sub',
+    :$type = 'sub', :$sig = Sig.simple) {
+    ::Op::SubDef.new(|node($/), var => self.gensym, :$once,
+        body => Body.new(
+            transparent => True,
+            :$ltm, :$class, :$type, signature => $sig, do => $op));
 }
 
-sub rxembed { my ($cl, $M, $op, $trans) = @_;
-    Op::CallSub->new(node($M),
-        positionals => [ Op::MakeCursor->new(node($M)) ],
-        invocant => Op::SubDef->new(node($M),
-            var  => $cl->gensym,
-            once => 1,
-            body => Body->new(
+method rxembed($/, $op, $trans) {
+    ::Op::CallSub.new(|node($/),
+        positionals => [ ::Op::MakeCursor.new(|node($/)) ],
+        invocant => ::Op::SubDef.new(|node($/),
+            var  => self.gensym,
+            once => True,
+            body => Body.new(
                 transparent => $trans,
                 type  => 'rxembedded',
                 class => 'Sub',
-                signature => Sig->simple('$¢'),
+                signature => Sig.simple('$¢'),
                 do => $op)));
 }
 
-sub op_for_regex { my ($cl, $M, $rxop) = @_;
-    my @lift = $rxop->oplift;
+method op_for_regex($/, $rxop) {
+    my @lift = $rxop.oplift;
     {
-        local $::paren = 0;
-        local $::dba = 'anonymous rule';
-        $rxop->check
+        my $*paren = 0;
+        my $*dba = 'anonymous rule';
+        $rxop.check
     }
-    my ($orxop, $mb) = Optimizer::RxSimple::run($rxop);
-    $cl->transparent($M, Op::RegexBody->new(node($M), canback => $mb,
-            pre => \@lift, rxop => $orxop),
-        class => 'Regex', type => 'regex', sig => Sig->simple->for_method);
+    my ($orxop, $mb) = ::Optimizer::RxSimple.run($rxop);
+    self.transparent($/, ::Op::RegexBody.new(|node($/), canback => $mb,
+            pre => @lift, rxop => $orxop),
+        class => 'Regex', type => 'regex', sig => Sig.simple.for_method);
 }
 
-sub quote__S_Slash_Slash { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->op_for_regex($M, $M->{nibble}{_ast});
-}
+method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
 
-sub encapsulate_regex { my ($cl, $M, $rxop, %args) = @_;
-    my @lift = $rxop->oplift;
-    my ($nrxop, $mb) = Optimizer::RxSimple::run($rxop);
-    my $lad = $rxop->lad;
+method encapsulate_regex($/, $rxop, :$goal, :$passcut, :$passcap) {
+    my @lift = $rxop.oplift;
+    my ($nrxop, $mb) = ::Optimizer::RxSimple.run($rxop);
+    my $lad = $rxop.lad;
     # XXX do this in the signature so it won't be affected by transparent
-    my @parm = Sig::Parameter->new(slot => 'self', name => 'self', readonly => 1);
-    if (exists $args{goal}) {
-        push @parm, Sig::Parameter->new(slot => '$*GOAL', name => '$*GOAL',
-            readonly => 1, positional => 0, optional => 1);
-        unshift @lift, Op::Bind->new(node($M), readonly => 1,
-            lhs => Op::Lexical->new(name => '$*GOAL'),
-            rhs => Op::StringLiteral->new(text => $args{goal}));
+    my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self', readonly => True);
+    if defined $goal {
+        push @parm, ::Sig::Parameter.new(slot => '$*GOAL', name => '$*GOAL',
+            readonly => True, positional => False, optional => True);
+        unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
+            lhs => ::Op::Lexical.new(name => '$*GOAL'),
+            rhs => ::Op::StringLiteral.new(text => $goal));
     }
-    my $subop = $cl->transparent($M,
-        Op::RegexBody->new(canback => $mb,
-            pre => \@lift, passcut => $args{passcut}, passcap => $args{passcap},
+    my $subop = self.transparent($/,
+        ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut, :$passcap,
             rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
-        sig => Sig->new(params => \@parm));
-    $subop = Op::CallSub->new(node($M), invocant => $subop, positionals => [ Op::MakeCursor->new(node($M)) ]);
-    return RxOp::Subrule->new(regex => $subop, passcap => $args{passcap},
-        _passcapzyg => $nrxop, _passcapltm => $lad);
+        sig => Sig.new(params => @parm));
+    $subop = ::Op::CallSub.new(|node($/), invocant => $subop,
+        positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
+    ::RxOp::Subrule.new(regex => $subop, :$passcap, _passcapzyg => $nrxop,
+        _passcapltm => $lad);
 }
 
-sub regex_block { my ($cl, $M) = @_;
-    if (@{ $M->{quotepair} }) {
-        $M->sorry('Regex adverbs NYI');
-        return;
+method regex_block($/) {
+    if $<quotepair> {
+        $/.CURSOR.sorry('Regex adverbs NYI');
     }
-    $M->{_ast} = $M->{nibble}{_ast};
+    make $<nibble>.ast;
 }
 
-sub regex_def { my ($cl, $M) = @_;
-    my ($name, $path) = $M->{deflongname}[0] ?
-        @{ $cl->mangle_longname($M->{deflongname}[0]) }{'name', 'path'} : ();
+method regex_def($/) {
+    my ($name, $path) = $<deflongname> ??
+        self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
     my $cname;
-    if ($path && @$path == 0 && $name->isa('Op')) {
+    if defined($path) && $path == 0 && $name.^isa(Op) {
         $cname = $name;
-        $name = $M->{deflongname}[0]->Str;
-        $path = undef;
+        $name = ~$<deflongname>[0];
+        $path = Any;
     }
 
-    my $scope = (!defined($name)) ? "anon" : ($::SCOPE || "has");
+    my $scope = (!defined($name)) ?? "anon" !! ($*SCOPE || "has");
 
-    if (@{ $M->{signature} } > 1) {
-        $M->sorry("Multiple signatures on a regex NYI");
-        return;
+    if $<signature> > 1 {
+        $/.CURSOR.sorry("Multiple signatures on a regex NYI");
+        return Nil;
     }
 
-    if ($cname && $scope ne 'has') {
-        $M->sorry("Only has regexes may have computed names");
-        $M->{_ast} = Op::StatementList->new;
-        return;
+    if $cname && $scope ne 'has' {
+        $/.CURSOR.sorry("Only has regexes may have computed names");
+        make ::Op::StatementList.new;
+        return Nil;
     }
 
     my $isproto;
     my $symtext =
-        ($cname || !defined($name)) ? undef :
-        ($name =~ /:sym<(.*)>/) ? $1 :
-        ($name =~ /:(\w+)/) ? $1 :
-        undef; #XXX
-    if ($::MULTINESS eq 'proto') {
-        if ($M->{signature}[0] || !$M->{regex_block}{onlystar} || $scope ne 'has') {
-            $M->sorry("Only simple {*} protoregexes with no parameters are supported");
-            return;
+        ($cname || !defined($name)) ?? Str !!
+        ($name ~~ /\:sym\<(.*)\>/) ?? ~$0 !!
+        ($name ~~ /\:(\w+)/) ?? ~$0 !!
+        Str; #XXX
+    if $*MULTINESS eq 'proto' {
+        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' {
+            $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
+            return Nil;
         }
-        $isproto = 1;
+        $isproto = True;
     } else {
-        my $m2 = defined($symtext) ? 'multi' : 'only';
-        if ($::MULTINESS && $::MULTINESS ne $m2) {
-            $M->sorry("Inferred multiness disagrees with explicit");
-            return;
+        my $m2 = defined($symtext) ?? 'multi' !! 'only';
+        if $*MULTINESS && $*MULTINESS ne $m2 {
+            $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
+            return Nil;
         }
     }
 
-    if ($path && $scope ne 'our') {
-        $M->sorry("Putting a regex in a package requires using the our scope.");
-        return;
+    if defined($path) && $scope ne 'our' {
+        $/.CURSOR.sorry("Putting a regex in a package requires using the our scope.");
+        return Nil;
     }
 
-    my $sig = $M->{signature}[0] ? $M->{signature}[0]{_ast} : Sig->simple();
+    my $sig = $<signature> ?? $<signature>[0].ast !! Sig.simple;
 
-    if ($scope =~ /state|augment|supersede/) {
-        $M->sorry("Nonsensical scope $scope for regex");
-        return;
+    if $scope ~~ /< state augment supersede >/ {
+        $/.CURSOR.sorry("Nonsensical scope $scope for regex");
+        return Nil;
     }
 
-    if ($scope eq 'our') {
-        $M->sorry("our regexes NYI");
-        return;
+    if $scope eq 'our' {
+        $/.CURSOR.sorry("our regexes NYI");
+        return Nil;
     }
 
-    my $var = ($scope eq 'anon' || $scope eq 'has') ? $cl->gensym
-        : '&' . $name;
+    my $var = ($scope eq 'anon' || $scope eq 'has') ?? self.gensym
+        !! '&' ~ $name;
 
-    my $ast = $M->{regex_block}{_ast};
-    if ($isproto) {
-        $ast = RxOp::ProtoRedis->new(name => $name);
+    my $ast = $<regex_block>.ast;
+    if $isproto {
+        $ast = ::RxOp::ProtoRedis.new(name => $name);
     }
 
     {
-        local $::paren = 0;
-        local $::symtext = $symtext;
-        local $::dba = $name // 'anonymous regex';
-        $ast->check;
+        my $*paren = 0;
+        my $*symtext = $symtext;
+        my $*dba = $name // 'anonymous regex';
+        $ast.check;
     }
-    my $lad = Optimizer::RxSimple::run_lad($ast->lad);
-    my @lift = $ast->oplift;
-    ($ast, my $mb) = Optimizer::RxSimple::run($ast);
-    $M->{_ast} = Op::SubDef->new(
+    my $lad = ::Optimizer::RxSimple.run_lad($ast.lad);
+    my @lift = $ast.oplift;
+    ($ast, my $mb) = ::Optimizer::RxSimple.run($ast);
+    make ::Op::SubDef.new(|node($/),
         var  => $var,
-        method_too => ($scope eq 'has' ? ['normal', $cname // $name] : undef),
-        body => Body->new(
+        method_too => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
+        body => Body.new(
             ltm   => $lad,
-            returnable => 1,
+            returnable => True,
             class => 'Regex',
             type  => 'regex',
             name  => $name // 'ANONrx',
-            signature => $sig->for_method,
-            do => Op::RegexBody->new(pre => \@lift,
+            signature => $sig.for_method,
+            do => ::Op::RegexBody.new(|node($/), pre => @lift,
                 name => ($name // ''), rxop => $ast, canback => $mb)));
 }
 
-sub regex_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{regex_def}{_ast};
-}
-sub regex_declarator__S_regex {}
-sub regex_declarator__S_rule {}
-sub regex_declarator__S_token {}
+method regex_declarator:regex ($/) { make $<regex_def>.ast }
+method regex_declarator:rule  ($/) { make $<regex_def>.ast }
+method regex_declarator:token ($/) { make $<regex_def>.ast }
 
 # :: RxOp
-sub atom { my ($cl, $M) = @_;
-    if ($M->{metachar}) {
-        $M->{_ast} = $M->{metachar}{_ast};
+method atom($/) {
+    if $<metachar> {
+        make $<metachar>.ast;
     } else {
-        $M->{_ast} = RxOp::String->new(text => $M->Str,
-            igcase => $::RX{i}, igmark => $::RX{a});
+        make ::RxOp::String.new(text => ~$/,
+            igcase => %*RX<i>, igmark => %*RX<a>);
     }
 }
 
-sub quantified_atom { my ($cl, $M) = @_; # :: RxOp
-    my $atom = $M->{atom}{_ast};
-    my $ns   = $M->{normspace}[0];
-    my $q    = $M->{quantifier}[0] ? $M->{quantifier}[0]{_ast} : undef;
+method quantified_atom($/) { # :: RxOp
+    my $atom = $<atom>.ast;
+    my $ns   = $<normspace>[0];
+    my $q    = $<quantifier> ?? $<quantifier>[0].ast !! Any;
 
-    return unless $atom;
+    return Nil unless $atom;
 
-    if ($::RX{r}) {
+    if %*RX<r> {
         # no quantifier at all?  treat it as :
         $q //= { mod => '' };
         # quantifier without explicit :? / :! gets :
-        $q->{mod} //= '';
+        $q<mod> //= '';
     }
 
-    if (defined $q->{min}) {
+    if defined $q<min> {
         my @z = $atom;
-        push @z, $q->{sep} if defined $q->{sep};
-        $atom = RxOp::Quantifier->new(min => $q->{min}, max => $q->{max},
-            zyg => [@z], minimal => ($q->{mod} && $q->{mod} eq '?'));
+        push @z, $q<sep> if defined $q<sep>;
+        $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
+            zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
     }
 
-    if (defined $q->{mod} && $q->{mod} eq '') {
-        $atom = RxOp::Cut->new(zyg => [$atom]);
+    if defined($q<mod>) && $q<mod> eq '' {
+        $atom = ::RxOp::Cut.new(zyg => [$atom]);
     }
 
-    if (defined $q->{tilde}) {
-        my ($closer, $inner) = @{ $q->{tilde} };
-        $closer = $closer->zyg->[0] if ($closer->isa('RxOp::Cut') &&
-            $closer->zyg->[0]->isa('RxOp::String'));
-        if (!$closer->isa('RxOp::String')) {
-            $M->sorry("Non-literal closers for ~ NYI");
-            $M->{_ast} = RxOp::None->new();
-            return;
+    if defined $q<tilde> {
+        my ($closer, $inner) = @( $q<tilde> );
+        $closer = $closer.zyg[0] if $closer.^isa(::RxOp::Cut) &&
+            $closer.zyg[0].^isa(::RxOp::String);
+        if !$closer.^isa(::RxOp::String) {
+            $/.CURSOR.sorry("Non-literal closers for ~ NYI");
+            make ::RxOp::None.new;
+            return Nil;
         }
-        $inner = $cl->encapsulate_regex($M, $inner, passcut => 1,
-            goal => $closer->text, passcap => 1);
-        $atom = RxOp::Sequence->new(zyg => [$atom,
-            RxOp::Tilde->new(closer => $closer->text, dba => $::RX{dba},
-                zyg => [$inner])]); # TODO
+        $inner = self.encapsulate_regex($/, $inner, passcut => True,
+            goal => $closer.text, passcap => True);
+        $atom = ::RxOp::Sequence.new(zyg => [$atom,
+            ::RxOp::Tilde.new(closer => $closer.text, dba => %*RX<dba>,
+                zyg => [$inner])]);
     }
 
-    $M->{_ast} = $atom;
+    make $atom;
 }
 
 # :: Context hash interpreted by quantified_atom
-sub quantifier {}
-sub quantifier__S_Star { my ($cl, $M) = @_;
-    $M->{_ast} = { min => 0, mod => $M->{quantmod}{_ast} };
+method quantifier:sym<*> ($/) { make { min => 0, mod => $<quantmod>.ast } }
+method quantifier:sym<+> ($/) { make { min => 1, mod => $<quantmod>.ast } }
+method quantifier:sym<?> ($/) { make { min => 0, max => 1, mod => $<quantmod>.ast } }
+method quantifier:sym<:> ($/) { make { mod => '' } }
+method quantifier:sym<~> ($/) {
+    make { tilde => [ map *.ast, @($<quantified_atom>) ] }
 }
-sub quantifier__S_Plus { my ($cl, $M) = @_;
-    $M->{_ast} = { min => 1, mod => $M->{quantmod}{_ast} };
-}
-sub quantifier__S_Question { my ($cl, $M) = @_;
-    $M->{_ast} = { min => 0, max => 1, mod => $M->{quantmod}{_ast} };
-}
-sub quantifier__S_Colon { my ($cl, $M) = @_;
-    $M->{_ast} = { mod => '' };
-}
-sub quantifier__S_Tilde { my ($cl, $M) = @_;
-    $M->{_ast} = { tilde => [ map { $_->{_ast} } @{ $M->{quantified_atom} } ] };
-}
-sub quantifier__S_StarStar { my ($cl, $M) = @_;
+method quantifier:sym<**> ($/) {
     # XXX can't handle normspace well since it's not labelled 1*/2*
-    $M->{_ast} =
-        $M->{1}[0] ? { min => $M->{0}->Str, max => $M->{1}[0]->Str } :
-        ($M->{0} && $M->Str =~ /\.\./) ? { min => $M->{0}->Str } :
-        $M->{0} ? { min => $M->{0}->Str, max => $M->{0}->Str } :
-        $M->{embeddedblock} ? { min => 0, cond => $M->{embeddedblock}{_ast} } :
-        { min => 1, sep => $M->{quantified_atom}{_ast} };
-    $M->{_ast}{mod} = $M->{quantmod}{_ast};
+    my $h =
+        $1 ?? { min => +~$0[0], max => +~$1[0] } !!
+        ($0 && defined($/.index('..'))) ?? { min => +~$0 } !!
+        $0 ?? { min => +~$0, max => +~$0 } !!
+        $<embeddedblock> ? { min => 0, cond => $<embeddedblock>.ast } !!
+        { min => 1, sep => $<quantified_atom>.ast };
+    $h<mod> = $<quantmod>.ast;
+    make $h;
 }
 
-sub quantmod { my ($cl, $M) = @_;
-    my $t = $M->Str;
-    return if ($t eq '');
-    $t =~ s/://;
-    if ($t eq '+') {
-        $M->sorry('STD parses + as a quantmod but there is nothing at all in S05 to explain what it should _do_'); #XXX
-        return;
+method quantmod($/) {
+    my $t = ~$/;
+    if $t eq '' { make Any; return Nil }
+    if substr($t,0,1) eq ':' { t = substr($t,1,chars($t)-1) }
+    if $t eq '+' {
+        $/.CURSOR.sorry('STD parses + as a quantmod but there is nothing at all in S05 to explain what it should _do_'); #XXX
+        make Any;
+        return Nil;
     }
-    $M->{_ast} = $t;
+    make $t;
 }
 
-sub quant_atom_list { my ($cl, $M) = @_;
-    for (@{ $M->{quantified_atom} }) { return unless $_->{_ast} }
-    $M->{_ast} = RxOp::Sequence->new(zyg =>
-        [ map { $_->{_ast} } @{ $M->{quantified_atom} } ]);
+method quant_atom_list($/) {
+    make ::RxOp::Sequence->new(zyg => [ map *.ast, @( $<quantified_atom> ) ]);
 }
 
 my %LISTrx_types = (
-    '&'  => 'RxOp::Conj',
-    '|'  => 'RxOp::Alt',
-    '&&' => 'RxOp::SeqConj',
-    '||' => 'RxOp::SeqAlt',
+    '&'  => ::RxOp::Conj,
+    '|'  => ::RxOp::Alt,
+    '&&' => ::RxOp::SeqConj,
+    '||' => ::RxOp::SeqAlt,
 );
-sub LISTrx { my ($cl, $M) = @_;
-    for (@{ $M->{list} }) { return unless $_->{_ast} }
-    $M->{_ast} = $LISTrx_types{$M->{delims}[0]{sym}}->new(zyg =>
-        [ map { $_->{_ast} } @{ $M->{list} } ], dba => $::RX{dba});
+
+method LISTrx($/)
+sub LISTrx($/) {
+    make %LISTrx_types{$<delims>[0]<sym>}.new(zyg =>
+        [ map *.ast, @( $M<list> ) ], dba => %*RX<dba>);
 }
 
-sub regex_infix {}
-sub regex_infix__S_Vert {}
-sub regex_infix__S_VertVert {}
-sub regex_infix__S_Amp {}
-sub regex_infix__S_AmpAmp {}
+method regex_infix:sym<|> {}
+method regex_infix:sym<||> {}
+method regex_infix:sym<&> {}
+method regex_infix:sym<&&> {}
 
-sub metachar {}
-sub metachar__S_sigwhite { my ($cl, $M) = @_;
-    $M->{_ast} = $::RX{s} ? RxOp::Sigspace->new : RxOp::Sequence->new;
+method metachar:sigwhite ($/) {
+    make (%*RX<s> ?? ::RxOp::Sigspace.new !! ::RxOp::Sequence.new);
+}
+method metachar:unsp ($/) { make ::RxOp::Sequence.new }
+
+method metachar:sym<{ }> ($/) {
+    my $inv = $<embeddedblock>.ast.invocant;
+    $inv.body.type = 'rxembedded';
+    $inv.body.signature = Sig.simple('$¢');
+    $inv.once = True;
+    $inv = ::Op::CallSub.new(|node($/), invocant => $inv, positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
+    make ::RxOp::VoidBlock.new(block => $inv);
 }
 
-sub metachar__S_unsp { my ($cl, $M) = @_;
-    $M->{_ast} = RxOp::Sequence->new;
-}
-
-sub metachar__S_Cur_Ly { my ($cl, $M) = @_;
-    my $inv = $M->{embeddedblock}{_ast}->invocant;
-    $inv->body->type('rxembedded');
-    $inv->body->signature(Sig->simple('$¢'));
-    $inv->once(1);
-    $inv = Op::CallSub->new(node($M), invocant => $inv, positionals => [ Op::MakeCursor->new(node($M)) ]);
-    $M->{_ast} = RxOp::VoidBlock->new(block => $inv);
-}
-
-sub metachar__S_mod { my ($cl, $M) = @_;
+method metachar:mod ($/) {
     # most of these have only parse-time effects
     $M->{_ast} = $M->{mod_internal}{_ast} // RxOp::Sequence->new;
 }

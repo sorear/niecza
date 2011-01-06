@@ -10,5 +10,8 @@ only slow me down...
 * &callsame
 * BUILD
 * given/when
-* non-$ attributes
+* non-$ attributes; @.foo and @<foo>
 * :$.foo is broken
+* eager map optimizations
+* return()
+* stashes should be accessed as common values
