@@ -1381,10 +1381,16 @@ noparams:
         }
 
         public override void SetSlot(string name, object obj) {
+            if (slots == null)
+                throw new NieczaException("Attempted to access slot " + name +
+                        " of type object for " + mo.name);
             slots[mo.FindSlot(name)] = obj;
         }
 
         public override object GetSlot(string name) {
+            if (slots == null)
+                throw new NieczaException("Attempted to access slot " + name +
+                        " of type object for " + mo.name);
             return slots[mo.FindSlot(name)];
         }
 
