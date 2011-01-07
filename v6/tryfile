@@ -13,47 +13,6 @@ augment class Match {
     method trim_heredoc () { self } # NYI
 }
 
-package Niecza {
-    grammar Grammar is STD {
-        grammar CgOp is STD {
-            rule nibbler { <cgexp> }
-
-            token category:cgexp { <sym> }
-            proto token cgexp {*}
-
-            token cgopname { <-[ ' " ( ) { } \[ \] \s ]> + }
-
-            token cgexp:op { <[ ( \[ ]>:s {} <cgopname> [ <cgexp> ]* <[ ) \] ]> }
-            token cgexp:name { <cgopname> }
-            token cgexp:quote { <?before <[ ' " ]>> {} [ :lang(%*LANG<MAIN>) <quote> ] }
-            token cgexp:decint { <decint> }
-            token cgexp:p6exp { :lang(%*LANG<MAIN>) '{' ~ '}' <statementlist> }
-            token cgexp:bad { <!before <[ ) \] ]> > {}
-                [ <?stdstopper> <.panic "Missing cgop"> ]
-                <.panic: "Unparsable cgop">
-            }
-        }
-
-        grammar Q is STD::Q { #} {
-            method tweak(:$CgOp, *%_) {
-                if $CgOp.defined { self.cursor_fresh(Niecza::Grammar::CgOp) }
-                else { nextwith(self, |%_) }
-            }
-        }
-
-        grammar P6 is STD::P6 {
-            method unitstart() {
-                %*LANG<Q> = Niecza::Grammar::Q ;
-                %*LANG<MAIN> = Niecza::Grammar::P6 ;
-                self;
-            }
-        }
-
-        method p6class () { Niecza::Grammar::P6 }
-    }
-}
-
-
 augment class STD {
 method lineof ($p) {
     return 1 unless defined $p;
@@ -239,7 +198,7 @@ sub compiler(:$filename, :$text, :$settingname, :$niecza) {
     my $*GOAL = "(eof)";
     my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
-    ($niecza ?? Niecza::Grammar !! STD).parse($text);
+    ($niecza ?? NieczaGrammar !! STD).parse($text);
 
     my $all;
 
