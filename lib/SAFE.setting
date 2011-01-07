@@ -596,12 +596,25 @@ my class List is Cool {
     method Bool() { self!fill(1) }
     method shift() { self!fill(1) ?? self!shift-item !! Any }
 
-    method eager() {
-        self!fill(1_000_000_000);
-        self;
-    }
+    method eager() { Q:CgOp {
+        (letn items (getslot items vvarlist (@ {self}))
+              rest  (getslot rest  vvarlist (@ {self}))
+          (whileloop 0 0 (iter_hasarg (l rest))
+            (vvarlist_push (l items) (vvarlist_shift (l rest))))
+          {self})
+    } }
 
-    method head { self!fill(1) ?? self!item-at-pos(0) !! Any }
+    method head() { Q:CgOp {
+        (letn items (getslot items vvarlist (@ {self}))
+              rest  (getslot rest  vvarlist (@ {self}))
+          (ternary (!= (i 0) (vvarlist_count (l items)))
+            (vvarlist_item (i 0) (l items))
+            (ternary (iter_hasarg (l rest))
+              (prog
+                (vvarlist_push (l items) (vvarlist_shift (l rest)))
+                (vvarlist_item (i 0) (l items)))
+              {Any})))
+    } }
 
     method elems() { self!fill(1000_000_000); self!count-items; }
     method Numeric () { self.elems }
@@ -651,14 +664,17 @@ my class List is Cool {
         }
     }
 
-    method push(*@items) {
-        @items.eager;
-        Q:CgOp {
-            (rnull
-              (vvarlist_append (getslot rest vvarlist (@ {self}))
-                (iter_copy_elems (unbox vvarlist (@ {@items.iterator})))))
-        }
-    }
+    method push(\|$args) { Q:CgOp {
+        (letn iter (vvarlist_from_fvarlist (unbox fvarlist (@ {$args})))
+              targ (getslot rest vvarlist (@ {self}))
+          (sink (vvarlist_shift (l iter)))
+          (ternary (== (i 0) (vvarlist_count (l targ)))
+            (l targ (getslot items vvarlist (@ {self})))
+            (prog))
+          (whileloop 0 0 (iter_hasflat (l iter))
+            (vvarlist_push (l targ) (nsw (@ (vvarlist_shift (l iter))))))
+          {Nil})
+    } }
 
     method pop() {
         self.eager;
@@ -761,9 +777,9 @@ my class Hash {
                   sobj (@ {self})
               (vvarlist_push (l iter) {$in})
               (whileloop 0 0 (iter_hasflat (l iter))
-                (letn elt (vvarlist_shift (l iter))
-                  (varhash_setindex (obj_getstr (methodcall (l elt) key))
-                    (l into) (nsw (@ (methodcall (l elt) value))))))
+                (letn elt (@ (vvarlist_shift (l iter)))
+                  (varhash_setindex (obj_getstr (getslot key var (l elt)))
+                    (l into) (nsw (@ (getslot value var (l elt)))))))
               (setbox (l sobj) (l into))
               (newrwlistvar (l sobj)))
         };
@@ -791,18 +807,14 @@ my class Hash {
     method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
 
     method at-key(\$self: $key) {
-        my $ks ::= Q:CgOp { (obj_asstr {$key}) };
         Q:CgOp {
-            (ternary (obj_is_defined (@ {$self}))
-              (letn vh (unbox varhash (@ {$self}))
-                    ky (unbox str (@ {$ks}))
-                (ternary (varhash_contains_key (l vh) (l ky))
-                  (varhash_getindex (l ky) (l vh))
-                  (newvhashvar (class_ref mo Any) (@ {$self}) (l ky) (@ {Any}))))
-              {Any!Any::butWHENCE(sub (\$var) {
-                   $self = Hash.new;
-                   $self!Hash::extend($key, $var);
-              })})
+            (letn ky (obj_getstr {$key})
+              (ternary (obj_is_defined (@ {$self}))
+                (letn vh (unbox varhash (@ {$self}))
+                  (ternary (varhash_contains_key (l vh) (l ky))
+                    (varhash_getindex (l ky) (l vh))
+                    (newvhashvar (class_ref mo Any) (@ {$self}) (l ky) (@ {Any}))))
+                (newvnewhashvar (class_ref mo Any) {$self} (l ky) (@ {Any}))))
         };
     }
 }
@@ -817,10 +829,7 @@ augment class Any {
     method at-key(\$self: $key) {
         defined($self) ??
             die("Cannot use hash access on an object of type $self.typename()") !!
-            Any!Any::butWHENCE(sub (\$var) {
-                $self = Hash.new;
-                $self!Hash::extend($key, $var);
-            });
+            Q:CgOp { (newvnewhashvar (class_ref mo Any) {$self} (obj_getstr {$key}) (@ {Any})) };
     }
 }
 
@@ -856,10 +865,7 @@ my class Pair is Enum {
 # }}}
 # List utilities {{{
 sub _vivify_array_at_pos(\$self, $ix) {
-    Any!Any::butWHENCE(sub (\$var) {
-        $self = Array.new;
-        $self!Array::extend($ix, $var);
-    });
+    Q:CgOp { (newvnewarrayvar (class_ref mo Any) {$self} (cast int (obj_getnum {$ix})) (@ {Any})) };
 }
 
 sub postcircumfix:<[ ]>(\$container, $index) {
