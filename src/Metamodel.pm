@@ -116,7 +116,7 @@ our %units;
                     unless join("\0", @{ $i1->[1] }) eq join("\0", @{ $i2->[1] });
             }
             if ($i1->[0] eq 'var') {
-                die "Non-stub packages cannot be merged " . join(" ", @path, $k)
+                die "Non-stub packages cannot be merged " . join(" ", @path, $k, ";", @{$i1->[1]}, ";", @{$i2->[1]})
                     if $i1->[1] && $i2->[1] && ($i1->[1][0] ne $i2->[1][0] ||
                         $i1->[1][1] != $i2->[1][1]) && $i1->[1][0] && $i2->[1][0];
                 $rinto->{$k} = ['var', $i1->[1] // $i2->[1],
