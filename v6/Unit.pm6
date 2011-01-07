@@ -3,3 +3,5 @@
 class Unit;
 has $.mainline = die "mainline required";
 has $.name = die "name required";
+has $.filename;
+has $.modtime;

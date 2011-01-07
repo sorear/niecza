@@ -16,6 +16,8 @@ use Metamodel;
 augment class Unit { method begin() {
     my $*unit = ::Metamodel::Unit.new(name => $.name,
         ns => ::Metamodel::Namespace.new,
+        filename => $.filename,
+        modtime => $.modtime,
         setting => $*SETTING_UNIT);
     %*units{$.name} = $*unit;
 
