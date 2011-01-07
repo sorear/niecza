@@ -3,7 +3,6 @@
 class NieczaActions;
 
 use Op;
-use OpHelpers;
 use RxOp;
 use Body;
 use Unit;
@@ -15,6 +14,12 @@ sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
 sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
 sub node($M) { file => $*FILE<name>, line => $M.cursor.lineof($M.to) }
+
+sub mklet($value, $body) {
+    my $var = NieczaActions.gensym;
+    ::Op::Let.new(var => $var, to => $value,
+        in => $body(::Op::LetVar.new(name => $var)));
+}
 
 sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
@@ -990,7 +995,7 @@ method check_hash($/) {
         return True;
     }
 
-    if @bits[0].^isa('Op::Lexical') && substr(@bits[0].name,0,1) eq '%' {
+    if @bits[0].^isa(::Op::Lexical) && substr(@bits[0].name,0,1) eq '%' {
         return True;
     }
 
@@ -1139,7 +1144,7 @@ method LIST($/) {
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
     my $op  = ~$<delims>[0]<sym>;
-    my ($st, @pos) = self.whatever_precheck("&infix:<$op>",
+    my ($st, @pos) = self.whatever_precheck("\&infix:<$op>",
         grep *.&defined, map *.ast, @( $<list> ));
 
     if $op eq ',' {
@@ -1170,7 +1175,7 @@ method POSTFIX($/) {
         make ::Op::Interrogative.new(|node($/), receiver => $arg,
             name => $op<name>);
     } elsif $op<metamethod> {
-        make ::Op::CallMethod.new(||node($/),
+        make ::Op::CallMethod.new(|node($/),
             receiver => $arg,
             ismeta => True,
             name => $op<metamethod>,
@@ -1194,7 +1199,7 @@ method POSTFIX($/) {
     } elsif $op<ref> { # $obj.&foo
         make ::Op::CallSub.new(|node($/),
             invocant => $op<ref>,
-            args     => [ $arg, @( $op<args> // [] } ]);
+            args     => [ $arg, @( $op<args> // [] ) ]);
     } elsif $op<postcall> {
         if $op<postcall> > 1 {
             $/.CURSOR.sorry("Slicels NYI");
@@ -1239,7 +1244,7 @@ method PREFIX($/) {
     }
 
     my ($st, $arg) = self.whatever_precheck($op, $rarg);
-    make self.whatever_postcheck($/, $st, mkcall($/, $op, $<arg>.ast));
+    make self.whatever_postcheck($/, $st, mkcall($/, $op, $arg));
 }
 
 method assign_meta_operator($ ) {}
@@ -1251,1426 +1256,1285 @@ method semilist_to_args($/) {
         $/.CURSOR.sorry('Slice lookups NYI');
         return [];
     }
-    my ($al) = @{ $M->{_ast} };
+    my $al = $/.ast.[0];
 
-    if (!defined $al) {
+    if !defined $al {
         return [];
-    } elsif ($al && $al->isa('Op::SimpleParcel')) {
-        return $al->items;
+    } elsif $al && $al.^isa(::Op::SimpleParcel) {
+        return $al.items;
     } else {
         return [$al];
     }
 }
 
-sub postcircumfix__S_Bra_Ket { my ($cl, $M) = @_;
-    $M->{_ast} = { postcircumfix => '[ ]', args => $M->{semilist}{_ast} };
+method postcircumfix:sym<[ ]> ($/) {
+    make { postcircumfix => '[ ]', args => $<semilist>.ast };
 }
-sub postcircumfix__S_Cur_Ly { my ($cl, $M) = @_;
-    $M->{_ast} = { postcircumfix => '{ }', args => $M->{semilist}{_ast} };
+method postcircumfix:sym<{ }> ($/) {
+    make { postcircumfix => '{ }', args => $<semilist>.ast };
 }
-sub postcircumfix__S_Lt_Gt { my ($cl, $M) = @_;
-    $cl->circumfix__S_Lt_Gt($M); #XXX
-    delete $M->{qpvalue};
-    $M->{_ast} = { postcircumfix => '{ }',
-        args => [ $M->{_ast} ] };
+method postcircumfix:sym«< >» ($/) {
+    self.split_circumfix($/);
+    make { postcircumfix => '{ }', args => [ $/.ast ] };
 }
 
-sub postop { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{postcircumfix} ? $M->{postcircumfix}{_ast} :
-        { postfix => $M->{sym} };
+method postop($/) {
+    make $<postcircumfix> ?? $<postcircumfix>.ast !! { postfix => ~$<sym> };
 }
-sub POST { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{dotty}{_ast} if $M->{dotty};
-    $M->{_ast} = $M->{privop}{_ast} if $M->{privop};
-    $M->{_ast} = $M->{postop}{_ast} if $M->{postop};
+method POST($/) {
+    make $<dotty>.ast  if $<dotty>;
+    make $<privop>.ast if $<privop>;
+    make $<postop>.ast if $<postop>;
 }
 
-sub PRE { }
+method PRE($/) { }
 
-sub methodop { my ($cl, $M) = @_;
+method methodop($/) {
     my %r;
-    if ($M->{longname}) {
-        my $c = $cl->mangle_longname($M->{longname});
-        @r{"name", "path"} = @$c{"name", "path"};
+    if $<longname> {
+        my $c = self.mangle_longname($<longname>);
+        %r<name path> = $c<name path>;
     }
-    $r{quote} = $M->{quote}{_ast} if $M->{quote};
-    $r{ref}   = $cl->do_variable_reference($M, $M->{variable}{_ast})
-        if $M->{variable};
+    %r<quote> = $<quote>.ast if $<quote>;
+    %r<ref>   = self.do_variable_reference($/, $<variable>.ast) if $<variable>;
 
-    $r{args}  = $M->{args}[0]{_ast}[0] if $M->{args}[0];
-    $r{args}  = $M->{arglist}[0]{_ast} if $M->{arglist}[0];
+    %r<args>  = $<args>[0].ast[0] if $<args>[0];
+    %r<args>  = $<arglist>[0].ast if $<arglist>[0];
 
-    $M->{_ast} = \%r;
+    make %r;
 }
 
-sub dottyop { my ($cl, $M) = @_;
-    if ($M->{colonpair}) {
-        $M->sorry("Colonpair dotties NYI");
-        return;
+method dottyop($/) {
+    if $<colonpair> {
+        $/.CURSOR.sorry("Colonpair dotties NYI");
+        make { posftix => '++' };
+        return Nil;
     }
 
-    $M->{_ast} = $M->{methodop}{_ast} if $M->{methodop};
-    $M->{_ast} = $M->{postop}{_ast} if $M->{postop};
+    make $<methodop>.ast if $<methodop>;
+    make $<postop>.ast if $<postop>;
 }
 
-sub privop { my ($cl, $M) = @_;
-    $M->{_ast} = { %{ $M->{methodop}{_ast} }, private => 1 };
+method privop($/) {
+    make _hash_constructor(($<methodop>.ast.pairs, private => True));
 }
 
-sub dotty { }
-sub dotty__S_Dot { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{dottyop}{_ast};
-}
+method dotty:sym<.> ($/) { make $<dottyop>.ast }
 
-sub dotty__S_DotStar { my ($cl, $M) = @_;
-    if ($M->{sym} eq '.^' && $M->{dottyop}{_ast}{name}) {
-        $M->{_ast} = { metamethod => $M->{dottyop}{_ast}{name},
-                       args => $M->{dottyop}{_ast}{args} };
+method dotty:sym<.*> ($/) {
+    if $<sym> eq '.^' && $<dottyop>.ast.<name> {
+        make { metamethod => $<dottyop>.ast.<name>,
+            args => $<dottyop>.ast.<args> };
     } else {
-        $M->sorry('NYI dottyop form ' . $M->{sym});
+        $/.CURSOR.sorry("NYI dottyop form $<sym>");
+        make { postfix => '++' }
     }
 }
 
-sub coloncircumfix { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{circumfix}{_ast};
-    $M->{qpvalue} = $M->{circumfix}{qpvalue};
+method coloncircumfix($/) { make $<circumfix>.ast }
+
+sub qpvalue($ast) {
+    if $ast.^isa(::Op::SimpleParcel) {
+        join " ", map &qpvalue, @( $ast.items )
+    } elsif $ast.^isa(::Op::StringLiteral) {
+        $ast.text;
+    } else {
+        "XXX"
+    }
 }
 
-sub qpvalue { ... }
-
-sub colonpair { my ($cl, $M) = @_;
-    my $k = $M->{k};
-    # STD seems to think term:name is term:sym<name>.  Needs speccy
-    # clarification.  XXX
+method colonpair($/) {
     my $n;
-    if (!ref $M->{v}) {
-        $n = ":" . ($M->{v} ? '' : '!') . $M->{k};
+    if !$<v>.^isa(Match) {
+        $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
     } else {
-        $n = ":" . $M->{k} . qpvalue($M->{v});
+        $n = ":" ~ $<k> ~ qpvalue($<v>.ast);
     }
-    my $tv = ref($M->{v}) ? $M->{v}{_ast} :
-        Op::Lexical->new(name => $M->{v} ? 'True' : 'False');
+    my $tv = $<v>.^isa(Match) ?? $<v>.ast !!
+        ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');
 
-    if (!defined $tv) {
-        if (substr($M->{v}->Str,1,1) eq '<') {
-            $tv = Op::CallMethod->new(name => 'at-key',
-                receiver => Op::ContextVar->new(name => '$*/'),
-                args => [Op::StringLiteral->new(text => $M->{k})]);
+    if !defined $tv {
+        if substr($<v>,1,1) eq '<' {
+            $tv = ::Op::CallMethod.new(name => 'at-key',
+                receiver => ::Op::ContextVar.new(name => '$*/'),
+                args => [::Op::StringLiteral.new(text => ~$<k>)]);
         } else {
-            $tv = $cl->do_variable_reference($M,
-                { sigil => $M->{v}{sigil}->Str,
-                    twigil => ($M->{v}{twigil}[0] ? $M->{v}{twigil}[0]->Str : ''),
-                    name => $M->{k} });
+            $tv = self.do_variable_reference($/,
+                { sigil => ~$<v><sigil>,
+                    twigil => ($<v><twigil> ?? ~$<v><twigil>[0] !! ''),
+                    name => $<k> });
         }
     }
 
-    $M->{_ast} = { ext => $n, term => Op::SimplePair->new(
-            key => $M->{k}, value => $tv) };
+    make { ext => $n, term => ::Op::SimplePair.new(key => $<k>, value => $tv) };
 }
 
-sub fatarrow { my ($cl, $M) = @_;
-    $M->{_ast} = Op::SimplePair->new(
-        key => $M->{key}->Str,
-        value => $M->{val}{_ast});
+method fatarrow($/) {
+    make ::Op::SimplePair.new(key => ~$<key>, value => $<val>.ast);
 }
 
-my %_nowhatever = (map { $_, 1 } ('&infix:<,>', '&infix:<..>', '&infix:<...>',
-    '&infix:<=>', '&infix:<xx>'));
-sub whatever_precheck { my ($cl, $op, @args) = @_;
-    return ([], @args) if $_nowhatever{$op};
+my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
+    '&infix:<...>', '&infix:<=>', '&infix:<xx>'));
+method whatever_precheck($op, *@args) {
+    return ([], @args) if %_nowhatever{$op};
     my @vars;
-    for (@args) {
-        Carp::confess("invalid undef here") if !$_;
-        if ($_->isa('Op::Whatever')) {
-            push @vars, $_->slot;
-            $_ = Op::Lexical->new(name => $_->slot);
-        } elsif ($_->isa('Op::WhateverCode')) {
-            push @vars, @{ $_->vars };
-            $_ = $_->ops;
+    for @args {
+        my $a = $_;
+        die "invalid undef here" if !$a;
+        if $a.^isa(::Op::Whatever) {
+            push @vars, $a.slot;
+            $a = ::Op::Lexical.new(name => $a.slot);
+        } elsif $a.isa(::Op::WhateverCode) {
+            push @vars, @( $a.vars );
+            $a = $a.ops;
         }
     }
-    (\@vars, @args);
+    $( @vars ), @args;
 }
 
-sub whatever_postcheck { my ($cl, $M, $st, $term) = @_;
-    if (@$st) {
-        return Op::WhateverCode->new(ops => $term, vars => $st,
-            slot => $cl->gensym, node($M));
+method whatever_postcheck($/, $st, $term) {
+    if @$st {
+        ::Op::WhateverCode.new(ops => $term, vars => $st,
+            slot => self.gensym, |node($/));
     } else {
-        return $term;
+        $term;
     }
 }
 
 # term :: Op
-sub term { }
+method term:value { make $<value>.ast }
 
-sub term__S_value { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{value}{_ast};
-}
+method term:name {
+    my ($id, $path) = self.mangle_longname($<longname>).<name path>;
 
-sub term__S_name { my ($cl, $M) = @_;
-    my ($id, $path) = @{ $cl->mangle_longname($M->{longname}) }{'name','path'};
-
-    if ($M->{args}) {
-        $M->sorry("Unsupported form of term:name");
-        return;
+    if $<args> {
+        $/.CURSOR.sorry("Unsupported form of term:name");
+        make ::Op::StatementList.new;
+        return Nil;
     }
 
-    if ($path) {
-        $M->{_ast} = Op::PackageVar->new(node($M), name => $id,
-            slot => $cl->gensym, path => $path);
+    if defined $path {
+        make ::Op::PackageVar.new(|node($/), name => $id,
+            slot => self.gensym, path => $path);
     } else {
-        $M->{_ast} = Op::Lexical->new(node($M), name => $id);
+        make ::Op::Lexical.new(|node($/), name => $id);
     }
 
-    if ($M->{postcircumfix}[0]) {
-        # XXX SAFE::
-        $M->{_ast} = Op::CallSub->new(node($M),
-            invocant => Op::Lexical->new(name => '&_param_role_inst'),
-            args => [ $M->{_ast}, @{ $M->{postcircumfix}[0]{_ast}{args} } ]);
+    if $<postcircumfix> {
+        make mkcall($/, '&_param_role_inst', $/.ast,
+            @( $<postcircumfix>[0].ast<args> ));
     }
 }
 
-sub term__S_identifier { my ($cl, $M) = @_;
-    my $id  = $M->{identifier}{_ast};
-    my $sal = $M->{args}{_ast} // [];  # TODO: support zero-D slicels
+method term:identifier ($/) {
+    my $id  = $<identifier>.ast;
+    my $sal = $<args> ?? $<args>.ast !! [];  # TODO: support zero-D slicels
 
-    if (@$sal > 1) {
-        $M->sorry("Slicel lists are NYI");
-        return;
+    if $sal > 1 {
+        $/.CURSOR.sorry("Slicel lists are NYI");
+        make ::Op::StatementList.new;
+        return Nil;
     }
 
-    if ($M->is_name($M->{identifier}->Str)) {
-        $M->{_ast} = Op::Lexical->new(node($M), name => $id);
-        return;
+    if $/.CURSOR.is_name(~$<identifier>) {
+        make ::Op::Lexical.new(|node($/), name => $id);
+        return Nil;
     }
 
-    my $args = $sal->[0] // [];
+    my $args = $sal[0] // [];
 
-    $M->{_ast} = Op::CallSub->new(node($M),
-        invocant => Op::Lexical->new(name => '&' . $id),
+    make ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(name => '&' ~ $id),
         args => $args);
 }
 
-sub term__S_self { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Lexical->new(node($M), name => 'self');
+method term:self ($/) { make ::Op::Lexical.new(|node($/), name => 'self') }
+method term:circumfix ($/) { make $<circumfix>.ast }
+method term:scope_declarator ($/) { make $<scope_declarator>.ast }
+method term:multi_declarator ($/) { make $<multi_declarator>.ast }
+method term:package_declarator ($/) { make $<package_declarator>.ast }
+method term:routine_declarator ($/) { make $<routine_declarator>.ast }
+method term:regex_declarator ($/) { make $<regex_declarator>.ast }
+method term:type_declarator ($/) { make $<type_declarator>.ast }
+method term:dotty ($/) { make $<dotty>.ast }
+method term:capterm ($/) { make $<capterm>.ast }
+method term:sigterm ($/) { make $<sigterm>.ast }
+method term:statement_prefix ($/) { make $<statement_prefix>.ast }
+method term:variable ($/) {
+    make self.do_variable_reference($/, $<variable>.ast);
+}
+method term:sym<...> ($/) { make ::Op::Yada.new(|node($/), kind => '...') }
+method term:sym<???> ($/) { make ::Op::Yada.new(|node($/), kind => '???') }
+method term:sym<!!!> ($/) { make ::Op::Yada.new(|node($/), kind => '!!!') }
+method term:sym<*> ($/) {
+    make ::Op::Whatever.new(|node($/), slot => self.gensym)
+}
+method term:lambda ($/) {
+    $<pblock>.ast.type = 'pointy';
+    make self.block_to_closure($/, $<pblock>.ast);
 }
 
-sub term__S_circumfix { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{circumfix}{_ast};
-}
-
-sub term__S_scope_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{scope_declarator}{_ast};
-}
-
-sub term__S_multi_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{multi_declarator}{_ast};
-}
-
-sub term__S_package_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_declarator}{_ast};
-}
-
-sub term__S_routine_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{routine_declarator}{_ast};
-}
-
-sub term__S_regex_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{regex_declarator}{_ast};
-}
-
-sub term__S_type_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{type_declarator}{_ast};
-}
-
-sub term__S_dotty { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{dotty}{_ast};
-}
-
-sub term__S_capterm { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{capterm}{_ast};
-}
-
-sub term__S_sigterm { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{sigterm}{_ast};
-}
-
-sub term__S_statement_prefix { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{statement_prefix}{_ast};
-}
-
-sub term__S_variable { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->do_variable_reference($M, $M->{variable}{_ast});
-}
-
-sub term__S_DotDotDot { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Yada->new(node($M), kind => '...');
-}
-
-sub term__S_BangBangBang { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Yada->new(node($M), kind => '!!!');
-}
-
-sub term__S_QuestionQuestionQuestion { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Yada->new(node($M), kind => '???');
-}
-
-sub term__S_lambda { my ($cl, $M) = @_;
-    $M->{pblock}{_ast}->type('pointy');
-    $M->{_ast} = $cl->block_to_closure($M, $M->{pblock}{_ast});
-}
-
-sub term__S_Star { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Whatever->new(node($M), slot => $cl->gensym);
-}
-
-sub term__S_colonpair { my ($cl, $M) = @_;
-    if (@{ $M->{colonpair} } > 1) {
-        $M->sorry("Multi colonpair syntax not yet understood"); #XXX
-        return;
+method term:colonpair ($/) {
+    if $<colonpair> > 1 {
+        $/.CURSOR.sorry("Multi colonpair syntax not yet understood"); #XXX
+        make ::Op::StatementList.new;
+        return Nil;
     }
-    $M->{_ast} = $M->{colonpair}[0]{_ast}{term};
+    make $<colonpair>[0].ast<term>;
 }
 
-sub term__S_fatarrow { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{fatarrow}{_ast};
-}
+method term:fatarrow ($/) { make $<fatarrow>.ast }
 
-sub do_variable_reference { my ($cl, $M, $v) = @_;
-    if ($v->{term}) {
-        return $v->{term};
+method do_variable_reference($M, $v) {
+    if $v<term> {
+        return $v<term>;
     }
 
-    my $sl = $v->{sigil} . $v->{twigil} . $v->{name};
+    my $tw = $v<twigil>;
+    my $sl = $v<sigil> ~ $tw ~ $v<name>;
 
-    if ($v->{rest} && $v->{twigil} =~ /[*=~?^:]/) {
-        $M->sorry("Twigil " . $v->{twigil} . " cannot be used with " .
-            "qualified names");
-        return;
+    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
+        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
+        return ::Op::StatementList.new;
     }
 
-    given ($v->{twigil}) {
-        when ('!') {
-            return Op::CallMethod->new(node($M), name => $v->{name},
-                receiver => Op::Lexical->new(name => 'self'),
-                private => 1, ppath => $v->{rest});
+    if $tw eq '!' {
+        ::Op::CallMethod.new(|node($M), name => $v<name>, private => True,
+            receiver => ::Op::Lexical.new(name => 'self'), ppath => $v<rest>);
+    }
+    elsif $tw eq '.' {
+        if defined $v<rest> {
+            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
+            return ::Op::StatementList.new;
         }
-        when ('.') {
-            if ($v->{rest}) {
-                $M->sorry('$.Foo::bar syntax NYI');
-                return;
-            }
 
-            return Op::CallMethod->new(node($M), name => $v->{name},
-                receiver => Op::Lexical->new(name => 'self'));
+        ::Op::CallMethod.new(|node($M), name => $v<name>,
+            receiver => ::Op::Lexical.new(name => 'self'));
+    }
+    # no twigil in lex name for these
+    elsif $tw eq '^' || $tw eq ':' {
+        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>);
+    }
+    elsif $tw eq '*' {
+        ::Op::ContextVar.new(|node($M), name => $sl);
+    }
+    elsif $tw eq '' || $tw eq '?' {
+        if defined($v<rest>) {
+            ::Op::PackageVar.new(path => $<rest>, name => $sl,
+                slot => self.gensym, |node($M));
+        } else {
+            ::Op::Lexical.new(|node($M), name => $sl);
         }
-        # no twigil in lex name for these
-        when ({ '^' => 1, ":" => 1}) {
-            return Op::Lexical->new(node($M), name => $v->{sigil} . $v->{name});
-        }
-        when ('?') {
-            return Op::Lexical->new(node($M), name => $sl);
-        }
-        when ('*') {
-            return Op::ContextVar->new(node($M), name => $sl);
-        }
-        when ('') {
-            if ($v->{rest}) {
-                return Op::PackageVar->new(path => $v->{rest}, name => $sl,
-                    slot => $cl->gensym, node($M));
-            } else {
-                return Op::Lexical->new(node($M), name => $sl);
-            }
-        }
-        default {
-            $M->sorry("Unhandled reference twigil " . $v->{twigil});
-        }
+    }
+    else {
+        $M.CURSOR.sorry("Unhandled reference twigil $tw");
     }
 }
 
-sub docontext { my ($cl, $M, $sigil, $term) = @_;
-    if ($sigil !~ /[\$\@\%]/) {
-        $M->sorry("Unhandled conext character $sigil");
+method docontext($M, $sigil, $term) {
+    if $sigil !~~ /<[\$\@\%\&]>/ {
+        $M.CURSOR.sorry("Unhandled conext character $sigil");
     }
-    my $method = ($sigil eq '$') ? 'item' :
-                 ($sigil eq '@') ? 'list' :
+    my $method = ($sigil eq '$' || $sigil eq '&') ?? 'item' !!
+                 ($sigil eq '@') ?? 'list' !!
                                    'hash';
 
-    Op::CallMethod->new(node($M), name => $method, receiver => $term);
+    ::Op::CallMethod.new(|node($M), name => $method, receiver => $term);
 }
 
-sub variable { my ($cl, $M) = @_;
-    my $sigil = $M->{sigil} ? $M->{sigil}->Str : substr($M->Str, 0, 1);
-    my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]{sym} : '';
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
 
     my ($name, $rest);
-    my $dsosl = ($M->{desigilname} || $M->{sublongname} || {})->{_ast};
-    if ($dsosl && $dsosl->{ind}) {
-        $M->{_ast} = { term => $cl->docontext($M, $sigil, $dsosl->{ind}) };
-        return;
-    } elsif ($dsosl) {
-        ($name, $rest) = @$dsosl{'name', 'path'};
-    } elsif ($M->{name}[0]) {
+    my $dsosl = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        Any;
+    if defined($dsosl) && defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return Nil;
+    } elsif defined $dsosl {
+        ($name, $rest) = $dsosl<name path>;
+    } elsif $<name> {
         # Both these cases are marked XXX in STD.  I agree.  What are they for?
-        if ($M->{name}[0]{dc}) {
-            $M->sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
-            return;
+        if $<name>[0].ast<dc> {
+            $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
+            make { term => ::Op::StatementList.new };
+            return Nil;
         }
-        if ($M->Str =~ /^\$::/) {
-            $rest = $M->{name}[0]{_ast}{names};
-            $name = pop @$rest;
+        if substr(~$/,0,3) eq '$::' {
+            $rest = $<name>[0].ast.<names>;
+            $name = pop $rest;
         } else {
-            if (@{ $M->{name}[0]{_ast}{names} } > 1) {
-                $M->sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
-                return;
+            if $<name>[0].ast<names> > 1 {
+                $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
+                make { term => ::Op::StatementList.new };
+                return Nil;
             }
-            $name = $M->{name}[0]{_ast}{names}[0];
+            $name = $<name>[0].ast<names>[0];
             $twigil = ':';
         }
-    } elsif ($M->{special_variable}) {
-        $name = substr($M->{special_variable}->Str, 1);
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
         $twigil = '*' if $name eq '/' or $name eq '!';
-    } elsif ($M->{index}) {
-        $M->{_ast} = { capid => $M->{index}{_ast}, term =>
-            # maybe a little of a cheat
-            $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-pos',
-                receiver => Op::ContextVar->new(name => '$*/'),
-                positionals => [ Op::Num->new(value => $M->{index}{_ast}) ])
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            ::Op::CallMethod.new(|node($/), name => 'at-pos',
+                receiver => ::Op::ContextVar.new(name => '$*/'),
+                positionals => [ ::Op::Num.new(value => $<index>.ast) ])
         };
-        return;
-    } elsif ($M->{postcircumfix}[0]) {
-        if ($M->{postcircumfix}[0]{sym} eq '< >') {
-            $M->{_ast} = { capid => $M->{postcircumfix}[0]{_ast}{args}[0]->text,
-                term =>
-                # maybe a little of a cheat
-                $M->{_ast} = Op::CallMethod->new(node($M), name => 'at-key',
-                    receiver => Op::ContextVar->new(name => '$*/'),
-                    positionals => $M->{postcircumfix}[0]{_ast}{args})
+        return Nil;
+    } elsif $<postcircumfix> {
+        if $<postcircumfix>[0]<sym> eq '< >' {
+            make { capid => $<postcircumfix>[0].ast<args>[0].text, term =>
+                ::Op::CallMethod.new(|node($/), name => 'at-key',
+                    receiver    => ::Op::ContextVar.new(name => '$*/'),
+                    positionals => $<postcircumfix>[0].ast<args>)
             };
-            return;
+            return Nil;
         } else {
-            $M->sorry("Contextualizer variables NYI");
-            return;
+            $/.CURSOR.sorry("Contextualizer variables NYI");
+            make { term => ::Op::StatementList.new };
+            return Nil;
         }
     } else {
-        say join " ", %$M;
-        $M->sorry("Non-simple variables NYI");
-        return;
+        $/.CURSOR.sorry("Non-simple variables NYI");
+        make { term => ::Op::StatementList.new };
+        return Nil;
     }
 
-    $M->{_ast} = {
+    make {
         sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
     };
 }
 
-sub special_variable {}
-sub special_variable__S_DollarSlash {}
-sub special_variable__S_DollarBang {}
-sub special_variable__S_Dollar_a2_ {}
+method special_variable:sym<$/> ($/) {}
+method special_variable:sym<$!> ($/) {}
+method special_variable:sym<$¢> ($/) {}
 
-sub param_sep {}
+method param_sep ($/) {}
 
 # :: { list : Bool, hash : Bool  slot : Maybe[Str], names : [Str] }
-sub named_param { my ($cl, $M) = @_;
+method named_param($/) {
     my %rt;
-    if ($M->{name}) {
-        if ($M->{named_param}) {
-            %rt = %{ $M->{named_param}{_ast} };
+    sub good($a, $b is rw) { $a ~~ /^<[@$%]><[.*!]>?(.*)/ && ($b = ~$0; True) }
+    if $<name> {
+        if $<named_param> {
+            %rt = %( $<named_param>.ast );
         } else {
-            %rt = %{ $M->{param_var}{_ast} };
+            %rt = %( $<param_var>.ast );
         }
-        $rt{names} = [ @{ $rt{names} // [] }, $M->{name}->Str ];
+        %rt<names> = [ @( %rt<names> // [] ), ~$<name> ];
     } else {
-        %rt = %{ $M->{param_var}{_ast} };
-        if ($rt{slot} && $rt{slot} =~ /^[\@\$\%][.*!]?(.*)/) {
-            $rt{names} = [ $1 ];
+        %rt = %( $<param_var>.ast );
+        if %rt<slot> && good(%rt<slot>, %rt<names>) {
         } else {
-            $M->sorry("Abbreviated named parameter must have a name");
+            $/.CURSOR.sorry("Abbreviated named parameter must have a name");
         }
     }
-    $rt{positional} = 0;
-    $M->{_ast} = \%rt;
+    %rt<positional> = False;
+    make %rt;
 }
 
 # :: { list : Bool, hash : Bool, slot : Maybe[Str] }
-sub param_var { my ($cl, $M) = @_;
-    if ($M->{signature}) {
-        $M->sorry('Sub-signatures NYI');
-        return;
+method param_var($/) {
+    if $<signature> {
+        $/.CURSOR.sorry('Sub-signatures NYI');
+        make { };
+        return Nil;
     }
-    my $twigil = $M->{twigil}[0] ? $M->{twigil}[0]->Str : '';
-    my $sigil = $M->{sigil}->Str;
-    my $name = $M->{name}[0] ? $M->{name}[0]->Str : undef;
+    my $twigil = $<twigil> ?? ~$<twigil>[0] !! '';
+    my $sigil =  ~$<sigil>;
+    my $name =   $<name> ?? ~$<name>[0] !! Any;
     $twigil = '*' if $name && ($name eq '/' || $name eq '!');
 
     my $slot;
-    if ($twigil eq '') {
-        $slot = defined($name) ? ($sigil . $name) : undef;
-    } elsif ($twigil eq '*') {
-        $slot = "$sigil*" . "$name";
+    if $twigil eq '' {
+        $slot = defined($name) ?? ($sigil ~ $name) !! Any;
+    } elsif $twigil eq '*' {
+        $slot = "$sigil*" ~ "$name";
     } else {
-        $M->sorry("Unhandled parameter twigil $twigil");
-        return;
+        $/.CURSOR.sorry("Unhandled parameter twigil $twigil");
+        make { };
+        return Nil;
     }
 
     if ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&') {
-        $M->sorry('Non bare scalar targets NYI');
-        return;
+        $/.CURSOR.sorry('Non bare scalar targets NYI');
+        make { }
+        return Nil;
     }
-    $M->{_ast} = { list => ($sigil eq '@'), hash => ($sigil eq '%'),
-        slot => $slot };
+    make { list => ($sigil eq '@'), hash => ($sigil eq '%'), :$slot };
 }
 
 # :: Sig::Parameter
-sub parameter { my ($cl, $M) = @_;
-    my $rw;
+method parameter($/) {
+    my $rw = False;
 
-    for (@{ $M->{trait} }) {
-        if ($_->{_ast}{rw}) { $rw = 1 }
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
         else {
-            $M->sorry('Unhandled trait ' . (keys(%{ $_->{_ast} }))[0]);
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
         }
     }
 
-    if (@{ $M->{post_constraint} } > 0) {
-        $M->sorry('Parameter post constraints NYI');
-        return;
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
     }
 
-    my $default = $M->{default_value}[0] ? $M->{default_value}[0]{_ast} : undef;
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
 
     my $sorry;
     my $slurpy;
     my $slurpycap;
     my $optional;
     my $rwt;
-    given ($M->{quant} . ':' . $M->{kind}) {
-        when ('**:*') { $sorry = "Slice parameters NYI" }
-        when ('*:*')  { $slurpy = 1 }
-        when ('|:*')  { $slurpycap = 1 }
-        when ('\\:!') { $rwt = 1 }
-        when ('\\:?') { $rwt = 1; $optional = 1 }
-        when (':!')   { }
-        when (':*')   { $optional = 1 }
-        when (':?')   { $optional = 1 }
-        when ('?:?')  { $optional = 1 }
-        when ('!:!')  { }
-        when ('!:?')  { $optional = 1 }
-        when ('!:*')  { }
-        default       { $sorry = "Confusing parameters ($_)" }
-    }
-    if ($sorry) { $M->sorry($sorry); return }
-    my $p = $M->{param_var} // $M->{named_param};
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
 
-    $M->{_ast} = Sig::Parameter->new(name => $M->Str, default => $default,
-        optional => $optional, slurpy => $slurpy, readonly => !$rw,
-        slurpycap => $slurpycap, rwtrans => $rwt, %{ $p->{_ast} });
+    make ::Sig::Parameter.new(name => ~$/, :$default,
+        :$optional, :$slurpy, readonly => !$rw,
+        :$slurpycap, rwtrans => $rwt, |$p.ast);
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
-sub signature { my ($cl, $M) = @_;
-    if ($M->{type_constraint}[0]) {
-        $M->sorry("Return type constraints NYI");
-        return;
+method signature($/) {
+    if $<type_constraint> {
+        $/.CURSOR.sorry("Return type constraints NYI");
+        return Nil;
     }
 
-    if ($M->{param_var}) {
-        $M->{_ast} = Sig->new(params => [ Sig::Parameter->new(
-                name => $M->{param_var}->Str, %{ $M->{param_var}{_ast} },
-                full_parcel => 1) ]);
-        return;
+    if $<param_var> {
+        make Sig.new(params => [ ::Sig::Parameter.new(
+                name => ~$<param_var>, |$<param_var>.ast,
+                full_parcel => True) ]);
+        return Nil;
     }
 
     my $exp = 0;
-    for (@{ $M->{param_sep} }) {
-        if ($_->Str =~ /:/) {
+    for @( $<param_sep> ) -> $sep {
+        if defined $sep.index(':') {
             $exp = 1;
-        } elsif ($_->Str !~ /[,:]/) {
-            $M->sorry('Parameter separator ' . $_->Str . ' NYI');
-            return;
+        } elsif !defined $sep.index(',') {
+            $/.CURSOR.sorry("Parameter separator $sep NYI");
+            return Nil;
         }
     }
 
-    $M->{_ast} = Sig->new(explicit_inv => $exp, params =>
-        [map { $_->{_ast} } @{ $M->{parameter} }]);
+    make Sig.new(explicit_inv => ?$exp, params =>
+        [map *.ast, @( $<parameter> )]);
 }
 
-sub multisig { my ($cl, $M) = @_;
-    if (@{ $M->{signature} } != 1) {
-        $M->sorry("Multiple signatures NYI");
-        return;
+method multisig($/) {
+    if $<signature> != 1 {
+        $/.CURSOR.sorry("Multiple signatures NYI");
+        return Nil;
     }
-    $M->{_ast} = $M->{signature}[0]{_ast};
+    make $<signature>[0].ast;
 }
 
-sub cgopname { my ($cl, $M) = @_;
-    $M->{_ast} = $M->Str;
-}
+method cgopname($/) { }
 
-sub cgexp { }
-sub cgexp__S_name { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{cgopname}{_ast};
-}
-
-sub cgexp__S_p6exp { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{statementlist}{_ast};
-}
-
-sub cgexp__S_decint { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{decint}{_ast};
-}
-
-sub cgexp__S_quote { my ($cl, $M) = @_;
-    if (!$M->{quote}{_ast}->isa('Op::StringLiteral')) {
-        $M->sorry("Strings used in CgOp code must be compile time constants");
+method cgexp:name ($/) { make ~$<cgopname> }
+method cgexp:p6exp ($/) { make $<statementlist>.ast }
+method cgexp:decint ($/) { make $<decint>.ast }
+method cgexp:quote ($/) {
+    if !$<quote>.ast.^isa(::Op::StringLiteral) {
+        $/.CURSOR.sorry("Strings used in CgOp code must be compile time constants");
+        make "";
+        return Nil;
     }
-    $M->{_ast} = $M->{quote}{_ast}->text;
+    make $<quote>.ast.text;
 }
 
 my %opshortcut = (
-    '@',   [ 'fetch' ],
-    'l',   [ 'scopedlex' ],
-    'ns',  [ 'newscalar' ],
-    'nsw', [ 'newrwscalar' ],
-    's',   [ 'str' ],
-    'i',   [ 'int' ],
-    'b',   [ 'bool' ],
-    'd',   [ 'double' ],
-    '==',  [ 'compare', '==' ], '!=',  [ 'compare', '!=' ],
-    '>=',  [ 'compare', '>=' ], '<=',  [ 'compare', '<=' ],
-    '<',   [ 'compare', '<' ],  '>',   [ 'compare', '>' ],
-    '+',   [ 'arith', '+' ],    '-',   [ 'arith', '-' ],
-    '*',   [ 'arith', '*' ],    '/',   [ 'arith', '/' ],
+    '@'   => [ 'fetch' ],
+    'l'   => [ 'scopedlex' ],
+    'ns'  => [ 'newscalar' ],
+    'nsw' => [ 'newrwscalar' ],
+    's'   => [ 'str' ],
+    'i'   => [ 'int' ],
+    'b'   => [ 'bool' ],
+    'd'   => [ 'double' ],
+    '=='  => [ 'compare', '==' ], '!=' => [ 'compare', '!=' ],
+    '>='  => [ 'compare', '>=' ], '<=' => [ 'compare', '<=' ],
+    '<'   => [ 'compare', '<' ],  '>'  => [ 'compare', '>' ],
+    '+'   => [ 'arith', '+' ],    '-'  => [ 'arith', '-' ],
+    '*'   => [ 'arith', '*' ],    '/'  => [ 'arith', '/' ],
 );
 
-sub cgexp__S_op { my ($cl, $M) = @_;
-    no strict 'refs';
-    my $l = $M->{cgopname}{_ast};
-    my @p = @{ $opshortcut{$l} // [ $l ] };
-    $M->{_ast} = [@p, map { $_->{_ast} } @{ $M->{cgexp} }];
+method cgexp:op ($/) {
+    my $l = ~$<cgopname>;
+    my @p = @( %opshortcut{$l} // [ $l ] );
+    make [@p, map *.ast, @( $<cgexp> )];
 }
 
-sub apostrophe {}
-sub quibble { my ($cl, $M) = @_;
-    if ($M->{babble}{B}[0]{_herelang}) { #XXX
-        $M->{_ast} = Op::HereStub->new(node => $M);
+method apostrophe($/) {}
+method quibble($/) {
+    if ($<babble><B>[0].hereinfo) {
+        make ::Op::HereStub.new(node => $<babble><B>[0].hereinfo.[1]);
     } else {
-        $M->{_ast} = $M->{nibble}{_ast};
+        make $<nibble>.ast;
     }
 }
-sub tribble {}
-sub babble {}
-sub quotepair {}
+method tribble($/) {}
+method babble($/) {}
+method quotepair($/) {}
 
 # We can't do much at blockoid reduce time because the context is unknown.
 # Roles and subs need somewhat different code gen
-sub blockoid { my ($cl, $M) = @_;
+method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
-    if ($M->Str eq '{YOU_ARE_HERE}') {
-        $M->{_ast} = Op::YouAreHere->new(node($M), unitname => $::UNITNAME);
+    if $/ eq '{YOU_ARE_HERE}' {
+        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
     } else {
-        $M->{_ast} = $M->{statementlist}{_ast};
+        make $<statementlist>.ast;
     }
 }
-sub lambda {}
-sub embeddedblock { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->block_to_immediate($M, 'bare',
-        $cl->sl_to_block('bare', $M->{statementlist}{_ast},
-            signature => Sig->simple()));
+method lambda($/) {}
+method embeddedblock($/) {
+    make self.block_to_immediate($/, 'bare',
+        self.sl_to_block('bare', $<statementlist>.ast,
+            signature => Sig.simple()));
 }
 
-sub sigil {}
-sub sigil__S_Amp {}
-sub sigil__S_Dollar {}
-sub sigil__S_At {}
-sub sigil__S_Percent {}
+method sigil:sym<&> ($/) {}
+method sigil:sym<@> ($/) {}
+method sigil:sym<%> ($/) {}
+method sigil:sym<$> ($/) {}
 
-sub twigil {}
-sub twigil__S_Equal {}
-sub twigil__S_Bang {}
-sub twigil__S_Dot {}
-sub twigil__S_Tilde {}
-sub twigil__S_Star {}
-sub twigil__S_Question {}
-sub twigil__S_Caret {}
-sub twigil__S_Colon {}
+method twigil:sym<=> ($/) {}
+method twigil:sym<!> ($/) {}
+method twigil:sym<.> ($/) {}
+method twigil:sym<~> ($/) {}
+method twigil:sym<*> ($/) {}
+method twigil:sym<?> ($/) {}
+method twigil:sym<^> ($/) {}
+method twigil:sym<:> ($/) {}
 
-sub terminator {}
-sub terminator__S_Thesis {}
-sub terminator__S_Semi {}
-sub terminator__S_Ket {}
-sub terminator__S_Ly {}
-sub terminator__S_if {}
-sub terminator__S_unless {}
-sub terminator__S_for {}
-sub terminator__S_until {}
-sub terminator__S_then {}
-sub terminator__S_again {}
-sub terminator__S_repeat {}
-sub terminator__S_while {}
-sub terminator__S_else {}
-sub terminator__S_BangBang {}
-sub stdstopper {}
-sub unitstopper {}
-sub eat_terminator {}
+method terminator:sym<)> ($/) {}
+method terminator:sym<;> ($/) {}
+method terminator:sym<]> ($/) {}
+method terminator:sym<}> ($/) {}
+method terminator:if ($/) {}
+method terminator:unless ($/) {}
+method terminator:for ($/) {}
+method terminator:until ($/) {}
+method terminator:then ($/) {}
+method terminator:again ($/) {}
+method terminator:repeat ($/) {}
+method terminator:while ($/) {}
+method terminator:else ($/) {}
+method terminator:sym<!!> ($/) {}
 
-sub scoped { my ($cl, $M) = @_;
-    $M->{_ast} = ($M->{declarator} // $M->{regex_declarator} //
-        $M->{package_declarator} // $M->{multi_declarator})->{_ast};
+method stdstopper($/) {}
+method unitstopper($/) {}
+method eat_terminator($/) {}
+
+method scoped($/) {
+    make ($<declarator> // $<regex_declarator> //
+        $<package_declarator> // $<multi_declarator>).ast;
 }
 
 # :: Op
-sub declarator { my ($cl, $M) = @_;
-    if ($M->{signature}) {
-        my @p = @{ $M->{signature}{_ast}->params };
+method declarator($/) {
+    if $<signature> {
+        my @p = @( $<signature>.ast.params );
         # TODO: keep the original signature around somewhere := can find it
-        for (@p) {
+        for @p {
             # TODO: fanciness checks
-            $_ = Op::Lexical->new(node($M), name => $_->slot, list => $_->list,
-                hash => $_->hash, declaring => 1);
+            $_ = ::Op::Lexical.new(|node($/), name => $_.slot, list => $_.list,
+                hash => $_.hash, declaring => True);
         }
-        $M->{_ast} = Op::SimpleParcel->new(node($M), items => \@p);
-        return;
+        make ::Op::SimpleParcel.new(|node($/), items => @p);
+        return Nil;
     }
-    $M->{_ast} = $M->{variable_declarator} ? $M->{variable_declarator}{_ast} :
-                 $M->{routine_declarator}  ? $M->{routine_declarator}{_ast} :
-                 $M->{regex_declarator}    ? $M->{regex_declarator}{_ast} :
-                 $M->{type_declarator}{_ast};
+    make $<variable_declarator> ?? $<variable_declarator>.ast !!
+         $<routine_declarator>  ?? $<routine_declarator>.ast !!
+         $<regex_declarator>    ?? $<regex_declarator>.ast !!
+         $<type_declarator>.ast;
 }
 
-sub scope_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{scoped}{_ast};
-}
-sub scope_declarator__S_my {}
-sub scope_declarator__S_our {}
-sub scope_declarator__S_augment {}
-sub scope_declarator__S_supersede {}
-sub scope_declarator__S_has {}
-sub scope_declarator__S_state {}
-sub scope_declarator__S_anon {}
+method scope_declarator:my ($/) { make $<scoped>.ast }
+method scope_declarator:our ($/) { make $<scoped>.ast }
+method scope_declarator:augment ($/) { make $<scoped>.ast }
+method scope_declarator:supersede ($/) { make $<scoped>.ast }
+method scope_declarator:has ($/) { make $<scoped>.ast }
+method scope_declarator:state ($/) { make $<scoped>.ast }
+method scope_declarator:anon ($/) { make $<scoped>.ast }
 
-sub multi_declarator { my ($cl, $M) = @_;
-    $M->{_ast} = ($M->{declarator} // $M->{routine_def})->{_ast};
-}
-sub multi_declarator__S_multi {}
-sub multi_declarator__S_proto {}
-sub multi_declarator__S_only  {}
+method multi_declarator:multi ($/) { make ($<declarator> // $<routine_def>).ast}
+method multi_declarator:proto ($/) { make ($<declarator> // $<routine_def>).ast}
+method multi_declarator:only  ($/) { make ($<declarator> // $<routine_def>).ast}
 
-sub variable_declarator { my ($cl, $M) = @_;
-    if ($::MULTINESS) {
-        $M->sorry("Multi variables NYI");
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
     }
-    if ($M->{trait}[0] || $M->{post_constraint}[0] || $M->{shape}[0]) {
-        $M->sorry("Traits, postconstraints, and shapes on variable declarators NYI");
-        return;
+    if $<trait> || $<post_constraint> || $<shape> {
+        $/.CURSOR.sorry("Traits, postconstraints, and shapes on variable declarators NYI");
     }
 
-    my $scope = $::SCOPE // 'my';
+    my $scope = $*SCOPE // 'my';
 
-    if ($scope eq 'augment' || $scope eq 'supersede') {
-        $M->sorry("Illogical scope $scope for simple variable");
-        return;
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
     }
 
-    my $v = $M->{variable}{_ast};
-    my $t = $v->{twigil};
-    if ($t =~ /[?=~^:]/) {
-        $M->sorry("Variables with the $t twigil cannot be declared using " .
-            "$scope; they are created " .
-            ($t eq '?' ? "using 'constant'." :
-             $t eq '=' ? "by parsing POD blocks." :
-             $t eq '~' ? "by 'slang' definitions." :
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
              "automatically as parameters to the current block."));
-        return;
     }
 
-    if ($scope ne 'has' && $t =~ /[.!]/) {
-        $M->sorry("Twigil $t is only valid on attribute definitions ('has').");
-        return;
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
     }
 
-    if ($v->{rest}) {
-        $M->sorry(":: syntax is only valid when referencing variables, not when defining them.");
-        return;
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
     }
 
-    my $name = $v->{sigil} . $v->{twigil} . $v->{name};
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
     # otherwise identical to my
-    my $slot = ($scope eq 'anon') ? $cl->gensym : $name;
+    my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
 
-    if ($scope eq 'has') {
-        $M->{_ast} = Op::Attribute->new(node($M), name => $v->{name},
-            accessor => ($v->{twigil} eq '.'));
-    } elsif ($scope eq 'state') {
-        $M->{_ast} = Op::Lexical->new(node($M), name => $slot, state_decl => 1,
-            state_backing => $cl->gensym, declaring => 1,
-            list => ($v->{sigil} eq '@'), hash => ($v->{sigil} eq '%'));
-    } elsif ($scope eq 'our') {
-        $M->{_ast} = Op::PackageVar->new(node($M), name => $slot, slot => $slot,
+    if $scope eq 'has' {
+        make ::Op::Attribute.new(|node($/), name => $v<name>,
+            accessor => $t eq '.');
+    } elsif $scope eq 'state' {
+        make ::Op::Lexical.new(|node($/), name => $slot, state_decl => True,
+            state_backing => self.gensym, declaring => True,
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%');
+    } elsif $scope eq 'our' {
+        make ::Op::PackageVar.new(|node($/), name => $slot, slot => $slot,
             path => [ 'OUR' ]);
     } else {
-        $M->{_ast} = Op::Lexical->new(node($M), name => $slot, declaring => 1,
-            list => ($v->{sigil} eq '@'), hash => ($v->{sigil} eq '%'));
+        make ::Op::Lexical.new(|node($/), name => $slot, declaring => True,
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%');
     }
 }
 
-sub type_declarator {}
-sub type_declarator__S_constant { my ($cl, $M) = @_;
-    if ($::MULTINESS) {
-        $M->sorry("Multi variables NYI");
+method type_declarator:constant {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
     }
-    my $scope = $::SCOPE // 'my';
-    if (!$M->{identifier} && !$M->{variable}) {
-        $M->sorry("Anonymous constants NYI"); #wtf?
-        return;
+    my $scope = $*SCOPE // 'my';
+    if !$<identifier> && !$<variable> {
+        $/.CURSOR.sorry("Anonymous constants NYI"); #wtf?
+        return Nil;
     }
-    my $slot  = ($M->{identifier} // $M->{variable})->Str;
+    my $slot  = ~($<identifier> // $<variable>);
 
-    $M->{_ast} = Op::ConstantDecl->new(node($M), name => $slot,
-        path => ($::SCOPE eq 'our' ? [ 'OUR' ] : undef));
+    make ::Op::ConstantDecl.new(|node($/), name => $slot,
+        path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
 }
 
-sub package_declarator {}
-sub package_declarator__S_class { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
+method package_declarator:class ($/) { make $<package_def>.ast }
+method package_declarator:grammar ($/) { make $<package_def>.ast }
+method package_declarator:role ($/) { make $<package_def>.ast }
+method package_declarator:slang ($/) { make $<package_def>.ast }
+method package_declarator:module ($/) { make $<package_def>.ast }
+method package_declarator:package ($/) { make $<package_def>.ast }
+method package_declarator:knowhow ($/) { make $<package_def>.ast }
+
+method package_declarator:also ($/) {
+    make ::Op::StatementList.new(|node($/), children =>
+        self.process_package_traits($/, Any, $<trait>));
 }
 
-sub package_declarator__S_grammar { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
-}
-
-sub package_declarator__S_package { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
-}
-
-sub package_declarator__S_module { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
-}
-
-sub package_declarator__S_knowhow { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
-}
-
-sub package_declarator__S_role { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
-}
-
-sub package_declarator__S_slang { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{package_def}{_ast};
-}
-
-sub package_declarator__S_also { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StatementList->new(node($M), children =>
-        $cl->process_package_traits($M, undef, @{ $M->{trait} }));
-}
-
-sub package_declarator__S_require { my ($cl, $M) = @_;
-    if ($M->{EXPR}[0]) {
-        $M->sorry('Expressional forms of require NYI');
-        return;
+method package_declarator:require ($/) {
+    if $<EXPR> {
+        $/.CURSOR.sorry('Expressional forms of require NYI');
+        make ::Op::StatementList.new;
+        return Nil;
     }
-    $M->{_ast} = Op::Require->new(node($M), unit => $M->{module_name}->Str);
+    make ::Op::Require.new(|node($/), unit => ~$<module_name>);
 }
 
-sub process_package_traits { my ($cl, $M, $export, @tr) = @_;
+method process_package_traits($/, $export, @tr) {
     my @r;
 
-    for (@tr) {
-        if (exists $_->{_ast}{name}) {
-            push @r, Op::Super->new(node($M), name => $_->{_ast}{name},
-                path => $_->{_ast}{path});
-        } elsif ($_->{_ast}{export}) {
-            if ($export) {
-                push @$export, @{ $_->{_ast}{export} };
+    for @tr -> $trait {
+        if $trait.ast.<name>:exists {
+            push @r, ::Op::Super.new(|node($/), name => $trait.ast.<name>,
+                path => $trait.ast.<path>);
+        } elsif $trait.ast.<export> {
+            if defined $export {
+                push $export, @( $trait.ast.<export> );
             } else {
-                $M->sorry('Cannot mark a class as exported outside the declarator');
+                $/.CURSOR.sorry('Cannot mark a class as exported outside the declarator');
             }
         } else {
-            $M->sorry("Non-superclass traits for packageoids NYI");
+            $/.CURSOR.sorry("Non-superclass traits for packageoids NYI");
         }
     }
 
     @r;
 }
 
-sub termish {}
-sub nulltermish { my ($cl, $M) = @_; # for 1,2,3,
-    # XXX this is insane
-    $M->{term}{_ast} = $M->{term}{term}{_ast} if $M->{term};
-}
-sub EXPR {}
-sub modifier_expr { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{EXPR}{_ast};
-}
-sub default_value { my ($cl, $M) = @_;
-    $M->{_ast} = Body->new(transparent => 1, name => 'ANON',
-        do => $M->{EXPR}{_ast});
+# normally termish's ast is not used, but it becomes the used ast under
+# nulltermish.
+method termish($/) { make $<term>.ast }
+method nulltermish($/) {}
+method EXPR($/) { make $<root>.ast }
+method modifier_expr($/) { make $<EXPR>.ast }
+method default_value($/) {
+    make Body.new(transparent => True, do => $<EXPR>.ast);
 }
 
-sub arglist { my ($cl, $M) = @_;
-    $M->sorry("Invocant handling is NYI") if $::INVOCANT_IS;
-    my $x = $M->{EXPR}{_ast};
+method arglist($/) {
+    $/.CURSOR.sorry("Invocant handling is NYI") if $*INVOCANT_IS;
+    my $x = $<EXPR> && $<EXPR>.ast;
 
-    if (!defined $x) {
-        $M->{_ast} = [];
-    } elsif ($x && $x->isa('Op::SimpleParcel')) {
-        $M->{_ast} = $x->items;
+    if !defined $x {
+        make [];
+    } elsif $x && $x.^isa(::Op::SimpleParcel) {
+        make $x.items;
     } else {
-        $M->{_ast} = [$x];
+        make [$x];
     }
 }
 
-sub semiarglist { my ($cl, $M) = @_;
-    $M->{_ast} = [ map { $_->{_ast} } @{ $M->{arglist} } ];
-}
+method semiarglist($/) { make [ map *.ast, @( $<arglist> ) ] }
 
-sub args { my ($cl, $M) = @_;
-    if ($M->{moreargs} || $M->{semiarglist} && $M->{arglist}[0]) {
-        $M->sorry("Interaction between semiargs and args is not understood");
-        return;
+method args($/) {
+    if $<moreargs> || $<semiarglist> && $<arglist> {
+        $/.CURSOR.sorry("Interaction between semiargs and args is not understood");
+        make [];
+        return Nil;
     }
 
-    $M->{_ast} = $M->{semiarglist} ? $M->{semiarglist}{_ast} :
-        $M->{arglist}[0] ? [ $M->{arglist}[0]{_ast} ] : undef;
+    make $<semiarglist> ?? $<semiarglist>.ast !!
+        $<arglist> ?? [ $<arglist>[0].ast ] !! Any;
 }
 
-sub statement { my ($cl, $M) = @_;
-    if ($M->{label}) {
-        $M->sorry("Labels are NYI");
-        return;
+method statement($/) {
+    if $<label> {
+        $/.CURSOR.sorry("Labels are NYI");
+        make ::Op::StatementList.new;
+        return Nil;
     }
 
-    $M->{_ast} = $M->{statement_control} ? $M->{statement_control}{_ast} :
-                 $M->{EXPR} ? $M->{EXPR}{_ast} : undef;
+    make ($<statement_control> ?? $<statement_control>.ast !!
+        $<EXPR> ?? $<EXPR>.ast !! ::Op::StatementList.new);
 
-    if ($M->{statement_mod_cond}[0]) {
-        my ($sym, $exp) = @{ $M->{statement_mod_cond}[0]{_ast} };
+    if $<statement_mod_cond> {
+        my ($sym, $exp) = @( $<statement_mod_cond>[0].ast );
 
-        if ($sym eq 'if') {
-            $M->{_ast} = Op::Conditional->new(node($M), check => $exp,
-                true => $M->{_ast}, false => undef);
-        } elsif ($sym eq 'unless') {
-            $M->{_ast} = Op::Conditional->new(node($M), check => $exp,
-                false => $M->{_ast}, true => undef);
+        if $sym eq 'if' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                true => $/.ast, false => Any);
+        } elsif $sym eq 'unless' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                false => $/.ast, true => Any);
         } else {
-            $M->sorry("Unhandled statement modifier $sym");
-            return;
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
         }
     }
 
-    if ($M->{statement_mod_loop}[0]) {
-        my ($sym, $exp) = @{ $M->{statement_mod_loop}[0]{_ast} };
+    if $<statement_mod_loop> {
+        my ($sym, $exp) = @( $<statement_mod_loop>[0].ast );
 
-        if ($sym eq 'while') {
-            $M->{_ast} = Op::WhileLoop->new(node($M), check => $exp,
-                body => $M->{_ast}, until => 0, once => 0);
-        } elsif ($sym eq 'until') {
-            $M->{_ast} = Op::WhileLoop->new(node($M), check => $exp,
-                body => $M->{_ast}, until => 1, once => 0);
+        if $sym eq 'while' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => False, once => False);
+        } elsif $sym eq 'until' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => True, once => False);
         } else {
-            $M->sorry("Unhandled statement modifier $sym");
-            return;
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
         }
     }
 }
 
-sub statement_mod_cond { my ($cl, $M) = @_;
-    $M->{_ast} = [ $M->{sym}, $M->{modifier_expr}{_ast} ];
-}
-sub statement_mod_loop { my ($cl, $M) = @_;
-    $M->{_ast} = [ $M->{sym}, $M->{modifier_expr}{_ast} ];
-}
+method statement_mod_cond($/) { make [ ~$<sym>, $<modifier_expr>.ast ] }
+method statement_mod_loop($/) { make [ ~$<sym>, $<modifier_expr>.ast ] }
 
-sub statement_mod_cond__S_if {}
-sub statement_mod_cond__S_unless {}
-sub statement_mod_cond__S_when {}
-sub statement_mod_loop__S_while {}
-sub statement_mod_loop__S_until {}
-sub statement_mod_loop__S_for {}
-sub statement_mod_loop__S_given {}
+method statement_mod_cond:if ($/) {}
+method statement_mod_cond:unless ($/) {}
+method statement_mod_cond:when ($/) {}
+method statement_mod_loop:while ($/) {}
+method statement_mod_loop:until ($/) {}
+method statement_mod_loop:for ($/) {}
+method statement_mod_loop:given ($/) {}
 
-sub statementlist { my ($cl, $M) = @_;
-    $M->{_ast} = Op::StatementList->new(node($M), children =>
-        [ map { $_->statement_level } grep { defined }
-            map { $_->{_ast} } @{ $M->{statement} } ]);
+method statementlist($/) {
+    make ::Op::StatementList.new(|node($/), children =>
+        [ map *.statement_level, map *.ast, @( $<statement> ) ]);
 }
 
-sub semilist { my ($cl, $M) = @_;
-    $M->{_ast} = [  map { $_->{_ast} } @{ $M->{statement} } ];
-}
+method semilist($/) { make [ map *.ast, @( $<statement> ) ] }
 
-sub module_name { }
-sub module_name__S_normal { my ($cl, $M) = @_;
+method module_name:normal ($/) {
     # name-extension stuff is just ignored on module names for now
-    $M->{_ast} = {
-        name => $M->{longname}{name}->Str,
-        args => $M->{arglist}[0] ? $M->{arglist}[0]{_ast} : undef };
+    make {
+        name => ~$<longname><name>,
+        args => $<arglist> ?? $<arglist>[0].ast !! Any };
 }
 
-sub statement_control { }
-
-
-# passes the $cond to the $block if it accepts a parameter, otherwise just runs it
-sub _if_block {
-    my ($cl,$M,$cond,$block) = @_;
-    if (defined $block->{lambda}) {
-        my $true_block = $cl->block_to_closure($block, $block->{_ast} , once => 1);
-        Op::CallSub->new(node($M),
-            invocant => $true_block,
-            positionals => [$cond]
-        );
+# passes the $cond to the $block if it accepts a parameter, otherwise just
+# runs the block.  Hack - we consider a block to have a used parameter
+# iff it has a lambda symbol.
+method if_block($/, $cond, $pb) {
+    if defined $pb<lambda> {
+        my $true_block = self.block_to_closure($pb, $pb.ast, once => True);
+        ::Op::CallSub.new(|node($/), invocant => $true_block,
+            positionals => [$cond]);
     } else {
-        $cl->block_to_immediate($M, 'cond', $block->{_ast}),
-    }
-
-}
-
-# handles all the if branches
-sub _if_branches {
-    my ($cl,$M,$previous_cond,$branch,@other_branches) = @_;
-    if ($branch) {
-        Op::Helpers::let($branch->{_ast}[0] => sub {
-            my $cond = shift;
-            Op::Conditional->new(node($M), check => $cond,
-                true => _if_block($cl,$M,$cond,$branch->{pblock}),
-                false => _if_branches($cl,$M,$cond,@other_branches));
-        });
-    } else {
-        $M->{else}[0] ? _if_block($cl,$M,$previous_cond,$M->{else}[0]) : undef;
+        self.block_to_immediate($/, 'cond', $pb.ast);
     }
 }
 
-sub statement_control__S_if {
-    my ($cl, $M) = @_;
-    $M->{_ast} = _if_branches($cl,$M,undef,$M->{xblock},@{$M->{elsif}});
+# This handles the branches of an if statement by induction.  At least one
+# if must be provided, since "else -> $x { }" needs the previous value.
+method if_branches($/, *@branches) {
+    my $branch = shift @branches;
+    mklet($branch.ast[0], -> $cond {
+        ::Op::Conditional.new(|node($/), check => $cond,
+            true  => self.if_block($/, $cond, $branch<pblock>),
+            false => @branches ?? self.if_branches($/, @branches) !!
+                $<else> ?? self.if_block($/, $cond, $<else>[0]) !!
+                Any);
+    });
 }
 
-sub statement_control__S_while { my ($cl, $M) = @_;
-    $M->{_ast} = Op::WhileLoop->new(node($M), check => $M->{xblock}{_ast}[0],
-        body => $cl->block_to_immediate($M, 'loop',$M->{xblock}{_ast}[1]),
-        until => 0, once => 0);
+method statement_control:if ($/) {
+    make self.if_branches($/, $<xblock>, @( $<elsif> ));
 }
 
-sub statement_control__S_until { my ($cl, $M) = @_;
-    $M->{_ast} = Op::WhileLoop->new(node($M), check => $M->{xblock}{_ast}[0],
-        body => $cl->block_to_immediate($M, 'loop', $M->{xblock}{_ast}[1]),
-        until => 1, once => 0);
+method statement_control:while ($/) {
+    make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
+        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]),
+        :!until, :!once);
 }
 
-sub statement_control__S_for { my ($cl, $M) = @_;
-    $M->{xblock}{_ast}[1]->type('loop');
-    # TODO: should use 'once'
-    $M->{_ast} = Op::ForLoop->new(node($M), source => $M->{xblock}{_ast}[0],
-        sink => $cl->block_to_closure($M, $M->{xblock}{_ast}[1]));
+method statement_control:until ($/) {
+    make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
+        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]),
+        :until, :!once);
 }
 
-sub statement_control__S_use { my ($cl, $M) = @_;
-    if ($M->{version}) {
-        return;
+method statement_control:for ($/) {
+    $<xblock>.ast[1].type = 'loop';
+    make ::Op::ForLoop.new(|node($/), source => $<xblock>.ast[0],
+        sink => self.block_to_closure($/, $<xblock>.ast[1]));
+}
+
+method statement_control:use ($/) {
+    make ::Op::StatementList.new;
+    if $<version> {
+        return Nil;
     }
 
-    my $name = $M->{module_name}{_ast}{name};
-    my $args = $M->{arglist} ? $M->{arglist}{_ast} : [];
+    my $name = $<module_name>.ast<name>;
+    my $args = $<arglist> ?? $<arglist>.ast !! [];
 
-    if ($M->{module_name}{_ast}{args}) {
-        $M->sorry("'use' of an instantiated role not yet understood");
-        return;
+    if defined $<module_name>.ast.<args> {
+        $/.CURSOR.sorry("'use' of an instantiated role not yet understood");
+        return Nil;
     }
 
-    if (@$args) {
-        $M->sorry("'use' with arguments NYI");
-        return;
+    if $args {
+        $/.CURSOR.sorry("'use' with arguments NYI");
+        return Nil;
     }
 
     if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
-        return;
+        return Nil;
     }
 
-    $M->{_ast} = Op::Use->new(node($M), unit => $name);
+    make ::Op::Use.new(|node($/), unit => $name);
 }
 
-# All package defs have a couple things in common - a special-ish block,
-# with a special decl, and some nice runtimey code
-sub package_def { my ($cl, $M) = @_;
-    if ($::MULTINESS) {
-        $M->sorry("Multi variables NYI");
+my %_decl2class = (
+    package => ::Op::PackageDef,
+    class   => ::Op::ClassDef,
+    module  => ::Op::ModuleDef,
+    grammar => ::Op::GrammarDef,
+    role    => ::Op::RoleDef,
+);
+
+method package_def ($/) {
+    make ::Op::StatementList.new;
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+        return Nil;
     }
-    my $scope = $::SCOPE;
-    if (!$M->{longname}[0]) {
+    my $scope = $*SCOPE;
+    if !$<longname> {
         $scope = 'anon';
     }
-    if ($scope eq 'supersede') {
-        $M->sorry('Supercede is not yet supported');
-        return;
+    if $scope eq 'supersede' {
+        $/.CURSOR.sorry('Supercede is not yet supported');
+        return Nil;
     }
-    if ($scope eq 'has' || $scope eq 'state') {
-        $M->sorry("Illogical scope $scope for package block");
-        return;
+    if $scope eq 'has' || $scope eq 'state' {
+        $/.CURSOR.sorry("Illogical scope $scope for package block");
+        return Nil;
     }
 
     my ($name, $outervar, @augpkg);
 
-    if ($scope eq 'augment') {
-        my $r = $cl->mangle_longname($M->{longname}[0]);
-        $name = $r->{name};
-        @augpkg = @{ $r->{path} // ['MY'] };
+    if $scope eq 'augment' {
+        my $r = self.mangle_longname($<longname>[0]);
+        $name = $r<name>;
+        @augpkg = @( $r<path> // ['MY'] );
     } else {
-        $name = $M->{longname}[0] ?
-            $cl->unqual_longname($M->{longname}[0],
-                "Qualified package definitions NYI", 1) : 'ANON';
-        $outervar = $scope ne 'anon' ? $name : $cl->gensym;
+        $name = $<longname> ??
+            self.unqual_longname($<longname>[0],
+                "Qualified package definitions NYI", True) !! 'ANON';
+        $outervar = $scope ne 'anon' ?? $name !! self.gensym;
     }
 
-    my $optype = 'Op::' . ucfirst($::PKGDECL) . 'Def';
-    my $blocktype = $::PKGDECL;
-    my $bodyvar = $cl->gensym;
+    my $optype = %_decl2class{$*PKGDECL};
+    my $blocktype = $*PKGDECL;
+    my $bodyvar = self.gensym;
     # currently always install into the local stash
-    my $ourpkg = ($scope eq 'our') ? [ 'OUR::' ] : undef;
+    my $ourpkg = ($scope eq 'our') ?? [ 'OUR::' ] !! Any;
 
-    if ($scope eq 'augment') {
-        my $stmts = $M->{statementlist} // $M->{blockoid};
-        $stmts = $stmts->{_ast};
-        my $cbody = $cl->sl_to_block($blocktype, $stmts, name => $name, subname => "augment-" . $name // 'ANON');
+    if $scope eq 'augment' {
+        my $stmts = $<statementlist> // $<blockoid>;
+        $stmts = $stmts.ast;
+        my $cbody = self.sl_to_block($blocktype, $stmts, name => $name, subname => "augment-" ~ ($name // 'ANON'));
 
-        $M->{_ast} = Op::Augment->new(
-            node($M),
+        make ::Op::Augment.new(
+            |node($/),
             pkg     => [@augpkg],
             name    => $name,
             bodyvar => $bodyvar,
             body    => $cbody);
-    } elsif (!$M->{decl}{stub}) {
-        my $stmts = $M->{statementlist} // $M->{blockoid};
+    } elsif !$*DECLARAND<stub> {
+        my $stmts = $<statementlist> // $<blockoid>;
         my @export;
 
-        $stmts = Op::StatementList->new(children =>
-            [ $cl->process_package_traits($M, \@export, @{ $M->{trait} }),
-                $stmts->{_ast} ]);
+        $stmts = ::Op::StatementList.new(children =>
+            [ self.process_package_traits($/, @export, $<trait>), $stmts.ast ]);
 
-        my $cbody = $cl->sl_to_block($blocktype, $stmts,
-            name => $name, subname => ($::PKGDECL . '-' . ($name // 'ANON')));
-        $M->{_ast} = $optype->new(
-            node($M),
-            (($blocktype eq 'role' && $M->{signature}[0]) ?
-                (signature => $M->{signature}[0]{_ast}) : ()),
+        my $cbody = self.sl_to_block($blocktype, $stmts,
+            name => $name, subname => ($*PKGDECL ~ '-' ~ ($name // 'ANON')));
+        make $optype.new(
+            |node($/),
+            signature => ($blocktype eq 'role' && $<signature> ??
+                $<signature>[0].ast !! Any),
             name    => $name,
             var     => $outervar,
-            exports => \@export,
+            exports => @export,
             bodyvar => $bodyvar,
             ourpkg  => $ourpkg,
             body    => $cbody);
     } else {
-        $M->{_ast} = $optype->new(
-            node($M),
+        make $optype.new(
+            |node($/),
             name    => $name,
             var     => $outervar,
             ourpkg  => $ourpkg,
-            stub    => 1);
+            stub    => True);
     }
 }
 
-sub trait_mod {}
-sub trait_mod__S_is { my ($cl, $M) = @_;
-    my $trait = $M->{longname}->Str;
+method trait_mod:is ($/) {
+    my $trait = ~$<longname>;
     my $noparm;
 
-    if ($M->is_name($trait)) {
-        $M->{_ast} = $cl->mangle_longname($M->{longname});
+    if $/.CURSOR.is_name($trait) {
+        make self.mangle_longname($<longname>);
         $noparm = 'Superclasses cannot have parameters';
-    } elsif ($trait eq 'export') {
-        $M->{_ast} = { export => [ 'DEFAULT', 'ALL' ] };
+    } elsif $trait eq 'export' {
+        make { export => [ 'DEFAULT', 'ALL' ] };
         $noparm = 'Export tags NYI';
     } elsif ($trait eq 'rawcall') {
-        $M->{_ast} = { nobinder => 1 };
-    } elsif ($trait eq 'return-pass') { # &return special
-        $M->{_ast} = { return_pass => 1 };
-    } elsif ($trait eq 'rw') {
-        $M->{_ast} = { rw => 1 };
+        make { nobinder => True };
+    } elsif $trait eq 'return-pass' { # &return special
+        make { return_pass => 1 };
+    } elsif $trait eq 'rw' {
+        make { rw => 1 };
     } else {
-        $M->sorry('Unhandled trait ' . $trait);
+        $/.CURSOR.sorry("Unhandled trait $trait");
+        make { };
     }
 
-    if ($noparm && $M->{circumfix}[0]) {
-        $M->sorry($noparm);
-        return;
+    if $noparm && $<circumfix> {
+        $/.CURSOR.sorry($noparm);
     }
 }
 
-sub trait { my ($cl, $M) = @_;
-    if ($M->{colonpair}) {
-        $M->sorry('Colonpair traits NYI');
-        return;
+method trait ($/) {
+    if $<colonpair> {
+        $/.CURSOR.sorry('Colonpair traits NYI');
+        make { };
+        return Nil;
     }
 
-    $M->{_ast} = $M->{trait_mod}{_ast};
+    make $<trait_mod>.ast;
 }
 
-sub routine_declarator {}
-sub routine_declarator__S_sub { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{routine_def}{_ast};
-}
-sub routine_declarator__S_method { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{method_def}{_ast};
-}
-sub routine_declarator__S_submethod { my ($cl, $M) = @_;
-    $M->{_ast} = $M->{method_def}{_ast};
-    if ($M->{_ast}->method_too->[0] ne 'normal') {
-        $M->sorry("Call pattern decorators cannot be used with submethod");
-        $M->{_ast} = undef;
-        return;
+method routine_declarator:sub ($/) { make $<routine_def>.ast }
+method routine_declarator:method ($/) { make $<method_def>.ast }
+method routine_declarator:submethod ($/) {
+    make $<method_def>.ast;
+    if $/.ast.method_too.[0] ne 'normal' {
+        $/.CURSOR.sorry("Call pattern decorators cannot be used with submethod");
     }
-    $M->{_ast}->method_too->[0] = 'sub';
+    $/.ast.method_too.[0] = 'sub';
 }
 
 my $next_anon_id = 0;
-sub gensym { 'anon_' . ($next_anon_id++) }
-sub genid  { ($next_anon_id++) }
+method gensym() { 'anon_' ~ ($next_anon_id++) }
+method genid()  { ($next_anon_id++) }
 
-sub blockcheck { my ($cl) = @_;
-}
-
-sub sl_to_block { my ($cl, $type, $ast, %args) = @_;
-    my $subname = $args{subname} // 'ANON';
-    $cl->blockcheck;
-    Body->new(
-        name      => $subname,
-        returnable=> $args{returnable} // ($type eq 'sub'),
-        ($type eq 'mainline' ? (
-                file => $::FILE->{name},
-                text => $::ORIG) : ()),
+method sl_to_block ($type, $ast, :$subname, :$returnable, :$signature) {
+    Body.new(
+        name      => $subname // 'ANON',
+        returnable=> $returnable // ($type eq 'sub'),
         type      => $type,
-        signature => $args{signature},
+        signature => $signature,
         do        => $ast);
 }
 
-sub get_outer { my ($cl, $pad) = @_;
-    $STD::ALL->{ $pad->{'OUTER::'}[0] };
-}
-
-sub block_to_immediate { my ($cl, $M, $type, $blk) = @_;
-    $blk->type($type);
-    Op::CallSub->new(node($M),
-        invocant => $cl->block_to_closure($M, $blk, once => 1),
+method block_to_immediate($/, $type, $blk) {
+    $blk.type = $type;
+    ::Op::CallSub.new(|node($/),
+        invocant => self.block_to_closure($/, $blk, once => True),
         positionals => []);
 }
 
-sub block_to_closure { my ($cl, $M, $blk, %args) = @_;
-    my $outer_key = $args{outer_key} // $cl->gensym;
-
-    Op::SubDef->new(var => $outer_key, body => $blk, node($M),
-        once => $args{once}, method_too => $args{method_too},
-        exports => ($args{exports} // []));
+method block_to_closure($/, $body, :$outer_key, :$method_too, :$once,
+        :$exports) {
+    ::Op::SubDef.new(|node($/), var => ($outer_key // self.gensym),
+        :$body, :$once, :$method_too, exports => ($exports // []));
 }
 
-sub get_placeholder_sig { my ($cl, $M) = @_;
+method get_placeholder_sig($/) {
     # for some reason, STD wants to deparse this
-    my @things = split ", ", $::CURLEX->{'$?SIGNATURE'};
-    shift @things if $things[0] eq '';
+    my @things = $*CURLEX<$?SIGNATURE>.split(", ");
+    shift @things if @things[0] eq '';
     my @parms;
-    for (@things) {
-        if ($_ =~ /^\$_ is ref/) {
-            push @parms, Sig::Parameter->new(optional => 1,
+    for @things -> $t {
+        if substr($t, 0, 9) eq '$_ is ref' {
+            push @parms, ::Sig::Parameter.new(optional => True,
                 slot => '$_', name => '$_');
-        } elsif ($_ eq '*@_') {
-            push @parms, Sig::Parameter->new(slurpy => 1, slot => '@_',
-                list => 1, name => '*@_');
-        } elsif ($_ =~ /^([@\$])/) {
-            push @parms, Sig::Parameter->new(slot => $_, name => $_,
-                list => ($1 eq '@'));
+        } elsif $t eq '*@_' {
+            push @parms, ::Sig::Parameter.new(slurpy => True, slot => '@_',
+                list => True, name => '*@_');
+        } elsif defined '$@%&'.index(substr($t,0,1)) {
+            push @parms, ::Sig::Parameter.new(slot => $t, name => $t,
+                list => (substr($t,0,1) eq '@'), hash => (substr($t,0,1) eq '%'));
         } else {
-            $M->sorry('Named placeholder parameters NYI');
-            return;
+            $/.CURSOR.sorry('Named placeholder parameters NYI');
+            return Sig.simple;
         }
     }
-    return Sig->new(params => \@parms);
+    return Sig.new(params => @parms);
 }
 
 # always a sub, though sometimes it's an implied sub after multi/proto/only
-sub routine_def { my ($cl, $M) = @_;
-    if ($::MULTINESS) {
-        $M->sorry("Multi routines NYI");
+method routine_def ($/) {
+    make ::Op::StatementList.new;
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi routines NYI");
     }
-    if ($M->{sigil}[0] && $M->{sigil}[0]->Str eq '&*') {
-        $M->sorry("Contextuals NYI");
-        return;
+    if $<sigil> && $<sigil>[0] eq '&*' {
+        $/.CURSOR.sorry("Contextual sub definitions NYI");
+        return Nil;
     }
-    my $dln = $M->{deflongname}[0];
-    if (@{ $M->{multisig} } > 1) {
-        $M->sorry("Multiple multisigs (what?) NYI");
-        return;
+    my $dln = $<deflongname>[0];
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
     }
     my @export;
     my $return_pass = 0;
-    my $signature = $M->{multisig}[0] ? $M->{multisig}[0]{_ast} :
-        $cl->get_placeholder_sig($M);
-    for my $t (@{ $M->{trait} }) {
-        if ($t->{_ast}{export}) {
-            push @export, @{ $t->{_ast}{export} };
-        } elsif ($t->{_ast}{nobinder}) {
-            $signature = undef;
-        } elsif ($t->{_ast}{return_pass}) {
+    my $signature = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+    for @( $<trait> ) -> $t {
+        if $t.ast.<export> {
+            push @export, @( $t.ast<export> );
+        } elsif $t.ast<nobinder> {
+            $signature = Any;
+        } elsif $t.ast<return_pass> {
             $return_pass = 1;
         } else {
-            $M->sorry('Non-export sub traits NYI');
+            $/.CURSOR.sorry('Non-export sub traits NYI');
         }
     }
-    my $scope = !$dln ? 'anon' : $::SCOPE || 'my';
-    my ($m,$p) = $dln ? @{$cl->mangle_longname($dln)}{'name','path' } : ();
+    my $scope = !$dln ?? 'anon' !! ($*SCOPE || 'my');
+    my ($m,$p) = $dln ?? self.mangle_longname($dln).<name path> !! ();
 
-    if ($scope ne 'my' && $scope ne 'our' && $scope ne 'anon') {
-        $M->sorry("Illegal scope $scope for subroutine");
-        return;
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        return Nil;
     }
-    if ($scope eq 'our') {
-        $M->sorry('Package subs NYI');
-        return;
-    } elsif ($p) {
-        $M->sorry('Defining a non-our sub with a package-qualified name makes no sense');
-        return;
+    if $scope eq 'our' {
+        $/.CURSOR.sorry('Package subs NYI');
+        return Nil;
+    } elsif $p {
+        $/.CURSOR.sorry('Defining a non-our sub with a package-qualified name makes no sense');
+        return Nil;
     }
 
-    $M->{_ast} = $cl->block_to_closure($M,
-            $cl->sl_to_block('sub',
-                $M->{blockoid}{_ast},
-                returnable => !$return_pass,
-                subname => $m,
-                signature => $signature),
-        outer_key => (($scope eq 'my') ? "&$m" : undef),
-        exports => \@export);
+    make self.block_to_closure($/,
+        self.sl_to_block('sub',
+            $<blockoid>.ast,
+            returnable => !$return_pass,
+            subname => $m,
+            signature => $signature),
+        outer_key => (($scope eq 'my') ?? "\&$m" !! Any),
+        exports => @export);
 }
 
-sub method_def { my ($cl, $M) = @_;
-    my $scope = $::SCOPE // 'has';
-    my $type = $M->{type} ? $M->{type}->Str : '';
-    $type = ($type eq ''  ? 'normal' :
-             $type eq '^' ? 'meta' :
-             $type eq '!' ? 'private' :
-             do {
-                 $M->sorry("Unhandled method decoration $type");
-                 return;
-             });
-    $scope = 'anon' if !$M->{longname};
-    my $name = $M->{longname} ? $cl->unqual_longname($M->{longname},
-        "Qualified method definitions not understood") : undef; #XXX
+method method_def ($/) {
+    make ::Op::StatementList.new;
+    my $scope = $*SCOPE // 'has';
+    my $type = $<type> ?? ~$<type> !! '';
+    $type = ($type eq ''  ?? 'normal' !!
+             $type eq '^' ?? 'meta' !!
+             $type eq '!' ?? 'private' !!
+             (
+                 $/.CURSOR.sorry("Unhandled method decoration $type");
+                 return Nil;
+             ));
+    $scope = 'anon' if !$<longname>;
+    my $name = $<longname> ?? self.unqual_longname($<longname>,
+        "Qualified method definitions not understood") !! Any; #XXX
 
-    if ($M->{sigil}) {
-        $M->sorry("Method sgils NYI");
-        return;
+    if $<sigil> {
+        $/.CURSOR.sorry("Method sgils NYI");
+        return Nil;
     }
-    if ($type eq 'meta') {
-        $M->sorry("Metamethod mixins NYI");
-        return;
+    if $type eq 'meta' {
+        $/.CURSOR.sorry("Metamethod mixins NYI");
+        return Nil;
     }
-    if (@{ $M->{multisig} } > 1) {
-        $M->sorry("Multiple multisigs (what?) NYI");
-        return;
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
     }
 
-    my $sym = ($scope eq 'my') ? ('&' . $name) : $cl->gensym;
+    my $sym = ($scope eq 'my') ?? ('&' ~ $name) !! self.gensym;
 
     if ($scope eq 'augment' || $scope eq 'supersede' || $scope eq 'state') {
-        $M->sorry("Illogical scope $scope for method");
-        return;
+        $/.CURSOR.sorry("Illogical scope $scope for method");
+        return Nil;
     }
 
     if ($scope eq 'our') {
-        $M->sorry("Packages NYI");
-        return;
+        $/.CURSOR.sorry("Packages NYI");
+        return Nil;
     }
-    my $sig = $M->{multisig}[0] ? $M->{multisig}[0]{_ast} :
-        $cl->get_placeholder_sig($M);
+    my $sig = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
 
-    for my $t (@{ $M->{trait} }) {
-        if ($t->{_ast}{nobinder}) {
-            $sig = undef;
+    for @( $<trait> ) -> $t {
+        if ($t.ast<nobinder>) {
+            $sig = Any;
         } else {
-            $M->sorry("NYI method trait " . $M->Str);
+            $/.CURSOR.sorry("NYI method trait $t");
         }
     }
 
-    my $bl = $cl->sl_to_block('sub', $M->{blockoid}{_ast},
+    my $bl = self.sl_to_block('sub', $<blockoid>.ast,
         subname => $name,
-        signature => $sig ? $sig->for_method : undef);
+        signature => $sig ?? $sig.for_method !! Any);
 
-    $M->{_ast} = $cl->block_to_closure($M, $bl, outer_key => $sym,
-        method_too => ($scope ne 'anon' ? [ $type, $name ] : undef));
+    make self.block_to_closure($/, $bl, outer_key => $sym,
+        method_too => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
 }
 
-sub block { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->sl_to_block('', $M->{blockoid}{_ast});
-}
+method block($/) { make self.sl_to_block('', $<blockoid>.ast); }
 
 # :: Body
-sub pblock { my ($cl, $M) = @_;
-    my $rw = $M->{lambda} && $M->{lambda}->Str eq '<->';
-    $M->{_ast} = $cl->sl_to_block('', $M->{blockoid}{_ast},
-        signature => ($M->{signature} ? $M->{signature}{_ast} :
-            $cl->get_placeholder_sig($M)));
+method pblock($/) {
+    my $rw = $<lambda> && $<lambda> eq '<->';
+    make self.sl_to_block('', $<blockoid>.ast,
+        signature => ($<signature> ?? $<signature>.ast !!
+            self.get_placeholder_sig($/)));
 }
 
-sub xblock { my ($cl, $M) = @_;
-    $M->{_ast} = [ $M->{EXPR}{_ast}, $M->{pblock}{_ast} ];
-}
+method xblock($/) { make [ $<EXPR>.ast, $<pblock>.ast ] }
 
 # returns Body of 0 args
-sub blast { my ($cl, $M) = @_;
-    if ($M->{block}) {
-        $M->{_ast} = $M->{block}{_ast};
+method blast($/) {
+    if $<block> {
+        make $<block>.ast;
     } else {
-        $M->{_ast} = Body->new(
-            transparent => 1,
-            name => 'ANON',
-            do   => $M->{statement}{_ast});
+        make Body.new(
+            transparent => True,
+            do   => $<statement>.ast);
     }
 }
 
-sub statement_prefix {}
-sub statement_prefix__S_do { my ($cl, $M) = @_;
-    $M->{_ast} = $cl->block_to_immediate($M, 'do', $M->{blast}{_ast});
+method statement_prefix:do ($/) {
+    make self.block_to_immediate($/, 'do', $<blast>.ast);
 }
-sub statement_prefix__S_gather { my ($cl, $M) = @_;
-    $M->{blast}{_ast}->type('gather');
-    $M->{_ast} = Op::Gather->new(node($M), var => $cl->gensym,
-        body => $M->{blast}{_ast});
+method statement_prefix:gather ($/) {
+    $<blast>.ast.type = 'gather';
+    make ::Op::Gather.new(|node($/), var => self.gensym, body => $<blast>.ast);
 }
-sub statement_prefix__S_try { my ($cl, $M) = @_;
-    $M->{_ast} = Op::Try->new(node($M), body =>
-        $cl->block_to_immediate($M, 'try', $M->{blast}{_ast}));
+method statement_prefix:try ($/) {
+    make ::Op::Try.new(|node($/), body =>
+        self.block_to_immediate($/, 'try', $<blast>.ast));
 }
 
-sub statement_prefix__S_START { my ($cl, $M) = @_;
-    my $cv = $cl->gensym;
-    $M->{_ast} = Op::Start->new(node($M), condvar => $cv, body =>
-        $cl->block_to_immediate($M, 'phaser', $M->{blast}{_ast}));
+method statement_prefix:START ($/) {
+    my $cv = self.gensym;
+    make ::Op::Start.new(|node($/), condvar => $cv, body =>
+        self.block_to_immediate($/, 'phaser', $<blast>.ast));
 }
 
 # TODO: retain and return a value
-sub statement_prefix__S_INIT { my ($cl, $M) = @_;
-    $M->{blast}{_ast}->type('init');
-    $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
+method statement_prefix:INIT ($/) {
+    $<blast>.ast.type = 'init';
+    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
 }
 # XXX 'As soon as possible' isn't quite soon enough here
-sub statement_prefix__S_BEGIN { my ($cl, $M) = @_;
-    $M->{blast}{_ast}->type('begin');
-    $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
+method statement_prefix:BEGIN ($/) {
+    $<blast>.ast.type = 'begin';
+    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
 }
-*statement_prefix__S_CHECK = *statement_prefix__S_BEGIN;
-
-sub statement_prefix__S_END { my ($cl, $M) = @_;
-    $M->{blast}{_ast}->type('end');
-    $M->{_ast} = Op::VoidPhaser->new(node($M), body => $M->{blast}{_ast});
+method statement_prefix:CHECK ($/) {
+    $<blast>.ast.type = 'begin';
+    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
 }
 
-sub comp_unit { my ($cl, $M) = @_;
+method statement_prefix:END ($/) {
+    $<blast>.ast.type = 'end';
+    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
+}
+
+method comp_unit($/) {
     my $body;
-    my $sl = $M->{statementlist}{_ast};
+    my $sl = $<statementlist>.ast;
 
-    $body = $cl->sl_to_block('mainline', $sl, subname => 'mainline');
+    $body = self.sl_to_block('mainline', $sl, subname => 'mainline');
 
-    my $sn = $::SETTINGNAME; $sn =~ s/::/./g;
-    $M->{_ast} = Unit->new(mainline => $body, name => $::UNITNAME,
-        is_setting => (!!$::YOU_WERE_HERE), setting_name => $sn);
+    make Unit.new(mainline => $body, name => $*UNITNAME,
+        is_setting => ?$*YOU_WERE_HERE, setting_name => $*SETTINGNAME,
+        orig => $/.orig, filename => $*FILE<name>, modtime => $*modtime);
 }
-
-1;
