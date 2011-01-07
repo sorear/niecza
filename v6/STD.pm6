@@ -826,16 +826,14 @@ token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
 ##################
 
 token ws {
-    :temp $*STUB = return self if @*MEMOS[self.pos]<ws> :exists;
-    :my $startpos = self.pos;
+    :my $startpos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {self}))))) };
+    :my $stub = return self if @*MEMOS[$startpos]<ws> :exists; #OK
 
     :dba('whitespace')
-    [
-        | \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
-        | <?before \w> <?after \w> :::
+    \h+ <![\#\s\\]> { @*MEMOS[ Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) } ]<ws> = $startpos; }   # common case
+    || <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws>:delete; }
             <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
-    ]
     ||
     [
     | <.unsp>
@@ -844,13 +842,16 @@ token ws {
     # | $ { $¢.moreinput }  NIECZA break inf loop
     ]*
 
+    # NOTE that this is only used in the slow path!  The || above is the
+    # top level separator.
     {
-        if ($¢.pos == $startpos) {
-            @*MEMOS[$¢.pos]<ws>:delete;
+        my $pos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) };
+        if ($pos == $startpos) {
+            @*MEMOS[$pos]<ws>:delete;
         }
         else {
-            @*MEMOS[$¢.pos]<ws> = $startpos;
-            @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
+            @*MEMOS[$pos]<ws> = $startpos;
+            @*MEMOS[$pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
                 if @*MEMOS[$startpos]<endstmt> :exists;
         }
     }
@@ -3132,9 +3133,10 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         <.ws>
     }
 
-    token infixish ($in_meta = $*IN_META) {
+    token infixish ($in_meta?) {
         :my ($infix, $O, $sym);
-        :my $*IN_META = $in_meta;
+        :temp $*IN_META;
+        :my $stub = ($*IN_META = $*IN_META // $in_meta); #OK not used
         <!stdstopper>
         <!infixstopper>
         :dba('infix or meta-infix')
@@ -4898,13 +4900,14 @@ method getsig {
     if ($*DECLARAND<mult>//'') ne 'proto' {
         for keys %$*CURLEX {
             my $desc = $*CURLEX{$_};
-            next unless $_ ~~ /<[\$\@\%\&]>\w/;
             next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
+            next if $desc !~~ Hash;
             next if $desc<used>;
             next if $desc<rebind>;
             next if $desc<dynamic>;
             next if $desc<scope> eq 'state';
             next if $desc<stub>;
+            next unless $_ ~~ /<[\$\@\%\&]>\w/;
             my $pos = $desc<declaredat> // self.pos;
             self.cursor($pos).worry("$_ is declared but not used");
         }

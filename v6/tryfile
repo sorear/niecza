@@ -7,8 +7,6 @@ use NAME;
 use JSYNC;
 use NieczaGrammar;
 
-my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
-
 augment class Match {
     method trim_heredoc () { self } # NYI
 }
@@ -27,76 +25,6 @@ method lineof ($p) {
 }
 
     our $ALL;
-method getsig {
-    my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
-    my $sig;
-    if $*CURLEX.<!NEEDSIG>:delete {
-        if $pv {
-            my $h_ = $pv.<%_>:delete;
-            my $a_ = $pv.<@_>:delete;
-            $sig = join ', ', (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) });
-            $sig ~= ', *@_' if $a_;
-            $sig ~= ', *%_' if $h_;
-        }
-        else {
-            $sig = '$_ is ref = OUTER::<$_>';
-        }
-        $*CURLEX.<$?SIGNATURE> = $sig;
-    }
-    else {
-        $sig = $*CURLEX.<$?SIGNATURE>;
-    }
-    # NIECZA immutable cursors
-    # self.<sig> = $sig;
-    # self.<lex> = $*CURLEX.idref;
-    if ($*DECLARAND<mult>//'') ne 'proto' {
-        for keys %$*CURLEX {
-            my $desc = $*CURLEX{$_};
-            next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
-            next if $desc !~~ Hash;
-            next if $desc<used>;
-            next if $desc<rebind>;
-            next if $desc<dynamic>;
-            next if $desc<scope> eq 'state';
-            next if $desc<stub>;
-            next unless $_ ~~ /<[\$\@\%\&]>\w/;
-            my $pos = $desc<declaredat> // self.pos;
-            self.cursor($pos).worry("$_ is declared but not used");
-        }
-    }
-    self;
-}
-token ws {
-    :my $startpos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {self}))))) };
-    :my $stub = return self if @*MEMOS[$startpos]<ws> :exists; #OK
-
-    :dba('whitespace')
-    \h+ <![\#\s\\]> { @*MEMOS[ Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) } ]<ws> = $startpos; }   # common case
-    || <?before \w> <?after \w> :::
-            { @*MEMOS[$startpos]<ws>:delete; }
-            <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
-    ||
-    [
-    | <.unsp>
-    | <.vws> <.heredoc>
-    | <.unv>
-    # | $ { $¢.moreinput }  NIECZA break inf loop
-    ]*
-
-    # NOTE that this is only used in the slow path!  The || above is the
-    # top level separator.
-    {
-        my $pos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) };
-        if ($pos == $startpos) {
-            @*MEMOS[$pos]<ws>:delete;
-        }
-        else {
-            @*MEMOS[$pos]<ws> = $startpos;
-            @*MEMOS[$pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
-                if @*MEMOS[$startpos]<endstmt> :exists;
-        }
-    }
-}
 method lookup_dynvar($name) { Any } # NYI
 method check_old_cclass($text) { } # NYI
 method do_use($module,$args) {
@@ -133,37 +61,6 @@ method load_lex($setting) {
 
     return Stash.new(%( from-jsync(slurp($setting ~ ".syml")) ));
 }
-}
-
-augment class STD::P6 {
-    token infixish ($in_meta?) {
-        :my ($infix, $O, $sym);
-        :temp $*IN_META;
-        :my $stub = ($*IN_META = $*IN_META // $in_meta); #OK not used
-        <!stdstopper>
-        <!infixstopper>
-        :dba('infix or meta-infix')
-        [
-        | <colonpair> $<fake> = {1} { $sym = ':' }
-            { $O = {:prec(%item_assignment<prec>), :assoc<unary>,
-                :dba<adverb> } }
-                # actual test is non-inclusive!
-        |   [
-            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $O = $<infix><O>; $sym = $<infix><sym> }
-            | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
-            | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
-            | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
-            | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
-            | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
-            ]
-            [ <?before '='> <assign_meta_operator($<infix>)>
-                   {$O = $<assign_meta_operator>[0]<O>}
-                   {$sym = $<assign_meta_operator>[0]<sym>}
-            ]?
-
-        ]
-        $<O> = { $O } $<sym> = { $sym }
-    }
 }
 
 augment class Cursor {
