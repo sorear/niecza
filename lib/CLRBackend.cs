@@ -3381,7 +3381,12 @@ namespace Niecza.CLRBackend {
             Func<NamProcessor, object[], CpsOp> handler;
             if (!handlers.TryGetValue(tag, out handler))
                 throw new Exception("Unhandled nam operator " + tag);
-            return handler(this, rnode);
+            if (CLRBackend.Verbose > 1)
+                Console.WriteLine("enter " + tag);
+            CpsOp r = handler(this, rnode);
+            if (CLRBackend.Verbose > 1)
+                Console.WriteLine("exit " + tag);
+            return r;
         }
     }
 
@@ -3396,7 +3401,7 @@ namespace Niecza.CLRBackend {
         internal List<CpsOp> thaw = new List<CpsOp>();
 
         public static int Verbose =
-            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") != null ? 1 : 0;
+            int.Parse(Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") ?? "0");
         public static bool Verifiable =
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_VERIFIABLE") != null ? true : false;
 
