@@ -116,12 +116,17 @@ our %units;
                     unless join("\0", @{ $i1->[1] }) eq join("\0", @{ $i2->[1] });
             }
             if ($i1->[0] eq 'var') {
+                my $nn1 = $i1->[1] && $i1->[1][0];
+                my $nn2 = $i2->[1] && $i2->[1][0];
                 die "Non-stub packages cannot be merged " . join(" ", @path, $k, ";", @{$i1->[1]}, ";", @{$i2->[1]})
-                    if $i1->[1] && $i2->[1] && ($i1->[1][0] ne $i2->[1][0] ||
-                        $i1->[1][1] != $i2->[1][1]) && $i1->[1][0] && $i2->[1][0];
-                $rinto->{$k} = ['var', $i1->[1] // $i2->[1],
+                    if $nn1 && $nn2 && ($i1->[1][0] ne $i2->[1][0] ||
+                        $i1->[1][1] != $i2->[1][1]);
+                my $obj = $nn1 ? $i1->[1] : $nn2 ? $i2->[1] :
+                    ($i1->[1] // $i2->[1]);
+                my $child = 
                     ($i1->[2] && $i2->[2]) ? _merge($i1->[2], $i2->[2], @path, $k) :
-                    ($i1->[2] // $i2->[2])];
+                    ($i1->[2] // $i2->[2]);
+                $rinto->{$k} = ['var', $obj, $child];
             }
         }
         return $rinto;
@@ -763,7 +768,7 @@ our %units;
 
     sub get_unit {
         my ($self, $name) = @_;
-        $units{$name};
+        $units{$name} // Carp::confess "invalid unit ref $name";
     }
 
     sub anon_stash {
