@@ -13,7 +13,7 @@ use OptRxSimple;
 sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
 sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
-sub node($M) { file => $*FILE<name>, line => $M.cursor.lineof($M.to) }
+sub node($M) { { file => $*FILE<name>, line => $M.cursor.lineof($M.to) } }
 
 sub mklet($value, $body) {
     my $var = NieczaActions.gensym;
