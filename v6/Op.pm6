@@ -41,7 +41,7 @@ method statement_level() { self }
 
     method zyg() {
         return Nil unless $.optree;
-        sub rec($node) {
+        sub rec($node is rw) {
             ($node ~~ Op) ?? $node !!
                 ($node ~~ List) ?? (map &rec, @$node) !! ();
         }

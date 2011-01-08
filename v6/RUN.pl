@@ -2,5 +2,9 @@ class Mu { }
 class Any is Mu { }
 class Num { }
 class Nil { }
+class Str { }
 class ClassHOW { }
-if 1 { Q:CgOp { (prog [say (str "Hello, world")] [null var]) } }
+
+sub infix:<+> ($x,$y) { $x + $y }
+
+Q:CgOp { (prog [say (obj_getstr {2 + 2})] [null var]) }

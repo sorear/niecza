@@ -6,7 +6,7 @@ use CgOp;
 # (-> $x { block })($y), due to control structures and regexes.  Try to clean
 # that up here.
 
-method run($*unit) {
+method invoke($*unit) {
     # XXX enter and sigs need love
     $*unit.visit_local_subs_postorder(-> $su {
         $su.code = run_optree($su, $su.code)
