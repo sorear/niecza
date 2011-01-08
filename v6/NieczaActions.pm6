@@ -39,6 +39,7 @@ method FALLBACK($meth, $/) {
 }
 
 method ws($ ) { }
+method alpha($ ) { }
 method is_ok($ ) { }
 method dumbsmart($ ) { }
 method normspace($ ) { }
@@ -179,7 +180,7 @@ method unqual_longname($/, $what, $clean) {
     return $h<name>;
 }
 
-method mangle_longname($/, $clean) {
+method mangle_longname($/, $clean?) {
     my @ns = @( $<name>.ast<names> );
     my $n = pop @ns;
 
@@ -783,7 +784,7 @@ method mod_internal:p6adv ($/) {
                 { $v = $v.children.[0]; redo }
             last;
         }
-        if !$v.isa(::Op::StringLiteral) {
+        if !$v.^isa(::Op::StringLiteral) {
             $/.CURSOR.sorry(":dba requires a literal string");
             make ::RxOp::None.new;
             return Nil;
@@ -926,7 +927,7 @@ method nibbler($/) {
     }
     if $/.CURSOR.^isa(::STD::Regex) {
         make $<EXPR>.ast;
-    } elsif $/.CURSOR.isa(::NieczaGrammar::CgOp) {
+    } elsif $/.CURSOR.^isa(::NieczaGrammar::CgOp) {
         if $*SAFEMODE {
             $/.CURSOR.sorry('Q:CgOp not allowed in safe mode');
             make ::Op::StatementList.new;
@@ -1384,7 +1385,7 @@ method whatever_precheck($op, *@args) {
         if $a.^isa(::Op::Whatever) {
             push @vars, $a.slot;
             $a = ::Op::Lexical.new(name => $a.slot);
-        } elsif $a.isa(::Op::WhateverCode) {
+        } elsif $a.^isa(::Op::WhateverCode) {
             push @vars, @( $a.vars );
             $a = $a.ops;
         }
@@ -1402,9 +1403,9 @@ method whatever_postcheck($/, $st, $term) {
 }
 
 # term :: Op
-method term:value { make $<value>.ast }
+method term:value ($/) { make $<value>.ast }
 
-method term:name {
+method term:name ($/) {
     my ($id, $path) = self.mangle_longname($<longname>).<name path>;
 
     if $<args> {
@@ -2222,7 +2223,7 @@ method package_def ($/) {
     if $scope eq 'augment' {
         my $stmts = $<statementlist> // $<blockoid>;
         $stmts = $stmts.ast;
-        my $cbody = self.sl_to_block($blocktype, $stmts, name => $name, subname => "augment-" ~ ($name // 'ANON'));
+        my $cbody = self.sl_to_block($blocktype, $stmts, subname => "augment-" ~ ($name // 'ANON'));
 
         make ::Op::Augment.new(
             |node($/),
@@ -2238,7 +2239,7 @@ method package_def ($/) {
             [ self.process_package_traits($/, @export, $<trait>), $stmts.ast ]);
 
         my $cbody = self.sl_to_block($blocktype, $stmts,
-            name => $name, subname => ($*PKGDECL ~ '-' ~ ($name // 'ANON')));
+            subname => ($*PKGDECL ~ '-' ~ ($name // 'ANON')));
         make $optype.new(
             |node($/),
             signature => ($blocktype eq 'role' && $<signature> ??
