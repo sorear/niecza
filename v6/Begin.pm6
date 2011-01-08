@@ -63,7 +63,7 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
     push @*opensubs, $metabody; # always visible in the signature XXX
 
     if $.signature {
-        $.signaturebegin;
+        $.signature.begin;
         $metabody.signature = $.signature;
     }
 
@@ -267,7 +267,7 @@ augment class Op::SubDef { #OK exist
         if $.exports || defined $.method_too {
             $body.strong_used = True;
         }
-        @*opensubs[*-1].create_static_pad if $.strong_used;
+        @*opensubs[*-1].create_static_pad if $body.strong_used;
 
         if defined $.method_too {
             if @*opensubs[*-1].augment_hack {

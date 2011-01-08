@@ -12,6 +12,7 @@ class Parameter {
     has $.rwtrans = False; # Bool
     has $.full_parcel = False; # Bool
     has $.optional = False; # Bool
+    has $.positional = True;
     has $.default; # Body
     has $.mdefault; # Xref; filled in by begin (rw)
     # not 'is rw' (how meta).

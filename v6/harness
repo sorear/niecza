@@ -6,6 +6,7 @@ use Begin;
 use JSYNC;
 use NAMOutput;
 use NieczaFrontendSTD;
+use NieczaPassBeta;
 
 my $fe = NieczaFrontendSTD.new(
     lang => 'NULL',
@@ -17,6 +18,7 @@ my $fe = NieczaFrontendSTD.new(
 my %*units;
 my $ast = $fe.parse(filename => "RUN.pl", source => slurp("RUN.pl"));
 my $mm = $ast.begin;
+$mm = NieczaPassBeta.new.run($mm);
 my $nstr = NAMOutput.run($mm);
 
 spew "../obj/RUN.nam", $nstr;
