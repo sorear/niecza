@@ -64,12 +64,12 @@ my class Regex  { ... }
 my class Num    { ... }
 my class Cool {
     method grep($sm) {
-        gather self.for(-> $r {
+        gather self.for(-> $r is rw {
             take $r if $r ~~ $sm;
         })
     }
     method map($func) {
-        gather self.for(-> $r {
+        gather self.for(-> $r is rw {
             take $func($r);
         })
     }
