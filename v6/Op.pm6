@@ -64,9 +64,8 @@ class StatementList is Op {
     has $.children = []; # Array of Op
     method zyg() { @$.children }
     method ctxzyg($f) {
-        my @r = map { $_, 0 }, @$.children;
-        @r[*-1] = $f if @r;
-        @r;
+        my $i = 1 - $.children;
+        map { $_, (($i++) ?? 0 !! $f) }, @$.children;
     }
 
     method code($body) {

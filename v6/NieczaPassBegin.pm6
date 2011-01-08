@@ -1,6 +1,6 @@
 # e5712784b523fe467ca765dce3d24c4b1b31d9a0
 
-module Begin;
+class NieczaPassBegin;
 
 use MONKEY_TYPING;
 use Unit;
@@ -8,6 +8,8 @@ use Sig;
 use Body;
 use Op;
 use Metamodel;
+
+method invoke($ast) { $ast.begin }
 
 ### Code goes here to build up the metamodel from an Op tree
 # We should eventually wire this to the parser, so that metamodel stuff can

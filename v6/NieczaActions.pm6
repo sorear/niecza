@@ -28,7 +28,12 @@ sub mkcall($/, $name, *@positionals) {
 
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
-    if substr($meth,0,7) eq 'prefix:' {
+    if $meth eq '::($name)' { # XXX STD miscompilation
+        if $<O><prec> eq 't=' { # additive
+            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $/ ~ '>');
+        }
+        return Nil;
+    } elsif substr($meth,0,7) eq 'prefix:' {
     } elsif substr($meth,0,8) eq 'postfix:' {
     } elsif substr($meth,0,6) eq 'infix:' {
         make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $<sym> ~ '>');
@@ -955,11 +960,11 @@ method split_circumfix ($/) {
     make ((@tok == 1) ?? @tok[0] !!
         ::Op::SimpleParcel.new(|node($/), items => @tok));
 }
-method circumfix:«< >» ($/) { self.split_circumfix($/) }
-method circumfix:«<< >>» ($/) { self.split_circumfix($/) }
-method circumfix:<« »> ($/) { self.split_circumfix($/) }
+method circumfix:sym«< >» ($/) { self.split_circumfix($/) }
+method circumfix:sym«<< >>» ($/) { self.split_circumfix($/) }
+method circumfix:sym<« »> ($/) { self.split_circumfix($/) }
 
-method circumfix:<( )> ($/) {
+method circumfix:sym<( )> ($/) {
     my @kids = @( $<semilist>.ast );
     if @kids == 1 && @kids[0].^isa(::Op::WhateverCode) {
         # XXX in cases like * > (2 + *), we *don't* want the parens to disable
@@ -970,7 +975,7 @@ method circumfix:<( )> ($/) {
     }
 }
 
-method circumfix:<[ ]> ($/) {
+method circumfix:sym<[ ]> ($/) {
     my @kids = @( $<semilist>.ast );
     make mkcall($/, '&_array_constructor',
         ::Op::StatementList.new(|node($/), children => @kids));
@@ -1349,7 +1354,7 @@ method colonpair($/) {
     if !$<v>.^isa(Match) {
         $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
     } else {
-        $n = ":" ~ $<k> ~ qpvalue($<v>.ast);
+        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast) ~ ">";
     }
     my $tv = $<v>.^isa(Match) ?? $<v>.ast !!
         ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');

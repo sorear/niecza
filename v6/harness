@@ -2,100 +2,15 @@ use Metamodel;
 use Op;
 use Body;
 use Unit;
-use Begin;
 use JSYNC;
 use NAMOutput;
 use NieczaFrontendSTD;
+use NieczaPassBegin;
 use NieczaPassBeta;
 use NieczaPassSimplifier;
 
 use MONKEY_TYPING;
 use NieczaActions;
-
-augment class Op::StatementList {
-    method ctxzyg($f) {
-        my $i = 1 - $.children;
-        map { $_, (($i++) ?? 0 !! $f) }, @$.children;
-    }
-}
-
-augment class NieczaActions {
-sub node($M) { { file => $*FILE<name>, line => $M.cursor.lineof($M.to) } }
-sub mkcall($/, $name, *@positionals) {
-    ::Op::CallSub.new(|node($/),
-        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
-}
-method circumfix:sym«< >» ($/) { self.split_circumfix($/) }
-method circumfix:sym«<< >>» ($/) { self.split_circumfix($/) }
-method circumfix:sym<« »> ($/) { self.split_circumfix($/) }
-
-method circumfix:sym<( )> ($/) {
-    my @kids = @( $<semilist>.ast );
-    if @kids == 1 && @kids[0].^isa(::Op::WhateverCode) {
-        # XXX in cases like * > (2 + *), we *don't* want the parens to disable
-        # syntactic specialization, since they're required for grouping
-        make @kids[0];
-    } else {
-        make ::Op::StatementList.new(|node($/), children => @kids);
-    }
-}
-
-method circumfix:sym<[ ]> ($/) {
-    my @kids = @( $<semilist>.ast );
-    make mkcall($/, '&_array_constructor',
-        ::Op::StatementList.new(|node($/), children => @kids));
-}
-method FALLBACK($meth, $/) {
-    if $meth eq '::($name)' { # XXX STD miscompilation
-        if $<O><prec> eq 't=' { # additive
-            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $/ ~ '>');
-        }
-        return Nil;
-    } elsif substr($meth,0,7) eq 'prefix:' {
-    } elsif substr($meth,0,8) eq 'postfix:' {
-    } elsif substr($meth,0,6) eq 'infix:' {
-        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $<sym> ~ '>');
-        return Nil;
-    } else {
-        $/.CURSOR.sorry("Action method $meth not yet implemented");
-    }
-}
-sub qpvalue($ast) {
-    if $ast.^isa(::Op::SimpleParcel) {
-        join " ", map &qpvalue, @( $ast.items )
-    } elsif $ast.^isa(::Op::StringLiteral) {
-        $ast.text;
-    } else {
-        "XXX"
-    }
-}
-
-method colonpair($/) {
-    my $n;
-    if !$<v>.^isa(Match) {
-        $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
-    } else {
-        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast) ~ ">";
-    }
-    my $tv = $<v>.^isa(Match) ?? $<v>.ast !!
-        ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');
-
-    if !defined $tv {
-        if substr($<v>,1,1) eq '<' {
-            $tv = ::Op::CallMethod.new(name => 'at-key',
-                receiver => ::Op::ContextVar.new(name => '$*/'),
-                args => [::Op::StringLiteral.new(text => ~$<k>)]);
-        } else {
-            $tv = self.do_variable_reference($/,
-                { sigil => ~$<v><sigil>,
-                    twigil => ($<v><twigil> ?? ~$<v><twigil>[0] !! ''),
-                    name => $<k> });
-        }
-    }
-
-    make { ext => $n, term => ::Op::SimplePair.new(key => $<k>, value => $tv) };
-}
-}
 
 my $fe = NieczaFrontendSTD.new(
     lang => 'NULL',
@@ -105,8 +20,8 @@ my $fe = NieczaFrontendSTD.new(
 );
 
 my %*units;
-my $ast = $fe.parse(filename => "RUN.pl", source => slurp("RUN.pl"));
-my $mm = $ast.begin;
+my $mm = $fe.parse(filename => "RUN.pl", source => slurp("RUN.pl"));
+$mm = NieczaPassBegin.new.invoke($mm);
 $mm = NieczaPassBeta.new.invoke($mm);
 $mm = NieczaPassSimplifier.new.invoke($mm);
 my $nstr = NAMOutput.run($mm);
