@@ -12,6 +12,31 @@ use NieczaPassSimplifier;
 use MONKEY_TYPING;
 use NieczaActions;
 
+# XXX mega hack.
+my class Instant {
+    has $.val;
+    method to-posix() { $!val }
+}
+
+my class IO {
+    has $.path; # Str
+
+    method slurp() { slurp $.path }
+    method spew($text) { spew $.path, $text }
+
+    method combine(*@paths) { ... }
+
+    method e() { ... }
+    method relative($base) { self.combine($base, self) }
+    method append($sub) { self.combine(self, $sub) }
+    method but-extension($ext) { ... }
+    method modified() { ... }
+}
+
+augment class Str {
+    method IO() { IO.new(path => self) }
+}
+
 my $fe = NieczaFrontendSTD.new(
     lang => 'NULL',
     safemode => False,
@@ -19,11 +44,13 @@ my $fe = NieczaFrontendSTD.new(
     loader => sub ($mn) { die "Module loading NYI" },
 );
 
+my $be = NieczaBackendNAM.new(
+    obj_dir = '../obj'
+);
+
 my %*units;
 my $mm = $fe.parse(filename => "RUN.pl", source => slurp("RUN.pl"));
 $mm = NieczaPassBegin.new.invoke($mm);
 $mm = NieczaPassBeta.new.invoke($mm);
 $mm = NieczaPassSimplifier.new.invoke($mm);
-my $nstr = NAMOutput.run($mm);
-
-spew "../obj/RUN.nam", $nstr;
+$be.save_unit("RUN", mm, :main);
