@@ -70,9 +70,13 @@
   (fare-matcher:match nam 
     ((list mainline-xref name log setting bottom-ref filename modtime x-ref t-deps root-stash) (loop for sub in x-ref for i upfrom 0 collect (compile-sub i sub)))))
 
+(defun print-thing (thing) (format t "~A" thing))
+(defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
+(defun p6-concat (&rest things) (apply 'concatenate 'string things))
+
 (defun wrap-for-eval (compiled-unit)
-  `(let 
-     ((|&say| (lambda (thing) (format t "~A~%" thing))))
+  `(let ((|&infix:<~>| #'p6-concat)
+         (|&say| #'p6-say))
       ,@compiled-unit (,(sub-symbol 0))))
 
 
