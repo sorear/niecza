@@ -646,10 +646,10 @@ class Unit {
     }
 
     method need_unit($u2name) {
-        my $u2 = %*units{$u2name} //= ::GLOBAL::CompilerDriver.metadata_for($u2name);
+        my $u2 = %*units{$u2name} //= $*module_loader.($u2name);
         $.tdeps{$u2name} = [ $u2.filename, $u2.modtime ];
         for keys $u2.tdeps -> $k {
-            %*units{$k} //= ::GLOBAL::CompilerDriver.metadata_for($k);
+            %*units{$k} //= $*module_loader.($k);
             $.tdeps{$k} //= $u2.tdeps{$k};
         }
         $.ns.add_from($u2name);

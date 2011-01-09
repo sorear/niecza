@@ -9,9 +9,10 @@ use NieczaPassBegin;
 use NieczaPassBeta;
 use NieczaPassSimplifier;
 use NieczaBackendNAM;
+use NieczaPathSearch;
+use NieczaCompiler;
 
 use MONKEY_TYPING;
-use NieczaActions;
 
 # XXX mega hack.
 my class Instant {
@@ -49,20 +50,25 @@ augment class Str {
     method IO() { IO.new(path => self) }
 }
 
-my $fe = NieczaFrontendSTD.new(
-    lang => 'NULL',
-    safemode => False,
-    unitname => 'CORE',
-    loader => sub ($mn) { die "Module loading NYI" },
+my $c = NieczaCompiler.new(
+    module_finder => NieczaPathSearch.new(
+        path => ["../lib", "."],
+    ),
+    frontend => NieczaFrontendSTD.new(
+        lang => 'CORE',
+        safemode => False,
+    ),
+    stages => [
+        NieczaPassBegin.new,
+        NieczaPassBeta.new,
+        NieczaPassSimplifier.new,
+    ],
+    backend => NieczaBackendNAM.new(
+        obj_dir => 'obj',
+    ),
+    verbose => True,
 );
 
-my $be = NieczaBackendNAM.new(
-    obj_dir => '../obj'
-);
-
-my %*units;
-my $mm = $fe.parse(filename => "RUN.pl", source => slurp("RUN.pl"));
-$mm = NieczaPassBegin.new.invoke($mm);
-$mm = NieczaPassBeta.new.invoke($mm);
-$mm = NieczaPassSimplifier.new.invoke($mm);
-$be.save_unit("RUN", $mm, :main);
+$c.compile_module("SAFE");
+$c.compile_module("CORE");
+$c.compile_string("say 'Hello, world'", False);

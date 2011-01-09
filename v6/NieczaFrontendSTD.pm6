@@ -39,8 +39,8 @@ augment class STD {
     method do_need($mo) {
         my $module = $mo.Str;
         my $topsym;
-        try { $topsym = self.sys_load_modinfo($module); }
-        if !$topsym {
+        $topsym = self.sys_load_modinfo($module);
+        if !defined $topsym {
             self.panic("Could not load $module");
         }
         self.add_my_name($module);
@@ -79,15 +79,23 @@ augment class Cursor {
 
 has $.lang;
 has $.safemode;
-has $.unitname;
-has $.loader;
 
-method parse(:$filename, :$source) {
+method parse(:$unitname, :$filename, :$modtime, :$source) {
 
     my $*SETTINGNAME = $.lang;
     my $*SAFEMODE    = $.safemode;
-    my $*UNITNAME    = $.unitname;
-    my $*module_loader = $.loader;
+    my $*UNITNAME    = $unitname;
+    my $*modtime     = $modtime;
+
+    if $unitname eq 'SAFE' {
+        $*SETTINGNAME = 'NULL';
+        $*SAFEMODE = False;
+    }
+
+    if $unitname eq 'CORE' {
+        $*SETTINGNAME = 'SAFE';
+        $*SAFEMODE = False;
+    }
 
     # XXX temp() or should be contextuals
     my @save_herestub = @STD::herestub_queue;

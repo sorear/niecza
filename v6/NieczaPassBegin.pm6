@@ -22,6 +22,7 @@ augment class Unit { method begin() {
         modtime => $.modtime,
         setting => $*SETTING_UNIT);
     %*units{$.name} = $*unit;
+    $*unit.tdeps{$.name} = [$.filename, $.modtime];
 
     $*unit.need_unit($*SETTING_UNIT) if $*SETTING_UNIT;
 
@@ -258,7 +259,7 @@ augment class Op::Super { #OK exist
 
 augment class Op::SubDef { #OK exist
     method begin() {
-        my $prefix;
+        my $prefix = '';
         if defined $.method_too {
             $prefix = $*unit.deref(@*opensubs[*-1].body_of).name ~ ".";
         }

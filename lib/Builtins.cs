@@ -347,4 +347,10 @@ public class Builtins {
         double d = ((double)(t - 621355968000000000L)) / 10000000.0;
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
     }
+
+    public static Variable GetNow() {
+        long t = System.DateTime.UtcNow.Ticks;
+        double d = ((double)(t - 621355968000000000L)) / 10000000.0;
+        return Kernel.BoxAnyMO(d, Kernel.NumMO);
+    }
 }
