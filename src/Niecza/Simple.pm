@@ -2,6 +2,10 @@ package Niecza::Simple;
 use v5.10;
 use strict;
 use warnings;
+
+#XXX yuk!
+use CompilerDriver;
+
 use Niecza::Frontend::STD;
 use Niecza::Backend::NAM;
 use Niecza::Backend::Mono;
