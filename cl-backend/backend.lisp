@@ -14,15 +14,13 @@
       (cons (to-symbol-first (first thing)) (mapcar #'to-symbol (rest thing)))
       thing))
 
-(setq core (make-hash-table :test #'equal))
-(setf (gethash "&say" core) (lambda (thing) (format t "~A~%" thing)))
 
  
 (defun sub-symbol (i) (intern (concatenate 'string "SUB-" (write-to-string i))))
 
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
-    ((list var x y id name) (list (intern var) `(symbol-function ,(sub-symbol id))))
+    ((list var x y id name) (list (intern var) `(symbol-function ',(sub-symbol id))))
     ((list var simple dunno) (list (intern var) '(quote NYI)))))
 
 (defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
@@ -73,11 +71,14 @@
     ((list mainline-xref name log setting bottom-ref filename modtime x-ref t-deps root-stash) (loop for sub in x-ref for i upfrom 0 collect (compile-sub i sub)))))
 
 (defun wrap-for-eval (compiled-unit)
-  `(progn ,@compiled-unit (,(sub-symbol 1))))
+  `(let 
+     ((|&say| (lambda (thing) (format t "~A~%" thing))))
+      ,@compiled-unit (,(sub-symbol 0))))
+
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
   (format t "~a~%~%~%" compiled-unit)
   (let ((wrapped (wrap-for-eval compiled-unit)))
-    (format t "~a~%" wrapped)
+;    (format t "~a~%" wrapped)
     (eval wrapped)
     ))
