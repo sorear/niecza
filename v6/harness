@@ -8,6 +8,7 @@ use NieczaFrontendSTD;
 use NieczaPassBegin;
 use NieczaPassBeta;
 use NieczaPassSimplifier;
+use NieczaBackendNAM;
 
 use MONKEY_TYPING;
 use NieczaActions;
@@ -21,16 +22,27 @@ my class Instant {
 my class IO {
     has $.path; # Str
 
+    method Str() { $.path }
+    method IO() { self }
+
     method slurp() { slurp $.path }
     method spew($text) { spew $.path, $text }
 
-    method combine(*@paths) { ... }
+    method combine(*@paths) {
+        die "Sorry, paths do not form a monoid." unless @paths;
+        my $acc = @paths.shift.IO;
+        for @paths { $acc = $acc.append($_) }
+        $acc
+    }
 
-    method e() { ... }
-    method relative($base) { self.combine($base, self) }
-    method append($sub) { self.combine(self, $sub) }
-    method but-extension($ext) { ... }
-    method modified() { ... }
+    method f() { Q:CgOp { (box Bool (rawscall System.IO.File.Exists (obj_getstr {$!path}))) } }
+    method d() { Q:CgOp { (box Bool (rawscall System.IO.Directory.Exists (obj_getstr {$!path}))) } }
+    method e() { self.f || self.d }
+    method relative($base) { $base.IO.append(self) }
+    method append($sub) { Q:CgOp { (box Str (rawscall System.IO.Path.Combine (obj_getstr {self}) (obj_getstr {$sub}))) }.IO }
+    method but-extension($ext) { Q:CgOp { (box Str (rawscall System.IO.Path.ChangeExtension (obj_getstr {self}) (obj_getstr {$ext}))) }.IO }
+    method realpath() { Q:CgOp { (box Str (rawscall System.IO.Path.GetFullPath (obj_getstr {self}))) }.IO }
+    method modified() { Instant.new(val => Q:CgOp { (rawscall Builtins,Kernel.GetModTime (obj_getstr {self})) }) }
 }
 
 augment class Str {
@@ -45,7 +57,7 @@ my $fe = NieczaFrontendSTD.new(
 );
 
 my $be = NieczaBackendNAM.new(
-    obj_dir = '../obj'
+    obj_dir => '../obj'
 );
 
 my %*units;
@@ -53,4 +65,4 @@ my $mm = $fe.parse(filename => "RUN.pl", source => slurp("RUN.pl"));
 $mm = NieczaPassBegin.new.invoke($mm);
 $mm = NieczaPassBeta.new.invoke($mm);
 $mm = NieczaPassSimplifier.new.invoke($mm);
-$be.save_unit("RUN", mm, :main);
+$be.save_unit("RUN", $mm, :main);

@@ -341,4 +341,10 @@ public class Builtins {
         l.slots[1] = new VarDeque();
         return Kernel.NewRWListVar(l);
     }
+
+    public static Variable GetModTime(string path) {
+        long t = System.IO.File.GetLastWriteTimeUtc(path).Ticks;
+        double d = ((double)(t - 621355968000000000L)) / 10000000.0;
+        return Kernel.BoxAnyMO(d, Kernel.NumMO);
+    }
 }
