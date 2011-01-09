@@ -176,7 +176,7 @@ method deflongname($ ) { }
 # path can be undefined for a simple name like $x, which goes straight to pad
 # pass $clean if you want to ignore adverbs entirely - currently needed for
 # package names
-method unqual_longname($/, $what, $clean) {
+method unqual_longname($/, $what, $clean?) {
     my $h = self.mangle_longname($/, $clean);
     if $h<path> {
         $/.CURSOR.sorry($what);
@@ -272,7 +272,7 @@ method op_for_regex($/, $rxop) {
         my $*dba = 'anonymous rule';
         $rxop.check
     }
-    my ($orxop, $mb) = ::Optimizer::RxSimple.run($rxop);
+    my ($orxop, $mb) = OptRxSimple.run($rxop);
     self.transparent($/, ::Op::RegexBody.new(|node($/), canback => $mb,
             pre => @lift, rxop => $orxop),
         class => 'Regex', type => 'regex', sig => Sig.simple.for_method);
@@ -282,7 +282,7 @@ method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
 
 method encapsulate_regex($/, $rxop, :$goal, :$passcut, :$passcap) {
     my @lift = $rxop.oplift;
-    my ($nrxop, $mb) = ::Optimizer::RxSimple.run($rxop);
+    my ($nrxop, $mb) = OptRxSimple.run($rxop);
     my $lad = $rxop.lad;
     # XXX do this in the signature so it won't be affected by transparent
     my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self', readonly => True);
@@ -384,9 +384,9 @@ method regex_def($/) {
         my $*dba = $name // 'anonymous regex';
         $ast.check;
     }
-    my $lad = ::Optimizer::RxSimple.run_lad($ast.lad);
+    my $lad = OptRxSimple.run_lad($ast.lad);
     my @lift = $ast.oplift;
-    ($ast, my $mb) = ::Optimizer::RxSimple.run($ast);
+    ($ast, my $mb) = OptRxSimple.run($ast);
     make ::Op::SubDef.new(|node($/),
         var  => $var,
         method_too => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
@@ -1434,7 +1434,8 @@ method term:name ($/) {
 
 method term:identifier ($/) {
     my $id  = $<identifier>.ast;
-    my $sal = $<args> ?? $<args>.ast !! [];  # TODO: support zero-D slicels
+    my $sal = $<args> ?? ($<args>.ast // []) !! [];
+    # TODO: support zero-D slicels
 
     if $sal > 1 {
         $/.CURSOR.sorry("Slicel lists are NYI");
@@ -1454,7 +1455,7 @@ method term:identifier ($/) {
         args => $args);
 }
 
-method term:self ($/) { make ::Op::Lexical.new(|node($/), name => 'self') }
+method term:sym<self> ($/) { make ::Op::Lexical.new(|node($/), name => 'self') }
 method term:circumfix ($/) { make $<circumfix>.ast }
 method term:scope_declarator ($/) { make $<scope_declarator>.ast }
 method term:multi_declarator ($/) { make $<multi_declarator>.ast }
@@ -1839,15 +1840,15 @@ method terminator:sym<)> ($/) {}
 method terminator:sym<;> ($/) {}
 method terminator:sym<]> ($/) {}
 method terminator:sym<}> ($/) {}
-method terminator:if ($/) {}
-method terminator:unless ($/) {}
-method terminator:for ($/) {}
-method terminator:until ($/) {}
-method terminator:then ($/) {}
-method terminator:again ($/) {}
-method terminator:repeat ($/) {}
-method terminator:while ($/) {}
-method terminator:else ($/) {}
+method terminator:sym<if> ($/) {}
+method terminator:sym<unless> ($/) {}
+method terminator:sym<for> ($/) {}
+method terminator:sym<until> ($/) {}
+method terminator:sym<then> ($/) {}
+method terminator:sym<again> ($/) {}
+method terminator:sym<repeat> ($/) {}
+method terminator:sym<while> ($/) {}
+method terminator:sym<else> ($/) {}
 method terminator:sym<!!> ($/) {}
 
 method stdstopper($/) {}
@@ -1894,7 +1895,7 @@ method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    if $<trait> || $<post_constraint> || $<shape> {
+    if $<trait> || $<post_constraint> || $<postcircumfix> || $<semilist> {
         $/.CURSOR.sorry("Traits, postconstraints, and shapes on variable declarators NYI");
     }
 
@@ -1966,7 +1967,7 @@ method package_declarator:module ($/) { make $<package_def>.ast }
 method package_declarator:package ($/) { make $<package_def>.ast }
 method package_declarator:knowhow ($/) { make $<package_def>.ast }
 
-method package_declarator:also ($/) {
+method package_declarator:sym<also> ($/) {
     make ::Op::StatementList.new(|node($/), children =>
         self.process_package_traits($/, Any, $<trait>));
 }
@@ -2083,13 +2084,13 @@ method statement($/) {
 method statement_mod_cond($/) { make [ ~$<sym>, $<modifier_expr>.ast ] }
 method statement_mod_loop($/) { make [ ~$<sym>, $<modifier_expr>.ast ] }
 
-method statement_mod_cond:if ($/) {}
-method statement_mod_cond:unless ($/) {}
-method statement_mod_cond:when ($/) {}
-method statement_mod_loop:while ($/) {}
-method statement_mod_loop:until ($/) {}
-method statement_mod_loop:for ($/) {}
-method statement_mod_loop:given ($/) {}
+method statement_mod_cond:if ($/)     { self.statement_mod_cond($/) }
+method statement_mod_cond:unless ($/) { self.statement_mod_cond($/) }
+method statement_mod_cond:when ($/)   { self.statement_mod_cond($/) }
+method statement_mod_loop:while ($/)  { self.statement_mod_loop($/) }
+method statement_mod_loop:until ($/)  { self.statement_mod_loop($/) }
+method statement_mod_loop:for ($/)    { self.statement_mod_loop($/) }
+method statement_mod_loop:given ($/)  { self.statement_mod_loop($/) }
 
 method statementlist($/) {
     make ::Op::StatementList.new(|node($/), children =>
