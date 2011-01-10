@@ -18,15 +18,33 @@
  
 (defun sub-symbol (i) (intern (concatenate 'string "SUB-" (write-to-string i))))
 
-(defun lexical-to-let (lexical)
-  (fare-matcher:match lexical 
-    ((list var x y id name) (list (intern var) `(symbol-function ',(sub-symbol id))))
-    ((list var simple dunno) (list (intern var) ""))))
+; P6 Classes
+ 
+(defun make-scalar (value) (let ((scalar (make-instance 'p6-Scalar)))
+  (setf (slot-value scalar 'value) value)
+  scalar))
 
-(defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
+(defclass p6-Scalar () (value))
+
+(defgeneric |FETCH| (value)) 
+(defmethod |FETCH| ((container p6-Scalar)) (slot-value container 'value))
+(defmethod |FETCH| (thing) thing)
+
+(defmethod |STORE| ((container p6-Scalar) value) (setf (slot-value container 'value)value))
+ 
 
 (defmacro nam-sub (i lexicals body) 
   `(defun ,(sub-symbol i) () (let ,(lexicals-to-let lexicals) ,body)))
+
+; converts one lexical to a variable declaration for a let
+(defun lexical-to-let (lexical)
+  (fare-matcher:match lexical 
+    ((list var x y id name) (list (intern var) `(symbol-function ',(sub-symbol id))))
+    ((list var simple dunno) (list (intern var) (make-scalar "")))))
+
+; converts a list of lexicals
+(defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
+
 
 (defmacro nam-ann (filename line op) op)
 (defmacro nam-prog (&body ops) `(progn ,@ops))
@@ -35,11 +53,11 @@
 (defun nam-str (string) string)
 (defun nam-double (number) number)
 
-(defmacro nam-assign (to what) `(setf ,to ,what))
+(defmacro nam-assign (to what) `(STORE ,to ,what))
 
 (defun nam-const (thing) thing)
 (defun nam-box (type thing) thing)
-(defun nam-fetch (thing) thing)
+(defun nam-fetch (thing) (FETCH thing))
 
 (defmacro nam-scopedlex (var &rest rvalue)
   (if (consp rvalue)
@@ -83,9 +101,9 @@
   (fare-matcher:match nam 
     ((list mainline-xref name log setting bottom-ref filename modtime x-ref t-deps root-stash) (loop for sub in x-ref for i upfrom 0 collect (compile-sub i sub)))))
 
-(defun print-thing (thing) (format t "~A" thing))
+(defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
-(defun p6-concat (&rest things) (apply 'concatenate 'string things))
+(defun p6-concat (&rest things) (apply 'concatenate 'string (mapcar #'FETCH things)))
 
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
