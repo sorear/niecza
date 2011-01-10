@@ -16,3 +16,6 @@ only slow me down...
 * return()
 * stashes should be accessed as common values
 * "Action method ::($name) not implemented" bug
+* context accelerators need to robustly handle undefined objects
+* .list, item as accelerated contexts
+* explicitly imprecise error reporting - lines A-B

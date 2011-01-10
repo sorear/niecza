@@ -15,122 +15,63 @@ use NieczaCompiler;
 use MONKEY_TYPING;
 
 use NieczaActions;
+use Metamodel;
 use CClass;
 use Sig;
 use OptRxSimple;
-augment class CClass {
-    method internal($str) { (&CClass::internal)($str) }
+
+augment class Metamodel::Namespace {
 }
 augment class NieczaActions {
 sub node($M) { { file => $*FILE<name>, line => $M.cursor.lineof($M.to) } }
-method regex_def($/) {
-    sub _symtext($name) {
-        ($name ~~ /\:sym\<(.*)\>/) ?? ~$0 !!
-            ($name ~~ /\:(\w+)/) ?? ~$0 !!
-            Str; #XXX
-    }
-    my ($name, $path) = $<deflongname> ??
-        self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
-    my $cname;
-    if defined($path) && $path == 0 && $name.^isa(Op) {
-        $cname = $name;
-        $name = ~$<deflongname>[0];
-        $path = Any;
-    }
-
-    my $scope = (!defined($name)) ?? "anon" !! ($*SCOPE || "has");
-
-    if $<signature> > 1 {
-        $/.CURSOR.sorry("Multiple signatures on a regex NYI");
-        return Nil;
-    }
-
-    if $cname && $scope ne 'has' {
-        $/.CURSOR.sorry("Only has regexes may have computed names");
-        make ::Op::StatementList.new;
-        return Nil;
-    }
-
-    my $isproto;
-    my $symtext = ($cname || !defined($name)) ?? Str !! _symtext($name);
-    if $*MULTINESS eq 'proto' {
-        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' {
-            $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
-            return Nil;
-        }
-        $isproto = True;
-    } else {
-        my $m2 = defined($symtext) ?? 'multi' !! 'only';
-        if $*MULTINESS && $*MULTINESS ne $m2 {
-            $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
-            return Nil;
-        }
-    }
-
-    if defined($path) && $scope ne 'our' {
-        $/.CURSOR.sorry("Putting a regex in a package requires using the our scope.");
-        return Nil;
-    }
-
-    my $sig = $<signature> ?? $<signature>[0].ast !! Sig.simple;
-
-    if $scope eq 'state' || $scope eq 'supercede' || $scope eq 'augment' {
-        $/.CURSOR.sorry("Nonsensical scope $scope for regex");
-        return Nil;
-    }
-
-    if $scope eq 'our' {
-        $/.CURSOR.sorry("our regexes NYI");
-        return Nil;
-    }
-
-    my $var = ($scope eq 'anon' || $scope eq 'has') ?? self.gensym
-        !! '&' ~ $name;
-
-    my $ast = $<regex_block>.ast;
-    if $isproto {
-        $ast = ::RxOp::ProtoRedis.new(name => $name);
-    }
-
-    {
-        my $*paren = 0;
-        my $*symtext = $symtext;
-        my $*dba = $name // 'anonymous regex';
-        $ast.check;
-    }
-    my $lad = OptRxSimple.run_lad($ast.lad);
-    my @lift = $ast.oplift;
-    ($ast, my $mb) = OptRxSimple.run($ast);
-    make ::Op::SubDef.new(|node($/),
-        var  => $var,
-        method_too => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
-        body => Body.new(
-            ltm   => $lad,
-            returnable => True,
-            class => 'Regex',
-            type  => 'regex',
-            name  => $name // 'ANONrx',
-            signature => $sig.for_method,
-            do => ::Op::RegexBody.new(|node($/), pre => @lift,
-                name => ($name // ''), rxop => $ast, canback => $mb)));
-}
 method regex_infix:sym<|> ($ ) {}
 method regex_infix:sym<||> ($ ) {}
 method regex_infix:sym<&> ($ ) {}
 method regex_infix:sym<&&> ($ ) {}
-method type_declarator:constant ($/) {
-    if $*MULTINESS {
-        $/.CURSOR.sorry("Multi variables NYI");
+method do_variable_reference($M, $v) {
+    if $v<term> {
+        return $v<term>;
     }
-    my $scope = $*SCOPE // 'my';
-    if !$<identifier> && !$<variable> {
-        $/.CURSOR.sorry("Anonymous constants NYI"); #wtf?
-        return Nil;
-    }
-    my $slot  = ~($<identifier> // $<variable>);
 
-    make ::Op::ConstantDecl.new(|node($/), name => $slot,
-        path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+    my $tw = $v<twigil>;
+    my $sl = $v<sigil> ~ $tw ~ $v<name>;
+
+    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
+        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
+        return ::Op::StatementList.new;
+    }
+
+    if $tw eq '!' {
+        ::Op::CallMethod.new(|node($M), name => $v<name>, private => True,
+            receiver => ::Op::Lexical.new(name => 'self'), ppath => $v<rest>);
+    }
+    elsif $tw eq '.' {
+        if defined $v<rest> {
+            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
+            return ::Op::StatementList.new;
+        }
+
+        ::Op::CallMethod.new(|node($M), name => $v<name>,
+            receiver => ::Op::Lexical.new(name => 'self'));
+    }
+    # no twigil in lex name for these
+    elsif $tw eq '^' || $tw eq ':' {
+        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>);
+    }
+    elsif $tw eq '*' {
+        ::Op::ContextVar.new(|node($M), name => $sl);
+    }
+    elsif $tw eq '' || $tw eq '?' {
+        if defined($v<rest>) {
+            ::Op::PackageVar.new(path => $M<rest>, name => $sl,
+                slot => self.gensym, |node($M));
+        } else {
+            ::Op::Lexical.new(|node($M), name => $sl);
+        }
+    }
+    else {
+        $M.CURSOR.sorry("Unhandled reference twigil $tw");
+    }
 }
 }
 
@@ -166,6 +107,18 @@ my class IO {
     method modified() { Instant.new(val => Q:CgOp { (rawscall Builtins,Kernel.GetModTime (obj_getstr {self})) }) }
 }
 
+augment class Metamodel::StaticSub {
+    method find_lex($name) {
+        say "Looking for $name in $.name";
+        my $l = $.lexicals{$name};
+        if $l {
+            return $l.^isa(::Metamodel::Lexical::Alias) ??
+                self.find_lex($l.to) !! $l;
+        }
+        return ($.outer ?? $.outer.find_lex($name) !! ::Metamodel::Lexical);
+    }
+}
+
 augment class Str {
     method IO() { IO.new(path => self) }
 }
@@ -189,6 +142,6 @@ my $c = NieczaCompiler.new(
     verbose => True,
 );
 
-$c.compile_module("SAFE");
+#$c.compile_module("SAFE");
 $c.compile_module("CORE");
 $c.compile_string("say 'Hello, world'", False);

@@ -62,6 +62,9 @@ method statement_level() { self }
 
 class StatementList is Op {
     has $.children = []; # Array of Op
+    method new(:$children = [], *%_) {
+        nextwith(self, children => [ @$children ], |%_);
+    }
     method zyg() { @$.children }
     method ctxzyg($f) {
         my $i = 1 - $.children;
@@ -80,6 +83,12 @@ class CallLike is Op {
     has $.positionals = [];
     has $.args;
     method zyg() { @( $.args // $.positionals ) }
+
+    method new(:$positionals = [], :$args, *%_) {
+        nextwith(self,
+            positionals => ($positionals andthen [@$positionals]),
+            args => ($args andthen [@$args]), |%_);
+    }
 
     method getargs() {
         $.args ?? @$.args !! (map { ::Op::Paren.new(inside => $_) },
@@ -206,6 +215,10 @@ class SimpleParcel is Op {
     has $.items = die "SimpleParcel.items required"; #Array of Op
     method zyg() { @$.items }
 
+    method new(:$items, *%_) {
+        nextwith(self, items => [@$items], |%_);
+    }
+
     method code($body) {
         CgOp.subcall(CgOp.fetch(CgOp.corelex('&infix:<,>')),
             map { $_.cgop($body) }, @$.items);
@@ -253,6 +266,9 @@ class ShortCircuit is Op {
     has $.kind = die "ShortCircuit.kind required"; # Str
     has $.args = die "ShortCircuit.args required"; # Array of Op
     method zyg() { @$.args }
+    method new(:$args, *%_) {
+        nextwith(self, args => [@$args], |%_);
+    }
 
     method red2($sym, $o2) {
         if $!kind eq '&&' {
@@ -728,6 +744,9 @@ class SigBind is Op {
     has $.positionals = die "SigBind.positionals required"; # Array of Op
 
     method zyg() { @$.positionals }
+    method new(:$positionals, *%_) {
+        nextwith(self, positionals => [@$positionals], |%_);
+    }
 
     method code($body) {
         CgOp.prog(
@@ -751,6 +770,9 @@ class Builtin is Op {
     has $.args = die "Builtin.args required"; # Array of Op
     has $.name = die "Builtin.name required"; # Str
     method zyg() { @$.args }
+    method new(:$args, *%_) {
+        nextwith(self, args => [@$args], |%_);
+    }
 
     method code($body) {
         my @a = (map { $_.cgop($body) }, @$.args);

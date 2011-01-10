@@ -382,7 +382,7 @@ augment class Op::Augment { #OK exist
         # XXX shouldn't we distinguish augment class Foo { } from ::Foo ?
         my $pkg = @*opensubs[*-1].find_pkg([ @$.pkg, $.name ]);
         my $so = $*unit.get_item($pkg);
-        my $dso = $*unitderef($so);
+        my $dso = $*unit.deref($so);
         if $dso.^isa(::Metamodel::Role) {
             die "illegal augment of a role";
         }

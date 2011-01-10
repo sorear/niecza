@@ -62,11 +62,11 @@ sub stash_tonam($hr) {
 sub stash_fromnam(@block) {
     my %out;
     for @block -> $row {
-        my $key = shift $row;
-        if $row[0] eq 'var' && $row[2] {
-            $row[2] = stash_fromnam($row[2]);
+        my ($key, @rest) = @$row;
+        if @rest[0] eq 'var' && @rest[2] {
+            @rest[2] = stash_fromnam(@rest[2]);
         }
-        %out{$key} = $row;
+        %out{$key} = @rest;
     }
     $( %out );
 }
@@ -88,7 +88,7 @@ sub unit_from_nam(@block) {
     my $*xid = 0;
     while $*xid < @$xr {
         my $xv = $xr[$*xid];
-        push $*xref, $xv && ($xr[0] eq 'sub' ?? &sub_from_nam !! &packagely)($xv);
+        push $*xref, $xv && ($xv[0] eq 'sub' ?? &sub_from_nam !! &packagely)($xv);
         $*xid++;
     }
     # XXX suboptimality
@@ -152,7 +152,7 @@ sub sub_from_nam(@block) {
         unit => $*unit,
         name => $name,
         xref => [ $*uname, $*xid, $name ],
-        outer => $outer,
+        outerx => $outer,
         run_once => ?($flags +& 1),
         spad_exists => ?($flags +& 2),
         lexicals => {},
@@ -303,17 +303,17 @@ augment class Metamodel::Lexical::Stash { #OK exist
 
 sub lex_from_nam(@block) {
     my ($name, $type, @xtra) = @block;
-    return $name, ::Metamodel::Lexical::Simple.new
+    return ($name, ::Metamodel::Lexical::Simple.new)
                         if $type eq 'simple';
-    return $name, ::Metamodel::Lexical::Common.new(name => pop(@xtra),
-        path => @xtra) if $type eq 'common';
-    return $name, ::Metamodel::Lexical::Alias.new(to => @xtra[0])
+    return ($name, ::Metamodel::Lexical::Common.new(name => pop(@xtra),
+        path => @xtra)) if $type eq 'common';
+    return ($name, ::Metamodel::Lexical::Alias.new(to => @xtra[0]))
                         if $type eq 'alias';
-    return $name, ::Metamodel::Lexical::Hint.new
+    return ($name, ::Metamodel::Lexical::Hint.new)
                         if $type eq 'hint';
-    return $name, ::Metamodel::Lexical::SubDef.new(body => $*xref[@xtra[1]])
+    return ($name, ::Metamodel::Lexical::SubDef.new(body => $*xref[@xtra[1]]))
                         if $type eq 'sub';
-    return $name, ::Metamodel::Lexical::Stash.new(path => @xtra)
+    return ($name, ::Metamodel::Lexical::Stash.new(path => @xtra))
                         if $type eq 'stash';
     die "weird lex type $type";
 }

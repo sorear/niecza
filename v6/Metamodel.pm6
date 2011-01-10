@@ -74,7 +74,7 @@ class Namespace {
             $cursor = $cursor{$k}[2];
             push @$used, $k;
         }
-        ($cursor, $used, @path);
+        @($cursor, $used, @path);
     }
 
     method stash_cname(@path) {
@@ -88,9 +88,9 @@ class Namespace {
 
     method visit_stashes($cb) {
         sub visitor($node, @path) {
-            $cb(@path);
+            $cb([@path]);
             for sort keys $node -> $k {
-                if $node{$k}[0] eq 'var' && $node{$k}[2] {
+                if $node{$k}[0] eq 'var' && defined $node{$k}[2] {
                     visitor($node{$k}[2], [ @path, $k ]);
                 }
             }
@@ -503,7 +503,7 @@ class StaticSub is RefTarget {
             @tp = @( self.find_lex_pkg(@names[1]) );
             shift @names;
             shift @names;
-        } elsif my $p = self.find_lex_pkg(@$names[0]) {
+        } elsif my $p = self.find_lex_pkg(@names[0]) {
             @tp = @$p;
             shift @names;
         } else {
@@ -661,13 +661,14 @@ class Unit {
 
     method create_syml() {
         my $all = {};
+        my $*unit = self;
 
         if (self.get_unit($.name) !=== self) {
             die "Local unit cache inconsistant";
         }
 
-        $.ns.visit_stashes(-> @path {
-            return unless @path;
+        $.ns.visit_stashes(sub (@path) {
+            return Nil unless @path;
             my $tag = join("", map { $_ ~ "::" }, @path);
             my $st = $all{$tag} = Stash.new('!id' => [$tag]);
             my @ppath = @path;

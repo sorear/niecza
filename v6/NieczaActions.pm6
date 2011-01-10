@@ -311,6 +311,11 @@ method regex_block($/) {
 }
 
 method regex_def($/) {
+    sub _symtext($name) {
+        ($name ~~ /\:sym\<(.*)\>/) ?? ~$0 !!
+            ($name ~~ /\:(\w+)/) ?? ~$0 !!
+            Str; #XXX
+    }
     my ($name, $path) = $<deflongname> ??
         self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
     my $cname;
@@ -334,11 +339,7 @@ method regex_def($/) {
     }
 
     my $isproto;
-    my $symtext =
-        ($cname || !defined($name)) ?? Str !!
-        ($name ~~ /\:sym\<(.*)\>/) ?? ~$0 !!
-        ($name ~~ /\:(\w+)/) ?? ~$0 !!
-        Str; #XXX
+    my $symtext = ($cname || !defined($name)) ?? Str !! _symtext($name);
     if $*MULTINESS eq 'proto' {
         if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' {
             $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
@@ -360,7 +361,7 @@ method regex_def($/) {
 
     my $sig = $<signature> ?? $<signature>[0].ast !! Sig.simple;
 
-    if $scope ~~ /< state augment supersede >/ {
+    if $scope eq 'state' || $scope eq 'supercede' || $scope eq 'augment' {
         $/.CURSOR.sorry("Nonsensical scope $scope for regex");
         return Nil;
     }
@@ -506,10 +507,10 @@ sub LISTrx($/) {
         [ map *.ast, @( $<list> ) ], dba => %*RX<dba>);
 }
 
-method regex_infix:sym<|> {}
-method regex_infix:sym<||> {}
-method regex_infix:sym<&> {}
-method regex_infix:sym<&&> {}
+method regex_infix:sym<|> ($/) {}
+method regex_infix:sym<||> ($/) {}
+method regex_infix:sym<&> ($/) {}
+method regex_infix:sym<&&> ($/) {}
 
 method metachar:sigwhite ($/) {
     make (%*RX<s> ?? ::RxOp::Sigspace.new !! ::RxOp::Sequence.new);
@@ -1944,7 +1945,7 @@ method variable_declarator($/) {
     }
 }
 
-method type_declarator:constant {
+method type_declarator:constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }

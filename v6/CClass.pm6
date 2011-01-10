@@ -91,3 +91,4 @@ our &internal = sub ($name) {
     ($name eq 'alpha') && return CClass.catm(< Lu Lt Ll Lm Lo >).plus('_');
     die "unknown internal cclass $name";
 }
+method internal($name) { &internal($name) }
