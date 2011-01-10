@@ -183,6 +183,14 @@ augment class Op::Lexical {
             CgOp.scopedlex($.name));
     }
 }
+augment class Op::PackageVar {
+    method code_bvalue($ , $ro, $rhscg) {
+        CgOp.prog(
+            CgOp.scopedlex($.slot,
+                CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
+            CgOp.scopedlex($.slot));
+    }
+}
 
 augment class RxOp::CClassElem {
     method lad() { [ 'CC', @( $.cc.terms ) ] }

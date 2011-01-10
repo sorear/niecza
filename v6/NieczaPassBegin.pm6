@@ -20,7 +20,7 @@ augment class Unit { method begin() {
         ns => ::Metamodel::Namespace.new,
         filename => $.filename,
         modtime => $.modtime,
-        setting => $.setting_name);
+        setting => ($.setting_name eq 'NULL' ?? Str !! $.setting_name));
     %*units{$.name} = $*unit;
     $*unit.tdeps{$.name} = [$.filename, $.modtime];
 
