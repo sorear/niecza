@@ -21,7 +21,7 @@
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
     ((list var x y id name) (list (intern var) `(symbol-function ',(sub-symbol id))))
-    ((list var simple dunno) (list (intern var) '(quote NYI)))))
+    ((list var simple dunno) (list (intern var) ""))))
 
 (defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
 
@@ -35,12 +35,25 @@
 (defun nam-str (string) string)
 (defun nam-double (number) number)
 
-; ???
+(defmacro nam-assign (to what) `(setf ,to ,what))
+
 (defun nam-const (thing) thing)
 (defun nam-box (type thing) thing)
 (defun nam-fetch (thing) thing)
-(defmacro nam-scopedlex (var) (intern var))
+
+(defmacro nam-scopedlex (var &rest rvalue)
+  (if (consp rvalue)
+      `(setf ,(intern var) ,@rvalue)
+      (intern var)))
+
+; ???
 (defun nam-subcall (dunno-what-that-is thing &rest args) (apply thing args))
+
+; HACK
+(defmacro nam-corelex (var) `(nam-scopedlex ,var))
+
+(defmacro nam-newboundvar (dunno1 dunno2 thing) thing)
+
 
 
 (defun compile-sub (i sub)
@@ -76,7 +89,9 @@
 
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
-         (|&say| #'p6-say))
+         (|&say| #'p6-say)
+         (|Nil| "") ; HACK
+         )
       ,@compiled-unit (,(sub-symbol 0))))
 
 
