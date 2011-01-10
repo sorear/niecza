@@ -1528,7 +1528,7 @@ method do_variable_reference($M, $v) {
     }
     elsif $tw eq '' || $tw eq '?' {
         if defined($v<rest>) {
-            ::Op::PackageVar.new(path => $<rest>, name => $sl,
+            ::Op::PackageVar.new(path => $v<rest>, name => $sl,
                 slot => self.gensym, |node($M));
         } else {
             ::Op::Lexical.new(|node($M), name => $sl);

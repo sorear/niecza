@@ -14,65 +14,134 @@ use NieczaCompiler;
 
 use MONKEY_TYPING;
 
+use CgOp;
 use NieczaActions;
 use Metamodel;
 use CClass;
 use Sig;
 use OptRxSimple;
+use RxOp;
 
 augment class Metamodel::Namespace {
 }
 augment class NieczaActions {
 sub node($M) { { file => $*FILE<name>, line => $M.cursor.lineof($M.to) } }
-method regex_infix:sym<|> ($ ) {}
-method regex_infix:sym<||> ($ ) {}
-method regex_infix:sym<&> ($ ) {}
-method regex_infix:sym<&&> ($ ) {}
-method do_variable_reference($M, $v) {
-    if $v<term> {
-        return $v<term>;
-    }
+sub mkcall($/, $name, *@positionals) {
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+my %loose2tight = (
+    '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
+    'orelse' => '//', 'and' => '&&', 'or' => '||',
+);
 
-    my $tw = $v<twigil>;
-    my $sl = $v<sigil> ~ $tw ~ $v<name>;
-
-    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
-        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
-        return ::Op::StatementList.new;
-    }
-
-    if $tw eq '!' {
-        ::Op::CallMethod.new(|node($M), name => $v<name>, private => True,
-            receiver => ::Op::Lexical.new(name => 'self'), ppath => $v<rest>);
-    }
-    elsif $tw eq '.' {
-        if defined $v<rest> {
-            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
-            return ::Op::StatementList.new;
-        }
-
-        ::Op::CallMethod.new(|node($M), name => $v<name>,
-            receiver => ::Op::Lexical.new(name => 'self'));
-    }
-    # no twigil in lex name for these
-    elsif $tw eq '^' || $tw eq ':' {
-        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>);
-    }
-    elsif $tw eq '*' {
-        ::Op::ContextVar.new(|node($M), name => $sl);
-    }
-    elsif $tw eq '' || $tw eq '?' {
-        if defined($v<rest>) {
-            ::Op::PackageVar.new(path => $M<rest>, name => $sl,
-                slot => self.gensym, |node($M));
-        } else {
-            ::Op::Lexical.new(|node($M), name => $sl);
-        }
-    }
-    else {
-        $M.CURSOR.sorry("Unhandled reference twigil $tw");
+method get_op_sym($M) {
+    if $M.reduced eq '::($name)' { # XXX STD miscompilation
+        return ~$M;
+    } elsif $M.reduced ~~ /\:sym\<(.*)\>/ {
+        return ~$0;
+    } elsif $M.reduced ~~ /\:(\w+)/ {
+        return ~$0;
+    } elsif $M.reduced eq 'PRE' {
+        return ~$M; # TODO: replace with better metaop
+    } else {
+        die "Cannot extract operator symbol ($M) ($M.reduced())";
     }
 }
+
+# XXX Niecza  Needs improvement
+method FALLBACK($meth, $/) {
+    if $meth eq '::($name)' { # XXX STD miscompilation
+        if $<O><prec> eq 't=' { # additive
+            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        }
+        return Nil;
+    } elsif substr($meth,0,7) eq 'prefix:' {
+    } elsif substr($meth,0,8) eq 'postfix:' {
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        return Nil;
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
+}
+method postop($/) {
+    make $<postcircumfix> ?? $<postcircumfix>.ast !!
+        { postfix => self.get_op_sym($<postfix>) };
+}
+
+method PREFIX($/) {
+    my $op = "\&prefix:<{ self.get_op_sym($<op>) }>";
+    my $rarg = $<arg>.ast;
+
+    # Macros
+    if $op eq '&prefix:<temp>' {
+        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
+            $/.CURSOR.sorry('Non-contextual case of temp NYI');
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+        make mkcall($/, '&infix:<=>',
+            ::Op::Lexical.new(name => $rarg.name, declaring => True,
+                        hash => substr($rarg.name,0,1) eq '%',
+                        list => substr($rarg.name,0,1) eq '@'),
+            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+        return Nil;
+    }
+
+    my ($st, $arg) = self.whatever_precheck($op, $rarg);
+    make self.whatever_postcheck($/, $st, mkcall($/, $op, $arg));
+}
+method named_param($/) {
+    my %rt;
+    sub good($a, $b is rw) { $a ~~ /^<[@$%]><[.*!]>?(.*)/ && ($b = [~$0]; True) }
+    if $<name> {
+        if $<named_param> {
+            %rt = %( $<named_param>.ast );
+        } else {
+            %rt = %( $<param_var>.ast );
+        }
+        %rt<names> = [ @( %rt<names> // [] ), ~$<name> ];
+    } else {
+        %rt = %( $<param_var>.ast );
+        if %rt<slot> && good(%rt<slot>, %rt<names>) {
+        } else {
+            $/.CURSOR.sorry("Abbreviated named parameter must have a name");
+        }
+    }
+    %rt<positional> = False;
+    make %rt;
+}
+sub _isinfix($out is rw, $str) {
+    $str ~~ /'&infix:<'(.*)'>'/ && ($out = $0; True)
+}
+method LIST($/) {
+    if $/.CURSOR.^isa(::STD::Regex) {
+        self.LISTrx($/);
+        return Nil;
+    }
+    # STD guarantees that all elements of delims have the same sym
+    # the last item may have an ast of undef due to nulltermish
+    my $fn = $<delims>[0].ast;
+    my $opn = $fn.^isa(::Op::Lexical) ?? $fn.name !!
+        ($fn.^isa(::Op::CallSub) && $fn.invocant.^isa(::Op::Lexical)) ??
+            $fn.invocant.name !! '';
+    _isinfix((my $op), $opn);
+    my ($st, @pos) = self.whatever_precheck($opn,
+        grep *.&defined, map *.ast, @( $<list> ));
+
+    if $op eq ',' {
+        make ::Op::SimpleParcel.new(|node($/), items => @pos);
+    } elsif %loose2tight{$op} {
+        make ::Op::ShortCircuit.new(|node($/), kind => %loose2tight{$op},
+            args => @pos);
+    } else {
+        make ::Op::CallSub.new(|node($/), invocant => $fn,
+            positionals => @pos);
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+
 }
 
 # XXX mega hack.
@@ -107,16 +176,19 @@ my class IO {
     method modified() { Instant.new(val => Q:CgOp { (rawscall Builtins,Kernel.GetModTime (obj_getstr {self})) }) }
 }
 
-augment class Metamodel::StaticSub {
-    method find_lex($name) {
-        say "Looking for $name in $.name";
-        my $l = $.lexicals{$name};
-        if $l {
-            return $l.^isa(::Metamodel::Lexical::Alias) ??
-                self.find_lex($l.to) !! $l;
-        }
-        return ($.outer ?? $.outer.find_lex($name) !! ::Metamodel::Lexical);
+augment class Op::Lexical {
+    method code_bvalue($ , $ro, $rhscg) {
+        CgOp.prog(
+            CgOp.scopedlex($.name, CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
+            CgOp.scopedlex($.name));
     }
+}
+
+augment class RxOp::CClassElem {
+    method lad() { [ 'CC', @( $.cc.terms ) ] }
+}
+
+augment class Metamodel::StaticSub {
 }
 
 augment class Str {
@@ -143,5 +215,5 @@ my $c = NieczaCompiler.new(
 );
 
 #$c.compile_module("SAFE");
-$c.compile_module("CORE");
+#$c.compile_module("CORE");
 $c.compile_string("say 'Hello, world'", False);

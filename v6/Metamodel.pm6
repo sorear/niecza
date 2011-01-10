@@ -103,8 +103,8 @@ class Namespace {
         $!root = _merge($!root, %*units{$from}.ns.root, []);
     }
 
-    sub _merge($rinto, $rfrom, @path) {
-        $rinto = { %$rinto };
+    sub _merge($rinto_, $rfrom, @path) {
+        my $rinto = _hash_constructor( %$rinto_ );
         for sort keys $rfrom -> $k {
             if !$rinto{$k} {
                 $rinto{$k} = $rfrom{$k};

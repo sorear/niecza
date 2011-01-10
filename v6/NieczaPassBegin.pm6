@@ -20,18 +20,18 @@ augment class Unit { method begin() {
         ns => ::Metamodel::Namespace.new,
         filename => $.filename,
         modtime => $.modtime,
-        setting => $*SETTING_UNIT);
+        setting => $.setting_name);
     %*units{$.name} = $*unit;
     $*unit.tdeps{$.name} = [$.filename, $.modtime];
 
-    $*unit.need_unit($*SETTING_UNIT) if $*SETTING_UNIT;
+    $*unit.need_unit($.setting_name) if $.setting_name ne 'NULL';
 
     $*unit.create_stash(['GLOBAL']);
     $*unit.create_stash(['PROCESS']);
 
     my @*opensubs;
     $*unit.mainline = $.mainline.begin(once => True,
-            itop => ($*SETTING_UNIT ?? $*unit.get_unit($*SETTING_UNIT).bottom_ref !! Any));
+            itop => ($.setting_name ne 'NULL' ?? $*unit.get_unit($.setting_name).bottom_ref !! Any));
 
     $*unit;
 } }
@@ -394,7 +394,7 @@ augment class Op::Augment { #OK exist
 
         my $ph = ::Metamodel::StaticSub.new(
             unit       => $*unit,
-            outer      => $body.xref,
+            outerx     => $body.xref,
             cur_pkg    => [ 'GLOBAL' ],
             name       => 'ANON',
             is_phaser  => 0,
