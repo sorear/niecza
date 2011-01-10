@@ -3,6 +3,7 @@ class NieczaBackendNAM;
 use NAMOutput;
 
 has $.obj_dir;
+has $.run_args = [];
 
 # The purpose of the backend is twofold.  It must be able to accept
 # and process units; and it must be able to retrieve processed units

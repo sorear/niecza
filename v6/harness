@@ -22,8 +22,6 @@ use Sig;
 use OptRxSimple;
 use RxOp;
 
-augment class Metamodel::Namespace {
-}
 augment class NieczaActions {
 sub node($M) { { file => $*FILE<name>, line => $M.cursor.lineof($M.to) } }
 sub mkcall($/, $name, *@positionals) {
@@ -176,14 +174,14 @@ my class IO {
     method modified() { Instant.new(val => Q:CgOp { (rawscall Builtins,Kernel.GetModTime (obj_getstr {self})) }) }
 }
 
-augment class Op::Lexical {
+augment class Op::Lexical { #OK exist
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
             CgOp.scopedlex($.name, CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
             CgOp.scopedlex($.name));
     }
 }
-augment class Op::PackageVar {
+augment class Op::PackageVar { #OK exist
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
             CgOp.scopedlex($.slot,
@@ -192,24 +190,162 @@ augment class Op::PackageVar {
     }
 }
 
-augment class RxOp::CClassElem {
+augment class RxOp::CClassElem { #OK exist
     method lad() { [ 'CC', @( $.cc.terms ) ] }
 }
 
-augment class Metamodel::StaticSub {
+augment class Metamodel::StaticSub { #OK exist
 }
 
 augment class Str {
     method IO() { IO.new(path => self) }
 }
 
+sub GetOptions(*@pairs, :$permute = True, :onerror($onerror_), :onarg($onarg_)) {
+    my @nonopt;
+    my $onerror = $onerror_ // sub ($message) {
+        note $message;
+        exit 1;
+    };
+    my $onarg = $onarg_ // sub ($arg) {
+        push @nonopt, $arg;
+        if !$permute {
+            push @nonopt, @*ARGS;
+            @*ARGS = ();
+        }
+    };
+    my @unpk;
+    sub pick_long_option($st) {
+        my @cand = grep { chars($_[0]) > 1 &&
+            substr($_[0],0,chars($st)) eq $st }, @unpk;
+        $onerror.("Ambiguous long option --$st; could be any of {map *[0], @cand}") if @cand > 1;
+        $onerror.("No match for long option --$st") if !@cand;
+        @cand[0];
+    }
+    sub pick_short_option($st) {
+        my @cand = grep { $_[0] eq $st }, @unpk;
+        $onerror.("No match for short option -$st") if !@cand;
+        @cand[0];
+    }
+    for @pairs -> $p {
+        my $key = $p.key;
+        my $type = '';
+        if $key ~~ /<[:=]>s$/ {
+            $type = ~$/;
+            $key = substr($key, 0, $/.from);
+        }
+        for $key.split('|') {
+            push @unpk, [ $_, $type, $p.value ];
+        }
+    }
+
+    while @*ARGS {
+        my $opt = shift @*ARGS;
+        if $opt eq '--' {
+            $onarg.(shift @*ARGS) while @*ARGS;
+            last;
+        }
+        elsif substr($opt, 0, 2) eq '--' {
+            if $opt ~~ /'='/ {
+                my $obl = pick_long_option(substr($opt, 2, $/.from - 2));
+                $onerror.("Long option --$obl[0] does not accept an argument")
+                    if $obl[1] eq '';
+                $obl[2].(substr($opt, $/.to));
+            } else {
+                my $obl = pick_long_option(substr($opt, 2));
+                if $obl[1] eq '=s' {
+                    $onerror.("Argument required for long option --$obl[0]")
+                        unless @*ARGS;
+                    $obl[2].(shift @*ARGS);
+                } else {
+                    $obl[2].(Str);
+                }
+            }
+        }
+        elsif chars($opt) > 1 && substr($opt, 0, 1) eq '-' {
+            $opt = substr($opt, 1);
+            while $opt ne '' {
+                my $obl = pick_short_option(substr($opt, 0, 1));
+                $opt = substr($opt, 1);
+                if $obl[1] eq '' || $obl[1] eq ':s' && $opt eq '' {
+                    $obl[2].(Str);
+                }
+                elsif $opt ne '' {
+                    $obl[2].($opt);
+                    $opt = '';
+                }
+                else {
+                    $onerror.("Argument required for short option -$obl[0]")
+                        unless @*ARGS;
+                    $obl[2].(shift @*ARGS);
+                }
+            }
+        }
+        else {
+            $onarg.($opt);
+        }
+    }
+
+    @*ARGS = @nonopt;
+}
+
+my $usage = q:to/EOM/;
+niecza -- a command line wrapper for Niecza
+
+usage: niecza -e 'code'      # run a one-liner
+   OR: niecza file.pl [args] # run a program
+   OR: niecza -C MyModule    # precompile a module
+   OR: niecza                # interactive shell
+
+general options:
+   -B --backend=NAME         # select backend (nam, mono, clisp)
+   -L --language=NAME        # select your setting
+   -v --verbose              # detailed timing info
+   -c --compile              # don't run (implied with -C)
+      --stop-after=STAGE     # stop after STAGE and dump AST
+      --safe                 # disable system interaction, implies -L SAFE
+      --help                 # display this message
+
+backend options:
+      --aot                  # run ahead-of-time compiler (mono)
+      --obj-dir=DIR          # select output location (all)
+EOM
+
+my @lib  = "../lib", ".";
+my $lang = "CORE";
+my $safe = False;
+my $bcnd = "nam";
+my $odir = "obj";
+my $verb = False;
+my @eval;
+my $cmod = False;
+my $comp = False;
+my $stop = "";
+my $aotc = False;
+
+my @*ARGS = @( @PROCESS::ARGS ); # XXX CORE bug
+
+GetOptions(:!permute,
+    "evaluate|e=s" => sub { push @eval, $_ },
+    "compile-module|C" => sub { $cmod = True },
+    "backend|B=s" => sub { $bcnd = $_ },
+    "language|L=s" => sub { $lang = $_ },
+    "verbose|v" => sub { $verb = True },
+    "compile|c" => sub { $comp = True },
+    "safe" => sub { $safe = True },
+    "stop=s" => sub { $stop = $_ },
+    "aot" => sub { $aotc = True },
+    "obj-dir=s" => sub { $odir = $_ },
+    "help|h" => sub { say $usage; exit 0 },
+);
+
 my $c = NieczaCompiler.new(
     module_finder => NieczaPathSearch.new(
-        path => ["../lib", "."],
+        path => @lib,
     ),
     frontend => NieczaFrontendSTD.new(
-        lang => 'CORE',
-        safemode => False,
+        lang => $safe ?? 'SAFE' !! $lang,
+        safemode => $safe,
     ),
     stages => [
         NieczaPassBegin.new,
@@ -217,11 +353,39 @@ my $c = NieczaCompiler.new(
         NieczaPassSimplifier.new,
     ],
     backend => NieczaBackendNAM.new(
-        obj_dir => 'obj',
+        obj_dir => $odir,
     ),
-    verbose => True,
+    verbose => $verb,
 );
 
-#$c.compile_module("SAFE");
-#$c.compile_module("CORE");
-$c.compile_string("say 'Hello, world'", False);
+if $cmod {
+    if @eval {
+        note "Module compilation cannot be used with strings to evaluate";
+        exit 1;
+    }
+    if !@*ARGS {
+        say "No modules named to compile!";
+        exit 0;
+    }
+    for @*ARGS {
+        $c.compile_module($_, $stop);
+    }
+}
+elsif @eval {
+    $c.backend.run_args = @*ARGS;
+    for @eval {
+        $c.compile_string($_, !$comp, $stop);
+    }
+}
+elsif @*ARGS {
+    my $file = shift @*ARGS;
+    $c.backend.run_args = @*ARGS;
+    $c.compile_file($file, !$comp, $stop);
+}
+else {
+    while True {
+        print "niecza> ";
+        my $l = $*IN.get // last;
+        $c.compile_string($l, !$comp, $stop);
+    }
+}
