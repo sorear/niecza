@@ -15,8 +15,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <CompilerPerl Include="src/**/*.pm"/>
-        <RTS Include="lib/*.cs"/>
+        <CompilerPerl Include="src\Op\Helpers.pm;src\CClass.pm;src\Op.pm;src\NAMWriter.pm;src\Niecza\Pass\Begin.pm;src\Niecza\Pass\Beta.pm;src\Niecza\Pass\Backend.pm;src\Niecza\Pass\Simplifier.pm;src\Niecza\Backend\CLisp.pm;src\Niecza\Backend\NAM.pm;src\Niecza\Backend\Mono.pm;src\Niecza\Actions.pm;src\Niecza\Grammar.pmc;src\Niecza\Frontend\STD.pm;src\Niecza\Simple.pm;src\Niecza\Compiler.pm;src\Body.pm;src\CgOp.pm;src\Sig.pm;src\Optimizer\Beta.pm;src\Optimizer\Simplifier.pm;src\Optimizer\RxSimple.pm;src\Metamodel.pm;src\NAMBackend.pm;src\RxOp.pm;src\Unit.pm;src\CompilerDriver.pm"/>
+        <RTS Include="lib\Kernel.cs;lib\JSYNC.cs;lib\Cursor.cs;lib\Builtins.cs;lib\NieczaCLR.cs"/>
     </ItemGroup>
 
     <!-- Meta targets -->
