@@ -105,13 +105,17 @@ Sets the $file and $line_numer for the $operation.
 
 =head2 Sequence control
 
-=head3 prog
+=head3 prog(@*arguments)
+
+Evaluates arguments in sequens and returns the result of the last one.
 
 =head3 span
 
 =head3 ehspan
 
-=head3 sink
+=head3 sink($argument)
+
+Evaluates and ignores $argument.
 
 =head3 labelhere
 
