@@ -436,11 +436,12 @@ class Subrule is Capturing {
     has $.zerowidth; # Bool
     has $.negative; # Bool
 
-    method clone(:$captures) {
+    method clone(*%_) {
         self.WHAT.new(method => $!method, regex => $!regex,
             passcap => $!passcap, _passcapltm => $!_passcapltm,
             _passcapzyg => $!_passcapzyg, selfcut => $!selfcut,
-            zerowidth => $!zerowidth, negative => $!negative, :$captures);
+            zerowidth => $!zerowidth, negative => $!negative,
+            captures => $!captures, |%_);
     }
 
     method opzyg() { $!regex // Nil }
@@ -687,7 +688,7 @@ class CClassElem is RxOp {
 
     method code($) { CgOp.rxbprim("CClass", CgOp.const(CgOp.cc_expr($.cc))); }
     method tocclist { $.cc }
-    method lad() { [ 'CC', $.cc.terms ] }
+    method lad() { [ 'CC', @( $.cc.terms ) ] }
 }
 
 class None is RxOp {

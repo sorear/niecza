@@ -5,7 +5,6 @@ class Op;
 use CgOp;
 
 # XXX Use raw-er StrPos stuff, and track more details
-has $.file; # Str
 has $.line; # Int
 
 method zyg() { }
@@ -15,8 +14,8 @@ method zyg() { }
 method ctxzyg($) { map { $_, 1 }, self.zyg }
 
 method cgop($body) {
-    if (defined $.file) {
-        CgOp.ann($.file, $.line, self.code($body));
+    if (defined $.line) {
+        CgOp.ann("", $.line, self.code($body));
     } else {
         self.code($body);
     }
@@ -601,7 +600,7 @@ class Lexical is Op {
 
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
-            CgOp.scopedlex($.name, CgOp.newboundvar($ro, +($.list || $.hash), $rhscg)),
+            CgOp.scopedlex($.name, CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
             CgOp.scopedlex($.name));
     }
 }
@@ -639,7 +638,7 @@ class PackageVar is Op {
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
             CgOp.scopedlex($.slot,
-                CgOp.newboundvar($ro, +($.list || $.hash), $rhscg)),
+                CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
             CgOp.scopedlex($.slot));
     }
 }

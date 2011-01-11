@@ -19,3 +19,4 @@ only slow me down...
 * context accelerators need to robustly handle undefined objects
 * .list, item as accelerated contexts
 * explicitly imprecise error reporting - lines A-B
+* @PROCESS::ARGS ::= [1,2,3]; ok +[ @*ARGS ] == 3 # Bug

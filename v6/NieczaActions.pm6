@@ -13,7 +13,7 @@ use OptRxSimple;
 sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
 sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
-sub node($M) { { file => $*FILE<name>, line => $M.cursor.lineof($M.to) } }
+sub node($M) { { line => $M.cursor.lineof($M.to) } }
 
 sub mklet($value, $body) {
     my $var = NieczaActions.gensym;
@@ -26,17 +26,31 @@ sub mkcall($/, $name, *@positionals) {
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
 
+method get_op_sym($M) {
+    if $M.reduced eq '::($name)' { # XXX STD miscompilation
+        return ~$M;
+    } elsif $M.reduced ~~ /\:sym\<(.*)\>/ {
+        return ~$0;
+    } elsif $M.reduced ~~ /\:(\w+)/ {
+        return ~$0;
+    } elsif $M.reduced eq 'PRE' {
+        return ~$M; # TODO: replace with better metaop
+    } else {
+        die "Cannot extract operator symbol ($M) ($M.reduced())";
+    }
+}
+
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
         if $<O><prec> eq 't=' { # additive
-            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $/ ~ '>');
+            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
         }
         return Nil;
     } elsif substr($meth,0,7) eq 'prefix:' {
     } elsif substr($meth,0,8) eq 'postfix:' {
     } elsif substr($meth,0,6) eq 'infix:' {
-        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ $<sym> ~ '>');
+        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
         return Nil;
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
@@ -1150,8 +1164,12 @@ method LIST($/) {
     }
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
-    my $op  = ~$<delims>[0]<sym>;
-    my ($st, @pos) = self.whatever_precheck("\&infix:<$op>",
+    my $fn = $<delims>[0].ast;
+    my $opn = $fn.^isa(::Op::Lexical) ?? $fn.name !!
+        ($fn.^isa(::Op::CallSub) && $fn.invocant.^isa(::Op::Lexical)) ??
+            $fn.invocant.name !! '';
+    _isinfix((my $op), $opn);
+    my ($st, @pos) = self.whatever_precheck($opn,
         grep *.&defined, map *.ast, @( $<list> ));
 
     if $op eq ',' {
@@ -1160,7 +1178,8 @@ method LIST($/) {
         make ::Op::ShortCircuit.new(|node($/), kind => %loose2tight{$op},
             args => @pos);
     } else {
-        make mkcall($/, "\&infix:<$op>", @pos);
+        make ::Op::CallSub.new(|node($/), invocant => $fn,
+            positionals => @pos);
     }
     make self.whatever_postcheck($/, $st, $/.ast);
 }
@@ -1232,7 +1251,7 @@ method POSTFIX($/) {
 }
 
 method PREFIX($/) {
-    my $op = "\&prefix:<$<sym>>";
+    my $op = "\&prefix:<{ self.get_op_sym($<op>) }>";
     my $rarg = $<arg>.ast;
 
     # Macros
@@ -1286,8 +1305,10 @@ method postcircumfix:sym«< >» ($/) {
 }
 
 method postop($/) {
-    make $<postcircumfix> ?? $<postcircumfix>.ast !! { postfix => ~$<sym> };
+    make $<postcircumfix> ?? $<postcircumfix>.ast !!
+        { postfix => self.get_op_sym($<postfix>) };
 }
+
 method POST($/) {
     make $<dotty>.ast  if $<dotty>;
     make $<privop>.ast if $<privop>;
@@ -1625,7 +1646,7 @@ method param_sep ($/) {}
 # :: { list : Bool, hash : Bool  slot : Maybe[Str], names : [Str] }
 method named_param($/) {
     my %rt;
-    sub good($a, $b is rw) { $a ~~ /^<[@$%]><[.*!]>?(.*)/ && ($b = ~$0; True) }
+    sub good($a, $b is rw) { $a ~~ /^<[@$%]><[.*!]>?(.*)/ && ($b = [~$0]; True) }
     if $<name> {
         if $<named_param> {
             %rt = %( $<named_param>.ast );
