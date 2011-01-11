@@ -15,7 +15,7 @@ use Niecza::Simple;
 # print the help message
 sub help {
 print <<'HELP';
-Usage: mildew [switches] [--] [programfile] [arguments]
+Usage: niecza [switches] [--] [programfile] [arguments]
   -B<backend>     execute using the <backend> backend
   -C<backend>     compile using the <backend> backend
                   (valid backends are: clisp,mono)
