@@ -1204,7 +1204,7 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Callvirt, Tokens.Variable_Fetch);
             cx.il.Emit(OpCodes.Ldfld, Tokens.IP6_mo);
             cx.il.Emit(OpCodes.Ldfld, thing);
-            cx.il.Emit(OpCodes.Ldfld, cx.ospill);
+            cx.il.Emit(OpCodes.Ldloc, cx.ospill);
             for (int i = 1; i < zyg.Length; i++)
                 zyg[i].CodeGen(cx);
             cx.il.Emit(OpCodes.Callvirt, inv);
