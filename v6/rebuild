@@ -1,0 +1,3 @@
+../niecza_eval -v --stop-after=codegen harness
+cp ../obj/*.dll run
+cp ../obj/MAIN.exe run/Niecza.exe

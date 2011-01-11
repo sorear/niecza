@@ -23,8 +23,64 @@ use CClass;
 use Sig;
 use OptRxSimple;
 use RxOp;
+use STD;
 
 augment class NieczaActions {
+}
+
+augment class STD { #OK exist
+role herestop1 {
+    token stopper { ^^ {} \h*? $*DELIM \h* <.unv>?? $$ \v? }
+}
+
+# XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
+our @herestub_queue;
+token quibble ($l) {
+    :my ($lang, $start, $stop);
+    <babble($l)>
+    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
+
+    $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+
+    {
+        if $lang.hereinfo.[0] {
+            push @herestub_queue,
+                ::STD::Herestub.new(
+                    delim => ~$<nibble>,
+                    orignode => $¢,
+                    writeback => $lang.hereinfo.[1],
+                    lang => $lang.hereinfo.[0],
+                );
+        }
+    }
+}
+
+method heredoc () {
+    my $here = self;
+    while my $herestub = shift @herestub_queue {
+        my $*DELIM = $herestub.delim;
+        my $lang = $herestub.lang.mixin( herestop1 );
+        my $doc;
+        if defined($doc = first /:r :lang($lang) <nibbler> <stopper>/.($here)) {
+            $herestub.writeback.[0] = $doc;
+            $here = $here.cursor($doc.to);
+            # $herestub.orignode<doc> = $doc; NIECZA immutable matches
+        }
+        else {
+            self.panic("Ending delimiter $*DELIM not found");
+        }
+    }
+    return self.cursor($here.pos);  # return to initial type
+}
+}
+
+augment class Op::HereStub { #OK exist
+    method zyg() {
+        if defined($.node.[0]) && $.node.[0] ~~ Match {
+            $.node.[0] = $.node.[0]<nibbler>.ast
+        }
+        $.node.[0] // die "Here document used before body defined";
+    }
 }
 
 # XXX mega hack.
