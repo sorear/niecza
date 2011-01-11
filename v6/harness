@@ -173,11 +173,14 @@ backend options:
       --obj-dir=DIR          # select output location (all)
 EOM
 
-my @lib  = "../lib", ".";
+my $runobj = Q:CgOp { (box Str (rawcall get_BaseDirectory (rawscall System.AppDomain.get_CurrentDomain))) };
+my $basedir = $runobj.IO.append("..").realpath;
+
+my @lib  = $basedir.append("lib"), ".".IO.realpath;
 my $lang = "CORE";
 my $safe = False;
 my $bcnd = "dotnet";
-my $odir = "obj";
+my $odir = $basedir.append("obj");
 my $verb = False;
 my @eval;
 my $cmod = False;
