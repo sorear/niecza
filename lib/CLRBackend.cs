@@ -3790,10 +3790,9 @@ namespace Niecza.CLRBackend {
             string unitfile = args[1];
             string outfile  = args[2];
             bool   ismain   = args[3] == "1";
-            Directory.SetCurrentDirectory(dir);
-            string tx = File.ReadAllText(unitfile);
+            string tx = File.ReadAllText(Path.Combine(dir, unitfile));
             Unit root = new Unit((object[])Reader.Read(tx));
-            CLRBackend c = new CLRBackend(null, root.name, outfile);
+            CLRBackend c = new CLRBackend(dir, root.name, outfile);
 
             used_units = new Dictionary<string, Unit>();
             used_units[root.name] = root;
@@ -3802,14 +3801,14 @@ namespace Niecza.CLRBackend {
                 object[] dn = (object[]) x;
                 string name = JScalar.S(dn[0]);
                 if (name == root.name) continue;
-                string dtx = File.ReadAllText(name + ".nam");
+                string dtx = File.ReadAllText(Path.Combine(dir, name + ".nam"));
                 used_units[name] = new Unit((object[])Reader.Read(dtx));
             }
 
             foreach (Unit u in used_units.Values) {
                 u.BindDepends();
                 if (u != root) {
-                    u.clrAssembly = Assembly.Load(u.name);
+                    u.clrAssembly = Assembly.LoadFile(Path.Combine(dir, u.name + ".dll"));
                     u.clrType = u.clrAssembly.GetType(u.name);
                     Dictionary<string,FieldInfo> df =
                         new Dictionary<string,FieldInfo>();

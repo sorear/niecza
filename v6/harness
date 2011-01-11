@@ -9,6 +9,8 @@ use NieczaPassBegin;
 use NieczaPassBeta;
 use NieczaPassSimplifier;
 use NieczaBackendNAM;
+use NieczaBackendDotnet;
+use NieczaBackendClisp;
 use NieczaPathSearch;
 use NieczaCompiler;
 
@@ -158,7 +160,7 @@ usage: niecza -e 'code'      # run a one-liner
    OR: niecza                # interactive shell
 
 general options:
-   -B --backend=NAME         # select backend (nam, mono, clisp)
+   -B --backend=NAME         # select backend (nam, dotnet, clisp)
    -L --language=NAME        # select your setting
    -v --verbose              # detailed timing info
    -c --compile              # don't run (implied with -C)
@@ -174,7 +176,7 @@ EOM
 my @lib  = "../lib", ".";
 my $lang = "CORE";
 my $safe = False;
-my $bcnd = "nam";
+my $bcnd = "dotnet";
 my $odir = "obj";
 my $verb = False;
 my @eval;
@@ -197,6 +199,21 @@ GetOptions(:!permute,
     "help|h" => sub { say $usage; exit 0 },
 );
 
+my $backend;
+if $bcnd eq 'nam' {
+    $backend = NieczaBackendNAM.new(obj_dir => $odir);
+}
+elsif $bcnd eq 'dotnet' || $bcnd eq 'mono' {
+    $backend = NieczaBackendDotnet.new(obj_dir => $odir);
+}
+elsif $bcnd eq 'clisp' {
+    $backend = NieczaBackendClisp.new(obj_dir => $odir);
+}
+else {
+    note "Backend '$bcnd' not supported";
+    exit 1;
+}
+
 my $c = NieczaCompiler.new(
     module_finder => NieczaPathSearch.new(
         path => @lib,
@@ -210,9 +227,7 @@ my $c = NieczaCompiler.new(
         NieczaPassBeta.new,
         NieczaPassSimplifier.new,
     ],
-    backend => NieczaBackendNAM.new(
-        obj_dir => $odir,
-    ),
+    backend => $backend,
     verbose => $verb,
 );
 

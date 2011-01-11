@@ -353,4 +353,29 @@ public class Builtins {
         double d = ((double)(t - 621355968000000000L)) / 10000000.0;
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
     }
+
+    // This is wrong in the long term.  The backend should be linked; it
+    // should generate collectable assemblies; app-domains should be made
+    // available through MetaServices.
+    public static Variable RunCLRSubtask(Variable filename, Variable args) {
+        List<string> la = new List<string>();
+        VarDeque iter = new VarDeque(args);
+        string sfn = filename.Fetch().mo.mro_raw_Str.Get(filename);
+        //Console.WriteLine("App name {0}", sfn);
+        while (Kernel.IterHasFlat(iter, true)) {
+            Variable v = iter.Shift();
+            la.Add(v.Fetch().mo.mro_raw_Str.Get(v));
+            //Console.WriteLine("Arg {0}", la[la.Count-1]);
+        }
+        AppDomainSetup ads = new AppDomainSetup();
+        ads.ApplicationBase = System.IO.Path.GetDirectoryName(sfn);
+        AppDomain ch = AppDomain.CreateDomain(sfn, null, ads);
+        int ret;
+        try {
+            ret = ch.ExecuteAssembly(sfn, null, la.ToArray());
+        } finally {
+            AppDomain.Unload(ch);
+        }
+        return Kernel.BoxAnyMO((double) ret, Kernel.NumMO);
+    }
 }
