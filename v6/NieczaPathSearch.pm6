@@ -18,7 +18,7 @@ method load_module($name) {
         }
     }
 
-    return ();
+    die "Unable to locate module $name in @$.path";
 }
 
 method load_file($name) {

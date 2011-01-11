@@ -1,3 +1,6 @@
 ../niecza_eval -v --stop-after=codegen harness
 cp ../obj/*.dll run
 cp ../obj/MAIN.exe run/Niecza.exe
+cp ../obj/Kernel.dll ../obj/CLRBackend.exe obj
+cp ../lib/*.setting lib
+cp ../lib/Test.pm6 lib
