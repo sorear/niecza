@@ -20,3 +20,4 @@ only slow me down...
 * .list, item as accelerated contexts
 * explicitly imprecise error reporting - lines A-B
 * @PROCESS::ARGS ::= [1,2,3]; ok +[ @*ARGS ] == 3 # Bug
+* Whatever-currying of prefixes my $x = ~*; say $x() # Whatever()<instance>

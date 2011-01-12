@@ -25,6 +25,50 @@ use OptRxSimple;
 use RxOp;
 use STD;
 
+augment class RxOp {
+method check()  { for @$!zyg { $_.check } }
+method used_caps() {
+    # XXX Hash.push
+    my %r;
+    for @$!zyg -> $k {
+        for $k.used_caps.pairs -> $p {
+            %r{$p.key} = (%r{$p.key} // 0) + $p.value;
+        }
+    }
+    %r;
+}
+}
+
+augment class Op::Lexical { #OK exist
+    method code_bvalue($ , $ro, $rhscg) {
+        CgOp.prog(
+            CgOp.scopedlex($.name, CgOp.newboundvar(+?$ro, +(?($.list || $.hash)), $rhscg)),
+            CgOp.scopedlex($.name));
+    }
+}
+
+augment class Op::PackageVar { #OK exist
+    method code_bvalue($ , $ro, $rhscg) {
+        CgOp.prog(
+            CgOp.scopedlex($.slot,
+                CgOp.newboundvar(+?$ro, +(?($.list || $.hash)), $rhscg)),
+            CgOp.scopedlex($.slot));
+    }
+}
+
+augment class RxOp::Capturing { #OK exist
+    method check() {
+        for @$.captures -> $c is rw {
+            if !defined($c) {
+                $c = $*paren++;
+            } elsif $c ~~ /^<[ 0..9 ]>+$/ {
+                $*paren = $c + 1;
+            }
+        }
+        for @$.zyg { $_.check }
+    }
+}
+
 augment class STD {
 method is_name ($n, $curlex = $*CURLEX) {
     my $name = $n;
@@ -77,12 +121,160 @@ method is_name ($n, $curlex = $*CURLEX) {
 }
 }
 
+augment class CClass {
+sub infix:<+&>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumAnd {$x} {$y}) } }
+sub prefix:<< +^ >>($x) { Q:CgOp { (rawscall Builtins,Kernel.NumCompl {$x}) } }
+sub _binop($func, $alr, $blr) {
+    my $bl = ($blr ~~ CClass) ?? $blr.terms !! CClass.range($blr, $blr).terms;
+    my $al = $alr.terms;
+    my ($alix, $alcur) = (0, 0);
+    my ($blix, $blcur) = (0, 0);
+    my @o;
+    my $pos = 0;
+    my $ocur = $func(0, 0);
+    if $ocur != 0 {
+        push @o, 0, $ocur;
+    }
+
+    while $pos != 10_000_000 {
+        my $ata = $alix < @$al && $al[$alix] == $pos;
+        my $atb = $blix < @$bl && $bl[$blix] == $pos;
+
+        if $ata {
+            $alcur = $al[$alix+1];
+            $alix = $alix + 2;
+        }
+
+        if $atb {
+            $blcur = $bl[$blix+1];
+            $blix = $blix + 2;
+        }
+
+        my $onew = $func($alcur, $blcur);
+        if $onew != $ocur {
+            push @o, $pos, $onew;
+            $ocur = $onew;
+        }
+
+        my $toa = $alix < @$al ?? $al[$alix] !! 10_000_000;
+        my $tob = $blix < @$bl ?? $bl[$blix] !! 10_000_000;
+
+        $pos = $toa < $tob ?? $toa !! $tob;
+    }
+
+    CClass.new(terms => @o);
+}
+method minus($other) { _binop({ $^a +& +^$^b }, self, $other); }
+}
+
+augment class Metamodel::ParametricRole { #OK exist
+    method add_method($kind, $name, $var, $body) { #OK not used
+        push $.methods, ::Metamodel::Method.new(:$name, :$body, :$var, :$kind);
+    }
+}
+
 augment class NieczaActions {
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
 
 sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+my %loose2tight = (
+    '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
+    'orelse' => '//', 'and' => '&&', 'or' => '||',
+);
+
+sub _isinfix($out is rw, $str) {
+    $str ~~ /'&infix:<'(.*)'>'/ && ($out = $0; True)
+}
+
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my $s = $fn.^isa(::Op::Lexical) ?? $fn.name !!
+        ($fn.^isa(::Op::CallSub) && $fn.invocant.^isa(::Op::Lexical)) ??
+            $fn.invocant.name !! '';
+    my ($st,$lhs,$rhs) = self.whatever_precheck($s, $<left>.ast, $<right>.ast);
+    my $n;
+
+    if $s eq '&infix:<?? !!>' { # XXX macro
+        make ::Op::Conditional.new(|node($/), check => $lhs,
+            true => $<infix><infix><EXPR>.ast, false => $rhs);
+    } elsif $s eq '&infix:<:=>' {
+        make ::Op::Bind.new(|node($/), :!readonly, :$lhs, :$rhs);
+    } elsif $s eq '&infix:<::=>' {
+        make ::Op::Bind.new(|node($/), :readonly, :$lhs, :$rhs);
+    } elsif $s eq '&infix:<,>' {
+        #XXX STD buglet causes , in setting to be parsed as left assoc
+        my @r;
+        push @r, $lhs.^isa(::Op::SimpleParcel) ?? @( $lhs.items ) !! $lhs;
+        push @r, $rhs.^isa(::Op::SimpleParcel) ?? @( $rhs.items ) !! $rhs;
+        make ::Op::SimpleParcel.new(|node($/), items => @r);
+    } elsif $s eq '&assignop' && $fn.positionals[0].^isa(::Op::Lexical) &&
+            _isinfix($n, $fn.positionals[0].name) && %loose2tight{$n} {
+        make ::Op::ShortCircuitAssign.new(|node($/),
+            kind => %loose2tight{$n}, :$lhs, :$rhs);
+    } else {
+        make ::Op::CallSub.new(|node($/), invocant => $fn,
+            positionals => [ $lhs, $rhs ]);
+
+        if $s eq '&infix:<=>' {
+            # Assignments to has and state declarators are rewritten into
+            # an appropriate phaser
+            if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+                my $cv = self.gensym;
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::Start.new(condvar => $cv, body => $/.ast),
+                    ::Op::Lexical.new(name => $lhs.name)]);
+            }
+            elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+                $lhs.initializer = self.sl_to_block('bare', $rhs,
+                    subname => $lhs.name ~ " init");
+                make $lhs;
+            }
+            elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+                $lhs.init = $rhs;
+                make $lhs;
+            }
+        }
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+method get_op_sym($M) {
+    if $M.reduced eq '::($name)' { # XXX STD miscompilation
+        return ~$M;
+    } elsif $M.reduced ~~ /\:sym\<(.*)\>/ {
+        return ~$0;
+    } elsif $M.reduced ~~ /\:(\w+)/ {
+        return ~$0;
+    } elsif $M.reduced eq 'PRE' {
+        return self.get_op_sym($M<prefix>); # TODO: replace with better metaop
+    } else {
+        die "Cannot extract operator symbol ($M) ($M.reduced())";
+    }
+}
+method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
+        :$passcap = False) {
+    my @lift = $rxop.oplift;
+    my $lad = $rxop.lad;
+    my ($nrxop, $mb) = OptRxSimple.run($rxop);
+    # XXX do this in the signature so it won't be affected by transparent
+    my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self', readonly => True);
+    if defined $goal {
+        push @parm, ::Sig::Parameter.new(slot => '$*GOAL', name => '$*GOAL',
+            readonly => True, positional => False, optional => True);
+        unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
+            lhs => ::Op::Lexical.new(name => '$*GOAL'),
+            rhs => ::Op::StringLiteral.new(text => $goal));
+    }
+    my $subop = self.transparent($/,
+        ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut, :$passcap,
+            rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
+        sig => Sig.new(params => @parm));
+    $subop = ::Op::CallSub.new(|node($/), invocant => $subop,
+        positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
+    ::RxOp::Subrule.new(regex => $subop, :$passcap, _passcapzyg => $nrxop,
+        _passcapltm => $lad);
 }
 method mod_internal:p6adv ($/) {
     my ($k, $v) = $<quotepair><k v>;

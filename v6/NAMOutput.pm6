@@ -18,9 +18,9 @@ method run($*unit) {
 sub nam_sub($s) {
     @*subsnam[$s.xref[1]] = $s.code.cgop($s);
     if $s.parametric_role_hack {
-        for @( $*unit.deref($s.parametric_role_hack).methods ) {
-            if $_.name ~~ ::GLOBAL::Op {
-                $_.name = $_.name.cgop($s).to_nam;
+        for @( $*unit.deref($s.parametric_role_hack).methods ) -> $me {
+            if $me.name ~~ ::GLOBAL::Op {
+                $me.name = $me.name.cgop($s);
             }
         }
     }
