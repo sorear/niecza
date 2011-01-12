@@ -742,7 +742,7 @@ class Herestub {
 }
 
 role herestop {
-    token stopper { ^^ {} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
+    token stopper { ^^ {} \h*? $*DELIM \h* <.unv>?? $$ \v? }
 }
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
@@ -753,9 +753,9 @@ method heredoc () {
         my $*DELIM = $herestub.delim;
         my $lang = $herestub.lang.mixin( herestop );
         my $doc;
-        if ($doc,) = $here.nibble($lang) {
-            $here = $doc.trim_heredoc();
+        if defined($doc = first /:r :lang($lang) <nibbler> <stopper>/.($here)) {
             $herestub.writeback.[0] = $doc;
+            $here = $here.cursor($doc.to);
             # $herestub.orignode<doc> = $doc; NIECZA immutable matches
         }
         else {
@@ -778,7 +778,7 @@ token quibble ($l) {
         if $lang.hereinfo.[0] {
             push @herestub_queue,
                 Herestub.new(
-                    delim => $<nibble><nibbles>[0]<TEXT>,
+                    delim => ~$<nibble>,
                     orignode => $¢,
                     writeback => $lang.hereinfo.[1],
                     lang => $lang.hereinfo.[0],
@@ -5484,7 +5484,7 @@ method add_placeholder($name) {
 
     my $varname = $name;
     my $twigil = '';
-    my $signame;
+    my $signame = $varname;
     my $M;
     if _subst($M, $varname, /<[ ^ : ]>/, "") {
         $twigil = $M.Str;

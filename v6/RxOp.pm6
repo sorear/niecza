@@ -441,7 +441,7 @@ class Subrule is Capturing {
             passcap => $!passcap, _passcapltm => $!_passcapltm,
             _passcapzyg => $!_passcapzyg, selfcut => $!selfcut,
             zerowidth => $!zerowidth, negative => $!negative,
-            captures => $!captures, |%_);
+            captures => $.captures, |%_);
     }
 
     method opzyg() { $!regex // Nil }
@@ -552,9 +552,10 @@ class SetLang is RxOp {
 }
 
 class Alt is AltBase {
+    has $.optimized_lads;
     method code($body) {
         my @ls = map { self.label }, @$.zyg;
-        my @lads = map { $_.lad }, @$.zyg;
+        my @lads = @( $.optimized_lads // (map { $_.lad }, @$.zyg) );
         my $end = self.label;
 
         die "check screwed up" unless defined $.dba;

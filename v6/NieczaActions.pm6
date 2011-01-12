@@ -45,6 +45,10 @@ method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
         if $<O><prec> eq 't=' { # additive
             make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        } elsif $<semilist> && $<O><prec> eq 'y=' {
+            my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
+                die "Unhandled postcircumfix ending in $*GOAL";
+            make { postcircumfix => $sym, args => $<semilist>.ast };
         }
         return Nil;
     } elsif substr($meth,0,7) eq 'prefix:' {
@@ -516,7 +520,7 @@ my %LISTrx_types = (
     '||' => ::RxOp::SeqAlt,
 );
 
-sub LISTrx($/) {
+method LISTrx($/) {
     make %LISTrx_types{$<delims>[0]<sym>}.new(zyg =>
         [ map *.ast, @( $<list> ) ], dba => %*RX<dba>);
 }
@@ -1057,8 +1061,8 @@ method infix_prefix_meta_operator:sym<Z> ($/) {
 }
 
 method infixish($/) {
-    if $<colonpair> {
-        return Nil; # handled in POST
+    if $<colonpair> || $<regex_infix> {
+        return Nil; # handled elsewhere
     }
 
     if $<assign_meta_operator> {
@@ -2377,7 +2381,6 @@ method get_placeholder_sig($/) {
                 list => (substr($t,0,1) eq '@'), hash => (substr($t,0,1) eq '%'));
         } else {
             $/.CURSOR.sorry('Named placeholder parameters NYI');
-            return Sig.simple;
         }
     }
     return Sig.new(params => @parms);

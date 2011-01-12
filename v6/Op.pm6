@@ -249,6 +249,9 @@ class HereStub is Op {
     has $.node = die "HereStub.node required";
 
     method zyg() {
+        if defined($.node.[0]) && $.node.[0] ~~ Match {
+            $.node.[0] = $.node.[0]<nibbler>.ast
+        }
         $.node.[0] // die "Here document used before body defined";
     }
 
