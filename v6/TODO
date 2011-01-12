@@ -15,7 +15,7 @@ only slow me down...
 * eager map optimizations
 * return()
 * stashes should be accessed as common values
-* "Action method ::($name) not implemented" bug
+* "Action method ::($name) not implemented", also needs $<sym>
 * context accelerators need to robustly handle undefined objects
 * .list, item as accelerated contexts
 * explicitly imprecise error reporting - lines A-B

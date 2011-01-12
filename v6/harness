@@ -26,6 +26,26 @@ use RxOp;
 use STD;
 
 augment class NieczaActions {
+sub node($M) { { line => $M.cursor.lineof($M.to) } }
+method FALLBACK($meth, $/) {
+    if $meth eq '::($name)' { # XXX STD miscompilation
+        if $<O><prec> eq 't=' { # additive
+            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        } elsif $<semilist> && $<O><prec> eq 'y=' {
+            my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
+                die "Unhandled postcircumfix ending in $*GOAL";
+            make { postcircumfix => $sym, args => $<semilist>.ast };
+        }
+        return Nil;
+    } elsif substr($meth,0,7) eq 'prefix:' {
+    } elsif substr($meth,0,8) eq 'postfix:' {
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        return Nil;
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
+}
 }
 
 augment class STD { #OK exist
