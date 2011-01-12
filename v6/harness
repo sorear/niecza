@@ -180,6 +180,24 @@ sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
+my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
+    '&infix:<...>', '&infix:<=>', '&infix:<xx>'));
+method whatever_precheck($op, *@args) {
+    return ([], @args) if %_nowhatever{$op};
+    my @vars;
+    my @args_ = @args;
+    for @args_ -> $a is rw {
+        die "invalid undef here" if !$a;
+        if $a.^isa(::Op::Whatever) {
+            push @vars, $a.slot;
+            $a = ::Op::Lexical.new(name => $a.slot);
+        } elsif $a.^isa(::Op::WhateverCode) {
+            push @vars, @( $a.vars );
+            $a = $a.ops;
+        }
+    }
+    $( @vars ), @args_;
+}
 my %loose2tight = (
     '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
     'orelse' => '//', 'and' => '&&', 'or' => '||',
