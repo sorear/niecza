@@ -173,6 +173,16 @@ augment class Op::HereStub { #OK exist
     }
 }
 
+augment class RxOp::Subrule { #OK exist
+    method clone(*%_) {
+        self.WHAT.new(method => $!method, regex => $!regex,
+            passcap => $!passcap, _passcapltm => $!_passcapltm,
+            _passcapzyg => $!_passcapzyg, selfcut => $!selfcut,
+            zerowidth => $!zerowidth, negative => $!negative,
+            captures => $.captures, |%_);
+    }
+}
+
 # XXX mega hack.
 my class Instant {
     has $.val;
