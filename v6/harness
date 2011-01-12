@@ -27,6 +27,34 @@ use STD;
 
 augment class NieczaActions {
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
+sub mkcall($/, $name, *@positionals) {
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+my %LISTrx_types = (
+    '&'  => ::RxOp::Conj,
+    '|'  => ::RxOp::Alt,
+    '&&' => ::RxOp::SeqConj,
+    '||' => ::RxOp::SeqAlt,
+);
+
+method LISTrx($/) {
+    make %LISTrx_types{$<delims>[0]<sym>}.new(zyg =>
+        [ map *.ast, @( $<list> ) ], dba => %*RX<dba>);
+}
+method infixish($/) {
+    if $<colonpair> || $<regex_infix> {
+        return Nil; # handled elsewhere
+    }
+
+    if $<assign_meta_operator> {
+        # TODO: there should probably be at least a potential for others
+
+        make mkcall($/, '&assignop', $<infix>.ast);
+    } else {
+        make $<infix>.ast;
+    }
+}
 method get_placeholder_sig($/) {
     # for some reason, STD wants to deparse this
     my @things = $*CURLEX<$?SIGNATURE>.split(", ");
