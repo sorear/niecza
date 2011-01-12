@@ -23,6 +23,59 @@ use CClass;
 use Sig;
 use OptRxSimple;
 use RxOp;
+use STD;
+
+augment class STD {
+method is_name ($n, $curlex = $*CURLEX) {
+    my $name = $n;
+    self.deb("is_name $name") if $DEBUG::symtab;
+
+    my $curpkg = $*CURPKG;
+    return True if $name ~~ /\:\:\(/;
+    my @components = self.canonicalize_name($name);
+    if +@components > 1 {
+        return True if @components[0] eq 'COMPILING::';
+        return True if @components[0] eq 'CALLER::';
+        return True if @components[0] eq 'CONTEXT::';
+        if $curpkg = self.find_top_pkg(@components[0]) {
+            self.deb("Found lexical package ", @components[0]) if $DEBUG::symtab;
+            shift @components;
+        }
+        else {
+            self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
+            $curpkg = $*GLOBAL;
+        }
+        while +@components > 1 {
+            my $pkg = shift @components;
+            $curpkg = $curpkg.{$pkg};
+            return False unless defined $curpkg;
+            if $curpkg ~~ List {
+                my $outlexid = $curpkg.[0] // return False;
+                $curpkg = $STD::ALL.{$outlexid} // return False;
+            }
+            self.deb("Found $pkg okay") if $DEBUG::symtab;
+        }
+    }
+    $name = shift(@components)//'';
+    self.deb("Looking for $name") if $DEBUG::symtab;
+    return True if $name eq '';
+    my $lex = $curlex;
+    while $lex {
+        self.deb("Looking in ", $lex.id) if $DEBUG::symtab;
+        if $lex.{$name} {
+            self.deb("Found $name in ", $lex.id) if $DEBUG::symtab;
+            $lex.{$name}<used> = 1;
+            return True;
+        }
+        my $oid = $lex.<OUTER::>[0] || last;
+        $lex = $STD::ALL.{$oid};
+    }
+    return True if $curpkg.{$name};
+    return True if $*GLOBAL.{$name};
+    self.deb("$name not found") if $DEBUG::symtab;
+    return False;
+}
+}
 
 augment class NieczaActions {
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
@@ -30,6 +83,98 @@ sub node($M) { { line => $M.cursor.lineof($M.to) } }
 sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+method mod_internal:p6adv ($/) {
+    my ($k, $v) = $<quotepair><k v>;
+
+    if !$v.^isa(List) {
+        $/.CURSOR.sorry(":$k requires an expression argument");
+        make ::RxOp::None.new;
+        return Nil;
+    }
+    $v = $v[0].ast;
+
+    if $k eq 'lang' {
+        make ::RxOp::SetLang.new(expr => self.rxembed($/, $v, True));
+    } elsif $k eq 'dba' {
+        while True {
+            if $v.^isa(::Op::Paren) { $v = $v.inside; redo }
+            if $v.^isa(::Op::StatementList) && +$v.children == 1
+                { $v = $v.children.[0]; redo }
+            last;
+        }
+        if !$v.^isa(::Op::StringLiteral) {
+            $/.CURSOR.sorry(":dba requires a literal string");
+            make ::RxOp::None.new;
+            return Nil;
+        }
+        %*RX<dba> = $v.text;
+    }
+}
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
+
+    my ($name, $rest);
+    my $dsosl = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        Any;
+    if defined($dsosl) && defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return Nil;
+    } elsif defined $dsosl {
+        ($name, $rest) = $dsosl<name path>;
+    } elsif $<name> {
+        # Both these cases are marked XXX in STD.  I agree.  What are they for?
+        if $<name>[0].ast<dc> {
+            $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
+            make { term => ::Op::StatementList.new };
+            return Nil;
+        }
+        if substr(~$/,0,3) eq '$::' {
+            $rest = $<name>[0].ast.<names>;
+            $name = pop $rest;
+        } else {
+            if $<name>[0].ast<names> > 1 {
+                $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
+                make { term => ::Op::StatementList.new };
+                return Nil;
+            }
+            $name = $<name>[0].ast<names>[0];
+            $twigil = ':';
+        }
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+        $twigil = '*' if $name eq '/' or $name eq '!';
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            ::Op::CallMethod.new(|node($/), name => 'at-pos',
+                receiver => ::Op::ContextVar.new(name => '$*/'),
+                positionals => [ ::Op::Num.new(value => $<index>.ast) ])
+        };
+        return Nil;
+    } elsif $<postcircumfix> {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => $<postcircumfix>[0].ast<args>[0].text, term =>
+                ::Op::CallMethod.new(|node($/), name => 'at-key',
+                    receiver    => ::Op::ContextVar.new(name => '$*/'),
+                    positionals => $<postcircumfix>[0].ast<args>)
+            };
+            return Nil;
+        } else {
+            $/.CURSOR.sorry("Contextualizer variables NYI");
+            make { term => ::Op::StatementList.new };
+            return Nil;
+        }
+    } else {
+        $/.CURSOR.sorry("Non-simple variables NYI");
+        make { term => ::Op::StatementList.new };
+        return Nil;
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
+    };
 }
 method regex_block($/) {
     if $<onlystar> {
@@ -39,6 +184,77 @@ method regex_block($/) {
         $/.CURSOR.sorry('Regex adverbs NYI');
     }
     make $<nibble>.ast;
+}
+method process_tribble(@bits) {
+    my @cstack;
+    my @mstack;
+    for @bits -> $b {
+        if $b.ast.^isa(Str) {
+            next if $b.ast eq "";
+            if chars($b.ast) > 1 {
+                $b.CURSOR.sorry("Cannot use >1 character strings as cclass elements");
+                return $CClass::Empty;
+            }
+        }
+        push @mstack, $b.CURSOR;
+        push @cstack, $b.ast;
+        if @cstack >= 2 && @cstack[*-2].typename eq 'RangeSymbol' {
+            if @cstack == 2 {
+                @mstack[0].sorry(".. requires a left endpoint");
+                return $CClass::Empty;
+            }
+            for 1, 3 -> $i {
+                if @cstack[*-$i] !~~ Str {
+                    @mstack[*-$i].sorry(".. endpoint must be a single character");
+                    return $CClass::Empty;
+                }
+            }
+            my $new = CClass.range(@cstack[*-3], @cstack[*-1]);
+            pop(@cstack); pop(@cstack); pop(@cstack); push(@cstack, $new);
+            pop(@mstack); pop(@mstack);
+        }
+    }
+    if @cstack && @cstack[*-1].typename eq 'RangeSymbol' {
+        @mstack[*-1].sorry(".. requires a right endpoint");
+        return $CClass::Empty;
+    }
+    my $ret = $CClass::Empty;
+    for @cstack { $ret = $ret.plus($_) }
+    $ret;
+}
+method quantifier:sym<**> ($/) {
+    # XXX can't handle normspace well since it's not labelled 1*/2*
+    my $h =
+        $1 ?? { min => +~$0, max => +~$1[0] } !!
+        ($0 && defined($/.index('..'))) ?? { min => +~$0 } !!
+        $0 ?? { min => +~$0, max => +~$0 } !!
+        $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
+        { min => 1, sep => $<quantified_atom>.ast };
+    $h<mod> = $<quantmod>.ast;
+    make $h;
+}
+method nibbler($/) {
+    sub iscclass($cur) {
+        my $*CCSTATE = '';
+        my $ok = False;
+        # XXX XXX
+        try { $cur.ccstate(".."); $ok = True };
+        $ok
+    }
+    if $/.CURSOR.^isa(::STD::Regex) {
+        make $<EXPR>.ast;
+    } elsif $/.CURSOR.^isa(::NieczaGrammar::CgOp) {
+        if $*SAFEMODE {
+            $/.CURSOR.sorry('Q:CgOp not allowed in safe mode');
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+        make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
+    } elsif iscclass($/.CURSOR) {
+        make self.process_tribble($<nibbles>);
+    } else {
+        make self.process_nibble($/, $<nibbles>);
+    }
 }
 method POSTFIX($/) {
     my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
@@ -146,6 +362,9 @@ my class IO {
 }
 
 augment class Str {
+    method Numeric() {
+        Q:CgOp { (box Num (rawscall System.Double.Parse (obj_getstr {self}))) }
+    }
     method IO() { IO.new(path => self) }
 }
 

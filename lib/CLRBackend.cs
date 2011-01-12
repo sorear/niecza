@@ -2945,8 +2945,12 @@ namespace Niecza.CLRBackend {
             handlers["rawscall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
                 int ix = name.LastIndexOf('.');
+                CpsOp[] rst = JScalar.A<CpsOp>(2, z, th.Scan);
+                Type[] tx = new Type[rst.Length];
+                for (int i = 0; i < tx.Length; i++)
+                    tx[i] = rst[i].head.Returns;
                 MethodInfo mi = Type.GetType(name.Substring(0, ix))
-                    .GetMethod(name.Substring(ix+1));
+                    .GetMethod(name.Substring(ix+1), tx);
                 return CpsOp.MethodCall(null, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
