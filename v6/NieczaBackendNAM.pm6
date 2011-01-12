@@ -21,19 +21,15 @@ method get_unit($name) {
 # Save a unit.  If $main is true, it is being considered as a main
 # module; if $run, it should be auto-run.  Main modules do not need
 # to be retrievable.
-method save_unit($name, $unit, :$main, :$run) {
+method save_unit($name, $unit) {
     my $file = $name.split('::').join('.').IO.but-extension('nam')\
         .relative($.obj_dir);
     $file.spew(NAMOutput.run($unit));
-
-    self._post_save($name, :$main);
-    self._run($name) if $run;
 }
 
-# For subclass use
-method _post_save($name, :$main) { #OK not used
+method post_save($name, :$main) { #OK not used
 }
 
-method _run($name) { #OK not used
+method run($name) { #OK not used
     die "nam backend does not support running code";
 }

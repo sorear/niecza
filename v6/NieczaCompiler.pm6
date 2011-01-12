@@ -20,8 +20,12 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
         $.frontend.typename => { $ast = $.frontend.parse(:$unitname,
             :$filename, :$modtime, :$source); },
         (map -> $st { $st.typename => { $ast = $st.invoke($ast) } }, @$.stages),
-        $.backend.typename => { $.backend.save_unit($unitname, $ast, :$main,
-            :$run); $ast = Any },
+        ($.backend.typename ~ "-save") =>
+            { $.backend.save_unit($unitname, $ast); $ast = Any },
+        ($.backend.typename ~ "-post") =>
+            { $.backend.post_save($unitname, :$main); },
+        ($.backend.typename ~ "-run") =>
+            { $run && $.backend.run($unitname); },
     );
 
     for @steps -> $step {

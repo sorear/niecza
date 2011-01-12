@@ -378,4 +378,8 @@ public class Builtins {
         }
         return Kernel.BoxAnyMO((double) ret, Kernel.NumMO);
     }
+
+    public static void RunSubtask(string file, string args) {
+        System.Diagnostics.Process.Start(file, args).WaitForExit();
+    }
 }
