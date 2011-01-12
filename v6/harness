@@ -24,6 +24,95 @@ use Sig;
 use OptRxSimple;
 use RxOp;
 
+augment class NieczaActions {
+sub node($M) { { line => $M.cursor.lineof($M.to) } }
+
+sub mkcall($/, $name, *@positionals) {
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+method regex_block($/) {
+    if $<onlystar> {
+        return Nil;
+    }
+    if $<quotepair> {
+        $/.CURSOR.sorry('Regex adverbs NYI');
+    }
+    make $<nibble>.ast;
+}
+method POSTFIX($/) {
+    my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
+    if $<op><colonpair> {
+        if $arg.^isa(::Op::CallLike) {
+            make $arg.adverb($<op><colonpair>.ast<term>);
+            make self.whatever_postcheck($/, $st, $/.ast);
+        } else {
+            $/.CURSOR.sorry("You can't adverb that");
+            make ::Op::StatementList.new;
+        }
+        return Nil;
+    }
+    my $op = $<op>.ast;
+    if $op<postfix> {
+        make mkcall($/, "\&postfix:<{$op<postfix>}>", $arg);
+    } elsif $op<postcircumfix> {
+        make mkcall($/, "\&postcircumfix:<{$op<postcircumfix>}>", $arg,
+            @( $op<args> ));
+    } elsif $op<name> && ($op<name> eq 'HOW' || $op<name> eq 'WHAT') {
+        if $op<args> {
+            $/.CURSOR.sorry("Interrogative operator {$op<name>} does not take arguments");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+        make ::Op::Interrogative.new(|node($/), receiver => $arg,
+            name => $op<name>);
+    } elsif $op<metamethod> {
+        make ::Op::CallMethod.new(|node($/),
+            receiver => $arg,
+            ismeta => True,
+            name => $op<metamethod>,
+            args => $op<args> // []);
+    } elsif $op<name> {
+        if $op<path> && !$op<private> {
+            $/.CURSOR.sorry("Qualified references to non-private methods NYI");
+        }
+        make ::Op::CallMethod.new(|node($/),
+            receiver => $arg,
+            private  => $op<private>,
+            ppath    => $op<path>,
+            name     => $op<name>,
+            args     => $op<args> // []);
+    } elsif $op<quote> {
+        make ::Op::CallMethod.new(|node($/),
+            receiver => $arg,
+            private  => $op<private>,
+            name     => $op<quote>,
+            args     => $op<args> // []);
+    } elsif $op<ref> { # $obj.&foo
+        make ::Op::CallSub.new(|node($/),
+            invocant => $op<ref>,
+            args     => [ $arg, @( $op<args> // [] ) ]);
+    } elsif $op<postcall> {
+        if $op<postcall> > 1 {
+            $/.CURSOR.sorry("Slicels NYI");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+        make ::Op::CallSub.new(|node($/),
+            invocant => $arg,
+            args => ($op<postcall>[0] // []));
+    } else {
+        $/.CURSOR.sorry("Unhandled postop type");
+        make ::Op::StatementList.new;
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+}
+
+augment class CgOp {
+    method construct_lad(*@trees) { CgOp._cgop('ladconstruct', [@trees]) }
+}
+
 # XXX mega hack.
 my class Instant {
     has $.val;
