@@ -603,7 +603,7 @@ class Lexical is Op {
 
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
-            CgOp.scopedlex($.name, CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
+            CgOp.scopedlex($.name, CgOp.newboundvar(+?$ro, +(?($.list || $.hash)), $rhscg)),
             CgOp.scopedlex($.name));
     }
 }
@@ -641,7 +641,7 @@ class PackageVar is Op {
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
             CgOp.scopedlex($.slot,
-                CgOp.newboundvar(+$ro, +($.list || $.hash), $rhscg)),
+                CgOp.newboundvar(+?$ro, +(?($.list || $.hash)), $rhscg)),
             CgOp.scopedlex($.slot));
     }
 }

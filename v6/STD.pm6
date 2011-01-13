@@ -4943,13 +4943,11 @@ method is_name ($n, $curlex = $*CURLEX) {
         while +@components > 1 {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg};
-            return False unless $curpkg;
-            try {
-                my $outlexid = $curpkg.[0];
-                return False unless $outlexid;
-                $curpkg = $ALL.{$outlexid};
-                return False unless $curpkg;
-            };
+            return False unless defined $curpkg;
+            if $curpkg ~~ List {
+                my $outlexid = $curpkg.[0] // return False;
+                $curpkg = $ALL.{$outlexid} // return False;
+            }
             self.deb("Found $pkg okay") if $DEBUG::symtab;
         }
     }

@@ -78,7 +78,7 @@ sub _binop($func, $alr, $blr) {
 }
 
 method plus($other) { _binop(* +| *, self, $other); }
-method minus($other) { _binop(* +& +^*, self, $other); }
+method minus($other) { _binop({ $^a +& +^$^b }, self, $other); }
 method negate() { _binop(-> $a, $b { 0x3FFF_FFFF +& +^$a }, self, $Empty) }
 
 our $Word   = CClass.catm(< Lu Lt Ll Lm Lo Nd Nl No >).plus('_');

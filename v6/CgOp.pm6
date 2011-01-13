@@ -272,7 +272,7 @@ method let($head,$body) {
 }
 
 method cc_expr($cc) { CgOp._cgop('newcc', @( $cc.terms )) }
-method construct_lad(*@trees) { CgOp._cgop('ladconstruct', @trees) }
+method construct_lad(*@trees) { CgOp._cgop('ladconstruct', [@trees]) }
 
 method _process_arglist(*@araw) {
     my @aout;

@@ -77,9 +77,10 @@ augment class RxOp::Sequence { #OK exist
 
 augment class RxOp::Alt { #OK exist
     method rxsimp($cut) {
+        my @lads = map { ::GLOBAL::OptRxSimple.run_lad($_.lad) }, @$.zyg;
         my @kids = map *.rxsimp($cut), @$.zyg;
         ::RxOp::Alt.new(
-            optimized_lads => [ map { OptRxSimple.run_lad($_.lad) }, @$.zyg ],
+            optimized_lads => @lads,
             dba  => $.dba,
             zyg  => @kids);
     }

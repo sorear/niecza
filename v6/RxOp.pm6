@@ -11,7 +11,7 @@ method opzyg()  { map *.opzyg, @$!zyg }
 method oplift() { map *.oplift, @$!zyg }
 method uncut()  { self }
 
-method check()  { map *.check, @$!zyg }
+method check()  { for @$!zyg { $_.check } }
 method tocclist() { CClass }
 
 # all that matters is 0-1-infty; $*in_quant valid here
@@ -19,7 +19,7 @@ method used_caps() {
     # XXX Hash.push
     my %r;
     for @$!zyg -> $k {
-        for $k.used_caps -> $p {
+        for $k.used_caps.pairs -> $p {
             %r{$p.key} = (%r{$p.key} // 0) + $p.value;
         }
     }
@@ -33,14 +33,14 @@ class Capturing is RxOp {
     has $.captures = []; # Array of Str
 
     method check() {
-        for @$.captures {
-            if !defined($_) {
-                $_ = $*paren++;
-            } elsif $_ ~~ /^<[ 0..9 ]>+$/ {
-                $*paren = $_ + 1;
+        for @$.captures -> $c is rw {
+            if !defined($c) {
+                $c = $*paren++;
+            } elsif $c ~~ /^<[ 0..9 ]>+$/ {
+                $*paren = $c + 1;
             }
         }
-        nextsame;
+        for @$.zyg { $_.check }
     }
 
     method used_caps() {

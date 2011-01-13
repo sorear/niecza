@@ -121,7 +121,7 @@ augment class Op::Use { #OK exist
         my @exp = (@can, 'EXPORT', 'DEFAULT');
 
         # XXX I am not sure how need binding should work in the :: case
-        if $name !~~ /::/ {
+        if $name !~~ /"::"/ {
             @*opensubs[*-1].lexicals{$name} =
                 ::Metamodel::Lexical::Stash.new(path => @can);
         }

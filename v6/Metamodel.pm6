@@ -57,8 +57,9 @@ class Namespace {
     # public API.
     has $.log = [];
 
-    method !lookup_common($used, @path) {
+    method !lookup_common($used, @path_) {
         my $cursor = $.root;
+        my @path = @path_;
         while @path > 1 {
             my $k = shift @path;
             if ($cursor{$k} && $cursor{$k}[0] eq 'graft') {
@@ -127,8 +128,9 @@ class Namespace {
                         $i1[1][1] != $i2[1][1]);
                 $rinto{$k} = ['var',
                     ($nn1 ?? $i1[1] !! $nn2 ?? $i2[1] !! ($i1[1] // $i2[1])),
-                    ($i1[2] && $i2[2]) ?? _merge($i1[2], $i2[2], [@path, $k]) !!
-                    ($i1[2] // $i2[2])];
+                    ((defined($i1[2]) && defined($i2[2])) ??
+                        _merge($i1[2], $i2[2], [@path, $k]) !!
+                    ($i1[2] // $i2[2]))];
             }
         }
         return $rinto;
@@ -167,7 +169,7 @@ class Namespace {
     method bind_item($path, $item) {
         my ($c,$u,$n) = self!lookup_common([], $path); #OK not used
         my $i = $c{$n} //= ['var',Any,Any];
-        if $i[0] ne 'var' || $i[1] {
+        if $i[0] ne 'var' || $i[1] && $i[1][0] {
             die "Collision installing pkg $path";
         }
         $i[1] = $item;
@@ -366,7 +368,7 @@ class ParametricRole is Module {
     }
 
     method add_method($kind, $name, $var, $body) { #OK not used
-        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind);
+        push $.methods, ::Metamodel::Method.new(:$name, :$body, :$var, :$kind);
     }
 
     method add_super($targ) {

@@ -34,7 +34,7 @@ method get_op_sym($M) {
     } elsif $M.reduced ~~ /\:(\w+)/ {
         return ~$0;
     } elsif $M.reduced eq 'PRE' {
-        return ~$M; # TODO: replace with better metaop
+        return self.get_op_sym($M<prefix>); # TODO: replace with better metaop
     } else {
         die "Cannot extract operator symbol ($M) ($M.reduced())";
     }
@@ -298,10 +298,11 @@ method op_for_regex($/, $rxop) {
 
 method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
 
-method encapsulate_regex($/, $rxop, :$goal, :$passcut, :$passcap) {
+method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
+        :$passcap = False) {
     my @lift = $rxop.oplift;
-    my ($nrxop, $mb) = OptRxSimple.run($rxop);
     my $lad = $rxop.lad;
+    my ($nrxop, $mb) = OptRxSimple.run($rxop);
     # XXX do this in the signature so it won't be affected by transparent
     my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self', readonly => True);
     if defined $goal {
@@ -322,6 +323,9 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut, :$passcap) {
 }
 
 method regex_block($/) {
+    if $<onlystar> {
+        return Nil;
+    }
     if $<quotepair> {
         $/.CURSOR.sorry('Regex adverbs NYI');
     }
@@ -488,7 +492,7 @@ method quantifier:sym<~> ($/) {
 method quantifier:sym<**> ($/) {
     # XXX can't handle normspace well since it's not labelled 1*/2*
     my $h =
-        $1 ?? { min => +~$0[0], max => +~$1[0] } !!
+        $1 ?? { min => +~$0, max => +~$1[0] } !!
         ($0 && defined($/.index('..'))) ?? { min => +~$0 } !!
         $0 ?? { min => +~$0, max => +~$0 } !!
         $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
@@ -792,7 +796,7 @@ method mod_internal:sym<:my> ($/) {
 method mod_internal:p6adv ($/) {
     my ($k, $v) = $<quotepair><k v>;
 
-    if !$v.^isa(Match) {
+    if !$v.^isa(List) {
         $/.CURSOR.sorry(":$k requires an expression argument");
         make ::RxOp::None.new;
         return Nil;
@@ -937,7 +941,7 @@ method process_tribble(@bits) {
         return $CClass::Empty;
     }
     my $ret = $CClass::Empty;
-    for @mstack { $ret = $ret.plus($_) }
+    for @cstack { $ret = $ret.plus($_) }
     $ret;
 }
 
@@ -958,7 +962,7 @@ method nibbler($/) {
             return Nil;
         }
         make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
-    } elsif iscclass($/) {
+    } elsif iscclass($/.CURSOR) {
         make self.process_tribble($<nibbles>);
     } else {
         make self.process_nibble($/, $<nibbles>);
@@ -1104,8 +1108,8 @@ method INFIX($/) {
         push @r, $lhs.^isa(::Op::SimpleParcel) ?? @( $lhs.items ) !! $lhs;
         push @r, $rhs.^isa(::Op::SimpleParcel) ?? @( $rhs.items ) !! $rhs;
         make ::Op::SimpleParcel.new(|node($/), items => @r);
-    } elsif $s eq '&assignop' && $fn.args[0].^isa(::Op::Lexical) &&
-            _isinfix($n, $fn.args[0].name) && %loose2tight{$n} {
+    } elsif $s eq '&assignop' && $fn.positionals[0].^isa(::Op::Lexical) &&
+            _isinfix($n, $fn.positionals[0].name) && %loose2tight{$n} {
         make ::Op::ShortCircuitAssign.new(|node($/),
             kind => %loose2tight{$n}, :$lhs, :$rhs);
     } else {
@@ -1189,8 +1193,18 @@ method LIST($/) {
 }
 
 method POSTFIX($/) {
-    my $op = $<op>.ast;
     my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
+    if $<op><colonpair> {
+        if $arg.^isa(::Op::CallLike) {
+            make $arg.adverb($<op><colonpair>.ast<term>);
+            make self.whatever_postcheck($/, $st, $/.ast);
+        } else {
+            $/.CURSOR.sorry("You can't adverb that");
+            make ::Op::StatementList.new;
+        }
+        return Nil;
+    }
+    my $op = $<op>.ast;
     if $op<postfix> {
         make mkcall($/, "\&postfix:<{$op<postfix>}>", $arg);
     } elsif $op<postcircumfix> {
@@ -1239,14 +1253,6 @@ method POSTFIX($/) {
         make ::Op::CallSub.new(|node($/),
             invocant => $arg,
             args => ($op<postcall>[0] // []));
-    } elsif $<colonpair> {
-        if $arg.^isa(::Op::CallLike) {
-            make $arg.adverb($<colonpair>.ast<term>);
-        } else {
-            $/.CURSOR.sorry("You can't adverb that");
-            make ::Op::StatementList.new;
-            return Nil;
-        }
     } else {
         $/.CURSOR.sorry("Unhandled postop type");
         make ::Op::StatementList.new;
@@ -1385,7 +1391,7 @@ method colonpair($/) {
     my $tv = $<v>.^isa(Match) ?? $<v>.ast !!
         ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');
 
-    if !defined $tv {
+    if $tv ~~ Str {
         if substr($<v>,1,1) eq '<' {
             $tv = ::Op::CallMethod.new(name => 'at-key',
                 receiver => ::Op::ContextVar.new(name => '$*/'),
@@ -1410,8 +1416,8 @@ my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
 method whatever_precheck($op, *@args) {
     return ([], @args) if %_nowhatever{$op};
     my @vars;
-    for @args {
-        my $a = $_;
+    my @args_ = @args;
+    for @args_ -> $a is rw {
         die "invalid undef here" if !$a;
         if $a.^isa(::Op::Whatever) {
             push @vars, $a.slot;
@@ -1421,7 +1427,7 @@ method whatever_precheck($op, *@args) {
             $a = $a.ops;
         }
     }
-    $( @vars ), @args;
+    $( @vars ), @args_;
 }
 
 method whatever_postcheck($/, $st, $term) {
@@ -1618,7 +1624,7 @@ method variable($/) {
         };
         return Nil;
     } elsif $<postcircumfix> {
-        if $<postcircumfix>[0]<sym> eq '< >' {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast<args>[0].text, term =>
                 ::Op::CallMethod.new(|node($/), name => 'at-key',
                     receiver    => ::Op::ContextVar.new(name => '$*/'),
