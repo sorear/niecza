@@ -17,6 +17,7 @@
 
  
 (defun sub-symbol (i) (intern (concatenate 'string "SUB-" (write-to-string i))))
+(defun class-symbol (i) (intern (concatenate 'string "CLASS-" (write-to-string i))))
 
 ; P6 Classes
  
@@ -36,11 +37,14 @@
 (defmacro nam-sub (i lexicals body) 
   `(defun ,(sub-symbol i) () (let ,(lexicals-to-let lexicals) ,body)))
 
+(defmacro nam-class (name attributes methods) `(defclass ,(class-symbol name) () ()))
+
 ; converts one lexical to a variable declaration for a let
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
-    ((list var x y id name) (list (intern var) `(symbol-function ',(sub-symbol id))))
-    ((list var simple dunno) (list (intern var) (make-scalar "")))))
+    ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (intern var) `(symbol-function ',(sub-symbol id))))
+    ((and (list var simple dunno) (when (equal simple "simple"))) (list (intern var) (make-scalar "")))
+    ((and (list* var stash path) (when (equal stash "stash"))) (list (intern var) `(quote ,path)))))
 
 ; converts a list of lexicals
 (defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
@@ -76,8 +80,8 @@
 
 (defun compile-sub (i sub)
   (fare-matcher:match sub 
-    ((list
-      sub  ; 'sub' literal
+    ((and (list
+      sub  ; "sub" literal
       name
       outer ;  raw xref
       flags
@@ -95,7 +99,16 @@
       signature-params
       lexicals
       nam
-    ) (list 'nam-sub i lexicals (to-symbol-first nam)))))
+    ) (when (equal sub "sub"))) (list 'nam-sub i lexicals (to-symbol-first nam)))
+    ((and (list
+      class ; "class" literal
+      name
+      exports
+      attributes
+      methods
+      superclasses
+      linearized_mro
+    ) (when (equal class "class"))) (list 'nam-class name attributes methods))))
 
 (defun compile-unit (nam)
   (fare-matcher:match nam 
