@@ -8,6 +8,8 @@ has $.stages;
 has $.frontend;
 has $.verbose;
 
+has $.unitcache = {};
+
 sub gettimeofday() { Q:CgOp { (rawscall Builtins,Kernel.GetNow) } }
 
 method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
@@ -76,17 +78,18 @@ method !up_to_date($mod) {
 
 method !load_dependent($module) {
     say "Trying to load depended module $module" if $.verbose;
-    my $newmod = $.backend.get_unit($module);
+    my $newmod = $.unitcache{$module} //= $.backend.get_unit($module);
 
     if !defined($newmod) || !self!up_to_date($newmod) {
+        $.unitcache{$module}:delete;
         say "(Re)compilation needed" if $.verbose;
         self.compile_module($module);
-        $newmod = $.backend.get_unit($module);
+        $newmod = $.unitcache{$module} = $.backend.get_unit($module);
     }
 
     %*units{$module} = $newmod;
     for keys $newmod.tdeps -> $mn {
-        %*units{$mn} //= $.backend.get_unit($mn);
+        %*units{$mn} //= ($.unitcache{$mn} //= $.backend.get_unit($mn));
     }
     say "Loaded $module" if $.verbose;
     $newmod;
