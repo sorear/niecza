@@ -4,6 +4,5 @@ use warnings;
 
 my @OPTS = ('--keep-exit-code', 'niecza');
 
-my $nt = `../roast/fudge @OPTS $ARGV[0]`;
-chomp($nt);
-system("./niecza_eval", $nt);
+my $nt = `../roast/fudge @OPTS @ARGV`;
+system("./niecza_eval", split ' ', $nt);

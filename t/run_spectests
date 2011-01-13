@@ -1,3 +1,4 @@
 #!/bin/sh
-prove -e 't/fudgeandrun' ../roast/S32-num/power.t
-prove -e 't/fudgeandrun' ../roast/S04-statements/if.t
+prove -e 't/fudgeandrun' \
+     ../roast/S32-num/power.t \
+     ../roast/S04-statements/if.t
