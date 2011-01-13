@@ -3,8 +3,13 @@ prove -e 't/fudgeandrun' \
     ../roast/S02-whitespace_and_comments/begin_end_pod.t \
     ../roast/S02-builtin_data_types/parsing-bool.t \
     ../roast/S02-whitespace_and_comments/pod-in-multi-line-exprs.t \
+    ../roast/S03-operators/scalar-assign.t \
+    ../roast/S03-operators/assign-is-not-binding.t \
+    ../roast/S03-operators/relational.t \
     ../roast/S04-statements/if.t \
     ../roast/S04-statement-modifiers/unless.t \
+    ../roast/S04-statements/if.t \
+    ../roast/S04-statements/until.t \
     ../roast/S06-traits/is-rw.t \
     ../roast/S09-autovivification/autoincrement.t \
     ../roast/S12-class/inheritance-class-methods.t \
