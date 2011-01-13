@@ -569,6 +569,81 @@ method POSTFIX($/) {
 }
 }
 
+augment class RxOp::Alt { #OK exist
+    method rxsimp($cut) {
+        my @lads = map { ::GLOBAL::OptRxSimple.run_lad($_.lad) }, @$.zyg;
+        my @kids = map *.rxsimp($cut), @$.zyg;
+        ::RxOp::Alt.new(
+            optimized_lads => @lads,
+            dba  => $.dba,
+            zyg  => @kids);
+    }
+}
+
+augment class Metamodel::Namespace { #OK exist
+    method !lookup_common($used, @path_) {
+        my $cursor = $.root;
+        my @path = @path_;
+        while @path > 1 {
+            my $k = shift @path;
+            if ($cursor{$k} && $cursor{$k}[0] eq 'graft') {
+                ($cursor, $used) = self!lookup_common([], [ @($cursor{$k}[1]), '' ]);
+                next;
+            }
+
+            $cursor{$k} //= ['var',Any,Any];
+            if !defined $cursor{$k}[2] {
+                $.log.push(['pkg',[@$used, $k]]);
+                $cursor{$k}[2] = {};
+            }
+            $cursor = $cursor{$k}[2];
+            push @$used, $k;
+        }
+        @($cursor, $used, @path);
+    }
+    method bind_item($path, $item) {
+        my ($c,$u,$n) = self!lookup_common([], $path); #OK not used
+        my $i = $c{$n} //= ['var',Any,Any];
+        if $i[0] ne 'var' || $i[1] && $i[1][0] {
+            die "Collision installing pkg $path";
+        }
+        $i[1] = $item;
+    }
+}
+
+augment class Op::Use { #OK exist
+    method begin() {
+        my $name = $.unit;
+        my $u2 = $*unit.need_unit($.unit);
+
+        my @can = @( $u2.mainline.find_pkg(['MY', $name.split('::')]) );
+        my @exp = (@can, 'EXPORT', 'DEFAULT');
+
+        # XXX I am not sure how need binding should work in the :: case
+        if $name !~~ /"::"/ {
+            @*opensubs[*-1].lexicals{$name} =
+                ::Metamodel::Lexical::Stash.new(path => @can);
+        }
+
+        for $*unit.list_stash(@exp) -> $tup {
+            my $uname = $tup[0];
+            my $lex;
+            if $tup[1] eq 'var' {
+                if $tup[2] && !$tup[2][0] {
+                    $lex = ::Metamodel::Lexical::Common.new(path => @exp, name => $uname);
+                } elsif $tup[2] {
+                    $lex = ::Metamodel::Lexical::Stash.new(path => [@exp, $uname]);
+                }
+            } elsif $tup[1] eq 'graft' {
+                $lex = ::Metamodel::Lexical::Stash.new(path => $tup[2]);
+            } else {
+                die "weird return";
+            }
+
+            @*opensubs[*-1].lexicals{$uname} = $lex;
+        }
+    }
+}
 augment class CgOp {
     method construct_lad(*@trees) { CgOp._cgop('ladconstruct', [@trees]) }
 }
