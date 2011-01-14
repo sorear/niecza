@@ -28,10 +28,12 @@ method bif_at_key (*@_) { self._cgop("bif_at_key", @_) }
 method bif_at_pos (*@_) { self._cgop("bif_at_pos", @_) }
 method bif_bool (*@_) { self._cgop("bif_bool", @_) }
 method bif_chars (*@_) { self._cgop("bif_chars", @_) }
+method bif_chr ($i) { self._cgop("bif_chr", $i) }
 method bif_defined (*@_) { self._cgop("bif_defined", @_) }
 method bif_delete_key (*@_) { self._cgop("bif_delete_key", @_) }
 method bif_divide (*@_) { self._cgop("bif_divide", @_) }
 method bif_exists_key (*@_) { self._cgop("bif_exists_key", @_) }
+method bif_gettimeofday () { self._cgop("bif_gettimeofday") }
 method bif_hash_keys (*@_) { self._cgop("bif_hash_keys", @_) }
 method bif_hash_kv (*@_) { self._cgop("bif_hash_kv", @_) }
 method bif_hash_pairs (*@_) { self._cgop("bif_hash_pairs", @_) }
@@ -41,12 +43,19 @@ method bif_mul (*@_) { self._cgop("bif_mul", @_) }
 method bif_negate (*@_) { self._cgop("bif_negate", @_) }
 method bif_not (*@_) { self._cgop("bif_not", @_) }
 method bif_num (*@_) { self._cgop("bif_num", @_) }
+method bif_numand ($n1, $n2) { self._cgop("bif_numand", $n1, $n2) }
+method bif_numcompl ($n) { self._cgop("bif_numcompl", $n) }
 method bif_numeq (*@_) { self._cgop("bif_numeq", @_) }
 method bif_numge (*@_) { self._cgop("bif_numge", @_) }
 method bif_numgt (*@_) { self._cgop("bif_numgt", @_) }
 method bif_numle (*@_) { self._cgop("bif_numle", @_) }
+method bif_numlshift ($n1, $n2) { self._cgop("bif_numlshift", $n1, $n2) }
 method bif_numlt (*@_) { self._cgop("bif_numlt", @_) }
 method bif_numne (*@_) { self._cgop("bif_numne", @_) }
+method bif_numor ($n1, $n2) { self._cgop("bif_numor", $n1, $n2) }
+method bif_numxor ($n1, $n2) { self._cgop("bif_numxor", $n1, $n2) }
+method bif_numrshift ($n1, $n2) { self._cgop("bif_numrshift", $n1, $n2) }
+method bif_ord ($n) { self._cgop("bif_ord", $n) }
 method bif_plus (*@_) { self._cgop("bif_plus", @_) }
 method bif_postinc (*@_) { self._cgop("bif_postinc", @_) }
 method bif_str (*@_) { self._cgop("bif_str", @_) }
@@ -84,6 +93,8 @@ method cursor_start (*@_) { self._cgop("cursor_start", @_) }
 method cursor_synthcap (*@_) { self._cgop("cursor_synthcap", @_) }
 method cursor_synthetic (*@_) { self._cgop("cursor_synthetic", @_) }
 method cursor_unpackcaps (*@_) { self._cgop("cursor_unpackcaps", @_) }
+method cursor_unmatch ($c) { self._cgop("cursor_unmatch", $c) }
+method cursor_reduced ($c) { self._cgop("cursor_reduced", $c) }
 method default_new (*@_) { self._cgop("default_new", @_) }
 method die (*@_) { self._cgop("die", @_) }
 method do_require (*@_) { self._cgop("do_require", @_) }
@@ -212,6 +223,7 @@ method str_length (*@_) { self._cgop("str_length", @_) }
 method str_substring (*@_) { self._cgop("str_substring", @_) }
 method str_tolower (*@_) { self._cgop("str_tolower", @_) }
 method str_toupper (*@_) { self._cgop("str_toupper", @_) }
+method str_tonum ($s) { self._cgop("str_tonum", $s) }
 method take (*@_) { self._cgop("take", @_) }
 method ternary (*@_) { self._cgop("ternary", @_) }
 method to_jsync (*@_) { self._cgop("to_jsync", @_) }
@@ -253,6 +265,13 @@ method bif_make (*@_) { self._cgop("bif_make", @_) }
 method cursor_ast (*@_) { self._cgop("cursor_ast", @_) }
 method to_json (*@_) { self._cgop("to_json", @_) }
 method from_json (*@_) { self._cgop("from_json", @_) }
+method path_file_exists($n) { self._cgop("path_file_exists", $n) }
+method path_dir_exists($n) { self._cgop("path_dir_exists", $n) }
+method path_any_exists($n) { self._cgop("path_any_exists", $n) }
+method path_combine($n1, $n2) { self._cgop("path_combine", $n1, $n2) }
+method path_change_ext($n, $ex) { self._cgop("path_change_ext", $n, $ex) }
+method path_realpath($n) { self._cgop("path_realpath", $n) }
+method path_modified($n) { self._cgop("path_modified", $n) }
 
 sub _str($x) { ($x ~~ List) ?? $x !! CgOp.str($x) }
 sub _int($x) { ($x ~~ List) ?? $x !! CgOp.int($x) }

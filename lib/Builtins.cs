@@ -354,6 +354,10 @@ public class Builtins {
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
     }
 
+    public static bool FileOrDirExists(string path) {
+        return System.IO.File.Exists(path) || System.IO.Directory.Exists(path);
+    }
+
     // This is wrong in the long term.  The backend should be linked; it
     // should generate collectable assemblies; app-domains should be made
     // available through MetaServices.

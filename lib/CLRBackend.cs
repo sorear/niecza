@@ -2963,6 +2963,7 @@ namespace Niecza.CLRBackend {
             thandlers["varhash_contains_key"] = Methody(null, Tokens.VarHash.GetMethod("ContainsKey"));
             thandlers["num_to_string"] = Methody(null, Tokens.Object_ToString);
             thandlers["str_length"] = Methody(null, Tokens.String.GetMethod("get_Length"));
+            thandlers["str_tonum"] = Methody(null, Tokens.Double.GetMethod("Parse", new Type[] { Tokens.String }));
             thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
             thandlers["str_tolower"] = Methody(null, Tokens.String.GetMethod("ToLowerInvariant"));
             thandlers["str_toupper"] = Methody(null, Tokens.String.GetMethod("ToUpperInvariant"));
@@ -2988,6 +2989,13 @@ namespace Niecza.CLRBackend {
             thandlers["vvarlist_from_fvarlist"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.FVarList }));
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
             thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
+            thandlers["path_file_exists"] = Methody(null, typeof(File).GetMethod("Exists"));
+            thandlers["path_dir_exists"] = Methody(null, typeof(Directory).GetMethod("Exists"));
+            thandlers["path_combine"] = Methody(null, typeof(Path).GetMethod("Combine", new Type[] { Tokens.String, Tokens.String }));
+            thandlers["path_change_ext"] = Methody(null, typeof(Path).GetMethod("ChangeExtension", new Type[] { Tokens.String, Tokens.String }));
+            thandlers["path_any_exists"] = Methody(null, typeof(Builtins).GetMethod("FileOrDirExists"));
+            thandlers["path_realpath"] = Methody(null, typeof(Path).GetMethod("GetFullPath"));
+            thandlers["path_modified"] = Methody(null, typeof(Builtins).GetMethod("GetModTime"));
             handlers["_parametricrole"] = delegate(NamProcessor th, object[] z) { return th.FillParamRole(); };
             handlers["_addmethod"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(null, Tokens.DMO_AddFooMethod[JScalar.S(z[1])], new CpsOp[] { th.Scan(z[2]), th.Scan(z[3]), th.Scan(z[4]) }); };
@@ -3013,10 +3021,20 @@ namespace Niecza.CLRBackend {
             thandlers["cursor_O"] = Methody(null, Tokens.Cursor.GetMethod("O"));
             thandlers["cursor_synthetic"] = Methody(null, Tokens.Cursor.GetMethod("Synthetic"));
             thandlers["cursor_fresh"] = Methody(null, Tokens.Cursor.GetMethod("FreshClass"));
+            thandlers["cursor_unmatch"] = Methody(null, Tokens.Cursor.GetMethod("UnMatch"));
+            thandlers["cursor_reduced"] = Methody(null, Tokens.Cursor.GetMethod("Reduced"));
             thandlers["rxstripcaps"] = Methody(null, Tokens.Cursor.GetMethod("StripCaps"));
 
             thandlers["prog"] = CpsOp.Sequence;
 
+            thandlers["bif_numand"] = SimpleB("NumAnd");
+            thandlers["bif_numor"] = SimpleB("NumOr");
+            thandlers["bif_numxor"] = SimpleB("NumXor");
+            thandlers["bif_numlshift"] = SimpleB("NumLShift");
+            thandlers["bif_numrshift"] = SimpleB("NumLShift");
+            thandlers["bif_numcompl"] = SimpleB("NumCompl");
+            thandlers["bif_ord"] = SimpleB("Ord");
+            thandlers["bif_chr"] = SimpleB("Chr");
             thandlers["bif_postinc"] = SimpleB("PostIncrement");
             thandlers["bif_numeq"] = SimpleB("NumericEq");
             thandlers["bif_numne"] = SimpleB("NumericNe");

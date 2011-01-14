@@ -2121,8 +2121,8 @@ grammar P6 is STD {
         '$!' '{' ~ '}' [<identifier> | <statementlist>]
         {{
             my $all = substr(self.orig, self.pos, $¢.pos - self.pos);
-            my ($inside) = $all ~~ /^...\s*(.*?)\s*.$/;
-            $¢.obs("Perl 5's $all construct", "a smartmatch like \$! ~~ $inside" );
+            $all ~~ /^...\s*(.*?)\s*.$/;
+            $¢.obs("Perl 5's $all construct", "a smartmatch like \$! ~~ $0");
         }}
     }
 
@@ -5093,7 +5093,7 @@ method add_my_name ($n, $d?, $p?) {
     return self if $name eq '$' or $name eq '@' or $name eq '%';
     return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
     if $shortname ~~ /\:/ {
-        ($shortname) = ($shortname ~~ /(.*?)\:/);
+        ($shortname,) = ($shortname ~~ /(.*?)\:/);
     }
 
     # This may just be a lexical alias to "our" and such,
@@ -5105,6 +5105,7 @@ method add_my_name ($n, $d?, $p?) {
         of   => $*OFTYPE,
         scope => $*SCOPE,
     );
+    self.deb("going to install $declaring") if $DEBUG::symtab;
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
         self.deb("$name exists, curstash = ", $curstash.id) if $DEBUG::symtab;
@@ -5148,8 +5149,10 @@ method add_my_name ($n, $d?, $p?) {
         }
     }
     else {
+        self.deb("installing in $curstash.id() slot $name") if $DEBUG::symtab;
         $*DECLARAND = $curstash.{$name} = $declaring;
         $curstash.{$shortname} = $declaring unless $shortname eq $name;
+        self.deb("$curstash.id() now contains $curstash.keys()") if $DEBUG::symtab;
         $*DECLARAND<declaredat> = self.pos;
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
@@ -5199,7 +5202,7 @@ method add_our_name ($n) {
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     if $shortname ~~ /\:/ {
-        ($shortname) = ($shortname ~~ /^(.*?)\:/);
+        ($shortname,) = ($shortname ~~ /^(.*?)\:/);
     }
 
     my $declaring = $*DECLARAND // NAME.new(
@@ -5396,12 +5399,13 @@ method is_known ($n, $curlex = $*CURLEX) {
 }
 
 method lex_can_find_name ($lex, $name, $varbind) {
-    self.deb("Looking in ", $lex.id) if $DEBUG::symtab;
+    self.deb("Looking for $name in $lex.id()") if $DEBUG::symtab;
     if $lex.{$name} {
         self.deb("Found $name in ", $lex.id) if $DEBUG::symtab;
         $lex.{$name}<used>++;
         return True;
     }
+    self.deb("$name not found among $lex.keys()") if $DEBUG::symtab;
 
     my $outlexid = $lex.<OUTER::>[0];
     return False unless $outlexid;
@@ -5514,7 +5518,7 @@ method check_variable ($variable) {
         $ok = $ok || $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
         if not $ok {
             my $id = $name;
-            ($id) = ($id ~~ /\W ** 0..2 (.*)/);
+            ($id,) = ($id ~~ /\W ** 0..2 (.*)/);
             if $name eq '@_' or $name eq '%_' {
                 $here.add_placeholder($name);
             }
@@ -5550,7 +5554,7 @@ method check_variable ($variable) {
     }
     elsif $twigil eq '?' {
         if $name ~~ /\:\:/ {
-            my ($first) = self.canonicalize_name($name);
+            my $first; ($first,) = self.canonicalize_name($name);
             $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
         }
         else {
@@ -6072,7 +6076,7 @@ method badinfix (Str $bad) {
 token term:sym<miscbad> {
     {} <!{ $*QSIGIL }>
     {{
-        my ($bad) = $¢.suppose( sub {
+        my $bad; ($bad,) = $¢.suppose( sub {
             $¢.infixish;
         });
         $*HIGHWATER = -1;
