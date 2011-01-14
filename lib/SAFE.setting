@@ -901,7 +901,7 @@ sub _gather($fr) {
 }
 
 sub take(\$p) { # should be \|$p
-    Q:CgOp { (take (l $p)) }
+    Q:CgOp { (take {$p}) }
 }
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }
