@@ -1,15 +1,48 @@
 # vim: ft=perl6
 
 my module CORE;
+use MONKEY_TYPING;
 
 sub slurp($path) { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
 
 sub spew($path,$text) { Q:CgOp { (rnull (spew (unbox str (@ {$path.Str})) (unbox str (@ {$text.Str})))) } }
 
-my class IO is Cool {
+my class Instant {
+    has $.val;
+    method to-posix() { $!val }
 }
 
-my class TextReader is IO {
+my class IO {
+    has $.path; # Str
+
+    method Str() { $.path }
+    method IO() { self }
+
+    method slurp() { slurp $.path }
+    method spew($text) { spew $.path, $text }
+
+    method combine(*@paths) {
+        die "Sorry, paths do not form a monoid." unless @paths;
+        my $acc = @paths.shift.IO;
+        for @paths { $acc = $acc.append($_) }
+        $acc
+    }
+
+    method f() { Q:CgOp { (box Bool (path_file_exists (obj_getstr {$!path}))) } }
+    method d() { Q:CgOp { (box Bool (path_dir_exists (obj_getstr {$!path}))) } }
+    method e() { Q:CgOp { (box Bool (path_any_exists (obj_getstr {$!path}))) } }
+    method relative($base) { $base.IO.append(self) }
+    method append($sub) { Q:CgOp { (box Str (path_combine (obj_getstr {self}) (obj_getstr {$sub}))) }.IO }
+    method but-extension($ext) { Q:CgOp { (box Str (path_change_ext (obj_getstr {self}) (obj_getstr {$ext}))) }.IO }
+    method realpath() { Q:CgOp { (box Str (path_realpath (obj_getstr {self}))) }.IO }
+    method modified() { Instant.new(val => Q:CgOp { (path_modified (obj_getstr {self})) }) }
+}
+
+augment class Str {
+    method IO() { IO.new(path => self) }
+}
+
+my class TextReader {
     method get() {
         Q:CgOp {
             (letn line (treader_getline (unbox treader (@ {self})))

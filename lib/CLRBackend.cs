@@ -3027,11 +3027,12 @@ namespace Niecza.CLRBackend {
 
             thandlers["prog"] = CpsOp.Sequence;
 
+            thandlers["bif_gettimeofday"] = SimpleB("GetNow");
             thandlers["bif_numand"] = SimpleB("NumAnd");
             thandlers["bif_numor"] = SimpleB("NumOr");
             thandlers["bif_numxor"] = SimpleB("NumXor");
             thandlers["bif_numlshift"] = SimpleB("NumLShift");
-            thandlers["bif_numrshift"] = SimpleB("NumLShift");
+            thandlers["bif_numrshift"] = SimpleB("NumRShift");
             thandlers["bif_numcompl"] = SimpleB("NumCompl");
             thandlers["bif_ord"] = SimpleB("Ord");
             thandlers["bif_chr"] = SimpleB("Chr");

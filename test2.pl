@@ -79,6 +79,18 @@ use MONKEY_TYPING;
     ok %into<foo>, "2011-01-13 list assignment parsefail";
 }
 
+{
+    is +"12" - 5, 7, "Str.Numeric works";
+    is 6 +& 3, 2, "+& works";
+    is 6 +^ 3, 5, "+^ works";
+    is 6 +| 3, 7, "+| works";
+    is 6 +< 3, 48, "+< works";
+    is 6 +> 1, 3, "+> works";
+    is +^6, -7, "+^ works";
+    is ord('0'), 48, "ord works";
+    is chr(65), 'A', "chr works";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

@@ -218,6 +218,7 @@ my class Str is Cool {
               [box Bool (bool 1)]
         )
     } }
+    method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
     method substr($from, $len) { substr(self, $from, $len) }
     method dump() { '"' ~ self ~ '"' }
 }
@@ -356,6 +357,17 @@ sub infix:<but>($obj, $role) { Q:CgOp {
 } }
 
 sub infix:<~~>($t,$m) { defined($m) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
+
+sub ord($x) { Q:CgOp { (bif_ord {$x}) } }
+sub chr($x) { Q:CgOp { (bif_chr {$x}) } }
+sub infix:<+&>($x, $y) { Q:CgOp { (bif_numand {$x} {$y}) } }
+sub infix:<+|>($x, $y) { Q:CgOp { (bif_numor {$x} {$y}) } }
+sub infix:<+^>($x, $y) { Q:CgOp { (bif_numxor {$x} {$y}) } }
+sub infix:<< +< >>($x, $y) { Q:CgOp { (bif_numlshift {$x} {$y}) } }
+sub infix:<< +> >>($x, $y) { Q:CgOp { (bif_numrshift {$x} {$y}) } }
+sub prefix:<< +^ >>($x) { Q:CgOp { (bif_numcompl {$x}) } }
+sub gettimeofday() { Q:CgOp { (bif_gettimeofday) } }
+
 # }}}
 # Flow inspection and control {{{
 my class CallFrame {
