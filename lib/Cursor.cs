@@ -624,7 +624,8 @@ public class Cursor : IP6 {
     public Variable O(VarHash caps) {
         Cursor nw = At(pos);
         foreach (KeyValuePair<string,Variable> kv in caps)
-            nw.captures = new CapInfo(nw.captures, new string[] { kv.Key }, kv.Value);
+            nw.captures = new CapInfo(nw.captures, new string[] { kv.Key },
+                    Kernel.NewRWScalar(Kernel.AnyMO, kv.Value.Fetch()));
         VarDeque ks = new VarDeque();
 
         DynObject lst = new DynObject(Kernel.ListMO);

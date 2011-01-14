@@ -16,6 +16,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
     my %*units;
 
     my $*module_loader = sub ($m) { self!load_dependent($m) };
+    my $*verbose = $.verbose;
 
     my $ast;
     my @steps = (

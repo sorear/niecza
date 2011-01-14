@@ -71,6 +71,14 @@ use MONKEY_TYPING;
         'action methods work (candidate rule)';
 }
 
+{
+    my @foo = 1; #OK
+    my $tgt; #OK
+    my %into;
+    $tgt = %into<foo> = True;
+    ok %into<foo>, "2011-01-13 list assignment parsefail";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

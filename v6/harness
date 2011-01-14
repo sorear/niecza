@@ -18,6 +18,342 @@ use MONKEY_TYPING;
 
 use CgOp;
 use Metamodel;
+use STD;
+use NAME;
+use Stash;
+
+augment class STD::P6 { #OK exist
+    token special_variable:sym<$!{ }> {
+        '$!' '{' ~ '}' [<identifier> | <statementlist>]
+        {{
+            my $all = substr(self.orig, self.pos, $¢.pos - self.pos);
+            $all ~~ /^...\s*(.*?)\s*.$/;
+            $¢.obs("Perl 5's $all construct", "a smartmatch like \$! ~~ $0");
+        }}
+    }
+}
+
+my package DEBUG { our $symtab = False }
+
+augment class STD {
+our $ALL;
+method add_my_name ($n, $d?, $p?) {
+    my $name = $n;
+    self.deb("add_my_name $name in ", $*CURLEX.id) if $DEBUG::symtab;
+    return self if $name ~~ /\:\:\(/;
+    my $curstash = $*CURLEX;
+    my @components = self.canonicalize_name($name);
+    my $sid = $curstash.id // '???';
+    while +@components > 1 {
+        my $pkg = shift @components;
+        $sid ~= "::$pkg";
+        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // Stash.new(
+            'PARENT::' => $curstash.idref,
+            '!stub' => 1,
+            '!id' => [$sid] );
+        self.deb("Adding new package $pkg in ", $curstash.id) if $DEBUG::symtab;
+        $curstash = $newstash;
+    }
+    $name = my $shortname = shift @components;
+    return self unless defined $name and $name ne '';
+    return self if $name eq '$' or $name eq '@' or $name eq '%';
+    return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
+    if $shortname ~~ /\:/ {
+        ($shortname,) = ($shortname ~~ /(.*?)\:/);
+    }
+
+    # This may just be a lexical alias to "our" and such,
+    # so reuse $*DECLARAND pointer if it's there.
+    my $declaring = $d // NAME.new(
+        name => $name,
+        file => $*FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+        of   => $*OFTYPE,
+        scope => $*SCOPE,
+    );
+    self.deb("going to install $declaring") if $DEBUG::symtab;
+    my $old = $curstash.{$name};
+    if $old and $old<line> and not $old<stub> {
+        self.deb("$name exists, curstash = ", $curstash.id) if $DEBUG::symtab;
+        my $omult = $old<mult> // '';
+        if $declaring === $old {}  # already did this, probably enum
+        elsif $*SCOPE eq 'use' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
+        elsif $*PKGDECL eq 'role' {}
+        elsif $*SIGNUM and $old<signum> and $*SIGNUM != $old<signum> {
+            $old<signum> = $*SIGNUM;
+        }
+        else {
+            my $ofile = $old.file // 0;
+            my $oline = $old.line // '???';
+            my $loc = '';
+            if $ofile {
+                if $ofile !=== $*FILE {
+                    my $oname = $ofile<name>;
+                    $loc = " (see $oname line $oline)";
+                }
+                else {
+                    $loc = " (see line $oline)";
+                }
+            }
+            if $old.olex {
+                my $rebind = $old<rebind>;
+                my $truename = $old<varbind><truename>;
+                self.sorry("Lexical symbol '$name' is already bound to an outer symbol$loc;\n  the implicit outer binding at line $rebind must be rewritten as $truename\n  before you can unambiguously declare a new '$name' in this scope");
+            }
+            elsif $name ~~ /^\w/ {
+                self.sorry("Illegal redeclaration of symbol '$name'$loc");
+            }
+            elsif $name ~~ /^\&/ {
+                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '&';
+            }
+            else {  # XXX eventually check for conformant arrays here
+                self.worry("Useless redeclaration of variable $name$loc");
+            }
+            return self;
+        }
+    }
+    else {
+        self.deb("installing in $curstash.id() slot $name") if $DEBUG::symtab;
+        $*DECLARAND = $curstash.{$name} = $declaring;
+        $curstash.{$shortname} = $declaring unless $shortname eq $name;
+        self.deb("$curstash.id() now contains $curstash.keys()") if $DEBUG::symtab;
+        $*DECLARAND<declaredat> = self.pos;
+        $*DECLARAND<inlex> = $curstash.idref;
+        $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
+        $*DECLARAND<const> = $*DECLARAND<const> || 1 if $*IN_DECL eq 'constant';
+        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %*MYSTERY{substr($name,1)};
+        if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
+            $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $curstash.{$shortname};
+            $curstash.{"\&$shortname"}<used> = 1;
+            $sid ~= "::$name";
+            if $name !~~ /\:\</ {
+                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
+                    'PARENT::' => $curstash.idref,
+                    '!file' => $*FILE, '!line' => self.line,
+                    '!id' => [$sid] ));
+            }
+        }
+    }
+    self;
+}
+method lex_can_find_name ($lex, $name, $varbind) {
+    self.deb("Looking for $name in $lex.id()") if $DEBUG::symtab;
+    if $lex.{$name} {
+        self.deb("Found $name in ", $lex.id) if $DEBUG::symtab;
+        $lex.{$name}<used>++;
+        return True;
+    }
+    self.deb("$name not found among $lex.keys()") if $DEBUG::symtab;
+
+    my $outlexid = $lex.<OUTER::>[0];
+    return False unless $outlexid;
+    my $outlex = $ALL.{$outlexid};
+
+    if self.lex_can_find_name($outlex,$name,$varbind) {
+        # fake up an alias to outer symbol to catch reclaration
+        my $outname = $outlex.{$name}<name>;
+        my $outfile = $outlex.{$name}<file>;
+        my $outline = $outlex.{$name}<line>;
+        $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
+        $outname = "OUTER::" ~ $outname;
+        $lex.{$name} = NAME.new(
+            olex => $lex.idref,
+            name => $outname,
+            file => $outfile, line => $outline,
+            rebind => self.line,
+            varbind => $varbind,
+            mult => 'only',
+            scope => $lex.{$name}<scope>,
+        );
+        # the innermost lex sets this last to get correct # of OUTER::s
+        $varbind.<truename> = $outname;
+        return True;
+    }
+
+    return False;
+}
+method add_our_name ($n) {
+    my $name = $n;
+    self.deb("add_our_name $name in " ~ $*CURPKG.id) if $DEBUG::symtab;
+    return self if $name ~~ /\:\:\(/;
+    my $curstash = $*CURPKG;
+    self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $DEBUG::symtab;
+    $name = ($name ~~ /(.*?)\:[ver|auth]/).[0] // $name;
+    my @components = self.canonicalize_name($name);
+    if +@components > 1 {
+        my $c = self.find_top_pkg(@components[0]);
+        if $c {
+            shift @components;
+            $curstash = $c;
+        }
+    }
+    my $sid = $curstash.id // '???';
+    while +@components > 1 {
+        my $pkg = shift @components;
+        $sid ~= "::$pkg";
+        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // Stash.new(
+            'PARENT::' => $curstash.idref,
+            '!stub' => 1,
+            '!id' => [$sid] );
+        $curstash = $newstash;
+        self.deb("Adding new package $pkg in $curstash ") if $DEBUG::symtab;
+    }
+    $name = my $shortname = shift @components;
+    return self unless defined $name and $name ne '';
+    if $shortname ~~ /\:/ {
+        ($shortname,) = ($shortname ~~ /^(.*?)\:/);
+    }
+
+    my $declaring = $*DECLARAND // NAME.new(
+        name => $name,
+        file => $*FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+        of   => $*OFTYPE,
+        scope => $*SCOPE,
+    );
+    my $old = $curstash.{$name};
+    if $old and $old<line> and not $old<stub> {
+        my $omult = $old<mult> // '';
+        if $declaring === $old {} # already did it somehow
+        elsif $*SCOPE eq 'use' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
+        elsif $*PKGDECL eq 'role' {}
+        else {
+            my $ofile = $old.file // 0;
+            my $oline = $old.line // '???';
+            my $loc = '';
+            if $ofile {
+                if $ofile !=== $*FILE {
+                    my $oname = $ofile<name>;
+                    $loc = " (from $oname line $oline)";
+                }
+                else {
+                    $loc = " (from line $oline)";
+                }
+            }
+            $sid = self.clean_id($sid, $name);
+            if $name ~~ /^\w/ {
+                self.sorry("Illegal redeclaration of symbol '$sid'$loc");
+            }
+            elsif $name ~~ /^\&/ {
+                self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '&';
+            }
+            else {  # XXX eventually check for conformant arrays here
+                # (redeclaration of identical package vars is not useless)
+            }
+            return self;
+        }
+    }
+    else {
+        $*DECLARAND = $curstash.{$name} = $declaring;
+        $curstash.{$shortname} = $curstash{$shortname} // $declaring unless $shortname eq $name;
+        $*DECLARAND<inpkg> = $curstash.idref;
+        if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
+            $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $declaring;
+            $curstash.{"\&$shortname"}<used> = 1;
+            $sid ~= "::$name";
+            $*NEWPKG = ($curstash.{$name ~ '::'} = $curstash.{$name ~ '::'} // Stash.new(
+                'PARENT::' => $curstash.idref,
+                '!file' => $*FILE, '!line' => self.line,
+                '!id' => [$sid] ));
+        }
+    }
+    self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
+    self;
+}
+method check_variable ($variable) {
+    return () unless defined $variable;
+    my $name = $variable.Str;
+    my $here = self.cursor($variable.to);
+    self.deb("check_variable $name") if $DEBUG::symtab;
+    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    if $twigil eq '' {
+        my $ok = 0;
+        $ok = $ok || $*IN_DECL;
+        $ok = $ok || $sigil eq '&';
+        $ok = $ok || $first lt 'A';
+        $ok = $ok || self.is_known($name);
+        $ok = $ok || $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+        if not $ok {
+            my $id = $name;
+            ($id,) = ($id ~~ /\W ** 0..2 (.*)/);
+            if $name eq '@_' or $name eq '%_' {
+                $here.add_placeholder($name);
+            }
+            else {  # guaranteed fail now
+                if my $scope = @*MEMOS[$variable.from]<declend> {
+                    return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                }
+                elsif $id !~~ /\:\:/ {
+                    if self.is_known('@' ~ $id) {
+                        return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                    }
+                    elsif self.is_known('%' ~ $id) {
+                        return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                    }
+                }
+                return $here.sorry("Variable $name is not predeclared");
+            }
+        }
+        elsif $*CURLEX{$name} {
+            $*CURLEX{$name}<used>++;
+        }
+    }
+    elsif $twigil eq '^' {
+        my $*MULTINESS = 'multi';
+        $here.add_placeholder($name);
+    }
+    elsif $twigil eq ':' {
+        my $*MULTINESS = 'multi';
+        $here.add_placeholder($name);
+    }
+    elsif $twigil eq '~' {
+        return %*LANG.{substr($name,2,$name.chars - 2)};
+    }
+    elsif $twigil eq '?' {
+        if $name ~~ /\:\:/ {
+            my $first; ($first,) = self.canonicalize_name($name);
+            $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+        }
+        else {
+            # search upward through languages to STD
+            my $v = $here.lookup_compiler_var($name);
+            # $variable.<value> = $v if $v; XXX IMMUTABLE MATCHES
+        }
+    }
+    self;
+}
+method worry (Str $s) {
+    my $m = $s ~ self.locmess;
+
+    # allow compile-time warning suppression with #OK some string
+    my $okmaybe; ($okmaybe,) = self.suppose( sub {
+        self.is_ok;
+    });
+    if $okmaybe {
+        my $okif = $okmaybe<okif>.Str;
+        return self if $okif eq '' or $s ~~ /$okif/;
+    }
+
+    push @*WORRIES, $m unless %*WORRIES{$s}++;
+    self;
+}
+token term:sym<miscbad> {
+    {} <!{ $*QSIGIL }>
+    {{
+        my $bad; ($bad,) = $¢.suppose( sub {
+            $¢.infixish;
+        });
+        $*HIGHWATER = -1;
+        $*HIGHMESS = '';
+        self.badinfix($bad.Str) if $bad;
+    }}
+    <!>
+}
+}
 
 augment class Metamodel::Namespace { #OK exist
 }
@@ -179,7 +515,7 @@ my $lang = "CORE";
 my $safe = False;
 my $bcnd = "dotnet";
 my $odir = $basedir.append("obj");
-my $verb = False;
+my $verb = 0;
 my @eval;
 my $cmod = False;
 my $comp = False;
@@ -191,7 +527,7 @@ GetOptions(:!permute,
     "compile-module|C" => sub { $cmod = True },
     "backend|B=s" => sub { $bcnd = $_ },
     "language|L=s" => sub { $lang = $_ },
-    "verbose|v" => sub { $verb = True },
+    "verbose|v" => sub { $verb++ },
     "compile|c" => sub { $comp = True },
     "safe" => sub { $safe = True },
     "stop=s" => sub { $stop = $_ },

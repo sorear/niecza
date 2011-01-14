@@ -116,9 +116,8 @@ method parse(:$unitname, :$filename, :$modtime, :$source) {
     my $*IN_SUPPOSE = 0;
     my $*FATALS = 0;
 
-    $DEBUG::EXPR = False;
-    $STD::DEBUG::EXPR = False;
-    $STD::DEBUG::symtab = False;
+    $DEBUG::EXPR = $STD::DEBUG::EXPR = $STD::DEBUG::symtab =
+        $*verbose > 1;
 
     my $*LAST_NIBBLE = 0;
     my $*LAST_NIBBLE_START = 0;
