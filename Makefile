@@ -17,7 +17,7 @@ units=SAFE CORE CClass Body Unit CgOp Op Sig RxOp NAME Stash JSYNC STD \
       NieczaCompiler
 
 all: obj/Kernel.dll obj/CLRBackend.exe .fetch-stamp
-	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -I../lib -v -c -Bnam niecza
+	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -v -c -Bnam niecza
 	for nfile in $(units); do echo $$nfile; \
 	    $(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
 	done
