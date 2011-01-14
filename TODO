@@ -1,36 +1,28 @@
-New lists: (a little dated, see newlist.pl)
-    s/Iterator/IterationCursor/
-    .iterator should return a real List (maybe even a primitive something)
-    a List itself represents an iteration state
-    Lists with no iterators are treated as a fast path in a lot of cases
-    possibly, Lists should be limited to one iterator
-    $!flat is completely wrong and should die.  .flat is just a map-like operator
+From the v6/TODO:
+These things were noticed during translation, but to fix them now would
+only slow me down...
 
-Niecza-NAM-Lorito:
-    NAM is a Lorito prototype!  See #parrot logs
-    To make it real:
-    * 3-operand code
-    * Deregisterization pass infers use of CLR stack when registers have nested live ranges and are used exactly once
-    * Types and ops can be provided by a library binding spec; var, fetch et al come from niecza-perl6 library binding.  As does the entire object model and subcall - bare NAM-Lorito probably won't have sub support.
-    * NAM has a wire format resembling LASM
-    * NAM needs to have real continuations
-
-needlib 'foo'
-
-const int 'a'
-var str 'b'
-
-code 'main' {
-    op 1, 2, 3
-}
-
-blob {
-    'a' = 1
-    'b' = 'Hello, world'
-}
+* sprintf, in particular, the ability to make numbers hex
+* hash initialization idioms don't work
+* no qw< >
+* Any strificatrion/numification warnings would be useful
+* no is rw on attributes and methods
+* &split
+* &callsame
+* BUILD
+* given/when
+* non-$ attributes; @.foo and @<foo>
+* :$.foo is broken
+* eager map optimizations
+* return()
+* stashes should be accessed as common values
+* "Action method ::($name) not implemented", also needs $<sym>
+* context accelerators need to robustly handle undefined objects
+* .list, item as accelerated contexts
+* explicitly imprecise error reporting - lines A-B
+* @PROCESS::ARGS ::= [1,2,3]; ok +[ @*ARGS ] == 3 # Bug
+* Whatever-currying of prefixes my $x = ~*; say $x() # Whatever()<instance>
 
 Other stuff
-    * Write a LHF file
     * Write a ROADMAP
     * Flesh out documentation a lot
-    * $*IN.slurp needs to use Console.OpenStdOutput (mike_f++)

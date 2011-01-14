@@ -9,5 +9,7 @@ v6/STD.errors
 *.mdb
 *.exe
 core
+boot
 perf/profile.txt
 perf/xdb.il
+.fetch-stamp

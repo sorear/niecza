@@ -1,4 +1,0 @@
-rm -f niecza-v6.zip
-zip -9 niecza-v6.zip run/*.dll run/Niecza.exe obj/Kernel.dll obj/CLRBackend.exe lib/*
-scp niecza-v6.zip sorear@feather.perl6.nl:public_html
-echo http://feather.perl6.nl/~sorear/niecza-v6.zip

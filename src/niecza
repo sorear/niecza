@@ -503,7 +503,6 @@ general options:
       --help                 # display this message
 
 backend options:
-      --aot                  # run ahead-of-time compiler (mono)
       --obj-dir=DIR          # select output location (all)
 EOM
 
@@ -532,6 +531,7 @@ GetOptions(:!permute,
     "safe" => sub { $safe = True },
     "stop=s" => sub { $stop = $_ },
     "aot" => sub { $aotc = True },
+    "include|I=s" => sub { unshift @lib, $_.IO.realpath },
     "obj-dir=s" => sub { $odir = $_ },
     "help|h" => sub { say $usage; exit 0 },
 );
