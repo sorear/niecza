@@ -10,19 +10,21 @@ cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs
 csbackend=CLRBackend.cs
 
 # keep this in dependency order
-units=SAFE CORE CClass Body Unit CgOp Op Sig RxOp NAME Stash JSYNC STD \
-      NieczaGrammar Metamodel OptRxSimple NAMOutput NieczaActions \
-      NieczaFrontendSTD NieczaPassBegin NieczaPassBeta NieczaPassSimplifier \
-      NieczaPathSearch NieczaBackendNAM NieczaBackendDotnet NieczaBackendClisp \
-      NieczaCompiler
+libunits=SAFE CORE JSYNC
+srcunits=CClass Body Unit CgOp Op Sig RxOp NAME Stash STD NieczaGrammar \
+	 Metamodel OptRxSimple NAMOutput NieczaActions NieczaFrontendSTD \
+	 NieczaPassBegin NieczaPassBeta NieczaPassSimplifier NieczaPathSearch \
+	 NieczaBackendNAM NieczaBackendDotnet NieczaBackendClisp NieczaCompiler
 
-all: obj/Kernel.dll obj/CLRBackend.exe .fetch-stamp
+all: run/Niecza.exe obj/Kernel.dll obj/CLRBackend.exe
+
+run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -v -c -Bnam niecza
-	for nfile in $(units); do echo $$nfile; \
+	for nfile in $(libunits) $(srcunits); do echo $$nfile; \
 	    $(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
 	done
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
-	$(CP) $(patsubst %,boot/obj/%.dll,Kernel $(units)) run/
+	$(CP) $(patsubst %,boot/obj/%.dll,Kernel $(libunits) $(srcunits)) run/
 	$(CP) boot/obj/MAIN.exe run/Niecza.exe
 
 .fetch-stamp: FETCH_URL
@@ -38,3 +40,11 @@ obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
 	    $(patsubst %,lib/%,$(csbackend))
+
+test: all
+	$(RUN_CLR) run/Niecza.exe -c test.pl
+	prove -e $(RUN_CLR) obj/MAIN.exe
+
+p6eval: all
+	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
+	$(RUN_CLR) --aot run/*.dll run/Niecza.exe
