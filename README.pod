@@ -13,8 +13,10 @@ C<test.pl>.
 
 =item *
 
-Mono.  2.6.4 and later are well-tested, though success has been reported with 2.4.x as well.  ggoebel on #perl6 reports that 2.6.7 fails with a bus error on OS X 10.4 x86, but 2.6.4 works; 2.6.7 is fine on other platforms.  2.9.x or later is
-recommended for best performance.
+To run on Mono:  2.6.4 and later are well-tested, though success has been
+reported with 2.4.x as well.  ggoebel on #perl6 reports that 2.6.7 fails
+with a bus error on OS X 10.4 x86, but 2.6.4 works; 2.6.7 is fine on other
+platforms.  2.9.x or later is recommended for best performance.
 
 Debian and derivatives have a modular mono packaging; you should install
 'mono-complete'.  (The other packages exist for the sake of Debian-packaged
@@ -22,14 +24,13 @@ programs.)
 
 =item *
 
-Windows/Microsoft .NET 3.5 (2.0 runtime with 3.5 extensions) or .NET 4.0. 
-Download 4.0 from here: goo.gl/PMKvB  
+To run on Windows/Microsoft .NET 3.5 (2.0 runtime with 3.5 extensions)
+or .NET 4.0: C<http://goo.gl/PMKvB>
 
-Currently, you need to make a couple of changes to the Makefile to enable
-a successful build under Cygwin, but once sorear makes a Configure.pl and/or
+Currently, you need to make a change to the C<Makefile> to enable
+a successful build under Cygwin, but once sorear makes a C<Configure.pl> and/or
 uses the mono autotools templates, this won't be needed... merely remove C<mono>
-from the line starting with C<RUN_CLR=>.  Note that you can also run niecza
-under mono on Windows (see above).
+from the line starting with C<RUN_CLR=>.  Niecza also runs on mono/Windows.
 
 =back
 
