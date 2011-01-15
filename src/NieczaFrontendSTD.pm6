@@ -74,7 +74,8 @@ augment class Cursor {
     our $RED    = "\e[31m";
     our $GREEN  = "\e[32m";
     our $YELLOW = "\e[33m";
-    our $CLEAR  = "\e[37m";
+    our $CLEAR  = "\e[0m";
+
 }
 
 has $.lang;
