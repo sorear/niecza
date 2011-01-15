@@ -13,5 +13,5 @@ method post_save($name, :$main) {
 
 method run($name) {
     my $fname = $name.split('::').join('.');
-    run_command("clisp", "cl-backend/backend.lisp " ~ $fname ~ ".nam");
+    run_command("clisp", "cl-backend/backend.lisp obj/" ~ $fname ~ ".nam");
 }
