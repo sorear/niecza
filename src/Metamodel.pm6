@@ -104,11 +104,27 @@ class Namespace {
         $!root = _merge($!root, %*units{$from}.ns.root, []);
     }
 
+    sub _dclone($tree) {
+        return $tree unless defined $tree;
+        my $rinto = { };
+        for keys $tree -> $k {
+            my $i = $tree{$k};
+            if $i[0] eq 'var' {
+                $i = ['var', $i[1], _dclone($i[2])];
+            }
+            $rinto{$k} = $i;
+        }
+        $rinto;
+    }
+
     sub _merge($rinto_, $rfrom, @path) {
         my $rinto = _hash_constructor( %$rinto_ );
         for sort keys $rfrom -> $k {
             if !$rinto{$k} {
                 $rinto{$k} = $rfrom{$k};
+                if $rinto{$k}[0] eq 'var' {
+                    $rinto{$k} = ['var', $rinto{$k}[1], _dclone($rinto{$k}[2]) ];
+                }
                 next;
             }
             my $i1 = $rinto{$k};
@@ -130,7 +146,7 @@ class Namespace {
                     ($nn1 ?? $i1[1] !! $nn2 ?? $i2[1] !! ($i1[1] // $i2[1])),
                     ((defined($i1[2]) && defined($i2[2])) ??
                         _merge($i1[2], $i2[2], [@path, $k]) !!
-                    ($i1[2] // $i2[2]))];
+                    _dclone($i1[2] // $i2[2]))];
             }
         }
         return $rinto;
