@@ -25,7 +25,8 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
             :$filename, :$modtime, :$source); },
         (map -> $st { $st.typename => { $ast = $st.invoke($ast) } }, @$.stages),
         ($.backend.typename ~ "-save") =>
-            { $.backend.save_unit($unitname, $ast); $ast = Any },
+            { $.backend.save_unit($unitname, $ast);
+              $ast.clear_optrees; $ast = Any },
         ($.backend.typename ~ "-post") =>
             { $.backend.post_save($unitname, :$main); },
         ($.backend.typename ~ "-run") =>

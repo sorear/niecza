@@ -494,6 +494,11 @@ class StaticSub is RefTarget {
     method add_child($z) { push $.zyg, $z }
     method children() { @$.zyg }
 
+    method clear_optree() {
+        $.code = Any;
+        $.ltm = Any;
+    }
+
     method create_static_pad() {
         return Nil if $.spad_exists;
         $.spad_exists = True;
@@ -645,6 +650,10 @@ class Unit {
         for @$.xref -> $x {
             $cb($x) if defined($x) && $x.^isa(Metamodel::Package);
         }
+    }
+
+    method clear_optrees() {
+        self.visit_local_subs_postorder({ $_.clear_optree })
     }
 
     method visit_local_subs_postorder($cb) {
