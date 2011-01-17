@@ -21,8 +21,9 @@ all: run/Niecza.exe obj/Kernel.dll obj/CLRBackend.exe
 run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -v -c -Bnam niecza
 	for nfile in $(libunits) $(srcunits); do echo $$nfile; \
-	    $(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
-	done
+	    if [ boot/obj/$$nfile.nam -nt boot/obj/$$nfile.dll ]; then \
+		$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
+	fi; done
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
 	$(CP) $(patsubst %,boot/obj/%.dll,Kernel $(libunits) $(srcunits)) run/
 	$(CP) boot/obj/MAIN.exe run/Niecza.exe
