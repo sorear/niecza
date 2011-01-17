@@ -711,7 +711,6 @@ namespace Niecza.CLRBackend {
             lineBuffer.Add(lineStack.Count == 0 ? 0 : lineStack[lineStack.Count - 1]);
         }
 
-        [ThreadStatic] private static int next_array;
         public void EmitIntArray(int[] vec) {
             EmitInt(vec.Length);
             // the mono JIT checks for this exact sequence
@@ -727,7 +726,7 @@ namespace Niecza.CLRBackend {
                     buf[r++] = (byte)((d >> 24) & 0xFF);
                 }
                 FieldBuilder fb = tb.DefineInitializedData(
-                        "A" + (next_array++), buf, 0);
+                        "A" + (CLRBackend.Current.nextarray++), buf, 0);
                 il.Emit(OpCodes.Dup);
                 il.Emit(OpCodes.Ldtoken, fb);
                 il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
@@ -2033,8 +2032,6 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrOp[] { nothead }, new ClrResult(ty));
         }
 
-        // XXX only needs to be unique per sub
-        [ThreadStatic] private static int nextunique = 0;
         // this particular use of a delegate feels wrong
         private static CpsOp Primitive(CpsOp[] zyg, Func<ClrOp[],CpsOp> raw) {
             List<ClrOp> stmts = new List<ClrOp>();
@@ -2053,7 +2050,7 @@ namespace Niecza.CLRBackend {
                 if (!more_stmts || zyg[i].head.Constant) {
                     args.Add(zyg[i].head);
                 } else {
-                    string ln = "!spill" + (nextunique++);
+                    string ln = "!spill" + (CLRBackend.Current.nextspill++);
                     args.Add(new ClrPeekLet(ln, zyg[i].head.Returns));
                     stmts.Add(new ClrPushLet(ln, zyg[i].head));
                     pop.Add(ln);
@@ -2135,8 +2132,9 @@ namespace Niecza.CLRBackend {
             Resultify(ref iftrue_s, ref iftrue_h);
             Resultify(ref iffalse_s, ref iffalse_h);
 
-            string l1 = "!else" + (nextunique++);
-            string l2 = "!endif" + (nextunique++);
+            CLRBackend cb = CLRBackend.Current;
+            string l1 = "!else"  + (cb.nextlabel++);
+            string l2 = "!endif" + (cb.nextlabel++);
 
             List<ClrOp> stmts = new List<ClrOp>();
             foreach (ClrOp c in cond.stmts)
@@ -2160,8 +2158,9 @@ namespace Niecza.CLRBackend {
 
         // this is simplified a bit since body is always void
         public static CpsOp While(bool until, bool once, CpsOp cond, CpsOp body) {
-            string l1 = "!again" + (nextunique++);
-            string l2 = "!check" + (nextunique++);
+            CLRBackend cb = CLRBackend.Current;
+            string l1 = "!again" + (cb.nextlabel++);
+            string l2 = "!check" + (cb.nextlabel++);
 
             List<ClrOp> stmts = new List<ClrOp>();
 
@@ -3426,6 +3425,11 @@ namespace Niecza.CLRBackend {
         internal ModuleBuilder mob;
         internal TypeBuilder tb;
 
+        [ThreadStatic] internal static CLRBackend Current;
+
+        internal int nextarray;
+        internal int nextspill;
+        internal int nextlabel;
         internal Unit unit;
 
         internal int constants;
@@ -3500,6 +3504,7 @@ namespace Niecza.CLRBackend {
 
         void Process(Unit unit, bool asmain) {
             this.unit = unit;
+            Current = this;
 
             unit.BindFields(delegate(string name, Type type) {
                 return tb.DefineField(name, type, FieldAttributes.Public |
@@ -3847,6 +3852,7 @@ namespace Niecza.CLRBackend {
             c.Process(root, ismain);
 
             c.Finish(outfile);
+            used_units = null; Current = null;
         }
     }
 }
