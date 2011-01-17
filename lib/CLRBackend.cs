@@ -3773,7 +3773,7 @@ namespace Niecza.CLRBackend {
             boot.Build(CpsOp.Sequence(thaw.ToArray()));
 
             if (asmain)
-                DefineMainMethod(boot.mb);
+                DefineMainMethod(unit.name, boot.mb);
         }
 
         void Finish(string filename) {
@@ -3782,12 +3782,13 @@ namespace Niecza.CLRBackend {
             ab.Save(filename);
         }
 
-        void DefineMainMethod(MethodInfo boot) {
+        void DefineMainMethod(string name, MethodInfo boot) {
             MethodBuilder mb = tb.DefineMethod("Main", MethodAttributes.Static |
                     MethodAttributes.Public, typeof(void),
                     new Type[] { typeof(string[]) });
             ILGenerator il = mb.GetILGenerator();
 
+            il.Emit(OpCodes.Ldstr, name);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldnull);
             il.Emit(OpCodes.Ldftn, boot);

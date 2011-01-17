@@ -2044,7 +2044,8 @@ slow:
             return th;
         }
 
-        public static void RunLoop(string[] args, DynBlockDelegate boot) {
+        public static void RunLoop(string main_unit,
+                string[] args, DynBlockDelegate boot) {
             commandArgs = args;
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
@@ -2062,7 +2063,7 @@ slow:
                 TraceCount = TraceFreq;
             }
             try {
-                BootModule("MAIN", boot);
+                BootModule(main_unit, boot);
             } catch (NieczaException n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
                 Environment.Exit(1);

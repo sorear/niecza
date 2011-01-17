@@ -7,6 +7,7 @@ has $.backend;
 has $.stages;
 has $.frontend;
 has $.verbose;
+has $!main-sn = 0;
 
 has $.unitcache = {};
 
@@ -52,13 +53,18 @@ method compile_module($module, $stop = "") {
     self!compile($module, $filename, $modtime, $source, False, False, $stop);
 }
 
+method !main_name() {
+    my $i = $!main-sn++;
+    $i ?? "MAIN_$i" !! "MAIN";
+}
+
 method compile_file($file, $run, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_file($file);
-    self!compile("MAIN", $filename, $modtime, $source, True, $run, $stop);
+    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop);
 }
 
 method compile_string($source, $run, $stop = "") {
-    self!compile("MAIN", "(eval)", 0, $source, True, $run, $stop);
+    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop);
 }
 
 method !up_to_date($mod) {
