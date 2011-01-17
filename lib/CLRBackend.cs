@@ -172,6 +172,7 @@ namespace Niecza.CLRBackend {
 
         public Assembly clrAssembly;
         public Type clrType;
+        bool depsBound;
 
         public Unit(object[] from) {
             mainline_ref = Xref.from(from[0]);
@@ -196,14 +197,31 @@ namespace Niecza.CLRBackend {
             tdeps = from[8] as object[];
         }
 
-        public void BindDepends() {
+        public void BindDepends(bool ismain) {
+            if (depsBound) return;
+            depsBound = true;
+
             foreach (object x in tdeps) {
                 string n = JScalar.S(((object[]) x)[0]);
                 if (n == name) continue;
                 Unit o = CLRBackend.GetUnit(n);
+                o.BindDepends(false);
                 foreach (KeyValuePair<string,Package> kv in o.exp_pkg)
                     exp_pkg[kv.Key] = kv.Value;
             }
+
+            if (ismain) return;
+
+            clrAssembly = Assembly.LoadFile(Path.Combine(
+                        CLRBackend.Current.dir, name + ".dll"));
+            clrType = clrAssembly.GetType(name);
+            Dictionary<string,FieldInfo> df =
+                new Dictionary<string,FieldInfo>();
+            foreach (FieldInfo fi in clrType.GetFields())
+                df[fi.Name] = fi;
+            BindFields(delegate(string fn, Type t) {
+                return df[fn];
+            });
         }
 
         public void VisitSubsPostorder(Action<int,StaticSub> cb) {
@@ -3431,6 +3449,7 @@ namespace Niecza.CLRBackend {
         internal int nextspill;
         internal int nextlabel;
         internal Unit unit;
+        internal string dir;
 
         internal int constants;
         internal List<CpsOp> thaw = new List<CpsOp>();
@@ -3442,6 +3461,7 @@ namespace Niecza.CLRBackend {
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
+            this.dir = dir;
             ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
                     AssemblyBuilderAccess.Save, dir);
             mob = ab.DefineDynamicModule(mobname, filename);
@@ -3504,7 +3524,6 @@ namespace Niecza.CLRBackend {
 
         void Process(Unit unit, bool asmain) {
             this.unit = unit;
-            Current = this;
 
             unit.BindFields(delegate(string name, Type type) {
                 return tb.DefineField(name, type, FieldAttributes.Public |
@@ -3805,10 +3824,28 @@ namespace Niecza.CLRBackend {
         }
 
         [ThreadStatic] static Dictionary<string, Unit> used_units;
+        static Dictionary<string, Unit> avail_units
+            = new Dictionary<string, Unit>();
         internal static object Resolve(Xref x) {
-            return used_units[x.unit].xref[x.index];
+            return GetUnit(x.unit).xref[x.index];
         }
-        internal static Unit GetUnit(string name) { return used_units[name]; }
+        internal static Unit GetUnit(string name) {
+            Unit u;
+            if (used_units.TryGetValue(name, out u))
+                return u;
+            return used_units[name] = LoadDepUnit(name);
+        }
+
+        internal static Unit LoadDepUnit(string name) {
+            lock (avail_units) {
+                Unit u;
+                if (avail_units.TryGetValue(name, out u))
+                    return u;
+                string dtx = File.ReadAllText(Path.Combine(Current.dir, name + ".nam"));
+                u = new Unit((object[])Reader.Read(dtx));
+                return avail_units[name] = u;
+            }
+        }
 
         public static void Main(string[] args) {
             if (args.Length != 4) {
@@ -3822,6 +3859,7 @@ namespace Niecza.CLRBackend {
             string tx = File.ReadAllText(Path.Combine(dir, unitfile));
             Unit root = new Unit((object[])Reader.Read(tx));
             CLRBackend c = new CLRBackend(dir, root.name, outfile);
+            Current = c;
 
             used_units = new Dictionary<string, Unit>();
             used_units[root.name] = root;
@@ -3830,24 +3868,9 @@ namespace Niecza.CLRBackend {
                 object[] dn = (object[]) x;
                 string name = JScalar.S(dn[0]);
                 if (name == root.name) continue;
-                string dtx = File.ReadAllText(Path.Combine(dir, name + ".nam"));
-                used_units[name] = new Unit((object[])Reader.Read(dtx));
+                used_units[name] = LoadDepUnit(name);
             }
-
-            foreach (Unit u in used_units.Values) {
-                u.BindDepends();
-                if (u != root) {
-                    u.clrAssembly = Assembly.LoadFile(Path.Combine(dir, u.name + ".dll"));
-                    u.clrType = u.clrAssembly.GetType(u.name);
-                    Dictionary<string,FieldInfo> df =
-                        new Dictionary<string,FieldInfo>();
-                    foreach (FieldInfo fi in u.clrType.GetFields())
-                        df[fi.Name] = fi;
-                    u.BindFields(delegate(string fn, Type t) {
-                        return df[fn];
-                    });
-                }
-            }
+            root.BindDepends(true);
 
             c.Process(root, ismain);
 
