@@ -54,16 +54,8 @@ my class Cursor { ... }
 my class Regex  { ... }
 my class Num    { ... }
 my class Cool {
-    method grep($sm) {
-        gather self.for(-> $r is rw {
-            take $r if $r ~~ $sm;
-        })
-    }
-    method map($func) {
-        gather self.for(-> $r is rw {
-            take $func($r);
-        })
-    }
+    method grep($sm)  { grep $sm, @(self) }
+    method map($func) { map $func, @(self) }
     method for (&cb) {
         Q:CgOp {
             (rnull (letn it (unbox vvarlist (@ {self.iterator}))
@@ -783,12 +775,12 @@ sub invert(%h) { %h.invert }
 sub keys(%h) { %h.keys }
 sub values(%h) { %h.values }
 
-sub grep($filter, *@items) { @items.grep($filter) }
-sub map($callback, *@items) { @items.map($callback) }
+sub grep($filter, *@items) { grep($filter, @items) }
+sub map($callback, *@items) { map($callback, @items) }
 
 sub sort(*@bits) { @bits.sort }
 
-sub _array_constructor(\$parcel) { my $r := (anon @new = $parcel);  $r }
+sub _array_constructor(\$parcel) { _array_constructor($parcel) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
 # }}}
 # Regular expression support {{{

@@ -59,6 +59,7 @@ our %funcs = (
     '&postcircumfix:<[ ]>' => &do_atpos,
     '&chars'               => do_builtin('chars', 1),
     '&defined'             => do_builtin('defined', 1),
+    '&grep'                => &do_map_grep,
     '&infix:<eq>'          => do_builtin('streq', 2),
     '&infix:<ge>'          => do_builtin('strge', 2),
     '&infix:<gt>'          => do_builtin('strgt', 2),
@@ -76,6 +77,7 @@ our %funcs = (
     '&infix:<!=>'          => do_builtin('numne', 2),
     '&infix:<+>'           => do_builtin('plus', 2),
     '&make'                => do_builtin('make', 1),
+    '&map'                 => &do_map_grep,
     '&not'                 => do_builtin('not', 1),
     '&postfix:<++>'        => do_builtin('postinc', 1),
     '&prefix:<?>'          => do_builtin('bool', 1),
@@ -85,6 +87,7 @@ our %funcs = (
     '&prefix:<~>'          => do_builtin('str', 1),
     '&so'                  => do_builtin('bool', 1),
     '&substr'              => do_builtin('substr3', 3),
+    '&_array_constructor'  => do_builtin('array_constructor', 1),
 );
 
 sub do_assign($body, $nv, $invname, $op) {
@@ -112,6 +115,12 @@ sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) {
     return $op unless $args == $expect;
     return ::Op::Builtin.new(name => $name, args => $args);
 } }
+
+sub do_map_grep($body, $nv, $invname, $op) {
+    return $op unless defined my $args = no_named_params($op);
+    return $op unless $args > 0;
+    return ::Op::Builtin.new(name => substr($invname, 1), args => $args);
+}
 
 sub do_atkey($body, $nv, $invname, $op) {
     my ($args, %named) = capture_params($op);
