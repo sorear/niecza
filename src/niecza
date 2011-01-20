@@ -29,6 +29,9 @@ method _cgop(*@bits) {
 method bif_item($i) { self._cgop("bif_item", $i) }
 method bif_list($i) { self._cgop("bif_list", $i) }
 method bif_hash($i) { self._cgop("bif_hash", $i) }
+method bif_grep(*@a) { self._cgop("bif_grep", @a) }
+method bif_map(*@a) { self._cgop("bif_map", @a) }
+method bif_array_constructor($i) { self._cgop("bif_array_constructor", $i) }
 }
 
 augment class NieczaActions {

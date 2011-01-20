@@ -954,6 +954,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("FirePhasers");
         public static readonly MethodInfo Builtins_Make =
             typeof(Builtins).GetMethod("Make");
+        public static readonly MethodInfo Builtins_MEMap =
+            typeof(Builtins).GetMethod("MEMap");
         public static readonly Dictionary<string,MethodInfo> DMO_AddFooMethod
             = _FooMethod();
         private static Dictionary<string,MethodInfo> _FooMethod() {
@@ -2853,6 +2855,9 @@ namespace Niecza.CLRBackend {
             thandlers["iter_hasarg"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_IterHasFlat,
                     new CpsOp[] { z[0], CpsOp.BoolLiteral(false) }); };
+            thandlers["bif_map"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(Tokens.Variable, Tokens.Builtins_MEMap,
+                        new CpsOp[] { CpsOp.NewArray(Tokens.Variable, z) }); };
             thandlers["newrwscalar"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar, new CpsOp[]{
                     CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0] }); };
@@ -3045,6 +3050,7 @@ namespace Niecza.CLRBackend {
             thandlers["prog"] = CpsOp.Sequence;
 
             thandlers["bif_gettimeofday"] = SimpleB("GetNow");
+            thandlers["bif_array_constructor"] = SimpleB("ArrayConstructor");
             thandlers["bif_numand"] = SimpleB("NumAnd");
             thandlers["bif_numor"] = SimpleB("NumOr");
             thandlers["bif_numxor"] = SimpleB("NumXor");
