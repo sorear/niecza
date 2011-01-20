@@ -884,7 +884,12 @@ noparams:
             if (items.Count() != 0) return true;
             VarDeque rest = (VarDeque) dob.slots[1];
             if (rest.Count() == 0) return false;
-            return DynMetaObject.RawCallBool.Get(obj);
+            if (Kernel.IterHasFlat(rest, false)) {
+                items.Push(rest.Shift());
+                return true;
+            } else {
+                return false;
+            }
         }
     }
 
@@ -896,7 +901,10 @@ noparams:
             VarDeque items = (VarDeque) dob.slots[0];
             VarDeque rest = (VarDeque) dob.slots[1];
             if (rest.Count() == 0) return items.Count();
-            return DynMetaObject.RawCallNumeric.Get(obj);
+            while (Kernel.IterHasFlat(rest, false)) {
+                items.Push(rest.Shift());
+            }
+            return items.Count();
         }
     }
 
@@ -1020,18 +1028,15 @@ noparams:
 
             IP6 ks = key.Fetch();
             if (ks.mo != Kernel.NumMO && ks.mo.HasMRO(Kernel.SubMO)) {
-                if (rest.Count() != 0)
-                    Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                                "eager", new Variable[] { obj }, null));
+                Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
                     Kernel.GetInferiorRoot(),
-                    new Variable[] { Kernel.BoxAnyMO<double>(items.Count(), Kernel.NumMO) }, null)));
+                    new Variable[] { nr }, null)));
             }
 
             int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
-            if (items.Count() <= ix && rest.Count() != 0) {
-                Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                            "eager", new Variable[] { obj }, null));
+            while (items.Count() <= ix && Kernel.IterHasFlat(rest, false)) {
+                items.Push(rest.Shift());
             }
             if (ix < 0)
                 return Kernel.NewROScalar(Kernel.AnyP);
@@ -1065,7 +1070,7 @@ noparams:
         public static readonly ContextHandler<Variable> CallDefined
             = new CtxCallMethod("defined");
         public static readonly ContextHandler<Variable> CallIterator
-            = new CtxCallMethod("defined");
+            = new CtxCallMethod("iterator");
         public static readonly ContextHandler<string> RawCallStr
             = new CtxCallMethodUnbox<string>("Str");
         public static readonly ContextHandler<bool> RawCallBool
@@ -1517,7 +1522,6 @@ noparams:
         public static DynMetaObject PairMO;
         public static DynMetaObject CallFrameMO;
         public static DynMetaObject CaptureMO;
-        public static DynMetaObject IteratorMO;
         public static DynMetaObject GatherIteratorMO;
         public static DynMetaObject IterCursorMO;
         public static IP6 AnyP;
@@ -1526,6 +1530,7 @@ noparams:
         public static IP6 HashP;
         public static IP6 IteratorP;
         public static readonly DynMetaObject AnyMO;
+        public static readonly DynMetaObject IteratorMO;
         public static readonly DynMetaObject ScalarMO;
         public static readonly DynMetaObject StashMO;
         public static readonly DynMetaObject SubMO;
@@ -1935,6 +1940,36 @@ slow:
             }
         }
 
+        private static void WrapHandler0(DynMetaObject kl, string name,
+                ContextHandler<Variable> cv) {
+            DynBlockDelegate dbd = delegate (Frame th) {
+                th.caller.resultSlot = cv.Get((Variable)th.lex0);
+                return th.caller;
+            };
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            si.sig_i = new int[3] {
+                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL,
+                0, 0 };
+            si.sig_r = new object[1] { "self" };
+            kl.AddMethod(name, MakeSub(si, null));
+        }
+
+        private static void WrapHandler1(DynMetaObject kl, string name,
+                IndexHandler cv) {
+            DynBlockDelegate dbd = delegate (Frame th) {
+                th.caller.resultSlot = cv.Get((Variable)th.lex0,
+                        (Variable)th.lex1);
+                return th.caller;
+            };
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            si.sig_i = new int[6] {
+                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0
+            };
+            si.sig_r = new object[2] { "self", "$key" };
+            kl.AddMethod(name, MakeSub(si, null));
+        }
+
         private static SubInfo IRSI = new SubInfo("InstantiateRole", IRC);
         private static Frame IRC(Frame th) {
             switch (th.ip) {
@@ -2194,10 +2229,18 @@ slow:
             PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque(),
                 new VarDeque() };
 
+            SubMO = new DynMetaObject("Sub");
+            SubMO.loc_INVOKE = new InvokeSub();
+            SubMO.FillProtoClass(new string[] { "outer", "info" });
+            SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
+            SubMO.Invalidate();
+
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
             BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
             BoolMO.FillProtoClass(new string[] { });
+            WrapHandler0(BoolMO, "Bool", BoolMO.loc_Bool);
+            BoolMO.Invalidate();
             TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
             FalseV = NewROScalar(BoxRaw<bool>(false, BoolMO));
 
@@ -2207,6 +2250,12 @@ slow:
             StrMO.loc_raw_Bool = new CtxStrBool();
             StrMO.loc_Bool = new CtxBoxify<bool>(StrMO.loc_raw_Bool, BoolMO);
             StrMO.FillProtoClass(new string[] { });
+            WrapHandler0(StrMO, "Bool", StrMO.loc_Bool);
+            WrapHandler0(StrMO, "Str", StrMO.loc_Str);
+            StrMO.Invalidate();
+
+            IteratorMO = new DynMetaObject("Iterator");
+            IteratorMO.FillProtoClass(new string[] { });
 
             NumMO = new DynMetaObject("Num");
             NumMO.loc_Numeric = new CtxReturnSelf();
@@ -2216,6 +2265,10 @@ slow:
             NumMO.loc_raw_Bool = new CtxNum2Bool();
             NumMO.loc_Bool = new CtxBoxify<bool>(NumMO.loc_raw_Bool, BoolMO);
             NumMO.FillProtoClass(new string[] { });
+            WrapHandler0(NumMO, "Bool", NumMO.loc_Bool);
+            WrapHandler0(NumMO, "Str", NumMO.loc_Str);
+            WrapHandler0(NumMO, "Numeric", NumMO.loc_Numeric);
+            NumMO.Invalidate();
 
             MuMO = new DynMetaObject("Mu");
             MuMO.loc_Bool = MuMO.loc_defined = new CtxBoolNativeDefined();
@@ -2234,6 +2287,9 @@ slow:
             MuMO.loc_raw_reify = DynMetaObject.RawCallReify;
             MuMO.loc_to_clr = new MuToCLR();
             MuMO.FillProtoClass(new string[] { });
+            WrapHandler0(MuMO, "Bool", MuMO.loc_Bool);
+            WrapHandler0(MuMO, "defined", MuMO.loc_defined);
+            MuMO.Invalidate();
 
             StashMO = new DynMetaObject("Stash");
             StashMO.FillProtoClass(new string[] { });
@@ -2242,10 +2298,15 @@ slow:
             ParcelMO = new DynMetaObject("Parcel");
             ParcelMO.loc_raw_iterator = new CtxParcelIterator();
             ParcelMO.FillProtoClass(new string[] { });
+            WrapHandler0(ParcelMO, "iterator", new CtxBoxify<VarDeque>(
+                        ParcelMO.loc_raw_iterator, IteratorMO));
+            ParcelMO.Invalidate();
 
             ArrayMO = new DynMetaObject("Array");
             ArrayMO.loc_at_pos = new IxListAtPos(true);
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
+            WrapHandler1(ArrayMO, "at-pos", ArrayMO.loc_at_pos);
+            ArrayMO.Invalidate();
 
             ListMO = new DynMetaObject("List");
             ListMO.loc_raw_iterator = new CtxListIterator();
@@ -2255,6 +2316,12 @@ slow:
             ListMO.loc_Bool = new CtxBoxify<bool>(ListMO.loc_raw_Bool, BoolMO);
             ListMO.loc_Numeric = new CtxBoxify<double>(ListMO.loc_raw_Numeric, NumMO);
             ListMO.FillProtoClass(new string[] { "items", "rest" });
+            WrapHandler0(ListMO, "iterator", new CtxBoxify<VarDeque>(
+                        ListMO.loc_raw_iterator, IteratorMO));
+            WrapHandler1(ListMO, "at-pos", ListMO.loc_at_pos);
+            WrapHandler0(ListMO, "Bool", ListMO.loc_Bool);
+            WrapHandler0(ListMO, "Numeric", ListMO.loc_Numeric);
+            ListMO.Invalidate();
 
             HashMO = new DynMetaObject("Hash");
             HashMO.loc_raw_iterator = new CtxHashIterator();
@@ -2263,16 +2330,28 @@ slow:
             HashMO.loc_raw_Bool = new CtxHashBool();
             HashMO.loc_Bool = new CtxBoxify<bool>(HashMO.loc_raw_Bool, BoolMO);
             HashMO.FillProtoClass(new string[] { });
+            WrapHandler1(HashMO, "exists-key", HashMO.loc_exists_key);
+            WrapHandler1(HashMO, "at-key", HashMO.loc_at_key);
+            WrapHandler0(HashMO, "iterator", new CtxBoxify<VarDeque>(
+                        HashMO.loc_raw_iterator, IteratorMO));
+            WrapHandler0(HashMO, "Bool", HashMO.loc_Bool);
+            HashMO.Invalidate();
 
             AnyMO = new DynMetaObject("Any");
             AnyMO.loc_at_key = new IxAnyAtKey();
             AnyMO.loc_at_pos = new IxAnyAtPos();
             AnyMO.FillProtoClass(new string[] { });
+            WrapHandler1(AnyMO, "at-key", AnyMO.loc_at_key);
+            WrapHandler1(AnyMO, "at-pos", AnyMO.loc_at_pos);
+            AnyMO.Invalidate();
 
             CursorMO = new DynMetaObject("Cursor");
             CursorMO.loc_at_key = new IxCursorAtKey();
             CursorMO.loc_at_pos = new IxCursorAtPos();
             CursorMO.FillProtoClass(new string[] { });
+            WrapHandler1(CursorMO, "at-key", CursorMO.loc_at_key);
+            WrapHandler1(CursorMO, "at-pos", CursorMO.loc_at_pos);
+            CursorMO.Invalidate();
 
             MatchMO = new DynMetaObject("Match");
             MatchMO.loc_at_key = CursorMO.loc_at_key;
@@ -2280,12 +2359,10 @@ slow:
             MatchMO.loc_raw_Str = new CtxMatchStr();
             MatchMO.loc_Str = new CtxBoxify<string>(MatchMO.loc_raw_Str, StrMO);
             MatchMO.FillProtoClass(new string[] { });
-
-            SubMO = new DynMetaObject("Sub");
-            SubMO.loc_INVOKE = new InvokeSub();
-            SubMO.FillProtoClass(new string[] { "outer", "info" });
-            SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
-            SubMO.Invalidate();
+            WrapHandler1(MatchMO, "at-key", MatchMO.loc_at_key);
+            WrapHandler1(MatchMO, "at-pos", MatchMO.loc_at_pos);
+            WrapHandler0(MatchMO, "Str", MatchMO.loc_Str);
+            MatchMO.Invalidate();
 
             ScalarMO = new DynMetaObject("Scalar");
             ScalarMO.FillProtoClass(new string[] { });

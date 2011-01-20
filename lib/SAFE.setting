@@ -8,9 +8,7 @@ use MONKEY_TYPING;
 
 # Fundamental types {{{
 my class Mu {
-    method defined() { defined(self) }
     method head() { @(self).head }
-    method Bool() { defined(self) }
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
@@ -43,11 +41,6 @@ my class Mu {
 }
 
 my class Any is Mu {
-    method at-pos(\$self: $ix) {
-        defined($self)
-            ?? ($ix == 0 ?? $self !! die("Invalid index for non-array"))
-            !! _vivify_array_at_pos($self, $ix)
-    }
     method flat() { (self,).list }
     method list() { (self,).list }
 
@@ -468,12 +461,6 @@ my class Parcel is Cool {
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
 
-    method iterator () {
-        Q:CgOp {
-            (box Iterator (vvarlist_from_fvarlist (unbox fvarlist (@ {self}))))
-        };
-    }
-
     method elems() { Q:CgOp {
         (box Num (cast num (fvarlist_length (unbox fvarlist (@ {self})))))
     } }
@@ -527,15 +514,6 @@ my class List is Cool {
         };
     }
 
-    method iterator () {
-        Q:CgOp {
-            (letn it (vvarlist_new_empty)
-              (vvarlist_append (l it) (getslot items vvarlist (@ {self})))
-              (vvarlist_append (l it) (getslot rest vvarlist (@ {self})))
-              (box Iterator (l it)))
-        };
-    }
-
     method flat() {
         self.iterator.flat
     }
@@ -566,86 +544,28 @@ my class List is Cool {
 
     method dump() { '[' ~ self.map(*.dump).join(', ') ~ ']' }
 
-    method !count-items() { Q:CgOp {
-        (box Num (cast num (vvarlist_count (getslot items vvarlist (@ {self})))))
-    } }
-
     method !shift-item() { Q:CgOp {
         (vvarlist_shift (getslot items vvarlist (@ {self})))
-    } }
-
-    method !item-at-pos($ix) { Q:CgOp {
-        (vvarlist_item (cast int (obj_getnum {$ix})) (getslot items vvarlist (@ {self})))
     } }
 
     method !pop-item() { Q:CgOp {
         (vvarlist_pop (getslot items vvarlist (@ {self})))
     } }
 
-    method !push-iterator(\$x) { Q:CgOp {
-        (rnull (vvarlist_push (getslot rest vvarlist (@ {self})) {$x}))
-    } }
-
-    method !push-item(\$x) { Q:CgOp {
-        (rnull (vvarlist_push (getslot items vvarlist (@ {self})) {$x}))
-    } }
-
     method !unshift-item(\$x) { Q:CgOp {
         (rnull (vvarlist_unshift (getslot items vvarlist (@ {self})) {$x}))
     } }
 
-    method !fill ($count) { Q:CgOp {
-        (letn ct (cast int (obj_getnum {$count}))
-              items (getslot items vvarlist (@ {self}))
-              rest  (getslot rest  vvarlist (@ {self}))
-          (whileloop 0 0
-            (ternary (> (l ct) (vvarlist_count (l items)))
-              (iter_hasarg (l rest)) (b 0))
-            (vvarlist_push (l items) (vvarlist_shift (l rest))))
-          (box Bool (<= (l ct) (vvarlist_count (l items)))))
-    } }
+    method shift() { self ?? self!shift-item !! Any }
 
-    method Bool() { self!fill(1) }
-    method shift() { self!fill(1) ?? self!shift-item !! Any }
+    method eager() { +self; self }
 
-    method eager() { Q:CgOp {
-        (letn items (getslot items vvarlist (@ {self}))
-              rest  (getslot rest  vvarlist (@ {self}))
-          (whileloop 0 0 (iter_hasarg (l rest))
-            (vvarlist_push (l items) (vvarlist_shift (l rest))))
-          {self})
-    } }
-
-    method head() { Q:CgOp {
-        (letn items (getslot items vvarlist (@ {self}))
-              rest  (getslot rest  vvarlist (@ {self}))
-          (ternary (!= (i 0) (vvarlist_count (l items)))
-            (vvarlist_item (i 0) (l items))
-            (ternary (iter_hasarg (l rest))
-              (prog
-                (vvarlist_push (l items) (vvarlist_shift (l rest)))
-                (vvarlist_item (i 0) (l items)))
-              {Any})))
-    } }
-
-    method elems() { self!fill(1000_000_000); self!count-items; }
-    method Numeric () { self.elems }
-
-    method at-pos(\$self: $ix) {
-        Q:CgOp {
-            (letn self (@ {$self})
-                  ixn  (cast int (obj_getnum {$ix}))
-              (ternary (obj_is_defined (l self))
-                (letn items (getslot items vvarlist (l self))
-                      rest  (getslot rest  vvarlist (l self))
-                  (ternary (< (l ixn) (vvarlist_count (l items)))
-                    (vvarlist_item (l ixn) (l items))
-                    (ternary (== (i 0) (vvarlist_count (l rest)))
-                      {Any}
-                      {$self!List::fill($ix+1); $self.at-pos($ix)})))
-                {_vivify_array_at_pos($self,$ix)}))
-        };
+    method head() { self ??
+        Q:CgOp { (vvarlist_item (i 0) (getslot items vvarlist (@ {self}))) } !!
+        Any
     }
+
+    method elems()    { +self }
 
     method join($sep) {
         my $t;
@@ -688,10 +608,7 @@ my class List is Cool {
           {Nil})
     } }
 
-    method pop() {
-        self.eager;
-        self!pop-item;
-    }
+    method pop() { +self; self!pop-item; }
 
     method unshift(*@a) {
         for reverse(@a) -> $v { self!unshift-item(anon $new = $v) }
@@ -712,50 +629,10 @@ my class Array is List {
               (newrwlistvar (l sobj)))
         };
     }
-
-    method !extend($ix, \$var) {
-        Q:CgOp {
-            (letn i (getslot items vvarlist (@ {self}))
-                  ct (- (cast int (unbox num (@ {$ix})))
-                        (vvarlist_count (l i)))
-              (ternary (>= (l ct) (int 0)) [prog]
-                [sink [die "Autovivification collision"]])
-              (whileloop 0 0 (!= (l ct) (int 0))
-                (prog
-                  (l ct (- (l ct) (int 1)))
-                  (vvarlist_push (l i) (newrwscalar (@ {Any})))))
-              (vvarlist_push (l i) {$var})
-              (null var))
-        };
-    }
-
-    method at-pos(\$self: $ix) {
-        Q:CgOp {
-            (letn self (@ {$self})
-                  ixn  (cast int (obj_getnum {$ix}))
-              (ternary (obj_is_defined (l self))
-                (letn items (getslot items vvarlist (l self))
-                      rest  (getslot rest  vvarlist (l self))
-                  (ternary (< (l ixn) (vvarlist_count (l items)))
-                    (vvarlist_item (l ixn) (l items))
-                    (ternary (== (i 0) (vvarlist_count (l rest)))
-                      (newvarrayvar (class_ref mo Any) (l self) (l ixn) (@ {Any}))
-                      {$self!List::fill($ix+1); $self.at-pos($ix)})))
-                {_vivify_array_at_pos($self,$ix)}))
-        };
-    }
 }
 
 my class Hash {
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
-    method !extend($key, \$var) {
-        Q:CgOp {
-            (letn d [unbox varhash (@ {self})]
-                  k [obj_getstr {$key}]
-              [varhash_setindex (l k) (l d) {$var}]
-              [null var])
-        };
-    }
     method hash() { unitem(self) }
 
     method Capture () {
@@ -773,8 +650,6 @@ my class Hash {
     method pairs()  { Q:CgOp { (bif_hash_pairs  {self}) } }
     method list()   { Q:CgOp { (bif_hash_pairs  {self}) } }
     method kv()     { Q:CgOp { (bif_hash_kv     {self}) } }
-
-    method Bool () { ?(self.list) }
 
     method invert() {
         my %new;
@@ -797,10 +672,6 @@ my class Hash {
         };
     }
 
-    method exists-key($str) {
-        Q:CgOp { (box Bool (ternary (obj_is_defined (@ {self})) (varhash_contains_key (unbox varhash (@ {self})) (obj_getstr {$str})) (bool 0))) }
-    }
-
     method delete-key($str) {
         Q:CgOp {
             (ternary (obj_is_defined (@ {self}))
@@ -815,20 +686,7 @@ my class Hash {
         };
     }
 
-    method iterator () { self.list.iterator }
     method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
-
-    method at-key(\$self: $key) {
-        Q:CgOp {
-            (letn ky (obj_getstr {$key})
-              (ternary (obj_is_defined (@ {$self}))
-                (letn vh (unbox varhash (@ {$self}))
-                  (ternary (varhash_contains_key (l vh) (l ky))
-                    (varhash_getindex (l ky) (l vh))
-                    (newvhashvar (class_ref mo Any) (@ {$self}) (l ky) (@ {Any}))))
-                (newvnewhashvar (class_ref mo Any) {$self} (l ky) (@ {Any}))))
-        };
-    }
 }
 
 augment class Any {
@@ -837,11 +695,6 @@ augment class Any {
     }
     method delete-key($) {
         defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! Any
-    }
-    method at-key(\$self: $key) {
-        defined($self) ??
-            die("Cannot use hash access on an object of type $self.typename()") !!
-            Q:CgOp { (newvnewhashvar (class_ref mo Any) {$self} (obj_getstr {$key}) (@ {Any})) };
     }
 }
 
@@ -983,10 +836,6 @@ my class Cursor {
     method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
-    method at-key($k) { Q:CgOp {
-        (cursor_item (cast cursor (@ {self})) (obj_getstr {$k}))
-    } }
-    method at-pos($i) { self.at-key($i) }
     token alpha { <+INTERNAL::alpha> }
 }
 
@@ -1000,10 +849,6 @@ my class Match is Cool {
           (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
           (newscalar (l cap)))
     } }
-    method at-key($k) { Q:CgOp {
-        (cursor_item (cast cursor (@ {self})) (obj_getstr {$k}))
-    } }
-    method at-pos($i) { self.at-key($i) }
     method new($) { die "Match.new NYI" }
     method from() { Q:CgOp { (box Num (cast num (cursor_from
         (cast cursor (@ {self}))))) } }
@@ -1014,7 +859,6 @@ my class Match is Cool {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ast () { Q:CgOp { (ns (cursor_ast (cast cursor (@ {self})))) } }
     method chars() { defined(self) ?? $.to - $.from !! 0 }
-    method Str() { defined(self) ?? $.orig.substr($.from, $.chars) !! "" }
     method dump() {
         "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
     }
