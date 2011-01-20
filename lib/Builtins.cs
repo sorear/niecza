@@ -393,7 +393,7 @@ public class Builtins {
         IP6 l = new DynObject(Kernel.ArrayMO);
         l.SetSlot("rest", rest);
         l.SetSlot("items", items);
-        return Kernel.NewRWListVar(l);
+        return Kernel.NewROScalar(l);
     }
 
     public static int GetArity(IP6 fcni) {
@@ -496,6 +496,90 @@ public class Builtins {
         fr.lex0 = iter;
         fr.lex1 = new VarDeque();
         fr.lex2 = fcni;
+        return fr;
+    }
+
+    private static SubInfo CommonGrep_I = new SubInfo("KERNEL grep", null,
+            CommonGrep_C, null, null, new int[] {
+                2, 3, SubInfo.ON_NEXT, 0, 0,
+                2, 3, SubInfo.ON_REDO, 1, 0,
+                2, 3, SubInfo.ON_LAST, 3, 0,
+            }, new string[] { "" }, 0, null, null);
+    private static Frame CommonGrep_C(Frame th) {
+        VarDeque src = (VarDeque) th.lex0;
+        VarDeque outq = (VarDeque) th.lex1;
+        Variable flt = (Variable) th.lex2;
+        int tailmode = th.lexi0;
+
+        switch (th.ip) {
+            case 0:
+                Variable pen = null;
+                while (pen == null) {
+                    if (tailmode != 0) {
+                        if (!Kernel.IterHasFlat(src, false)) break;
+                    } else {
+                        if (src.Count() == 0) break;
+                        if (src[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
+                            DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                            th.lex = new Dictionary<string,object>();
+                            th.lex["!return"] = null;
+                            thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
+                            thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+                            DynObject lst = new DynObject(Kernel.ListMO);
+                            lst.slots[0] = outq;
+                            lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
+                            th.caller.resultSlot = Kernel.NewRWListVar(lst);
+                            th.lexi0 = 1;
+                            return th.caller;
+                        }
+                    }
+                    pen = src.Shift();
+                }
+                if (pen == null) {
+                    DynObject lst = new DynObject(Kernel.ListMO);
+                    lst.slots[0] = outq;
+                    lst.slots[1] = new VarDeque();
+                    th.caller.resultSlot = Kernel.NewRWListVar(lst);
+                    return th.caller;
+                }
+                th.lex3 = pen;
+                th.ip = 1;
+                goto case 1;
+            case 1:
+                th.ip = 2;
+                return flt.Fetch().InvokeMethod(th, "ACCEPTS",
+                        new Variable[] { flt, (Variable)th.lex3 }, null);
+            case 2:
+                Variable r = (Variable) th.resultSlot;
+                if (!r.Fetch().mo.mro_raw_Bool.Get(r)) {
+                    th.ip = 0;
+                    goto case 0;
+                }
+                if (tailmode != 0) {
+                    th.ip = 0;
+                    return Kernel.Take(th, (Variable)th.lex3);
+                } else {
+                    outq.Push((Variable) th.lex3);
+                    th.ip = 0;
+                    goto case 0;
+                }
+            case 3:
+                th.lex0 = src = new VarDeque();
+                goto case 0;
+            default:
+                return Kernel.Die(th, "Invalid IP");
+        }
+    }
+    public static Frame MEGrep(Frame th, Variable[] lst) {
+        VarDeque iter = new VarDeque(lst);
+        Variable fcn = iter.Shift();
+        iter = Kernel.IterFlatten(iter);
+
+        Frame fr = th.MakeChild(null, CommonGrep_I);
+        fr.lexi0 = 0;
+        fr.lex0 = iter;
+        fr.lex1 = new VarDeque();
+        fr.lex2 = fcn;
         return fr;
     }
 }

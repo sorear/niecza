@@ -956,6 +956,8 @@ namespace Niecza.CLRBackend {
             typeof(Builtins).GetMethod("Make");
         public static readonly MethodInfo Builtins_MEMap =
             typeof(Builtins).GetMethod("MEMap");
+        public static readonly MethodInfo Builtins_MEGrep =
+            typeof(Builtins).GetMethod("MEGrep");
         public static readonly Dictionary<string,MethodInfo> DMO_AddFooMethod
             = _FooMethod();
         private static Dictionary<string,MethodInfo> _FooMethod() {
@@ -2857,6 +2859,9 @@ namespace Niecza.CLRBackend {
                     new CpsOp[] { z[0], CpsOp.BoolLiteral(false) }); };
             thandlers["bif_map"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Variable, Tokens.Builtins_MEMap,
+                        new CpsOp[] { CpsOp.NewArray(Tokens.Variable, z) }); };
+            thandlers["bif_grep"] = delegate(CpsOp[] z) {
+                return CpsOp.MethodCall(Tokens.Variable, Tokens.Builtins_MEGrep,
                         new CpsOp[] { CpsOp.NewArray(Tokens.Variable, z) }); };
             thandlers["newrwscalar"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar, new CpsOp[]{
