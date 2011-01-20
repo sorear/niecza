@@ -302,7 +302,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 }
 
 {
-    our $kluw = 99;
+    our $kluw = 99; #OK
     ok $GLOBAL::kluw == 99, "GLOBAL:: works";
     ok $OUR::kluw == 99, "OUR:: works";
 }

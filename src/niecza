@@ -18,6 +18,32 @@ use MONKEY_TYPING;
 
 use CgOp;
 use Metamodel;
+use NieczaActions;
+
+augment class CgOp {
+method _cgop(*@bits) {
+    for @bits { $_ // die "Illegal undef in cgop @bits[0]" }
+    [ @bits ];
+}
+
+method bif_item($i) { self._cgop("bif_item", $i) }
+method bif_list($i) { self._cgop("bif_list", $i) }
+method bif_hash($i) { self._cgop("bif_hash", $i) }
+}
+
+augment class NieczaActions {
+sub node($M) { { line => $M.cursor.lineof($M.to) } }
+method docontext($M, $sigil, $term) {
+    if $sigil !~~ /<[\$\@\%\&]>/ {
+        $M.CURSOR.sorry("Unhandled conext character $sigil");
+    }
+    my $method = ($sigil eq '$' || $sigil eq '&') ?? 'item' !!
+                 ($sigil eq '@') ?? 'list' !!
+                                   'hash';
+
+    ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
+}
+}
 
 # XXX mega hack.
 my class Instant {

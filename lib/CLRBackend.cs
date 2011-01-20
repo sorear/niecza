@@ -3079,6 +3079,9 @@ namespace Niecza.CLRBackend {
             thandlers["bif_bool"] = Contexty("mro_Bool");
             thandlers["bif_num"] = Contexty("mro_Numeric");
             thandlers["bif_str"] = Contexty("mro_Str");
+            thandlers["bif_item"] = Contexty("mro_item");
+            thandlers["bif_list"] = Contexty("mro_list");
+            thandlers["bif_hash"] = Contexty("mro_hash");
             thandlers["obj_asdef"] = Contexty("mro_defined");
             thandlers["obj_asbool"] = Contexty("mro_Bool");
             thandlers["obj_asnum"] = Contexty("mro_Numeric");

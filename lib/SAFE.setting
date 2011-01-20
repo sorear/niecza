@@ -21,7 +21,6 @@ my class Mu {
         }
     }
     method dump() { defined(self) ?? "Unknown{self.typename}" !! "undef" }
-    method item() { self }
     method so() { ?self }
     method not() { !self }
     method RAWCREATE(\|$vars) { Q:CgOp {
@@ -41,10 +40,9 @@ my class Mu {
 }
 
 my class Any is Mu {
-    method flat() { (self,).list }
-    method list() { (self,).list }
+    method flat() { @(self) }
 
-    method sort($cmp = &infix:<leg>) { self.list.sort($cmp) }
+    method sort($cmp = &infix:<leg>) { @(self).sort($cmp) }
 
     method ACCEPTS($t) { self === $t }
     method !butWHENCE($cr) {
@@ -459,7 +457,6 @@ my class Array { ... }
 
 my class Parcel is Cool {
     method flat() { self.iterator.flat }
-    method list() { self.iterator.list }
 
     method elems() { Q:CgOp {
         (box Num (cast num (fvarlist_length (unbox fvarlist (@ {self})))))
@@ -517,7 +514,6 @@ my class List is Cool {
     method flat() {
         self.iterator.flat
     }
-    method list() { unitem(self) }
 
     method Seq () {
         Q:CgOp { (box Iterator (iter_copy_elems (unbox vvarlist (@ {self.eager.iterator})))) }.list
@@ -578,7 +574,7 @@ my class List is Cool {
     method Str() { self.join(" ") }
 
     method sort($cmp = &infix:<leg>) {
-        my $l = self.list.eager;
+        my $l = @(self).eager;
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {List})))
               (setslot items (l n) (vvarlist_sort (@ {$cmp})
@@ -686,7 +682,7 @@ my class Hash {
         };
     }
 
-    method dump () { '{' ~ self.list.map(*.dump).join(', ') ~ '}' }
+    method dump () { '{' ~ @(self).map(*.dump).join(', ') ~ '}' }
 }
 
 augment class Any {
