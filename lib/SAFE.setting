@@ -20,7 +20,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
-    method dump() { defined(self) ?? "Unknown{self.typename}" !! "undef" }
+    method perl() { defined(self) ?? self.Str !! self.typename }
     method so() { ?self }
     method not() { !self }
     method RAWCREATE(\|$vars) { Q:CgOp {
@@ -177,7 +177,6 @@ my class Num is Cool {
     } }
     method Numeric() { self }
     method ACCEPTS($t) { self == $t }
-    method dump() { ~self }
 }
 
 #TODO use a power from the standard library
@@ -203,7 +202,8 @@ my class Str is Cool {
     } }
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
     method substr($from, $len) { substr(self, $from, $len) }
-    method dump() { '"' ~ self ~ '"' }
+    # XXX .trans
+    method perl() { defined(self) ?? '"' ~ self ~ '"' !! 'Str' }
 }
 
 my class Scalar {
@@ -530,7 +530,8 @@ my class List is Cool {
         }
     }
 
-    method dump() { '[' ~ self.map(*.dump).join(', ') ~ ']' }
+    method perl() { defined(self) ?? '[' ~ self.map(*.perl).join(', ') ~ ']'
+        !! self.typename }
 
     method !shift-item() { Q:CgOp {
         (vvarlist_shift (getslot items vvarlist (@ {self})))
@@ -674,7 +675,7 @@ my class Hash {
         };
     }
 
-    method dump () { '{' ~ @(self).map(*.dump).join(', ') ~ '}' }
+    method perl () { defined(self) ?? '{' ~ @(self).map(*.perl).join(', ') ~ '}' !! self.typename }
 }
 
 augment class Any {
@@ -706,7 +707,7 @@ my class Enum is Cool {
         ($.key, $.value);
     }
 
-    method dump() { self.key.dump ~ ' => ' ~ self.value.dump }
+    method perl() { defined(self) ?? (self.key.perl ~ ' => ' ~ self.value.perl) !! self.typename }
 
     method pairs() {
         self.flat;
@@ -847,8 +848,9 @@ my class Match is Cool {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ast () { Q:CgOp { (ns (cursor_ast (cast cursor (@ {self})))) } }
     method chars() { defined(self) ?? $.to - $.from !! 0 }
-    method dump() {
-        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).dump }) named({ %(self).dump })>"
+    method perl() {
+        !defined(self) ?? self.typename !!
+        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).perl }) named({ %(self).perl })>"
     }
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
         Q:CgOp {
