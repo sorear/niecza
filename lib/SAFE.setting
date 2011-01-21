@@ -906,6 +906,127 @@ my class Grammar is Cursor {
     }
 }
 # }}}
+# Other operators {{{
+constant Inf = 1 / 0;
+my class RangeIter is IterCursor {
+    has $.current;
+    has $.limit;
+    has $.exclusive;
+
+    method reify() {
+        ($!exclusive ?? ($!current >= $!limit) !! ($!current > $!limit))
+            ?? Nil !! ($!current, RangeIter.new(current => $!current + 1,
+                    limit => $!limit, exclusive => $!exclusive));
+    }
+}
+
+my class Range is Cool {
+    has $.min;
+    has $.max;
+    has $.excludes_min = False;
+    has $.excludes_max = False;
+
+    method new($min, $max, :$excludes_min = False, :$excludes_max = False) {
+        unitem(self.CREATE(min => ($min.^isa(Whatever) ?? -Inf !! $min),
+            max => ($max.^isa(Whatever) ?? Inf !! $max),
+            :$excludes_min, :$excludes_max));
+    }
+
+    method list() { self.iterator.list }
+    method flat() { self.iterator.flat }
+
+    method bounds() { $.min, $.max }
+    method from() { $.min }
+    method to() { $.max }
+
+    method iterator() {
+        &infix:<,>(RangeIter.new(:current($!excludes_min ?? $!min + 1 !! $!min),
+                      :limit($!max), :exclusive($!excludes_max))).iterator
+    }
+
+    method Str() { self.perl }
+    method perl() {
+        ( $.min.perl,
+          ('^' if $.excludes_min),
+          '..',
+          ('^' if $.excludes_max),
+          $.max.perl
+        ).join('');
+    }
+
+    method ACCEPTS($topic) {
+        !defined(self) ?? ($topic.^isa(Range)) !!
+        ($topic.^isa(Range) ??
+            (($.min == $topic.min)
+                && ($.max == $topic.max)
+                && ($.excludes_min == $topic.excludes_min)
+                && ($.excludes_max == $topic.excludes_min)) !!
+            (self!min_test($topic) && self!max_test($topic)))
+    }
+
+    method !max_test($topic) {
+        $topic < $.max || (!$.excludes_max && !($topic > $.max));
+    }
+
+    method !min_test($topic) {
+        $.min < $topic || (!$.excludes_min && !($.min > $topic));
+    }
+}
+
+sub infix:<..> ($a, $b)   { Range.new($a, $b) }
+sub infix:<..^> ($a, $b)  { Range.new($a, $b, :excludes_max) }
+sub infix:<^..> ($a, $b)  { Range.new($a, $b, :excludes_min) }
+sub infix:<^..^> ($a, $b) { Range.new($a, $b, :excludes_min, :excludes_max) }
+
+sub infix:<%%> ($x,$y) { $x % $y == 0 }
+sub infix:<?&> ($a, $b) { $a && $b }
+sub infix:<?|> ($a, $b) { $a || $b }
+sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
+sub prefix:<?^> ($a) { !$a }
+sub prefix:<|> (\$item) { $item.Capture }
+sub prefix:<^> ($limit) { 0 ..^ $limit }
+sub prefix:<so> ($item) { ?$item }
+sub infix:<xx> (\$list, $ct) { map { $list }, ^$ct }
+sub prefix:<abs> ($x) { $x > 0 ?? $x !! -$x }
+# XXX 'Order' type
+sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
+# XXX polymorphic equality
+sub infix:<cmp> ($a, $b) { $a leg $b }
+sub infix:<eqv> ($a, $b) { $a eq $b }
+sub infix:<before> ($a, $b) { $a lt $b }
+sub infix:<after> ($a, $b) { $a gt $b }
+sub seqop($op) { $op } # TODO: Special case with hyper
+sub reverseop($op) { sub (\$x, \$y) { $op($y, $x) } }
+
+sub infix:<%> ($x,$y) { die "Modulus calculation NYI"; } #OK
+sub infix:<div> ($x,$y) { die "Modulus calculation NYI"; } #OK
+sub infix:<mod> ($x,$y) { die "Modulus calculation NYI"; } #OK
+sub infix:<~&> ($x, $y) { die "Buffer bitops NYI"; } #OK
+sub infix:<~|> ($x, $y) { die "Buffer bitops NYI"; } #OK
+sub infix:<~^> ($x, $y) { die "Buffer bitops NYI"; } #OK
+sub infix:«~<» ($x, $y) { die "Buffer bitops NYI"; } #OK
+sub infix:«~>» ($x, $y) { die "Buffer bitops NYI"; } #OK
+sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
+sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
+sub postfix:<i> ($item) { die "Complex NYI" } #OK
+sub infix:<&> (\|$args) { die "Junctions NYI" } #OK
+sub infix:<|> (\|$args) { die "Junctions NYI" } #OK
+sub infix:<^> (\|$args) { die "Junctions NYI" } #OK
+sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
+sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
+sub infix:<=:=> (\$a, \$b) { die "Binding checks NYI" } #OK
+sub infix:<X> (\|$args) { die "Cross products NYI" } #OK
+sub crossop($op) { die "Cross products NYI" } #OK
+sub infix:<Z> (\|$args) { die "Zip operators NYI" } #OK
+sub zipop($op) { die "Zip operators NYI" } #OK
+sub infix:<minmax>(\|$args) { die "minmax NYI" } #OK
+sub infix:<...>(\|$args) { die "Series op NYI" } #OK
+sub infix:<...^>(\|$args) { die "Series op NYI" } #OK
+sub infix:« ==> »(\|$args) { die "Feed ops NYI" } #OK
+sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
+sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
+sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
+# }}}
 
 # this needs to be at the end because it screws up the parsing of everything
 # after it.

@@ -2,6 +2,16 @@
 use Test;
 use MONKEY_TYPING;
 
+{
+    is [ 1..5 ], "1 2 3 4 5", "Ranges work in list context";
+    is [ 1 ..^ 5 ], "1 2 3 4", "Tail exclusion works";
+    is [ 1 ^.. 5 ], "2 3 4 5", "Head exclusion works";
+    is [ 1 ^..^ 5 ], "2 3 4", "Dual exclusion works";
+    is [ ^5 ], "0 1 2 3 4", "Shorthand form works";
+    is ((5 .. *)[3]), 8, "Infinite ranges can be iterated";
+    ok 3 ~~ 1..4, "Range checking works (+)";
+    ok 5 !~~ 1..4, "Range checking works (-)";
+}
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
