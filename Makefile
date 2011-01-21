@@ -21,8 +21,10 @@ all: run/Niecza.exe obj/Kernel.dll obj/CLRBackend.exe
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -v -c -Bnam niecza
-	for nfile in $(libunits) $(srcunits); do echo $$nfile; \
-	    if [ boot/obj/$$nfile.nam -nt boot/obj/$$nfile.dll ]; then \
+	for nfile in $(libunits) $(srcunits); do \
+	    if [ boot/obj/$$nfile.nam -nt boot/obj/$$nfile.dll -o \
+			! -e boot/obj/$$nfile.dll ]; then \
+		echo $$nfile; \
 		$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
 	fi; done
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
@@ -49,4 +51,3 @@ test: all
 
 p6eval: all
 	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
-	$(RUN_CLR) --aot run/*.dll run/Niecza.exe
