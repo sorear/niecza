@@ -17,6 +17,7 @@ srcunits=CClass Body Unit CgOp Op Sig RxOp NAME Stash STD NieczaGrammar \
 	 NieczaBackendNAM NieczaBackendDotnet NieczaBackendClisp NieczaCompiler
 
 all: run/Niecza.exe obj/Kernel.dll obj/CLRBackend.exe
+	git describe --tags > VERSION
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -v -c -Bnam niecza
