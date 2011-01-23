@@ -19,6 +19,7 @@ use MONKEY_TYPING;
 use CgOp;
 use Metamodel;
 use NieczaActions;
+use Operator;
 
 augment class CgOp {
 method _cgop(*@bits) {
@@ -36,6 +37,17 @@ method bif_array_constructor($i) { self._cgop("bif_array_constructor", $i) }
 
 augment class NieczaActions {
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
+
+sub mklet($value, $body) {
+    my $var = NieczaActions.gensym;
+    ::Op::Let.new(var => $var, to => $value,
+        in => $body(::Op::LetVar.new(name => $var)));
+}
+
+sub mkcall($/, $name, *@positionals) {
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
 method docontext($M, $sigil, $term) {
     if $sigil !~~ /<[\$\@\%\&]>/ {
         $M.CURSOR.sorry("Unhandled conext character $sigil");
@@ -45,6 +57,193 @@ method docontext($M, $sigil, $term) {
                                    'hash';
 
     ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
+}
+method POSTFIX($/) {
+    my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
+    if $<op><colonpair> {
+        if $arg.^isa(::Op::CallLike) {
+            make $arg.adverb($<op><colonpair>.ast<term>);
+            make self.whatever_postcheck($/, $st, $/.ast);
+        } else {
+            $/.CURSOR.sorry("You can't adverb that");
+            make ::Op::StatementList.new;
+        }
+        return Nil;
+    }
+    make $<op>.ast.with_args($/, $arg);
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+method postcircumfix:sym<[ ]> ($/) {
+    make Operator.funop('&postcircumfix:<[ ]>', @( $<semilist>.ast ));
+}
+method postcircumfix:sym<{ }> ($/) {
+    make Operator.funop('&postcircumfix:<{ }>', @( $<semilist>.ast ));
+}
+method postcircumfix:sym«< >» ($/) {
+    self.split_circumfix($/);
+    make Operator.funop('&postcircumfix:<{ }>', $/.ast);
+}
+method postcircumfix:sym<( )> ($/) {
+    make ::Operator::PostCall.new(args => $<semiarglist>.ast[0]);
+}
+method dottyop($/) {
+    if $<colonpair> {
+        $/.CURSOR.sorry("Colonpair dotties NYI");
+        make Operator.funop('&postfix:<++>');
+        return Nil;
+    }
+
+    make $<methodop>.ast if $<methodop>;
+    make $<postop>.ast if $<postop>;
+}
+
+method dotty:sym<.*> ($/) {
+    if !$<dottyop>.ast.^isa(::Operator::Method) {
+        $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
+        make Operator.funop('&postfix:<++>');
+        return Nil;
+    }
+    if $<sym> eq '.^' {
+        make $<dottyop>.ast.clone(:meta);
+    } else {
+        $/.CURSOR.sorry("NYI dottyop form $<sym>");
+        make Operator.funop('&postfix:<++>');
+    }
+}
+
+method methodop($/) {
+    if $<longname> {
+        my $c = self.mangle_longname($<longname>);
+        make ::Operator::Method.new(name => $c<name>, path => $c<path>);
+    } elsif $<quote> {
+        make ::Operator::Method.new(name => $<quote>.ast);
+    } elsif $<variable> {
+        make ::Operator::Function.new(function =>
+            self.do_variable_reference($/, $<variable>.ast));
+    }
+
+    $/.ast.args = $<args>[0].ast[0] if $<args>[0];
+    $/.ast.args = $<arglist>[0].ast if $<arglist>[0];
+}
+
+method privop($/) {
+    if $<methodop>.ast.^isa(::Operator::Function) {
+        $/.CURSOR.sorry("! privacy marker only affects search, and as such is meaningless with a method reference.");
+    } else {
+        make $<methodop>.ast.clone(:private);
+    }
+}
+
+method postop($/) {
+    make $<postcircumfix> ?? $<postcircumfix>.ast !! $<postfix>.ast;
+}
+method term:name ($/) {
+    my ($id, $path) = self.mangle_longname($<longname>).<name path>;
+
+    if $<args> {
+        $/.CURSOR.sorry("Unsupported form of term:name");
+        make ::Op::StatementList.new;
+        return Nil;
+    }
+
+    if defined $path {
+        make ::Op::PackageVar.new(|node($/), name => $id,
+            slot => self.gensym, path => $path);
+    } else {
+        make ::Op::Lexical.new(|node($/), name => $id);
+    }
+
+    if $<postcircumfix> {
+        make mkcall($/, '&_param_role_inst', $/.ast,
+            @( $<postcircumfix>[0].ast.args ));
+    }
+}
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
+
+    my ($name, $rest);
+    my $dsosl = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        Any;
+    if defined($dsosl) && defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return Nil;
+    } elsif defined $dsosl {
+        ($name, $rest) = $dsosl<name path>;
+    } elsif $<name> {
+        # Both these cases are marked XXX in STD.  I agree.  What are they for?
+        if $<name>[0].ast<dc> {
+            $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
+            make { term => ::Op::StatementList.new };
+            return Nil;
+        }
+        if substr(~$/,0,3) eq '$::' {
+            $rest = $<name>[0].ast.<names>;
+            $name = pop $rest;
+        } else {
+            if $<name>[0].ast<names> > 1 {
+                $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
+                make { term => ::Op::StatementList.new };
+                return Nil;
+            }
+            $name = $<name>[0].ast<names>[0];
+            $twigil = ':';
+        }
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+        $twigil = '*' if $name eq '/' or $name eq '!';
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            ::Op::CallMethod.new(|node($/), name => 'at-pos',
+                receiver => ::Op::ContextVar.new(name => '$*/'),
+                positionals => [ ::Op::Num.new(value => $<index>.ast) ])
+        };
+        return Nil;
+    } elsif $<postcircumfix> {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
+                ::Op::CallMethod.new(|node($/), name => 'at-key',
+                    receiver    => ::Op::ContextVar.new(name => '$*/'),
+                    positionals => $<postcircumfix>[0].ast.args)
+            };
+            return Nil;
+        } else {
+            $/.CURSOR.sorry("Contextualizer variables NYI");
+            make { term => ::Op::StatementList.new };
+            return Nil;
+        }
+    } else {
+        $/.CURSOR.sorry("Non-simple variables NYI");
+        make { term => ::Op::StatementList.new };
+        return Nil;
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
+    };
+}
+method FALLBACK($meth, $/) {
+    if $meth eq '::($name)' { # XXX STD miscompilation
+        if $<O><prec> eq 't=' { # additive
+            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        } elsif $<semilist> && $<O><prec> eq 'y=' {
+            my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
+                die "Unhandled postcircumfix ending in $*GOAL";
+            make Operator.funop('&postcircumfix:<' ~ $sym ~ '>', @( $<semilist>.ast ));
+        } elsif $<O><prec> eq 'y=' {
+            make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
+        }
+        return Nil;
+    } elsif substr($meth,0,7) eq 'prefix:' {
+    } elsif substr($meth,0,8) eq 'postfix:' {
+        make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+        return Nil;
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
 }
 }
 
