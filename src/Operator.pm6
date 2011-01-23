@@ -22,7 +22,7 @@ sub mkcall($/, $name, *@positionals) {
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
 
-method whatever_curry() { True }
+method whatever_curry() { False }
 method assignish() { False }
 
 method meta_assign() { ::Operator::CompoundAssign.new(base => self); }
@@ -63,8 +63,6 @@ class PostCall is Operator {
             invocant => @args[0],
             args => [ @$.args ]);
     }
-
-    method whatever_curry() { False }
 }
 
 class Method is Operator {
@@ -100,6 +98,7 @@ class Method is Operator {
                 args     => [ @$.args ]);
         }
     }
+    method whatever_curry() { True }
 }
 
 class ShortCircuit is Operator {
@@ -108,6 +107,8 @@ class ShortCircuit is Operator {
     method with_args($/, *@args) {
         ::Op::ShortCircuit.new(|node($/), kind => $.kind, args => [ @args ])
     }
+
+    method whatever_curry() { True }
 }
 
 class CompoundAssign is Operator {
@@ -127,7 +128,6 @@ class CompoundAssign is Operator {
     }
 
     method assignish() { True }
-    method whatever_curry() { False }
 }
 
 class MetaNot is Operator {
@@ -136,6 +136,8 @@ class MetaNot is Operator {
     method with_args($/, *@args) {
         mkcall($/, '&prefix:<!>', $.base.with_args(@args));
     }
+
+    method whatever_curry() { True }
 }
 
 class Binding is Operator {
@@ -147,7 +149,6 @@ class Binding is Operator {
     }
 
     method assignish() { True }
-    method whatever_curry() { False }
 }
 
 class Comma is Operator {
@@ -158,8 +159,6 @@ class Comma is Operator {
         }
         ::Op::SimpleParcel.new(|node($/), items => @bits);
     }
-
-    method whatever_curry() { False }
 }
 
 class Ternary is Operator {
@@ -168,6 +167,19 @@ class Ternary is Operator {
         ::Op::Conditional.new(|node($/), check => @args[0], true => $.middle,
             false => @args[1]);
     }
+}
 
-    method whatever_curry() { False }
+class Temp is Operator {
+    method with_args($/, *@args) {
+        my $rarg = @args[0];
+        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
+            $/.CURSOR.sorry('Non-contextual case of temp NYI');
+            return ::Op::StatementList.new;
+        }
+        mkcall($/, '&infix:<=>',
+            ::Op::Lexical.new(name => $rarg.name, declaring => True,
+                        hash => substr($rarg.name,0,1) eq '%',
+                        list => substr($rarg.name,0,1) eq '@'),
+            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+    }
 }

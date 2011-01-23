@@ -48,6 +48,29 @@ sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
+my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
+    '&infix:<...>', '&infix:<=>', '&infix:<xx>'));
+method whatever_precheck($op, *@args) {
+    return ([], @args) if ($op.^isa(Operator) ?? !$op.whatever_curry !! %_nowhatever{$op});
+    my @vars;
+    my @args_ = @args;
+    for @args_ -> $a is rw {
+        die "invalid undef here" if !$a;
+        if $a.^isa(::Op::Whatever) {
+            push @vars, $a.slot;
+            $a = ::Op::Lexical.new(name => $a.slot);
+        } elsif $a.^isa(::Op::WhateverCode) {
+            push @vars, @( $a.vars );
+            $a = $a.ops;
+        }
+    }
+    $( @vars ), @args_;
+}
+method PRE($/) { make $<prefix>.ast }
+method PREFIX($/) {
+    my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
+    make self.whatever_postcheck($/, $st, $<op>.ast.with_args($/, $arg));
+}
 method docontext($M, $sigil, $term) {
     if $sigil !~~ /<[\$\@\%\&]>/ {
         $M.CURSOR.sorry("Unhandled conext character $sigil");
@@ -59,7 +82,7 @@ method docontext($M, $sigil, $term) {
     ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
 }
 method POSTFIX($/) {
-    my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
+    my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
     if $<op><colonpair> {
         if $arg.^isa(::Op::CallLike) {
             make $arg.adverb($<op><colonpair>.ast<term>);
@@ -223,19 +246,24 @@ method variable($/) {
         sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
     };
 }
+method prefix:temp ($/) { make ::Operator::Temp.new }
 method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
-        if $<O><prec> eq 't=' { # additive
+        my $p = $<O><prec>;
+        if $p eq 't=' { # additive
             make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
-        } elsif $<semilist> && $<O><prec> eq 'y=' {
+        } elsif $p eq 'y=' && $<semilist> {
             my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
                 die "Unhandled postcircumfix ending in $*GOAL";
             make Operator.funop('&postcircumfix:<' ~ $sym ~ '>', @( $<semilist>.ast ));
-        } elsif $<O><prec> eq 'y=' {
+        } elsif $p eq 'y=' {
             make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
+        } elsif $p eq 'v=' || $p eq 'o=' {
+            make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>');
         }
         return Nil;
     } elsif substr($meth,0,7) eq 'prefix:' {
+        make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>');
     } elsif substr($meth,0,8) eq 'postfix:' {
         make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
     } elsif substr($meth,0,6) eq 'infix:' {

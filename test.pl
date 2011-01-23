@@ -369,7 +369,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
     ok ((*) eq "foo") eq "Bool::False", "parens defeat Whatever directly";
     ok (1 + 2 * *)(5) == 11, "nested Whatever works";
     ok (2 * (1 + *))(5) == 12, "parens for grouping do not kill WhateverCode";
-    ok (* + *)(5,12) == 19, "multiple *, multiple args";
+    ok (* + *)(5,12) == 17, "multiple *, multiple args";
     ok ((2 * *) + (3 * *))(13,19) == 83, "even from groups";
     ok (1,*).^isa(Parcel), "infix:<,> doesn't curry";
 }
