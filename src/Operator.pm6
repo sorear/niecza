@@ -134,7 +134,7 @@ class MetaNot is Operator {
     has $.base; # Operator
 
     method with_args($/, *@args) {
-        mkcall($/, '&prefix:<!>', $.base.with_args(@args));
+        mkcall($/, '&prefix:<!>', $.base.with_args($/, @args));
     }
 
     method whatever_curry() { True }

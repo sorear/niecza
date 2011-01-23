@@ -71,6 +71,34 @@ method PREFIX($/) {
     my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
     make self.whatever_postcheck($/, $st, $<op>.ast.with_args($/, $arg));
 }
+method infix:sym<,>($/) { make ::Operator::Comma.new }
+method infix:sym<:=>($/) { make ::Operator::Binding.new(:!readonly) }
+method infix:sym<::=>($/) { make ::Operator::Binding.new(:readonly) }
+method infix:sym<&&>($/) { make ::Operator::ShortCircuit.new(kind => '&&') }
+method infix:sym<and>($/) { make ::Operator::ShortCircuit.new(kind => '&&') }
+method infix:sym<||>($/) { make ::Operator::ShortCircuit.new(kind => '||') }
+method infix:sym<or>($/) { make ::Operator::ShortCircuit.new(kind => '||') }
+method infix:sym<//>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
+method infix:sym<orelse>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
+method infix:sym<andthen>($/) { make ::Operator::ShortCircuit.new(kind => 'andthen') }
+method infix:sym<?? !!>($/) { make ::Operator::Ternary.new(middle => $<EXPR>.ast) }
+method infixish($/) {
+    if $<colonpair> || $<regex_infix> {
+        return Nil; # handled elsewhere
+    }
+
+    if $<assign_meta_operator> {
+        # TODO: there should probably be at least a potential for others
+
+        make $<infix>.ast.meta_assign;
+    } else {
+        make $<infix>.ast;
+    }
+}
+method infix_prefix_meta_operator:sym<!> ($/) {
+    make $<infixish>.ast.meta_not;
+}
+
 method docontext($M, $sigil, $term) {
     if $sigil !~~ /<[\$\@\%\&]>/ {
         $M.CURSOR.sorry("Unhandled conext character $sigil");
@@ -80,6 +108,74 @@ method docontext($M, $sigil, $term) {
                                    'hash';
 
     ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
+}
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    if $fn.assignish {
+        # Assignments to has and state declarators are rewritten into
+        # an appropriate phaser
+        if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+            my $cv = self.gensym;
+            make ::Op::StatementList.new(|node($/), children => [
+                ::Op::Start.new(condvar => $cv, body => $/.ast),
+                ::Op::Lexical.new(name => $lhs.name)]);
+        }
+        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+            $lhs.initializer = self.sl_to_block('bare', $rhs,
+                subname => $lhs.name ~ " init");
+            make $lhs;
+        }
+        elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+            $lhs.init = $rhs;
+            make $lhs;
+        }
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+method CHAIN($/) {
+    my @args;
+    my @ops;
+    my $i = 0;
+    while True {
+        push @args, $<chain>[$i++].ast;
+        last if $i == $<chain>;
+        push @ops,  $<chain>[$i++]<infix>.ast;
+    }
+
+    my ($st, @vargs) = self.whatever_precheck(@ops[0], @args);
+
+    sub reduce() {
+        my $fa = shift @vargs;
+        my $fo = shift @ops;
+        if @ops {
+            mklet($fa, -> $lhs { mklet(@vargs[0], -> $rhs {
+                @vargs[0] = $rhs;
+                ::Op::ShortCircuit.new(|node($/), kind => '&&', args =>
+                    [ $fo.with_args($/, $lhs, $rhs), reduce() ]) }) })
+        } else {
+            $fo.with_args($/, $fa, @vargs[0])
+        }
+    }
+
+    make self.whatever_postcheck($/, $st, reduce());
+}
+
+method LIST($/) {
+    if $/.CURSOR.^isa(::STD::Regex) {
+        self.LISTrx($/);
+        return Nil;
+    }
+    # STD guarantees that all elements of delims have the same sym
+    # the last item may have an ast of undef due to nulltermish
+    my $fn = $<delims>[0].ast;
+    my ($st, @pos) = self.whatever_precheck($fn,
+        grep *.&defined, map *.ast, @( $<list> ));
+
+    make self.whatever_postcheck($/, $st, $fn.with_args($/, @pos));
 }
 method POSTFIX($/) {
     my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
@@ -251,7 +347,7 @@ method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
         my $p = $<O><prec>;
         if $p eq 't=' { # additive
-            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
+            make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>');
         } elsif $p eq 'y=' && $<semilist> {
             my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
                 die "Unhandled postcircumfix ending in $*GOAL";
@@ -261,14 +357,12 @@ method FALLBACK($meth, $/) {
         } elsif $p eq 'v=' || $p eq 'o=' {
             make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>');
         }
-        return Nil;
     } elsif substr($meth,0,7) eq 'prefix:' {
         make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>');
     } elsif substr($meth,0,8) eq 'postfix:' {
         make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
     } elsif substr($meth,0,6) eq 'infix:' {
-        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
-        return Nil;
+        make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>');
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
     }
