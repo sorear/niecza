@@ -13,6 +13,12 @@ use MONKEY_TYPING;
     ok 5 !~~ 1..4, "Range checking works (-)";
 }
 
+{
+    my $i = 0;
+    1 < ($i++; 2) < 3;
+    is $i, 1, "Chained comparisons only evaluate terms once";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

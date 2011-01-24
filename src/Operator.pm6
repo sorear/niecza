@@ -4,6 +4,9 @@
 #
 class Operator;
 
+use Body;
+use Sig;
+
 has $.whatever_curry;
 has $.assignish;
 
@@ -17,9 +20,16 @@ sub mklet($value, $body) {
         in => $body(::Op::LetVar.new(name => $var)));
 }
 
+sub mklex($/, $name) { ::Op::Lexical.new(|node($/), :$name); }
+
 sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+
+method as_function($/) {
+    $/.CURSOR.sorry("This macro cannot be used as a function");
+    mklex($/, '&die');
 }
 
 method whatever_curry() { False }
@@ -27,19 +37,43 @@ method assignish() { False }
 
 method meta_assign() { ::Operator::CompoundAssign.new(base => self); }
 method meta_not() { ::Operator::MetaNot.new(base => self); }
+method meta_fun($/, $fun, *@extra) {
+    ::Operator::Function.new(function => mklex($/, $fun),
+        preargs => [ @extra, self.as_function($/) ])
+}
 
 method funop($name, *@args) {
     ::Operator::Function.new(function => ::Op::Lexical.new(name => $name),
         args => @args)
 }
 
+method wrap_in_function($/) {
+    my @args;
+    my $i = -self.arity;
+    while $i++ { push @args, ::GLOBAL::NieczaActions.gensym }
+    my $do = self.with_args($/, map { mklex($/, $_) }, @args);
+    ::Op::SubDef.new(|node($/), var => ::GLOBAL::NieczaActions.gensym,
+        body => Body.new( :transparent, signature => Sig.simple(@args), :$do));
+}
+
 class Function is Operator {
     has $.function; # Op; .++; use args for assuming-nature (but at end)
-    has $.args = []; # Array of Op
+    has $.arity;
+    constant $empty = [];
+    has $.args = $empty; # Array of Op
+    has $.preargs = $empty; # Array of Op
+
+    method as_function($/) {
+        if $.args || $.preargs {
+            self.wrap_in_function($/)
+        } else {
+            $.function
+        }
+    }
 
     method with_args($/, *@args) {
         ::Op::CallSub.new(|node($/), invocant => $.function,
-            positionals => [ @args, @$.args ])
+            positionals => [ @$.preargs, @args, @$.args ])
     }
 
     method !name() {
@@ -63,6 +97,9 @@ class PostCall is Operator {
             invocant => @args[0],
             args => [ @$.args ]);
     }
+
+    method as_function($/) { self.wrap_in_function($/, 1) }
+    method arity() { 1 }
 }
 
 class Method is Operator {
@@ -76,6 +113,9 @@ class Method is Operator {
         self.new(name => $!name, args => $!args, meta => $!meta,
             private => $!private, path => $!path, |%_);
     }
+
+    method as_function($/) { self.wrap_in_function($/) }
+    method arity() { 1 }
 
     method with_args($/, *@args) {
         if ($.name eq 'HOW' || $.name eq 'WHAT') && !$.private && !$.meta {
@@ -114,18 +154,18 @@ class ShortCircuit is Operator {
 class CompoundAssign is Operator {
     has $.base; # Operator
 
-    method with_args($/, *@args) {
-        my @margs = @args;
-        my $left = @margs[0];
+    method with_args($/, $left, *@rest) {
         if $left.^isa(::Op::Lexical) {
-            @margs[0] = ::Op::Lexical.new(|node($/), name => $left.name);
-            mkcall($/, '&infix:<=>', $left, $.base.with_args($/, @margs));
+            my $nlft = ::Op::Lexical.new(|node($/), name => $left.name);
+            mkcall($/, '&infix:<=>', $left, $.base.with_args($/, $nlft, @rest));
         } else {
             mklet($left, -> $ll {
-                @margs[0] = $ll;
-                mkcall($/, '&infix:<=>', $ll, $.base.with_args($/, @margs)) });
+                mkcall($/, '&infix:<=>', $ll, $.base.with_args($/, $ll, @rest)) });
         }
     }
+
+    method as_function($/) { self.wrap_in_function($/) }
+    method arity() { $.base.arity }
 
     method assignish() { True }
 }
@@ -159,6 +199,7 @@ class Comma is Operator {
         }
         ::Op::SimpleParcel.new(|node($/), items => @bits);
     }
+    method as_function($/) { mklex($/, '&infix:<,>') }
 }
 
 class Ternary is Operator {

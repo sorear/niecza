@@ -98,6 +98,29 @@ method infixish($/) {
 method infix_prefix_meta_operator:sym<!> ($/) {
     make $<infixish>.ast.meta_not;
 }
+method infix_prefix_meta_operator:sym<R> ($/) {
+    make $<infixish>.ast.meta_fun($/, '&reverseop');
+}
+method infix_prefix_meta_operator:sym<Z> ($/) {
+    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&zipop') !!
+        Operator.funop('&infix:<Z>');
+}
+method infix_prefix_meta_operator:sym<X> ($/) {
+    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&crossop') !!
+        Operator.funop('&infix:<X>');
+}
+method infix_prefix_meta_operator:sym<S> ($/) {
+    make $<infixish>.ast.meta_fun($/, '&seqop');
+}
+sub mkbool($i) { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
+method infix_circumfix_meta_operator:sym<« »> ($/) {
+    make $<infixish>.ast.meta_fun($/, '&hyper',
+        mkbool(substr($/,0,1) eq '«'), mkbool(substr($/,chars($/)-1,1) eq '»'));
+}
+method infix_circumfix_meta_operator:sym«<< >>» ($/) {
+    make $<infixish>.ast.meta_fun($/, '&hyper', mkbool(substr($/,0,2) eq '<<'),
+        mkbool(substr($/,chars($/)-2,2) eq '>>'));
+}
 
 method docontext($M, $sigil, $term) {
     if $sigil !~~ /<[\$\@\%\&]>/ {
