@@ -66,7 +66,6 @@ method whatever_precheck($op, *@args) {
     }
     $( @vars ), @args_;
 }
-method PRE($/) { make $<prefix>.ast }
 method PREFIX($/) {
     my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
     make self.whatever_postcheck($/, $st, $<op>.ast.with_args($/, $arg));
@@ -201,6 +200,15 @@ method LIST($/) {
 
     make self.whatever_postcheck($/, $st, $fn.with_args($/, @pos));
 }
+method PRE($/) {
+    make $<prefix>.ast if $<prefix>;
+    make $<prefix_circumfix_meta_operator>.ast
+        if $<prefix_circumfix_meta_operator>;
+
+    for @$<prefix_postfix_meta_operator> {
+        make $/.ast.meta_fun($/, '&hyperunary', 1);
+    }
+}
 method POST($/) {
     make $<dotty>.ast  if $<dotty>;
     make $<privop>.ast if $<privop>;
@@ -210,7 +218,15 @@ method POST($/) {
         make $/.ast.meta_fun($/, '&hyperunary', 1);
     }
 }
+method prefix_circumfix_meta_operator:reduce ($/) {
+    my $assoc = $<s><op><O><assoc>;
+    my $op = $<s><op>.ast;
+    my $tr = substr($/,1,1) eq '\\';
+    make $op.meta_fun($/, '&reduceop', 1, mkbool($tr), mkbool($assoc eq 'list'),
+        mkbool($assoc eq 'right'), mkbool($assoc eq 'chain'));
+}
 method postfix_prefix_meta_operator:sym< » > ($/) { } #handled in POST
+method prefix_postfix_meta_operator:sym< « > ($/) { } #handled in PRE
 method POSTFIX($/) {
     my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
     if $<op><colonpair> {
