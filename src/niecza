@@ -99,26 +99,27 @@ method infix_prefix_meta_operator:sym<!> ($/) {
     make $<infixish>.ast.meta_not;
 }
 method infix_prefix_meta_operator:sym<R> ($/) {
-    make $<infixish>.ast.meta_fun($/, '&reverseop');
+    make $<infixish>.ast.meta_fun($/, '&reverseop', 2);
 }
 method infix_prefix_meta_operator:sym<Z> ($/) {
-    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&zipop') !!
-        Operator.funop('&infix:<Z>');
+    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&zipop', 2) !!
+        Operator.funop('&infix:<Z>', 2);
 }
 method infix_prefix_meta_operator:sym<X> ($/) {
-    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&crossop') !!
-        Operator.funop('&infix:<X>');
+    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&crossop', 2) !!
+        Operator.funop('&infix:<X>', 2);
 }
 method infix_prefix_meta_operator:sym<S> ($/) {
-    make $<infixish>.ast.meta_fun($/, '&seqop');
+    make $<infixish>.ast.meta_fun($/, '&seqop', 2);
 }
 sub mkbool($i) { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 method infix_circumfix_meta_operator:sym<« »> ($/) {
-    make $<infixish>.ast.meta_fun($/, '&hyper',
+    make $<infixish>.ast.meta_fun($/, '&hyper', 2,
         mkbool(substr($/,0,1) eq '«'), mkbool(substr($/,chars($/)-1,1) eq '»'));
 }
 method infix_circumfix_meta_operator:sym«<< >>» ($/) {
-    make $<infixish>.ast.meta_fun($/, '&hyper', mkbool(substr($/,0,2) eq '<<'),
+    make $<infixish>.ast.meta_fun($/, '&hyper', 2,
+        mkbool(substr($/,0,2) eq '<<'),
         mkbool(substr($/,chars($/)-2,2) eq '>>'));
 }
 
@@ -200,6 +201,16 @@ method LIST($/) {
 
     make self.whatever_postcheck($/, $st, $fn.with_args($/, @pos));
 }
+method POST($/) {
+    make $<dotty>.ast  if $<dotty>;
+    make $<privop>.ast if $<privop>;
+    make $<postop>.ast if $<postop>;
+
+    for @$<postfix_prefix_meta_operator> {
+        make $/.ast.meta_fun($/, '&hyperunary', 1);
+    }
+}
+method postfix_prefix_meta_operator:sym< » > ($/) { } #handled in POST
 method POSTFIX($/) {
     my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
     if $<op><colonpair> {
@@ -216,14 +227,14 @@ method POSTFIX($/) {
     make self.whatever_postcheck($/, $st, $/.ast);
 }
 method postcircumfix:sym<[ ]> ($/) {
-    make Operator.funop('&postcircumfix:<[ ]>', @( $<semilist>.ast ));
+    make Operator.funop('&postcircumfix:<[ ]>', 1, @( $<semilist>.ast ));
 }
 method postcircumfix:sym<{ }> ($/) {
-    make Operator.funop('&postcircumfix:<{ }>', @( $<semilist>.ast ));
+    make Operator.funop('&postcircumfix:<{ }>', 1, @( $<semilist>.ast ));
 }
 method postcircumfix:sym«< >» ($/) {
     self.split_circumfix($/);
-    make Operator.funop('&postcircumfix:<{ }>', $/.ast);
+    make Operator.funop('&postcircumfix:<{ }>', 1, $/.ast);
 }
 method postcircumfix:sym<( )> ($/) {
     make ::Operator::PostCall.new(args => $<semiarglist>.ast[0]);
@@ -231,7 +242,7 @@ method postcircumfix:sym<( )> ($/) {
 method dottyop($/) {
     if $<colonpair> {
         $/.CURSOR.sorry("Colonpair dotties NYI");
-        make Operator.funop('&postfix:<++>');
+        make Operator.funop('&postfix:<++>', 1);
         return Nil;
     }
 
@@ -242,14 +253,14 @@ method dottyop($/) {
 method dotty:sym<.*> ($/) {
     if !$<dottyop>.ast.^isa(::Operator::Method) {
         $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
-        make Operator.funop('&postfix:<++>');
+        make Operator.funop('&postfix:<++>', 1);
         return Nil;
     }
     if $<sym> eq '.^' {
         make $<dottyop>.ast.clone(:meta);
     } else {
         $/.CURSOR.sorry("NYI dottyop form $<sym>");
-        make Operator.funop('&postfix:<++>');
+        make Operator.funop('&postfix:<++>', 1);
     }
 }
 
@@ -370,22 +381,22 @@ method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
         my $p = $<O><prec>;
         if $p eq 't=' { # additive
-            make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>');
+            make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
         } elsif $p eq 'y=' && $<semilist> {
             my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
                 die "Unhandled postcircumfix ending in $*GOAL";
-            make Operator.funop('&postcircumfix:<' ~ $sym ~ '>', @( $<semilist>.ast ));
+            make Operator.funop('&postcircumfix:<' ~ $sym ~ '>', 1, @( $<semilist>.ast ));
         } elsif $p eq 'y=' {
-            make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
+            make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
         } elsif $p eq 'v=' || $p eq 'o=' {
-            make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>');
+            make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
         }
     } elsif substr($meth,0,7) eq 'prefix:' {
-        make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>');
+        make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
     } elsif substr($meth,0,8) eq 'postfix:' {
-        make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>');
+        make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
     } elsif substr($meth,0,6) eq 'infix:' {
-        make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>');
+        make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
     }

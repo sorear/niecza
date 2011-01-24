@@ -37,14 +37,14 @@ method assignish() { False }
 
 method meta_assign() { ::Operator::CompoundAssign.new(base => self); }
 method meta_not() { ::Operator::MetaNot.new(base => self); }
-method meta_fun($/, $fun, *@extra) {
-    ::Operator::Function.new(function => mklex($/, $fun),
+method meta_fun($/, $fun, $arity, *@extra) {
+    ::Operator::Function.new(function => mklex($/, $fun), :$arity,
         preargs => [ @extra, self.as_function($/) ])
 }
 
-method funop($name, *@args) {
+method funop($name, $arity, *@args) {
     ::Operator::Function.new(function => ::Op::Lexical.new(name => $name),
-        args => @args)
+        args => @args, :$arity)
 }
 
 method wrap_in_function($/) {
