@@ -200,6 +200,8 @@ method LIST($/) {
 
     make self.whatever_postcheck($/, $st, $fn.with_args($/, @pos));
 }
+method term:dotty ($/) { make $<dotty>.ast.with_args($/,
+    ::Op::Lexical.new(name => '$_')) }
 method PRE($/) {
     make $<prefix>.ast if $<prefix>;
     make $<prefix_circumfix_meta_operator>.ast

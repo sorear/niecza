@@ -17,6 +17,10 @@ use MONKEY_TYPING;
     my $i = 0;
     1 < ($i++; 2) < 3;
     is $i, 1, "Chained comparisons only evaluate terms once";
+
+    my $foo = [5];
+    for $foo { .shift }
+    is +$foo, 0, ".method works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
