@@ -31,7 +31,6 @@
 (defgeneric |new| (invocant))
 (defmethod |new| (invocant) (make-instance (class-of invocant)))
 
-;(defmethod |bar| (invocant arg) (format t "in bar: ~w" arg))
 
 (defclass p6-Scalar () (value))
 
