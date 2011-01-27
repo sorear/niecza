@@ -4,6 +4,8 @@ This is 'Niecza', which will eventually be a Perl 6 implementation focusing
 on optimization research.  It targets the Common Language Runtime (ECMA-335;
 implementations are "Mono" and ".NET").
 
+There is also a Common Lisp backend in the works.
+
 To see the current state of the art, the best documentation is the testsuite,
 C<test.pl>.
 
@@ -16,7 +18,10 @@ C<test.pl>.
 To run on Mono:  2.6.4 and later are well-tested, though success has been
 reported with 2.4.x as well.  ggoebel on #perl6 reports that 2.6.7 fails
 with a bus error on OS X 10.4 x86, but 2.6.4 works; 2.6.7 is fine on other
-platforms.  2.9.x or later is recommended for best performance.
+platforms.
+
+2.8.2 or later is recommended for best performance; you should use
+C<RUN_CLR=mono-sgen> in this case.
 
 Debian and derivatives have a modular mono packaging; you should install
 'mono-complete'.  (The other packages exist for the sake of Debian-packaged
@@ -63,6 +68,12 @@ unzip
     $ mono run/Niecza.exe -e 'say 2 + 2'
     4
     $
+
+Notes: The first time the compiler is run, the setting must be compiled,
+which adds about a minute on most hardware to the runtime.  The second
+run will be much faster.  Also, the recompilation checker is not robust
+to file format changes; it may be necessary to clean temporary files
+after updates.
 
 =head1 COPYRIGHT AND LICENSE
 
