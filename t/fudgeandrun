@@ -5,4 +5,4 @@ use warnings;
 my @OPTS = ('--keep-exit-code', 'niecza');
 
 my $nt = `../roast/fudge @OPTS @ARGV`;
-system("./niecza_eval", split ' ', $nt);
+system("mono", "./run/Niecza.exe", split ' ', $nt);
