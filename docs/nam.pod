@@ -1,27 +1,41 @@
 =head1 Synopsis
 
-This document describes NAM, aka CgOp, the Niecza Abstract Machine.  It is a
-language used to connect the portable parts of Niecza to the unportable, and
-as such requires a fairly strong definition.  Unfortunately this document
-is rather incomplete.
+This document describes NAM, aka CgOp, the Niecza Abstract Machine.  NAM is the
+language used to connect the portable parts of Niecza to the unportable.  It is
+the last Niecza IR which is shared between all cross-compiler backends.  It is
+used primarily to refer to three things: a computing model suitable for running
+Niecza output, a representation of abstract operations in the model, and a file
+format for storing modules in the model.
 
 =head1 General model
 
-NAM code consists of one or more units.  Each unit contains a set of fixups
-(details TBD) which allow compiled code to find metaobject data, and a set of
-compilable function bodies.  One unit shall contain a body named MAIN, which
-is run to start execution.
+A program for execution by NAM consists of one or more units, one of which is
+singled out as the main unit by a compiler option.  Each unit consists of some
+global data, a list of dependency units, and a set of meta-objects.
 
-A body contains some basic metadata such as the number of lexical slots
-required, and also a tree of operations.  This tree is structured much like a
-Lisp program and obeys similar evaluation rules.  One difference is that NAM
-nodes have two kinds of children, scalar children and node children, which are
-treated separately.
+The dependency lists organize the units into a directed acyclic graph.  A unit
+can only see objects from another unit if a dependency is declared.  This
+facilitates recompilation checking.
+
+Meta-objects have per-unit unique identifiers, and can be identified globally
+by a token known as an xref, which contains the originating unit's identity,
+the per-unit identifier, and a name to facilitate debugging.  Meta-objects
+come in two basic types; sub bodies and packages.  Packages are further
+subdivided into packages, modules, classes, grammars, roles, and parametric
+roles.
+
+Sub bodies contain a variety of metadata, including the runtime class, flags
+for various special types of sub, the signature, the set of lexical variable
+definitions, and a tree of operations.  This tree is structured much like a
+Lisp program and obeys similar evaluation rules.
 
 NAM code must be statically typable but this may not always be enforced.
 Different data objects have logical types, which can map many-to-one onto
 lower-level types, especially in type-poor environments such as Parrot and
 JavaScript.
+
+Packageoids contain information about the construction of the object, such
+as methods, attributes, superclasses, the C3 MRO, and the name.
 
 =head1 Runtime data objects, by static type
 
