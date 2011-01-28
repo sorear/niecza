@@ -1,0 +1,85 @@
+    Announce: Niecza Perl 6 v2
+
+This is the second announcement of a distinguished Niecza version, and
+the first to be regularly scheduled.  Niecza tag announcements occur
+on the last Monday of each month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft.NET are known to
+work.
+
+    List of changes
+
+* The most significant change is that Niecza is now written in Perl 6
+  and compiled using itself.  Perl 5 is no longer required to use
+  Niecza (although some supporting tools need it).  This makes Niecza
+  a good amount faster on large files, or on small ones if the
+  precompiler is used; the REPL is especially benefitted.  Niecza runs
+  as a single CLR process.
+
+* Another very welcome change is that Paweł Murias (pmurias) is now a
+  regular committer.
+
+* The REPL now keeps the same interpreting context between lines, so
+  lines (after the first) are processed instantly and with our-scoped
+  variables preserved.
+
+* A bug which prevented Niecza from working on Microsoft.NET has been
+  found and fixed (Matthew Wilson)
+
+* A spectest harness has been added, and Niecza can run more than 200
+  spectests (Moritz Lenz)
+
+* New compiler features:
+  - Metaoperators in all cases
+  - .foo; implicit $_ syntax
+  - if COND -> $r { ... } (Paweł Murias)
+  - Method calls can have string names ."$foo"
+  - $/ and $! are supported in parameter lists
+  - $?FOO works again
+
+* New setting and runtime facilities:
+  - map, grep, and [] are mostly eager and C# coded
+  - Ranges, including .. and ^ operators
+  - Numeric bit operators (+^, +&, +|, +<, +>)
+  - Boolean bit operators
+  - chr & ord
+  - Portable path manipulation
+  - grep and map now return lvalues
+  - done_testing is now done and .dump is now .perl
+  - JSYNC.pm6 now provides JSON functionality
+  - Action methods and &make are supported
+  - Test.pm6 improvements (Paweł Murias)
+  - Initial attribute values can be passed to Any.new
+
+* Redesigned compiler API from Paweł Murias.
+
+* Improved documentation of nam IR.
+
+* Numerous bug fixes
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also see docs/lhf.txt for a list of things that need to
+be done in no particular order.
+
+    Future directions
+
+For next month, I plan to focus on the type system.  That will mean
+copying Jonathan Worthington's "6model" design to whatever extent is
+reasonable; subtypes, role composition, type constraints on variables,
+type constraints on parameters, enums, multiple dispatch, and
+representation polymorphism will be implemented.
+
+After this, it will be possible to greatly expand the setting, and
+with it, spectest coverage.  &eval and BEGIN are on the table and will
+be worked on as inspiration permits.
