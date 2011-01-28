@@ -125,7 +125,11 @@ Sets the $file and $line_numer for the $operation.
 
 =head3 prog(@*arguments)
 
-Evaluates arguments in sequens and returns the result of the last one.
+Evaluates arguments in sequence and returns the result of the last one.
+
+=head3 rnull(@*arguments)
+
+Evaluates arguments in sequens and returns Nil (taken from CORE?).
 
 =head3 span
 
