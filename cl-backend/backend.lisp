@@ -10,10 +10,17 @@
 
 (log-message :info "cl-backend started")
 
-(defun nam-op-log (name result) (log-message :info (format nil "~a => ~w" name result)) result)
+(defun nam-op-log (name result) (log-message :info (format nil "~a => ~w" name (strip-ann result))) result)
 
 
 
+(defun strip-ann (thing) 
+  (if (consp thing)
+      (if (eq (first thing) 'nam-ann)
+          (strip-ann (cadddr thing)) 
+          (mapcar #'strip-ann thing)
+      )
+      thing))
 
 (defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
 
@@ -182,8 +189,7 @@
 
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
-  (format t "~w~%~%~%" compiled-unit)
+  (format t "~w~%~%~%" (strip-ann compiled-unit))
   (let ((wrapped (wrap-for-eval compiled-unit)))
-;    (format t "~a~%" wrapped)
     (eval wrapped)
     ))
