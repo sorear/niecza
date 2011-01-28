@@ -111,6 +111,10 @@ A reference to a call frame.  Currently a subtype of obj.
 
 =head2 Annotations
 
+=head3 const($value)
+
+The const op causes its argument to be evaluated once and stored in the constant table; it's semantically the same as the identity.
+
 =head3 ann($file,$line_number,$operation)
 
 Sets the $file and $line_numer for the $operation.
