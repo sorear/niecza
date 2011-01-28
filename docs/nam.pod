@@ -163,7 +163,9 @@ Evaluates and ignores $argument.
 
 =head3 newrwlistvar
 
-=head3 null
+=head3 null($type)
+
+Produces a null pointer of type $type.
 
 =head3 sink
 
