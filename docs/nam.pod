@@ -189,7 +189,11 @@ Evaluate and throw away the argument
 
 =head3 subcall
 
-=head3 methodcall
+=head3 methodcall($methodname,$dunno,@*args)
+
+Calls method $methodname (which is a nam op).
+Named parameters are passed by having a string ":option-name" and then the nam op which evaluates to the option value.
+
 
 =head2 I/O
 
