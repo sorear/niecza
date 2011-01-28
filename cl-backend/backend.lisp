@@ -2,6 +2,22 @@
 			   (user-homedir-pathname)))
 (ql:quickload "cl-json")
 (ql:quickload "fare-matcher")
+(ql:quickload "cl-log")
+
+(use-package "COM.RAVENBROOK.COMMON-LISP-LOG")
+(setf (log-manager) (make-instance 'log-manager :message-class 'formatted-message))
+(start-messenger 'text-file-messenger :filename "cl-backend.log")
+
+(log-message :info "cl-backend started")
+
+(defun nam-op-log (name result) (log-message :info (format nil "~a => ~w" name result)) result)
+
+
+
+
+(defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
+
+(defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params (nam-op-log ',name (progn ,@body))))
 
 
 (defun to-symbol-first (thing)
@@ -21,7 +37,6 @@
 
 ; P6 Classes
 
-(defun trace (value) (format t "~w~%" value) value)
  
 (defun make-scalar (value) (let ((scalar (make-instance 'p6-Scalar)))
   (setf (slot-value scalar 'value) value)
@@ -42,7 +57,7 @@
 
  
 
-(defmacro nam-sub (i lexicals body) 
+(nam-op sub (i lexicals body) 
   `(defun ,(sub-symbol i) () (let ,(lexicals-to-let lexicals) ,body)))
 
 (defun xref-to-subsymbol (xref) (sub-symbol (cadr xref)))
@@ -53,13 +68,11 @@
       `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol xref))))))
 
 
-(defmacro nam-class (name attributes methods)
-  (trace methods)
-  (trace
+(nam-op class (name attributes methods)
   `(progn 
     (defclass ,(class-symbol name) (p6-Object) ())
     ,@(mapcar #'compile-method methods)
-  )))
+  ))
 
 
 
@@ -78,22 +91,22 @@
 (defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
 
 
-(defmacro nam-ann (filename line op) op)
-(defmacro nam-prog (&body ops) `(progn ,@ops))
+(nam-op ann (filename line op) op)
+(nam-op prog (&body ops) `(progn ,@ops))
 (defun nam-sink (argument) nil)
 
 (defun nam-str (string) string)
 (defun nam-double (number) number)
 
-(defmacro nam-assign (to what) `(STORE ,to ,what))
+(nam-op assign (to what) `(STORE ,to ,what))
 
 (defun nam-const (thing) thing)
 (defun nam-box (type thing) thing)
 (defun nam-fetch (thing) (FETCH thing))
 
-(defmacro nam-letvar (var) (intern var))
+(nam-op letvar (var) (intern var))
 
-(defmacro nam-scopedlex (var &rest rvalue)
+(nam-op scopedlex (var &rest rvalue)
   (if (consp rvalue)
       `(setf ,(intern var) ,@rvalue)
       (intern var)))
@@ -102,20 +115,20 @@
   (if (consp vars)
       (cons (list (intern (car vars)) (cadr vars)) (to-let-vars (cddr vars)))
       '()))
-(defmacro nam-letn (&body vars-and-body)
+(nam-op letn (&body vars-and-body)
  `(let ,(to-let-vars (butlast vars-and-body)) ,(first (last vars-and-body))))
 
 ; ???
 (defun nam-subcall (dunno-what-that-is thing &rest args) (apply thing args))
 
-(defmacro nam-methodcall (method-name dunno invocant &rest args) 
+(nam-op methodcall (method-name dunno invocant &rest args) 
   `(,(intern (cadr method-name)) ,@args))
 
 
 ; HACK
-(defmacro nam-corelex (var) `(nam-scopedlex ,var))
+(nam-op corelex (var) `(nam-scopedlex ,var))
 
-(defmacro nam-newboundvar (dunno1 dunno2 thing) thing)
+(nam-op newboundvar (dunno1 dunno2 thing) thing)
 
 
 
