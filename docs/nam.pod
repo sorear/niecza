@@ -714,3 +714,102 @@ Evaluates and ignores $argument.
 =head3 rawcall
 
 =head3 rawscall
+
+=head1 File format
+
+NAM unit files are encoded in JSON, using only numbers, strings, and sequences;
+mappings and boolean values are excluded.  It is helpful to consider a number
+of "node types" for describing the format of the sequences.  Most node types
+reflect a sequence with a fixed number of children with fixed interpretations.
+No names are used; all access is by index.
+
+=head2 File root
+
+    Name            Type    Description
+    mainline_ref    Xref    Xref to mainline subroutine
+    name            string  Unit's unique name
+    log             ...     Mostly unused vestige of last stash system
+    setting         string  Name of setting unit or null
+    bottom_ref      Xref    Xref to sub containing {YOU_ARE_HERE}, or null
+    filename        string  Filename of source code or null
+    modtime         number  Seconds since 1970-01-01
+    xref            Xref[]  Resolves refs from other units
+    tdeps           TDep[]  Holds dependency data for recompilation
+    stash_root      StNode  Trie holding classes and global variables
+
+xref entries cannot be reordered as they are referenced by index.  Filename and
+modification time are used for checking recompilation necessity; tdeps
+("transitive dependency") are used to check for recursive recompilation with
+minimal file reading.  Filename is also used to provide C<$?FILE>.  Each xref
+entry is either null, a Subroutine, or a Packageoid.
+
+=head2 Cross-reference
+
+    Name            Type    Description
+    unit            string  Names unit of origin
+    index           number  Indexes into unit's xref array
+    name            string  Descriptive name for debugging
+
+Cross-reference (xref) nodes allow object references to cross unit boundaries
+without complicating serialization.
+
+=head2 Transitive dependency node
+
+    Name            Type    Descripton
+    unitname        string  Names unit that is depended on
+    filename        string  Absolute filename of source code
+    modtime         number  Modification time in POSIX seconds
+
+=head2 Stash node
+
+    Name            Type    Description
+
+=head2 Subroutine
+
+    Name            Type    Description
+    typecode        string  Always "sub"
+    name            string  Sub's name for backtraces
+    outer_xref      Xref    OUTER:: sub, may be in a setting unit
+    flags           number  [1]
+    children        num[]   Supports tree traversals
+    param_role_hack ...     [2]
+    augment_hack    ...     [3]
+    hint_hack       ...     [4]
+    is_phaser       number  [5]
+    body_of         Xref    Only valid in immediate block of class {} et al
+    in_class        Xref    Innermost enclosing body_of
+    cur_pkg         str[]   OUR:: as a list of names
+    class           string  &?BLOCK.WHAT; "Sub" or "Regex"
+    ltm             LtmNode Only for regexes; stores declarative prefix
+    exports         str[][] List of global names
+    signature       Param[] May be null in exotic cases
+    lexicals        Lex[]   Come in multiple forms
+    nam             ...     See description of opcodes earlier
+
+[1] The following flags are used:
+
+    1   RUN_ONCE        Sub does not need pad cloning
+    2   SPAD_EXISTS     Sub needs a static pad
+    4   GATHER_HACK     Assume a "take EMPTY" at end
+    8   STRONG_USED     Not dead code even if unreferenced
+    16  RETURNABLE      Add a return exception handler
+    32  AUGMENTING      Is an augment{} block
+
+[2] Xref to role object if this is a role{} block with parameters
+
+[3] Sequence; first item is a ref to the target packageoid, subsequent items
+are Method descriptors.
+
+[4] Sequence of [Xref, string] identifying a specific "hint" lexical in a
+specific sub.  This lexical is bound to the return value of the current sub's
+code; will always be seen with a PREINIT phaser.
+
+[5] If non-null, registers the current sub for a phaser queue.
+
+    0   INIT    Before global mainline
+    1   END     Not implemented
+    2   PREINIT Before all mainlines
+
+=head2 Packageoid
+
+    Name            Type    Description
