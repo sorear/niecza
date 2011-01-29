@@ -109,135 +109,608 @@ A reference to a call frame.  Currently a subtype of obj.
 
 =head1 Operations
 
+=head2 Macros
+
+These do not appear in nam files as they are expanded in C<src/CgOp.pm6>.
+
+=head3 cc_expr
+
+=head3 construct_lad
+
+=head3 getattr
+
+=head3 let
+
+=head3 newblankhash
+
+=head3 newblanklist
+
+=head3 noop
+
+=head3 rnull(*@arguments)
+
+Evaluates arguments in sequence and returns C<CORE::Nil>.  Useful for
+embedding a sequence of void nam ops in a Perl 6 statement list.
+
+=head3 string_var
+
+=head3 varattr
+
+=head2 Internal to the backend
+
+These should not be used by the frontend.
+
+=head3 _addmethod
+
+=head3 _hintset
+
+=head3 _invalidate
+
+=head3 _makesub
+
+=head3 _parametricrole
+
+
 =head2 Annotations
 
-=head3 const($value)
+=head3 ann($unused,$line_number,$operation)
 
-The const op causes its argument to be evaluated once and stored in the constant table; it's semantically the same as the identity.
-
-=head3 ann($file,$line_number,$operation)
-
-Sets the $file and $line_numer for the $operation.
-
-=head2 Aritmetic and logical operations
-
-=head2 Sequence control
-
-=head3 prog(@*arguments)
-
-Evaluates arguments in sequence and returns the result of the last one.
-
-=head3 rnull(@*arguments)
-
-Evaluates arguments in sequens and returns Nil (taken from CORE?).
-
-=head3 span
+Sets the C<$line_number> for the C<$operation>.
 
 =head3 ehspan
 
-=head3 sink($argument)
+=head3 span
 
-Evaluates and ignores $argument.
 
-=head3 labelhere
+=head2 Operations on numbers
 
-=head3 cgoto
+=head3 arith
 
-=head3 goto
+=head3 bif_divide
 
-=head3 ncgoto
+=head3 bif_minus
 
-=head3 ternary
+=head3 bif_mul
 
-=head3 whileloop
+=head3 bif_negate
 
-=head3 take
+=head3 bif_numand
 
-=head3 cotake
+=head3 bif_numcompl
 
-=head2 Data control
+=head3 bif_numeq
 
-=head3 letn
+=head3 bif_numge
 
-=head3 fetch
+=head3 bif_numgt
+
+=head3 bif_numle
+
+=head3 bif_numlshift
+
+=head3 bif_numlt
+
+=head3 bif_numne
+
+=head3 bif_numor
+
+=head3 bif_numrshift
+
+=head3 bif_numxor
+
+=head3 bif_plus
+
+=head3 bif_postinc
+
+=head3 double
+
+=head3 int
+
+=head3 num_to_string
+
+
+=head2 Operations on variables
 
 =head3 assign
 
-=head3 newscalar
+=head3 bget
 
-=head3 newrwscalar
+=head3 fetch
 
 =head3 newblankrwscalar
 
+=head3 newboundvar
+
 =head3 newrwlistvar
 
-=head3 null($type)
+=head3 newrwscalar
 
-Produces a null pointer of type $type.
+=head3 newscalar
 
-=head3 sink
+=head3 newvarrayvar
 
-Evaluate and throw away the argument
+=head3 newvhashvar
 
-=head3 cast
+=head3 newvnewarrayvar
 
-=head2 Object model
+=head3 newvnewhashvar
 
-=head3 getslot
+=head3 newvsubvar
 
-=head3 setslot
+=head3 var_islist
 
-=head3 how
 
-=head3 obj_is_defined
+=head2 Operations on strings
 
-=head3 obj_llhow
+=head3 bif_chars
 
-=head3 obj_isa
+=head3 bif_chr
 
-=head3 obj_does
+=head3 bif_ord
 
-=head3 subcall
+=head3 bif_streq
+
+=head3 bif_strge
+
+=head3 bif_strgt
+
+=head3 bif_strle
+
+=head3 bif_strlt
+
+=head3 bif_strne
+
+=head3 bif_substr3
+
+=head3 char
+
+=head3 str
+
+=head3 strbuf_append
+
+=head3 strbuf_new
+
+=head3 strbuf_seal
+
+=head3 str_chr
+
+=head3 strcmp
+
+=head3 str_length
+
+=head3 str_substring
+
+=head3 str_tolower
+
+=head3 str_tonum
+
+=head3 str_toupper
+
+
+=head2 Regex engine operations
+
+=head3 bif_make
+
+=head3 cursor_ast
+
+=head3 cursor_backing
+
+=head3 cursor_butpos
+
+=head3 cursor_dows
+
+=head3 cursor_fresh
+
+=head3 cursor_from
+
+=head3 cursor_item
+
+=head3 cursor_O
+
+=head3 cursor_pos
+
+=head3 cursor_reduced
+
+=head3 cursor_start
+
+=head3 cursor_synthetic
+
+=head3 cursor_unmatch
+
+=head3 cursor_unpackcaps
+
+=head3 fcclist_new
+
+=head3 get_lexer
+
+=head3 ladconstruct
+
+=head3 mrl_count
+
+=head3 mrl_index
+
+=head3 newcc
+
+=head3 popcut
+
+=head3 pushcut
+
+=head3 run_protoregex
+
+=head3 rxbacktrack
+
+=head3 rxbprim
+
+=head3 rxcall
+
+=head3 rxclosequant
+
+=head3 rxcommitgroup
+
+=head3 rxend
+
+=head3 rxfinalend
+
+=head3 rxframe
+
+=head3 rxgetpos
+
+=head3 rxgetquant
+
+=head3 rxincquant
+
+=head3 rxinit
+
+=head3 rxopenquant
+
+=head3 rxpushb
+
+=head3 rxpushcapture
+
+=head3 rxsetcapsfrom
+
+=head3 rxsetclass
+
+=head3 rxsetpos
+
+=head3 rxsetquant
+
+=head3 rxstripcaps
+
+
+=head2 Operations on Perl 6 lists
+
+=head3 bif_array_constructor
+
+=head3 bif_grep
+
+=head3 bif_map
+
+
+=head2 Operations on low-level lists
+
+=head3 fvarlist_item
+
+=head3 fvarlist_length
+
+=head3 fvarlist_new
+
+=head3 get_first
+
+=head3 iter_copy_elems
+
+=head3 iter_flatten
+
+=head3 iter_hasarg
+
+=head3 iter_hasflat
+
+=head3 iter_to_list
+
+=head3 promote_to_list
+
+=head3 vvarlist_append
+
+=head3 vvarlist_clone
+
+=head3 vvarlist_count
+
+=head3 vvarlist_from_fvarlist
+
+=head3 vvarlist_item
+
+=head3 vvarlist_new_empty
+
+=head3 vvarlist_new_singleton
+
+=head3 vvarlist_pop
+
+=head3 vvarlist_push
+
+=head3 vvarlist_shift
+
+=head3 vvarlist_sort
+
+=head3 vvarlist_to_fvarlist
+
+=head3 vvarlist_unshift
+
+=head3 vvarlist_unshiftn
+
+
+=head2 Operations involving the operating system
+
+=head3 bif_gettimeofday
+
+=head3 exit
+
+=head3 getargv
+
+=head3 note
+
+=head3 path_any_exists
+
+=head3 path_change_ext
+
+=head3 path_combine
+
+=head3 path_dir_exists
+
+=head3 path_file_exists
+
+=head3 path_modified
+
+=head3 path_realpath
+
+=head3 print
+
+=head3 say
+
+=head3 slurp
+
+=head3 spew
+
+=head3 treader_getc
+
+=head3 treader_getline
+
+=head3 treader_open
+
+=head3 treader_slurp
+
+=head3 treader_stdin
+
+
+=head2 Operations invoking the context system
+
+=head3 bif_at_key
+
+=head3 bif_at_pos
+
+=head3 bif_bool
+
+=head3 bif_defined
+
+=head3 bif_delete_key
+
+=head3 bif_exists_key
+
+=head3 bif_hash
+
+=head3 bif_item
+
+=head3 bif_list
+
+=head3 bif_num
+
+=head3 bif_str
+
+=head3 obj_asbool
+
+=head3 obj_asdef
+
+=head3 obj_asnum
+
+=head3 obj_asstr
+
+=head3 obj_at_key
+
+=head3 obj_at_pos
+
+=head3 obj_delete_key
+
+=head3 obj_exists_key
+
+=head3 obj_getbool
+
+=head3 obj_getdef
+
+=head3 obj_getnum
+
+=head3 obj_getstr
+
+
+
+
+=head2 Operations on hashes
+
+=head3 bif_hash_keys
+
+=head3 bif_hash_kv
+
+=head3 bif_hash_pairs
+
+=head3 bif_hash_values
+
+=head3 varhash_clear
+
+=head3 varhash_contains_key
+
+=head3 varhash_delete_key
+
+=head3 varhash_dup
+
+=head3 varhash_getindex
+
+=head3 varhash_new
+
+=head3 varhash_setindex
+
+
+=head2 Operations on activation frames
+
+=head3 callframe
+
+=head3 frame_caller
+
+=head3 frame_file
+
+=head3 frame_hint
+
+=head3 frame_line
+
+
+=head2 Sequence control operations
+
+=head3 cgoto
+
+=head3 control
+
+=head3 cotake
+
+=head3 die
+
+=head3 do_require
+
+=head3 goto
+
+=head3 label
+
+=head3 label_table
 
 =head3 methodcall($methodname,$dunno,@*args)
 
 Calls method $methodname (which is a nam op).
 Named parameters are passed by having a string ":option-name" and then the nam op which evaluates to the option value.
 
+=head3 ncgoto
 
-=head2 I/O
+=head3 prog(*@arguments)
 
-=head3 say
+Evaluates arguments in sequence and returns the result of the last one.
 
-=head3 slurp
+=head3 return
 
-=head3 treader_stdin
+=head3 startgather
 
-=head2 Native operations (CLR)
+=head3 subcall
 
-These are for user code only.  Core library code should define custom system
-primitives instead.
+=head3 take
 
-=head3 getfield
+=head3 ternary
 
-=head3 setfield
+=head3 whileloop
 
-=head3 rawsget
 
-=head3 rawsset
+=head2 Operations supporting modules
 
-=head3 rawscall
+=head3 from_json
+
+=head3 from_jsync
+
+=head3 to_json
+
+=head3 to_jsync
+
+
+=head2 Operations on booleans
+
+=head3 bif_not
+
+=head3 bool
+
+=head3 compare
+
+
+=head2 Data control operations
+
+=head3 cast
+
+=head3 const($value)
+
+The const op causes its argument to be evaluated once and stored in the
+constant table; it should only be used in cases where the identity will
+have the same effect, and backends are not required to honor it.
+
+=head3 context_get
+
+=head3 corelex
+
+=head3 letn
+
+=head3 letvar
+
+=head3 null($type)
+
+Produces a null value of type C<$type>, suitable for initializing
+a variable or other similar usage.
+
+=head3 scopedlex
+
+=head3 set_status
+
+=head3 sink($argument)
+
+Evaluates and ignores $argument.
+
+=head3 status_get
+
+
+=head2 Object model operations
+
+=head3 box
+
+=head3 class_ref
+
+=head3 default_new
+
+=head3 getslot
+
+=head3 how
+
+=head3 instrole
+
+=head3 llhow_name
+
+=head3 obj_does
+
+=head3 obj_isa
+
+=head3 obj_is_defined
+
+=head3 obj_llhow
+
+=head3 obj_newblank
+
+=head3 obj_typename
+
+=head3 obj_what
+
+=head3 role_apply
+
+=head3 setbox
+
+=head3 setslot
+
+=head3 stab_privatemethod
+
+=head3 stab_what
+
+=head3 unbox
+
+
+=head2 CLR interface operations
 
 =head3 rawcall
 
-=head3 setindex
-
-=head3 getindex
-
-=head3 rawnew
-
-=head3 rawnewarr
-
-=head3 rawnewzarr
-
-=head3 labelid
+=head3 rawscall
