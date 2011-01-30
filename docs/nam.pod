@@ -762,7 +762,26 @@ without complicating serialization.
 
 =head2 Stash node
 
+This is a sequence of tuples; each such tuple has one of the forms
+C<[ name, "var", Xref, ChildNode ]> or C<[ name, "graft", path ]>.
+
+=head2 Method node
+
     Name            Type    Description
+    name            string  Method name without ! decorator
+    kind            string  [1]
+    var             string  Variable for implementing sub in param role
+    body            Xref    Reference to implementing sub
+
+[1] Allowable kinds are "normal", "private", and "sub".
+
+=head2 Attribute node
+
+    Name            Type    Description
+    name            string  Attribute name without sigil or twigil
+    public          number  Nonzero if attribute should be easy to inspect
+    ivar            string  Sub name of BUILD phaser for param roles
+    ibody           Xref    Reference to BUILD phaser
 
 =head2 Subroutine
 
@@ -810,6 +829,93 @@ code; will always be seen with a PREINIT phaser.
     1   END     Not implemented
     2   PREINIT Before all mainlines
 
+=head2 Lexical definition
+
+These come in several flavors, but all share the same first two fields, which
+are used to find the correct lexical and identify its format.
+
+    Name            Type    Description
+    name            string  "$?FOO" or similar
+    typecode        string  Always 'hint'
+
+This type is used for lexically scoped constants.  They cannot be rebound by
+the scopedlex or corelex operations, but are automatically bound by the
+handling of hint_hack subs.
+
+    Name            Type    Description
+    name            string  "$foo"
+    typecode        string  Always 'simple'
+    flags           number  4=NOINIT, 2=LIST, 1=HASH
+
+These are used for run of the mill my-variables.  NOINIT is required for
+variables that are initialized by signature binding.
+
+    Name            Type    Description
+    name            string  "$foo"
+    typecode        string  Always 'alias'
+    to              string  "anon_21934"
+
+These are used for state variables, which need storage in an outer sub, but
+should only be accessible under the declared name in an inner one.
+
+    Name            Type    Description
+    name            string  "Regex"
+    typecode        string  Always 'stash'
+    path...         string  "GLOBAL"
+    path...         string  "STD"
+    path...         string  "Regex"
+
+These are used to lexically name packageoids.  All packageoids have a stash
+name; my-scoped packageoids get gensym names.  The list of names is stored
+inline.
+
+    Name            Type    Description
+    name            string  "$ALL"
+    typecode        string  Always 'common'
+    path...         string  "GLOBAL"
+    path...         string  "STD"
+    path...         string  "$ALL"
+
+These are used for our-scoped variables.  As an optimization, direct references
+like C<$STD::ALL> generate a gensym-named common lexical.
+
+    Name            Type    Description
+    name            string  "&say"
+    typecode        string  Always 'sub'
+    [Xref stored inline here]
+
+These are used for subs, and must be in correspondence with the "zyg" list.
+
+=head2 Signature parameter
+
+    Name            Type    Description
+    name            string  For binding error messages
+    flags           number  [1]
+    names           str[]   All legal named-parameter names
+    slot            string  Name of lexical to accept value
+    default         Xref    Sub to call if HAS_DEFAULT; must be child of this
+
+[1] Flag values are as follows.
+
+    1   SLURPY      *@foo or *%foo (check HASH)
+    2   SLURPYCAP   |$foo
+    4   RWTRANS     \$foo
+    8   FULL_PARCEL \|$foo
+    16  OPTIONAL    $foo?
+    32  POSITIONAL  $foo, not :$foo
+    64  READONLY    $foo, not $foo is rw
+    128 LIST        @foo
+    256 HASH        %foo
+
 =head2 Packageoid
 
     Name            Type    Description
+    typecode        string  A definition keyword or "parametricrole"
+    name            string  The object's debug name
+    exports         str[][] List of global names to which object is bound
+    (The following are only found in class, grammar, role, parametricrole)
+    attributes      attr[]  Attributes local to the class
+    methods         methd[] Methods local to the class
+    superclasses    Xref[]  Direct superclasses of the class
+    (The following is only found in class, grammar)
+    linear_mro      Xref[]  All superclasses in C3 order
