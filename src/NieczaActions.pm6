@@ -9,9 +9,7 @@ use Unit;
 use Sig;
 use CClass;
 use OptRxSimple;
-
-sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
-sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
+use Operator;
 
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
 
@@ -25,6 +23,8 @@ sub mkcall($/, $name, *@positionals) {
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
+
+sub mkbool($i) { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 
 method get_op_sym($M) {
     if $M.reduced eq '::($name)' { # XXX STD miscompilation
@@ -43,19 +43,24 @@ method get_op_sym($M) {
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
-        if $<O><prec> eq 't=' { # additive
-            make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
-        } elsif $<semilist> && $<O><prec> eq 'y=' {
+        my $p = $<O><prec>;
+        if $p eq 't=' { # additive
+            make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
+        } elsif $p eq 'y=' && $<semilist> {
             my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
                 die "Unhandled postcircumfix ending in $*GOAL";
-            make { postcircumfix => $sym, args => $<semilist>.ast };
+            make Operator.funop('&postcircumfix:<' ~ $sym ~ '>', 1, @( $<semilist>.ast ));
+        } elsif $p eq 'y=' {
+            make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
+        } elsif $p eq 'v=' || $p eq 'o=' {
+            make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
         }
-        return Nil;
     } elsif substr($meth,0,7) eq 'prefix:' {
+        make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
     } elsif substr($meth,0,8) eq 'postfix:' {
+        make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
     } elsif substr($meth,0,6) eq 'infix:' {
-        make ::Op::Lexical.new(|node($/), name => '&infix:<' ~ self.get_op_sym($/) ~ '>');
-        return Nil;
+        make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
     }
@@ -1049,20 +1054,43 @@ method circumfix:sigil ($/) {
 }
 
 method infix_prefix_meta_operator:sym<!> ($/) {
-    make mkcall($/, '&notop', $<infixish><infix>.ast);
+    make $<infixish>.ast.meta_not;
 }
 method infix_prefix_meta_operator:sym<R> ($/) {
-    make mkcall($/, '&reverseop', $<infixish><infix>.ast);
-}
-method infix_prefix_meta_operator:sym<S> ($/) {
-    make mkcall($/, '&zipop', $<infixish><infix>.ast);
-}
-method infix_prefix_meta_operator:sym<X> ($/) {
-    make mkcall($/, '&seqop', $<infixish><infix>.ast);
+    make $<infixish>.ast.meta_fun($/, '&reverseop', 2);
 }
 method infix_prefix_meta_operator:sym<Z> ($/) {
-    make mkcall($/, '&crossop', $<infixish><infix>.ast);
+    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&zipop', 2) !!
+        Operator.funop('&infix:<Z>', 2);
 }
+method infix_prefix_meta_operator:sym<X> ($/) {
+    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&crossop', 2) !!
+        Operator.funop('&infix:<X>', 2);
+}
+method infix_prefix_meta_operator:sym<S> ($/) {
+    make $<infixish>.ast.meta_fun($/, '&seqop', 2);
+}
+
+method infix_circumfix_meta_operator:sym<« »> ($/) {
+    make $<infixish>.ast.meta_fun($/, '&hyper', 2,
+        mkbool(substr($/,0,1) eq '«'), mkbool(substr($/,chars($/)-1,1) eq '»'));
+}
+method infix_circumfix_meta_operator:sym«<< >>» ($/) {
+    make $<infixish>.ast.meta_fun($/, '&hyper', 2,
+        mkbool(substr($/,0,2) eq '<<'),
+        mkbool(substr($/,chars($/)-2,2) eq '>>'));
+}
+
+method prefix_circumfix_meta_operator:reduce ($/) {
+    my $assoc = $<s><op><O><assoc>;
+    my $op = $<s><op>.ast;
+    my $tr = substr($/,1,1) eq '\\';
+    make $op.meta_fun($/, '&reduceop', 1, mkbool($tr), mkbool($assoc eq 'list'),
+        mkbool($assoc eq 'right'), mkbool($assoc eq 'chain'));
+}
+
+method postfix_prefix_meta_operator:sym< » > ($/) { } #handled in POST
+method prefix_postfix_meta_operator:sym< « > ($/) { } #handled in PRE
 
 method infixish($/) {
     if $<colonpair> || $<regex_infix> {
@@ -1072,7 +1100,7 @@ method infixish($/) {
     if $<assign_meta_operator> {
         # TODO: there should probably be at least a potential for others
 
-        make mkcall($/, '&assignop', $<infix>.ast);
+        make $<infix>.ast.meta_assign;
     } else {
         make $<infix>.ast;
     }
@@ -1083,57 +1111,43 @@ my %loose2tight = (
     'orelse' => '//', 'and' => '&&', 'or' => '||',
 );
 
-sub _isinfix($out is rw, $str) {
-    $str ~~ /'&infix:<'(.*)'>'/ && ($out = $0; True)
-}
+method infix:sym<,>($/) { make ::Operator::Comma.new }
+method infix:sym<:=>($/) { make ::Operator::Binding.new(:!readonly) }
+method infix:sym<::=>($/) { make ::Operator::Binding.new(:readonly) }
+method infix:sym<&&>($/) { make ::Operator::ShortCircuit.new(kind => '&&') }
+method infix:sym<and>($/) { make ::Operator::ShortCircuit.new(kind => '&&') }
+method infix:sym<||>($/) { make ::Operator::ShortCircuit.new(kind => '||') }
+method infix:sym<or>($/) { make ::Operator::ShortCircuit.new(kind => '||') }
+method infix:sym<//>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
+method infix:sym<orelse>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
+method infix:sym<andthen>($/) { make ::Operator::ShortCircuit.new(kind => 'andthen') }
+method infix:sym<?? !!>($/) { make ::Operator::Ternary.new(middle => $<EXPR>.ast) }
+
+method prefix:temp ($/) { make ::Operator::Temp.new }
 
 method INFIX($/) {
     my $fn = $<infix>.ast;
-    my $s = $fn.^isa(::Op::Lexical) ?? $fn.name !!
-        ($fn.^isa(::Op::CallSub) && $fn.invocant.^isa(::Op::Lexical)) ??
-            $fn.invocant.name !! '';
-    my ($st,$lhs,$rhs) = self.whatever_precheck($s, $<left>.ast, $<right>.ast);
-    my $n;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
 
-    if $s eq '&infix:<?? !!>' { # XXX macro
-        make ::Op::Conditional.new(|node($/), check => $lhs,
-            true => $<infix><infix><EXPR>.ast, false => $rhs);
-    } elsif $s eq '&infix:<:=>' {
-        make ::Op::Bind.new(|node($/), :!readonly, :$lhs, :$rhs);
-    } elsif $s eq '&infix:<::=>' {
-        make ::Op::Bind.new(|node($/), :readonly, :$lhs, :$rhs);
-    } elsif $s eq '&infix:<,>' {
-        #XXX STD buglet causes , in setting to be parsed as left assoc
-        my @r;
-        push @r, $lhs.^isa(::Op::SimpleParcel) ?? @( $lhs.items ) !! $lhs;
-        push @r, $rhs.^isa(::Op::SimpleParcel) ?? @( $rhs.items ) !! $rhs;
-        make ::Op::SimpleParcel.new(|node($/), items => @r);
-    } elsif $s eq '&assignop' && $fn.positionals[0].^isa(::Op::Lexical) &&
-            _isinfix($n, $fn.positionals[0].name) && %loose2tight{$n} {
-        make ::Op::ShortCircuitAssign.new(|node($/),
-            kind => %loose2tight{$n}, :$lhs, :$rhs);
-    } else {
-        make ::Op::CallSub.new(|node($/), invocant => $fn,
-            positionals => [ $lhs, $rhs ]);
+    make $fn.with_args($/, $lhs, $rhs);
 
-        if $s eq '&infix:<=>' {
-            # Assignments to has and state declarators are rewritten into
-            # an appropriate phaser
-            if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
-                my $cv = self.gensym;
-                make ::Op::StatementList.new(|node($/), children => [
-                    ::Op::Start.new(condvar => $cv, body => $/.ast),
-                    ::Op::Lexical.new(name => $lhs.name)]);
-            }
-            elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
-                $lhs.initializer = self.sl_to_block('bare', $rhs,
-                    subname => $lhs.name ~ " init");
-                make $lhs;
-            }
-            elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
-                $lhs.init = $rhs;
-                make $lhs;
-            }
+    if $fn.assignish {
+        # Assignments to has and state declarators are rewritten into
+        # an appropriate phaser
+        if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+            my $cv = self.gensym;
+            make ::Op::StatementList.new(|node($/), children => [
+                ::Op::Start.new(condvar => $cv, body => $/.ast),
+                ::Op::Lexical.new(name => $lhs.name)]);
+        }
+        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+            $lhs.initializer = self.sl_to_block('bare', $rhs,
+                subname => $lhs.name ~ " init");
+            make $lhs;
+        }
+        elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+            $lhs.init = $rhs;
+            make $lhs;
         }
     }
     make self.whatever_postcheck($/, $st, $/.ast);
@@ -1149,20 +1163,22 @@ method CHAIN($/) {
         push @ops,  $<chain>[$i++]<infix>.ast;
     }
 
-    my ($st, @vargs) = self.whatever_precheck('', @args);
+    my ($st, @vargs) = self.whatever_precheck(@ops[0], @args);
 
-    my @pairwise;
-    while @vargs >= 2 {
-        push @pairwise, ::Op::CallSub.new(|node($/),
-                invocant => shift(@ops),
-                positionals => [ @vargs[0], @vargs[1] ]);
-        shift @vargs;
+    sub reduce() {
+        my $fa = shift @vargs;
+        my $fo = shift @ops;
+        if @ops {
+            mklet($fa, -> $lhs { mklet(@vargs[0], -> $rhs {
+                @vargs[0] = $rhs;
+                ::Op::ShortCircuit.new(|node($/), kind => '&&', args =>
+                    [ $fo.with_args($/, $lhs, $rhs), reduce() ]) }) })
+        } else {
+            $fo.with_args($/, $fa, @vargs[0])
+        }
     }
 
-    make ((@pairwise > 1) ?? ::Op::ShortCircuit.new(|node($/),
-        kind => '&&', args => @pairwise) !! @pairwise[0]);
-
-    make self.whatever_postcheck($/, $st, $/.ast);
+    make self.whatever_postcheck($/, $st, reduce());
 }
 
 method LIST($/) {
@@ -1173,27 +1189,14 @@ method LIST($/) {
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
     my $fn = $<delims>[0].ast;
-    my $opn = $fn.^isa(::Op::Lexical) ?? $fn.name !!
-        ($fn.^isa(::Op::CallSub) && $fn.invocant.^isa(::Op::Lexical)) ??
-            $fn.invocant.name !! '';
-    _isinfix((my $op), $opn);
-    my ($st, @pos) = self.whatever_precheck($opn,
+    my ($st, @pos) = self.whatever_precheck($fn,
         grep *.&defined, map *.ast, @( $<list> ));
 
-    if $op eq ',' {
-        make ::Op::SimpleParcel.new(|node($/), items => @pos);
-    } elsif %loose2tight{$op} {
-        make ::Op::ShortCircuit.new(|node($/), kind => %loose2tight{$op},
-            args => @pos);
-    } else {
-        make ::Op::CallSub.new(|node($/), invocant => $fn,
-            positionals => @pos);
-    }
-    make self.whatever_postcheck($/, $st, $/.ast);
+    make self.whatever_postcheck($/, $st, $fn.with_args($/, @pos));
 }
 
 method POSTFIX($/) {
-    my ($st, $arg) = self.whatever_precheck('', $<arg>.ast);
+    my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
     if $<op><colonpair> {
         if $arg.^isa(::Op::CallLike) {
             make $arg.adverb($<op><colonpair>.ast<term>);
@@ -1204,88 +1207,16 @@ method POSTFIX($/) {
         }
         return Nil;
     }
-    my $op = $<op>.ast;
-    if $op<postfix> {
-        make mkcall($/, "\&postfix:<{$op<postfix>}>", $arg);
-    } elsif $op<postcircumfix> {
-        make mkcall($/, "\&postcircumfix:<{$op<postcircumfix>}>", $arg,
-            @( $op<args> ));
-    } elsif $op<name> && ($op<name> eq 'HOW' || $op<name> eq 'WHAT') {
-        if $op<args> {
-            $/.CURSOR.sorry("Interrogative operator {$op<name>} does not take arguments");
-            make ::Op::StatementList.new;
-            return Nil;
-        }
-        make ::Op::Interrogative.new(|node($/), receiver => $arg,
-            name => $op<name>);
-    } elsif $op<metamethod> {
-        make ::Op::CallMethod.new(|node($/),
-            receiver => $arg,
-            ismeta => True,
-            name => $op<metamethod>,
-            args => $op<args> // []);
-    } elsif $op<name> {
-        if $op<path> && !$op<private> {
-            $/.CURSOR.sorry("Qualified references to non-private methods NYI");
-        }
-        make ::Op::CallMethod.new(|node($/),
-            receiver => $arg,
-            private  => $op<private>,
-            ppath    => $op<path>,
-            name     => $op<name>,
-            args     => $op<args> // []);
-    } elsif $op<quote> {
-        make ::Op::CallMethod.new(|node($/),
-            receiver => $arg,
-            private  => $op<private>,
-            name     => $op<quote>,
-            args     => $op<args> // []);
-    } elsif $op<ref> { # $obj.&foo
-        make ::Op::CallSub.new(|node($/),
-            invocant => $op<ref>,
-            args     => [ $arg, @( $op<args> // [] ) ]);
-    } elsif $op<postcall> {
-        if $op<postcall> > 1 {
-            $/.CURSOR.sorry("Slicels NYI");
-            make ::Op::StatementList.new;
-            return Nil;
-        }
-        make ::Op::CallSub.new(|node($/),
-            invocant => $arg,
-            args => ($op<postcall>[0] // []));
-    } else {
-        $/.CURSOR.sorry("Unhandled postop type");
-        make ::Op::StatementList.new;
-    }
+    make $<op>.ast.with_args($/, $arg);
     make self.whatever_postcheck($/, $st, $/.ast);
 }
 
 method PREFIX($/) {
-    my $op = "\&prefix:<{ self.get_op_sym($<op>) }>";
-    my $rarg = $<arg>.ast;
-
-    # Macros
-    if $op eq '&prefix:<temp>' {
-        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
-            $/.CURSOR.sorry('Non-contextual case of temp NYI');
-            make ::Op::StatementList.new;
-            return Nil;
-        }
-        make mkcall($/, '&infix:<=>',
-            ::Op::Lexical.new(name => $rarg.name, declaring => True,
-                        hash => substr($rarg.name,0,1) eq '%',
-                        list => substr($rarg.name,0,1) eq '@'),
-            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
-        return Nil;
-    }
-
-    my ($st, $arg) = self.whatever_precheck($op, $rarg);
-    make self.whatever_postcheck($/, $st, mkcall($/, $op, $arg));
+    my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
+    make self.whatever_postcheck($/, $st, $<op>.ast.with_args($/, $arg));
 }
 
 method assign_meta_operator($ ) {}
-
-method postcircumfix:sym<( )> ($/) { make { postcall => $<semiarglist>.ast }; }
 
 method semilist_to_args($/) {
     if $/.ast > 1 {
@@ -1304,48 +1235,62 @@ method semilist_to_args($/) {
 }
 
 method postcircumfix:sym<[ ]> ($/) {
-    make { postcircumfix => '[ ]', args => $<semilist>.ast };
+    make Operator.funop('&postcircumfix:<[ ]>', 1, @( $<semilist>.ast ));
 }
 method postcircumfix:sym<{ }> ($/) {
-    make { postcircumfix => '{ }', args => $<semilist>.ast };
+    make Operator.funop('&postcircumfix:<{ }>', 1, @( $<semilist>.ast ));
 }
 method postcircumfix:sym«< >» ($/) {
     self.split_circumfix($/);
-    make { postcircumfix => '{ }', args => [ $/.ast ] };
+    make Operator.funop('&postcircumfix:<{ }>', 1, $/.ast);
+}
+method postcircumfix:sym<( )> ($/) {
+    make ::Operator::PostCall.new(args => $<semiarglist>.ast[0]);
 }
 
 method postop($/) {
-    make $<postcircumfix> ?? $<postcircumfix>.ast !!
-        { postfix => self.get_op_sym($<postfix>) };
+    make $<postcircumfix> ?? $<postcircumfix>.ast !! $<postfix>.ast;
 }
 
 method POST($/) {
     make $<dotty>.ast  if $<dotty>;
     make $<privop>.ast if $<privop>;
     make $<postop>.ast if $<postop>;
+
+    for @$<postfix_prefix_meta_operator> {
+        make $/.ast.meta_fun($/, '&hyperunary', 1);
+    }
 }
 
-method PRE($/) { }
+method PRE($/) {
+    make $<prefix>.ast if $<prefix>;
+    make $<prefix_circumfix_meta_operator>.ast
+        if $<prefix_circumfix_meta_operator>;
+
+    for @$<prefix_postfix_meta_operator> {
+        make $/.ast.meta_fun($/, '&hyperunary', 1);
+    }
+}
 
 method methodop($/) {
-    my %r;
     if $<longname> {
         my $c = self.mangle_longname($<longname>);
-        %r<name path> = $c<name path>;
+        make ::Operator::Method.new(name => $c<name>, path => $c<path>);
+    } elsif $<quote> {
+        make ::Operator::Method.new(name => $<quote>.ast);
+    } elsif $<variable> {
+        make ::Operator::Function.new(function =>
+            self.do_variable_reference($/, $<variable>.ast));
     }
-    %r<quote> = $<quote>.ast if $<quote>;
-    %r<ref>   = self.do_variable_reference($/, $<variable>.ast) if $<variable>;
 
-    %r<args>  = $<args>[0].ast[0] if $<args>[0];
-    %r<args>  = $<arglist>[0].ast if $<arglist>[0];
-
-    make %r;
+    $/.ast.args = $<args>[0].ast[0] if $<args>[0];
+    $/.ast.args = $<arglist>[0].ast if $<arglist>[0];
 }
 
 method dottyop($/) {
     if $<colonpair> {
         $/.CURSOR.sorry("Colonpair dotties NYI");
-        make { posftix => '++' };
+        make Operator.funop('&postfix:<++>', 1);
         return Nil;
     }
 
@@ -1354,18 +1299,26 @@ method dottyop($/) {
 }
 
 method privop($/) {
-    make _hash_constructor(($<methodop>.ast.pairs, private => True));
+    if $<methodop>.ast.^isa(::Operator::Function) {
+        $/.CURSOR.sorry("! privacy marker only affects search, and as such is meaningless with a method reference.");
+    } else {
+        make $<methodop>.ast.clone(:private);
+    }
 }
 
 method dotty:sym<.> ($/) { make $<dottyop>.ast }
 
 method dotty:sym<.*> ($/) {
-    if $<sym> eq '.^' && $<dottyop>.ast.<name> {
-        make { metamethod => $<dottyop>.ast.<name>,
-            args => $<dottyop>.ast.<args> };
+    if !$<dottyop>.ast.^isa(::Operator::Method) {
+        $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
+        make Operator.funop('&postfix:<++>', 1);
+        return Nil;
+    }
+    if $<sym> eq '.^' {
+        make $<dottyop>.ast.clone(:meta);
     } else {
         $/.CURSOR.sorry("NYI dottyop form $<sym>");
-        make { postfix => '++' }
+        make Operator.funop('&postfix:<++>', 1);
     }
 }
 
@@ -1414,7 +1367,7 @@ method fatarrow($/) {
 my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
     '&infix:<...>', '&infix:<=>', '&infix:<xx>'));
 method whatever_precheck($op, *@args) {
-    return ([], @args) if %_nowhatever{$op};
+    return ([], @args) if ($op.^isa(Operator) ?? !$op.whatever_curry !! %_nowhatever{$op});
     my @vars;
     my @args_ = @args;
     for @args_ -> $a is rw {
@@ -1460,7 +1413,7 @@ method term:name ($/) {
 
     if $<postcircumfix> {
         make mkcall($/, '&_param_role_inst', $/.ast,
-            @( $<postcircumfix>[0].ast<args> ));
+            @( $<postcircumfix>[0].ast.args ));
     }
 }
 
@@ -1495,7 +1448,8 @@ method term:package_declarator ($/) { make $<package_declarator>.ast }
 method term:routine_declarator ($/) { make $<routine_declarator>.ast }
 method term:regex_declarator ($/) { make $<regex_declarator>.ast }
 method term:type_declarator ($/) { make $<type_declarator>.ast }
-method term:dotty ($/) { make $<dotty>.ast }
+method term:dotty ($/) { make $<dotty>.ast.with_args($/,
+    ::Op::Lexical.new(name => '$_')) }
 method term:capterm ($/) { make $<capterm>.ast }
 method term:sigterm ($/) { make $<sigterm>.ast }
 method term:statement_prefix ($/) { make $<statement_prefix>.ast }
@@ -1578,7 +1532,7 @@ method docontext($M, $sigil, $term) {
                  ($sigil eq '@') ?? 'list' !!
                                    'hash';
 
-    ::Op::CallMethod.new(|node($M), name => $method, receiver => $term);
+    ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
 }
 
 method variable($/) {
@@ -1625,10 +1579,10 @@ method variable($/) {
         return Nil;
     } elsif $<postcircumfix> {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
-            make { capid => $<postcircumfix>[0].ast<args>[0].text, term =>
+            make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
                 ::Op::CallMethod.new(|node($/), name => 'at-key',
                     receiver    => ::Op::ContextVar.new(name => '$*/'),
-                    positionals => $<postcircumfix>[0].ast<args>)
+                    positionals => $<postcircumfix>[0].ast.args)
             };
             return Nil;
         } else {

@@ -4,9 +4,9 @@ class CgOp;
 
 sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
-method _cgop($name, *@bits) {
-    for @bits { $_ // die "Illegal undef in cgop $name" }
-    [ $name, @bits ];
+method _cgop(*@bits) {
+    for @bits { $_ // die "Illegal undef in cgop @bits[0]" }
+    [ @bits ];
 }
 
 method getfield (*@_) { self._cgop("getfield", @_) }
@@ -272,6 +272,12 @@ method path_combine($n1, $n2) { self._cgop("path_combine", $n1, $n2) }
 method path_change_ext($n, $ex) { self._cgop("path_change_ext", $n, $ex) }
 method path_realpath($n) { self._cgop("path_realpath", $n) }
 method path_modified($n) { self._cgop("path_modified", $n) }
+method bif_item($i) { self._cgop("bif_item", $i) }
+method bif_list($i) { self._cgop("bif_list", $i) }
+method bif_hash($i) { self._cgop("bif_hash", $i) }
+method bif_grep(*@a) { self._cgop("bif_grep", @a) }
+method bif_map(*@a) { self._cgop("bif_map", @a) }
+method bif_array_constructor($i) { self._cgop("bif_array_constructor", $i) }
 
 sub _str($x) { ($x ~~ List) ?? $x !! CgOp.str($x) }
 sub _int($x) { ($x ~~ List) ?? $x !! CgOp.int($x) }
