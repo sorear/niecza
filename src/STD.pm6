@@ -1383,7 +1383,7 @@ grammar P6 is STD {
             \h*
             <!before ';' | ')' | ']' | '}' >
             <!infixstopper>
-            { $*HIGHWATER = $¢.pos = @*MEMOS[$¢.pos]<ws>//$¢.pos; }
+            <.backup_ws>
             <.panic: "Strange text after block (missing comma, semicolon, comment marker?)">
         ]?
     }
