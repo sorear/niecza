@@ -440,6 +440,7 @@ public class Builtins {
                             DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
                             th.lex = new Dictionary<string,object>();
                             th.lex["!return"] = null;
+                            th.MarkSharedChain();
                             thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
                             thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
                             DynObject lst = new DynObject(Kernel.ListMO);
@@ -455,6 +456,8 @@ public class Builtins {
                     pen.Add(src.Shift());
                 }
                 if (pen.Count == 0) {
+                    if (tailmode != 0)
+                        return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
                     DynObject lst = new DynObject(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
@@ -478,6 +481,7 @@ public class Builtins {
                 }
             case 3:
                 th.lex0 = src = new VarDeque();
+                th.ip = 0;
                 goto case 0;
             default:
                 return Kernel.Die(th, "Invalid IP");
@@ -523,6 +527,7 @@ public class Builtins {
                             DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
                             th.lex = new Dictionary<string,object>();
                             th.lex["!return"] = null;
+                            th.MarkSharedChain();
                             thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
                             thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
                             DynObject lst = new DynObject(Kernel.ListMO);
@@ -536,6 +541,8 @@ public class Builtins {
                     pen = src.Shift();
                 }
                 if (pen == null) {
+                    if (tailmode != 0)
+                        return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
                     DynObject lst = new DynObject(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
@@ -565,6 +572,7 @@ public class Builtins {
                 }
             case 3:
                 th.lex0 = src = new VarDeque();
+                th.ip = 0;
                 goto case 0;
             default:
                 return Kernel.Die(th, "Invalid IP");
