@@ -171,9 +171,22 @@
       linearized_mro
     ) (when (equal class "class"))) (list 'nam-class name attributes methods))))
 
+
+
 (defun compile-unit (nam)
   (fare-matcher:match nam 
-    ((list mainline-xref name log setting bottom-ref filename modtime x-ref t-deps root-stash) (loop for sub in x-ref for i upfrom 0 collect (compile-sub i sub)))))
+    ((list
+      mainline_ref    ;  Xref to mainline subroutine
+      name            ;  Unit's unique name
+      log             ;  Mostly unused vestige of last stash system
+      setting         ;  Name of setting unit or null
+      bottom_ref      ;  Xref to sub containing {YOU_ARE_HERE}, or null
+      filename        ;  Filename of source code or null
+      modtime         ;  Seconds since 1970-01-01
+      xref            ;  Resolves refs from other units
+      tdeps           ;  Holds dependency data for recompilation
+      stash_root      ;  Trie holding classes and global variables
+    ) (loop for sub in xref for i upfrom 0 collect (compile-sub i sub)))))
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
