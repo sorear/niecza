@@ -2,6 +2,10 @@
 			   (user-homedir-pathname)))
 (ql:quickload "cl-json")
 (ql:quickload "fare-matcher")
+
+
+; Logging - not sure we need it
+
 (ql:quickload "cl-log")
 
 (use-package "COM.RAVENBROOK.COMMON-LISP-LOG")
@@ -10,21 +14,24 @@
 
 (log-message :info "cl-backend started")
 
-(defun nam-op-log (name result) (log-message :info (format nil "~a => ~w" name (strip-ann result))) result)
+(defun nam-op-log (name result) "Log what an nam op gets transformed into" (log-message :info (format nil "~a => ~w" name (strip-ann result))) result)
 
+
+; Macros 
+ 
+(defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params (nam-op-log ',name (progn ,@body))))
 
 
 (defun strip-ann (thing) 
   (if (consp thing)
       (if (eq (first thing) 'nam-ann)
-          (strip-ann (cadddr thing)) 
+          (strip-ann (fourth thing)) 
           (mapcar #'strip-ann thing)
       )
       thing))
 
 (defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
 
-(defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params (nam-op-log ',name (progn ,@body))))
 
 
 (defun to-symbol-first (thing)
@@ -64,8 +71,30 @@
 
  
 
-(nam-op sub (i lexicals body) 
-  `(defun ,(sub-symbol i) () (let ,(lexicals-to-let lexicals) ,body)))
+(defmacro define-nam-sub  
+  (i                ; The Xref Id
+    name             ; Sub's name for backtraces
+    outer_xref       ; OUTER:: sub, may be in a setting unit
+    flags            ; See doc/nam.pod
+    children         ; Supports tree traversals
+    param_role_hack  ; See doc/nam.pod
+    augment_hack     ; See doc/nam.pod
+    hint_hack        ; See doc/nam.pod
+    is_phaser        ; See doc/nam.pod
+    body_of          ; Only valid in immediate block of class {} et al
+    in_class         ; Innermost enclosing body_of
+    cur_pkg          ; OUR:: as a list of names
+    class            ; &?BLOCK.WHAT; "Sub" or "Regex"
+    ltm              ; Only for regexes; stores declarative prefix
+    exports          ; List of global names
+    signature        ; May be null in exotic cases
+    lexicals         ; Come in multiple forms
+    nam              ; See description of opcodes earlier
+  )
+
+  `(defun ,(sub-symbol i) () (let ,(lexicals-to-let lexicals) ,@nam)))
+
+
 
 (defun xref-to-subsymbol (xref) (sub-symbol (cadr xref)))
 
@@ -75,7 +104,7 @@
       `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol xref))))))
 
 
-(nam-op class (name attributes methods)
+(defun define-nam-class (name attributes methods)
   `(progn 
     (defclass ,(class-symbol name) (p6-Object) ())
     ,@(mapcar #'compile-method methods)
@@ -137,39 +166,27 @@
 
 (nam-op newboundvar (dunno1 dunno2 thing) thing)
 
+(defun compile-sub-or-packagoid (i def)
+  (let* ((type (first def))
+        (args (if (equal type "sub") (append (butlast (rest def)) (list (to-symbol-first (last def)))) (rest def))))
+
+    `(
+      ,(intern (string-upcase (concatenate 'string "define-nam-" type)))
+      ,i
+      ,@args
+      )))
 
 
-(defun compile-sub (i sub)
-  (fare-matcher:match sub 
-    ((and (list
-      sub  ; "sub" literal
-      name
-      outer ;  raw xref
-      flags
-      dunno-what-that-is ; [ map { $_->xref->[1] } @{ $self->zyg } ]
-      parametric-role-hack
-      augment-hack
-      hint-hack
-      is-phaser
-      body-of
-      in-class
-      cur-pkg
-      class
-      ltm
-      exports
-      signature-params
-      lexicals
-      nam
-    ) (when (equal sub "sub"))) (list 'nam-sub i lexicals (to-symbol-first nam)))
-    ((and (list
-      class ; "class" literal
-      name
-      exports
-      attributes
-      methods
-      superclasses
-      linearized_mro
-    ) (when (equal class "class"))) (list 'nam-class name attributes methods))))
+
+;;    ((and (list
+;;      class ; "class" literal
+;;      name
+;;      exports
+;;      attributes
+;;      methods
+;;      superclasses
+;;      linearized_mro
+;;    ) (when (equal class "class"))) (list 'define-nam-class name attributes methods))))
 
 
 
@@ -186,7 +203,7 @@
       xref            ;  Resolves refs from other units
       tdeps           ;  Holds dependency data for recompilation
       stash_root      ;  Trie holding classes and global variables
-    ) (loop for sub in xref for i upfrom 0 collect (compile-sub i sub)))))
+    ) (loop for thing in xref for i upfrom 0 collect (compile-sub-or-packagoid i thing)))))
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
@@ -202,6 +219,8 @@
 
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
+  ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
+  ;(format t "~w~%~%~%" compiled-unit)
   (format t "~w~%~%~%" (strip-ann compiled-unit))
   (let ((wrapped (wrap-for-eval compiled-unit)))
     (eval wrapped)
