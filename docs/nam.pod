@@ -138,7 +138,8 @@ embedding a sequence of void nam ops in a Perl 6 statement list.
 
 =head2 Internal to the backend
 
-These should not be used by the frontend.
+These should not be used by the frontend.  They are used for construction of
+some internal code fragments, usually in response to _hack settings.
 
 =head3 _addmethod
 
@@ -155,11 +156,35 @@ These should not be used by the frontend.
 
 =head3 ann($unused,$line_number,$operation)
 
-Sets the C<$line_number> for the C<$operation>.
+Sets the C<$line_number> for the C<$operation>.  In the C# backend, line
+number is only recorded at high-level call sites within the span.
 
-=head3 ehspan
+=head3 ehspan($class,$tag,$name,$start,$end,$goto)
 
-=head3 span
+In the half-open interval from C<$start> to C<$end> (both of which should be
+string label names), an exception of class C<$class> [1] will cause control
+to be transferred to C<$end>.  C<$tag> and C<$name> are part of the incomplete
+lexotics handling.  Exactly how return values are passed is still something of
+a mystery.
+
+[1] The following class values are currently defined:
+
+    1   ON_NEXT             &next
+    2   ON_LAST             &last
+    3   ON_REDO             &redo
+    4   ON_RETURN           &return
+    5   ON_DIE              General exception, payload usually Str
+    6   ON_SUCCEED
+    7   ON_PROCEED
+    8   ON_GOTO
+    9   ON_NEXTDISPATCH     &nextsame, &nextwith; payload is a Capture
+
+=head3 span($n1,$n2,$sync,$body)
+
+Generates the code for C<$body> bracketed by the labels C<$n1> and C<$n2>.  If
+an exception transfers control to C<$n2>, the exception payload will be
+returned.  C<$sync> forces exception handling to be synchronous with respect
+to the boundaries, allowing an C<ON_DIE> handler to function properly.
 
 
 =head2 Operations on numbers
@@ -211,13 +236,18 @@ Sets the C<$line_number> for the C<$operation>.
 
 =head2 Operations on variables
 
-=head3 assign
+=head3 assign($lhs,$rhs)
 
-=head3 bget
+The basic polymorphic assignment operator.  Depending on the list status of
+the left variable, either generates a basic store, or a LISTSTORE method call.
 
-=head3 fetch
+=head3 fetch($var)
 
-=head3 newblankrwscalar
+Extracts the value stored in a variable.
+
+=head3 newblankrwscalar()
+
+Creates a new scalar variable of type Any containing Any.
 
 =head3 newboundvar
 
@@ -386,56 +416,106 @@ Sets the C<$line_number> for the C<$operation>.
 
 =head3 bif_map
 
+=head3 get_first($list)
+
+=head3 iter_to_list($iter)
+
+=head3 promote_to_list($var)
+
 
 =head2 Operations on low-level lists
 
-=head3 fvarlist_item
+A C<fvarlist> is a fixed sized object like a C# or Java C<Variable[]> array.
+A C<vvarlist> is an OZ<>(1) deque like a C++ C<< std::deque<var> >>.  Most
+operations on these types are fairly straightforward.  C<vvarlist> also does
+duty as the most fundamental type of iterator; several operations are designed
+to do essential iterator tasks.  C<vvarlist_> operations are not cognizant of
+iterator structure and should not be used on iterators without careful
+consideration of the effect.
 
-=head3 fvarlist_length
+=head3 fvarlist_item($index,$fvl)
 
-=head3 fvarlist_new
+Extracts a single element.  BUG: Currently evaluates its arguements in the
+wrong order.
 
-=head3 get_first
+=head3 fvarlist_length($fvl)
 
-=head3 iter_copy_elems
+Return the number of elements in the argument as an C<int>.
 
-=head3 iter_flatten
+=head3 fvarlist_new(*@elements)
 
-=head3 iter_hasarg
+Construct a new fvarlist of compile-time length, like a C# array literal.
 
-=head3 iter_hasflat
+=head3 iter_copy_elems($iter)
 
-=head3 iter_to_list
+Creates a new iterator which iterates over the same values, but all copied
+into fresh read-write variables.  Mostly eager.
 
-=head3 promote_to_list
+=head3 iter_flatten($iter)
 
-=head3 vvarlist_append
+Creates a new iterator which mostly-eagerly presents the same values with
+sublists flattened.
 
-=head3 vvarlist_clone
+=head3 iter_hasarg($iter)
 
-=head3 vvarlist_count
+Attempts to extract a value from an iterator without flattening sublists.
+Returns C<bool>; if true, the value may be returned by C<vvarlist_shift>.
 
-=head3 vvarlist_from_fvarlist
+=head3 iter_hasflat($iter)
 
-=head3 vvarlist_item
+See C<iter_hasarg>.
 
-=head3 vvarlist_new_empty
+=head3 vvarlist_append($onto,$new)
 
-=head3 vvarlist_new_singleton
+Adds all elements (non-destructively) from a source list onto the end of a
+destination list in order.
 
-=head3 vvarlist_pop
+=head3 vvarlist_clone($old)
 
-=head3 vvarlist_push
+Creates a new non-aliasing list with all elements aliases of the elements of
+an old list.
 
-=head3 vvarlist_shift
+=head3 vvarlist_count($list)
 
-=head3 vvarlist_sort
+Returns the number of items in a list.
 
-=head3 vvarlist_to_fvarlist
+=head3 vvarlist_from_fvarlist($fv)
 
-=head3 vvarlist_unshift
+=head3 vvarlist_item($index,$list)
 
-=head3 vvarlist_unshiftn
+=head3 vvarlist_new_empty()
+
+=head3 vvarlist_new_singleton($var)
+
+Creates a new list with exactly one initial element.  Useful for bootstrapping
+iterations.
+
+=head3 vvarlist_pop($list)
+
+Removes and returns the last element of a nonempty list.
+
+=head3 vvarlist_push($list,$item)
+
+Adds a new element to the end of a list.
+
+=head3 vvarlist_shift($list)
+
+Removes and returns the first element of a nonempty list.
+
+=head3 vvarlist_sort($cb_obj,$list)
+
+Sorts a list (not in place).  C<$cb_obj> must be an invocable object which
+functions as a two-argument sort routine, returning C<Num>.
+
+=head3 vvarlist_to_fvarlist($list)
+
+=head3 vvarlist_unshift($list,$item)
+
+Adds a new element to the beginning of a list.
+
+=head3 vvarlist_unshiftn($list,$fvl)
+
+Adds the contents of a fixed list to the beginning of a variable list in order.
 
 
 =head2 Operations involving the operating system
