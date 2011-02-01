@@ -83,3 +83,6 @@ representation polymorphism will be implemented.
 After this, it will be possible to greatly expand the setting, and
 with it, spectest coverage.  &eval and BEGIN are on the table and will
 be worked on as inspiration permits.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-2.zip
+[2] https://github.com/sorear/niecza
