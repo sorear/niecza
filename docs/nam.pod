@@ -249,13 +249,22 @@ Extracts the value stored in a variable.
 
 Creates a new scalar variable of type Any containing Any.
 
-=head3 newboundvar
+=head3 newboundvar($ro,$list,$var)
 
-=head3 newrwlistvar
+Used for binding parameters in beta-eliminated subs, used to be the heart of
+the binder but this is no longer so.
 
-=head3 newrwscalar
+=head3 newrwlistvar($obj)
 
-=head3 newscalar
+Wraps C<$obj> in a read-only variable with the list nature.
+
+=head3 newrwscalar($obj)
+
+Creates a new variable of type Any containing C<$obj>.
+
+=head3 newscalar($obj)
+
+Wraps C<$obj> in a read-only variable.
 
 =head3 newvarrayvar
 
@@ -265,9 +274,16 @@ Creates a new scalar variable of type Any containing Any.
 
 =head3 newvnewhashvar
 
-=head3 newvsubvar
+Were used for autovivification; currently unused.
 
-=head3 var_islist
+=head3 newvsubvar($type,$sub,$obj)
+
+Creates an autovivifiable variable which will call C<$sub> when written to or
+bound rw, and otherwise functions as ordinary rw.
+
+=head3 var_islist($var)
+
+True if C<$var> has the list nature.
 
 
 =head2 Operations on strings
@@ -652,44 +668,78 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 =head2 Sequence control operations
 
-=head3 cgoto
+=head3 cgoto($name,$if)
 
-=head3 control
+Go to label named C<$name> (must be a literal string) if C<$if> is true.
 
-=head3 cotake
+=head3 control($type,$target,$lid,$name,$payload)
 
-=head3 die
+The most general interface to the exception generator.
 
-=head3 do_require
+=head3 cotake($cont)
 
-=head3 goto
+Passes control to a coroutine identified by the continuation frame C<$cont>.
+When said coroutine uses take, the new continuation frame is stored in the
+C<$*nextframe> lexical and the value passed is returned.
 
-=head3 label
+=head3 die($exception)
+
+Throws a basic non-resumable exception.  C<$exception> may be a raw string and
+it will DWIM.
+
+=head3 do_require($module)
+
+=head3 goto($label)
+
+=head3 label($name)
 
 =head3 label_table
 
-=head3 methodcall($methodname,$dunno,@*args)
+=head3 methodcall($name,$sig,*@args)
 
-Calls method $methodname (which is a nam op).
-Named parameters are passed by having a string ":option-name" and then the nam op which evaluates to the option value.
+Calls method C<$name> on the first argument.  The interpretation of the rest of
+the arguments is controlled by C<$sig>; for each argument, there is a token in
+C<$sig> consisting of a length and a sequence of characters.  A zero-length
+sequence represents an ordinary positional, a string like ":name" represents
+a named parameter, and "flatcap" represents a | parameter.  Note that in the
+last case, the argument should have type C<obj>.
 
-=head3 ncgoto
+=head3 ncgoto($to,$if)
+
+See cgoto.
 
 =head3 prog(*@arguments)
 
 Evaluates arguments in sequence and returns the result of the last one.
 
-=head3 return
+=head3 return($value)
 
-=head3 startgather
+Low-level return from a body; does NOT use the control exception mechanism.
+Probably best regarded as a backend-internal operator.
 
-=head3 subcall
+=head3 startgather($sub)
 
-=head3 take
+Creates a new coroutine to invoke C<$sub> without arguments, and returns the
+initial continuation frame.
 
-=head3 ternary
+=head3 subcall($sig,*@args)
 
-=head3 whileloop
+Identical to methodcall, except that the method name is considered forced to
+C<INVOKE>.
+
+=head3 take($thing)
+
+Passes C<$thing> to the coroutine which caused the current coroutine to be
+invoked.  When this coroutine is restarted, take returns the value unchanged.
+
+=head3 ternary($cond,$true,$false)
+
+The basic branching operator.
+
+=head3 whileloop($until,$once,$cond,$body)
+
+The basic repetition operator.  If C<$once> is passed, the loop is treated as
+repeat..while.  If C<$until> is passed, the condition is inverted.
 
 
 =head2 Operations supporting modules
@@ -748,45 +798,69 @@ Evaluates and ignores $argument.
 
 =head2 Object model operations
 
-=head3 box
+=head3 box($proto,$value)
 
-=head3 class_ref
+Creates a boxing object of a given type.  C<$proto> may be a CORE:: name.
 
-=head3 default_new
+=head3 class_ref("mo",$corename) | class_ref("mo",$unit,$xix,$name)
 
-=head3 getslot
+Returns the raw C<stab> for a class, by CORE:: name or xref node fields.
 
-=head3 how
+=head3 default_new(obj $proto, varhash $args)
 
-=head3 instrole
+Implements Mu.new.
 
-=head3 llhow_name
+=head3 getslot($name,$type,$object)
 
-=head3 obj_does
+Fetches a named slot from an object.  C<$type> must be used consistantly.
 
-=head3 obj_isa
+=head3 how($obj)
 
-=head3 obj_is_defined
+Returns the ClassHOW or similar instance for an object.
 
-=head3 obj_llhow
+=head3 instrole(fvarlist $parcel)
 
-=head3 obj_newblank
+Instantiates a parameterized role (first argument) with arguments (rest).
 
-=head3 obj_typename
+=head3 llhow_name(stab $stb)
 
-=head3 obj_what
+=head3 obj_does(obj $obj, stab $role)
 
-=head3 role_apply
+=head3 obj_isa(obj $obj, stab $super)
 
-=head3 setbox
+=head3 obj_is_defined(obj $obj)
 
-=head3 setslot
+Checks REPR-level definedness, not .defined.
 
-=head3 stab_privatemethod
+=head3 obj_llhow(obj $obj)
 
-=head3 stab_what
+=head3 obj_newblank(stab $stab)
 
-=head3 unbox
+Fastest way to create an object.  Does B<not> set up variables for attributes.
+
+=head3 obj_typename(obj $obj)
+
+=head3 obj_what(obj $obj)
+
+=head3 role_apply(stab $base, stab $role)
+
+Implements the but operator for type objects.
+
+=head3 setbox(obj $obj, ::T $value)
+
+Mutates a boxed value in place.  Use carefully!
+
+=head3 setslot($name, obj $obj, ::T $value)
+
+Binds a slot, possibly to a native value.
+
+=head3 stab_privatemethod(stab $stab, str $name)
+
+Obtains a reference to the Sub implementing a private method.
+
+=head3 stab_what(stab $stab)
+
+=head3 unbox($typename, obj $obj)
 
 
 =head2 CLR interface operations
