@@ -16,6 +16,40 @@ use NieczaCompiler;
 
 use MONKEY_TYPING;
 
+use STD;
+augment class STD::P6 { #OK exist
+my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+    token infixish ($in_meta?) {
+        :my ($infix, $O, $sym);
+        :temp $*IN_META;
+        :my $stub = ($*IN_META = $*IN_META // $in_meta); #OK not used
+        <!stdstopper>
+        <!infixstopper>
+        :dba('infix or meta-infix')
+        [
+        | <colonpair> $<fake> = {1} { $sym = ':' }
+            { $O = {:prec(%item_assignment<prec>), :assoc<unary>,
+                :dba<adverb> } }
+                # actual test is non-inclusive!
+        |   [
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $O = $<infix><O>; $sym = $<infix><sym> }
+              [ <!{ $*IN_META }> <before \s> { self.worry("Useless use of metaoperator grouping brackets") } ]?
+            | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
+            | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
+            ]
+            [ <?before '='> <assign_meta_operator($<infix>)>
+                   {$O = $<assign_meta_operator>[0]<O>}
+                   {$sym = $<assign_meta_operator>[0]<sym>}
+            ]?
+
+        ]
+        $<O> = { $O } $<sym> = { $sym }
+    }
+}
+
 sub GetOptions(*@pairs, :$permute = True, :onerror($onerror_), :onarg($onarg_)) {
     my @nonopt;
     my $onerror = $onerror_ // sub ($message) {
