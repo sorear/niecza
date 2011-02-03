@@ -91,7 +91,9 @@ method !load_dependent($module) {
     if !defined($newmod) || !self!up_to_date($newmod) {
         $.unitcache{$module}:delete;
         say "(Re)compilation needed" if $.verbose;
+        note "[auto-compiling setting]" if $module eq 'CORE';
         self.compile_module($module);
+        note "[done]" if $module eq 'CORE';
         $newmod = $.unitcache{$module} = $.backend.get_unit($module);
     }
 
