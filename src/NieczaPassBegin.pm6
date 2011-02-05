@@ -73,6 +73,8 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
     if $type eq 'regex' {
         $metabody.add_my_name('$*/');
     }
+    $metabody.add_my_name('$_') unless $.transparent ||
+        ($metabody.lexicals<$_>:exists);
 
     pop @*opensubs if $.transparent;
 

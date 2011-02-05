@@ -21,6 +21,10 @@ use MONKEY_TYPING;
     my $foo = [5];
     for $foo { .shift }
     is +$foo, 0, ".method works";
+
+    my $x = 5;
+    $x ~~ .++;
+    is $x, 6, "~~ topicalization works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

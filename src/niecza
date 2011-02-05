@@ -17,8 +17,43 @@ use NieczaCompiler;
 use MONKEY_TYPING;
 
 use NieczaActions;
+use Operator;
+sub node($M) { { line => $M.cursor.lineof($M.to) } }
+
+sub mklet($value, $body) {
+    my $var = ::GLOBAL::NieczaActions.gensym;
+    ::Op::Let.new(var => $var, to => $value,
+        in => $body(::Op::LetVar.new(name => $var)));
+}
+
+sub mklex($/, $name) { ::Op::Lexical.new(|node($/), :$name); }
+
+sub mkcall($/, $name, *@positionals) {
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+}
+
 augment class NieczaActions {
     method keyspace($/) { }
+    method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
+}
+
+augment class Operator {
+class SmartMatch is Operator {
+    method as_function($/) { mklex($/, '&infix:<~~>') }
+    method with_args($/, *@args) {
+        mklet(mklex($/, '$_'), -> $old_ {
+            ::Op::StatementList.new(|node($/), children => [
+                # XXX should be a raw bind
+                ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'), rhs => @args[0]),
+                mklet(::Op::CallMethod.new(receiver => @args[1], name => 'ACCEPTS', args => [ mklex($/, '$_') ]), -> $result {
+                    ::Op::StatementList.new(children => [
+                        # XXX should be a raw bind
+                        ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'),
+                            rhs => $old_),
+                        $result]) }) ]) });
+    }
+}
 }
 
 sub GetOptions(*@pairs, :$permute = True, :onerror($onerror_), :onarg($onarg_)) {
