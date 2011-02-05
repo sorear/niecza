@@ -7,23 +7,12 @@
 
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
-use Stash;
 use NAME;
+use Stash;
 
 package DEBUG {
-    our $autolexer = False;
-    our $symtab = False;
-    our $fixed_length = False;
-    our $fates = False;
-    our $longest_token_pattern_generation = False;
-    our $EXPR = False;
-    our $matchers = False;
-    our $trace_call = False;
-    our $cursors = False;
-    our $try_processing = False;
-    our $mixins = False;
-    our $callm_show_subnames = False;
-    our $use_color = False;
+    our constant symtab = 1;
+    our constant EXPR   = 2;
 }
 
 sub _subst($M is rw, $text is rw, $regex, $repl) {
@@ -304,6 +293,7 @@ token unspacey { <.unsp>? }
 token begid { <?before \w> }
 token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
+token keyspace { <?before <-[(]> > [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
 token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -336,7 +326,7 @@ regex stdstopper {
     | <?before <stopper> >
     | $                                 # unlikely, check last (normal LTM behavior)
     ]
-    { @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$¢.pos]<endstmt> || 1; }
+    { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
 }
 
 token longname {
@@ -367,204 +357,6 @@ token morename {
 # Quote primitives           #
 ##############################
 
-# XXX should eventually be derived from current Unicode tables.
-my %open2close = (
-"\x0028" => "\x0029",
-"\x003C" => "\x003E",
-"\x005B" => "\x005D",
-"\x007B" => "\x007D",
-"\x00AB" => "\x00BB",
-"\x0F3A" => "\x0F3B",
-"\x0F3C" => "\x0F3D",
-"\x169B" => "\x169C",
-"\x2018" => "\x2019",
-"\x201A" => "\x2019",
-"\x201B" => "\x2019",
-"\x201C" => "\x201D",
-"\x201E" => "\x201D",
-"\x201F" => "\x201D",
-"\x2039" => "\x203A",
-"\x2045" => "\x2046",
-"\x207D" => "\x207E",
-"\x208D" => "\x208E",
-"\x2208" => "\x220B",
-"\x2209" => "\x220C",
-"\x220A" => "\x220D",
-"\x2215" => "\x29F5",
-"\x223C" => "\x223D",
-"\x2243" => "\x22CD",
-"\x2252" => "\x2253",
-"\x2254" => "\x2255",
-"\x2264" => "\x2265",
-"\x2266" => "\x2267",
-"\x2268" => "\x2269",
-"\x226A" => "\x226B",
-"\x226E" => "\x226F",
-"\x2270" => "\x2271",
-"\x2272" => "\x2273",
-"\x2274" => "\x2275",
-"\x2276" => "\x2277",
-"\x2278" => "\x2279",
-"\x227A" => "\x227B",
-"\x227C" => "\x227D",
-"\x227E" => "\x227F",
-"\x2280" => "\x2281",
-"\x2282" => "\x2283",
-"\x2284" => "\x2285",
-"\x2286" => "\x2287",
-"\x2288" => "\x2289",
-"\x228A" => "\x228B",
-"\x228F" => "\x2290",
-"\x2291" => "\x2292",
-"\x2298" => "\x29B8",
-"\x22A2" => "\x22A3",
-"\x22A6" => "\x2ADE",
-"\x22A8" => "\x2AE4",
-"\x22A9" => "\x2AE3",
-"\x22AB" => "\x2AE5",
-"\x22B0" => "\x22B1",
-"\x22B2" => "\x22B3",
-"\x22B4" => "\x22B5",
-"\x22B6" => "\x22B7",
-"\x22C9" => "\x22CA",
-"\x22CB" => "\x22CC",
-"\x22D0" => "\x22D1",
-"\x22D6" => "\x22D7",
-"\x22D8" => "\x22D9",
-"\x22DA" => "\x22DB",
-"\x22DC" => "\x22DD",
-"\x22DE" => "\x22DF",
-"\x22E0" => "\x22E1",
-"\x22E2" => "\x22E3",
-"\x22E4" => "\x22E5",
-"\x22E6" => "\x22E7",
-"\x22E8" => "\x22E9",
-"\x22EA" => "\x22EB",
-"\x22EC" => "\x22ED",
-"\x22F0" => "\x22F1",
-"\x22F2" => "\x22FA",
-"\x22F3" => "\x22FB",
-"\x22F4" => "\x22FC",
-"\x22F6" => "\x22FD",
-"\x22F7" => "\x22FE",
-"\x2308" => "\x2309",
-"\x230A" => "\x230B",
-"\x2329" => "\x232A",
-"\x23B4" => "\x23B5",
-"\x2768" => "\x2769",
-"\x276A" => "\x276B",
-"\x276C" => "\x276D",
-"\x276E" => "\x276F",
-"\x2770" => "\x2771",
-"\x2772" => "\x2773",
-"\x2774" => "\x2775",
-"\x27C3" => "\x27C4",
-"\x27C5" => "\x27C6",
-"\x27D5" => "\x27D6",
-"\x27DD" => "\x27DE",
-"\x27E2" => "\x27E3",
-"\x27E4" => "\x27E5",
-"\x27E6" => "\x27E7",
-"\x27E8" => "\x27E9",
-"\x27EA" => "\x27EB",
-"\x2983" => "\x2984",
-"\x2985" => "\x2986",
-"\x2987" => "\x2988",
-"\x2989" => "\x298A",
-"\x298B" => "\x298C",
-"\x298D" => "\x298E",
-"\x298F" => "\x2990",
-"\x2991" => "\x2992",
-"\x2993" => "\x2994",
-"\x2995" => "\x2996",
-"\x2997" => "\x2998",
-"\x29C0" => "\x29C1",
-"\x29C4" => "\x29C5",
-"\x29CF" => "\x29D0",
-"\x29D1" => "\x29D2",
-"\x29D4" => "\x29D5",
-"\x29D8" => "\x29D9",
-"\x29DA" => "\x29DB",
-"\x29F8" => "\x29F9",
-"\x29FC" => "\x29FD",
-"\x2A2B" => "\x2A2C",
-"\x2A2D" => "\x2A2E",
-"\x2A34" => "\x2A35",
-"\x2A3C" => "\x2A3D",
-"\x2A64" => "\x2A65",
-"\x2A79" => "\x2A7A",
-"\x2A7D" => "\x2A7E",
-"\x2A7F" => "\x2A80",
-"\x2A81" => "\x2A82",
-"\x2A83" => "\x2A84",
-"\x2A8B" => "\x2A8C",
-"\x2A91" => "\x2A92",
-"\x2A93" => "\x2A94",
-"\x2A95" => "\x2A96",
-"\x2A97" => "\x2A98",
-"\x2A99" => "\x2A9A",
-"\x2A9B" => "\x2A9C",
-"\x2AA1" => "\x2AA2",
-"\x2AA6" => "\x2AA7",
-"\x2AA8" => "\x2AA9",
-"\x2AAA" => "\x2AAB",
-"\x2AAC" => "\x2AAD",
-"\x2AAF" => "\x2AB0",
-"\x2AB3" => "\x2AB4",
-"\x2ABB" => "\x2ABC",
-"\x2ABD" => "\x2ABE",
-"\x2ABF" => "\x2AC0",
-"\x2AC1" => "\x2AC2",
-"\x2AC3" => "\x2AC4",
-"\x2AC5" => "\x2AC6",
-"\x2ACD" => "\x2ACE",
-"\x2ACF" => "\x2AD0",
-"\x2AD1" => "\x2AD2",
-"\x2AD3" => "\x2AD4",
-"\x2AD5" => "\x2AD6",
-"\x2AEC" => "\x2AED",
-"\x2AF7" => "\x2AF8",
-"\x2AF9" => "\x2AFA",
-"\x2E02" => "\x2E03",
-"\x2E04" => "\x2E05",
-"\x2E09" => "\x2E0A",
-"\x2E0C" => "\x2E0D",
-"\x2E1C" => "\x2E1D",
-"\x2E20" => "\x2E21",
-"\x3008" => "\x3009",
-"\x300A" => "\x300B",
-"\x300C" => "\x300D",
-"\x300E" => "\x300F",
-"\x3010" => "\x3011",
-"\x3014" => "\x3015",
-"\x3016" => "\x3017",
-"\x3018" => "\x3019",
-"\x301A" => "\x301B",
-"\x301D" => "\x301E",
-"\xFD3E" => "\xFD3F",
-"\xFE17" => "\xFE18",
-"\xFE35" => "\xFE36",
-"\xFE37" => "\xFE38",
-"\xFE39" => "\xFE3A",
-"\xFE3B" => "\xFE3C",
-"\xFE3D" => "\xFE3E",
-"\xFE3F" => "\xFE40",
-"\xFE41" => "\xFE42",
-"\xFE43" => "\xFE44",
-"\xFE47" => "\xFE48",
-"\xFE59" => "\xFE5A",
-"\xFE5B" => "\xFE5C",
-"\xFE5D" => "\xFE5E",
-"\xFF08" => "\xFF09",
-"\xFF1C" => "\xFF1E",
-"\xFF3B" => "\xFF3D",
-"\xFF5B" => "\xFF5D",
-"\xFF5F" => "\xFF60",
-"\xFF62" => "\xFF63",
-);
-
-my %close2open = invert %open2close;
-
 # assumes whitespace is eaten already
 
 method peek_delimiters {
@@ -577,14 +369,14 @@ method peek_delimiters {
     elsif $char ~~ /^\w$/ {
         self.panic("Alphanumeric character is not allowed as delimiter");
     }
-    elsif %close2open{$char} {
+    elsif %STD::close2open{$char} {
         self.panic("Use of a closing delimiter for an opener is reserved");
     }
     elsif $char eq ':' {
         self.panic("Colons may not be used to delimit quoting constructs");
     }
 
-    my $rightbrack = %open2close{$char};
+    my $rightbrack = %STD::open2close{$char};
     if not defined $rightbrack {
         return ($char, $char);
     }
@@ -661,10 +453,10 @@ token nibbler {
     [ <!before <stopper> >
         [
         || <starter> <nibbler> <stopper>
-                        {
+                        {{
                             push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
 
-                            my $n = $<nibbler>[(+$<nibbler>)-1]<nibbles>;
+                            my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
 
                             push @nibbles, $<starter>;
@@ -673,13 +465,13 @@ token nibbler {
 
                             $text = '';
                             $to = $from = $¢.pos;
-                        }
-        || <escape>     {
+                        }}
+        || <escape>     {{
                             push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
-                            push @nibbles, $<escape>[(+$<escape>)-1];
+                            push @nibbles, $<escape>[*-1];
                             $text = '';
                             $to = $from = $¢.pos;
-                        }
+                        }}
         || .
                         {{
                             my $ch = substr(self.orig, $¢.pos-1, 1);
@@ -692,7 +484,8 @@ token nibbler {
         ]
     ]*
     {
-        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to or !@nibbles;
+        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to),
+            :method<Str>, :captures()) if $from != $to or !@nibbles;
         $*LAST_NIBBLE = $¢.pos;
         $*LAST_NIBBLE_START = self.pos;
         $*LAST_NIBBLE_MULTILINE = $¢.pos if $multiline;
@@ -709,7 +502,7 @@ token babble ($l) {
     <.ws>
     [ <quotepair> <.ws>
         {
-            my $kv = $<quotepair>[(+$<quotepair>)-1];
+            my $kv = $<quotepair>[*-1];
             $lang = ($lang.tweak(| ($kv.<k> => $kv.<v>))
                 or $lang.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
         }
@@ -730,15 +523,6 @@ class Herestub {
     has $.orignode;
     has $.lang;
     has $.writeback;
-
-    method new(:$delim, :$orignode, :$lang, :$writeback) {
-        my $new = self.CREATE;
-        $new!delim = $delim;
-        $new!orignode = $orignode;
-        $new!lang = $lang;
-        $new!writeback = $writeback;
-        $new;
-    }
 }
 
 role herestop {
@@ -774,7 +558,7 @@ token quibble ($l) {
 
     $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
-    {
+    {{
         if $lang.hereinfo.[0] {
             push @herestub_queue,
                 Herestub.new(
@@ -784,7 +568,7 @@ token quibble ($l) {
                     lang => $lang.hereinfo.[0],
                 );
         }
-    }
+    }}
 }
 
 token quotepair {
@@ -872,7 +656,7 @@ token vws {
     [
         [
         | \v
-        # | '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } \V* \v
+        | '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } \V* \v
         | '<<<<<<<' :: <?before [.*? \v '=======']: .*? \v '>>>>>>>' > <.sorry: 'Found a version control conflict marker'> \V* \v
         | '=======' :: .*? \v '>>>>>>>' \V* \v   # ignore second half
         ]
@@ -1076,6 +860,203 @@ token terminator:sym<]>
 token terminator:sym<}>
     { '}' <O(|%terminator)> }
 
+# XXX should eventually be derived from current Unicode tables.
+our %open2close = (
+"\x0028" => "\x0029",
+"\x003C" => "\x003E",
+"\x005B" => "\x005D",
+"\x007B" => "\x007D",
+"\x00AB" => "\x00BB",
+"\x0F3A" => "\x0F3B",
+"\x0F3C" => "\x0F3D",
+"\x169B" => "\x169C",
+"\x2018" => "\x2019",
+"\x201A" => "\x2019",
+"\x201B" => "\x2019",
+"\x201C" => "\x201D",
+"\x201E" => "\x201D",
+"\x201F" => "\x201D",
+"\x2039" => "\x203A",
+"\x2045" => "\x2046",
+"\x207D" => "\x207E",
+"\x208D" => "\x208E",
+"\x2208" => "\x220B",
+"\x2209" => "\x220C",
+"\x220A" => "\x220D",
+"\x2215" => "\x29F5",
+"\x223C" => "\x223D",
+"\x2243" => "\x22CD",
+"\x2252" => "\x2253",
+"\x2254" => "\x2255",
+"\x2264" => "\x2265",
+"\x2266" => "\x2267",
+"\x2268" => "\x2269",
+"\x226A" => "\x226B",
+"\x226E" => "\x226F",
+"\x2270" => "\x2271",
+"\x2272" => "\x2273",
+"\x2274" => "\x2275",
+"\x2276" => "\x2277",
+"\x2278" => "\x2279",
+"\x227A" => "\x227B",
+"\x227C" => "\x227D",
+"\x227E" => "\x227F",
+"\x2280" => "\x2281",
+"\x2282" => "\x2283",
+"\x2284" => "\x2285",
+"\x2286" => "\x2287",
+"\x2288" => "\x2289",
+"\x228A" => "\x228B",
+"\x228F" => "\x2290",
+"\x2291" => "\x2292",
+"\x2298" => "\x29B8",
+"\x22A2" => "\x22A3",
+"\x22A6" => "\x2ADE",
+"\x22A8" => "\x2AE4",
+"\x22A9" => "\x2AE3",
+"\x22AB" => "\x2AE5",
+"\x22B0" => "\x22B1",
+"\x22B2" => "\x22B3",
+"\x22B4" => "\x22B5",
+"\x22B6" => "\x22B7",
+"\x22C9" => "\x22CA",
+"\x22CB" => "\x22CC",
+"\x22D0" => "\x22D1",
+"\x22D6" => "\x22D7",
+"\x22D8" => "\x22D9",
+"\x22DA" => "\x22DB",
+"\x22DC" => "\x22DD",
+"\x22DE" => "\x22DF",
+"\x22E0" => "\x22E1",
+"\x22E2" => "\x22E3",
+"\x22E4" => "\x22E5",
+"\x22E6" => "\x22E7",
+"\x22E8" => "\x22E9",
+"\x22EA" => "\x22EB",
+"\x22EC" => "\x22ED",
+"\x22F0" => "\x22F1",
+"\x22F2" => "\x22FA",
+"\x22F3" => "\x22FB",
+"\x22F4" => "\x22FC",
+"\x22F6" => "\x22FD",
+"\x22F7" => "\x22FE",
+"\x2308" => "\x2309",
+"\x230A" => "\x230B",
+"\x2329" => "\x232A",
+"\x23B4" => "\x23B5",
+"\x2768" => "\x2769",
+"\x276A" => "\x276B",
+"\x276C" => "\x276D",
+"\x276E" => "\x276F",
+"\x2770" => "\x2771",
+"\x2772" => "\x2773",
+"\x2774" => "\x2775",
+"\x27C3" => "\x27C4",
+"\x27C5" => "\x27C6",
+"\x27D5" => "\x27D6",
+"\x27DD" => "\x27DE",
+"\x27E2" => "\x27E3",
+"\x27E4" => "\x27E5",
+"\x27E6" => "\x27E7",
+"\x27E8" => "\x27E9",
+"\x27EA" => "\x27EB",
+"\x2983" => "\x2984",
+"\x2985" => "\x2986",
+"\x2987" => "\x2988",
+"\x2989" => "\x298A",
+"\x298B" => "\x298C",
+"\x298D" => "\x298E",
+"\x298F" => "\x2990",
+"\x2991" => "\x2992",
+"\x2993" => "\x2994",
+"\x2995" => "\x2996",
+"\x2997" => "\x2998",
+"\x29C0" => "\x29C1",
+"\x29C4" => "\x29C5",
+"\x29CF" => "\x29D0",
+"\x29D1" => "\x29D2",
+"\x29D4" => "\x29D5",
+"\x29D8" => "\x29D9",
+"\x29DA" => "\x29DB",
+"\x29F8" => "\x29F9",
+"\x29FC" => "\x29FD",
+"\x2A2B" => "\x2A2C",
+"\x2A2D" => "\x2A2E",
+"\x2A34" => "\x2A35",
+"\x2A3C" => "\x2A3D",
+"\x2A64" => "\x2A65",
+"\x2A79" => "\x2A7A",
+"\x2A7D" => "\x2A7E",
+"\x2A7F" => "\x2A80",
+"\x2A81" => "\x2A82",
+"\x2A83" => "\x2A84",
+"\x2A8B" => "\x2A8C",
+"\x2A91" => "\x2A92",
+"\x2A93" => "\x2A94",
+"\x2A95" => "\x2A96",
+"\x2A97" => "\x2A98",
+"\x2A99" => "\x2A9A",
+"\x2A9B" => "\x2A9C",
+"\x2AA1" => "\x2AA2",
+"\x2AA6" => "\x2AA7",
+"\x2AA8" => "\x2AA9",
+"\x2AAA" => "\x2AAB",
+"\x2AAC" => "\x2AAD",
+"\x2AAF" => "\x2AB0",
+"\x2AB3" => "\x2AB4",
+"\x2ABB" => "\x2ABC",
+"\x2ABD" => "\x2ABE",
+"\x2ABF" => "\x2AC0",
+"\x2AC1" => "\x2AC2",
+"\x2AC3" => "\x2AC4",
+"\x2AC5" => "\x2AC6",
+"\x2ACD" => "\x2ACE",
+"\x2ACF" => "\x2AD0",
+"\x2AD1" => "\x2AD2",
+"\x2AD3" => "\x2AD4",
+"\x2AD5" => "\x2AD6",
+"\x2AEC" => "\x2AED",
+"\x2AF7" => "\x2AF8",
+"\x2AF9" => "\x2AFA",
+"\x2E02" => "\x2E03",
+"\x2E04" => "\x2E05",
+"\x2E09" => "\x2E0A",
+"\x2E0C" => "\x2E0D",
+"\x2E1C" => "\x2E1D",
+"\x2E20" => "\x2E21",
+"\x3008" => "\x3009",
+"\x300A" => "\x300B",
+"\x300C" => "\x300D",
+"\x300E" => "\x300F",
+"\x3010" => "\x3011",
+"\x3014" => "\x3015",
+"\x3016" => "\x3017",
+"\x3018" => "\x3019",
+"\x301A" => "\x301B",
+"\x301D" => "\x301E",
+"\xFD3E" => "\xFD3F",
+"\xFE17" => "\xFE18",
+"\xFE35" => "\xFE36",
+"\xFE37" => "\xFE38",
+"\xFE39" => "\xFE3A",
+"\xFE3B" => "\xFE3C",
+"\xFE3D" => "\xFE3E",
+"\xFE3F" => "\xFE40",
+"\xFE41" => "\xFE42",
+"\xFE43" => "\xFE44",
+"\xFE47" => "\xFE48",
+"\xFE59" => "\xFE5A",
+"\xFE5B" => "\xFE5C",
+"\xFE5D" => "\xFE5E",
+"\xFF08" => "\xFF09",
+"\xFF1C" => "\xFF1E",
+"\xFF3B" => "\xFF3D",
+"\xFF5B" => "\xFF5D",
+"\xFF5F" => "\xFF60",
+"\xFF62" => "\xFF63",
+);
+
+our %close2open = invert %STD::open2close;
 
 token opener {
   <[
@@ -1109,6 +1090,7 @@ grammar P6 is STD {
     # Note: we only check for the stopper.  We don't check for ^ because
     # we might be embedded in something else.
     rule comp_unit {
+        :my $*DEBUG = $GLOBAL::DEBUG_STD // 0;
         :my $*begin_compunit = 1;
         :my $*endargs = -1;
         :my %*LANG;
@@ -1166,13 +1148,13 @@ grammar P6 is STD {
         [ <?unitstopper> || <.panic: "Confused"> ]
         # "CHECK" time...
         $<LEX> = { $*CURLEX }
-        {
+        {{
             $¢.explain_mystery();
             if @*WORRIES {
                 note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
             }
             die "Check failed\n" if $*FATALS;
-        }
+        }}
     }
 
     # Note: because of the possibility of placeholders we can't determine arity of
@@ -1227,7 +1209,7 @@ grammar P6 is STD {
         :my $*GOAL ::= '{';
         :my $*BORG = {};
         <EXPR>
-        { $*BORG.<culprit> = $*BORG<culprit> // self }
+        { $*BORG.<culprit> //= self }
         <.ws>
         <pblock>
     }
@@ -1276,7 +1258,7 @@ grammar P6 is STD {
 
         [ <quotepair> <.ws>
             {
-                my $kv = $<quotepair>[(+$<quotepair>)-1];
+                my $kv = $<quotepair>[*-1];
                 $lang = ($lang.tweak(|($kv.<k>.Str => $kv.<v>))
                     or $lang.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
             }
@@ -1342,9 +1324,6 @@ grammar P6 is STD {
         # this could either be a statement that follows a declaration
         # or a statement that is within the block of a code declaration
         :lang( %*LANG<MAIN> )
-        <!!{ $*LASTSTATE = $¢.pos; True  }>
-
-        # <!before $ >
 
         [
         | <label> <statement>
@@ -1414,14 +1393,14 @@ grammar P6 is STD {
 
     token statement_control:need {
         :my $longname;
-        <sym><.spacey>:s
+        <sym><.keyspace>:s
         [
         |<version>
         |<module_name>
             {{
                 my $*IN_DECL = 'use';
                 my $*SCOPE = 'use';
-                $longname = $<module_name>[(+$<module_name>)-1]<longname>;
+                $longname = $<module_name>[*-1]<longname>;
                 $¢.do_need($longname<name>);
             }}
         ] ** ','
@@ -1430,7 +1409,7 @@ grammar P6 is STD {
     token statement_control:import {
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
         <term>
         [
         || <.spacey> <arglist>
@@ -1449,7 +1428,7 @@ grammar P6 is STD {
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
         :my %*MYSTERY;
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
         [
         | <version>
         | <module_name>
@@ -1475,36 +1454,36 @@ grammar P6 is STD {
     token statement_control:no {
         :my %*MYSTERY;
         <sym><.spacey> <.ws>
-        <module_name>[<.spacey><arglist>]?
+        <module_name>[<.keyspace><arglist>]?
         <.ws>
         <.explain_mystery>
     }
 
 
     token statement_control:if {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         <xblock>
         [
             [
             | 'else'\h*'if' <.sorry: "Please use 'elsif'">
-            | 'elsif'<?spacey> <elsif=.xblock>
+            | 'elsif'<?keyspace> <elsif=.xblock>
             ]
         ]*
         [
-            'else'<?spacey> <else=.pblock>
+            'else'<?keyspace> <else=.pblock>
         ]?
     }
 
 
     token statement_control:unless {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         <xblock>
         [ <!before 'else'> || <.panic: "\"unless\" does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
     }
 
 
     token statement_control:while {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
             <.panic: "This appears to be Perl 5 code"> ]?
         <xblock>
@@ -1512,23 +1491,23 @@ grammar P6 is STD {
 
 
     token statement_control:until {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         <xblock>
     }
 
 
     token statement_control:repeat {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         [
-            | $<wu>=['while'|'until']<.spacey>
+            | $<wu>=['while'|'until']<.keyspace>
               <xblock>
             | <pblock>
-              $<wu>=['while'|'until'][<.spacey>||<.panic: "Whitespace required after keyword">] <EXPR>
+              $<wu>=['while'|'until'][<.keyspace>||<.panic: "Whitespace required after keyword">] <EXPR>
         ]
     }
 
     token statement_control:loop {
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
         $<eee> = (
             '(' [ :s
                 <e1=.EXPR>? ';'
@@ -1542,7 +1521,7 @@ grammar P6 is STD {
 
 
     token statement_control:for {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         [ <?before 'my'? '$'\w+ '(' >
             <.panic: "This appears to be Perl 5 code"> ]?
         [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
@@ -1551,19 +1530,19 @@ grammar P6 is STD {
     }
 
     token statement_control:foreach {
-        <sym><.spacey> <.obs("'foreach'", "'for'")>
+        <sym><.keyspace> <.obs("'foreach'", "'for'")>
     }
 
     token statement_control:given {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         <xblock>
     }
     token statement_control:when {
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         <?dumbsmart>
         <xblock>
     }
-    rule statement_control:default {<sym><.spacey> <block> }
+    rule statement_control:default {<sym><.keyspace> <block> }
 
     token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
     token statement_prefix:CHECK   { <sym> <blast> }
@@ -1581,9 +1560,9 @@ grammar P6 is STD {
     token statement_prefix:PRE     { <sym> <blast> }
     token statement_prefix:POST    { <sym> <blast> }
 
-    rule statement_control:CATCH   {<sym><.spacey> <block> }
-    rule statement_control:CONTROL {<sym><.spacey> <block> }
-    rule statement_control:TEMP    {<sym><.spacey> <block> }
+    rule statement_control:CATCH   {<sym><.keyspace> <block> }
+    rule statement_control:CONTROL {<sym><.keyspace> <block> }
+    rule statement_control:TEMP    {<sym><.keyspace> <block> }
 
     #######################
     # statement modifiers #
@@ -1700,41 +1679,41 @@ grammar P6 is STD {
 
     token package_declarator:class {
         :my $*PKGDECL ::= 'class';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:grammar {
         :my $*PKGDECL ::= 'grammar';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:module {
         :my $*PKGDECL ::= 'module';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:package {
         :my $*PKGDECL ::= 'package';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:role {
         :my $*PKGDECL ::= 'role';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:knowhow {
         :my $*PKGDECL ::= 'knowhow';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:slang {
         :my $*PKGDECL ::= 'slang';
-        <sym><.spacey> <package_def>
+        <sym><.keyspace> <package_def>
     }
 
     token package_declarator:require {   # here because of declarational aspects
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
         [
         || <module_name> <.ws> <EXPR>?
         || <EXPR>
@@ -1742,12 +1721,12 @@ grammar P6 is STD {
     }
 
     token package_declarator:trusts {
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
         <module_name>
     }
 
     token package_declarator:sym<also> {
-        <sym><.spacey>:s
+        <sym><.keyspace>:s
         <trait>+
     }
 
@@ -1761,7 +1740,7 @@ grammar P6 is STD {
         :temp $*CURLEX;
         :temp $*SCOPE;
         :my $outer = $*CURLEX;
-        { $*SCOPE = $*SCOPE || 'our'; }
+        { $*SCOPE ||= 'our'; }
         [
             [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
             <.newlex>
@@ -1781,15 +1760,15 @@ grammar P6 is STD {
                         my $shortname = $longname.<name>.Str;
                         if $*SCOPE eq 'our' {
                             $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                            self.deb("added our " ~ $*CURPKG.id) if $DEBUG::symtab;
+                            self.deb("added our " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
                         }
                         else {
                             $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                            self.deb("added my " ~ $*CURPKG.id) if $DEBUG::symtab;
+                            self.deb("added my " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
                         }
                     }
                     $*begin_compunit = 0;
-                    $*UNIT<$?LONGNAME> = $*UNIT<$?LONGNAME> || ($longname ?? $longname<name>.Str !! '');
+                    $*UNIT<$?LONGNAME> ||= $longname ?? $longname<name>.Str !! '';
                 }}
                 { $*IN_DECL = ''; }
                 <blockoid>
@@ -1833,15 +1812,15 @@ grammar P6 is STD {
 
     token multi_declarator:multi {
         :my $*MULTINESS = 'multi';
-        <sym><.spacey> <.ws> [ <declarator> || <routine_def('multi')> || <.panic: 'Malformed multi'> ]
+        <sym><.keyspace> <.ws> [ <declarator> || <routine_def('multi')> || <.panic: 'Malformed multi'> ]
     }
     token multi_declarator:proto {
         :my $*MULTINESS = 'proto';
-        <sym><.spacey> <.ws> [ <declarator> || <routine_def('proto')> || <.panic: 'Malformed proto'> ]
+        <sym><.keyspace> <.ws> [ <declarator> || <routine_def('proto')> || <.panic: 'Malformed proto'> ]
     }
     token multi_declarator:only {
         :my $*MULTINESS = 'only';
-        <sym><.spacey> <.ws> [ <declarator> || <routine_def('only')> || <.panic: 'Malformed only'> ]
+        <sym><.keyspace> <.ws> [ <declarator> || <routine_def('only')> || <.panic: 'Malformed only'> ]
     }
     token multi_declarator:null {
         :my $*MULTINESS = '';
@@ -1853,9 +1832,9 @@ grammar P6 is STD {
     token routine_declarator:submethod { <sym><.nofun> <method_def> }
     token routine_declarator:macro     { <sym><.nofun> <macro_def> }
 
-    token regex_declarator:regex { <sym><.spacey> <regex_def(:!r,:!s)> }
-    token regex_declarator:token { <sym><.spacey> <regex_def(:r,:!s)> }
-    token regex_declarator:rule  { <sym><.spacey> <regex_def(:r,:s)> }
+    token regex_declarator:regex { <sym><.keyspace> <regex_def(:!r,:!s)> }
+    token regex_declarator:token { <sym><.keyspace> <regex_def(:r,:!s)> }
+    token regex_declarator:rule  { <sym><.keyspace> <regex_def(:r,:s)> }
 
     rule multisig {
         :my $signum = 0;
@@ -1975,7 +1954,7 @@ grammar P6 is STD {
     }
 
     token trait_mod:is {
-        <sym><.spacey>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
+        <sym><.keyspace>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
         {{
             if $*DECLARAND {
                 my $traitname = $<longname>.Str;
@@ -1985,23 +1964,23 @@ grammar P6 is STD {
         }}
     }
     token trait_mod:hides {
-        <sym><.spacey>:s <module_name>
+        <sym><.keyspace>:s <module_name>
     }
     token trait_mod:does {
         :my $*PKGDECL ::= 'role';
-        <sym><.spacey>:s <module_name>
+        <sym><.keyspace>:s <module_name>
     }
     token trait_mod:will {
-        <sym><.spacey>:s <identifier> <pblock>
+        <sym><.keyspace>:s <identifier> <pblock>
     }
 
     token trait_mod:of {
-        ['of'|'returns']:s <typename>
+        ['of'|'returns']<.keyspace>:s <typename>
         [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
         { $*DECLARAND<of> = $<typename>.Str; }
     }
-    token trait_mod:as      { <sym><.spacey>:s <typename> }
-    token trait_mod:handles { <sym><.spacey>:s <term> }
+    token trait_mod:as      { <sym><.keyspace>:s <typename> }
+    token trait_mod:handles { <sym><.keyspace>:s <term> }
 
     #########
     # Nouns #
@@ -2030,7 +2009,7 @@ grammar P6 is STD {
         :my $*VAR;
         :dba('prefix or term')
         [
-        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[(+@p)-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
+        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
             [ <?{ $<term> }> || <term> || <.panic("Prefix requires an argument")> ]
         | <term>
         ]
@@ -2414,7 +2393,7 @@ grammar P6 is STD {
         :my $name;
         <?before <sigil> {
             $sigil = $<sigil>.Str;
-            $*LEFTSIGIL = $*LEFTSIGIL || $sigil;
+            $*LEFTSIGIL ||= $sigil;
         }> {}
         [
         || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
@@ -2761,9 +2740,10 @@ grammar P6 is STD {
     token type_declarator:subset {
         :my $*IN_DECL = 'subset';
         :my $*DECLARAND;
-        <sym><.spacey> :s
+        <sym><.keyspace> :s
         [
             [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
+            { $*IN_DECL = ''; }
             <trait>*
             [where <EXPR(item %item_assignment)> ]?    # (EXPR can parse multiple where clauses)
         || <.panic: "Malformed subset">
@@ -2773,7 +2753,7 @@ grammar P6 is STD {
     token type_declarator:enum {
         :my $*IN_DECL = 'enum';
         :my $*DECLARAND;
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
         [
         | <name=longname> { $¢.add_name($<name>.Str); }
         | <name=variable> { $¢.add_variable($<name>.Str); }
@@ -2788,7 +2768,7 @@ grammar P6 is STD {
     token type_declarator:constant {
         :my $*IN_DECL = 'constant';
         :my $*DECLARAND;
-        <sym><.spacey> <.ws>
+        <sym><.keyspace> <.ws>
 
         [
         | <identifier> { $¢.add_name($<identifier>.Str); }
@@ -2901,8 +2881,8 @@ grammar P6 is STD {
         | <type_constraint>+
             {{
                 my $t = $<type_constraint>;
-                my @t = grep { substr($^tc.Str,0,2) ne '::' }, @$t;
-                +@t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
+                my @t = grep { substr($_.Str,0,2) ne '::' }, @$t;
+                @t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
             }}
             [
             | '**' <param_var>   { $quant = '**'; $kind = '*'; }
@@ -2915,7 +2895,7 @@ grammar P6 is STD {
                 ]
                 [
                 | '?'           { $quant = '?'; $kind = '?' }
-                | '!'           { $quant = '!'; $kind = $kind // '!' }
+                | '!'           { $quant = '!'; $kind //= '!' }
                 | <?>
                 ]
             | <?> { $quant = ''; $kind = '!' }
@@ -2931,7 +2911,7 @@ grammar P6 is STD {
             ]
             [
             | '?'           { $quant = '?'; $kind = '?' }
-            | '!'           { $quant = '!'; $kind = $kind // '!' }
+            | '!'           { $quant = '!'; $kind //= '!' }
             | <?>
             ]
         | {} <longname> <.panic("In parameter declaration, typename '" ~ $<longname>.Str ~ "' must be predeclared (or marked as declarative with :: prefix)")>
@@ -3107,7 +3087,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     }
 
     token circumfix:sigil
-        { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL = $*LEFTSIGIL || $<sigil>.Str } <O(|%term)> }
+        { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
 
     token circumfix:sym<( )>
         { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
@@ -3147,6 +3127,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
                 # actual test is non-inclusive!
         |   [
             | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $O = $<infix><O>; $sym = $<infix><sym> }
+                    [ <!before '='> { self.worry("Useless use of [] around infix op") unless $*IN_META; } ]?
             | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
             | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
@@ -3922,7 +3903,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
         { <sym> <O(|%list_infix)> }
 
     token infix:sym<...>
-        { <sym> <O(|%list_infix)> }
+        { <sym> <O(|%list_infix)> '^'? }
 
     token term:sym<...>
         { <sym> <args>? <O(|%list_prefix)> }
@@ -4138,19 +4119,19 @@ grammar Q is STD {
         token backslash:t { <sym> }
         token backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
         token backslash:sym<0> { <sym> }
-    }
+    } # end role
 
     role b0 {
         token escape:sym<\\> { <!> }
-    }
+    } # end role
 
     role c1 {
         token escape:sym<{ }> { <?before '{'> [ :lang(%*LANG<MAIN>) <embeddedblock> ] }
-    }
+    } # end role
 
     role c0 {
         token escape:sym<{ }> { <!> }
-    }
+    } # end role
 
     role s1 {
         token escape:sym<$> {
@@ -4158,11 +4139,11 @@ grammar Q is STD {
             <?before '$'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> || <.panic: "Non-variable \$ must be backslashed"> ]
         }
-    }
+    } # end role
 
     role s0 {
         token escape:sym<$> { <!> }
-    }
+    } # end role
 
     role a1 {
         token escape:sym<@> {
@@ -4170,11 +4151,11 @@ grammar Q is STD {
             <?before '@'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ] # trap ABORTBRANCH from variable's ::
         }
-    }
+    } # end role
 
     role a0 {
         token escape:sym<@> { <!> }
-    }
+    } # end role
 
     role h1 {
         token escape:sym<%> {
@@ -4182,11 +4163,11 @@ grammar Q is STD {
             <?before '%'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
         }
-    }
+    } # end role
 
     role h0 {
         token escape:sym<%> { <!> }
-    }
+    } # end role
 
     role f1 {
         token escape:sym<&> {
@@ -4194,43 +4175,43 @@ grammar Q is STD {
             <?before '&'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
         }
-    }
+    } # end role
 
     role f0 {
         token escape:sym<&> { <!> }
-    }
+    } # end role
 
     role p1 {
         method postprocess ($s) { $s.parsepath }
-    }
+    } # end role
 
     role p0 {
         method postprocess ($s) { $s }
-    }
+    } # end role
 
     role w1 {
         method postprocess ($s) { $s.words }
-    }
+    } # end role
 
     role w0 {
         method postprocess ($s) { $s }
-    }
+    } # end role
 
     role ww1 {
         method postprocess ($s) { $s.words }
-    }
+    } # end role
 
     role ww0 {
         method postprocess ($s) { $s }
-    }
+    } # end role
 
     role x1 {
         method postprocess ($s) { $s.run }
-    }
+    } # end role
 
     role x0 {
         method postprocess ($s) { $s }
-    }
+    } # end role
 
     role q {
         token stopper { \' }
@@ -4251,7 +4232,7 @@ grammar Q is STD {
             elsif $cc.defined { self.panic("Too late for :cc") }
             else { nextwith(self, |%_) }
         }
-    }
+    } # end role
 
     role qq {
         token stopper { \" }
@@ -4265,7 +4246,7 @@ grammar Q is STD {
             elsif $cc.defined { self.panic("Too late for :cc") }
             else { nextwith(self, |%_) }
         }
-    }
+    } # end role
 
     role cc {
         token stopper { \' }
@@ -4326,7 +4307,7 @@ grammar Q is STD {
             elsif $cc.defined { self.panic("Too late for :cc") }
             else { nextwith(self, |%_) }
         }
-    }
+    } # end role
 
     role p5 {
         # begin tweaks (DO NOT ERASE)
@@ -4341,7 +4322,7 @@ grammar Q is STD {
             elsif $c.defined { self }
             else             { nextwith(self, |%_) }
         }
-    }
+    } # end role
 
     role herehead[$info] {
         method hereinfo() { $info }
@@ -4508,7 +4489,7 @@ grammar Regex is STD {
         :dba('infix stopper')
         [
         | <?before <[\) \} \]]> >
-        | <?before '>' <-[>)]> >
+        | <?before '>' <-[>]> >
         | <?before <stopper> >
         ]
     }
@@ -4743,6 +4724,7 @@ grammar Regex is STD {
                                     ]?
     }
 
+    token assertion:sym<:> { <?before ':'<alpha>> <cclass_elem>+ }
     token assertion:sym<[> { <?before '['> <cclass_elem>+ }
     token assertion:sym<+> { <?before '+'> <cclass_elem>+ }
     token assertion:sym<-> { <?before '-'> <cclass_elem>+ }
@@ -4761,6 +4743,7 @@ grammar Regex is STD {
         [
         | <name>
         | <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
+        | [:lang(%*LANG<MAIN>) <colonpair> ]
         ]
         <.normspace>?
     }
@@ -4868,9 +4851,9 @@ method newlex ($needsig = 0) {
 
 method finishlex {
     my $line = self.lineof(self.pos);
-    $*CURLEX<$_> = $*CURLEX<$_> // NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    $*CURLEX<$/> = $*CURLEX<$/> // NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    $*CURLEX<$!> = $*CURLEX<$!> // NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
     $*SIGNUM = 0;
     self;
 }
@@ -4923,24 +4906,24 @@ method getdecl {
 
 method is_name ($n, $curlex = $*CURLEX) {
     my $name = $n;
-    self.deb("is_name $name") if $DEBUG::symtab;
+    self.deb("is_name $name") if $*DEBUG +& DEBUG::symtab;
 
     my $curpkg = $*CURPKG;
     return True if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
-    if +@components > 1 {
+    if @components > 1 {
         return True if @components[0] eq 'COMPILING::';
         return True if @components[0] eq 'CALLER::';
         return True if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $DEBUG::symtab;
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
             $curpkg = $*GLOBAL;
         }
-        while +@components > 1 {
+        while @components > 1 {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg};
             return False unless defined $curpkg;
@@ -4948,17 +4931,17 @@ method is_name ($n, $curlex = $*CURLEX) {
                 my $outlexid = $curpkg.[0] // return False;
                 $curpkg = $ALL.{$outlexid} // return False;
             }
-            self.deb("Found $pkg okay") if $DEBUG::symtab;
+            self.deb("Found $pkg okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
-    self.deb("Looking for $name") if $DEBUG::symtab;
+    self.deb("Looking for $name") if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
     my $lex = $curlex;
     while $lex {
-        self.deb("Looking in ", $lex.id) if $DEBUG::symtab;
+        self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
         if $lex.{$name} {
-            self.deb("Found $name in ", $lex.id) if $DEBUG::symtab;
+            self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
             $lex.{$name}<used> = 1;
             return True;
         }
@@ -4967,30 +4950,30 @@ method is_name ($n, $curlex = $*CURLEX) {
     }
     return True if $curpkg.{$name};
     return True if $*GLOBAL.{$name};
-    self.deb("$name not found") if $DEBUG::symtab;
+    self.deb("$name not found") if $*DEBUG +& DEBUG::symtab;
     return False;
 }
 
 method find_stash ($n, $crlex = $*CURLEX) {
     my $name = $n;
     my $curlex = $crlex;
-    self.deb("find_stash $name") if $DEBUG::symtab;
+    self.deb("find_stash $name") if $*DEBUG +& DEBUG::symtab;
 
     return Any if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
-    if +@components > 1 {
+    if @components > 1 {
         return Any if @components[0] eq 'COMPILING::';
         return Any if @components[0] eq 'CALLER::';
         return Any if @components[0] eq 'CONTEXT::';
         if $curlex = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $DEBUG::symtab;
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
             $curlex = $*GLOBAL;
         }
-        while +@components > 1 {
+        while @components > 1 {
             my $lex = shift @components;
             $curlex = $curlex.{$lex};
             return Any unless $curlex;
@@ -5000,7 +4983,7 @@ method find_stash ($n, $crlex = $*CURLEX) {
                 $curlex = $ALL.{$outlexid};
                 return Any unless $curlex;
             };
-            self.deb("Found $lex okay") if $DEBUG::symtab;
+            self.deb("Found $lex okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
@@ -5019,7 +5002,7 @@ method find_stash ($n, $crlex = $*CURLEX) {
 }
 
 method find_top_pkg ($name) {
-    self.deb("find_top_pkg $name") if $DEBUG::symtab;
+    self.deb("find_top_pkg $name") if $*DEBUG +& DEBUG::symtab;
     $name ~= '::' unless $name ~~ /\:\:$/;
     if $name eq 'OUR::' {
         return $*CURPKG;
@@ -5053,7 +5036,7 @@ method add_name ($name) {
     my $scope = $*SCOPE || 'my';
     my $pkgdecl = $*PKGDECL || 'symbol';
     return self if $scope eq 'anon' or $pkgdecl eq 'slang';
-    self.deb("Adding $scope $name") if $DEBUG::symtab;
+    self.deb("Adding $scope $name") if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or
             self.worry("Can't $scope $pkgdecl $name because it doesn't exist");
@@ -5073,19 +5056,19 @@ method add_name ($name) {
 
 method add_my_name ($n, $d?, $p?) {
     my $name = $n;
-    self.deb("add_my_name $name in ", $*CURLEX.id) if $DEBUG::symtab;
+    self.deb("add_my_name $name in ", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURLEX;
     my @components = self.canonicalize_name($name);
     my $sid = $curstash.id // '???';
-    while +@components > 1 {
+    while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // Stash.new(
+        my $newstash = $curstash.{$pkg} //= Stash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
-        self.deb("Adding new package $pkg in ", $curstash.id) if $DEBUG::symtab;
+        self.deb("Adding new package $pkg in ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
         $curstash = $newstash;
     }
     $name = my $shortname = shift @components;
@@ -5105,10 +5088,10 @@ method add_my_name ($n, $d?, $p?) {
         of   => $*OFTYPE,
         scope => $*SCOPE,
     );
-    self.deb("going to install $declaring") if $DEBUG::symtab;
+    self.deb("going to install $declaring") if $*DEBUG +& DEBUG::symtab;
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
-        self.deb("$name exists, curstash = ", $curstash.id) if $DEBUG::symtab;
+        self.deb("$name exists, curstash = ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
         my $omult = $old<mult> // '';
         if $declaring === $old {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
@@ -5149,17 +5132,17 @@ method add_my_name ($n, $d?, $p?) {
         }
     }
     else {
-        self.deb("installing in $curstash.id() slot $name") if $DEBUG::symtab;
+        self.deb("installing in $curstash.id() slot $name") if $*DEBUG +& DEBUG::symtab;
         $*DECLARAND = $curstash.{$name} = $declaring;
         $curstash.{$shortname} = $declaring unless $shortname eq $name;
-        self.deb("$curstash.id() now contains $curstash.keys()") if $DEBUG::symtab;
+        self.deb("$curstash.id() now contains $curstash.keys()") if $*DEBUG +& DEBUG::symtab;
         $*DECLARAND<declaredat> = self.pos;
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
-        $*DECLARAND<const> = $*DECLARAND<const> || 1 if $*IN_DECL eq 'constant';
+        $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
         $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %*MYSTERY{substr($name,1)};
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
-            $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $curstash.{$shortname};
+            $curstash.{"\&$shortname"} //= $curstash.{$shortname};
             $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
@@ -5175,13 +5158,13 @@ method add_my_name ($n, $d?, $p?) {
 
 method add_our_name ($n) {
     my $name = $n;
-    self.deb("add_our_name $name in " ~ $*CURPKG.id) if $DEBUG::symtab;
+    self.deb("add_our_name $name in " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
-    self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $DEBUG::symtab;
+    self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $*DEBUG +& DEBUG::symtab;
     $name = ($name ~~ /(.*?)\:[ver|auth]/).[0] // $name;
     my @components = self.canonicalize_name($name);
-    if +@components > 1 {
+    if @components > 1 {
         my $c = self.find_top_pkg(@components[0]);
         if $c {
             shift @components;
@@ -5189,15 +5172,15 @@ method add_our_name ($n) {
         }
     }
     my $sid = $curstash.id // '???';
-    while +@components > 1 {
+    while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} = $curstash.{$pkg} // Stash.new(
+        my $newstash = $curstash.{$pkg} //= Stash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
         $curstash = $newstash;
-        self.deb("Adding new package $pkg in $curstash ") if $DEBUG::symtab;
+        self.deb("Adding new package $pkg in $curstash ") if $*DEBUG +& DEBUG::symtab;
     }
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
@@ -5248,16 +5231,16 @@ method add_our_name ($n) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        $curstash.{$shortname} = $curstash{$shortname} // $declaring unless $shortname eq $name;
+        $curstash.{$shortname} //= $declaring unless $shortname eq $name;
         $*DECLARAND<inpkg> = $curstash.idref;
         if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
-            $curstash.{"\&$shortname"} = $curstash.{"\&$shortname"} // $declaring;
+            $curstash.{"\&$shortname"} //= $declaring;
             $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
-            $*NEWPKG = ($curstash.{$name ~ '::'} = $curstash.{$name ~ '::'} // Stash.new(
+            $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
-                '!id' => [$sid] ));
+                '!id' => [$sid] );
         }
     }
     self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
@@ -5268,10 +5251,10 @@ method add_mystery ($token,$pos,$ctx) {
     my $name = $token.Str;
     return self if $*IN_PANIC;
     if self.is_known('&' ~ $name) or self.is_known($name) {
-        self.deb("$name is known") if $DEBUG::symtab;
+        self.deb("$name is known") if $*DEBUG +& DEBUG::symtab;
     }
     else {
-        self.deb("add_mystery $name $*CURLEX") if $DEBUG::symtab;
+        self.deb("add_mystery $name $*CURLEX") if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<lex> = $*CURLEX;
         %*MYSTERY{$name}.<token> = self.cursor($token.to);
         %*MYSTERY{$name}.<ctx> = $ctx;
@@ -5306,21 +5289,21 @@ method explain_mystery() {
     }
     if %post_types {
         my @tmp = sort keys(%post_types);
-        $m ~= "Illegally post-declared type" ~ ('s' x (+@tmp != 1)) ~ ":\n";
+        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %post_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_types {
         my @tmp = sort keys(%unk_types);
-        $m ~= "Undeclared name" ~ ('s' x (+@tmp != 1)) ~ ":\n";
+        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %unk_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_routines {
         my @tmp = sort keys(%unk_routines);
-        $m ~= "Undeclared routine" ~ ('s' x (+@tmp != 1)) ~ ":\n";
+        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %unk_routines{$_}.<line> ~ "\n";
         }
@@ -5333,7 +5316,7 @@ method load_setting ($setting) {
     $ALL = self.load_lex($setting);
 
     $*CORE = $ALL<CORE>;
-    $*CORE.<!id> = $*CORE.<!id> // ['CORE'];
+    $*CORE.<!id> //= ['CORE'];
 
     $*SETTING = $ALL<SETTING>;
     $*CURLEX = $*SETTING;
@@ -5347,27 +5330,27 @@ method load_setting ($setting) {
 
 method is_known ($n, $curlex = $*CURLEX) {
     my $name = $n;
-    self.deb("is_known $name") if $DEBUG::symtab;
+    self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
     return True if $*CURPKG.{$name};
     return False if $name ~~ /\:\:\(/;
     my $curpkg = $*CURPKG;
     my @components = self.canonicalize_name($name);
-    if +@components > 1 {
+    if @components > 1 {
         return True if @components[0] eq 'COMPILING::';
         return True if @components[0] eq 'CALLER::';
         return True if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $DEBUG::symtab;
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            self.deb("Looking for GLOBAL::<$name>") if $DEBUG::symtab;
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
             $curpkg = $*GLOBAL;
         }
-        while +@components > 1 {
+        while @components > 1 {
             my $pkg = shift @components;
-            self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $DEBUG::symtab;
+            self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
             try {
@@ -5376,15 +5359,15 @@ method is_known ($n, $curlex = $*CURLEX) {
                 $curpkg = $ALL.{$outlexid};
                 return False unless $curpkg;
             };
-            self.deb("Found $pkg okay, now in $curpkg ") if $DEBUG::symtab;
+            self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
         }
     }
 
     $name = shift(@components)//'';
-    self.deb("Final component is $name") if $DEBUG::symtab;
+    self.deb("Final component is $name") if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
     if $curpkg.{$name} {
-        self.deb("Found") if $DEBUG::symtab;
+        self.deb("Found") if $*DEBUG +& DEBUG::symtab;
         $curpkg.{$name}<used>++;
         return True;
     }
@@ -5393,19 +5376,19 @@ method is_known ($n, $curlex = $*CURLEX) {
 
     my $varbind = { truename => '???' };
     return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
-    self.deb("Not Found") if $DEBUG::symtab;
+    self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
 
     return False;
 }
 
 method lex_can_find_name ($lex, $name, $varbind) {
-    self.deb("Looking for $name in $lex.id()") if $DEBUG::symtab;
+    self.deb("Looking for $name in $lex.id()") if $*DEBUG +& DEBUG::symtab;
     if $lex.{$name} {
-        self.deb("Found $name in ", $lex.id) if $DEBUG::symtab;
+        self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
         $lex.{$name}<used>++;
         return True;
     }
-    self.deb("$name not found among $lex.keys()") if $DEBUG::symtab;
+    self.deb("$name not found among $lex.keys()") if $*DEBUG +& DEBUG::symtab;
 
     my $outlexid = $lex.<OUTER::>[0];
     return False unless $outlexid;
@@ -5456,7 +5439,7 @@ method add_variable ($name) {
 
 method add_constant($name,$value) {
     my $*IN_DECL = 'constant';
-    self.deb("add_constant $name = $value in", $*CURLEX.id) if $DEBUG::symtab;
+    self.deb("add_constant $name = $value in", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
     my $*DECLARAND;
     self.add_my_name($name);
     $*DECLARAND<value> = $value;
@@ -5507,15 +5490,15 @@ method check_variable ($variable) {
     return () unless defined $variable;
     my $name = $variable.Str;
     my $here = self.cursor($variable.to);
-    self.deb("check_variable $name") if $DEBUG::symtab;
+    self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
     if $twigil eq '' {
         my $ok = 0;
-        $ok = $ok || $*IN_DECL;
-        $ok = $ok || $sigil eq '&';
-        $ok = $ok || $first lt 'A';
-        $ok = $ok || self.is_known($name);
-        $ok = $ok || $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+        $ok ||= $*IN_DECL;
+        $ok ||= $sigil eq '&';
+        $ok ||= $first lt 'A';
+        $ok ||= self.is_known($name);
+        $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
         if not $ok {
             my $id = $name;
             ($id,) = ($id ~~ /\W ** 0..2 (.*)/);
@@ -5631,29 +5614,27 @@ method EXPR ($preclvl?) {
     my @opstack;
     my $termish = 'termish';
 
-    sub _top(@a) { @a[ @a.elems - 1 ] }
-
     my $state;
     my $here;
 
     sub reduce() {
-        self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $DEBUG::EXPR;
+        self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $*DEBUG +& DEBUG::EXPR;
         my $op = pop @opstack;
         my $sym = $op<sym>;
         my $assoc = $op<O><assoc> // 'unary';
         if $assoc eq 'chain' {
-            self.deb("reducing chain") if $DEBUG::EXPR;
+            self.deb("reducing chain") if $*DEBUG +& DEBUG::EXPR;
             my @chain;
             push @chain, pop(@termstack);
             push @chain, $op;
             while @opstack {
-                last if $op<O><prec> ne _top(@opstack)<O><prec>;
+                last if $op<O><prec> ne @opstack[*-1]<O><prec>;
                 push @chain, pop(@termstack);
                 push @chain, pop(@opstack);
             }
             push @chain, pop(@termstack);
             my $endpos = @chain[0].to;
-            @chain = reverse @chain if (+@chain) > 1;
+            @chain = reverse @chain if @chain > 1;
             my $startpos = @chain[0].from;
             my $i = True;
             my @caplist;
@@ -5669,13 +5650,13 @@ method EXPR ($preclvl?) {
                 :to($endpos));
         }
         elsif $assoc eq 'list' {
-            self.deb("reducing list") if $DEBUG::EXPR;
+            self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;
             my @list;
             my @delims = $op;
             push @list, pop(@termstack);
             while @opstack {
-                self.deb($sym ~ " vs " ~ _top(@opstack)<sym>) if $DEBUG::EXPR;
-                last if $sym ne _top(@opstack)<sym>;
+                self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
+                last if $sym ne @opstack[*-1]<sym>;
                 if @termstack and defined @termstack[0] {
                     push @list, pop(@termstack);
                 }
@@ -5692,14 +5673,14 @@ method EXPR ($preclvl?) {
             }
             @list = grep *.defined, @list;
             my $endpos = @list[0].to;
-            @list = reverse @list if (+@list) > 1;
+            @list = reverse @list if @list > 1;
             my $startpos = @list[0].from;
-            @delims = reverse @delims if (+@delims) > 1;
+            @delims = reverse @delims if @delims > 1;
             my @caps;
             if @list {
                 push @caps, (elem => @list[0]) if @list[0];
                 my $i = 0;
-                while $i < (+@delims)-1 {
+                while $i < @delims-1 {
                     my $d = @delims[$i];
                     my $l = @list[$i+1];
                     push @caps, (delim => $d);
@@ -5714,8 +5695,8 @@ method EXPR ($preclvl?) {
                     :list(@list), :O($op<O>), :sym($sym)));
         }
         elsif $assoc eq 'unary' {
-            self.deb("reducing") if $DEBUG::EXPR;
-            self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
+            self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
+            self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
             my $arg = pop @termstack;
             if $arg.from < $op.from { # postfix
@@ -5732,8 +5713,8 @@ method EXPR ($preclvl?) {
             }
         }
         else {
-            self.deb("reducing") if $DEBUG::EXPR;
-            self.deb("Termstack size: ", +@termstack) if $DEBUG::EXPR;
+            self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
+            self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
             my $right = pop @termstack;
             my $left = pop @termstack;
@@ -5743,18 +5724,17 @@ method EXPR ($preclvl?) {
                 :captures(:left($left), :infix($op), :right($right),
                     :_arity<BINARY>), :method<INFIX>);
 
-#           self.deb(_top(@termstack).dump) if $DEBUG::EXPR;
-            my $ck;
-            if $ck = $op<O><_reducecheck> {
-                _top(@termstack) = $ck(self,_top(@termstack));
+#           self.deb(@termstack[*-1].perl) if $*DEBUG +& DEBUG::EXPR;
+            if $op<O><_reducecheck> -> $ck {
+                @termstack[*-1] = $ck(self, @termstack[*-1]);
             }
         }
     }
 
     sub termstate() {
-        $here.deb("Looking for a term") if $DEBUG::EXPR;
-        $here.deb("Top of opstack is ", _top(@opstack).dump) if $DEBUG::EXPR;
-        $*LEFTSIGIL = _top(@opstack)<O><prec> gt $item_assignment_prec
+        $here.deb("Looking for a term") if $*DEBUG +& DEBUG::EXPR;
+        $here.deb("Top of opstack is ", @opstack[*-1].perl) if $*DEBUG +& DEBUG::EXPR;
+        $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec
             ?? '@' !! '';     # XXX P6
         my $term = first(
             ($termish eq 'termish') ?? $here.termish !!
@@ -5764,11 +5744,11 @@ method EXPR ($preclvl?) {
             die "weird value of $termish");
 
         if not $term {
-            $here.deb("Didn't find it") if $DEBUG::EXPR;
-            $here.panic("Bogus term") if (+@opstack) > 1;
+            $here.deb("Didn't find it") if $*DEBUG +& DEBUG::EXPR;
+            $here.panic("Bogus term") if @opstack > 1;
             return 2;
         }
-        $here.deb("Found term to {$term.to}") if $DEBUG::EXPR;
+        $here.deb("Found term to {$term.to}") if $*DEBUG +& DEBUG::EXPR;
         $here = $here.cursor($term.to);
         $termish = 'termish';
         my @PRE = @( $term<PRE> // [] );
@@ -5798,7 +5778,7 @@ method EXPR ($preclvl?) {
         push @opstack, @PRE,@POST;
 
         push @termstack, $term<term>;
-        $here.deb("after push: " ~ (+@termstack)) if $DEBUG::EXPR;
+        $here.deb("after push: " ~ (+@termstack)) if $*DEBUG +& DEBUG::EXPR;
 
         # say "methodcall break" if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
         $state = &infixstate;
@@ -5807,20 +5787,20 @@ method EXPR ($preclvl?) {
 
     # std bug sees infixstate as unused
     sub infixstate() { #OK
-        $here.deb("Looking for an infix") if $DEBUG::EXPR;
+        $here.deb("Looking for an infix") if $*DEBUG +& DEBUG::EXPR;
         return 1 if (@*MEMOS[$here.pos]<endstmt> // 0) == 2;  # XXX P6
         # If this isn't here, then "$foo.method" will try to parse
         # .method as an infix, and panic.  No infix operator is
         # tighter than this anyhow.
         if $preclim ge $methodcall_prec {
-            $here.deb("Aborting; interpolational context") if $DEBUG::EXPR;
+            $here.deb("Aborting; interpolational context") if $*DEBUG +& DEBUG::EXPR;
             return 1;
         }
         my $ws = first($here.ws);
         $here = $here.cursor($ws.to);
         my $infix = first($here.infixish);
         return 1 unless $infix;
-        $here.deb("Got one! " ~ $infix<sym>) if $DEBUG::EXPR;
+        $here.deb("Got one! " ~ $infix<sym>) if $*DEBUG +& DEBUG::EXPR;
 
         my $inO = $infix<O>;
         my $inprec = $inO<prec>;
@@ -5829,7 +5809,7 @@ method EXPR ($preclvl?) {
         }
 
         if $inprec lt $preclim {
-            $here.deb("Precedence $inprec of operator is too low for $preclim context") if $DEBUG::EXPR;
+            $here.deb("Precedence $inprec of operator is too low for $preclim context") if $*DEBUG +& DEBUG::EXPR;
             if $preclim ne $LOOSEST {
                 my $dba = $*prevlevel.<dba>;
                 my $h = $*HIGHEXPECT;
@@ -5847,7 +5827,7 @@ method EXPR ($preclvl?) {
         $inO<prec> = $inO<sub> if $inO<sub>;
 
         # Does new infix (or terminator) force any reductions?
-        while _top(@opstack)<O><prec> gt $inprec {
+        while @opstack[*-1]<O><prec> gt $inprec {
             reduce;
         }
 
@@ -5861,7 +5841,7 @@ method EXPR ($preclvl?) {
         }
 
         # Equal precedence, so use associativity to decide.
-        if _top(@opstack)<O><prec> eq $inprec {
+        if @opstack[*-1]<O><prec> eq $inprec {
             my $assoc = 1;
             my $atype = $inO<assoc>;
             if $atype eq 'non'   { $assoc = 0; }
@@ -5870,11 +5850,11 @@ method EXPR ($preclvl?) {
             elsif $atype eq 'chain' { }            # just shift
             elsif $atype eq 'unary' { }            # just shift
             elsif $atype eq 'list'  {
-                $assoc = 0 unless $infix<sym> eq _top(@opstack)<sym>;
+                $assoc = 0 unless $infix<sym> eq @opstack[*-1]<sym>;
             }
             else { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
             if not $assoc {
-               $here.sorry('"' ~ _top(@opstack)<sym> ~ '" and "' ~ $infix.Str ~ '" are non-associative and require parens');
+               $here.sorry('"' ~ @opstack[*-1]<sym> ~ '" and "' ~ $infix.Str ~ '" are non-associative and require parens');
             }
         }
 
@@ -5885,24 +5865,24 @@ method EXPR ($preclvl?) {
     }
 
     push @opstack, { 'O' => %terminator, 'sym' => '' };         # (just a sentinel value)
-    self.deb(@opstack.dump) if $DEBUG::EXPR;
+    self.deb(@opstack.dump) if $*DEBUG +& DEBUG::EXPR;
 
     $here = self;
-    self.deb("In EXPR, at {$here.pos}") if $DEBUG::EXPR;
+    self.deb("In EXPR, at {$here.pos}") if $*DEBUG +& DEBUG::EXPR;
 
     my $stop = 0;
     $state = &termstate;
     until $stop {
-        $here.deb("At {$here.pos}, {@opstack.dump}; {@termstack.dump}") if $DEBUG::EXPR;
+        $here.deb("At {$here.pos}, {@opstack.dump}; {@termstack.dump}") if $*DEBUG +& DEBUG::EXPR;
         $stop = $state();
     }
-    $here.deb("Stop code $stop") if $DEBUG::EXPR;
+    $here.deb("Stop code $stop") if $*DEBUG +& DEBUG::EXPR;
     return () if $stop == 2;
-    reduce() while +@opstack > 1;
-    $here.deb("After final reduction, ", @termstack.dump, @opstack.dump) if $DEBUG::EXPR;
+    reduce() while @opstack > 1;
+    $here.deb("After final reduction, ", @termstack.dump, @opstack.dump) if $*DEBUG +& DEBUG::EXPR;
 
     if @termstack {
-        +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
+        @termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
         return @( Match.synthetic(:to($here.pos), :from(self.pos),
                 :cursor(self), :method<EXPR>,
                 :captures( root => @termstack[0] )), );
@@ -6188,7 +6168,7 @@ method canonicalize_name($n) {
     shift(@components) while @components and @components[0] eq '';
     if (defined $vname) {
         if @components {
-            my $last := @components[+@components - 1];
+            my $last := @components[* - 1];
             $last ~= '::' if $last.chars < 2 || $last.substr($last.chars - 2, 2) ne '::';
         }
         push(@components, $vname) if defined $vname;

@@ -13,12 +13,10 @@ only slow me down...
 * given/when
 * non-$ attributes; @.foo and @<foo>
 * :$.foo is broken
-* eager map optimizations
 * return()
 * stashes should be accessed as common values
 * "Action method ::($name) not implemented", also needs $<sym>
 * context accelerators need to robustly handle undefined objects
-* .list, item as accelerated contexts
 * explicitly imprecise error reporting - lines A-B
 * @PROCESS::ARGS ::= [1,2,3]; ok +[ @*ARGS ] == 3 # Bug
 * Whatever-currying of prefixes my $x = ~*; say $x() # Whatever()<instance>
@@ -26,3 +24,9 @@ only slow me down...
 Other stuff
     * Write a ROADMAP
     * Flesh out documentation a lot
+
+For STD difference minimization:
+    * Find a compromise on :$*endsym
+    * s///
+    * given / when
+    * constant %foo = (a => 1, b => 2)
