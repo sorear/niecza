@@ -20,6 +20,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
+    method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
     method perl() { defined(self) ?? self.Str !! self.typename }
     method so() { ?self }
     method not() { !self }
@@ -44,7 +45,6 @@ my class Any is Mu {
 
     method sort($cmp = &infix:<leg>) { @(self).sort($cmp) }
 
-    method ACCEPTS($t) { self === $t }
     method !butWHENCE($cr) {
         Q:CgOp { (newvsubvar (class_ref mo Any) (@ {$cr}) (@ {self})) }
     }
@@ -176,7 +176,7 @@ my class Num is Cool {
         (box Bool (compare != (double 0) (unbox num (@ {self}))))
     } }
     method Numeric() { self }
-    method ACCEPTS($t) { self == $t }
+    method ACCEPTS($t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 
 #TODO use a power from the standard library
@@ -192,7 +192,7 @@ sub infix:<**>($num,$power) {
 
 my class Str is Cool {
     method Str () { self }
-    method ACCEPTS($t) { self eq $t }
+    method ACCEPTS($t) { defined(self) ?? self eq $t !! $t.^does(self) }
     method Bool () { self ne "" }
     method chars() { chars(self) }
     method say() { Q:CgOp {
@@ -214,7 +214,7 @@ my class Sub {
     has $!info;
 
     # Should be for Block, not Sub
-    method ACCEPTS($t) { (self)($t) }
+    method ACCEPTS($t) { defined(self) ?? (self)($t) !! $t.^does(self) }
 }
 
 my class ClassHOW {
@@ -228,7 +228,7 @@ my class EnumType is Cool { }
 my class Bool is EnumType {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Bool() { self }
-    method ACCEPTS($) { self }
+    method ACCEPTS($t) { defined(self) ?? self !! $t.^does(self) }
     method Numeric() { self ?? 1 !! 0 }
     our constant True  = Q:CgOp { (box Bool (bool 1)) };
     our constant False = Q:CgOp { (box Bool (bool 0)) };
@@ -339,7 +339,7 @@ sub infix:<but>($obj, $role) { Q:CgOp {
     (ns (stab_what (role_apply (obj_llhow (@ {$obj})) (obj_llhow (@ {$role})))))
 } }
 
-sub infix:<~~>($t,$m) { defined($m) ?? ($m.ACCEPTS($t)) !! ($t.^does($m)) }
+sub infix:<~~>($t,$m) { $m.ACCEPTS($t) }
 
 sub ord($x) { Q:CgOp { (bif_ord {$x}) } }
 sub chr($x) { Q:CgOp { (bif_chr {$x}) } }
@@ -865,6 +865,7 @@ my class Match is Cool {
 
 my class Regex is Sub {
     method ACCEPTS($st) {
+        return $st.^does(self) unless defined self;
         Q:CgOp {
             (letn ix   (i 0)
                   str  (obj_getstr {$st})

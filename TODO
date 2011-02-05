@@ -27,6 +27,9 @@ Other stuff
 
 For STD difference minimization:
     * Find a compromise on :$*endsym
+        - TimToady and I seem to both not hate traits
+    * Find a compromise on cursor mutability
+    * basic multimethods
     * s///
     * given / when
     * constant %foo = (a => 1, b => 2)
