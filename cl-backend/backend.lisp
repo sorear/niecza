@@ -45,9 +45,14 @@
       thing))
 
 
+(defun to-stash-name (name) (intern (format nil "~{~A~^-~}" name)))
+(defmacro get-stash (name) (to-stash-name name))
+
  
-(defun sub-symbol (i) (intern (concatenate 'string "SUB-" (write-to-string i))))
-(defun class-symbol (i) (intern (concatenate 'string "CLASS-" (write-to-string i))))
+(defun xref-to-symbol (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
+
+(defun main-xref (i) (xref-to-symbol (list "MAIN" i "...")))
+
 
 ; P6 Classes
 
@@ -56,7 +61,7 @@
   (setf (slot-value scalar 'value) value)
   scalar))
 
-(defclass p6-Object () ())
+(defclass p6-Mu () ())
 (defgeneric |new| (invocant))
 (defmethod |new| (invocant) (make-instance (class-of invocant)))
 
@@ -92,36 +97,46 @@
     nam              ; See description of opcodes earlier
   )
 
-  `(defun ,(sub-symbol i) () (let ,(lexicals-to-let lexicals) ,@nam)))
+  `(defun ,(main-xref i) () (let ,(lexicals-to-let lexicals) ,@nam)))
 
 
 
-(defun xref-to-subsymbol (xref) (sub-symbol (cadr xref)))
+
+(defun xref-to-subsymbol (xref) (main-xref (cadr xref)))
 
 (defun compile-method (method)
   (fare-matcher:match method 
     ((and (list name normal dunno xref) (when (equal normal "normal")))
       `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol xref))))))
 
+(defmacro define-nam-class (
+ i
+ name            ; The object's debug name
+ exports         ; List of global names to which object is bound
+ attributes      ; Attributes local to the class
+ methods         ; Methods local to the class
+ superclasses    ; Direct superclasses of the class
+ linear_mro      ; All superclasses in C3 order
+ ) 
+  `(progn
+    (defclass ,(main-xref i) (p6-Mu) ())
+    (setf ,(main-xref i) (make-instance ',(main-xref i)))))
 
-(defun define-nam-class (name attributes methods)
-  `(progn 
-    (defclass ,(class-symbol name) (p6-Object) ())
-    ,@(mapcar #'compile-method methods)
-  ))
+;(trace define-nam-class)
 
 
 
-; HACK
-(defun stash-to-lisp-expression (path) `(make-instance (class-symbol (first (last ',path)))))
+
+
+
 
 ; converts one lexical to a variable declaration for a let
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
-    ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (intern var) `(symbol-function ',(sub-symbol id))))
+    ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (intern var) `(symbol-function ',(main-xref id))))
     ((and (list var simple dunno) (when (equal simple "simple"))) (list (intern var) (make-scalar "")))
     ((and (list* var stash path) (when (equal stash "stash")))
-       (list (intern var) (stash-to-lisp-expression path)))))
+       (list (intern var) `(get-stash ,path)))))
 
 ; converts a list of lexicals
 (defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
@@ -177,16 +192,31 @@
       )))
 
 
+(defun fstash (prefix node) 
+  (fare-matcher:match node
+    ((and (list name var Xref ChildNode) (when (equal var "var")))
+      (let ((stash-entry (if Xref (list (cons (append prefix (list name)) (list Xref))) '())))
+        (append stash-entry (fstash-list (cons name prefix) ChildNode))))))
 
-;;    ((and (list
-;;      class ; "class" literal
-;;      name
-;;      exports
-;;      attributes
-;;      methods
-;;      superclasses
-;;      linearized_mro
-;;    ) (when (equal class "class"))) (list 'define-nam-class name attributes methods))))
+(defun fstash-list (prefix nodes) (apply 'append (mapcar #'(lambda (x) (fstash prefix x)) nodes)))
+
+(defun fstash-to-let (stash body)
+  `(let
+     ,(mapcar (lambda (x) (list (to-stash-name (first x)) nil)) (hide-foreign stash))
+     ,@body
+     ,@(fstash-to-setf stash)
+     ))
+
+(defun fstash-to-setf (stash)
+  (mapcar (lambda (x) `(setf ,(to-stash-name (first x)) ,(xref-to-symbol (second x))))  (hide-foreign stash)))
+
+
+
+(defun hide-foreign (stash)
+  (remove-if
+    (lambda (x)
+      (not (equal (first (second x)) "MAIN")))
+    stash))
 
 
 
@@ -203,7 +233,11 @@
       xref            ;  Resolves refs from other units
       tdeps           ;  Holds dependency data for recompilation
       stash_root      ;  Trie holding classes and global variables
-    ) (loop for thing in xref for i upfrom 0 collect (compile-sub-or-packagoid i thing)))))
+    )
+
+    (list (fstash-to-let (fstash-list '() stash_root)
+      (loop for thing in xref for i upfrom 0 collect (compile-sub-or-packagoid i thing)))))))
+
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
@@ -215,13 +249,13 @@
          (|&say| #'p6-say)
          (|Nil| "") ; HACK
          )
-      ,@compiled-unit (,(sub-symbol 0))))
+      ,@compiled-unit (,(main-xref 0))))
 
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
   ;(format t "~w~%~%~%" compiled-unit)
-  (format t "~w~%~%~%" (strip-ann compiled-unit))
+  (format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
   (let ((wrapped (wrap-for-eval compiled-unit)))
     (eval wrapped)
     ))
