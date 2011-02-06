@@ -159,13 +159,13 @@ some internal code fragments, usually in response to _hack settings.
 Sets the C<$line_number> for the C<$operation>.  In the C# backend, line
 number is only recorded at high-level call sites within the span.
 
-=head3 ehspan($class,$tag,$name,$start,$end,$goto)
+=head3 ehspan($class,$name,$unused,$start,$end,$goto)
 
 In the half-open interval from C<$start> to C<$end> (both of which should be
 string label names), an exception of class C<$class> [1] will cause control
-to be transferred to C<$end>.  C<$tag> and C<$name> are part of the incomplete
-lexotics handling.  Exactly how return values are passed is still something of
-a mystery.
+to be transferred to C<$end>.  C<$name> is used for targetted control
+exceptions, possibly paired with the identity of the target frame.  Exactly
+how return values are passed is still something of a mystery.
 
 [1] The following class values are currently defined:
 
@@ -672,7 +672,7 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 Go to label named C<$name> (must be a literal string) if C<$if> is true.
 
-=head3 control($type,$target,$lid,$name,$payload)
+=head3 control($type,$target,$unused,$name,$payload)
 
 The most general interface to the exception generator.
 

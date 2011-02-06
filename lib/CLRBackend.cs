@@ -1455,23 +1455,23 @@ namespace Niecza.CLRBackend {
     class ClrEhSpan : ClrOp {
         public readonly int kls;
         public readonly string tag;
-        public readonly int lid;
         public readonly string ls;
         public readonly string le;
         public readonly string lg;
 
-        public ClrEhSpan(int kls, string tag, int lid, string ls, string le,
-                string lg) {
+        public ClrEhSpan(int kls, string tag, string ls, string le, string lg) {
             Returns = Tokens.Void;
             HasCases = false;
             this.kls = kls; this.tag = tag; this.ls = ls; this.le = le;
-            this.lg = lg; this.lid = lid;
+            this.lg = lg;
         }
         public override void CodeGen(CgContext cx) {
             int lidn = -1;
             if (tag != "") {
-                lidn = cx.ehlabelBuffer.Count;
-                cx.ehlabelBuffer.Add(tag);
+                for (lidn = 0; lidn < cx.ehlabelBuffer.Count &&
+                        cx.ehlabelBuffer[lidn] != tag; lidn++);
+                if (lidn == cx.ehlabelBuffer.Count)
+                    cx.ehlabelBuffer.Add(tag);
             }
             cx.ehspanBuffer.Add(cx.named_cases[ls]);
             cx.ehspanBuffer.Add(cx.named_cases[le]);
@@ -2221,9 +2221,9 @@ namespace Niecza.CLRBackend {
             });
         }
 
-        public static CpsOp EhSpan(int kls, string tag, int lid,
+        public static CpsOp EhSpan(int kls, string tag,
                 string ls, string le, string lg) {
-            return new CpsOp(new ClrEhSpan(kls, tag, lid, ls, le, lg));
+            return new CpsOp(new ClrEhSpan(kls, tag, ls, le, lg));
         }
 
         public static CpsOp LabelId(CgContext tcx, string label) {
@@ -2608,7 +2608,7 @@ namespace Niecza.CLRBackend {
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
             handlers["ehspan"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.EhSpan(FixInt(z[1]), FixStr(z[2]), FixInt(z[3]),
+                return CpsOp.EhSpan(FixInt(z[1]), FixStr(z[2]),
                     FixStr(z[4]), FixStr(z[5]), FixStr(z[6]));
             };
             handlers["label"] = delegate(NamProcessor th, object[] z) {

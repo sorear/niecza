@@ -273,27 +273,23 @@ namespace Niecza {
         private static string[] controls = new string[] { "unknown", "next",
             "last", "redo", "return", "die", "succeed", "proceed", "goto",
             "nextsame/nextwith" };
-        public static string DescribeControl(int type, Frame tgt, int lid,
+        public static string DescribeControl(int type, Frame tgt,
                 string name) {
             string ty = (type < controls.Length) ? controls[type] : "unknown";
-            if (lid >= 0) {
-                return ty + "(" + tgt.info.label_names[lid] + ", lexotic)";
-            } else if (name != null) {
-                return ty + "(" + name + ", dynamic)";
+            if (name != null) {
+                return ty + "(" + name + (tgt != null ? ", lexotic)" : ", dynamic)");
             } else {
                 return ty;
             }
         }
 
-        public int FindControlEnt(int ip, int ty, string name, int lid) {
+        public int FindControlEnt(int ip, int ty, string name) {
             for (int i = 0; i < edata.Length; i+=5) {
                 if (ip < edata[i] || ip >= edata[i+1])
                     continue;
                 if (ty != edata[i+2])
                     continue;
-                if (lid >= 0 && lid != edata[i+4])
-                    continue;
-                if (name != null && !name.Equals(label_names[edata[i+4]]))
+                if (name != null && (edata[i+4] < 0 || !name.Equals(label_names[edata[i+4]])))
                     continue;
                 return edata[i+3];
             }
@@ -2476,11 +2472,11 @@ slow:
             return new System.IO.StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
         }
 
-        private static string DescribeException(int type, Frame tgt, int lid,
+        private static string DescribeException(int type, Frame tgt,
                 string name, object payload) {
             if (type != SubInfo.ON_DIE)
                 return "Illegal control operator: " +
-                    SubInfo.DescribeControl(type, tgt, lid, name);
+                    SubInfo.DescribeControl(type, tgt, name);
             try {
                 Variable v = (Variable) payload;
                 return v.Fetch().mo.mro_raw_Str.Get(v);
@@ -2493,7 +2489,7 @@ slow:
         // 1. find the correct place to unwind to, calling CATCH filters
         // 2. unwind, calling LEAVE functions
         public static Frame SearchForHandler(Frame th, int type, Frame tgt,
-                int lid, string name, object payload) {
+                int unused, string name, object payload) {
             Frame csr;
 
             Frame unf = null;
@@ -2505,8 +2501,8 @@ slow:
                 if (csr.info == ExitRunloopSI) {
                     // when this exception reaches the outer runloop,
                     // more frames will be added
-                    csr.lex0 = DescribeException(type, tgt, lid, name,
-                            payload) + DescribeBacktrace(th, csr.caller);
+                    csr.lex0 = DescribeException(type, tgt, name, payload) +
+                            DescribeBacktrace(th, csr.caller);
                     return csr;
                 }
                 if (type == SubInfo.ON_NEXTDISPATCH) {
@@ -2519,7 +2515,7 @@ slow:
                 // for lexoticism
                 if (tgt != null && tgt != csr)
                     continue;
-                unip = csr.info.FindControlEnt(csr.ip, type, name, lid);
+                unip = csr.info.FindControlEnt(csr.ip, type, name);
                 if (unip >= 0) {
                     unf = csr;
                     break;
