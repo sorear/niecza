@@ -378,16 +378,22 @@ sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
 # XXX multi dispatch
 sub next() {
-    Q:CgOp { (control 1 (null frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (control 1 (null frame) (int -1) (null str) {()}) }
 }
 sub last() {
-    Q:CgOp { (control 2 (null frame) (int -1) (null str) (null var)) }
+    Q:CgOp { (control 2 (null frame) (int -1) (null str) {()}) }
 }
 sub redo() {
     Q:CgOp { (control 3 (null frame) (int -1) (null str) (null var)) }
 }
 sub return(\$obj) is return-pass {
     Q:CgOp { (control 4 (null frame) (int -1) (null str) {$obj}) }
+}
+sub succeed() {
+    Q:CgOp { (control 6 (null frame) (int -1) (null str) {()}) }
+}
+sub proceed() {
+    Q:CgOp { (control 7 (null frame) (int -1) (null str) {()}) }
 }
 sub nextsame() {
     Q:CgOp { (control 9 (null frame) (int -1) (null str) (null obj)) }

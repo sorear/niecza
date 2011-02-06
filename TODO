@@ -3,14 +3,12 @@ These things were noticed during translation, but to fix them now would
 only slow me down...
 
 * sprintf, in particular, the ability to make numbers hex
-* hash initialization idioms don't work
 * no qw< >
 * Any strificatrion/numification warnings would be useful
 * no is rw on attributes and methods
 * &split
 * &callsame
 * BUILD
-* given/when
 * non-$ attributes; @.foo and @<foo>
 * :$.foo is broken
 * return()
@@ -19,7 +17,6 @@ only slow me down...
 * context accelerators need to robustly handle undefined objects
 * explicitly imprecise error reporting - lines A-B
 * @PROCESS::ARGS ::= [1,2,3]; ok +[ @*ARGS ] == 3 # Bug
-* Whatever-currying of prefixes my $x = ~*; say $x() # Whatever()<instance>
 
 Other stuff
     * Write a ROADMAP
@@ -31,5 +28,4 @@ For STD difference minimization:
     * Find a compromise on cursor mutability
     * basic multimethods
     * s///
-    * given / when
     * constant %foo = (a => 1, b => 2)
