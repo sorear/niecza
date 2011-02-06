@@ -32,6 +32,18 @@ use MONKEY_TYPING;
 
     $y = $_ given 24;
     is $y, 24, "postfix given works";
+
+    my $z = '';
+    $z ~= $_ for 1, 2, 3;
+    is $z, '123', "postfix for works";
+
+    my $k = '';
+    given 12 {
+        $k ~= 1 when 12;
+        $k ~= 2 when * > 5;
+        $k ~= 3 when * <= 5;
+    }
+    is $k, '12', "postfix when works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

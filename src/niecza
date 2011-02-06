@@ -80,6 +80,11 @@ method statement($/) {
         } elsif $sym eq 'unless' {
             make ::Op::Conditional.new(|node($/), check => $exp,
                 false => $/.ast, true => Any);
+        } elsif $sym eq 'when' {
+            make ::Op::Conditional.new(|node($/),
+                check => ::Op::CallMethod.new(name => 'ACCEPTS',
+                    receiver => $exp, positionals => [ mklex($/, '$_') ]),
+                true => $/.ast, false => Any);
         } else {
             $/.CURSOR.sorry("Unhandled statement modifier $sym");
             make ::Op::StatementList.new;
@@ -98,6 +103,11 @@ method statement($/) {
                 body => $/.ast, until => True, once => False);
         } elsif $sym eq 'given' {
             make mktemptopic($/, $exp, $/.ast);
+        } elsif $sym eq 'for' {
+            # XXX laziness, comprehensions
+            my $var = self.gensym;
+            make ::Op::ImmedForLoop.new(|node($/), :$var, source => $exp,
+                sink => mktemptopic($/, ::Op::LetVar.new(name => $var), $/.ast));
         } else {
             $/.CURSOR.sorry("Unhandled statement modifier $sym");
             make ::Op::StatementList.new;
