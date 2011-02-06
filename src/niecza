@@ -61,6 +61,12 @@ method statement_control:given ($/) {
         invocant => self.block_to_closure($/, $<xblock>.ast[1], :once));
 }
 
+method statement_control:when ($/) {
+    $<xblock>.ast[1].type = 'cond';
+    make ::Op::When.new(|node($/), match => $<xblock>.ast[0],
+        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]));
+}
+
 method statement($/) {
     if $<label> {
         $/.CURSOR.sorry("Labels are NYI");
@@ -124,6 +130,26 @@ augment class Metamodel::StaticSub { #OK exist
 }
 
 augment class Op {
+class When is Op {
+    has $.match;
+    has $.body;
+    method zyg() { $.match, $.body }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
+                $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
+            CgOp.prog(
+                CgOp.ehspan(7, '', 0, "start$id", "end$id", "end$id"),
+                CgOp.span("start$id", "end$id", 0, CgOp.prog(
+                    CgOp.sink($.body.cgop($body)),
+                    CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
+                        CgOp.null('str'), CgOp.corelex('Nil'))))),
+            CgOp.corelex('Nil'));
+    }
+}
+
 class TopicalHook is Op {
     has $.inner;
     method zyg() { $.inner }

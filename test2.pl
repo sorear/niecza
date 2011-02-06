@@ -44,6 +44,14 @@ use MONKEY_TYPING;
         $k ~= 3 when * <= 5;
     }
     is $k, '12', "postfix when works";
+
+    $k = '';
+    given 12 {
+        when 9 { $k ~= 1 }
+        when * > 6 { $k ~= 2 }
+        when * > 3 { $k ~= 3 }
+    }
+    is $k, '2', "normal when works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
