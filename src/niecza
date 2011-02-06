@@ -34,9 +34,77 @@ sub mkcall($/, $name, *@positionals) {
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
 
+sub mktemptopic($/, $item, $expr) {
+    mklet(mklex($/, '$_'), -> $old_ {
+        ::Op::StatementList.new(|node($/), children => [
+            # XXX should be a raw bind
+            ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'), rhs => $item),
+            mklet($expr, -> $result {
+                ::Op::StatementList.new(children => [
+                    # XXX should be a raw bind
+                    ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'),
+                        rhs => $old_),
+                    $result]) }) ]) });
+}
+
 augment class NieczaActions {
-    method keyspace($/) { }
-    method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
+method keyspace($/) { }
+method terminator:sym<given> ($/) {}
+method terminator:sym<when> ($/) {}
+method terminator:sym« --> » ($/) {}
+
+method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
+
+method statement_control:given ($/) {
+    $<xblock>.ast[1].type = 'immed';
+    make ::Op::CallSub.new(|node($/), positionals => [ $<xblock>.ast[0] ],
+        invocant => self.block_to_closure($/, $<xblock>.ast[1], :once));
+}
+
+method statement($/) {
+    if $<label> {
+        $/.CURSOR.sorry("Labels are NYI");
+        make ::Op::StatementList.new;
+        return Nil;
+    }
+
+    make ($<statement_control> ?? $<statement_control>.ast !!
+        $<EXPR> ?? $<EXPR>.ast !! ::Op::StatementList.new);
+
+    if $<statement_mod_cond> {
+        my ($sym, $exp) = @( $<statement_mod_cond>[0].ast );
+
+        if $sym eq 'if' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                true => $/.ast, false => Any);
+        } elsif $sym eq 'unless' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                false => $/.ast, true => Any);
+        } else {
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+    }
+
+    if $<statement_mod_loop> {
+        my ($sym, $exp) = @( $<statement_mod_loop>[0].ast );
+
+        if $sym eq 'while' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => False, once => False);
+        } elsif $sym eq 'until' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => True, once => False);
+        } elsif $sym eq 'given' {
+            make mktemptopic($/, $exp, $/.ast);
+        } else {
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+    }
+}
 }
 
 augment class Metamodel::StaticSub { #OK exist
@@ -64,16 +132,8 @@ augment class Operator {
 class SmartMatch is Operator {
     method as_function($/) { mklex($/, '&infix:<~~>') }
     method with_args($/, *@args) {
-        mklet(mklex($/, '$_'), -> $old_ {
-            ::Op::StatementList.new(|node($/), children => [
-                # XXX should be a raw bind
-                ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'), rhs => @args[0]),
-                mklet(::Op::CallMethod.new(receiver => @args[1], name => 'ACCEPTS', args => [ mklex($/, '$_') ]), -> $result {
-                    ::Op::StatementList.new(children => [
-                        # XXX should be a raw bind
-                        ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'),
-                            rhs => $old_),
-                        $result]) }) ]) });
+        mktemptopic($/, @args[0], ::Op::CallMethod.new(receiver => @args[1],
+            name => 'ACCEPTS', args => [ mklex($/, '$_') ]));
     }
 }
 }

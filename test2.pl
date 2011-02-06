@@ -25,6 +25,13 @@ use MONKEY_TYPING;
     my $x = 5;
     $x ~~ .++;
     is $x, 6, "~~ topicalization works";
+
+    my $y;
+    given 12 { $y = $_ }
+    is $y, 12, "prefix given works";
+
+    $y = $_ given 24;
+    is $y, 24, "postfix given works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
