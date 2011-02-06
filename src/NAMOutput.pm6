@@ -16,7 +16,11 @@ method run($*unit) {
 }
 
 sub nam_sub($s) {
-    @*subsnam[$s.xref[1]] = $s.code.cgop($s);
+    my $code = $s.code;
+    if $s.topicalizer {
+        $code = ::Op::TopicalHook.new(inner => $code);
+    }
+    @*subsnam[$s.xref[1]] = $code.cgop($s);
     if $s.parametric_role_hack {
         for @( $*unit.deref($s.parametric_role_hack).methods ) -> $me {
             if $me.name ~~ ::GLOBAL::Op {

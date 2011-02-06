@@ -106,5 +106,9 @@ sub beta_optimize($body, $op, $inv, $cbody) {
         $nop = ::Op::Let.new(var => $a.[1], to => $a.[0], in => $nop);
     }
 
+    if $cbody.topicalizer {
+        $nop = ::Op::TopicalHook.new(inner => $nop);
+    }
+
     $nop;
 }

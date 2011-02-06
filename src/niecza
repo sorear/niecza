@@ -18,6 +18,7 @@ use MONKEY_TYPING;
 
 use NieczaActions;
 use Operator;
+use CgOp;
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
 
 sub mklet($value, $body) {
@@ -36,6 +37,27 @@ sub mkcall($/, $name, *@positionals) {
 augment class NieczaActions {
     method keyspace($/) { }
     method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
+}
+
+augment class Metamodel::StaticSub { #OK exist
+    method topicalizer() {
+        $.signature && ?( grep { .slot && .slot eq '$_' }, @( $.signature.params ) )
+    }
+}
+
+augment class Op {
+class TopicalHook is Op {
+    has $.inner;
+    method zyg() { $.inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            CgOp.ehspan(6, '', 0, "start$id", "end$id", "end$id"),
+            CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
+    }
+}
 }
 
 augment class Operator {
