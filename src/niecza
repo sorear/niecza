@@ -19,6 +19,7 @@ use MONKEY_TYPING;
 use NieczaActions;
 use Operator;
 use CgOp;
+
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
 
 sub mklet($value, $body) {
@@ -54,6 +55,29 @@ method terminator:sym<when> ($/) {}
 method terminator:sym« --> » ($/) {}
 
 method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
+
+method sibble($/) {
+    my $regex = self.op_for_regex($/, $<left>.ast);
+    my $repl;
+    if $<infixish> {
+        if $<infixish> eq '=' {
+            $repl = $<right>.ast;
+        } elsif $<infixish>.ast ~~ ::Operator::CompoundAssign {
+            $repl = $<infixish>.ast.base.with_args($/,
+                mkcall($/, '&prefix:<~>', ::Op::ContextVar.new(name => '$*/')),
+                $<right>.ast);
+        } else {
+            $/.CURSOR.sorry("Unhandled operator in substitution");
+            $repl = mklex($/, 'Any');
+        }
+    } else {
+        $repl = $<right>.ast;
+    }
+    $repl = self.transparent($/, $repl);
+    make mkcall($/, '&_substitute', mklex($/, '$_'), $regex, $repl);
+}
+
+method quote:s ($/) { make $<pat>.ast }
 
 method statement_control:given ($/) {
     $<xblock>.ast[1].type = 'immed';

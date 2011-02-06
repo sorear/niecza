@@ -895,16 +895,16 @@ my class Regex is Sub {
     }
 }
 
-# used in a few parts of STD until s/// is working
-sub _subst($M is rw, $text is rw, $regex, $repl) {
-    $text = ~$text;
-    $M = ($text ~~ $regex);
-    if $M {
-        $text = substr($text, 0, $M.from) ~
-            (($repl ~~ Str) ?? $repl !! $repl()) ~
-                substr($text, $M.to, (chars($text) - $M.to));
+sub _substitute(\$target, $regex, $repl) {
+    my $st = ~$target;
+    if $regex.ACCEPTS($st) {
+        Q:CgOp { (rnull (set_status (s '$*/') {$/})) };
+        $target = (substr($st, 0, $/.from) ~ $repl() ~
+            substr($st, $/.to, (chars($st) - $/.to)));
+        True;
+    } else {
+        False;
     }
-    ?$M;
 }
 
 sub make($x) { make $x }

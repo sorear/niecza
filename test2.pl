@@ -52,6 +52,36 @@ use MONKEY_TYPING;
         when * > 3 { $k ~= 3 }
     }
     is $k, '2', "normal when works";
+
+    given my $g { #OK
+        $_ = 'abc';
+        s/b/d/;
+        is $_, 'adc', 'simple s/// works';
+        is $/, 'b', 's/// sets $/';
+        $k = 'bac';
+        $k ~~ s/c/g/;
+        is $k, 'bag', '~~ s/// works';
+        $_ = 'abc';
+        s/(\w)/$0$0/;
+        is $_, 'aabc', 's/// can refer to $/';
+        $_ = 'abc';
+        ok ?(s/b/x/), 's/// is true if replacing';
+        $_ = 'abc';
+        ok !(s/d/x/), 's/// is false if not replacing';
+        is $_, 'abc', '... and target unchanged';
+        $_ = 'abc';
+        s!a!xx!;
+        is $_, 'xxbc', 's/// with alternate delims works';
+        $_ = 'abc123';
+        s{b} = 'g' ~ 'k';
+        is $_, 'agkc123', 's{} = works';
+        $_ = 'abc123';
+        s{\D+} = $/ ~ $/;
+        is $_, 'abcabc123', 's{} = can refer to $/';
+        $_ = 'abc123';
+        s{\d+} *= 2;
+        is $_, 'abc246', 'metaoperator s{} works';
+    }
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
