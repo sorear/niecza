@@ -104,10 +104,6 @@
 
 (defun xref-to-subsymbol (xref) (main-xref (cadr xref)))
 
-(defun compile-method (method)
-  (fare-matcher:match method 
-    ((and (list name normal dunno xref) (when (equal normal "normal")))
-      `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol xref))))))
 
 (defmacro define-nam-class (
  i
@@ -120,7 +116,18 @@
  ) 
   `(progn
     (defclass ,(main-xref i) (p6-Mu) ())
+    ,@(mapcar #'compile-method methods)
     (setf ,(main-xref i) (make-instance ',(main-xref i)))))
+
+(defun compile-method (method)
+  (fare-matcher:match method 
+    ((and (list 
+      name ; Method name without ! decorator
+      kind ; Allowable kinds are "normal", "private", and "sub"
+      var  ; Variable for implementing sub in param role
+      body ; Reference to implementing sub
+    ) (when (equal kind "normal")))
+      `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol body))))))
 
 ;(trace define-nam-class)
 
