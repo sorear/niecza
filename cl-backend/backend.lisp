@@ -3,23 +3,9 @@
 (ql:quickload "cl-json")
 (ql:quickload "fare-matcher")
 
-
-; Logging - not sure we need it
-
-(ql:quickload "cl-log")
-
-(use-package "COM.RAVENBROOK.COMMON-LISP-LOG")
-(setf (log-manager) (make-instance 'log-manager :message-class 'formatted-message))
-(start-messenger 'text-file-messenger :filename "cl-backend.log")
-
-(log-message :info "cl-backend started")
-
-(defun nam-op-log (name result) "Log what an nam op gets transformed into" (log-message :info (format nil "~a => ~w" name (strip-ann result))) result)
-
-
 ; Macros 
  
-(defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params (nam-op-log ',name (progn ,@body))))
+(defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params ,@body))
 
 (defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
 
@@ -148,7 +134,6 @@
     ) (when (equal kind "normal")))
       `(defmethod ,(intern name) (invocant &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
 
-;(trace define-nam-class)
 
 
 
@@ -197,13 +182,19 @@
       (cons (list (intern (car vars)) (cadr vars)) (to-let-vars (cddr vars)))
       '()))
 (nam-op letn (&body vars-and-body)
- `(let ,(to-let-vars (butlast vars-and-body)) ,(first (last vars-and-body))))
+ `(let ,(to-let-vars (butlast vars-and-body)) ,@(last vars-and-body)))
+
 
 ; ???
 (defun nam-subcall (dunno-what-that-is thing &rest args) (apply thing args))
 
 (nam-op methodcall (method-name dunno invocant &rest args) 
   `(,(intern (cadr method-name)) ,@args))
+
+(defun nam-obj_getbool (obj) (if (numberp obj) (not (equal obj 0)) t))
+(nam-op ternary (cond if then) `(if ,cond ,if ,then))
+
+(defun nam-null (type) nil) 
 
 
 ; HACK
@@ -278,6 +269,7 @@
   `(let ((|&infix:<~>| #'p6-concat)
          (|&say| #'p6-say)
          (|Nil| "") ; HACK
+         (|Any| "") ; HACK
          )
       ,@compiled-unit (,(main-xref 0))))
 
@@ -285,7 +277,7 @@
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
   ;(format t "~w~%~%~%" compiled-unit)
-  (format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
+  ;(format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
   (let ((wrapped (wrap-for-eval compiled-unit)))
     (eval wrapped)
     ))
