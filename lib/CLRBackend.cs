@@ -2679,7 +2679,8 @@ namespace Niecza.CLRBackend {
                 CpsOp[] z = new CpsOp[5];
                 for (int i = 1; i < 5; i++)
                     z[i] = th.Scan(zyg[i+1]);
-                z[0] = CpsOp.IntLiteral(FixInt(zyg[1]));
+                z[0] = zyg[1] is JScalar ? CpsOp.IntLiteral(FixInt(zyg[1])) :
+                    th.Scan(zyg[1]);
                 return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_SFH, z);
             };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {

@@ -84,6 +84,34 @@ use MONKEY_TYPING;
     }
 }
 
+{
+    my $a = 0;
+    {
+        A: while True {
+            $a++; while True { last A }; $a++;
+            last;
+        }
+    }
+    is $a, 1, "last with label works";
+    sub funlp($fn) {
+        A: while True {
+            $fn(A)
+        }
+    }
+    my $b = 0;
+    funlp(-> $o {
+        $b++; funlp(-> $i { last $o }); $b++; #OK
+        last;
+    });
+    is $b, 1, "last with label object is not fooled by names";
+    my $c = 0;
+    funlp(-> $o { #OK
+        $c++; funlp(-> $i { last "A" }); $c++; #OK
+        last;
+    });
+    is $c, 2, "last with name picks innermost";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

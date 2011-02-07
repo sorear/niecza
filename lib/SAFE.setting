@@ -382,15 +382,25 @@ my class Label {
 }
 
 # XXX multi dispatch
-sub next() {
-    Q:CgOp { (control 1 (null frame) (int -1) (null str) {()}) }
+sub _lexotic ($id, $x, $val) {
+    Q:CgOp {
+        (letn fr (null frame)
+              nm (null str)
+              id (@ {$x})
+          (ternary (obj_isa (l id) (class_ref mo Label))
+            (prog (l fr (getslot target frame (l id)))
+                  (l nm (getslot name str (l id))))
+            (ternary (obj_isa (l id) (class_ref mo Str))
+              (l nm (obj_getstr {$x}))
+              (prog)))
+          (control (cast int (obj_getnum {$id})) (l fr) (int -1) (l nm) {$val}))
+    }
 }
-sub last() {
-    Q:CgOp { (control 2 (null frame) (int -1) (null str) {()}) }
-}
-sub redo() {
-    Q:CgOp { (control 3 (null frame) (int -1) (null str) (null var)) }
-}
+sub next ($x?) { _lexotic(1, $x, ()) }
+sub last ($x?) { _lexotic(2, $x, ()) }
+sub redo ($x?) { _lexotic(3, $x, ()) }
+sub goto ($x)  { _lexotic(8, $x, ()) }
+
 sub return(\$obj) is return-pass {
     Q:CgOp { (control 4 (null frame) (int -1) (null str) {$obj}) }
 }
