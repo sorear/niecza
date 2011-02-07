@@ -149,6 +149,16 @@ method statement($/) {
 }
 
 augment class Op {
+method cgop_labelled($body, $label) {
+    if (defined $.line) {
+        CgOp.ann("", $.line, self.code_labelled($body, $label));
+    } else {
+        self.code_labelled($body, $label);
+    }
+}
+
+method code_labelled($body, $label) { self.code($body) }
+
 class When is Op {
     has $.match;
     has $.body;
@@ -204,9 +214,54 @@ class Labelled is Op {
     method zyg() { $.stmt }
 
     method code($body) {
-        CgOp.prog(CgOp.label("goto_$.name"), $.stmt.cgop($body));
+        CgOp.prog(CgOp.label("goto_$.name"),$.stmt.cgop_labelled($body,$.name));
     }
 }
+}
+
+augment class Op::WhileLoop { #OK exist
+    method code($body) { self.code_labelled($body,'') }
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            CgOp.whileloop(+$.until, +$.once,
+                CgOp.obj_getbool($.check.cgop($body)),
+                CgOp.prog(
+                    CgOp.label("redo$id"),
+                    CgOp.sink($.body.cgop($body)),
+                    CgOp.label("next$id"),
+                    CgOp.ehspan(1, $l, 0, "redo$id", "next$id", "next$id"),
+                    CgOp.ehspan(2, $l, 0, "redo$id", "next$id", "last$id"),
+                    CgOp.ehspan(3, $l, 0, "redo$id", "next$id", "redo$id"))),
+            CgOp.label("last$id"),
+            CgOp.corelex('Nil'));
+    }
+}
+
+augment class Op::ImmedForLoop { #OK exist
+    method code($body) { self.code_labelled($body, '') }
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.rnull(CgOp.letn(
+            "!iter$id", CgOp.vvarlist_new_empty,
+            $.var, CgOp.null('var'),
+            CgOp.vvarlist_push(CgOp.letvar("!iter$id"),
+                $.source.cgop($body)),
+            CgOp.whileloop(0, 0,
+                CgOp.iter_hasflat(CgOp.letvar("!iter$id")),
+                CgOp.prog(
+                    CgOp.letvar($.var,
+                        CgOp.vvarlist_shift(CgOp.letvar("!iter$id"))),
+                    CgOp.label("redo$id"),
+                    CgOp.sink($.sink.cgop($body)),
+                    CgOp.label("next$id"),
+                    CgOp.ehspan(1, $l, 0, "redo$id", "next$id", "next$id"),
+                    CgOp.ehspan(2, $l, 0, "redo$id", "next$id", "last$id"),
+                    CgOp.ehspan(3, $l, 0, "redo$id", "next$id", "redo$id"))),
+            CgOp.label("last$id")));
+    }
 }
 
 augment class Op::Labelled { #OK exist
