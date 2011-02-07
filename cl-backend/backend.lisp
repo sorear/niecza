@@ -146,7 +146,7 @@
       var  ; Variable for implementing sub in param role
       body ; Reference to implementing sub
     ) (when (equal kind "normal")))
-      `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol body) invocant)))))
+      `(defmethod ,(intern name) (invocant &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
 
 ;(trace define-nam-class)
 
