@@ -21,6 +21,12 @@
  
 (defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params (nam-op-log ',name (progn ,@body))))
 
+(defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
+
+; Hacks
+
+(nam-op ehspan (class name unused start end goto) )
+(nam-op span (n1 n2 sync body) body)
 
 (defun strip-ann (thing) 
   (if (consp thing)
@@ -30,7 +36,6 @@
       )
       thing))
 
-(defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
 
 
 
@@ -83,9 +88,12 @@
     slot            ; Name of lexical to accept value
     names           ; All legal named-parameter names
     default         ; Xref    Sub to call if HAS_DEFAULT; must be child of this
-    ) (intern slot))))
+    ) (if (equal flags 96)
+          (intern slot)
+          nil))))
 
  
+(defun mymap (func list) (remove-if #'null (mapcar func list)))
 
 (defmacro define-nam-sub  
   (i                ; The Xref Id
@@ -108,7 +116,7 @@
     nam              ; See description of opcodes earlier
   )
 
-  `(defun ,(main-xref i) ,(mapcar #'compile-param signature) (let ,(lexicals-to-let lexicals) ,@nam)))
+  `(defun ,(main-xref i) ,(mymap #'compile-param signature) (let ,(lexicals-to-let lexicals) ,@nam)))
 
 
 
@@ -138,7 +146,7 @@
       var  ; Variable for implementing sub in param role
       body ; Reference to implementing sub
     ) (when (equal kind "normal")))
-      `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol body))))))
+      `(defmethod ,(intern name) (invocant) (,(xref-to-subsymbol body) invocant)))))
 
 ;(trace define-nam-class)
 
