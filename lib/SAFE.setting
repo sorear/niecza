@@ -376,6 +376,11 @@ sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 
 sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
 
+my class Label {
+    has $!target;
+    has $!name;
+}
+
 # XXX multi dispatch
 sub next() {
     Q:CgOp { (control 1 (null frame) (int -1) (null str) {()}) }

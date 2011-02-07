@@ -1574,6 +1574,7 @@ noparams:
         public static IP6 EMPTYP;
         public static IP6 HashP;
         public static IP6 IteratorP;
+        public static readonly DynMetaObject LabelMO;
         public static readonly DynMetaObject AnyMO;
         public static readonly DynMetaObject IteratorMO;
         public static readonly DynMetaObject ScalarMO;
@@ -2280,6 +2281,10 @@ slow:
             SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
             SubMO.Invalidate();
 
+            LabelMO = new DynMetaObject("Label");
+            LabelMO.FillProtoClass(new string[] { "target", "name" });
+            LabelMO.Invalidate();
+
             BoolMO = new DynMetaObject("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
             BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
@@ -2470,6 +2475,14 @@ slow:
 
         public static System.IO.TextWriter OpenStderr() {
             return new System.IO.StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
+        }
+
+        public static Variable NewLabelVar(Frame fr, string name) {
+            DynObject dob = new DynObject(LabelMO);
+            fr.MarkSharedChain();
+            dob.slots[0] = fr;
+            dob.slots[1] = name;
+            return NewROScalar(dob);
         }
 
         private static string DescribeException(int type, Frame tgt,

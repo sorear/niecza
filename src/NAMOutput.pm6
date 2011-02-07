@@ -20,6 +20,11 @@ sub nam_sub($s) {
     if $s.topicalizer {
         $code = ::Op::TopicalHook.new(inner => $code);
     }
+    my $lx = $s.lexicals;
+    my @labels = grep { $lx{$_}.^isa(::Metamodel::Lexical::Label) }, $lx.keys;
+    if @labels {
+        $code = ::Op::LabelHook.new(labels => @labels, inner => $code);
+    }
     @*subsnam[$s.xref[1]] = $code.cgop($s);
     if $s.parametric_role_hack {
         for @( $*unit.deref($s.parametric_role_hack).methods ) -> $me {
@@ -298,6 +303,9 @@ augment class Metamodel::Lexical::Alias { #OK exist
 augment class Metamodel::Lexical::Hint { #OK exist
     method to_nam() { ['hint'] }
 }
+augment class Metamodel::Lexical::Label { #OK exist
+    method to_nam() { ['label'] }
+}
 augment class Metamodel::Lexical::SubDef { #OK exist
     method to_nam() { ['sub', @( $.body.xref ) ] }
 }
@@ -315,6 +323,8 @@ sub lex_from_nam(@block) {
                         if $type eq 'alias';
     return ($name, ::Metamodel::Lexical::Hint.new)
                         if $type eq 'hint';
+    return ($name, ::Metamodel::Lexical::Label.new)
+                        if $type eq 'label';
     return ($name, ::Metamodel::Lexical::SubDef.new(body => $*xref[@xtra[1]]))
                         if $type eq 'sub';
     return ($name, ::Metamodel::Lexical::Stash.new(path => @xtra))

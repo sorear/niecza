@@ -91,10 +91,11 @@ method statement_control:when ($/) {
         body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]));
 }
 
+method label($/) { }
 method statement($/) {
     if $<label> {
-        $/.CURSOR.sorry("Labels are NYI");
-        make ::Op::StatementList.new;
+        make ::Op::Labelled.new(|node($/), name => ~$<label><identifier>,
+            stmt => $<statement>.ast);
         return Nil;
     }
 
@@ -147,12 +148,6 @@ method statement($/) {
 }
 }
 
-augment class Metamodel::StaticSub { #OK exist
-    method topicalizer() {
-        $.signature && ?( grep { .slot && .slot eq '$_' }, @( $.signature.params ) )
-    }
-}
-
 augment class Op {
 class When is Op {
     has $.match;
@@ -174,6 +169,7 @@ class When is Op {
     }
 }
 
+# These two are created to codegen wrappers in NAMOutput... bad factor
 class TopicalHook is Op {
     has $.inner;
     method zyg() { $.inner }
@@ -186,6 +182,38 @@ class TopicalHook is Op {
             CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
     }
 }
+
+class LabelHook is Op {
+    has $.inner;
+    has $.labels;
+    method zyg() { $.inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            map({ CgOp.ehspan(8, $_, 0, "start$id", "end$id", "goto_$_") },
+                @$.labels),
+            CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
+    }
+}
+
+class Labelled is Op {
+    has $.stmt;
+    has $.name;
+    method zyg() { $.stmt }
+
+    method code($body) {
+        CgOp.prog(CgOp.label("goto_$.name"), $.stmt.cgop($body));
+    }
+}
+}
+
+augment class Op::Labelled { #OK exist
+    method begin() {
+        @*opensubs[*-1].add_label($.name);
+        for self.zyg { $_.begin } # XXX callsame
+    }
 }
 
 augment class Operator {

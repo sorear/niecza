@@ -539,6 +539,8 @@ namespace Niecza.CLRBackend {
                     obj = new LexAlias(bl);
                 } else if (type == "stash") {
                     obj = new LexStash(unit, bl);
+                } else if (type == "label") {
+                    obj = new LexLabel(bl);
                 } else {
                     throw new Exception("unknown lex type " + type);
                 }
@@ -629,6 +631,10 @@ namespace Niecza.CLRBackend {
         public LexSimple(object[] l) {
             flags = JScalar.I(l[2]);
         }
+    }
+
+    class LexLabel : LexVarish {
+        public LexLabel(object[] l) { }
     }
 
     class LexHint : Lexical {
@@ -916,6 +922,8 @@ namespace Niecza.CLRBackend {
             VarHash.GetMethod("set_Item");
         public static readonly MethodInfo Kernel_MakeSub =
             typeof(Kernel).GetMethod("MakeSub");
+        public static readonly MethodInfo Kernel_NewLabelVar =
+            typeof(Kernel).GetMethod("NewLabelVar");
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_SFH =
@@ -2718,6 +2726,10 @@ namespace Niecza.CLRBackend {
                 return CpsOp.MethodCall(null, Tokens.Kernel_MakeSub, new CpsOp[]{
                     CpsOp.GetSField(((StaticSub)z[1]).subinfo),
                     CpsOp.CallFrame() }); };
+            handlers["_newlabel"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_NewLabelVar, new CpsOp[]{
+                    CpsOp.CallFrame(),
+                    CpsOp.StringLiteral(JScalar.S(z[1])) }); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
                 string kind = FixStr(z[1]);
                 ModuleWithTypeObject m;
@@ -3310,6 +3322,11 @@ namespace Niecza.CLRBackend {
                     }
                     frags.Add(new object[] { new JScalar("scopedlex"),
                         new JScalar(kv.Key), bit });
+                } else if (kv.Value is LexLabel) {
+                    frags.Add(new object[] { new JScalar("scopedlex"),
+                        new JScalar(kv.Key),
+                        new object[] { new JScalar("_newlabel"),
+                            new JScalar(kv.Key) } });
                 }
             }
         }

@@ -414,6 +414,11 @@ class Lexical {
     class Hint is Lexical {
     }
 
+    # These store destinations for lexotic control transfers, and clone like
+    # subs to handle recursion properly.
+    class Label is Lexical {
+    }
+
     # our...
     class Common is Lexical {
         has $.path = die "M:L:Common.path required"; # Array of Str
@@ -505,6 +510,10 @@ class StaticSub is RefTarget {
         $.outer.create_static_pad if $.outer;
     }
 
+    method topicalizer() {
+        $.signature && ?( grep { .slot && .slot eq '$_' }, @( $.signature.params ) )
+    }
+
     method find_lex_pkg($name) {
         my $toplex = self.find_lex($name) // return Array;
         if !$toplex.^isa(Metamodel::Lexical::Stash) {
@@ -561,6 +570,10 @@ class StaticSub is RefTarget {
 
     method add_hint($slot) {
         $.lexicals{$slot} = Metamodel::Lexical::Hint.new;
+    }
+
+    method add_label($slot) {
+        $.lexicals{$slot} = Metamodel::Lexical::Label.new;
     }
 
     method add_common_name($slot, $path, $name) {

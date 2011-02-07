@@ -27,5 +27,4 @@ For STD difference minimization:
         - TimToady and I seem to both not hate traits
     * Find a compromise on cursor mutability
     * basic multimethods
-    * s///
     * constant %foo = (a => 1, b => 2)
