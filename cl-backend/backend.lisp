@@ -74,6 +74,17 @@
 
 (defmethod |FETCH| (thing) thing)
 
+
+(defun compile-param (param)
+  (fare-matcher:match param 
+    ((list 
+    name            ; For binding error messages
+    flags           ; See doc/nam.pod
+    slot            ; Name of lexical to accept value
+    names           ; All legal named-parameter names
+    default         ; Xref    Sub to call if HAS_DEFAULT; must be child of this
+    ) (intern slot))))
+
  
 
 (defmacro define-nam-sub  
@@ -97,7 +108,7 @@
     nam              ; See description of opcodes earlier
   )
 
-  `(defun ,(main-xref i) () (let ,(lexicals-to-let lexicals) ,@nam)))
+  `(defun ,(main-xref i) ,(mapcar #'compile-param signature) (let ,(lexicals-to-let lexicals) ,@nam)))
 
 
 
@@ -141,12 +152,16 @@
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
     ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (intern var) `(symbol-function ',(main-xref id))))
-    ((and (list var simple dunno) (when (equal simple "simple"))) (list (intern var) (make-scalar "")))
+    ((and (list var simple flags) (when (equal simple "simple")))
+      (if (equal flags 4)
+          nil
+          (list (intern var) (make-scalar ""))))
     ((and (list* var stash path) (when (equal stash "stash")))
        (list (intern var) `(get-stash ,path)))))
 
+
 ; converts a list of lexicals
-(defun lexicals-to-let (lexicals) (mapcar #'lexical-to-let lexicals))
+(defun lexicals-to-let (lexicals) (remove-if #'null (mapcar #'lexical-to-let lexicals)))
 
 
 (nam-op ann (filename line op) op)
