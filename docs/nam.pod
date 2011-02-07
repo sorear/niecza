@@ -1045,8 +1045,8 @@ These are used for subs, and must be in correspondence with the "zyg" list.
     Name            Type    Description
     name            string  For binding error messages
     flags           number  [1]
-    names           str[]   All legal named-parameter names
     slot            string  Name of lexical to accept value
+    names           str[]   All legal named-parameter names
     default         Xref    Sub to call if HAS_DEFAULT; must be child of this
 
 [1] Flag values are as follows.
