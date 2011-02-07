@@ -266,7 +266,7 @@
     )
 
     (list (fstash-to-let (fstash-list '() stash_root)
-      (loop for thing in xref for i upfrom 0 collect (compile-sub-or-packagoid i thing)))))))
+      (loop for thing in xref for i upfrom 0 when thing collect (compile-sub-or-packagoid i thing)))))))
 
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
