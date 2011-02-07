@@ -19,6 +19,11 @@ use MONKEY_TYPING;
 use NieczaActions;
 use Operator;
 use CgOp;
+use STD;
+
+augment class STD {
+token keyspace { <![(]> [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
+}
 
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
 

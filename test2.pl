@@ -110,6 +110,9 @@ use MONKEY_TYPING;
         last;
     });
     is $c, 2, "last with name picks innermost";
+
+    sub loopy () { True }
+    ok loopy, "can call functions starting with 'loop'";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
