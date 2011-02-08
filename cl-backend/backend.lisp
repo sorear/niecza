@@ -22,9 +22,6 @@
       )
       thing))
 
-
-
-
 (defun to-symbol-first (thing)
   (if (stringp thing)
       (intern (string-upcase (concatenate 'string "nam-" thing)))
@@ -140,13 +137,6 @@
     ) (when (equal kind "normal")))
       `(defmethod ,(intern name) (invocant &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
 
-
-
-
-
-
-
-
 ; converts one lexical to a variable declaration for a let
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
@@ -176,41 +166,26 @@
 (defun nam-box (type thing) thing)
 (defun nam-fetch (thing) (FETCH thing))
 
-(nam-op letvar (var) (intern var))
+(nam-op letvar (&rest args) `(nam-scopedlex ,@args))
 
 (nam-op scopedlex (var &rest rvalue)
   (if (consp rvalue)
       `(setf ,(intern var) ,@rvalue)
       (intern var)))
 
-
-(labels (
-  (seperate (mixed)
+(labels 
+  ((seperate (mixed)
     (if (stringp (first mixed)) 
         (let ((result (seperate (rest (rest mixed)))))
           (list 
             (cons (list (intern (first mixed)) (second mixed)) (first result))
             (second result))
           )
-        (list nil mixed)))
-
-  (to-let-vars (vars)
-    (if (consp vars)
-        (cons (list (intern (car vars)) (cadr vars)) (to-let-vars (cddr vars)))
-       '())))
+        (list nil mixed))))
 
   (nam-op letn (&body vars-and-body)
     (let ((seperated (seperate vars-and-body)))
     `(let* ,(first seperated) ,@(second seperated)))))
-
-;(trace nam-letn)
-
-
-
-                          
-
-
-
 
 
 ; ???
