@@ -113,6 +113,11 @@ use MONKEY_TYPING;
 
     sub loopy () { True }
     ok loopy, "can call functions starting with 'loop'";
+
+    my @a = "abc" ~~ /abc/;
+    is +@a, 1, "capture-less matches return 1 item";
+    @a = "abc" ~~ /(a)(b)(c)/;
+    is +@a, 3, "capturing matches return catures in list context";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
