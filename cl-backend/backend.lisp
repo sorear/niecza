@@ -53,8 +53,8 @@
   scalar))
 
 (defclass p6-Mu () ())
-(defgeneric |new| (invocant))
-(defmethod |new| (invocant) (make-instance (class-of invocant)))
+(defgeneric |new| (invocant &rest rest))
+(defmethod |new| (invocant &rest rest) (make-instance (class-of invocant)))
 
 
 (defclass p6-Scalar () (value))
@@ -109,6 +109,12 @@
 
 (defun xref-to-subsymbol (xref) (main-xref (cadr xref)))
 
+; HACK
+(defmacro define-nam-module (
+ i
+ name            ; The object's debug name
+ exports         ; List of global names to which object is bound
+))
 
 (defmacro define-nam-class (
  i
@@ -177,12 +183,34 @@
       `(setf ,(intern var) ,@rvalue)
       (intern var)))
 
-(defun to-let-vars (vars)
-  (if (consp vars)
-      (cons (list (intern (car vars)) (cadr vars)) (to-let-vars (cddr vars)))
-      '()))
-(nam-op letn (&body vars-and-body)
- `(let ,(to-let-vars (butlast vars-and-body)) ,@(last vars-and-body)))
+
+(labels (
+  (seperate (mixed)
+    (if (stringp (first mixed)) 
+        (let ((result (seperate (rest (rest mixed)))))
+          (list 
+            (cons (list (intern (first mixed)) (second mixed)) (first result))
+            (second result))
+          )
+        (list nil mixed)))
+
+  (to-let-vars (vars)
+    (if (consp vars)
+        (cons (list (intern (car vars)) (cadr vars)) (to-let-vars (cddr vars)))
+       '())))
+
+  (nam-op letn (&body vars-and-body)
+    (let ((seperated (seperate vars-and-body)))
+    `(let* ,(first seperated) ,@(second seperated)))))
+
+;(trace nam-letn)
+
+
+
+                          
+
+
+
 
 
 ; ???
