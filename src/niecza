@@ -224,6 +224,15 @@ class Labelled is Op {
 }
 }
 
+augment class CgOp { #OK exist
+    method double($x) {
+        # Hack - prevent JSON syntax errors
+        my $str = ~$x;
+        ($str eq 'Infinity' || $str eq 'NaN' || $str eq '-Infinity') ??
+            CgOp._cgop('double', $str) !! CgOp._cgop('double', $x);
+    }
+}
+
 augment class Op::WhileLoop { #OK exist
     method code($body) { self.code_labelled($body,'') }
     method code_labelled($body, $l) {
