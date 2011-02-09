@@ -121,23 +121,24 @@
 ) `(setf ,(main-xref i) 'placeholder))
 
 (defmacro define-nam-class (
- i
- name            ; The object's debug name
- exports         ; List of global names to which object is bound
- attributes      ; Attributes local to the class
- methods         ; Methods local to the class
- superclasses    ; Direct superclasses of the class
- linear_mro      ; All superclasses in C3 order
- ) 
-  `(progn
-    (defclass ,(main-xref i) (p6-Mu) ())
-    ,@(mapcar #'compile-method methods)
-    (setf ,(main-xref i) (make-instance ',(main-xref i)))
-    ))
+  i
+  name            ; The object's debug name
+  exports         ; List of global names to which object is bound
+  attributes      ; Attributes local to the class
+  methods         ; Methods local to the class
+  superclasses    ; Direct superclasses of the class
+  linear_mro      ; All superclasses in C3 order
+  ) 
+  (let ((class (main-xref i)))
+    `(progn
+      (defclass ,class (p6-Mu) ())
+      ,@(mapcar (lambda (m) (compile-method class m)) methods)
+      (setf ,(main-xref i) (make-instance ',(main-xref i)))
+    )))
 
 (defun method-name (name) (intern name))
 
-(defun compile-method (method)
+(defun compile-method (class method)
   (fare-matcher:match method 
     ((and (list 
       name ; Method name without ! decorator
@@ -145,7 +146,7 @@
       var  ; Variable for implementing sub in param role
       body ; Reference to implementing sub
     ) (when (equal kind "normal")))
-      `(defmethod ,(method-name name) (invocant &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
+      `(defmethod ,(method-name name) ((invocant ,class) &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
 
 ; converts one lexical to a variable declaration for a let
 (defun lexical-to-let (lexical)
@@ -210,7 +211,7 @@
                             (format t "Can't handle that sort of method call yet")
                             ))))
 (nam-op methodcall (method-name dunno invocant &rest args) 
-  `(,(method-name (to-string method-name)) ,@args)))
+  `(,(method-name (to-string method-name)) (FETCH ,(first args)) ,@(rest args))))
 
 
 (defun nam-obj_getbool (obj) (if (numberp obj) (not (equal obj 0)) t))
