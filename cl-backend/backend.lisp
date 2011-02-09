@@ -5,9 +5,22 @@
 
 ; Macros 
  
+(defun to-stash-name (name) (intern (format nil "~{~A~^-~}" name)))
+(defmacro get-stash (name) (to-stash-name name))
+ 
+(defun xref-to-symbol (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
+
+(defun main-xref (i) (xref-to-symbol (list "MAIN" i "...")))
+
+ 
 (defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params ,@body))
 
 (defun concat-symbol (a b) (intern (concatenate 'string (string a) (string b))))
+
+; Translation to symbols
+
+(defun method-name (name) (intern name))
+(defun var-name (name) (intern name))
 
 ; Hacks
 
@@ -33,13 +46,7 @@
       thing))
 
 
-(defun to-stash-name (name) (intern (format nil "~{~A~^-~}" name)))
-(defmacro get-stash (name) (to-stash-name name))
 
- 
-(defun xref-to-symbol (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
-
-(defun main-xref (i) (xref-to-symbol (list "MAIN" i "...")))
 
 
 ; P6 Classes
@@ -72,7 +79,7 @@
     names           ; All legal named-parameter names
     default         ; Xref    Sub to call if HAS_DEFAULT; must be child of this
     ) (if (equal flags 96)
-          (intern slot)
+          (var-name slot)
           nil))))
 
  
@@ -111,7 +118,7 @@
  i
  name            ; The object's debug name
  exports         ; List of global names to which object is bound
-))
+) `(setf ,(main-xref i) 'placeholder))
 
 (defmacro define-nam-class (
  i
@@ -125,7 +132,10 @@
   `(progn
     (defclass ,(main-xref i) (p6-Mu) ())
     ,@(mapcar #'compile-method methods)
-    (setf ,(main-xref i) (make-instance ',(main-xref i)))))
+    (setf ,(main-xref i) (make-instance ',(main-xref i)))
+    ))
+
+(defun method-name (name) (intern name))
 
 (defun compile-method (method)
   (fare-matcher:match method 
@@ -135,18 +145,18 @@
       var  ; Variable for implementing sub in param role
       body ; Reference to implementing sub
     ) (when (equal kind "normal")))
-      `(defmethod ,(intern name) (invocant &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
+      `(defmethod ,(method-name name) (invocant &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
 
 ; converts one lexical to a variable declaration for a let
 (defun lexical-to-let (lexical)
   (fare-matcher:match lexical 
-    ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (intern var) `(symbol-function ',(main-xref id))))
+    ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (var-name var) `(symbol-function ',(main-xref id))))
     ((and (list var simple flags) (when (equal simple "simple")))
       (if (equal flags 4)
           nil
-          (list (intern var) (make-scalar ""))))
+          (list (var-name var) (make-scalar ""))))
     ((and (list* var stash path) (when (equal stash "stash")))
-       (list (intern var) `(get-stash ,path)))))
+       (list (var-name var) `(get-stash ,path)))))
 
 
 ; converts a list of lexicals
@@ -170,15 +180,15 @@
 
 (nam-op scopedlex (var &rest rvalue)
   (if (consp rvalue)
-      `(setf ,(intern var) ,@rvalue)
-      (intern var)))
+      `(setf ,(var-name var) ,@rvalue)
+      (var-name var)))
 
 (labels 
   ((seperate (mixed)
     (if (stringp (first mixed)) 
         (let ((result (seperate (rest (rest mixed)))))
           (list 
-            (cons (list (intern (first mixed)) (second mixed)) (first result))
+            (cons (list (var-name (first mixed)) (second mixed)) (first result))
             (second result))
           )
         (list nil mixed))))
@@ -191,8 +201,17 @@
 ; ???
 (defun nam-subcall (dunno-what-that-is thing &rest args) (apply thing args))
 
+
+(labels
+  ((to-string (arg) (if (stringp arg)
+                        arg
+                        (if (eq (first arg) 'nam-str)
+                            (second arg)
+                            (format t "Can't handle that sort of method call yet")
+                            ))))
 (nam-op methodcall (method-name dunno invocant &rest args) 
-  `(,(intern (cadr method-name)) ,@args))
+  `(,(method-name (to-string method-name)) ,@args)))
+
 
 (defun nam-obj_getbool (obj) (if (numberp obj) (not (equal obj 0)) t))
 (nam-op ternary (cond if then) `(if ,cond ,if ,then))
@@ -280,7 +299,7 @@
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
   ;(format t "~w~%~%~%" compiled-unit)
-  ;(format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
+  (format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
   (let ((wrapped (wrap-for-eval compiled-unit)))
     (eval wrapped)
     ))
