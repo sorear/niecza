@@ -11,7 +11,6 @@
 (defun xref-to-symbol (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
 
 (defun main-xref (i) (xref-to-symbol (list "MAIN" i "...")))
-
  
 (defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params ,@body))
 
@@ -44,10 +43,6 @@
   (if (consp thing)
       (cons (to-symbol-first (first thing)) (mapcar #'to-symbol (rest thing)))
       thing))
-
-
-
-
 
 ; P6 Classes
 
@@ -107,8 +102,6 @@
   )
 
   `(defun ,(main-xref i) ,(mymap #'compile-param signature) (let ,(lexicals-to-let lexicals) ,@nam)))
-
-
 
 
 (defun xref-to-subsymbol (xref) (main-xref (cadr xref)))
@@ -257,15 +250,11 @@
 (defun fstash-to-setf (stash)
   (mapcar (lambda (x) `(setf ,(to-stash-name (first x)) ,(xref-to-symbol (second x)))) (only-with-xrefs (hide-foreign stash))))
 
-
-
 (defun hide-foreign (stash)
   (remove-if
     (lambda (x)
       (and (second x) (not (equal (first (second x)) "MAIN"))))
     stash))
-
-
 
 (defun compile-unit (nam)
   (fare-matcher:match nam 
@@ -285,11 +274,9 @@
     (list (fstash-to-let (fstash-list '() stash_root)
       (loop for thing in xref for i upfrom 0 when thing collect (compile-sub-or-packagoid i thing)))))))
 
-
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
 (defun p6-concat (&rest things) (apply 'concatenate 'string (mapcar #'FETCH things)))
-
 
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
@@ -298,7 +285,6 @@
          (|Any| "") ; HACK
          )
       ,@compiled-unit (,(main-xref 0))))
-
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
