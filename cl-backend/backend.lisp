@@ -1,16 +1,24 @@
 (load (merge-pathnames "quicklisp/setup.lisp" 
 			   (user-homedir-pathname)))
+
 (ql:quickload "cl-json")
 (ql:quickload "fare-matcher")
 
+(defpackage niecza (:use common-lisp)) 
+(in-package :niecza)
+
 ; Macros 
  
-(defun to-stash-name (name) (intern (format nil "~{~A~^-~}" name)))
-(defmacro get-stash (name) (to-stash-name name))
  
 (defun xref-to-symbol (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
 
+(load "cl-backend/niecza-stash.lisp")
+
+
+
 (defun main-xref (i) (xref-to-symbol (list "MAIN" i "...")))
+
+(defmacro get-stash (name) (niecza-stash:to-stash-name name))
  
 (defmacro nam-op (name params &body body) `(defmacro ,(concat-symbol 'nam- name) ,params ,@body))
 
@@ -229,32 +237,7 @@
       )))
 
 
-(defun fstash (prefix node) 
-  (fare-matcher:match node
-    ((and (list name var Xref ChildNode) (when (equal var "var")))
-        (cons (list (append prefix (list name)) Xref) (fstash-list (cons name prefix) ChildNode)))))
 
-
-(defun fstash-list (prefix nodes) (apply 'append (mapcar #'(lambda (x) (fstash prefix x)) nodes)))
-
-
-(defun fstash-to-let (stash body)
-  `(let
-     ,(mapcar (lambda (x) (list (to-stash-name (first x)) nil)) (hide-foreign stash))
-     ,@body
-     ,@(fstash-to-setf stash)
-     ))
-
-(defun only-with-xrefs (stash) (remove-if (lambda (x) (not (second x))) stash))
-
-(defun fstash-to-setf (stash)
-  (mapcar (lambda (x) `(setf ,(to-stash-name (first x)) ,(xref-to-symbol (second x)))) (only-with-xrefs (hide-foreign stash))))
-
-(defun hide-foreign (stash)
-  (remove-if
-    (lambda (x)
-      (and (second x) (not (equal (first (second x)) "MAIN"))))
-    stash))
 
 (defun compile-unit (nam)
   (fare-matcher:match nam 
@@ -271,7 +254,7 @@
       stash_root      ;  Trie holding classes and global variables
     )
 
-    (list (fstash-to-let (fstash-list '() stash_root)
+    (list (niecza-stash:wrap-in-let stash_root 
       (loop for thing in xref for i upfrom 0 when thing collect (compile-sub-or-packagoid i thing)))))))
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
@@ -299,7 +282,7 @@
          )
       ,@compiled-unit (,(main-xref 0))))
 
-(let ((compiled-unit (compile-unit (json:decode-json (open (first *args*))))))
+(let ((compiled-unit (compile-unit (json:decode-json (open (first common-lisp-user::*args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
   ;(format t "~w~%~%~%" compiled-unit)
   (format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
