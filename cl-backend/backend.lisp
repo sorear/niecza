@@ -207,7 +207,7 @@
   `(,(method-name (to-string method-name)) (FETCH ,(first args)) ,@(rest args))))
 
 
-(defun nam-obj_getbool (obj) (if (numberp obj) (not (equal obj 0)) t))
+(defun nam-obj_getbool (obj) (if (numberp obj) (not (equal obj 0)) obj))
 (nam-op ternary (cond if then) `(if ,cond ,if ,then))
 
 (defun nam-null (type) nil) 
@@ -277,6 +277,19 @@
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
 (defun p6-concat (&rest things) (apply 'concatenate 'string (mapcar #'FETCH things)))
+
+; BIF
+
+(defun nam-bif_plus (a b) (+ (FETCH a) (FETCH b)))
+
+(defun nam-bif_minus (a b) (- (FETCH a) (FETCH b)))
+
+(defun nam-bif_mul (a b) (* (FETCH a) (FETCH b)))
+
+(defun nam-bif_numgt (a b) (> (FETCH a) (FETCH b)))
+
+(defun nam-bif_numeq (a b) (= (FETCH a) (FETCH b)))
+
 
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
