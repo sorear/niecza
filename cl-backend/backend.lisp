@@ -270,8 +270,13 @@
 (defun nam-bif_mul (a b) (* (FETCH a) (FETCH b)))
 
 (defun nam-bif_numgt (a b) (> (FETCH a) (FETCH b)))
+(defun nam-bif_numlt (a b) (< (FETCH a) (FETCH b)))
 
 (defun nam-bif_numeq (a b) (= (FETCH a) (FETCH b)))
+
+(nam-op whileloop (until once cond body) `(loop while ,cond do ,body))
+
+(defun nam-label (label))
 
 
 (defun wrap-for-eval (compiled-unit)
