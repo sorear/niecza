@@ -422,6 +422,24 @@ public class Builtins {
             r = null;
             return true;
         }
+        protected static int TryOne(VarDeque items, bool block) {
+            if (block) {
+                return Kernel.IterHasFlat(items, true) ? +1 : -1;
+            } else {
+again:
+                if (items.Count() == 0) return -1;
+                Variable v = items[0];
+                IP6 i = v.Fetch();
+                if (i.mo.HasMRO(Kernel.IterCursorMO))
+                    return 0;
+                if (v.islist) {
+                    items.Shift();
+                    items.UnshiftD(i.mo.mro_raw_iterator.Get(v));
+                    goto again;
+                }
+                return +1;
+            }
+        }
     }
 
     class BatchSource: ItemSource {
@@ -437,23 +455,28 @@ public class Builtins {
             r = null;
             List<Variable> pen = new List<Variable>();
             while (pen.Count < arity) {
-                if (block) {
-                    if (!Kernel.IterHasFlat(items, false)) break;
-                } else {
-                    if (items.Count() == 0) break;
-                    if (items[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
+                switch (TryOne(items, block)) {
+                    case -1: goto nomore;
+                    case 0:
                         for (int i = pen.Count - 1; i >= 0; i--)
                             items.Unshift(pen[i]);
                         return false;
-                    }
+                    case +1: pen.Add(items.Shift()); break;
                 }
-                pen.Add(items.Shift());
             }
+nomore:
             if (pen.Count != 0)
                 r = pen.ToArray();
             return true;
         }
     }
+
+    //class ZipSource : ItemSource {
+    //    VarDeque[] sources;
+    //    public ZipSource(VarDeque[] sources) {
+    //        ...
+    //    }
+    //}
 
     private static SubInfo CommonMEMap_I = new SubInfo("KERNEL map", null,
             CommonMEMap_C, null, null, new int[] {
@@ -526,7 +549,6 @@ public class Builtins {
     public static Frame MEMap(Frame th, Variable[] lst) {
         VarDeque iter = new VarDeque(lst);
         Variable fcn = iter.Shift();
-        iter = Kernel.IterFlatten(iter);
         IP6 fcni = fcn.Fetch();
         int arity = GetArity(fcni);
 
