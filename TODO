@@ -1,30 +1,107 @@
-From the v6/TODO:
-These things were noticed during translation, but to fix them now would
-only slow me down...
+Here are a bunch of project ideas, both for me and for anyone else who
+wants to help out.  Starred items are ones I've already spent time
+thinking about; check with me if you want to build on that.
 
-* sprintf, in particular, the ability to make numbers hex
-* no qw< >
-* Any strificatrion/numification warnings would be useful
-* no is rw on attributes and methods
-* &split
-* &callsame
-* BUILD
-* non-$ attributes; @.foo and @<foo>
-* :$.foo is broken
-* return()
-* stashes should be accessed as common values
-* "Action method ::($name) not implemented", also needs $<sym>
-* context accelerators need to robustly handle undefined objects
-* explicitly imprecise error reporting - lines A-B
-* @PROCESS::ARGS ::= [1,2,3]; ok +[ @*ARGS ] == 3 # Bug
+EASY
 
-Other stuff
-    * Write a ROADMAP
-    * Flesh out documentation a lot
+   Add your favorite missing function to the setting, with tests.
+   In particular, I could use: sprintf, dir, write, close, split, ...
 
-For STD difference minimization:
-    * Find a compromise on :$*endsym
-        - TimToady and I seem to both not hate traits
-    * Find a compromise on cursor mutability
-    * basic multimethods
-    * constant %foo = (a => 1, b => 2)
+   Add $*ARGFILES, %*ENV, your favorite other *-var.
+
+   Add the 'loop' statement.  Should be very straightforward.
+
+   Add decimal literals.  (Don't try to implement your own floating point
+   radix converter; use +$str)
+
+  *Optimize control exceptions to gotos in the intrablock case.
+
+   Add more benchmarks to perf/.
+
+   Fix the qw< > parsing problems.
+
+   Strip whitespace from here documents.
+
+   return and take need to accept multiple arguments and wrap them in a Parcel
+
+   :$.foo is broken.  Find out why and fix it.
+
+   Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
+
+MEDIUM
+
+   Implement buffer types and binary I/O.
+
+   Implement a general socket API.
+
+   Design and implement a generic system for multiplexed and non-blocking I/O.
+
+  *CATCH and CONTROL blocks.
+
+   Jump table optimization for when chains.
+
+   Implement callsame.
+
+   Implement constant %foo = a => 1 and constant @foo = 1, 2.  It needs to
+   contextualize into a list/hash or something like that.
+
+   Find out what readonly subs are supposed to do with lists, etc and implement
+   that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
+
+  *Implement BUILD submethod calling.
+
+   Implement @.foo contextualiztion and make $.foo contextualize.
+
+   Methods with variable names need to call the correct action method.  (See
+   the horrible hack in NieczaActions.FALLBACK).
+
+   Audit accelerated context routines for correct undefined value and odd
+   representation handling.  +Num shouldn't crash, etc.
+
+HARD
+
+   Design and implement some sort of NFG thing that allows use codes, graphs,
+   etc and handles canonical equivalence in regexes.
+
+   Replace nam with something that doesn't use as much memory.  (Talk to
+   pmurias to get his experiences.)
+
+  *Implement junctions.  You'll need to add some slightly tricky code
+   on the slow path of nominal type checks.  You will also need to fix
+   the optimized builtins to use nominal type checking.  Bonus points
+   if the optimizer can turn if $x == any(1,3,5) into a loop.
+
+  *Implement multiple dispatch.
+
+   Niecza is probably the ideal platform for prototyping a concurrency
+   system which will whirlpool back into the synopses.
+
+  *Parallel hyperops!  Read the Cilk papers, they seem to have a data
+   parallelism model most similar to what Perl 6 needs.
+
+   Understand the Str/Stringy distinctions, and improve stringification
+   and numification handling for Any.  Develop a warning system.
+
+  *Explicitly imprecise error reporting.  In many circumstances niecza
+   doesn't actually have an exact line number; it should be able to
+   report a range.
+
+   Design something to take the place of STD's :$*endsym, probably as
+   a trait of some kind.
+
+   Design something to deal with the last remnants of cursor mutability
+   in STD.pm6.
+
+  *"Immediate mode metamodel" - Metamodel::StaticSub object should be
+   constructed by the closing brace at the latest.  This will require
+   a lot of STD hacking and is required for BEGIN to work.
+
+NASTY
+
+  *A multicore job scheduler would be cool.  You'll need to talk with
+   TimToady on dependency extraction; there are some subtle points with
+   modules that export slangs.
+
+  *Figure out how eval can possibly work.  Do it.
+
+  *Figure out how BEGIN can possibly work.  Do it.
