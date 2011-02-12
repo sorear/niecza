@@ -804,6 +804,19 @@ sub sort(*@bits) { @bits.sort }
 
 sub _array_constructor(\$parcel) { _array_constructor($parcel) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
+
+sub infix:<Z>(\|$pcl) {
+    Q:CgOp { (bif_zip (b 0) (unbox fvarlist (@ {$pcl}))) }
+}
+sub infix:<X>(\|$pcl) {
+    Q:CgOp { (bif_cross (b 0) (unbox fvarlist (@ {$pcl}))) }
+}
+sub zipop(\|$pcl) {
+    Q:CgOp { (bif_zip (b 1) (unbox fvarlist (@ {$pcl}))) }
+}
+sub crossop(\|$pcl) {
+    Q:CgOp { (bif_cross (b 1) (unbox fvarlist (@ {$pcl}))) }
+}
 # }}}
 # Regular expression support {{{
 my class Cursor {
@@ -1041,10 +1054,6 @@ sub infix:<^> (\|$args) { die "Junctions NYI" } #OK
 sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
 sub infix:<=:=> (\$a, \$b) { die "Binding checks NYI" } #OK
-sub infix:<X> (\|$args) { die "Cross products NYI" } #OK
-sub crossop($op) { die "Cross products NYI" } #OK
-sub infix:<Z> (\|$args) { die "Zip operators NYI" } #OK
-sub zipop($op) { die "Zip operators NYI" } #OK
 sub infix:<minmax>(\|$args) { die "minmax NYI" } #OK
 sub infix:<...>(\|$args) { die "Series op NYI" } #OK
 sub infix:<...^>(\|$args) { die "Series op NYI" } #OK

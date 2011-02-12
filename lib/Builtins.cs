@@ -471,12 +471,91 @@ nomore:
         }
     }
 
-    //class ZipSource : ItemSource {
-    //    VarDeque[] sources;
-    //    public ZipSource(VarDeque[] sources) {
-    //        ...
-    //    }
-    //}
+    class ZipSource : ItemSource {
+        VarDeque[] sources;
+        public ZipSource(Variable[] pcl) {
+            sources = new VarDeque[pcl.Length];
+            for (int i = 0; i < pcl.Length; i++)
+                sources[i] = new VarDeque(pcl[i]);
+        }
+
+        public override bool TryGet(out Variable[] r, bool block) {
+            r = null;
+            for (int i = 0; i < sources.Length; i++)
+                switch (TryOne(sources[i], block)) {
+                    case -1: return true;
+                    case  0: return false;
+                }
+            r = new Variable[sources.Length];
+            for (int i = 0; i < sources.Length; i++)
+                r[i] = sources[i].Shift();
+            return true;
+        }
+    }
+
+    class CrossSource: ItemSource {
+        VarDeque[] basic;
+        VarDeque[] iter;
+        Variable[] basic_top;
+        Variable[] iter_top;
+        // 0=init 1=end i=advance wheel i-2
+        int state;
+
+        public CrossSource(Variable[] pcl) {
+            basic = new VarDeque[pcl.Length];
+            iter  = new VarDeque[pcl.Length];
+            basic_top = new Variable[pcl.Length];
+            iter_top  = new Variable[pcl.Length];
+            for (int i = 0; i < pcl.Length; i++) {
+                iter[i] = new VarDeque(pcl[i]);
+            }
+        }
+
+        public override bool TryGet(out Variable[] r, bool block) {
+            r = null;
+            if (state == 0) {
+                // Make sure all the lists are non-empty.
+                for (int i = 0; i < iter.Length; i++) {
+                    switch (TryOne(iter[i], block)) {
+                        case -1: return true;
+                        case 0:  return false;
+                        case 1:  break;
+                    }
+                }
+                for (int i = 0; i < iter.Length; i++) {
+                    iter_top[i] = iter[i].Shift();
+                    if (i != 0) {
+                        basic[i] = new VarDeque(iter[i]);
+                        basic_top[i] = iter_top[i];
+                    }
+                }
+            }
+            else if (state == 1) {
+                return true;
+            }
+            else {
+again:
+                int wheel = state - 2;
+                switch (TryOne(iter[wheel], block)) {
+                    case 0:  return false;
+                    case +1:
+                        iter_top[wheel] = iter[wheel].Shift();
+                        break;
+                    case -1:
+                        if (wheel == 0) return true;
+                        iter[wheel] = new VarDeque(basic[wheel]);
+                        iter_top[wheel] = basic_top[wheel];
+                        state--;
+                        goto again;
+                }
+            }
+            r = new Variable[iter_top.Length];
+            for (int i = 0; i < iter_top.Length; i++)
+                r[i] = iter_top[i];
+            state = iter_top.Length + 1;
+            return true;
+        }
+    }
 
     private static SubInfo CommonMEMap_I = new SubInfo("KERNEL map", null,
             CommonMEMap_C, null, null, new int[] {
@@ -546,6 +625,7 @@ nomore:
                 return Kernel.Die(th, "Invalid IP");
         }
     }
+
     public static Frame MEMap(Frame th, Variable[] lst) {
         VarDeque iter = new VarDeque(lst);
         Variable fcn = iter.Shift();
@@ -557,6 +637,33 @@ nomore:
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
         fr.lex2 = fcni;
+        return fr;
+    }
+
+    static IP6 ExtractWith(bool with, ref Variable[] pcl) {
+        if (!with) return null;
+        Variable[] opcl = pcl;
+        pcl = new Variable[pcl.Length - 1];
+        for (int j = 0; j < pcl.Length; j++)
+            pcl[j] = opcl[j+1];
+        return opcl[0].Fetch();
+    }
+
+    public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
+        Frame fr = th.MakeChild(null, CommonMEMap_I);
+        fr.lexi0 = 0;
+        fr.lex2 = ExtractWith(with, ref pcl);
+        fr.lex0 = new ZipSource(pcl);
+        fr.lex1 = new VarDeque();
+        return fr;
+    }
+
+    public static Frame MECross(Frame th, bool with, Variable[] pcl) {
+        Frame fr = th.MakeChild(null, CommonMEMap_I);
+        fr.lexi0 = 0;
+        fr.lex2 = ExtractWith(with, ref pcl);
+        fr.lex0 = new CrossSource(pcl);
+        fr.lex1 = new VarDeque();
         return fr;
     }
 

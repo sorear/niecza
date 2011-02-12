@@ -3118,6 +3118,8 @@ namespace Niecza.CLRBackend {
             thandlers["bif_at_pos"] = thandlers["obj_at_pos"] = Contexty("mro_at_pos");
             thandlers["bif_exists_key"] = thandlers["obj_exists_key"] = Contexty("mro_exists_key");
             thandlers["bif_delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
+            thandlers["bif_cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
+            thandlers["bif_zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
             thandlers["obj_typename"] = Methody(null, Tokens.IP6.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");
