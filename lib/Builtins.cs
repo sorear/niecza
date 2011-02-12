@@ -415,6 +415,46 @@ public class Builtins {
         return arity;
     }
 
+    class ItemSource {
+        protected ItemSource() {}
+        public static ItemSource Empty = new ItemSource();
+        public virtual bool TryGet(out Variable[] r, bool block) {
+            r = null;
+            return true;
+        }
+    }
+
+    class BatchSource: ItemSource {
+        int arity;
+        VarDeque items;
+
+        public BatchSource(int count, VarDeque items) {
+            this.arity = count;
+            this.items = items;
+        }
+
+        public override bool TryGet(out Variable[] r, bool block) {
+            r = null;
+            List<Variable> pen = new List<Variable>();
+            while (pen.Count < arity) {
+                if (block) {
+                    if (!Kernel.IterHasFlat(items, false)) break;
+                } else {
+                    if (items.Count() == 0) break;
+                    if (items[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
+                        for (int i = pen.Count - 1; i >= 0; i--)
+                            items.Unshift(pen[i]);
+                        return false;
+                    }
+                }
+                pen.Add(items.Shift());
+            }
+            if (pen.Count != 0)
+                r = pen.ToArray();
+            return true;
+        }
+    }
+
     private static SubInfo CommonMEMap_I = new SubInfo("KERNEL map", null,
             CommonMEMap_C, null, null, new int[] {
                 2, 3, SubInfo.ON_NEXT, 0, 0,
@@ -422,40 +462,29 @@ public class Builtins {
                 2, 3, SubInfo.ON_LAST, 3, 0,
             }, new string[] { "" }, 0, null, null);
     private static Frame CommonMEMap_C(Frame th) {
-        VarDeque src = (VarDeque) th.lex0;
+        ItemSource src = (ItemSource) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;
         IP6 fnc = (IP6) th.lex2;
         int tailmode = th.lexi0;
-        int arity = th.lexi1;
 
         switch (th.ip) {
             case 0:
-                List<Variable> pen = new List<Variable>();
-                while (pen.Count < arity) {
-                    if (tailmode != 0) {
-                        if (!Kernel.IterHasFlat(src, false)) break;
-                    } else {
-                        if (src.Count() == 0) break;
-                        if (src[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
-                            DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
-                            th.lex = new Dictionary<string,object>();
-                            th.lex["!return"] = null;
-                            th.MarkSharedChain();
-                            thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
-                            thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
-                            DynObject lst = new DynObject(Kernel.ListMO);
-                            lst.slots[0] = outq;
-                            lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
-                            th.caller.resultSlot = Kernel.NewRWListVar(lst);
-                            for (int i = pen.Count - 1; i >= 0; i--)
-                                src.Unshift(pen[i]);
-                            th.lexi0 = 1;
-                            return th.caller;
-                        }
-                    }
-                    pen.Add(src.Shift());
+                Variable[] pen;
+                if (!src.TryGet(out pen, tailmode != 0)) {
+                    DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                    th.lex = new Dictionary<string,object>();
+                    th.lex["!return"] = null;
+                    th.MarkSharedChain();
+                    thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
+                    thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+                    DynObject lst = new DynObject(Kernel.ListMO);
+                    lst.slots[0] = outq;
+                    lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
+                    th.caller.resultSlot = Kernel.NewRWListVar(lst);
+                    th.lexi0 = 1;
+                    return th.caller;
                 }
-                if (pen.Count == 0) {
+                if (pen == null) {
                     if (tailmode != 0)
                         return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
                     DynObject lst = new DynObject(Kernel.ListMO);
@@ -464,12 +493,19 @@ public class Builtins {
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
                     return th.caller;
                 }
-                th.lex3 = pen.ToArray();
+                th.lex3 = pen;
                 th.ip = 1;
                 goto case 1;
             case 1:
                 th.ip = 2;
-                return fnc.Invoke(th, (Variable[])th.lex3, null);
+                if (fnc != null)
+                    return fnc.Invoke(th, (Variable[])th.lex3, null);
+                else {
+                    th.resultSlot = Kernel.NewRWListVar(
+                            Kernel.BoxRaw((Variable[])th.lex3,
+                                Kernel.ParcelMO));
+                    goto case 2;
+                }
             case 2:
                 if (tailmode != 0) {
                     th.ip = 0;
@@ -480,7 +516,7 @@ public class Builtins {
                     goto case 0;
                 }
             case 3:
-                th.lex0 = src = new VarDeque();
+                th.lex0 = src = ItemSource.Empty;
                 th.ip = 0;
                 goto case 0;
             default:
@@ -496,8 +532,7 @@ public class Builtins {
 
         Frame fr = th.MakeChild(null, CommonMEMap_I);
         fr.lexi0 = 0;
-        fr.lexi1 = arity;
-        fr.lex0 = iter;
+        fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
         fr.lex2 = fcni;
         return fr;
