@@ -1,6 +1,7 @@
 Here are a bunch of project ideas, both for me and for anyone else who
 wants to help out.  Starred items are ones I've already spent time
-thinking about; check with me if you want to build on that.
+thinking about; check with me if you want to build on that.  Plussed
+items are considered a priority for v3.
 
 EASY
 
@@ -14,17 +15,17 @@ EASY
    Add decimal literals.  (Don't try to implement your own floating point
    radix converter; use +$str)
 
-  *Optimize control exceptions to gotos in the intrablock case.
+ +*Optimize control exceptions to gotos in the intrablock case.
 
    Add more benchmarks to perf/.
 
    Fix the qw< > parsing problems.
 
-   Strip whitespace from here documents.
+ + Strip whitespace from here documents.
 
-   return and take need to accept multiple arguments and wrap them in a Parcel
+ + return and take need to accept multiple arguments and wrap them in a Parcel
 
-   :$.foo is broken.  Find out why and fix it.
+ + :$.foo is broken.  Find out why and fix it.
 
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
 
@@ -38,11 +39,11 @@ MEDIUM
 
   *CATCH and CONTROL blocks.
 
-   Jump table optimization for when chains.
+ + Jump table optimization for when chains.
 
-   Implement callsame.
+ + Implement callsame.
 
-   Implement constant %foo = a => 1 and constant @foo = 1, 2.  It needs to
+ + Implement constant %foo = a => 1 and constant @foo = 1, 2.  It needs to
    contextualize into a list/hash or something like that.
 
    Find out what readonly subs are supposed to do with lists, etc and implement
@@ -50,7 +51,7 @@ MEDIUM
 
   *Implement BUILD submethod calling.
 
-   Implement @.foo contextualiztion and make $.foo contextualize.
+ + Implement @.foo contextualiztion and make $.foo contextualize.
 
    Methods with variable names need to call the correct action method.  (See
    the horrible hack in NieczaActions.FALLBACK).
@@ -58,12 +59,17 @@ MEDIUM
    Audit accelerated context routines for correct undefined value and odd
    representation handling.  +Num shouldn't crash, etc.
 
+ + Change x? to not create an array.
+
+ +*A general procedure for communicating data up and down the meta-spiral.
+   Use this to make a very simple eval knockoff.
+
 HARD
 
    Design and implement some sort of NFG thing that allows use codes, graphs,
    etc and handles canonical equivalence in regexes.
 
-   Replace nam with something that doesn't use as much memory.  (Talk to
+ + Replace nam with something that doesn't use as much memory.  (Talk to
    pmurias to get his experiences.)
 
   *Implement junctions.  You'll need to add some slightly tricky code
@@ -92,9 +98,11 @@ HARD
    Design something to deal with the last remnants of cursor mutability
    in STD.pm6.
 
-  *"Immediate mode metamodel" - Metamodel::StaticSub object should be
+ +*"Immediate mode metamodel" - Metamodel::StaticSub object should be
    constructed by the closing brace at the latest.  This will require
    a lot of STD hacking and is required for BEGIN to work.
+
+   Study Nil and find the correct way to integrate it into Niecza.
 
 NASTY
 
