@@ -19,8 +19,6 @@ EASY
 
    Add more benchmarks to perf/.
 
-   Fix the qw< > parsing problems.
-
  + return and take need to accept multiple arguments and wrap them in a Parcel
 
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
