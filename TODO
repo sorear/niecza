@@ -49,8 +49,6 @@ MEDIUM
 
   *Implement BUILD submethod calling.
 
- + Implement @.foo contextualiztion and make $.foo contextualize.
-
    Methods with variable names need to call the correct action method.  (See
    the horrible hack in NieczaActions.FALLBACK).
 
@@ -76,6 +74,9 @@ HARD
    if the optimizer can turn if $x == any(1,3,5) into a loop.
 
   *Implement multiple dispatch.
+
+  *Create multiple numeric types with sensible overloads between them.  Add
+   more numeric operators.
 
    Niecza is probably the ideal platform for prototyping a concurrency
    system which will whirlpool back into the synopses.

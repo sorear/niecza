@@ -132,6 +132,19 @@ use MONKEY_TYPING;
     A
 }
 
+{
+    my class X1 {
+        my @foo = 4, 5, 6;
+        method a() { @foo }
+        method b() { [ 1, 2, 3 ] }
+        method test() {
+            is +[ @.b ], 3, '@.foo syntax listifies';
+            is +[ $.a ], 1, '$.foo syntax itemifies';
+        }
+    }
+    X1.test;
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

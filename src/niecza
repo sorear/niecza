@@ -76,6 +76,52 @@ sub mktemptopic($/, $item, $expr) {
 }
 
 augment class NieczaActions {
+method do_variable_reference($M, $v) {
+    if $v<term> {
+        return $v<term>;
+    }
+
+    my $tw = $v<twigil>;
+    my $sl = $v<sigil> ~ $tw ~ $v<name>;
+
+    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
+        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
+        return ::Op::StatementList.new;
+    }
+
+    if $tw eq '!' {
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, private => True, receiver => mklex($M, 'self'),
+            ppath => $v<rest>));
+    }
+    elsif $tw eq '.' {
+        if defined $v<rest> {
+            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
+            return ::Op::StatementList.new;
+        }
+
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, receiver => mklex($M, 'self')));
+    }
+    # no twigil in lex name for these
+    elsif $tw eq '^' || $tw eq ':' {
+        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>);
+    }
+    elsif $tw eq '*' {
+        ::Op::ContextVar.new(|node($M), name => $sl);
+    }
+    elsif $tw eq '' || $tw eq '?' {
+        if defined($v<rest>) {
+            ::Op::PackageVar.new(path => $v<rest>, name => $sl,
+                slot => self.gensym, |node($M));
+        } else {
+            ::Op::Lexical.new(|node($M), name => $sl);
+        }
+    }
+    else {
+        $M.CURSOR.sorry("Unhandled reference twigil $tw");
+    }
+}
 method quibble($/) {
     if ($<babble><B>[0].hereinfo) {
         my $stub = ::Op::HereStub.new(node => Any);
