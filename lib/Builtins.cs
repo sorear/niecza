@@ -754,4 +754,26 @@ again:
         fr.lex2 = fcn;
         return fr;
     }
+
+    public static Frame CallNext(Frame th, IP6 cap) {
+        Frame to = th;
+        while (to != null && to.curDisp == null)
+            to = to.caller;
+        if (to == null || to.curDisp.next == null)
+            return Kernel.Die(th, "No next function to call!");
+
+        DispatchEnt de = to.curDisp.next;
+        DynObject o = cap as DynObject;
+        Frame nf = th.MakeChild(de.outer, de.info);
+
+        Variable[] p = to.pos;
+        VarHash n    = to.named;
+        if (o != null) {
+            p = (Variable[]) o.slots[0];
+            n = o.slots[1] as VarHash;
+        }
+        nf = nf.info.Binder(nf, p, n);
+        nf.curDisp = de;
+        return nf;
+    }
 }

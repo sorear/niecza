@@ -151,6 +151,19 @@ use MONKEY_TYPING;
     is +[ $foo ], 1, '$-constants itemize';
     is +@bar, 1, '@-constants listize';
     is %baz<c>, 6, '%-constants hashize';
+
+    my class X2 {
+        method test($x) { $x * $x }
+    }
+
+    my class X3 is X2 {
+        method test($) {
+            is callsame(), 25, "callsame() works";
+            is callwith(self, 6), 36, "callwith() works";
+        }
+    }
+
+    X3.test(5);
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

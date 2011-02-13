@@ -419,6 +419,9 @@ sub nextwith(|$cap) {
     Q:CgOp { (control 9 (null frame) (int -1) (null str) (@ {$cap})) }
 }
 
+sub callsame () { Q:CgOp { (callnext (null obj)) } }
+sub callwith (|$cap) { Q:CgOp { (callnext (@ {$cap})) } }
+
 sub assignop($fn) {
     anon sub _assign(\$lhs, \$rhs) {
         $lhs = $fn($lhs, $rhs)

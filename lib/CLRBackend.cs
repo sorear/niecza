@@ -2853,6 +2853,8 @@ namespace Niecza.CLRBackend {
             thandlers["bif_make"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Builtins_Make,
                     new CpsOp[] { CpsOp.CallFrame(), z[0] }); };
+            thandlers["callnext"] = Methody(Tokens.Variable,
+                    Tokens.Builtins.GetMethod("CallNext"));
             thandlers["context_get"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_ContextHelper,
                     new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };

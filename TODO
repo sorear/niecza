@@ -39,8 +39,6 @@ MEDIUM
 
  + Jump table optimization for when chains.
 
- + Implement callsame.
-
    Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 

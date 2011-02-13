@@ -397,6 +397,7 @@ class Labelled is Op {
 }
 
 augment class CgOp { #OK exist
+    method callnext($cap) { self._cgop("callnext",$cap) }
     method bif_zip($fcn,$pcl) { self._cgop("bif_zip",$fcn,$pcl) }
     method bif_cross($fcn,$pcl) { self._cgop("bif_cross",$fcn,$pcl) }
     method double($x) {
