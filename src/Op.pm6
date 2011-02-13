@@ -21,6 +21,17 @@ method cgop($body) {
     }
 }
 
+# ick
+method cgop_labelled($body, $label) {
+    if (defined $.line) {
+        CgOp.ann("", $.line, self.code_labelled($body, $label));
+    } else {
+        self.code_labelled($body, $label);
+    }
+}
+
+method code_labelled($body, $label) { self.code($body) }
+
 # A few words on the nature of bvalues
 # A bvalue cannot escape a sub; the return would always extract the
 # Variable.  Most ops don't return bvalues, nor expect them.  To avoid
@@ -128,16 +139,6 @@ class CallSub is CallLike {
 
     method code($body) {
         CgOp.subcall(CgOp.fetch($.invocant.cgop($body)), self.argblock($body));
-    }
-}
-
-class YouAreHere is Op {
-    has $.unitname; # Str
-
-    method code($ ) {
-        # this should be a little fancier so closure can work
-        CgOp.subcall(CgOp.fetch(CgOp.context_get(CgOp.str(
-                        '*resume_' ~ $.unitname), CgOp.int(0))));
     }
 }
 
@@ -249,10 +250,7 @@ class HereStub is Op {
     has $.node = die "HereStub.node required";
 
     method zyg() {
-        if defined($.node.[0]) && $.node.[0] ~~ Match {
-            $.node.[0] = $.node.[0]<nibbler>.ast
-        }
-        $.node.[0] // die "Here document used before body defined";
+        $.node // die "Here document used before body defined";
     }
 
     method code($body) { self.zyg.cgop($body) }
@@ -364,7 +362,8 @@ class WhileLoop is Op {
     method zyg() { $.check, $.body }
     method ctxzyg($) { $.check, 1, $.body, 0 }
 
-    method code($body) {
+    method code($body) { self.code_labelled($body,'') }
+    method code_labelled($body, $l) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
         CgOp.prog(
@@ -374,9 +373,9 @@ class WhileLoop is Op {
                     CgOp.label("redo$id"),
                     CgOp.sink($.body.cgop($body)),
                     CgOp.label("next$id"),
-                    CgOp.ehspan(1, '', 0, "redo$id", "next$id", "next$id"),
-                    CgOp.ehspan(2, '', 0, "redo$id", "next$id", "last$id"),
-                    CgOp.ehspan(3, '', 0, "redo$id", "next$id", "redo$id"))),
+                    CgOp.ehspan(1, $l, 0, "redo$id", "next$id", "next$id"),
+                    CgOp.ehspan(2, $l, 0, "redo$id", "next$id", "last$id"),
+                    CgOp.ehspan(3, $l, 0, "redo$id", "next$id", "redo$id"))),
             CgOp.label("last$id"),
             CgOp.corelex('Nil'));
     }
@@ -414,7 +413,8 @@ class ImmedForLoop is Op {
     method zyg() { $.source, $.sink }
     method ctxzyg($) { $.source, 1, $.sink, 0 }
 
-    method code($body) {
+    method code($body) { self.code_labelled($body, '') }
+    method code_labelled($body, $l) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
         CgOp.rnull(CgOp.letn(
@@ -430,10 +430,40 @@ class ImmedForLoop is Op {
                     CgOp.label("redo$id"),
                     CgOp.sink($.sink.cgop($body)),
                     CgOp.label("next$id"),
-                    CgOp.ehspan(1, '', 0, "redo$id", "next$id", "next$id"),
-                    CgOp.ehspan(2, '', 0, "redo$id", "next$id", "last$id"),
-                    CgOp.ehspan(3, '', 0, "redo$id", "next$id", "redo$id"))),
+                    CgOp.ehspan(1, $l, 0, "redo$id", "next$id", "next$id"),
+                    CgOp.ehspan(2, $l, 0, "redo$id", "next$id", "last$id"),
+                    CgOp.ehspan(3, $l, 0, "redo$id", "next$id", "redo$id"))),
             CgOp.label("last$id")));
+    }
+}
+
+class Labelled is Op {
+    has $.stmt;
+    has $.name;
+    method zyg() { $.stmt }
+
+    method code($body) {
+        CgOp.prog(CgOp.label("goto_$.name"),$.stmt.cgop_labelled($body,$.name));
+    }
+}
+
+class When is Op {
+    has $.match;
+    has $.body;
+    method zyg() { $.match, $.body }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
+                $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
+            CgOp.prog(
+                CgOp.ehspan(7, '', 0, "start$id", "end$id", "end$id"),
+                CgOp.span("start$id", "end$id", 0, CgOp.prog(
+                    CgOp.sink($.body.cgop($body)),
+                    CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
+                        CgOp.null('str'), CgOp.corelex('Nil'))))),
+            CgOp.corelex('Nil'));
     }
 }
 
@@ -734,6 +764,18 @@ class RegexBody is Op {
     }
 }
 
+class YouAreHere is Op {
+    has $.unitname; # Str
+
+    method code($ ) {
+        # this should be a little fancier so closure can work
+        CgOp.subcall(CgOp.fetch(CgOp.context_get(CgOp.str(
+                        '*resume_' ~ $.unitname), CgOp.int(0))));
+    }
+}
+
+
+
 ### BEGIN DESUGARING OPS
 # These don't appear in source code, but are used by other ops to preserve
 # useful structure.
@@ -793,5 +835,34 @@ class Let is Op {
     method code($body) {
         CgOp.letn($.var, ($.to ?? $.to.cgop($body) !! CgOp.null($.type)),
             $.in.cgop($body));
+    }
+}
+
+# These two are created to codegen wrappers in NAMOutput... bad factor
+class TopicalHook is Op {
+    has $.inner;
+    method zyg() { $.inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            CgOp.ehspan(6, '', 0, "start$id", "end$id", "end$id"),
+            CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
+    }
+}
+
+class LabelHook is Op {
+    has $.inner;
+    has $.labels;
+    method zyg() { $.inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            map({ CgOp.ehspan(8, $_, 0, "start$id", "end$id", "goto_$_") },
+                @$.labels),
+            CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
     }
 }

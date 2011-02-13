@@ -6,26 +6,12 @@ class Operator;
 
 use Body;
 use Sig;
+use OpHelpers;
 
 has $.whatever_curry;
 has $.assignish;
 
 method with_args ($/, *@_) { !!! }
-
-sub node($M) { { line => $M.cursor.lineof($M.to) } }
-
-sub mklet($value, $body) {
-    my $var = ::GLOBAL::NieczaActions.gensym;
-    ::Op::Let.new(var => $var, to => $value,
-        in => $body(::Op::LetVar.new(name => $var)));
-}
-
-sub mklex($/, $name) { ::Op::Lexical.new(|node($/), :$name); }
-
-sub mkcall($/, $name, *@positionals) {
-    ::Op::CallSub.new(|node($/),
-        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
-}
 
 method as_function($/) {
     $/.CURSOR.sorry("This macro cannot be used as a function");
@@ -222,5 +208,13 @@ class Temp is Operator {
                         hash => substr($rarg.name,0,1) eq '%',
                         list => substr($rarg.name,0,1) eq '@'),
             ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+    }
+}
+
+class SmartMatch is Operator {
+    method as_function($/) { mklex($/, '&infix:<~~>') }
+    method with_args($/, *@args) {
+        mktemptopic($/, @args[0], ::Op::CallMethod.new(receiver => @args[1],
+            name => 'ACCEPTS', args => [ mklex($/, '$_') ]));
     }
 }

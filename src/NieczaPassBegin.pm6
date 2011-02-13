@@ -174,6 +174,13 @@ augment class Op::CallMethod { #OK exist
     }
 }
 
+augment class Op::Labelled { #OK exist
+    method begin() {
+        @*opensubs[*-1].add_label($.name);
+        for self.zyg { $_.begin } # XXX callsame
+    }
+}
+
 augment class Op::ConstantDecl { #OK exist
     method begin() {
         if $.path {

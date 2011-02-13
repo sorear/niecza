@@ -11,11 +11,11 @@ csbackend=CLRBackend.cs
 
 # keep this in dependency order
 libunits=SAFE CORE JSYNC
-srcunits=CClass Body Unit CgOp Op Sig RxOp NAME Stash STD NieczaGrammar \
-	 Metamodel OptRxSimple NAMOutput Operator NieczaActions \
+srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
+	 NieczaGrammar Metamodel OptRxSimple NAMOutput Operator NieczaActions \
 	 NieczaFrontendSTD NieczaPassBegin NieczaPassBeta NieczaPassSimplifier \
 	 NieczaPathSearch NieczaBackendNAM NieczaBackendDotnet \
-	 NieczaBackendClisp NieczaCompiler
+	 NieczaBackendClisp NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Kernel.dll obj/CLRBackend.exe
 	git describe --tags > VERSION

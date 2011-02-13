@@ -98,7 +98,6 @@ method cursor_reduced ($c) { self._cgop("cursor_reduced", $c) }
 method default_new (*@_) { self._cgop("default_new", @_) }
 method die (*@_) { self._cgop("die", @_) }
 method do_require (*@_) { self._cgop("do_require", @_) }
-method double (*@_) { self._cgop("double", @_) }
 method ehspan (*@_) { self._cgop("ehspan", @_) }
 method exit (*@_) { self._cgop("exit", @_) }
 method fcclist_new (*@_) { self._cgop("fcclist_new", @_) }
@@ -278,6 +277,16 @@ method bif_hash($i) { self._cgop("bif_hash", $i) }
 method bif_grep(*@a) { self._cgop("bif_grep", @a) }
 method bif_map(*@a) { self._cgop("bif_map", @a) }
 method bif_array_constructor($i) { self._cgop("bif_array_constructor", $i) }
+method callnext($cap) { self._cgop("callnext",$cap) }
+method bif_zip($fcn,$pcl) { self._cgop("bif_zip",$fcn,$pcl) }
+method bif_cross($fcn,$pcl) { self._cgop("bif_cross",$fcn,$pcl) }
+
+method double($x) {
+    # Hack - prevent JSON syntax errors
+    my $str = ~$x;
+    self._cgop('double', ($str eq 'Infinity' || $str eq 'NaN' ||
+        $str eq '-Infinity') ?? $str !! $x);
+}
 
 sub _str($x) { ($x ~~ List) ?? $x !! CgOp.str($x) }
 sub _int($x) { ($x ~~ List) ?? $x !! CgOp.int($x) }

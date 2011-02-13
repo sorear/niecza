@@ -9,22 +9,8 @@ use Unit;
 use Sig;
 use CClass;
 use OptRxSimple;
+use OpHelpers;
 use Operator;
-
-sub node($M) { { line => $M.cursor.lineof($M.to) } }
-
-sub mklet($value, $body) {
-    my $var = NieczaActions.gensym;
-    ::Op::Let.new(var => $var, to => $value,
-        in => $body(::Op::LetVar.new(name => $var)));
-}
-
-sub mkcall($/, $name, *@positionals) {
-    ::Op::CallSub.new(|node($/),
-        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
-}
-
-sub mkbool($i) { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 
 method get_op_sym($M) {
     if $M.reduced eq '::($name)' { # XXX STD miscompilation
@@ -79,6 +65,7 @@ method comment:sym<#>($ ) { }
 method comment:sym<#`(...)>($ ) { }
 method opener($ ) { }
 method starter($ ) { }
+method keyspace($ ) { }
 method spacey($ ) { }
 method unspacey($ ) { }
 method unsp($ ) { }
@@ -174,6 +161,7 @@ method value:quote ($/) { make $<quote>.ast }
 
 # make ~$/ is default
 method ident($ ) { }
+method label($ ) { }
 method identifier($ ) { }
 
 # Either String Op
@@ -265,6 +253,7 @@ method quote:sym<' '> ($/) { make $<nibble>.ast }
 method quote:qq ($/) { make $<quibble>.ast }
 method quote:q ($/) { make $<quibble>.ast }
 method quote:Q ($/) { make $<quibble>.ast }
+method quote:s ($/) { make $<pat>.ast }
 
 method transparent($/, $op, :$once = False, :$ltm, :$class = 'Sub',
     :$type = 'sub', :$sig = Sig.simple) {
@@ -887,7 +876,7 @@ method escape:sym<..> ($/) { make RangeSymbol }
 
 # XXX I probably shouldn't have used "Str" for this action method name
 method Str($match?) { "NieczaActions" } #OK not used
-method process_nibble($/, @bits) {
+method process_nibble($/, @bits, $prefix?) {
     my @acc;
     for @bits -> $n {
         my $ast = $n.ast;
@@ -897,7 +886,11 @@ method process_nibble($/, @bits) {
             $ast = "";
         }
 
-        $ast = ::Op::StringLiteral.new(|node($/), text => $ast) if $ast !~~ Op;
+        if $ast !~~ Op {
+            my $str = $ast;
+            $str = $str.split(/^^<before \s>[ $prefix || \s* ]/).join("") if defined $prefix;
+            $ast = ::Op::StringLiteral.new(|node($/), text => $str);
+        }
 
         # this *might* belong in an optimization pass
         if @acc && @acc[*-1] ~~ ::Op::StringLiteral &&
@@ -909,7 +902,8 @@ method process_nibble($/, @bits) {
         }
     }
     make do @acc == 0 ?? ::Op::StringLiteral.new(|node($/), text => "") !!
-            @acc == 1 ?? @acc[0] !!
+            @acc == 1 ?? (@acc[0] ~~ ::Op::StringLiteral ?? @acc[0] !!
+                    mkcall($/, '&prefix:<~>', @acc[0])) !!
             mkcall($/, '&infix:<~>', @acc);
 }
 
@@ -951,7 +945,7 @@ method process_tribble(@bits) {
     $ret;
 }
 
-method nibbler($/) {
+method nibbler($/, $prefix?) {
     sub iscclass($cur) {
         my $*CCSTATE = '';
         my $ok = False;
@@ -971,7 +965,7 @@ method nibbler($/) {
     } elsif iscclass($/.CURSOR) {
         make self.process_tribble($<nibbles>);
     } else {
-        make self.process_nibble($/, $<nibbles>);
+        make self.process_nibble($/, $<nibbles>, $prefix);
     }
 }
 
@@ -1112,6 +1106,7 @@ my %loose2tight = (
     'orelse' => '//', 'and' => '&&', 'or' => '||',
 );
 
+method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
 method infix:sym<,>($/) { make ::Operator::Comma.new }
 method infix:sym<:=>($/) { make ::Operator::Binding.new(:!readonly) }
 method infix:sym<::=>($/) { make ::Operator::Binding.new(:readonly) }
@@ -1147,7 +1142,12 @@ method INFIX($/) {
             make $lhs;
         }
         elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
-            $lhs.init = $rhs;
+            my $sig = substr($lhs.name, 0, 1);
+            if defined '$@&%'.index($sig) {
+                $lhs.init = self.docontext($/, $sig, $rhs)
+            } else {
+                $lhs.init = $rhs;
+            }
             make $lhs;
         }
     }
@@ -1493,8 +1493,9 @@ method do_variable_reference($M, $v) {
     }
 
     if $tw eq '!' {
-        ::Op::CallMethod.new(|node($M), name => $v<name>, private => True,
-            receiver => ::Op::Lexical.new(name => 'self'), ppath => $v<rest>);
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, private => True, receiver => mklex($M, 'self'),
+            ppath => $v<rest>));
     }
     elsif $tw eq '.' {
         if defined $v<rest> {
@@ -1502,8 +1503,8 @@ method do_variable_reference($M, $v) {
             return ::Op::StatementList.new;
         }
 
-        ::Op::CallMethod.new(|node($M), name => $v<name>,
-            receiver => ::Op::Lexical.new(name => 'self'));
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, receiver => mklex($M, 'self')));
     }
     # no twigil in lex name for these
     elsif $tw eq '^' || $tw eq ':' {
@@ -1782,10 +1783,38 @@ method cgexp:op ($/) {
 method apostrophe($/) {}
 method quibble($/) {
     if ($<babble><B>[0].hereinfo) {
-        make ::Op::HereStub.new(node => $<babble><B>[0].hereinfo.[1]);
+        my $stub = ::Op::HereStub.new(node => Any);
+        make $stub;
+        $<babble><B>[0].hereinfo.[1][0] = sub ($delim, $lang, $/) { #OK
+            my $nws    = (~$<stopper>).index($delim);
+            my $prefix = (~$<stopper>).substr(0, $nws);
+
+            self.nibbler($<nibbler>, $prefix);
+            $stub.node = $<nibbler>.ast;
+        };
     } else {
         make $<nibble>.ast;
     }
+}
+method sibble($/) {
+    my $regex = self.op_for_regex($/, $<left>.ast);
+    my $repl;
+    if $<infixish> {
+        if $<infixish> eq '=' {
+            $repl = $<right>.ast;
+        } elsif $<infixish>.ast ~~ ::Operator::CompoundAssign {
+            $repl = $<infixish>.ast.base.with_args($/,
+                mkcall($/, '&prefix:<~>', ::Op::ContextVar.new(name => '$*/')),
+                $<right>.ast);
+        } else {
+            $/.CURSOR.sorry("Unhandled operator in substitution");
+            $repl = mklex($/, 'Any');
+        }
+    } else {
+        $repl = $<right>.ast;
+    }
+    $repl = self.transparent($/, $repl);
+    make mkcall($/, '&_substitute', mklex($/, '$_'), $regex, $repl);
 }
 method tribble($/) {}
 method babble($/) {}
@@ -1836,6 +1865,9 @@ method terminator:sym<again> ($/) {}
 method terminator:sym<repeat> ($/) {}
 method terminator:sym<while> ($/) {}
 method terminator:sym<else> ($/) {}
+method terminator:sym<given> ($/) {}
+method terminator:sym<when> ($/) {}
+method terminator:sym« --> » ($/) {}
 method terminator:sym<!!> ($/) {}
 
 method stdstopper($/) {}
@@ -2027,8 +2059,8 @@ method args($/) {
 
 method statement($/) {
     if $<label> {
-        $/.CURSOR.sorry("Labels are NYI");
-        make ::Op::StatementList.new;
+        make ::Op::Labelled.new(|node($/), name => ~$<label><identifier>,
+            stmt => $<statement>.ast);
         return Nil;
     }
 
@@ -2044,6 +2076,11 @@ method statement($/) {
         } elsif $sym eq 'unless' {
             make ::Op::Conditional.new(|node($/), check => $exp,
                 false => $/.ast, true => Any);
+        } elsif $sym eq 'when' {
+            make ::Op::Conditional.new(|node($/),
+                check => ::Op::CallMethod.new(name => 'ACCEPTS',
+                    receiver => $exp, positionals => [ mklex($/, '$_') ]),
+                true => $/.ast, false => Any);
         } else {
             $/.CURSOR.sorry("Unhandled statement modifier $sym");
             make ::Op::StatementList.new;
@@ -2060,6 +2097,13 @@ method statement($/) {
         } elsif $sym eq 'until' {
             make ::Op::WhileLoop.new(|node($/), check => $exp,
                 body => $/.ast, until => True, once => False);
+        } elsif $sym eq 'given' {
+            make mktemptopic($/, $exp, $/.ast);
+        } elsif $sym eq 'for' {
+            # XXX laziness, comprehensions
+            my $var = self.gensym;
+            make ::Op::ImmedForLoop.new(|node($/), :$var, source => $exp,
+                sink => mktemptopic($/, ::Op::LetVar.new(name => $var), $/.ast));
         } else {
             $/.CURSOR.sorry("Unhandled statement modifier $sym");
             make ::Op::StatementList.new;
@@ -2139,6 +2183,18 @@ method statement_control:for ($/) {
     $<xblock>.ast[1].type = 'loop';
     make ::Op::ForLoop.new(|node($/), source => $<xblock>.ast[0],
         sink => self.block_to_closure($/, $<xblock>.ast[1]));
+}
+
+method statement_control:given ($/) {
+    $<xblock>.ast[1].type = 'immed';
+    make ::Op::CallSub.new(|node($/), positionals => [ $<xblock>.ast[0] ],
+        invocant => self.block_to_closure($/, $<xblock>.ast[1], :once));
+}
+
+method statement_control:when ($/) {
+    $<xblock>.ast[1].type = 'cond';
+    make ::Op::When.new(|node($/), match => $<xblock>.ast[0],
+        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]));
 }
 
 method statement_control:use ($/) {

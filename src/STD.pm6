@@ -527,18 +527,22 @@ method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
-        my $lang = $herestub.lang.mixin( herestop );
-        my $doc;
-        if defined($doc = first /:r :lang($lang) <nibbler> <stopper>/.($here)) {
-            $herestub.writeback.[0] = $doc;
+        my $lang   = $herestub.lang.mixin( herestop );
+        my $doc    = first /:r :lang($lang) <nibbler> <stopper>/.($here);
+
+        if defined $doc {
+            if $herestub.writeback.[0] ~~ Sub {
+                $herestub.writeback.[0].($*DELIM, $lang, $doc)
+            } else {
+                $herestub.writeback.[0] = $doc;
+            }
             $here = $here.cursor($doc.to);
-            # $herestub.orignode<doc> = $doc; NIECZA immutable matches
         }
         else {
             self.panic("Ending delimiter $*DELIM not found");
         }
     }
-    return self.cursor($here.pos);  # return to initial type
+    $here;
 }
 
 method hereinfo () { [] }
