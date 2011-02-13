@@ -1,6 +1,7 @@
 use Metamodel;
 use Op;
 use CClass;
+use CgOp;
 use Body;
 use Unit;
 use JSYNC;
@@ -118,6 +119,89 @@ method quote_mod:h  ($) { }
 method quote_mod:f  ($) { }
 method quote_mod:c  ($) { }
 method quote_mod:b  ($) { }
+}
+
+augment class CgOp {
+method xspan(*@items) { self._cgop('xspan', @items) }
+}
+
+augment class Op::WhileLoop { #OK exist
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            CgOp.whileloop(+$.until, +$.once,
+                CgOp.obj_getbool($.check.cgop($body)),
+                CgOp.sink(CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+                    1, $l, "next$id", 2, $l, "last$id", 3, $l, "redo$id"))),
+            CgOp.label("last$id"),
+            CgOp.corelex('Nil'));
+    }
+}
+
+augment class Op::ImmedForLoop { #OK exist
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.rnull(CgOp.letn(
+            "!iter$id", CgOp.vvarlist_new_empty,
+            $.var, CgOp.null('var'),
+            CgOp.vvarlist_push(CgOp.letvar("!iter$id"),
+                $.source.cgop($body)),
+            CgOp.whileloop(0, 0,
+                CgOp.iter_hasflat(CgOp.letvar("!iter$id")),
+                CgOp.prog(
+                    CgOp.letvar($.var,
+                        CgOp.vvarlist_shift(CgOp.letvar("!iter$id"))),
+                    CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
+                        $.sink.cgop($body),
+                        1, $l, "next$id",
+                        2, $l, "last$id",
+                        3, $l, "redo$id")))),
+            CgOp.label("last$id")));
+    }
+}
+
+augment class Op::When { #OK exist
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
+                $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
+            CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
+                    CgOp.sink($.body.cgop($body)),
+                    CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
+                        CgOp.null('str'), CgOp.corelex('Nil'))),
+                7, '', "end$id"),
+            CgOp.corelex('Nil'));
+    }
+}
+
+augment class Op::Try { #OK exist
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 1, $.body.cgop($body),
+            5, '', "end$id");
+    }
+}
+
+augment class Op::TopicalHook { #OK exist
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+            6, '', "end$id");
+    }
+}
+
+augment class Op::LabelHook { #OK exist
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+            map({ 8, $_, "goto_$_" }, @$.labels));
+    }
 }
 
 my $usage = q:to/EOM/;

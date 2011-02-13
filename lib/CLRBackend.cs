@@ -2137,7 +2137,8 @@ namespace Niecza.CLRBackend {
             head = head_s;
         }
 
-        public static CpsOp Span(string l1, string l2, bool sync, CpsOp body) {
+        public static CpsOp Span(string l1, string l2, bool sync,
+                List<ClrOp> co, CpsOp body) {
             ClrOp body_h = body.head;
             ClrOp[] body_s = body.stmts;
             Resultify(ref body_s, ref body_h);
@@ -2149,6 +2150,7 @@ namespace Niecza.CLRBackend {
             stmts.Add(body_h);
             if (sync) stmts.Add(ClrSync.Instance);
             stmts.Add(new ClrLabel(l2, true));
+            foreach (ClrOp cl in co) stmts.Add(cl);
 
             return new CpsOp(stmts.ToArray(), new ClrResult(body.head.Returns));
         }
@@ -2227,11 +2229,6 @@ namespace Niecza.CLRBackend {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return new CpsOp(new ClrCpsReturn(heads.Length > 0 ? heads[0] : null));
             });
-        }
-
-        public static CpsOp EhSpan(int kls, string tag,
-                string ls, string le, string lg) {
-            return new CpsOp(new ClrEhSpan(kls, tag, ls, le, lg));
         }
 
         public static CpsOp LabelId(CgContext tcx, string label) {
@@ -2615,10 +2612,6 @@ namespace Niecza.CLRBackend {
                 return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
-            handlers["ehspan"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.EhSpan(FixInt(z[1]), FixStr(z[2]),
-                    FixStr(z[4]), FixStr(z[5]), FixStr(z[6]));
-            };
             handlers["label"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.Label(FixStr(z[1]), true);
             };
@@ -2631,9 +2624,14 @@ namespace Niecza.CLRBackend {
             handlers["goto"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.Goto(FixStr(z[1]), false, new CpsOp[] {});
             };
-            handlers["span"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.Span(FixStr(z[1]), FixStr(z[2]), FixBool(z[3]),
-                    th.Scan(z[4]));
+            handlers["xspan"] = delegate(NamProcessor th, object[] z) {
+                List<ClrOp> xn = new List<ClrOp>();
+                string ls = FixStr(z[1]);
+                string le = FixStr(z[2]);
+                for (int i = 5; i < z.Length; i += 3)
+                    xn.Add(new ClrEhSpan(FixInt(z[i]), FixStr(z[i+1]),
+                                ls, le, FixStr(z[i+2])));
+                return CpsOp.Span(ls, le, FixBool(z[3]), xn, th.Scan(z[4]));
             };
             handlers["compare"] = handlers["arith"] =
                 delegate(NamProcessor th, object[] zyg) {
@@ -3442,12 +3440,10 @@ namespace Niecza.CLRBackend {
                 b = enter.ToArray();
             } else if ((sub.flags & StaticSub.RETURNABLE) != 0) {
                 enter.Add(new object[] { new JScalar("return"),
-                    new object[] { new JScalar("span"),
+                    new object[] { new JScalar("xspan"),
                         new JScalar("rstart"), new JScalar("rend"),
-                        new JScalar("0"), b } });
-                enter.Add(new object[] { new JScalar("ehspan"),
-                    new JScalar("4"), new JScalar(""), new JScalar("0"),
-                    new JScalar("rstart"), new JScalar("rend"), new JScalar("rend") });
+                        new JScalar("0"), b,
+                        new JScalar("4"), new JScalar(""), new JScalar("rend") } });
                 enter.Insert(0, new JScalar("prog"));
                 b = enter.ToArray();
             } else {
