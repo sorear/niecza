@@ -122,6 +122,39 @@ method do_variable_reference($M, $v) {
         $M.CURSOR.sorry("Unhandled reference twigil $tw");
     }
 }
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    if $fn.assignish {
+        # Assignments to has and state declarators are rewritten into
+        # an appropriate phaser
+        if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+            my $cv = self.gensym;
+            make ::Op::StatementList.new(|node($/), children => [
+                ::Op::Start.new(condvar => $cv, body => $/.ast),
+                ::Op::Lexical.new(name => $lhs.name)]);
+        }
+        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+            $lhs.initializer = self.sl_to_block('bare', $rhs,
+                subname => $lhs.name ~ " init");
+            make $lhs;
+        }
+        elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+            my $sig = substr($lhs.name, 0, 1);
+            if defined '$@&%'.index($sig) {
+                $lhs.init = self.docontext($/, $sig, $rhs)
+            } else {
+                $lhs.init = $rhs;
+            }
+            make $lhs;
+        }
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+
 method quibble($/) {
     if ($<babble><B>[0].hereinfo) {
         my $stub = ::Op::HereStub.new(node => Any);

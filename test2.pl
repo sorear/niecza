@@ -143,6 +143,14 @@ use MONKEY_TYPING;
         }
     }
     X1.test;
+
+    constant $foo = 1, 2, 3;
+    constant @bar = 4;
+    constant %baz = a => 3, c => 6;
+
+    is +[ $foo ], 1, '$-constants itemize';
+    is +@bar, 1, '@-constants listize';
+    is %baz<c>, 6, '%-constants hashize';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

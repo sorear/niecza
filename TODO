@@ -41,9 +41,6 @@ MEDIUM
 
  + Implement callsame.
 
- + Implement constant %foo = a => 1 and constant @foo = 1, 2.  It needs to
-   contextualize into a list/hash or something like that.
-
    Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 

@@ -48,6 +48,8 @@ my class Any is Mu {
     method !butWHENCE($cr) {
         Q:CgOp { (newvsubvar (class_ref mo Any) (@ {$cr}) (@ {self})) }
     }
+
+    method hash() { _hash_constructor(@(self)) }
 }
 
 my class Cursor { ... }
