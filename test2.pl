@@ -125,6 +125,11 @@ use MONKEY_TYPING;
     is ~[1,2 X+ 3,4 X+ 5,6], "9 10 10 11 10 11 11 12", "X+ works";
     is ~[4,0 Z  2,0 Z  1,0], "4 2 1 0 0 0", "Z works";
     is ~[1,2 X  3,4 X  5,6], "1 3 5 1 3 6 1 4 5 1 4 6 2 3 5 2 3 6 2 4 5 2 4 6", "X works";
+
+    ok "{1}" ~~ Str, "string interpolation stringifies";
+    is q:to[A] , " x\n", "q:to strips equal whitespace";
+     x
+    A
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

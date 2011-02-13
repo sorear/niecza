@@ -21,8 +21,6 @@ EASY
 
    Fix the qw< > parsing problems.
 
- + Strip whitespace from here documents.
-
  + return and take need to accept multiple arguments and wrap them in a Parcel
 
  + :$.foo is broken.  Find out why and fix it.

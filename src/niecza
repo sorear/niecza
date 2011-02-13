@@ -19,6 +19,33 @@ use MONKEY_TYPING;
 use NieczaActions;
 use Operator;
 use CgOp;
+use STD;
+use CClass;
+
+augment class STD {
+our @herestub_queue;
+method heredoc () {
+    my $here = self;
+    while my $herestub = shift @herestub_queue {
+        my $*DELIM = $herestub.delim;
+        my $lang   = $herestub.lang.mixin( ::STD::herestop );
+        my $doc    = first /:r :lang($lang) <nibbler> <stopper>/.($here);
+
+        if defined $doc {
+            if $herestub.writeback.[0] ~~ Sub {
+                $herestub.writeback.[0].($*DELIM, $lang, $doc)
+            } else {
+                $herestub.writeback.[0] = $doc;
+            }
+            $here = $here.cursor($doc.to);
+        }
+        else {
+            self.panic("Ending delimiter $*DELIM not found");
+        }
+    }
+    $here;
+}
+}
 
 sub node($M) { { line => $M.cursor.lineof($M.to) } }
 
@@ -49,6 +76,77 @@ sub mktemptopic($/, $item, $expr) {
 }
 
 augment class NieczaActions {
+method quibble($/) {
+    if ($<babble><B>[0].hereinfo) {
+        my $stub = ::Op::HereStub.new(node => Any);
+        make $stub;
+        $<babble><B>[0].hereinfo.[1][0] = sub ($delim, $lang, $/) { #OK
+            my $nws    = (~$<stopper>).index($delim);
+            my $prefix = (~$<stopper>).substr(0, $nws);
+
+            self.nibbler($<nibbler>, $prefix);
+            $stub.node = $<nibbler>.ast;
+        };
+    } else {
+        make $<nibble>.ast;
+    }
+}
+
+method nibbler($/, $prefix?) {
+    sub iscclass($cur) {
+        my $*CCSTATE = '';
+        my $ok = False;
+        # XXX XXX
+        try { $cur.ccstate(".."); $ok = True };
+        $ok
+    }
+    if $/.CURSOR.^isa(::STD::Regex) {
+        make $<EXPR>.ast;
+    } elsif $/.CURSOR.^isa(::NieczaGrammar::CgOp) {
+        if $*SAFEMODE {
+            $/.CURSOR.sorry('Q:CgOp not allowed in safe mode');
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+        make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
+    } elsif iscclass($/.CURSOR) {
+        make self.process_tribble($<nibbles>);
+    } else {
+        make self.process_nibble($/, $<nibbles>, $prefix);
+    }
+}
+
+method process_nibble($/, @bits, $prefix?) {
+    my @acc;
+    for @bits -> $n {
+        my $ast = $n.ast;
+
+        if $ast ~~ CClass {
+            $n.CURSOR.sorry("Cannot use a character class in a string");
+            $ast = "";
+        }
+
+        if $ast !~~ Op {
+            my $str = $ast;
+            $str = $str.split(/^^<before \s>[ $prefix || \s* ]/).join("") if defined $prefix;
+            $ast = ::Op::StringLiteral.new(|node($/), text => $str);
+        }
+
+        # this *might* belong in an optimization pass
+        if @acc && @acc[*-1] ~~ ::Op::StringLiteral &&
+                $ast ~~ ::Op::StringLiteral {
+            @acc[*-1] = ::Op::StringLiteral.new(|node($/),
+                text => (@acc[*-1].text ~ $ast.text));
+        } else {
+            push @acc, $ast;
+        }
+    }
+    make do @acc == 0 ?? ::Op::StringLiteral.new(|node($/), text => "") !!
+            @acc == 1 ?? (@acc[0] ~~ ::Op::StringLiteral ?? @acc[0] !!
+                    mkcall($/, '&prefix:<~>', @acc[0])) !!
+            mkcall($/, '&infix:<~>', @acc);
+}
+
 method keyspace($/) { }
 method terminator:sym<given> ($/) {}
 method terminator:sym<when> ($/) {}
@@ -227,6 +325,12 @@ augment class CgOp { #OK exist
         my $str = ~$x;
         ($str eq 'Infinity' || $str eq 'NaN' || $str eq '-Infinity') ??
             CgOp._cgop('double', $str) !! CgOp._cgop('double', $x);
+    }
+}
+
+augment class Op::HereStub { #OK exist
+    method zyg() {
+        $.node // die "Here document used before body defined";
     }
 }
 
