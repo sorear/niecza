@@ -460,6 +460,7 @@ method quantified_atom($/) { # :: RxOp
         my @z = $atom;
         push @z, $q<sep> if defined $q<sep>;
         $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
+            nonlisty => $q<nonlisty>,
             zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
     }
 
@@ -489,7 +490,7 @@ method quantified_atom($/) { # :: RxOp
 # :: Context hash interpreted by quantified_atom
 method quantifier:sym<*> ($/) { make { min => 0, mod => $<quantmod>.ast } }
 method quantifier:sym<+> ($/) { make { min => 1, mod => $<quantmod>.ast } }
-method quantifier:sym<?> ($/) { make { min => 0, max => 1, mod => $<quantmod>.ast } }
+method quantifier:sym<?> ($/) { make { min => 0, max => 1, mod => $<quantmod>.ast, :nonlisty } }
 method quantifier:sym<:> ($/) { make { mod => '' } }
 method quantifier:sym<~> ($/) {
     make { tilde => [ map *.ast, @($<quantified_atom>) ] }

@@ -954,9 +954,9 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
     }).parse("2 -34 5");
     ok $me<tok> ~~ List, "a list of tokens";
     is +$me<tok>, 5, "5 of them";
-    is +$me<tok>[0]<sign>, 0, "first no sign";
-    is +$me<tok>[2]<sign>, 1, "third sign";
-    is +$me<tok>[4]<sign>, 0, "fifth no sign";
+    is ?($me<tok>[0]<sign>), False, "first no sign";
+    is ?($me<tok>[2]<sign>), True, "third sign";
+    is ?($me<tok>[4]<sign>), False, "fifth no sign";
     is $me<tok>[2], '-34', "3rd token '-34'";
 }
 

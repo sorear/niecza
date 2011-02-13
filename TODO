@@ -50,8 +50,6 @@ MEDIUM
    Audit accelerated context routines for correct undefined value and odd
    representation handling.  +Num shouldn't crash, etc.
 
- + Change x? to not create an array.
-
  +*A general procedure for communicating data up and down the meta-spiral.
    Use this to make a very simple eval knockoff.
 

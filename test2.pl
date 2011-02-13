@@ -166,6 +166,11 @@ use MONKEY_TYPING;
     X3.test(5);
 }
 
+{
+    "f" ~~ /<alpha>?/;
+    ok $<alpha>.^isa(Match), "? returns match directly on success";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
