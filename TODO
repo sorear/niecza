@@ -23,8 +23,6 @@ EASY
 
  + return and take need to accept multiple arguments and wrap them in a Parcel
 
- + :$.foo is broken.  Find out why and fix it.
-
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
 
 MEDIUM

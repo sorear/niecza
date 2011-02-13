@@ -4178,35 +4178,35 @@ grammar Q is STD {
     }
 
     role p1 {
-        method postprocess ($s) { $s.parsepath }
+        method postprocessor () { 'path' }
     }
 
     role p0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role w1 {
-        method postprocess ($s) { $s.words }
+        method postprocessor () { 'words' }
     }
 
     role w0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role ww1 {
-        method postprocess ($s) { $s.words }
+        method postprocessor () { 'quotewords' }
     }
 
     role ww0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role x1 {
-        method postprocess ($s) { $s.run }
+        method postprocessor () { 'run' }
     }
 
     role x0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role q {
@@ -4323,6 +4323,8 @@ grammar Q is STD {
     role herehead[$info] {
         method hereinfo() { $info }
     }
+
+    method postprocessor () { 'null' }
 
     method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), :backslash(:$b),
             :scalar(:$s), :array(:$a), :hash(:$h), :function(:$f),

@@ -17,6 +17,21 @@ use NieczaCompiler;
 use MONKEY_TYPING;
 
 use GetOptLong;
+use NieczaActions;
+
+augment class NieczaActions {
+method quote_mod:w  ($) { }
+method quote_mod:ww ($) { }
+method quote_mod:p  ($) { }
+method quote_mod:x  ($) { }
+method quote_mod:to ($) { }
+method quote_mod:s  ($) { }
+method quote_mod:a  ($) { }
+method quote_mod:h  ($) { }
+method quote_mod:f  ($) { }
+method quote_mod:c  ($) { }
+method quote_mod:b  ($) { }
+}
 
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
