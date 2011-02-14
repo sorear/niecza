@@ -76,8 +76,10 @@ our %funcs = (
     '&infix:<<>'           => do_builtin('numlt', 2),
     '&infix:<!=>'          => do_builtin('numne', 2),
     '&infix:<+>'           => do_builtin('plus', 2),
+    '&last'                => do_nullary_control(2),
     '&make'                => do_builtin('make', 1),
     '&map'                 => &do_map_grep,
+    '&next'                => do_nullary_control(1),
     '&not'                 => do_builtin('not', 1),
     '&postfix:<++>'        => do_builtin('postinc', 1),
     '&prefix:<?>'          => do_builtin('bool', 1),
@@ -85,8 +87,13 @@ our %funcs = (
     '&prefix:<!>'          => do_builtin('not', 1),
     '&prefix:<+>'          => do_builtin('num', 1),
     '&prefix:<~>'          => do_builtin('str', 1),
+    '&proceed'             => do_nullary_control(7),
+    '&redo'                => do_nullary_control(3),
+    '&return'              => &do_return_take,
     '&so'                  => do_builtin('bool', 1),
     '&substr'              => do_builtin('substr3', 3),
+    '&succeed'             => do_nullary_control(6),
+    '&take'                => &do_return_take,
     '&_array_constructor'  => do_builtin('array_constructor', 1),
 );
 
@@ -121,6 +128,22 @@ sub do_map_grep($body, $nv, $invname, $op) {
     return $op unless $args > 0;
     return ::Op::Builtin.new(name => substr($invname, 1), args => $args);
 }
+
+sub do_return_take($body, $nv, $invname, $op) {
+    return $op unless defined my $args = no_named_params($op);
+    my $parcel = ($args == 1 ?? $args[0] !!
+        ::Op::CallSub.new(invocant => ::Op::Lexical.new(name => '&infix:<,>'),
+            positionals => [@$args]));
+    return ($invname eq '&take' ??
+        ::Op::Take.new(value => $parcel) !!
+        ::Op::Control.new(payload => $parcel, number => 4));
+}
+
+sub do_nullary_control($number) { sub ($body, $nv, $ , $op) {
+    return $op unless defined my $args = no_named_params($op);
+    return $op unless $args == 0;
+    return ::Op::Control.new(:$number, payload => ::Op::Lexical.new(name => 'Nil'));
+} }
 
 sub do_atkey($body, $nv, $invname, $op) {
     my ($args, %named) = capture_params($op);

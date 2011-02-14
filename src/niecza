@@ -125,6 +125,22 @@ augment class CgOp {
 method xspan(*@items) { self._cgop('xspan', @items) }
 }
 
+augment class Op {
+class Control is Op {
+    has $.payload = die "Control.payload required"; # Op
+    has $.name = "";
+    has $.number = die "Control.number required"; # Num
+
+    method zyg() { $.payload }
+
+    method code($body) {
+        CgOp.control($.number, CgOp.null('frame'), CgOp.int(-1),
+            ($.name eq '' ?? CgOp.null('str') !! CgOp.str($.name)),
+            $.payload.cgop($body));
+    }
+}
+}
+
 augment class Op::WhileLoop { #OK exist
     method code_labelled($body, $l) {
         my $id = ::GLOBAL::NieczaActions.genid;
