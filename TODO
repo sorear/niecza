@@ -15,8 +15,6 @@ EASY
    Add decimal literals.  (Don't try to implement your own floating point
    radix converter; use +$str)
 
- +*Optimize control exceptions to gotos in the intrablock case.
-
    Add more benchmarks to perf/.
 
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.

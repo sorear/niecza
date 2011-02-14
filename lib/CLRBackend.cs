@@ -2138,7 +2138,7 @@ namespace Niecza.CLRBackend {
         }
 
         public static CpsOp Span(string l1, string l2, bool sync,
-                List<ClrOp> co, CpsOp body) {
+                List<ClrEhSpan> co, CpsOp body) {
             ClrOp body_h = body.head;
             ClrOp[] body_s = body.stmts;
             Resultify(ref body_s, ref body_h);
@@ -2150,7 +2150,7 @@ namespace Niecza.CLRBackend {
             stmts.Add(body_h);
             if (sync) stmts.Add(ClrSync.Instance);
             stmts.Add(new ClrLabel(l2, true));
-            foreach (ClrOp cl in co) stmts.Add(cl);
+            foreach (ClrEhSpan cl in co) stmts.Add(cl);
 
             return new CpsOp(stmts.ToArray(), new ClrResult(body.head.Returns));
         }
@@ -2244,6 +2244,19 @@ namespace Niecza.CLRBackend {
                 return new CpsOp(new ClrGoto(label, iffalse,
                     heads.Length > 0 ? heads[0] : null));
             });
+        }
+
+        public static CpsOp GotoReturn(string label, CpsOp body) {
+            ClrOp body_h = body.head;
+            ClrOp[] body_s = body.stmts;
+            Resultify(ref body_s, ref body_h);
+            List<ClrOp> stmts = new List<ClrOp>();
+
+            foreach (ClrOp c in body_s) stmts.Add(c);
+            stmts.Add(body_h);
+            stmts.Add(new ClrGoto(label, false, null));
+
+            return new CpsOp(stmts.ToArray(), new ClrNullLiteral(Tokens.Variable));
         }
 
         public static CpsOp StringLiteral(string s) {
@@ -2491,6 +2504,7 @@ namespace Niecza.CLRBackend {
         StaticSub sub;
         public readonly CpsBuilder cpb;
         Dictionary<string, Type> let_types = new Dictionary<string, Type>();
+        List<List<ClrEhSpan>> eh_stack = new List<List<ClrEhSpan>>();
 
         public NamProcessor(CpsBuilder cpb, StaticSub sub) {
             this.sub = sub;
@@ -2625,13 +2639,16 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Goto(FixStr(z[1]), false, new CpsOp[] {});
             };
             handlers["xspan"] = delegate(NamProcessor th, object[] z) {
-                List<ClrOp> xn = new List<ClrOp>();
+                List<ClrEhSpan> xn = new List<ClrEhSpan>();
                 string ls = FixStr(z[1]);
                 string le = FixStr(z[2]);
                 for (int i = 5; i < z.Length; i += 3)
                     xn.Add(new ClrEhSpan(FixInt(z[i]), FixStr(z[i+1]),
                                 ls, le, FixStr(z[i+2])));
-                return CpsOp.Span(ls, le, FixBool(z[3]), xn, th.Scan(z[4]));
+                th.eh_stack.Add(xn);
+                CpsOp ch = th.Scan(z[4]);
+                th.eh_stack.RemoveAt(th.eh_stack.Count - 1);
+                return CpsOp.Span(ls, le, FixBool(z[3]), xn, ch);
             };
             handlers["compare"] = handlers["arith"] =
                 delegate(NamProcessor th, object[] zyg) {
@@ -2674,11 +2691,32 @@ namespace Niecza.CLRBackend {
                 }
             };
             handlers["control"] = delegate(NamProcessor th, object[] zyg) {
+                if (!(zyg[1] is JScalar)) goto dynamic;
+                if (JScalar.S(((object[])zyg[2])[0]) != "null") goto dynamic;
+                if (JScalar.S(((object[])zyg[3])[0]) != "int") goto dynamic;
+                if (JScalar.S(((object[])zyg[4])[0]) != "null") goto dynamic;
+
+                {
+                    int type = JScalar.I(zyg[1]);
+                    string lbl = null;
+                    for (int i = th.eh_stack.Count - 1; i >= 0; i--)
+                        foreach (ClrEhSpan ces in th.eh_stack[i])
+                            if (ces.kls == type) {
+                                lbl = ces.lg;
+                                goto found;
+                            }
+                    goto dynamic;
+found:
+                    return CpsOp.GotoReturn(lbl, th.Scan(zyg[5]));
+                }
+
+dynamic:
                 CpsOp[] z = new CpsOp[5];
                 for (int i = 1; i < 5; i++)
                     z[i] = th.Scan(zyg[i+1]);
                 z[0] = zyg[1] is JScalar ? CpsOp.IntLiteral(FixInt(zyg[1])) :
                     th.Scan(zyg[1]);
+
                 return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_SFH, z);
             };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
