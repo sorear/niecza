@@ -19,8 +19,6 @@ EASY
 
    Add more benchmarks to perf/.
 
- + return and take need to accept multiple arguments and wrap them in a Parcel
-
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
 
 MEDIUM
@@ -35,7 +33,7 @@ MEDIUM
 
  + Jump table optimization for when chains.
 
-   Find out what readonly subs are supposed to do with lists, etc and implement
+ + Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 
   *Implement BUILD submethod calling.

@@ -403,8 +403,13 @@ sub last ($x?) { _lexotic(2, $x, ()) }
 sub redo ($x?) { _lexotic(3, $x, ()) }
 sub goto ($x)  { _lexotic(8, $x, ()) }
 
-sub return(\$obj) is return-pass {
-    Q:CgOp { (control 4 (null frame) (int -1) (null str) {$obj}) }
+sub return(\|@pcl) is return-pass {
+    Q:CgOp {
+        (letn p (unbox fvarlist (@ {@pcl}))
+          (control 4 (null frame) (int -1) (null str)
+            (ternary (== (i 1) (fvarlist_length (l p)))
+              (fvarlist_item (i 0) (l p)) {@pcl})))
+    }
 }
 sub succeed() {
     Q:CgOp { (control 6 (null frame) (int -1) (null str) {()}) }
@@ -780,8 +785,12 @@ sub _gather($fr) {
     &infix:<,>(GatherIterator.RAWCREATE("frame", $fr, "reify", Any)).list
 }
 
-sub take(\$p) { # should be \|$p
-    Q:CgOp { (take {$p}) }
+sub take(\|@pcl) {
+    Q:CgOp {
+        (letn p (unbox fvarlist (@ {@pcl}))
+          (take (ternary (== (i 1) (fvarlist_length (l p)))
+              (fvarlist_item (i 0) (l p)) {@pcl})))
+    }
 }
 
 sub infix:<< => >>($k, $v) { Pair.RAWCREATE("key", $k, "value", $v) }

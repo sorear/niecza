@@ -169,6 +169,22 @@ use MONKEY_TYPING;
 {
     "f" ~~ /<alpha>?/;
     ok $<alpha>.^isa(Match), "? returns match directly on success";
+
+    my $r = &return;
+    sub dfoo()  { return; }
+    sub dbar()  { return 5; }
+    sub dquux() { return 5, 10; }
+    sub foo()   { $r(); }
+    sub bar()   { $r(5); }
+    sub quux()  { $r(5, 10); }
+    is +[ foo ], 0, "can return no values (i)";
+    is +[ bar ], 1, "can return one value (i)";
+    ok (bar() == 5), "one value isn't wrapped (i)";
+    is +[ quux ], 2, "can return two values (i)";
+    is +[ dfoo ], 0, "can return no values";
+    is +[ dbar ], 1, "can return one value";
+    ok (dbar() == 5), "one value isn't wrapped";
+    is +[ dquux ], 2, "can return two values";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
