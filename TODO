@@ -12,14 +12,33 @@ EASY
 
    Add the 'loop' statement.  Should be very straightforward.
 
+   Give labels methods to invoke control operations.
+
+   Implement Sub.leave and CallFrame.leave
+
    Add decimal literals.  (Don't try to implement your own floating point
    radix converter; use +$str)
 
    Add more benchmarks to perf/.
 
+   Character class expressions like [[a .. A] & [\W]]
+
+   ::> cut syntax.
+
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
 
+   Fudge and run your favorite spectest file.
+
 MEDIUM
+
+   Implement your favorite ?-vars.
+
+   Finish the set of Num operators, includig number-theoretic and
+   transcedental functions.
+
+  *Implement &?BLOCK and &?ROUTINE.
+
+   Break down Sub into a hierarchy Code->Block->Routine->Sub->Method.
 
    Implement buffer types and binary I/O.
 
@@ -45,10 +64,15 @@ MEDIUM
  +*A general procedure for communicating data up and down the meta-spiral.
    Use this to make a very simple eval knockoff.
 
+ + Run MAIN without a temporary file (needed for eval knockoff).
+
 HARD
 
    Design and implement some sort of NFG thing that allows use codes, graphs,
    etc and handles canonical equivalence in regexes.
+
+   Determine the best way to map Perl6 process-think onto Windows/.NET
+   process think.  Then implement &run, &runinstead, and &rungather.
 
  + Replace nam with something that doesn't use as much memory.  (Talk to
    pmurias to get his experiences.)
@@ -88,12 +112,22 @@ HARD
 
    Study Nil and find the correct way to integrate it into Niecza.
 
+   Add a JVM backend.
+
+   Add a Parrot backend.
+
 NASTY
 
-  *A multicore job scheduler would be cool.  You'll need to talk with
+   A multicore job scheduler would be cool.  You'll need to talk with
    TimToady on dependency extraction; there are some subtle points with
    modules that export slangs.
 
   *Figure out how eval can possibly work.  Do it.
 
   *Figure out how BEGIN can possibly work.  Do it.
+
+   Native type support.
+
+   SIMD hyperoperators.
+
+   Export Perl 6 code into a CLR .dll
