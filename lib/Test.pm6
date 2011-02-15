@@ -43,6 +43,14 @@ class Builder {
         if !$bool { self.note(self.blame); }
     }
 
+    # TODO: Generalize this.
+    method todo($tag, $reason) {
+        self!output("not ok {$.current-test++} - $tag # TODO $reason");
+    }
+    method skip($reason) {
+        self!output("ok {$.current-test++} # skip $reason");
+    }
+
     method expected-tests($num) {
         self!output("1.." ~ $num);
     }
@@ -67,9 +75,17 @@ class Builder {
 $GLOBAL::TEST-BUILDER = Builder.CREATE;
 $GLOBAL::TEST-BUILDER.reset;
 
-sub ok($bool, $tag?) is export { $*TEST-BUILDER.ok($bool, $tag) }
+sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }
+sub nok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(!$bool, $tag) }
 sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag) }
 sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
+sub eval_dies_ok($, $tag?) is export {
+    $*TEST-BUILDER.todo($tag, "eval");
+}
+sub eval_lives_ok($, $tag?) is export {
+    $*TEST-BUILDER.todo($tag, "eval");
+}
+sub isa_ok($obj, $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
 sub is($got, $expected, $tag?) is export {
 
     # avoid comparing twice
@@ -82,14 +98,21 @@ sub is($got, $expected, $tag?) is export {
         $*TEST-BUILDER.note('     expected: '~$expected);
     }
 }
+sub isnt($got, $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
+sub lives_ok($code,$why?) is export {
+    my $lived = False;
+    try { $code.(); $lived = True; }
+    $*TEST-BUILDER.ok($lived, $why);
+}
+sub dies_ok($code,$why?) is export {
+    my $lived = False;
+    try { $code.(); $lived = True; }
+    $*TEST-BUILDER.ok(!$lived, $why);
+}
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done() is export { $*TEST-BUILDER.done }
 sub skip($number,$reason) is export {
-    my $i = 0;
-    while ($i < $number) {
-        $*TEST-BUILDER.ok(1, "skip "~$reason);
-        $i++;
-    }
+    $*TEST-BUILDER.skip($reason) for ^$number;
 }
 
 # TODO standardize me

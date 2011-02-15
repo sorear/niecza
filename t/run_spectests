@@ -1,5 +1,9 @@
 #!/bin/sh
 prove -e 't/fudgeandrun' \
+    ../roast/S02-builtin_data_types/array.t \
+    ../roast/S02-builtin_data_types/autovivification.t \
+    ../roast/S02-builtin_data_types/bool.t \
+    ../roast/S02-lexical-conventions/unicode.t \
     ../roast/S02-whitespace_and_comments/begin_end_pod.t \
     ../roast/S02-builtin_data_types/parsing-bool.t \
     ../roast/S02-whitespace_and_comments/pod-in-multi-line-exprs.t \
