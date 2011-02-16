@@ -208,18 +208,25 @@
 (defun nam-subcall (dunno-what-that-is thing &rest args) (apply thing args))
 
 
+
+; TODO: check if this needs to be optimised
 (labels
-  ((to-string (arg) (if (stringp arg)
-                        arg
+  ((known (arg) `(quote ,(intern arg)))
+   (to-method (arg) (if (stringp arg)
+                        (known arg) 
                         (if (eq (first arg) 'nam-str)
-                            (second arg)
-                            (format t "Can't handle that sort of method call yet")
+                            (known (second arg))
+                            `(intern ,arg)
                             ))))
 (nam-op methodcall (method-name dunno invocant &rest args) 
-  `(,(method-name (to-string method-name)) (FETCH ,(first args)) ,@(rest args))))
+  `(apply ,(to-method method-name) (list (FETCH ,(first args)) ,@(rest args)))))
 
 
 (defun nam-obj_getbool (obj) (if (numberp obj) (not (equal obj 0)) obj))
+
+(defun nam-bif_str (obj) (FETCH obj))
+(defun nam-obj_getstr (obj) obj)
+
 (nam-op ternary (cond if then) `(if ,cond ,if ,then))
 
 (defun nam-null (type) nil) 
