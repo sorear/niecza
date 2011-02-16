@@ -83,10 +83,11 @@
     names           ; All legal named-parameter names
     default         ; Xref    Sub to call if HAS_DEFAULT; must be child of this
     ) (if (equal flags 96)
-          (var-name slot)
+          (if slot
+              (var-name slot)
+              (gensym))
           nil))))
 
- 
 (defun mymap (func list) (remove-if #'null (mapcar func list)))
 
 (defmacro define-nam-sub  
