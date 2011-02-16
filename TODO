@@ -29,6 +29,13 @@ EASY
 
    Fudge and run your favorite spectest file.
 
+   Stuff spectests are blocking on: "is readonly", "[+]", "++ on Bool",
+   "&ucfirst", "Block", "&prefix:<\>", "*.notdef", "Bool.key", "&hash",
+   ".join without argument", "?| et al failing to take Mu and return Bool",
+   "writable $_", "closure for",
+
+   At least parsing Int et al on my-decls would help a lot
+
 MEDIUM
 
    Implement your favorite ?-vars.
