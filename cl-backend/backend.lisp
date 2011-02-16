@@ -10,7 +10,8 @@
 ; Macros 
  
  
-(defun xref-to-symbol (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
+(defun xref-to-symbol (xref) (if (equal (first xref) "MAIN") (xref-to-symbol-real xref) (list 'quote (xref-to-symbol-real xref))))
+(defun xref-to-symbol-real (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
 
 (load "cl-backend/niecza-stash.lisp")
 
@@ -158,7 +159,9 @@
           nil
           (list (var-name var) (make-scalar ""))))
     ((and (list* var stash path) (when (equal stash "stash")))
-       (list (var-name var) `(get-stash ,path)))))
+       (list (var-name var) `(get-stash ,path)))
+    ((and (list* var common path) (when (equal common "common")))
+       (list (var-name var) (niecza-stash:to-stash-name path)))))
 
 
 ; converts a list of lexicals
@@ -256,6 +259,7 @@
 
     (list (niecza-stash:wrap-in-let stash_root 
       (loop for thing in xref for i upfrom 0 when thing collect (compile-sub-or-packagoid i thing)))))))
+
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
