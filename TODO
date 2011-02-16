@@ -32,7 +32,8 @@ EASY
    Stuff spectests are blocking on: "is readonly", "[+]", "++ on Bool",
    "&ucfirst", "Block", "&prefix:<\>", "*.notdef", "Bool.key", "&hash",
    ".join without argument", "?| et al failing to take Mu and return Bool",
-   "writable $_", "closure for",
+   "writable $_", "closure for", "ranges of chars", "gather for", "%",
+   "unless", "my regex / <&foo>",
 
    At least parsing Int et al on my-decls would help a lot
 

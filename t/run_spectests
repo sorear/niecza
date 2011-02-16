@@ -22,10 +22,17 @@ prove -e 't/fudgeandrun' \
     ../roast/S04-statement-modifiers/for.t \
     ../roast/S04-statement-modifiers/given.t \
     ../roast/S04-statement-modifiers/if.t \
-    ../roast/S04-statement-modifiers/unless.t \
+    ../roast/S04-statement-modifiers/unless.t 
+    ../roast/S04-statements/for_with_only_one_item.t \
+    ../roast/S04-statements/gather.t \
     ../roast/S04-statements/if.t \
+    ../roast/S04-statements/last.t \
     ../roast/S04-statements/map-and-sort-in-for.t \
+    ../roast/S04-statements/next.t \
+    ../roast/S04-statements/no-implicit-block.t \
     ../roast/S04-statements/until.t \
+    ../roast/S04-statements/while.t \
+    ../roast/S05-grammar/protoregex.t \
     ../roast/S06-traits/is-rw.t \
     ../roast/S09-autovivification/autoincrement.t \
     ../roast/S12-class/inheritance-class-methods.t \
