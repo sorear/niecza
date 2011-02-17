@@ -29,9 +29,8 @@ EASY
 
    Fudge and run your favorite spectest file.
 
-   Stuff spectests are blocking on: "is readonly", "[+]", "++ on Bool",
-   "&ucfirst", "Block", "&prefix:<\>", "*.notdef", "Bool.key", "&hash",
-   ".join without argument", "?| et al failing to take Mu and return Bool",
+   Stuff spectests are blocking on: "is readonly", "[+]",
+   "Block", "&prefix:<\>", "&hash",
    "writable $_", "closure for", "ranges of chars", "gather for", "%",
    "unless", "my regex / <&foo>", "m//",
 

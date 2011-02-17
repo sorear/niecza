@@ -20,6 +20,8 @@ my class Mu {
             $tn ~ "()"
         }
     }
+    method succ() { defined(self) ?? die("cannot increment a value of type $.typename") !! 1 }
+    method pred() { defined(self) ?? die("cannot decrement a value of type $.typename") !! -1 }
     method notdef() { !self.defined }
     method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
     method perl() { defined(self) ?? self.Str !! self.typename }
@@ -179,6 +181,8 @@ my class Num is Cool {
     method Bool() { Q:CgOp {
         (box Bool (compare != (double 0) (unbox num (@ {self}))))
     } }
+    method pred() { (self // 0) - 1 }
+    method succ() { (self // 0) + 1 }
     method Numeric() { self }
     method ACCEPTS($t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
@@ -302,10 +306,10 @@ sub defined($x) { defined($x) }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
 # forget their precedence.
-sub prefix:<-->($v is rw) { $v = (($v // 0) - 1); $v }
-sub prefix:<++>($v is rw) { $v = (($v // 0) + 1); $v }
-sub postfix:<-->($v is rw) { my $old = $v; $v = (($v // 0) - 1); $old }
-sub postfix:<++>($v is rw) { my $old = $v; $v = (($v // 0) + 1); $old }
+sub prefix:<-->($v is rw) { $v = $v.pred; $v }
+sub prefix:<++>($v is rw) { $v = $v.succ; $v }
+sub postfix:<-->($v is rw) { my $old = $v; $v = $v.pred; $old }
+sub postfix:<++>($v is rw) { my $old = $v; $v = $v.succ; $old }
 
 sub prefix:<~>($v) { ~$v }
 sub prefix:<?>($v) { ?$v }
@@ -337,8 +341,8 @@ sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
 sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
 sub lc($s) { (~$s).lc }
 sub uc($s) { (~$s).uc }
-sub lcfirst($o) { my $s = ~$o; lc(substr($o,0,1)) ~ substr($o,1) }
-sub ucfirst($o) { my $s = ~$o; uc(substr($o,0,1)) ~ substr($o,1) }
+sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
+sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))

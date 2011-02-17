@@ -792,6 +792,15 @@ noparams:
         }
     }
 
+    class CtxCallMethodFetch : ContextHandler<IP6> {
+        string method;
+        public CtxCallMethodFetch(string method) { this.method = method; }
+
+        public override IP6 Get(Variable obj) {
+            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null)).Fetch();
+        }
+    }
+
     class CtxJustUnbox<T> : ContextHandler<T> {
         public override T Get(Variable obj) {
             return Kernel.UnboxAny<T>(obj.Fetch());
@@ -884,6 +893,16 @@ noparams:
     class CtxBoolNativeDefined : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             return obj.Fetch().IsDefined() ? Kernel.TrueV : Kernel.FalseV;
+        }
+    }
+
+    class CtxNumSuccish : ContextHandler<IP6> {
+        double amt;
+        public CtxNumSuccish(double amt) { this.amt = amt; }
+        public override IP6 Get(Variable obj) {
+            IP6 o = obj.Fetch();
+            double v = (o is BoxObject<double>) ? Kernel.UnboxAny<double>(o):0;
+            return Kernel.BoxRaw(v + amt, Kernel.NumMO);
         }
     }
 
@@ -1106,6 +1125,10 @@ noparams:
             = new CtxCallMethod("list");
         public static readonly ContextHandler<Variable> CallHash
             = new CtxCallMethod("hash");
+        public static readonly ContextHandler<IP6> CallPred
+            = new CtxCallMethodFetch("pred");
+        public static readonly ContextHandler<IP6> CallSucc
+            = new CtxCallMethodFetch("succ");
         public static readonly ContextHandler<string> RawCallStr
             = new CtxCallMethodUnbox<string>("Str");
         public static readonly ContextHandler<bool> RawCallBool
@@ -1150,6 +1173,7 @@ noparams:
                 loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined,
                 mro_iterator, loc_iterator, mro_item, loc_item, mro_list,
                 loc_list, mro_hash, loc_hash;
+        public ContextHandler<IP6> loc_pred, loc_succ, mro_pred, mro_succ;
         public ContextHandler<bool> mro_raw_Bool, loc_raw_Bool, mro_raw_defined,
                 loc_raw_defined;
         public ContextHandler<string> mro_raw_Str, loc_raw_Str;
@@ -1245,6 +1269,10 @@ noparams:
                         mro_list = CallList;
                     if (m.Key == "hash")
                         mro_hash = CallHash;
+                    if (m.Key == "pred")
+                        mro_pred = CallPred;
+                    if (m.Key == "succ")
+                        mro_succ = CallSucc;
                     if (m.Key == "at-key")
                         mro_at_key = CallAtKey;
                     if (m.Key == "at-pos")
@@ -1263,6 +1291,8 @@ noparams:
                 if (k.loc_item != null) mro_item = k.loc_item;
                 if (k.loc_list != null) mro_list = k.loc_list;
                 if (k.loc_hash != null) mro_hash = k.loc_hash;
+                if (k.loc_pred != null) mro_pred = k.loc_pred;
+                if (k.loc_succ != null) mro_succ = k.loc_succ;
                 if (k.loc_to_clr != null) mro_to_clr = k.loc_to_clr;
                 if (k.loc_INVOKE != null) mro_INVOKE = k.loc_INVOKE;
                 if (k.loc_Numeric != null) mro_Numeric = k.loc_Numeric;
@@ -2314,6 +2344,8 @@ slow:
             NumMO.loc_raw_Str = new CtxRawNativeNum2Str();
             NumMO.loc_raw_Bool = new CtxNum2Bool();
             NumMO.loc_Bool = new CtxBoxify<bool>(NumMO.loc_raw_Bool, BoolMO);
+            NumMO.loc_succ = new CtxNumSuccish(+1);
+            NumMO.loc_pred = new CtxNumSuccish(-1);
             NumMO.FillProtoClass(new string[] { });
             WrapHandler0(NumMO, "Bool", NumMO.loc_Bool);
             WrapHandler0(NumMO, "Str", NumMO.loc_Str);
@@ -2339,6 +2371,8 @@ slow:
             MuMO.loc_hash = DynMetaObject.CallHash;
             MuMO.loc_list = DynMetaObject.CallList;
             MuMO.loc_item = DynMetaObject.CallItem;
+            MuMO.loc_pred = DynMetaObject.CallPred;
+            MuMO.loc_succ = DynMetaObject.CallSucc;
             MuMO.FillProtoClass(new string[] { });
             WrapHandler0(MuMO, "Bool", MuMO.loc_Bool);
             WrapHandler0(MuMO, "defined", MuMO.loc_defined);
