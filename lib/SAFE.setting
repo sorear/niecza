@@ -147,7 +147,8 @@ my class Cool {
     method substr($x,$y) { substr(self,$x,$y) }
     method lc() { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc() { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
-
+    method ucfirst() { ucfirst(self) }
+    method lcfirst() { lcfirst(self) }
 
     method at-pos(\$self: $ix) {
         defined($self)
@@ -336,6 +337,8 @@ sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
 sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
 sub lc($s) { (~$s).lc }
 sub uc($s) { (~$s).uc }
+sub lcfirst($o) { my $s = ~$o; lc(substr($o,0,1)) ~ substr($o,1) }
+sub ucfirst($o) { my $s = ~$o; uc(substr($o,0,1)) ~ substr($o,1) }
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
