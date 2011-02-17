@@ -20,6 +20,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
+    method notdef() { !self.defined }
     method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
     method perl() { defined(self) ?? self.Str !! self.typename }
     method so() { ?self }
@@ -229,11 +230,18 @@ my class ClassHOW {
 my class EnumType is Cool { }
 my class Bool is EnumType {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
+    method Stringy() { self.key }
+    method perl() { ~self }
     method Bool() { self }
     method ACCEPTS($t) { defined(self) ?? self !! $t.^does(self) }
     method Numeric() { self ?? 1 !! 0 }
     our constant True  = Q:CgOp { (box Bool (bool 1)) };
     our constant False = Q:CgOp { (box Bool (bool 0)) };
+    method succ() { True }
+    method pred() { False }
+    method key() { self ?? "True" !! "False" }
+    method value() { self ?? 1 !! 0 }
+    method kv() { self.key, self.value }
 }
 # TODO: import
 constant True  = Q:CgOp { (box Bool (bool 1)) };
@@ -1032,8 +1040,8 @@ sub infix:<^..> ($a, $b)  { Range.new($a, $b, :excludes_min) }
 sub infix:<^..^> ($a, $b) { Range.new($a, $b, :excludes_min, :excludes_max) }
 
 sub infix:<%%> ($x,$y) { $x % $y == 0 }
-sub infix:<?&> ($a, $b) { $a && $b }
-sub infix:<?|> ($a, $b) { $a || $b }
+sub infix:<?&> ($a, $b) { ?($a && $b) }
+sub infix:<?|> ($a, $b) { ?($a || $b) }
 sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) { !$a }
 sub prefix:<|> (\$item) { $item.Capture }
