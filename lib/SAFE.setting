@@ -156,7 +156,7 @@ my class Cool {
     }
     method elems() { self.flat.elems }
     method iterator() { self.flat.iterator }
-    method join($sep) { self.flat.join($sep) }
+    method join($sep = "") { self.flat.join($sep) }
 }
 
 my class Capture {
@@ -595,7 +595,7 @@ my class List is Cool {
 
     method elems()    { +self }
 
-    method join($sep) {
+    method join($sep = '') {
         my $t;
         for unitem(self) -> $x {
             $t = (defined($t) ?? ($t ~ ($sep ~ $x)) !! $x);
