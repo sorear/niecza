@@ -49,6 +49,82 @@ sub mkstringycat($/, *@strings) {
 }
 
 augment class NieczaActions {
+method trait_mod:is ($/) {
+    my $trait = ~$<longname>;
+    my $noparm;
+
+    if $/.CURSOR.is_name($trait) {
+        make self.mangle_longname($<longname>);
+        $noparm = 'Superclasses cannot have parameters';
+    } elsif $trait eq 'export' {
+        make { export => [ 'DEFAULT', 'ALL' ] };
+        $noparm = 'Export tags NYI';
+    } elsif ($trait eq 'rawcall') {
+        make { nobinder => True };
+    } elsif $trait eq 'return-pass' { # &return special
+        make { return_pass => 1 };
+    } elsif $trait eq 'rw' {
+        make { rw => 1 };
+    } elsif $trait eq 'parcel' {
+        make { rwt => 1 };
+    } elsif $trait eq 'readonly' {
+        make { readonly => 1 };
+    } else {
+        $/.CURSOR.sorry("Unhandled trait $trait");
+        make { };
+    }
+
+    if $noparm && $<circumfix> {
+        $/.CURSOR.sorry($noparm);
+    }
+}
+method parameter($/) {
+    my $rw = False;
+    my $sorry;
+    my $slurpy;
+    my $slurpycap;
+    my $optional;
+    my $rwt;
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
+
+    make ::Sig::Parameter.new(name => ~$/, :$default,
+        :$optional, :$slurpy, readonly => !$rw,
+        :$slurpycap, rwtrans => $rwt, |$p.ast);
+}
+
 method capture($ ) {}
 method capterm($/) {
     my @args;
