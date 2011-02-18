@@ -9,6 +9,7 @@ prove -e 't/fudgeandrun' \
     ../roast/S02-names_and_variables/contextual.t \
     ../roast/S02-whitespace_and_comments/begin_end_pod.t \
     ../roast/S02-whitespace_and_comments/pod-in-multi-line-exprs.t \
+    ../roast/S03-metaops/reduce.t \
     ../roast/S03-operators/assign-is-not-binding.t \
     ../roast/S03-operators/binding-scalars.t \
     ../roast/S03-operators/bit.t \

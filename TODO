@@ -29,7 +29,7 @@ EASY
 
    Fudge and run your favorite spectest file.
 
-   Stuff spectests are blocking on: "is readonly", "[+]",
+   Stuff spectests are blocking on: "is readonly",
    "Block", "&hash",
    "writable $_", "closure for", "ranges of chars", "gather for",
    "unless", "my regex / <&foo>", "m//",
