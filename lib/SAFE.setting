@@ -862,13 +862,14 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
                     my $last = shift @items;
                     while @items {
                         my $next = shift @items;
-                        take ($ok &&= $func($last, $next));
+                        my $val ::= ($ok &&= $func($last, $next));
+                        take $val;
                         $last = $next;
                     }
                 }
             }
         }
-        elsif $list || $right {
+        elsif $list {
             my @pool;
             gather {
                 while @items {
@@ -877,14 +878,28 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
                 }
             }
         }
+        elsif $right {
+            gather {
+                while @items >= 2 {
+                    my $right ::= @items.pop;
+                    take $right;
+                    my $left  = @items.pop;
+                    @items.push($func($left,$right));
+                }
+                if @items {
+                    my $last ::= @items.shift;
+                    take $last;
+                }
+            }
+        }
         else { # left assoc 
             gather {
                 if @items {
-                    my $cumu = @items.shift;
+                    my $cumu ::= @items.shift;
                     take $cumu;
                     while @items {
-                        $cumu = $func($cumu, @items.shift);
-                        take $cumu;
+                        my $new ::= ($cumu ::= $func($cumu, @items.shift));
+                        take $new;
                     }
                 }
             }
