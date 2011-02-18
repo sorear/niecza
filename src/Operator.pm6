@@ -163,6 +163,10 @@ class MetaNot is Operator {
         mkcall($/, '&prefix:<!>', $.base.with_args($/, @args));
     }
 
+    method as_function($/) { self.wrap_in_function($/) }
+    method arity() { $.base.arity }
+
+
     method whatever_curry() { True }
 }
 
