@@ -69,6 +69,7 @@ our %funcs = (
     '&infix:</>'           => do_builtin('divide', 2),
     '&infix:<->'           => do_builtin('minus', 2),
     '&infix:<*>'           => do_builtin('mul', 2),
+    '&infix:<%>'           => do_builtin('mod', 2),
     '&infix:<==>'          => do_builtin('numeq', 2),
     '&infix:<>=>'          => do_builtin('numge', 2),
     '&infix:<>>'           => do_builtin('numgt', 2),

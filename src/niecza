@@ -123,6 +123,7 @@ method quote_mod:b  ($) { }
 
 augment class CgOp {
 method xspan(*@items) { self._cgop('xspan', @items) }
+method bif_mod($x,$y) { self._cgop('bif_mod', $x, $y) }
 }
 
 augment class Op {

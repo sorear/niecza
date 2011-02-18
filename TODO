@@ -31,7 +31,7 @@ EASY
 
    Stuff spectests are blocking on: "is readonly", "[+]",
    "Block", "&prefix:<\>", "&hash",
-   "writable $_", "closure for", "ranges of chars", "gather for", "%",
+   "writable $_", "closure for", "ranges of chars", "gather for",
    "unless", "my regex / <&foo>", "m//",
 
    At least parsing Int et al on my-decls would help a lot

@@ -3130,6 +3130,7 @@ dynamic:
             thandlers["bif_strgt"] = SimpleB("StringGt");
             thandlers["bif_plus"] = SimpleB("Plus");
             thandlers["bif_minus"] = SimpleB("Minus");
+            thandlers["bif_mod"] = SimpleB("Mod");
             thandlers["bif_mul"] = SimpleB("Mul");
             thandlers["bif_divide"] = SimpleB("Divide");
             thandlers["bif_not"] = SimpleB("Not");

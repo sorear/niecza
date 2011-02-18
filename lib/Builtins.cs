@@ -204,6 +204,14 @@ public class Builtins {
         return Kernel.BoxAnyMO<double>(r1 / r2, Kernel.NumMO);
     }
 
+    public static Variable Mod(Variable v1, Variable v2) {
+        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        double r1 = o1.mo.mro_raw_Numeric.Get(v1);
+        double r2 = o2.mo.mro_raw_Numeric.Get(v2);
+        return Kernel.BoxAnyMO<double>(r1 - r2 * Math.Floor(r1 / r2), Kernel.NumMO);
+    }
+
     public static Variable NumAnd(Variable v1, Variable v2) {
         IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
