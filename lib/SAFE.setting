@@ -171,8 +171,10 @@ my class Capture {
     method Capture () { self }
     method list () { @( Q:CgOp { (box Parcel (getslot positionals fvarlist
         (@ {self}))) } ) }
-    method hash () { unitem( Q:CgOp { (box Hash (getslot named varhash
-        (@ {self}))) } // {} ) }
+    method hash () { unitem( Q:CgOp {
+        (letn h (getslot named varhash (@ {self}))
+          (ternary (== (l h) (null varhash)) {{}} (box Hash (l h))))
+    }) }
 }
 # }}}
 # Scalar types {{{

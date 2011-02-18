@@ -49,6 +49,22 @@ sub mkstringycat($/, *@strings) {
 }
 
 augment class NieczaActions {
+method capture($ ) {}
+method capterm($/) {
+    my @args;
+    if $<capture> {
+        my $x = $<capture>[0]<EXPR>.ast;
+        if $x.^isa(::Op::SimpleParcel) {
+            @args = @($x.items);
+        } else {
+            @args = $x;
+        }
+    } elsif $<termish> {
+        @args = ::Op::Paren.new(|node($/), inside => $<termish>.ast);
+    }
+    make ::Op::CallSub.new(|node($/), invocant => mklex($/, '&_make_capture'),
+        args => @args);
+}
 method process_nibble($/, @bits, $prefix?) {
     my @acc;
     for @bits -> $n {
