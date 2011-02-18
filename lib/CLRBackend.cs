@@ -3528,7 +3528,7 @@ dynamic:
         public static int Verbose =
             int.Parse(Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") ?? "0");
         public static bool Verifiable =
-            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_VERIFIABLE") != null ? true : false;
+            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
 
         CLRBackend(string dir, string mobname, string filename) {
             AssemblyName an = new AssemblyName(mobname);
