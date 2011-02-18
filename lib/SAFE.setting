@@ -852,6 +852,74 @@ sub zipop(\|$pcl) {
 sub crossop(\|$pcl) {
     Q:CgOp { (bif_cross (b 1) (unbox fvarlist (@ {$pcl}))) }
 }
+sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
+    if $triangle {
+        if $chain {
+            gather {
+                my $ok = True;
+                if @items {
+                    take True;
+                    my $last = shift @items;
+                    while @items {
+                        my $next = shift @items;
+                        take ($ok &&= $func($last, $next));
+                        $last = $next;
+                    }
+                }
+            }
+        }
+        elsif $list || $right {
+            my @pool;
+            gather {
+                while @items {
+                    push @pool, shift @items;
+                    take reduceop(False, $list, $right, $chain, $func, @pool);
+                }
+            }
+        }
+        else { # left assoc 
+            gather {
+                if @items {
+                    my $cumu = @items.shift;
+                    take $cumu;
+                    while @items {
+                        $cumu = $func($cumu, @items.shift);
+                        take $cumu;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        if $list {
+            $func(|@items);
+        }
+        elsif $chain {
+            my $ok = True;
+            while @items >= 2 {
+                $ok &&= $func(@items[0], @items[1]);
+                shift @items;
+            }
+            $ok;
+        }
+        elsif $right {
+            while @items >= 2 {
+                my $r = @items.pop;
+                my $l = @items.pop;
+                @items.push($func($l,$r));
+            }
+            @items ?? @items[0] !! 0; # XXX identity
+        }
+        else { # left
+            while @items >= 2 {
+                my $l = @items.shift;
+                my $r = @items.shift;
+                @items.unshift($func($l,$r));
+            }
+            @items ?? @items[0] !! 0; # XXX identity
+        }
+    }
+}
 # }}}
 # Regular expression support {{{
 my class Cursor {
