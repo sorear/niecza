@@ -605,7 +605,7 @@ my class List is Cool {
     method join($sep = '') {
         my $t;
         for unitem(self) -> $x {
-            $t = (defined($t) ?? ($t ~ ($sep ~ $x)) !! $x);
+            $t = (defined($t) ?? ($t ~ $sep ~ $x) !! ~$x);
         }
         $t // '';
     }
