@@ -166,6 +166,8 @@ my class Capture {
     has $!positionals;
     has $!named;
 
+    method perl() { "\\(|{ @(self).perl }, |{ %(self).perl })" }
+
     method Capture () { self }
     method list () { @( Q:CgOp { (box Parcel (getslot positionals fvarlist
         (@ {self}))) } ) }
@@ -834,6 +836,7 @@ sub sort(*@bits) { @bits.sort }
 
 sub _array_constructor(\$parcel) { _array_constructor($parcel) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
+sub _make_capture(|$c) { $c }
 
 sub infix:<Z>(\|$pcl) {
     Q:CgOp { (bif_zip (b 0) (unbox fvarlist (@ {$pcl}))) }
