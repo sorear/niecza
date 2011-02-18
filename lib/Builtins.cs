@@ -1,6 +1,8 @@
 using Niecza;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 
 public class Builtins {
     public static IP6 NominalCheck(string name, DynMetaObject mo, Variable v) {
@@ -349,46 +351,82 @@ public class Builtins {
     }
 
     public static Variable GetModTime(string path) {
-        long t = System.IO.File.GetLastWriteTimeUtc(path).Ticks;
+        long t = File.GetLastWriteTimeUtc(path).Ticks;
         double d = ((double)(t - 621355968000000000L)) / 10000000.0;
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
     }
 
     public static Variable GetNow() {
-        long t = System.DateTime.UtcNow.Ticks;
+        long t = DateTime.UtcNow.Ticks;
         double d = ((double)(t - 621355968000000000L)) / 10000000.0;
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
     }
 
     public static bool FileOrDirExists(string path) {
-        return System.IO.File.Exists(path) || System.IO.Directory.Exists(path);
+        return File.Exists(path) || Directory.Exists(path);
     }
 
-    // This is wrong in the long term.  The backend should be linked; it
-    // should generate collectable assemblies; app-domains should be made
-    // available through MetaServices.
-    private static AppDomain subDomain;
-    public static Variable RunCLRSubtask(Variable filename, Variable args) {
+    public static Variable BoxLoS(string[] los) {
+        VarDeque items = new VarDeque();
+        foreach (string i in los)
+            items.Push(Kernel.BoxAnyMO(i, Kernel.StrMO));
+        IP6 l = new DynObject(Kernel.ListMO);
+        l.SetSlot("rest", new VarDeque());
+        l.SetSlot("items", items);
+        return Kernel.NewRWListVar(l);
+    }
+
+    public static string[] UnboxLoS(Variable args) {
         List<string> la = new List<string>();
         VarDeque iter = new VarDeque(args);
-        string sfn = filename.Fetch().mo.mro_raw_Str.Get(filename);
-        //Console.WriteLine("App name {0}", sfn);
         while (Kernel.IterHasFlat(iter, true)) {
             Variable v = iter.Shift();
             la.Add(v.Fetch().mo.mro_raw_Str.Get(v));
-            //Console.WriteLine("Arg {0}", la[la.Count-1]);
         }
-        if (subDomain == null) {
-            AppDomainSetup ads = new AppDomainSetup();
-            ads.ApplicationBase = System.IO.Path.GetDirectoryName(sfn);
-            subDomain = AppDomain.CreateDomain("zyg", null, ads);
-        }
-        int ret = subDomain.ExecuteAssembly(sfn, null, la.ToArray());
+        return la.ToArray();
+    }
+
+    // temporary until compiler is converted to use only downcalls
+    public static Variable RunCLRSubtask(Variable filename, Variable args) {
+        string sfn = filename.Fetch().mo.mro_raw_Str.Get(filename);
+        //Console.WriteLine("App name {0}", sfn);
+        int ret = GetSubDomain().ExecuteAssembly(sfn, null, UnboxLoS(args));
         return Kernel.BoxAnyMO((double) ret, Kernel.NumMO);
     }
 
     public static void RunSubtask(string file, string args) {
         System.Diagnostics.Process.Start(file, args).WaitForExit();
+    }
+
+    private static AppDomain subDomain;
+    private static object backend;
+    // Better, but still fudgy.  Relies too mcuh on path structure.
+    private static AppDomain GetSubDomain() {
+        if (subDomain != null) return subDomain;
+
+        AppDomainSetup ads = new AppDomainSetup();
+        string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
+        ads.ApplicationBase = obj;
+        subDomain = AppDomain.CreateDomain("zyg", null, ads);
+        backend = subDomain.CreateInstanceFromAndUnwrap(Path.Combine(obj, "CLRBackend.exe"), "Niecza.CLRBackend.DownCallAcceptor");
+        return subDomain;
+    }
+    public static Variable DownCall(Variable cb, Variable list) {
+        GetSubDomain();
+        string[] ret = (string[]) backend.GetType().InvokeMember(
+            "DownCalled", BindingFlags.Public | BindingFlags.Instance |
+            BindingFlags.InvokeMethod, null, backend,
+            new object[] { new UpCallee(cb.Fetch()), UnboxLoS(list) });
+        return BoxLoS(ret);
+    }
+    class UpCallee: MarshalByRefObject {
+        IP6 func;
+        public UpCallee(IP6 func) { this.func = func; }
+        public string[] UpCalled(string[] args) {
+            return UnboxLoS(Kernel.RunInferior(func.Invoke(
+                Kernel.GetInferiorRoot(), new Variable[] { BoxLoS(args) },
+                null)));
+        }
     }
 
     public static Variable ArrayConstructor(Variable bits) {

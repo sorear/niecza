@@ -3949,4 +3949,19 @@ dynamic:
             used_units = null; Current = null;
         }
     }
+
+    // instantiatable for the sake of reflecty loading
+    public class DownCallAcceptor: MarshalByRefObject {
+        public string[] DownCalled(object cb, string[] args) {
+            if (args[0] == "hello") {
+                cb.GetType().InvokeMember(
+                    "UpCalled", BindingFlags.Public | BindingFlags.Instance |
+                    BindingFlags.InvokeMethod, null, cb,
+                    new object[] { new string[] { "world" } });
+                return new string[] { Assembly.GetExecutingAssembly().Location };
+            } else {
+                return new string[] { "ERROR" };
+            }
+        }
+    }
 }
