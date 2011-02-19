@@ -248,6 +248,13 @@ method statement_control:loop ($/) {
     make ::Op::GeneralLoop.new(|node($/), :$body, :$init, :$cond, :$step);
 }
 
+method statement_control:repeat ($/) {
+    my $until = $<wu> eq 'until';
+    my $check = $<xblock> ?? $<xblock>.ast[0] !! $<EXPR>.ast;
+    my $body  = self.block_to_immediate($/, 'loop',
+        $<xblock> ?? $<xblock>.ast[1] !! $<pblock>.ast);
+    make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once);
+}
 }
 
 augment class CgOp {
