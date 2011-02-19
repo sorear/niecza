@@ -232,6 +232,35 @@ method cgexp:op ($/) {
     my @p = @( %opshortcut{$l} // [ $l ] );
     make [@p, map *.ast, @( $<cgexp> )];
 }
+
+method statement_control:unless ($/) {
+    make ::Op::Conditional.new(|node($/), check => $<xblock>.ast[0],
+        false => self.block_to_immediate($/, 'cond', $<xblock>.ast[1]));
+}
+
+method statement_control:loop ($/) {
+    my $body = self.block_to_immediate($/, 'loop', $<block>.ast);
+    # XXX wrong interpretation
+    my $init = $0 && $0[0]<e1>[0];
+    my $cond = $0 && $0[0]<e2>[0];
+    my $step = $0 && $0[0]<e3>[0];
+
+    if $step {
+        $body = ::Op::StatementList.new(|node($/),
+            children => [ $body, $step.ast ]);
+    }
+
+    $body = ::Op::WhileLoop.new(|node($/), :!once, :!until,
+        check => ($cond ?? $cond.ast !! mklex($/, 'True')), body => $body);
+
+    if $init {
+        $body = ::Op::StatementList.new(|node($/),
+            children => [ $init.ast, $body ]);
+    }
+
+    make $body;
+}
+
 }
 
 augment class CgOp {
