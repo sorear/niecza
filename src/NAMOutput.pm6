@@ -128,6 +128,7 @@ augment class Metamodel::StaticSub { #OK exist
         $flags +|=  8 if $.strong_used;
         $flags +|= 16 if $.returnable;
         $flags +|= 32 if $.augmenting;
+        $flags +|= 64 if $.transparent;
         [
             'sub',
             $.name,
@@ -164,6 +165,7 @@ sub sub_from_nam(@block) {
         outerx => $outer,
         run_once => ?($flags +& 1),
         spad_exists => ?($flags +& 2),
+        transparent => ?($flags +& 64),
         lexicals => {},
         zyg => [],
         class => $cls,

@@ -2505,6 +2505,7 @@ namespace Niecza.CLRBackend {
         public readonly CpsBuilder cpb;
         Dictionary<string, Type> let_types = new Dictionary<string, Type>();
         List<List<ClrEhSpan>> eh_stack = new List<List<ClrEhSpan>>();
+        List<object[]> scope_stack = new List<object[]>();
 
         public NamProcessor(CpsBuilder cpb, StaticSub sub) {
             this.sub = sub;
@@ -2516,19 +2517,34 @@ namespace Niecza.CLRBackend {
                 (zyg.Length > 2 ? Scan(zyg[2]) : null) );
         }
 
-        CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
-            bool core = (type == "corelex");
-            bool letonly = (type == "letvar");
-
+        CpsOp AccessLet(object[] zyg) {
+            string name = JScalar.S(zyg[1]);
+            CpsOp set_to = zyg.Length > 2 ? Scan(zyg[2]) : null;
             Type t;
-            if (!core && let_types.TryGetValue(name, out t)) {
+
+            if (let_types.TryGetValue(name, out t)) {
                 return (set_to == null) ? CpsOp.PeekLet(name, t) :
                     CpsOp.PokeLet(name, new CpsOp[1] { set_to });
             }
-            if (letonly)
-                throw new Exception("No such let " + name);
+            throw new Exception("No such let " + name);
+        }
 
+        CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
+            bool core = type == "corelex";
             int uplevel;
+
+            for (int i = (core ? -1 : scope_stack.Count - 1); i >= 0; i--) {
+                object[] rec = scope_stack[i];
+                for (int j = 2; j < rec.Length - 2; j += 2) {
+                    if (JScalar.S(rec[j]) == name) {
+                        string lname = JScalar.S(rec[j+1]);
+                        return (set_to == null) ?
+                            CpsOp.PeekLet(lname, let_types[lname]) :
+                            CpsOp.PokeLet(lname, new CpsOp[1] { set_to });
+                    }
+                }
+            }
+
             Lexical lex = ResolveLex(name, out uplevel, core);
 
             return CpsOp.LexAccess(lex, uplevel,
@@ -2779,8 +2795,15 @@ dynamic:
                     throw new NotImplementedException();
                 return CpsOp.GetSField(m.metaObject);
             };
+            handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
+                th.scope_stack.Add(zyg);
+                CpsOp co = th.Scan(zyg[zyg.Length - 1]);
+                th.scope_stack.RemoveAt(th.scope_stack.Count - 1);
+                return co;
+            };
+            handlers["letvar"] = delegate(NamProcessor th, object[] zyg) {
+                return th.AccessLet(zyg); };
             handlers["scopedlex"] =
-            handlers["letvar"] =
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
                 return th.AccessLex(zyg); };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {

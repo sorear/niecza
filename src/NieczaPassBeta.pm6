@@ -85,23 +85,28 @@ sub beta_optimize($body, $op, $inv, $cbody) {
         @$c = grep { $_ !=== $cbody }, @$c;
     }
 
-    my @pos = (map { ::Op::Lexical.new(name => $_[1]) }, @args);
+    my @pos = (map { ::Op::LetVar.new(name => $_[1]) }, @args);
 
     my $nop = ::Op::StatementList.new(children => [
         ::Op::SigBind.new(signature => $cbody.signature,
             positionals => @pos),
         $cbody.code]);
 
+    my @scope;
     for sort keys $cbody.lexicals -> $dn {
         my $d = $cbody.lexicals{$dn};
+        my $nm = ::GLOBAL::NieczaActions.gensym;
         my $to = $d.noinit ?? CgOp.null('var') !!
                  $d.hash   ?? CgOp.newblankhash !!
                  $d.list   ?? CgOp.newblanklist !!
                               CgOp.newblankrwscalar;
-        $nop = ::Op::Let.new(var => $dn,
+        $nop = ::Op::Let.new(var => $nm,
             to => ::Op::CgOp.new(op => $to), in => $nop);
+        push @scope, $dn, $nm;
     }
 
+    $nop = ::Op::LetScope.new(names => @scope, inner => $nop,
+        transparent => $cbody.transparent);
     for reverse @args -> $a {
         $nop = ::Op::Let.new(var => $a.[1], to => $a.[0], in => $nop);
     }

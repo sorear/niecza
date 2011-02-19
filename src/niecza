@@ -211,14 +211,48 @@ method quote_mod:h  ($) { }
 method quote_mod:f  ($) { }
 method quote_mod:c  ($) { }
 method quote_mod:b  ($) { }
+my %opshortcut = (
+    '@'   => [ 'fetch' ],
+    'l'   => [ 'letvar' ],
+    'ns'  => [ 'newscalar' ],
+    'nsw' => [ 'newrwscalar' ],
+    's'   => [ 'str' ],
+    'i'   => [ 'int' ],
+    'b'   => [ 'bool' ],
+    'd'   => [ 'double' ],
+    '=='  => [ 'compare', '==' ], '!=' => [ 'compare', '!=' ],
+    '>='  => [ 'compare', '>=' ], '<=' => [ 'compare', '<=' ],
+    '<'   => [ 'compare', '<' ],  '>'  => [ 'compare', '>' ],
+    '+'   => [ 'arith', '+' ],    '-'  => [ 'arith', '-' ],
+    '*'   => [ 'arith', '*' ],    '/'  => [ 'arith', '/' ],
+);
+
+method cgexp:op ($/) {
+    my $l = ~$<cgopname>;
+    my @p = @( %opshortcut{$l} // [ $l ] );
+    make [@p, map *.ast, @( $<cgexp> )];
+}
 }
 
 augment class CgOp {
+method letscope(*@items) { self._cgop('letscope', @items) }
 method xspan(*@items) { self._cgop('xspan', @items) }
 method bif_mod($x,$y) { self._cgop('bif_mod', $x, $y) }
 }
 
 augment class Op {
+class LetScope is Op {
+    has $.transparent;
+    has $.names;
+    has $.inner;
+
+    method zyg() { $.inner }
+
+    method code($body) {
+        CgOp.letscope(+$.transparent, @($.names), $.inner.cgop($body));
+    }
+}
+
 class Control is Op {
     has $.payload = die "Control.payload required"; # Op
     has $.name = "";

@@ -41,6 +41,7 @@ my %type2phaser = ( init => 0, end => 1, begin => 2 );
 augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, :$augmenting = False, :$prefix = '', :$gather_hack, :$augment_hack) {
     my $top = @*opensubs ?? @*opensubs[*-1].xref !! $itop;
     my $rtop = $top && $*unit.deref($top);
+    my $istop = !@*opensubs;
 
     my $type = $.type // '';
     my $metabody = ::Metamodel::StaticSub.new(
@@ -54,12 +55,13 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
         augmenting => $augmenting,
         name       => $prefix ~ $.name,
         returnable => $.returnable,
+        transparent=> $.transparent,
         gather_hack=> $gather_hack,
         augment_hack=> $augment_hack,
         is_phaser  => %type2phaser{$type},
         class      => $.class,
         ltm        => $.ltm,
-        run_once   => $once && (!@*opensubs || $rtop.run_once));
+        run_once   => $once && ($istop || $rtop.run_once));
 
     $*unit.create_stash($metabody.cur_pkg);
 
@@ -73,8 +75,7 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
     if $type eq 'regex' {
         $metabody.add_my_name('$*/');
     }
-    $metabody.add_my_name('$_') unless $.transparent ||
-        ($metabody.lexicals<$_>:exists);
+    $metabody.add_my_name('$_') if $istop;
 
     pop @*opensubs if $.transparent;
 
@@ -199,6 +200,7 @@ augment class Op::ConstantDecl { #OK exist
 
         $.init.begin;
         my $nb = ::Metamodel::StaticSub.new(
+            transparent=> True,
             unit       => $*unit,
             outerx     => @*opensubs[*-1].xref,
             name       => $.name,
@@ -237,6 +239,7 @@ augment class Op::Attribute { #OK exist
         $ns = $*unit.deref($ns);
         $ns.add_attribute($.name, +$.accessor, $ibvar, $ibref);
         my $nb = ::Metamodel::StaticSub.new(
+            transparent=> True,
             unit       => $*unit,
             outerx     => @*opensubs[*-1].xref,
             name       => $.name,

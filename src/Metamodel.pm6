@@ -461,6 +461,7 @@ class StaticSub is RefTarget {
     has $.outerx; # Xref
     has $.run_once = False; # Bool
     has $.spad_exists = False; # Bool
+    has $.transparent = False; # Bool; ignored by OUTER::
     has $.lexicals = {};
     has $.code; # Op, is rw
     has $.signature; # Sig, is rw
