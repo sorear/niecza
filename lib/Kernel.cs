@@ -919,7 +919,8 @@ noparams:
 
     class CtxStrBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
-            return Kernel.UnboxAny<string>(obj.Fetch()) != "";
+            string s = Kernel.UnboxAny<string>(obj.Fetch());
+            return !(s == "" || s == "0");
         }
     }
 
