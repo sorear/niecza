@@ -280,6 +280,9 @@ method bif_array_constructor($i) { self._cgop("bif_array_constructor", $i) }
 method callnext($cap) { self._cgop("callnext",$cap) }
 method bif_zip($fcn,$pcl) { self._cgop("bif_zip",$fcn,$pcl) }
 method bif_cross($fcn,$pcl) { self._cgop("bif_cross",$fcn,$pcl) }
+method letscope(*@items) { self._cgop('letscope', @items) }
+method xspan(*@items) { self._cgop('xspan', @items) }
+method bif_mod($x,$y) { self._cgop('bif_mod', $x, $y) }
 
 method double($x) {
     # Hack - prevent JSON syntax errors

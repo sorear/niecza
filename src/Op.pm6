@@ -369,13 +369,41 @@ class WhileLoop is Op {
         CgOp.prog(
             CgOp.whileloop(+$.until, +$.once,
                 CgOp.obj_getbool($.check.cgop($body)),
+                CgOp.sink(CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+                    1, $l, "next$id", 2, $l, "last$id", 3, $l, "redo$id"))),
+            CgOp.label("last$id"),
+            CgOp.corelex('Nil'));
+    }
+}
+
+class GeneralLoop is Op {
+    has $.init; # Op
+    has $.cond; # Op
+    has $.step; # Op
+    has $.body; # Op
+
+    method zyg() { grep &defined, $.init, $.cond, $.step, $.body }
+    method ctxzyg($) {
+        ($.init ?? ($.init, 0) !! ()),
+        ($.cond ?? ($.cond, 1) !! ()),
+        ($.step ?? ($.step, 0) !! ()),
+        $.body, 0
+    }
+
+    method code($body) { self.code_labelled($body,'') }
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.prog(
+            ($.init ?? CgOp.sink($.init.cgop($body)) !! ()),
+            CgOp.whileloop(0, 0,
+                ($.cond ?? CgOp.obj_getbool($.cond.cgop($body)) !!
+                    CgOp.bool(1)),
                 CgOp.prog(
-                    CgOp.label("redo$id"),
-                    CgOp.sink($.body.cgop($body)),
-                    CgOp.label("next$id"),
-                    CgOp.ehspan(1, $l, 0, "redo$id", "next$id", "next$id"),
-                    CgOp.ehspan(2, $l, 0, "redo$id", "next$id", "last$id"),
-                    CgOp.ehspan(3, $l, 0, "redo$id", "next$id", "redo$id"))),
+                    CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
+                            $.body.cgop($body), 1, $l, "next$id",
+                            2, $l, "last$id", 3, $l, "redo$id")),
+                    ($.step ?? CgOp.sink($.step.cgop($body)) !! ()))),
             CgOp.label("last$id"),
             CgOp.corelex('Nil'));
     }
@@ -427,12 +455,11 @@ class ImmedForLoop is Op {
                 CgOp.prog(
                     CgOp.letvar($.var,
                         CgOp.vvarlist_shift(CgOp.letvar("!iter$id"))),
-                    CgOp.label("redo$id"),
-                    CgOp.sink($.sink.cgop($body)),
-                    CgOp.label("next$id"),
-                    CgOp.ehspan(1, $l, 0, "redo$id", "next$id", "next$id"),
-                    CgOp.ehspan(2, $l, 0, "redo$id", "next$id", "last$id"),
-                    CgOp.ehspan(3, $l, 0, "redo$id", "next$id", "redo$id"))),
+                    CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
+                        $.sink.cgop($body),
+                        1, $l, "next$id",
+                        2, $l, "last$id",
+                        3, $l, "redo$id")))),
             CgOp.label("last$id")));
     }
 }
@@ -457,12 +484,11 @@ class When is Op {
 
         CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
                 $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
-            CgOp.prog(
-                CgOp.ehspan(7, '', 0, "start$id", "end$id", "end$id"),
-                CgOp.span("start$id", "end$id", 0, CgOp.prog(
+            CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
                     CgOp.sink($.body.cgop($body)),
                     CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
-                        CgOp.null('str'), CgOp.corelex('Nil'))))),
+                        CgOp.null('str'), CgOp.corelex('Nil'))),
+                7, '', "end$id"),
             CgOp.corelex('Nil'));
     }
 }
@@ -499,9 +525,22 @@ class Try is Op {
     method code($body) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
-        CgOp.prog(
-            CgOp.ehspan(5, '', 0, "start$id", "end$id", "end$id"),
-            CgOp.span("start$id", "end$id", 1, $.body.cgop($body)));
+        CgOp.xspan("start$id", "end$id", 1, $.body.cgop($body),
+            5, '', "end$id");
+    }
+}
+
+class Control is Op {
+    has $.payload = die "Control.payload required"; # Op
+    has $.name = "";
+    has $.number = die "Control.number required"; # Num
+
+    method zyg() { $.payload }
+
+    method code($body) {
+        CgOp.control($.number, CgOp.null('frame'), CgOp.int(-1),
+            ($.name eq '' ?? CgOp.null('str') !! CgOp.str($.name)),
+            $.payload.cgop($body));
     }
 }
 
@@ -838,6 +877,18 @@ class Let is Op {
     }
 }
 
+class LetScope is Op {
+    has $.transparent;
+    has $.names;
+    has $.inner;
+
+    method zyg() { $.inner }
+
+    method code($body) {
+        CgOp.letscope(+$.transparent, @($.names), $.inner.cgop($body));
+    }
+}
+
 # These two are created to codegen wrappers in NAMOutput... bad factor
 class TopicalHook is Op {
     has $.inner;
@@ -846,9 +897,8 @@ class TopicalHook is Op {
     method code($body) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
-        CgOp.prog(
-            CgOp.ehspan(6, '', 0, "start$id", "end$id", "end$id"),
-            CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
+        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+            6, '', "end$id");
     }
 }
 
@@ -860,9 +910,7 @@ class LabelHook is Op {
     method code($body) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
-        CgOp.prog(
-            map({ CgOp.ehspan(8, $_, 0, "start$id", "end$id", "goto_$_") },
-                @$.labels),
-            CgOp.span("start$id", "end$id", 0, $.inner.cgop($body)));
+        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+            map({ 8, $_, "goto_$_" }, @$.labels));
     }
 }

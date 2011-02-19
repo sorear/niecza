@@ -146,6 +146,11 @@ method integer($/) {
     make ($<decint> // $<octint> // $<hexint> // $<binint>).ast
 }
 
+method escale ($/) { }
+method dec_number ($/) {
+    make +((~$/).comb(/<-[_]>/).join(""));
+}
+
 # XXX niecza rats will break this
 method number($/) {
     my $child = $<integer> // $<dec_number> // $<rad_number>;
@@ -246,6 +251,18 @@ method desigilname($/) {
 }
 
 method stopper($ ) { }
+
+method quote_mod:w  ($) { }
+method quote_mod:ww ($) { }
+method quote_mod:p  ($) { }
+method quote_mod:x  ($) { }
+method quote_mod:to ($) { }
+method quote_mod:s  ($) { }
+method quote_mod:a  ($) { }
+method quote_mod:h  ($) { }
+method quote_mod:f  ($) { }
+method quote_mod:c  ($) { }
+method quote_mod:b  ($) { }
 
 # quote :: Op
 method quote:sym<" "> ($/) { make $<nibble>.ast }
@@ -874,6 +891,30 @@ method escape:ws ($/) { make "" }
 my class RangeSymbol { };
 method escape:sym<..> ($/) { make RangeSymbol }
 
+sub mkstringycat($/, *@strings) {
+    my @a;
+    for @strings -> $s {
+        my $i = ($s !~~ Op) ?? ::Op::StringLiteral.new(|node($/),
+            text => $s) !! $s;
+
+        # this *might* belong in an optimization pass
+        if @a && @a[*-1] ~~ ::Op::StringLiteral &&
+                $i ~~ ::Op::StringLiteral {
+            @a[*-1] = ::Op::StringLiteral.new(|node($/),
+                text => (@a[*-1].text ~ $i.text));
+        } else {
+            push @a, $i;
+        }
+    }
+    if @a == 0 {
+        return ::Op::StringLiteral.new(|node($/), text => "");
+    } elsif  @a == 1 {
+        return (@a[0] ~~ ::Op::StringLiteral) ?? @a[0] !!
+            mkcall($/, '&prefix:<~>', @a[0]);
+    } else {
+        return mkcall($/, '&infix:<~>', @a);
+    }
+}
 # XXX I probably shouldn't have used "Str" for this action method name
 method Str($match?) { "NieczaActions" } #OK not used
 method process_nibble($/, @bits, $prefix?) {
@@ -886,25 +927,45 @@ method process_nibble($/, @bits, $prefix?) {
             $ast = "";
         }
 
-        if $ast !~~ Op {
-            my $str = $ast;
-            $str = $str.split(/^^<before \s>[ $prefix || \s* ]/).join("") if defined $prefix;
-            $ast = ::Op::StringLiteral.new(|node($/), text => $str);
+        if $ast !~~ Op && defined $prefix {
+            $ast = $ast.split(/^^<before \s>[ $prefix || \s* ]/).join("");
         }
 
-        # this *might* belong in an optimization pass
-        if @acc && @acc[*-1] ~~ ::Op::StringLiteral &&
-                $ast ~~ ::Op::StringLiteral {
-            @acc[*-1] = ::Op::StringLiteral.new(|node($/),
-                text => (@acc[*-1].text ~ $ast.text));
-        } else {
-            push @acc, $ast;
+        push @acc, $ast;
+    }
+
+    my $post = $/.CURSOR.postprocessor;
+    make mkstringycat($/, @acc);
+
+    if $post eq 'null' {
+        # already OK
+    }
+    # actually quotewords is a bit trickier than this...
+    elsif $post eq 'words' || $post eq 'quotewords' {
+        my $sl = $/.ast;
+        if !$sl.^isa(::Op::StringLiteral) {
+            make ::Op::CallMethod.new(|node($/), :name<words>, receiver => $sl);
+        }
+        else {
+            my @tok = $sl.text.words;
+            @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
+
+            make ((@tok == 1) ?? @tok[0] !!
+                ::Op::SimpleParcel.new(|node($/), items => @tok));
         }
     }
-    make do @acc == 0 ?? ::Op::StringLiteral.new(|node($/), text => "") !!
-            @acc == 1 ?? (@acc[0] ~~ ::Op::StringLiteral ?? @acc[0] !!
-                    mkcall($/, '&prefix:<~>', @acc[0])) !!
-            mkcall($/, '&infix:<~>', @acc);
+    elsif $post eq 'path' {
+        # TODO could stand to be a lot fancier.
+        make ::Op::CallMethod(|node($/), receiver => $/.ast, :name<IO>);
+    }
+    elsif $post eq 'run' {
+        make mkcall($/, 'rungather', $/.ast);
+    }
+    else {
+        $/.CURSOR.sorry("Unhandled postprocessor $post");
+    }
+
+    $/.ast;
 }
 
 method process_tribble(@bits) {
@@ -983,9 +1044,9 @@ method split_circumfix ($/) {
     make ((@tok == 1) ?? @tok[0] !!
         ::Op::SimpleParcel.new(|node($/), items => @tok));
 }
-method circumfix:sym«< >» ($/) { self.split_circumfix($/) }
-method circumfix:sym«<< >>» ($/) { self.split_circumfix($/) }
-method circumfix:sym<« »> ($/) { self.split_circumfix($/) }
+method circumfix:sym«< >» ($/)   { make $<nibble>.ast }
+method circumfix:sym«<< >>» ($/) { make $<nibble>.ast }
+method circumfix:sym<« »> ($/)   { make $<nibble>.ast }
 
 method circumfix:sym<( )> ($/) {
     my @kids = @( $<semilist>.ast );
@@ -1242,8 +1303,7 @@ method postcircumfix:sym<{ }> ($/) {
     make Operator.funop('&postcircumfix:<{ }>', 1, @( $<semilist>.ast ));
 }
 method postcircumfix:sym«< >» ($/) {
-    self.split_circumfix($/);
-    make Operator.funop('&postcircumfix:<{ }>', 1, $/.ast);
+    make Operator.funop('&postcircumfix:<{ }>', 1, $<nibble>.ast);
 }
 method postcircumfix:sym<( )> ($/) {
     make ::Operator::PostCall.new(args => $<semiarglist>.ast[0]);
@@ -1665,9 +1725,16 @@ method param_var($/) {
 # :: Sig::Parameter
 method parameter($/) {
     my $rw = False;
+    my $sorry;
+    my $slurpy;
+    my $slurpycap;
+    my $optional;
+    my $rwt;
 
     for @( $<trait> ) -> $trait {
         if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
         else {
             $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
         }
@@ -1681,11 +1748,6 @@ method parameter($/) {
 
     my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
 
-    my $sorry;
-    my $slurpy;
-    my $slurpycap;
-    my $optional;
-    my $rwt;
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
     elsif $tag eq '*:*'  { $slurpy = True }
@@ -1760,7 +1822,7 @@ method cgexp:quote ($/) {
 
 my %opshortcut = (
     '@'   => [ 'fetch' ],
-    'l'   => [ 'scopedlex' ],
+    'l'   => [ 'letvar' ],
     'ns'  => [ 'newscalar' ],
     'nsw' => [ 'newrwscalar' ],
     's'   => [ 'str' ],
@@ -1819,6 +1881,23 @@ method sibble($/) {
 method tribble($/) {}
 method babble($/) {}
 method quotepair($/) {}
+
+method capture($ ) {}
+method capterm($/) {
+    my @args;
+    if $<capture> {
+        my $x = $<capture>[0]<EXPR>.ast;
+        if $x.^isa(::Op::SimpleParcel) {
+            @args = @($x.items);
+        } else {
+            @args = $x;
+        }
+    } elsif $<termish> {
+        @args = ::Op::Paren.new(|node($/), inside => $<termish>.ast);
+    }
+    make ::Op::CallSub.new(|node($/), invocant => mklex($/, '&_make_capture'),
+        args => @args);
+}
 
 # We can't do much at blockoid reduce time because the context is unknown.
 # Roles and subs need somewhat different code gen
@@ -2167,6 +2246,11 @@ method statement_control:if ($/) {
     make self.if_branches($/, $<xblock>, @( $<elsif> ));
 }
 
+method statement_control:unless ($/) {
+    make ::Op::Conditional.new(|node($/), check => $<xblock>.ast[0],
+        false => self.block_to_immediate($/, 'cond', $<xblock>.ast[1]));
+}
+
 method statement_control:while ($/) {
     make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
         body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]),
@@ -2177,6 +2261,24 @@ method statement_control:until ($/) {
     make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
         body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]),
         :until, :!once);
+}
+
+method statement_control:repeat ($/) {
+    my $until = $<wu> eq 'until';
+    my $check = $<xblock> ?? $<xblock>.ast[0] !! $<EXPR>.ast;
+    my $body  = self.block_to_immediate($/, 'loop',
+        $<xblock> ?? $<xblock>.ast[1] !! $<pblock>.ast);
+    make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once);
+}
+
+method statement_control:loop ($/) {
+    my $body = self.block_to_immediate($/, 'loop', $<block>.ast);
+    # XXX wrong interpretation
+    my $init = $0 && $0[0]<e1>[0] ?? $0[0]<e1>[0].ast !! Any;
+    my $cond = $0 && $0[0]<e2>[0] ?? $0[0]<e2>[0].ast !! Any;
+    my $step = $0 && $0[0]<e3>[0] ?? $0[0]<e3>[0].ast !! Any;
+
+    make ::Op::GeneralLoop.new(|node($/), :$body, :$init, :$cond, :$step);
 }
 
 method statement_control:for ($/) {
@@ -2325,6 +2427,10 @@ method trait_mod:is ($/) {
         make { return_pass => 1 };
     } elsif $trait eq 'rw' {
         make { rw => 1 };
+    } elsif $trait eq 'parcel' {
+        make { rwt => 1 };
+    } elsif $trait eq 'readonly' {
+        make { readonly => 1 };
     } else {
         $/.CURSOR.sorry("Unhandled trait $trait");
         make { };
