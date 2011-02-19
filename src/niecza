@@ -255,6 +255,11 @@ method statement_control:repeat ($/) {
         $<xblock> ?? $<xblock>.ast[1] !! $<pblock>.ast);
     make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once);
 }
+
+method escale ($/) { }
+method dec_number ($/) {
+    make +((~$/).comb(/<-[_]>/).join(""));
+}
 }
 
 augment class CgOp {
