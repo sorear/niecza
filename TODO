@@ -14,9 +14,6 @@ EASY
 
    Implement Sub.leave and CallFrame.leave
 
-   Add decimal literals.  (Don't try to implement your own floating point
-   radix converter; use +$str)
-
    Add more benchmarks to perf/.
 
    Character class expressions like [[a .. A] & [\W]]
