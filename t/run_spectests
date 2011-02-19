@@ -28,6 +28,7 @@ prove -e 't/fudgeandrun' \
     ../roast/S04-statements/gather.t \
     ../roast/S04-statements/if.t \
     ../roast/S04-statements/last.t \
+    ../roast/S04-statements/loop.t \
     ../roast/S04-statements/map-and-sort-in-for.t \
     ../roast/S04-statements/next.t \
     ../roast/S04-statements/no-implicit-block.t \
