@@ -31,6 +31,13 @@ method quote:m  ($/) {
             receiver => self.op_for_regex($/, $<quibble>.ast),
             args => [ mklex($/, '$_') ]));
 }
+
+# actually we need a few more special cases here.
+method assertion:variable ($/) {
+    make ::RxOp::Subrule.new(|node($/), regex =>
+        ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
+            positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+}
 }
 
 my $usage = q:to/EOM/;
