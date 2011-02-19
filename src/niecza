@@ -23,6 +23,16 @@ use NieczaActions;
 use OpHelpers;
 use Operator;
 
+augment class NieczaActions {
+method quote:rx ($/) { make self.op_for_regex($/, $<quibble>.ast); }
+method quote:m  ($/) {
+    make mkcall($/, '&prefix:<?>',
+        ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
+            receiver => self.op_for_regex($/, $<quibble>.ast),
+            args => [ mklex($/, '$_') ]));
+}
+}
+
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
 

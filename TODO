@@ -26,7 +26,7 @@ EASY
 
    Stuff spectests are blocking on: "Block", "&hash", "writable $_",
    "closure for", "ranges of chars", "gather for",
-   "my regex / <&foo>", "m//",
+   "my regex / <&foo>",
 
    At least parsing Int et al on my-decls would help a lot
 
