@@ -2,7 +2,7 @@
 
 This is 'Niecza', which will eventually be a Perl 6 implementation focusing
 on optimization research.  It targets the Common Language Runtime (ECMA-335;
-implementations are "Mono" and ".NET").
+implementations are "Mono" and ".NET"). 
 
 There is also a Common Lisp backend in the works.
 
@@ -21,21 +21,19 @@ with a bus error on OS X 10.4 x86, but 2.6.4 works; 2.6.7 is fine on other
 platforms.
 
 2.8.2 or later is recommended for best performance; you should use
-C<RUN_CLR=mono-sgen> in this case.
+C<RUN_CLR=mono-sgen> in this case.  2.10 (latest stable) is also tested.
 
 Debian and derivatives have a modular mono packaging; you should install
 'mono-complete'.  (The other packages exist for the sake of Debian-packaged
 programs.)
 
+To run on Windows/Mono (2.8.2 and 2.10) and other systems, download the
+mono installers from C<http://go-mono.org/>
+
 =item *
 
 To run on Windows/Microsoft .NET 3.5 (2.0 runtime with 3.5 extensions)
-or .NET 4.0: C<http://goo.gl/PMKvB>
-
-Currently, you need to make a change to the C<Makefile> to enable
-a successful build under Cygwin, but once sorear makes a C<Configure.pl> and/or
-uses the mono autotools templates, this won't be needed... merely remove C<mono>
-from the line starting with C<RUN_CLR=>.  Niecza also runs on mono/Windows.
+or .NET 4.0, install the .NET runtime from C<http://goo.gl/PMKvB>
 
 =back
 
@@ -75,6 +73,10 @@ run will be much faster.  Also, the recompilation checker is not robust
 to file format changes; it may be necessary to clean temporary files
 after updates.
 
+Building on Windows currently requires the Cygwin environment with Mono's
+gmcs.exe in your Cygwin shell's $PATH, though in principle .NET's csc.exe
+could be made to work eventually, if it doesn't already.
+
 =head1 COPYRIGHT AND LICENSE
 
 Niecza is Copyright 2010 Stefan O'Rear et al.  It may be used and distributed
@@ -83,5 +85,5 @@ under the Artistic License 2.0 (included under LICENSE).
 =head1 CREDITS AND PRIOR ART
 
 This project was originally a spin-off of experiments done for
-Matthew "diakopter" Wilson's sprixel project, and is heavily inspired by
+Matthew "diakopter" Wilson's sprixel project, and was heavily inspired by
 many of its lower-level details.
