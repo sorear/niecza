@@ -22,7 +22,7 @@ my class Mu {
     }
     method succ() { defined(self) ?? die("cannot increment a value of type $.typename") !! 1 }
     method pred() { defined(self) ?? die("cannot decrement a value of type $.typename") !! -1 }
-    method notdef() { !self.defined }
+    method notdef() { !defined(self) }
     method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
     method perl() { defined(self) ?? self.Str !! self.typename }
     method so() { ?self }
@@ -179,15 +179,8 @@ my class Capture {
 # }}}
 # Scalar types {{{
 my class Num is Cool {
-    method Str () { Q:CgOp {
-        (box Str (num_to_string (unbox num (@ {self}))))
-    } }
-    method Bool() { Q:CgOp {
-        (box Bool (compare != (double 0) (unbox num (@ {self}))))
-    } }
     method pred() { (self // 0) - 1 }
     method succ() { (self // 0) + 1 }
-    method Numeric() { self }
     method ACCEPTS($t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 
@@ -203,9 +196,7 @@ sub infix:<**>($num,$power) {
 }
 
 my class Str is Cool {
-    method Str () { self }
     method ACCEPTS($t) { defined(self) ?? self eq $t !! $t.^does(self) }
-    method Bool () { self ne "" }
     method chars() { chars(self) }
     method say() { Q:CgOp {
         (prog [say (unbox str (@ {self}))]
@@ -241,7 +232,6 @@ my class Bool is EnumType {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Stringy() { self.key }
     method perl() { ~self }
-    method Bool() { self }
     method ACCEPTS($t) { defined(self) ?? self !! $t.^does(self) }
     method Numeric() { self ?? 1 !! 0 }
     our constant True  = Q:CgOp { (box Bool (bool 1)) };
