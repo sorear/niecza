@@ -971,6 +971,7 @@ my class Cursor {
 }
 
 my class Match is Cool {
+    method ACCEPTS($) { self // nextsame }
     method list () { @( self.Capture ) }
     method hash () { %( self.Capture ) }
     method flat () { @( self.Capture ) }

@@ -61,9 +61,6 @@ MEDIUM
    Audit accelerated context routines for correct undefined value and odd
    representation handling.  +Num shouldn't crash, etc.
 
- +*A general procedure for communicating data up and down the meta-spiral.
-   Use this to make a very simple eval knockoff.
-
  + Run MAIN without a temporary file (needed for eval knockoff).
 
 HARD

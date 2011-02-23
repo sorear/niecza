@@ -26,10 +26,9 @@ use Operator;
 augment class NieczaActions {
 method quote:rx ($/) { make self.op_for_regex($/, $<quibble>.ast); }
 method quote:m  ($/) {
-    make mkcall($/, '&prefix:<?>',
-        ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
+    make ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
             receiver => self.op_for_regex($/, $<quibble>.ast),
-            args => [ mklex($/, '$_') ]));
+            args => [ mklex($/, '$_') ]);
 }
 
 # actually we need a few more special cases here.
