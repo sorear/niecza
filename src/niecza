@@ -22,8 +22,143 @@ use GetOptLong;
 use NieczaActions;
 use OpHelpers;
 use Operator;
+use OptRxSimple;
+use Sig;
 
 augment class NieczaActions {
+method trait_mod:is ($/) {
+    my $trait = ~$<longname>;
+    my $noparm;
+
+    if $/.CURSOR.is_name($trait) {
+        make self.mangle_longname($<longname>);
+        $noparm = 'Superclasses cannot have parameters';
+    } elsif $trait eq 'export' {
+        make { export => [ 'DEFAULT', 'ALL' ] };
+        $noparm = 'Export tags NYI';
+    } elsif ($trait eq 'rawcall') {
+        make { nobinder => True };
+    } elsif $trait eq 'return-pass' { # &return special
+        make { return_pass => 1 };
+    } elsif $trait eq 'parcel' {
+        make { rwt => 1 };
+    } else {
+        make { $trait => True };
+    }
+
+    if $noparm && $<circumfix> {
+        $/.CURSOR.sorry($noparm);
+    }
+}
+
+method regex_def($/) {
+    sub _symtext($name) {
+        ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name, Str);
+    }
+    my ($name, $path) = $<deflongname> ??
+        self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
+    my $cname;
+    if defined($path) && $path == 0 && $name.^isa(Op) {
+        $cname = $name;
+        $name = ~$<deflongname>[0];
+        $path = Any;
+    }
+
+    my $scope = (!defined($name)) ?? "anon" !! ($*SCOPE || "has");
+
+    if $<signature> > 1 {
+        $/.CURSOR.sorry("Multiple signatures on a regex NYI");
+        return Nil;
+    }
+
+    if $cname && $scope ne 'has' {
+        $/.CURSOR.sorry("Only has regexes may have computed names");
+        make ::Op::StatementList.new;
+        return Nil;
+    }
+
+    my $isproto;
+    my ($basename, $symtext) = ($cname || !defined($name))
+        ?? (Str, Str) !! _symtext($name);
+
+    my $endsym;
+    for map *.ast, @$<trait> -> $t {
+        if $t<unary> || $t<binary> || $t<defequiv> {
+            # Ignored for now
+        }
+        elsif defined $t<endsym> {
+            $endsym = $t<endsym>;
+        }
+        else {
+            $/.CURSOR.sorry("Unhandled regex trait $t.keys.[0]");
+        }
+    }
+
+    if $*MULTINESS eq 'proto' {
+        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' ||
+                !defined($basename) {
+            $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
+            return Nil;
+        }
+        $isproto = True;
+    } else {
+        my $m2 = defined($symtext) ?? 'multi' !! 'only';
+        if $*MULTINESS && $*MULTINESS ne $m2 {
+            $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
+            return Nil;
+        }
+    }
+
+    if defined($path) && $scope ne 'our' {
+        $/.CURSOR.sorry("Putting a regex in a package requires using the our scope.");
+        return Nil;
+    }
+
+    my $sig = $<signature> ?? $<signature>[0].ast !! Sig.simple;
+
+    if $scope eq 'state' || $scope eq 'supercede' || $scope eq 'augment' {
+        $/.CURSOR.sorry("Nonsensical scope $scope for regex");
+        return Nil;
+    }
+
+    if $scope eq 'our' {
+        $/.CURSOR.sorry("our regexes NYI");
+        return Nil;
+    }
+
+    my $var = ($scope eq 'anon' || $scope eq 'has') ?? self.gensym
+        !! '&' ~ $name;
+
+    my $ast = $<regex_block>.ast;
+    if $isproto {
+        $ast = ::RxOp::ProtoRedis.new(name => $name);
+    }
+
+    {
+        my $*paren = 0;
+        my $*symtext = $symtext;
+        my $*dba = $name // 'anonymous regex';
+        $ast.check;
+    }
+    my $lad = OptRxSimple.run_lad($ast.lad);
+    my @lift = $ast.oplift;
+    ($ast, my $mb) = OptRxSimple.run($ast);
+    make ::Op::SubDef.new(|node($/),
+        var  => $var,
+        method_too => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
+        body => Body.new(
+            ltm   => $lad,
+            returnable => True,
+            class => 'Regex',
+            type  => 'regex',
+            name  => $name // 'ANONrx',
+            signature => $sig.for_method,
+            do => ::Op::RegexBody.new(|node($/), pre => @lift,
+                name => ($name // ''), rxop => $ast, canback => $mb)));
+}
+
 method quote:rx ($/) { make self.op_for_regex($/, $<quibble>.ast); }
 method quote:m  ($/) {
     make ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
