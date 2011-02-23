@@ -1,0 +1,102 @@
+    Announce: Niecza Perl 6 v3
+
+This is the third announcement of a distinguished Niecza version, and
+we seem to be settling into a routine here.  *Yay*  On the other hand,
+I didn't get around to doing as much as I wanted this month. Niecza tag
+announcements occur on the last Monday of each month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  Cygwin is required for source builds only; see the README for
+details.
+
+    List of changes
+
+Control operators with labels are now available, and function lexotically
+as described in S04.  This is possibly the first implementation of
+lexotics.  (Yes, attaching labels to loops and statements is now supported.
+I'm not *that* cheap.)  The goto statement is also supported.
+
+The given/when structure is now available.  Sorry, but there's no jump
+table generation yet - a given with N equally likely cases will take
+O(N) time.  This includes succeed and proceed.
+
+Niecza follows the recent S05 change to not generate lists for the
+"?" quantifier.  This will probably break most of your regex code.
+
+Control operators will be translated into low-level jumps if no stack
+unwinding is required; return statements are no longer at all expensive.
+
+The regular expression forms rx//, m//, and s/// are now supported.
+
+Several more metaoperators are supported, specifically Z+, X+, and [+].
+The non-meta versions of Z and X of course came with the deal.
+
+Here-documents are now deindented in a way that approximates S02.
+
+Callwith and callsame are now supported.
+
+Generation of "unsafe" code in the CLR backend has been turned off by
+default.
+
+New loops and conditionals: unless, repeat/while, repeat/until, loop.
+
+Decimal literals like 1.5e2 parse now.
+
+Indirect regex calls of the <&foo> form are supported now.
+
+Many more passing spectests (over a thousand).
+
+Minor stuff:
+ * Various improvements to nam documentation.
+ * ~~ now binds $_ in its right side.
+ * Using a match operation without subcaptures in list context has been
+   special-cased to DWME (Do What Moritz Expects).  Hopefully it will be
+   less suprising to you, too.
+ * 1 [+] 2 now warns.  (It means the same as 1 + 2)
+ * The TODO lists have been reorganized and are hopefully more useful.
+ * @.foo et al now impose list etc context as they should.
+ * Sigilled constants behave in a slightly more useful way.
+ * %() can now turn a list of pairs into a hash.
+ * qw[] et al are now parsed correctly.
+ * return now takes multiple arguemnts (and handles them like Rakudo does)
+ * ++ and -- are polymorphic using .succ and .pred.
+ * Any.join defaults separator to ""
+ * ucfirst and lcfirst have been added
+ * Capture expressions (and Capture.perl) are now supported.
+
+Really minor stuff:
+ * There's an [auto-compiling setting] notice, so you won't think the
+   compiler has hung on Hello World.
+ * Starting to clean up the nieczaisms in niecza's STD.pm6
+ * The frontend no longer generates invalid JSON.  (Oops!)
+ * is readonly is now parsed and ignored.
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+Next month's first priorities will be a development of a usable stopgap
+eval and a reasonable way to install Niecza.  Since 6model integration
+was not completed last month, it is still on the agenda. That will mean
+copying Jonathan Worthington's "6model" design to whatever extent is
+reasonable; subtypes, role composition, type constraints on variables,
+type constraints on parameters, enums, multiple dispatch, and
+representation polymorphism will be implemented.
+
+Much more focus on spectest support is also expected in the coming weeks.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-3.zip
+[2] https://github.com/sorear/niecza
