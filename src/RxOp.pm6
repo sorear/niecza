@@ -51,6 +51,7 @@ class Capturing is RxOp {
 
 class Sym is Capturing {
     has $.text; # Str, is rw
+    has $.endsym; # Str, is rw
     has $.igcase; # Bool
     has $.igmark; # Bool
 
@@ -59,7 +60,7 @@ class Sym is Capturing {
             :$captures);
     }
 
-    method check() { $.text = $*symtext; nextsame }
+    method check() { $.text = $*symtext; $.endsym = $*endsym; nextsame }
 
     method code($body) { #OK not used
         my $t = $.text;
@@ -67,17 +68,20 @@ class Sym is Capturing {
         # a good reason.
         my $p = CgOp.rxpushcapture(CgOp.string_var($t), @$.captures);
         my $ic = $.igcase ?? "NoCase" !! "";
+        my @e = !defined($.endsym) ?? () !!
+            ::RxOp::Subrule.new(method => $.endsym, :selfcut).code($body);
         if chars($t) == 1 {
-            $p, CgOp.rxbprim("ExactOne$ic", CgOp.char($t));
+            $p, CgOp.rxbprim("ExactOne$ic", CgOp.char($t)), @e;
         } else {
-            $p, CgOp.rxbprim("Exact$ic", CgOp.str($t));
+            $p, CgOp.rxbprim("Exact$ic", CgOp.str($t)), @e;
         }
     }
 
     method tocclist() { $!text.comb.map({ CClass.enum($_) }) }
 
     method lad() {
-        [ ($!igcase ?? 'StrNoCase' !! 'Str'), $!text ];
+        my $m = [ ($!igcase ?? 'StrNoCase' !! 'Str'), $!text ];
+        defined($!endsym) ?? [ 'Sequence', [ [ 'Method', $!endsym ], $m ] ] !! $m;
     }
 }
 

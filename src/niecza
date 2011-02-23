@@ -1,5 +1,6 @@
 use Metamodel;
 use Op;
+use RxOp;
 use CClass;
 use CgOp;
 use Body;
@@ -25,6 +26,13 @@ use Operator;
 use OptRxSimple;
 use Sig;
 
+augment class RxOp::Sym { #OK exist
+    method lad() {
+        my $m = [ ($!igcase ?? 'StrNoCase' !! 'Str'), $!text ];
+        defined($!endsym) ?? [ 'Sequence', [$m, [ 'Method', $!endsym ]] ] !! $m;
+    }
+}
+
 augment class NieczaActions {
 method trait_mod:is ($/) {
     my $trait = ~$<longname>;
@@ -36,10 +44,20 @@ method trait_mod:is ($/) {
     } elsif $trait eq 'export' {
         make { export => [ 'DEFAULT', 'ALL' ] };
         $noparm = 'Export tags NYI';
-    } elsif ($trait eq 'rawcall') {
+    } elsif $trait eq 'endsym' {
+        my $text;
+        if !$<circumfix> || !$<circumfix>[0].ast.^isa(::Op::StringLiteral) {
+            $/.CURSOR.sorry("Argument to endsym must be a literal string");
+        } else {
+            $text = $<circumfix>[0].ast.text;
+        }
+        make { endsym => $text };
+    } elsif $trait eq 'rawcall' {
         make { nobinder => True };
     } elsif $trait eq 'return-pass' { # &return special
         make { return_pass => 1 };
+    } elsif $trait eq 'parcel' {
+        make { rwt => 1 };
     } elsif $trait eq 'parcel' {
         make { rwt => 1 };
     } else {
@@ -49,6 +67,21 @@ method trait_mod:is ($/) {
     if $noparm && $<circumfix> {
         $/.CURSOR.sorry($noparm);
     }
+}
+
+method op_for_regex($/, $rxop) {
+    my @lift = $rxop.oplift;
+    {
+        my $*paren = 0;
+        my $*dba = 'anonymous rule';
+        my $*symtext;
+        my $*endsym;
+        $rxop.check
+    }
+    my ($orxop, $mb) = OptRxSimple.run($rxop);
+    self.transparent($/, ::Op::RegexBody.new(|node($/), canback => $mb,
+            pre => @lift, rxop => $orxop),
+        class => 'Regex', type => 'regex', sig => Sig.simple.for_method);
 }
 
 method regex_def($/) {
@@ -102,6 +135,7 @@ method regex_def($/) {
             $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
             return Nil;
         }
+        @*MEMOS[0]<proto_endsym>{$basename} = $endsym;
         $isproto = True;
     } else {
         my $m2 = defined($symtext) ?? 'multi' !! 'only';
@@ -109,6 +143,7 @@ method regex_def($/) {
             $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
             return Nil;
         }
+        $endsym //= @*MEMOS[0]<proto_endsym>{$basename} if defined $basename;
     }
 
     if defined($path) && $scope ne 'our' {
@@ -139,6 +174,7 @@ method regex_def($/) {
     {
         my $*paren = 0;
         my $*symtext = $symtext;
+        my $*endsym = $endsym;
         my $*dba = $name // 'anonymous regex';
         $ast.check;
     }
