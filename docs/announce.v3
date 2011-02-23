@@ -15,8 +15,8 @@ better" perspective.
 Niecza is a Perl 6 compiler project studying questions about the
 efficient implementability of Perl 6 features.  It currently targets
 the Common Language Runtime; both Mono and Microsoft .NET are known to
-work.  Cygwin is required for source builds only; see the README for
-details.
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
 
     List of changes
 
@@ -67,7 +67,7 @@ Minor stuff:
  * Sigilled constants behave in a slightly more useful way.
  * %() can now turn a list of pairs into a hash.
  * qw[] et al are now parsed correctly.
- * return now takes multiple arguemnts (and handles them like Rakudo does)
+ * return now takes multiple arguments (and handles them like Rakudo does)
  * ++ and -- are polymorphic using .succ and .pred.
  * Any.join defaults separator to ""
  * ucfirst and lcfirst have been added
