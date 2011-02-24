@@ -770,9 +770,11 @@ sub postcircumfix:<[ ]>(\$container, $index) {
     $container.at-pos($index)
 }
 
-sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete) {
+sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete, :$p, :$kv) {
     $exists ?? $container.exists-key($key) !!
     $delete ?? $container.delete-key($key) !!
+    $p      ?? $key => $container.at-key($key) !!
+    $kv     ?? $key,   $container.at-key($key) !!
     $container.at-key($key)
 }
 
