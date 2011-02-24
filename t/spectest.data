@@ -9,8 +9,10 @@ S02-builtin_data_types/nested_pairs.t
 S02-builtin_data_types/parsing-bool.t
 S02-builtin_data_types/subscripts_and_context.t
 S02-lexical-conventions/unicode.t
+S02-literals/hex_chars.t
 S02-literals/pair-boolean.t
 S02-literals/underscores.t
+S02-names/identifier.t
 S02-names_and_variables/contextual.t
 S02-whitespace_and_comments/begin_end_pod.t
 S02-whitespace_and_comments/pod-in-multi-line-exprs.t
@@ -51,6 +53,7 @@ S04-statements/while.t
 S05-capture/subrule.t
 S05-grammar/methods.t
 S05-grammar/protoregex.t
+S05-modifier/ignoreaccent.t
 S05-interpolation/lexicals.t
 S05-metachars/line-anchors.t
 S05-metasyntax/changed.t
@@ -70,6 +73,7 @@ S12-methods/how.t
 S29-any/cmp.t
 S29-context/exit-in-if.t
 S32-array/bool.t
+S32-hash/pairs.t
 S32-num/power.t
 S32-str/append.t
 S32-str/bool.t
