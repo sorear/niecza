@@ -756,6 +756,9 @@ my class Enum is Cool {
 }
 
 my class Pair is Enum {
+    method Str() {
+        $.key ~ "\t" ~ $.value
+    }
 }
 # }}}
 # List utilities {{{
