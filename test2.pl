@@ -2,6 +2,11 @@
 use Test;
 use MONKEY_TYPING;
 
+{
+    "foo" ~~ /\w+/;
+    is $0, "foo", 'Match[0] returns whole match if no parens';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

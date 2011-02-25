@@ -585,11 +585,15 @@ public class Cursor : IP6 {
             it = it.prev;
         }
 
+        if (str == "0" && caps.Count() == 0)
+            caps.Unshift(Kernel.NewROScalar(this));
+
         return FixupList(caps);
     }
 
     public void UnpackCaps(IP6 into) {
         List<VarDeque> posr = new List<VarDeque>();
+        posr.Add(new VarDeque());
         Dictionary<string,VarDeque> namr = new Dictionary<string,VarDeque>();
         CapInfo it = captures;
 
@@ -608,6 +612,9 @@ public class Cursor : IP6 {
             }
             it = it.prev;
         }
+
+        if (posr[0].Count() == 0)
+            posr[0].Unshift(Kernel.NewROScalar(this));
 
         VarHash nam = new VarHash();
         Variable[] pos = new Variable[posr.Count];
