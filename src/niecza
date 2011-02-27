@@ -25,6 +25,57 @@ use OpHelpers;
 use Operator;
 use OptRxSimple;
 use Sig;
+use STD;
+
+augment class STD::P6 { #OK exist
+    token param_var($named = 0) {
+        :dba('formal parameter')
+        [
+        | '[' ~ ']' <signature>
+        | '(' ~ ')' <signature>
+        | <sigil> <twigil>?
+            [
+                # Is it a longname declaration?
+            || <?{ $<sigil>.Str eq '&' }> <?ident> {}
+                <name=.sublongname>
+
+            ||  # Is it a shaped array or hash declaration?
+                <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
+                <name=.identifier>?
+                <?before <[ \< \( \[ \{ ]> >
+                <postcircumfix>
+
+                # ordinary parameter name
+            || <name=.identifier>
+            || <name=.decint> <.panic: "Can't declare a numeric parameter">
+            || $<name> = [<[/!]>]
+
+                # bare sigil?
+            ]?
+            {
+                my $vname = $<sigil>.Str;
+                my $t = $<twigil>;
+                my $twigil = '';
+                $twigil = $t.Str if $t;
+                $vname ~= $twigil;
+                my $n = ($<name> // '').Str;
+                $vname ~= $n;
+                if $twigil eq '' {
+                    self.add_my_name($vname) if $n ne '';
+                    # :$param is often used as a multi matcher without $param used in body
+                    #   so don't count as "declared but not used"
+                    $*CURLEX{$vname}<used> = 1 if $named and $n;
+                }
+                elsif $twigil eq '.' { }
+                elsif $twigil eq '!' { }
+                elsif $twigil eq '*' { }
+                else {
+                    self.panic("You may not use the $twigil twigil in a signature");
+                }
+            }
+        ]
+    }
+}
 
 augment class RxOp::Sym { #OK exist
     method lad() {
@@ -34,6 +85,85 @@ augment class RxOp::Sym { #OK exist
 }
 
 augment class NieczaActions {
+method mod_internal:p6adv ($/) {
+    my ($k, $v) = $<quotepair><k v>;
+
+    if !$v.^isa(Match) {
+        $/.CURSOR.sorry(":$k requires an expression argument");
+        make ::RxOp::None.new;
+        return Nil;
+    }
+    $v = $v.ast;
+
+    if $k eq 'lang' {
+        make ::RxOp::SetLang.new(expr => self.rxembed($/, $v, True));
+    } elsif $k eq 'dba' {
+        while True {
+            if $v.^isa(::Op::Paren) { $v = $v.inside; redo }
+            if $v.^isa(::Op::StatementList) && +$v.children == 1
+                { $v = $v.children.[0]; redo }
+            last;
+        }
+        if !$v.^isa(::Op::StringLiteral) {
+            $/.CURSOR.sorry(":dba requires a literal string");
+            make ::RxOp::None.new;
+            return Nil;
+        }
+        %*RX<dba> = $v.text;
+    }
+}
+method quantifier:sym<**> ($/) {
+    # XXX can't handle normspace well since it's not labelled 1*/2*
+    my $h = $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
+            $<quantified_atom> ?? { min => 1, sep => $<quantified_atom>.ast } !!
+            { min => +~$0, max => ($1 ?? +~$1 !!
+                defined($/.index('..')) ?? Any !! +~$0) };
+    $h<mod> = $<quantmod>.ast;
+    make $h;
+}
+method quantified_atom($/) { # :: RxOp
+    my $atom = $<atom>.ast;
+    my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;
+
+    return Nil unless $atom;
+
+    if %*RX<r> {
+        # no quantifier at all?  treat it as :
+        $q //= { mod => '' };
+        # quantifier without explicit :? / :! gets :
+        $q<mod> //= '';
+    }
+
+    if defined $q<min> {
+        my @z = $atom;
+        push @z, $q<sep> if defined $q<sep>;
+        $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
+            nonlisty => $q<nonlisty>,
+            zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
+    }
+
+    if defined($q<mod>) && $q<mod> eq '' {
+        $atom = ::RxOp::Cut.new(zyg => [$atom]);
+    }
+
+    if defined $q<tilde> {
+        my ($closer, $inner) = @( $q<tilde> );
+        $closer = $closer.zyg[0] if $closer.^isa(::RxOp::Cut) &&
+            $closer.zyg[0].^isa(::RxOp::String);
+        if !$closer.^isa(::RxOp::String) {
+            $/.CURSOR.sorry("Non-literal closers for ~ NYI");
+            make ::RxOp::None.new;
+            return Nil;
+        }
+        $inner = self.encapsulate_regex($/, $inner, passcut => True,
+            goal => $closer.text, passcap => True);
+        $atom = ::RxOp::Sequence.new(zyg => [$atom,
+            ::RxOp::Tilde.new(closer => $closer.text, dba => %*RX<dba>,
+                zyg => [$inner])]);
+    }
+
+    make $atom;
+}
 sub mkstringycat($/, *@strings) {
     my @a;
     for @strings -> $s {
