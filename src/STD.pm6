@@ -15,17 +15,6 @@ package DEBUG {
     our constant EXPR   = 2;
 }
 
-sub _subst($M is rw, $text is rw, $regex, $repl) {
-    $text = $text.Str;
-    $M = ($text ~~ $regex);
-    if $M {
-        $text = $text.substr(0, $M.from) ~
-            (($repl ~~ Str) ?? $repl !! $repl()) ~
-                $text.substr($M.to, $text.chars - $M.to);
-    }
-    ?$M;
-}
-
 our $ALL;
 
 =begin comment
@@ -5468,9 +5457,8 @@ method add_placeholder($name) {
     my $varname = $name;
     my $twigil = '';
     my $signame = $varname;
-    my $M;
-    if _subst($M, $varname, /<[ ^ : ]>/, "") {
-        $twigil = $M.Str;
+    if $varname ~~ s/<[ ^ : ]>// {
+        $twigil = $/.Str;
         $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
     }
     return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
@@ -6078,10 +6066,9 @@ method add_categorical($name) {
         self.add_my_name($name);
         return self;
     }
-    my $M = ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
-    return self unless $M;
-    my $cat = $M[0];
-    my $sym = substr($name, $M.to);
+    return self unless ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
+    my $cat = ~$0;
+    my $sym = substr($name, $/.to);
     if $sym ~~ /^\<\< .*: <?after \>\>>$/ {
         $sym = substr($sym, 2, $sym.chars - 4);
     }
@@ -6092,8 +6079,8 @@ method add_categorical($name) {
         $sym = substr($sym, 1, $sym.chars - 2);
     }
 
-    _subst($M, $sym, /^\s*/, "");
-    _subst($M, $sym, /\s*$/, "");
+    $sym ~~ s/^\s*//;
+    $sym ~~ s/\s*$//;
 
     my $O;
 
@@ -6111,9 +6098,9 @@ method add_categorical($name) {
     }
 
     # XXX to do this right requires .comb and .trans
-    if $M = ($sym ~~ /\s+/) {
-        my $sym1 = $sym.substr(0, $M.from);
-        my $sym2 = $sym.substr($M.to, $sym.chars - $M.to);
+    if $sym ~~ /\s+/ {
+        my $sym1 = $sym.substr(0, $/.from);
+        my $sym2 = $sym.substr($/.to, $sym.chars - $/.to);
         my $cname = $cat ~ ":<$sym1 $sym2>";
         %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[$cname, $sym1, $sym2, $O];
     } else {
@@ -6149,18 +6136,18 @@ method canonicalize_name($n) {
     return $name unless $name ~~ /::/;
     self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
 
-    if $M = $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
-        $name = $M[1] ~ "<" ~ $M[0] ~ substr($name, $M.to) ~ ">";
+    if $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
+        $name = $1 ~ "<" ~ $0 ~ substr($name, $/.to) ~ ">";
     }
     my $vname;
-    if ($M = $name ~~ /'::<'/) && $name.substr($name.chars - 1, 1) eq '>' {
-        $name = substr($name, 0, $M.from);
-        $vname = substr($name, $M.to, $name.chars - $M.to - 1);
+    if ($name ~~ /'::<'/) && $name.substr($name.chars - 1, 1) eq '>' {
+        $name = substr($name, 0, $/.from);
+        $vname = substr($name, $/.to, $name.chars - $/.to - 1);
     }
     my @components;
-    while $M = $name ~~ / '::' / {
-        push @components, $name.substr(0, $M.to);
-        $name = substr($name, $M.to);
+    while $name ~~ / '::' / {
+        push @components, $name.substr(0, $/.to);
+        $name = substr($name, $/.to);
     }
     push @components, $name;
     shift(@components) while @components and @components[0] eq '';
@@ -6185,13 +6172,13 @@ method locmess () {
     my $pre = substr(self.orig, 0, $pos);
     my $prel = chars($pre) min 40;
     $pre = substr($pre, chars($pre)-$prel, $prel);
-    if my $M = ($pre ~~ /^.*\n/) {
-        $pre = substr($pre, $M.to);
+    if ($pre ~~ /^.*\n/) {
+        $pre = substr($pre, $/.to);
     }
     $pre = '<BOL>' if $pre eq '';
     my $post = substr(self.orig, $pos, (chars(self.orig)-$pos) min 40);
-    if $M = ($post ~~ /\n/) {
-        $post = substr($post,0,$M.from);
+    if ($post ~~ /\n/) {
+        $post = substr($post,0,$/.from);
     }
     $post = '<EOL>' if $post eq '';
     " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~
@@ -6240,15 +6227,14 @@ method mark_sinks(@sl) {
 
 method gettrait($traitname,$param) {
     my $text;
-    my $M;
     if @$param {
         $text = $param.[0].Str;
-        _subst($M, $text, /^\<(.*)\>$/, { $M[0].Str }) or
-            _subst($M, $text, /^\((.*)\)$/, { $M[0].Str });
+        ($text ~~ s/^\<(.*)\>$/$0/) ||
+            ($text ~~ s/^\((.*)\)$/$0/);
     }
     if ($traitname eq 'export') {
         if (defined $text) {
-            while _subst($M, $text, /\:/, "") { }
+            while $text ~~ s/\:// { }
         }
         else {
             $text = 'DEFAULT';
@@ -6285,11 +6271,10 @@ method clean_id ($idx, $name) {
     my $file = $*FILE<name>;
 
     $id ~= '::';
-    my $M;
-    _subst($id, $M, /^'MY:file<CORE.setting>'.*?'::'/, "CORE::");
-    _subst($id, $M, /^MY\:file\<\w+\.setting\>.*?\:\:/, "SETTING::");
-    _subst($id, $M, /^MY\:file\<$file\>$/, "UNIT");
-    _subst($id, $M, /\:pos\(\d+\)/, "");
+    $id ~~ s/^'MY:file<CORE.setting>'.*?'::'/CORE::/;
+    $id ~~ s/^MY\:file\<\w+\.setting\>.*?\:\:/SETTING::/;
+    $id ~~ s/^MY\:file\<$file\>$/UNIT/;
+    $id ~~ s/\:pos\(\d+\)//;
     $id ~= "<$name>";
     $id;
 }
@@ -6309,9 +6294,8 @@ method label_id() {
 method do_import($m, $args) { #, perl6.vim stupidity
     my @imports;
     my $module = $m.Str;
-    my $M;
-    if $M = ($module ~~ /(class|module|role|package)\s+(\S+)/) {
-        $module = $M[1];
+    if $module ~~ /(class|module|role|package)\s+(\S+)/ {
+        $module = ~$1;
     }
 
     my $pkg = self.find_stash($module);
@@ -6324,15 +6308,15 @@ method do_import($m, $args) { #, perl6.vim stupidity
     if $args {
         my $text = $args.Str;
         return self unless $text;
-        while _subst($M, $text, /^\s*\:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?\<(.*?)\>\,?/, "") {
-            my $scope = lc($M[0] // 'my');
-            my $imports = $M[1].Str;
+        while $text ~~ s/^\s*\:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?\<(.*?)\>\,?// {
+            my $scope = lc($0 // 'my');
+            my $imports = $1.Str;
             my $*SCOPE = $scope;
             @imports = $imports.comb(/\S+/);
             for @imports -> $i {
                 my $imp = $i;
                 if $pkg {
-                    if _subst($M, $imp, /^\:/, "") {
+                    if $imp ~~ s/^\:// {
                         my @tagimports;
                         try { @tagimports = $pkg<EXPORT::>{$imp}.keys }
                         self.do_import_aliases($pkg, @tagimports);
