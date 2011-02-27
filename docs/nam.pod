@@ -149,6 +149,8 @@ some internal code fragments, usually in response to _hack settings.
 
 =head3 _makesub
 
+=head3 _newlabel
+
 =head3 _parametricrole
 
 
@@ -159,13 +161,20 @@ some internal code fragments, usually in response to _hack settings.
 Sets the C<$line_number> for the C<$operation>.  In the C# backend, line
 number is only recorded at high-level call sites within the span.
 
-=head3 ehspan($class,$name,$unused,$start,$end,$goto)
+=head3 xspan($n1,$n2,$sync,$body,{$class,$name,$goto},..)
 
-In the half-open interval from C<$start> to C<$end> (both of which should be
-string label names), an exception of class C<$class> [1] will cause control
-to be transferred to C<$end>.  C<$name> is used for targetted control
-exceptions, possibly paired with the identity of the target frame.  Exactly
-how return values are passed is still something of a mystery.
+Generates the code for C<$body> bracketed by the labels C<$n1> and
+C<$n2>.  If an exception transfers control to C<$n2>, the exception
+payload will be returned.  Triples of C<$code>, C<$label>, and
+C<$goto> define exception handling within the block.  C<$sync> forces
+exception handling to be synchronous with respect to the boundaries,
+allowing an C<ON_DIE> handler to function properly.
+
+For each triple, while execution is within the block, an exception of
+class C<$class> [1] will cause control to be transferred to C<$goto>.
+C<$name> is used for targetted control exceptions, possibly paired
+with the identity of the target frame.  A name of the empty string is
+treated as no name; such handlers can only be reached anonymously.
 
 [1] The following class values are currently defined:
 
@@ -174,17 +183,10 @@ how return values are passed is still something of a mystery.
     3   ON_REDO             &redo
     4   ON_RETURN           &return
     5   ON_DIE              General exception, payload usually Str
-    6   ON_SUCCEED
-    7   ON_PROCEED
-    8   ON_GOTO
+    6   ON_SUCCEED          &succeed, when{} matched
+    7   ON_PROCEED          &proceed
+    8   ON_GOTO             &goto
     9   ON_NEXTDISPATCH     &nextsame, &nextwith; payload is a Capture
-
-=head3 span($n1,$n2,$sync,$body)
-
-Generates the code for C<$body> bracketed by the labels C<$n1> and C<$n2>.  If
-an exception transfers control to C<$n2>, the exception payload will be
-returned.  C<$sync> forces exception handling to be synchronous with respect
-to the boundaries, allowing an C<ON_DIE> handler to function properly.
 
 
 =head2 Operations on numbers
@@ -194,6 +196,8 @@ to the boundaries, allowing an C<ON_DIE> handler to function properly.
 =head3 bif_divide
 
 =head3 bif_minus
+
+=head3 bif_mod
 
 =head3 bif_mul
 
@@ -428,9 +432,19 @@ True if C<$var> has the list nature.
 
 =head3 bif_array_constructor
 
+=head3 bif_cross($usefun,$fvarlist)
+
+Implements C<X> or C<Xop>; if C<$usefun> is true, the first item in
+C<$fvarlist> is taken as a function reference.
+
 =head3 bif_grep
 
 =head3 bif_map
+
+=head3 bif_zip($usefun,$fvarlist)
+
+Implements C<Z> or C<Zop>; if C<$usefun> is true, the first item in
+C<$fvarlist> is taken as a function reference.
 
 =head3 get_first($list)
 
@@ -667,6 +681,8 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 
 =head2 Sequence control operations
+
+=head3 callnext($capture)
 
 =head3 cgoto($name,$if)
 
@@ -997,6 +1013,13 @@ the scopedlex or corelex operations, but are automatically bound by the
 handling of hint_hack subs.
 
     Name            Type    Description
+    name            string  "OUTER" or similar
+    typecode        string  Always 'label'
+
+This type marks labels.  Labels are cloned like subs on entry, and
+refer to objects which encapsulate a name and a frame reference.
+
+    Name            Type    Description
     name            string  "$foo"
     typecode        string  Always 'simple'
     flags           number  4=NOINIT, 2=LIST, 1=HASH
@@ -1073,3 +1096,5 @@ These are used for subs, and must be in correspondence with the "zyg" list.
     superclasses    Xref[]  Direct superclasses of the class
     (The following is only found in class, grammar)
     linear_mro      Xref[]  All superclasses in C3 order
+
+=for vim vim: tw=70
