@@ -480,6 +480,20 @@ else {
     exit 1;
 }
 
+my $stages;
+if $bcnd eq 'clisp' {
+    $stages = [
+        NieczaPassBegin.new,
+        NieczaPassSimplifier.new,
+    ];
+} else {
+    $stages = [
+        NieczaPassBegin.new,
+        NieczaPassBeta.new,
+        NieczaPassSimplifier.new,
+    ];
+}
+
 my $c = NieczaCompiler.new(
     module_finder => NieczaPathSearch.new(
         path => @lib,
@@ -488,11 +502,7 @@ my $c = NieczaCompiler.new(
         lang => $safe ?? 'SAFE' !! $lang,
         safemode => $safe,
     ),
-    stages => [
-        NieczaPassBegin.new,
-        NieczaPassBeta.new,
-        NieczaPassSimplifier.new,
-    ],
+    stages => $stages,
     backend => $backend,
     verbose => $verb,
 );

@@ -32,8 +32,9 @@
 
 ; Hacks
 
-(nam-op ehspan (class name unused start end goto) )
-(nam-op span (n1 n2 sync body) body)
+;(nam-op ehspan (class name unused start end goto) )
+;(nam-op span (n1 n2 sync body) body)
+(nam-op xspan (n1 n2 flag body dunno1 dunno2 dunno3) body)
 
 (defun strip-ann (thing) 
   (if (consp thing)
