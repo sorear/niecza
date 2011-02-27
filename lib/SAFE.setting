@@ -52,7 +52,7 @@ my class Any is Mu {
         Q:CgOp { (newvsubvar (class_ref mo Any) (@ {$cr}) (@ {self})) }
     }
 
-    method hash() { _hash_constructor(@(self)) }
+    method hash() { anon %hash = @(self) }
 }
 
 my class Cursor { ... }

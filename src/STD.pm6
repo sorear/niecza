@@ -167,7 +167,7 @@ token category:sigil { <sym> }
 proto token sigil {*}
 
 token category:twigil { <sym> }
-proto token twigil {*}
+proto token twigil is endsym<begid> {*}
 
 token category:special_variable { <sym> }
 proto token special_variable {*}
@@ -203,7 +203,7 @@ token category:postfix { <sym> }
 proto token postfix {*}
 
 token category:dotty { <sym> }
-proto token dotty {*}
+proto token dotty is endsym<unspacey> {*}
 
 token category:circumfix { <sym> }
 proto token circumfix {*}
@@ -215,37 +215,37 @@ token category:quote_mod { <sym> }
 proto token quote_mod {*}
 
 token category:trait_mod { <sym> }
-proto token trait_mod {*}
+proto token trait_mod is endsym<keyspace> {*}
 
 token category:type_declarator { <sym> }
-proto token type_declarator {*}
+proto token type_declarator is endsym<keyspace> {*}
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator {*}
+proto token scope_declarator is endsym<nofun> {*}
 
 token category:package_declarator { <sym> }
-proto token package_declarator {*}
+proto token package_declarator is endsym<keyspace> {*}
 
 token category:multi_declarator { <sym> }
-proto token multi_declarator {*}
+proto token multi_declarator is endsym<keyspace> {*}
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator {*}
+proto token routine_declarator is endsym<nofun> {*}
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator {*}
+proto token regex_declarator is endsym<keyspace> {*}
 
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix {*}
 
 token category:statement_control { <sym> }
-proto rule  statement_control {*}
+proto rule  statement_control is endsym<keyspace> {*}
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond {*}
+proto rule  statement_mod_cond is endsym<nofun> {*}
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop {*}
+proto rule  statement_mod_loop is endsym<nofun> {*}
 
 token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator {*}
@@ -285,14 +285,14 @@ token sigil:sym<@>  { <sym> }
 token sigil:sym<%>  { <sym> }
 token sigil:sym<&>  { <sym> }
 
-token twigil:sym<.> { <sym> <.begid> }
-token twigil:sym<!> { <sym> <.begid> }
-token twigil:sym<^> { <sym> <.begid> }
-token twigil:sym<:> { <sym> <.begid> }
-token twigil:sym<*> { <sym> <.begid> }
-token twigil:sym<?> { <sym> <.begid> }
-token twigil:sym<=> { <sym> <.begid> }
-token twigil:sym<~> { <sym> <.begid> }
+token twigil:sym<.> { <sym> }
+token twigil:sym<!> { <sym> }
+token twigil:sym<^> { <sym> }
+token twigil:sym<:> { <sym> }
+token twigil:sym<*> { <sym> }
+token twigil:sym<?> { <sym> }
+token twigil:sym<=> { <sym> }
+token twigil:sym<~> { <sym> }
 
 # overridden in subgrammars
 token stopper { <!> }
@@ -1378,7 +1378,7 @@ grammar P6 is STD {
 
     token statement_control:need {
         :my $longname;
-        <sym><.keyspace>:s
+        <sym>:s
         [
         |<version>
         |<module_name>
@@ -1394,7 +1394,7 @@ grammar P6 is STD {
     token statement_control:import {
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
         <term>
         [
         || <.spacey> <arglist>
@@ -1413,7 +1413,7 @@ grammar P6 is STD {
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
         :my %*MYSTERY;
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
         [
         | <version>
         | <module_name>
@@ -1438,7 +1438,7 @@ grammar P6 is STD {
 
     token statement_control:no {
         :my %*MYSTERY;
-        <sym><.spacey> <.ws>
+        <sym> <.ws>
         <module_name>[<.keyspace><arglist>]?
         <.ws>
         <.explain_mystery>
@@ -1446,7 +1446,7 @@ grammar P6 is STD {
 
 
     token statement_control:if {
-        <sym><.keyspace> :s
+        <sym> :s
         <xblock>
         [
             [
@@ -1461,14 +1461,14 @@ grammar P6 is STD {
 
 
     token statement_control:unless {
-        <sym><.keyspace> :s
+        <sym> :s
         <xblock>
         [ <!before 'else'> || <.panic: "\"unless\" does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
     }
 
 
     token statement_control:while {
-        <sym><.keyspace> :s
+        <sym> :s
         [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
             <.panic: "This appears to be Perl 5 code"> ]?
         <xblock>
@@ -1476,13 +1476,13 @@ grammar P6 is STD {
 
 
     token statement_control:until {
-        <sym><.keyspace> :s
+        <sym> :s
         <xblock>
     }
 
 
     token statement_control:repeat {
-        <sym><.keyspace> :s
+        <sym> :s
         [
             | $<wu>=['while'|'until']<.keyspace>
               <xblock>
@@ -1492,7 +1492,7 @@ grammar P6 is STD {
     }
 
     token statement_control:loop {
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
         $<eee> = (
             '(' [ :s
                 <e1=.EXPR>? ';'
@@ -1506,7 +1506,7 @@ grammar P6 is STD {
 
 
     token statement_control:for {
-        <sym><.keyspace> :s
+        <sym> :s
         [ <?before 'my'? '$'\w+ '(' >
             <.panic: "This appears to be Perl 5 code"> ]?
         [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
@@ -1515,19 +1515,19 @@ grammar P6 is STD {
     }
 
     token statement_control:foreach {
-        <sym><.keyspace> <.obs("'foreach'", "'for'")>
+        <sym> <.obs("'foreach'", "'for'")>
     }
 
     token statement_control:given {
-        <sym><.keyspace> :s
+        <sym> :s
         <xblock>
     }
     token statement_control:when {
-        <sym><.keyspace> :s
+        <sym> :s
         <?dumbsmart>
         <xblock>
     }
-    rule statement_control:default {<sym><.keyspace> <block> }
+    rule statement_control:default {<sym> <block> }
 
     token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
     token statement_prefix:CHECK   { <sym> <blast> }
@@ -1545,9 +1545,9 @@ grammar P6 is STD {
     token statement_prefix:PRE     { <sym> <blast> }
     token statement_prefix:POST    { <sym> <blast> }
 
-    rule statement_control:CATCH   {<sym><.keyspace> <block> }
-    rule statement_control:CONTROL {<sym><.keyspace> <block> }
-    rule statement_control:TEMP    {<sym><.keyspace> <block> }
+    rule statement_control:CATCH   {<sym> <block> }
+    rule statement_control:CONTROL {<sym> <block> }
+    rule statement_control:TEMP    {<sym> <block> }
 
     #######################
     # statement modifiers #
@@ -1555,15 +1555,15 @@ grammar P6 is STD {
 
     rule modifier_expr { <EXPR> }
 
-    rule statement_mod_cond:if     {<sym><.nofun> <modifier_expr> }
-    rule statement_mod_cond:unless {<sym><.nofun> <modifier_expr> }
-    rule statement_mod_cond:when   {<sym><.nofun> <?dumbsmart> <modifier_expr> }
+    rule statement_mod_cond:if     {<sym> <modifier_expr> }
+    rule statement_mod_cond:unless {<sym> <modifier_expr> }
+    rule statement_mod_cond:when   {<sym> <?dumbsmart> <modifier_expr> }
 
-    rule statement_mod_loop:while {<sym><.nofun> <modifier_expr> }
-    rule statement_mod_loop:until {<sym><.nofun> <modifier_expr> }
+    rule statement_mod_loop:while {<sym> <modifier_expr> }
+    rule statement_mod_loop:until {<sym> <modifier_expr> }
 
-    rule statement_mod_loop:for   {<sym><.nofun> <modifier_expr> }
-    rule statement_mod_loop:given {<sym><.nofun> <modifier_expr> }
+    rule statement_mod_loop:for   {<sym> <modifier_expr> }
+    rule statement_mod_loop:given {<sym> <modifier_expr> }
 
     ################
     # module names #
@@ -1653,52 +1653,52 @@ grammar P6 is STD {
         || <.panic: "Malformed $*SCOPE">
     }
 
-    token scope_declarator:my        { <sym><.nofun> <scoped('my')> }
-    token scope_declarator:our       { <sym><.nofun> <scoped('our')> }
-    token scope_declarator:anon      { <sym><.nofun> <scoped('anon')> }
-    token scope_declarator:state     { <sym><.nofun> <scoped('state')> }
-    token scope_declarator:has       { <sym><.nofun> <scoped('has')> }
-    token scope_declarator:augment   { <sym><.nofun> <scoped('augment')> }
-    token scope_declarator:supersede { <sym><.nofun> <scoped('supersede')> }
+    token scope_declarator:my        { <sym> <scoped('my')> }
+    token scope_declarator:our       { <sym> <scoped('our')> }
+    token scope_declarator:anon      { <sym> <scoped('anon')> }
+    token scope_declarator:state     { <sym> <scoped('state')> }
+    token scope_declarator:has       { <sym> <scoped('has')> }
+    token scope_declarator:augment   { <sym> <scoped('augment')> }
+    token scope_declarator:supersede { <sym> <scoped('supersede')> }
 
 
     token package_declarator:class {
         :my $*PKGDECL ::= 'class';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:grammar {
         :my $*PKGDECL ::= 'grammar';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:module {
         :my $*PKGDECL ::= 'module';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:package {
         :my $*PKGDECL ::= 'package';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:role {
         :my $*PKGDECL ::= 'role';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:knowhow {
         :my $*PKGDECL ::= 'knowhow';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:slang {
         :my $*PKGDECL ::= 'slang';
-        <sym><.keyspace> <package_def>
+        <sym> <package_def>
     }
 
     token package_declarator:require {   # here because of declarational aspects
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
         [
         || <module_name> <.ws> <EXPR>?
         || <EXPR>
@@ -1706,12 +1706,12 @@ grammar P6 is STD {
     }
 
     token package_declarator:trusts {
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
         <module_name>
     }
 
     token package_declarator:sym<also> {
-        <sym><.keyspace>:s
+        <sym>:s
         <trait>+
     }
 
@@ -1797,29 +1797,29 @@ grammar P6 is STD {
 
     token multi_declarator:multi {
         :my $*MULTINESS = 'multi';
-        <sym><.keyspace> <.ws> [ <declarator> || <routine_def('multi')> || <.panic: 'Malformed multi'> ]
+        <sym> <.ws> [ <declarator> || <routine_def('multi')> || <.panic: 'Malformed multi'> ]
     }
     token multi_declarator:proto {
         :my $*MULTINESS = 'proto';
-        <sym><.keyspace> <.ws> [ <declarator> || <routine_def('proto')> || <.panic: 'Malformed proto'> ]
+        <sym> <.ws> [ <declarator> || <routine_def('proto')> || <.panic: 'Malformed proto'> ]
     }
     token multi_declarator:only {
         :my $*MULTINESS = 'only';
-        <sym><.keyspace> <.ws> [ <declarator> || <routine_def('only')> || <.panic: 'Malformed only'> ]
+        <sym> <.ws> [ <declarator> || <routine_def('only')> || <.panic: 'Malformed only'> ]
     }
     token multi_declarator:null {
         :my $*MULTINESS = '';
         <declarator>
     }
 
-    token routine_declarator:sub       { <sym><.nofun> <routine_def('sub')> }
-    token routine_declarator:method    { <sym><.nofun> <method_def> }
-    token routine_declarator:submethod { <sym><.nofun> <method_def> }
-    token routine_declarator:macro     { <sym><.nofun> <macro_def> }
+    token routine_declarator:sub       { <sym> <routine_def('sub')> }
+    token routine_declarator:method    { <sym> <method_def> }
+    token routine_declarator:submethod { <sym> <method_def> }
+    token routine_declarator:macro     { <sym> <macro_def> }
 
-    token regex_declarator:regex { <sym><.keyspace> <regex_def(:!r,:!s)> }
-    token regex_declarator:token { <sym><.keyspace> <regex_def(:r,:!s)> }
-    token regex_declarator:rule  { <sym><.keyspace> <regex_def(:r,:s)> }
+    token regex_declarator:regex { <sym> <regex_def(:!r,:!s)> }
+    token regex_declarator:token { <sym> <regex_def(:r,:!s)> }
+    token regex_declarator:rule  { <sym> <regex_def(:r,:s)> }
 
     rule multisig {
         :my $signum = 0;
@@ -1939,7 +1939,7 @@ grammar P6 is STD {
     }
 
     token trait_mod:is {
-        <sym><.keyspace>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
+        <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
         {
             if $*DECLARAND {
                 my $traitname = $<longname>.Str;
@@ -1949,14 +1949,14 @@ grammar P6 is STD {
         }
     }
     token trait_mod:hides {
-        <sym><.keyspace>:s <module_name>
+        <sym>:s <module_name>
     }
     token trait_mod:does {
         :my $*PKGDECL ::= 'role';
-        <sym><.keyspace>:s <module_name>
+        <sym>:s <module_name>
     }
     token trait_mod:will {
-        <sym><.keyspace>:s <identifier> <pblock>
+        <sym>:s <identifier> <pblock>
     }
 
     token trait_mod:of {
@@ -1964,8 +1964,8 @@ grammar P6 is STD {
         [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
         { $*DECLARAND<of> = $<typename>.Str; }
     }
-    token trait_mod:as      { <sym><.keyspace>:s <typename> }
-    token trait_mod:handles { <sym><.keyspace>:s <term> }
+    token trait_mod:as      { <sym>:s <typename> }
+    token trait_mod:handles { <sym>:s <term> }
 
     #########
     # Nouns #
@@ -2725,7 +2725,7 @@ grammar P6 is STD {
     token type_declarator:subset {
         :my $*IN_DECL = 'subset';
         :my $*DECLARAND;
-        <sym><.keyspace> :s
+        <sym> :s
         [
             [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
             { $*IN_DECL = ''; }
@@ -2738,7 +2738,7 @@ grammar P6 is STD {
     token type_declarator:enum {
         :my $*IN_DECL = 'enum';
         :my $*DECLARAND;
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
         [
         | <name=longname> { $¢.add_name($<name>.Str); }
         | <name=variable> { $¢.add_variable($<name>.Str); }
@@ -2753,7 +2753,7 @@ grammar P6 is STD {
     token type_declarator:constant {
         :my $*IN_DECL = 'constant';
         :my $*DECLARAND;
-        <sym><.keyspace> <.ws>
+        <sym> <.ws>
 
         [
         | <identifier> { $¢.add_name($<identifier>.Str); }
@@ -3140,7 +3140,7 @@ $¢.sorry("Can't put optional positional parameter after variadic parameters");
     }
 
     token dotty:sym<.> {
-        <sym> <.unspacey> <dottyop>
+        <sym> <dottyop>
         <O(|%methodcall)>
     }
 

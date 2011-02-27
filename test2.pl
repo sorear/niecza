@@ -5,6 +5,9 @@ use MONKEY_TYPING;
 {
     "foo" ~~ /\w+/;
     is $0, "foo", 'Match[0] returns whole match if no parens';
+
+    constant %bar = (:a, :b);
+    is +[ %bar ], 2, "constant hashes flatten";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
