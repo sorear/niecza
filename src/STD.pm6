@@ -2845,9 +2845,9 @@ grammar P6 is STD {
                 my $vname = $<sigil>.Str;
                 my $t = $<twigil>;
                 my $twigil = '';
-                $twigil = $t.[0].Str if @$t;
+                $twigil = $t.Str if $t;
                 $vname ~= $twigil;
-                my $n = ($<name>[0] // '').Str;
+                my $n = ($<name> // '').Str;
                 $vname ~= $n;
                 given $twigil {
                     when '' {
