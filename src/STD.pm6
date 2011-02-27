@@ -1602,18 +1602,19 @@ grammar P6 is STD {
             $<shape> = [
             | '(' ~ ')' <signature>
                 {
-                    my $sigil = substr($var,0,1);
-                    if $sigil eq '&' {
-                        $¢.sorry("The () shape syntax in routine declarations is reserved (maybe use :() to declare a longname?)");
-                    }
-                    elsif $sigil eq '@' {
-                        $¢.sorry("The () shape syntax in array declarations is reserved");
-                    }
-                    elsif $sigil eq '%' {
-                        $¢.sorry("The () shape syntax in hash declarations is reserved");
-                    }
-                    else {
-                        $¢.sorry("The () shape syntax in variable declarations is reserved");
+                    given substr($var,0,1) {
+                        when '&' {
+                            $¢.sorry("The () shape syntax in routine declarations is reserved (maybe use :() to declare a longname?)");
+                        }
+                        when '@' {
+                            $¢.sorry("The () shape syntax in array declarations is reserved");
+                        }
+                        when '%' {
+                            $¢.sorry("The () shape syntax in hash declarations is reserved");
+                        }
+                        when True { #OK
+                            $¢.sorry("The () shape syntax in variable declarations is reserved");
+                        }
                     }
                 }
             | :dba('shape definition') '[' ~ ']' <semilist>
@@ -1834,13 +1835,15 @@ grammar P6 is STD {
         try {
             my $statements = self.<blockoid><statementlist><statement>;
             my $startsym = $statements[0]<EXPR><root><sym> // '';
-            if $startsym eq '...' { $*DECLARAND<stub> = 1 }
-            elsif $startsym eq '!!!' { $*DECLARAND<stub> = 1 }
-            elsif $startsym eq '???' { $*DECLARAND<stub> = 1 }
-            elsif $startsym eq '*' {
-                if $*MULTINESS eq 'proto' and $statements.elems == 1 {
-                    self.<blockoid>:delete;
-                    self.<onlystar> = 1;
+            given $startsym {
+                when '...' { $*DECLARAND<stub> = 1 }
+                when '!!!' { $*DECLARAND<stub> = 1 }
+                when '???' { $*DECLARAND<stub> = 1 }
+                when '*' {
+                    if $*MULTINESS eq 'proto' and $statements.elems == 1 {
+                        self.<blockoid>:delete;
+                        self.<onlystar> = 1;
+                    }
                 }
             }
         }
@@ -2229,40 +2232,44 @@ grammar P6 is STD {
     # XXX should eventually rely on multi instead of nested cases here...
     method obscaret (Str $var, Str $sigil, Str $name) {
         my $repl;
-        if $sigil eq '$' {
-            if $name eq 'MATCH'        { $repl = '$/' }
-            elsif $name eq 'PREMATCH'  { $repl = 'an explicit pattern before <(' }
-            elsif $name eq 'POSTMATCH' { $repl = 'an explicit pattern after )>' }
-            elsif $name eq 'ENCODING'  { $repl = '$?ENCODING' }
-            elsif $name eq 'UNICODE'   { $repl = '$?UNICODE' }  # XXX ???
-            elsif $name eq 'TAINT'     { $repl = '$*TAINT' }
-            elsif $name eq 'OPEN'      { $repl = 'filehandle introspection' }
-            elsif $name eq 'N'         { $repl = '$-1' } # XXX ???
-            elsif $name eq 'L'         { $repl = 'Form module' }
-            elsif $name eq 'A'         { $repl = 'Form module' }
-            elsif $name eq 'E'         { $repl = '$!.extended_os_error' }
-            elsif $name eq 'C'         { $repl = 'COMPILING namespace' }
-            elsif $name eq 'D'         { $repl = '$*DEBUGGING' }
-            elsif $name eq 'F'         { $repl = '$*SYSTEM_FD_MAX' }
-            elsif $name eq 'H'         { $repl = '$?FOO variables' }
-            elsif $name eq 'I'         { $repl = '$*INPLACE' } # XXX ???
-            elsif $name eq 'O'         { $repl = '$?OS or $*OS' }
-            elsif $name eq 'P'         { $repl = 'whatever debugger Perl 6 comes with' }
-            elsif $name eq 'R'         { $repl = 'an explicit result variable' }
-            elsif $name eq 'S'         { $repl = 'the context function' } # XXX ???
-            elsif $name eq 'T'         { $repl = '$*BASETIME' }
-            elsif $name eq 'V'         { $repl = '$*PERL_VERSION' }
-            elsif $name eq 'W'         { $repl = '$*WARNING' }
-            elsif $name eq 'X'         { $repl = '$*EXECUTABLE_NAME' }
-            else                       { $repl = "a global form such as $sigil*$name" }
-        }
-        elsif $sigil eq '%' {
-            if $name eq 'H'            { $repl = '$?FOO variables' }
-            else                       { $repl = "a global form such as $sigil*$name" }
-        }
-        else {
-            $repl = "a global form such as $sigil*$name"
-        }
+        given $sigil {
+            when '$' {
+                given $name {
+                    when 'MATCH'         { $repl = '$/' }
+                    when 'PREMATCH'      { $repl = 'an explicit pattern before <(' }
+                    when 'POSTMATCH'     { $repl = 'an explicit pattern after )>' }
+                    when 'ENCODING'      { $repl = '$?ENCODING' }
+                    when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
+                    when 'TAINT'         { $repl = '$*TAINT' }
+                    when 'OPEN'          { $repl = 'filehandle introspection' }
+                    when 'N'             { $repl = '$-1' } # XXX ???
+                    when 'L'             { $repl = 'Form module' }
+                    when 'A'             { $repl = 'Form module' }
+                    when 'E'             { $repl = '$!.extended_os_error' }
+                    when 'C'             { $repl = 'COMPILING namespace' }
+                    when 'D'             { $repl = '$*DEBUGGING' }
+                    when 'F'             { $repl = '$*SYSTEM_FD_MAX' }
+                    when 'H'             { $repl = '$?FOO variables' }
+                    when 'I'             { $repl = '$*INPLACE' } # XXX ???
+                    when 'O'             { $repl = '$?OS or $*OS' }
+                    when 'P'             { $repl = 'whatever debugger Perl 6 comes with' }
+                    when 'R'             { $repl = 'an explicit result variable' }
+                    when 'S'             { $repl = 'the context function' } # XXX ???
+                    when 'T'             { $repl = '$*BASETIME' }
+                    when 'V'             { $repl = '$*PERL_VERSION' }
+                    when 'W'             { $repl = '$*WARNING' }
+                    when 'X'             { $repl = '$*EXECUTABLE_NAME' }
+                    when True            { $repl = "a global form such as $sigil*$name" } #OK
+                }
+            }
+            when '%' {
+                given $name {
+                    when 'H'             { $repl = '$?FOO variables' }
+                    when True            { $repl = "a global form such as $sigil*$name" } #OK
+                }
+            }
+            when True { $repl = "a global form such as $sigil*$name" } #OK
+        };
         return self.obs("$var variable", $repl);
     }
 
@@ -2628,26 +2635,28 @@ grammar P6 is STD {
         <!after \s>
         (< i g s m x c e >+) 
         {
-            my $m = $0.Str;
-            $m ~~ /i/ and $¢.worryobs('/i',':i');
-            $m ~~ /g/ and $¢.worryobs('/g',':g');
-            $m ~~ /m/ and $¢.worryobs('/m','^^ and $$ anchors');
-            $m ~~ /s/ and $¢.worryobs('/s','. or \N');
-            $m ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
-            $m ~~ /c/ and $¢.worryobs('/c',':c or :p');
-            $m ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
-            $¢.obs('suffix regex modifiers','prefix adverbs');
+            given $0.Str {
+                $_ ~~ /i/ and $¢.worryobs('/i',':i');
+                $_ ~~ /g/ and $¢.worryobs('/g',':g');
+                $_ ~~ /m/ and $¢.worryobs('/m','^^ and $$ anchors');
+                $_ ~~ /s/ and $¢.worryobs('/s','. or \N');
+                $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
+                $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
+                $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
+                $¢.obs('suffix regex modifiers','prefix adverbs');
+            }
         }
     }
 
     token old_tr_mods {
         (< c d s ] >+) 
         {
-            my $m = $0.Str;
-            $m ~~ /c/ and $¢.worryobs('/c',':c');
-            $m ~~ /d/ and $¢.worryobs('/g',':d');
-            $m ~~ /s/ and $¢.worryobs('/s',':s');
-            $¢.obs('suffix transliteration modifiers','prefix adverbs');
+            given $0.Str {
+                $_ ~~ /c/ and $¢.worryobs('/c',':c');
+                $_ ~~ /d/ and $¢.worryobs('/g',':d');
+                $_ ~~ /s/ and $¢.worryobs('/s',':s');
+                $¢.obs('suffix transliteration modifiers','prefix adverbs');
+            }
         }
     }
 
@@ -2840,17 +2849,22 @@ grammar P6 is STD {
                 $vname ~= $twigil;
                 my $n = ($<name>[0] // '').Str;
                 $vname ~= $n;
-                if $twigil eq '' {
-                    self.add_my_name($vname) if $n ne '';
-                    # :$param is often used as a multi matcher without $param used in body
-                    #   so don't count as "declared but not used"
-                    $*CURLEX{$vname}<used> = 1 if $named and $n;
-                }
-                elsif $twigil eq '.' { }
-                elsif $twigil eq '!' { }
-                elsif $twigil eq '*' { }
-                else {
-                    self.panic("You may not use the $twigil twigil in a signature");
+                given $twigil {
+                    when '' {
+                        self.add_my_name($vname) if $n ne '';
+                        # :$param is often used as a multi matcher without $param used in body
+                        #   so don't count as "declared but not used"
+                        $*CURLEX{$vname}<used> = 1 if $named and $n;
+                    }
+                    when '.' {
+                    }
+                    when '!' {
+                    }
+                    when '*' {
+                    }
+                    when True { #OK
+                        self.panic("You may not use the $twigil twigil in a signature");
+                    }
                 }
             }
         ]
@@ -2910,11 +2924,13 @@ grammar P6 is STD {
 
         [
             <default_value> {
-                if $quant eq '!' { $¢.sorry("Can't put a default on a required parameter") }
-                elsif $quant eq '*' { $¢.sorry("Can't put a default on a slurpy parameter") }
-                elsif $quant eq '**' { $¢.sorry("Can't put a default on a slice parameter") }
-                elsif $quant eq '|' { $¢.sorry("Can't put a default on an slurpy capture parameter") }
-                elsif $quant eq '\\' { $¢.sorry("Can't put a default on a capture parameter") }
+                given $quant {
+                  when '!' { $¢.sorry("Can't put a default on a required parameter") }
+                  when '*' { $¢.sorry("Can't put a default on a slurpy parameter") }
+                  when '**' { $¢.sorry("Can't put a default on a slice parameter") }
+                  when '|' { $¢.sorry("Can't put a default on an slurpy capture parameter") }
+                  when '\\' { $¢.sorry("Can't put a default on a capture parameter") }
+                }
                 $kind = '?' if $kind eq '!';
             }
             [<?before ':' > <.sorry: "Can't put a default on the invocant parameter">]?
@@ -2927,22 +2943,28 @@ grammar P6 is STD {
 
         # enforce zone constraints
         {
-            if $kind eq '!' {
-                if $*zone eq 'posopt' {
+            given $kind {
+                when '!' {
+                    given $*zone {
+                        when 'posopt' {
     $¢.sorry("Can't put required parameter after optional parameters");
-                }
-                elsif $*zone eq 'var' {
+                        }
+                        when 'var' {
     $¢.sorry("Can't put required parameter after variadic parameters");
+                        }
+                    }
                 }
-            }
-            elsif $kind eq '?' {
-                if $*zone eq 'posreq' { $*zone = 'posopt' }
-                elsif $*zone eq 'var' {
-$¢.sorry("Can't put optional positional parameter after variadic parameters");
+                when '?' {
+                    given $*zone {
+                        when 'posreq' { $*zone = 'posopt' }
+                        when 'var' {
+    $¢.sorry("Can't put optional positional parameter after variadic parameters");
+                        }
+                    }
                 }
-            }
-            elsif $kind eq '*' {
-                $*zone = 'var';
+                when '*' {
+                    $*zone = 'var';
+                }
             }
         }
     }
@@ -5478,58 +5500,60 @@ method check_variable ($variable) {
     my $here = self.cursor($variable.to);
     self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
-    if $twigil eq '' {
-        my $ok = 0;
-        $ok ||= $*IN_DECL;
-        $ok ||= $sigil eq '&';
-        $ok ||= $first lt 'A';
-        $ok ||= self.is_known($name);
-        $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
-        if not $ok {
-            my $id = $name;
-            ($id,) = ($id ~~ /\W ** 0..2 (.*)/);
-            if $name eq '@_' or $name eq '%_' {
-                $here.add_placeholder($name);
-            }
-            else {  # guaranteed fail now
-                if my $scope = @*MEMOS[$variable.from]<declend> {
-                    return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+    given $twigil {
+        when '' {
+            my $ok = 0;
+            $ok ||= $*IN_DECL;
+            $ok ||= $sigil eq '&';
+            $ok ||= $first lt 'A';
+            $ok ||= self.is_known($name);
+            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+            if not $ok {
+                my $id = $name;
+                ($id,) = ($id ~~ /\W ** 0..2 (.*)/);
+                if $name eq '@_' or $name eq '%_' {
+                    $here.add_placeholder($name);
                 }
-                elsif $id !~~ /\:\:/ {
-                    if self.is_known('@' ~ $id) {
-                        return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                else {  # guaranteed fail now
+                    if my $scope = @*MEMOS[$variable.from]<declend> {
+                        return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                     }
-                    elsif self.is_known('%' ~ $id) {
-                        return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                    elsif $id !~~ /\:\:/ {
+                        if self.is_known('@' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                        }
+                        elsif self.is_known('%' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                        }
                     }
+                    return $here.sorry("Variable $name is not predeclared");
                 }
-                return $here.sorry("Variable $name is not predeclared");
+            }
+            elsif $*CURLEX{$name} {
+                $*CURLEX{$name}<used>++;
             }
         }
-        elsif $*CURLEX{$name} {
-            $*CURLEX{$name}<used>++;
+        when '^' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
         }
-    }
-    elsif $twigil eq '^' {
-        my $*MULTINESS = 'multi';
-        $here.add_placeholder($name);
-    }
-    elsif $twigil eq ':' {
-        my $*MULTINESS = 'multi';
-        $here.add_placeholder($name);
-    }
-    elsif $twigil eq '~' {
-        return %*LANG.{substr($name,2,$name.chars - 2)};
-    }
-    elsif $twigil eq '?' {
-        if $name ~~ /\:\:/ {
-            my $first; ($first,) = self.canonicalize_name($name);
-            $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+        when ':' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
         }
-        else {
-            # search upward through languages to STD
-            my $v = $here.lookup_compiler_var($name);
-            # $variable.<value> = $v if $v; XXX IMMUTABLE MATCHES
+        when '~' {
+            return %*LANG.{substr($name,2,$name.chars - 2)};
+        }
+        when '?' {
+            if $name ~~ /\:\:/ {
+                my $first; ($first,) = self.canonicalize_name($name);
+                $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+            }
+            else {
+                # search upward through languages to STD
+                my $v = $here.lookup_compiler_var($name);
+                # $variable.<value> = $v if $v; XXX IMMUTABLE MATCHES
+            }
         }
     }
     self;
@@ -5548,37 +5572,37 @@ method lookup_compiler_var($name, $default?) {
         }
     }
 
-    if    $name eq '$?FILE'     { return $*FILE<name>; }
-    elsif $name eq '$?LINE'     { return self.lineof(self.pos); }
-    elsif $name eq '$?POSITION' { return self.pos; }
+    given $name {
+        when '$?FILE'     { return $*FILE<name>; }
+        when '$?LINE'     { return self.lineof(self.pos); }
+        when '$?POSITION' { return self.pos; }
 
-    elsif $name eq '$?LANG'     { return item %*LANG; }
+        when '$?LANG'     { return item %*LANG; }
 
-    elsif $name eq '$?LEXINFO'   { return $*CURLEX; }
+        when '$?LEXINFO'   { return $*CURLEX; }
 
-    elsif $name eq '$?PACKAGE'  { return $*CURPKG; }
-    elsif $name eq '$?MODULE'   { return $*CURPKG; } #  XXX should scan
-    elsif $name eq '$?CLASS'    { return $*CURPKG; } #  XXX should scan
-    elsif $name eq '$?ROLE'     { return $*CURPKG; } #  XXX should scan
-    elsif $name eq '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
+        when '$?PACKAGE'  { return $*CURPKG; }
+        when '$?MODULE'   { return $*CURPKG; } #  XXX should scan
+        when '$?CLASS'    { return $*CURPKG; } #  XXX should scan
+        when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
+        when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
 
-    elsif $name eq '$?PACKAGENAME' { return $*CURPKG.id }
+        when '$?PACKAGENAME' { return $*CURPKG.id }
 
-    elsif $name eq '$?OS'       { return 'unimpl'; }
-    elsif $name eq '$?DISTRO'   { return 'unimpl'; }
-    elsif $name eq '$?VM'       { return 'unimpl'; }
-    elsif $name eq '$?XVM'      { return 'unimpl'; }
-    elsif $name eq '$?PERL'     { return 'unimpl'; }
+        when '$?OS'       { return 'unimpl'; }
+        when '$?DISTRO'   { return 'unimpl'; }
+        when '$?VM'       { return 'unimpl'; }
+        when '$?XVM'      { return 'unimpl'; }
+        when '$?PERL'     { return 'unimpl'; }
 
-    elsif $name eq '$?USAGE'    { return 'unimpl'; }
+        when '$?USAGE'    { return 'unimpl'; }
 
-    elsif $name eq '&?ROUTINE'  { return 'unimpl'; }
-    elsif $name eq '&?BLOCK'    { return 'unimpl'; }
+        when '&?ROUTINE'  { return 'unimpl'; }
+        when '&?BLOCK'    { return 'unimpl'; }
 
-    elsif $name eq '%?CONFIG'    { return 'unimpl'; }
-    elsif $name eq '%?DEEPMAGIC' { return 'unimpl'; }
+        when '%?CONFIG'    { return 'unimpl'; }
+        when '%?DEEPMAGIC' { return 'unimpl'; }
 
-    else {
         my $dynvar = self.lookup_dynvar($name);
         return $dynvar if defined $dynvar;
 
