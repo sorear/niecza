@@ -5873,7 +5873,8 @@ method lookup_compiler_var($name, $default?) {
 method panic (Str $s) {
     die "Recursive panic" if $*IN_PANIC;
     $*IN_PANIC++;
-    my $m = "";
+    self.deb("panic $s") if $*DEBUG;
+    my $m;
     my $here = self;
 
     my $first = $here.lineof($*LAST_NIBBLE_START);
@@ -5895,10 +5896,7 @@ method panic (Str $s) {
     $m ~= $s;
 
     if substr(self.orig,$here.pos,1) ~~ /\)|\]|\}|\»/ {
-        my $ma = ($m ~~ /(.*?)Confused(.*)/);
-        if ($ma) {
-            $m = $ma[0] ~ "Unexpected closing bracket" ~ $ma[1];
-        }
+        $m ~~ s|Confused|Unexpected closing bracket|;
     }
 
     $m ~= $here.locmess;
@@ -5906,33 +5904,29 @@ method panic (Str $s) {
 
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
         my @t = $here.suppose( sub { $here.term } );
-        my $conf;
         if @t {
             my $endpos = $here.pos;
             my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
 
             if self.lineof($startpos) != self.lineof($endpos) {
-                $conf = "Two terms in a row (previous line missing its semicolon?)";
+                $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
             }
             elsif @*MEMOS[$here.pos - 1]<baremeth> {
-                $conf = "Two terms in a row (method call requires colon or parens to take arguments)";
+                $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
             }
             elsif @*MEMOS[$here.pos - 1]<arraycomp> {
-                $conf = "Two terms in a row (preceding is not a valid reduce operator)";
+                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
             }
             else {
-                $conf = "Two terms in a row";
+                $m ~~ s|Confused|Two terms in a row|;
             }
         }
         elsif my $type = @*MEMOS[$here.pos - 1]<nodecl> {
             my @t = $here.suppose( sub { $here.variable } );
             if @t {
                 my $variable = @t[0].Str;
-                $conf = "Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'";
+                $m ~~ s|Confused|Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'|;
             }
-        }
-        if $conf && my $ma = ($m ~~ /(.*?)Confused(.*)/) {
-            $m = $ma[0] ~ $conf ~ $ma[1];
         }
     }
     elsif my $type = @*MEMOS[$here.pos - 1]<wasname> {
@@ -5941,8 +5935,7 @@ method panic (Str $s) {
         my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
         my $d = $*IN_DECL;
         $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
-        my ($a,$b) = $m ~~ /(.*?)Malformed block(.*)/;
-        defined($a) and $m = $a ~ "Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.$b";
+        $m ~~ s|Malformed block|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
     }
 
     if @*WORRIES {
