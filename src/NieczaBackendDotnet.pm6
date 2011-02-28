@@ -1,6 +1,8 @@
 use NieczaBackendNAM;
 class NieczaBackendDotnet is NieczaBackendNAM;
 
+use NAMOutput;
+
 sub upcalled(@strings) {
     say "upcall: @strings.join('|')";
     "ERROR";
@@ -15,6 +17,13 @@ sub run_subtask($file, *@args) {
 }
 
 method accept($unitname, $ast is rw, :$main, :$run) {
+    if $run {
+        my $nam = NAMOutput.run($ast);
+        $ast.clear_optrees;
+        $ast = Any;
+        downcall("runnam", $.obj_dir, $nam);
+        return;
+    }
     self.save_unit($unitname, $ast);
     $ast.clear_optrees;
     $ast = Any;
@@ -33,5 +42,3 @@ method run($name) {
     my $fname = $name.split('::').join('.');
     run_subtask($.obj_dir.IO.append($fname ~ ".exe"), @$.run_args);
 }
-
-

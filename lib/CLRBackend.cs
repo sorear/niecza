@@ -3557,8 +3557,10 @@ dynamic:
             AssemblyName an = new AssemblyName(mobname);
             this.dir = dir;
             ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
-                    AssemblyBuilderAccess.Save, dir);
-            mob = ab.DefineDynamicModule(mobname, filename);
+                    (filename == null ? AssemblyBuilderAccess.RunAndCollect :
+                        AssemblyBuilderAccess.Save), dir);
+            mob = filename == null ? ab.DefineDynamicModule(mobname) :
+                ab.DefineDynamicModule(mobname, filename);
 
             tb = mob.DefineType(mobname, TypeAttributes.Public |
                     TypeAttributes.Sealed | TypeAttributes.Abstract |
@@ -3919,6 +3921,19 @@ dynamic:
             il.Emit(OpCodes.Ret);
 
             ab.SetEntryPoint(mb);
+
+            mb = tb.DefineMethod("EVAL", MethodAttributes.Static |
+                    MethodAttributes.Public, Tokens.Variable,
+                    new Type[] { typeof(string[]) });
+            il = mb.GetILGenerator();
+
+            il.Emit(OpCodes.Ldstr, name);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldnull);
+            il.Emit(OpCodes.Ldftn, boot);
+            il.Emit(OpCodes.Newobj, Tokens.DynBlockDelegate_ctor);
+            il.Emit(OpCodes.Call, Tokens.Kernel_RunLoop);
+            il.Emit(OpCodes.Ret);
         }
 
         [ThreadStatic] static Dictionary<string, Unit> used_units;
@@ -3943,6 +3958,35 @@ dynamic:
                 u = new Unit((object[])Reader.Read(dtx));
                 return avail_units[name] = u;
             }
+        }
+
+        internal static void RunMain(string dir, string contents,
+                string[] argv) {
+            Unit root = new Unit((object[])Reader.Read(contents));
+            CLRBackend old_Current = Current;
+            Dictionary<string,Unit> old_used_units = used_units;
+            CLRBackend c = new CLRBackend(dir, root.name, null);
+            Current = c;
+
+            used_units = new Dictionary<string, Unit>();
+            used_units[root.name] = root;
+
+            foreach (object x in root.tdeps) {
+                object[] dn = (object[]) x;
+                string name = JScalar.S(dn[0]);
+                if (name == root.name) continue;
+                used_units[name] = LoadDepUnit(name);
+            }
+            root.BindDepends(true);
+
+            c.Process(root, true);
+
+            Type t = c.tb.CreateType();
+            used_units = old_used_units; Current = old_Current;
+
+            Builtins.eval_result = (Variable) t.InvokeMember("EVAL",
+                    BindingFlags.Public | BindingFlags.Static |
+                    BindingFlags.InvokeMethod, null, null, new object[] { argv });
         }
 
         public static void Main(string[] args) {
@@ -3984,10 +4028,11 @@ dynamic:
             if (args[0] == "post_save") {
                 CLRBackend.Main(new string[] { args[1], args[2], args[3], args[4] });
                 return new string[0];
-            } else if (args[0] == "runnam") {
-                Console.WriteLine("directory : {0}", args[1]);
-                Console.WriteLine("unit name : {0}", args[2]);
-                Console.WriteLine("contents  : {0}", args[3]);
+            } else if (args[0] == "runnam" || args[0] == "evalnam") {
+                string[] argv = new string[args.Length - 3];
+                Array.Copy(args, 3, argv, 0, argv.Length);
+                CLRBackend.RunMain(args[1], args[2],
+                        args[0] == "evalnam" ? null : argv);
                 return new string[0];
             } else if (args[0] == "hello") {
                 return new string[] { Assembly.GetExecutingAssembly().Location };

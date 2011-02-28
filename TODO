@@ -61,8 +61,6 @@ MEDIUM
    Audit accelerated context routines for correct undefined value and odd
    representation handling.  +Num shouldn't crash, etc.
 
- + Run MAIN without a temporary file (needed for eval knockoff).
-
 HARD
 
    Design and implement some sort of NFG thing that allows use codes, graphs,

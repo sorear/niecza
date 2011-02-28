@@ -2159,6 +2159,9 @@ slow:
 
         public static Variable RunLoop(string main_unit,
                 string[] args, DynBlockDelegate boot) {
+            if (args == null) {
+                return BootModule(main_unit, boot);
+            }
             commandArgs = args;
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
