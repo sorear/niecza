@@ -27,6 +27,10 @@ use OptRxSimple;
 use Sig;
 use STD;
 
+augment class CgOp {
+method bif_simple_eval($str) { self._cgop("bif_simple_eval", $str) }
+}
+
 augment class STD::P6 { #OK exist
 }
 

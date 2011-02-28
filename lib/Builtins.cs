@@ -433,6 +433,18 @@ public class Builtins {
         return BoxLoS(r.Call(AppDomain.CurrentDomain, UnboxLoS(list)));
     }
 
+    public static Variable SimpleEval(Variable str) {
+        if (up_domain == null)
+            throw new NieczaException("Cannot eval; no compiler available");
+        CrossDomainReceiver r = (CrossDomainReceiver)
+            up_domain.CreateInstanceAndUnwrap("Kernel", "Niecza.UpCallee");
+        r.Call(AppDomain.CurrentDomain, new string[] { "eval",
+                str.Fetch().mo.mro_raw_Str.Get(str) });
+        Variable rt = eval_result;
+        eval_result = null;
+        return rt;
+    }
+
     public static Variable ArrayConstructor(Variable bits) {
         VarDeque rest  = new VarDeque(bits);
         VarDeque items = new VarDeque();

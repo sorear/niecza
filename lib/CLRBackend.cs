@@ -3160,6 +3160,7 @@ dynamic:
             thandlers["bif_negate"] = SimpleB("Negate");
             thandlers["bif_chars"] = SimpleB("Chars");
             thandlers["bif_substr3"] = SimpleB("Substr3");
+            thandlers["bif_simple_eval"] = SimpleB("SimpleEval");
 
             thandlers["bif_defined"] = Contexty("mro_defined");
             thandlers["bif_bool"] = Contexty("mro_Bool");

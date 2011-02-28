@@ -4,8 +4,14 @@ class NieczaBackendDotnet is NieczaBackendNAM;
 use NAMOutput;
 
 sub upcalled(@strings) {
-    say "upcall: @strings.join('|')";
-    "ERROR";
+    given @strings[0] {
+        when "eval" {
+            $*compiler.compile_string(@strings[1], True, :evalmode);
+            return;
+        }
+        say "upcall: @strings.join('|')";
+        "ERROR";
+    }
 }
 
 sub downcall(*@args) {
@@ -16,12 +22,12 @@ sub run_subtask($file, *@args) {
     Q:CgOp { (rawscall Builtins,Kernel.RunCLRSubtask {$file} {@args}) }
 }
 
-method accept($unitname, $ast is rw, :$main, :$run) {
+method accept($unitname, $ast is rw, :$main, :$run, :$evalmode) {
     if $run {
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;
         $ast = Any;
-        downcall("runnam", $.obj_dir, $nam);
+        downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam);
         return;
     }
     self.save_unit($unitname, $ast);

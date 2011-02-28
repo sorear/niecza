@@ -13,10 +13,11 @@ has $.unitcache = {};
 
 sub gettimeofday() { Q:CgOp { (rawscall Builtins,Kernel.GetNow) } }
 
-method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
+method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode) {
     my %*units;
 
     my $*module_loader = sub ($m) { self!load_dependent($m) };
+    my $*compiler = self;
     my $*verbose = $.verbose;
 
     my $ast;
@@ -24,7 +25,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
         $.frontend.typename => { $ast = $.frontend.parse(:$unitname,
             :$filename, :$modtime, :$source); },
         (map -> $st { $st.typename => { $ast = $st.invoke($ast) } }, @$.stages),
-        $.backend.typename => { $.backend.accept($unitname, $ast, :$main, :$run) },
+        $.backend.typename => { $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode) },
     );
 
     for @steps -> $step {
@@ -45,7 +46,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end) {
 
 method compile_module($module, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_module($module);
-    self!compile($module, $filename, $modtime, $source, False, False, $stop);
+    self!compile($module, $filename, $modtime, $source, False, False, $stop, False);
 }
 
 method !main_name() {
@@ -55,11 +56,11 @@ method !main_name() {
 
 method compile_file($file, $run, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_file($file);
-    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop);
+    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False);
 }
 
-method compile_string($source, $run, $stop = "") {
-    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop);
+method compile_string($source, $run, $stop = "", :$evalmode = False) {
+    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop, $evalmode);
 }
 
 method !up_to_date($mod) {

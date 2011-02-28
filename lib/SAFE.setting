@@ -1173,6 +1173,8 @@ sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 
+sub eval($str) { Q:CgOp { (bif_simple_eval {$str}) } }
+
 sub rungather($ ) { die "Run NYI" }
 # }}}
 
