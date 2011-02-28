@@ -3978,13 +3978,18 @@ dynamic:
     }
 
     // instantiatable for the sake of reflecty loading
-    public class DownCallAcceptor: MarshalByRefObject {
-        public string[] DownCalled(object cb, string[] args) {
-            if (args[0] == "hello") {
-                cb.GetType().InvokeMember(
-                    "UpCalled", BindingFlags.Public | BindingFlags.Instance |
-                    BindingFlags.InvokeMethod, null, cb,
-                    new object[] { new string[] { "world" } });
+    public class DownCallAcceptor: CrossDomainReceiver {
+        public override string[] Call(AppDomain up, string[] args) {
+            Builtins.up_domain = up;
+            if (args[0] == "post_save") {
+                CLRBackend.Main(new string[] { args[1], args[2], args[3], args[4] });
+                return new string[0];
+            } else if (args[0] == "runnam") {
+                Console.WriteLine("directory : {0}", args[1]);
+                Console.WriteLine("unit name : {0}", args[2]);
+                Console.WriteLine("contents  : {0}", args[3]);
+                return new string[0];
+            } else if (args[0] == "hello") {
                 return new string[] { Assembly.GetExecutingAssembly().Location };
             } else {
                 return new string[] { "ERROR" };

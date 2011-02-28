@@ -8,6 +8,7 @@ CP=cp
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs
 csbackend=CLRBackend.cs
+csxdr=CrossDomainReceiver.cs
 
 # keep this in dependency order
 libunits=SAFE CORE JSYNC
@@ -32,7 +33,7 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 		$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
 	fi; done
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
-	$(CP) $(patsubst %,boot/obj/%.dll,Kernel $(libunits) $(srcunits)) run/
+	$(CP) $(patsubst %,boot/obj/%.dll,Kernel CrossDomainReceiver $(libunits) $(srcunits)) run/
 	$(CP) boot/obj/MAIN.exe run/Niecza.exe
 
 .fetch-stamp: FETCH_URL
@@ -42,12 +43,15 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 	cd boot && unzip niecza.zip
 	touch .fetch-stamp
 
-obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
-	$(CSC) /target:library /out:obj/Kernel.dll /unsafe+ \
-	    $(patsubst %,lib/%,$(cskernel))
-obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll
+obj/CrossDomainReceiver.dll: $(patsubst %,lib/%,$(csxdr))
+	$(CSC) /target:library /out:obj/CrossDomainReceiver.dll \
+	    $(patsubst %,lib/%,$(csxdr))
+obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) obj/CrossDomainReceiver.dll
+	$(CSC) /target:library /out:obj/Kernel.dll /r:CrossDomainReceiver.dll \
+	    /lib:obj /unsafe+ $(patsubst %,lib/%,$(cskernel))
+obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll obj/CrossDomainReceiver.dll
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
-	    $(patsubst %,lib/%,$(csbackend))
+	    /r:CrossDomainReceiver.dll $(patsubst %,lib/%,$(csbackend))
 
 test: all
 	$(RUN_CLR) run/Niecza.exe -c test.pl

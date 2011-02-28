@@ -4,6 +4,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
+namespace Niecza {
+    public class UpCallee: CrossDomainReceiver {
+        public override string[] Call(AppDomain from, string[] args) {
+            return Builtins.UnboxLoS(Kernel.RunInferior(Builtins.upcall_cb.Fetch().Invoke(
+                Kernel.GetInferiorRoot(), new Variable[] { Builtins.BoxLoS(args) },
+                null)));
+        }
+    }
+}
+
 public class Builtins {
     public static IP6 NominalCheck(string name, DynMetaObject mo, Variable v) {
         IP6 r = v.Fetch();
@@ -399,7 +409,7 @@ public class Builtins {
     }
 
     private static AppDomain subDomain;
-    private static object backend;
+    private static string backend;
     // Better, but still fudgy.  Relies too mcuh on path structure.
     private static AppDomain GetSubDomain() {
         if (subDomain != null) return subDomain;
@@ -407,26 +417,20 @@ public class Builtins {
         AppDomainSetup ads = new AppDomainSetup();
         string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
         ads.ApplicationBase = obj;
+        backend = Path.Combine(obj, "CLRBackend.exe");
         subDomain = AppDomain.CreateDomain("zyg", null, ads);
-        backend = subDomain.CreateInstanceFromAndUnwrap(Path.Combine(obj, "CLRBackend.exe"), "Niecza.CLRBackend.DownCallAcceptor");
         return subDomain;
     }
+    public static AppDomain up_domain;
+    public static Variable upcall_cb;
+    public static Variable eval_result;
     public static Variable DownCall(Variable cb, Variable list) {
         GetSubDomain();
-        string[] ret = (string[]) backend.GetType().InvokeMember(
-            "DownCalled", BindingFlags.Public | BindingFlags.Instance |
-            BindingFlags.InvokeMethod, null, backend,
-            new object[] { new UpCallee(cb.Fetch()), UnboxLoS(list) });
-        return BoxLoS(ret);
-    }
-    class UpCallee: MarshalByRefObject {
-        IP6 func;
-        public UpCallee(IP6 func) { this.func = func; }
-        public string[] UpCalled(string[] args) {
-            return UnboxLoS(Kernel.RunInferior(func.Invoke(
-                Kernel.GetInferiorRoot(), new Variable[] { BoxLoS(args) },
-                null)));
-        }
+        upcall_cb = cb;
+        CrossDomainReceiver r = (CrossDomainReceiver)
+            subDomain.CreateInstanceFromAndUnwrap(backend,
+                    "Niecza.CLRBackend.DownCallAcceptor");
+        return BoxLoS(r.Call(AppDomain.CurrentDomain, UnboxLoS(list)));
     }
 
     public static Variable ArrayConstructor(Variable bits) {
