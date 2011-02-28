@@ -14,60 +14,363 @@ augment class Match {
 }
 
 augment class STD {
-    our $ALL;
+our $ALL;
 
-    method lineof ($p) {
-        return 1 unless defined $p;
-        my $line = @*LINEMEMOS[$p];
-        return $line if $line;
-        $line = 1; my $pos = 0;
-        my $lm = @*LINEMEMOS;
-        self.orig ~~ / :r [ \n { $lm[$pos++] = $line++ } ||
-                            .  { $lm[$pos++] = $line } ]* /;
-        $lm[$pos++] = $line;
-        return $lm[$p] // 0;
+my %term            = (:dba('term')            , :prec<z=>);
+my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
+my %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>, :pure);
+my %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>, :pure);
+my %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>, :pure);
+
+# TODO: allow variable :dba()s
+role sym_categorical[$name,$sym,$O] {
+    token ::($name) () { $sym $<O>={$O} }
+}
+role bracket_categorical[$name,$sym1,$sym2,$O] {
+    token ::($name) () { :my $*GOAL = $sym2; $sym1 {}:s [ :lang($¢.unbalanced($sym2)) <semilist> ] [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} }
+}
+
+method add_categorical($name) {
+    # Signature extension, not categorical
+    if $name ~~ /^\w+\:\(/ {
+        self.add_my_name($name);
+        return self;
+    }
+    return self unless ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
+    my $cat = ~$0;
+    my $sym = substr($name, $/.to);
+    if $sym ~~ /^\<\< .*: <?after \>\>>$/ {
+        $sym = substr($sym, 2, $sym.chars - 4);
+    }
+    elsif $sym ~~ /^\< .*: <?after \>>$/ {
+        $sym = substr($sym, 1, $sym.chars - 2);
+    }
+    elsif $sym ~~ /^\« .*: <?after \»>$/ {
+        $sym = substr($sym, 1, $sym.chars - 2);
     }
 
-    method lookup_dynvar($name) { Any } # NYI
-    method check_old_cclass($text) { } # NYI
-    method do_use($module,$args) {
-        self.do_need($module);
-        self.do_import($module,$args);
-        self;
+    $sym ~~ s/^\s*//;
+    $sym ~~ s/\s*$//;
+
+    my $O;
+
+    if $cat eq 'infix'            { $O = %additive }
+    elsif $cat eq 'prefix'        {
+        $O = ($sym ~~ /^\W/) ?? %symbolic_unary !! %named_unary
+    }
+    elsif $cat eq 'postfix'       { $O = %methodcall }
+    elsif $cat eq 'circumfix'     { $O = %term }
+    elsif $cat eq 'postcircumfix' { $O = %methodcall }
+    elsif $cat eq 'term'          { $O = %term }
+    else {
+        self.sorry("Cannot extend category:$name with subs");
+        return self;
     }
 
-    method do_need($mo) {
-        my $module = $mo.Str;
-        my $topsym;
-        $topsym = self.sys_load_modinfo($module);
-        if !defined $topsym {
-            self.panic("Could not load $module");
+    # XXX to do this right requires .comb and .trans
+    if $sym ~~ /\s+/ {
+        my $sym1 = $sym.substr(0, $/.from);
+        my $sym2 = $sym.substr($/.to, $sym.chars - $/.to);
+        my $cname = $cat ~ ":<$sym1 $sym2>";
+        %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[$cname, $sym1, $sym2, $O];
+    } else {
+        my $cname = $cat ~ ":<$sym>";
+        %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[$cname, $sym, $O];
+    }
+    self.cursor_fresh(%*LANG<MAIN>);
+}
+
+method add_enum($type,$expr) {
+    return self unless $type;
+    return self unless $expr;
+    my $typename = $type.Str;
+    my $*IN_DECL ::= 'constant';
+    # XXX complete kludge, really need to eval EXPR
+    # $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
+    for $expr.comb(/ <[ a..z A..Z _ ]> \w* /) -> $n {
+        self.add_name($typename ~ "::$n");
+        self.add_name($n);
+    }
+    self
+}
+
+method canonicalize_name($n) {
+    my $M;
+    my $name = $n;
+    if $M = first(/(< $ @ % & >)( \^ || \: <!before \:> )/(Cursor.new($name))) {
+        $name = $M[0] ~ substr($name, $M.to);
+    }
+    if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {
+        $name = $name.substr(0, $name.chars - 2);
+    }
+    return $name unless $name ~~ /::/;
+    self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
+
+    if $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
+        $name = $1 ~ "<" ~ $0 ~ substr($name, $/.to) ~ ">";
+    }
+    my $vname;
+    if ($name ~~ /'::<'/) && $name.substr($name.chars - 1, 1) eq '>' {
+        $name = substr($name, 0, $/.from);
+        $vname = substr($name, $/.to, $name.chars - $/.to - 1);
+    }
+    my @components;
+    while $name ~~ / '::' / {
+        push @components, $name.substr(0, $/.to);
+        $name = substr($name, $/.to);
+    }
+    push @components, $name;
+    shift(@components) while @components and @components[0] eq '';
+    if (defined $vname) {
+        if @components {
+            my $last := @components[* - 1];
+            $last ~= '::' if $last.chars < 2 || $last.substr($last.chars - 2, 2) ne '::';
         }
-        self.add_my_name($module);
-        $*DECLARAND<really> = $topsym;
-        self;
+        push(@components, $vname) if defined $vname;
+    }
+    @components;
+}
+
+method locmess () {
+    my $pos = self.pos;
+    my $line = self.lineof($pos);
+
+    if $pos >= chars(self.orig) {
+        $line = $line ~ " (EOF)";
     }
 
-    method sys_load_modinfo($module) {
-        # These are handled within the grammar
-        if $module eq 'MONKEY_TYPING' || $module eq 'lib' ||
-                $module eq 'fatal' {
-            return { };
+    my $pre = substr(self.orig, 0, $pos);
+    my $prel = chars($pre) min 40;
+    $pre = substr($pre, chars($pre)-$prel, $prel);
+    if ($pre ~~ /^.*\n/) {
+        $pre = substr($pre, $/.to);
+    }
+    $pre = '<BOL>' if $pre eq '';
+    my $post = substr(self.orig, $pos, (chars(self.orig)-$pos) min 40);
+    if ($post ~~ /\n/) {
+        $post = substr($post,0,$/.from);
+    }
+    $post = '<EOL>' if $post eq '';
+    " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~
+        $pre ~ $Cursor::YELLOW ~ "\x23CF" ~ $Cursor::RED ~ $post ~
+        $Cursor::CLEAR;
+}
+
+method line {
+    self.lineof(self.pos);
+}
+
+method SETGOAL { }
+method FAILGOAL ($stop, $name, $startpos) {
+    my $s = "'$stop'";
+    $s = '"\'"' if $s eq "'''";
+    self.panic("Unable to parse $name" ~ self.cursor($startpos).locmess ~ "\nCouldn't find final $s; gave up");
+}
+
+method deb(*@str) { note @str }
+
+method cursor_fresh($k = self) { Q:CgOp {
+    (ns (cursor_fresh (cast cursor (@ {self})) (@ {$k})))
+} }
+method cursor_force($pos) {
+    $*HIGHWATER = $pos;
+    self.cursor($pos);
+}
+
+method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
+
+method mark_sinks(@sl) { #OK not used
+    #NYI
+    self
+}
+
+method gettrait($traitname,$param) {
+    my $text;
+    if @$param {
+        $text = $param.[0].Str;
+        ($text ~~ s/^\<(.*)\>$/$0/) ||
+            ($text ~~ s/^\((.*)\)$/$0/);
+    }
+    if ($traitname eq 'export') {
+        if (defined $text) {
+            while $text ~~ s/\:// { }
         }
-        $*module_loader.($module).create_syml;
-    }
-
-    method load_lex($setting) {
-        if $setting eq 'NULL' {
-            my $id = "MY:file<NULL.pad>:line(1):pos(0)";
-            my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
-                '!line' => 1);
-            return Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
-                'SETTING' => $core, $id => $core);
+        else {
+            $text = 'DEFAULT';
         }
-
-        $*module_loader.($setting).create_syml;
+        self.set_export($text);
+        $text;
     }
+    elsif (defined $text) {
+        $text;
+    }
+    else {
+        1;
+    }
+}
+
+method set_export($text) {
+    my $textpkg = $text ~ '::';
+    my $name = $*DECLARAND<name>;
+    my $xlex = $STD::ALL{ $*DECLARAND<inlex>[0] };
+    $*DECLARAND<export> = $text;
+    my $sid = $*CURLEX.idref;
+    my $x = $xlex<EXPORT::> // Stash.new( 'PARENT::' => $sid, '!id' => [$sid.[0] ~ '::EXPORT'] );
+    $xlex<EXPORT::> = $x;
+    $x{$textpkg} = $x{$textpkg} // Stash.new( 'PARENT::' => $x.idref, '!id' => [$sid.[0] ~ '::EXPORT::' ~ $text] );
+    $x{$textpkg}{$name} = $*DECLARAND;
+    $x{$textpkg}{'&'~$name} = $*DECLARAND
+            if $name ~~ /^\w/ and $*IN_DECL ne 'constant';
+    self;
+}
+
+# only used for error reporting
+method clean_id ($idx, $name) {
+    my $id = $idx;
+    my $file = $*FILE<name>;
+
+    $id ~= '::';
+    $id ~~ s/^'MY:file<CORE.setting>'.*?'::'/CORE::/;
+    $id ~~ s/^MY\:file\<\w+\.setting\>.*?\:\:/SETTING::/;
+    $id ~~ s/^MY\:file\<$file\>$/UNIT/;
+    $id ~~ s/\:pos\(\d+\)//;
+    $id ~= "<$name>";
+    $id;
+}
+
+class LABEL {
+    has $.file;
+    has $.pos;
+}
+
+method label_id() {
+    my $l = LABEL.new;
+    $l.pos = self.pos;
+    $l.file = $*FILE<name>;
+    $l;
+}
+
+method do_import($m, $args) { #, perl6.vim stupidity
+    my @imports;
+    my $module = $m.Str;
+    if $module ~~ /(class|module|role|package)\s+(\S+)/ {
+        $module = ~$1;
+    }
+
+    my $pkg = self.find_stash($module);
+    if $pkg<really> {
+        $pkg = $pkg<really><UNIT>;
+    }
+    else {
+        $pkg = self.find_stash($module ~ '::');
+    }
+    if $args {
+        my $text = $args.Str;
+        return self unless $text;
+        while $text ~~ s/^\s*\:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?\<(.*?)\>\,?// {
+            my $scope = lc($0 // 'my');
+            my $imports = $1.Str;
+            my $*SCOPE = $scope;
+            @imports = $imports.comb(/\S+/);
+            for @imports -> $i {
+                my $imp = $i;
+                if $pkg {
+                    if $imp ~~ s/^\:// {
+                        my @tagimports;
+                        try { @tagimports = $pkg<EXPORT::>{$imp}.keys }
+                        self.do_import_aliases($pkg, @tagimports);
+                    }
+                    elsif $pkg{$imp}<export> {
+                        self.add_my_name($imp, $pkg{$imp});
+                    }
+                    elsif $pkg{'&'~$imp}<export> {
+                        $imp = '&' ~ $imp;
+                        self.add_my_name($imp, $pkg{$imp});
+                    }
+                    elsif $pkg{$imp} {
+                        self.worry("Can't import $imp because it's not exported by $module");
+                        next;
+                    }
+                }
+                else {
+                    self.add_my_name($imp);
+                }
+            }
+        }
+    }
+    else {
+        return self unless $pkg;
+        try { @imports = $pkg<EXPORT::><DEFAULT::>.keys };
+        my $*SCOPE = 'my';
+        self.do_import_aliases($pkg, @imports);
+    }
+
+    self;
+}
+method do_import_aliases($pkg, *@names) {
+#    say "attempting to import @names";
+    for @names -> $n {
+        next if $n ~~ /^\!/;
+        next if $n ~~ /^PARENT\:\:/;
+        next if $n ~~ /^OUTER\:\:/;
+        self.add_my_name($n, $pkg{$n});
+    }
+    self;
+}
+
+method you_are_here() { $*YOU_WERE_HERE = $*CURLEX; self }
+method lineof ($p) {
+    return 1 unless defined $p;
+    my $line = @*LINEMEMOS[$p];
+    return $line if $line;
+    $line = 1; my $pos = 0;
+    my $lm = @*LINEMEMOS;
+    self.orig ~~ / :r [ \n { $lm[$pos++] = $line++ } ||
+                        .  { $lm[$pos++] = $line } ]* /;
+    $lm[$pos++] = $line;
+    return $lm[$p] // 0;
+}
+
+method lookup_dynvar($) { Any } # NYI
+method check_old_cclass($) { } # NYI
+method do_use($module,$args) {
+    self.do_need($module);
+    self.do_import($module,$args);
+    self;
+}
+
+method do_need($mo) {
+    my $module = $mo.Str;
+    my $topsym;
+    $topsym = self.sys_load_modinfo($module);
+    if !defined $topsym {
+        self.panic("Could not load $module");
+    }
+    self.add_my_name($module);
+    $*DECLARAND<really> = $topsym;
+    self;
+}
+
+method sys_load_modinfo($module) {
+    # These are handled within the grammar
+    if $module eq 'MONKEY_TYPING' || $module eq 'lib' ||
+            $module eq 'fatal' {
+        return { };
+    }
+    $*module_loader.($module).create_syml;
+}
+
+method load_lex($setting) {
+    if $setting eq 'NULL' {
+        my $id = "MY:file<NULL.pad>:line(1):pos(0)";
+        my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
+            '!line' => 1);
+        return Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
+            'SETTING' => $core, $id => $core);
+    }
+
+    $*module_loader.($setting).create_syml;
+}
 }
 
 augment class Cursor {
