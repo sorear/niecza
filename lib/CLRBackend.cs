@@ -3627,8 +3627,8 @@ dynamic:
             foreach (object o in unit.tdeps) {
                 string dp = JScalar.S(((object[])o)[0]);
                 if (dp == unit.name) continue;
-                thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_BootModule, new CpsOp[] {
-                    CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")) }));
+                thaw.Add(CpsOp.Sink(CpsOp.MethodCall(null, Tokens.Kernel_BootModule, new CpsOp[] {
+                    CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")) })));
             }
 
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
@@ -3882,12 +3882,15 @@ dynamic:
                     s = su.setting;
                     m = su.mainline_ref.Resolve<StaticSub>();
                 }
-                thaw.Add(CpsOp.Sink(CpsOp.SubyCall(false, "",
-                    new CpsOp[] { CpsOp.GetSField(m.protosub) })));
+                thaw.Add(CpsOp.CpsReturn(new CpsOp[] { CpsOp.SubyCall(false,"",
+                    new CpsOp[] { CpsOp.GetSField(m.protosub) }) }));
+            } else {
+                thaw.Add(CpsOp.CpsReturn(new CpsOp[] {
+                    CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar,
+                        new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyP) }) }));
             }
 
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
-            thaw.Add(CpsOp.CpsReturn(new CpsOp[0]));
             boot.Build(CpsOp.Sequence(thaw.ToArray()));
 
             if (asmain)
@@ -3912,6 +3915,7 @@ dynamic:
             il.Emit(OpCodes.Ldftn, boot);
             il.Emit(OpCodes.Newobj, Tokens.DynBlockDelegate_ctor);
             il.Emit(OpCodes.Call, Tokens.Kernel_RunLoop);
+            il.Emit(OpCodes.Pop);
             il.Emit(OpCodes.Ret);
 
             ab.SetEntryPoint(mb);

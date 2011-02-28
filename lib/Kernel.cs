@@ -1504,18 +1504,19 @@ noparams:
         private static HashSet<string> ModulesStarted;
         private static HashSet<string> ModulesFinished;
 
-        public static void BootModule(string name, DynBlockDelegate dgt) {
+        public static Variable BootModule(string name, DynBlockDelegate dgt) {
             if (ModulesStarted == null) ModulesStarted = new HashSet<string>();
             if (ModulesFinished == null) ModulesFinished = new HashSet<string>();
             if (ModulesFinished.Contains(name))
-                return;
+                return NewROScalar(AnyP);
             if (ModulesStarted.Contains(name))
                 throw new NieczaException("Recursive module graph detected at " + name + ": " + JoinS(" ", ModulesStarted));
             ModulesStarted.Add(name);
-            Kernel.RunInferior(Kernel.GetInferiorRoot().MakeChild(null,
-                        new SubInfo("boot-" + name, dgt)));
+            Variable r = Kernel.RunInferior(Kernel.GetInferiorRoot().
+                    MakeChild(null, new SubInfo("boot-" + name, dgt)));
             ModulesFinished.Add(name);
             ModulesStarted.Remove(name);
+            return r;
         }
 
         public static void DoRequire(string name) {
@@ -2156,7 +2157,7 @@ slow:
             return th;
         }
 
-        public static void RunLoop(string main_unit,
+        public static Variable RunLoop(string main_unit,
                 string[] args, DynBlockDelegate boot) {
             commandArgs = args;
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
@@ -2174,12 +2175,14 @@ slow:
                 }
                 TraceCount = TraceFreq;
             }
+            Variable r = null;
             try {
-                BootModule(main_unit, boot);
+                r = BootModule(main_unit, boot);
             } catch (NieczaException n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
                 Environment.Exit(1);
             }
+            return r;
         }
 
         class ExitRunloopException : Exception {

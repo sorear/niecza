@@ -1176,7 +1176,7 @@ sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 sub rungather($ ) { die "Run NYI" }
 # }}}
 
-# this needs to be at the end because it screws up the parsing of everything
+# This needs to be at the end because it screws up the parsing of everything
 # after it.
 sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 
