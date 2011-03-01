@@ -161,6 +161,13 @@ some internal code fragments, usually in response to _hack settings.
 Sets the C<$line_number> for the C<$operation>.  In the C# backend, line
 number is only recorded at high-level call sites within the span.
 
+=head3 letscope($transparent,{$lexname,$letname}...,$body)
+
+Within C<$body>, any lexical access to a C<$lexname> is remapped into
+a C<letvar> access to the corresponding C<$letname>.  This is used for
+inlined functions.  If C<$transparent> is false, the corresponding
+scope should be seen by C<OUTER::> and the like (not yet implemented).
+
 =head3 xspan($n1,$n2,$sync,$body,{$class,$name,$goto},..)
 
 Generates the code for C<$body> bracketed by the labels C<$n1> and
