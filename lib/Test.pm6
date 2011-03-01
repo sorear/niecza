@@ -115,7 +115,7 @@ sub eval_lives_ok($code, $why?) is export {
 }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done() is export { $*TEST-BUILDER.done }
-sub skip($number,$reason) is export {
+sub skip($reason,$number) is export {
     $*TEST-BUILDER.skip($reason) for ^$number;
 }
 
