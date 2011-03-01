@@ -1,5 +1,6 @@
 integration/advent2009-day10.t
 integration/lexical-array-in-inner-block.t
+integration/no-indirect-new.t
 integration/passing-pair-class-to-sub.t
 S02-builtin_data_types/array.t
 S02-builtin_data_types/autovivification.t
@@ -10,6 +11,7 @@ S02-builtin_data_types/parsing-bool.t
 S02-builtin_data_types/subscripts_and_context.t
 S02-lexical-conventions/unicode.t
 S02-literals/pair-boolean.t
+S02-literals/types.t
 S02-literals/underscores.t
 S02-names/identifier.t
 S02-names_and_variables/contextual.t
@@ -28,6 +30,7 @@ S03-operators/repeat.t
 S03-operators/scalar-assign.t
 S03-operators/spaceship-and-containers.t
 S03-operators/spaceship.t
+S03-operators/subscript-vs-lt.t
 S03-smartmatch/any-bool.t
 S03-smartmatch/any-str.t
 S04-declarations/multiple.t
@@ -46,6 +49,7 @@ S04-statements/map-and-sort-in-for.t
 S04-statements/next.t
 S04-statements/no-implicit-block.t
 S04-statements/repeat.t
+S04-statements/return.t
 S04-statements/unless.t
 S04-statements/until.t
 S04-statements/while.t
@@ -62,6 +66,7 @@ S06-signature/positional-placeholders.t
 S06-traits/is-rw.t
 S06-traits/slurpy-is-rw.t
 S09-autovivification/autoincrement.t
+S12-class/declaration-order.t
 S12-class/inheritance-class-methods.t
 S12-class/lexical.t
 S12-class/stubs.t
