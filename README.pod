@@ -15,9 +15,17 @@ C<test.pl>.
 
 =item *
 
-To run on Mono: You will need 2.8.x or higher.  2.8.2 or later is
-recommended for best performance; you should use C<RUN_CLR=mono-sgen>
-in this case.  2.10 (latest stable) is also tested.
+To run on Mono:  2.6.4 and later are well-tested, though success has been
+reported with 2.4.x as well.  ggoebel on #perl6 reports that 2.6.7 fails
+with a bus error on OS X 10.4 x86, but 2.6.4 works; 2.6.7 is fine on other
+platforms.
+
+2.8.2 or later is recommended for best performance; you should use
+C<RUN_CLR=mono-sgen> in this case.  2.10 (latest stable) is also tested.
+
+Debian and derivatives have a modular mono packaging; you should install
+'mono-complete'.  (The other packages exist for the sake of Debian-packaged
+programs.)
 
 To run on Windows/Mono (2.8.2 and 2.10) and other systems, download the
 mono installers from C<http://go-mono.org/>

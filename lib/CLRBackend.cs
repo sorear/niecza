@@ -3558,7 +3558,7 @@ dynamic:
             AssemblyName an = new AssemblyName(mobname);
             this.dir = dir;
             ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
-                    (filename == null ? AssemblyBuilderAccess.RunAndCollect :
+                    (filename == null ? AssemblyBuilderAccess.Run :
                         AssemblyBuilderAccess.Save), dir);
             mob = filename == null ? ab.DefineDynamicModule(mobname) :
                 ab.DefineDynamicModule(mobname, filename);
