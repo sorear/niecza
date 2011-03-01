@@ -79,12 +79,6 @@ sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }
 sub nok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(!$bool, $tag) }
 sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag) }
 sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
-sub eval_dies_ok($, $tag?) is export {
-    $*TEST-BUILDER.todo($tag, "eval");
-}
-sub eval_lives_ok($, $tag?) is export {
-    $*TEST-BUILDER.todo($tag, "eval");
-}
 sub isa_ok($obj, $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
 sub is($got, $expected, $tag?) is export {
 
@@ -108,6 +102,16 @@ sub dies_ok($code,$why?) is export {
     my $lived = False;
     try { $code.(); $lived = True; }
     $*TEST-BUILDER.ok(!$lived, $why);
+}
+sub eval_dies_ok($code, $why?) is export {
+    my $lived = False;
+    try { eval $code; $lived = True; }
+    $*TEST-BUILDER.ok(!$lived, $why);
+}
+sub eval_lives_ok($code, $why?) is export {
+    my $lived = False;
+    try { eval $code; $lived = True; }
+    $*TEST-BUILDER.ok($lived, $why);
 }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done() is export { $*TEST-BUILDER.done }
