@@ -6,8 +6,13 @@ use NAMOutput;
 sub upcalled(@strings) {
     given @strings[0] {
         when "eval" {
-            $*compiler.compile_string(@strings[1], True, :evalmode);
-            return;
+            my $*IN_EVAL = True;
+            # XXX NieczaException is eaten by boundary
+            try {
+                $*compiler.compile_string(@strings[1], True, :evalmode);
+                return "";
+            }
+            return $!;
         }
         say "upcall: @strings.join('|')";
         "ERROR";

@@ -371,6 +371,109 @@ method load_lex($setting) {
 
     $*module_loader.($setting).create_syml;
 }
+
+method sorry (Str $s) {
+    self.deb("sorry $s") if $*DEBUG;
+    die $s if $*IN_EVAL;
+    note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
+        unless $*IN_SUPPOSE or $*FATALS++;
+    if $s {
+        my $m = $s;
+        $m ~= self.locmess ~ "\n" unless $m ~~ /\n$/;
+        if $*FATALS > 10 or $*IN_SUPPOSE {
+            die $m;
+        }
+        else {
+            note $m unless %*WORRIES{$m}++;
+        }
+    }
+    self;
+}
+method panic (Str $s) {
+    die "Recursive panic" if $*IN_PANIC;
+    $*IN_PANIC++;
+    self.deb("panic $s") if $*DEBUG;
+    my $m;
+    my $here = self;
+
+    my $first = $here.lineof($*LAST_NIBBLE_START);
+    my $last = $here.lineof($*LAST_NIBBLE);
+    if $first != $last {
+        if $here.lineof($here.pos) == $last {
+            $m ~= "(Possible runaway string from line $first)\n";
+        }
+        else {
+            $first = $here.lineof($*LAST_NIBBLE_MULTILINE_START);
+            $last = $here.lineof($*LAST_NIBBLE_MULTILINE);
+            # the bigger the string (in lines), the further back we suspect it
+            if $here.lineof($here.pos) - $last < $last - $first  {
+                $m ~= "(Possible runaway string from line $first to line $last)\n";
+            }
+        }
+    }
+
+    $m ~= $s;
+
+    if substr(self.orig,$here.pos,1) ~~ /\)|\]|\}|\»/ {
+        $m ~~ s|Confused|Unexpected closing bracket|;
+    }
+
+    $m ~= $here.locmess;
+    $m ~= "\n" unless $m ~~ /\n$/;
+
+    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
+        my @t = $here.suppose( sub { $here.term } );
+        if @t {
+            my $endpos = $here.pos;
+            my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
+
+            if self.lineof($startpos) != self.lineof($endpos) {
+                $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+            }
+            elsif @*MEMOS[$here.pos - 1]<baremeth> {
+                $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
+            }
+            elsif @*MEMOS[$here.pos - 1]<arraycomp> {
+                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
+            }
+            else {
+                $m ~~ s|Confused|Two terms in a row|;
+            }
+        }
+        elsif my $type = @*MEMOS[$here.pos - 1]<nodecl> {
+            my @t = $here.suppose( sub { $here.variable } );
+            if @t {
+                my $variable = @t[0].Str;
+                $m ~~ s|Confused|Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'|;
+            }
+        }
+    }
+    elsif my $type = @*MEMOS[$here.pos - 1]<wasname> {
+        my @t = $here.suppose( sub { $here.identifier } );
+        my $name = @t[0].Str;
+        my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
+        my $d = $*IN_DECL;
+        $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
+        $m ~~ s|Malformed block|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
+    }
+
+    if @*WORRIES {
+        $m ~= "Other potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+    }
+
+    $*IN_PANIC--;
+    die $m if $*IN_SUPPOSE || $*IN_EVAL;     # just throw the exception back to the supposer
+    $*IN_PANIC++;
+
+    note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
+        unless $*FATALS++;
+    note $m;
+    self.explain_mystery();
+
+    $*IN_PANIC--;
+    note "Parse failed\n";
+    exit 1;
+}
 }
 
 augment class Cursor {

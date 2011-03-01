@@ -438,8 +438,10 @@ public class Builtins {
             throw new NieczaException("Cannot eval; no compiler available");
         CrossDomainReceiver r = (CrossDomainReceiver)
             up_domain.CreateInstanceAndUnwrap("Kernel", "Niecza.UpCallee");
-        r.Call(AppDomain.CurrentDomain, new string[] { "eval",
+        string[] msg = r.Call(AppDomain.CurrentDomain, new string[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str) });
+        if (msg[0] != "")
+            throw new NieczaException(msg[0]);
         Variable rt = eval_result;
         eval_result = null;
         return rt;
