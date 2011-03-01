@@ -52,7 +52,6 @@ S04-statements/while.t
 S05-capture/subrule.t
 S05-grammar/methods.t
 S05-grammar/protoregex.t
-S05-modifier/ignoreaccent.t
 S05-interpolation/lexicals.t
 S05-metachars/line-anchors.t
 S05-metasyntax/changed.t
