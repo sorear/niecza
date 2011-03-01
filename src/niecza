@@ -32,6 +32,40 @@ method bif_simple_eval($str) { self._cgop("bif_simple_eval", $str) }
 }
 
 augment class STD::P6 { #OK exist
+my %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
+    regex prefix_circumfix_meta_operator:reduce {
+        :my $*IN_REDUCE = 1;
+        :my ($op, $term);
+        <?before '['\S+']'>
+        $<s> = (
+            '['
+            [
+            || <op=.infixish('red')> <?before ']'>
+            || \\<op=.infixish('tri')> <?before ']'>
+            || <!>
+            ]
+            ']' ['«'|<?>]
+        )
+        { $op = $<s><op>; }
+
+        <.can_meta($op, "reduce with")>
+
+        [
+        || <!{ $op<O><diffy> }>
+        || <?{ $op<O><assoc> eq 'chain' }>
+        || <.sorry("Can't reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
+        ]
+
+        [
+        || <?before '('>
+        || <?before \s+ [ <?stdstopper> { $term = 1 } ]? >
+        || { $term = 1 }
+        ]
+
+        <O(|%($op<O>), |%list_prefix, assoc => 'unary', uassoc => 'left', term => $term)>
+        $<sym> = {$<s>.Str}
+
+    }
 }
 
 augment class RxOp::Sym { #OK exist
