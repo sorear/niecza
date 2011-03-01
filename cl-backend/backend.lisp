@@ -7,6 +7,8 @@
 (defpackage niecza (:use common-lisp)) 
 (in-package :niecza)
 
+
+
 ; Macros 
  
  
@@ -91,6 +93,9 @@
 
 (defun mymap (func list) (remove-if #'null (mapcar func list)))
 
+(defvar preinit)
+(setf preinit '())
+
 (defmacro define-nam-sub  
   (i                ; The Xref Id
     name             ; Sub's name for backtraces
@@ -112,7 +117,15 @@
     nam              ; See description of opcodes earlier
   )
 
-  `(defun ,(main-xref i) ,(mymap #'compile-param signature) (let ,(lexicals-to-let lexicals) ,@nam)))
+  (if hint_hack
+      (let ((var (hint-var (xref-to-symbol (first hint_hack)) (second hint_hack))))
+        (eval `(defvar ,var))
+        (setf preinit (append `((setf ,var (,(main-xref i)))) preinit))
+  ))
+
+  `(defun ,(main-xref i)
+     ,(mymap #'compile-param signature)
+        (let ,(lexicals-to-let (main-xref i) lexicals) ,@nam)))
 
 
 (defun xref-to-subsymbol (xref) (main-xref (cadr xref)))
@@ -152,22 +165,35 @@
     ) (when (equal kind "normal")))
       `(defmethod ,(method-name name) ((invocant ,class) &rest rest) (apply ',(xref-to-subsymbol body) invocant rest)))))
 
+(defun hint-var (xref name)
+  (intern (concatenate 'string "HINT-" (string xref) "-" name)))
+
+
 ; converts one lexical to a variable declaration for a let
-(defun lexical-to-let (lexical)
+(defun lexical-to-let (xref lexical)
   (fare-matcher:match lexical 
     ((and (list var sub dunno-1 id dunno-2) (when (equal sub "sub"))) (list (var-name var) `(symbol-function ',(main-xref id))))
+
     ((and (list var simple flags) (when (equal simple "simple")))
       (if (equal flags 4)
           nil
           (list (var-name var) (make-scalar ""))))
+
     ((and (list* var stash path) (when (equal stash "stash")))
        (list (var-name var) `(get-stash ,path)))
+
+    ((and (list var hint) (when (equal hint "hint")))
+       (list (var-name var) (hint-var xref var)))
+
     ((and (list* var common path) (when (equal common "common")))
        (list (var-name var) (niecza-stash:to-stash-name path)))))
 
 
+
+
 ; converts a list of lexicals
-(defun lexicals-to-let (lexicals) (remove-if #'null (mapcar #'lexical-to-let lexicals)))
+(defun lexicals-to-let (xref lexicals)
+  (remove-if #'null (mapcar (lambda (x) (lexical-to-let xref x)) lexicals)))
 
 
 (nam-op ann (filename line op) op)
@@ -298,7 +324,7 @@
          (|Nil| "") ; HACK
          (|Any| "") ; HACK
          )
-      ,@compiled-unit (,(main-xref 0))))
+      ,@compiled-unit (eval `(progn ,@preinit)) (,(main-xref 0))))
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first common-lisp-user::*args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
