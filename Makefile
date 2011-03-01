@@ -55,7 +55,7 @@ obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll obj/CrossDom
 
 test: all
 	$(RUN_CLR) run/Niecza.exe -c test.pl
-	prove -e $(RUN_CLR) obj/MAIN.exe
+	prove -e "$(RUN_CLR)" obj/MAIN.exe
 
 p6eval: all
 	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC

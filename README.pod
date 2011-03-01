@@ -23,6 +23,8 @@ platforms.
 2.8.2 or later is recommended for best performance; you should use
 C<RUN_CLR=mono-sgen> in this case.  2.10 (latest stable) is also tested.
 
+(2.6.x is currently broken due to versioning issues.  Stay tuned.)
+
 Debian and derivatives have a modular mono packaging; you should install
 'mono-complete'.  (The other packages exist for the sake of Debian-packaged
 programs.)
