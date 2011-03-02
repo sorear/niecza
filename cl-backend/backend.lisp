@@ -36,7 +36,7 @@
 
 ;(nam-op ehspan (class name unused start end goto) )
 ;(nam-op span (n1 n2 sync body) body)
-(nam-op xspan (n1 n2 flag body dunno1 dunno2 dunno3) body)
+(nam-op xspan (n1 n2 flag body &rest rest) body)
 
 (defun strip-ann (thing) 
   (if (consp thing)
@@ -258,6 +258,8 @@
 
 (defun nam-null (type) nil) 
 
+; HACK
+(nam-op bool (val) val)
 
 ; HACK
 (nam-op corelex (var) `(nam-scopedlex ,var))
@@ -307,6 +309,8 @@
 (defun nam-bif_minus (a b) (- (FETCH a) (FETCH b)))
 
 (defun nam-bif_mul (a b) (* (FETCH a) (FETCH b)))
+
+(defun nam-bif_divide (a b) (/ (FETCH a) (FETCH b)))
 
 (defun nam-bif_numgt (a b) (> (FETCH a) (FETCH b)))
 (defun nam-bif_numlt (a b) (< (FETCH a) (FETCH b)))
