@@ -129,6 +129,7 @@ augment class Metamodel::StaticSub { #OK exist
         $flags +|= 16 if $.returnable;
         $flags +|= 32 if $.augmenting;
         $flags +|= 64 if $.transparent;
+        $flags +|= 128 if $.unsafe;
         [
             'sub',
             $.name,

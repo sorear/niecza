@@ -3,6 +3,8 @@ class NieczaBackendDotnet is NieczaBackendNAM;
 
 use NAMOutput;
 
+has $.safemode = False;
+
 sub upcalled(@strings) {
     given @strings[0] {
         when "eval" {
@@ -28,6 +30,7 @@ sub run_subtask($file, *@args) {
 }
 
 method accept($unitname, $ast is rw, :$main, :$run, :$evalmode) {
+    downcall("safemode") if $.safemode;
     if $run {
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;

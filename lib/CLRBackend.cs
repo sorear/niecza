@@ -474,6 +474,7 @@ namespace Niecza.CLRBackend {
         public const int STRONG_USED = 8;
         public const int RETURNABLE = 16;
         public const int AUGMENTING = 32;
+        public const int UNSAFE = 128;
         public readonly string name;
         public readonly Unit unit;
         public readonly Xref outer;
@@ -922,6 +923,8 @@ namespace Niecza.CLRBackend {
             VarHash.GetMethod("set_Item");
         public static readonly MethodInfo Kernel_MakeSub =
             typeof(Kernel).GetMethod("MakeSub");
+        public static readonly MethodInfo Kernel_CheckUnsafe =
+            typeof(Kernel).GetMethod("CheckUnsafe");
         public static readonly MethodInfo Kernel_NewLabelVar =
             typeof(Kernel).GetMethod("NewLabelVar");
         public static readonly MethodInfo Kernel_Die =
@@ -3728,6 +3731,9 @@ dynamic:
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub2 {0}", obj.name);
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
+                if ((obj.flags & StaticSub.UNSAFE) != 0)
+                    thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_CheckUnsafe,
+                            new CpsOp[] { CpsOp.GetSField(obj.subinfo) }));
                 if (obj.sclass != "Sub") {
                     Class c = (Class) obj.GetCorePackage(obj.sclass);
                     thaw.Add(CpsOp.SetField(Tokens.SubInfo_mo,
@@ -4034,6 +4040,9 @@ dynamic:
                 Array.Copy(args, 3, argv, 0, argv.Length);
                 CLRBackend.RunMain(args[1], args[2],
                         args[0] == "evalnam" ? null : argv);
+                return new string[0];
+            } else if (args[0] == "safemode") {
+                Kernel.SaferMode = true;
                 return new string[0];
             } else if (args[0] == "hello") {
                 return new string[] { Assembly.GetExecutingAssembly().Location };

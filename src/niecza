@@ -85,7 +85,7 @@ general options:
    -v --verbose              # detailed timing info
    -c --compile              # don't run (implied with -C)
       --stop-after=STAGE     # stop after STAGE and dump AST
-      --safe                 # disable system interaction, implies -L SAFE
+      --safe                 # disable system interaction
       --help                 # display this message
 
 backend options:
@@ -127,7 +127,7 @@ if $bcnd eq 'nam' {
     $backend = NieczaBackendNAM.new(obj_dir => $odir);
 }
 elsif $bcnd eq 'dotnet' || $bcnd eq 'mono' {
-    $backend = NieczaBackendDotnet.new(obj_dir => $odir);
+    $backend = NieczaBackendDotnet.new(obj_dir => $odir, safemode => $safe);
 }
 elsif $bcnd eq 'clisp' {
     $backend = NieczaBackendClisp.new(obj_dir => $odir);
@@ -156,7 +156,7 @@ my $c = NieczaCompiler.new(
         path => @lib,
     ),
     frontend => NieczaFrontendSTD.new(
-        lang => $safe ?? 'SAFE' !! $lang,
+        lang => $lang,
         safemode => $safe,
     ),
     stages => $stages,

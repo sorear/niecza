@@ -555,6 +555,7 @@ noparams:
 
         public static readonly bool TraceCalls =
             Environment.GetEnvironmentVariable("NIECZA_TRACE_CALLS") != null;
+
         public Frame MakeChild(Frame outer, SubInfo info) {
             if (reusable_child == null) {
                 reusable_child = new Frame();
@@ -1635,6 +1636,16 @@ noparams:
             return n;
         }
 
+        public static bool SaferMode;
+
+        private static Frame SaferTrap(Frame th) {
+            return Die(th, th.info.name + " may not be used in safe mode");
+        }
+
+        public static void CheckUnsafe(SubInfo info) {
+            if (SaferMode)
+                info.code = SaferTrap;
+        }
         public static Variable BoxAny<T>(T v, IP6 proto) {
             if (proto == BoolMO.typeObject)
                 return ((bool) (object) v) ? TrueV : FalseV;
