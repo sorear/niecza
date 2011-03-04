@@ -12,6 +12,7 @@ has $.type;
 has $.returnable;
 # my $x inside, floats out; mostly for blasts; set by context so must be rw
 has $.transparent = False;
+has $.unsafe = False;
 has $.text;
 # metadata for runtime inspection
 has $.class = 'Sub';

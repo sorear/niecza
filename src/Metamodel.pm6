@@ -483,6 +483,7 @@ class StaticSub is RefTarget {
     has $.cur_pkg; # Array of Str
     has $.returnable = False; # Bool; catches &return
     has $.augmenting = False; # Bool; traps add_attribute
+    has $.unsafe = False; # Bool; disallowed in safe mode
     has $.class = 'Sub'; # Str
     has $.ltm; # is rw
     has $.exports; # is rw

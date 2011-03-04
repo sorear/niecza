@@ -81,7 +81,7 @@ class Sym is Capturing {
 
     method lad() {
         my $m = [ ($!igcase ?? 'StrNoCase' !! 'Str'), $!text ];
-        defined($!endsym) ?? [ 'Sequence', [ [ 'Method', $!endsym ], $m ] ] !! $m;
+        defined($!endsym) ?? [ 'Sequence', [$m, [ 'Method', $!endsym ]] ] !! $m;
     }
 }
 

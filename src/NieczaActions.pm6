@@ -299,6 +299,8 @@ method op_for_regex($/, $rxop) {
     {
         my $*paren = 0;
         my $*dba = 'anonymous rule';
+        my $*symtext;
+        my $*endsym;
         $rxop.check
     }
     my ($orxop, $mb) = OptRxSimple.run($rxop);
@@ -308,6 +310,12 @@ method op_for_regex($/, $rxop) {
 }
 
 method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
+method quote:rx ($/) { make self.op_for_regex($/, $<quibble>.ast); }
+method quote:m  ($/) {
+    make ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
+            receiver => self.op_for_regex($/, $<quibble>.ast),
+            args => [ mklex($/, '$_') ]);
+}
 
 method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
         :$passcap = False) {
@@ -345,9 +353,9 @@ method regex_block($/) {
 
 method regex_def($/) {
     sub _symtext($name) {
-        ($name ~~ /\:sym\<(.*)\>/) ?? ~$0 !!
-            ($name ~~ /\:(\w+)/) ?? ~$0 !!
-            Str; #XXX
+        ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name, Str);
     }
     my ($name, $path) = $<deflongname> ??
         self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
@@ -372,12 +380,29 @@ method regex_def($/) {
     }
 
     my $isproto;
-    my $symtext = ($cname || !defined($name)) ?? Str !! _symtext($name);
+    my ($basename, $symtext) = ($cname || !defined($name))
+        ?? (Str, Str) !! _symtext($name);
+
+    my $endsym;
+    for map *.ast, @$<trait> -> $t {
+        if $t<unary> || $t<binary> || $t<defequiv> {
+            # Ignored for now
+        }
+        elsif defined $t<endsym> {
+            $endsym = $t<endsym>;
+        }
+        else {
+            $/.CURSOR.sorry("Unhandled regex trait $t.keys.[0]");
+        }
+    }
+
     if $*MULTINESS eq 'proto' {
-        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' {
+        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' ||
+                !defined($basename) {
             $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
             return Nil;
         }
+        @*MEMOS[0]<proto_endsym>{$basename} = $endsym;
         $isproto = True;
     } else {
         my $m2 = defined($symtext) ?? 'multi' !! 'only';
@@ -385,6 +410,7 @@ method regex_def($/) {
             $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
             return Nil;
         }
+        $endsym //= @*MEMOS[0]<proto_endsym>{$basename} if defined $basename;
     }
 
     if defined($path) && $scope ne 'our' {
@@ -415,6 +441,7 @@ method regex_def($/) {
     {
         my $*paren = 0;
         my $*symtext = $symtext;
+        my $*endsym = $endsym;
         my $*dba = $name // 'anonymous regex';
         $ast.check;
     }
@@ -451,7 +478,7 @@ method atom($/) {
 
 method quantified_atom($/) { # :: RxOp
     my $atom = $<atom>.ast;
-    my $q    = $<quantifier> ?? $<quantifier>[0].ast !! Any;
+    my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;
 
     return Nil unless $atom;
 
@@ -503,12 +530,10 @@ method quantifier:sym<~> ($/) {
 }
 method quantifier:sym<**> ($/) {
     # XXX can't handle normspace well since it's not labelled 1*/2*
-    my $h =
-        $1 ?? { min => +~$0, max => +~$1[0] } !!
-        ($0 && defined($/.index('..'))) ?? { min => +~$0 } !!
-        $0 ?? { min => +~$0, max => +~$0 } !!
-        $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
-        { min => 1, sep => $<quantified_atom>.ast };
+    my $h = $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
+            $<quantified_atom> ?? { min => 1, sep => $<quantified_atom>.ast } !!
+            { min => +~$0, max => ($1 ?? +~$1 !!
+                defined($/.index('..')) ?? Any !! +~$0) };
     $h<mod> = $<quantmod>.ast;
     make $h;
 }
@@ -744,6 +769,13 @@ method assertion:name ($/) {
     make self.rxcapturize($/, $name, $/.ast);
 }
 
+# actually we need a few more special cases here.
+method assertion:variable ($/) {
+    make ::RxOp::Subrule.new(|node($/), regex =>
+        ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
+            positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+}
+
 method assertion:method ($/) {
     if $<dottyop> {
         $/.CURSOR.sorry("Dottyop assertions NYI");
@@ -808,12 +840,12 @@ method mod_internal:sym<:my> ($/) {
 method mod_internal:p6adv ($/) {
     my ($k, $v) = $<quotepair><k v>;
 
-    if !$v.^isa(List) {
+    if !$v.^isa(Match) {
         $/.CURSOR.sorry(":$k requires an expression argument");
         make ::RxOp::None.new;
         return Nil;
     }
-    $v = $v[0].ast;
+    $v = $v.ast;
 
     if $k eq 'lang' {
         make ::RxOp::SetLang.new(expr => self.rxembed($/, $v, True));
@@ -927,8 +959,8 @@ method process_nibble($/, @bits, $prefix?) {
             $ast = "";
         }
 
-        if $ast !~~ Op && defined $prefix {
-            $ast = $ast.split(/^^<before \s>[ $prefix || \s* ]/).join("");
+        if $ast !~~ Op && defined($prefix) && $prefix ne "" {
+            $ast = $ast.split(/^^<before \h>[ $prefix || \h+ ]/).join("");
         }
 
         push @acc, $ast;
@@ -2421,19 +2453,22 @@ method trait_mod:is ($/) {
     } elsif $trait eq 'export' {
         make { export => [ 'DEFAULT', 'ALL' ] };
         $noparm = 'Export tags NYI';
-    } elsif ($trait eq 'rawcall') {
+    } elsif $trait eq 'endsym' {
+        my $text;
+        if !$<circumfix> || !$<circumfix>[0].ast.^isa(::Op::StringLiteral) {
+            $/.CURSOR.sorry("Argument to endsym must be a literal string");
+        } else {
+            $text = $<circumfix>[0].ast.text;
+        }
+        make { endsym => $text };
+    } elsif $trait eq 'rawcall' {
         make { nobinder => True };
     } elsif $trait eq 'return-pass' { # &return special
         make { return_pass => 1 };
-    } elsif $trait eq 'rw' {
-        make { rw => 1 };
     } elsif $trait eq 'parcel' {
         make { rwt => 1 };
-    } elsif $trait eq 'readonly' {
-        make { readonly => 1 };
     } else {
-        $/.CURSOR.sorry("Unhandled trait $trait");
-        make { };
+        make { $trait => True };
     }
 
     if $noparm && $<circumfix> {
@@ -2465,12 +2500,14 @@ my $next_anon_id = 0;
 method gensym() { 'anon_' ~ ($next_anon_id++) }
 method genid()  { ($next_anon_id++) }
 
-method sl_to_block ($type, $ast, :$subname, :$returnable, :$signature) {
+method sl_to_block ($type, $ast, :$subname, :$returnable, :$signature,
+        :$unsafe = False) {
     Body.new(
         name      => $subname // 'ANON',
         returnable=> $returnable // ($type eq 'sub'),
         type      => $type,
         signature => $signature,
+        unsafe    => $unsafe,
         do        => $ast);
 }
 
@@ -2528,6 +2565,7 @@ method routine_def ($/) {
     my $return_pass = 0;
     my $signature = $<multisig> ?? $<multisig>[0].ast !!
         self.get_placeholder_sig($/);
+    my $unsafe = False;
     for @( $<trait> ) -> $t {
         if $t.ast.<export> {
             push @export, @( $t.ast<export> );
@@ -2535,8 +2573,10 @@ method routine_def ($/) {
             $signature = Any;
         } elsif $t.ast<return_pass> {
             $return_pass = 1;
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
         } else {
-            $/.CURSOR.sorry('Non-export sub traits NYI');
+            $/.CURSOR.sorry("Sub trait $t.ast.keys.[0] not available");
         }
     }
     my $scope = !$dln ?? 'anon' !! ($*SCOPE || 'my');
@@ -2558,7 +2598,7 @@ method routine_def ($/) {
         self.sl_to_block('sub',
             $<blockoid>.ast,
             returnable => !$return_pass,
-            subname => $m,
+            subname => $m, :$unsafe,
             signature => $signature),
         outer_key => (($scope eq 'my') ?? "\&$m" !! Any),
         exports => @export);
@@ -2606,16 +2646,19 @@ method method_def ($/) {
     my $sig = $<multisig> ?? $<multisig>[0].ast !!
         self.get_placeholder_sig($/);
 
+    my $unsafe = False;
     for @( $<trait> ) -> $t {
-        if ($t.ast<nobinder>) {
+        if $t.ast<nobinder> {
             $sig = Any;
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
         } else {
             $/.CURSOR.sorry("NYI method trait $t");
         }
     }
 
     my $bl = self.sl_to_block('sub', $<blockoid>.ast,
-        subname => $name,
+        subname => $name, :$unsafe,
         signature => $sig ?? $sig.for_method !! Any);
 
     make self.block_to_closure($/, $bl, outer_key => $sym,
