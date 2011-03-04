@@ -553,7 +553,7 @@ namespace Niecza.CLRBackend {
 
         public bool IsCore() {
             string s = unit.name;
-            return (s == "SAFE" || s == "CORE");
+            return s == "CORE";
         }
 
         public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
@@ -572,7 +572,7 @@ namespace Niecza.CLRBackend {
 
         public Package GetCorePackage(string name) {
             StaticSub csr = this;
-            while (csr.unit.name != "SAFE" && csr.unit.name != "CORE")
+            while (csr.unit.name != "CORE")
                 csr = csr.outer.Resolve<StaticSub>();
             while (!csr.l_lexicals.ContainsKey(name))
                 csr = csr.outer.Resolve<StaticSub>();
@@ -3646,19 +3646,6 @@ dynamic:
                 np.MakeBody();
             });
 
-            foreach (object le in unit.log) {
-                object[] lea = (object[]) le;
-                string t = ((JScalar)lea[0]).str;
-                if (t == "pkg" || t == "var") {
-                    CpsOp[] sa = new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0, lea[1])) };
-                    if (t == "pkg") {
-                        thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_CreatePath, sa));
-                    } else {
-                        thaw.Add(CpsOp.Sink(CpsOp.MethodCall(null, Tokens.Kernel_GetVar, sa)));
-                    }
-                }
-            }
-
             unit.VisitPackages(delegate(int ix, Package pkg) {
                 if (Verbose > 0) Console.WriteLine("pkg2 {0}", pkg.name);
                 if (!(pkg is ModuleWithTypeObject))
@@ -3667,7 +3654,7 @@ dynamic:
                 FieldInfo km = null;
                 FieldInfo kp = null;
                 bool existing_mo = false;
-                if (unit.name == "SAFE" || unit.name == "CORE") {
+                if (unit.name == "CORE") {
                     km = Tokens.Kernel.GetField(m.name + "MO");
                     kp = Tokens.Kernel.GetField(m.name + "P");
                     existing_mo = km != null && km.IsInitOnly;
@@ -3863,6 +3850,20 @@ dynamic:
                     }
                 }
             });
+
+            // this needs to come late so that Array and Hash are available
+            foreach (object le in unit.log) {
+                object[] lea = (object[]) le;
+                string t = ((JScalar)lea[0]).str;
+                if (t == "pkg" || t == "var") {
+                    CpsOp[] sa = new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0, lea[1])) };
+                    if (t == "pkg") {
+                        thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_CreatePath, sa));
+                    } else {
+                        thaw.Add(CpsOp.Sink(CpsOp.MethodCall(null, Tokens.Kernel_GetVar, sa)));
+                    }
+                }
+            }
 
             thaw.Add(CpsOp.MethodCall(null, Tokens.SubInfo.GetMethod("SetStringHint"), new CpsOp[] {
                 CpsOp.GetSField(unit.mainline_ref.Resolve<StaticSub>().subinfo),

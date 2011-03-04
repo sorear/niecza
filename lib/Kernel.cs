@@ -1811,7 +1811,7 @@ noparams:
                 string n = th.info.name;
                 // Mega-Hack: These functions wrap stuff and should
                 // propagate $/
-                if (n == "SAFE infix:<~~>") {
+                if (n == "CORE infix:<~~>") {
                     th = th.caller;
                     continue;
                 }

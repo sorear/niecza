@@ -16,10 +16,9 @@ lowest levels of library functionality.
 
 =head1 Core library
 
-C<lib/SAFE.setting> and C<lib/CORE.setting> are used automatically in Perl 6
-programs and provide definitions of all Perl 6 functions.  They use Niecza
-extensions fairly heavily, especially inline NAM code and references into
-the runtime.
+C<lib/CORE.setting> is used automatically in Perl 6 programs and provides
+definitions of all Perl 6 functions.  It uses Niecza extensions fairly
+heavily, especially inline NAM code and references into the runtime.
 
 =head1 Other libraries
 

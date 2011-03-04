@@ -21,7 +21,7 @@ srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
 	git describe --tags > VERSION
 
-obj/CORE.nam: run/Niecza.exe obj/CLRBackend.exe lib/SAFE.setting lib/CORE.setting
+obj/CORE.nam: run/Niecza.exe obj/CLRBackend.exe lib/CORE.setting
 	$(RUN_CLR) run/Niecza.exe -C CORE
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza

@@ -494,13 +494,8 @@ method parse(:$unitname, :$filename, :$modtime, :$source) {
     my $*UNITNAME    = $unitname;
     my $*modtime     = $modtime;
 
-    if $unitname eq 'SAFE' {
-        $*SETTINGNAME = 'NULL';
-        $*SAFEMODE = False;
-    }
-
     if $unitname eq 'CORE' {
-        $*SETTINGNAME = 'SAFE';
+        $*SETTINGNAME = 'NULL';
         $*SAFEMODE = False;
     }
 

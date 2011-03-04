@@ -317,7 +317,7 @@ public class Builtins {
     }
 
     public static Variable Make(Frame fr, Variable v) {
-        if (fr.info.name == "SAFE make")
+        if (fr.info.name == "CORE make")
             fr = fr.caller;
         Cursor c = (Cursor) Kernel.StatusHelper(fr, "$*/", 0).Fetch();
         c.Make(v);

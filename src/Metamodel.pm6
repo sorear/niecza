@@ -639,7 +639,7 @@ class Unit {
     method list_stash(@path)         { $!ns.list_stash(@path) }
     method get_item(@path)           { $!ns.get_item(@path) }
 
-    method is_true_setting() { $.name eq 'SAFE' || $.name eq 'CORE' }
+    method is_true_setting() { $.name eq 'CORE' }
 
     method get_unit($name) { %*units{$name} }
 
