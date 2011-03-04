@@ -503,6 +503,10 @@ my class Parcel is Cool {
         }
     }
 
+    method Numeric() { + @(self) }
+    method Str    () { ~ @(self) }
+    method Bool   () { ? @(self) }
+
     method LISTSTORE(*@in) {
         my @values = @in;
 
