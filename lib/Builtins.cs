@@ -15,15 +15,15 @@ namespace Niecza {
 }
 
 public class Builtins {
-    public static IP6 NominalCheck(string name, DynMetaObject mo, Variable v) {
-        IP6 r = v.Fetch();
+    public static P6any NominalCheck(string name, STable mo, Variable v) {
+        P6any r = v.Fetch();
         if (!r.mo.HasMRO(mo))
             throw new NieczaException("Nominal type check failed for " + name +
                     " needed " + mo.name + " got " + r.mo.name);
         return r;
     }
 
-    public static void AssignV(Variable lhs, IP6 rhs) {
+    public static void AssignV(Variable lhs, P6any rhs) {
         if (!lhs.islist) {
             lhs.Store(rhs);
         } else {
@@ -51,8 +51,8 @@ public class Builtins {
     }
 
     public static Variable NumericEq(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Numeric.Get(v1) == o2.mo.mro_raw_Numeric.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -61,8 +61,8 @@ public class Builtins {
     }
 
     public static Variable NumericLt(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Numeric.Get(v1) < o2.mo.mro_raw_Numeric.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -71,8 +71,8 @@ public class Builtins {
     }
 
     public static Variable NumericNe(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Numeric.Get(v1) != o2.mo.mro_raw_Numeric.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -81,8 +81,8 @@ public class Builtins {
     }
 
     public static Variable NumericLe(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Numeric.Get(v1) <= o2.mo.mro_raw_Numeric.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -91,8 +91,8 @@ public class Builtins {
     }
 
     public static Variable NumericGt(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Numeric.Get(v1) > o2.mo.mro_raw_Numeric.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -101,8 +101,8 @@ public class Builtins {
     }
 
     public static Variable NumericGe(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Numeric.Get(v1) >= o2.mo.mro_raw_Numeric.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -111,8 +111,8 @@ public class Builtins {
     }
 
     public static Variable StringEq(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Str.Get(v1) == o2.mo.mro_raw_Str.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -121,8 +121,8 @@ public class Builtins {
     }
 
     public static Variable StringNe(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Str.Get(v1) != o2.mo.mro_raw_Str.Get(v2)) {
             return Kernel.TrueV;
         } else {
@@ -131,8 +131,8 @@ public class Builtins {
     }
 
     public static Variable StringLt(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                     o2.mo.mro_raw_Str.Get(v2)) < 0) {
             return Kernel.TrueV;
@@ -142,8 +142,8 @@ public class Builtins {
     }
 
     public static Variable StringLe(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                     o2.mo.mro_raw_Str.Get(v2)) <= 0) {
             return Kernel.TrueV;
@@ -153,8 +153,8 @@ public class Builtins {
     }
 
     public static Variable StringGe(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                     o2.mo.mro_raw_Str.Get(v2)) >= 0) {
             return Kernel.TrueV;
@@ -164,8 +164,8 @@ public class Builtins {
     }
 
     public static Variable StringGt(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                     o2.mo.mro_raw_Str.Get(v2)) > 0) {
             return Kernel.TrueV;
@@ -175,9 +175,9 @@ public class Builtins {
     }
 
     public static Variable Substr3(Variable v1, Variable v2, Variable v3) {
-        IP6 o1 = NominalCheck("$string", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$start", Kernel.AnyMO, v2);
-        IP6 o3 = NominalCheck("$chars", Kernel.AnyMO, v3);
+        P6any o1 = NominalCheck("$string", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$start", Kernel.AnyMO, v2);
+        P6any o3 = NominalCheck("$chars", Kernel.AnyMO, v3);
         string r1 = o1.mo.mro_raw_Str.Get(v1);
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
         int r3    = (int)o3.mo.mro_raw_Numeric.Get(v3);
@@ -185,117 +185,117 @@ public class Builtins {
     }
 
     public static Variable Plus(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>(r1 + r2, Kernel.NumMO);
     }
 
     public static Variable Minus(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>(r1 - r2, Kernel.NumMO);
     }
 
     public static Variable Mul(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>(r1 * r2, Kernel.NumMO);
     }
 
     public static Variable Divide(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>(r1 / r2, Kernel.NumMO);
     }
 
     public static Variable Mod(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         double r1 = o1.mo.mro_raw_Numeric.Get(v1);
         double r2 = o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>(r1 - r2 * Math.Floor(r1 / r2), Kernel.NumMO);
     }
 
     public static Variable NumAnd(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>((double)(r1 & r2), Kernel.NumMO);
     }
 
     public static Variable NumOr(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>((double)(r1 | r2), Kernel.NumMO);
     }
 
     public static Variable NumXor(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>((double)(r1 ^ r2), Kernel.NumMO);
     }
 
     public static Variable NumLShift(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>((double)(r1 << r2), Kernel.NumMO);
     }
 
     public static Variable NumRShift(Variable v1, Variable v2) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        IP6 o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return Kernel.BoxAnyMO<double>((double)(r1 >> r2), Kernel.NumMO);
     }
 
     public static Variable NumCompl(Variable v1) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return Kernel.BoxAnyMO<double>((double)(~r1), Kernel.NumMO);
     }
 
     public static Variable PostIncrement(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         AssignV(v, o1.mo.mro_succ.Get(v));
         return Kernel.NewROScalar(o1);
     }
 
     public static Variable Not(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         bool r = o1.mo.mro_raw_Bool.Get(v);
         return r ? Kernel.FalseV : Kernel.TrueV;
     }
 
     public static Variable Chars(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         string r = o1.mo.mro_raw_Str.Get(v);
         return Kernel.BoxAnyMO((double)r.Length, Kernel.NumMO);
     }
 
     public static Variable Negate(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO<double>(-r, Kernel.NumMO);
     }
 
     public static Variable Ord(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
         if (r.Length == 0) return Kernel.NewROScalar(Kernel.AnyP);
@@ -303,14 +303,14 @@ public class Builtins {
     }
 
     public static Variable Chr(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
     }
 
     // used in cclass.t; maybe worth exposing
     public static Variable UniCat(Variable v) {
-        IP6 o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         char c = (char) o1.mo.mro_raw_Numeric.Get(v);
         int ix = (int) char.GetUnicodeCategory(c);
         return Kernel.BoxAnyMO((double)ix, Kernel.NumMO);
@@ -325,7 +325,7 @@ public class Builtins {
     }
 
     public static VarDeque HashIterRaw(int mode, Variable v) {
-        IP6 o = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o = NominalCheck("$x", Kernel.AnyMO, v);
         VarHash d = Kernel.UnboxAny<VarHash>(o);
 
         VarDeque lv = new VarDeque();
@@ -343,7 +343,7 @@ public class Builtins {
                     lv.Push(kv.Value);
                     break;
                 case 3:
-                    DynObject p = new DynObject(Kernel.PairMO);
+                    P6opaque p = new P6opaque(Kernel.PairMO);
                     p.slots[0] = Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO);
                     p.slots[1] = kv.Value;
                     lv.Push(Kernel.NewROScalar(p));
@@ -354,7 +354,7 @@ public class Builtins {
     }
     public static Variable HashIter(int mode, Variable v) {
         VarDeque lv = HashIterRaw(mode, v);
-        DynObject l = new DynObject(Kernel.ListMO);
+        P6opaque l = new P6opaque(Kernel.ListMO);
         l.slots[0] = lv;
         l.slots[1] = new VarDeque();
         return Kernel.NewRWListVar(l);
@@ -380,7 +380,7 @@ public class Builtins {
         VarDeque items = new VarDeque();
         foreach (string i in los)
             items.Push(Kernel.BoxAnyMO(i, Kernel.StrMO));
-        IP6 l = new DynObject(Kernel.ListMO);
+        P6any l = new P6opaque(Kernel.ListMO);
         l.SetSlot("rest", new VarDeque());
         l.SetSlot("items", items);
         return Kernel.NewRWListVar(l);
@@ -452,13 +452,13 @@ public class Builtins {
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
             items.Push(Kernel.NewRWScalar(Kernel.AnyMO, rest.Shift().Fetch()));
-        IP6 l = new DynObject(Kernel.ArrayMO);
+        P6any l = new P6opaque(Kernel.ArrayMO);
         l.SetSlot("rest", rest);
         l.SetSlot("items", items);
         return Kernel.NewROScalar(l);
     }
 
-    public static int GetArity(IP6 fcni) {
+    public static int GetArity(P6any fcni) {
         if (!fcni.Isa(Kernel.SubMO))
             return 1; // can't introspect fake subs (?)
         SubInfo si = (SubInfo) fcni.GetSlot("info");
@@ -491,7 +491,7 @@ public class Builtins {
 again:
                 if (items.Count() == 0) return -1;
                 Variable v = items[0];
-                IP6 i = v.Fetch();
+                P6any i = v.Fetch();
                 if (i.mo.HasMRO(Kernel.IterCursorMO))
                     return 0;
                 if (v.islist) {
@@ -628,20 +628,20 @@ again:
     private static Frame CommonMEMap_C(Frame th) {
         ItemSource src = (ItemSource) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;
-        IP6 fnc = (IP6) th.lex2;
+        P6any fnc = (P6any) th.lex2;
         int tailmode = th.lexi0;
 
         switch (th.ip) {
             case 0:
                 Variable[] pen;
                 if (!src.TryGet(out pen, tailmode != 0)) {
-                    DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                    P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
                     th.lex = new Dictionary<string,object>();
                     th.lex["!return"] = null;
                     th.MarkSharedChain();
                     thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
                     thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
-                    DynObject lst = new DynObject(Kernel.ListMO);
+                    P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -651,7 +651,7 @@ again:
                 if (pen == null) {
                     if (tailmode != 0)
                         return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
-                    DynObject lst = new DynObject(Kernel.ListMO);
+                    P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -691,7 +691,7 @@ again:
     public static Frame MEMap(Frame th, Variable[] lst) {
         VarDeque iter = new VarDeque(lst);
         Variable fcn = iter.Shift();
-        IP6 fcni = fcn.Fetch();
+        P6any fcni = fcn.Fetch();
         int arity = GetArity(fcni);
 
         Frame fr = th.MakeChild(null, CommonMEMap_I);
@@ -702,7 +702,7 @@ again:
         return fr;
     }
 
-    static IP6 ExtractWith(bool with, ref Variable[] pcl) {
+    static P6any ExtractWith(bool with, ref Variable[] pcl) {
         if (!with) return null;
         Variable[] opcl = pcl;
         pcl = new Variable[pcl.Length - 1];
@@ -750,13 +750,13 @@ again:
                     } else {
                         if (src.Count() == 0) break;
                         if (src[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
-                            DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                            P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
                             th.lex = new Dictionary<string,object>();
                             th.lex["!return"] = null;
                             th.MarkSharedChain();
                             thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
                             thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
-                            DynObject lst = new DynObject(Kernel.ListMO);
+                            P6opaque lst = new P6opaque(Kernel.ListMO);
                             lst.slots[0] = outq;
                             lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
                             th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -769,7 +769,7 @@ again:
                 if (pen == null) {
                     if (tailmode != 0)
                         return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
-                    DynObject lst = new DynObject(Kernel.ListMO);
+                    P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -817,7 +817,7 @@ again:
         return fr;
     }
 
-    public static Frame CallNext(Frame th, IP6 cap) {
+    public static Frame CallNext(Frame th, P6any cap) {
         Frame to = th;
         while (to != null && to.curDisp == null)
             to = to.caller;
@@ -825,7 +825,7 @@ again:
             return Kernel.Die(th, "No next function to call!");
 
         DispatchEnt de = to.curDisp.next;
-        DynObject o = cap as DynObject;
+        P6opaque o = cap as P6opaque;
         Frame nf = th.MakeChild(de.outer, de.info);
 
         Variable[] p = to.pos;

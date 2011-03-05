@@ -18,8 +18,8 @@ namespace Niecza {
     // Used by DynFrame to plug in code
     public delegate Frame DynBlockDelegate(Frame frame);
 
-    public abstract class IP6 {
-        public DynMetaObject mo;
+    public abstract class P6any {
+        public STable mo;
 
         public virtual object GetSlot(string name) {
             throw new InvalidOperationException("no slots in this repr");
@@ -56,7 +56,7 @@ namespace Niecza {
             return Fail(caller, "Unable to resolve method " + name);
         }
 
-        public IP6 GetTypeObject() {
+        public P6any GetTypeObject() {
             return mo.typeObject;
         }
 
@@ -64,11 +64,11 @@ namespace Niecza {
             return mo.name;
         }
 
-        public bool Isa(DynMetaObject mo) {
+        public bool Isa(STable mo) {
             return this.mo.HasMRO(mo);
         }
 
-        public bool Does(DynMetaObject mo) {
+        public bool Does(STable mo) {
             return this.mo.HasMRO(mo);
         }
 
@@ -81,12 +81,12 @@ namespace Niecza {
         public DispatchEnt next;
         public SubInfo info;
         public Frame outer;
-        public IP6 ip6;
+        public P6any ip6;
 
-        public DispatchEnt(DispatchEnt next, IP6 ip6) {
+        public DispatchEnt(DispatchEnt next, P6any ip6) {
             this.ip6 = ip6;
             this.next = next;
-            DynObject d = (DynObject)ip6;
+            P6opaque d = (P6opaque)ip6;
             this.outer = (Frame) d.slots[0];
             this.info = (SubInfo) d.slots[1];
         }
@@ -100,14 +100,14 @@ namespace Niecza {
         public ViviHook whence;
 
         // these should be treated as ro for the life of the variable
-        public DynMetaObject type;
+        public STable type;
         public bool rw;
         public bool islist;
 
-        public abstract IP6  Fetch();
-        public abstract void Store(IP6 v);
+        public abstract P6any  Fetch();
+        public abstract void Store(P6any v);
 
-        public abstract IP6  GetVar();
+        public abstract P6any  GetVar();
 
         public static readonly Variable[] None = new Variable[0];
     }
@@ -117,8 +117,8 @@ namespace Niecza {
     }
 
     public class SubViviHook : ViviHook {
-        IP6 sub;
-        public SubViviHook(IP6 sub) { this.sub = sub; }
+        P6any sub;
+        public SubViviHook(P6any sub) { this.sub = sub; }
         public override void Do(Variable toviv) {
             Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
                         new Variable[] { toviv }, null));
@@ -126,9 +126,9 @@ namespace Niecza {
     }
 
     public class HashViviHook : ViviHook {
-        IP6 hash;
+        P6any hash;
         string key;
-        public HashViviHook(IP6 hash, string key) { this.hash = hash; this.key = key; }
+        public HashViviHook(P6any hash, string key) { this.hash = hash; this.key = key; }
         public override void Do(Variable toviv) {
             VarHash rh = Kernel.UnboxAny<VarHash>(hash);
             rh[key] = toviv;
@@ -147,9 +147,9 @@ namespace Niecza {
     }
 
     public class ArrayViviHook : ViviHook {
-        IP6 ary;
+        P6any ary;
         int key;
-        public ArrayViviHook(IP6 ary, int key) { this.ary = ary; this.key = key; }
+        public ArrayViviHook(P6any ary, int key) { this.ary = ary; this.key = key; }
         public override void Do(Variable toviv) {
             VarDeque vd = (VarDeque) ary.GetSlot("items");
             while (vd.Count() <= key)
@@ -167,7 +167,7 @@ namespace Niecza {
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
             vd[key] = toviv;
-            DynObject d = new DynObject(Kernel.ArrayMO);
+            P6opaque d = new P6opaque(Kernel.ArrayMO);
             d.slots[0] = vd;
             d.slots[1] = new VarDeque();
             ary.Store(d);
@@ -175,15 +175,15 @@ namespace Niecza {
     }
 
     public sealed class SimpleVariable: Variable {
-        IP6 val;
+        P6any val;
 
-        public SimpleVariable(bool rw, bool islist, DynMetaObject type, ViviHook whence, IP6 val) {
+        public SimpleVariable(bool rw, bool islist, STable type, ViviHook whence, P6any val) {
             this.val = val; this.whence = whence; this.rw = rw;
             this.islist = islist; this.type = type;
         }
 
-        public override IP6  Fetch()       { return val; }
-        public override void Store(IP6 v)  {
+        public override P6any  Fetch()       { return val; }
+        public override void Store(P6any v)  {
             if (!rw) {
                 throw new NieczaException("Writing to readonly scalar");
             }
@@ -198,7 +198,7 @@ namespace Niecza {
             val = v;
         }
 
-        public override IP6  GetVar()      {
+        public override P6any  GetVar()      {
             return new BoxObject<SimpleVariable>(this, Kernel.ScalarMO);
         }
     }
@@ -215,7 +215,7 @@ namespace Niecza {
     public class SubInfo {
         public int[] lines;
         public DynBlockDelegate code;
-        public DynMetaObject mo;
+        public STable mo;
         // for inheriting hints
         public SubInfo outer;
         public string name;
@@ -235,7 +235,7 @@ namespace Niecza {
 
         // R records are variable size, but contain canonical name,
         // usable names (in order), default SubInfo (if present),
-        // type DynMetaObject (if present)
+        // type STable (if present)
 
         // Value processing
         public const int SIG_F_HASTYPE    = 1; // else Kernel.AnyMO
@@ -326,9 +326,9 @@ namespace Niecza {
                 int rbase = rc;
                 rc += (1 + names);
                 if ((flags & SIG_F_HASDEFAULT) != 0) rc++;
-                DynMetaObject type = Kernel.AnyMO;
+                STable type = Kernel.AnyMO;
                 if ((flags & SIG_F_HASTYPE) != 0)
-                    type = (DynMetaObject)rbuf[rc++];
+                    type = (STable)rbuf[rc++];
 
                 Variable src = null;
                 if ((flags & SIG_F_SLURPY_PCL) != 0) {
@@ -337,7 +337,7 @@ namespace Niecza {
                     goto gotit;
                 }
                 if ((flags & SIG_F_SLURPY_CAP) != 0) {
-                    IP6 nw = new DynObject(Kernel.CaptureMO);
+                    P6any nw = new P6opaque(Kernel.CaptureMO);
                     nw.SetSlot("positionals", pos);
                     nw.SetSlot("named", named);
                     src = Kernel.NewROScalar(nw);
@@ -345,7 +345,7 @@ namespace Niecza {
                     goto gotit;
                 }
                 if ((flags & SIG_F_SLURPY_POS) != 0) {
-                    IP6 l = new DynObject(Kernel.ListMO);
+                    P6any l = new P6opaque(Kernel.ListMO);
                     Kernel.IterToList(l, Kernel.IterFlatten(
                                 Kernel.SlurpyHelper(th, posc)));
                     src = Kernel.NewRWListVar(l);
@@ -412,7 +412,7 @@ gotit:
                     // rw = false and rhs.rw = true OR
                     // rw = false and islist = false and rhs.islist = true OR
                     // rw = false and islist = true and rhs.islist = false
-                    IP6 srco = src.Fetch();
+                    P6any srco = src.Fetch();
                     if (!srco.mo.HasMRO(type))
                         return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
                     src = new SimpleVariable(false, islist, srco.mo, null, srco);
@@ -502,7 +502,7 @@ noparams:
 
     // We need hashy frames available to properly handle BEGIN; for the time
     // being, all frames will be hashy for simplicity
-    public class Frame: IP6 {
+    public class Frame: P6any {
         public Frame caller;
         public Frame outer;
         public SubInfo info;
@@ -720,7 +720,7 @@ noparams:
     }
 
     public abstract class InvokeHandler {
-        public abstract Frame Invoke(IP6 obj, Frame th, Variable[] pos, VarHash named);
+        public abstract Frame Invoke(P6any obj, Frame th, Variable[] pos, VarHash named);
     }
 
     public abstract class IndexHandler {
@@ -750,9 +750,9 @@ noparams:
     }
 
     class InvokeSub : InvokeHandler {
-        public override Frame Invoke(IP6 th, Frame caller,
+        public override Frame Invoke(P6any th, Frame caller,
                 Variable[] pos, VarHash named) {
-            DynObject dyo = ((DynObject) th);
+            P6opaque dyo = ((P6opaque) th);
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
 
@@ -764,7 +764,7 @@ noparams:
     }
 
     class InvokeCallMethod : InvokeHandler {
-        public override Frame Invoke(IP6 th, Frame caller,
+        public override Frame Invoke(P6any th, Frame caller,
                 Variable[] pos, VarHash named) {
             Variable[] np = new Variable[pos.Length + 1];
             Array.Copy(pos, 0, np, 1, pos.Length);
@@ -793,11 +793,11 @@ noparams:
         }
     }
 
-    class CtxCallMethodFetch : ContextHandler<IP6> {
+    class CtxCallMethodFetch : ContextHandler<P6any> {
         string method;
         public CtxCallMethodFetch(string method) { this.method = method; }
 
-        public override IP6 Get(Variable obj) {
+        public override P6any Get(Variable obj) {
             return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null)).Fetch();
         }
     }
@@ -832,7 +832,7 @@ noparams:
         public override Variable Get(Variable obj) {
             VarDeque itr = new VarDeque(
                     obj.islist ? Kernel.NewROScalar(obj.Fetch()) : obj);
-            IP6 l = new DynObject(Kernel.ListMO);
+            P6any l = new P6opaque(Kernel.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
         }
@@ -841,7 +841,7 @@ noparams:
     class CtxParcelList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             VarDeque itr = new VarDeque(Kernel.UnboxAny<Variable[]>(obj.Fetch()));
-            IP6 l = new DynObject(Kernel.ListMO);
+            P6any l = new P6opaque(Kernel.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
         }
@@ -849,8 +849,8 @@ noparams:
 
     class CtxBoxify<T> : ContextHandler<Variable> {
         ContextHandler<T> inner;
-        DynMetaObject box;
-        public CtxBoxify(ContextHandler<T> inner, DynMetaObject box) {
+        STable box;
+        public CtxBoxify(ContextHandler<T> inner, STable box) {
             this.inner = inner;
             this.box = box;
         }
@@ -867,7 +867,7 @@ noparams:
 
     class CtxListIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
-            DynObject d = (DynObject) obj.Fetch();
+            P6opaque d = (P6opaque) obj.Fetch();
             VarDeque r = new VarDeque( (VarDeque) d.slots[0] );
             r.PushD((VarDeque) d.slots[1]);
             return r;
@@ -897,11 +897,11 @@ noparams:
         }
     }
 
-    class CtxNumSuccish : ContextHandler<IP6> {
+    class CtxNumSuccish : ContextHandler<P6any> {
         double amt;
         public CtxNumSuccish(double amt) { this.amt = amt; }
-        public override IP6 Get(Variable obj) {
-            IP6 o = obj.Fetch();
+        public override P6any Get(Variable obj) {
+            P6any o = obj.Fetch();
             double v = (o is BoxObject<double>) ? Kernel.UnboxAny<double>(o):0;
             return Kernel.BoxRaw(v + amt, Kernel.NumMO);
         }
@@ -927,9 +927,9 @@ noparams:
 
     class CtxListBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
-            IP6 o = obj.Fetch();
+            P6any o = obj.Fetch();
             if (!o.IsDefined()) return false;
-            DynObject dob = (DynObject) o;
+            P6opaque dob = (P6opaque) o;
             VarDeque items = (VarDeque) dob.slots[0];
             if (items.Count() != 0) return true;
             VarDeque rest = (VarDeque) dob.slots[1];
@@ -945,9 +945,9 @@ noparams:
 
     class CtxListNum : ContextHandler<double> {
         public override double Get(Variable obj) {
-            IP6 o = obj.Fetch();
+            P6any o = obj.Fetch();
             if (!o.IsDefined()) return 0;
-            DynObject dob = (DynObject) o;
+            P6opaque dob = (P6opaque) o;
             VarDeque items = (VarDeque) dob.slots[0];
             VarDeque rest = (VarDeque) dob.slots[1];
             if (rest.Count() == 0) return items.Count();
@@ -960,7 +960,7 @@ noparams:
 
     class CtxMatchStr : ContextHandler<string> {
         public override string Get(Variable obj) {
-            IP6 o = obj.Fetch();
+            P6any o = obj.Fetch();
             if (!o.IsDefined()) return "";
             Cursor c = (Cursor) o;
             return c.GetBacking().Substring(c.from, c.pos - c.from);
@@ -989,7 +989,7 @@ noparams:
                 return Slice(obj, key);
             }
 
-            IP6 os = obj.Fetch();
+            P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
             throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
@@ -1001,7 +1001,7 @@ noparams:
                 return Slice(obj, key);
             }
 
-            IP6 os = obj.Fetch();
+            P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
             int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
@@ -1037,7 +1037,7 @@ noparams:
                 return Slice(obj, key);
             }
 
-            IP6 os = obj.Fetch();
+            P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
             string ks = key.Fetch().mo.mro_raw_Str.Get(key);
@@ -1050,7 +1050,7 @@ noparams:
     }
     class IxHashExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            IP6 os = obj.Fetch();
+            P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.FalseV;
             string ks = key.Fetch().mo.mro_raw_Str.Get(key);
             VarHash h =
@@ -1068,15 +1068,15 @@ noparams:
                 return Slice(obj, key);
             }
 
-            IP6 os = obj.Fetch();
+            P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
 
-            DynObject dos = (DynObject) os;
+            P6opaque dos = (P6opaque) os;
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            IP6 ks = key.Fetch();
+            P6any ks = key.Fetch();
             if (ks.mo != Kernel.NumMO && ks.mo.HasMRO(Kernel.SubMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
@@ -1102,12 +1102,12 @@ noparams:
         }
     }
 
-    // NOT IP6; these things should only be exposed through a ClassHOW-like
+    // NOT P6any; these things should only be exposed through a ClassHOW-like
     // façade
-    public class DynMetaObject {
+    public class STable {
         public struct AttrInfo {
             public string name;
-            public IP6 init;
+            public P6any init;
             public bool publ;
         }
 
@@ -1127,9 +1127,9 @@ noparams:
             = new CtxCallMethod("list");
         public static readonly ContextHandler<Variable> CallHash
             = new CtxCallMethod("hash");
-        public static readonly ContextHandler<IP6> CallPred
+        public static readonly ContextHandler<P6any> CallPred
             = new CtxCallMethodFetch("pred");
-        public static readonly ContextHandler<IP6> CallSucc
+        public static readonly ContextHandler<P6any> CallSucc
             = new CtxCallMethodFetch("succ");
         public static readonly ContextHandler<string> RawCallStr
             = new CtxCallMethodUnbox<string>("Str");
@@ -1154,13 +1154,13 @@ noparams:
         public static readonly InvokeHandler CallINVOKE
             = new InvokeCallMethod();
 
-        public IP6 how;
-        public IP6 typeObject;
+        public P6any how;
+        public P6any typeObject;
         public string name;
 
         public bool isRole;
-        public IP6 roleFactory;
-        public Dictionary<string, IP6> instCache;
+        public P6any roleFactory;
+        public Dictionary<string, P6any> instCache;
         // role type objects have an empty MRO cache so no methods can be
         // called against them; the fallback (NYI) is to pun.
 
@@ -1175,7 +1175,7 @@ noparams:
                 loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined,
                 mro_iterator, loc_iterator, mro_item, loc_item, mro_list,
                 loc_list, mro_hash, loc_hash;
-        public ContextHandler<IP6> loc_pred, loc_succ, mro_pred, mro_succ;
+        public ContextHandler<P6any> loc_pred, loc_succ, mro_pred, mro_succ;
         public ContextHandler<bool> mro_raw_Bool, loc_raw_Bool, mro_raw_defined,
                 loc_raw_defined;
         public ContextHandler<string> mro_raw_Str, loc_raw_Str;
@@ -1191,18 +1191,18 @@ noparams:
 
         public Dictionary<string, DispatchEnt> mro_methods;
 
-        public DynMetaObject[] local_does;
+        public STable[] local_does;
 
-        public List<DynMetaObject> superclasses
-            = new List<DynMetaObject>();
-        public Dictionary<string, IP6> local
-            = new Dictionary<string, IP6>();
-        public List<KeyValuePair<string, IP6>> ord_methods
-            = new List<KeyValuePair<string, IP6>>();
-        public Dictionary<string, IP6> priv
-            = new Dictionary<string, IP6>();
-        public Dictionary<string, IP6> submethods
-            = new Dictionary<string, IP6>();
+        public List<STable> superclasses
+            = new List<STable>();
+        public Dictionary<string, P6any> local
+            = new Dictionary<string, P6any>();
+        public List<KeyValuePair<string, P6any>> ord_methods
+            = new List<KeyValuePair<string, P6any>>();
+        public Dictionary<string, P6any> priv
+            = new Dictionary<string, P6any>();
+        public Dictionary<string, P6any> submethods
+            = new Dictionary<string, P6any>();
         public List<AttrInfo> local_attr = new List<AttrInfo>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
@@ -1219,16 +1219,16 @@ noparams:
             return slotMap[name];
         }
 
-        public DynMetaObject[] mro;
-        public HashSet<DynMetaObject> isa;
+        public STable[] mro;
+        public HashSet<STable> isa;
 
-        public Dictionary<DynMetaObject, DynMetaObject> butCache;
+        public Dictionary<STable, STable> butCache;
 
-        public DynMetaObject(string name) {
+        public STable(string name) {
             this.name = name;
             this.wr_this = new WeakReference(this);
 
-            isa = new HashSet<DynMetaObject>();
+            isa = new HashSet<STable>();
         }
 
         private void Revalidate() {
@@ -1240,8 +1240,8 @@ noparams:
                 return;
 
             for (int kx = mro.Length - 1; kx >= 0; kx--) {
-                DynMetaObject k = mro[kx];
-                foreach (KeyValuePair<string,IP6> m in k.ord_methods) {
+                STable k = mro[kx];
+                foreach (KeyValuePair<string,P6any> m in k.ord_methods) {
                     DispatchEnt de;
                     mro_methods.TryGetValue(m.Key, out de);
                     mro_methods[m.Key] = new DispatchEnt(de, m.Value);
@@ -1313,47 +1313,47 @@ noparams:
                 if (k.loc_delete_key != null) mro_delete_key = k.loc_delete_key;
             }
 
-            foreach (KeyValuePair<string,IP6> m in submethods) {
+            foreach (KeyValuePair<string,P6any> m in submethods) {
                 DispatchEnt de;
                 mro_methods.TryGetValue(m.Key, out de);
                 mro_methods[m.Key] = new DispatchEnt(de, m.Value);
             }
         }
 
-        private void SetMRO(DynMetaObject[] arr) {
+        private void SetMRO(STable[] arr) {
             lock(mro_cache_lock) {
                 if (mro != null)
-                    foreach (DynMetaObject k in mro)
+                    foreach (STable k in mro)
                         k.subclasses.Remove(wr_this);
-                foreach (DynMetaObject k in arr)
+                foreach (STable k in arr)
                     k.subclasses.Add(wr_this);
             }
             mro = arr;
             isa.Clear();
-            foreach (DynMetaObject k in arr)
+            foreach (STable k in arr)
                 isa.Add(k);
         }
 
-        ~DynMetaObject() {
+        ~STable() {
             lock(mro_cache_lock)
                 if (mro != null)
-                    foreach (DynMetaObject k in mro)
+                    foreach (STable k in mro)
                         k.subclasses.Remove(wr_this);
         }
 
         public void Invalidate() {
             if (mro == null)
                 return;
-            List<DynMetaObject> notify = new List<DynMetaObject>();
+            List<STable> notify = new List<STable>();
             lock(mro_cache_lock)
                 foreach (WeakReference k in subclasses)
-                    notify.Add(k.Target as DynMetaObject);
-            foreach (DynMetaObject k in notify)
+                    notify.Add(k.Target as STable);
+            foreach (STable k in notify)
                 if (k != null)
                     k.Revalidate();
         }
 
-        public IP6 Can(string name) {
+        public P6any Can(string name) {
             DispatchEnt m;
             if (mro_methods.TryGetValue(name, out m))
                 return m.ip6; // TODO return an iterator
@@ -1364,14 +1364,14 @@ noparams:
             return mro_methods;
         }
 
-        public HashSet<IP6> AllMethodsSet() {
-            HashSet<IP6> r = new HashSet<IP6>();
+        public HashSet<P6any> AllMethodsSet() {
+            HashSet<P6any> r = new HashSet<P6any>();
             foreach (KeyValuePair<string,DispatchEnt> kv in mro_methods)
                 r.Add(kv.Value.ip6);
             return r;
         }
 
-        public bool HasMRO(DynMetaObject m) {
+        public bool HasMRO(STable m) {
             int k = mro.Length;
             if (k >= 20) {
                 return isa.Contains(m);
@@ -1383,20 +1383,20 @@ noparams:
             }
         }
 
-        public void AddMethod(string name, IP6 code) {
+        public void AddMethod(string name, P6any code) {
             local[name] = code;
-            ord_methods.Add(new KeyValuePair<string,IP6>(name, code));
+            ord_methods.Add(new KeyValuePair<string,P6any>(name, code));
         }
 
-        public void AddPrivateMethod(string name, IP6 code) {
+        public void AddPrivateMethod(string name, P6any code) {
             priv[name] = code;
         }
 
-        public void AddSubMethod(string name, IP6 code) {
+        public void AddSubMethod(string name, P6any code) {
             submethods[name] = code;
         }
 
-        public void AddAttribute(string name, bool publ, IP6 init) {
+        public void AddAttribute(string name, bool publ, P6any init) {
             AttrInfo ai;
             ai.name = name;
             ai.publ = publ;
@@ -1404,25 +1404,25 @@ noparams:
             local_attr.Add(ai);
         }
 
-        public IP6 GetPrivateMethod(string name) {
-            IP6 code = priv[name];
+        public P6any GetPrivateMethod(string name) {
+            P6any code = priv[name];
             if (code == null) { throw new NieczaException("private method lookup failed for " + name + " in class " + this.name); }
             return code;
         }
 
 
         public void FillProtoClass(string[] slots) {
-            FillClass(slots, new DynMetaObject[] {},
-                    new DynMetaObject[] { this });
+            FillClass(slots, new STable[] {},
+                    new STable[] { this });
         }
 
-        public void FillClass(string[] all_slot, DynMetaObject[] superclasses,
-                DynMetaObject[] mro) {
-            this.superclasses = new List<DynMetaObject>(superclasses);
+        public void FillClass(string[] all_slot, STable[] superclasses,
+                STable[] mro) {
+            this.superclasses = new List<STable>(superclasses);
             SetMRO(mro);
-            this.butCache = new Dictionary<DynMetaObject, DynMetaObject>();
+            this.butCache = new Dictionary<STable, STable>();
             this.all_slot = all_slot;
-            this.local_does = new DynMetaObject[0];
+            this.local_does = new STable[0];
 
             nslots = 0;
             foreach (string an in all_slot) {
@@ -1432,19 +1432,19 @@ noparams:
             Invalidate();
         }
 
-        public void FillRole(DynMetaObject[] superclasses,
-                DynMetaObject[] cronies) {
-            this.superclasses = new List<DynMetaObject>(superclasses);
+        public void FillRole(STable[] superclasses,
+                STable[] cronies) {
+            this.superclasses = new List<STable>(superclasses);
             this.local_does = cronies;
             this.isRole = true;
             Revalidate(); // need to call directly as we aren't in any mro list
             SetMRO(Kernel.AnyMO.mro);
         }
 
-        public void FillParametricRole(IP6 factory) {
+        public void FillParametricRole(P6any factory) {
             this.isRole = true;
             this.roleFactory = factory;
-            this.instCache = new Dictionary<string, IP6>();
+            this.instCache = new Dictionary<string, P6any>();
             Revalidate();
             SetMRO(Kernel.AnyMO.mro);
         }
@@ -1452,12 +1452,12 @@ noparams:
 
     // This is quite similar to DynFrame and I wonder if I can unify them.
     // These are always hashy for the same reason as Frame above
-    public class DynObject: IP6 {
+    public class P6opaque: P6any {
         // the slots have to support non-containerized values, because
         // containers are objects now
         public object[] slots;
 
-        public DynObject(DynMetaObject klass) {
+        public P6opaque(STable klass) {
             this.mo = klass;
             this.slots = (klass.nslots != 0) ? new object[klass.nslots] : null;
         }
@@ -1481,9 +1481,9 @@ noparams:
         }
     }
 
-    public class BoxObject<T> : DynObject {
+    public class BoxObject<T> : P6opaque {
         public T value;
-        public BoxObject(T x, DynMetaObject klass) : base(klass) { value = x; }
+        public BoxObject(T x, STable klass) : base(klass) { value = x; }
     }
 
     // A bunch of stuff which raises big circularity issues if done in the
@@ -1491,7 +1491,7 @@ noparams:
     public class Kernel {
         private static VarDeque[] PhaserBanks;
 
-        public static void AddPhaser(int i, IP6 v) {
+        public static void AddPhaser(int i, P6any v) {
             PhaserBanks[i].Push(NewROScalar(v));
         }
 
@@ -1533,7 +1533,7 @@ noparams:
             });
         }
 
-        public static T UnboxAny<T>(IP6 o) {
+        public static T UnboxAny<T>(P6any o) {
             return ((BoxObject<T>)o).value;
         }
 
@@ -1563,8 +1563,8 @@ noparams:
             return from;
         }
 
-        public static Frame GatherHelper(Frame th, IP6 sub) {
-            DynObject dyo = (DynObject) sub;
+        public static Frame GatherHelper(Frame th, P6any sub) {
+            P6opaque dyo = (P6opaque) sub;
             Frame n = th.MakeChild((Frame) dyo.slots[0],
                     (SubInfo) dyo.slots[1]);
             n = n.info.Binder(n, Variable.None, null);
@@ -1580,7 +1580,7 @@ noparams:
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-            return SubMO.mro_INVOKE.Invoke((DynObject)th.pos[0].Fetch(),
+            return SubMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
                     th.caller, post, th.named);
         }
 
@@ -1589,47 +1589,47 @@ noparams:
                     BoxAnyMO<string>(msg, StrMO));
         }
 
-        public static IP6 SigSlurpCapture(Frame caller) {
-            IP6 nw = new DynObject(CaptureMO);
+        public static P6any SigSlurpCapture(Frame caller) {
+            P6any nw = new P6opaque(CaptureMO);
             nw.SetSlot("positionals", caller.pos);
             nw.SetSlot("named", caller.named);
             caller.named = null;
             return nw;
         }
 
-        public static DynMetaObject PairMO;
-        public static DynMetaObject CallFrameMO;
-        public static DynMetaObject CaptureMO;
-        public static DynMetaObject GatherIteratorMO;
-        public static DynMetaObject IterCursorMO;
-        public static IP6 AnyP;
-        public static IP6 ArrayP;
-        public static IP6 EMPTYP;
-        public static IP6 HashP;
-        public static IP6 IteratorP;
-        public static readonly DynMetaObject LabelMO;
-        public static readonly DynMetaObject AnyMO;
-        public static readonly DynMetaObject IteratorMO;
-        public static readonly DynMetaObject ScalarMO;
-        public static readonly DynMetaObject StashMO;
-        public static readonly DynMetaObject SubMO;
-        public static readonly DynMetaObject StrMO;
-        public static readonly DynMetaObject NumMO;
-        public static readonly DynMetaObject ArrayMO;
-        public static readonly DynMetaObject CursorMO;
-        public static readonly DynMetaObject MatchMO;
-        public static readonly DynMetaObject ParcelMO;
-        public static readonly DynMetaObject ListMO;
-        public static readonly DynMetaObject HashMO;
-        public static readonly DynMetaObject BoolMO;
-        public static readonly DynMetaObject MuMO;
-        public static readonly IP6 StashP;
+        public static STable PairMO;
+        public static STable CallFrameMO;
+        public static STable CaptureMO;
+        public static STable GatherIteratorMO;
+        public static STable IterCursorMO;
+        public static P6any AnyP;
+        public static P6any ArrayP;
+        public static P6any EMPTYP;
+        public static P6any HashP;
+        public static P6any IteratorP;
+        public static readonly STable LabelMO;
+        public static readonly STable AnyMO;
+        public static readonly STable IteratorMO;
+        public static readonly STable ScalarMO;
+        public static readonly STable StashMO;
+        public static readonly STable SubMO;
+        public static readonly STable StrMO;
+        public static readonly STable NumMO;
+        public static readonly STable ArrayMO;
+        public static readonly STable CursorMO;
+        public static readonly STable MatchMO;
+        public static readonly STable ParcelMO;
+        public static readonly STable ListMO;
+        public static readonly STable HashMO;
+        public static readonly STable BoolMO;
+        public static readonly STable MuMO;
+        public static readonly P6any StashP;
 
         public static readonly Variable TrueV;
         public static readonly Variable FalseV;
 
-        public static IP6 MakeSub(SubInfo info, Frame outer) {
-            DynObject n = new DynObject(info.mo ?? SubMO);
+        public static P6any MakeSub(SubInfo info, Frame outer) {
+            P6opaque n = new P6opaque(info.mo ?? SubMO);
             n.slots[0] = outer;
             if (outer != null) outer.MarkShared();
             n.slots[1] = info;
@@ -1646,23 +1646,23 @@ noparams:
             if (SaferMode)
                 info.code = SaferTrap;
         }
-        public static Variable BoxAny<T>(T v, IP6 proto) {
+        public static Variable BoxAny<T>(T v, P6any proto) {
             if (proto == BoolMO.typeObject)
                 return ((bool) (object) v) ? TrueV : FalseV;
-            return NewROScalar(new BoxObject<T>(v, ((DynObject)proto).mo));
+            return NewROScalar(new BoxObject<T>(v, ((P6opaque)proto).mo));
         }
 
-        public static void SetBox<T>(IP6 obj, T v) {
+        public static void SetBox<T>(P6any obj, T v) {
             ((BoxObject<T>) obj).value = v;
         }
 
-        public static Variable BoxAnyMO<T>(T v, DynMetaObject proto) {
+        public static Variable BoxAnyMO<T>(T v, STable proto) {
             if (proto == BoolMO)
                 return ((bool) (object) v) ? TrueV : FalseV;
             return NewROScalar(new BoxObject<T>(v, proto));
         }
 
-        public static IP6 BoxRaw<T>(T v, DynMetaObject proto) {
+        public static P6any BoxRaw<T>(T v, STable proto) {
             return new BoxObject<T>(v, proto);
         }
 
@@ -1675,12 +1675,12 @@ noparams:
 
         public static Variable Decontainerize(Variable rhs) {
             if (!rhs.rw) return rhs;
-            IP6 v = rhs.Fetch();
+            P6any v = rhs.Fetch();
             return new SimpleVariable(false, rhs.islist, v.mo, null, v);
         }
 
         public static Frame NewBoundVar(Frame th, bool ro, bool islist,
-                DynMetaObject type, Variable rhs) {
+                STable type, Variable rhs) {
             if (islist) ro = true;
             if (!rhs.rw) ro = true;
             // fast path
@@ -1695,7 +1695,7 @@ noparams:
             // whence != null (and rhs.rw = true)
 
             if (!rhs.rw) {
-                IP6 v = rhs.Fetch();
+                P6any v = rhs.Fetch();
                 if (!v.mo.HasMRO(type))
                     return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
                 th.resultSlot = new SimpleVariable(false, islist, v.mo, null, v);
@@ -1704,7 +1704,7 @@ noparams:
             // ro = true and rhw.rw = true OR
             // whence != null
             if (ro) {
-                IP6 v = rhs.Fetch();
+                P6any v = rhs.Fetch();
                 if (!v.mo.HasMRO(type))
                     return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
                 th.resultSlot = new SimpleVariable(false, islist, v.mo, null, rhs.Fetch());
@@ -1734,15 +1734,15 @@ noparams:
         }
 
         // ro, not rebindable
-        public static Variable NewROScalar(IP6 obj) {
+        public static Variable NewROScalar(P6any obj) {
             return new SimpleVariable(false, false, obj.mo, null, obj);
         }
 
-        public static Variable NewRWScalar(DynMetaObject t, IP6 obj) {
+        public static Variable NewRWScalar(STable t, P6any obj) {
             return new SimpleVariable(true, false, t, null, obj);
         }
 
-        public static Variable NewRWListVar(IP6 container) {
+        public static Variable NewRWListVar(P6any container) {
             return new SimpleVariable(false, true, container.mo, null,
                     container);
         }
@@ -1771,7 +1771,7 @@ noparams:
             return lv.ToArray();
         }
 
-        public static VarDeque SortHelper(Frame th, IP6 cb, VarDeque from) {
+        public static VarDeque SortHelper(Frame th, P6any cb, VarDeque from) {
             Variable[] tmp = from.CopyAsArray();
             Array.Sort(tmp, delegate (Variable v1, Variable v2) {
                 Variable v = RunInferior(cb.Invoke(GetInferiorRoot(),
@@ -1840,13 +1840,13 @@ noparams:
             return NewROScalar(AnyP);
         }
 
-        public static Variable DefaultNew(IP6 proto, VarHash args) {
-            DynObject n = new DynObject(((DynObject)proto).mo);
-            DynMetaObject[] mro = n.mo.mro;
+        public static Variable DefaultNew(P6any proto, VarHash args) {
+            P6opaque n = new P6opaque(((P6opaque)proto).mo);
+            STable[] mro = n.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
-                foreach (DynMetaObject.AttrInfo a in mro[i].local_attr) {
-                    IP6 val;
+                foreach (STable.AttrInfo a in mro[i].local_attr) {
+                    P6any val;
                     Variable vx;
                     if (a.publ && args.TryGetValue(a.name, out vx)) {
                         val = vx.Fetch();
@@ -1865,13 +1865,13 @@ noparams:
 
         public static Frame PromoteToList(Frame th, Variable v) {
             if (!v.islist) {
-                DynObject lst = new DynObject(Kernel.ListMO);
+                P6opaque lst = new P6opaque(Kernel.ListMO);
                 lst.slots[0 /*items*/] = new VarDeque(new Variable[] { v });
                 lst.slots[1 /*rest*/ ] = new VarDeque();
                 th.resultSlot = Kernel.NewRWListVar(lst);
                 return th;
             }
-            IP6 o = v.Fetch();
+            P6any o = v.Fetch();
             if (o.mo.HasMRO(Kernel.ListMO)) {
                 th.resultSlot = v;
                 return th;
@@ -1888,9 +1888,9 @@ noparams:
         // and any infinite or I/O-bearing tasks be wrapped in them.  Calls
         // to List.iterator, however, may be assumed cheap and done eagerly.
 
-        public static void IterToList(IP6 list, VarDeque iter) {
+        public static void IterToList(P6any list, VarDeque iter) {
             VarDeque items = new VarDeque();
-            IP6 item;
+            P6any item;
             while (iter.Count() != 0) {
                 item = iter[0].Fetch();
                 if (item.mo.HasMRO(IterCursorMO)) {
@@ -1906,7 +1906,7 @@ noparams:
         public static VarDeque IterFlatten(VarDeque inq) {
             VarDeque outq = new VarDeque();
             Variable inq0v;
-            IP6 inq0;
+            P6any inq0;
 
 again:
             if (inq.Count() == 0)
@@ -1921,7 +1921,7 @@ again:
             if (inq0.mo.HasMRO(IterCursorMO)) {
                 Frame th = new Frame(null, null, IF_SI);
                 th.lex0 = inq;
-                DynObject thunk = new DynObject(Kernel.GatherIteratorMO);
+                P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
                 th.lex = new Dictionary<string,object>();
                 th.lex["!return"] = null;
                 thunk.slots[0] = NewRWScalar(AnyMO, th);
@@ -1954,7 +1954,7 @@ again:
                     iter.UnshiftD(i0.Fetch().mo.mro_raw_iterator.Get(i0));
                     continue;
                 }
-                IP6 i0v = i0.Fetch();
+                P6any i0v = i0.Fetch();
                 if (i0v.mo.HasMRO(IterCursorMO)) {
                     iter.Shift();
                     iter.UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
@@ -1969,7 +1969,7 @@ again:
             if (!lst.islist) {
                 return lst;
             }
-            DynObject dyl = lst.Fetch() as DynObject;
+            P6opaque dyl = lst.Fetch() as P6opaque;
             if (dyl == null) { goto slow; }
             if (dyl.mo != Kernel.ListMO) { goto slow; }
             VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
@@ -1989,20 +1989,20 @@ slow:
 
         // TODO: Runtime access to grafts
         public static void CreatePath(string[] path) {
-            IP6 cursor = RootO;
+            P6any cursor = RootO;
             foreach (string n in path)
                 cursor = PackageLookup(cursor, n + "::").v.Fetch();
         }
 
         public static BValue GetVar(string[] path) {
-            IP6 cursor = RootO;
+            P6any cursor = RootO;
             for (int i = 0; i < path.Length - 1; i++) {
                 cursor = PackageLookup(cursor, path[i] + "::").v.Fetch();
             }
             return PackageLookup(cursor, path[path.Length - 1]);
         }
 
-        public static BValue PackageLookup(IP6 parent, string name) {
+        public static BValue PackageLookup(P6any parent, string name) {
             Dictionary<string,BValue> stash =
                 UnboxAny<Dictionary<string,BValue>>(parent);
             BValue v;
@@ -2029,7 +2029,7 @@ slow:
             }
         }
 
-        private static void WrapHandler0(DynMetaObject kl, string name,
+        private static void WrapHandler0(STable kl, string name,
                 ContextHandler<Variable> cv) {
             DynBlockDelegate dbd = delegate (Frame th) {
                 th.caller.resultSlot = cv.Get((Variable)th.lex0);
@@ -2043,7 +2043,7 @@ slow:
             kl.AddMethod(name, MakeSub(si, null));
         }
 
-        private static void WrapHandler1(DynMetaObject kl, string name,
+        private static void WrapHandler1(STable kl, string name,
                 IndexHandler cv) {
             DynBlockDelegate dbd = delegate (Frame th) {
                 th.caller.resultSlot = cv.Get((Variable)th.lex0,
@@ -2068,7 +2068,7 @@ slow:
                         th.lex0 = th.pos[0].Fetch().mo;
                         bool cache_ok = true;
                         Variable[] args;
-                        IP6 argv = th.pos[1].Fetch();
+                        P6any argv = th.pos[1].Fetch();
                         if (argv.mo == Kernel.ParcelMO) {
                             args = UnboxAny<Variable[]>(argv);
                         } else {
@@ -2076,7 +2076,7 @@ slow:
                         }
                         Variable[] to_pass = new Variable[args.Length];
                         for (int i = 0; i < args.Length; i++) {
-                            IP6 obj = args[i].Fetch();
+                            P6any obj = args[i].Fetch();
                             to_pass[i] = NewROScalar(obj);
                             if (obj.mo == StrMO) {
                                 string p = UnboxAny<string>(obj);
@@ -2085,26 +2085,26 @@ slow:
                             } else { cache_ok = false; }
                         }
                         if (!cache_ok) {
-                            return ((DynMetaObject) th.lex0).roleFactory.
+                            return ((STable) th.lex0).roleFactory.
                                 Invoke(th.caller, to_pass, null);
                         }
                         th.lex1 = s;
                         bool ok;
-                        IP6 r;
+                        P6any r;
                         lock (th.lex0)
-                            ok = ((DynMetaObject) th.lex0).instCache.
+                            ok = ((STable) th.lex0).instCache.
                                 TryGetValue((string) th.lex1, out r);
                         if (ok) {
                             th.caller.resultSlot = NewROScalar(r);
                             return th.caller;
                         }
                         th.ip = 1;
-                        return ((DynMetaObject) th.lex0).roleFactory.
+                        return ((STable) th.lex0).roleFactory.
                             Invoke(th, to_pass, null);
                     }
                 case 1:
                     lock (th.lex0) {
-                        ((DynMetaObject) th.lex0).instCache[(string) th.lex1]
+                        ((STable) th.lex0).instCache[(string) th.lex1]
                             = ((Variable) th.resultSlot).Fetch();
                     }
                     th.caller.resultSlot = th.resultSlot;
@@ -2119,43 +2119,43 @@ slow:
             return n;
         }
 
-        private static DynMetaObject DoRoleApply(DynMetaObject b,
-                DynMetaObject role) {
-            DynMetaObject n = new DynMetaObject(b.name + " but " + role.name);
+        private static STable DoRoleApply(STable b,
+                STable role) {
+            STable n = new STable(b.name + " but " + role.name);
             if (role.local_attr.Count != 0)
                 throw new NieczaException("RoleApply with attributes NYI");
             if (role.superclasses.Count != 0)
                 throw new NieczaException("RoleApply with superclasses NYI");
-            DynMetaObject[] nmro = new DynMetaObject[b.mro.Length + 1];
+            STable[] nmro = new STable[b.mro.Length + 1];
             Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
             nmro[0] = n;
-            n.FillClass(b.all_slot, new DynMetaObject[] { b }, nmro);
-            foreach (KeyValuePair<string, IP6> kv in role.priv)
+            n.FillClass(b.all_slot, new STable[] { b }, nmro);
+            foreach (KeyValuePair<string, P6any> kv in role.priv)
                 n.AddPrivateMethod(kv.Key, kv.Value);
-            foreach (DynMetaObject.AttrInfo ai in role.local_attr)
+            foreach (STable.AttrInfo ai in role.local_attr)
                 n.AddAttribute(ai.name, ai.publ, ai.init);
-            foreach (KeyValuePair<string, IP6> kv in role.ord_methods)
+            foreach (KeyValuePair<string, P6any> kv in role.ord_methods)
                 n.AddMethod(kv.Key, kv.Value);
             n.Invalidate();
 
-            n.how = BoxAny<DynMetaObject>(n, b.how).Fetch();
-            n.typeObject = new DynObject(n);
-            ((DynObject)n.typeObject).slots = null;
+            n.how = BoxAny<STable>(n, b.how).Fetch();
+            n.typeObject = new P6opaque(n);
+            ((P6opaque)n.typeObject).slots = null;
 
             return n;
         }
 
-        public static DynMetaObject RoleApply(DynMetaObject b,
-                DynMetaObject role) {
+        public static STable RoleApply(STable b,
+                STable role) {
             lock (b) {
-                DynMetaObject rs;
+                STable rs;
                 if (b.butCache.TryGetValue(role, out rs))
                     return rs;
                 return b.butCache[role] = DoRoleApply(b, role);
             }
         }
 
-        public static Frame StartP6Thread(Frame th, IP6 sub) {
+        public static Frame StartP6Thread(Frame th, P6any sub) {
             th.MarkSharedChain();
             Thread thr = new Thread(delegate () {
                     rlstack = new LastFrameNode();
@@ -2299,7 +2299,7 @@ slow:
         }
 
         public static void AddCap(List<Variable> p,
-                VarHash n, IP6 cap) {
+                VarHash n, P6any cap) {
             Variable[] fp = cap.GetSlot("positionals") as Variable[];
             VarHash fn = cap.GetSlot("named")
                 as VarHash;
@@ -2314,26 +2314,26 @@ slow:
             }
         }
 
-        public static IP6 RootO;
+        public static P6any RootO;
         // used as the fallbacks for $*FOO
-        public static IP6 GlobalO;
-        public static IP6 ProcessO;
+        public static P6any GlobalO;
+        public static P6any ProcessO;
 
         static Kernel() {
             PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque(),
                 new VarDeque() };
 
-            SubMO = new DynMetaObject("Sub");
+            SubMO = new STable("Sub");
             SubMO.loc_INVOKE = new InvokeSub();
             SubMO.FillProtoClass(new string[] { "outer", "info" });
             SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
             SubMO.Invalidate();
 
-            LabelMO = new DynMetaObject("Label");
+            LabelMO = new STable("Label");
             LabelMO.FillProtoClass(new string[] { "target", "name" });
             LabelMO.Invalidate();
 
-            BoolMO = new DynMetaObject("Bool");
+            BoolMO = new STable("Bool");
             BoolMO.loc_Bool = new CtxReturnSelf();
             BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
             BoolMO.FillProtoClass(new string[] { });
@@ -2342,7 +2342,7 @@ slow:
             TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
             FalseV = NewROScalar(BoxRaw<bool>(false, BoolMO));
 
-            StrMO = new DynMetaObject("Str");
+            StrMO = new STable("Str");
             StrMO.loc_Str = new CtxReturnSelf();
             StrMO.loc_raw_Str = new CtxJustUnbox<string>();
             StrMO.loc_raw_Bool = new CtxStrBool();
@@ -2352,10 +2352,10 @@ slow:
             WrapHandler0(StrMO, "Str", StrMO.loc_Str);
             StrMO.Invalidate();
 
-            IteratorMO = new DynMetaObject("Iterator");
+            IteratorMO = new STable("Iterator");
             IteratorMO.FillProtoClass(new string[] { });
 
-            NumMO = new DynMetaObject("Num");
+            NumMO = new STable("Num");
             NumMO.loc_Numeric = new CtxReturnSelf();
             NumMO.loc_raw_Numeric = new CtxJustUnbox<double>();
             NumMO.loc_Str = new CtxStrNativeNum2Str();
@@ -2370,37 +2370,37 @@ slow:
             WrapHandler0(NumMO, "Numeric", NumMO.loc_Numeric);
             NumMO.Invalidate();
 
-            MuMO = new DynMetaObject("Mu");
+            MuMO = new STable("Mu");
             MuMO.loc_Bool = MuMO.loc_defined = new CtxBoolNativeDefined();
             MuMO.loc_raw_Bool = MuMO.loc_raw_defined = new CtxRawNativeDefined();
-            MuMO.loc_Numeric = DynMetaObject.CallNumeric;
-            MuMO.loc_raw_Numeric = DynMetaObject.RawCallNumeric;
-            MuMO.loc_Str = DynMetaObject.CallStr;
-            MuMO.loc_raw_Str = DynMetaObject.RawCallStr;
-            MuMO.loc_iterator = DynMetaObject.CallIterator;
-            MuMO.loc_raw_iterator = DynMetaObject.RawCallIterator;
-            MuMO.loc_at_pos = DynMetaObject.CallAtPos;
-            MuMO.loc_at_key = DynMetaObject.CallAtKey;
-            MuMO.loc_delete_key = DynMetaObject.CallDeleteKey;
-            MuMO.loc_exists_key = DynMetaObject.CallExistsKey;
-            MuMO.loc_INVOKE = DynMetaObject.CallINVOKE;
-            MuMO.loc_raw_reify = DynMetaObject.RawCallReify;
+            MuMO.loc_Numeric = STable.CallNumeric;
+            MuMO.loc_raw_Numeric = STable.RawCallNumeric;
+            MuMO.loc_Str = STable.CallStr;
+            MuMO.loc_raw_Str = STable.RawCallStr;
+            MuMO.loc_iterator = STable.CallIterator;
+            MuMO.loc_raw_iterator = STable.RawCallIterator;
+            MuMO.loc_at_pos = STable.CallAtPos;
+            MuMO.loc_at_key = STable.CallAtKey;
+            MuMO.loc_delete_key = STable.CallDeleteKey;
+            MuMO.loc_exists_key = STable.CallExistsKey;
+            MuMO.loc_INVOKE = STable.CallINVOKE;
+            MuMO.loc_raw_reify = STable.RawCallReify;
             MuMO.loc_to_clr = new MuToCLR();
-            MuMO.loc_hash = DynMetaObject.CallHash;
-            MuMO.loc_list = DynMetaObject.CallList;
-            MuMO.loc_item = DynMetaObject.CallItem;
-            MuMO.loc_pred = DynMetaObject.CallPred;
-            MuMO.loc_succ = DynMetaObject.CallSucc;
+            MuMO.loc_hash = STable.CallHash;
+            MuMO.loc_list = STable.CallList;
+            MuMO.loc_item = STable.CallItem;
+            MuMO.loc_pred = STable.CallPred;
+            MuMO.loc_succ = STable.CallSucc;
             MuMO.FillProtoClass(new string[] { });
             WrapHandler0(MuMO, "Bool", MuMO.loc_Bool);
             WrapHandler0(MuMO, "defined", MuMO.loc_defined);
             MuMO.Invalidate();
 
-            StashMO = new DynMetaObject("Stash");
+            StashMO = new STable("Stash");
             StashMO.FillProtoClass(new string[] { });
-            StashP = new DynObject(StashMO);
+            StashP = new P6opaque(StashMO);
 
-            ParcelMO = new DynMetaObject("Parcel");
+            ParcelMO = new STable("Parcel");
             ParcelMO.loc_raw_iterator = new CtxParcelIterator();
             ParcelMO.loc_list = new CtxParcelList();
             ParcelMO.FillProtoClass(new string[] { });
@@ -2409,13 +2409,13 @@ slow:
                         ParcelMO.loc_raw_iterator, IteratorMO));
             ParcelMO.Invalidate();
 
-            ArrayMO = new DynMetaObject("Array");
+            ArrayMO = new STable("Array");
             ArrayMO.loc_at_pos = new IxListAtPos(true);
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
             WrapHandler1(ArrayMO, "at-pos", ArrayMO.loc_at_pos);
             ArrayMO.Invalidate();
 
-            ListMO = new DynMetaObject("List");
+            ListMO = new STable("List");
             ListMO.loc_raw_iterator = new CtxListIterator();
             ListMO.loc_at_pos = new IxListAtPos(false);
             ListMO.loc_raw_Bool = new CtxListBool();
@@ -2432,7 +2432,7 @@ slow:
             WrapHandler0(ListMO, "Numeric", ListMO.loc_Numeric);
             ListMO.Invalidate();
 
-            HashMO = new DynMetaObject("Hash");
+            HashMO = new STable("Hash");
             HashMO.loc_raw_iterator = new CtxHashIterator();
             HashMO.loc_at_key = new IxHashAtKey();
             HashMO.loc_exists_key = new IxHashExistsKey();
@@ -2448,7 +2448,7 @@ slow:
             WrapHandler0(HashMO, "hash", HashMO.loc_hash);
             HashMO.Invalidate();
 
-            AnyMO = new DynMetaObject("Any");
+            AnyMO = new STable("Any");
             AnyMO.loc_at_key = new IxAnyAtKey();
             AnyMO.loc_at_pos = new IxAnyAtPos();
             AnyMO.loc_list = new CtxAnyList();
@@ -2460,7 +2460,7 @@ slow:
             WrapHandler0(AnyMO, "item", AnyMO.loc_item);
             AnyMO.Invalidate();
 
-            CursorMO = new DynMetaObject("Cursor");
+            CursorMO = new STable("Cursor");
             CursorMO.loc_at_key = new IxCursorAtKey();
             CursorMO.loc_at_pos = new IxCursorAtPos();
             CursorMO.FillProtoClass(new string[] { });
@@ -2468,7 +2468,7 @@ slow:
             WrapHandler1(CursorMO, "at-pos", CursorMO.loc_at_pos);
             CursorMO.Invalidate();
 
-            MatchMO = new DynMetaObject("Match");
+            MatchMO = new STable("Match");
             MatchMO.loc_at_key = CursorMO.loc_at_key;
             MatchMO.loc_at_pos = CursorMO.loc_at_pos;
             MatchMO.loc_raw_Str = new CtxMatchStr();
@@ -2479,7 +2479,7 @@ slow:
             WrapHandler0(MatchMO, "Str", MatchMO.loc_Str);
             MatchMO.Invalidate();
 
-            ScalarMO = new DynMetaObject("Scalar");
+            ScalarMO = new STable("Scalar");
             ScalarMO.FillProtoClass(new string[] { });
 
             RootO = BoxRaw(new Dictionary<string,BValue>(), StashMO);
@@ -2530,7 +2530,7 @@ slow:
         }
 
         public static Variable NewLabelVar(Frame fr, string name) {
-            DynObject dob = new DynObject(LabelMO);
+            P6opaque dob = new P6opaque(LabelMO);
             fr.MarkSharedChain();
             dob.slots[0] = fr;
             dob.slots[1] = name;
@@ -2614,7 +2614,7 @@ slow:
                 // These are a bit special because there isn't actually a
                 // catching frame.
                 DispatchEnt de = tf.curDisp.next;
-                DynObject o = td as DynObject;
+                P6opaque o = td as P6opaque;
                 if (de != null) {
                     Variable[] p = tf.pos;
                     VarHash n = tf.named;

@@ -18,7 +18,7 @@ public sealed class GState {
         if (actions == null || name == "" || name == null)
             return;
         DispatchEnt m;
-        IP6 actions_p = actions.Fetch();
+        P6any actions_p = actions.Fetch();
         Variable[] pos;
         if (actions_p.mo.mro_methods.TryGetValue(name, out m)) {
             pos = new Variable[] { actions, Kernel.NewROScalar(match) };
@@ -36,7 +36,7 @@ public sealed class GState {
         Kernel.RunInferior(nf);
     }
 
-    public GState(string orig, IP6 actions) {
+    public GState(string orig, P6any actions) {
         this.actions = (actions == Kernel.AnyP) ? null :
             Kernel.NewROScalar(actions);
         orig_s = orig;
@@ -71,7 +71,7 @@ public sealed class NState {
     public string name;
     public Choice cut_to;
     public int quant;
-    public DynMetaObject klass;
+    public STable klass;
 
     public NState(Choice cut_to, string name, NState proto) {
         next = proto; this.cut_to = cut_to; this.name = name;
@@ -135,7 +135,7 @@ public sealed class RxFrame {
 
     // these go into the match but currently aren't scoped by backtrack
     // control in any way
-    public IP6 ast;
+    public P6any ast;
 
     public GState global;
     // our backing string, in a cheap to index form
@@ -183,7 +183,7 @@ public sealed class RxFrame {
                     Console.WriteLine("Failing {0}@{1} after some matches",
                             name, from);
                 if (EmptyList == null) {
-                    DynObject lst = new DynObject(Kernel.ListMO);
+                    P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0 /*items*/] = new VarDeque();
                     lst.slots[1 /*rest*/ ] = new VarDeque();
                     EmptyList = Kernel.NewRWListVar(lst);
@@ -397,9 +397,9 @@ public sealed class RxFrame {
         return st.ns.quant;
     }
 
-    public DynMetaObject GetClass() { return st.ns.klass; }
+    public STable GetClass() { return st.ns.klass; }
 
-    public void SetClass(DynMetaObject dm) {
+    public void SetClass(STable dm) {
         st.ns.klass = dm;
     }
 
@@ -438,12 +438,12 @@ public sealed class RxFrame {
             ks.Push(Kernel.NewROScalar(m));
             th.lex = new Dictionary<string,object>();
             th.lex["!return"] = null;
-            DynObject it  = new DynObject(Kernel.GatherIteratorMO);
+            P6opaque it  = new P6opaque(Kernel.GatherIteratorMO);
             it.slots[0 /*frame*/] = Kernel.NewRWScalar(Kernel.AnyMO, th);
             it.slots[1 /*reify*/] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
             VarDeque iss = new VarDeque();
             iss.Push(Kernel.NewROScalar(it));
-            DynObject lst = new DynObject(Kernel.ListMO);
+            P6opaque lst = new P6opaque(Kernel.ListMO);
             lst.slots[0 /*items*/] = ks;
             lst.slots[1 /*rest*/ ] = iss;
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -457,7 +457,7 @@ public sealed class RxFrame {
 
 // this does double duty backing Match; note that Cursor and Match need to be
 // treated polymorphically in a couple places
-public class Cursor : IP6 {
+public class Cursor : P6any {
     public static bool Trace =
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
     public static bool HwTrace =
@@ -472,17 +472,17 @@ public class Cursor : IP6 {
     public RxFrame feedback;
     // Match only
     public string reduced;
-    public IP6 ast;
+    public P6any ast;
     public int from;
     public CapInfo captures;
-    public DynMetaObject save_klass;
+    public STable save_klass;
 
     public string GetBacking() { return global.orig_s; }
 
-    public Cursor(IP6 proto, string text, IP6 actions)
+    public Cursor(P6any proto, string text, P6any actions)
         : this(new GState(text, actions), proto.mo, null, null, null, 0, null) { }
 
-    public Cursor(GState g, DynMetaObject klass, int from, int pos, CapInfo captures, IP6 ast, string reduced) {
+    public Cursor(GState g, STable klass, int from, int pos, CapInfo captures, P6any ast, string reduced) {
         this.global = g;
         this.captures = captures;
         this.pos = pos;
@@ -496,7 +496,7 @@ public class Cursor : IP6 {
             g.CallAction(reduced, this);
     }
 
-    public Cursor(GState g, DynMetaObject klass, RxFrame feedback, NState ns, Choice xact, int pos, CapInfo captures) {
+    public Cursor(GState g, STable klass, RxFrame feedback, NState ns, Choice xact, int pos, CapInfo captures) {
         this.mo = this.save_klass = klass;
         this.xact = xact;
         this.nstate = ns;
@@ -511,7 +511,7 @@ public class Cursor : IP6 {
         VarDeque iter = new VarDeque(caplist);
         CapInfo ci = null;
         while (Kernel.IterHasFlat(iter, true)) {
-            IP6 pair = iter.Shift().Fetch();
+            P6any pair = iter.Shift().Fetch();
             Variable k = (Variable)pair.GetSlot("key");
             Variable v = (Variable)pair.GetSlot("value");
             ci = new CapInfo(ci, new string[] {
@@ -533,7 +533,7 @@ public class Cursor : IP6 {
         return new Cursor(global, save_klass, null, null, null, pos, null);
     }
 
-    public Cursor FreshClass(IP6 from) {
+    public Cursor FreshClass(P6any from) {
         return new Cursor(global, from.mo, feedback, nstate, xact, pos, null);
     }
 
@@ -544,7 +544,7 @@ public class Cursor : IP6 {
     private Variable FixupList(VarDeque caps) {
         if (caps.Count() != 0 && caps[0] == null) {
             caps.Shift();
-            DynObject l = new DynObject(Kernel.ListMO);
+            P6opaque l = new P6opaque(Kernel.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
             return Kernel.NewROScalar(l);
@@ -562,8 +562,8 @@ public class Cursor : IP6 {
     }
 
     public string Reduced() { return reduced; }
-    public IP6 AST() {
-        IP6 a = (feedback != null) ? feedback.ast : ast;
+    public P6any AST() {
+        P6any a = (feedback != null) ? feedback.ast : ast;
         if (a != null)
             return a;
         else
@@ -591,7 +591,7 @@ public class Cursor : IP6 {
         return FixupList(caps);
     }
 
-    public void UnpackCaps(IP6 into) {
+    public void UnpackCaps(P6any into) {
         List<VarDeque> posr = new List<VarDeque>();
         posr.Add(new VarDeque());
         Dictionary<string,VarDeque> namr = new Dictionary<string,VarDeque>();
@@ -635,7 +635,7 @@ public class Cursor : IP6 {
                     Kernel.NewRWScalar(Kernel.AnyMO, kv.Value.Fetch()));
         VarDeque ks = new VarDeque();
 
-        DynObject lst = new DynObject(Kernel.ListMO);
+        P6opaque lst = new P6opaque(Kernel.ListMO);
         lst.slots[0 /*items*/] = ks;
         lst.slots[1 /*rest*/ ] = new VarDeque();
 
@@ -651,7 +651,7 @@ public class Cursor : IP6 {
 
         VarDeque ks = new VarDeque();
 
-        DynObject lst = new DynObject(Kernel.ListMO);
+        P6opaque lst = new P6opaque(Kernel.ListMO);
         lst.slots[0 /*items*/] = ks;
         lst.slots[1 /*rest*/ ] = new VarDeque();
 
@@ -818,7 +818,7 @@ public sealed class NFA {
     public Node[] nodes;
     public int curfate;
 
-    public DynMetaObject cursor_class;
+    public STable cursor_class;
     public HashSet<string> method_stack = new HashSet<string>();
     public HashSet<string> used_methods = new HashSet<string>();
     public List<Frame> outer_stack = new List<Frame>();
@@ -835,7 +835,7 @@ public sealed class NFA {
         }
         if (Lexer.LtmTrace)
             Console.WriteLine("+ Method MISS for {0}", name);
-        IP6 method = cursor_class.Can(name);
+        P6any method = cursor_class.Can(name);
 
         if (Lexer.LtmTrace && method != null)
             Console.WriteLine("+ Found method");
@@ -845,8 +845,8 @@ public sealed class NFA {
             return method_cache[name] = new LADImp();
         }
 
-        sub = ((SubInfo)(((DynObject)method).GetSlot("info"))).ltm;
-        outer = ((Frame)(((DynObject)method).GetSlot("outer")));
+        sub = ((SubInfo)(((P6opaque)method).GetSlot("info"))).ltm;
+        outer = ((Frame)(((P6opaque)method).GetSlot("outer")));
 
         if (Lexer.LtmTrace)
             Console.WriteLine("+ {0} to sub-automaton",
@@ -1191,7 +1191,7 @@ public class LADParam : LAD {
             reason = "parameter not found";
             goto imp;
         }
-        IP6 i = p.Fetch();
+        P6any i = p.Fetch();
         if (i.mo != Kernel.StrMO) {
             reason = "parameter is not a string";
             goto imp;
@@ -1286,7 +1286,7 @@ public class LADProtoRegex : LAD {
     }
 
     public override LAD Reify(NFA pad) {
-        DynObject[] cands = Lexer.ResolveProtoregex(pad.cursor_class.GetLexerCache(), name);
+        P6opaque[] cands = Lexer.ResolveProtoregex(pad.cursor_class.GetLexerCache(), name);
         LAD[] opts = new LAD[cands.Length];
         pad.used_methods.Add(name);
 
@@ -1395,11 +1395,11 @@ public sealed class LexerState {
 }
 
 public class LexerCache {
-    public DynMetaObject mo;
+    public STable mo;
     public LexerCache parent;
     public HashSet<string> repl_methods;
 
-    public LexerCache(DynMetaObject mo) {
+    public LexerCache(STable mo) {
         this.mo = mo;
         if (mo.superclasses.Count == 1) {
             parent = mo.superclasses[0].GetLexerCache();
@@ -1413,8 +1413,8 @@ public class LexerCache {
     }
 
     public Dictionary<LAD[], Lexer> nfas = new Dictionary<LAD[], Lexer>();
-    public Dictionary<string, DynObject[]> protorx_fns =
-        new Dictionary<string, DynObject[]>();
+    public Dictionary<string, P6opaque[]> protorx_fns =
+        new Dictionary<string, P6opaque[]>();
     public Dictionary<string, Lexer> protorx_nfa =
         new Dictionary<string, Lexer>();
 }
@@ -1438,7 +1438,7 @@ public class Lexer {
     public static bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
-    public static Lexer GetLexer(Frame fromf, DynMetaObject kl, LAD[] lads, string title) {
+    public static Lexer GetLexer(Frame fromf, STable kl, LAD[] lads, string title) {
         LexerCache lc = kl.GetLexerCache();
         Lexer ret;
         if (lc.nfas.TryGetValue(lads, out ret))
@@ -1583,9 +1583,9 @@ anew:
         return uniqfates;
     }
 
-    public static Lexer GetProtoregexLexer(DynMetaObject kl, string name) {
+    public static Lexer GetProtoregexLexer(STable kl, string name) {
         LexerCache lc = kl.GetLexerCache();
-        DynObject[] candidates = ResolveProtoregex(lc, name);
+        P6opaque[] candidates = ResolveProtoregex(lc, name);
         Lexer l;
 
         if (lc.protorx_nfa.TryGetValue(name, out l)) {
@@ -1633,25 +1633,25 @@ anew:
         return lc.protorx_nfa[name] = new Lexer(pad, name, branches);
     }
 
-    public static IP6[] RunProtoregex(Frame fromf, IP6 cursor, string name) {
-        DynMetaObject kl = cursor.mo;
+    public static P6any[] RunProtoregex(Frame fromf, P6any cursor, string name) {
+        STable kl = cursor.mo;
 
-        DynObject[] candidates = ResolveProtoregex(kl.GetLexerCache(), name);
+        P6opaque[] candidates = ResolveProtoregex(kl.GetLexerCache(), name);
         Lexer l = GetProtoregexLexer(kl, name);
         Cursor c = (Cursor)cursor;
         int[] brnum = l.Run(c.global.orig_s, c.pos);
 
-        IP6[] ret = new IP6[brnum.Length];
+        P6any[] ret = new P6any[brnum.Length];
         for (int i = 0; i < brnum.Length; i++)
             ret[i] = candidates[brnum[i]];
 
         return ret;
     }
 
-    public static DynObject[] ResolveProtoregex(LexerCache lc,
+    public static P6opaque[] ResolveProtoregex(LexerCache lc,
             string name) {
-        DynObject[] ret;
-        DynMetaObject cursor_class = lc.mo;
+        P6opaque[] ret;
+        STable cursor_class = lc.mo;
         if (lc.protorx_fns.TryGetValue(name, out ret)) {
             if (LtmTrace)
                 Console.WriteLine("+ Protoregex method list HIT on {0}.{1}",
@@ -1667,19 +1667,19 @@ anew:
             return lc.protorx_fns[name] = ResolveProtoregex(lc.parent, name);
         }
 
-        IP6 proto = cursor_class.Can(name);
+        P6any proto = cursor_class.Can(name);
         string filter = name + ":";
 
-        List<DynObject> raword = new List<DynObject>();
+        List<P6opaque> raword = new List<P6opaque>();
 
-        foreach (DynMetaObject k in cursor_class.mro) {
+        foreach (STable k in cursor_class.mro) {
             if (proto != k.Can(name))
                 continue;
-            foreach (KeyValuePair<string,IP6> o in k.ord_methods) {
+            foreach (KeyValuePair<string,P6any> o in k.ord_methods) {
                 if (!Utils.StartsWithInvariant(filter, o.Key))
                     continue;
                 if (cursor_class.Can(o.Key) == o.Value) {
-                    raword.Add((DynObject) o.Value);
+                    raword.Add((P6opaque) o.Value);
                 }
             }
         }

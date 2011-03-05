@@ -20,7 +20,7 @@ public class JsyncWriter {
         }
     }
 
-    void WriteObj(IP6 obj) {
+    void WriteObj(P6any obj) {
         int anchor;
         if (anchors.TryGetValue(obj, out anchor)) {
             WriteAnchor(anchor);
@@ -46,7 +46,7 @@ public class JsyncWriter {
         o.Append("null");
     }
 
-    void WriteArray(IP6 obj) {
+    void WriteArray(P6any obj) {
         int a = nextanchor++;
         anchors[obj] = a;
         Kernel.RunInferior(obj.InvokeMethod(Kernel.GetInferiorRoot(), "eager",
@@ -62,7 +62,7 @@ public class JsyncWriter {
         o.Append(']');
     }
 
-    void WriteHash(IP6 obj) {
+    void WriteHash(P6any obj) {
         int a = nextanchor++;
         anchors[obj] = a;
         VarHash entries =
@@ -89,16 +89,16 @@ public class JsyncWriter {
         o.Append('}');
     }
 
-    void WriteGeneral(IP6 obj) {
-        if (FailSoft && !(obj is DynObject)) {
+    void WriteGeneral(P6any obj) {
+        if (FailSoft && !(obj is P6opaque)) {
             o.AppendFormat("\"UNSERIALIZABLE {0}\"", obj.mo.name);
             return;
         }
 
         int a = nextanchor++;
         anchors[obj] = a;
-        DynObject dyo = (DynObject) obj;
-        DynMetaObject mo = dyo.mo;
+        P6opaque dyo = (P6opaque) obj;
+        STable mo = dyo.mo;
 
         o.Append('{');
         contUsed = true;
@@ -189,7 +189,7 @@ public class JsyncWriter {
         o.AppendFormat("\"*A{0}\"", i);
     }
 
-    public static string ToJsync(IP6 obj) {
+    public static string ToJsync(P6any obj) {
         JsyncWriter w = new JsyncWriter();
         w.WriteObj(obj);
         if (w.headerized) w.o.Append(']');
@@ -200,7 +200,7 @@ public class JsyncWriter {
 public class JsyncReader {
     string from;
     int ix = 0;
-    Dictionary<string,IP6> anchors = new Dictionary<string,IP6>();
+    Dictionary<string,P6any> anchors = new Dictionary<string,P6any>();
     Dictionary<string,List<Variable>> anchorrefs =
         new Dictionary<string,List<Variable>>();
 
@@ -252,8 +252,8 @@ public class JsyncReader {
         ix++;
     }
 
-    static Variable BoxRW<T>(T o, DynMetaObject mo) {
-        DynObject dyo = new BoxObject<T>(o, mo);
+    static Variable BoxRW<T>(T o, STable mo) {
+        P6opaque dyo = new BoxObject<T>(o, mo);
         return Kernel.NewRWScalar(Kernel.AnyMO, dyo);
     }
 
@@ -348,7 +348,7 @@ public class JsyncReader {
             }
             SkipWhite(true);
             SkipChar(']');
-            IP6 i = new DynObject(Kernel.ArrayMO);
+            P6any i = new P6opaque(Kernel.ArrayMO);
             i.SetSlot("items", q);
             i.SetSlot("rest", new VarDeque());
             return Kernel.NewROScalar(i);
@@ -394,7 +394,7 @@ public class JsyncReader {
         }
     }
 
-    void AddAnchor(string anch, IP6 obj) {
+    void AddAnchor(string anch, P6any obj) {
         for (int i = 0; i < anch.Length; i++) {
             char c = anch[i];
             if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) continue;
@@ -506,7 +506,7 @@ public class JsyncReader {
     Variable GetFromArray() {
         SkipCharWS('[');
         VarDeque kids = new VarDeque();
-        DynObject obj = new DynObject(Kernel.ArrayMO);
+        P6opaque obj = new P6opaque(Kernel.ArrayMO);
         obj.SetSlot("items", kids);
         obj.SetSlot("rest",  new VarDeque());
         bool comma = false;
@@ -635,7 +635,7 @@ public class JsyncReader {
             if (!Utils.StartsWithInvariant("!perl6/", h_tag))
                 Err("Unsupported hash tag " + h_tag);
             int s_cursor = 7;
-            IP6 p_cursor = Kernel.GlobalO;
+            P6any p_cursor = Kernel.GlobalO;
             while(s_cursor < h_tag.Length) {
                 int s_next = h_tag.IndexOf("::", s_cursor);
                 if (s_next < 0) s_next = h_tag.Length;
@@ -651,7 +651,7 @@ public class JsyncReader {
                     Err("Cannot thaw Hash subclass " + p_cursor.mo.name + "; it has attributes");
                 obj = BoxRW<VarHash>(zyg, p_cursor.mo);
             } else {
-                DynObject dyo = new DynObject(p_cursor.mo);
+                P6opaque dyo = new P6opaque(p_cursor.mo);
                 for (int i = 0; i < dyo.mo.nslots; i++) {
                     string sn = dyo.mo.all_slot[i];
                     if (!zyg.ContainsKey(sn))
@@ -770,7 +770,7 @@ bare:
 
     // TODO GetTopLevel
 
-    public static IP6 FromJson(string inp) {
+    public static P6any FromJson(string inp) {
         JsyncReader j = new JsyncReader();
         j.from = inp;
         j.SkipWhite(true);
@@ -782,7 +782,7 @@ bare:
         return top.Fetch();
     }
 
-    public static IP6 FromJsync(string inp) {
+    public static P6any FromJsync(string inp) {
         JsyncReader j = new JsyncReader();
         j.from = inp;
         j.SkipWhite(true);
@@ -790,7 +790,7 @@ bare:
 
 
         foreach (KeyValuePair<string, List<Variable>> da in j.anchorrefs) {
-            IP6 r;
+            P6any r;
             if (!j.anchors.TryGetValue(da.Key, out r))
                 j.Err("Undefined anchor " + da.Key);
             foreach (Variable to in da.Value)
@@ -808,7 +808,7 @@ bare:
 public class JsonWriter {
     StringBuilder o = new StringBuilder();
 
-    void WriteVal(IP6 obj) {
+    void WriteVal(P6any obj) {
         if (!obj.IsDefined()) {
             o.Append("null");
         } else if (obj.Isa(Kernel.BoolMO)) {
@@ -824,7 +824,7 @@ public class JsonWriter {
         }
     }
 
-    void WriteObj(IP6 obj) {
+    void WriteObj(P6any obj) {
         bool comma = false;
         bool def = obj.IsDefined();
         if (def && obj.Isa(Kernel.HashMO)) {
@@ -857,7 +857,7 @@ public class JsonWriter {
         }
     }
 
-    public static string ToJson(IP6 obj) {
+    public static string ToJson(P6any obj) {
         JsonWriter w = new JsonWriter();
         w.WriteObj(obj);
         return w.o.ToString();

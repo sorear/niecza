@@ -18,18 +18,18 @@ class MuToCLR : ContextHandler<object> {
 class CLRToCLR : ContextHandler<object> {
     public static readonly CLRToCLR Instance = new CLRToCLR();
     public override object Get(Variable v) {
-        IP6 i = v.Fetch();
+        P6any i = v.Fetch();
         return i.IsDefined() ? Kernel.UnboxAny<object>(i) : null;
     }
 }
 
 public class NieczaCLR {
-    static Dictionary<Type, DynMetaObject> wrapper_cache
-        = new Dictionary<Type, DynMetaObject>();
+    static Dictionary<Type, STable> wrapper_cache
+        = new Dictionary<Type, STable>();
 
-    static DynMetaObject GetWrapper(Type t) {
+    static STable GetWrapper(Type t) {
         lock (wrapper_cache) {
-            DynMetaObject r;
+            STable r;
             if (wrapper_cache.TryGetValue(t, out r))
                 return r;
             return wrapper_cache[t] = NewWrapper(t);
@@ -62,14 +62,14 @@ public class NieczaCLR {
         l.Add(v);
     }
 
-    static DynMetaObject NewWrapper(Type t) {
-        DynMetaObject m = new DynMetaObject("clr:" + t.FullName);
-        DynMetaObject pm = t.BaseType == null ? Kernel.AnyMO :
+    static STable NewWrapper(Type t) {
+        STable m = new STable("clr:" + t.FullName);
+        STable pm = t.BaseType == null ? Kernel.AnyMO :
             GetWrapper(t.BaseType);
-        DynMetaObject[] mro = new DynMetaObject[pm.mro.Length + 1];
+        STable[] mro = new STable[pm.mro.Length + 1];
         Array.Copy(pm.mro, 0, mro, 1, pm.mro.Length);
         mro[0] = m;
-        m.FillClass(new string[] { }, new DynMetaObject[] { pm }, mro);
+        m.FillClass(new string[] { }, new STable[] { pm }, mro);
         m.loc_to_clr = CLRToCLR.Instance;
         if (NieczaCLROpts.Debug)
             Console.WriteLine("Setting up wrapper for {0}", t.FullName);
@@ -133,7 +133,7 @@ public class NieczaCLR {
 
         m.Invalidate();
         m.typeObject = new BoxObject<object>(null, m);
-        ((DynObject)m.typeObject).slots = null;
+        ((P6opaque)m.typeObject).slots = null;
         return m;
     }
 

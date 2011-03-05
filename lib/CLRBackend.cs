@@ -377,9 +377,9 @@ namespace Niecza.CLRBackend {
 
         public override void BindFields(int ix,
                 Func<string,Type,FieldInfo> binder) {
-            typeObject = binder(Unit.SharedName('T', ix, name), Tokens.IP6);
+            typeObject = binder(Unit.SharedName('T', ix, name), Tokens.P6any);
             typeVar    = binder(Unit.SharedName('V', ix, name), Tokens.Variable);
-            metaObject = binder(Unit.SharedName('M', ix, name), Tokens.DynMetaObject);
+            metaObject = binder(Unit.SharedName('M', ix, name), Tokens.STable);
         }
 
         public ModuleWithTypeObject(object[] p) : base(p) { }
@@ -562,7 +562,7 @@ namespace Niecza.CLRBackend {
                 protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
             if (outer == null || (outer.Resolve<StaticSub>().flags
                         & SPAD_EXISTS) != 0)
-                protosub = binder(Unit.SharedName('S', ix, name), Tokens.IP6);
+                protosub = binder(Unit.SharedName('S', ix, name), Tokens.P6any);
 
             nlexn = 0;
             for (int i = 0; i < lexicals.Count; i++)
@@ -832,12 +832,12 @@ namespace Niecza.CLRBackend {
         public static readonly Type Kernel = typeof(Kernel);
         public static readonly Type Builtins = typeof(Builtins);
         public static readonly Type SubInfo = typeof(SubInfo);
-        public static readonly Type IP6 = typeof(IP6);
+        public static readonly Type P6any = typeof(P6any);
         public static readonly Type Variable = typeof(Variable);
         public static readonly Type BValue = typeof(BValue);
-        public static readonly Type DynObject = typeof(DynObject);
+        public static readonly Type P6opaque = typeof(P6opaque);
         public static readonly Type DynBlockDelegate = typeof(DynBlockDelegate);
-        public static readonly Type DynMetaObject = typeof(DynMetaObject);
+        public static readonly Type STable = typeof(STable);
         public static readonly Type VarHash = typeof(VarHash);
         public static readonly Type VVarList = typeof(VarDeque);
         public static readonly Type FVarList = typeof(Variable[]);
@@ -854,24 +854,24 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo DynBlockDelegate_ctor =
             typeof(DynBlockDelegate).GetConstructor(new Type[] {
                     typeof(object), typeof(IntPtr) });
-        public static readonly ConstructorInfo DynObject_ctor =
-            typeof(DynObject).GetConstructor(new Type[] {
-                    DynMetaObject });
+        public static readonly ConstructorInfo P6opaque_ctor =
+            typeof(P6opaque).GetConstructor(new Type[] {
+                    STable });
         public static readonly ConstructorInfo DMO_ctor =
-            DynMetaObject.GetConstructor(new Type[] { String });
+            STable.GetConstructor(new Type[] { String });
         public static readonly ConstructorInfo RxFrame_ctor =
             RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean, Boolean });
         public static readonly ConstructorInfo Frame_ctor =
             Frame.GetConstructor(new Type[] { Frame, Frame, SubInfo });
         public static readonly ConstructorInfo SV_ctor =
             typeof(SimpleVariable).GetConstructor(new Type[] {
-                    Boolean, Boolean, DynMetaObject, typeof(ViviHook), IP6 });
+                    Boolean, Boolean, STable, typeof(ViviHook), P6any });
         public static readonly ConstructorInfo SubViviHook_ctor =
-            typeof(SubViviHook).GetConstructor(new Type[] { IP6 });
+            typeof(SubViviHook).GetConstructor(new Type[] { P6any });
         public static readonly ConstructorInfo HashViviHook_ctor =
-            typeof(HashViviHook).GetConstructor(new Type[] { IP6, String });
+            typeof(HashViviHook).GetConstructor(new Type[] { P6any, String });
         public static readonly ConstructorInfo ArrayViviHook_ctor =
-            typeof(ArrayViviHook).GetConstructor(new Type[] { IP6, Int32 });
+            typeof(ArrayViviHook).GetConstructor(new Type[] { P6any, Int32 });
         public static readonly ConstructorInfo NewHashViviHook_ctor =
             typeof(NewHashViviHook).GetConstructor(new Type[] { Variable, String });
         public static readonly ConstructorInfo NewArrayViviHook_ctor =
@@ -901,14 +901,14 @@ namespace Niecza.CLRBackend {
             return n;
         }
 
-        public static readonly MethodInfo IP6_InvokeMethod =
-            IP6.GetMethod("InvokeMethod");
-        public static readonly MethodInfo IP6_Invoke =
-            IP6.GetMethod("Invoke");
-        public static readonly MethodInfo IP6_SetSlot =
-            IP6.GetMethod("SetSlot");
-        public static readonly MethodInfo IP6_GetSlot =
-            IP6.GetMethod("GetSlot");
+        public static readonly MethodInfo P6any_InvokeMethod =
+            P6any.GetMethod("InvokeMethod");
+        public static readonly MethodInfo P6any_Invoke =
+            P6any.GetMethod("Invoke");
+        public static readonly MethodInfo P6any_SetSlot =
+            P6any.GetMethod("SetSlot");
+        public static readonly MethodInfo P6any_GetSlot =
+            P6any.GetMethod("GetSlot");
         public static readonly MethodInfo SubInfo_AddHint =
             SubInfo.GetMethod("AddHint");
         public static readonly MethodInfo Variable_Fetch =
@@ -974,21 +974,21 @@ namespace Niecza.CLRBackend {
         private static Dictionary<string,MethodInfo> _FooMethod() {
             Dictionary<string,MethodInfo> n =
                 new Dictionary<string,MethodInfo>();
-            n["normal"] = DynMetaObject.GetMethod("AddMethod");
-            n["private"] = DynMetaObject.GetMethod("AddPrivateMethod");
-            n["sub"] = DynMetaObject.GetMethod("AddSubMethod");
+            n["normal"] = STable.GetMethod("AddMethod");
+            n["private"] = STable.GetMethod("AddPrivateMethod");
+            n["sub"] = STable.GetMethod("AddSubMethod");
             return n;
         }
         public static readonly MethodInfo DMO_AddAttribute =
-            typeof(DynMetaObject).GetMethod("AddAttribute");
+            typeof(STable).GetMethod("AddAttribute");
         public static readonly MethodInfo DMO_Invalidate =
-            typeof(DynMetaObject).GetMethod("Invalidate");
+            typeof(STable).GetMethod("Invalidate");
         public static readonly MethodInfo DMO_FillParametricRole =
-            typeof(DynMetaObject).GetMethod("FillParametricRole");
+            typeof(STable).GetMethod("FillParametricRole");
         public static readonly MethodInfo DMO_FillRole =
-            typeof(DynMetaObject).GetMethod("FillRole");
+            typeof(STable).GetMethod("FillRole");
         public static readonly MethodInfo DMO_FillClass =
-            typeof(DynMetaObject).GetMethod("FillClass");
+            typeof(STable).GetMethod("FillClass");
         public static readonly MethodInfo RxFrame_PushBacktrack =
             typeof(RxFrame).GetMethod("PushBacktrack");
         public static readonly MethodInfo RxFrame_PushCapture =
@@ -1008,8 +1008,8 @@ namespace Niecza.CLRBackend {
         public static readonly MethodInfo Object_ToString =
             typeof(object).GetMethod("ToString", new Type[0]);
 
-        public static readonly FieldInfo IP6_mo =
-            IP6.GetField("mo");
+        public static readonly FieldInfo P6any_mo =
+            P6any.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
         public static readonly FieldInfo SubInfo_mo =
@@ -1018,12 +1018,12 @@ namespace Niecza.CLRBackend {
             SubInfo.GetField("sig_i");
         public static readonly FieldInfo SubInfo_sig_r =
             SubInfo.GetField("sig_r");
-        public static readonly FieldInfo DynObject_slots =
-            DynObject.GetField("slots");
+        public static readonly FieldInfo P6opaque_slots =
+            P6opaque.GetField("slots");
         public static readonly FieldInfo DMO_typeObject =
-            DynMetaObject.GetField("typeObject");
+            STable.GetField("typeObject");
         public static readonly FieldInfo DMO_how =
-            DynMetaObject.GetField("how");
+            STable.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
             Kernel.GetField("NumMO");
         public static readonly FieldInfo Kernel_StrMO =
@@ -1234,7 +1234,7 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Stloc, cx.ospill);
             cx.il.Emit(OpCodes.Ldloc, cx.ospill);
             cx.il.Emit(OpCodes.Callvirt, Tokens.Variable_Fetch);
-            cx.il.Emit(OpCodes.Ldfld, Tokens.IP6_mo);
+            cx.il.Emit(OpCodes.Ldfld, Tokens.P6any_mo);
             cx.il.Emit(OpCodes.Ldfld, thing);
             cx.il.Emit(OpCodes.Ldloc, cx.ospill);
             for (int i = 1; i < zyg.Length; i++)
@@ -1620,7 +1620,7 @@ namespace Niecza.CLRBackend {
             GenArgList(ismethod ? 2 : 1, cx);
 
             cx.il.Emit(OpCodes.Callvirt, ismethod ?
-                    Tokens.IP6_InvokeMethod : Tokens.IP6_Invoke);
+                    Tokens.P6any_InvokeMethod : Tokens.P6any_Invoke);
             cx.il.Emit(OpCodes.Ret);
             cx.il.MarkLabel(cx.cases[cx.next_case++]);
             cx.save_line();
@@ -1634,12 +1634,12 @@ namespace Niecza.CLRBackend {
             if (ismethod) sig = "\0" + sig;
             int i = 0;
             if (ismethod) TypeCheck(zyg[i++].Returns, Tokens.String);
-            TypeCheck(zyg[i++].Returns, Tokens.IP6);
+            TypeCheck(zyg[i++].Returns, Tokens.P6any);
             int j = 0;
             while (j < sig.Length) {
                 string s = sig.Substring(j+1, sig[j]);
                 j += (1 + s.Length);
-                TypeCheck(zyg[i++].Returns, (s == "flatcap") ? Tokens.IP6 : Tokens.Variable);
+                TypeCheck(zyg[i++].Returns, (s == "flatcap") ? Tokens.P6any : Tokens.Variable);
             }
             this.ismethod = ismethod;
             this.sig = sig;
@@ -2616,7 +2616,7 @@ namespace Niecza.CLRBackend {
             namtypes["num"] = Tokens.Double;
             namtypes["int"] = Tokens.Int32;
             namtypes["var"] = Tokens.Variable;
-            namtypes["obj"] = Tokens.IP6;
+            namtypes["obj"] = Tokens.P6any;
             namtypes["fvarlist"] = Tokens.FVarList;
             namtypes["vvarlist"] = Tokens.VVarList;
             namtypes["varhash"] = Tokens.VarHash;
@@ -2674,20 +2674,20 @@ namespace Niecza.CLRBackend {
                     return CpsOp.PolyOp(FixStr(zyg[1]),
                             th.Scan(zyg[2]), th.Scan(zyg[3])); };
             handlers["setslot"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.MethodCall(null, Tokens.IP6_SetSlot, new CpsOp[] {
+                return CpsOp.MethodCall(null, Tokens.P6any_SetSlot, new CpsOp[] {
                     th.Scan(zyg[2]), th.AnyStr(zyg[1]), th.Scan(zyg[3]) }); };
             handlers["getslot"] = delegate(NamProcessor th, object[] zyg) {
                 Type ty = namtypes[FixStr(zyg[2])];
                 return CpsOp.UnboxAny(ty, CpsOp.MethodCall(null,
-                    Tokens.IP6_GetSlot, new CpsOp[] { th.Scan(zyg[3]),
+                    Tokens.P6any_GetSlot, new CpsOp[] { th.Scan(zyg[3]),
                         th.AnyStr(zyg[1]) })); };
             handlers["cast"] = delegate(NamProcessor th, object[] zyg) {
                 Type tty = namtypes[FixStr(zyg[1])];
                 CpsOp z = th.Scan(zyg[2]);
                 Type fty = z.head.Returns;
 
-                if (tty == Tokens.Frame && fty == Tokens.IP6
-                        || tty == Tokens.Cursor && fty == Tokens.IP6) {
+                if (tty == Tokens.Frame && fty == Tokens.P6any
+                        || tty == Tokens.Cursor && fty == Tokens.P6any) {
                     return CpsOp.UnboxAny(tty, z);
                 } else if (tty == Tokens.Double && fty == Tokens.Int32) {
                     return CpsOp.Operator(tty, OpCodes.Conv_R8, new CpsOp[]{z});
@@ -2753,7 +2753,7 @@ dynamic:
                         mo = new CpsOp(new ClrGetSField(p.metaObject));
                     }
                 } else {
-                    mo = CpsOp.GetField(Tokens.IP6_mo, th.Scan(zyg[1]));
+                    mo = CpsOp.GetField(Tokens.P6any_mo, th.Scan(zyg[1]));
                 }
                 CpsOp boxee = th.Scan(zyg[2]);
                 return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), new CpsOp[2] { boxee, mo });
@@ -2898,7 +2898,7 @@ dynamic:
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
                     new CpsOp[] { z[1], z[0] }); };
             thandlers["mrl_index"] = delegate(CpsOp[] z) {
-                return CpsOp.Operator(Tokens.IP6, OpCodes.Ldelem_Ref,
+                return CpsOp.Operator(Tokens.P6any, OpCodes.Ldelem_Ref,
                     new CpsOp[] { z[1], z[0] }); };
             thandlers["vvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.VVarList_Item, new CpsOp[]{
@@ -3058,9 +3058,9 @@ dynamic:
                 return CpsOp.MethodCall(null, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
-            thandlers["llhow_name"] = FieldGet(Tokens.DynMetaObject, "name");
-            thandlers["stab_what"] = FieldGet(Tokens.DynMetaObject, "typeObject");
-            thandlers["obj_llhow"] = FieldGet(Tokens.IP6, "mo");
+            thandlers["llhow_name"] = FieldGet(Tokens.STable, "name");
+            thandlers["stab_what"] = FieldGet(Tokens.STable, "typeObject");
+            thandlers["obj_llhow"] = FieldGet(Tokens.P6any, "mo");
             thandlers["varhash_clear"] = Methody(null, Tokens.VarHash.GetMethod("Clear"));
             thandlers["varhash_new"] = Constructy(Tokens.VarHash.GetConstructor(new Type[0]));
             thandlers["varhash_dup"] = Constructy(Tokens.VarHash.GetConstructor(new Type[]{ Tokens.VarHash }));
@@ -3092,7 +3092,7 @@ dynamic:
             thandlers["vvarlist_new_singleton"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.Variable }));
             thandlers["vvarlist_from_fvarlist"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.FVarList }));
             thandlers["vvarlist_clone"] = Constructy(Tokens.VVarList.GetConstructor(new Type[] { Tokens.VVarList }));
-            thandlers["stab_privatemethod"] = Methody(null, Tokens.DynMetaObject.GetMethod("GetPrivateMethod"));
+            thandlers["stab_privatemethod"] = Methody(null, Tokens.STable.GetMethod("GetPrivateMethod"));
             thandlers["path_file_exists"] = Methody(null, typeof(File).GetMethod("Exists"));
             thandlers["path_dir_exists"] = Methody(null, typeof(Directory).GetMethod("Exists"));
             thandlers["path_combine"] = Methody(null, typeof(Path).GetMethod("Combine", new Type[] { Tokens.String, Tokens.String }));
@@ -3103,17 +3103,17 @@ dynamic:
             handlers["_parametricrole"] = delegate(NamProcessor th, object[] z) { return th.FillParamRole(); };
             handlers["_addmethod"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(null, Tokens.DMO_AddFooMethod[JScalar.S(z[1])], new CpsOp[] { th.Scan(z[2]), th.Scan(z[3]), th.Scan(z[4]) }); };
-            thandlers["_invalidate"] = Methody(null, Tokens.DynMetaObject.GetMethod("Invalidate"));
+            thandlers["_invalidate"] = Methody(null, Tokens.STable.GetMethod("Invalidate"));
             handlers["do_require"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("DoRequire"),
                     new CpsOp[] { CpsOp.StringLiteral(JScalar.S(z[1])) }); };
-            thandlers["obj_is_defined"] = Methody(null, Tokens.IP6.GetMethod("IsDefined"));
-            thandlers["how"] = Methody(Tokens.IP6, Tokens.IP6.GetMethod("HOW"));
-            thandlers["obj_what"] = Methody(null, Tokens.IP6.GetMethod("GetTypeObject"));
-            thandlers["obj_isa"] = Methody(null, Tokens.IP6.GetMethod("Isa"));
-            thandlers["obj_does"] = Methody(null, Tokens.IP6.GetMethod("Does"));
-            thandlers["obj_newblank"] = Constructy(Tokens.DynObject_ctor);
-            thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.IP6, Tokens.String, Tokens.IP6 }));
+            thandlers["obj_is_defined"] = Methody(null, Tokens.P6any.GetMethod("IsDefined"));
+            thandlers["how"] = Methody(Tokens.P6any, Tokens.P6any.GetMethod("HOW"));
+            thandlers["obj_what"] = Methody(null, Tokens.P6any.GetMethod("GetTypeObject"));
+            thandlers["obj_isa"] = Methody(null, Tokens.P6any.GetMethod("Isa"));
+            thandlers["obj_does"] = Methody(null, Tokens.P6any.GetMethod("Does"));
+            thandlers["obj_newblank"] = Constructy(Tokens.P6opaque_ctor);
+            thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.P6any, Tokens.String, Tokens.P6any }));
             thandlers["cursor_pos"] = FieldGet(Tokens.Cursor, "pos");
             thandlers["cursor_from"] = FieldGet(Tokens.Cursor, "from");
             thandlers["cursor_butpos"] = Methody(null, Tokens.Cursor.GetMethod("At"));
@@ -3186,7 +3186,7 @@ dynamic:
             thandlers["bif_delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
             thandlers["bif_cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
             thandlers["bif_zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
-            thandlers["obj_typename"] = Methody(null, Tokens.IP6.GetMethod("GetTypeName"));
+            thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");
             thandlers["default_new"] = Methody(null, Tokens.Kernel.GetMethod("DefaultNew"));
@@ -3259,7 +3259,7 @@ dynamic:
         }
 
         static Func<CpsOp[], CpsOp> Contexty(string name) {
-            FieldInfo f = Tokens.DynMetaObject.GetField(name);
+            FieldInfo f = Tokens.STable.GetField(name);
             MethodInfo g = f.FieldType.GetMethod("Get");
             return delegate(CpsOp[] cpses) {
                 return CpsOp.Contexty(f, g, cpses);
@@ -3403,8 +3403,8 @@ dynamic:
         CpsOp FillParamRole() {
             ParametricRole pr =
                 sub.parametric_role_hack.Resolve<ParametricRole>();
-            CpsOp mo = CpsOp.PeekLet("!mo", Tokens.DynMetaObject);
-            CpsOp to = CpsOp.PeekLet("!to", Tokens.DynObject);
+            CpsOp mo = CpsOp.PeekLet("!mo", Tokens.STable);
+            CpsOp to = CpsOp.PeekLet("!to", Tokens.P6opaque);
             CpsOp pa = CpsOp.PeekLet("!pa", Tokens.VarHash);
 
             List<CpsOp> build = new List<CpsOp>();
@@ -3413,8 +3413,8 @@ dynamic:
             for (int i = 0; i < supers.Length; i++)
                 supers[i] = CpsOp.GetSField(pr.superclasses[i].Resolve<Class>().metaObject);
             build.Add( CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
-                mo, CpsOp.NewArray(Tokens.DynMetaObject, supers),
-                CpsOp.NewArray(Tokens.DynMetaObject, new CpsOp[0]) }) );
+                mo, CpsOp.NewArray(Tokens.STable, supers),
+                CpsOp.NewArray(Tokens.STable, new CpsOp[0]) }) );
 
             foreach (Method m in pr.methods) {
                 CpsOp name = (m.name != null) ? CpsOp.StringLiteral(m.name) :
@@ -3429,7 +3429,7 @@ dynamic:
             foreach (Attribute a in pr.attributes) {
                 CpsOp name = CpsOp.StringLiteral(a.name);
                 CpsOp publ = CpsOp.BoolLiteral(a.publ);
-                CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.IP6) :
+                CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.P6any) :
                     RawAccessLex("scopedlex", a.ivar, null);
                 build.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
                     new CpsOp[] { mo, name, publ, init }));
@@ -3446,14 +3446,14 @@ dynamic:
             }
 
             build.Add(RawAccessLex("scopedlex", "*params", pa));
-            build.Add(CpsOp.SetField(Tokens.DynObject_slots, to,
+            build.Add(CpsOp.SetField(Tokens.P6opaque_slots, to,
                         CpsOp.Null(typeof(object[]))));
             build.Add(CpsOp.SetField(Tokens.DMO_typeObject, mo, to));
             build.Add(CpsOp.CpsReturn(new CpsOp[] { CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar, new CpsOp[] { to })}));
 
             return CpsOp.Let("!mo", CpsOp.ConstructorCall(Tokens.DMO_ctor,
                         new CpsOp[] { CpsOp.StringLiteral(pr.name) }),
-                    CpsOp.Let("!to", CpsOp.ConstructorCall(Tokens.DynObject_ctor,
+                    CpsOp.Let("!to", CpsOp.ConstructorCall(Tokens.P6opaque_ctor,
                             new CpsOp[] { mo }),
                         CpsOp.Let("!pa", CpsOp.ConstructorCall(Tokens.VarHash.GetConstructor(new Type[0]), new CpsOp[0]),
                             CpsOp.Sequence(build.ToArray()))));
@@ -3672,8 +3672,8 @@ dynamic:
 
                     thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
                         CpsOp.GetSField(r.metaObject),
-                        CpsOp.NewArray(Tokens.DynMetaObject, super),
-                        CpsOp.NewArray(Tokens.DynMetaObject, new CpsOp[0]) }));
+                        CpsOp.NewArray(Tokens.STable, super),
+                        CpsOp.NewArray(Tokens.STable, new CpsOp[0]) }));
                 } else if (m is ParametricRole) {
                     // The heavy lifting is done in WrapBody
                 } else if (m is Class) {
@@ -3693,15 +3693,15 @@ dynamic:
                     thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillClass, new CpsOp[] {
                         CpsOp.GetSField(r.metaObject),
                         CpsOp.StringArray(false, all_slot.ToArray()),
-                        CpsOp.NewArray(Tokens.DynMetaObject, super),
-                        CpsOp.NewArray(Tokens.DynMetaObject, mro) }));
+                        CpsOp.NewArray(Tokens.STable, super),
+                        CpsOp.NewArray(Tokens.STable, mro) }));
                 }
 
                 thaw.Add(CpsOp.SetSField(m.typeObject,
-                    CpsOp.ConstructorCall(Tokens.DynObject_ctor, new CpsOp[] {
+                    CpsOp.ConstructorCall(Tokens.P6opaque_ctor, new CpsOp[] {
                         CpsOp.GetSField(m.metaObject) })));
-                thaw.Add(CpsOp.SetField(Tokens.DynObject_slots,
-                    CpsOp.UnboxAny(Tokens.DynObject, CpsOp.GetSField(m.typeObject)),
+                thaw.Add(CpsOp.SetField(Tokens.P6opaque_slots,
+                    CpsOp.UnboxAny(Tokens.P6opaque, CpsOp.GetSField(m.typeObject)),
                         CpsOp.Null(typeof(object[]))));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_typeObject,
                     CpsOp.GetSField(m.metaObject), CpsOp.GetSField(m.typeObject)));
@@ -3779,7 +3779,7 @@ dynamic:
                     }));
                 }
                 foreach (Attribute a in attrs) {
-                    CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.IP6) :
+                    CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.P6any) :
                         CpsOp.GetSField(a.ibody.Resolve<StaticSub>().protosub);
                     thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
                         new CpsOp[] { CpsOp.GetSField(m.metaObject),
@@ -3789,7 +3789,7 @@ dynamic:
                 thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate,
                     new CpsOp [] { CpsOp.GetSField(m.metaObject) }));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
-                    CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.DynMetaObject), new CpsOp[] { CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject ) })));
+                    CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), new CpsOp[] { CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject ) })));
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
