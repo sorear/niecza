@@ -182,6 +182,9 @@
     ((and (list* var stash path) (when (equal stash "stash")))
        (list (var-name var) `(get-stash ,path)))
 
+    ((and (list* var sub xref) (when (equal sub "sub")))
+       (list (var-name var) `(#',(xref-to-symbol xref))))
+
     ((and (list var hint) (when (equal hint "hint")))
        (list (var-name var) (hint-var xref var)))
 
@@ -302,6 +305,13 @@
 (defun p6-say (&rest things) (mapcar #'print-thing things) (format t "~%"))
 (defun p6-concat (&rest things) (apply 'concatenate 'string (mapcar #'FETCH things)))
 
+
+(defun nam-newrwlistvar (thing) thing)
+
+; fvarlist
+
+(defun nam-fvarlist_new (&rest args) (coerce args 'array))
+
 ; BIF
 
 (defun nam-bif_plus (a b) (+ (FETCH a) (FETCH b)))
@@ -321,10 +331,12 @@
 
 (defun nam-label (label))
 
+(defun p6-assign (left right) (STORE left right))
 
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
          (|&say| #'p6-say)
+         (|&infix:<=>| #'p6-assign)
          (|Nil| "") ; HACK
          (|Any| "") ; HACK
          )
