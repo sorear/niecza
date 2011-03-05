@@ -179,8 +179,6 @@ my class Capture {
 # }}}
 # Scalar types {{{
 my class Num is Cool {
-    method pred() { (self // 0) - 1 }
-    method succ() { (self // 0) + 1 }
     method ACCEPTS($t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 

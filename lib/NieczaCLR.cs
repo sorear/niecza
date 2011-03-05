@@ -70,7 +70,7 @@ public class NieczaCLR {
         Array.Copy(pm.mro, 0, mro, 1, pm.mro.Length);
         mro[0] = m;
         m.FillClass(new string[] { }, new STable[] { pm }, mro);
-        m.loc_to_clr = CLRToCLR.Instance;
+        //m.loc_to_clr = CLRToCLR.Instance;
         if (NieczaCLROpts.Debug)
             Console.WriteLine("Setting up wrapper for {0}", t.FullName);
 

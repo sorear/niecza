@@ -228,6 +228,9 @@ namespace Niecza {
         public int[] sig_i;
         public object[] sig_r;
 
+        public object vtable_boxed;
+        public object vtable_unboxed;
+
         public const int SIG_I_RECORD  = 3;
         public const int SIG_I_FLAGS   = 0;
         public const int SIG_I_SLOT    = 1;
@@ -859,6 +862,16 @@ noparams:
         }
     }
 
+    class CtxContainerize : ContextHandler<Variable> {
+        ContextHandler<P6any> inner;
+        public CtxContainerize(ContextHandler<P6any> inner) {
+            this.inner = inner;
+        }
+        public override Variable Get(Variable obj) {
+            return Kernel.NewROScalar(inner.Get(obj));
+        }
+    }
+
     class CtxParcelIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
             return new VarDeque(Kernel.UnboxAny<Variable[]>(obj.Fetch()));
@@ -1143,6 +1156,7 @@ noparams:
             = new CtxCallMethodUnbox<VarDeque>("iterator");
         public static readonly ContextHandler<Variable[]> RawCallReify
             = new CtxCallMethodUnbox<Variable[]>("reify");
+        public static readonly ContextHandler<object> CallToCLR = new MuToCLR();
         public static readonly IndexHandler CallAtPos
             = new IxCallMethod("at-pos");
         public static readonly IndexHandler CallAtKey
@@ -1171,23 +1185,19 @@ noparams:
             return lexcache;
         }
 
-        public ContextHandler<Variable> mro_Str, loc_Str, mro_Numeric,
-                loc_Numeric, mro_Bool, loc_Bool, mro_defined, loc_defined,
-                mro_iterator, loc_iterator, mro_item, loc_item, mro_list,
-                loc_list, mro_hash, loc_hash;
-        public ContextHandler<P6any> loc_pred, loc_succ, mro_pred, mro_succ;
-        public ContextHandler<bool> mro_raw_Bool, loc_raw_Bool, mro_raw_defined,
-                loc_raw_defined;
-        public ContextHandler<string> mro_raw_Str, loc_raw_Str;
-        public ContextHandler<double> mro_raw_Numeric, loc_raw_Numeric;
-        public ContextHandler<VarDeque> mro_raw_iterator, loc_raw_iterator;
-        public ContextHandler<Variable[]> mro_raw_reify, loc_raw_reify;
-        public ContextHandler<object> mro_to_clr, loc_to_clr;
+        public ContextHandler<Variable> mro_Str, mro_Numeric, mro_Bool,
+                mro_defined, mro_iterator, mro_item, mro_list, mro_hash;
+        public ContextHandler<P6any> mro_pred, mro_succ;
+        public ContextHandler<bool> mro_raw_Bool, mro_raw_defined;
+        public ContextHandler<string> mro_raw_Str;
+        public ContextHandler<double> mro_raw_Numeric;
+        public ContextHandler<VarDeque> mro_raw_iterator;
+        public ContextHandler<Variable[]> mro_raw_reify;
+        public ContextHandler<object> mro_to_clr;
         public IndexHandler mro_at_pos, mro_at_key, mro_exists_key,
-               mro_delete_key, loc_at_pos, loc_at_key, loc_exists_key,
-               loc_delete_key;
+               mro_delete_key;
 
-        public InvokeHandler loc_INVOKE, mro_INVOKE;
+        public InvokeHandler mro_INVOKE;
 
         public Dictionary<string, DispatchEnt> mro_methods;
 
@@ -1245,72 +1255,7 @@ noparams:
                     DispatchEnt de;
                     mro_methods.TryGetValue(m.Key, out de);
                     mro_methods[m.Key] = new DispatchEnt(de, m.Value);
-                    if (m.Key == "Numeric") {
-                        mro_Numeric = CallNumeric;
-                        mro_raw_Numeric = RawCallNumeric;
-                    }
-                    if (m.Key == "Bool") {
-                        mro_Bool = CallBool;
-                        mro_raw_Bool = RawCallBool;
-                    }
-                    if (m.Key == "Str") {
-                        mro_Str = CallStr;
-                        mro_raw_Str = RawCallStr;
-                    }
-                    if (m.Key == "defined") {
-                        mro_defined = CallDefined;
-                        mro_raw_defined = RawCallDefined;
-                    }
-                    if (m.Key == "iterator") {
-                        mro_iterator = CallIterator;
-                        mro_raw_iterator = RawCallIterator;
-                    }
-                    if (m.Key == "item")
-                        mro_item = CallItem;
-                    if (m.Key == "list")
-                        mro_list = CallList;
-                    if (m.Key == "hash")
-                        mro_hash = CallHash;
-                    if (m.Key == "pred")
-                        mro_pred = CallPred;
-                    if (m.Key == "succ")
-                        mro_succ = CallSucc;
-                    if (m.Key == "at-key")
-                        mro_at_key = CallAtKey;
-                    if (m.Key == "at-pos")
-                        mro_at_pos = CallAtPos;
-                    if (m.Key == "delete-key")
-                        mro_delete_key = CallDeleteKey;
-                    if (m.Key == "exists-key")
-                        mro_exists_key = CallExistsKey;
-                    if (m.Key == "INVOKE")
-                        mro_INVOKE = CallINVOKE;
-                    if (m.Key == "reify")
-                        mro_raw_reify = RawCallReify;
                 }
-
-                if (k.loc_raw_reify != null) mro_raw_reify = k.loc_raw_reify;
-                if (k.loc_item != null) mro_item = k.loc_item;
-                if (k.loc_list != null) mro_list = k.loc_list;
-                if (k.loc_hash != null) mro_hash = k.loc_hash;
-                if (k.loc_pred != null) mro_pred = k.loc_pred;
-                if (k.loc_succ != null) mro_succ = k.loc_succ;
-                if (k.loc_to_clr != null) mro_to_clr = k.loc_to_clr;
-                if (k.loc_INVOKE != null) mro_INVOKE = k.loc_INVOKE;
-                if (k.loc_Numeric != null) mro_Numeric = k.loc_Numeric;
-                if (k.loc_defined != null) mro_defined = k.loc_defined;
-                if (k.loc_Bool != null) mro_Bool = k.loc_Bool;
-                if (k.loc_Str != null) mro_Str = k.loc_Str;
-                if (k.loc_iterator != null) mro_iterator = k.loc_iterator;
-                if (k.loc_raw_Numeric != null) mro_raw_Numeric = k.loc_raw_Numeric;
-                if (k.loc_raw_defined != null) mro_raw_defined = k.loc_raw_defined;
-                if (k.loc_raw_Bool != null) mro_raw_Bool = k.loc_raw_Bool;
-                if (k.loc_raw_Str != null) mro_raw_Str = k.loc_raw_Str;
-                if (k.loc_raw_iterator != null) mro_raw_iterator = k.loc_raw_iterator;
-                if (k.loc_at_pos != null) mro_at_pos = k.loc_at_pos;
-                if (k.loc_at_key != null) mro_at_key = k.loc_at_key;
-                if (k.loc_exists_key != null) mro_exists_key = k.loc_exists_key;
-                if (k.loc_delete_key != null) mro_delete_key = k.loc_delete_key;
             }
 
             foreach (KeyValuePair<string,P6any> m in submethods) {
@@ -1318,6 +1263,41 @@ noparams:
                 mro_methods.TryGetValue(m.Key, out de);
                 mro_methods[m.Key] = new DispatchEnt(de, m.Value);
             }
+
+            mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
+            mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
+            mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
+            mro_defined = _GetVT("defined") as ContextHandler<Variable> ?? CallDefined;
+            mro_delete_key = _GetVT("delete-key") as IndexHandler ?? CallDeleteKey;
+            mro_exists_key = _GetVT("exists-key") as IndexHandler ?? CallExistsKey;
+            mro_hash = _GetVT("hash") as ContextHandler<Variable> ?? CallHash;
+            mro_INVOKE = _GetVT("INVOKE") as InvokeHandler ?? CallINVOKE;
+            mro_item = _GetVT("item") as ContextHandler<Variable> ?? CallItem;
+            mro_iterator = _GetVT("iterator") as ContextHandler<Variable> ?? CallIterator;
+            mro_list = _GetVT("list") as ContextHandler<Variable> ?? CallList;
+            mro_Numeric = _GetVT("Numeric") as ContextHandler<Variable> ?? CallNumeric;
+            mro_pred = _GetVTU("pred") as ContextHandler<P6any> ?? CallPred;
+            mro_raw_Bool = _GetVTU("Bool") as ContextHandler<bool> ?? RawCallBool;
+            mro_raw_defined = _GetVTU("defined") as ContextHandler<bool> ?? RawCallDefined;
+            mro_raw_iterator = _GetVTU("iterator") as ContextHandler<VarDeque> ?? RawCallIterator;
+            mro_raw_Numeric = _GetVTU("Numeric") as ContextHandler<double> ?? RawCallNumeric;
+            mro_raw_reify = _GetVT("reify") as ContextHandler<Variable[]> ?? RawCallReify;
+            mro_raw_Str = _GetVTU("Str") as ContextHandler<string> ?? RawCallStr;
+            mro_Str = _GetVT("Str") as ContextHandler<Variable> ?? CallStr;
+            mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? CallSucc;
+            mro_to_clr = _GetVT("to-clr") as ContextHandler<object>;
+        }
+
+        private object _GetVT(string name) {
+            DispatchEnt de;
+            mro_methods.TryGetValue(name, out de);
+            return de == null ? null : de.info.vtable_boxed;
+        }
+
+        private object _GetVTU(string name) {
+            DispatchEnt de;
+            mro_methods.TryGetValue(name, out de);
+            return de == null ? null : de.info.vtable_unboxed;
         }
 
         private void SetMRO(STable[] arr) {
@@ -2029,8 +2009,25 @@ slow:
             }
         }
 
+        private static void Handler_Vonly(STable kl, string name,
+                ContextHandler<Variable> cv, object cu) {
+            WrapHandler0(kl, name, cv, cv, cu);
+        }
+
+        private static void Handler_PandBox<T>(STable kl, string name,
+                ContextHandler<T> cvu, STable box) {
+            ContextHandler<Variable> cv = new CtxBoxify<T>(cvu, box);
+            WrapHandler0(kl, name, cv, cv, cvu);
+        }
+
+        private static void Handler_PandCont(STable kl, string name,
+                ContextHandler<P6any> cvu) {
+            ContextHandler<Variable> cv = new CtxContainerize(cvu);
+            WrapHandler0(kl, name, cv, cv, cvu);
+        }
+
         private static void WrapHandler0(STable kl, string name,
-                ContextHandler<Variable> cv) {
+                ContextHandler<Variable> cv, object cvb, object cvu) {
             DynBlockDelegate dbd = delegate (Frame th) {
                 th.caller.resultSlot = cv.Get((Variable)th.lex0);
                 return th.caller;
@@ -2040,6 +2037,8 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL,
                 0, 0 };
             si.sig_r = new object[1] { "self" };
+            si.vtable_boxed = cvb;
+            si.vtable_unboxed = cvu;
             kl.AddMethod(name, MakeSub(si, null));
         }
 
@@ -2056,6 +2055,7 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0
             };
             si.sig_r = new object[2] { "self", "$key" };
+            si.vtable_boxed = cv;
             kl.AddMethod(name, MakeSub(si, null));
         }
 
@@ -2324,7 +2324,7 @@ slow:
                 new VarDeque() };
 
             SubMO = new STable("Sub");
-            SubMO.loc_INVOKE = new InvokeSub();
+            SubInvokeSubSI.vtable_boxed = new InvokeSub();
             SubMO.FillProtoClass(new string[] { "outer", "info" });
             SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
             SubMO.Invalidate();
@@ -2334,66 +2334,40 @@ slow:
             LabelMO.Invalidate();
 
             BoolMO = new STable("Bool");
-            BoolMO.loc_Bool = new CtxReturnSelf();
-            BoolMO.loc_raw_Bool = new CtxJustUnbox<bool>();
+            Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
+                    new CtxJustUnbox<bool>());
             BoolMO.FillProtoClass(new string[] { });
-            WrapHandler0(BoolMO, "Bool", BoolMO.loc_Bool);
             BoolMO.Invalidate();
             TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
             FalseV = NewROScalar(BoxRaw<bool>(false, BoolMO));
 
             StrMO = new STable("Str");
-            StrMO.loc_Str = new CtxReturnSelf();
-            StrMO.loc_raw_Str = new CtxJustUnbox<string>();
-            StrMO.loc_raw_Bool = new CtxStrBool();
-            StrMO.loc_Bool = new CtxBoxify<bool>(StrMO.loc_raw_Bool, BoolMO);
+            Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
+                    new CtxJustUnbox<string>());
+            Handler_PandBox(StrMO, "Bool", new CtxStrBool(), BoolMO);
             StrMO.FillProtoClass(new string[] { });
-            WrapHandler0(StrMO, "Bool", StrMO.loc_Bool);
-            WrapHandler0(StrMO, "Str", StrMO.loc_Str);
             StrMO.Invalidate();
 
             IteratorMO = new STable("Iterator");
             IteratorMO.FillProtoClass(new string[] { });
 
             NumMO = new STable("Num");
-            NumMO.loc_Numeric = new CtxReturnSelf();
-            NumMO.loc_raw_Numeric = new CtxJustUnbox<double>();
-            NumMO.loc_Str = new CtxStrNativeNum2Str();
-            NumMO.loc_raw_Str = new CtxRawNativeNum2Str();
-            NumMO.loc_raw_Bool = new CtxNum2Bool();
-            NumMO.loc_Bool = new CtxBoxify<bool>(NumMO.loc_raw_Bool, BoolMO);
-            NumMO.loc_succ = new CtxNumSuccish(+1);
-            NumMO.loc_pred = new CtxNumSuccish(-1);
+            Handler_Vonly(NumMO, "Numeric", new CtxReturnSelf(),
+                    new CtxJustUnbox<double>());
+            Handler_Vonly(NumMO, "Str", new CtxStrNativeNum2Str(),
+                    new CtxRawNativeNum2Str());
+            Handler_PandBox(NumMO, "Bool", new CtxNum2Bool(), BoolMO);
+            Handler_PandCont(NumMO, "succ", new CtxNumSuccish(+1));
+            Handler_PandCont(NumMO, "pred", new CtxNumSuccish(-1));
             NumMO.FillProtoClass(new string[] { });
-            WrapHandler0(NumMO, "Bool", NumMO.loc_Bool);
-            WrapHandler0(NumMO, "Str", NumMO.loc_Str);
-            WrapHandler0(NumMO, "Numeric", NumMO.loc_Numeric);
             NumMO.Invalidate();
 
             MuMO = new STable("Mu");
-            MuMO.loc_Bool = MuMO.loc_defined = new CtxBoolNativeDefined();
-            MuMO.loc_raw_Bool = MuMO.loc_raw_defined = new CtxRawNativeDefined();
-            MuMO.loc_Numeric = STable.CallNumeric;
-            MuMO.loc_raw_Numeric = STable.RawCallNumeric;
-            MuMO.loc_Str = STable.CallStr;
-            MuMO.loc_raw_Str = STable.RawCallStr;
-            MuMO.loc_iterator = STable.CallIterator;
-            MuMO.loc_raw_iterator = STable.RawCallIterator;
-            MuMO.loc_at_pos = STable.CallAtPos;
-            MuMO.loc_at_key = STable.CallAtKey;
-            MuMO.loc_delete_key = STable.CallDeleteKey;
-            MuMO.loc_exists_key = STable.CallExistsKey;
-            MuMO.loc_INVOKE = STable.CallINVOKE;
-            MuMO.loc_raw_reify = STable.RawCallReify;
-            MuMO.loc_to_clr = new MuToCLR();
-            MuMO.loc_hash = STable.CallHash;
-            MuMO.loc_list = STable.CallList;
-            MuMO.loc_item = STable.CallItem;
-            MuMO.loc_pred = STable.CallPred;
-            MuMO.loc_succ = STable.CallSucc;
+            Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
+                    new CtxRawNativeDefined());
+            Handler_Vonly(MuMO, "Bool", new CtxBoolNativeDefined(),
+                    new CtxRawNativeDefined());
             MuMO.FillProtoClass(new string[] { });
-            WrapHandler0(MuMO, "Bool", MuMO.loc_Bool);
-            WrapHandler0(MuMO, "defined", MuMO.loc_defined);
             MuMO.Invalidate();
 
             StashMO = new STable("Stash");
@@ -2401,82 +2375,55 @@ slow:
             StashP = new P6opaque(StashMO);
 
             ParcelMO = new STable("Parcel");
-            ParcelMO.loc_raw_iterator = new CtxParcelIterator();
-            ParcelMO.loc_list = new CtxParcelList();
+            Handler_PandBox(ParcelMO, "iterator", new CtxParcelIterator(),
+                    IteratorMO);
+            Handler_Vonly(ParcelMO, "list", new CtxParcelList(), null);
             ParcelMO.FillProtoClass(new string[] { });
-            WrapHandler0(ParcelMO, "list", ParcelMO.loc_list);
-            WrapHandler0(ParcelMO, "iterator", new CtxBoxify<VarDeque>(
-                        ParcelMO.loc_raw_iterator, IteratorMO));
             ParcelMO.Invalidate();
 
             ArrayMO = new STable("Array");
-            ArrayMO.loc_at_pos = new IxListAtPos(true);
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
-            WrapHandler1(ArrayMO, "at-pos", ArrayMO.loc_at_pos);
+            WrapHandler1(ArrayMO, "at-pos", new IxListAtPos(true));
             ArrayMO.Invalidate();
 
             ListMO = new STable("List");
-            ListMO.loc_raw_iterator = new CtxListIterator();
-            ListMO.loc_at_pos = new IxListAtPos(false);
-            ListMO.loc_raw_Bool = new CtxListBool();
-            ListMO.loc_raw_Numeric = new CtxListNum();
-            ListMO.loc_Bool = new CtxBoxify<bool>(ListMO.loc_raw_Bool, BoolMO);
-            ListMO.loc_Numeric = new CtxBoxify<double>(ListMO.loc_raw_Numeric, NumMO);
-            ListMO.loc_list = new CtxReturnSelfList();
+            WrapHandler1(ListMO, "at-pos", new IxListAtPos(false));
+            Handler_PandBox(ListMO, "iterator", new CtxListIterator(),
+                    IteratorMO);
+            Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
+            Handler_PandBox(ListMO, "Numeric", new CtxListNum(), NumMO);
+            Handler_Vonly(ListMO, "list", new CtxReturnSelfList(), null);
             ListMO.FillProtoClass(new string[] { "items", "rest" });
-            WrapHandler0(ListMO, "iterator", new CtxBoxify<VarDeque>(
-                        ListMO.loc_raw_iterator, IteratorMO));
-            WrapHandler1(ListMO, "at-pos", ListMO.loc_at_pos);
-            WrapHandler0(ListMO, "Bool", ListMO.loc_Bool);
-            WrapHandler0(ListMO, "list", ListMO.loc_list);
-            WrapHandler0(ListMO, "Numeric", ListMO.loc_Numeric);
             ListMO.Invalidate();
 
             HashMO = new STable("Hash");
-            HashMO.loc_raw_iterator = new CtxHashIterator();
-            HashMO.loc_at_key = new IxHashAtKey();
-            HashMO.loc_exists_key = new IxHashExistsKey();
-            HashMO.loc_raw_Bool = new CtxHashBool();
-            HashMO.loc_Bool = new CtxBoxify<bool>(HashMO.loc_raw_Bool, BoolMO);
-            HashMO.loc_hash = new CtxReturnSelfList();
+            WrapHandler1(HashMO, "exists-key", new IxHashExistsKey());
+            WrapHandler1(HashMO, "at-key", new IxHashAtKey());
+            Handler_PandBox(HashMO, "iterator", new CtxHashIterator(), IteratorMO);
+            Handler_PandBox(HashMO, "Bool", new CtxHashBool(), BoolMO);
+            Handler_Vonly(HashMO, "hash", new CtxReturnSelfList(), null);
             HashMO.FillProtoClass(new string[] { });
-            WrapHandler1(HashMO, "exists-key", HashMO.loc_exists_key);
-            WrapHandler1(HashMO, "at-key", HashMO.loc_at_key);
-            WrapHandler0(HashMO, "iterator", new CtxBoxify<VarDeque>(
-                        HashMO.loc_raw_iterator, IteratorMO));
-            WrapHandler0(HashMO, "Bool", HashMO.loc_Bool);
-            WrapHandler0(HashMO, "hash", HashMO.loc_hash);
             HashMO.Invalidate();
 
             AnyMO = new STable("Any");
-            AnyMO.loc_at_key = new IxAnyAtKey();
-            AnyMO.loc_at_pos = new IxAnyAtPos();
-            AnyMO.loc_list = new CtxAnyList();
-            AnyMO.loc_item = new CtxReturnSelfItem();
+            WrapHandler1(AnyMO, "at-key", new IxAnyAtKey());
+            WrapHandler1(AnyMO, "at-pos", new IxAnyAtPos());
+            Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
+            Handler_Vonly(AnyMO, "item", new CtxReturnSelfItem(), null);
             AnyMO.FillProtoClass(new string[] { });
-            WrapHandler1(AnyMO, "at-key", AnyMO.loc_at_key);
-            WrapHandler1(AnyMO, "at-pos", AnyMO.loc_at_pos);
-            WrapHandler0(AnyMO, "list", AnyMO.loc_list);
-            WrapHandler0(AnyMO, "item", AnyMO.loc_item);
             AnyMO.Invalidate();
 
             CursorMO = new STable("Cursor");
-            CursorMO.loc_at_key = new IxCursorAtKey();
-            CursorMO.loc_at_pos = new IxCursorAtPos();
+            WrapHandler1(CursorMO, "at-key", new IxCursorAtKey());
+            WrapHandler1(CursorMO, "at-pos", new IxCursorAtPos());
             CursorMO.FillProtoClass(new string[] { });
-            WrapHandler1(CursorMO, "at-key", CursorMO.loc_at_key);
-            WrapHandler1(CursorMO, "at-pos", CursorMO.loc_at_pos);
             CursorMO.Invalidate();
 
             MatchMO = new STable("Match");
-            MatchMO.loc_at_key = CursorMO.loc_at_key;
-            MatchMO.loc_at_pos = CursorMO.loc_at_pos;
-            MatchMO.loc_raw_Str = new CtxMatchStr();
-            MatchMO.loc_Str = new CtxBoxify<string>(MatchMO.loc_raw_Str, StrMO);
+            WrapHandler1(MatchMO, "at-key", new IxCursorAtKey());
+            WrapHandler1(MatchMO, "at-pos", new IxCursorAtPos());
+            Handler_PandBox(MatchMO, "Str", new CtxMatchStr(), StrMO);
             MatchMO.FillProtoClass(new string[] { });
-            WrapHandler1(MatchMO, "at-key", MatchMO.loc_at_key);
-            WrapHandler1(MatchMO, "at-pos", MatchMO.loc_at_pos);
-            WrapHandler0(MatchMO, "Str", MatchMO.loc_Str);
             MatchMO.Invalidate();
 
             ScalarMO = new STable("Scalar");
