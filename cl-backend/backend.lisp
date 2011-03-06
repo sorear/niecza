@@ -85,7 +85,7 @@
     slot            ; Name of lexical to accept value
     names           ; All legal named-parameter names
     default         ; Xref    Sub to call if HAS_DEFAULT; must be child of this
-    ) (if (equal flags 96)
+    ) (if (or (equal flags 96) (equal flags 100)) ; TODO: more correctness
           (if slot
               (var-name slot)
               (gensym))
