@@ -281,6 +281,12 @@
 
 
 
+(defun wrap-in-unit-name (unit-name stmts)
+  "Set the name of the unit we are compiling"
+  `(let ((*unit-name* ,unit-name)) ,@stmts))
+
+(defun compile-xref-table (xref)
+  (loop for thing in xref for i upfrom 0 when thing collect (compile-sub-or-packagoid i thing)))
 
 (defun compile-unit (nam)
   (fare-matcher:match nam 
@@ -297,8 +303,10 @@
       stash_root      ;  Trie holding classes and global variables
     )
 
-    (list (niecza-stash:wrap-in-let stash_root 
-      (loop for thing in xref for i upfrom 0 when thing collect (compile-sub-or-packagoid i thing)))))))
+    (wrap-in-unit-name name `(
+        ,(niecza-stash:wrap-in-let stash_root (compile-xref-table xref))
+        (eval `(progn ,@preinit))
+        (,(xref-to-symbol mainline_ref)))))))
 
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
@@ -340,7 +348,7 @@
          (|Nil| "") ; HACK
          (|Any| "") ; HACK
          )
-      ,@compiled-unit (eval `(progn ,@preinit)) (,(main-xref 0))))
+      ,compiled-unit ))
 
 (let ((compiled-unit (compile-unit (json:decode-json (open (first common-lisp-user::*args*))))))
   ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
