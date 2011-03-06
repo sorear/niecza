@@ -71,7 +71,9 @@ method !up_to_date($mod) {
             say "$p.key() resolves to $filename now, was $p.value.[0]" if $.verbose;
             return False;
         }
-        if $modtime > $p.value.[1] {
+        # number storage isn't reliable atm and frequently causes small
+        # errors, especially on Windows
+        if $modtime - $p.value.[1] > 0.001 {
             say "$p.key() mod-time increased from $p.value.[1] to $modtime" if $.verbose;
             return False;
         }
