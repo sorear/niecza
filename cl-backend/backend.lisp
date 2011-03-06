@@ -328,7 +328,7 @@
 
 (defun nam-bif_mul (a b) (* (FETCH a) (FETCH b)))
 
-(defun nam-bif_divide (a b) (/ (FETCH a) (FETCH b)))
+(defun nam-bif_divide (a b) (if (equal b 0) 666 (/ (FETCH a) (FETCH b))))
 
 (defun nam-bif_numgt (a b) (> (FETCH a) (FETCH b)))
 (defun nam-bif_numlt (a b) (< (FETCH a) (FETCH b)))
@@ -340,6 +340,11 @@
 (defun nam-label (label))
 
 (defun p6-assign (left right) (STORE left right))
+
+; HACK
+(defun nam-treader_stdin () 'treader_stdin)
+; HACK
+(defun nam-getargv () 'getargv)
 
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
