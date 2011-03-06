@@ -633,7 +633,7 @@ class Unit {
     has $.next_anon_stash = 0; # is rw, Int
 
     method bind_item($path,$item)    { $!ns.bind_item($path,$item) }
-    method bind_graft($path1,$path2) { $!ns.bind_graph($path1,$path2) }
+    method bind_graft($path1,$path2) { $!ns.bind_graft($path1,$path2) }
     method create_stash(@path)       { $!ns.create_stash(@path) }
     method create_var(@path)         { $!ns.create_var(@path) }
     method list_stash(@path)         { $!ns.list_stash(@path) }

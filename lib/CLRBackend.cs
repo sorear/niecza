@@ -2610,6 +2610,13 @@ namespace Niecza.CLRBackend {
         static Dictionary<string, Func<CpsOp[], CpsOp>> thandlers;
         static Dictionary<string, Type> namtypes;
 
+        static Type namtype(object z) {
+            string name = JScalar.S(z);
+            if (name.Length > 4 && name.Substring(0,4) == "clr:")
+                return Type.GetType(name.Substring(4));
+            return namtypes[name];
+        }
+
         static NamProcessor() {
             namtypes = new Dictionary<string, Type>();
             namtypes["str"] = Tokens.String;
@@ -2632,7 +2639,7 @@ namespace Niecza.CLRBackend {
 
 
             handlers["null"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.Null(namtypes[((JScalar)zyg[1]).str]); };
+                return CpsOp.Null(namtype(zyg[1])); };
             handlers["str"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.StringLiteral(((JScalar)zyg[1]).str); };
             handlers["int"] = delegate(NamProcessor th, object[] zyg) {
@@ -2677,12 +2684,12 @@ namespace Niecza.CLRBackend {
                 return CpsOp.MethodCall(null, Tokens.P6any_SetSlot, new CpsOp[] {
                     th.Scan(zyg[2]), th.AnyStr(zyg[1]), th.Scan(zyg[3]) }); };
             handlers["getslot"] = delegate(NamProcessor th, object[] zyg) {
-                Type ty = namtypes[FixStr(zyg[2])];
+                Type ty = namtype(zyg[2]);
                 return CpsOp.UnboxAny(ty, CpsOp.MethodCall(null,
                     Tokens.P6any_GetSlot, new CpsOp[] { th.Scan(zyg[3]),
                         th.AnyStr(zyg[1]) })); };
             handlers["cast"] = delegate(NamProcessor th, object[] zyg) {
-                Type tty = namtypes[FixStr(zyg[1])];
+                Type tty = namtype(zyg[1]);
                 CpsOp z = th.Scan(zyg[2]);
                 Type fty = z.head.Returns;
 
@@ -2759,7 +2766,7 @@ dynamic:
                 return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), new CpsOp[2] { boxee, mo });
             };
             handlers["unbox"] = delegate(NamProcessor th, object[] zyg) {
-                Type t = namtypes[((JScalar)zyg[1]).str];
+                Type t = namtype(zyg[1]);
                 CpsOp unboxee = th.Scan(zyg[2]);
                 return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("UnboxAny").MakeGenericMethod(t), new CpsOp[1] { unboxee });
             };
@@ -3048,14 +3055,22 @@ dynamic:
                 return CpsOp.MethodCall(null, mi, rst); };
             handlers["rawscall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
+                int ixn = name.LastIndexOf(':');
+                Type cpsrt;
+                if (ixn >= 0) {
+                    cpsrt = Type.GetType(name.Substring(ixn+1));
+                    name = name.Substring(0, ixn);
+                }
                 int ix = name.LastIndexOf('.');
                 CpsOp[] rst = JScalar.A<CpsOp>(2, z, th.Scan);
-                Type[] tx = new Type[rst.Length];
-                for (int i = 0; i < tx.Length; i++)
-                    tx[i] = rst[i].head.Returns;
+                int k = (cpsrt != null) ? 1 : 0;
+                Type[] tx = new Type[rst.Length + k];
+                for (int i = 0; i < rst.Length; i++)
+                    tx[i+k] = rst[i].head.Returns;
+                if (cpsrt != null) tx[0] = Tokens.Frame;
                 MethodInfo mi = Type.GetType(name.Substring(0, ix))
                     .GetMethod(name.Substring(ix+1), tx);
-                return CpsOp.MethodCall(null, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
+                return CpsOp.MethodCall(cpsrt, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["llhow_name"] = FieldGet(Tokens.STable, "name");
