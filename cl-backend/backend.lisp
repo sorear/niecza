@@ -1,8 +1,11 @@
 (load (merge-pathnames "quicklisp/setup.lisp" 
 			   (user-homedir-pathname)))
 
-(ql:quickload "cl-json")
-(ql:quickload "fare-matcher")
+; hide annoying messages
+(let ((*standard-output* (make-broadcast-stream)))
+    (ql:quickload "cl-json")
+    (ql:quickload "fare-matcher")
+)
 
 (defpackage niecza (:use common-lisp)) 
 (in-package :niecza)

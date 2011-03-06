@@ -1,7 +1,10 @@
 (defpackage niecza-stash (:export wrap-in-let to-stash-name) (:use :common-lisp))
 (in-package :niecza-stash)
 
-(ql:quickload "fare-matcher")
+; hide annoying messages
+(let ((*standard-output* (make-broadcast-stream)))
+    (ql:quickload "fare-matcher")
+)
 
 (defun to-stash-name (name) (intern (format nil "~{~A~^-~}" name)))
 
