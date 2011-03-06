@@ -3056,7 +3056,7 @@ dynamic:
             handlers["rawscall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
                 int ixn = name.LastIndexOf(':');
-                Type cpsrt;
+                Type cpsrt = null;
                 if (ixn >= 0) {
                     cpsrt = Type.GetType(name.Substring(ixn+1));
                     name = name.Substring(0, ixn);
