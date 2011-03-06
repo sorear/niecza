@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 namespace Niecza {
     // We like to reuse continuation objects for speed - every function only
     // creates one kind of continuation, but tweaks a field for exact return
@@ -1117,6 +1118,7 @@ noparams:
 
     // NOT P6any; these things should only be exposed through a ClassHOW-like
     // façade
+
     public class STable {
         public struct AttrInfo {
             public string name;
@@ -1219,10 +1221,8 @@ noparams:
         public int nslots = 0;
         public string[] all_slot;
 
-        private WeakReference wr_this;
-        // protected by static lock
-        private HashSet<WeakReference> subclasses = new HashSet<WeakReference>();
-        private static object mro_cache_lock = new object();
+        internal SubscriberSet subclasses = new SubscriberSet();
+        Subscription[] mro_sub;
 
         public int FindSlot(string name) {
             //Kernel.LogNameLookup(name);
@@ -1236,8 +1236,6 @@ noparams:
 
         public STable(string name) {
             this.name = name;
-            this.wr_this = new WeakReference(this);
-
             isa = new HashSet<STable>();
         }
 
@@ -1301,36 +1299,22 @@ noparams:
         }
 
         private void SetMRO(STable[] arr) {
-            lock(mro_cache_lock) {
-                if (mro != null)
-                    foreach (STable k in mro)
-                        k.subclasses.Remove(wr_this);
-                foreach (STable k in arr)
-                    k.subclasses.Add(wr_this);
-            }
+            if (mro_sub != null)
+                foreach (Subscription k in mro_sub)
+                    k.Terminate();
+            mro_sub = new Subscription[arr.Length];
+            for (int i = 0; i < arr.Length; i++)
+                mro_sub[i] = new Subscription(this, arr[i].subclasses);
             mro = arr;
             isa.Clear();
             foreach (STable k in arr)
                 isa.Add(k);
         }
 
-        ~STable() {
-            lock(mro_cache_lock)
-                if (mro != null)
-                    foreach (STable k in mro)
-                        k.subclasses.Remove(wr_this);
-        }
-
         public void Invalidate() {
-            if (mro == null)
-                return;
-            List<STable> notify = new List<STable>();
-            lock(mro_cache_lock)
-                foreach (WeakReference k in subclasses)
-                    notify.Add(k.Target as STable);
-            foreach (STable k in notify)
-                if (k != null)
-                    k.Revalidate();
+            List<object> notify = subclasses.GetSubscribers();
+            foreach (object k in notify)
+                ((STable)k).Revalidate();
         }
 
         public P6any Can(string name) {
@@ -3008,5 +2992,45 @@ slow:
         }
 
         public VarHashKeys Keys { get { return new VarHashKeys(this); } }
+    }
+
+    public class SubscriberSet {
+        HashSet<WeakReference> subscribers = new HashSet<WeakReference>();
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        internal void Add(WeakReference w) { subscribers.Add(w); }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        internal void Remove(WeakReference w) { subscribers.Remove(w); }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public List<object> GetSubscribers() {
+            List<object> r = new List<object>();
+            foreach (WeakReference w in subscribers) {
+                Subscription s = w.Target as Subscription;
+                object o = (s == null) ? null : s.owner.Target;
+                if (o != null) r.Add(o);
+            }
+            return r;
+        }
+    }
+
+    public class Subscription {
+        WeakReference wr_this;
+        internal WeakReference owner;
+        SubscriberSet set;
+
+        public Subscription(object owner, SubscriberSet set) {
+            this.owner = new WeakReference(owner);
+            this.set = set;
+            wr_this = new WeakReference(this);
+            set.Add(wr_this);
+        }
+
+        public void Terminate() {
+            set.Remove(wr_this);
+        }
+
+        ~Subscription() { Terminate(); }
     }
 }
