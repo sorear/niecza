@@ -12,14 +12,19 @@
 ; Macros 
  
  
-(defun xref-to-symbol (xref) (if (equal (first xref) "MAIN") (xref-to-symbol-real xref) (list 'quote (xref-to-symbol-real xref))))
-(defun xref-to-symbol-real (xref) (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref)))))
+(defun xref-to-symbol (xref)
+  (if (equal (first xref) "")
+      '(make-scalar "")
+      (intern (concatenate 'string "XREF-" (first xref) "-" (write-to-string (second xref))))
+      ))
+        
 
 (load "cl-backend/niecza-stash.lisp")
 
 
 
-(defun main-xref (i) (xref-to-symbol (list "MAIN" i "...")))
+(defvar *unit-name*)
+(defun main-xref (i) (xref-to-symbol (list *unit-name* i "...")))
 
 (defmacro get-stash (name) (niecza-stash:to-stash-name name))
  
@@ -94,7 +99,6 @@
 (defun mymap (func list) (remove-if #'null (mapcar func list)))
 
 (defvar preinit)
-(setf preinit '())
 
 (defmacro define-nam-sub  
   (i                ; The Xref Id
@@ -205,6 +209,7 @@
 
 (defun nam-str (string) string)
 (defun nam-double (number) number)
+(defun nam-int (number) number)
 
 (nam-op assign (to what) `(STORE ,to ,what))
 
@@ -303,10 +308,11 @@
       stash_root      ;  Trie holding classes and global variables
     )
 
-    (wrap-in-unit-name name `(
-        ,(niecza-stash:wrap-in-let stash_root (compile-xref-table xref))
-        (eval `(progn ,@preinit))
-        (,(xref-to-symbol mainline_ref)))))))
+      (wrap-in-unit-name name `(
+        (let ((preinit '()))
+          ,(niecza-stash:wrap-in-let stash_root (compile-xref-table xref))
+          (eval `(progn ,@preinit))
+          (,(xref-to-symbol mainline_ref))))))))
 
 
 (defun print-thing (thing) (format t "~A" (FETCH thing)))
@@ -346,6 +352,9 @@
 ; HACK
 (defun nam-getargv () 'getargv)
 
+; HACK
+(defun nam-context_get (name level) (if (equal name "*resume_CORE") (lambda () )))
+
 (defun wrap-for-eval (compiled-unit)
   `(let ((|&infix:<~>| #'p6-concat)
          (|&say| #'p6-say)
@@ -355,10 +364,11 @@
          )
       ,compiled-unit ))
 
-(let ((compiled-unit (compile-unit (json:decode-json (open (first common-lisp-user::*args*))))))
-  ;(format t "~w~%~%~%" (json:decode-json (open (first *args*))))
-  ;(format t "~w~%~%~%" compiled-unit)
-  (format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
-  (let ((wrapped (wrap-for-eval compiled-unit)))
-    (eval wrapped)
-    ))
+(defun run-unit (filename) "Runs a nam file containing a unit"
+  (let ((compiled-unit (compile-unit (json:decode-json (open filename)))))
+       ;(format t "--------~%~%~w~%~%~%" (strip-ann compiled-unit))
+       (eval (wrap-for-eval compiled-unit))))
+
+(run-unit "obj/CORE.nam")
+(run-unit (first common-lisp-user::*args*))
+
