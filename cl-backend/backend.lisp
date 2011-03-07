@@ -101,7 +101,7 @@
 
 (defun mymap (func list) (remove-if #'null (mapcar func list)))
 
-(defvar preinit)
+(defvar *preinit*)
 
 (defmacro define-nam-sub  
   (i                ; The Xref Id
@@ -127,7 +127,7 @@
   (if hint_hack
       (let ((var (hint-var (xref-to-symbol (first hint_hack)) (second hint_hack))))
         (eval `(defvar ,var))
-        (setf preinit (append `((setf ,var (,(main-xref i)))) preinit))
+        (setf *preinit* (append `((setf ,var (,(main-xref i)))) *preinit*))
   ))
 
   `(defun ,(main-xref i)
@@ -312,9 +312,9 @@
     )
 
       (wrap-in-unit-name name `(
-        (let ((preinit '()))
+        (let ((*preinit* '()))
           ,(niecza-stash:wrap-in-let stash_root (compile-xref-table xref))
-          (eval `(progn ,@preinit))
+          (eval `(progn ,@*preinit*))
           (,(xref-to-symbol mainline_ref))))))))
 
 
