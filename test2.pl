@@ -10,6 +10,21 @@ use MONKEY_TYPING;
     is +[ %bar ], 2, "constant hashes flatten";
 }
 
+{
+    package Foo7426 { ... }
+    class Foo7426::Inner {
+        method pie() { 32 }
+    }
+
+    is Foo7426::Inner.pie, 32, ":: class names work";
+
+    class Foo9215::Inner {
+        method pie() { 64 }
+    }
+
+    is Foo9215::Inner.pie, 64, ":: class names work, without predecl";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

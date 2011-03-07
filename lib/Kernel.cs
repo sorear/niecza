@@ -1118,7 +1118,13 @@ noparams:
 
     // NOT P6any; these things should only be exposed through a ClassHOW-like
     // façade
+    public class P6how {
+    }
 
+    // The role of STable is to hold stuff that needs to exist per
+    // (representation, type) pair.  Note that types are somewhat
+    // epiphenominal.  STable is also in charge of cachey bits of
+    // the metamodel that need to be common a lot, like vtables.
     public class STable {
         public struct AttrInfo {
             public string name;

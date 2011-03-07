@@ -69,6 +69,101 @@ my %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uass
 }
 
 augment class NieczaActions {
+my %_decl2class = (
+    package => ::Op::PackageDef,
+    class   => ::Op::ClassDef,
+    module  => ::Op::ModuleDef,
+    grammar => ::Op::GrammarDef,
+    role    => ::Op::RoleDef,
+);
+
+method package_def ($/) {
+    make ::Op::StatementList.new;
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+        return Nil;
+    }
+    my $scope = $*SCOPE;
+    if !$<longname> {
+        $scope = 'anon';
+    }
+
+    if $scope eq 'supersede' {
+        $/.CURSOR.sorry('Supercede is not yet supported');
+        return Nil;
+    }
+    if $scope eq 'has' || $scope eq 'state' {
+        $/.CURSOR.sorry("Illogical scope $scope for package block");
+        return Nil;
+    }
+
+    my ($name, $outervar, @augpkg);
+
+    my $optype = %_decl2class{$*PKGDECL};
+    my $blocktype = $*PKGDECL;
+    my $bodyvar = self.gensym;
+    my $ourpkg = Any;
+
+    if $scope eq 'augment' {
+        my $r = self.mangle_longname($<longname>[0]);
+        $name = $r<name>;
+        @augpkg = @( $r<path> // ['MY'] );
+    } elsif $<longname> {
+        my $r = self.mangle_longname($<longname>[0]);
+        $name = $r<name>;
+        if ($r<name>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Block name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+        # TODO: no lexical alias for %r<path>:exists
+        # (Requires adding a separate "ourname" slot in Op::PackageDef)
+        $outervar = ($scope eq 'anon') ?? self.gensym
+            !! $name;
+    } else {
+        $name = 'ANON';
+        $outervar = self.gensym;
+    }
+
+    if $scope eq 'augment' {
+        my $stmts = $<statementlist> // $<blockoid>;
+        $stmts = $stmts.ast;
+        my $cbody = self.sl_to_block($blocktype, $stmts, subname => "augment-" ~ ($name // 'ANON'));
+
+        make ::Op::Augment.new(
+            |node($/),
+            pkg     => [@augpkg],
+            name    => $name,
+            bodyvar => $bodyvar,
+            body    => $cbody);
+    } elsif !$*DECLARAND<stub> {
+        my $stmts = $<statementlist> // $<blockoid>;
+        my @export;
+
+        $stmts = ::Op::StatementList.new(children =>
+            [ self.process_package_traits($/, @export, $<trait>), $stmts.ast ]);
+
+        my $cbody = self.sl_to_block($blocktype, $stmts,
+            subname => ($*PKGDECL ~ '-' ~ ($name // 'ANON')));
+        make $optype.new(
+            |node($/),
+            signature => ($blocktype eq 'role' && $<signature> ??
+                $<signature>[0].ast !! Any),
+            name    => $name,
+            var     => $outervar,
+            exports => @export,
+            bodyvar => $bodyvar,
+            ourpkg  => $ourpkg,
+            body    => $cbody);
+    } else {
+        make $optype.new(
+            |node($/),
+            name    => $name,
+            var     => $outervar,
+            ourpkg  => $ourpkg,
+            stub    => True);
+    }
+}
 }
 
 my $usage = q:to/EOM/;
