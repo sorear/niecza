@@ -362,13 +362,13 @@ augment class Op::PackageDef { #OK exist
         }
 
         my @ns = $.ourpkg ??
-            (@( @*opensubs[*-1].find_pkg($.ourpkg) ), $.var) !!
+            (@( @*opensubs[*-1].find_pkg($.ourpkg) ), $.ourvar) !!
             $*unit.anon_stash;
         my $n = pop(@ns);
 
         $*unit.create_stash([@ns, $n]);
         @*opensubs[*-1].add_my_stash($.var, [ @ns, $n ]);
-        @*opensubs[*-1].add_pkg_exports($*unit, $.var, [ @ns, $n ], $.exports);
+        @*opensubs[*-1].add_pkg_exports($*unit, $.name, [ @ns, $n ], $.exports);
         if !$.stub {
             my $obj  = $pclass.new(name => $.name).xref;
             $*unit.bind_item([ @ns, $n ], $obj);

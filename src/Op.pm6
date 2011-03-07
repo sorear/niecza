@@ -580,6 +580,7 @@ class PackageDef is Op {
     has $.body; # Body
     has $.exports = []; # Array of Str
     has $.ourpkg; # Array of Str
+    has $.ourvar; # Str
 
     method code($ ) {
         if $.stub {

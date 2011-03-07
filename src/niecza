@@ -102,7 +102,7 @@ method package_def ($/) {
     my $optype = %_decl2class{$*PKGDECL};
     my $blocktype = $*PKGDECL;
     my $bodyvar = self.gensym;
-    my $ourpkg = Any;
+    my ($ourpkg, $ourvar);
 
     if $scope eq 'augment' {
         my $r = self.mangle_longname($<longname>[0]);
@@ -111,14 +111,15 @@ method package_def ($/) {
     } elsif $<longname> {
         my $r = self.mangle_longname($<longname>[0]);
         $name = $r<name>;
-        if ($r<name>:exists) && $scope ne 'our' {
+        if ($r<path>:exists) && $scope ne 'our' {
             $/.CURSOR.sorry("Block name $<longname> requires our scope");
             $scope = 'our';
         }
-        $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
-        # TODO: no lexical alias for %r<path>:exists
-        # (Requires adding a separate "ourname" slot in Op::PackageDef)
-        $outervar = ($scope eq 'anon') ?? self.gensym
+        if $scope eq 'our' {
+            $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourvar = $r<name>;
+        }
+        $outervar = ($scope eq 'anon' || ($r<path>:exists)) ?? self.gensym
             !! $name;
     } else {
         $name = 'ANON';
@@ -154,6 +155,7 @@ method package_def ($/) {
             exports => @export,
             bodyvar => $bodyvar,
             ourpkg  => $ourpkg,
+            ourvar  => $ourvar,
             body    => $cbody);
     } else {
         make $optype.new(
@@ -161,6 +163,7 @@ method package_def ($/) {
             name    => $name,
             var     => $outervar,
             ourpkg  => $ourpkg,
+            ourvar  => $ourvar,
             stub    => True);
     }
 }

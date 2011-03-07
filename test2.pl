@@ -23,6 +23,9 @@ use MONKEY_TYPING;
     }
 
     is Foo9215::Inner.pie, 64, ":: class names work, without predecl";
+
+    eval_dies_ok 'my class A::B { }', 'cannot use :: with my';
+    eval_dies_ok 'my class A::B { }; B', 'A::B does not install B alias';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
