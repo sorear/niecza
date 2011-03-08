@@ -168,6 +168,29 @@ method package_def ($/) {
     }
 }
 
+method infix:sym<.=> ($/) { make ::Operator::DotEq.new }
+
+method dottyopish ($/) { make $<term>.ast }
+
+method dotty:sym<.*> ($/) {
+    if $<sym> eq '.=' {
+        make $<dottyop>.ast.meta_assign;
+        return;
+    }
+    if !$<dottyop>.ast.^isa(::Operator::Method) {
+        $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
+        make Operator.funop('&postfix:<++>', 1);
+        return Nil;
+    }
+    if $<sym> eq '.^' {
+        make $<dottyop>.ast.clone(:meta);
+    } else {
+        $/.CURSOR.sorry("NYI dottyop form $<sym>");
+        make Operator.funop('&postfix:<++>', 1);
+    }
+}
+
+
 method multi_declarator:null ($/) { make $<declarator>.ast }
 
 method variable_declarator($/) {
@@ -230,6 +253,17 @@ method variable_declarator($/) {
     }
 }
 
+}
+
+augment class Operator {
+class DotEq is Operator {
+    method assignish() { True }
+    method meta_assign() { die ".= may not be metaoperated" }
+    method meta_not() { die ".= may not be metaoperated" }
+    method with_args($/, *@args) {
+        @args[1].meta_assign.with_args($/, @args[0]);
+    }
+}
 }
 
 my $usage = q:to/EOM/;

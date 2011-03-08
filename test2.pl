@@ -29,6 +29,15 @@ use MONKEY_TYPING;
 }
 
 {
+    my $x = 5;
+    $x.=pred;
+    is $x, 4, ".=foo works (dottyop form)";
+
+    $x = 4; $x .= pred;
+    is $x, 3, ".= foo works (infix form)";
+}
+
+{
     my class K { }
     my class L { has Str $.y }
 
@@ -37,8 +46,8 @@ use MONKEY_TYPING;
     lives_ok { $x = "pie" }, "can assign correct type";
     dies_ok { $x = True }, "cannot assign wrong type";
 
-    #my K $z .= new;
-    #ok ($z.defined && $z ~~ K), 'my K $z .= new syntax works';
+    my K $z .= new;
+    ok ($z.defined && $z ~~ K), 'my K $z .= new syntax works';
 
     my $l = L.new;
     ok $l.y === Str, "typed attribute initializes to type object";
