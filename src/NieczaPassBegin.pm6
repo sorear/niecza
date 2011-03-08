@@ -121,7 +121,7 @@ augment class Op::Use { #OK exist
         my $name = $.unit;
         my $u2 = $*unit.need_unit($.unit);
 
-        my @can = @( $u2.mainline.find_pkg(['MY', $name.split('::')]) );
+        my @can = @( $u2.mainline.find_pkg([$name.split('::')]) );
         my @exp = (@can, 'EXPORT', 'DEFAULT');
 
         # XXX I am not sure how need binding should work in the :: case

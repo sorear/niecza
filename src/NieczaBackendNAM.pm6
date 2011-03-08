@@ -13,7 +13,7 @@ has $.run_args = [];
 # will check tdeps, load them if needed, and maybe even discard the
 # returned unit.
 method get_unit($name) {
-    my $file = $name.split('::').join('.').IO.but-extension('nam')\
+    my $file = ($name.split('::').join('.') ~ ".nam").IO\
         .relative($.obj_dir);
     $file.e ?? NAMOutput.load($file.slurp) !! ::Metamodel::Unit;
 }
@@ -22,7 +22,7 @@ method get_unit($name) {
 # module; if $run, it should be auto-run.  Main modules do not need
 # to be retrievable.
 method save_unit($name, $unit) {
-    my $file = $name.split('::').join('.').IO.but-extension('nam')\
+    my $file = ($name.split('::').join('.') ~ ".nam").IO\
         .relative($.obj_dir);
     $file.spew(NAMOutput.run($unit));
 }

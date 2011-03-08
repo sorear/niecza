@@ -211,10 +211,11 @@ namespace Niecza.CLRBackend {
             }
 
             if (ismain) return;
+            string dname = name.Replace("::",".");
 
             clrAssembly = Assembly.LoadFile(Path.Combine(
-                        CLRBackend.Current.dir, name + ".dll"));
-            clrType = clrAssembly.GetType(name);
+                        CLRBackend.Current.dir, dname + ".dll"));
+            clrType = clrAssembly.GetType(dname);
             Dictionary<string,FieldInfo> df =
                 new Dictionary<string,FieldInfo>();
             foreach (FieldInfo fi in clrType.GetFields())
@@ -3977,7 +3978,8 @@ dynamic:
                 Unit u;
                 if (avail_units.TryGetValue(name, out u))
                     return u;
-                string dtx = File.ReadAllText(Path.Combine(Current.dir, name + ".nam"));
+                string dtx = File.ReadAllText(Path.Combine(Current.dir,
+                            name.Replace("::",".") + ".nam"));
                 u = new Unit((object[])Reader.Read(dtx));
                 return avail_units[name] = u;
             }
@@ -4023,7 +4025,7 @@ dynamic:
             bool   ismain   = args[3] == "1";
             string tx = File.ReadAllText(Path.Combine(dir, unitfile));
             Unit root = new Unit((object[])Reader.Read(tx));
-            CLRBackend c = new CLRBackend(dir, root.name, outfile);
+            CLRBackend c = new CLRBackend(dir, root.name.Replace("::","."), outfile);
             Current = c;
 
             used_units = new Dictionary<string, Unit>();

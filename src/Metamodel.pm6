@@ -534,7 +534,7 @@ class StaticSub is RefTarget {
         } elsif @names[0] eq 'PROCESS' or @names[0] eq 'GLOBAL' {
             @tp = shift @names;
         } elsif @names[0] eq 'MY' {
-            @tp = @( self.find_lex_pkg(@names[1]) );
+            @tp = @( self.find_lex_pkg(@names[1]) // die "{@names} doesn't seem to exist" );
             shift @names;
             shift @names;
         } elsif my $p = self.find_lex_pkg(@names[0]) {
@@ -766,7 +766,7 @@ class Unit {
         #say STDERR "UNIT ", $self->mainline;
         #$all->{'UNIT'} = $subt{$self->mainline};
         {
-            my @nbits = @( $.mainline.find_pkg(['MY', $.name.split('::')]) );
+            my @nbits = @( $.mainline.find_pkg([$.name.split('::')]) );
             @nbits = $.ns.stash_canon(@nbits);
             # XXX wrong, but makes STD importing work
             # say STDERR (YAML::XS::Dump @nbits);
