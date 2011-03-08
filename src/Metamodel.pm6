@@ -225,7 +225,7 @@ class RefTarget {
 class Package is RefTarget {
     has $.exports; # is rw
 
-    method add_attribute($name, $public, $ivar, $ibody) { #OK not used
+    method add_attribute($name, $public, $ivar, $ibody, $tc) { #OK not used
         die "attribute $name defined in a lowly package";
     }
 
@@ -257,6 +257,7 @@ class Attribute {
     has $.public; # Bool
     has $.ivar; # Str
     has $.ibody; # Xref
+    has $.typeconstraint; # Xref
 }
 
 class Class is Module {
@@ -266,9 +267,9 @@ class Class is Module {
     has $.linearized_mro; # is rw
     has $!closing;
 
-    method add_attribute($name, $public, $ivar, $ibody) {
+    method add_attribute($name, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name,
-            :$public, :$ivar, :$ibody);
+            :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
     method add_method($kind, $name, $var, $body) { #OK not used
@@ -355,9 +356,9 @@ class Role is Module {
     has $.methods = [];
     has $.superclasses = [];
 
-    method add_attribute($name, $public, $ivar, $ibody) {
+    method add_attribute($name, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name,
-            :$public, :$ivar, :$ibody);
+            :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
     method add_method($kind, $name, $var, $body) { #OK not used
@@ -378,9 +379,9 @@ class ParametricRole is Module {
     has $.methods = [];
     has $.superclasses = [];
 
-    method add_attribute($name, $public, $ivar, $ibody) {
+    method add_attribute($name, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name,
-            :$public, :$ivar, :$ibody);
+            :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
     method add_method($kind, $name, $var, $body) { #OK not used
@@ -407,6 +408,7 @@ class Lexical {
         has $.list   = False; # Bool
         has $.hash   = False; # Bool
         has $.noinit = False; # Bool
+        has $.typeconstraint; # Xref
     }
 
     # These are used for $?foo et al, and should be inaccessible until assigned,

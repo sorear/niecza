@@ -152,11 +152,17 @@ augment class Op::Use { #OK exist
 
 augment class Op::Lexical { #OK exist
     method begin() {
+        my $typeconstraint = $.typeconstraint;
+        if $typeconstraint {
+            $typeconstraint = $*unit.get_item(
+                @*opensubs[*-1].find_pkg($typeconstraint));
+        }
         if $.state_backing {
             @*opensubs[*-1].add_state_name($.name, $.state_backing,
-                list => $.list, hash => $.hash);
+                list => $.list, hash => $.hash, :$typeconstraint);
         } elsif $.declaring {
-            @*opensubs[*-1].add_my_name($.name, list => $.list, hash => $.hash);
+            @*opensubs[*-1].add_my_name($.name, list => $.list, hash => $.hash,
+                :$typeconstraint);
         }
     }
 }
@@ -228,6 +234,10 @@ augment class Op::Attribute { #OK exist
     method begin() {
         my $ns = @*opensubs[*-1].body_of //
             die "attribute $.name declared outside of any class";
+        my $tc = $.typeconstraint;
+        if $tc {
+            $tc = $*unit.get_item(@*opensubs[*-1].find_pkg($tc));
+        }
         die "attribute $.name declared in an augment"
             if @*opensubs[*-1].augmenting;
         my ($ibref, $ibvar);
@@ -238,7 +248,7 @@ augment class Op::Attribute { #OK exist
             $ibref = $ibody.xref;
         }
         $ns = $*unit.deref($ns);
-        $ns.add_attribute($.name, +$.accessor, $ibvar, $ibref);
+        $ns.add_attribute($.name, +$.accessor, $ibvar, $ibref, $tc);
         my $nb = ::Metamodel::StaticSub.new(
             transparent=> True,
             unit       => $*unit,

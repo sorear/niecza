@@ -246,7 +246,7 @@ augment class Metamodel::Method { #OK exist
 
 augment class Metamodel::Attribute { #OK exist
     method to_nam() {
-        [ $.name, $.public, $.ivar, $.ibody ]
+        [ $.name, $.public, $.ivar, $.ibody, $.typeconstraint ]
     }
 }
 
@@ -256,8 +256,9 @@ sub method_from_nam(@block) {
 }
 
 sub attr_from_nam(@block) {
-    my ($name, $public, $ivar, $ibody) = @block;
-    ::Metamodel::Attribute.new(:$name, :$public, :$ivar, :$ibody);
+    my ($name, $public, $ivar, $ibody, $typeconstraint) = @block;
+    ::Metamodel::Attribute.new(:$name, :$public, :$ivar, :$ibody,
+        :$typeconstraint);
 }
 
 augment class Sig::Parameter { #OK exist
@@ -295,7 +296,8 @@ sub parm_from_nam(@block) {
 }
 
 augment class Metamodel::Lexical::Simple { #OK exist
-    method to_nam() { ['simple', 4 * $.noinit + 2 * $.list + 1 * $.hash] }
+    method to_nam() { ['simple', 4 * $.noinit + 2 * $.list + 1 * $.hash,
+        $.typeconstraint] }
 }
 augment class Metamodel::Lexical::Common { #OK exist
     method to_nam() { ['common', @$.path, $.name ] }
