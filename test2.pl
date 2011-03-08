@@ -28,6 +28,24 @@ use MONKEY_TYPING;
     eval_dies_ok 'my class A::B { }; B', 'A::B does not install B alias';
 }
 
+{
+    my class K { }
+    my class L { has Str $.y }
+
+    my Str $x;
+    ok $x === Str, "typed variable initializes to type object";
+    lives_ok { $x = "pie" }, "can assign correct type";
+    dies_ok { $x = True }, "cannot assign wrong type";
+
+    #my K $z .= new;
+    #ok ($z.defined && $z ~~ K), 'my K $z .= new syntax works';
+
+    my $l = L.new;
+    ok $l.y === Str, "typed attribute initializes to type object";
+    lives_ok { $l.y = "pie" }, "can assign correct type";
+    dies_ok { $l.y = True }, "cannot assign wrong type";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

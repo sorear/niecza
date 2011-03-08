@@ -415,12 +415,14 @@ namespace Niecza.CLRBackend {
         public readonly bool   publ;
         public readonly string ivar;
         public readonly Xref   ibody;
+        public readonly Xref   type;
 
         public Attribute(object[] x) {
             name  = JScalar.S(x[0]);
             publ  = JScalar.B(x[1]);
             ivar  = JScalar.S(x[2]);
             ibody = Xref.from(x[3]);
+            type  = Xref.from(x[4]);
         }
 
         public static Attribute[] fromArray(object x) {
@@ -629,9 +631,11 @@ namespace Niecza.CLRBackend {
         public const int LIST = 2;
         public const int HASH = 1;
         public readonly int flags;
+        public readonly Xref type;
 
         public LexSimple(object[] l) {
             flags = JScalar.I(l[2]);
+            type = Xref.from(l[3]);
         }
     }
 
@@ -942,6 +946,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewRWListVar");
         public static readonly MethodInfo Kernel_NewRWScalar =
             typeof(Kernel).GetMethod("NewRWScalar");
+        public static readonly MethodInfo Kernel_NewTypedScalar =
+            typeof(Kernel).GetMethod("NewTypedScalar");
         public static readonly MethodInfo Kernel_Decontainerize =
             typeof(Kernel).GetMethod("Decontainerize");
         public static readonly MethodInfo Kernel_NewBoundVar =
@@ -2897,10 +2903,12 @@ dynamic:
                     new CpsOp[] { CpsOp.Operator(Tokens.IntPtr, OpCodes.Ldlen,
                         z) });
             };
+            handlers["_newoftype"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.MethodCall(null, Tokens.Kernel_NewTypedScalar,
+                    new CpsOp[] { CpsOp.GetSField((FieldInfo)z[1]) }); };
             thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar,
-                    new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyMO),
-                        CpsOp.GetSField(Tokens.Kernel_AnyP) }); };
+                return CpsOp.MethodCall(null, Tokens.Kernel_NewTypedScalar,
+                    new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyMO) }); };
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
@@ -3392,10 +3400,14 @@ dynamic:
                             new object[] { new JScalar("_makesub"),
                                 ls.def.Resolve<StaticSub>() } } });
                 } else if (kv.Value is LexSimple) {
-                    int f = ((LexSimple) kv.Value).flags;
+                    LexSimple ls = kv.Value as LexSimple;
+                    int f = ls.flags;
                     if ((f & LexSimple.NOINIT) != 0) continue;
 
                     object bit;
+                    FieldInfo tc = ls.type == null ?
+                        Tokens.Kernel_AnyMO :
+                        ls.type.Resolve<Class>().metaObject;
                     if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
                         string s = ((f & LexSimple.HASH) != 0) ? "Hash" : "Array";
                         bit = new object[] { new JScalar("methodcall"),
@@ -3403,7 +3415,7 @@ dynamic:
                             new object[] { new JScalar("fetch"), new object[] { new JScalar("corelex"), new JScalar(s) } },
                             new object[] { new JScalar("corelex"), new JScalar(s) } };
                     } else {
-                        bit = new object[] { new JScalar("newblankrwscalar") };
+                        bit = new object[] { new JScalar("_newoftype"), tc };
                     }
                     frags.Add(new object[] { new JScalar("scopedlex"),
                         new JScalar(kv.Key), bit });
@@ -3447,8 +3459,11 @@ dynamic:
                 CpsOp publ = CpsOp.BoolLiteral(a.publ);
                 CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.P6any) :
                     RawAccessLex("scopedlex", a.ivar, null);
+                CpsOp type = a.type == null ?
+                    CpsOp.GetSField(Tokens.Kernel_AnyMO) :
+                    CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
                 build.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
-                    new CpsOp[] { mo, name, publ, init }));
+                    new CpsOp[] { mo, name, publ, init, type }));
             }
 
             build.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate, new CpsOp[] { mo }));
@@ -3797,10 +3812,13 @@ dynamic:
                 foreach (Attribute a in attrs) {
                     CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.P6any) :
                         CpsOp.GetSField(a.ibody.Resolve<StaticSub>().protosub);
+                    CpsOp type = a.type == null ?
+                        CpsOp.GetSField(Tokens.Kernel_AnyMO) :
+                        CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
                     thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
                         new CpsOp[] { CpsOp.GetSField(m.metaObject),
                         CpsOp.StringLiteral(a.name),
-                        CpsOp.BoolLiteral(a.publ), init }));
+                        CpsOp.BoolLiteral(a.publ), init, type }));
                 }
                 thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate,
                     new CpsOp [] { CpsOp.GetSField(m.metaObject) }));
@@ -3858,10 +3876,12 @@ dynamic:
                                     CpsOp.GetSField(c.typeObject),
                                     CpsOp.GetSField(c.typeVar) }));
                         } else {
+                            FieldInfo tc = lx.type == null ?
+                                Tokens.Kernel_AnyMO :
+                                lx.type.Resolve<Class>().metaObject;
                             SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(null,
-                                Tokens.Kernel_NewRWScalar, new CpsOp[] {
-                                    CpsOp.GetSField(Tokens.Kernel_AnyMO),
-                                    CpsOp.GetSField(Tokens.Kernel_AnyP) }));
+                                Tokens.Kernel_NewTypedScalar, new CpsOp[] {
+                                    CpsOp.GetSField(tc) }));
                         }
                     }
                 }

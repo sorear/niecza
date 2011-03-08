@@ -1130,6 +1130,7 @@ noparams:
             public string name;
             public P6any init;
             public bool publ;
+            public STable type;
         }
 
         public static readonly ContextHandler<Variable> CallStr
@@ -1366,11 +1367,13 @@ noparams:
             submethods[name] = code;
         }
 
-        public void AddAttribute(string name, bool publ, P6any init) {
+        public void AddAttribute(string name, bool publ, P6any init,
+                STable type) {
             AttrInfo ai;
             ai.name = name;
             ai.publ = publ;
             ai.init = init;
+            ai.type = type;
             local_attr.Add(ai);
         }
 
@@ -1712,6 +1715,10 @@ noparams:
             return new SimpleVariable(true, false, t, null, obj);
         }
 
+        public static Variable NewTypedScalar(STable t) {
+            return new SimpleVariable(true, false, t, null, t.typeObject);
+        }
+
         public static Variable NewRWListVar(P6any container) {
             return new SimpleVariable(false, true, container.mo, null,
                     container);
@@ -1821,12 +1828,12 @@ noparams:
                     if (a.publ && args.TryGetValue(a.name, out vx)) {
                         val = vx.Fetch();
                     } else if (a.init == null) {
-                        val = AnyP;
+                        val = a.type.typeObject;
                     } else {
                         val = RunInferior(a.init.Invoke(GetInferiorRoot(),
                                     Variable.None, null)).Fetch();
                     }
-                    n.SetSlot(a.name, NewRWScalar(AnyMO, val));
+                    n.SetSlot(a.name, NewRWScalar(a.type, val));
                 }
             }
 
@@ -2123,7 +2130,7 @@ slow:
             foreach (KeyValuePair<string, P6any> kv in role.priv)
                 n.AddPrivateMethod(kv.Key, kv.Value);
             foreach (STable.AttrInfo ai in role.local_attr)
-                n.AddAttribute(ai.name, ai.publ, ai.init);
+                n.AddAttribute(ai.name, ai.publ, ai.init, ai.type);
             foreach (KeyValuePair<string, P6any> kv in role.ord_methods)
                 n.AddMethod(kv.Key, kv.Value);
             n.Invalidate();
