@@ -615,6 +615,8 @@ class Attribute is Op {
     has $.accessor; # Bool
     has $.initializer; # Body, is rw
     has $.typeconstraint; # Array of Str
+    has $.sigil;
+    has $.rw;
 
     method code($) { CgOp.corelex('Nil') }
 }
