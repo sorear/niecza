@@ -167,6 +167,69 @@ method package_def ($/) {
             stub    => True);
     }
 }
+
+method multi_declarator:null ($/) { make $<declarator>.ast }
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    if $<trait> || $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Traits, postconstraints, and shapes on variable declarators NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        my ($name,$rest) = self.mangle_longname($*OFTYPE<longname>)<name rest>;
+        $typeconstraint = defined($rest) ?? [ @$rest,$name ] !! [ 'MY', $name ];
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
+
+    if $scope eq 'has' {
+        make ::Op::Attribute.new(|node($/), name => $v<name>,
+            accessor => $t eq '.', :$typeconstraint);
+    } elsif $scope eq 'state' {
+        make ::Op::Lexical.new(|node($/), name => $slot, state_decl => True,
+            state_backing => self.gensym, declaring => True, :$typeconstraint,
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%');
+    } elsif $scope eq 'our' {
+        make ::Op::PackageVar.new(|node($/), name => $slot, slot => $slot,
+            path => [ 'OUR' ]);
+    } else {
+        make ::Op::Lexical.new(|node($/), name => $slot, declaring => True,
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%', :$typeconstraint);
+    }
+}
+
 }
 
 my $usage = q:to/EOM/;
