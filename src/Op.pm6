@@ -614,6 +614,7 @@ class Attribute is Op {
     has $.name; # Str
     has $.accessor; # Bool
     has $.initializer; # Body, is rw
+    has $.typeconstraint; # Array of Str
 
     method code($) { CgOp.corelex('Nil') }
 }
@@ -666,6 +667,7 @@ class Lexical is Op {
     has $.declaring; # Bool
     has $.list; # Bool
     has $.hash; # Bool
+    has $.typeconstraint; # Array of Str
 
     has $.state_backing; # Str
 
