@@ -3614,6 +3614,7 @@ dynamic:
                 string   slot  = JScalar.S(param[2]);
                 string[] names = JScalar.SA(0, param[3]);
                 Xref     deflt = Xref.from(param[4]);
+                Xref     type  = Xref.from(param[5]);
 
                 sig_r.Add(CpsOp.StringLiteral(name));
                 foreach (string n in names)
@@ -3626,6 +3627,10 @@ dynamic:
                 if (deflt != null) {
                     ufl |= SubInfo.SIG_F_HASDEFAULT;
                     sig_r.Add(CpsOp.GetSField(deflt.Resolve<StaticSub>().subinfo));
+                }
+                if (type != null) {
+                    ufl |= SubInfo.SIG_F_HASTYPE;
+                    sig_r.Add(CpsOp.GetSField(type.Resolve<Class>().metaObject));
                 }
                 if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
                 if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;

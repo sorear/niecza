@@ -102,6 +102,9 @@ augment class Sig::Parameter { method begin() { #OK exist
         @*opensubs[*-1].add_child($mdefault);
         $!default = Any;
     }
+    # XXX should use a proper undef not 'Any'
+    $.tclass = ($.type ~~ Str) ?? Any !!
+        $*unit.get_item(@*opensubs[*-1].find_pkg($.type));
 } }
 
 augment class Op {

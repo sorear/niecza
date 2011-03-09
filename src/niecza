@@ -209,8 +209,7 @@ method variable_declarator($/) {
 
     my $typeconstraint;
     if $*OFTYPE {
-        my ($name,$rest) = self.mangle_longname($*OFTYPE<longname>)<name rest>;
-        $typeconstraint = defined($rest) ?? [ @$rest,$name ] !! [ 'MY', $name ];
+        $typeconstraint = self.simple_longname($*OFTYPE<longname>);
         $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
     }
 
@@ -251,6 +250,63 @@ method variable_declarator($/) {
         make ::Op::Lexical.new(|node($/), name => $slot, declaring => True,
             list => $v<sigil> eq '@', hash => $v<sigil> eq '%', :$typeconstraint);
     }
+}
+
+method simple_longname($/) {
+    my $r = self.mangle_longname($/);
+    ($r<rest>:exists) ?? [ @($r<rest>), $r<name> ] !! [ 'MY', $r<name> ];
+}
+
+method parameter($/) {
+    my $rw = False;
+    my $sorry;
+    my $slurpy;
+    my $slurpycap;
+    my $optional;
+    my $rwt;
+    my $type;
+
+    if $<type_constraint> {
+        $type = self.simple_longname($<type_constraint>[0]<typename><longname>);
+    }
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
+
+    make ::Sig::Parameter.new(name => ~$/, :$default,
+        :$optional, :$slurpy, readonly => !$rw, type => ($type // 'Any'),
+        :$slurpycap, rwtrans => $rwt, |$p.ast);
 }
 
 }

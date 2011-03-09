@@ -279,20 +279,21 @@ augment class Sig::Parameter { #OK exist
             $flags,
             $.slot,
             $.names,
-            $.mdefault
+            $.mdefault,
+            $.tclass
         ]
     }
 }
 
 sub parm_from_nam(@block) {
-    my ($name, $flags, $slot, $names, $mdefault) = @block; #OK
+    my ($name, $flags, $slot, $names, $mdefault, $tclass) = @block; #OK
     ::Sig::Parameter.new(
         slurpy   => ?($flags +& 1),   slurpycap   => ?($flags +& 2),
         rwtrans  => ?($flags +& 4),   full_parcel => ?($flags +& 8),
         optional => ?($flags +& 16),  positional  => ?($flags +& 32),
         readonly => ?($flags +& 64),  list        => ?($flags +& 128),
         hash     => ?($flags +& 256),
-        name => $name, slot => $slot, names => $names);
+        name => $name, slot => $slot, names => $names, :$tclass);
 }
 
 augment class Metamodel::Lexical::Simple { #OK exist

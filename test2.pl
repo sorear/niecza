@@ -55,6 +55,12 @@ use MONKEY_TYPING;
     dies_ok { $l.y = True }, "cannot assign wrong type";
 }
 
+{
+    sub bar(Str $) {}
+    lives_ok { bar "foo" }, "can pass correct type";
+    dies_ok { bar True }, "cannot pass wrong type";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
