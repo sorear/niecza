@@ -1029,8 +1029,11 @@ noparams:
             if (key.islist) {
                 return Slice(obj, key);
             }
+            P6any o = obj.Fetch();
+            if (!o.IsDefined())
+                return Kernel.NewROScalar(Kernel.AnyP);
 
-            Cursor os = (Cursor)obj.Fetch();
+            Cursor os = (Cursor)o;
             return os.GetKey(key.Fetch().mo.mro_raw_Str.Get(key));
         }
     }
@@ -1040,7 +1043,11 @@ noparams:
                 return Slice(obj, key);
             }
 
-            Cursor os = (Cursor)obj.Fetch();
+            P6any o = obj.Fetch();
+            if (!o.IsDefined())
+                return Kernel.NewROScalar(Kernel.AnyP);
+
+            Cursor os = (Cursor)o;
             return os.GetKey(key.Fetch().mo.mro_raw_Numeric.Get(key).ToString());
         }
     }
