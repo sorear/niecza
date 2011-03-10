@@ -105,11 +105,11 @@ method package_def ($/) {
     my ($ourpkg, $ourvar);
 
     if $scope eq 'augment' {
-        my $r = self.mangle_longname($<longname>[0]);
+        my $r = self.mangle_longname($<longname>[0], True);
         $name = $r<name>;
         @augpkg = @( $r<path> // ['MY'] );
     } elsif $<longname> {
-        my $r = self.mangle_longname($<longname>[0]);
+        my $r = self.mangle_longname($<longname>[0], True);
         $name = $r<name>;
         if ($r<path>:exists) && $scope ne 'our' {
             $/.CURSOR.sorry("Block name $<longname> requires our scope");
