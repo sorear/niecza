@@ -11,7 +11,7 @@ csbackend=CLRBackend.cs
 csxdr=CrossDomainReceiver.cs
 
 # keep this in dependency order
-libunits=SAFE CORE JSYNC
+libunits=CORE JSYNC
 srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
 	 NieczaGrammar Metamodel OptRxSimple NAMOutput Operator NieczaActions \
 	 NieczaFrontendSTD NieczaPassBegin NieczaPassBeta NieczaPassSimplifier \
