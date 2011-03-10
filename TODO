@@ -1,9 +1,25 @@
 Here are a bunch of project ideas, both for me and for anyone else who
 wants to help out.  Starred items are ones I've already spent time
 thinking about; check with me if you want to build on that.  Plussed
-items are considered a priority for v3.
+items are required for yapsi.
 
 EASY
+
+ + &prompt
+
+ + $*PROGRAM_NAME
+
+ + Cursor.CURSOR should be a no-op
+
+ + when {} shouldn't disrupt flow of $_
+
+ + .parse should set $/
+
+ + Str.subst
+
+ + ClassHOW.can
+
+ + $*OUT
 
    Add your favorite missing function to the setting, with tests.
    In particular, I could use: sprintf, dir, write, close, split, ...
@@ -31,6 +47,18 @@ EASY
 
 MEDIUM
 
+ + qx[]
+
+ + $obj.?method
+
+ + has @!foo; (needs to ignore types for now)
+
+ + &hyperunary
+
+ + Correct speccy &first
+
+ + for-loops with multiple parameters
+
    Implement your favorite ?-vars.
 
    Finish the set of Num operators, includig number-theoretic and
@@ -48,9 +76,9 @@ MEDIUM
 
   *CATCH and CONTROL blocks.
 
- + Jump table optimization for when chains.
+   Jump table optimization for when chains.
 
- + Find out what readonly subs are supposed to do with lists, etc and implement
+   Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 
   *Implement BUILD submethod calling.
@@ -63,21 +91,23 @@ MEDIUM
 
 HARD
 
+ + subset declarations.
+
    Design and implement some sort of NFG thing that allows use codes, graphs,
    etc and handles canonical equivalence in regexes.
 
    Determine the best way to map Perl6 process-think onto Windows/.NET
    process think.  Then implement &run, &runinstead, and &rungather.
 
- + Replace nam with something that doesn't use as much memory.  (Talk to
+   Replace nam with something that doesn't use as much memory.  (Talk to
    pmurias to get his experiences.)
 
-  *Implement junctions.  You'll need to add some slightly tricky code
+ +*Implement junctions.  You'll need to add some slightly tricky code
    on the slow path of nominal type checks.  You will also need to fix
    the optimized builtins to use nominal type checking.  Bonus points
    if the optimizer can turn if $x == any(1,3,5) into a loop.
 
-  *Implement multiple dispatch.
+ +*Implement multiple dispatch.
 
   *Create multiple numeric types with sensible overloads between them.  Add
    more numeric operators.
@@ -101,7 +131,7 @@ HARD
    Design something to deal with the last remnants of cursor mutability
    in STD.pm6.
 
- +*"Immediate mode metamodel" - Metamodel::StaticSub object should be
+  *"Immediate mode metamodel" - Metamodel::StaticSub object should be
    constructed by the closing brace at the latest.  This will require
    a lot of STD hacking and is required for BEGIN to work.
 
