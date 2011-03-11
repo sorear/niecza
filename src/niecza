@@ -69,6 +69,70 @@ my %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uass
 }
 
 augment class NieczaActions {
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
+
+    my ($name, $rest);
+    my $dsosl = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        Any;
+    if defined($dsosl) && defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return;
+    } elsif defined $dsosl {
+        ($name, $rest) = $dsosl<name path>;
+    } elsif $<name> {
+        # Both these cases are marked XXX in STD.  I agree.  What are they for?
+        if $<name>[0].ast<dc> {
+            $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
+            make { term => ::Op::StatementList.new };
+            return;
+        }
+        if substr(~$/,0,3) eq '$::' {
+            $rest = $<name>[0].ast.<names>;
+            $name = pop $rest;
+        } else {
+            if $<name>[0].ast<names> > 1 {
+                $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
+                make { term => ::Op::StatementList.new };
+                return;
+            }
+            $name = $<name>[0].ast<names>[0];
+            $twigil = ':';
+        }
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+        $twigil = '*' if $name eq '/' or $name eq '!';
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            ::Op::CallMethod.new(|node($/), name => 'at-pos',
+                receiver => ::Op::ContextVar.new(name => '$*/'),
+                positionals => [ ::Op::Num.new(value => $<index>.ast) ])
+        };
+        return Nil;
+    } elsif $<postcircumfix> {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
+                ::Op::CallMethod.new(|node($/), name => 'at-key',
+                    receiver    => ::Op::ContextVar.new(name => '$*/'),
+                    positionals => $<postcircumfix>[0].ast.args)
+            };
+            return;
+        } else {
+            make { term => self.docontext($/, $sigil, $<postcircumfix>[0].ast.args[0]) };
+            return;
+        }
+    } else {
+        $/.CURSOR.sorry("Non-simple variables NYI");
+        make { term => ::Op::StatementList.new };
+        return;
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
+    };
+}
 my %_decl2class = (
     package => ::Op::PackageDef,
     class   => ::Op::ClassDef,

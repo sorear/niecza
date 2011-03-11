@@ -59,6 +59,8 @@ use MONKEY_TYPING;
     sub bar(Str $) {}
     lives_ok { bar "foo" }, "can pass correct type";
     dies_ok { bar True }, "cannot pass wrong type";
+
+    is "foo".$({ uc $_ }), "FOO", "contextualizer variables";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
