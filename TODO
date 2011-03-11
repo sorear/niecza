@@ -21,6 +21,10 @@ EASY
 
  + $*OUT
 
+   Rename at-key, at-pos to "postcircumfix:<[ ]>" etc.
+
+   Implement $obj.$( code )
+
    Add your favorite missing function to the setting, with tests.
    In particular, I could use: sprintf, dir, write, close, split, ...
 
@@ -89,6 +93,12 @@ MEDIUM
    Audit accelerated context routines for correct undefined value and odd
    representation handling.  +Num shouldn't crash, etc.
 
+  *Implement -p and -n.
+
+   Add :rotate - depends on sized numbers.
+
+   Add Buf bitops.
+
 HARD
 
  + subset declarations.
@@ -125,15 +135,16 @@ HARD
    doesn't actually have an exact line number; it should be able to
    report a range.
 
-   Design something to take the place of STD's :$*endsym, probably as
-   a trait of some kind.
-
    Design something to deal with the last remnants of cursor mutability
    in STD.pm6.
 
   *"Immediate mode metamodel" - Metamodel::StaticSub object should be
    constructed by the closing brace at the latest.  This will require
    a lot of STD hacking and is required for BEGIN to work.
+
+  *Finish roles.
+
+   MY::, CALLER::, OUTER::, UNIT:: et al
 
    Study Nil and find the correct way to integrate it into Niecza.
 
@@ -147,7 +158,7 @@ NASTY
    TimToady on dependency extraction; there are some subtle points with
    modules that export slangs.
 
-  *Figure out how eval can possibly work.  Do it.
+  *Figure out how general eval can possibly work.  Do it.
 
   *Figure out how BEGIN can possibly work.  Do it.
 
