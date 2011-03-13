@@ -1187,7 +1187,10 @@ sub spew($path,$text) is unsafe { Q:CgOp { (rnull (spew (unbox str (@ {$path.Str
 
 my class Instant {
     has $.val;
-    method to-posix() { $!val }
+    method to-posix() { ($!val, False) }
+}
+sub term:« now »() {
+    Instant.new( val => Q:CgOp { (bif_now) } );
 }
 
 my class IO {

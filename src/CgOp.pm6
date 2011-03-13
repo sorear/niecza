@@ -38,6 +38,7 @@ method bif_minus (*@_) { self._cgop("bif_minus", @_) }
 method bif_mul (*@_) { self._cgop("bif_mul", @_) }
 method bif_negate (*@_) { self._cgop("bif_negate", @_) }
 method bif_not (*@_) { self._cgop("bif_not", @_) }
+method bif_now () { self._cgop("bif_now") }
 method bif_num (*@_) { self._cgop("bif_num", @_) }
 method bif_numand ($n1, $n2) { self._cgop("bif_numand", $n1, $n2) }
 method bif_numcompl ($n) { self._cgop("bif_numcompl", $n) }
