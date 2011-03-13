@@ -1,5 +1,3 @@
-# e5712784b523fe467ca765dce3d24c4b1b31d9a0
-
 class NieczaPassBegin;
 
 use MONKEY_TYPING;

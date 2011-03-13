@@ -1,4 +1,3 @@
-# 7ab22da574d860f10011a6dc4c99d2b4de3f0809
 # first half of the file - begin augments are in Begin.pm6
 
 module Metamodel;

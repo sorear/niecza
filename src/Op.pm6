@@ -1,5 +1,3 @@
-# b508f750646c0869a9efa961965e17e6e40c8d83
-
 class Op;
 
 use CgOp;
@@ -30,7 +28,7 @@ method cgop_labelled($body, $label) {
     }
 }
 
-method code_labelled($body, $label) { self.code($body) }
+method code_labelled($body, $label) { self.code($body) } #OK not used
 
 # A few words on the nature of bvalues
 # A bvalue cannot escape a sub; the return would always extract the

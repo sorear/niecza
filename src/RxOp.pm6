@@ -1,5 +1,3 @@
-# a15d1ecd179d77621b806c0a95af2908c0f2e6b6
-
 class RxOp;
 
 use CgOp;
@@ -634,7 +632,7 @@ class ProtoRedis is RxOp {
     has $.name = die "ProtoRedis.name required"; # Str
     has $.cutltm = False; # Bool
 
-    method code($body) {
+    method code($) {
         # will probably break with complicated harnesses
         CgOp.letn(
           "fns", CgOp.run_protoregex(CgOp.callframe,

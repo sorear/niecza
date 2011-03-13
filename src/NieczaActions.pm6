@@ -1,5 +1,3 @@
-# a07a966de52560ebbeea470bc29373a08182a869
-
 class NieczaActions;
 
 use Op;
@@ -2700,7 +2698,7 @@ method block($/) { make self.sl_to_block('', $<blockoid>.ast); }
 
 # :: Body
 method pblock($/) {
-    my $rw = $<lambda> && $<lambda> eq '<->';
+    #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
     make self.sl_to_block('', $<blockoid>.ast,
         signature => ($<signature> ?? $<signature>.ast !!
             self.get_placeholder_sig($/)));

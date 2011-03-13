@@ -88,7 +88,7 @@ augment class RxOp::Alt { #OK exist
 
 augment class RxOp::Cut { #OK exist
     method mayback() { False }
-    method rxsimp($cut) {
+    method rxsimp($cut) { #OK not used
         my $kid = $.zyg[0].rxsimp(True);
         $kid.mayback ?? ::RxOp::Cut.new(zyg => [$kid]) !! $kid;
     }
@@ -110,7 +110,7 @@ augment class RxOp::Sigspace { #OK exist
 
 augment class RxOp::Statement { #OK exist
     method mayback()    { False }
-    method rxsimp($cut) { ::RxOp::Sequence.new(zyg => []) }
+    method rxsimp($ ) { ::RxOp::Sequence.new(zyg => []) }
 }
 
 augment class RxOp::ConfineLang { #OK exist

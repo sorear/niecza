@@ -1,8 +1,4 @@
-# 049d8e5b643845aa2e4409f24ebe039668211dd2
-
 class CgOp;
-
-sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
 
 method _cgop(*@bits) {
     for @bits { $_ // die "Illegal undef in cgop @bits[0]" }

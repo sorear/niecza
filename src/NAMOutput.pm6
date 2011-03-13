@@ -1,5 +1,3 @@
-# 7ab22da574d860f10011a6dc4c99d2b4de3f0809
-
 class NAMOutput;
 
 use JSYNC;
@@ -7,8 +5,6 @@ use Metamodel;
 use Sig;
 use MONKEY_TYPING;
 
-sub infix:<+|>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumOr {$x} {$y}) } }
-sub infix:<+&>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumAnd {$x} {$y}) } }
 method run($*unit) {
     my @*subsnam;
     $*unit.visit_local_subs_postorder(&nam_sub);

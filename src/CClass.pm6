@@ -1,14 +1,4 @@
-# 28f112a757ef2d6f553d144dd8f8b9a1de17c71b
 class CClass;
-
-sub ord($x) { Q:CgOp { (rawscall Builtins,Kernel.Ord {$x}) } }
-sub chr($x) { Q:CgOp { (rawscall Builtins,Kernel.Chr {$x}) } }
-sub infix:<+&>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumAnd {$x} {$y}) } }
-sub infix:<+|>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumOr {$x} {$y}) } }
-sub infix:<+^>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumXor {$x} {$y}) } }
-sub infix:<< +< >>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumLShift {$x} {$y}) } }
-sub infix:<< +> >>($x, $y) { Q:CgOp { (rawscall Builtins,Kernel.NumRShift {$x} {$y}) } }
-sub prefix:<< +^ >>($x) { Q:CgOp { (rawscall Builtins,Kernel.NumCompl {$x}) } }
 
 has $.terms;
 
@@ -79,7 +69,7 @@ sub _binop($func, $alr, $blr) {
 
 method plus($other) { _binop(* +| *, self, $other); }
 method minus($other) { _binop({ $^a +& +^$^b }, self, $other); }
-method negate() { _binop(-> $a, $b { 0x3FFF_FFFF +& +^$a }, self, $Empty) }
+method negate() { _binop(-> $a, $ { 0x3FFF_FFFF +& +^$a }, self, $Empty) }
 
 our $Word   = CClass.catm(< Lu Lt Ll Lm Lo Nd Nl No >).plus('_');
 our $Digit  = CClass.catm(< Nd Nl No >);
