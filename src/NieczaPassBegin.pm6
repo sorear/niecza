@@ -286,34 +286,37 @@ augment class Op::Super { #OK exist
 augment class Op::SubDef { #OK exist
     method begin() {
         my $prefix = '';
-        if defined $.method_too {
+        if defined $.bindmethod {
             $prefix = $*unit.deref(@*opensubs[*-1].body_of).name ~ ".";
         }
+        $.symbol = $.bindlex ?? ('&' ~ $.body.name) !!
+            ::GLOBAL::NieczaActions.gensym;
+        $.bindpackages //= [];
         my $body = $.body.begin(:$prefix,
             once => ($.body.type // '') eq 'voidbare');
-        @*opensubs[*-1].add_my_sub($.var, $body);
+        @*opensubs[*-1].add_my_sub($.symbol, $body);
         my $r = $body.xref;
-        if $.exports || defined $.method_too {
+        if $.bindpackages || defined $.bindmethod {
             $body.strong_used = True;
         }
         @*opensubs[*-1].create_static_pad if $body.strong_used;
 
-        if defined $.method_too {
+        if defined $.bindmethod {
             if @*opensubs[*-1].augment_hack {
-                if $.method_too[1] ~~ Op {
+                if $.bindmethod[1] ~~ Op {
                     die "Computed names are legal only in parametric roles";
                 }
                 push @*opensubs[*-1].augment_hack,
-                    [ @$.method_too, $.var, $r ];
+                    [ @$.bindmethod, $.symbol, $r ];
             } else {
                 $*unit.deref(@*opensubs[*-1].body_of)\
-                    .add_method(|$.method_too, $.var, $r);
+                    .add_method(|$.bindmethod, $.symbol, $r);
             }
         }
 
-        @*opensubs[*-1].add_exports($*unit, $.var, $.exports);
-        $body.exports = [ map { [ @($body.cur_pkg), 'EXPORT', $_, $.var ] },
-                @$.exports ];
+        @*opensubs[*-1].add_exports($*unit, $.symbol, $.bindpackages);
+        $body.exports = [ map { [ @($body.cur_pkg), 'EXPORT', $_, $.symbol ] },
+                @$.bindpackages ];
 
         $!body = Body;
     }

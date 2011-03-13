@@ -23,7 +23,7 @@ sub run_optree($body, $op) {
     return $op unless $op.^isa(::Op::CallSub) && no_named_params($op);
     my $inv = $op.invocant;
     return $op unless $inv.^isa(::Op::SubDef) && $inv.once;
-    my $cbody = $body.find_lex($inv.var) or return $op;
+    my $cbody = $body.find_lex($inv.symbol) or return $op;
     $cbody = $cbody.body;
     return $op unless is_removable_body($cbody);
 
@@ -78,7 +78,7 @@ sub beta_optimize($body, $op, $inv, $cbody) {
     # the function
     my @args = map { [ $_, ::GLOBAL::NieczaActions.gensym ] }, @( $op.positionals );
 
-    $body.delete_lex($inv.var);
+    $body.delete_lex($inv.symbol);
     $*unit.xref.[$cbody.xref[1]] = Any;
     {
         my $c = $cbody.outer.zyg;

@@ -38,8 +38,8 @@ method wrap_in_function($/) {
     my $i = -self.arity;
     while $i++ { push @args, ::GLOBAL::NieczaActions.gensym }
     my $do = self.with_args($/, map { mklex($/, $_) }, @args);
-    ::Op::SubDef.new(|node($/), var => ::GLOBAL::NieczaActions.gensym,
-        body => Body.new( :transparent, signature => Sig.simple(@args), :$do));
+    ::Op::SubDef.new(|node($/), body => Body.new(
+        :transparent, signature => Sig.simple(@args), :$do));
 }
 
 class Function is Operator {

@@ -1616,6 +1616,14 @@ noparams:
             return n;
         }
 
+        public static P6any MakeDispatcher(P6any proto, P6any[] cands) {
+            string s1 = "Dispatch";
+            foreach (P6any s in cands)
+                s1 += ", " + ((SubInfo)s.GetSlot("info")).name;
+            Console.WriteLine("MakeDispatcher: {0}", s1);
+            return AnyP;
+        }
+
         public static bool SaferMode;
 
         private static Frame SaferTrap(Frame th) {

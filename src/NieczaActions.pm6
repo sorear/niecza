@@ -274,9 +274,7 @@ method quote:s ($/) { make $<pat>.ast }
 
 method transparent($/, $op, :$once = False, :$ltm, :$class = 'Sub',
     :$type = 'sub', :$sig = Sig.simple) {
-    ::Op::SubDef.new(|node($/), var => self.gensym, :$once,
-        body => Body.new(
-            transparent => True,
+    ::Op::SubDef.new(|node($/), :$once, body => Body.new(:transparent,
             :$ltm, :$class, :$type, signature => $sig, do => $op));
 }
 
@@ -284,7 +282,6 @@ method rxembed($/, $op, $trans) {
     ::Op::CallSub.new(|node($/),
         positionals => [ ::Op::MakeCursor.new(|node($/)) ],
         invocant => ::Op::SubDef.new(|node($/),
-            var  => self.gensym,
             once => True,
             body => Body.new(
                 transparent => $trans,
@@ -430,9 +427,6 @@ method regex_def($/) {
         return Nil;
     }
 
-    my $var = ($scope eq 'anon' || $scope eq 'has') ?? self.gensym
-        !! '&' ~ $name;
-
     my $ast = $<regex_block>.ast;
     if $isproto {
         $ast = ::RxOp::ProtoRedis.new(name => $name);
@@ -449,8 +443,8 @@ method regex_def($/) {
     my @lift = $ast.oplift;
     ($ast, my $mb) = OptRxSimple.run($ast);
     make ::Op::SubDef.new(|node($/),
-        var  => $var,
-        method_too => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
+        bindlex => ($scope ne 'anon' && $scope ne 'has'),
+        bindmethod => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
         body => Body.new(
             ltm   => $lad,
             returnable => True,
@@ -2490,10 +2484,10 @@ method routine_declarator:sub ($/) { make $<routine_def>.ast }
 method routine_declarator:method ($/) { make $<method_def>.ast }
 method routine_declarator:submethod ($/) {
     make $<method_def>.ast;
-    if $/.ast.method_too.[0] ne 'normal' {
+    if $/.ast.bindmethod.[0] ne 'normal' {
         $/.CURSOR.sorry("Call pattern decorators cannot be used with submethod");
     }
-    $/.ast.method_too.[0] = 'sub';
+    $/.ast.bindmethod.[0] = 'sub';
 }
 
 my $next_anon_id = 0;
@@ -2518,10 +2512,10 @@ method block_to_immediate($/, $type, $blk) {
         positionals => []);
 }
 
-method block_to_closure($/, $body, :$outer_key, :$method_too, :$once,
-        :$exports) {
-    ::Op::SubDef.new(|node($/), var => ($outer_key // self.gensym),
-        :$body, :$once, :$method_too, exports => ($exports // []));
+method block_to_closure($/, $body, :$bindlex, :$bindmethod, :$once,
+        :$bindpackages = []) {
+    ::Op::SubDef.new(|node($/), :$bindlex, :$bindmethod, :$body, :$once,
+        :$bindpackages);
 }
 
 method get_placeholder_sig($/) {
@@ -2595,13 +2589,13 @@ method routine_def ($/) {
     }
 
     make self.block_to_closure($/,
+        bindlex => ($scope eq 'my'),
         self.sl_to_block('sub',
             $<blockoid>.ast,
             returnable => !$return_pass,
             subname => $m, :$unsafe,
             signature => $signature),
-        outer_key => (($scope eq 'my') ?? "\&$m" !! Any),
-        exports => @export);
+        bindpackages => @export);
 }
 
 method method_def ($/) {
@@ -2632,8 +2626,6 @@ method method_def ($/) {
         return Nil;
     }
 
-    my $sym = ($scope eq 'my') ?? ('&' ~ $name) !! self.gensym;
-
     if ($scope eq 'augment' || $scope eq 'supersede' || $scope eq 'state') {
         $/.CURSOR.sorry("Illogical scope $scope for method");
         return Nil;
@@ -2661,8 +2653,8 @@ method method_def ($/) {
         subname => $name, :$unsafe,
         signature => $sig ?? $sig.for_method !! Any);
 
-    make self.block_to_closure($/, $bl, outer_key => $sym,
-        method_too => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
+    make self.block_to_closure($/, $bl, bindlex => ($scope eq 'my'),
+        bindmethod => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
 }
 
 method block($/) { make self.sl_to_block('', $<blockoid>.ast); }

@@ -643,23 +643,30 @@ class BareBlock is Op {
 
     method statement_level() {
         $.body.type = 'voidbare';
-        ::Op::CallSub.new(invocant => ::Op::SubDef.new(var => $.var,
-                body => $.body, once => True));
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => $.body, :once));
     }
 }
 
 class SubDef is Op {
-    has $.var = die "SubDef.var required"; # Str
     has $.body = die "SubDef.body required"; # Body
-    has $.method_too; # Array
-    has $.exports = []; # Array of Str
+
+    # often a gensym; will be set to the "correct" symbol if it is being
+    # used as a lexical; set by begin
+    has $.symbol; # Str, is rw
+
+    has $.multiness; # proto, only, multi, Any=null
+    has $.bindlex; # Bool
+    has $.bindpackages; # Array of Array of Str to install in
+    # used for 'our' and 'is export'
+    has $.bindmethod; # named array blocky thing
+
     # Is candidate for beta-optimization.  Not compatible with method_too,
     # exports, ltm
     has $.once = False; # is rw, Bool
 
-    method zyg() { ($.method_too && ($.method_too[1] ~~ Op)) ?? $.method_too[1] !! () }
+    method zyg() { ($.bindmethod && ($.bindmethod[1] ~~ Op)) ?? $.bindmethod[1] !! () }
 
-    method code($) { CgOp.scopedlex($.var) }
+    method code($) { CgOp.scopedlex($.symbol // 'Any') }
 }
 
 class Lexical is Op {
