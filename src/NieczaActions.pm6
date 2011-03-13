@@ -40,6 +40,8 @@ method FALLBACK($meth, $/) {
             make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
         } elsif $p eq 'v=' || $p eq 'o=' {
             make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
+        } elsif $p eq 'z=' && !$<semilist> {
+            make mkcall($/, '&term:<' ~ self.get_op_sym($/) ~ '>');
         }
     } elsif substr($meth,0,7) eq 'prefix:' {
         make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
@@ -47,6 +49,8 @@ method FALLBACK($meth, $/) {
         make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
     } elsif substr($meth,0,6) eq 'infix:' {
         make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
+    } elsif substr($meth,0,5) eq 'term:' {
+        make mkcall($/, '&term:<' ~ self.get_op_sym($/) ~ '>');
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
     }
@@ -199,6 +203,11 @@ method unqual_longname($/, $what, $clean?) {
         return "";
     }
     return $h<name>;
+}
+
+method simple_longname($/) {
+    my $r = self.mangle_longname($/);
+    ($r<rest>:exists) ?? [ @($r<rest>), $r<name> ] !! [ 'MY', $r<name> ];
 }
 
 method mangle_longname($/, $clean?) {
@@ -1205,6 +1214,7 @@ method infix:sym<//>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
 method infix:sym<orelse>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
 method infix:sym<andthen>($/) { make ::Operator::ShortCircuit.new(kind => 'andthen') }
 method infix:sym<?? !!>($/) { make ::Operator::Ternary.new(middle => $<EXPR>.ast) }
+method infix:sym<.=> ($/) { make ::Operator::DotEq.new }
 
 method prefix:temp ($/) { make ::Operator::Temp.new }
 
@@ -1374,6 +1384,7 @@ method methodop($/) {
     $/.ast.args = $<arglist>[0].ast if $<arglist>[0];
 }
 
+method dottyopish ($/) { make $<term>.ast }
 method dottyop($/) {
     if $<colonpair> {
         $/.CURSOR.sorry("Colonpair dotties NYI");
@@ -1396,6 +1407,10 @@ method privop($/) {
 method dotty:sym<.> ($/) { make $<dottyop>.ast }
 
 method dotty:sym<.*> ($/) {
+    if $<sym> eq '.=' {
+        make $<dottyop>.ast.meta_assign;
+        return;
+    }
     if !$<dottyop>.ast.^isa(::Operator::Method) {
         $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
         make Operator.funop('&postfix:<++>', 1);
@@ -1633,7 +1648,7 @@ method variable($/) {
         Any;
     if defined($dsosl) && defined($dsosl<ind>) {
         make { term => self.docontext($/, $sigil, $dsosl<ind>) };
-        return Nil;
+        return;
     } elsif defined $dsosl {
         ($name, $rest) = $dsosl<name path>;
     } elsif $<name> {
@@ -1641,7 +1656,7 @@ method variable($/) {
         if $<name>[0].ast<dc> {
             $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
             make { term => ::Op::StatementList.new };
-            return Nil;
+            return;
         }
         if substr(~$/,0,3) eq '$::' {
             $rest = $<name>[0].ast.<names>;
@@ -1650,7 +1665,7 @@ method variable($/) {
             if $<name>[0].ast<names> > 1 {
                 $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
                 make { term => ::Op::StatementList.new };
-                return Nil;
+                return;
             }
             $name = $<name>[0].ast<names>[0];
             $twigil = ':';
@@ -1672,16 +1687,15 @@ method variable($/) {
                     receiver    => ::Op::ContextVar.new(name => '$*/'),
                     positionals => $<postcircumfix>[0].ast.args)
             };
-            return Nil;
+            return;
         } else {
-            $/.CURSOR.sorry("Contextualizer variables NYI");
-            make { term => ::Op::StatementList.new };
-            return Nil;
+            make { term => self.docontext($/, $sigil, $<postcircumfix>[0].ast.args[0]) };
+            return;
         }
     } else {
         $/.CURSOR.sorry("Non-simple variables NYI");
         make { term => ::Op::StatementList.new };
-        return Nil;
+        return;
     }
 
     make {
@@ -1756,6 +1770,11 @@ method parameter($/) {
     my $slurpycap;
     my $optional;
     my $rwt;
+    my $type;
+
+    if $<type_constraint> {
+        $type = self.simple_longname($<type_constraint>[0]<typename><longname>);
+    }
 
     for @( $<trait> ) -> $trait {
         if $trait.ast<rw> { $rw = True }
@@ -1792,7 +1811,7 @@ method parameter($/) {
     my $p = $<param_var> // $<named_param>;
 
     make ::Sig::Parameter.new(name => ~$/, :$default,
-        :$optional, :$slurpy, readonly => !$rw,
+        :$optional, :$slurpy, readonly => !$rw, type => ($type // 'Any'),
         :$slurpycap, rwtrans => $rwt, |$p.ast);
 }
 
@@ -2011,6 +2030,7 @@ method scope_declarator:has ($/) { make $<scoped>.ast }
 method scope_declarator:state ($/) { make $<scoped>.ast }
 method scope_declarator:anon ($/) { make $<scoped>.ast }
 
+method multi_declarator:null  ($/) { make $<declarator>.ast }
 method multi_declarator:multi ($/) { make ($<declarator> // $<routine_def>).ast}
 method multi_declarator:proto ($/) { make ($<declarator> // $<routine_def>).ast}
 method multi_declarator:only  ($/) { make ($<declarator> // $<routine_def>).ast}
@@ -2027,6 +2047,12 @@ method variable_declarator($/) {
 
     if $scope eq 'augment' || $scope eq 'supersede' {
         $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        $typeconstraint = self.simple_longname($*OFTYPE<longname>);
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
     }
 
     my $v = $<variable>.ast;
@@ -2054,17 +2080,17 @@ method variable_declarator($/) {
 
     if $scope eq 'has' {
         make ::Op::Attribute.new(|node($/), name => $v<name>,
-            accessor => $t eq '.');
+            accessor => $t eq '.', :$typeconstraint);
     } elsif $scope eq 'state' {
         make ::Op::Lexical.new(|node($/), name => $slot, state_decl => True,
-            state_backing => self.gensym, declaring => True,
+            state_backing => self.gensym, declaring => True, :$typeconstraint,
             list => $v<sigil> eq '@', hash => $v<sigil> eq '%');
     } elsif $scope eq 'our' {
         make ::Op::PackageVar.new(|node($/), name => $slot, slot => $slot,
             path => [ 'OUR' ]);
     } else {
         make ::Op::Lexical.new(|node($/), name => $slot, declaring => True,
-            list => $v<sigil> eq '@', hash => $v<sigil> eq '%');
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%', :$typeconstraint);
     }
 }
 
@@ -2369,6 +2395,7 @@ method package_def ($/) {
     if !$<longname> {
         $scope = 'anon';
     }
+
     if $scope eq 'supersede' {
         $/.CURSOR.sorry('Supercede is not yet supported');
         return Nil;
@@ -2380,22 +2407,32 @@ method package_def ($/) {
 
     my ($name, $outervar, @augpkg);
 
-    if $scope eq 'augment' {
-        my $r = self.mangle_longname($<longname>[0]);
-        $name = $r<name>;
-        @augpkg = @( $r<path> // ['MY'] );
-    } else {
-        $name = $<longname> ??
-            self.unqual_longname($<longname>[0],
-                "Qualified package definitions NYI", True) !! 'ANON';
-        $outervar = $scope ne 'anon' ?? $name !! self.gensym;
-    }
-
     my $optype = %_decl2class{$*PKGDECL};
     my $blocktype = $*PKGDECL;
     my $bodyvar = self.gensym;
-    # currently always install into the local stash
-    my $ourpkg = ($scope eq 'our') ?? [ 'OUR::' ] !! Any;
+    my ($ourpkg, $ourvar);
+
+    if $scope eq 'augment' {
+        my $r = self.mangle_longname($<longname>[0], True);
+        $name = $r<name>;
+        @augpkg = @( $r<path> // ['MY'] );
+    } elsif $<longname> {
+        my $r = self.mangle_longname($<longname>[0], True);
+        $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Block name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        if $scope eq 'our' {
+            $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourvar = $r<name>;
+        }
+        $outervar = ($scope eq 'anon' || ($r<path>:exists)) ?? self.gensym
+            !! $name;
+    } else {
+        $name = 'ANON';
+        $outervar = self.gensym;
+    }
 
     if $scope eq 'augment' {
         my $stmts = $<statementlist> // $<blockoid>;
@@ -2426,6 +2463,7 @@ method package_def ($/) {
             exports => @export,
             bodyvar => $bodyvar,
             ourpkg  => $ourpkg,
+            ourvar  => $ourvar,
             body    => $cbody);
     } else {
         make $optype.new(
@@ -2433,6 +2471,7 @@ method package_def ($/) {
             name    => $name,
             var     => $outervar,
             ourpkg  => $ourpkg,
+            ourvar  => $ourvar,
             stub    => True);
     }
 }

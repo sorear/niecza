@@ -222,3 +222,12 @@ class SmartMatch is Operator {
             name => 'ACCEPTS', args => [ mklex($/, '$_') ]));
     }
 }
+
+class DotEq is Operator {
+    method assignish() { True }
+    method meta_assign() { die ".= may not be metaoperated" }
+    method meta_not() { die ".= may not be metaoperated" }
+    method with_args($/, *@args) {
+        @args[1].meta_assign.with_args($/, @args[0]);
+    }
+}

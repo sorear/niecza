@@ -3241,7 +3241,7 @@ grammar P6 is STD {
         || { $term = 1 }
         ]
 
-        <O(|($op<O>), |%list_prefix, assoc => 'unary', uassoc => 'left', term => $term)>
+        <O(|%($op<O>), |%list_prefix, assoc => 'unary', uassoc => 'left', term => $term)>
         $<sym> = {$<s>.Str}
 
     }
