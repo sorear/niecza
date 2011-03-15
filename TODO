@@ -23,8 +23,6 @@ EASY
 
    Rename at-key, at-pos to "postcircumfix:<[ ]>" etc.
 
-   Implement $obj.$( code )
-
    Add your favorite missing function to the setting, with tests.
    In particular, I could use: sprintf, dir, write, close, split, ...
 
@@ -46,8 +44,6 @@ EASY
 
    Stuff spectests are blocking on: "Block", "&hash", "writable $_",
    "closure for", "ranges of chars", "gather for",
-
-   At least parsing Int et al on my-decls would help a lot
 
 MEDIUM
 

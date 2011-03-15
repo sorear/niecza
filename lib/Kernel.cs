@@ -1140,6 +1140,30 @@ noparams:
             public STable type;
         }
 
+        // 0 must be public only
+        public const int V_PUBLIC    = 0;
+        public const int V_PRIVATE   = 1;
+        public const int V_SUBMETHOD = 2;
+        public const int V_MASK      = 3;
+
+        public const int M_ONLY  = 0;
+        public const int M_PROTO = 4;
+        public const int M_MULTI = 8;
+        public const int M_MASK  = 12;
+
+        public struct MethodInfo {
+            public string short_name;
+            public string long_name;
+
+            public string Name() {
+                return ((flags & STable.M_MASK) != 0) ? long_name : short_name;
+            }
+
+            public P6any impl;
+
+            public int flags;
+        }
+
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -1216,19 +1240,13 @@ noparams:
         public InvokeHandler mro_INVOKE;
 
         public Dictionary<string, DispatchEnt> mro_methods;
+        public Dictionary<string, P6any> private_mro;
 
         public STable[] local_does;
 
         public List<STable> superclasses
             = new List<STable>();
-        public Dictionary<string, P6any> local
-            = new Dictionary<string, P6any>();
-        public List<KeyValuePair<string, P6any>> ord_methods
-            = new List<KeyValuePair<string, P6any>>();
-        public Dictionary<string, P6any> priv
-            = new Dictionary<string, P6any>();
-        public Dictionary<string, P6any> submethods
-            = new Dictionary<string, P6any>();
+        public List<MethodInfo> lmethods = new List<MethodInfo>();
         public List<AttrInfo> local_attr = new List<AttrInfo>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
@@ -1255,6 +1273,7 @@ noparams:
 
         private void Revalidate() {
             mro_methods = new Dictionary<string,DispatchEnt>();
+            private_mro = new Dictionary<string,P6any>();
 
             if (mro == null)
                 return;
@@ -1263,17 +1282,26 @@ noparams:
 
             for (int kx = mro.Length - 1; kx >= 0; kx--) {
                 STable k = mro[kx];
-                foreach (KeyValuePair<string,P6any> m in k.ord_methods) {
+                foreach (MethodInfo m in k.lmethods) {
                     DispatchEnt de;
-                    mro_methods.TryGetValue(m.Key, out de);
-                    mro_methods[m.Key] = new DispatchEnt(de, m.Value);
+                    if ((m.flags & V_MASK) != V_PUBLIC)
+                        continue;
+                    string n = m.Name();
+                    mro_methods.TryGetValue(n, out de);
+                    mro_methods[n] = new DispatchEnt(de, m.impl);
                 }
             }
 
-            foreach (KeyValuePair<string,P6any> m in submethods) {
-                DispatchEnt de;
-                mro_methods.TryGetValue(m.Key, out de);
-                mro_methods[m.Key] = new DispatchEnt(de, m.Value);
+            foreach (MethodInfo m in lmethods) {
+                string n = m.Name();
+                if ((m.flags & V_MASK) == V_PRIVATE) {
+                    private_mro[n] = m.impl;
+                }
+                else if ((m.flags & V_MASK) == V_SUBMETHOD) {
+                    DispatchEnt de;
+                    mro_methods.TryGetValue(n, out de);
+                    mro_methods[n] = new DispatchEnt(de, m.impl);
+                }
             }
 
             mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
@@ -1361,17 +1389,14 @@ noparams:
             }
         }
 
-        public void AddMethod(string name, P6any code) {
-            local[name] = code;
-            ord_methods.Add(new KeyValuePair<string,P6any>(name, code));
-        }
-
-        public void AddPrivateMethod(string name, P6any code) {
-            priv[name] = code;
-        }
-
-        public void AddSubMethod(string name, P6any code) {
-            submethods[name] = code;
+        public void AddMethod(int flags, string name, P6any code) {
+            MethodInfo mi;
+            //SubInfo si = (SubInfo) code.GetSlot("info");
+            mi.impl = code;
+            mi.short_name = name;
+            mi.long_name = name; // TODO: signature encoding
+            mi.flags = flags;
+            lmethods.Add(mi);
         }
 
         public void AddAttribute(string name, bool publ, P6any init,
@@ -1385,7 +1410,7 @@ noparams:
         }
 
         public P6any GetPrivateMethod(string name) {
-            P6any code = priv[name];
+            P6any code = private_mro[name];
             if (code == null) { throw new NieczaException("private method lookup failed for " + name + " in class " + this.name); }
             return code;
         }
@@ -2051,7 +2076,7 @@ slow:
             si.sig_r = new object[1] { "self" };
             si.vtable_boxed = cvb;
             si.vtable_unboxed = cvu;
-            kl.AddMethod(name, MakeSub(si, null));
+            kl.AddMethod(0, name, MakeSub(si, null));
         }
 
         private static void WrapHandler1(STable kl, string name,
@@ -2068,7 +2093,7 @@ slow:
             };
             si.sig_r = new object[2] { "self", "$key" };
             si.vtable_boxed = cv;
-            kl.AddMethod(name, MakeSub(si, null));
+            kl.AddMethod(0, name, MakeSub(si, null));
         }
 
         private static SubInfo IRSI = new SubInfo("InstantiateRole", IRC);
@@ -2142,12 +2167,10 @@ slow:
             Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
             nmro[0] = n;
             n.FillClass(b.all_slot, new STable[] { b }, nmro);
-            foreach (KeyValuePair<string, P6any> kv in role.priv)
-                n.AddPrivateMethod(kv.Key, kv.Value);
+            foreach (STable.MethodInfo mi in role.lmethods)
+                n.lmethods.Add(mi);
             foreach (STable.AttrInfo ai in role.local_attr)
-                n.AddAttribute(ai.name, ai.publ, ai.init, ai.type);
-            foreach (KeyValuePair<string, P6any> kv in role.ord_methods)
-                n.AddMethod(kv.Key, kv.Value);
+                n.local_attr.Add(ai);
             n.Invalidate();
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
@@ -2338,7 +2361,7 @@ slow:
             SubMO = new STable("Sub");
             SubInvokeSubSI.vtable_boxed = new InvokeSub();
             SubMO.FillProtoClass(new string[] { "outer", "info" });
-            SubMO.AddMethod("INVOKE", MakeSub(SubInvokeSubSI, null));
+            SubMO.AddMethod(0, "INVOKE", MakeSub(SubInvokeSubSI, null));
             SubMO.Invalidate();
 
             LabelMO = new STable("Label");

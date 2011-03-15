@@ -234,9 +234,11 @@ augment class Metamodel::ParametricRole { #OK exist
     }
 }
 
+my %methodtypes = ( normal => 0, private => 1, sub => 2 );
+my @methodfromtype = ('normal', 'private', 'sub');
 augment class Metamodel::Method { #OK exist
     method to_nam() {
-        [ $.name, $.kind, $.var, $.body ]
+        [ $.name, %methodtypes{$.kind}, $.var, $.body ]
     }
 }
 
@@ -248,7 +250,8 @@ augment class Metamodel::Attribute { #OK exist
 
 sub method_from_nam(@block) {
     my ($name, $kind, $var, $body) = @block;
-    ::Metamodel::Method.new(:$name, :$kind, :$var, :$body);
+    ::Metamodel::Method.new(:$name, kind => @methodfromtype[$kind], :$var,
+        :$body);
 }
 
 sub attr_from_nam(@block) {

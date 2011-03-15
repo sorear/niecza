@@ -128,7 +128,7 @@ public class NieczaCLR {
 
             if (NieczaCLROpts.Debug)
                 Console.WriteLine("Installing {0}", siname);
-            m.AddMethod(n, Kernel.MakeSub(new SubInfo(siname, method), null));
+            m.AddMethod(0,n, Kernel.MakeSub(new SubInfo(siname, method), null));
         }
 
         m.Invalidate();

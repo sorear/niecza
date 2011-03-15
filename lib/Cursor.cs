@@ -1404,7 +1404,10 @@ public class LexerCache {
         if (mo.superclasses.Count == 1) {
             parent = mo.superclasses[0].GetLexerCache();
             repl_methods = new HashSet<string>();
-            foreach (string mn in mo.local.Keys) {
+            foreach (STable.MethodInfo mi in mo.lmethods) {
+                if ((mi.flags & STable.V_MASK) != STable.V_PUBLIC)
+                    continue;
+                string mn = mi.short_name;
                 int ix = mn.IndexOf(':');
                 if (ix >= 0) repl_methods.Add(mn.Substring(0,ix));
                 else repl_methods.Add(mn);
@@ -1675,11 +1678,13 @@ anew:
         foreach (STable k in cursor_class.mro) {
             if (proto != k.Can(name))
                 continue;
-            foreach (KeyValuePair<string,P6any> o in k.ord_methods) {
-                if (!Utils.StartsWithInvariant(filter, o.Key))
+            foreach (STable.MethodInfo o in k.lmethods) {
+                if ((o.flags & STable.V_MASK) != STable.V_PUBLIC)
                     continue;
-                if (cursor_class.Can(o.Key) == o.Value) {
-                    raword.Add((P6opaque) o.Value);
+                if (!Utils.StartsWithInvariant(filter, o.short_name))
+                    continue;
+                if (cursor_class.Can(o.short_name) == o.impl) {
+                    raword.Add((P6opaque) o.impl);
                 }
             }
         }
