@@ -26,6 +26,118 @@ use Operator;
 use OptRxSimple;
 use Sig;
 
+augment class NieczaActions {
+method regex_def($/) {
+    sub _symtext($name) {
+        ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name, Str);
+    }
+    my ($name, $path) = $<deflongname> ??
+        self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
+    my $cname;
+    if defined($path) && $path == 0 && $name.^isa(Op) {
+        $cname = $name;
+        $name = ~$<deflongname>[0];
+        $path = Any;
+    }
+
+    my $multiness = $*MULTINESS || Any;
+
+    my $scope = (!defined($name)) ?? "anon" !! ($*SCOPE || "has");
+
+    if $<signature> > 1 {
+        $/.CURSOR.sorry("Multiple signatures on a regex NYI");
+        return Nil;
+    }
+
+    if $cname && $scope ne 'has' {
+        $/.CURSOR.sorry("Only has regexes may have computed names");
+        make ::Op::StatementList.new;
+        return Nil;
+    }
+
+    my $isproto;
+    my ($basename, $symtext) = ($cname || !defined($name))
+        ?? (Str, Str) !! _symtext($name);
+
+    my $endsym;
+    for map *.ast, @$<trait> -> $t {
+        if $t<unary> || $t<binary> || $t<defequiv> {
+            # Ignored for now
+        }
+        elsif defined $t<endsym> {
+            $endsym = $t<endsym>;
+        }
+        else {
+            $/.CURSOR.sorry("Unhandled regex trait $t.keys.[0]");
+        }
+    }
+
+    if $multiness && $multiness eq 'proto' {
+        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' ||
+                !defined($basename) {
+            $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
+            return Nil;
+        }
+        @*MEMOS[0]<proto_endsym>{$basename} = $endsym;
+    } else {
+        my $m2 = defined($symtext) ?? 'multi' !! 'only';
+        if $multiness && $multiness ne $m2 {
+            $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
+        }
+        $multiness = $m2;
+        $endsym //= @*MEMOS[0]<proto_endsym>{$basename} if defined $basename;
+    }
+
+    if defined($path) && $scope ne 'our' {
+        $/.CURSOR.sorry("Putting a regex in a package requires using the our scope.");
+        return Nil;
+    }
+
+    my $sig = $<signature> ?? $<signature>[0].ast !! Sig.simple;
+
+    if $scope eq 'state' || $scope eq 'supercede' || $scope eq 'augment' {
+        $/.CURSOR.sorry("Nonsensical scope $scope for regex");
+        return Nil;
+    }
+
+    if $scope eq 'our' {
+        $/.CURSOR.sorry("our regexes NYI");
+        return Nil;
+    }
+
+    my $ast = $<regex_block>.ast;
+    if $multiness eq 'proto' {
+        $ast = ::RxOp::ProtoRedis.new(name => $name);
+    }
+
+    {
+        my $*paren = 0;
+        my $*symtext = $symtext;
+        my $*endsym = $endsym;
+        my $*dba = $name // 'anonymous regex';
+        $ast.check;
+    }
+    my $lad = OptRxSimple.run_lad($ast.lad);
+    my @lift = $ast.oplift;
+    ($ast, my $mb) = OptRxSimple.run($ast);
+    make ::Op::SubDef.new(|node($/),
+        :$multiness,
+        bindlex => ($scope ne 'anon' && $scope ne 'has'),
+        bindmethod => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
+        body => Body.new(
+            ltm   => $lad,
+            returnable => True,
+            class => 'Regex',
+            type  => 'regex',
+            name  => $name // 'ANONrx',
+            signature => $sig.for_method,
+            do => ::Op::RegexBody.new(|node($/), pre => @lift,
+                name => ($name // ''), rxop => $ast, canback => $mb)));
+}
+}
+
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
 

@@ -3508,14 +3508,16 @@ dynamic:
                 object[] tuples = (object[]) sub.augment_hack;
                 for (int i = 1; i < tuples.Length; i++) {
                     object[] t = (object[]) tuples[i];
-                    string k = JScalar.S(t[0]);
-                    int ik = (k == "normal") ? 0 : (k == "private") ? 1 : 2;
+                    string k1 = JScalar.S(t[0]);
+                    string k2 = JScalar.S(t[1]);
+                    int ik = (k2 == "normal") ? 0 : (k2 == "private") ? 1 : 2;
+                    ik += ((k1 == "only") ? 0 : (k1 == "proto") ? 4 : 8);
                     enter.Add(new object[] {
                         new JScalar( "_addmethod" ),
                         new object[] { new JScalar("letvar"), new JScalar("!mo") },
                         new JScalar(ik.ToString()),
-                        new object[] { new JScalar("str"), t[1] },
-                        new object[] { new JScalar("fetch"), new object[] { new JScalar("scopedlex"), t[2] } } });
+                        new object[] { new JScalar("str"), t[2] },
+                        new object[] { new JScalar("fetch"), new object[] { new JScalar("scopedlex"), t[3] } } });
                 }
                 enter.Add(new object[] { new JScalar("_invalidate"), new object[] { new JScalar("letvar"), new JScalar("!mo") } });
                 enter.Add(new object[] { new JScalar("return") });

@@ -228,7 +228,7 @@ class Package is RefTarget {
         die "attribute $name defined in a lowly package";
     }
 
-    method add_method($kind, $name, $var, $body) { #OK not used
+    method add_method($multi, $kind, $name, $var, $body) { #OK not used
         die "method $name defined in a lowly package";
     }
 
@@ -247,6 +247,7 @@ class Method {
     has $.name = die "Method.name is required";
     # normal, private, meta, sub
     has $.kind = die "Method.kind is required"; # Str
+    has $.multi = die "Method.multi is required"; # Str
     has $.var; # Str
     has $.body; # Xref
 }
@@ -271,8 +272,8 @@ class Class is Module {
             :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
-    method add_method($kind, $name, $var, $body) { #OK not used
-        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind);
+    method add_method($multi, $kind, $name, $var, $body) { #OK not used
+        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind, :$multi);
     }
 
     method add_super($targ) {
@@ -360,11 +361,12 @@ class Role is Module {
             :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
-    method add_method($kind, $name, $var, $body) { #OK not used
+    method add_method($multi, $kind, $name, $var, $body) { #OK not used
         if $name !~~ Str {
             die "Computed names are legal only in parametric roles";
         }
-        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind);
+        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind,
+            :$multi);
     }
 
     method add_super($targ) {
@@ -383,8 +385,8 @@ class ParametricRole is Module {
             :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
-    method add_method($kind, $name, $var, $body) { #OK not used
-        push $.methods, ::Metamodel::Method.new(:$name, :$body, :$var, :$kind);
+    method add_method($multi, $kind, $name, $var, $body) { #OK not used
+        push $.methods, ::Metamodel::Method.new(:$name, :$body, :$var, :$kind, :$multi);
     }
 
     method add_super($targ) {

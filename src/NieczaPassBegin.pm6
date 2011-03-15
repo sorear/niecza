@@ -264,9 +264,9 @@ augment class Op::Attribute { #OK exist
         @*opensubs[*-1].create_static_pad; # for protosub instance
         $nb.strong_used = True;
         @*opensubs[*-1].add_my_sub($.name ~ '!a', $nb);
-        $ns.add_method('private', $.name, $.name ~ '!a', $nb.xref);
+        $ns.add_method('only', 'private', $.name, $.name ~ '!a', $nb.xref);
         if $.accessor {
-            $ns.add_method('normal', $.name, $.name ~ '!a', $nb.xref);
+            $ns.add_method('only', 'normal', $.name, $.name ~ '!a', $nb.xref);
         }
     }
 }
@@ -290,6 +290,7 @@ augment class Op::SubDef { #OK exist
         $.symbol = $.bindlex ?? ('&' ~ $.body.name) !!
             ::GLOBAL::NieczaActions.gensym;
         $.bindpackages //= [];
+        $.multiness //= 'only';
         my $body = $.body.begin(:$prefix,
             once => ($.body.type // '') eq 'voidbare');
         @*opensubs[*-1].add_my_sub($.symbol, $body);
@@ -305,10 +306,10 @@ augment class Op::SubDef { #OK exist
                     die "Computed names are legal only in parametric roles";
                 }
                 push @*opensubs[*-1].augment_hack,
-                    [ @$.bindmethod, $.symbol, $r ];
+                    [ $.multiness, @$.bindmethod, $.symbol, $r ];
             } else {
                 $*unit.deref(@*opensubs[*-1].body_of)\
-                    .add_method(|$.bindmethod, $.symbol, $r);
+                    .add_method($.multiness, |$.bindmethod, $.symbol, $r);
             }
         }
 
