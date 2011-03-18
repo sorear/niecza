@@ -213,9 +213,22 @@ namespace Niecza {
 
     // This stores all the invariant stuff about a Sub, i.e. everything
     // except the outer pointer.  Now distinct from protopads
+    //
+    // Actually not quite *in*variant; some of this stuff has to be
+    // changed, but it's rare by construction.  We don't want to be
+    // like Rakudo/Parrot where simple sub cloning requires copying
+    // 100s of bytes.
     public class SubInfo {
-        public int[] lines;
+        // Essential call functions
         public DynBlockDelegate code;
+        public int nspill;
+        public int[] sig_i;
+        public object[] sig_r;
+
+        // Standard metadata
+        public Dictionary<string, int> dylex;
+        public uint dylex_filter; // (32,1) Bloom on hash code
+        public int[] lines;
         public STable mo;
         // for inheriting hints
         public SubInfo outer;
@@ -223,15 +236,13 @@ namespace Niecza {
         public Dictionary<string, BValue> hints;
         // maybe should be a hint
         public LAD ltm;
-        public int nspill;
-        public Dictionary<string, int> dylex;
-        public uint dylex_filter; // (32,1) Bloom on hash code
-        public int[] sig_i;
-        public object[] sig_r;
 
-        public object vtable_boxed;
-        public object vtable_unboxed;
+        // Used for closing runtime-generated SubInfo over values used
+        // For vtable wrappers: 0 = unboxed, 1 = boxed
+        // For dispatch routines, 0 = parameter list
+        public object param0, param1;
 
+        // No instance fields past this point
         public const int SIG_I_RECORD  = 3;
         public const int SIG_I_FLAGS   = 0;
         public const int SIG_I_SLOT    = 1;
@@ -1331,13 +1342,13 @@ noparams:
         private object _GetVT(string name) {
             DispatchEnt de;
             mro_methods.TryGetValue(name, out de);
-            return de == null ? null : de.info.vtable_boxed;
+            return de == null ? null : de.info.param1;
         }
 
         private object _GetVTU(string name) {
             DispatchEnt de;
             mro_methods.TryGetValue(name, out de);
-            return de == null ? null : de.info.vtable_unboxed;
+            return de == null ? null : de.info.param0;
         }
 
         private void SetMRO(STable[] arr) {
@@ -2074,8 +2085,8 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL,
                 0, 0 };
             si.sig_r = new object[1] { "self" };
-            si.vtable_boxed = cvb;
-            si.vtable_unboxed = cvu;
+            si.param1 = cvb;
+            si.param0 = cvu;
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -2092,7 +2103,7 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0
             };
             si.sig_r = new object[2] { "self", "$key" };
-            si.vtable_boxed = cv;
+            si.param1 = cv;
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -2359,7 +2370,7 @@ slow:
                 new VarDeque() };
 
             SubMO = new STable("Sub");
-            SubInvokeSubSI.vtable_boxed = new InvokeSub();
+            SubInvokeSubSI.param1 = new InvokeSub();
             SubMO.FillProtoClass(new string[] { "outer", "info" });
             SubMO.AddMethod(0, "INVOKE", MakeSub(SubInvokeSubSI, null));
             SubMO.Invalidate();

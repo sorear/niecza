@@ -819,43 +819,10 @@ public sealed class NFA {
     public int curfate;
 
     public STable cursor_class;
-    public HashSet<string> method_stack = new HashSet<string>();
+    public HashSet<string> name_stack = new HashSet<string>();
     public HashSet<string> used_methods = new HashSet<string>();
-    public List<Frame> outer_stack = new List<Frame>();
-    public Dictionary<string,LAD> method_cache = new Dictionary<string,LAD>();
-    public Dictionary<string,Frame> outer_cache = new Dictionary<string,Frame>();
-
-    public LAD ResolveMethod(string name, out Frame outer) {
-        LAD sub = null;
-        if (method_cache.TryGetValue(name, out sub)) {
-            if (Lexer.LtmTrace)
-                Console.WriteLine("+ Method HIT for {0}", name);
-            outer = outer_cache[name];
-            return sub;
-        }
-        if (Lexer.LtmTrace)
-            Console.WriteLine("+ Method MISS for {0}", name);
-        P6any method = cursor_class.Can(name);
-
-        if (Lexer.LtmTrace && method != null)
-            Console.WriteLine("+ Found method");
-
-        if (method == null) {
-            outer = outer_cache[name] = null;
-            return method_cache[name] = new LADImp();
-        }
-
-        sub = ((SubInfo)(((P6opaque)method).GetSlot("info"))).ltm;
-        outer = ((Frame)(((P6opaque)method).GetSlot("outer")));
-
-        if (Lexer.LtmTrace)
-            Console.WriteLine("+ {0} to sub-automaton",
-                    (sub != null ? "Resolved" : "Failed to resolve"));
-
-        method_cache[name] = sub;
-        outer_cache[name] = outer;
-        return sub;
-    }
+    public List<Frame>   outer_stack = new List<Frame>();
+    public List<SubInfo> info_stack  = new List<SubInfo>();
 
     public int AddNode() {
         nodes_l.Add(new Node(curfate));
@@ -1240,7 +1207,7 @@ public class LADMethod : LAD {
             return new LADImp();
         pad.used_methods.Add(name);
 
-        if (pad.method_stack.Contains(name)) {
+        if (pad.name_stack.Contains(name)) {
             // NFAs cannot be recursive, so treat this as the end of the
             // declarative prefix.
             if (Lexer.LtmTrace)
@@ -1248,21 +1215,20 @@ public class LADMethod : LAD {
             return new LADImp();
         }
 
-        Frame outer;
-        LAD sub = pad.ResolveMethod(name, out outer);
+        DispatchEnt de;
+        if (!pad.cursor_class.mro_methods.TryGetValue(name, out de)
+                || de.info.ltm == null)
+            return new LADImp();
 
-        pad.method_stack.Add(name);
-        pad.outer_stack.Add(outer);
+        pad.name_stack.Add(name);
+        pad.outer_stack.Add(de.outer);
+        pad.info_stack.Add(de.info);
 
-        LAD ret;
-        if (sub == null) {
-            ret = new LADImp();
-        } else {
-            ret = sub.Reify(pad);
-        }
+        LAD ret = de.info.ltm.Reify(pad);
 
-        pad.method_stack.Remove(name);
+        pad.name_stack.Remove(name);
         pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+        pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
 
         return ret;
     }
@@ -1292,8 +1258,10 @@ public class LADProtoRegex : LAD {
 
         for (int i = 0; i < opts.Length; i++) {
             pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
+            pad.info_stack.Add((SubInfo)cands[i].GetSlot("info"));
             opts[i] = ((SubInfo)cands[i].GetSlot("info")).ltm.Reify(pad);
             pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+            pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
         }
 
         return new LADAny(opts);
@@ -1466,6 +1434,7 @@ anew:
         pad.cursor_class = kl;
         LAD[] lads_p = new LAD[lads.Length];
         pad.outer_stack.Add(fromf);
+        pad.info_stack.Add(fromf.info);
         for (int i = 0; i < lads_p.Length; i++)
             lads_p[i] = lads[i].Reify(pad);
 
@@ -1629,9 +1598,11 @@ anew:
         pad.cursor_class = kl;
         for (int i = 0; i < candidates.Length; i++) {
             pad.outer_stack.Add((Frame) candidates[i].GetSlot("outer"));
+            pad.info_stack.Add((SubInfo) candidates[i].GetSlot("info"));
             branches[i] = (((SubInfo) candidates[i].GetSlot("info")).ltm).
                 Reify(pad);
             pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+            pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
         }
         return lc.protorx_nfa[name] = new Lexer(pad, name, branches);
     }
