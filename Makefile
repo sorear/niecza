@@ -10,6 +10,10 @@ cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs
 csbackend=CLRBackend.cs
 csxdr=CrossDomainReceiver.cs
 
+# Tell make to regard the following targets as not being filenames
+.PHONY: all aot test spectest clean realclean
+.PHONY: help
+
 # keep this in dependency order
 libunits=CORE JSYNC
 srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
@@ -19,7 +23,7 @@ srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
 	 NieczaBackendClisp NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
-	git describe --tags > VERSION
+	@git describe --tags > VERSION
 
 obj/CORE.nam: run/Niecza.exe obj/CLRBackend.exe lib/CORE.setting
 	$(RUN_CLR) run/Niecza.exe -C CORE
@@ -53,9 +57,44 @@ obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll obj/CrossDom
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
 	    /r:CrossDomainReceiver.dll $(patsubst %,lib/%,$(csbackend))
 
+aot:
+	mono --aot run/*.dll run/Niecza.exe
+
 test: all
 	$(RUN_CLR) run/Niecza.exe -c test.pl
 	prove -e "$(RUN_CLR)" obj/MAIN.exe
 
+spectest: all
+	@t/run_spectests
+
 p6eval: all
 	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
+
+clean:
+	@touch obj/CORE.dll obj/MAIN.exe obj/MAIN.nam
+	@rm obj/*.dll obj/*.exe obj/*.nam
+	@touch run/Niecza.exe
+	@rm run/Niecza.exe
+	@touch run/CORE.dll
+	@rm run/*.dll
+	@touch run/CORE.dll.so
+	@rm run/*.dll.so
+	@touch a~
+	@rm -r *~
+
+realclean: clean
+	@rm .fetch-stamp
+
+help:
+	@echo ''
+	@echo 'You can make the following targets in this Niecza Makefile:'
+	@echo ''
+	@echo 'all        the main Niecza compiler and runtime files (default)'
+	@echo 'aot        Ahead of Time compile run/Niecza.exe and run/*.dll (increases speed)'
+	@echo 'test       run/Niecza.exe test.pl'
+	@echo 'spectest   t/run_spectests'
+	@echo 'clean      remove all generated files'
+	@echo 'realclean  clean and also require new download of bootstrap files'
+	@echo 'help       this list of targets'
+	@echo ''
+
