@@ -1271,6 +1271,48 @@ public class LADProtoRegex : LAD {
         Console.WriteLine(new string(' ', indent) + "protorx " + name);
     }
 }
+
+// Only really makes sense if used in the static scope of a proto
+public class LADDispatcher : LAD {
+    public override void ToNFA(NFA pad, int from, int to) {
+        throw new InvalidOperationException();
+    }
+
+    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
+        throw new InvalidOperationException();
+    }
+
+    public override LAD Reify(NFA pad) {
+        Frame   of = pad.outer_stack[pad.outer_stack.Count - 1];
+        SubInfo si = pad.info_stack[pad.info_stack.Count - 1];
+
+        while ((si == null || si.param0 == null) && of != null) {
+            si = of.info;
+            of = of.outer;
+        }
+
+        if (si == null || si.param0 == null || !(si.param0 is P6any[]))
+            throw new NieczaException("Cannot resolve dispatch operator");
+
+        P6any[] cands = si.param0 as P6any[];
+        LAD[] opts = new LAD[cands.Length];
+
+        for (int i = 0; i < opts.Length; i++) {
+            pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
+            pad.info_stack.Add((SubInfo)cands[i].GetSlot("info"));
+            opts[i] = ((SubInfo)cands[i].GetSlot("info")).ltm.Reify(pad);
+            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+            pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
+        }
+
+        return new LADAny(opts);
+    }
+
+    public override void Dump(int indent) {
+        Console.WriteLine(new string(' ', indent) + "dispatcher");
+    }
+}
+
 // These objects get put in hash tables, so don't change nstates[] after
 // that happens
 public sealed class LexerState {
@@ -1388,6 +1430,8 @@ public class LexerCache {
         new Dictionary<string, P6opaque[]>();
     public Dictionary<string, Lexer> protorx_nfa =
         new Dictionary<string, Lexer>();
+    public Dictionary<SubInfo, Lexer> dispatch_nfas =
+        new Dictionary<SubInfo, Lexer>();
 }
 
 public class Lexer {
@@ -1440,6 +1484,45 @@ anew:
 
         ret = new Lexer(pad, title, lads_p);
         lc.nfas[lads] = ret;
+        return ret;
+    }
+
+    public static Lexer GetDispatchLexer(Frame fromf, STable kl, SubInfo disp) {
+        LexerCache lc = kl.GetLexerCache();
+        Lexer ret;
+        if (lc.dispatch_nfas.TryGetValue(disp, out ret))
+            return ret;
+        if (lc.parent != null && lc.parent.mo.name != "Cursor" && lc.parent.mo.name != "Any") {
+            ret = GetDispatchLexer(fromf, lc.parent.mo, disp);
+            foreach (string u in ret.pad.used_methods) {
+                if (lc.repl_methods.Contains(u))
+                    goto anew;
+            }
+            if (LtmTrace)
+                Console.WriteLine("Reused {0} dispatch lexer for {1} in {2}",
+                        disp.name, lc.parent.mo.name, kl.name);
+            return lc.dispatch_nfas[disp] = ret;
+        }
+anew:
+        if (LtmTrace) {
+            Console.WriteLine("Need new dispatch lexer for {0} in {1}",
+                    disp.name, kl.name);
+        }
+        NFA pad = new NFA();
+        pad.cursor_class = kl;
+        P6any[] cands = (P6any[])disp.param0;
+        LAD[] lads_p = new LAD[cands.Length];
+
+        for (int i = 0; i < lads_p.Length; i++) {
+            pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
+            pad.info_stack.Add((SubInfo)cands[i].GetSlot("info"));
+            lads_p[i] = pad.info_stack[0].ltm.Reify(pad);
+            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
+            pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
+        }
+
+        ret = new Lexer(pad, disp.name, lads_p);
+        lc.dispatch_nfas[disp] = ret;
         return ret;
     }
 
@@ -1605,6 +1688,61 @@ anew:
             pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
         }
         return lc.protorx_nfa[name] = new Lexer(pad, name, branches);
+    }
+
+    public static P6any[] RunDispatch(Frame fromf, P6any cursor) {
+        STable kl = cursor.mo;
+        while (fromf.info.param0 == null) fromf = fromf.outer;
+
+        Lexer l = GetDispatchLexer(fromf, kl, fromf.info);
+        P6any[] candidates = (P6any[]) fromf.info.param0;
+
+        Cursor c = (Cursor)cursor;
+        int[] brnum = l.Run(c.global.orig_s, c.pos);
+
+        P6any[] ret = new P6any[brnum.Length];
+        for (int i = 0; i < brnum.Length; i++)
+            ret[i] = candidates[brnum[i]];
+
+        return ret;
+    }
+
+    // XXX duplicates logic from RxOp::ProtoRedis and Op::RegexBody
+    private static Frame StandardProtoC(Frame th) {
+        switch (th.ip) {
+            default:
+                return Kernel.Die(th, "Invalid IP");
+            case 1:
+                return th.rx.Backtrack(th);
+            case 0:
+                th.rx = new RxFrame(th.info.name, (Cursor) ((Variable)th.lex0).Fetch(), false, false);
+                th.rx.PushCutGroup("LTM");
+                th.lex1 = RunDispatch(th, ((Variable)th.lex0).Fetch());
+                th.lexi0 = 0;
+                goto case 2;
+            case 2:
+                if (th.lexi0 == ((P6any[])th.lex1).Length)
+                    goto case 1;
+                th.rx.PushBacktrack(2);
+                th.ip = 3;
+                return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th,
+                    new Variable[] { (Variable)th.lex0 }, null);
+            case 3:
+                th.lex2 = new VarDeque((Variable) th.resultSlot);
+                goto case 4;
+            case 4:
+                if (!Kernel.IterHasFlat((VarDeque)th.lex2, true))
+                    goto case 1;
+                return th.rx.EndWith(th, (Cursor) ((VarDeque)th.lex2).Shift().Fetch());
+        }
+    }
+
+    public static P6any MakeDispatcher(string name, P6any[] cands) {
+        SubInfo si = new SubInfo(name, StandardProtoC);
+        si.param0 = cands;
+        si.sig_i = new int[3] { SubInfo.SIG_F_POSITIONAL, 0, 0 };
+        si.sig_r = new object[1] { "self" };
+        return Kernel.MakeSub(si, null);
     }
 
     public static P6any[] RunProtoregex(Frame fromf, P6any cursor, string name) {
