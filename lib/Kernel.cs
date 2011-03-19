@@ -1364,10 +1364,21 @@ noparams:
                 isa.Add(k);
         }
 
+        // invariant: if a class is dirty, so are all subclasses
+        // invariant: mro-graph is acyclic
+        void RevalidateTree(HashSet<STable> dirty) {
+            if (!dirty.Contains(this)) return;
+            foreach (STable sp in mro)
+                if (sp != this) sp.RevalidateTree(dirty);
+            Revalidate();
+            dirty.Remove(this);
+        }
+
         public void Invalidate() {
             List<object> notify = subclasses.GetSubscribers();
-            foreach (object k in notify)
-                ((STable)k).Revalidate();
+            HashSet<STable> dirty = new HashSet<STable>();
+            foreach (object k in notify) dirty.Add((STable)k);
+            foreach (object k in notify) ((STable)k).RevalidateTree(dirty);
         }
 
         public P6any Can(string name) {
