@@ -104,7 +104,7 @@ method canonicalize_name($n) {
         $name = $name.substr(0, $name.chars - 2);
     }
     return $name unless $name ~~ /::/;
-    self.panic("Can't canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
+    self.panic("Cannot canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
 
     if $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
         $name = $1 ~ "<" ~ $0 ~ substr($name, $/.to) ~ ">";
@@ -288,7 +288,7 @@ method do_import($m, $args) { #, perl6.vim stupidity
                         self.add_my_name($imp, $pkg{$imp});
                     }
                     elsif $pkg{$imp} {
-                        self.worry("Can't import $imp because it's not exported by $module");
+                        self.worry("Cannot import $imp because it's not exported by $module");
                         next;
                     }
                 }

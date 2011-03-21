@@ -70,7 +70,7 @@ else {
                 exit;
             }
             else {
-                die "Can't fork: $!";
+                die "Cannot fork: $!";
             }
         }
         else {
@@ -113,7 +113,7 @@ sub go {
 sub read_specfile {
     my $fn = shift;
     my @res;
-    open (my $f, '<', $fn) or die "Can't open file '$fn' for reading: $!";
+    open (my $f, '<', $fn) or die "Cannot open file '$fn' for reading: $!";
     while (<$f>){
         s/\s*\#.*//;   # strip out comments and any spaces before them
         m/(\S+)/ && push @res, "t/spec/$1";

@@ -1663,7 +1663,7 @@ anew:
             foreach (string used in pl.pad.used_methods) {
                 if (lc.repl_methods.Contains(used)) {
                     if (LtmTrace)
-                        Console.WriteLine("+ Can't; {0} is overridden",
+                        Console.WriteLine("+ Cannot; {0} is overridden",
                                 used);
                     goto anew;
                 }

@@ -392,7 +392,7 @@ method unitstop ($stop) { self.mixin( STD::unitstop[$stop] ); }
 
 method truly ($bool,$opt) {
     return self if $bool;
-    self.sorry("Can't negate $opt adverb");
+    self.sorry("Cannot negate $opt adverb");
     self;
 }
 
@@ -2368,7 +2368,7 @@ grammar P6 is STD {
     token desigilname {
         [
         | <?before '$' >
-            [ <?{ $*IN_DECL }> <.panic: "Can't declare an indirect variable name"> ]?
+            [ <?{ $*IN_DECL }> <.panic: "Cannot declare an indirect variable name"> ]?
             <variable> {
                 $*VAR = $<variable>;
                 self.check_variable($*VAR) if substr($*VAR,1,1) ne '$';
@@ -2399,10 +2399,10 @@ grammar P6 is STD {
         || [
             | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
             | <special_variable>
-            | <sigil> <index=.decint> [<?{ $*IN_DECL }> <.panic: "Can't declare a numeric variable">]?
+            | <sigil> <index=.decint> [<?{ $*IN_DECL }> <.panic: "Cannot declare a numeric variable">]?
             # Note: $() can also parse as contextualizer in an expression; should have same effect
-            | <sigil> <?before '<'> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Can't declare a match variable">]?
-            | <sigil> <?before '('> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Can't declare a contextualizer">]?
+            | <sigil> <?before '<'> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Cannot declare a match variable">]?
+            | <sigil> <?before '('> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Cannot declare a contextualizer">]?
             | <sigil> <?{ $*IN_DECL }>
             | <?> {
                 if $*QSIGIL {
@@ -2836,7 +2836,7 @@ grammar P6 is STD {
 
                 # ordinary parameter name
             || <name=.identifier>
-            || <name=.decint> <.panic: "Can't declare a numeric parameter">
+            || <name=.decint> <.panic: "Cannot declare a numeric parameter">
             || $<name> = [<[/!]>]
 
                 # bare sigil?
@@ -2925,15 +2925,15 @@ grammar P6 is STD {
         [
             <default_value> {
                 given $quant {
-                  when '!' { $¢.sorry("Can't put a default on a required parameter") }
-                  when '*' { $¢.sorry("Can't put a default on a slurpy parameter") }
-                  when '**' { $¢.sorry("Can't put a default on a slice parameter") }
-                  when '|' { $¢.sorry("Can't put a default on an slurpy capture parameter") }
-                  when '\\' { $¢.sorry("Can't put a default on a capture parameter") }
+                  when '!' { $¢.sorry("Cannot put a default on a required parameter") }
+                  when '*' { $¢.sorry("Cannot put a default on a slurpy parameter") }
+                  when '**' { $¢.sorry("Cannot put a default on a slice parameter") }
+                  when '|' { $¢.sorry("Cannot put a default on an slurpy capture parameter") }
+                  when '\\' { $¢.sorry("Cannot put a default on a capture parameter") }
                 }
                 $kind = '?' if $kind eq '!';
             }
-            [<?before ':' > <.sorry: "Can't put a default on the invocant parameter">]?
+            [<?before ':' > <.sorry: "Cannot put a default on the invocant parameter">]?
             [<!before <[,;)\]\{\-]> > <.sorry: "Default expression must come last">]?
         ]?
         [<?before ':'> <?{ $kind ne '!' }> <.sorry: "Invocant is too exotic">]?
@@ -2947,10 +2947,10 @@ grammar P6 is STD {
                 when '!' {
                     given $*zone {
                         when 'posopt' {
-    $¢.sorry("Can't put required parameter after optional parameters");
+    $¢.sorry("Cannot put required parameter after optional parameters");
                         }
                         when 'var' {
-    $¢.sorry("Can't put required parameter after variadic parameters");
+    $¢.sorry("Cannot put required parameter after variadic parameters");
                         }
                     }
                 }
@@ -2958,7 +2958,7 @@ grammar P6 is STD {
                     given $*zone {
                         when 'posreq' { $*zone = 'posopt' }
                         when 'var' {
-    $¢.sorry("Can't put optional positional parameter after variadic parameters");
+    $¢.sorry("Cannot put optional positional parameter after variadic parameters");
                         }
                     }
                 }
@@ -3208,7 +3208,7 @@ grammar P6 is STD {
 
     method can_meta ($op, $meta) {
         !$op<O><fiddly> ||
-            self.sorry("Can't " ~ $meta ~ " " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are too fiddly");
+            self.sorry("Cannot " ~ $meta ~ " " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are too fiddly");
         self;
     }
 
@@ -3232,7 +3232,7 @@ grammar P6 is STD {
         [
         || <!{ $op<O><diffy> }>
         || <?{ $op<O><assoc> eq 'chain' }>
-        || <.sorry("Can't reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
+        || <.sorry("Cannot reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
         ]
 
         [
@@ -3265,7 +3265,7 @@ grammar P6 is STD {
            <?{ $<infixish><O><iffy> }>
            $<O> = {$<infixish><O>}
             
-        || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
+        || <.panic("Cannot negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
         ]
     }
 
@@ -3329,7 +3329,7 @@ grammar P6 is STD {
         :my %prec;
         '='
         <.can_meta($op, "make assignment out of")>
-        [ <!{ $op<O><diffy> }> || <.sorry("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
+        [ <!{ $op<O><diffy> }> || <.sorry("Cannot make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
         $<sym> = {$op<sym> ~ '='}
         {
             if $op<O><prec> gt %comma<prec> {
@@ -4768,7 +4768,7 @@ grammar Regex is STD {
         <atom>
         [ <normspace>? <quantifier> ]?
 #            <?{ $<atom>.max_width }>
-#                || <.panic: "Can't quantify zero-width atom">
+#                || <.panic: "Cannot quantify zero-width atom">
     }
 
     token atom {
@@ -5302,9 +5302,9 @@ method add_name ($name) {
     self.deb("Adding $scope $name") if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or
-            self.worry("Can't $scope $pkgdecl $name because it doesn't exist");
+            self.worry("Cannot $scope $pkgdecl $name because it doesn't exist");
         $*MONKEY_TYPING or
-            self.sorry("Can't $scope $pkgdecl $name without MONKEY_TYPING");
+            self.sorry("Cannot $scope $pkgdecl $name without MONKEY_TYPING");
     }
     else {
         if $scope eq 'our' {
