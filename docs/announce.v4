@@ -1,0 +1,82 @@
+    Announce: Niecza Perl 6 v4
+
+Niecza tag announcements occur on the last Monday of each month,
+irrespective of the rate of development.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+Martin Berends (mberends) is the new contributor for this month.
+
+    List of changes
+
+eval is now supported, along with eval_lives_ok and company.  Note the
+following limitations and bugs:
+  - No lexical scope inheritance (my $x; eval '$x')
+  - Leaks memory (no garbage collection for compiled code)
+  - eval always returns Any, so is only useful for side effects
+  - eval requires the compiler at runtime, so it cannot be used in
+    programs which will be precompiled to .exe
+
+Threads.pm6 has been debitrotten and extended with a full monitor API
+and an ObjectPipe class.
+
+Class declarations of the form A::B are now allowed, and can be used in
+files with names like A/B.pm6.
+
+Type constraints are now supported for variable and parameter declarators.
+
+The $foo.=bar and $foo .= bar syntaxes are now supported.
+
+The $foo.$( ... ) syntax is now supported.
+
+More spectest work, mostly by moritz++.
+
+Categoricals like term:<foo> are now available, additionally, term:<now>
+has been added by mberends++.
+
+$match.[0] is now treated as a synonym for $match if $match has no
+positional captures.  This means that { say 'foo' ~~ /o*/ } will now do
+what you expect.
+
+Internal and interface changes:
+  - SAFE is gone; an "is unsafe" trait is now used for the sandbox.
+  - Refactored generation of vtable overrides.
+  - Much groundwork for multiple dispatch has been set.
+  - Niecza's STD.pm6 has been brought even closer to the standard one.
+  - More makefile targets (spectest, aot, clean, realclean, help) (mberends)
+  - Error messages consistantly use "Cannot" (moritz)
+
+Bug fixes:
+  - $str ~~ m// no longer is always true.
+  - Parcels can be used as Lists in more places.
+  - Mono 2.6.x compatibility has been restored.
+  - Rounding of dates on Win32 no longer disables recompilation checking.
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+The current general focus is on applications.  I hope to have yapsi
+running on Niecza soon.  This will require multiple dispatch and some
+small object model improvements.  Improved designs from 6model will
+be gradually incorporated.
+
+A JVM backend is in the design stages.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-4.zip
+[2] https://github.com/sorear/niecza
