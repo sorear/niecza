@@ -13,7 +13,7 @@ method load_module($name) {
                 my $text = $fn.slurp;
                 # check borrowed from STD to weed out Perl 5 heuristically
                 next if $ext eq 'pm' && $text ~~ /^^\h*package\h+\w+\s*\;/;
-                return (~$fn.realpath, $fn.modified.to-posix, $text);
+                return (~$fn.realpath, $fn.modified.to-posix.[0], $text);
             }
         }
     }
@@ -23,5 +23,5 @@ method load_module($name) {
 
 method load_file($name) {
     my $p = $name.IO;
-    (~$p.realpath, $p.modified.to-posix, $p.slurp);
+    (~$p.realpath, $p.modified.to-posix.[0], $p.slurp);
 }
