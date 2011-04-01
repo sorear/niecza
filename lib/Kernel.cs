@@ -1251,6 +1251,7 @@ noparams:
         public InvokeHandler mro_INVOKE;
 
         public Dictionary<string, DispatchEnt> mro_methods;
+        public Dictionary<string, DispatchEnt> inherit_methods;
         public Dictionary<string, P6any> private_mro;
 
         public STable[] local_does;
@@ -1282,8 +1283,9 @@ noparams:
             isa = new HashSet<STable>();
         }
 
-        private void Revalidate() {
-            mro_methods = new Dictionary<string,DispatchEnt>();
+        void Revalidate() {
+            inherit_methods = mro_methods =
+                new Dictionary<string,DispatchEnt>();
             private_mro = new Dictionary<string,P6any>();
 
             if (mro == null)
@@ -1291,18 +1293,32 @@ noparams:
             if (isRole)
                 return;
 
-            for (int kx = mro.Length - 1; kx >= 0; kx--) {
-                STable k = mro[kx];
-                foreach (MethodInfo m in k.lmethods) {
-                    DispatchEnt de;
-                    if ((m.flags & V_MASK) != V_PUBLIC)
-                        continue;
-                    string n = m.Name();
-                    mro_methods.TryGetValue(n, out de);
-                    mro_methods[n] = new DispatchEnt(de, m.impl);
-                }
+            if (superclasses.Count == 1) {
+                inherit_methods = mro_methods =
+                    new Dictionary<string,DispatchEnt>(
+                        superclasses[0].inherit_methods);
+                SetupMRO(this);
+            } else {
+                for (int kx = mro.Length - 1; kx >= 0; kx--)
+                    SetupMRO(mro[kx]);
             }
 
+            SetupPrivates();
+            SetupVTables();
+        }
+
+        void SetupMRO(STable k) {
+            foreach (MethodInfo m in k.lmethods) {
+                DispatchEnt de;
+                if ((m.flags & V_MASK) != V_PUBLIC)
+                    continue;
+                string n = m.Name();
+                inherit_methods.TryGetValue(n, out de);
+                inherit_methods[n] = new DispatchEnt(de, m.impl);
+            }
+        }
+
+        void SetupPrivates() {
             foreach (MethodInfo m in lmethods) {
                 string n = m.Name();
                 if ((m.flags & V_MASK) == V_PRIVATE) {
@@ -1310,11 +1326,16 @@ noparams:
                 }
                 else if ((m.flags & V_MASK) == V_SUBMETHOD) {
                     DispatchEnt de;
+                    if (mro_methods == inherit_methods)
+                        mro_methods = new Dictionary<string,DispatchEnt>(
+                                inherit_methods);
                     mro_methods.TryGetValue(n, out de);
                     mro_methods[n] = new DispatchEnt(de, m.impl);
                 }
             }
+        }
 
+        void SetupVTables() {
             mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
             mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
             mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
