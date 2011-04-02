@@ -67,6 +67,14 @@ use MONKEY_TYPING;
         multi token foo:b { y }
     }
     ok "y" ~~ / :lang(G19) <foo> /, "can use multi regex without proto";
+
+    my class C20 {
+        multi method bar(Bool $) { "bool" }
+        multi method bar(Str $) { "str" }
+    }
+
+    is C20.bar(True), "bool", "multimethods work (1)";
+    is C20.bar("foo"), "str", "multimethods work (2)";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

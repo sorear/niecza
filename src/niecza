@@ -27,6 +27,72 @@ use OptRxSimple;
 use Sig;
 
 augment class NieczaActions {
+method method_def ($/) {
+    make ::Op::StatementList.new;
+    my $scope = $*SCOPE // 'has';
+    my $type = $<type> ?? ~$<type> !! '';
+    $type = ($type eq ''  ?? 'normal' !!
+             $type eq '^' ?? 'meta' !!
+             $type eq '!' ?? 'private' !!
+             (
+                 $/.CURSOR.sorry("Unhandled method decoration $type");
+                 return Nil;
+             ));
+    $scope = 'anon' if !$<longname>;
+    my $name = $<longname> ?? self.unqual_longname($<longname>,
+        "Qualified method definitions not understood") !! Any; #XXX
+
+    if $<sigil> {
+        $/.CURSOR.sorry("Method sgils NYI");
+        return Nil;
+    }
+    if $type eq 'meta' {
+        $/.CURSOR.sorry("Metamethod mixins NYI");
+        return Nil;
+    }
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
+    }
+
+    if ($scope eq 'augment' || $scope eq 'supersede' || $scope eq 'state') {
+        $/.CURSOR.sorry("Illogical scope $scope for method");
+        return Nil;
+    }
+
+    if ($scope eq 'our') {
+        $/.CURSOR.sorry("Packages NYI");
+        return Nil;
+    }
+    my $sig = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+
+    my $unsafe = False;
+    for @( $<trait> ) -> $t {
+        if $t.ast<nobinder> {
+            $sig = Any;
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
+        } else {
+            $/.CURSOR.sorry("NYI method trait $t");
+        }
+    }
+
+    my $bl = self.sl_to_block('sub', $<blockoid>.ast,
+        subname => $name, :$unsafe,
+        signature => $sig ?? $sig.for_method !! Any);
+
+    make self.block_to_closure($/, $bl, bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
+        bindmethod => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
+}
+
+method block_to_closure($/, $body, :$bindlex, :$bindmethod, :$once,
+        :$bindpackages = [], :$multiness) {
+    ::Op::SubDef.new(|node($/), :$bindlex, :$bindmethod, :$body, :$once,
+        :$bindpackages, :$multiness);
+}
+
 method regex_def($/) {
     sub _symtext($name) {
         ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
