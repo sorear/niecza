@@ -61,6 +61,12 @@ use MONKEY_TYPING;
     dies_ok { bar True }, "cannot pass wrong type";
 
     is "foo".$({ uc $_ }), "FOO", "contextualizer variables";
+
+    my grammar G19 {
+        multi token foo:a { x }
+        multi token foo:b { y }
+    }
+    ok "y" ~~ / :lang(G19) <foo> /, "can use multi regex without proto";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
