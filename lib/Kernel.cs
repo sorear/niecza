@@ -1522,13 +1522,20 @@ next_method: ;
             //SubInfo si = (SubInfo) code.GetSlot("info");
             mi.impl = code;
             mi.short_name = name;
-            mi.long_name = name; // TODO: signature encoding
-            if (code.mo.name == "Regex" && (flags & M_MASK) != 0) {
-                int k = mi.short_name.IndexOf(':');
-                if (k >= 0) mi.short_name = mi.short_name.Substring(0, k);
-                if ((flags & M_MASK) == M_PROTO)
+            mi.long_name = name;
+            if ((flags & M_MASK) != 0) {
+                if ((flags & M_MASK) == M_PROTO) {
                     mi.long_name = mi.long_name + ":(proto)";
+                } else if (code.mo.name == "Regex") {
+                    int k = mi.short_name.IndexOf(':');
+                    if (k >= 0) mi.short_name = mi.short_name.Substring(0, k);
+                } else {
+                    // TODO this should use the real longname, but there
+                    // are currently order problems with that.
+                    mi.long_name += ":(" + Kernel.MMDCandidateLongname.get_unique() + ")";
+                }
             }
+            //Console.WriteLine("{0} {1} {2} {3}", this.name, flags, mi.short_name, mi.long_name);
             mi.flags = flags;
             lmethods.Add(mi);
         }
@@ -1775,6 +1782,128 @@ next_method: ;
             return n;
         }
 
+        public class MMDParameter {
+            public STable type;
+            public bool constrained;
+            public bool required;
+        }
+
+        public class MMDCandidateLongname {
+            public P6any impl;
+            public SubInfo info;
+
+            public List<MMDParameter> pos;
+            public Dictionary<string,MMDParameter> nam;
+
+            public bool slurpy_pos;
+            public bool slurpy_nam;
+            public bool extra_constraints;
+
+            public MMDCandidateLongname(P6any impl) {
+                this.impl = impl;
+                info = (SubInfo) impl.GetSlot("info");
+                int ct = info.sig_i.Length / SubInfo.SIG_I_RECORD;
+
+                pos = new List<MMDParameter>();
+                nam = new Dictionary<string,MMDParameter>();
+                int rix = 0;
+
+                for (int ix = 0; ix < ct; ix++) {
+                    int flags = info.sig_i[ix*SubInfo.SIG_I_RECORD +
+                        SubInfo.SIG_I_FLAGS];
+                    int nnames = info.sig_i[ix*SubInfo.SIG_I_RECORD +
+                        SubInfo.SIG_I_NNAMES];
+                    int rbase = rix;
+                    rix += (nnames + 1);
+                    MMDParameter p = new MMDParameter();
+                    p.required = ((flags & (SubInfo.SIG_F_OPTIONAL | SubInfo.SIG_F_HASDEFAULT)) == 0);
+                    p.constrained = false;
+                    p.type = AnyMO;
+                    if ((flags & SubInfo.SIG_F_HASDEFAULT) != 0) rix++;
+                    if ((flags & SubInfo.SIG_F_HASTYPE) != 0)
+                        p.type = (STable) info.sig_r[rix++];
+
+                    // XXX The long name model does not represent the full
+                    // diversity of Perl 6 parameters, instead restricting
+                    // them to 'only positional' or '1 name'
+                    if (nnames > 0 && (flags & SubInfo.SIG_F_POSITIONAL) == 0) {
+                        if (nnames == 1) {
+                            nam[(string)info.sig_r[rbase+1]] = p;
+                        } else {
+                            slurpy_nam = true;
+                            extra_constraints = true;
+                        }
+                    } else if ((flags & SubInfo.SIG_F_SLURPY_PCL) != 0) {
+                        slurpy_pos = true;
+                    } else if ((flags & SubInfo.SIG_F_SLURPY_CAP) != 0) {
+                        slurpy_pos = true;
+                        slurpy_nam = true;
+                    } else if ((flags & SubInfo.SIG_F_SLURPY_POS) != 0) {
+                        slurpy_pos = true;
+                    } else if ((flags & SubInfo.SIG_F_SLURPY_NAM) != 0) {
+                        slurpy_nam = true;
+                    } else if ((flags & SubInfo.SIG_F_POSITIONAL) != 0) {
+                        pos.Add(p);
+                    }
+                }
+            }
+
+            private static long unique;
+            public static long get_unique() {
+                return Interlocked.Increment(ref unique);
+            }
+
+            public string LongName() {
+                List<string> bits = new List<string>();
+
+                foreach (MMDParameter p in pos) {
+                    string n = p.type.name;
+                    if (!p.required) n += "?";
+                    if (p.constrained)
+                        n += " where { ... " + get_unique() + " }";
+                    bits.Add(n);
+                }
+
+                if (slurpy_pos) bits.Add("*@_");
+
+                List<string> names = new List<string>(nam.Keys);
+                names.Sort();
+                foreach (string nm in names) {
+                    MMDParameter p = nam[nm];
+                    string b = p.type.name + " :$" + nm;
+                    if (p.required) b += "!";
+                    if (p.constrained)
+                        b += " where { ... " + get_unique() + " }";
+                    bits.Add(b);
+                }
+
+                if (slurpy_nam) bits.Add("*%_");
+                string full = JoinS(", ", bits);
+                if (extra_constraints)
+                    full += ";; |$c where { ... " + get_unique() + " }";
+                return full;
+            }
+        }
+
+        public static Frame TypeDispatcher(Frame th, bool tailcall) {
+            Frame dth = th;
+            while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
+
+            foreach (P6any p in dth.info.param0 as P6any[])
+                Console.WriteLine((new MMDCandidateLongname(p)).LongName());
+
+            // XXX I think this is a harmless race
+            //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
+            //if (cs == null)
+            //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
+
+            throw new NieczaException("NYFI");
+        }
+
+        private static Frame StandardTypeProtoC(Frame th) {
+            return TypeDispatcher(th, true);
+        }
+
         public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
             //string s1 = "Dispatch";
             //foreach (P6any s in cands)
@@ -1784,7 +1913,9 @@ next_method: ;
             if (proto != null && proto.mo.name == "Regex") goto ltm;
             if (cands.Length > 0 && cands[0].mo.name == "Regex") goto ltm;
 
-            throw new NieczaException("Type-based MMD NYI");
+            SubInfo si = new SubInfo(name, StandardTypeProtoC);
+            si.param0 = cands;
+            return Kernel.MakeSub(si, null);
 ltm:
             return Lexer.MakeDispatcher(name, cands);
         }
