@@ -1175,6 +1175,12 @@ noparams:
             public int flags;
         }
 
+        public class DispatchSet {
+            public STable defining_class;
+            public string name;
+            public P6any proto;
+        }
+
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -1254,6 +1260,10 @@ noparams:
         public Dictionary<string, DispatchEnt> inherit_methods;
         public Dictionary<string, P6any> private_mro;
 
+        public Dictionary<string, DispatchSet> up_protos;
+        public List<DispatchSet> here_protos;
+        public Dictionary<DispatchSet, List<MethodInfo>> multimethods;
+
         public STable[] local_does;
 
         public List<STable> superclasses
@@ -1283,6 +1293,61 @@ noparams:
             isa = new HashSet<STable>();
         }
 
+        void CollectMMDs() {
+            // Superclass data already collected
+            up_protos = new Dictionary<string,DispatchSet>();
+            here_protos = new List<DispatchSet>();
+            multimethods = new Dictionary<DispatchSet,
+                         List<MethodInfo>>();
+            for (int i = superclasses.Count - 1; i >= 0; i--)
+                foreach (KeyValuePair<string,DispatchSet> kv in
+                        superclasses[i].up_protos)
+                    up_protos[kv.Key] = kv.Value;
+            DispatchSet ds;
+            foreach (MethodInfo mi in lmethods) {
+                if ((mi.flags & V_MASK) != V_PUBLIC)
+                    continue;
+                switch (mi.flags & M_MASK) {
+                    case M_PROTO:
+                        ds = new DispatchSet();
+                        ds.proto = mi.impl;
+                        ds.name  = mi.short_name;
+                        ds.defining_class = this;
+                        here_protos.Add(ds);
+                        up_protos[ds.name] = ds;
+                        break;
+                    case M_MULTI:
+                        if (up_protos.ContainsKey(mi.short_name)
+                                && up_protos[mi.short_name] != null) break;
+                        ds = new DispatchSet();
+                        ds.name  = mi.short_name;
+                        ds.defining_class = this;
+                        here_protos.Add(ds);
+                        up_protos[ds.name] = ds;
+                        break;
+                    case M_ONLY:
+                        up_protos[mi.short_name] = null;
+                        break;
+                }
+            }
+
+            foreach (STable k in mro) {
+                foreach (MethodInfo mi in k.lmethods) {
+                    if (mi.flags != (V_PUBLIC | M_MULTI))
+                        continue;
+                    ds = k.up_protos[mi.short_name];
+                    List<MethodInfo> lmi;
+                    if (!multimethods.TryGetValue(ds, out lmi))
+                        multimethods[ds] = lmi = new List<MethodInfo>();
+                    for (int ix = 0; ix < lmi.Count; ix++)
+                        if (lmi[ix].long_name == mi.long_name)
+                            goto next_method;
+                    lmi.Add(mi);
+next_method: ;
+                }
+            }
+        }
+
         void Revalidate() {
             inherit_methods = mro_methods =
                 new Dictionary<string,DispatchEnt>();
@@ -1293,14 +1358,21 @@ noparams:
             if (isRole)
                 return;
 
+            CollectMMDs();
+            for (int kx = mro.Length - 1; kx >= 0; kx--)
+                SetupMRO(mro[kx]);
+
+            // XXX really ugly, doesn't do much except allow categoricals
+            // to re-use lexers
             if (superclasses.Count == 1) {
-                inherit_methods = mro_methods =
-                    new Dictionary<string,DispatchEnt>(
-                        superclasses[0].inherit_methods);
-                SetupMRO(this);
-            } else {
-                for (int kx = mro.Length - 1; kx >= 0; kx--)
-                    SetupMRO(mro[kx]);
+                HashSet<string> names = new HashSet<string>(superclasses[0].inherit_methods.Keys);
+                foreach (MethodInfo mi in lmethods)
+                    if ((mi.flags & V_MASK) == V_PUBLIC)
+                        names.Remove(mi.short_name);
+                foreach (string n in names) {
+                    //Console.WriteLine("For {0}, removing dangerous override {1}", name, n);
+                    inherit_methods[n] = superclasses[0].inherit_methods[n];
+                }
             }
 
             SetupPrivates();
@@ -1315,6 +1387,19 @@ noparams:
                 string n = m.Name();
                 inherit_methods.TryGetValue(n, out de);
                 inherit_methods[n] = new DispatchEnt(de, m.impl);
+            }
+
+            foreach (DispatchSet ds in k.here_protos) {
+                List<MethodInfo> cands;
+                if (!multimethods.TryGetValue(ds, out cands))
+                    cands = new List<MethodInfo>();
+                P6any[] cl = new P6any[cands.Count];
+                for (int ix = 0; ix < cl.Length; ix++)
+                    cl[ix] = cands[ix].impl;
+                P6any disp = Kernel.MakeDispatcher(ds.name, ds.proto, cl);
+                DispatchEnt de;
+                inherit_methods.TryGetValue(ds.name, out de);
+                inherit_methods[ds.name] = new DispatchEnt(de, disp);
             }
         }
 
@@ -1438,6 +1523,12 @@ noparams:
             mi.impl = code;
             mi.short_name = name;
             mi.long_name = name; // TODO: signature encoding
+            if (code.mo.name == "Regex" && (flags & M_MASK) != 0) {
+                int k = mi.short_name.IndexOf(':');
+                if (k >= 0) mi.short_name = mi.short_name.Substring(0, k);
+                if ((flags & M_MASK) == M_PROTO)
+                    mi.long_name = mi.long_name + ":(proto)";
+            }
             mi.flags = flags;
             lmethods.Add(mi);
         }
@@ -1684,12 +1775,18 @@ noparams:
             return n;
         }
 
-        public static P6any MakeDispatcher(P6any proto, P6any[] cands) {
-            string s1 = "Dispatch";
-            foreach (P6any s in cands)
-                s1 += ", " + ((SubInfo)s.GetSlot("info")).name;
-            Console.WriteLine("MakeDispatcher: {0}", s1);
-            return AnyP;
+        public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
+            //string s1 = "Dispatch";
+            //foreach (P6any s in cands)
+            //    s1 += ", " + ((SubInfo)s.GetSlot("info")).name;
+            //Console.WriteLine("MakeDispatcher: {0}", s1);
+
+            if (proto != null && proto.mo.name == "Regex") goto ltm;
+            if (cands.Length > 0 && cands[0].mo.name == "Regex") goto ltm;
+
+            throw new NieczaException("Type-based MMD NYI");
+ltm:
+            return Lexer.MakeDispatcher(name, cands);
         }
 
         public static bool SaferMode;

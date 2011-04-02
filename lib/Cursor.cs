@@ -1726,7 +1726,7 @@ anew:
                 th.rx.PushBacktrack(2);
                 th.ip = 3;
                 return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th,
-                    new Variable[] { (Variable)th.lex0 }, null);
+                    new Variable[] { Kernel.NewROScalar(th.rx.MakeCursor()) }, null);
             case 3:
                 th.lex2 = new VarDeque((Variable) th.resultSlot);
                 goto case 4;
