@@ -1238,40 +1238,6 @@ public class LADMethod : LAD {
     }
 }
 
-public class LADProtoRegex : LAD {
-    public readonly string name;
-
-    public LADProtoRegex(string name) { this.name = name; }
-
-    public override void ToNFA(NFA pad, int from, int to) {
-        throw new InvalidOperationException();
-    }
-
-    public override void QueryLiteral(NFA pad, out int len, out bool cont) {
-        throw new InvalidOperationException();
-    }
-
-    public override LAD Reify(NFA pad) {
-        P6opaque[] cands = Lexer.ResolveProtoregex(pad.cursor_class.GetLexerCache(), name);
-        LAD[] opts = new LAD[cands.Length];
-        pad.used_methods.Add(name);
-
-        for (int i = 0; i < opts.Length; i++) {
-            pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
-            pad.info_stack.Add((SubInfo)cands[i].GetSlot("info"));
-            opts[i] = ((SubInfo)cands[i].GetSlot("info")).ltm.Reify(pad);
-            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
-            pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
-        }
-
-        return new LADAny(opts);
-    }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "protorx " + name);
-    }
-}
-
 // Only really makes sense if used in the static scope of a proto
 public class LADDispatcher : LAD {
     public override void ToNFA(NFA pad, int from, int to) {
@@ -1426,10 +1392,6 @@ public class LexerCache {
     }
 
     public Dictionary<LAD[], Lexer> nfas = new Dictionary<LAD[], Lexer>();
-    public Dictionary<string, P6opaque[]> protorx_fns =
-        new Dictionary<string, P6opaque[]>();
-    public Dictionary<string, Lexer> protorx_nfa =
-        new Dictionary<string, Lexer>();
     public Dictionary<SubInfo, Lexer> dispatch_nfas =
         new Dictionary<SubInfo, Lexer>();
 }
@@ -1638,58 +1600,6 @@ anew:
         return uniqfates;
     }
 
-    public static Lexer GetProtoregexLexer(STable kl, string name) {
-        LexerCache lc = kl.GetLexerCache();
-        P6opaque[] candidates = ResolveProtoregex(lc, name);
-        Lexer l;
-
-        if (lc.protorx_nfa.TryGetValue(name, out l)) {
-            if (LtmTrace)
-                Console.WriteLine("+ Protoregex lexer HIT on {0}.{1}",
-                        kl.name, name);
-            return l;
-        }
-
-        if (LtmTrace)
-            Console.WriteLine("+ Protoregex lexer MISS on {0}.{1}",
-                    kl.name, name);
-
-        if (lc.parent != null && !lc.repl_methods.Contains(name)) {
-            if (LtmTrace)
-                Console.WriteLine("+ Trying to delegate to {0}",
-                        lc.parent.mo.name);
-            Lexer pl = GetProtoregexLexer(lc.parent.mo, name);
-
-            foreach (string used in pl.pad.used_methods) {
-                if (lc.repl_methods.Contains(used)) {
-                    if (LtmTrace)
-                        Console.WriteLine("+ Cannot; {0} is overridden",
-                                used);
-                    goto anew;
-                }
-            }
-
-            if (LtmTrace)
-                Console.WriteLine("+ Success!");
-
-            return lc.protorx_nfa[name] = pl;
-        }
-anew:
-        LAD[] branches = new LAD[candidates.Length];
-        NFA pad = new NFA();
-        pad.used_methods.Add(name);
-        pad.cursor_class = kl;
-        for (int i = 0; i < candidates.Length; i++) {
-            pad.outer_stack.Add((Frame) candidates[i].GetSlot("outer"));
-            pad.info_stack.Add((SubInfo) candidates[i].GetSlot("info"));
-            branches[i] = (((SubInfo) candidates[i].GetSlot("info")).ltm).
-                Reify(pad);
-            pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
-            pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
-        }
-        return lc.protorx_nfa[name] = new Lexer(pad, name, branches);
-    }
-
     public static P6any[] RunDispatch(Frame fromf, P6any cursor) {
         STable kl = cursor.mo;
         while (fromf.info.param0 == null) fromf = fromf.outer;
@@ -1744,64 +1654,6 @@ anew:
         si.sig_r = new object[1] { "self" };
         si.ltm = new LADDispatcher();
         return Kernel.MakeSub(si, null);
-    }
-
-    public static P6any[] RunProtoregex(Frame fromf, P6any cursor, string name) {
-        STable kl = cursor.mo;
-
-        P6opaque[] candidates = ResolveProtoregex(kl.GetLexerCache(), name);
-        Lexer l = GetProtoregexLexer(kl, name);
-        Cursor c = (Cursor)cursor;
-        int[] brnum = l.Run(c.global.orig_s, c.pos);
-
-        P6any[] ret = new P6any[brnum.Length];
-        for (int i = 0; i < brnum.Length; i++)
-            ret[i] = candidates[brnum[i]];
-
-        return ret;
-    }
-
-    public static P6opaque[] ResolveProtoregex(LexerCache lc,
-            string name) {
-        P6opaque[] ret;
-        STable cursor_class = lc.mo;
-        if (lc.protorx_fns.TryGetValue(name, out ret)) {
-            if (LtmTrace)
-                Console.WriteLine("+ Protoregex method list HIT on {0}.{1}",
-                        cursor_class.name, name);
-            return ret;
-        }
-        if (LtmTrace)
-            Console.WriteLine("+ Protoregex method list MISS on {0}.{1}",
-                    cursor_class.name, name);
-        if (lc.parent != null && !lc.repl_methods.Contains(name)) {
-            if (LtmTrace)
-                Console.WriteLine("+ Stealing from parent");
-            return lc.protorx_fns[name] = ResolveProtoregex(lc.parent, name);
-        }
-
-        P6any proto = cursor_class.Can(name);
-        string filter = name + ":";
-
-        List<P6opaque> raword = new List<P6opaque>();
-
-        foreach (STable k in cursor_class.mro) {
-            if (proto != k.Can(name))
-                continue;
-            foreach (STable.MethodInfo o in k.lmethods) {
-                if ((o.flags & STable.V_MASK) != STable.V_PUBLIC)
-                    continue;
-                if (!Utils.StartsWithInvariant(filter, o.short_name))
-                    continue;
-                if (cursor_class.Can(o.short_name) == o.impl) {
-                    raword.Add((P6opaque) o.impl);
-                }
-            }
-        }
-
-        ret = raword.ToArray();
-        cursor_class.GetLexerCache().protorx_fns[name] = ret;
-        return ret;
     }
 }
 
