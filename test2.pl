@@ -69,12 +69,28 @@ use MONKEY_TYPING;
     ok "y" ~~ / :lang(G19) <foo> /, "can use multi regex without proto";
 
     my class C20 {
-        multi method bar(Bool $) { "bool" }
-        multi method bar(Str $) { "str" }
+        multi method b1(Bool $) { "bool" }
+        multi method b1(Str $) { "str" }
+
+        multi method b2(Bool $) { "bool" }
+        multi method b2(Any $) { "any" }
+
+        multi method b3(Any $) { "any" }
+        multi method b3(Bool $) { "bool" }
+
+        multi method b4(Bool $ , Any $) { "doom" }
+        multi method b4(Any $ , Bool $) { "doom" }
     }
 
-    is C20.bar(True), "bool", "multimethods work (1)";
-    is C20.bar("foo"), "str", "multimethods work (2)";
+    is C20.b1(True), "bool", "multimethods work (1)";
+    is C20.b1("foo"), "str", "multimethods work (2)";
+
+    is C20.b2(True), "bool", "multimethod sorting works (1)";
+    is C20.b2("foo"), "any", "multimethod sorting works (1)";
+    is C20.b3(True), "bool", "multimethod sorting works (1)";
+    is C20.b3("foo"), "any", "multimethod sorting works (1)";
+
+    dies_ok { C20.b4("foo", "bar") }, "multimethod tie checking works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

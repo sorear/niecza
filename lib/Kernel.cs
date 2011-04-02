@@ -1889,6 +1889,7 @@ next_method: ;
             Frame dth = th;
             while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
 
+            Console.WriteLine("---");
             foreach (P6any p in dth.info.param0 as P6any[])
                 Console.WriteLine((new MMDCandidateLongname(p)).LongName());
 
@@ -1897,7 +1898,9 @@ next_method: ;
             //if (cs == null)
             //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
 
-            throw new NieczaException("NYFI");
+            if (tailcall) th = th.caller;
+            th.resultSlot = NewROScalar(AnyP);
+            return th;
         }
 
         private static Frame StandardTypeProtoC(Frame th) {
