@@ -138,6 +138,42 @@ method regex_def($/) {
 }
 }
 
+augment class CgOp {
+#method run_protoregex (*@_) { self._cgop("run_protoregex", @_) }
+method run_dispatch (*@_) { self._cgop("run_dispatch", @_) }
+}
+
+augment class RxOp::ProtoRedis { #OK exist
+    method code($) {
+        CgOp.letn(
+          "fns", CgOp.run_dispatch(CgOp.callframe,
+            CgOp.fetch(CgOp.scopedlex('self'))),
+          "i",   CgOp.int(0),
+          "ks",  CgOp.null('vvarlist'),
+          CgOp.pushcut('LTM'),
+          CgOp.label('nextfn'),
+          CgOp.cgoto('backtrack',
+            CgOp.compare('>=', CgOp.letvar("i"),
+              CgOp.mrl_count(CgOp.letvar("fns")))),
+          CgOp.rxpushb('LTM', 'nextfn'),
+          CgOp.letvar("ks", CgOp.vvarlist_new_singleton(
+            CgOp.subcall(CgOp.mrl_index(CgOp.letvar("i"),
+                CgOp.letvar("fns")), CgOp.newscalar(CgOp.rxcall(
+                    'MakeCursor'))))),
+          CgOp.letvar("i", CgOp.arith('+', CgOp.letvar("i"), CgOp.int(1))),
+          CgOp.label('nextcsr'),
+          CgOp.ncgoto('backtrack', CgOp.iter_hasflat(CgOp.letvar('ks'))),
+          CgOp.rxpushb('SUBRULE', 'nextcsr'),
+          CgOp.rxcall('EndWith', CgOp.cast('cursor',
+              CgOp.fetch(CgOp.vvarlist_shift(CgOp.letvar('ks'))))),
+          CgOp.goto('backtrack'));
+    }
+
+    method lad() {
+        $.cutltm ?? [ 'Imp' ] !! [ 'Dispatcher' ];
+    }
+}
+
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
 

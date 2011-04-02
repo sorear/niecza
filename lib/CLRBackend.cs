@@ -892,7 +892,7 @@ namespace Niecza.CLRBackend {
             n["Str"] = typeof(LADStr).GetConstructor(new Type[] { String });
             n["Param"] = typeof(LADParam).GetConstructor(new Type[] { String });
             n["Method"] = typeof(LADMethod).GetConstructor(new Type[] { String });
-            n["ProtoRegex"] = typeof(LADProtoRegex).GetConstructor(new Type[] { String });
+            n["Dispatcher"] = typeof(LADDispatcher).GetConstructor(new Type[] { });
             n["StrNoCase"] = typeof(LADStrNoCase).GetConstructor(new Type[] { String });
             n["Imp"] = typeof(LADImp).GetConstructor(new Type[] { });
             n["Dot"] = typeof(LADDot).GetConstructor(new Type[] { });
@@ -3043,7 +3043,7 @@ dynamic:
             thandlers["rxgetpos"] = RxCall(null, "GetPos");
             thandlers["rxcommitgroup"] = RxCall(null, "CommitGroup");
             thandlers["get_lexer"] = Methody(null, typeof(Lexer).GetMethod("GetLexer"));
-            thandlers["run_protoregex"] = Methody(null, typeof(Lexer).GetMethod("RunProtoregex"));
+            thandlers["run_dispatch"] = Methody(null, typeof(Lexer).GetMethod("RunDispatch"));
             handlers["ladconstruct"] = delegate(NamProcessor th, object[] z) {
                 return th.ProcessLADArr(z[1]); };
             handlers["rawcall"] = delegate(NamProcessor th, object[] z) {
@@ -3325,9 +3325,9 @@ dynamic:
                 return CpsOp.ConstructorCall(ci, new CpsOp[] {
                     CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
                         CpsOp.NewIntArray(ccs) }) });
-            } else if (head == "Imp" || head == "Dot" || head == "Null" || head == "None") {
+            } else if (head == "Imp" || head == "Dot" || head == "Null" || head == "None" || head == "Dispatcher") {
                 return CpsOp.ConstructorCall(ci, new CpsOp[0]);
-            } else if (head == "Str" || head == "StrNoCase" || head == "Param" || head == "ProtoRegex" || head == "Method") {
+            } else if (head == "Str" || head == "StrNoCase" || head == "Param" || head == "Method") {
                 return CpsOp.ConstructorCall(ci, new CpsOp[]{
                     CpsOp.StringLiteral(JScalar.S(body[1])) });
             } else if (head == "Opt" || head == "Star" || head == "Plus") {

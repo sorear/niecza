@@ -1742,6 +1742,7 @@ anew:
         si.param0 = cands;
         si.sig_i = new int[3] { SubInfo.SIG_F_POSITIONAL, 0, 0 };
         si.sig_r = new object[1] { "self" };
+        si.ltm = new LADDispatcher();
         return Kernel.MakeSub(si, null);
     }
 
