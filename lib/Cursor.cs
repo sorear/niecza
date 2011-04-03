@@ -1656,20 +1656,3 @@ anew:
         return Kernel.MakeSub(si, null);
     }
 }
-
-public class Utils {
-    // s1 must not have embedded nuls
-    public static unsafe bool StartsWithInvariant(string s1, string s2) {
-        fixed (char* st1 = s1) {
-            char* p1 = st1;
-            fixed (char* st2 = s2) {
-                char* p2 = st2;
-                while (*p1 != '\0' && *p1 == *p2) {
-                    p1++;
-                    p2++;
-                }
-                return (*p1 == '\0');
-            }
-        }
-    }
-}
