@@ -6,7 +6,8 @@ CSC=gmcs
 RM=rm -f
 CP=cp
 
-cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs
+cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
+	 ObjModel.cs
 csbackend=CLRBackend.cs
 csxdr=CrossDomainReceiver.cs
 
