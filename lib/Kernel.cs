@@ -1138,14 +1138,6 @@ noparams:
     // façade
     public class P6how {
         public STable stable;
-    }
-
-    // The role of STable is to hold stuff that needs to exist per
-    // (representation, type) pair.  Note that types are somewhat
-    // epiphenominal.  STable is also in charge of cachey bits of
-    // the metamodel that need to be common a lot, like vtables.
-    public class STable {
-        public P6how mo;
 
         public struct AttrInfo {
             public string name;
@@ -1170,7 +1162,7 @@ noparams:
             public string long_name;
 
             public string Name() {
-                return ((flags & STable.M_MASK) != 0) ? long_name : short_name;
+                return ((flags & P6how.M_MASK) != 0) ? long_name : short_name;
             }
 
             public P6any impl;
@@ -1184,6 +1176,13 @@ noparams:
             public P6any proto;
         }
 
+    }
+
+    // The role of STable is to hold stuff that needs to exist per
+    // (representation, type) pair.  Note that types are somewhat
+    // epiphenominal.  STable is also in charge of cachey bits of
+    // the metamodel that need to be common a lot, like vtables.
+    public class STable {
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -1228,6 +1227,8 @@ noparams:
         public static readonly InvokeHandler CallINVOKE
             = new InvokeCallMethod();
 
+        public P6how mo;
+
         public P6any how;
         public P6any typeObject;
         public string name;
@@ -1239,11 +1240,6 @@ noparams:
         // called against them; the fallback (NYI) is to pun.
 
         public LexerCache lexcache;
-        public LexerCache GetLexerCache() {
-            if (lexcache == null)
-                lexcache = new LexerCache(this);
-            return lexcache;
-        }
 
         public ContextHandler<Variable> mro_Str, mro_Numeric, mro_Bool,
                 mro_defined, mro_iterator, mro_item, mro_list, mro_hash;
@@ -1263,16 +1259,16 @@ noparams:
         public Dictionary<string, DispatchEnt> inherit_methods;
         public Dictionary<string, P6any> private_mro;
 
-        public Dictionary<string, DispatchSet> up_protos;
-        public List<DispatchSet> here_protos;
-        public Dictionary<DispatchSet, List<MethodInfo>> multimethods;
+        public Dictionary<string, P6how.DispatchSet> up_protos;
+        public List<P6how.DispatchSet> here_protos;
+        public Dictionary<P6how.DispatchSet, List<P6how.MethodInfo>> multimethods;
 
         public STable[] local_does;
 
         public List<STable> superclasses
             = new List<STable>();
-        public List<MethodInfo> lmethods = new List<MethodInfo>();
-        public List<AttrInfo> local_attr = new List<AttrInfo>();
+        public List<P6how.MethodInfo> lmethods = new List<P6how.MethodInfo>();
+        public List<P6how.AttrInfo> local_attr = new List<P6how.AttrInfo>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
@@ -1280,11 +1276,6 @@ noparams:
 
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
-
-        public int FindSlot(string name) {
-            //Kernel.LogNameLookup(name);
-            return slotMap[name];
-        }
 
         public STable[] mro;
         public HashSet<STable> isa;
@@ -1298,52 +1289,63 @@ noparams:
             isa = new HashSet<STable>();
         }
 
+        public int FindSlot(string name) {
+            //Kernel.LogNameLookup(name);
+            return slotMap[name];
+        }
+
+        public LexerCache GetLexerCache() {
+            if (lexcache == null)
+                lexcache = new LexerCache(this);
+            return lexcache;
+        }
+
         void CollectMMDs() {
             // Superclass data already collected
-            up_protos = new Dictionary<string,DispatchSet>();
-            here_protos = new List<DispatchSet>();
-            multimethods = new Dictionary<DispatchSet,
-                         List<MethodInfo>>();
+            up_protos = new Dictionary<string,P6how.DispatchSet>();
+            here_protos = new List<P6how.DispatchSet>();
+            multimethods = new Dictionary<P6how.DispatchSet,
+                         List<P6how.MethodInfo>>();
             for (int i = superclasses.Count - 1; i >= 0; i--)
-                foreach (KeyValuePair<string,DispatchSet> kv in
+                foreach (KeyValuePair<string,P6how.DispatchSet> kv in
                         superclasses[i].up_protos)
                     up_protos[kv.Key] = kv.Value;
-            DispatchSet ds;
-            foreach (MethodInfo mi in lmethods) {
-                if ((mi.flags & V_MASK) != V_PUBLIC)
+            P6how.DispatchSet ds;
+            foreach (P6how.MethodInfo mi in lmethods) {
+                if ((mi.flags & P6how.V_MASK) != P6how.V_PUBLIC)
                     continue;
-                switch (mi.flags & M_MASK) {
-                    case M_PROTO:
-                        ds = new DispatchSet();
+                switch (mi.flags & P6how.M_MASK) {
+                    case P6how.M_PROTO:
+                        ds = new P6how.DispatchSet();
                         ds.proto = mi.impl;
                         ds.name  = mi.short_name;
                         ds.defining_class = this;
                         here_protos.Add(ds);
                         up_protos[ds.name] = ds;
                         break;
-                    case M_MULTI:
+                    case P6how.M_MULTI:
                         if (up_protos.ContainsKey(mi.short_name)
                                 && up_protos[mi.short_name] != null) break;
-                        ds = new DispatchSet();
+                        ds = new P6how.DispatchSet();
                         ds.name  = mi.short_name;
                         ds.defining_class = this;
                         here_protos.Add(ds);
                         up_protos[ds.name] = ds;
                         break;
-                    case M_ONLY:
+                    case P6how.M_ONLY:
                         up_protos[mi.short_name] = null;
                         break;
                 }
             }
 
             foreach (STable k in mro) {
-                foreach (MethodInfo mi in k.lmethods) {
-                    if (mi.flags != (V_PUBLIC | M_MULTI))
+                foreach (P6how.MethodInfo mi in k.lmethods) {
+                    if (mi.flags != (P6how.V_PUBLIC | P6how.M_MULTI))
                         continue;
                     ds = k.up_protos[mi.short_name];
-                    List<MethodInfo> lmi;
+                    List<P6how.MethodInfo> lmi;
                     if (!multimethods.TryGetValue(ds, out lmi))
-                        multimethods[ds] = lmi = new List<MethodInfo>();
+                        multimethods[ds] = lmi = new List<P6how.MethodInfo>();
                     for (int ix = 0; ix < lmi.Count; ix++)
                         if (lmi[ix].long_name == mi.long_name)
                             goto next_method;
@@ -1371,8 +1373,8 @@ next_method: ;
             // to re-use lexers
             if (superclasses.Count == 1) {
                 HashSet<string> names = new HashSet<string>(superclasses[0].inherit_methods.Keys);
-                foreach (MethodInfo mi in lmethods)
-                    if ((mi.flags & V_MASK) == V_PUBLIC)
+                foreach (P6how.MethodInfo mi in lmethods)
+                    if ((mi.flags & P6how.V_MASK) == P6how.V_PUBLIC)
                         names.Remove(mi.short_name);
                 foreach (string n in names) {
                     //Console.WriteLine("For {0}, removing dangerous override {1}", name, n);
@@ -1385,19 +1387,19 @@ next_method: ;
         }
 
         void SetupMRO(STable k) {
-            foreach (MethodInfo m in k.lmethods) {
+            foreach (P6how.MethodInfo m in k.lmethods) {
                 DispatchEnt de;
-                if ((m.flags & V_MASK) != V_PUBLIC)
+                if ((m.flags & P6how.V_MASK) != P6how.V_PUBLIC)
                     continue;
                 string n = m.Name();
                 inherit_methods.TryGetValue(n, out de);
                 inherit_methods[n] = new DispatchEnt(de, m.impl);
             }
 
-            foreach (DispatchSet ds in k.here_protos) {
-                List<MethodInfo> cands;
+            foreach (P6how.DispatchSet ds in k.here_protos) {
+                List<P6how.MethodInfo> cands;
                 if (!multimethods.TryGetValue(ds, out cands))
-                    cands = new List<MethodInfo>();
+                    cands = new List<P6how.MethodInfo>();
                 P6any[] cl = new P6any[cands.Count];
                 for (int ix = 0; ix < cl.Length; ix++)
                     cl[ix] = cands[ix].impl;
@@ -1409,12 +1411,12 @@ next_method: ;
         }
 
         void SetupPrivates() {
-            foreach (MethodInfo m in lmethods) {
+            foreach (P6how.MethodInfo m in lmethods) {
                 string n = m.Name();
-                if ((m.flags & V_MASK) == V_PRIVATE) {
+                if ((m.flags & P6how.V_MASK) == P6how.V_PRIVATE) {
                     private_mro[n] = m.impl;
                 }
-                else if ((m.flags & V_MASK) == V_SUBMETHOD) {
+                else if ((m.flags & P6how.V_MASK) == P6how.V_SUBMETHOD) {
                     DispatchEnt de;
                     if (mro_methods == inherit_methods)
                         mro_methods = new Dictionary<string,DispatchEnt>(
@@ -1523,13 +1525,13 @@ next_method: ;
         }
 
         public void AddMethod(int flags, string name, P6any code) {
-            MethodInfo mi;
+            P6how.MethodInfo mi;
             //SubInfo si = (SubInfo) code.GetSlot("info");
             mi.impl = code;
             mi.short_name = name;
             mi.long_name = name;
-            if ((flags & M_MASK) != 0) {
-                if ((flags & M_MASK) == M_PROTO) {
+            if ((flags & P6how.M_MASK) != 0) {
+                if ((flags & P6how.M_MASK) == P6how.M_PROTO) {
                     mi.long_name = mi.long_name + ":(proto)";
                 } else if (code.mo.name == "Regex") {
                     int k = mi.short_name.IndexOf(':');
@@ -1547,7 +1549,7 @@ next_method: ;
 
         public void AddAttribute(string name, bool publ, P6any init,
                 STable type) {
-            AttrInfo ai;
+            P6how.AttrInfo ai;
             ai.name = name;
             ai.publ = publ;
             ai.init = init;
@@ -2141,7 +2143,7 @@ ltm:
             STable[] mro = n.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
-                foreach (STable.AttrInfo a in mro[i].local_attr) {
+                foreach (P6how.AttrInfo a in mro[i].local_attr) {
                     P6any val;
                     Variable vx;
                     if (a.publ && args.TryGetValue(a.name, out vx)) {
@@ -2446,9 +2448,9 @@ slow:
             Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
             nmro[0] = n;
             n.FillClass(b.all_slot, new STable[] { b }, nmro);
-            foreach (STable.MethodInfo mi in role.lmethods)
+            foreach (P6how.MethodInfo mi in role.lmethods)
                 n.lmethods.Add(mi);
-            foreach (STable.AttrInfo ai in role.local_attr)
+            foreach (P6how.AttrInfo ai in role.local_attr)
                 n.local_attr.Add(ai);
             n.Invalidate();
 

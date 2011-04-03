@@ -1380,8 +1380,8 @@ public class LexerCache {
         if (mo.superclasses.Count == 1) {
             parent = mo.superclasses[0].GetLexerCache();
             repl_methods = new HashSet<string>();
-            foreach (STable.MethodInfo mi in mo.lmethods) {
-                if ((mi.flags & STable.V_MASK) != STable.V_PUBLIC)
+            foreach (P6how.MethodInfo mi in mo.lmethods) {
+                if ((mi.flags & P6how.V_MASK) != P6how.V_PUBLIC)
                     continue;
                 string mn = mi.short_name;
                 int ix = mn.IndexOf(':');
