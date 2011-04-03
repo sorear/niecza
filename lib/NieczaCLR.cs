@@ -66,8 +66,8 @@ public class NieczaCLR {
         STable m = new STable("clr:" + t.FullName);
         STable pm = t.BaseType == null ? Kernel.AnyMO :
             GetWrapper(t.BaseType);
-        STable[] mro = new STable[pm.mro.Length + 1];
-        Array.Copy(pm.mro, 0, mro, 1, pm.mro.Length);
+        STable[] mro = new STable[pm.mo.mro.Length + 1];
+        Array.Copy(pm.mo.mro, 0, mro, 1, pm.mo.mro.Length);
         mro[0] = m;
         m.FillClass(new string[] { }, new STable[] { pm }, mro);
         //m.loc_to_clr = CLRToCLR.Instance;

@@ -1377,8 +1377,8 @@ public class LexerCache {
 
     public LexerCache(STable mo) {
         this.mo = mo;
-        if (mo.superclasses.Count == 1) {
-            parent = mo.superclasses[0].GetLexerCache();
+        if (mo.mo.superclasses.Count == 1) {
+            parent = mo.mo.superclasses[0].GetLexerCache();
             repl_methods = new HashSet<string>();
             foreach (P6how.MethodInfo mi in mo.mo.lmethods) {
                 if ((mi.flags & P6how.V_MASK) != P6how.V_PUBLIC)

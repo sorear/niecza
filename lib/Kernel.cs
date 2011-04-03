@@ -1158,6 +1158,13 @@ noparams:
         public List<MethodInfo> lmethods = new List<MethodInfo>();
         public List<AttrInfo> local_attr = new List<AttrInfo>();
 
+        public List<STable> superclasses = new List<STable>();
+        internal SubscriberSet subclasses = new SubscriberSet();
+        Subscription[] mro_sub;
+
+        public STable[] mro;
+        public HashSet<STable> isa = new HashSet<STable>();
+
         public struct AttrInfo {
             public string name;
             public P6any init;
@@ -1200,9 +1207,9 @@ noparams:
             up_protos = new Dictionary<string,DispatchSet>();
             here_protos = new List<DispatchSet>();
             multimethods = new Dictionary<DispatchSet, List<MethodInfo>>();
-            for (int i = stable.superclasses.Count - 1; i >= 0; i--)
+            for (int i = superclasses.Count - 1; i >= 0; i--)
                 foreach (KeyValuePair<string,DispatchSet> kv in
-                        stable.superclasses[i].mo.up_protos)
+                        superclasses[i].mo.up_protos)
                     up_protos[kv.Key] = kv.Value;
             DispatchSet ds;
             foreach (MethodInfo mi in lmethods) {
@@ -1221,7 +1228,7 @@ noparams:
                         if (up_protos.ContainsKey(mi.short_name)
                                 && up_protos[mi.short_name] != null) break;
                         ds = new DispatchSet();
-                        ds.name  = mi.short_name;
+                        ds.name = mi.short_name;
                         ds.defining_class = stable;
                         here_protos.Add(ds);
                         up_protos[ds.name] = ds;
@@ -1232,7 +1239,7 @@ noparams:
                 }
             }
 
-            foreach (STable k in stable.mro) {
+            foreach (STable k in mro) {
                 foreach (MethodInfo mi in k.mo.lmethods) {
                     if (mi.flags != (V_PUBLIC | M_MULTI))
                         continue;
@@ -1254,25 +1261,25 @@ next_method: ;
                 new Dictionary<string,DispatchEnt>();
             stable.private_mro = new Dictionary<string,P6any>();
 
-            if (stable.mro == null)
+            if (mro == null)
                 return;
             if (isRole)
                 return;
 
             CollectMMDs();
-            for (int kx = stable.mro.Length - 1; kx >= 0; kx--)
-                SetupMRO(stable.mro[kx].mo);
+            for (int kx = mro.Length - 1; kx >= 0; kx--)
+                SetupMRO(mro[kx].mo);
 
             // XXX really ugly, doesn't do much except allow categoricals
             // to re-use lexers
-            if (stable.superclasses.Count == 1) {
-                HashSet<string> names = new HashSet<string>(stable.superclasses[0].mo.inherit_methods.Keys);
+            if (superclasses.Count == 1) {
+                HashSet<string> names = new HashSet<string>(superclasses[0].mo.inherit_methods.Keys);
                 foreach (MethodInfo mi in lmethods)
                     if ((mi.flags & V_MASK) == V_PUBLIC)
                         names.Remove(mi.short_name);
                 foreach (string n in names) {
                     //Console.WriteLine("For {0}, removing dangerous override {1}", name, n);
-                    inherit_methods[n] = stable.superclasses[0].mo.inherit_methods[n];
+                    inherit_methods[n] = superclasses[0].mo.inherit_methods[n];
                 }
             }
 
@@ -1320,12 +1327,116 @@ next_method: ;
             }
         }
 
+        private void SetMRO(STable[] arr) {
+            if (mro_sub != null)
+                foreach (Subscription k in mro_sub)
+                    k.Terminate();
+            mro_sub = new Subscription[arr.Length];
+            for (int i = 0; i < arr.Length; i++)
+                mro_sub[i] = new Subscription(stable, arr[i].mo.subclasses);
+            mro = arr;
+            isa.Clear();
+            foreach (STable k in arr)
+                isa.Add(k);
+        }
+
+        // invariant: if a class is dirty, so are all subclasses
+        // invariant: mro-graph is acyclic
+        void RevalidateTree(HashSet<STable> dirty) {
+            if (!dirty.Contains(stable)) return;
+            foreach (STable sp in mro)
+                if (sp != stable) sp.mo.RevalidateTree(dirty);
+            Revalidate();
+            stable.SetupVTables();
+            dirty.Remove(stable);
+        }
+
+        public void Invalidate() {
+            List<object> notify = subclasses.GetSubscribers();
+            HashSet<STable> dirty = new HashSet<STable>();
+            foreach (object k in notify) dirty.Add((STable)k);
+            foreach (object k in notify) ((STable)k).mo.RevalidateTree(dirty);
+        }
+
+        public void AddMethod(int flags, string name, P6any code) {
+            MethodInfo mi;
+            //SubInfo si = (SubInfo) code.GetSlot("info");
+            mi.impl = code;
+            mi.short_name = name;
+            mi.long_name = name;
+            if ((flags & M_MASK) != 0) {
+                if ((flags & M_MASK) == M_PROTO) {
+                    mi.long_name = mi.long_name + ":(proto)";
+                } else if (code.mo.name == "Regex") {
+                    int k = mi.short_name.IndexOf(':');
+                    if (k >= 0) mi.short_name = mi.short_name.Substring(0, k);
+                } else {
+                    // TODO this should use the real longname, but there
+                    // are currently order problems with that.
+                    mi.long_name += ":(" + Kernel.MMDCandidateLongname.get_unique() + ")";
+                }
+            }
+            //Console.WriteLine("{0} {1} {2} {3}", this.name, flags, mi.short_name, mi.long_name);
+            mi.flags = flags;
+            lmethods.Add(mi);
+        }
+
+        public void AddAttribute(string name, bool publ, P6any init,
+                STable type) {
+            AttrInfo ai;
+            ai.name = name;
+            ai.publ = publ;
+            ai.init = init;
+            ai.type = type;
+            local_attr.Add(ai);
+        }
+
+        public void FillProtoClass(string[] slots) {
+            FillClass(slots, new STable[] {}, new STable[] { stable });
+        }
+
+        public void FillClass(string[] all_slot, STable[] superclasses,
+                STable[] mro) {
+            this.superclasses = new List<STable>(superclasses);
+            SetMRO(mro);
+            butCache = new Dictionary<STable, STable>();
+            stable.all_slot = all_slot;
+            local_does = new STable[0];
+
+            stable.nslots = 0;
+            foreach (string an in all_slot) {
+                stable.slotMap[an] = stable.nslots++;
+            }
+
+            Invalidate();
+        }
+
+        public void FillRole(STable[] superclasses, STable[] cronies) {
+            this.superclasses = new List<STable>(superclasses);
+            local_does = cronies;
+            isRole = true;
+            Revalidate(); // need to call directly as we aren't in any mro list
+            SetMRO(Kernel.AnyMO.mo.mro);
+        }
+
+        public void FillParametricRole(P6any factory) {
+            isRole = true;
+            roleFactory = factory;
+            instCache = new Dictionary<string, P6any>();
+            Revalidate();
+            SetMRO(Kernel.AnyMO.mo.mro);
+        }
     }
 
     // The role of STable is to hold stuff that needs to exist per
     // (representation, type) pair.  Note that types are somewhat
     // epiphenominal.  STable is also in charge of cachey bits of
     // the metamodel that need to be common a lot, like vtables.
+    //
+    // STables currenly exist in 1:1 correspondence with types, so
+    // generally a single class is limited to a single representation.
+    // (Although due to quirks of the C# implementation, Cursor and
+    // BoxObject can share the P6opaque STable)
     public class STable {
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
@@ -1400,18 +1511,10 @@ next_method: ;
         public int nslots = 0;
         public string[] all_slot;
 
-        public List<STable> superclasses = new List<STable>();
-        internal SubscriberSet subclasses = new SubscriberSet();
-        Subscription[] mro_sub;
-
-        public STable[] mro;
-        public HashSet<STable> isa;
-
         public STable(string name) {
             this.name = name;
             mo = new P6how();
             mo.stable = this;
-            isa = new HashSet<STable>();
         }
 
         public int FindSlot(string name) {
@@ -1425,7 +1528,7 @@ next_method: ;
             return lexcache;
         }
 
-        void SetupVTables() {
+        internal void SetupVTables() {
             mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
             mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
             mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
@@ -1462,98 +1565,19 @@ next_method: ;
             return de == null ? null : de.info.param0;
         }
 
-        private void SetMRO(STable[] arr) {
-            if (mro_sub != null)
-                foreach (Subscription k in mro_sub)
-                    k.Terminate();
-            mro_sub = new Subscription[arr.Length];
-            for (int i = 0; i < arr.Length; i++)
-                mro_sub[i] = new Subscription(this, arr[i].subclasses);
-            mro = arr;
-            isa.Clear();
-            foreach (STable k in arr)
-                isa.Add(k);
-        }
+        public void Invalidate() { mo.Invalidate(); }
 
-        // invariant: if a class is dirty, so are all subclasses
-        // invariant: mro-graph is acyclic
-        void RevalidateTree(HashSet<STable> dirty) {
-            if (!dirty.Contains(this)) return;
-            foreach (STable sp in mro)
-                if (sp != this) sp.RevalidateTree(dirty);
-            mo.Revalidate();
-            SetupVTables();
-            dirty.Remove(this);
-        }
-
-        public void Invalidate() {
-            List<object> notify = subclasses.GetSubscribers();
-            HashSet<STable> dirty = new HashSet<STable>();
-            foreach (object k in notify) dirty.Add((STable)k);
-            foreach (object k in notify) ((STable)k).RevalidateTree(dirty);
-        }
-
-        public P6any Can(string name) {
-            DispatchEnt m;
-            if (mro_methods.TryGetValue(name, out m))
-                return m.ip6; // TODO return an iterator
-            return null;
-        }
-
-        public Dictionary<string,DispatchEnt> AllMethods() {
-            return mro_methods;
-        }
-
-        public HashSet<P6any> AllMethodsSet() {
-            HashSet<P6any> r = new HashSet<P6any>();
-            foreach (KeyValuePair<string,DispatchEnt> kv in mro_methods)
-                r.Add(kv.Value.ip6);
-            return r;
-        }
-
+        // XXX Need jnthn to come up with a good type cache thing.
         public bool HasMRO(STable m) {
-            int k = mro.Length;
+            int k = mo.mro.Length;
             if (k >= 20) {
-                return isa.Contains(m);
+                return mo.isa.Contains(m);
             } else {
                 while (k != 0) {
-                    if (mro[--k] == m) return true;
+                    if (mo.mro[--k] == m) return true;
                 }
                 return false;
             }
-        }
-
-        public void AddMethod(int flags, string name, P6any code) {
-            P6how.MethodInfo mi;
-            //SubInfo si = (SubInfo) code.GetSlot("info");
-            mi.impl = code;
-            mi.short_name = name;
-            mi.long_name = name;
-            if ((flags & P6how.M_MASK) != 0) {
-                if ((flags & P6how.M_MASK) == P6how.M_PROTO) {
-                    mi.long_name = mi.long_name + ":(proto)";
-                } else if (code.mo.name == "Regex") {
-                    int k = mi.short_name.IndexOf(':');
-                    if (k >= 0) mi.short_name = mi.short_name.Substring(0, k);
-                } else {
-                    // TODO this should use the real longname, but there
-                    // are currently order problems with that.
-                    mi.long_name += ":(" + Kernel.MMDCandidateLongname.get_unique() + ")";
-                }
-            }
-            //Console.WriteLine("{0} {1} {2} {3}", this.name, flags, mi.short_name, mi.long_name);
-            mi.flags = flags;
-            mo.lmethods.Add(mi);
-        }
-
-        public void AddAttribute(string name, bool publ, P6any init,
-                STable type) {
-            P6how.AttrInfo ai;
-            ai.name = name;
-            ai.publ = publ;
-            ai.init = init;
-            ai.type = type;
-            mo.local_attr.Add(ai);
         }
 
         public P6any GetPrivateMethod(string name) {
@@ -1562,43 +1586,30 @@ next_method: ;
             return code;
         }
 
+        public void AddMethod(int flags, string name, P6any code) {
+            mo.AddMethod(flags, name, code);
+        }
+
+        public void AddAttribute(string name, bool publ, P6any init,
+                STable type) {
+            mo.AddAttribute(name, publ, init, type);
+        }
 
         public void FillProtoClass(string[] slots) {
-            FillClass(slots, new STable[] {},
-                    new STable[] { this });
+            mo.FillProtoClass(slots);
         }
 
         public void FillClass(string[] all_slot, STable[] superclasses,
                 STable[] mro) {
-            this.superclasses = new List<STable>(superclasses);
-            SetMRO(mro);
-            this.mo.butCache = new Dictionary<STable, STable>();
-            this.all_slot = all_slot;
-            this.mo.local_does = new STable[0];
-
-            nslots = 0;
-            foreach (string an in all_slot) {
-                slotMap[an] = nslots++;
-            }
-
-            Invalidate();
+            mo.FillClass(all_slot, superclasses, mro);
         }
 
-        public void FillRole(STable[] superclasses,
-                STable[] cronies) {
-            this.superclasses = new List<STable>(superclasses);
-            this.mo.local_does = cronies;
-            this.mo.isRole = true;
-            mo.Revalidate(); // need to call directly as we aren't in any mro list
-            SetMRO(Kernel.AnyMO.mro);
+        public void FillRole(STable[] superclasses, STable[] cronies) {
+            mo.FillRole(superclasses, cronies);
         }
 
         public void FillParametricRole(P6any factory) {
-            this.mo.isRole = true;
-            this.mo.roleFactory = factory;
-            this.mo.instCache = new Dictionary<string, P6any>();
-            mo.Revalidate();
-            SetMRO(Kernel.AnyMO.mro);
+            mo.FillParametricRole(factory);
         }
     }
 
@@ -2139,7 +2150,7 @@ ltm:
 
         public static Variable DefaultNew(P6any proto, VarHash args) {
             P6opaque n = new P6opaque(((P6opaque)proto).mo);
-            STable[] mro = n.mo.mro;
+            STable[] mro = n.mo.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
                 foreach (P6how.AttrInfo a in mro[i].mo.local_attr) {
@@ -2441,17 +2452,17 @@ slow:
             STable n = new STable(b.name + " but " + role.name);
             if (role.mo.local_attr.Count != 0)
                 throw new NieczaException("RoleApply with attributes NYI");
-            if (role.superclasses.Count != 0)
+            if (role.mo.superclasses.Count != 0)
                 throw new NieczaException("RoleApply with superclasses NYI");
-            STable[] nmro = new STable[b.mro.Length + 1];
-            Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
+            STable[] nmro = new STable[b.mo.mro.Length + 1];
+            Array.Copy(b.mo.mro, 0, nmro, 1, b.mo.mro.Length);
             nmro[0] = n;
             n.FillClass(b.all_slot, new STable[] { b }, nmro);
             foreach (P6how.MethodInfo mi in role.mo.lmethods)
                 n.mo.lmethods.Add(mi);
             foreach (P6how.AttrInfo ai in role.mo.local_attr)
                 n.mo.local_attr.Add(ai);
-            n.Invalidate();
+            n.mo.Invalidate();
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
             n.typeObject = new P6opaque(n);
