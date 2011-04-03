@@ -1195,6 +1195,131 @@ noparams:
             public P6any proto;
         }
 
+        void CollectMMDs() {
+            // Superclass data already collected
+            up_protos = new Dictionary<string,DispatchSet>();
+            here_protos = new List<DispatchSet>();
+            multimethods = new Dictionary<DispatchSet, List<MethodInfo>>();
+            for (int i = stable.superclasses.Count - 1; i >= 0; i--)
+                foreach (KeyValuePair<string,DispatchSet> kv in
+                        stable.superclasses[i].mo.up_protos)
+                    up_protos[kv.Key] = kv.Value;
+            DispatchSet ds;
+            foreach (MethodInfo mi in lmethods) {
+                if ((mi.flags & V_MASK) != V_PUBLIC)
+                    continue;
+                switch (mi.flags & M_MASK) {
+                    case M_PROTO:
+                        ds = new DispatchSet();
+                        ds.proto = mi.impl;
+                        ds.name  = mi.short_name;
+                        ds.defining_class = stable;
+                        here_protos.Add(ds);
+                        up_protos[ds.name] = ds;
+                        break;
+                    case P6how.M_MULTI:
+                        if (up_protos.ContainsKey(mi.short_name)
+                                && up_protos[mi.short_name] != null) break;
+                        ds = new DispatchSet();
+                        ds.name  = mi.short_name;
+                        ds.defining_class = stable;
+                        here_protos.Add(ds);
+                        up_protos[ds.name] = ds;
+                        break;
+                    case P6how.M_ONLY:
+                        up_protos[mi.short_name] = null;
+                        break;
+                }
+            }
+
+            foreach (STable k in stable.mro) {
+                foreach (MethodInfo mi in k.mo.lmethods) {
+                    if (mi.flags != (V_PUBLIC | M_MULTI))
+                        continue;
+                    ds = k.mo.up_protos[mi.short_name];
+                    List<MethodInfo> lmi;
+                    if (!multimethods.TryGetValue(ds, out lmi))
+                        multimethods[ds] = lmi = new List<MethodInfo>();
+                    for (int ix = 0; ix < lmi.Count; ix++)
+                        if (lmi[ix].long_name == mi.long_name)
+                            goto next_method;
+                    lmi.Add(mi);
+next_method: ;
+                }
+            }
+        }
+
+        internal void Revalidate() {
+            inherit_methods = stable.mro_methods =
+                new Dictionary<string,DispatchEnt>();
+            stable.private_mro = new Dictionary<string,P6any>();
+
+            if (stable.mro == null)
+                return;
+            if (isRole)
+                return;
+
+            CollectMMDs();
+            for (int kx = stable.mro.Length - 1; kx >= 0; kx--)
+                SetupMRO(stable.mro[kx].mo);
+
+            // XXX really ugly, doesn't do much except allow categoricals
+            // to re-use lexers
+            if (stable.superclasses.Count == 1) {
+                HashSet<string> names = new HashSet<string>(stable.superclasses[0].mo.inherit_methods.Keys);
+                foreach (MethodInfo mi in lmethods)
+                    if ((mi.flags & V_MASK) == V_PUBLIC)
+                        names.Remove(mi.short_name);
+                foreach (string n in names) {
+                    //Console.WriteLine("For {0}, removing dangerous override {1}", name, n);
+                    inherit_methods[n] = stable.superclasses[0].mo.inherit_methods[n];
+                }
+            }
+
+            SetupPrivates();
+        }
+
+        void SetupMRO(P6how k) {
+            foreach (MethodInfo m in k.lmethods) {
+                DispatchEnt de;
+                if ((m.flags & V_MASK) != V_PUBLIC)
+                    continue;
+                string n = m.Name();
+                inherit_methods.TryGetValue(n, out de);
+                inherit_methods[n] = new DispatchEnt(de, m.impl);
+            }
+
+            foreach (DispatchSet ds in k.here_protos) {
+                List<MethodInfo> cands;
+                if (!multimethods.TryGetValue(ds, out cands))
+                    cands = new List<MethodInfo>();
+                P6any[] cl = new P6any[cands.Count];
+                for (int ix = 0; ix < cl.Length; ix++)
+                    cl[ix] = cands[ix].impl;
+                P6any disp = Kernel.MakeDispatcher(ds.name, ds.proto, cl);
+                DispatchEnt de;
+                inherit_methods.TryGetValue(ds.name, out de);
+                inherit_methods[ds.name] = new DispatchEnt(de, disp);
+            }
+        }
+
+        void SetupPrivates() {
+            foreach (MethodInfo m in lmethods) {
+                string n = m.Name();
+                if ((m.flags & V_MASK) == V_PRIVATE) {
+                    stable.private_mro[n] = m.impl;
+                }
+                else if ((m.flags & V_MASK) == V_SUBMETHOD) {
+                    DispatchEnt de;
+                    if (stable.mro_methods == inherit_methods)
+                        stable.mro_methods = new Dictionary<string,DispatchEnt>(
+                                inherit_methods);
+                    stable.mro_methods.TryGetValue(n, out de);
+                    stable.mro_methods[n] = new DispatchEnt(de, m.impl);
+                }
+            }
+        }
+
     }
 
     // The role of STable is to hold stuff that needs to exist per
@@ -1300,133 +1425,6 @@ noparams:
             return lexcache;
         }
 
-        void CollectMMDs() {
-            // Superclass data already collected
-            mo.up_protos = new Dictionary<string,P6how.DispatchSet>();
-            mo.here_protos = new List<P6how.DispatchSet>();
-            mo.multimethods = new Dictionary<P6how.DispatchSet,
-                         List<P6how.MethodInfo>>();
-            for (int i = superclasses.Count - 1; i >= 0; i--)
-                foreach (KeyValuePair<string,P6how.DispatchSet> kv in
-                        superclasses[i].mo.up_protos)
-                    mo.up_protos[kv.Key] = kv.Value;
-            P6how.DispatchSet ds;
-            foreach (P6how.MethodInfo mi in mo.lmethods) {
-                if ((mi.flags & P6how.V_MASK) != P6how.V_PUBLIC)
-                    continue;
-                switch (mi.flags & P6how.M_MASK) {
-                    case P6how.M_PROTO:
-                        ds = new P6how.DispatchSet();
-                        ds.proto = mi.impl;
-                        ds.name  = mi.short_name;
-                        ds.defining_class = this;
-                        mo.here_protos.Add(ds);
-                        mo.up_protos[ds.name] = ds;
-                        break;
-                    case P6how.M_MULTI:
-                        if (mo.up_protos.ContainsKey(mi.short_name)
-                                && mo.up_protos[mi.short_name] != null) break;
-                        ds = new P6how.DispatchSet();
-                        ds.name  = mi.short_name;
-                        ds.defining_class = this;
-                        mo.here_protos.Add(ds);
-                        mo.up_protos[ds.name] = ds;
-                        break;
-                    case P6how.M_ONLY:
-                        mo.up_protos[mi.short_name] = null;
-                        break;
-                }
-            }
-
-            foreach (STable k in mro) {
-                foreach (P6how.MethodInfo mi in k.mo.lmethods) {
-                    if (mi.flags != (P6how.V_PUBLIC | P6how.M_MULTI))
-                        continue;
-                    ds = k.mo.up_protos[mi.short_name];
-                    List<P6how.MethodInfo> lmi;
-                    if (!mo.multimethods.TryGetValue(ds, out lmi))
-                        mo.multimethods[ds] = lmi = new List<P6how.MethodInfo>();
-                    for (int ix = 0; ix < lmi.Count; ix++)
-                        if (lmi[ix].long_name == mi.long_name)
-                            goto next_method;
-                    lmi.Add(mi);
-next_method: ;
-                }
-            }
-        }
-
-        void Revalidate() {
-            mo.inherit_methods = mro_methods =
-                new Dictionary<string,DispatchEnt>();
-            private_mro = new Dictionary<string,P6any>();
-
-            if (mro == null)
-                return;
-            if (mo.isRole)
-                return;
-
-            CollectMMDs();
-            for (int kx = mro.Length - 1; kx >= 0; kx--)
-                SetupMRO(mro[kx]);
-
-            // XXX really ugly, doesn't do much except allow categoricals
-            // to re-use lexers
-            if (superclasses.Count == 1) {
-                HashSet<string> names = new HashSet<string>(superclasses[0].mo.inherit_methods.Keys);
-                foreach (P6how.MethodInfo mi in mo.lmethods)
-                    if ((mi.flags & P6how.V_MASK) == P6how.V_PUBLIC)
-                        names.Remove(mi.short_name);
-                foreach (string n in names) {
-                    //Console.WriteLine("For {0}, removing dangerous override {1}", name, n);
-                    mo.inherit_methods[n] = superclasses[0].mo.inherit_methods[n];
-                }
-            }
-
-            SetupPrivates();
-            SetupVTables();
-        }
-
-        void SetupMRO(STable k) {
-            foreach (P6how.MethodInfo m in k.mo.lmethods) {
-                DispatchEnt de;
-                if ((m.flags & P6how.V_MASK) != P6how.V_PUBLIC)
-                    continue;
-                string n = m.Name();
-                mo.inherit_methods.TryGetValue(n, out de);
-                mo.inherit_methods[n] = new DispatchEnt(de, m.impl);
-            }
-
-            foreach (P6how.DispatchSet ds in k.mo.here_protos) {
-                List<P6how.MethodInfo> cands;
-                if (!mo.multimethods.TryGetValue(ds, out cands))
-                    cands = new List<P6how.MethodInfo>();
-                P6any[] cl = new P6any[cands.Count];
-                for (int ix = 0; ix < cl.Length; ix++)
-                    cl[ix] = cands[ix].impl;
-                P6any disp = Kernel.MakeDispatcher(ds.name, ds.proto, cl);
-                DispatchEnt de;
-                mo.inherit_methods.TryGetValue(ds.name, out de);
-                mo.inherit_methods[ds.name] = new DispatchEnt(de, disp);
-            }
-        }
-
-        void SetupPrivates() {
-            foreach (P6how.MethodInfo m in mo.lmethods) {
-                string n = m.Name();
-                if ((m.flags & P6how.V_MASK) == P6how.V_PRIVATE) {
-                    private_mro[n] = m.impl;
-                }
-                else if ((m.flags & P6how.V_MASK) == P6how.V_SUBMETHOD) {
-                    DispatchEnt de;
-                    if (mro_methods == mo.inherit_methods)
-                        mro_methods = new Dictionary<string,DispatchEnt>(
-                                mo.inherit_methods);
-                    mro_methods.TryGetValue(n, out de);
-                    mro_methods[n] = new DispatchEnt(de, m.impl);
-                }
-            }
-        }
-
         void SetupVTables() {
             mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
             mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
@@ -1483,7 +1481,8 @@ next_method: ;
             if (!dirty.Contains(this)) return;
             foreach (STable sp in mro)
                 if (sp != this) sp.RevalidateTree(dirty);
-            Revalidate();
+            mo.Revalidate();
+            SetupVTables();
             dirty.Remove(this);
         }
 
@@ -1590,7 +1589,7 @@ next_method: ;
             this.superclasses = new List<STable>(superclasses);
             this.mo.local_does = cronies;
             this.mo.isRole = true;
-            Revalidate(); // need to call directly as we aren't in any mro list
+            mo.Revalidate(); // need to call directly as we aren't in any mro list
             SetMRO(Kernel.AnyMO.mro);
         }
 
@@ -1598,7 +1597,7 @@ next_method: ;
             this.mo.isRole = true;
             this.mo.roleFactory = factory;
             this.mo.instCache = new Dictionary<string, P6any>();
-            Revalidate();
+            mo.Revalidate();
             SetMRO(Kernel.AnyMO.mro);
         }
     }
