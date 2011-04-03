@@ -1139,6 +1139,14 @@ noparams:
     public class P6how {
         public STable stable;
 
+        public bool isRole;
+        public P6any roleFactory;
+        public Dictionary<string, P6any> instCache;
+        // role type objects have an empty MRO cache so no methods can be
+        // called against them; the fallback (NYI) is to pun.
+
+        public Dictionary<STable, STable> butCache;
+
         public struct AttrInfo {
             public string name;
             public P6any init;
@@ -1233,12 +1241,6 @@ noparams:
         public P6any typeObject;
         public string name;
 
-        public bool isRole;
-        public P6any roleFactory;
-        public Dictionary<string, P6any> instCache;
-        // role type objects have an empty MRO cache so no methods can be
-        // called against them; the fallback (NYI) is to pun.
-
         public LexerCache lexcache;
 
         public ContextHandler<Variable> mro_Str, mro_Numeric, mro_Bool,
@@ -1279,8 +1281,6 @@ noparams:
 
         public STable[] mro;
         public HashSet<STable> isa;
-
-        public Dictionary<STable, STable> butCache;
 
         public STable(string name) {
             this.name = name;
@@ -1362,7 +1362,7 @@ next_method: ;
 
             if (mro == null)
                 return;
-            if (isRole)
+            if (mo.isRole)
                 return;
 
             CollectMMDs();
@@ -1573,7 +1573,7 @@ next_method: ;
                 STable[] mro) {
             this.superclasses = new List<STable>(superclasses);
             SetMRO(mro);
-            this.butCache = new Dictionary<STable, STable>();
+            this.mo.butCache = new Dictionary<STable, STable>();
             this.all_slot = all_slot;
             this.local_does = new STable[0];
 
@@ -1589,15 +1589,15 @@ next_method: ;
                 STable[] cronies) {
             this.superclasses = new List<STable>(superclasses);
             this.local_does = cronies;
-            this.isRole = true;
+            this.mo.isRole = true;
             Revalidate(); // need to call directly as we aren't in any mro list
             SetMRO(Kernel.AnyMO.mro);
         }
 
         public void FillParametricRole(P6any factory) {
-            this.isRole = true;
-            this.roleFactory = factory;
-            this.instCache = new Dictionary<string, P6any>();
+            this.mo.isRole = true;
+            this.mo.roleFactory = factory;
+            this.mo.instCache = new Dictionary<string, P6any>();
             Revalidate();
             SetMRO(Kernel.AnyMO.mro);
         }
@@ -2403,26 +2403,26 @@ slow:
                             } else { cache_ok = false; }
                         }
                         if (!cache_ok) {
-                            return ((STable) th.lex0).roleFactory.
+                            return ((STable) th.lex0).mo.roleFactory.
                                 Invoke(th.caller, to_pass, null);
                         }
                         th.lex1 = s;
                         bool ok;
                         P6any r;
                         lock (th.lex0)
-                            ok = ((STable) th.lex0).instCache.
+                            ok = ((STable) th.lex0).mo.instCache.
                                 TryGetValue((string) th.lex1, out r);
                         if (ok) {
                             th.caller.resultSlot = NewROScalar(r);
                             return th.caller;
                         }
                         th.ip = 1;
-                        return ((STable) th.lex0).roleFactory.
+                        return ((STable) th.lex0).mo.roleFactory.
                             Invoke(th, to_pass, null);
                     }
                 case 1:
                     lock (th.lex0) {
-                        ((STable) th.lex0).instCache[(string) th.lex1]
+                        ((STable) th.lex0).mo.instCache[(string) th.lex1]
                             = ((Variable) th.resultSlot).Fetch();
                     }
                     th.caller.resultSlot = th.resultSlot;
@@ -2465,9 +2465,9 @@ slow:
                 STable role) {
             lock (b) {
                 STable rs;
-                if (b.butCache.TryGetValue(role, out rs))
+                if (b.mo.butCache.TryGetValue(role, out rs))
                     return rs;
-                return b.butCache[role] = DoRoleApply(b, role);
+                return b.mo.butCache[role] = DoRoleApply(b, role);
             }
         }
 
