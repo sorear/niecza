@@ -1147,6 +1147,17 @@ noparams:
 
         public Dictionary<STable, STable> butCache;
 
+        public Dictionary<string, DispatchEnt> inherit_methods;
+
+        public Dictionary<string, P6how.DispatchSet> up_protos;
+        public List<DispatchSet> here_protos;
+        public Dictionary<DispatchSet, List<MethodInfo>> multimethods;
+
+        public STable[] local_does;
+
+        public List<MethodInfo> lmethods = new List<MethodInfo>();
+        public List<AttrInfo> local_attr = new List<AttrInfo>();
+
         public struct AttrInfo {
             public string name;
             public P6any init;
@@ -1258,24 +1269,13 @@ noparams:
         public InvokeHandler mro_INVOKE;
 
         public Dictionary<string, DispatchEnt> mro_methods;
-        public Dictionary<string, DispatchEnt> inherit_methods;
         public Dictionary<string, P6any> private_mro;
-
-        public Dictionary<string, P6how.DispatchSet> up_protos;
-        public List<P6how.DispatchSet> here_protos;
-        public Dictionary<P6how.DispatchSet, List<P6how.MethodInfo>> multimethods;
-
-        public STable[] local_does;
-
-        public List<STable> superclasses
-            = new List<STable>();
-        public List<P6how.MethodInfo> lmethods = new List<P6how.MethodInfo>();
-        public List<P6how.AttrInfo> local_attr = new List<P6how.AttrInfo>();
 
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
         public string[] all_slot;
 
+        public List<STable> superclasses = new List<STable>();
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
 
@@ -1302,16 +1302,16 @@ noparams:
 
         void CollectMMDs() {
             // Superclass data already collected
-            up_protos = new Dictionary<string,P6how.DispatchSet>();
-            here_protos = new List<P6how.DispatchSet>();
-            multimethods = new Dictionary<P6how.DispatchSet,
+            mo.up_protos = new Dictionary<string,P6how.DispatchSet>();
+            mo.here_protos = new List<P6how.DispatchSet>();
+            mo.multimethods = new Dictionary<P6how.DispatchSet,
                          List<P6how.MethodInfo>>();
             for (int i = superclasses.Count - 1; i >= 0; i--)
                 foreach (KeyValuePair<string,P6how.DispatchSet> kv in
-                        superclasses[i].up_protos)
-                    up_protos[kv.Key] = kv.Value;
+                        superclasses[i].mo.up_protos)
+                    mo.up_protos[kv.Key] = kv.Value;
             P6how.DispatchSet ds;
-            foreach (P6how.MethodInfo mi in lmethods) {
+            foreach (P6how.MethodInfo mi in mo.lmethods) {
                 if ((mi.flags & P6how.V_MASK) != P6how.V_PUBLIC)
                     continue;
                 switch (mi.flags & P6how.M_MASK) {
@@ -1320,32 +1320,32 @@ noparams:
                         ds.proto = mi.impl;
                         ds.name  = mi.short_name;
                         ds.defining_class = this;
-                        here_protos.Add(ds);
-                        up_protos[ds.name] = ds;
+                        mo.here_protos.Add(ds);
+                        mo.up_protos[ds.name] = ds;
                         break;
                     case P6how.M_MULTI:
-                        if (up_protos.ContainsKey(mi.short_name)
-                                && up_protos[mi.short_name] != null) break;
+                        if (mo.up_protos.ContainsKey(mi.short_name)
+                                && mo.up_protos[mi.short_name] != null) break;
                         ds = new P6how.DispatchSet();
                         ds.name  = mi.short_name;
                         ds.defining_class = this;
-                        here_protos.Add(ds);
-                        up_protos[ds.name] = ds;
+                        mo.here_protos.Add(ds);
+                        mo.up_protos[ds.name] = ds;
                         break;
                     case P6how.M_ONLY:
-                        up_protos[mi.short_name] = null;
+                        mo.up_protos[mi.short_name] = null;
                         break;
                 }
             }
 
             foreach (STable k in mro) {
-                foreach (P6how.MethodInfo mi in k.lmethods) {
+                foreach (P6how.MethodInfo mi in k.mo.lmethods) {
                     if (mi.flags != (P6how.V_PUBLIC | P6how.M_MULTI))
                         continue;
-                    ds = k.up_protos[mi.short_name];
+                    ds = k.mo.up_protos[mi.short_name];
                     List<P6how.MethodInfo> lmi;
-                    if (!multimethods.TryGetValue(ds, out lmi))
-                        multimethods[ds] = lmi = new List<P6how.MethodInfo>();
+                    if (!mo.multimethods.TryGetValue(ds, out lmi))
+                        mo.multimethods[ds] = lmi = new List<P6how.MethodInfo>();
                     for (int ix = 0; ix < lmi.Count; ix++)
                         if (lmi[ix].long_name == mi.long_name)
                             goto next_method;
@@ -1356,7 +1356,7 @@ next_method: ;
         }
 
         void Revalidate() {
-            inherit_methods = mro_methods =
+            mo.inherit_methods = mro_methods =
                 new Dictionary<string,DispatchEnt>();
             private_mro = new Dictionary<string,P6any>();
 
@@ -1372,13 +1372,13 @@ next_method: ;
             // XXX really ugly, doesn't do much except allow categoricals
             // to re-use lexers
             if (superclasses.Count == 1) {
-                HashSet<string> names = new HashSet<string>(superclasses[0].inherit_methods.Keys);
-                foreach (P6how.MethodInfo mi in lmethods)
+                HashSet<string> names = new HashSet<string>(superclasses[0].mo.inherit_methods.Keys);
+                foreach (P6how.MethodInfo mi in mo.lmethods)
                     if ((mi.flags & P6how.V_MASK) == P6how.V_PUBLIC)
                         names.Remove(mi.short_name);
                 foreach (string n in names) {
                     //Console.WriteLine("For {0}, removing dangerous override {1}", name, n);
-                    inherit_methods[n] = superclasses[0].inherit_methods[n];
+                    mo.inherit_methods[n] = superclasses[0].mo.inherit_methods[n];
                 }
             }
 
@@ -1387,40 +1387,40 @@ next_method: ;
         }
 
         void SetupMRO(STable k) {
-            foreach (P6how.MethodInfo m in k.lmethods) {
+            foreach (P6how.MethodInfo m in k.mo.lmethods) {
                 DispatchEnt de;
                 if ((m.flags & P6how.V_MASK) != P6how.V_PUBLIC)
                     continue;
                 string n = m.Name();
-                inherit_methods.TryGetValue(n, out de);
-                inherit_methods[n] = new DispatchEnt(de, m.impl);
+                mo.inherit_methods.TryGetValue(n, out de);
+                mo.inherit_methods[n] = new DispatchEnt(de, m.impl);
             }
 
-            foreach (P6how.DispatchSet ds in k.here_protos) {
+            foreach (P6how.DispatchSet ds in k.mo.here_protos) {
                 List<P6how.MethodInfo> cands;
-                if (!multimethods.TryGetValue(ds, out cands))
+                if (!mo.multimethods.TryGetValue(ds, out cands))
                     cands = new List<P6how.MethodInfo>();
                 P6any[] cl = new P6any[cands.Count];
                 for (int ix = 0; ix < cl.Length; ix++)
                     cl[ix] = cands[ix].impl;
                 P6any disp = Kernel.MakeDispatcher(ds.name, ds.proto, cl);
                 DispatchEnt de;
-                inherit_methods.TryGetValue(ds.name, out de);
-                inherit_methods[ds.name] = new DispatchEnt(de, disp);
+                mo.inherit_methods.TryGetValue(ds.name, out de);
+                mo.inherit_methods[ds.name] = new DispatchEnt(de, disp);
             }
         }
 
         void SetupPrivates() {
-            foreach (P6how.MethodInfo m in lmethods) {
+            foreach (P6how.MethodInfo m in mo.lmethods) {
                 string n = m.Name();
                 if ((m.flags & P6how.V_MASK) == P6how.V_PRIVATE) {
                     private_mro[n] = m.impl;
                 }
                 else if ((m.flags & P6how.V_MASK) == P6how.V_SUBMETHOD) {
                     DispatchEnt de;
-                    if (mro_methods == inherit_methods)
+                    if (mro_methods == mo.inherit_methods)
                         mro_methods = new Dictionary<string,DispatchEnt>(
-                                inherit_methods);
+                                mo.inherit_methods);
                     mro_methods.TryGetValue(n, out de);
                     mro_methods[n] = new DispatchEnt(de, m.impl);
                 }
@@ -1544,7 +1544,7 @@ next_method: ;
             }
             //Console.WriteLine("{0} {1} {2} {3}", this.name, flags, mi.short_name, mi.long_name);
             mi.flags = flags;
-            lmethods.Add(mi);
+            mo.lmethods.Add(mi);
         }
 
         public void AddAttribute(string name, bool publ, P6any init,
@@ -1554,7 +1554,7 @@ next_method: ;
             ai.publ = publ;
             ai.init = init;
             ai.type = type;
-            local_attr.Add(ai);
+            mo.local_attr.Add(ai);
         }
 
         public P6any GetPrivateMethod(string name) {
@@ -1575,7 +1575,7 @@ next_method: ;
             SetMRO(mro);
             this.mo.butCache = new Dictionary<STable, STable>();
             this.all_slot = all_slot;
-            this.local_does = new STable[0];
+            this.mo.local_does = new STable[0];
 
             nslots = 0;
             foreach (string an in all_slot) {
@@ -1588,7 +1588,7 @@ next_method: ;
         public void FillRole(STable[] superclasses,
                 STable[] cronies) {
             this.superclasses = new List<STable>(superclasses);
-            this.local_does = cronies;
+            this.mo.local_does = cronies;
             this.mo.isRole = true;
             Revalidate(); // need to call directly as we aren't in any mro list
             SetMRO(Kernel.AnyMO.mro);
@@ -2143,7 +2143,7 @@ ltm:
             STable[] mro = n.mo.mro;
 
             for (int i = mro.Length - 1; i >= 0; i--) {
-                foreach (P6how.AttrInfo a in mro[i].local_attr) {
+                foreach (P6how.AttrInfo a in mro[i].mo.local_attr) {
                     P6any val;
                     Variable vx;
                     if (a.publ && args.TryGetValue(a.name, out vx)) {
@@ -2440,7 +2440,7 @@ slow:
         private static STable DoRoleApply(STable b,
                 STable role) {
             STable n = new STable(b.name + " but " + role.name);
-            if (role.local_attr.Count != 0)
+            if (role.mo.local_attr.Count != 0)
                 throw new NieczaException("RoleApply with attributes NYI");
             if (role.superclasses.Count != 0)
                 throw new NieczaException("RoleApply with superclasses NYI");
@@ -2448,10 +2448,10 @@ slow:
             Array.Copy(b.mro, 0, nmro, 1, b.mro.Length);
             nmro[0] = n;
             n.FillClass(b.all_slot, new STable[] { b }, nmro);
-            foreach (P6how.MethodInfo mi in role.lmethods)
-                n.lmethods.Add(mi);
-            foreach (P6how.AttrInfo ai in role.local_attr)
-                n.local_attr.Add(ai);
+            foreach (P6how.MethodInfo mi in role.mo.lmethods)
+                n.mo.lmethods.Add(mi);
+            foreach (P6how.AttrInfo ai in role.mo.local_attr)
+                n.mo.local_attr.Add(ai);
             n.Invalidate();
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
