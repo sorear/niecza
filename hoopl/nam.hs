@@ -19,7 +19,7 @@ data Unit = Unit {
       name         ::   String,  -- Unit's unique name
 --    log          ::   ...     -- Mostly unused vestige of last stash system
 --    setting      ::   String,  -- Name of setting unit or null
---    bottom_ref   ::   Xref    -- Xref to sub containing {YOU_ARE_HERE}, or null
+    bottom_ref   ::   Maybe Xref,    -- Xref to sub containing {YOU_ARE_HERE}, or null
     filename     ::   String,  -- Filename of source code or null
     modtime      ::   Integer -- Seconds since 1970-01-01
 --    xref         ::   [Xref]  -- Resolves refs from other units
@@ -41,13 +41,13 @@ instance FromJSON Unit where
         mainline_ref <- parseJSON (a ! 0)
         name <- parseJSON (a ! 1)
         -- skipping log and setting 
---        bottom_ref <- parseJSON (a ! 4)
+        bottom_ref <- parseJSON (a ! 4)
         filename <- parseJSON (a ! 5)
         modtime <- parseJSON (a ! 6)
         return $ Unit {
             mainline_ref=mainline_ref,
             name=name,
---            bottom_ref=bottom_ref
+            bottom_ref=bottom_ref,
             filename=filename,
             modtime=modtime
         }
