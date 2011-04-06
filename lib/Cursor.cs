@@ -31,7 +31,7 @@ public sealed class GState {
         }
 
         Frame nf = m.info.Binder(Kernel.GetInferiorRoot()
-                .MakeChild(m.outer, m.info), pos, null);
+                .MakeChild(m.outer, m.info), pos, null, false);
         nf.curDisp = m;
         Kernel.RunInferior(nf);
     }

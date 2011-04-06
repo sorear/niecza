@@ -86,7 +86,6 @@ use MONKEY_TYPING;
     is $log, "B", "bind called when needed (write)";
 }
 
-#`「
 {
     sub bar(Str $) {}
     lives_ok { bar "foo" }, "can pass correct type";
@@ -118,13 +117,12 @@ use MONKEY_TYPING;
     is C20.b1("foo"), "str", "multimethods work (2)";
 
     is C20.b2(True), "bool", "multimethod sorting works (1)";
-    is C20.b2("foo"), "any", "multimethod sorting works (1)";
-    is C20.b3(True), "bool", "multimethod sorting works (1)";
-    is C20.b3("foo"), "any", "multimethod sorting works (1)";
+    is C20.b2("foo"), "any", "multimethod sorting works (2)";
+    is C20.b3(True), "bool", "multimethod sorting works (3)";
+    is C20.b3("foo"), "any", "multimethod sorting works (4)";
 
     dies_ok { C20.b4("foo", "bar") }, "multimethod tie checking works";
 }
-」
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

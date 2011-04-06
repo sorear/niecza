@@ -289,7 +289,8 @@ namespace Niecza {
         private string PName(int rbase) {
             return ((string)sig_r[rbase]) + " in " + name;
         }
-        public unsafe Frame Binder(Frame th, Variable[] pos, VarHash named) {
+        public unsafe Frame Binder(Frame th, Variable[] pos, VarHash named,
+                bool quiet) {
             th.pos = pos;
             th.named = named;
             // XXX I don't fully understand how this works, but it's
@@ -380,6 +381,7 @@ namespace Niecza {
                     src = Kernel.NewROScalar(type.typeObject);
                     goto gotit;
                 }
+                if (quiet) return null;
                 return Kernel.Die(th, "No value for parameter " + PName(rbase));
 gotit:
                 if ((flags & SIG_F_RWTRANS) != 0) {
@@ -393,8 +395,10 @@ gotit:
                         //return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
                     // fast path
                     if (rw == src.rw && islist == src.islist) {
-                        if (!src.type.HasMRO(type))
+                        if (!src.type.HasMRO(type)) {
+                            if (quiet) return null;
                             return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + src.type.name + ", needed " + type.name);
+                        }
                         if (src.whence != null)
                             Kernel.Vivify(src);
                         goto bound;
@@ -403,8 +407,10 @@ gotit:
                     // rw = false and islist = false and rhs.islist = true OR
                     // rw = false and islist = true and rhs.islist = false
                     P6any srco = src.Fetch();
-                    if (!srco.mo.HasMRO(type))
+                    if (!srco.mo.HasMRO(type)) {
+                        if (quiet) return null;
                         return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
+                    }
                     src = new SimpleVariable(false, islist, srco.mo, null, srco);
 bound: ;
                 }
@@ -427,6 +433,7 @@ bound: ;
 noparams:
 
             if (posc != pos.Length || namedc != null && namedc.Count != 0) {
+                if (quiet) return null;
                 string m = "Excess arguments to " + name;
                 if (posc != pos.Length)
                     m += string.Format(", used {0} of {1} positionals",
@@ -713,7 +720,7 @@ noparams:
             SubInfo info = (SubInfo) dyo.slots[1];
 
             Frame n = caller.MakeChild(outer, info);
-            n = n.info.Binder(n, pos, named);
+            n = n.info.Binder(n, pos, named, false);
 
             return n;
         }
@@ -1156,7 +1163,7 @@ noparams:
             P6opaque dyo = (P6opaque) sub;
             Frame n = th.MakeChild((Frame) dyo.slots[0],
                     (SubInfo) dyo.slots[1]);
-            n = n.info.Binder(n, Variable.None, null);
+            n = n.info.Binder(n, Variable.None, null, false);
             n.MarkSharedChain();
             n.lex = new Dictionary<string,object>();
             n.lex["!return"] = null;
@@ -1333,8 +1340,17 @@ noparams:
             while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
 
             Console.WriteLine("---");
-            foreach (P6any p in dth.info.param0 as P6any[])
+            foreach (P6any p in dth.info.param0 as P6any[]) {
                 Console.WriteLine((new MMDCandidateLongname(p)).LongName());
+                SubInfo si = (SubInfo)p.GetSlot("info");
+                Frame   o  = (Frame)p.GetSlot("outer");
+                Frame nth = th.MakeChild(o, si);
+                if (nth.info.Binder(nth, dth.pos, dth.named, true) == null) {
+                    Console.WriteLine("NOT BINDABLE");
+                } else {
+                    Console.WriteLine("BINDABLE");
+                }
+            }
 
             // XXX I think this is a harmless race
             //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
@@ -1869,7 +1885,7 @@ slow:
         }
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
             Frame n = th.MakeChild(null, IRSI);
-            n = n.info.Binder(n, pcl, null);
+            n = n.info.Binder(n, pcl, null, false);
             return n;
         }
 
@@ -2322,7 +2338,7 @@ slow:
                         p = (Variable[]) o.slots[0];
                         n = o.slots[1] as VarHash;
                     }
-                    tf = tf.info.Binder(tf, p, n);
+                    tf = tf.info.Binder(tf, p, n, false);
                     tf.curDisp = de;
                     return tf;
                 } else {

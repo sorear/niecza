@@ -834,7 +834,7 @@ again:
             p = (Variable[]) o.slots[0];
             n = o.slots[1] as VarHash;
         }
-        nf = nf.info.Binder(nf, p, n);
+        nf = nf.info.Binder(nf, p, n, false);
         nf.curDisp = de;
         return nf;
     }
