@@ -3203,6 +3203,8 @@ dynamic:
             thandlers["bif_delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
             thandlers["bif_cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
             thandlers["bif_zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
+            thandlers["var_get_var"] = Methody(null, Tokens.Variable.GetMethod("GetVar"));
+            thandlers["var_new_tied"] = Constructy(typeof(TiedVariable).GetConstructor(new Type[] { Tokens.STable, Tokens.P6any, Tokens.P6any, Tokens.P6any }));
             thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");

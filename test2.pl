@@ -56,6 +56,38 @@ use MONKEY_TYPING;
 }
 
 {
+    my $log;
+    my $ret;
+    my $var := _newtiedscalar(Any, Any, { $log ~= "F"; $ret }, { $log ~= $_ });
+
+    $ret = 5; $log = "";
+    my $a = $var;
+    is $a, 5, "fetches work";
+    is $log, "F", "fetch called once only";
+
+    $ret = 3; $log = "";
+    $var = 9;
+    is $log, "9", "stores work";
+
+    $log = "";
+    $a = _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any });
+    is $log, "", "bind not called spuriously (1)";
+
+    $log = "";
+    $a ::= _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any });
+    is $log, "", "bind not called spuriously (2)";
+
+    $log = "";
+    my $b := _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any }); #OK
+    is $log, "B", "bind called when needed (bind)";
+
+    $log = "";
+    _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any }) = 5;
+    is $log, "B", "bind called when needed (write)";
+}
+
+#`「
+{
     sub bar(Str $) {}
     lives_ok { bar "foo" }, "can pass correct type";
     dies_ok { bar True }, "cannot pass wrong type";
@@ -92,6 +124,7 @@ use MONKEY_TYPING;
 
     dies_ok { C20.b4("foo", "bar") }, "multimethod tie checking works";
 }
+」
 
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

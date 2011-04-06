@@ -207,6 +207,52 @@ method regex_def($/) {
 augment class CgOp {
 #method run_protoregex (*@_) { self._cgop("run_protoregex", @_) }
 method run_dispatch (*@_) { self._cgop("run_dispatch", @_) }
+method var_get_var ($v) { self._cgop("var_get_var", $v) }
+method var_new_tied ($t,$b,$f,$s) { self._cgop("var_new_tied", $t,$b,$f,$s) }
+}
+
+augment class Operator::Method { #OK exist
+    method with_args($/, *@args) {
+        if ($.name eq 'HOW' || $.name eq 'WHAT' || $.name eq 'VAR')
+                && !$.private && !$.meta {
+            if $.args {
+                $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
+                return ::Op::StatementList.new;
+            }
+            ::Op::Interrogative.new(|node($/), receiver => @args[0],
+                name => $.name);
+        } else {
+            if defined($.path) && !$.private {
+                $/.CURSOR.sorry("Qualified references to non-private methods NYI");
+            }
+            ::Op::CallMethod.new(|node($/),
+                receiver => @args[0],
+                ismeta   => $.meta,
+                name     => $.name,
+                private  => $.private,
+                ppath    => $.path,
+                args     => [ @$.args ]);
+        }
+    }
+}
+
+augment class Op::Interrogative { #OK exist
+    method code($body) {
+        if $.name eq "VAR" {
+            return CgOp.var_get_var($.receiver.cgop($body));
+        }
+        my $c = CgOp.fetch($.receiver.cgop($body));
+        if $.name eq "HOW" {
+            $c = CgOp.how($c);
+        }
+        elsif $.name eq "WHAT" {
+            $c = CgOp.obj_what($c);
+        }
+        else {
+            die "Invalid interrogative $.name";
+        }
+        CgOp.newscalar($c);
+    }
 }
 
 augment class RxOp::ProtoRedis { #OK exist

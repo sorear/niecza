@@ -837,6 +837,10 @@ sub _array_constructor(\$parcel) { _array_constructor($parcel) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
 sub _make_capture(|$c) { $c }
 
+sub _newtiedscalar($type, $bind, $fetch, $store) {
+    Q:CgOp { (var_new_tied (obj_llhow (@ {$type})) (@ {$bind}) (@ {$fetch}) (@ {$store})) }
+}
+
 sub infix:<Z>(\|$pcl) {
     Q:CgOp { (bif_zip (b 0) (unbox fvarlist (@ {$pcl}))) }
 }

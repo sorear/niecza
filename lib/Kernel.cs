@@ -43,10 +43,10 @@ namespace Niecza {
         public bool rw;
         public bool islist;
 
-        public abstract P6any  Fetch();
+        public abstract P6any Fetch();
         public abstract void Store(P6any v);
 
-        public abstract P6any  GetVar();
+        public abstract Variable GetVar();
 
         public static readonly Variable[] None = new Variable[0];
     }
@@ -137,8 +137,45 @@ namespace Niecza {
             val = v;
         }
 
-        public override P6any  GetVar()      {
-            return new BoxObject<SimpleVariable>(this, Kernel.ScalarMO);
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+    }
+
+    public sealed class TiedVariable: Variable {
+        P6any fetch;
+        P6any store;
+
+        public TiedVariable(STable type, P6any whsub, P6any fetch, P6any store) {
+            this.fetch = fetch;
+            this.store = store;
+            this.whence = whsub.IsDefined() ? new SubViviHook(whsub) : null;
+            this.rw = true;
+            this.type = type;
+        }
+
+        public override P6any Fetch() {
+            Variable vr = Kernel.RunInferior(fetch.Invoke(
+                Kernel.GetInferiorRoot(), None, null));
+            P6any vl = vr.Fetch();
+            if (!vl.mo.HasMRO(type))
+                throw new NieczaException("Tied variable of type " + type +
+                        " returned value of type " + vl.mo.name + " instead");
+            return vl;
+        }
+
+        public override void Store(P6any v) {
+            if (whence != null) {
+                ViviHook vh = whence;
+                whence = null;
+                vh.Do(this);
+            }
+            Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
+                        new Variable[] { Kernel.NewROScalar(v) }, null));
+        }
+
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
     }
 

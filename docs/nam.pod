@@ -292,9 +292,19 @@ Were used for autovivification; currently unused.
 Creates an autovivifiable variable which will call C<$sub> when written to or
 bound rw, and otherwise functions as ordinary rw.
 
+=head3 var_get_var($var)
+
+Returns the object backing C<$var> (will be a fake proxy if not tied).
+
 =head3 var_islist($var)
 
 True if C<$var> has the list nature.
+
+=head3 var_new_tied($type,$bind,$fetch,$store)
+
+Creates a new variable of type C<$type> which delegates access to
+C<$fetch> and C<$store>.  If C<$bind> is defined, it will be called on
+the first rw binding, per the autovivification protocol.
 
 
 =head2 Operations on strings
