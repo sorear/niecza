@@ -5,8 +5,6 @@ items are required for yapsi.
 
 EASY
 
- + &prompt
-
  + $*PROGRAM_NAME
 
  + Cursor.CURSOR should be a no-op
@@ -54,8 +52,6 @@ MEDIUM
  + has @!foo; (needs to ignore types for now)
 
  + &hyperunary
-
- + Correct speccy &first
 
  + for-loops with multiple parameters
 

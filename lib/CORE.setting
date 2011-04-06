@@ -47,6 +47,7 @@ my class Any is Mu {
     method flat() { @(self) }
 
     method sort($cmp = &infix:<leg>) { @(self).sort($cmp) }
+    method first(Mu $filter) { for @(self) { return $_ if $_ ~~ $filter } }
 
     method !butWHENCE($cr) {
         Q:CgOp { (newvsubvar (class_ref mo Any) (@ {$cr}) (@ {self})) }
@@ -80,7 +81,7 @@ my class Cool {
         my $limctr = $limit;
         my $M;
         while ($i <= chars $str) && ($limctr > 1) {
-            $M = first($matchrx($C.cursor($i++)));
+            $M = head($matchrx($C.cursor($i++)));
             if $M {
                 push @out, substr($str, $last, ($M.from - $last));
                 push @out, $M if $all;
@@ -127,7 +128,7 @@ my class Cool {
         my $limctr = $limit;
         my @out;
         while ($i < chars $str) && $limctr {
-            my $M = first($matcher($C.cursor($i++)));
+            my $M = head($matcher($C.cursor($i++)));
             if $M {
                 $i max= $M.to;
                 push @out, ($match ?? $M !! (~$M));
@@ -453,7 +454,7 @@ sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
 # Array: mutable list of read-write scalar boxes
 
 sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
-sub first(\$x) { for $x -> $elt { return $elt }; Any }
+sub head(\$x) { for $x -> $elt { return $elt }; Any }
 
 my class Iterator {
     method list () {
@@ -833,6 +834,8 @@ sub map($callback, *@items) { map($callback, @items) }
 
 sub sort(*@bits) { @bits.sort }
 
+sub first(Mu $test, *@bits) { @bits.first($test) }
+
 sub _array_constructor(\$parcel) { _array_constructor($parcel) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
 sub _make_capture(|$c) { $c }
@@ -947,7 +950,7 @@ my class Cursor {
         my $*HIGHWATER = -1;
         my $*HIGHEXPECT = {};
         try {
-            my $ret = first($rx(self));
+            my $ret = head($rx(self));
             if ($ret) { return $ret }
         };
         return ();
@@ -1256,6 +1259,12 @@ my class TextReader {
 sub open($filename) is unsafe {
     Q:CgOp { (box TextReader (treader_open (obj_getstr {$filename}))) }
 }
+
+# TODO $*ARGFILES, multi
+sub get($handle = $*IN) { $handle.get }
+sub lines($filehandle = $*IN) { $filehandle.lines }
+sub prompt($msg) { print $msg; $*IN.get }
+sub getc($handle) { $handle.getc }
 
 $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
 @PROCESS::ARGS = unitem(Q:CgOp { (box Parcel (getargv)) });
