@@ -1405,7 +1405,7 @@ noparams:
             for (int i = 0; i < raw.Length; i++) {
                 for (int j = 0; j < raw.Length; j++) {
                     if (lns[i].IsNarrowerThan(lns[j])) {
-                        Console.WriteLine("{0} < {1}", lns[i].LongName(), lns[j].LongName());
+                        //Console.WriteLine("{0} < {1}", lns[i].LongName(), lns[j].LongName());
                         heads[2*j+1]++;
                         links[ap] = heads[2*i];
                         links[ap+1] = j;
@@ -1432,7 +1432,10 @@ noparams:
                     for (int j = heads[2*i]; j >= 0; j = links[j]) {
                         heads[2*links[j+1]+1]--;
                     }
+                    // prevent constrained candidates from being part of a tie
+                    if (lns[i].extra_constraints) outp.Add(null);
                     outp.Add(raw[i]);
+                    if (lns[i].extra_constraints) outp.Add(null);
                     k--;
                 }
                 if (d == 0 && k != 0) {
@@ -1448,7 +1451,7 @@ noparams:
             Frame dth = th;
             while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
 
-            Console.WriteLine("---");
+            //Console.WriteLine("---");
             DispatchEnt root = new DispatchEnt();
             DispatchEnt ptr  = root;
 
@@ -1458,19 +1461,25 @@ noparams:
             //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
             //if (cs == null)
             //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
+            int tie_state = 0;
+            // 0: seen nothing  1: after first group  2: an item in first group
             foreach (P6any p in sp) {
                 if (p == null) {
-                    Console.WriteLine(".");
+                    if (tie_state == 2) tie_state = 1;
+                    //Console.WriteLine(".");
                     continue;
                 }
-                Console.WriteLine((new MMDCandidateLongname(p)).LongName());
+                //Console.WriteLine((new MMDCandidateLongname(p)).LongName());
                 SubInfo si = (SubInfo)p.GetSlot("info");
                 Frame   o  = (Frame)p.GetSlot("outer");
                 Frame nth = th.MakeChild(o, si);
                 if (nth.info.Binder(nth, dth.pos, dth.named, true) == null) {
-                    Console.WriteLine("NOT BINDABLE");
+                    //Console.WriteLine("NOT BINDABLE");
                 } else {
-                    Console.WriteLine("BINDABLE");
+                    if (tie_state == 0) tie_state = 2;
+                    else if (tie_state == 2)
+                        return Kernel.Die(th, "Ambiguous dispatch for " + dth.info.name);
+                    //Console.WriteLine("BINDABLE");
                     ptr.next = new DispatchEnt(null, p);
                     ptr = ptr.next;
                 }
