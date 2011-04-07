@@ -1237,6 +1237,29 @@ noparams:
             public STable type;
             public bool constrained;
             public bool required;
+
+            public static MMDParameter TOP = new MMDParameter();
+            public static MMDParameter BOTTOM = new MMDParameter();
+
+            // XXX Should requiredness be factored in?
+            // 2: narrower 0: tied 1: less narrow 3: incomparable
+            // by design these can be ORed
+            public int IsNarrowerThan(MMDParameter other) {
+                if (other == TOP) return (this == TOP) ? 0 : 2;
+                if (other == BOTTOM) return (this == BOTTOM) ? 0 : 1;
+                if (this == TOP) return 1;
+                if (this == BOTTOM) return 2;
+
+                bool k1 = type.HasMRO(other.type);
+                bool k2 = other.type.HasMRO(type);
+                if (k1 && !k2) return 2;
+                if (k2 && !k1) return 1;
+
+                if (constrained && !other.constrained) return 2;
+                if (other.constrained && !constrained) return 1;
+
+                return 0;
+            }
         }
 
         public class MMDCandidateLongname {
@@ -1249,6 +1272,35 @@ noparams:
             public bool slurpy_pos;
             public bool slurpy_nam;
             public bool extra_constraints;
+
+            public bool IsNarrowerThan(MMDCandidateLongname other) {
+                int narrower = 0;
+
+                for (int i = 0; ; i++) {
+                    MMDParameter tp = (i < pos.Count) ? pos[i] :
+                        (slurpy_pos ? MMDParameter.TOP : MMDParameter.BOTTOM);
+                    MMDParameter op = (i < other.pos.Count) ? other.pos[i] :
+                        (other.slurpy_pos ? MMDParameter.TOP : MMDParameter.BOTTOM);
+                    narrower |= tp.IsNarrowerThan(op);
+                    if (i >= pos.Count && i >= other.pos.Count) break;
+                }
+
+                List<string> ns = new List<string>(nam.Keys);
+                foreach (string s in other.nam.Keys)
+                    if (!nam.ContainsKey(s)) ns.Add(s);
+                foreach (string s in ns) {
+                    MMDParameter tp = nam.ContainsKey(s) ? nam[s] :
+                        (slurpy_nam ? MMDParameter.TOP : MMDParameter.BOTTOM);
+                    MMDParameter op = other.nam.ContainsKey(s) ? other.nam[s] :
+                        (other.slurpy_nam ? MMDParameter.TOP : MMDParameter.BOTTOM);
+                    narrower |= tp.IsNarrowerThan(op);
+                }
+
+                if (slurpy_nam && !other.slurpy_nam) narrower |= 1;
+                if (!slurpy_nam && other.slurpy_nam) narrower |= 2;
+
+                return (narrower == 2);
+            }
 
             public MMDCandidateLongname(P6any impl) {
                 this.impl = impl;
@@ -1336,6 +1388,62 @@ noparams:
             }
         }
 
+        // This is a little odd.  Pending full understanding of the
+        // rules it aims more for Rakudo compatibility than anything
+        // else.
+        private static List<P6any> SortCandidates(P6any[] raw) {
+            int[] links = new int[raw.Length * raw.Length * 2];
+            int ap = 0;
+            int[] heads = new int[raw.Length * 2];
+            MMDCandidateLongname[] lns = new MMDCandidateLongname[raw.Length];
+
+            for (int i = 0; i < raw.Length; i++) {
+                lns[i] = new MMDCandidateLongname(raw[i]);
+                heads[2*i] = -1;
+            }
+
+            for (int i = 0; i < raw.Length; i++) {
+                for (int j = 0; j < raw.Length; j++) {
+                    if (lns[i].IsNarrowerThan(lns[j])) {
+                        Console.WriteLine("{0} < {1}", lns[i].LongName(), lns[j].LongName());
+                        heads[2*j+1]++;
+                        links[ap] = heads[2*i];
+                        links[ap+1] = j;
+                        heads[2*i] = ap;
+                        ap += 2;
+                    }
+                }
+            }
+
+            List<P6any> outp = new List<P6any>();
+
+            int k = raw.Length;
+            while (k != 0) {
+                int d = 0;
+                for (int i = 0; i < raw.Length; i++) {
+                    if (heads[2*i+1] != 0) continue;
+                    heads[2*i+1] = -1;
+                    d++;
+                }
+                for (int i = 0; i < raw.Length; i++) {
+                    if (heads[2*i+1] != -1) continue;
+                    heads[2*i+1] = -2;
+
+                    for (int j = heads[2*i]; j >= 0; j = links[j]) {
+                        heads[2*links[j+1]+1]--;
+                    }
+                    outp.Add(raw[i]);
+                    k--;
+                }
+                if (d == 0 && k != 0) {
+                    throw new NieczaException("Partial order wedged");
+                }
+                outp.Add(null);
+            }
+
+            return outp;
+        }
+
         public static Frame TypeDispatcher(Frame th, bool tailcall) {
             Frame dth = th;
             while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
@@ -1344,11 +1452,17 @@ noparams:
             DispatchEnt root = new DispatchEnt();
             DispatchEnt ptr  = root;
 
+            List<P6any> sp = SortCandidates(dth.info.param0 as P6any[]);
+
             // XXX I think this is a harmless race
             //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
             //if (cs == null)
             //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
-            foreach (P6any p in dth.info.param0 as P6any[]) {
+            foreach (P6any p in sp) {
+                if (p == null) {
+                    Console.WriteLine(".");
+                    continue;
+                }
                 Console.WriteLine((new MMDCandidateLongname(p)).LongName());
                 SubInfo si = (SubInfo)p.GetSlot("info");
                 Frame   o  = (Frame)p.GetSlot("outer");
