@@ -51,8 +51,9 @@ Executable niecza-hoopl
     Main-is: nam.hs         
   
   -- Packages needed in order to build this package.
-   Build-depends: aeson >= 0.3.2.1,bytestring >= 0.9.1.5,vector >= 0.7.0.1,base >= 4,attoparsec >= 0.8.5.1 
+   Build-depends: aeson >= 0.3.2.1,bytestring >= 0.9.1.5,vector >= 0.7.0.1,base >= 4,attoparsec >= 0.8.5.1 ,text
   
+
   -- Modules not exported by this package.
   -- Other-modules:       
   
