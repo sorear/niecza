@@ -22,6 +22,7 @@ namespace Niecza {
         public Frame outer;
         public P6any ip6;
 
+        public DispatchEnt() {}
         public DispatchEnt(DispatchEnt next, P6any ip6) {
             this.ip6 = ip6;
             this.next = next;
@@ -1340,6 +1341,13 @@ noparams:
             while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
 
             Console.WriteLine("---");
+            DispatchEnt root = new DispatchEnt();
+            DispatchEnt ptr  = root;
+
+            // XXX I think this is a harmless race
+            //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
+            //if (cs == null)
+            //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
             foreach (P6any p in dth.info.param0 as P6any[]) {
                 Console.WriteLine((new MMDCandidateLongname(p)).LongName());
                 SubInfo si = (SubInfo)p.GetSlot("info");
@@ -1349,17 +1357,20 @@ noparams:
                     Console.WriteLine("NOT BINDABLE");
                 } else {
                     Console.WriteLine("BINDABLE");
+                    ptr.next = new DispatchEnt(null, p);
+                    ptr = ptr.next;
                 }
             }
 
-            // XXX I think this is a harmless race
-            //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
-            //if (cs == null)
-            //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
+            root = root.next;
+            if (root == null)
+                return Kernel.Die(th, "No matching candidates to dispatch for " + dth.info.name);
 
             if (tailcall) th = th.caller;
-            th.resultSlot = NewROScalar(AnyP);
-            return th;
+            Frame nf = root.info.Binder(th.MakeChild(root.outer, root.info),
+                    dth.pos, dth.named, false);
+            nf.curDisp = root;
+            return nf;
         }
 
         private static Frame StandardTypeProtoC(Frame th) {

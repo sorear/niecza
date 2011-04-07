@@ -121,7 +121,8 @@ use MONKEY_TYPING;
     is C20.b3(True), "bool", "multimethod sorting works (3)";
     is C20.b3("foo"), "any", "multimethod sorting works (4)";
 
-    dies_ok { C20.b4("foo", "bar") }, "multimethod tie checking works";
+    dies_ok { C20.b4("foo", "bar") }, "multimethod fail checking works";
+    dies_ok { C20.b4(True, True) }, "multimethod tie checking works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
