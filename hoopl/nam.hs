@@ -6,6 +6,7 @@ import Data.Attoparsec.Number
 import Control.Monad
 import Debug.Trace
 import Data.Vector ((!))
+import qualified Op
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import qualified Data.ByteString.Char8 as B
@@ -31,38 +32,6 @@ data Unit = Unit {
 --    stash_root   ::   StNode  -- Trie holding classes and global variables
 } deriving Show
 
-data Op =
-    Ann Integer Op
-    | Prog [Op]
-    | Fetch Op 
-    | Const Op 
-    | Unknow Value
-    | StrLit String
-    | Subcall [Op]
-    | ScopedLex Op
-    | Box String Op
-    | Double Double
-    deriving Show
-
-str (String t) = T.unpack t
-double (Number (D n)) = n
-double (Number (I n)) = fromInteger n
-double x = error $ show x
-int (Number (I n)) = n
-int x = error $ show x
---,_,,op
--- turns an raw array of opcodes into Op
-rawOpsToOp (Array a) = case (V.toList a) of 
-    [(str -> "ann"),_,(int -> pos),op] -> Ann pos (rawOpsToOp op)
-    (str -> "prog"):rest -> Prog $ map rawOpsToOp rest
-    [(str -> "fetch"),arg] -> Fetch $ rawOpsToOp arg
-    [(str -> "const"),arg] -> Const $ rawOpsToOp arg
-    [(str -> "scopedlex"),arg] -> ScopedLex $ rawOpsToOp arg
-    [(str -> "box"),(str -> typeName),thing] -> Box typeName (rawOpsToOp thing)
-    ((str -> "subcall"):sig:rest) -> Subcall (map rawOpsToOp rest)
-    [(str -> "double"),(double -> val)] -> Double val
-    other -> Unknow (Array $ V.fromList other)
-rawOpsToOp other = Unknow other
 
     {-
 data Sub = 
@@ -86,13 +55,13 @@ data Sub =
 
 data XrefThing = Sub {
     subName :: String,
-    nam :: Op
+    nam :: Op.Op
     } | Other String
     deriving Show
 
 parseXrefThing "sub" a = do
     subName_ <- parseJSON (a ! 1)
-    return $ Sub {subName=subName_,nam=rawOpsToOp (a ! 17)}
+    return $ Sub {subName=subName_,nam=Op.rawOpsToOp (a ! 17)}
 
 parseXrefThing thing_type _ = return $ Other thing_type
 
