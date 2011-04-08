@@ -40,6 +40,8 @@ method FALLBACK($meth, $/) {
             make Operator.funop('&prefix:<' ~ $<sym> ~ '>', 1);
         } elsif $p eq 'z=' && !$<semilist> {
             make mkcall($/, '&term:<' ~ $<sym> ~ '>');
+        } elsif $p eq 'z=' {
+            make mkcall($/, '&circumfix:<' ~ $<sym> ~ '>', @( $<semilist>.ast ));
         }
     } elsif substr($meth,0,7) eq 'prefix:' {
         make Operator.funop('&prefix:<' ~ $<sym> ~ '>', 1);
