@@ -24,10 +24,10 @@ my %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uass
 
 # TODO: allow variable :dba()s
 role sym_categorical[$name,$sym,$O] {
-    token ::($name) () { $sym $<O>={$O} }
+    token ::($name) () { $sym $<O>={$O} $<sym>={$sym} }
 }
 role bracket_categorical[$name,$sym1,$sym2,$O] {
-    token ::($name) () { :my $*GOAL = $sym2; $sym1 {}:s [ :lang($¢.unbalanced($sym2)) <semilist> ] [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} }
+    token ::($name) () { :my $*GOAL = $sym2; $sym1 {}:s [ :lang($¢.unbalanced($sym2)) <semilist> ] [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} $<sym>={[$sym1,$sym2]} }
 }
 
 method add_categorical($name) {
@@ -36,6 +36,8 @@ method add_categorical($name) {
         self.add_my_name($name);
         return self;
     }
+    # CORE names are hardcoded
+    return self if $*UNITNAME eq 'CORE';
     return self unless ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
     my $cat = ~$0;
     my $sym = substr($name, $/.to);
