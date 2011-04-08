@@ -288,7 +288,14 @@ augment class Op::SubDef { #OK exist
             $prefix = $*unit.deref(@*opensubs[*-1].body_of).name ~ ".";
         }
         $.multiness //= 'only';
-        if $.bindlex {
+        if $.bindlex && $.body.class eq 'Regex' {
+            $.symbol = '&' ~ $.body.name;
+            my $proto = $.symbol;
+            $proto ~~ s/\:.*//;
+            @*opensubs[*-1].add_dispatcher($proto) if $.multiness ne 'only'
+                && !@*opensubs[*-1].lexicals.{$proto};
+            $.symbol ~= ":(!proto)" if $.multiness eq 'proto';
+        } elsif $.bindlex {
             $.symbol = '&' ~ $.body.name;
             @*opensubs[*-1].add_dispatcher($.symbol) if $.multiness ne 'only'
                 && !@*opensubs[*-1].lexicals.{$.symbol};

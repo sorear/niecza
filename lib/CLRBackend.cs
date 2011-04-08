@@ -2584,7 +2584,7 @@ namespace Niecza.CLRBackend {
         CpsOp MakeDispatch(string prefix) {
             HashSet<string> names = new HashSet<string>();
             List<CpsOp> cands = new List<CpsOp>();
-            string filter = prefix + ":(";
+            string filter = prefix + ":";
             string pn = prefix + ":(!proto)";
 
             for (StaticSub csr = sub; ; csr = csr.outer.Resolve<StaticSub>()) {
