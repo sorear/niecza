@@ -517,7 +517,7 @@ method heredoc () {
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
         my $lang   = $herestub.lang.mixin( herestop );
-        my $doc    = first /:r :lang($lang) <nibbler> <stopper>/.($here);
+        my $doc    = head /:r :lang($lang) <nibbler> <stopper>/.($here);
 
         if defined $doc {
             if $herestub.writeback.[0] ~~ Sub {
@@ -4527,7 +4527,7 @@ method EXPR ($preclvl?) {
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
         $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';     # XXX P6
-        my $term = first($here."$termish"());
+        my $term = head($here."$termish"());
 
         if not $term {
             $here.panic("Bogus term") if @opstack > 1;
@@ -4569,9 +4569,9 @@ method EXPR ($preclvl?) {
         loop {     # while we see adverbs
             $oldpos = $here.pos;
             last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;   # XXX P6
-            my $ws = first($here.ws);
+            my $ws = head($here.ws);
             $here = $here.cursor($ws.to);
-            my $infix = first($here.infixish);
+            my $infix = head($here.infixish);
             last TERM unless $infix;
             
             if not $infix<sym> {
@@ -4591,7 +4591,7 @@ method EXPR ($preclvl?) {
             }
 
             $here = $here.cursor($infix.to);
-            $ws   = first($here.ws);
+            $ws   = head($here.ws);
             $here = $here.cursor($ws.to);
 
             # substitute precedence for listops

@@ -99,7 +99,7 @@ method add_enum($type,$expr) {
 method canonicalize_name($n) {
     my $M;
     my $name = $n;
-    if $M = first(/(< $ @ % & >)( \^ || \: <!before \:> )/(Cursor.new($name))) {
+    if $M = head(/(< $ @ % & >)( \^ || \: <!before \:> )/(Cursor.new($name))) {
         $name = $M[0] ~ substr($name, $M.to);
     }
     if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {

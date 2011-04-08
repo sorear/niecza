@@ -325,6 +325,11 @@ next_method: ;
             mi.impl = code;
             mi.short_name = name;
             mi.long_name = name;
+            // XXX
+            if ((flags & M_MASK) == 0 && code.mo.name == "Regex" &&
+                    name.IndexOf(':') >= 0) {
+                flags |= M_MULTI;
+            }
             if ((flags & M_MASK) != 0) {
                 if ((flags & M_MASK) == M_PROTO) {
                     mi.long_name = mi.long_name + ":(proto)";
