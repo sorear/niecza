@@ -1,6 +1,8 @@
 integration/lexical-array-in-inner-block.t
+integration/method-calls-and-instantiation.t
 integration/no-indirect-new.t
 integration/passing-pair-class-to-sub.t
+integration/substr-after-match-in-gather-in-for.t
 S02-builtin_data_types/array.t
 S02-builtin_data_types/autovivification.t
 S02-builtin_data_types/bool.t
@@ -26,6 +28,7 @@ S03-operators/binding-scalars.t
 S03-operators/bit.t
 S03-operators/chained-declarators.t
 S03-operators/not.t
+S03-operators/range-basic.t
 S03-operators/relational.t
 S03-operators/repeat.t
 S03-operators/scalar-assign.t
@@ -57,12 +60,15 @@ S04-statements/while.t
 S05-capture/subrule.t
 S05-grammar/methods.t
 S05-grammar/protoregex.t
+S05-grammar/signatures.t
 S05-interpolation/lexicals.t
 S05-mass/recursive.t
 S05-metachars/line-anchors.t
 S05-metasyntax/changed.t
 S05-metasyntax/null.t
 S05-metasyntax/single-quotes.t
+S06-multi/lexical-multis.t
+S06-multi/positional-vs-named.t
 S06-other/misc.t
 S06-signature/passing-arrays.t
 S06-signature/positional.t
@@ -80,6 +86,7 @@ S12-methods/calling_syntax.t
 S12-methods/class-and-instance.t
 S12-methods/how.t
 S13-type-casting/methods.t
+S16-unfiled/slurp.t
 S29-any/cmp.t
 S29-context/exit-in-if.t
 S32-array/bool.t
