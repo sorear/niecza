@@ -1037,6 +1037,15 @@ This type marks labels.  Labels are cloned like subs on entry, and
 refer to objects which encapsulate a name and a frame reference.
 
     Name            Type    Description
+    name            string  "&infix:<+>" or similar
+    typecode        string  Always 'dispatch'
+
+This type is used for dispatch subs.  Dispatch subs are created on
+clone and encapsulate some number of multi candidates, specifically
+all lexically-visible unshadowed subs with names like the dispatch
+followed by ":(" and any extra stuff.
+
+    Name            Type    Description
     name            string  "$foo"
     typecode        string  Always 'simple'
     flags           number  4=NOINIT, 2=LIST, 1=HASH

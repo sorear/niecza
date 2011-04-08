@@ -287,10 +287,20 @@ augment class Op::SubDef { #OK exist
         if defined $.bindmethod {
             $prefix = $*unit.deref(@*opensubs[*-1].body_of).name ~ ".";
         }
-        $.symbol = $.bindlex ?? ('&' ~ $.body.name) !!
-            ::GLOBAL::NieczaActions.gensym;
-        $.bindpackages //= [];
         $.multiness //= 'only';
+        if $.bindlex {
+            $.symbol = '&' ~ $.body.name;
+            @*opensubs[*-1].add_dispatcher($.symbol) if $.multiness ne 'only'
+                && !@*opensubs[*-1].lexicals.{$.symbol};
+
+            given $.multiness {
+                when 'multi' { $.symbol ~= ":({ ::GLOBAL::NieczaActions.gensym })"; }
+                when 'proto' { $.symbol ~= ":(!proto)"; }
+            }
+        } else {
+            $.symbol = ::GLOBAL::NieczaActions.gensym;
+        }
+        $.bindpackages //= [];
         my $body = $.body.begin(:$prefix,
             once => ($.body.type // '') eq 'voidbare');
         @*opensubs[*-1].add_my_sub($.symbol, $body);

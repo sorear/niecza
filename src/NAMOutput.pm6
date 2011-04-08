@@ -314,6 +314,9 @@ augment class Metamodel::Lexical::Hint { #OK exist
 augment class Metamodel::Lexical::Label { #OK exist
     method to_nam() { ['label'] }
 }
+augment class Metamodel::Lexical::Dispatch { #OK exist
+    method to_nam() { ['dispatch'] }
+}
 augment class Metamodel::Lexical::SubDef { #OK exist
     method to_nam() { ['sub', @( $.body.xref ) ] }
 }
@@ -333,6 +336,8 @@ sub lex_from_nam(@block) {
                         if $type eq 'hint';
     return ($name, ::Metamodel::Lexical::Label.new)
                         if $type eq 'label';
+    return ($name, ::Metamodel::Lexical::Dispatch.new)
+                        if $type eq 'dispatch';
     return ($name, ::Metamodel::Lexical::SubDef.new(body => $*xref[@xtra[1]]))
                         if $type eq 'sub';
     return ($name, ::Metamodel::Lexical::Stash.new(path => @xtra))

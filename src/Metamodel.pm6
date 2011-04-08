@@ -422,6 +422,9 @@ class Lexical {
     class Label is Lexical {
     }
 
+    class Dispatch is Lexical {
+    }
+
     # our...
     class Common is Lexical {
         has $.path = die "M:L:Common.path required"; # Array of Str
@@ -579,6 +582,10 @@ class StaticSub is RefTarget {
 
     method add_label($slot) {
         $.lexicals{$slot} = Metamodel::Lexical::Label.new;
+    }
+
+    method add_dispatcher($slot) {
+        $.lexicals{$slot} = Metamodel::Lexical::Dispatch.new;
     }
 
     method add_common_name($slot, $path, $name) {

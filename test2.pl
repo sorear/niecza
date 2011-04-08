@@ -2,6 +2,8 @@
 use Test;
 use MONKEY_TYPING;
 
+#`「
+
 {
     "foo" ~~ /\w+/;
     is $0, "foo", 'Match[0] returns whole match if no parens';
@@ -123,6 +125,32 @@ use MONKEY_TYPING;
 
     dies_ok { C20.b4("foo", "bar") }, "multimethod fail checking works";
     dies_ok { C20.b4(True, True) }, "multimethod tie checking works";
+}
+」
+
+{
+    multi foo(Str $) { "str" }
+    multi foo(Bool $) { "bool" }
+
+    is foo(True), "bool", "multisubs work (1)";
+    is foo("abc"), "str", "multisubs work (2)";
+
+    {
+        multi foo(Any $) { "any" }
+        is foo(True), "bool", "augmenting multisubs works (1)";
+        is foo(5), "any", "augmenting multisubs works (2)";
+
+        # {
+        #     proto foo($) {*}
+        #     multi foo(Any $) { "any2" }
+        #     is foo(True), "any2", "proto-shadowing works";
+        # }
+
+        {
+            sub foo(Any $) { "any3" }
+            is foo(True), "any3", "only-shadowing works";
+        }
+    }
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
