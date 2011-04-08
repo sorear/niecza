@@ -27,6 +27,32 @@ use OptRxSimple;
 use Sig;
 
 augment class NieczaActions {
+method FALLBACK($meth, $/) {
+    if $meth eq '::($name)' { # XXX STD miscompilation
+        my $p = $<O><prec>;
+        if $p eq 't=' { # additive
+            make Operator.funop('&infix:<' ~ $<sym> ~ '>', 2);
+        } elsif $p eq 'y=' && $<semilist> {
+            make Operator.funop('&postcircumfix:<' ~ $<sym> ~ '>', 1, @( $<semilist>.ast ));
+        } elsif $p eq 'y=' {
+            make Operator.funop('&postfix:<' ~ $<sym> ~ '>', 1);
+        } elsif $p eq 'v=' || $p eq 'o=' {
+            make Operator.funop('&prefix:<' ~ $<sym> ~ '>', 1);
+        } elsif $p eq 'z=' && !$<semilist> {
+            make mkcall($/, '&term:<' ~ $<sym> ~ '>');
+        }
+    } elsif substr($meth,0,7) eq 'prefix:' {
+        make Operator.funop('&prefix:<' ~ $<sym> ~ '>', 1);
+    } elsif substr($meth,0,8) eq 'postfix:' {
+        make Operator.funop('&postfix:<' ~ $<sym> ~ '>', 1);
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make Operator.funop('&infix:<' ~ $<sym> ~ '>', 2);
+    } elsif substr($meth,0,5) eq 'term:' {
+        make mkcall($/, '&term:<' ~ $<sym> ~ '>');
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
+}
 method method_def ($/) {
     make ::Op::StatementList.new;
     my $scope = $*SCOPE // 'has';
