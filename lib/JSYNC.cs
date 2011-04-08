@@ -181,7 +181,7 @@ public class JsyncWriter {
 
     void WriteNum(double x) {
         ScalarCheck();
-        o.Append(x);
+        o.Append(Utils.N2S(x));
     }
 
     void WriteAnchor(int i) {
@@ -388,7 +388,7 @@ public class JsyncReader {
         } else {
             double d;
             string tx = GetJsonNumber();
-            if (!double.TryParse(tx, out d))
+            if (!Utils.S2NB(tx, out d))
                 Err("Unparsable number " + tx);
             return BoxRW<double>(d, Kernel.NumMO);
         }
@@ -483,7 +483,7 @@ public class JsyncReader {
             return BoxRW<string>(s_content, Kernel.StrMO);
         } else if (s_tag == "Num") {
             double r;
-            if (!double.TryParse(s_content, out r))
+            if (!Utils.S2NB(s_content, out r))
                 Err("Num format error");
             return BoxRW<double>(r, Kernel.NumMO);
         } else {
@@ -814,7 +814,7 @@ public class JsonWriter {
         } else if (obj.Isa(Kernel.BoolMO)) {
             o.Append(Kernel.UnboxAny<bool>(obj) ? "true" : "false");
         } else if (obj.Isa(Kernel.NumMO)) {
-            o.Append(Kernel.UnboxAny<double>(obj));
+            o.Append(Utils.N2S(Kernel.UnboxAny<double>(obj)));
         } else if (obj.Isa(Kernel.StrMO)) {
             o.Append('"');
             JsyncWriter.AddStringContents(o, Kernel.UnboxAny<string>(obj));

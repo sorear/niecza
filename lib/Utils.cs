@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace Niecza {
@@ -480,6 +481,18 @@ namespace Niecza {
                     return (*p1 == '\0');
                 }
             }
+        }
+
+        public static string N2S(double n) {
+            return n.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static double S2N(string n) {
+            return double.Parse(n, CultureInfo.InvariantCulture);
+        }
+
+        public static bool S2NB(string n, out double o) {
+            return double.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out o);
         }
     }
 }

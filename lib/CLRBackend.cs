@@ -25,7 +25,7 @@ namespace Niecza.CLRBackend {
         public double num {
             get {
                 if (has_val) return val;
-                val = double.Parse(text);
+                val = Utils.S2N(text);
                 has_val = true;
                 return val;
             }
@@ -3115,9 +3115,9 @@ dynamic:
             thandlers["varhash_new"] = Constructy(Tokens.VarHash.GetConstructor(new Type[0]));
             thandlers["varhash_dup"] = Constructy(Tokens.VarHash.GetConstructor(new Type[]{ Tokens.VarHash }));
             thandlers["varhash_contains_key"] = Methody(null, Tokens.VarHash.GetMethod("ContainsKey"));
-            thandlers["num_to_string"] = Methody(null, Tokens.Object_ToString);
+            thandlers["num_to_string"] = Methody(null, typeof(Utils).GetMethod("N2S"));
             thandlers["str_length"] = Methody(null, Tokens.String.GetMethod("get_Length"));
-            thandlers["str_tonum"] = Methody(null, Tokens.Double.GetMethod("Parse", new Type[] { Tokens.String }));
+            thandlers["str_tonum"] = Methody(null, typeof(Utils).GetMethod("S2N"));
             thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
             thandlers["str_tolower"] = Methody(null, Tokens.String.GetMethod("ToLowerInvariant"));
             thandlers["str_toupper"] = Methody(null, Tokens.String.GetMethod("ToUpperInvariant"));

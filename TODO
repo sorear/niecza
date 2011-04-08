@@ -41,7 +41,8 @@ EASY
    Fudge and run your favorite spectest file.
 
    Stuff spectests are blocking on: "Block", "&hash", "writable $_",
-   "closure for", "ranges of chars", "gather for",
+   "closure for", "ranges of chars", "gather for", constants in signatures,
+   ::T, Int, ...
 
 MEDIUM
 
@@ -82,9 +83,6 @@ MEDIUM
    Methods with variable names need to call the correct action method.  (See
    the horrible hack in NieczaActions.FALLBACK).
 
-   Audit accelerated context routines for correct undefined value and odd
-   representation handling.  +Num shouldn't crash, etc.
-
   *Implement -p and -n.
 
    Add :rotate - depends on sized numbers.
@@ -108,8 +106,6 @@ HARD
    on the slow path of nominal type checks.  You will also need to fix
    the optimized builtins to use nominal type checking.  Bonus points
    if the optimizer can turn if $x == any(1,3,5) into a loop.
-
- +*Implement multiple dispatch.
 
   *Create multiple numeric types with sensible overloads between them.  Add
    more numeric operators.

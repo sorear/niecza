@@ -716,6 +716,8 @@ noparams:
     class InvokeSub : InvokeHandler {
         public override Frame Invoke(P6any th, Frame caller,
                 Variable[] pos, VarHash named) {
+            if (!th.IsDefined())
+                return Kernel.Die(caller, "Cannot invoke an undef sub");
             P6opaque dyo = ((P6opaque) th);
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
@@ -737,7 +739,6 @@ noparams:
         }
     }
 
-    // TODO: find out if generic sharing is killing performance
     class CtxCallMethodUnbox<T> : ContextHandler<T> {
         string method;
         public CtxCallMethodUnbox(string method) { this.method = method; }
@@ -767,8 +768,12 @@ noparams:
     }
 
     class CtxJustUnbox<T> : ContextHandler<T> {
+        T dflt;
+        public CtxJustUnbox(T dflt) { this.dflt = dflt; }
         public override T Get(Variable obj) {
-            return Kernel.UnboxAny<T>(obj.Fetch());
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) return dflt;
+            return Kernel.UnboxAny<T>(o);
         }
     }
 
@@ -804,7 +809,8 @@ noparams:
 
     class CtxParcelList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            VarDeque itr = new VarDeque(Kernel.UnboxAny<Variable[]>(obj.Fetch()));
+            P6any o = obj.Fetch();
+            VarDeque itr = o.IsDefined() ? new VarDeque(Kernel.UnboxAny<Variable[]>(o)) : new VarDeque();
             P6any l = new P6opaque(Kernel.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
@@ -835,13 +841,15 @@ noparams:
 
     class CtxParcelIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
-            return new VarDeque(Kernel.UnboxAny<Variable[]>(obj.Fetch()));
+            P6any o = obj.Fetch();
+            return o.IsDefined() ? new VarDeque(Kernel.UnboxAny<Variable[]>(o)) : new VarDeque();
         }
     }
 
     class CtxListIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
             P6opaque d = (P6opaque) obj.Fetch();
+            if (!d.IsDefined()) return new VarDeque();
             VarDeque r = new VarDeque( (VarDeque) d.slots[0] );
             r.PushD((VarDeque) d.slots[1]);
             return r;
@@ -855,7 +863,8 @@ noparams:
     }
     class CtxHashBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
-            return Kernel.UnboxAny<VarHash>(obj.Fetch()).IsNonEmpty;
+            P6any o = obj.Fetch();
+            return o.IsDefined() && Kernel.UnboxAny<VarHash>(o).IsNonEmpty;
         }
     }
 
@@ -876,25 +885,29 @@ noparams:
         public CtxNumSuccish(double amt) { this.amt = amt; }
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
-            double v = (o is BoxObject<double>) ? Kernel.UnboxAny<double>(o):0;
+            double v = o.IsDefined() ? Kernel.UnboxAny<double>(o) : 0;
             return Kernel.BoxRaw(v + amt, Kernel.NumMO);
         }
     }
 
     class CtxRawNativeNum2Str : ContextHandler<string> {
         public override string Get(Variable obj) {
-            return Kernel.UnboxAny<double>(obj.Fetch()).ToString();
+            P6any o = obj.Fetch();
+            return o.IsDefined() ? Utils.N2S(Kernel.UnboxAny<double>(o)) : "Num()";
         }
     }
     class CtxNum2Bool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
-            return Kernel.UnboxAny<double>(obj.Fetch()) != 0;
+            P6any o = obj.Fetch();
+            return o.IsDefined() && Kernel.UnboxAny<double>(o) != 0;
         }
     }
 
     class CtxStrBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
-            string s = Kernel.UnboxAny<string>(obj.Fetch());
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) return false;
+            string s = Kernel.UnboxAny<string>(o);
             return !(s == "" || s == "0");
         }
     }
@@ -943,7 +956,8 @@ noparams:
 
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            return Kernel.BoxAnyMO<string>(Kernel.UnboxAny<double>(obj.Fetch()).ToString(), Kernel.StrMO);
+            P6any o = obj.Fetch();
+            return Kernel.BoxAnyMO<string>(o.IsDefined() ? Utils.N2S(Kernel.UnboxAny<double>(o)) : "Num()", Kernel.StrMO);
         }
     }
 
@@ -1008,7 +1022,7 @@ noparams:
                 return Kernel.NewROScalar(Kernel.AnyP);
 
             Cursor os = (Cursor)o;
-            return os.GetKey(key.Fetch().mo.mro_raw_Numeric.Get(key).ToString());
+            return os.GetKey(Utils.N2S(key.Fetch().mo.mro_raw_Numeric.Get(key)));
         }
     }
 
@@ -2237,7 +2251,7 @@ slow:
 
             BoolMO = new STable("Bool");
             Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
-                    new CtxJustUnbox<bool>());
+                    new CtxJustUnbox<bool>(false));
             BoolMO.FillProtoClass(new string[] { });
             BoolMO.Invalidate();
             TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
@@ -2245,7 +2259,7 @@ slow:
 
             StrMO = new STable("Str");
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
-                    new CtxJustUnbox<string>());
+                    new CtxJustUnbox<string>(""));
             Handler_PandBox(StrMO, "Bool", new CtxStrBool(), BoolMO);
             StrMO.FillProtoClass(new string[] { });
             StrMO.Invalidate();
@@ -2255,7 +2269,7 @@ slow:
 
             NumMO = new STable("Num");
             Handler_Vonly(NumMO, "Numeric", new CtxReturnSelf(),
-                    new CtxJustUnbox<double>());
+                    new CtxJustUnbox<double>(0));
             Handler_Vonly(NumMO, "Str", new CtxStrNativeNum2Str(),
                     new CtxRawNativeNum2Str());
             Handler_PandBox(NumMO, "Bool", new CtxNum2Bool(), BoolMO);
