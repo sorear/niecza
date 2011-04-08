@@ -545,6 +545,8 @@ namespace Niecza.CLRBackend {
                     obj = new LexStash(unit, bl);
                 } else if (type == "label") {
                     obj = new LexLabel(bl);
+                } else if (type == "dispatch") {
+                    obj = new LexDispatch(bl);
                 } else {
                     throw new Exception("unknown lex type " + type);
                 }
@@ -641,6 +643,9 @@ namespace Niecza.CLRBackend {
 
     class LexLabel : LexVarish {
         public LexLabel(object[] l) { }
+    }
+    class LexDispatch : LexVarish {
+        public LexDispatch(object[] l) { }
     }
 
     class LexHint : Lexical {
@@ -932,6 +937,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("CheckUnsafe");
         public static readonly MethodInfo Kernel_NewLabelVar =
             typeof(Kernel).GetMethod("NewLabelVar");
+        public static readonly MethodInfo Kernel_MakeDispatcher =
+            typeof(Kernel).GetMethod("MakeDispatcher");
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_SFH =
@@ -2574,6 +2581,31 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        CpsOp MakeDispatch(string prefix) {
+            HashSet<string> names = new HashSet<string>();
+            List<CpsOp> cands = new List<CpsOp>();
+            string filter = prefix + ":(";
+            string pn = prefix + ":(!proto)";
+
+            for (StaticSub csr = sub; ; csr = csr.outer.Resolve<StaticSub>()) {
+                foreach (KeyValuePair<string,Lexical> kp in csr.lexicals) {
+                    if (Utils.StartsWithInvariant(filter, kp.Key) &&
+                            kp.Key != pn &&
+                            !names.Contains(kp.Key)) {
+                        names.Add(kp.Key);
+                        cands.Add(CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { RawAccessLex("scopedlex", kp.Key, null) }));
+                    }
+                }
+                if (csr.outer == null) break;
+            }
+
+            return CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar,
+                new CpsOp[] { CpsOp.MethodCall(null, Tokens.Kernel_MakeDispatcher,
+                    new CpsOp[] { CpsOp.StringLiteral(prefix),
+                    CpsOp.Null(Tokens.P6any),
+                    CpsOp.NewArray(Tokens.P6any, cands.ToArray()) }) });
+        }
+
         CpsOp Constant(CpsOp val) {
             if (val.stmts.Length != 0 || val.head.HasCases)
                 throw new ArgumentException();
@@ -2792,6 +2824,8 @@ dynamic:
                 return CpsOp.MethodCall(null, Tokens.Kernel_NewLabelVar, new CpsOp[]{
                     CpsOp.CallFrame(),
                     CpsOp.StringLiteral(JScalar.S(z[1])) }); };
+            handlers["_newdispatch"] = delegate(NamProcessor th, object[] z) {
+                return th.MakeDispatch(JScalar.S(z[1])); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
                 string kind = FixStr(z[1]);
                 ModuleWithTypeObject m;
@@ -3381,6 +3415,7 @@ dynamic:
         }
 
         void EnterCode(List<object> frags) {
+            List<object> latefrags = new List<object>();
             foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
                 if ((sub.flags & StaticSub.RUN_ONCE) != 0 &&
                         (sub.flags & StaticSub.SPAD_EXISTS) != 0 &&
@@ -3419,8 +3454,14 @@ dynamic:
                         new JScalar(kv.Key),
                         new object[] { new JScalar("_newlabel"),
                             new JScalar(kv.Key) } });
+                } else if (kv.Value is LexDispatch) {
+                    latefrags.Add(new object[] { new JScalar("scopedlex"),
+                        new JScalar(kv.Key),
+                        new object[] { new JScalar("_newdispatch"),
+                            new JScalar(kv.Key) } });
                 }
             }
+            foreach (object lf in latefrags) frags.Add(lf);
         }
 
         CpsOp FillParamRole() {

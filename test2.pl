@@ -2,8 +2,6 @@
 use Test;
 use MONKEY_TYPING;
 
-#`「
-
 {
     "foo" ~~ /\w+/;
     is $0, "foo", 'Match[0] returns whole match if no parens';
@@ -126,7 +124,6 @@ use MONKEY_TYPING;
     dies_ok { C20.b4("foo", "bar") }, "multimethod fail checking works";
     dies_ok { C20.b4(True, True) }, "multimethod tie checking works";
 }
-」
 
 {
     multi foo(Str $) { "str" }
