@@ -150,6 +150,14 @@ use MONKEY_TYPING;
     }
 }
 
+{
+    sub circumfix:<《 》>($a) { "|{$a}|" }
+    sub postcircumfix:<「 」>($a,$b) { "|{$a}|{$b}|" }
+
+    is 《 2 》, "|2|", "user circumfix works";
+    is 3「4」, "|3|4|", "user postcircumfix works";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
