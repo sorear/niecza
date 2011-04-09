@@ -26,6 +26,12 @@ use MONKEY_TYPING;
     rxtest /z [ [ a ::> x || . ] | . y ]/, "z[[a::>x||.]|.y]", ("zay",), Nil;
 }
 
+{
+    my $i = 0;
+    L1: while $i < 10 { L1.last if $i == 5; $i++ }
+    is $i, 5, "method .last works";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

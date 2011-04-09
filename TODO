@@ -18,15 +18,11 @@ EASY
 
    Add $*ARGFILES, %*ENV, your favorite other *-var.
 
-   Give labels methods to invoke control operations.
-
    Implement Sub.leave and CallFrame.leave
 
    Add more benchmarks to perf/.
 
    Character class expressions like [[a .. A] & [\W]]
-
-   ::> cut syntax.
 
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
 
