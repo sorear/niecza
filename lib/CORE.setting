@@ -981,6 +981,7 @@ my class Cursor {
     method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
+    method CURSOR() { self }
     token alpha { <+INTERNAL::alpha> }
 }
 
@@ -1009,6 +1010,9 @@ my class Match is Cool {
         !defined(self) ?? self.typename !!
         "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).perl }) named({ %(self).perl })>"
     }
+    method CURSOR() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
+    method cursor() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
+    method reduced() { Q:CgOp { (box Str (cursor_reduced (cast cursor (@ {self})))) } }
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
         Q:CgOp {
             (newscalar (cursor_synthetic
