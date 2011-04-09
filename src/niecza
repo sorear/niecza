@@ -26,6 +26,12 @@ use Operator;
 use OptRxSimple;
 use Sig;
 
+augment class Op::Labelled { #OK exist
+    method statement_level() {
+        self.new(name => $.name, stmt => $.stmt.statement_level);
+    }
+}
+
 class RxOp::CutBrack is RxOp {
     method code($) { CgOp.rxcall('CommitGroup', CgOp.str("BRACK")) }
     method lad() { [ 'Null' ]; }

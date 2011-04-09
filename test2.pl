@@ -30,6 +30,9 @@ use MONKEY_TYPING;
     my $i = 0;
     L1: while $i < 10 { L1.last if $i == 5; $i++ }
     is $i, 5, "method .last works";
+
+    L2: for 2,3,4 { $i = $_; last L2 if $i == 3; }
+    is $i, 3, "last in for works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
