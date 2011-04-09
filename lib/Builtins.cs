@@ -838,4 +838,8 @@ again:
         nf.curDisp = de;
         return nf;
     }
+
+    public static bool can(P6any obj, string mname) {
+        return obj.mo.mro_methods.ContainsKey(mname);
+    }
 }

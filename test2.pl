@@ -16,6 +16,10 @@ use MONKEY_TYPING;
     is "a1b2c".subst(/\d/, 'd'), 'adb2c', '.subst works';
     is "a1b2c".subst(:global, /\d/, 'd'), 'adbdc', '.subst works with :g';
     is "a1b2c".subst(/\d/, {$/+1}, :g), 'a2b3c', '.subst works with $/';
+
+    ok Str.^can("subst"), "Str can subst";
+    ok Str.^can("defined"), "Str can defined";
+    nok Str.^can("quux"), "Str cannot quux";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

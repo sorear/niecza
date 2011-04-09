@@ -9,10 +9,6 @@ EASY
 
  + when {} shouldn't disrupt flow of $_
 
- + Str.subst
-
- + ClassHOW.can
-
  + $*OUT
 
    Rename at-key, at-pos to "postcircumfix:<[ ]>" etc.

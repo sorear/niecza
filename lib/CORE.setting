@@ -244,6 +244,9 @@ my class ClassHOW {
         (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))
     } }
     method does($obj, $role) { self.isa($obj, $role) } #no roles yet
+    method can($obj, $name) { Q:CgOp {
+        (box Bool (_cgop obj_can (@ {$obj}) (obj_getstr {$name})))
+    } }
 }
 
 my class EnumType is Cool { }

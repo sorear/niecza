@@ -3162,6 +3162,7 @@ dynamic:
             thandlers["obj_what"] = Methody(null, Tokens.P6any.GetMethod("GetTypeObject"));
             thandlers["obj_isa"] = Methody(null, Tokens.P6any.GetMethod("Isa"));
             thandlers["obj_does"] = Methody(null, Tokens.P6any.GetMethod("Does"));
+            thandlers["obj_can"] = Methody(null, Tokens.Builtins.GetMethod("can"));
             thandlers["obj_newblank"] = Constructy(Tokens.P6opaque_ctor);
             thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.P6any, Tokens.String, Tokens.P6any }));
             thandlers["cursor_pos"] = FieldGet(Tokens.Cursor, "pos");
