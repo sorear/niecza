@@ -252,7 +252,6 @@ method vvarlist_unshift (*@_) { self._cgop("vvarlist_unshift", @_) }
 method vvarlist_unshiftn (*@_) { self._cgop("vvarlist_unshiftn", @_) }
 method whileloop (*@_) { self._cgop("whileloop", @_) }
 method get_lexer (*@_) { self._cgop("get_lexer", @_) }
-method run_protoregex (*@_) { self._cgop("run_protoregex", @_) }
 method label_table (*@_) { self._cgop("label_table", @_) }
 method mrl_count (*@_) { self._cgop("mrl_count", @_) }
 method mrl_index (*@_) { self._cgop("mrl_index", @_) }
@@ -281,6 +280,9 @@ method letscope(*@items) { self._cgop('letscope', @items) }
 method xspan(*@items) { self._cgop('xspan', @items) }
 method bif_mod($x,$y) { self._cgop('bif_mod', $x, $y) }
 method bif_simple_eval($str) { self._cgop("bif_simple_eval", $str) }
+method run_dispatch (*@_) { self._cgop("run_dispatch", @_) }
+method var_get_var ($v) { self._cgop("var_get_var", $v) }
+method var_new_tied ($t,$b,$f,$s) { self._cgop("var_new_tied", $t,$b,$f,$s) }
 
 method double($x) {
     # Hack - prevent JSON syntax errors

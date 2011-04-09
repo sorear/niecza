@@ -104,7 +104,8 @@ class Method is Operator {
     method arity() { 1 }
 
     method with_args($/, *@args) {
-        if ($.name eq 'HOW' || $.name eq 'WHAT') && !$.private && !$.meta {
+        if ($.name eq 'HOW' || $.name eq 'WHAT' || $.name eq 'VAR')
+                && !$.private && !$.meta {
             if $.args {
                 $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
                 return ::Op::StatementList.new;

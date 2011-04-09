@@ -633,40 +633,32 @@ class ProtoRedis is RxOp {
     has $.cutltm = False; # Bool
 
     method code($) {
-        # will probably break with complicated harnesses
         CgOp.letn(
-          "fns", CgOp.run_protoregex(CgOp.callframe,
-            CgOp.fetch(CgOp.scopedlex('self')), CgOp.str($.name)),
+          "fns", CgOp.run_dispatch(CgOp.callframe,
+            CgOp.fetch(CgOp.scopedlex('self'))),
           "i",   CgOp.int(0),
-          "ks",  CgOp.null('var'),
-          "ki",  CgOp.null('vvarlist'),
-          "k",   CgOp.null('obj'),
+          "ks",  CgOp.null('vvarlist'),
           CgOp.pushcut('LTM'),
           CgOp.label('nextfn'),
           CgOp.cgoto('backtrack',
             CgOp.compare('>=', CgOp.letvar("i"),
               CgOp.mrl_count(CgOp.letvar("fns")))),
           CgOp.rxpushb('LTM', 'nextfn'),
-          CgOp.letvar("ks", CgOp.subcall(CgOp.mrl_index(CgOp.letvar("i"),
+          CgOp.letvar("ks", CgOp.vvarlist_new_singleton(
+            CgOp.subcall(CgOp.mrl_index(CgOp.letvar("i"),
                 CgOp.letvar("fns")), CgOp.newscalar(CgOp.rxcall(
-                    'MakeCursor')))),
+                    'MakeCursor'))))),
           CgOp.letvar("i", CgOp.arith('+', CgOp.letvar("i"), CgOp.int(1))),
-          CgOp.letvar("k", CgOp.fetch(CgOp.get_first(CgOp.letvar("ks")))),
-          CgOp.ncgoto('backtrack', CgOp.obj_is_defined(CgOp.letvar("k"))),
-          CgOp.rxcall('EndWith', CgOp.cast('cursor', CgOp.letvar("k"))),
-          CgOp.letvar('ki', CgOp.vvarlist_new_singleton(CgOp.letvar('ks'))),
-          CgOp.sink(CgOp.iter_hasflat(CgOp.letvar('ki'))),
-          CgOp.sink(CgOp.vvarlist_shift(CgOp.letvar('ki'))),
           CgOp.label('nextcsr'),
-          CgOp.ncgoto('backtrack', CgOp.iter_hasflat(CgOp.letvar('ki'))),
+          CgOp.ncgoto('backtrack', CgOp.iter_hasflat(CgOp.letvar('ks'))),
           CgOp.rxpushb('SUBRULE', 'nextcsr'),
           CgOp.rxcall('EndWith', CgOp.cast('cursor',
-              CgOp.fetch(CgOp.vvarlist_shift(CgOp.letvar('ki'))))),
+              CgOp.fetch(CgOp.vvarlist_shift(CgOp.letvar('ks'))))),
           CgOp.goto('backtrack'));
     }
 
     method lad() {
-        $.cutltm ?? [ 'Imp' ] !! [ 'ProtoRegex', $.name ];
+        $.cutltm ?? [ 'Imp' ] !! [ 'Dispatcher' ];
     }
 }
 

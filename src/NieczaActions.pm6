@@ -10,45 +10,31 @@ use OptRxSimple;
 use OpHelpers;
 use Operator;
 
-method get_op_sym($M) {
-    if $M.reduced eq '::($name)' { # XXX STD miscompilation
-        return ~$M;
-    } elsif $M.reduced ~~ /\:sym\<(.*)\>/ {
-        return ~$0;
-    } elsif $M.reduced ~~ /\:(\w+)/ {
-        return ~$0;
-    } elsif $M.reduced eq 'PRE' {
-        return self.get_op_sym($M<prefix>); # TODO: replace with better metaop
-    } else {
-        die "Cannot extract operator symbol ($M) ($M.reduced())";
-    }
-}
-
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
         my $p = $<O><prec>;
         if $p eq 't=' { # additive
-            make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
+            make Operator.funop('&infix:<' ~ $<sym> ~ '>', 2);
         } elsif $p eq 'y=' && $<semilist> {
-            my $sym = $*GOAL eq '}' ?? '{ }' !! $*GOAL eq ']' ?? '[ ]' !!
-                die "Unhandled postcircumfix ending in $*GOAL";
-            make Operator.funop('&postcircumfix:<' ~ $sym ~ '>', 1, @( $<semilist>.ast ));
+            make Operator.funop('&postcircumfix:<' ~ $<sym> ~ '>', 1, @( $<semilist>.ast ));
         } elsif $p eq 'y=' {
-            make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
+            make Operator.funop('&postfix:<' ~ $<sym> ~ '>', 1);
         } elsif $p eq 'v=' || $p eq 'o=' {
-            make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
+            make Operator.funop('&prefix:<' ~ $<sym> ~ '>', 1);
         } elsif $p eq 'z=' && !$<semilist> {
-            make mkcall($/, '&term:<' ~ self.get_op_sym($/) ~ '>');
+            make mkcall($/, '&term:<' ~ $<sym> ~ '>');
+        } elsif $p eq 'z=' {
+            make mkcall($/, '&circumfix:<' ~ $<sym> ~ '>', @( $<semilist>.ast ));
         }
     } elsif substr($meth,0,7) eq 'prefix:' {
-        make Operator.funop('&prefix:<' ~ self.get_op_sym($/) ~ '>', 1);
+        make Operator.funop('&prefix:<' ~ $<sym> ~ '>', 1);
     } elsif substr($meth,0,8) eq 'postfix:' {
-        make Operator.funop('&postfix:<' ~ self.get_op_sym($/) ~ '>', 1);
+        make Operator.funop('&postfix:<' ~ $<sym> ~ '>', 1);
     } elsif substr($meth,0,6) eq 'infix:' {
-        make Operator.funop('&infix:<' ~ self.get_op_sym($/) ~ '>', 2);
+        make Operator.funop('&infix:<' ~ $<sym> ~ '>', 2);
     } elsif substr($meth,0,5) eq 'term:' {
-        make mkcall($/, '&term:<' ~ self.get_op_sym($/) ~ '>');
+        make mkcall($/, '&term:<' ~ $<sym> ~ '>');
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
     }
@@ -370,6 +356,8 @@ method regex_def($/) {
         $path = Any;
     }
 
+    my $multiness = $*MULTINESS || Any;
+
     my $scope = (!defined($name)) ?? "anon" !! ($*SCOPE || "has");
 
     if $<signature> > 1 {
@@ -400,20 +388,19 @@ method regex_def($/) {
         }
     }
 
-    if $*MULTINESS eq 'proto' {
+    if $multiness && $multiness eq 'proto' {
         if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' ||
                 !defined($basename) {
             $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
             return Nil;
         }
         @*MEMOS[0]<proto_endsym>{$basename} = $endsym;
-        $isproto = True;
     } else {
         my $m2 = defined($symtext) ?? 'multi' !! 'only';
-        if $*MULTINESS && $*MULTINESS ne $m2 {
+        if $multiness && $multiness ne $m2 {
             $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
-            return Nil;
         }
+        $multiness = $m2;
         $endsym //= @*MEMOS[0]<proto_endsym>{$basename} if defined $basename;
     }
 
@@ -435,7 +422,7 @@ method regex_def($/) {
     }
 
     my $ast = $<regex_block>.ast;
-    if $isproto {
+    if $multiness eq 'proto' {
         $ast = ::RxOp::ProtoRedis.new(name => $name);
     }
 
@@ -450,6 +437,7 @@ method regex_def($/) {
     my @lift = $ast.oplift;
     ($ast, my $mb) = OptRxSimple.run($ast);
     make ::Op::SubDef.new(|node($/),
+        :$multiness,
         bindlex => ($scope ne 'anon' && $scope ne 'has'),
         bindmethod => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
         body => Body.new(
@@ -2550,9 +2538,9 @@ method block_to_immediate($/, $type, $blk) {
 }
 
 method block_to_closure($/, $body, :$bindlex, :$bindmethod, :$once,
-        :$bindpackages = []) {
+        :$bindpackages = [], :$multiness) {
     ::Op::SubDef.new(|node($/), :$bindlex, :$bindmethod, :$body, :$once,
-        :$bindpackages);
+        :$bindpackages, :$multiness);
 }
 
 method get_placeholder_sig($/) {
@@ -2580,9 +2568,6 @@ method get_placeholder_sig($/) {
 # always a sub, though sometimes it's an implied sub after multi/proto/only
 method routine_def ($/) {
     make ::Op::StatementList.new;
-    if $*MULTINESS {
-        $/.CURSOR.sorry("Multi routines NYI");
-    }
     if $<sigil> && $<sigil>[0] eq '&*' {
         $/.CURSOR.sorry("Contextual sub definitions NYI");
         return Nil;
@@ -2627,6 +2612,7 @@ method routine_def ($/) {
 
     make self.block_to_closure($/,
         bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
         self.sl_to_block('sub',
             $<blockoid>.ast,
             returnable => !$return_pass,
@@ -2691,6 +2677,7 @@ method method_def ($/) {
         signature => $sig ?? $sig.for_method !! Any);
 
     make self.block_to_closure($/, $bl, bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
         bindmethod => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
 }
 

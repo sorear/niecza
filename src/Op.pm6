@@ -229,6 +229,9 @@ class Interrogative is Op {
     method zyg() { $.receiver }
 
     method code($body) {
+        if $.name eq "VAR" {
+            return CgOp.var_get_var($.receiver.cgop($body));
+        }
         my $c = CgOp.fetch($.receiver.cgop($body));
         if $.name eq "HOW" {
             $c = CgOp.how($c);
