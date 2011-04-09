@@ -26,6 +26,11 @@ use Operator;
 use OptRxSimple;
 use Sig;
 
+class RxOp::CutBrack is RxOp {
+    method code($) { CgOp.rxcall('CommitGroup', CgOp.str("BRACK")) }
+    method lad() { [ 'Null' ]; }
+}
+
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
 

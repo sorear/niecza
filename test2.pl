@@ -20,6 +20,10 @@ use MONKEY_TYPING;
     ok Str.^can("subst"), "Str can subst";
     ok Str.^can("defined"), "Str can defined";
     nok Str.^can("quux"), "Str cannot quux";
+
+    rxtest /z .* y [ a ::> x || . ]/, "z.*y[a::>x||.]",
+        ("zyax", "zyb", "zyaxya"), ("zya",);
+    rxtest /z [ [ a ::> x || . ] | . y ]/, "z[[a::>x||.]|.y]", ("zay",), Nil;
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
