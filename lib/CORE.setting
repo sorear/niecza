@@ -1066,7 +1066,10 @@ sub make($x) { make $x }
 
 my class Grammar is Cursor {
     method parse($text, :$rule = "TOP", :$actions) {
-        flat(grep { $_.to == chars $text }, self.new($text, $actions)."$rule"()).head
+        my $match = (head grep { $_.to == chars $text },
+            self.new($text, $actions)."$rule"()) // self;
+        Q:CgOp { (rnull (set_status (s '$*/') {$match})) };
+        $match;
     }
 }
 # }}}

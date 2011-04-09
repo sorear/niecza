@@ -7,11 +7,7 @@ EASY
 
  + $*PROGRAM_NAME
 
- + Cursor.CURSOR should be a no-op
-
  + when {} shouldn't disrupt flow of $_
-
- + .parse should set $/
 
  + Str.subst
 
