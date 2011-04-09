@@ -12,6 +12,12 @@ use MONKEY_TYPING;
     nok $/, '.parse sets $/ (2)';
 }
 
+{
+    is "a1b2c".subst(/\d/, 'd'), 'adb2c', '.subst works';
+    is "a1b2c".subst(:global, /\d/, 'd'), 'adbdc', '.subst works with :g';
+    is "a1b2c".subst(/\d/, {$/+1}, :g), 'a2b3c', '.subst works with $/';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

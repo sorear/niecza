@@ -59,6 +59,7 @@ my class Any is Mu {
 my class Cursor { ... }
 my class Regex  { ... }
 my class Num    { ... }
+my class Str    { ... }
 my class Cool {
     method grep($sm)  { grep $sm, @(self) }
     method map($func) { map $func, @(self) }
@@ -91,6 +92,25 @@ my class Cool {
         }
         push @out, substr($str, $last, (chars($str) - $last));
         @out;
+    }
+    method subst($matcher, $replacement, :g(:$global)) {
+        my $str = ~self;
+        my $C = Cursor.new($str);
+        my $i = 0;
+        my $to = 0;
+        my $limctr = $global ?? Inf !! 1;
+        my @out;
+        while $i < chars($str) && $limctr {
+            my $M = head($matcher($C.cursor($i++)));
+            if $M && $M.chars {
+                Q:CgOp { (rnull (set_status (s '$*/') {$M})) };
+                push @out, substr($str,$to,$M.from-$to);
+                push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
+                $to = $i = $M.to;
+                $limctr = $limctr - 1;
+            }
+        }
+        join "", @out, substr($str,$to,chars($str)-$to);
     }
 
     method index($substring, $pos = 0) {
@@ -991,6 +1011,7 @@ my class Match is Cool {
     method hash () { %( self.Capture ) }
     method flat () { @( self.Capture ) }
     method iterator () { self.flat.iterator }
+    method Numeric() { +(~self) }
     method Capture () { Q:CgOp {
         (letn cap (obj_newblank (obj_llhow (@ {Capture})))
           (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
