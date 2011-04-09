@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Op (rawOpsToOp,Op) where
+module Op (rawOpsToOp,Op,Op(..)) where
 import Data.Vector ((!))
 import qualified Data.Text as T
 import qualified Data.Vector as V
