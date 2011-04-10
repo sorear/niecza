@@ -5,6 +5,7 @@ import Data.Aeson.Parser;
 import Data.Attoparsec
 import Data.Aeson;
 import Compiler.Hoopl
+import Control.Monad.State.Strict
 mainLineNam = nam . head . xref
 main = do
     namSource <- (B.readFile "MAIN.nam")
@@ -12,6 +13,6 @@ main = do
     let (Success parsed) = (T.parse (parseJSON) r) :: (T.Result Unit)
     putStrLn $ show parsed
 --    putStrLn $ show $ mainLineNam parsed
-    let converted = convert $ mainLineNam parsed
+    let converted = fst $ evalState (convert $ mainLineNam parsed) 0
     putStrLn "\ngraph:"
     putStrLn $ showGraph ((++ "\n") . show) converted
