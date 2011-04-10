@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Op (rawOpsToOp,Op,Op(..)) where
+module Op (rawOpsToOp,Op(..)) where
 import Data.Vector ((!))
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -38,4 +38,4 @@ rawOpsToOp (Array a) = case (V.toList a) of
     ((str -> "subcall"):sig:rest) -> Subcall (map rawOpsToOp rest)
     [(str -> "double"),(double -> val)] -> Double val
     other -> Unknow (Array $ V.fromList other)
-rawOpsToOp other = Unknow other
+rawOpsToOp (String t) = StrLit (T.unpack t)

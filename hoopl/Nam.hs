@@ -37,7 +37,7 @@ convert :: Op.Op -> State Int ((Graph Insn O O),Expr)
 
 convert (Op.Double d) = simple $ Double d
 convert (Op.StrLit str) = simple $ StrLit str
-convert (Op.ScopedLex (Op.StrLit str)) = simple $ ScopedLex $ StrLit "???"
+convert (Op.ScopedLex (Op.StrLit str)) = simple $ ScopedLex $ StrLit str
 
 -- HACKS 
   
