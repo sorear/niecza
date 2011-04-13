@@ -18,6 +18,7 @@ data Op =
     | ScopedLex Op
     | Box String Op
     | Double Double
+    | Sink Op
     deriving Show
 
 str (String t) = T.unpack t
@@ -37,5 +38,6 @@ rawOpsToOp (Array a) = case (V.toList a) of
     [(str -> "box"),(str -> typeName),thing] -> Box typeName (rawOpsToOp thing)
     ((str -> "subcall"):sig:rest) -> Subcall (map rawOpsToOp rest)
     [(str -> "double"),(double -> val)] -> Double val
+    [(str -> "sink"),arg] -> Sink $ rawOpsToOp arg
     other -> Unknow (Array $ V.fromList other)
 rawOpsToOp (String t) = StrLit (T.unpack t)

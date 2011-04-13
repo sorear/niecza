@@ -62,6 +62,8 @@ convert (Op.Fetch arg) = do
     (setup,val) <- convert arg
     return $ (setup <*> (mkMiddle $ Fetch id val),Reg id)
 
+convert (Op.Sink arg) = convert arg
+
 -- HACK those nodes shouldn't be ignored
 
 convert (other) = error $ "Can't convert: " ++ (show other)
