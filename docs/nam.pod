@@ -234,7 +234,9 @@ treated as no name; such handlers can only be reached anonymously.
 
 =head3 bif_numxor
 
-=head3 bif_plus
+=head3 bif_plus(var $left,var $right) is pure
+
+Adds $left and $right together.
 
 =head3 bif_postinc
 
