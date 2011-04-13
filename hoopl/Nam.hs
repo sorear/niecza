@@ -18,6 +18,7 @@ data Expr = Double Double |  StrLit String | ScopedLex Expr | Reg Int
 data Insn e x where
     Fetch :: Int -> Expr -> Insn O O
     Subcall :: Int -> [Expr] -> Insn O O
+    BifPlus :: Int -> Expr -> Expr -> Insn O O
 
 instance NonLocal (Insn) 
     
@@ -61,6 +62,12 @@ convert (Op.Fetch arg) = do
     id <- freshId
     (setup,val) <- convert arg
     return $ (setup <*> (mkMiddle $ Fetch id val),Reg id)
+
+convert (Op.BifPlus a b) = do
+    id <- freshId
+    (setup1,val1) <- convert a
+    (setup2,val2) <- convert b
+    return $ (setup1 <*> setup2 <*> (mkMiddle $ BifPlus id val1 val2),Reg id)
 
 convert (Op.Sink arg) = convert arg
 
