@@ -14,6 +14,7 @@ use NieczaPassSimplifier;
 use NieczaBackendNAM;
 use NieczaBackendDotnet;
 use NieczaBackendClisp;
+use NieczaBackendHoopl;
 use NieczaPathSearch;
 use NieczaCompiler;
 
@@ -46,7 +47,7 @@ usage: niecza -e 'code'      # run a one-liner
    OR: niecza                # interactive shell
 
 general options:
-   -B --backend=NAME         # select backend (nam, dotnet, clisp)
+   -B --backend=NAME         # select backend (nam, dotnet, clisp, hoopl)
    -L --language=NAME        # select your setting
    -v --verbose              # detailed timing info
    -c --compile              # don't run (implied with -C)
@@ -97,6 +98,9 @@ elsif $bcnd eq 'dotnet' || $bcnd eq 'mono' {
 }
 elsif $bcnd eq 'clisp' {
     $backend = NieczaBackendClisp.new(obj_dir => $odir);
+}
+elsif $bcnd eq 'hoopl' {
+    $backend = NieczaBackendHoopl.new(obj_dir => $odir);
 }
 else {
     note "Backend '$bcnd' not supported";

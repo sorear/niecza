@@ -21,7 +21,7 @@ srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
 	 NieczaGrammar Metamodel OptRxSimple NAMOutput Operator NieczaActions \
 	 NieczaFrontendSTD NieczaPassBegin NieczaPassBeta NieczaPassSimplifier \
 	 NieczaPathSearch NieczaBackendNAM NieczaBackendDotnet \
-	 NieczaBackendClisp NieczaCompiler GetOptLong
+	 NieczaBackendClisp NieczaBackendHoopl NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
 	@git describe --tags > VERSION

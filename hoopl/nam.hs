@@ -6,9 +6,11 @@ import Data.Attoparsec
 import Data.Aeson;
 import Compiler.Hoopl
 import Control.Monad.State.Strict
+import System.Environment
 mainLineNam = nam . head . xref
 main = do
-    namSource <- (B.readFile "MAIN.nam")
+    [filename] <- getArgs
+    namSource <- (B.readFile filename)
     let (Done rest r) = parse json namSource
     let (Success parsed) = (T.parse (parseJSON) r) :: (T.Result Unit)
     putStrLn $ show parsed
