@@ -10,15 +10,8 @@ import qualified Op
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import Control.Monad.State.Strict
+import Insn
 
--- a side effect free expression
--- FIXME handle Box and Ann smartly
-data Expr = Double Double |  StrLit String | ScopedLex Expr | Reg Int
-    deriving Show
-data Insn e x where
-    Fetch :: Int -> Expr -> Insn O O
-    Subcall :: Int -> [Expr] -> Insn O O
-    BifPlus :: Int -> Expr -> Expr -> Insn O O
 
 instance NonLocal (Insn) 
     
