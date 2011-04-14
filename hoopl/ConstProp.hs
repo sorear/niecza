@@ -33,7 +33,6 @@ constLattice = DataflowLattice
 -- a call site.
 -- Note that we don't need a case for x := y, where y holds a constant.
 -- We can write the simplest solution and rely on the interleaved optimization.
--- @ start cprop.tex
 --------------------------------------------------
 -- Analysis: variable equals a literal constant
 varHasLit :: FwdTransfer Insn ConstFact
@@ -50,14 +49,25 @@ varHasLit = mkFTransfer ft
 constPropPass = FwdPass
   { fp_lattice  = constLattice
   , fp_transfer = varHasLit
-  , fp_rewrite  = constProp }
+  , fp_rewrite  = constProp `thenFwdRw` simplify}
 
 initFact :: ConstFact
 initFact = Map.fromList []
--- @ start cprop.tex
---------------------------------------------------
+
 -- Rewriting: replace constant variables
+  
 constProp :: FuelMonad m => FwdRewrite m Insn ConstFact
 constProp = mkFRewrite cp
  where
-    cp node f = return Nothing
+    cp _ f = return Nothing
+
+--insnToG :: Insn e x -> Graph Insn e x
+
+simplify :: FuelMonad m => FwdRewrite m Insn ConstFact
+simplify = mkFRewrite s
+ where
+    s :: (Monad m) => Insn e x -> a -> m (Maybe (Graph Insn e x))
+    s (BifPlus reg (Double a) (Double b)) f = return $ Just $ mkMiddle $ RegSet reg (Double (a+b))
+    s _ f = return Nothing
+
+
