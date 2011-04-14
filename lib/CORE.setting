@@ -649,6 +649,8 @@ my class List is Cool {
         }
     }
 
+    method reverse() { reverse( @(self) ); }
+
     method plan(*@items) {
         Q:CgOp {
             (rnull
