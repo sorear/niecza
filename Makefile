@@ -58,7 +58,7 @@ obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll obj/CrossDom
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
 	    /r:CrossDomainReceiver.dll $(patsubst %,lib/%,$(csbackend))
 
-aot:
+aot: all
 	mono --aot run/*.dll run/Niecza.exe
 
 test: all

@@ -3182,7 +3182,7 @@ dynamic:
 
             thandlers["prog"] = CpsOp.Sequence;
 
-            thandlers["bif_gettimeofday"] = SimpleB("GetNow");
+            thandlers["bif_gettimeofday"] = SimpleB("GetTimeOfDay");
             thandlers["bif_array_constructor"] = SimpleB("ArrayConstructor");
             thandlers["bif_numand"] = SimpleB("NumAnd");
             thandlers["bif_numor"] = SimpleB("NumOr");
@@ -3211,7 +3211,7 @@ dynamic:
             thandlers["bif_mul"] = SimpleB("Mul");
             thandlers["bif_divide"] = SimpleB("Divide");
             thandlers["bif_not"] = SimpleB("Not");
-            thandlers["bif_now"] = SimpleB("GetNow");
+            thandlers["bif_now"] = SimpleB("GetTimeOfDay");
             thandlers["bif_negate"] = SimpleB("Negate");
             thandlers["bif_chars"] = SimpleB("Chars");
             thandlers["bif_substr3"] = SimpleB("Substr3");

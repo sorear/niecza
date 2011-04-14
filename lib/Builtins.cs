@@ -366,7 +366,7 @@ public class Builtins {
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
     }
 
-    public static Variable GetNow() {
+    public static Variable GetTimeOfDay() {
         long t = DateTime.UtcNow.Ticks;
         double d = ((double)(t - 621355968000000000L)) / 10000000.0;
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
