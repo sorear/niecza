@@ -19,6 +19,8 @@ data Op =
     | Box String Op
     | Double Double
     | BifPlus Op Op
+    | BifDivide Op Op
+    | BifMinus Op Op
     | Sink Op
     deriving Show
 
@@ -35,7 +37,11 @@ rawOpsToOp (Array a) = case (V.toList a) of
     (str -> "prog"):rest -> Prog $ map rawOpsToOp rest
     [(str -> "fetch"),arg] -> Fetch $ rawOpsToOp arg
     [(str -> "const"),arg] -> Const $ rawOpsToOp arg
-    [(str -> "bif_plus"),a,b] -> BifPlus (rawOpsToOp a) (rawOpsToOp b)
+
+    [(str -> "bif_plus"),a,b]   -> BifPlus (rawOpsToOp a) (rawOpsToOp b)
+    [(str -> "bif_minus"),a,b]  -> BifMinus (rawOpsToOp a) (rawOpsToOp b)
+    [(str -> "bif_divide"),a,b] -> BifDivide (rawOpsToOp a) (rawOpsToOp b)
+
     [(str -> "scopedlex"),arg] -> ScopedLex $ rawOpsToOp arg
     [(str -> "box"),(str -> typeName),thing] -> Box typeName (rawOpsToOp thing)
     ((str -> "subcall"):sig:rest) -> Subcall (map rawOpsToOp rest)

@@ -62,6 +62,18 @@ convert (Op.BifPlus a b) = do
     (setup2,val2) <- convert b
     return $ (setup1 <*> setup2 <*> (mkMiddle $ BifPlus id val1 val2),Reg id)
 
+convert (Op.BifDivide a b) = do
+    id <- freshId
+    (setup1,val1) <- convert a
+    (setup2,val2) <- convert b
+    return $ (setup1 <*> setup2 <*> (mkMiddle $ BifDivide id val1 val2),Reg id)
+
+convert (Op.BifMinus a b) = do
+    id <- freshId
+    (setup1,val1) <- convert a
+    (setup2,val2) <- convert b
+    return $ (setup1 <*> setup2 <*> (mkMiddle $ BifMinus id val1 val2),Reg id)
+
 convert (Op.Sink arg) = convert arg
 
 -- HACK those nodes shouldn't be ignored

@@ -43,6 +43,8 @@ varHasLit = mkFTransfer ft
   ft :: Insn e x -> ConstFact -> Fact x ConstFact
 
   ft (BifPlus reg _ _)   f = Map.insert reg Top f
+  ft (BifDivide reg _ _)   f = Map.insert reg Top f
+  ft (BifMinus reg _ _)   f = Map.insert reg Top f
   ft (Subcall reg _) f = Map.insert reg Top f
   ft (Fetch reg _) f = Map.insert reg Top f
   ft (RegSet reg constant@(Double _)) f = Map.insert reg (PElem constant) f
@@ -78,6 +80,8 @@ simplify = mkFRewrite s
  where
     s :: (Monad m) => Insn e x -> a -> m (Maybe (Graph Insn e x))
     s (BifPlus reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a+b))
+    s (BifMinus reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a-b))
+    s (BifDivide reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a/b))
     s _ _ = return Nothing
 
 
