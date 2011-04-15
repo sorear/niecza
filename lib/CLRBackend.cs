@@ -3121,6 +3121,7 @@ dynamic:
             thandlers["str_substring"] = Methody(null, Tokens.Builtins.GetMethod("LaxSubstring2"));
             thandlers["str_tolower"] = Methody(null, Tokens.String.GetMethod("ToLowerInvariant"));
             thandlers["str_toupper"] = Methody(null, Tokens.String.GetMethod("ToUpperInvariant"));
+            thandlers["str_flip"] = Methody(null, typeof(Utils).GetMethod("StrFlip"));
             thandlers["strcmp"] = Methody(null, Tokens.String.GetMethod("CompareOrdinal", new Type[] { Tokens.String, Tokens.String }));
             thandlers["strbuf_new"] = Constructy(typeof(StringBuilder).GetConstructor(new Type[0]));
             thandlers["strbuf_seal"] = Methody(null, Tokens.Object_ToString);

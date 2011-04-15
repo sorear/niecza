@@ -215,6 +215,7 @@ method strbuf_new (*@_) { self._cgop("strbuf_new", @_) }
 method strbuf_seal (*@_) { self._cgop("strbuf_seal", @_) }
 method str_chr (*@_) { self._cgop("str_chr", @_) }
 method strcmp (*@_) { self._cgop("strcmp", @_) }
+method str_flip (*@_) { self._cgop("str_flip", @_) }
 method str_length (*@_) { self._cgop("str_length", @_) }
 method str_substring (*@_) { self._cgop("str_substring", @_) }
 method str_tolower (*@_) { self._cgop("str_tolower", @_) }

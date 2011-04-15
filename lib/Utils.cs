@@ -494,6 +494,12 @@ namespace Niecza {
         public static bool S2NB(string n, out double o) {
             return double.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out o);
         }
+
+        public static string StrFlip(string n) {
+            char[] tempCharArray = n.ToCharArray();
+            Array.Reverse(tempCharArray);
+            return new string(tempCharArray);
+        }
     }
 }
 

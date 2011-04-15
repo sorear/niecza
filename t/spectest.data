@@ -95,6 +95,7 @@ S32-hash/pairs.t
 S32-num/power.t
 S32-str/append.t
 S32-str/bool.t
+S32-str/flip.t
 S32-str/lc.t
 S32-str/lines.t
 S32-str/pos.t
