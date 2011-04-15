@@ -59,7 +59,16 @@ initFact = Map.fromList []
 constProp :: FuelMonad m => FwdRewrite m Insn ConstFact
 constProp = mkFRewrite cp
  where
-    cp _ f = return Nothing
+    cp :: (Monad m) => Insn e x -> Map.Map Int (WithTop Expr) -> m (Maybe (Graph Insn e x))
+    cp (BifPlus reg a b) f = return $ Just $ mkMiddle (BifPlus reg (lookup f a) (lookup f b))
+    cp (Subcall reg args) f = return $ Just $ mkMiddle (Subcall reg (map (lookup f) args))
+    cp _ _ = return Nothing
+    lookup f reg@(Reg r)  = case Map.lookup r f of
+        Just (PElem c) -> c 
+        _ -> reg
+    lookup _ x  = x
+
+
 
 --insnToG :: Insn e x -> Graph Insn e x
 
