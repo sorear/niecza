@@ -35,6 +35,6 @@ main = do
     let graph = (unmonad (analyze converted))
     putStrLn "\norginal:"
     putGraph converted
-    putStrLn "\nanalyzed:"
+    putStrLn "\noptimised:"
     putGraph graph
 
