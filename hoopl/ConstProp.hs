@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 {-# LANGUAGE ScopedTypeVariables, GADTs, NoMonomorphismRestriction #-}
-module ConstProp (ConstFact, constLattice, initFact, varHasLit, constProp, constPropPass) where
+module ConstProp (ConstFact, constLattice, initFact, varHasLit, constProp, constPropPass, M) where
+
 
 --import Control.Monad
 import Insn
@@ -16,6 +17,7 @@ import Compiler.Hoopl
 --   Top     => variable's value is not constant
 -- Type and definition of the lattice
 
+type M = CheckingFuelMonad (SimpleUniqueMonad)
 type ConstFact = Map.Map Int (WithTop Expr)
 constLattice :: DataflowLattice ConstFact
 constLattice = DataflowLattice
@@ -46,6 +48,7 @@ varHasLit = mkFTransfer ft
   ft (RegSet reg constant@(Double _)) f = Map.insert reg (PElem constant) f
   ft (RegSet reg _) f = Map.insert reg Top f
 
+constPropPass :: FwdPass M Insn ConstFact
 constPropPass = FwdPass
   { fp_lattice  = constLattice
   , fp_transfer = varHasLit
@@ -76,7 +79,7 @@ simplify :: FuelMonad m => FwdRewrite m Insn ConstFact
 simplify = mkFRewrite s
  where
     s :: (Monad m) => Insn e x -> a -> m (Maybe (Graph Insn e x))
-    s (BifPlus reg (Double a) (Double b)) f = return $ Just $ mkMiddle $ RegSet reg (Double (a+b))
-    s _ f = return Nothing
+    s (BifPlus reg (Double a) (Double b)) _ = return $ Just $ mkMiddle $ RegSet reg (Double (a+b))
+    s _ _ = return Nothing
 
 

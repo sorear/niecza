@@ -11,7 +11,6 @@ import Control.Monad.State.Strict
 import System.Environment
 mainLineNam = nam . head . xref
 
-type M = CheckingFuelMonad (SimpleUniqueMonad)
 
 unmonad :: M a -> a
 unmonad p = (runSimpleUniqueMonad $ runWithFuel 99999 p)
