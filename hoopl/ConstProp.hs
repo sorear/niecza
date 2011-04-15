@@ -57,15 +57,13 @@ constPropPass = FwdPass
 initFact :: ConstFact
 initFact = Map.fromList []
 
--- Rewriting: replace constant variables
-  
+singleInsn = return . Just . insnToGraph
+
 constProp :: FuelMonad m => FwdRewrite m Insn ConstFact
 constProp = mkFRewrite cp
  where
-    cp :: (Monad m) => Insn e x -> Map.Map Int (WithTop Expr) -> m (Maybe (Graph Insn e x))
-    cp (BifPlus reg a b) f = return $ Just $ mkMiddle (BifPlus reg (lookup f a) (lookup f b))
-    cp (Subcall reg args) f = return $ Just $ mkMiddle (Subcall reg (map (lookup f) args))
-    cp _ _ = return Nothing
+    cp :: (Monad m) => Insn e x -> ConstFact -> m (Maybe (Graph Insn e x))
+    cp insn f = singleInsn $ mapE (lookup f) insn
     lookup f reg@(Reg r)  = case Map.lookup r f of
         Just (PElem c) -> c 
         _ -> reg
@@ -79,7 +77,7 @@ simplify :: FuelMonad m => FwdRewrite m Insn ConstFact
 simplify = mkFRewrite s
  where
     s :: (Monad m) => Insn e x -> a -> m (Maybe (Graph Insn e x))
-    s (BifPlus reg (Double a) (Double b)) _ = return $ Just $ mkMiddle $ RegSet reg (Double (a+b))
+    s (BifPlus reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a+b))
     s _ _ = return Nothing
 
 
