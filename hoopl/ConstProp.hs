@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
-{-# LANGUAGE ScopedTypeVariables, GADTs, NoMonomorphismRestriction #-}
+{-# LANGUAGE ScopedTypeVariables, GADTs, NoMonomorphismRestriction,ViewPatterns #-}
 module ConstProp (ConstFact, constLattice, initFact, varHasLit, constProp, constPropPass, M) where
 
 
@@ -38,17 +38,16 @@ constLattice = DataflowLattice
 --------------------------------------------------
 -- Analysis: variable equals a literal constant
 varHasLit :: FwdTransfer Insn ConstFact
-varHasLit = mkFTransfer ft
+varHasLit = mkFTransfer3 hack1 ft hack2 -- HACK: we don't have thsoe node types yet
  where
-  ft :: Insn e x -> ConstFact -> Fact x ConstFact
+  ft :: Insn O O -> ConstFact ->  ConstFact
 
-  ft (BifPlus reg _ _)   f = Map.insert reg Top f
-  ft (BifDivide reg _ _)   f = Map.insert reg Top f
-  ft (BifMinus reg _ _)   f = Map.insert reg Top f
-  ft (Subcall reg _) f = Map.insert reg Top f
-  ft (Fetch reg _) f = Map.insert reg Top f
   ft (RegSet reg constant@(Double _)) f = Map.insert reg (PElem constant) f
-  ft (RegSet reg _) f = Map.insert reg Top f
+  ft (insnTarget -> Just reg)  f = (Map.insert reg Top f)
+  ft _ f = f
+
+  hack1 _ f = f
+  hack2 _ _ = noFacts
 
 constPropPass :: FwdPass M Insn ConstFact
 constPropPass = FwdPass
@@ -59,6 +58,7 @@ constPropPass = FwdPass
 initFact :: ConstFact
 initFact = Map.fromList []
 
+singleInsn :: (Monad m) => Insn e x -> m (Maybe (Graph Insn e x))
 singleInsn = return . Just . insnToGraph
 
 constProp :: FuelMonad m => FwdRewrite m Insn ConstFact

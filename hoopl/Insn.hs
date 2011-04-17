@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns,GADTs,StandaloneDeriving,NoMonomorphismRestriction #-}
-module Insn (Insn(..),Expr(..),mapE,insnToGraph) where
+module Insn (Insn(..),Expr(..),mapE,insnToGraph,insnTarget) where
 import Compiler.Hoopl
 -- a side effect free expression
 -- FIXME handle Box and Ann smartly
@@ -29,3 +29,15 @@ insnToGraph n@(BifPlus   _ _ _)    = mkMiddle n
 insnToGraph n@(BifDivide _ _ _)    = mkMiddle n
 insnToGraph n@(BifMinus _ _ _)    = mkMiddle n
 insnToGraph n@(RegSet _ _)    = mkMiddle n
+
+
+insnTarget :: Insn e x -> Maybe Int
+insnTarget insn = Just $ r insn
+    where 
+          r :: Insn e x -> Int
+          r (Fetch reg _) = reg
+          r (Subcall reg _) = reg
+          r (BifPlus reg _ _) = reg
+          r (BifMinus reg _ _) = reg
+          r (BifDivide reg _ _) = reg
+          r (RegSet reg _) = reg
