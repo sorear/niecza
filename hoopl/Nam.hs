@@ -174,6 +174,5 @@ instance FromJSON Unit where
         }
     parseJSON _ = mzero
 
-deriving instance Show (Insn e x)
 
 --showNode x = "...;\n"

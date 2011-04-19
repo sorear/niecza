@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns,GADTs,StandaloneDeriving,NoMonomorphismRestriction #-}
-module Insn (Insn(..),Expr(..),mapE,insnToGraph,insnTarget) where
+module Insn (Insn(..),Expr(..),mapE,insnToGraph,insnTarget,exprs) where
 import Compiler.Hoopl
 -- a side effect free expression
 -- FIXME handle Box and Ann smartly
@@ -14,6 +14,9 @@ data Insn e x where
     BifDivide :: Int -> Expr -> Expr -> Insn O O
     RegSet  :: Int -> Expr -> Insn O O
 
+deriving instance Show (Insn e x)
+
+-- map over all the expressions inside
 mapE :: (Expr -> Expr) -> Insn e x -> Insn e x
 mapE func (BifPlus reg a b) = BifPlus reg (func a) (func b)
 mapE func (BifDivide reg a b) = BifDivide reg (func a) (func b)
@@ -22,6 +25,17 @@ mapE func (Subcall reg args)   = Subcall reg (map func args)
 mapE func (RegSet reg a) = RegSet reg (func a) 
 mapE func (Fetch reg a) = Fetch reg (func a)
 
+-- expresions in the instruction
+exprs :: Insn e x -> [Expr]
+exprs (BifPlus reg a b) = [a,b]
+exprs (BifDivide reg a b) = [a,b]
+exprs (BifMinus reg a b) = [a,b]
+exprs (Subcall reg args) = args
+exprs (RegSet reg a) = [a] 
+exprs (Fetch reg a) = [a]
+
+
+-- convert an expression to a graph containing only it
 insnToGraph :: Insn e x -> Graph Insn e x
 insnToGraph n@(Fetch _ _)   = mkMiddle n
 insnToGraph n@(Subcall _ _)    = mkMiddle n
@@ -31,6 +45,7 @@ insnToGraph n@(BifMinus _ _ _)    = mkMiddle n
 insnToGraph n@(RegSet _ _)    = mkMiddle n
 
 
+-- the register the instruction writes to
 insnTarget :: Insn e x -> Maybe Int
 insnTarget insn = Just $ r insn
     where 
