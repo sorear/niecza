@@ -29,11 +29,15 @@ analyzeBwd graph = do
 putGraph :: Graph Insn e x -> IO ()
 putGraph = putStrLn . showGraph ((++ "\n") . show)
 
+parseUnit json = case ((T.parse (parseJSON) json) :: (T.Result Unit)) of
+    Success unit -> unit
+    Error msg -> error msg
+
 main = do
     [filename] <- getArgs
     namSource <- (B.readFile filename)
     let (Done rest r) = parse json namSource
-    let (Success parsed) = (T.parse (parseJSON) r) :: (T.Result Unit)
+    let parsed = parseUnit r
     putStrLn $ show parsed
 --    putStrLn $ show $ mainLineNam parsed
     let converted = fst $ evalState (convert $ mainLineNam parsed) 0

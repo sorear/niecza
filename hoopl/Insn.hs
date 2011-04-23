@@ -3,7 +3,7 @@ module Insn (Insn(..),Expr(..),mapE,insnToGraph,insnTarget,exprs) where
 import Compiler.Hoopl
 -- a side effect free expression
 -- FIXME handle Box and Ann smartly
-data Expr = Double Double |  StrLit String | ScopedLex Expr | Reg Int
+data Expr = Double Double |  StrLit String | ScopedLex String | Reg Int
     deriving (Show,Eq)
 
 data Insn e x where

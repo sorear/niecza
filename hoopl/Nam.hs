@@ -11,6 +11,7 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import Control.Monad.State.Strict
 import Insn
+import Util
 
 
 instance NonLocal (Insn) 
@@ -31,7 +32,7 @@ convert :: Op.Op -> State Int ((Graph Insn O O),Expr)
 
 convert (Op.Double d) = simple $ Double d
 convert (Op.StrLit str) = simple $ StrLit str
-convert (Op.ScopedLex (Op.StrLit str)) = simple $ ScopedLex $ StrLit str
+convert (Op.ScopedLex str) = simple $ ScopedLex str
 
 -- HACKS 
   
@@ -78,6 +79,7 @@ convert (Op.Sink arg) = convert arg
 
 -- HACK those nodes shouldn't be ignored
 
+convert (Op.Unknown value) = error $ "Can't convert: " ++ (toStr value)
 convert (other) = error $ "Can't convert: " ++ (show other)
 
 --convert (expr) = do
@@ -127,7 +129,7 @@ data Sub =
 data XrefThing = Sub {
     subName :: String,
     nam :: Op.Op
-    } | Other String
+    } | Missing | Other String
     deriving Show
 
 parseXrefThing "sub" a = do
@@ -140,7 +142,8 @@ instance FromJSON XrefThing where
     parseJSON (Array a) = do
         thing_type <- parseJSON (a ! 0)
         parseXrefThing thing_type a
-    parseJSON _ = mzero
+    parseJSON Null = return $ Missing
+    parseJSON other = fail ("Can't parse XrefThing:"++(show other))
 
 
 instance FromJSON Xref where 
@@ -150,7 +153,8 @@ instance FromJSON Xref where
         xref_name <- parseJSON (a ! 2)
         return $ Xref { unit=unit, index=index, xref_name=xref_name }
         
-    parseJSON _ = mzero
+    parseJSON other = fail ("Can't parse Xref:"++(show other))
+
 
 instance FromJSON Unit where 
     parseJSON (Array a) = do
@@ -162,7 +166,7 @@ instance FromJSON Unit where
         bottom_ref <- parseJSON (a ! 4)
         filename <- parseJSON (a ! 5)
         modtime <- parseJSON (a ! 6)
-        xref <- parseJSON (a ! 7)
+        xref <- trace (toStr $ a ! 7) $ parseJSON (a ! 7)
         return $ Unit {
             mainline_ref=mainline_ref,
             name=name,
@@ -172,7 +176,7 @@ instance FromJSON Unit where
             modtime=modtime,
             xref=xref
         }
-    parseJSON _ = mzero
+    parseJSON other = fail ("Can't parse Unit:"++(show other))
 
 
 --showNode x = "...;\n"
