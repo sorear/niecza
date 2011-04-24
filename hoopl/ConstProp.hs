@@ -18,7 +18,7 @@ import Compiler.Hoopl
 -- Type and definition of the lattice
 
 type M = CheckingFuelMonad (SimpleUniqueMonad)
-type ConstFact = Map.Map Int (WithTop Expr)
+type ConstFact = Map.Map Reg (WithTop Expr)
 constLattice :: DataflowLattice ConstFact
 constLattice = DataflowLattice
  { fact_name = "Constant propagation"

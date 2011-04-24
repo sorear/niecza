@@ -1,18 +1,20 @@
 {-# LANGUAGE ViewPatterns,GADTs,StandaloneDeriving,NoMonomorphismRestriction #-}
-module Insn (Insn(..),Expr(..),mapE,insnToGraph,insnTarget,exprs) where
+module Insn (Reg,Insn(..),Expr(..),mapE,insnToGraph,insnTarget,exprs) where
 import Compiler.Hoopl
 -- a side effect free expression
 -- FIXME handle Box and Ann smartly
-data Expr = Double Double |  StrLit String | ScopedLex String | Reg Int
+
+type Reg = Int
+data Expr = Double Double |  StrLit String | ScopedLex String | Reg Reg
     deriving (Show,Eq)
 
 data Insn e x where
-    Fetch :: Int -> Expr -> Insn O O
-    Subcall :: Int -> [Expr] -> Insn O O
-    BifPlus :: Int -> Expr -> Expr -> Insn O O
-    BifMinus :: Int -> Expr -> Expr -> Insn O O
-    BifDivide :: Int -> Expr -> Expr -> Insn O O
-    RegSet  :: Int -> Expr -> Insn O O
+    Fetch :: Reg -> Expr -> Insn O O
+    Subcall :: Reg -> [Expr] -> Insn O O
+    BifPlus :: Reg -> Expr -> Expr -> Insn O O
+    BifMinus :: Reg -> Expr -> Expr -> Insn O O
+    BifDivide :: Reg -> Expr -> Expr -> Insn O O
+    RegSet  :: Reg -> Expr -> Insn O O
 
 deriving instance Show (Insn e x)
 
@@ -46,10 +48,10 @@ insnToGraph n@(RegSet _ _)    = mkMiddle n
 
 
 -- the register the instruction writes to
-insnTarget :: Insn e x -> Maybe Int
+insnTarget :: Insn e x -> Maybe Reg
 insnTarget insn = Just $ r insn
     where 
-          r :: Insn e x -> Int
+          r :: Insn e x -> Reg
           r (Fetch reg _) = reg
           r (Subcall reg _) = reg
           r (BifPlus reg _ _) = reg

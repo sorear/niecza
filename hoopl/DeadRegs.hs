@@ -15,11 +15,11 @@ import Compiler.Hoopl
 
 -- DeadRegsFact:
 -- The set of registers alive at that point
-type DeadRegsFact = S.Set Int
+type DeadRegsFact = S.Set Reg
 
 type M = CheckingFuelMonad (SimpleUniqueMonad)
 
-deadRegsInitFact :: S.Set Int
+deadRegsInitFact :: S.Set Reg
 deadRegsInitFact = S.empty
 
 deadRegsLattice :: DataflowLattice DeadRegsFact

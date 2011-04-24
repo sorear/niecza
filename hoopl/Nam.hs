@@ -17,16 +17,33 @@ import Util
 instance NonLocal (Insn) 
     
 
+type CM a = State Int a
 
 
-freshId = do
+freshID :: CM Reg
+freshID = do
     id <- get
     put (id+1)
     return $ id
 
 simple val = return $ (emptyGraph,val) 
 
-convert :: Op.Op -> State Int ((Graph Insn O O),Expr)
+-- TODO: pick better name?
+composit args func = do
+    converted <- mapM convert args
+    let (setup,vals) = unzip converted
+    (extraSetup,ret) <- func vals
+    return ((foldl (<*>) emptyGraph  setup) <*> extraSetup,ret)
+
+basicInsn :: [Op.Op] -> (Reg -> [Expr] -> Insn O O) ->  CM ((Graph Insn O O),Expr)
+
+basicInsn args transform = do
+    id <- freshID
+    composit args (\vals ->
+        return (mkMiddle $ transform id vals,Reg id))
+
+
+convert :: Op.Op -> CM ((Graph Insn O O),Expr)
 
 -- ops which map directly to Expr
 
@@ -41,39 +58,17 @@ convert (Op.Box _ op) = convert op
 convert (Op.Const op) = convert op
 
 
-convert (Op.Prog ops) = do
-    converted <- mapM convert ops
-    let (setup,vals) = unzip converted
-    return $ (foldl1 (<*>) setup,last vals)
+convert (Op.Prog ops) = composit ops (\vals -> return (emptyGraph,last vals))
 
-convert (Op.Subcall args) = do
-    converted <- mapM convert args
-    let (setup,vals) = unzip converted
-    id <- freshId
-    return $ (((foldl1 (<*>) setup) <*> (mkMiddle $ Subcall id vals)),Reg id)
+convert (Op.Subcall args) = basicInsn args Subcall
 
-convert (Op.Fetch arg) = do
-    id <- freshId
-    (setup,val) <- convert arg
-    return $ (setup <*> (mkMiddle $ Fetch id val),Reg id)
+convert (Op.Fetch arg) = basicInsn [arg] (\reg [arg] -> Fetch reg arg)
 
-convert (Op.BifPlus a b) = do
-    id <- freshId
-    (setup1,val1) <- convert a
-    (setup2,val2) <- convert b
-    return $ (setup1 <*> setup2 <*> (mkMiddle $ BifPlus id val1 val2),Reg id)
+convert (Op.BifPlus a b) = basicInsn [a,b] (\reg [a,b] -> BifPlus reg a b)
 
-convert (Op.BifDivide a b) = do
-    id <- freshId
-    (setup1,val1) <- convert a
-    (setup2,val2) <- convert b
-    return $ (setup1 <*> setup2 <*> (mkMiddle $ BifDivide id val1 val2),Reg id)
+convert (Op.BifDivide a b) = basicInsn [a,b] (\reg [a,b] -> BifDivide reg a b)
 
-convert (Op.BifMinus a b) = do
-    id <- freshId
-    (setup1,val1) <- convert a
-    (setup2,val2) <- convert b
-    return $ (setup1 <*> setup2 <*> (mkMiddle $ BifMinus id val1 val2),Reg id)
+convert (Op.BifMinus a b) = basicInsn [a,b] (\reg [a,b] -> BifMinus reg a b)
 
 convert (Op.Sink arg) = convert arg
 
