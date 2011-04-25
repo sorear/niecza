@@ -20,7 +20,7 @@ import qualified Data.Map as Map
 type CM  = StateT ConvertState M
 data ConvertState = ConvertState {
     uniqueReg :: Int,
-    letVars :: Map.Map String Reg
+    letVars :: Map.Map String Expr
 }
 
 
@@ -29,6 +29,20 @@ freshID = do
     state <- get
     put (state{uniqueReg=uniqueReg state+1})
     return $ uniqueReg state
+
+lookupLetVar name = do
+    state <- get
+    case Map.lookup name (letVars state) of 
+        Just r -> return r
+        Nothing -> error ("Can't lookup:"++name)
+
+withVars :: [(String,Expr)] -> CM a -> CM a
+withVars vars action = do
+    state <- get
+    put state{letVars=foldl (\m (name,reg) -> Map.insert name reg m) (letVars state) vars}
+    result <- action
+    put state
+    return result
 
 simple val = return $ (emptyGraph,val) 
 
@@ -58,7 +72,9 @@ convert (Op.Double d) = simple $ Double d
 convert (Op.StrLit str) = simple $ StrLit str
 convert (Op.ScopedLex str) = simple $ ScopedLex str
 convert (Op.CoreLex str) = simple $ CoreLex str
-convert (Op.LetVar str) = simple $ StrLit $ "let var"
+convert (Op.LetVar str) = do
+    r <- lookupLetVar str
+    simple $ r
 
 -- HACKS 
   
@@ -95,8 +111,10 @@ convert (Op.Ternary cond true false) = do
 
 
 convert (Op.LetN pairs body) = 
-    let (regs,values) = unzip pairs in composit values (\
-        expr -> convert body)
+    let (regs,values) = unzip pairs in composit values (
+        \expr -> do
+            withVars (zip regs expr) (convert body)
+    )
 
 
 
