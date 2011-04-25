@@ -34,14 +34,8 @@ parseUnit json = case ((T.parse (parseJSON) json) :: (T.Result Unit)) of
     Success unit -> unit
     Error msg -> error msg
 
-main = do
-    [filename] <- getArgs
-    namSource <- (B.readFile filename)
-    let (Done rest r) = parse json namSource
-    let parsed = parseUnit r
-    putStrLn $ show parsed
---    putStrLn $ show $ mainLineNam parsed
-    let converted = fst $ unmonad $ evalStateT (convert $ mainLineNam parsed) ConvertState{uniqueReg=0,letVars=Map.empty}
+optimiseXref xref = do
+    let converted = fst $ unmonad $ evalStateT (convert $ nam xref) ConvertState{uniqueReg=0,letVars=Map.empty}
     let graph = (unmonad (analyze converted))
     let graph2 = (unmonad (analyzeBwd graph))
     putStrLn "\norginal:"
@@ -50,4 +44,11 @@ main = do
     putGraph graph
     putStrLn "\nsecond pass:"
     putGraph graph2
+    
+main = do
+    [filename] <- getArgs
+    namSource <- (B.readFile filename)
+    let (Done rest r) = parse json namSource
+    let parsed = parseUnit r
 
+    optimiseXref $ head  $ xref parsed

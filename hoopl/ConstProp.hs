@@ -38,15 +38,13 @@ constLattice = DataflowLattice
 --------------------------------------------------
 -- Analysis: variable equals a literal constant
 varHasLit :: FwdTransfer Insn ConstFact
-varHasLit = mkFTransfer3 hack1 ft hack2 -- HACK: we don't have thsoe node types yet
+varHasLit = mkFTransfer3 ft' ft distributeFact -- HACK: we don't have thsoe node types yet
  where
   ft :: Insn O O -> ConstFact ->  ConstFact
 
   ft (Op reg (RegSet constant@(Double _))) f = Map.insert reg (PElem constant) f
   ft (Op reg _)  f = (Map.insert reg Top f)
-
-  hack1 _ f = f
-  hack2 _ _ = noFacts
+  ft' _ f = f
 
 constPropPass :: FwdPass M Insn ConstFact
 constPropPass = FwdPass

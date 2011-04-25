@@ -207,7 +207,7 @@ instance FromJSON Unit where
         bottom_ref <- parseJSON (a ! 4)
         filename <- parseJSON (a ! 5)
         modtime <- parseJSON (a ! 6)
-        xref <- trace (toStr $ a ! 7) $ parseJSON (a ! 7)
+        xref <- parseJSON (a ! 7)
         return $ Unit {
             mainline_ref=mainline_ref,
             name=name,
