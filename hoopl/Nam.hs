@@ -46,8 +46,8 @@ basicInsn args transform = do
     composit args (\vals ->
         return (mkMiddle $ Op id (transform vals),Reg id))
 
-branch :: Expr -> Label -> Label -> AGraph Insn O C
-branch cond' trueLabel falseLabel = 
+branchInsn :: Expr -> Label -> Label -> AGraph Insn O C
+branchInsn cond' trueLabel falseLabel = 
     aGraphOfGraph $ mkLast $ CondBranch cond' trueLabel falseLabel
 
 convert :: Op.Op -> CM ((Graph Insn O O),Expr)
@@ -58,7 +58,7 @@ convert (Op.Double d) = simple $ Double d
 convert (Op.StrLit str) = simple $ StrLit str
 convert (Op.ScopedLex str) = simple $ ScopedLex str
 convert (Op.CoreLex str) = simple $ CoreLex str
-convert (Op.LetVar str) = simple $ StrLit $ "let var" ++ (show str)
+convert (Op.LetVar str) = simple $ StrLit $ "let var"
 
 -- HACKS 
   
@@ -85,9 +85,12 @@ convert (Op.Sink arg) = convert arg
 convert (Op.Ternary cond true false) = do
     result <- freshID
     (condSetup',cond') <- convert cond
-    (trueSetup',true') <- convert true
-    (falseSetup',false') <- convert false
-    ifStmt <- lift $ graphOfAGraph $ mkIfThenElse (branch cond') (aGraphOfGraph trueSetup') ((aGraphOfGraph falseSetup') :: AGraph Insn O O)
+    let branch op = do
+        (setup,val) <- convert op
+        return $ aGraphOfGraph $ setup <*> mkMiddle (Op result (RegSet val))
+    true'  <- branch true
+    false' <- branch false
+    ifStmt <- lift $ graphOfAGraph $ mkIfThenElse (branchInsn cond') true' false'
     return $ (condSetup' <*> ifStmt,Reg result)
 
 

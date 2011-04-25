@@ -17,11 +17,11 @@ data Insn e x where
 data Op where
     Fetch :: Expr -> Op
     Subcall :: [Expr] -> Op
+    RegSet  ::  Expr -> Op
+    ObjGetBool  :: Expr -> Op
     BifPlus :: Expr -> Expr -> Op
     BifMinus :: Expr -> Expr -> Op
     BifDivide :: Expr -> Expr -> Op
-    RegSet  ::  Expr -> Op
-    ObjGetBool  :: Expr -> Op
     deriving (Show,Eq)
 
 deriving instance Show (Insn e x)
@@ -38,12 +38,13 @@ instance HooplNode (Insn) where
 -- map over all the expressions inside
 -- BOILERPLATE
 mapEO :: (Expr -> Expr) -> Op -> Op
+mapEO func (Fetch a) = Fetch (func a)
+mapEO func (Subcall args)   = Subcall (map func args)
+mapEO func (ObjGetBool a)   = ObjGetBool a
+mapEO func (RegSet a) = RegSet (func a) 
 mapEO func (BifPlus a b) = BifPlus (func a) (func b)
 mapEO func (BifDivide a b) = BifDivide (func a) (func b)
 mapEO func (BifMinus a b) = BifMinus (func a) (func b)
-mapEO func (Subcall args)   = Subcall (map func args)
-mapEO func (RegSet a) = RegSet (func a) 
-mapEO func (Fetch a) = Fetch (func a)
 
 mapE :: (Expr -> Expr) -> Insn e x -> Insn e x
 mapE func (Op r op) = Op (r :: Reg) (mapEO func (op :: Op))
@@ -56,9 +57,11 @@ exprs :: Op -> [Expr]
 exprs (BifPlus a b) = [a,b]
 exprs (BifDivide a b) = [a,b]
 exprs (BifMinus a b) = [a,b]
+
+exprs (ObjGetBool a) = [a] 
+exprs (Fetch a) = [a]
 exprs (Subcall args) = args
 exprs (RegSet a) = [a] 
-exprs (Fetch a) = [a]
 
 
 -- convert an expression to a graph containing only it
