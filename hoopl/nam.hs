@@ -10,6 +10,7 @@ import Data.Aeson;
 import Compiler.Hoopl
 import Control.Monad.State.Strict
 import System.Environment
+import qualified Data.Map as Map
 mainLineNam = nam . head . xref
 
 
@@ -40,7 +41,7 @@ main = do
     let parsed = parseUnit r
     putStrLn $ show parsed
 --    putStrLn $ show $ mainLineNam parsed
-    let converted = fst $ evalState (convert $ mainLineNam parsed) 0
+    let converted = fst $ unmonad $ evalStateT (convert $ mainLineNam parsed) ConvertState{uniqueReg=0,letVars=Map.empty}
     let graph = (unmonad (analyze converted))
     let graph2 = (unmonad (analyzeBwd graph))
     putStrLn "\norginal:"

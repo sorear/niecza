@@ -10,6 +10,7 @@ import Insn
 import qualified Data.Set as S
 
 import Compiler.Hoopl
+import Util
 --import IR
 --import OptSupport
 
@@ -17,7 +18,6 @@ import Compiler.Hoopl
 -- The set of registers alive at that point
 type DeadRegsFact = S.Set Reg
 
-type M = CheckingFuelMonad (SimpleUniqueMonad)
 
 deadRegsInitFact :: S.Set Reg
 deadRegsInitFact = S.empty

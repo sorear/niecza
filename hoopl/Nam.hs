@@ -12,19 +12,23 @@ import qualified Data.Vector as V
 import Control.Monad.State.Strict
 import Insn
 import Util
+import qualified Data.Map as Map
 
 
-instance NonLocal (Insn) 
     
 
-type CM a = State Int a
+type CM  = StateT ConvertState M
+data ConvertState = ConvertState {
+    uniqueReg :: Int,
+    letVars :: Map.Map String Reg
+}
 
 
 freshID :: CM Reg
 freshID = do
-    id <- get
-    put (id+1)
-    return $ id
+    state <- get
+    put (state{uniqueReg=uniqueReg state+1})
+    return $ uniqueReg state
 
 simple val = return $ (emptyGraph,val) 
 
@@ -42,6 +46,9 @@ basicInsn args transform = do
     composit args (\vals ->
         return (mkMiddle $ transform id vals,Reg id))
 
+branch :: Expr -> Label -> Label -> AGraph Insn O C
+branch cond' trueLabel falseLabel = 
+    aGraphOfGraph $ mkLast $ CondBranch cond' trueLabel falseLabel
 
 convert :: Op.Op -> CM ((Graph Insn O O),Expr)
 
@@ -50,6 +57,8 @@ convert :: Op.Op -> CM ((Graph Insn O O),Expr)
 convert (Op.Double d) = simple $ Double d
 convert (Op.StrLit str) = simple $ StrLit str
 convert (Op.ScopedLex str) = simple $ ScopedLex str
+convert (Op.CoreLex str) = simple $ CoreLex str
+convert (Op.LetVar str) = simple $ StrLit $ "let var" ++ (show str)
 
 -- HACKS 
   
@@ -63,6 +72,7 @@ convert (Op.Prog ops) = composit ops (\vals -> return (emptyGraph,last vals))
 convert (Op.Subcall args) = basicInsn args Subcall
 
 convert (Op.Fetch arg) = basicInsn [arg] (\reg [arg] -> Fetch reg arg)
+convert (Op.ObjGetBool arg) = basicInsn [arg] (\reg [arg] -> ObjGetBool reg arg)
 
 convert (Op.BifPlus a b) = basicInsn [a,b] (\reg [a,b] -> BifPlus reg a b)
 
@@ -71,6 +81,21 @@ convert (Op.BifDivide a b) = basicInsn [a,b] (\reg [a,b] -> BifDivide reg a b)
 convert (Op.BifMinus a b) = basicInsn [a,b] (\reg [a,b] -> BifMinus reg a b)
 
 convert (Op.Sink arg) = convert arg
+
+convert (Op.Ternary cond true false) = do
+    result <- freshID
+    (condSetup',cond') <- convert cond
+    (trueSetup',true') <- convert true
+    (falseSetup',false') <- convert false
+    ifStmt <- lift $ graphOfAGraph $ mkIfThenElse (branch cond') (aGraphOfGraph trueSetup') ((aGraphOfGraph falseSetup') :: AGraph Insn O O)
+    return $ (condSetup' <*> ifStmt,Reg result)
+
+
+convert (Op.LetN pairs body) = 
+    let (regs,values) = unzip pairs in composit values (\
+        expr -> convert body)
+
+
 
 -- HACK those nodes shouldn't be ignored
 

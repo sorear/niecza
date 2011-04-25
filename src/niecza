@@ -189,6 +189,11 @@ if $bcnd eq 'clisp' {
         NieczaPassBegin.new,
         NieczaPassSimplifier.new,
     ];
+} elsif $bcnd eq 'hoopl' {
+    $stages = [
+        NieczaPassBegin.new,
+        NieczaPassSimplifier.new,
+    ];
 } else {
     $stages = [
         NieczaPassBegin.new,

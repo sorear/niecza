@@ -6,6 +6,7 @@ module ConstProp (ConstFact, constLattice, initFact, varHasLit, constProp, const
 --import Control.Monad
 import Insn
 import qualified Data.Map as Map
+import Util
 
 import Compiler.Hoopl
 --import IR
@@ -17,7 +18,6 @@ import Compiler.Hoopl
 --   Top     => variable's value is not constant
 -- Type and definition of the lattice
 
-type M = CheckingFuelMonad (SimpleUniqueMonad)
 type ConstFact = Map.Map Reg (WithTop Expr)
 constLattice :: DataflowLattice ConstFact
 constLattice = DataflowLattice

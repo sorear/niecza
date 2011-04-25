@@ -5,7 +5,7 @@ import Compiler.Hoopl
 -- FIXME handle Box and Ann smartly
 
 type Reg = Int
-data Expr = Double Double |  StrLit String | ScopedLex String | Reg Reg
+data Expr = Double Double |  StrLit String | ScopedLex String | CoreLex String | Reg Reg
     deriving (Show,Eq)
 
 data Insn e x where
@@ -15,8 +15,21 @@ data Insn e x where
     BifMinus :: Reg -> Expr -> Expr -> Insn O O
     BifDivide :: Reg -> Expr -> Expr -> Insn O O
     RegSet  :: Reg -> Expr -> Insn O O
+    ObjGetBool  :: Reg -> Expr -> Insn O O
+    CondBranch  :: Expr -> Label -> Label -> Insn O C
+    Goto :: Label -> Insn O C
+    Label :: Label -> Insn C O
 
 deriving instance Show (Insn e x)
+
+instance NonLocal (Insn) where
+    entryLabel (Label l) = l 
+    successors (Goto l) = [l]
+    successors (CondBranch _ true false) = [true,false]
+
+instance HooplNode (Insn) where
+    mkBranchNode = Goto
+    mkLabelNode = Label
 
 -- map over all the expressions inside
 mapE :: (Expr -> Expr) -> Insn e x -> Insn e x
