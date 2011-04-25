@@ -41,7 +41,7 @@ withVars vars action = do
     state <- get
     put state{letVars=foldl (\m (name,reg) -> Map.insert name reg m) (letVars state) vars}
     result <- action
-    put state
+    modify(\s -> s{letVars=letVars state})
     return result
 
 simple val = return $ (emptyGraph,val) 
