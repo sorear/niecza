@@ -39,12 +39,12 @@ composit args func = do
     (extraSetup,ret) <- func vals
     return ((foldl (<*>) emptyGraph  setup) <*> extraSetup,ret)
 
-basicInsn :: [Op.Op] -> (Reg -> [Expr] -> Insn O O) ->  CM ((Graph Insn O O),Expr)
+basicInsn :: [Op.Op] -> ([Expr] -> Op) ->  CM ((Graph Insn O O),Expr)
 
 basicInsn args transform = do
     id <- freshID
     composit args (\vals ->
-        return (mkMiddle $ transform id vals,Reg id))
+        return (mkMiddle $ Op id (transform vals),Reg id))
 
 branch :: Expr -> Label -> Label -> AGraph Insn O C
 branch cond' trueLabel falseLabel = 
@@ -71,14 +71,14 @@ convert (Op.Prog ops) = composit ops (\vals -> return (emptyGraph,last vals))
 
 convert (Op.Subcall args) = basicInsn args Subcall
 
-convert (Op.Fetch arg) = basicInsn [arg] (\reg [arg] -> Fetch reg arg)
-convert (Op.ObjGetBool arg) = basicInsn [arg] (\reg [arg] -> ObjGetBool reg arg)
+convert (Op.Fetch arg) = basicInsn [arg] (\[arg] -> Fetch arg)
+convert (Op.ObjGetBool arg) = basicInsn [arg] (\[arg] -> ObjGetBool arg)
 
-convert (Op.BifPlus a b) = basicInsn [a,b] (\reg [a,b] -> BifPlus reg a b)
+convert (Op.BifPlus a b) = basicInsn [a,b] (\[a,b] -> BifPlus a b)
 
-convert (Op.BifDivide a b) = basicInsn [a,b] (\reg [a,b] -> BifDivide reg a b)
+convert (Op.BifDivide a b) = basicInsn [a,b] (\[a,b] -> BifDivide a b)
 
-convert (Op.BifMinus a b) = basicInsn [a,b] (\reg [a,b] -> BifMinus reg a b)
+convert (Op.BifMinus a b) = basicInsn [a,b] (\[a,b] -> BifMinus a b)
 
 convert (Op.Sink arg) = convert arg
 

@@ -37,7 +37,7 @@ usedRegs :: BwdTransfer Insn DeadRegsFact
 usedRegs = mkBTransfer3 hack1 ft hack2 -- HACK: we don't have those node types yet
  where
   ft :: Insn O O -> DeadRegsFact ->  DeadRegsFact
-  ft insn f = S.union f (S.fromList $ mapMaybe regID $ exprs insn)
+  ft (Op r op) f = S.union f (S.fromList $ mapMaybe regID $ exprs op)
   hack1 _ f = f
   hack2 _ _ = S.empty
   regID (Reg r) = Just r
@@ -57,7 +57,7 @@ removeNoop :: FuelMonad m => BwdRewrite m Insn DeadRegsFact
 removeNoop = mkBRewrite s
  where
     s :: (Monad m) => Insn e x -> Fact x DeadRegsFact -> m (Maybe (Graph Insn e x))
-    s (RegSet r _) live =
+    s (Op r (RegSet _)) live =
             if (S.member r live) then return $ Nothing
             else return $ Just emptyGraph
     s _ _ = return $ Nothing

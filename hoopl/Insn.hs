@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns,GADTs,StandaloneDeriving,NoMonomorphismRestriction #-}
-module Insn (Reg,Insn(..),Expr(..),mapE,insnToGraph,insnTarget,exprs) where
+module Insn (Reg,Insn(..),Expr(..),Op(..),mapE,insnToGraph,exprs) where
 import Compiler.Hoopl
 -- a side effect free expression
 -- FIXME handle Box and Ann smartly
@@ -9,16 +9,20 @@ data Expr = Double Double |  StrLit String | ScopedLex String | CoreLex String |
     deriving (Show,Eq)
 
 data Insn e x where
-    Fetch :: Reg -> Expr -> Insn O O
-    Subcall :: Reg -> [Expr] -> Insn O O
-    BifPlus :: Reg -> Expr -> Expr -> Insn O O
-    BifMinus :: Reg -> Expr -> Expr -> Insn O O
-    BifDivide :: Reg -> Expr -> Expr -> Insn O O
-    RegSet  :: Reg -> Expr -> Insn O O
-    ObjGetBool  :: Reg -> Expr -> Insn O O
     CondBranch  :: Expr -> Label -> Label -> Insn O C
     Goto :: Label -> Insn O C
     Label :: Label -> Insn C O
+    Op :: Reg -> Op  -> Insn O O
+
+data Op where
+    Fetch :: Expr -> Op
+    Subcall :: [Expr] -> Op
+    BifPlus :: Expr -> Expr -> Op
+    BifMinus :: Expr -> Expr -> Op
+    BifDivide :: Expr -> Expr -> Op
+    RegSet  ::  Expr -> Op
+    ObjGetBool  :: Expr -> Op
+    deriving (Show,Eq)
 
 deriving instance Show (Insn e x)
 
@@ -32,42 +36,35 @@ instance HooplNode (Insn) where
     mkLabelNode = Label
 
 -- map over all the expressions inside
-mapE :: (Expr -> Expr) -> Insn e x -> Insn e x
-mapE func (BifPlus reg a b) = BifPlus reg (func a) (func b)
-mapE func (BifDivide reg a b) = BifDivide reg (func a) (func b)
-mapE func (BifMinus reg a b) = BifMinus reg (func a) (func b)
-mapE func (Subcall reg args)   = Subcall reg (map func args)
-mapE func (RegSet reg a) = RegSet reg (func a) 
-mapE func (Fetch reg a) = Fetch reg (func a)
+-- BOILERPLATE
+mapEO :: (Expr -> Expr) -> Op -> Op
+mapEO func (BifPlus a b) = BifPlus (func a) (func b)
+mapEO func (BifDivide a b) = BifDivide (func a) (func b)
+mapEO func (BifMinus a b) = BifMinus (func a) (func b)
+mapEO func (Subcall args)   = Subcall (map func args)
+mapEO func (RegSet a) = RegSet (func a) 
+mapEO func (Fetch a) = Fetch (func a)
 
--- expresions in the instruction
-exprs :: Insn e x -> [Expr]
-exprs (BifPlus reg a b) = [a,b]
-exprs (BifDivide reg a b) = [a,b]
-exprs (BifMinus reg a b) = [a,b]
-exprs (Subcall reg args) = args
-exprs (RegSet reg a) = [a] 
-exprs (Fetch reg a) = [a]
+mapE :: (Expr -> Expr) -> Insn e x -> Insn e x
+mapE func (Op r op) = Op (r :: Reg) (mapEO func (op :: Op))
+mapE func (CondBranch cond true false) = CondBranch (func cond) true false
+mapE _ n@(Goto _) = n
+mapE _ n@(Label _) = n
+
+-- BOILERPLATE
+exprs :: Op -> [Expr]
+exprs (BifPlus a b) = [a,b]
+exprs (BifDivide a b) = [a,b]
+exprs (BifMinus a b) = [a,b]
+exprs (Subcall args) = args
+exprs (RegSet a) = [a] 
+exprs (Fetch a) = [a]
 
 
 -- convert an expression to a graph containing only it
 insnToGraph :: Insn e x -> Graph Insn e x
-insnToGraph n@(Fetch _ _)   = mkMiddle n
-insnToGraph n@(Subcall _ _)    = mkMiddle n
-insnToGraph n@(BifPlus   _ _ _)    = mkMiddle n
-insnToGraph n@(BifDivide _ _ _)    = mkMiddle n
-insnToGraph n@(BifMinus _ _ _)    = mkMiddle n
-insnToGraph n@(RegSet _ _)    = mkMiddle n
+insnToGraph n@(Op _ _)   = mkMiddle n
+insnToGraph n@(CondBranch _ _ _)   = mkLast n
+insnToGraph n@(Goto _)   = mkLast n
+insnToGraph n@(Label _)   = mkFirst n
 
-
--- the register the instruction writes to
-insnTarget :: Insn e x -> Maybe Reg
-insnTarget insn = Just $ r insn
-    where 
-          r :: Insn e x -> Reg
-          r (Fetch reg _) = reg
-          r (Subcall reg _) = reg
-          r (BifPlus reg _ _) = reg
-          r (BifMinus reg _ _) = reg
-          r (BifDivide reg _ _) = reg
-          r (RegSet reg _) = reg

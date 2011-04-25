@@ -42,9 +42,8 @@ varHasLit = mkFTransfer3 hack1 ft hack2 -- HACK: we don't have thsoe node types 
  where
   ft :: Insn O O -> ConstFact ->  ConstFact
 
-  ft (RegSet reg constant@(Double _)) f = Map.insert reg (PElem constant) f
-  ft (insnTarget -> Just reg)  f = (Map.insert reg Top f)
-  ft _ f = f
+  ft (Op reg (RegSet constant@(Double _))) f = Map.insert reg (PElem constant) f
+  ft (Op reg _)  f = (Map.insert reg Top f)
 
   hack1 _ f = f
   hack2 _ _ = noFacts
@@ -79,9 +78,15 @@ simplify :: FuelMonad m => FwdRewrite m Insn ConstFact
 simplify = mkFRewrite s
  where
     s :: (Monad m) => Insn e x -> a -> m (Maybe (Graph Insn e x))
-    s (BifPlus reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a+b))
-    s (BifMinus reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a-b))
-    s (BifDivide reg (Double a) (Double b)) _ = singleInsn $ RegSet reg (Double (a/b))
+    s (Op reg op) _ = case op of  
+        BifPlus (Double a) (Double b) -> double (a+b)
+        BifMinus (Double a) (Double b) -> double (a-b)
+        BifDivide (Double a) (Double b) -> double (a/b)
+        _ -> return Nothing
+        where
+            double = singleInsn . (Op reg) . RegSet . Double
+
     s _ _ = return Nothing
+
 
 
