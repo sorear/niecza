@@ -15,7 +15,6 @@ csxdr=CrossDomainReceiver.cs
 .PHONY: all aot test spectest clean realclean
 .PHONY: help
 
-# keep this in dependency order
 libunits=CORE JSYNC
 srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
 	 NieczaGrammar Metamodel OptRxSimple NAMOutput Operator NieczaActions \
@@ -26,17 +25,15 @@ srcunits=CClass Body Unit CgOp Op OpHelpers Sig RxOp NAME Stash STD \
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
 	@git describe --tags > VERSION
 
+$(patsubst %,boot/obj/%.nam,$(srcunits)): boot/obj/%.nam: .fetch-stamp src/%.pm6 boot/obj/CORE.nam
+	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -Bnam -C $*
+	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $*.nam $*.dll 0
+
 obj/CORE.nam: run/Niecza.exe obj/CLRBackend.exe lib/CORE.setting
 	$(RUN_CLR) run/Niecza.exe -C CORE
 
-run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
-	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -v -c -Bnam niecza
-	for nfile in $(libunits) $(srcunits); do \
-	    if [ boot/obj/$$nfile.nam -nt boot/obj/$$nfile.dll -o \
-			! -e boot/obj/$$nfile.dll ]; then \
-		echo $$nfile; \
-		$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $$nfile.nam $$nfile.dll 0; \
-	fi; done
+run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
+	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -c -Bnam niecza
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
 	$(CP) $(patsubst %,boot/obj/%.dll,Kernel CrossDomainReceiver $(libunits) $(srcunits)) run/
 	$(CP) boot/obj/MAIN.exe run/Niecza.exe
@@ -46,6 +43,7 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,src/%.pm6,$(srcunits)) src/niecza
 	mkdir boot
 	wget --no-check-certificate -Oboot/niecza.zip $$(cat FETCH_URL)
 	cd boot && unzip niecza.zip
+	$(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
 	touch .fetch-stamp
 
 obj/CrossDomainReceiver.dll: $(patsubst %,lib/%,$(csxdr))
@@ -99,3 +97,45 @@ help:
 	@echo 'help       this list of targets'
 	@echo ''
 
+# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/\1.nam: boot/obj/\2.nam|'
+boot/obj/Metamodel.nam: boot/obj/NAME.nam
+boot/obj/Metamodel.nam: boot/obj/Stash.nam
+boot/obj/NAMOutput.nam: boot/obj/JSYNC.nam
+boot/obj/NAMOutput.nam: boot/obj/Metamodel.nam
+boot/obj/NAMOutput.nam: boot/obj/Sig.nam
+boot/obj/NieczaActions.nam: boot/obj/Op.nam
+boot/obj/NieczaActions.nam: boot/obj/RxOp.nam
+boot/obj/NieczaActions.nam: boot/obj/Body.nam
+boot/obj/NieczaActions.nam: boot/obj/Unit.nam
+boot/obj/NieczaActions.nam: boot/obj/Sig.nam
+boot/obj/NieczaActions.nam: boot/obj/CClass.nam
+boot/obj/NieczaActions.nam: boot/obj/OptRxSimple.nam
+boot/obj/NieczaActions.nam: boot/obj/OpHelpers.nam
+boot/obj/NieczaActions.nam: boot/obj/Operator.nam
+boot/obj/NieczaBackendClisp.nam: boot/obj/NieczaBackendNAM.nam
+boot/obj/NieczaBackendDotnet.nam: boot/obj/NieczaBackendNAM.nam
+boot/obj/NieczaBackendDotnet.nam: boot/obj/NAMOutput.nam
+boot/obj/NieczaBackendHoopl.nam: boot/obj/NieczaBackendNAM.nam
+boot/obj/NieczaBackendNAM.nam: boot/obj/NAMOutput.nam
+boot/obj/NieczaCompiler.nam: boot/obj/JSYNC.nam
+boot/obj/NieczaFrontendSTD.nam: boot/obj/STD.nam
+boot/obj/NieczaFrontendSTD.nam: boot/obj/Stash.nam
+boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaGrammar.nam
+boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaActions.nam
+boot/obj/NieczaGrammar.nam: boot/obj/STD.nam
+boot/obj/NieczaPassBegin.nam: boot/obj/Unit.nam
+boot/obj/NieczaPassBegin.nam: boot/obj/Sig.nam
+boot/obj/NieczaPassBegin.nam: boot/obj/Body.nam
+boot/obj/NieczaPassBegin.nam: boot/obj/Op.nam
+boot/obj/NieczaPassBegin.nam: boot/obj/Metamodel.nam
+boot/obj/NieczaPassBeta.nam: boot/obj/CgOp.nam
+boot/obj/Operator.nam: boot/obj/Body.nam
+boot/obj/Operator.nam: boot/obj/Sig.nam
+boot/obj/Operator.nam: boot/obj/OpHelpers.nam
+boot/obj/Op.nam: boot/obj/CgOp.nam
+boot/obj/OptRxSimple.nam: boot/obj/RxOp.nam
+boot/obj/RxOp.nam: boot/obj/CgOp.nam
+boot/obj/RxOp.nam: boot/obj/CClass.nam
+boot/obj/Sig.nam: boot/obj/CgOp.nam
+boot/obj/STD.nam: boot/obj/NAME.nam
+boot/obj/STD.nam: boot/obj/Stash.nam
