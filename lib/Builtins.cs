@@ -34,6 +34,42 @@ public class Builtins {
         }
     }
 
+    class SubstrLValue: Variable {
+        Variable backing;
+        int from;
+        int length;
+
+        public SubstrLValue(Variable backing, int from, int length) {
+            this.backing = backing;
+            this.from = from;
+            this.length = length;
+            // XXX Should binding a substr lvalue count as binding the original?
+            this.whence = null;
+            this.rw = backing.rw;
+            this.type = Kernel.StrMO;
+        }
+
+        public override P6any Fetch() {
+            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
+            return Kernel.BoxRaw<string>(Builtins.LaxSubstring2(str, from, length), Kernel.StrMO);
+        }
+
+        public override void Store(P6any v) {
+            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
+            int left = (from < 0) ? 0 : (from > str.Length) ? str.Length : from;
+            int right = ((length > (str.Length - left)) ? (str.Length - left) :
+                (length < 0) ? 0 : length) + left;
+            string lfr = str.Substring(0, left);
+            string mfr = v.mo.mro_raw_Str.Get(Kernel.NewROScalar(v));
+            string rfr = str.Substring(right);
+            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Kernel.StrMO));
+        }
+
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+    }
+
     public static string LaxSubstring(string str, int from) {
         if (from <= 0)
             return str;
@@ -175,13 +211,11 @@ public class Builtins {
     }
 
     public static Variable Substr3(Variable v1, Variable v2, Variable v3) {
-        P6any o1 = NominalCheck("$string", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$start", Kernel.AnyMO, v2);
         P6any o3 = NominalCheck("$chars", Kernel.AnyMO, v3);
-        string r1 = o1.mo.mro_raw_Str.Get(v1);
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
         int r3    = (int)o3.mo.mro_raw_Numeric.Get(v3);
-        return Kernel.BoxAnyMO<string>(LaxSubstring2(r1, r2, r3), Kernel.StrMO);
+        return new SubstrLValue(v1, r2, r3);
     }
 
     public static Variable Plus(Variable v1, Variable v2) {

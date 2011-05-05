@@ -35,6 +35,26 @@ use MONKEY_TYPING;
     is $i, 3, "last in for works";
 }
 
+{
+    my ($str, $v1, $v2);
+    $str = "abcdef";
+    substr($str,1,2) = "xy";
+    is $str, "axydef", "lvalue substr is functional";
+    $str = "abcdef";
+    substr($str,1,2) = "jklmno";
+    is $str, "ajklmnodef", "lvalue substr can change string length";
+    $str = "abcdef";
+    $v1 := substr($str,1,2);
+    $str = "xyzw";
+    is $v1, "yz", "substr return values read lazily";
+    $str = "abcdef";
+    $v1 := substr($str,0,1);
+    $v2 := substr($str,3,1);
+    $v1 = "xx";
+    $v2 = "yy";
+    is $str, "xxbyydef", "substr thunks track by index";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
