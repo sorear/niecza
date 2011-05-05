@@ -5521,6 +5521,7 @@ method add_mystery ($token,$pos,$ctx) {
         %*MYSTERY{$name}.<lex> = $*CURLEX;
         %*MYSTERY{$name}.<token> = self.cursor($token.to);
         %*MYSTERY{$name}.<ctx> = $ctx;
+        %*MYSTERY{$name}.<line> //= ''; #NIECZA
         %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos);
     }
