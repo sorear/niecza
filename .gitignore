@@ -12,4 +12,6 @@ core
 boot
 perf/profile.txt
 perf/xdb.il
+stage2
+stage3
 .fetch-stamp

@@ -79,12 +79,12 @@ clean:
 reboot: all
 	# setup a clean build area
 	rm -rf stage2/ stage3/
-	mkdir -p stage2/lib stage2/obj stage2/run stage2/boot stage2/boot/obj \
-	    stage3/lib stage3/obj stage3/run stage3/boot stage3/boot/obj
+	mkdir -p stage2/obj stage2/run stage2/boot stage2/boot/obj \
+	    stage3/obj stage3/run stage3/boot stage3/boot/obj
 	touch stage2/FETCH_URL stage3/FETCH_URL stage2/.fetch-stamp \
 	    stage3/.fetch-stamp
-	cp -a src/ Makefile stage2/
-	cp -a src/ Makefile stage3/
+	cp -a src/ lib/ Makefile stage2/
+	cp -a src/ lib/ Makefile stage3/
 	# build a current Niecza with current Niecza
 	cp obj/Kernel.dll obj/CrossDomainReceiver.dll obj/CLRBackend.exe \
 	    stage2/boot/obj
@@ -96,10 +96,11 @@ reboot: all
 	    stage2/obj/CLRBackend.exe stage3/boot/obj
 	cp -a lib stage2/run stage3/boot
 	cd stage3 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
+	cp test.pl stage3/
 	cd stage3 && $(MAKE) test
 	# yay, stage2/ looks like a good new bootstrap version
-	# clean up the stuff that should NOT go into the s
-	cd stage2 && rm -rf lib/*.cs obj/* src
+	# clean up the stuff that should NOT go into the boot
+	cd stage2 && rm -rf lib/*.cs obj/* src boot VERSION FETCH_URL
 	cp obj/CrossDomainReceiver.dll obj/Kernel.dll obj/CLRBackend.exe \
 	    stage2/obj
 	cp -a LICENSE README.pod docs/ stage2/
