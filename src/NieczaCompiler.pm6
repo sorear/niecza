@@ -11,7 +11,7 @@ has $!main-sn = 0;
 
 has $.unitcache = {};
 
-sub gettimeofday() { Q:CgOp { (rawscall Builtins,Kernel.GetNow) } }
+sub gettimeofday() { now.to-posix }
 
 method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode) {
     my %*units;
