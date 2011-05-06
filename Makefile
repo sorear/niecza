@@ -70,16 +70,40 @@ p6eval: all
 	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
 
 clean:
-	@touch obj/CORE.dll obj/MAIN.exe obj/MAIN.nam
-	@rm obj/*.dll obj/*.exe obj/*.nam
-	@touch run/Niecza.exe
-	@rm run/Niecza.exe
-	@touch run/CORE.dll
-	@rm run/*.dll
-	@touch run/CORE.dll.so
-	@rm run/*.dll.so
-	@touch a~
-	@rm -r *~
+	@rm -f obj/*.dll obj/*.exe obj/*.nam
+	@rm -f run/Niecza.exe
+	@rm -f run/*.dll
+	@rm -f run/*.dll.so
+	@rm -fr *~
+
+reboot: all
+	# setup a clean build area
+	rm -rf stage2/ stage3/
+	mkdir -p stage2/lib stage2/obj stage2/run stage2/boot stage2/boot/obj \
+	    stage3/lib stage3/obj stage3/run stage3/boot stage3/boot/obj
+	touch stage2/FETCH_URL stage3/FETCH_URL stage2/.fetch-stamp \
+	    stage3/.fetch-stamp
+	cp -a src/ Makefile stage2/
+	cp -a src/ Makefile stage3/
+	# build a current Niecza with current Niecza
+	cp obj/Kernel.dll obj/CrossDomainReceiver.dll obj/CLRBackend.exe \
+	    stage2/boot/obj
+	cp -a lib run stage2/boot
+	cd stage2 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
+	cd stage2 && $(MAKE)
+	# verify that the new Niecza can build itself correctly
+	cp stage2/obj/Kernel.dll stage2/obj/CrossDomainReceiver.dll \
+	    stage2/obj/CLRBackend.exe stage3/boot/obj
+	cp -a lib stage2/run stage3/boot
+	cd stage3 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
+	cd stage3 && $(MAKE) test
+	# yay, stage2/ looks like a good new bootstrap version
+	# clean up the stuff that should NOT go into the s
+	cd stage2 && rm -rf lib/*.cs obj/* src
+	cp obj/CrossDomainReceiver.dll obj/Kernel.dll obj/CLRBackend.exe \
+	    stage2/obj
+	cp -a LICENSE README.pod docs/ stage2/
+	cd stage2 && zip -9r ../NewNieczaBootstrap.zip *
 
 realclean: clean
 	@rm .fetch-stamp
