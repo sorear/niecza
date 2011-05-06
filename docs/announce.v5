@@ -1,0 +1,83 @@
+    Announce: Niecza Perl 6 v5
+
+This release of Niecza is delayed slightly because of my personal
+business.  For the same reason there isn't as much cool new stuff as
+I'd like.  Sorry.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+Real multiple dispatch is now supported!  Subs or methods, longest
+token or type based, it's all unified.  For instance, you can use
+"my multi regex" now, which would never have worked with Rakudo.  I'm
+rather proud of that.
+
+New functions and methods: prompt, getc, lines, get, first*,
+Match.CURSOR, Match.reduced, Cool.subst, ClassHOW.can, Label.next,
+Label.last, Label.redo, Label.goto
+
+New functions and methods (Martin Berends): Str.flip, flip,
+List.reverse
+
+Unsupported regex adverbs now give an error.
+
+if(1) now gives a better error.
+
+Grammar.parse now sets $/.
+
+substr (all forms) now returns an lvalue.
+
+::> is now supported in grammars.
+
+User-defined circumfix and postcircumfix operators are now supported.
+
+* first was previously available but it was a Niecza extension
+  unrelated to the spec's first.  It has been renamed head.
+
+An "extra strength" optimizer is in development. (Paweł Murias)
+
+Handling of undefined values in Hash.Bool et al is fixed.
+
+JSON/JSYNC parsing and output are no longer locale sensitive.
+(Tadeusz Sośnierz found this stupid bug)
+
+Many more spec-test files are now tested. (Moritz Lenz)
+
+The build has been redone to use less memory and support -jN.
+
+Internal changes:
+- Some progress has been made in splitting out P6how from STable.
+- Parsing of operator definitions in CORE has been tweaked for a
+  large speedup
+- There's a Makefile rule to automate building release tarballs.
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+The current general focus is on applications.  I hope to have yapsi
+running on Niecza soon.  This will require better multiple dispatch
+and some small object model improvements.  Improved designs from
+6model will be gradually incorporated.
+
+A JVM backend is in the design stages.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-5.zip
+[2] https://github.com/sorear/niecza
