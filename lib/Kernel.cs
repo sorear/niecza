@@ -1278,6 +1278,7 @@ noparams:
 
         public class MMDCandidateLongname {
             public P6any impl;
+            public int tien;
             public SubInfo info;
 
             public List<MMDParameter> pos;
@@ -1313,11 +1314,15 @@ noparams:
                 if (slurpy_nam && !other.slurpy_nam) narrower |= 1;
                 if (!slurpy_nam && other.slurpy_nam) narrower |= 2;
 
+                if (narrower == 0 || narrower == 3)
+                    return tien < other.tien;
+
                 return (narrower == 2);
             }
 
-            public MMDCandidateLongname(P6any impl) {
+            public MMDCandidateLongname(P6any impl, int tien) {
                 this.impl = impl;
+                this.tien = tien;
                 info = (SubInfo) impl.GetSlot("info");
                 int ct = info.sig_i.Length / SubInfo.SIG_I_RECORD;
 
@@ -1410,14 +1415,21 @@ noparams:
             int ap = 0;
             int[] heads = new int[raw.Length * 2];
             MMDCandidateLongname[] lns = new MMDCandidateLongname[raw.Length];
+            int nlns = 0;
+            int tien = 0;
 
             for (int i = 0; i < raw.Length; i++) {
-                lns[i] = new MMDCandidateLongname(raw[i]);
-                heads[2*i] = -1;
+                if (raw[i] == null) {
+                    tien++;
+                } else {
+                    lns[nlns] = new MMDCandidateLongname(raw[i], tien);
+                    heads[2*nlns] = -1;
+                    nlns++;
+                }
             }
 
-            for (int i = 0; i < raw.Length; i++) {
-                for (int j = 0; j < raw.Length; j++) {
+            for (int i = 0; i < nlns; i++) {
+                for (int j = 0; j < nlns; j++) {
                     if (lns[i].IsNarrowerThan(lns[j])) {
                         //Console.WriteLine("{0} < {1}", lns[i].LongName(), lns[j].LongName());
                         heads[2*j+1]++;
@@ -1431,15 +1443,15 @@ noparams:
 
             List<P6any> outp = new List<P6any>();
 
-            int k = raw.Length;
+            int k = nlns;
             while (k != 0) {
                 int d = 0;
-                for (int i = 0; i < raw.Length; i++) {
+                for (int i = 0; i < nlns; i++) {
                     if (heads[2*i+1] != 0) continue;
                     heads[2*i+1] = -1;
                     d++;
                 }
-                for (int i = 0; i < raw.Length; i++) {
+                for (int i = 0; i < nlns; i++) {
                     if (heads[2*i+1] != -1) continue;
                     heads[2*i+1] = -2;
 
@@ -1521,13 +1533,20 @@ noparams:
             //Console.WriteLine("MakeDispatcher: {0}", s1);
 
             if (proto != null && proto.mo.name == "Regex") goto ltm;
-            if (cands.Length > 0 && cands[0].mo.name == "Regex") goto ltm;
+            for (int i = 0; i < cands.Length; i++) {
+                if (cands[i] == null) continue;
+                if (cands[i].mo.name == "Regex") goto ltm;
+                break;
+            }
 
             SubInfo si = new SubInfo(name, StandardTypeProtoC);
             si.param0 = cands;
             return Kernel.MakeSub(si, null);
 ltm:
-            return Lexer.MakeDispatcher(name, cands);
+            List<P6any> lp = new List<P6any>();
+            foreach (P6any p in cands)
+                if (p != null) lp.Add(p);
+            return Lexer.MakeDispatcher(name, lp.ToArray());
         }
 
         public static bool SaferMode;

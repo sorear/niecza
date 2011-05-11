@@ -201,6 +201,8 @@ namespace Niecza {
             }
 
             foreach (STable k in mro) {
+                HashSet<List<MethodInfo>> needs_break =
+                    new HashSet<List<MethodInfo>>();
                 foreach (MethodInfo mi in k.mo.lmethods) {
                     if (mi.flags != (V_PUBLIC | M_MULTI))
                         continue;
@@ -212,8 +214,11 @@ namespace Niecza {
                         if (lmi[ix].long_name == mi.long_name)
                             goto next_method;
                     lmi.Add(mi);
+                    needs_break.Add(lmi);
 next_method: ;
                 }
+                foreach (List<MethodInfo> lmi in needs_break)
+                    lmi.Add(new MethodInfo());
             }
         }
 

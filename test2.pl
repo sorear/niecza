@@ -55,6 +55,21 @@ use MONKEY_TYPING;
     is $str, "xxbyydef", "substr thunks track by index";
 }
 
+{
+    my class A {
+        multi method foo(Str $, Any $) { "A" }
+    }
+    my class B is A {
+        multi method foo(Any $, Str $) { "B" }
+    }
+    is B.foo("x","y"), "B", "MRO used as tiebreaker";
+    multi bar(Str $, Any $) { "X" } #OK
+    {
+        multi bar(Any $, Str $) { "Y" }
+        is bar("a","b"), "Y", "depth used as tiebreaker";
+    }
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
