@@ -1414,6 +1414,7 @@ noparams:
             int[] links = new int[raw.Length * raw.Length * 2];
             int ap = 0;
             int[] heads = new int[raw.Length * 2];
+            int[] orig = new int[raw.Length];
             MMDCandidateLongname[] lns = new MMDCandidateLongname[raw.Length];
             int nlns = 0;
             int tien = 0;
@@ -1423,6 +1424,7 @@ noparams:
                     tien++;
                 } else {
                     lns[nlns] = new MMDCandidateLongname(raw[i], tien);
+                    orig[nlns] = i;
                     heads[2*nlns] = -1;
                     nlns++;
                 }
@@ -1460,7 +1462,7 @@ noparams:
                     }
                     // prevent constrained candidates from being part of a tie
                     if (lns[i].extra_constraints) outp.Add(null);
-                    outp.Add(raw[i]);
+                    outp.Add(raw[orig[i]]);
                     if (lns[i].extra_constraints) outp.Add(null);
                     k--;
                 }
@@ -1495,7 +1497,7 @@ noparams:
                     //Console.WriteLine(".");
                     continue;
                 }
-                //Console.WriteLine((new MMDCandidateLongname(p)).LongName());
+                //Console.WriteLine((new MMDCandidateLongname(p,0)).LongName());
                 SubInfo si = (SubInfo)p.GetSlot("info");
                 Frame   o  = (Frame)p.GetSlot("outer");
                 Frame nth = th.MakeChild(o, si);

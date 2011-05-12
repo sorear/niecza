@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 827;
+plan 828;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1913,11 +1913,11 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
         is foo(True), "bool", "augmenting multisubs works (1)";
         is foo(5), "any", "augmenting multisubs works (2)";
 
-        # {
-        #     proto foo($) {*}
-        #     multi foo(Any $) { "any2" }
-        #     is foo(True), "any2", "proto-shadowing works";
-        # }
+        {
+            proto foo($) {*}
+            multi foo(Any $) { "any2" }
+            is foo(True), "any2", "proto-shadowing works";
+        }
 
         {
             sub foo(Any $) { "any3" }

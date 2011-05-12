@@ -2599,6 +2599,8 @@ namespace Niecza.CLRBackend {
                     }
                 }
                 if (csr.outer == null) break;
+                // don't go above nearest proto
+                if (csr.l_lexicals.ContainsKey(pn)) break;
                 if (brk) cands.Add(CpsOp.Null(Tokens.P6any));
             }
 
