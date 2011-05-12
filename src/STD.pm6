@@ -107,34 +107,34 @@ method TOP ($STOP = '') {
 # The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
 
-my %term            = (:dba('term')            , :prec<z=>);
-my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
-my %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>, :!pure);
-my %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :pure);
-my %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>, :pure);
-my %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>, :pure);
-my %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>, :pure);
-my %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>, :pure);
-my %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>, :pure);
-my %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>, :pure);
-my %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>, :pure);
-my %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>, :pure);
-my %structural      = (:dba('structural infix'), :prec<n=>, :assoc<non>, :diffy);
-my %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :diffy, :iffy, :pure);
-my %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
-my %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
-my %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
-my %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
-my %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly, :!pure);
-my %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>, :pure);
-my %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly, :pure);
-my %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>, :pure);
-my %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
-my %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>);
-my %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>);
-my %sequencer       = (:dba('sequencer')       , :prec<b=>, :assoc<list>, :nextterm<statement>, :fiddly);
-my %LOOSEST         = (:dba('LOOSEST')         , :prec<a=!>);
-my %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
+constant %term            = (:dba('term')            , :prec<z=>);
+constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
+constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>, :!pure);
+constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :pure);
+constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>, :pure);
+constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>, :pure);
+constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>, :pure);
+constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>, :pure);
+constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>, :pure);
+constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>, :pure);
+constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>, :pure);
+constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>, :pure);
+constant %structural      = (:dba('structural infix'), :prec<n=>, :assoc<non>, :diffy);
+constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :diffy, :iffy, :pure);
+constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
+constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
+constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
+constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly, :!pure);
+constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>, :pure);
+constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly, :pure);
+constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>, :pure);
+constant %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
+constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>);
+constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>);
+constant %sequencer       = (:dba('sequencer')       , :prec<b=>, :assoc<list>, :nextterm<statement>, :fiddly);
+constant %LOOSEST         = (:dba('LOOSEST')         , :prec<a=!>);
+constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 
 # "epsilon" tighter than terminator
 #constant $LOOSEST = %LOOSEST<prec>;
