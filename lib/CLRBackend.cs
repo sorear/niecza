@@ -2588,15 +2588,18 @@ namespace Niecza.CLRBackend {
             string pn = prefix + ":(!proto)";
 
             for (StaticSub csr = sub; ; csr = csr.outer.Resolve<StaticSub>()) {
+                bool brk = false;
                 foreach (KeyValuePair<string,Lexical> kp in csr.lexicals) {
                     if (Utils.StartsWithInvariant(filter, kp.Key) &&
                             kp.Key != pn &&
                             !names.Contains(kp.Key)) {
                         names.Add(kp.Key);
+                        brk = true;
                         cands.Add(CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { RawAccessLex("scopedlex", kp.Key, null) }));
                     }
                 }
                 if (csr.outer == null) break;
+                if (brk) cands.Add(CpsOp.Null(Tokens.P6any));
             }
 
             return CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar,
