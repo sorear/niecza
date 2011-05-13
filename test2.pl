@@ -68,6 +68,13 @@ use MONKEY_TYPING;
         multi bar(Any $, Str $) { "Y" }
         is bar("a","b"), "Y", "depth used as tiebreaker";
     }
+
+    my $ok;
+    given 1 {
+        when 2 { }
+        default { $ok = True }
+    }
+    ok $ok, "default works";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

@@ -210,6 +210,11 @@ method regex_def($/) {
             do => ::Op::RegexBody.new(|node($/), pre => @lift,
                 name => ($name // ''), rxop => $ast, canback => $mb)));
 }
+method statement_control:default ($/) {
+    $<block>.ast.type = 'cond';
+    make ::Op::When.new(|node($/), match => mklex($/, 'True'),
+        body => self.block_to_immediate($/, 'loop', $<block>.ast));
+}
 }
 
 
