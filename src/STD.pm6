@@ -47,6 +47,7 @@ our $ALL;
     my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
 
     my $*IN_DECL;     # (d) a declarator is looking for a name to declare
+    my $*HAS_SELF;     # (d) in a context where 'self' exists
     my $*SCOPE = "";      # (d) which scope declarator we're under
     my $*MULTINESS;       # (d) which multi declarator we're under
     my $*PKGDECL ::= "";         # (d) current package declarator
@@ -1081,6 +1082,7 @@ grammar P6 is STD {
         :my %*LANG;
         :my $*PKGDECL ::= "";
         :my $*IN_DECL = '';
+        :my $*HAS_SELF = '';
         :my $*DECLARAND;
         :my $*OFTYPE;
         :my $*NEWPKG;
@@ -1393,6 +1395,7 @@ grammar P6 is STD {
 
     token statement_control:import {
         :my $*IN_DECL = 'use';
+        :my $*HAS_SELF = '';
         :my $*SCOPE = 'use';
         <sym> <.ws>
         <term>
@@ -1412,6 +1415,7 @@ grammar P6 is STD {
         :my $longname;
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
+        :my $*HAS_SELF = '';
         :my %*MYSTERY;
         <sym> <.ws>
         [
@@ -1658,10 +1662,20 @@ grammar P6 is STD {
     token scope_declarator:our       { <sym> <scoped('our')> }
     token scope_declarator:anon      { <sym> <scoped('anon')> }
     token scope_declarator:state     { <sym> <scoped('state')> }
-    token scope_declarator:has       { <sym> <scoped('has')> }
     token scope_declarator:augment   { <sym> <scoped('augment')> }
     token scope_declarator:supersede { <sym> <scoped('supersede')> }
-
+    token scope_declarator:has       {
+        :my $*HAS_SELF = 'partial';
+        <sym> {
+            given $*PKGDECL {
+                when 'class'   {} # XXX to be replaced by MOP queries
+                when 'grammar' {}
+                when 'role'    {}
+                $¢.worry("'has' declaration outside of class")
+            }
+        }
+        <scoped('has')>
+    }
 
     token package_declarator:class {
         :my $*PKGDECL ::= 'class';
@@ -1713,12 +1727,13 @@ grammar P6 is STD {
 
     token package_declarator:sym<also> {
         <sym>:s
-        <trait>+
+        [ <trait>+ || <.panic: "No valid trait found after also"> ]
     }
 
     rule package_def {
         :my $longname;
         :my $*IN_DECL = 'package';
+        :my $*HAS_SELF = '';
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWLEX;
@@ -1814,13 +1829,13 @@ grammar P6 is STD {
     }
 
     token routine_declarator:sub       { <sym> <routine_def('sub')> }
-    token routine_declarator:method    { <sym> <method_def> }
-    token routine_declarator:submethod { <sym> <method_def> }
+    token routine_declarator:method    { <sym> <method_def('method')> }
+    token routine_declarator:submethod { <sym> <method_def('submethod')> }
     token routine_declarator:macro     { <sym> <macro_def> }
 
-    token regex_declarator:regex { <sym> <regex_def(:!r,:!s)> }
-    token regex_declarator:token { <sym> <regex_def(:r,:!s)> }
-    token regex_declarator:rule  { <sym> <regex_def(:r,:s)> }
+    token regex_declarator:regex { <sym> <regex_def('regex', :!r,:!s)> }
+    token regex_declarator:token { <sym> <regex_def('token', :r,:!s)> }
+    token regex_declarator:rule  { <sym> <regex_def('rule', :r,:s)> }
 
     rule multisig {
         :my $signum = 0;
@@ -1869,10 +1884,11 @@ grammar P6 is STD {
         ] || <.panic: "Malformed routine">
     }
 
-    rule method_def () {
+    rule method_def ($d) {
         :temp $*CURLEX;
-        :my $*IN_DECL = 'method';
+        :my $*IN_DECL = $d;
         :my $*DECLARAND;
+        :my $*HAS_SELF = $d eq 'submethod' ?? 'partial' !! 'complete';
         <.newlex(1)>
         [
             [
@@ -1889,6 +1905,15 @@ grammar P6 is STD {
                 <trait>*
             | <?>
             ]
+            {
+                given $*PKGDECL {
+                    when 'class'   {} # XXX to be replaced by MOP queries
+                    when 'grammar' {}
+                    when 'role'    {}
+                    $¢.worry("'$d' declaration outside of class")
+                        if ($*SCOPE || 'has') eq 'has' && $<longname>
+                }
+            }
             { $*IN_DECL = ''; }
             <blockoid>:!s
             <.checkyada>
@@ -1897,14 +1922,23 @@ grammar P6 is STD {
         ] || <.panic: "Malformed method">
     }
 
-    rule regex_def (:$r, :$s) {
+    rule regex_def ($d, :$r, :$s) {
         :temp $*CURLEX;
-        :my $*IN_DECL = 'regex';
+        :my $*IN_DECL = $d;
         :temp %*RX;
         :my $*DECLARAND;
+        :my $*HAS_SELF = 'complete';
         { %*RX<s> = $s; %*RX<r> = $r; }
         [
             [ '&'<deflongname>? | <deflongname> ]?
+            {
+                given $*PKGDECL {
+                    when 'grammar' {} # XXX to be replaced by MOP queries
+                    when 'role'    {}
+                    $¢.worry("'$d' declaration outside of grammar")
+                        if ($*SCOPE || 'has') eq 'has' && $<deflongname>;
+                }
+            }
             <.newlex(1)>
             [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
             [ <!before '{'> <.panic: "Malformed block"> ]?
@@ -2934,7 +2968,7 @@ grammar P6 is STD {
                 $kind = '?' if $kind eq '!';
             }
             [<?before ':' > <.sorry: "Cannot put a default on the invocant parameter">]?
-            [<!before <[,;)\]\{\-]> > <.sorry: "Default expression must come last">]?
+            [<!before <[,;)\]\{\}\-]> > <.sorry: "Default expression must come last">]?
         ]?
         [<?before ':'> <?{ $kind ne '!' }> <.sorry: "Invocant is too exotic">]?
 
@@ -3037,8 +3071,11 @@ grammar P6 is STD {
     token term:sym<now>
         { <sym> » <O(|%term)> }
 
-    token term:sym<self>
-        { <sym> » <O(|%term)> }
+    token term:sym<self> {
+        <sym> »
+        { $*HAS_SELF || $¢.sorry("'self' used where no object is available") }
+        <O(|%term)>
+    }
 
     token term:sym<defer>
         { <sym> » <O(|%term)> }
@@ -3543,6 +3580,12 @@ grammar P6 is STD {
         { <sym> <O(|%multiplicative, iffy => 1)> }      # "is divisible by" returns Bool
 
     token infix:sym<mod>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<gcd>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<lcm>
         { <sym> <O(|%multiplicative)> }
 
     token infix:sym<+&>
@@ -4733,7 +4776,7 @@ grammar Regex is STD {
                     }
                 }
             || $$ <.panic: "Regex not terminated">
-            || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+            || (\W) <.sorry: "Unrecognized regex metacharacter " ~ $0.Str ~ " (must be quoted to match literally)">
             || <.panic: "Regex not terminated">
             ]
         ]
@@ -5151,6 +5194,7 @@ method getsig {
             next if $desc<used>;
             next if $desc<rebind>;
             next if $desc<dynamic>;
+            next if $desc<scope> eq 'our';
             next if $desc<scope> eq 'state';
             next if $desc<stub>;
             next unless $_ ~~ /<[\$\@\%\&]>\w/;
@@ -5752,15 +5796,17 @@ method add_placeholder($name) {
 method check_variable ($variable) {
     return () unless defined $variable;
     my $name = $variable.Str;
-    my $here = self.cursor($variable.to);
+    my $here = self.cursor($variable.from);
     self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    ($first,$twigil) = ($twigil, '') if $first eq '';
     given $twigil {
         when '' {
             my $ok = 0;
             $ok ||= $*IN_DECL;
             $ok ||= $sigil eq '&';
             $ok ||= $first lt 'A';
+            $ok ||= $first eq '¢';
             $ok ||= self.is_known($name);
             $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
             if not $ok {
@@ -5786,6 +5832,18 @@ method check_variable ($variable) {
             }
             elsif $*CURLEX{$name} {
                 $*CURLEX{$name}<used>++;
+            }
+        }
+        when '!' {
+            if not $*HAS_SELF { # XXX to be replaced by MOP queries
+                $here.sorry("Variable $name used where no 'self' is available");
+            }
+        }
+        when '.' {
+            given $*HAS_SELF { # XXX to be replaced by MOP queries
+                when 'complete' {}
+                when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
+                $here.sorry("Variable $name used where no 'self' is available");
             }
         }
         when '^' {

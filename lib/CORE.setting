@@ -1008,7 +1008,7 @@ my class Cursor {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method CURSOR() { self }
-    token alpha { <+INTERNAL::alpha> }
+    token alpha { <+INTERNAL::alpha> } #OK
 }
 
 my class Match is Cool {
