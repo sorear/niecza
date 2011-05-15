@@ -86,7 +86,7 @@ my class Cool {
             if $M {
                 push @out, substr($str, $last, ($M.from - $last));
                 push @out, $M if $all;
-                $i = ($last = $M.to);
+                $i = $i max ($last = $M.to);
                 $limctr = ($limctr - 1);
             }
         }

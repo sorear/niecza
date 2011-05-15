@@ -97,6 +97,9 @@ use MONKEY_TYPING;
     $_ := "baar";
     ok (/a+/ ?? True !! False), "Regex.Bool works";
     is $/.chars, 2, 'Regex.Bool sets $/ properly';
+
+    is 'ab-c'.split(/<.ws>/).join('|'), '|ab|-|c|',
+        'zero-width split works correctly';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
