@@ -93,6 +93,7 @@ sub beta_optimize($body, $op, $inv, $cbody) {
         $cbody.code]);
 
     my @scope;
+    my @let;
     for sort keys $cbody.lexicals -> $dn {
         my $d = $cbody.lexicals{$dn};
         my $nm = ::GLOBAL::NieczaActions.gensym;
@@ -100,13 +101,17 @@ sub beta_optimize($body, $op, $inv, $cbody) {
                  $d.hash   ?? CgOp.newblankhash !!
                  $d.list   ?? CgOp.newblanklist !!
                               CgOp.newblankrwscalar;
-        $nop = ::Op::Let.new(var => $nm,
-            to => ::Op::CgOp.new(op => $to), in => $nop);
         push @scope, $dn, $nm;
+        push @let, [$nm, ::Op::CgOp.new(op => $to)];
     }
 
     $nop = ::Op::LetScope.new(names => @scope, inner => $nop,
         transparent => $cbody.transparent);
+
+    for @let {
+        $nop = ::Op::Let.new(var => $_[0], to => $_[1], in => $nop);
+    }
+
     for reverse @args -> $a {
         $nop = ::Op::Let.new(var => $a.[1], to => $a.[0], in => $nop);
     }

@@ -1474,6 +1474,7 @@ namespace Niecza.CLRBackend {
         public readonly string tag;
         public readonly string ls;
         public readonly string le;
+        public readonly int ng;
         public readonly string lg;
 
         public ClrEhSpan(int kls, string tag, string ls, string le, string lg) {
@@ -1482,6 +1483,13 @@ namespace Niecza.CLRBackend {
             this.kls = kls; this.tag = tag; this.ls = ls; this.le = le;
             this.lg = lg;
         }
+        public ClrEhSpan(int kls, string tag, string ls, string le, int ng) {
+            Returns = Tokens.Void;
+            HasCases = false;
+            this.kls = kls; this.tag = tag; this.ls = ls; this.le = le;
+            this.ng = ng;
+        }
+
         public override void CodeGen(CgContext cx) {
             int lidn = -1;
             if (tag != "") {
@@ -1493,7 +1501,18 @@ namespace Niecza.CLRBackend {
             cx.ehspanBuffer.Add(cx.named_cases[ls]);
             cx.ehspanBuffer.Add(cx.named_cases[le]);
             cx.ehspanBuffer.Add(kls);
-            cx.ehspanBuffer.Add(cx.named_cases[lg]);
+            if (lg == null) {
+                cx.ehspanBuffer.Add(ng);
+            } else if (kls == SubInfo.ON_VARLOOKUP) {
+                int ix = cx.let_names.Length - 1;
+                while (ix >= 0 && cx.let_names[ix] != lg)
+                    ix--;
+                if (ix < Tokens.NumInt32)
+                    throw new Exception("variable in index area??");
+                cx.ehspanBuffer.Add(ix - Tokens.NumInt32);
+            } else {
+                cx.ehspanBuffer.Add(cx.named_cases[lg]);
+            }
             cx.ehspanBuffer.Add(lidn);
         }
     }
@@ -2712,6 +2731,26 @@ namespace Niecza.CLRBackend {
                 th.eh_stack.RemoveAt(th.eh_stack.Count - 1);
                 return CpsOp.Span(ls, le, FixBool(z[3]), xn, ch);
             };
+            handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
+                List<ClrEhSpan> xn = new List<ClrEhSpan>();
+                string s = "!start" + CLRBackend.Current.nextlabel++;
+                string e = "!end" + CLRBackend.Current.nextlabel++;
+                for (int i = 2; i < zyg.Length - 2; i += 2) {
+                    string vn = JScalar.S(zyg[i]);
+                    string ln = JScalar.S(zyg[i+1]);
+                    xn.Add(new ClrEhSpan(SubInfo.ON_VARLOOKUP, vn, s, e, ln));
+                }
+                th.scope_stack.Add(zyg);
+                xn.Add(new ClrEhSpan(SubInfo.ON_VARLOOKUP, "", s, e, th.scope_stack.Count));
+                CpsOp co = th.Scan(zyg[zyg.Length - 1]);
+                th.scope_stack.RemoveAt(th.scope_stack.Count - 1);
+                return CpsOp.Span(s, e, false, xn, co);
+            };
+            handlers["letvar"] = delegate(NamProcessor th, object[] zyg) {
+                return th.AccessLet(zyg); };
+            handlers["scopedlex"] =
+            handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
+                return th.AccessLex(zyg); };
             handlers["compare"] = handlers["arith"] =
                 delegate(NamProcessor th, object[] zyg) {
                     return CpsOp.PolyOp(FixStr(zyg[1]),
@@ -2843,17 +2882,6 @@ dynamic:
                     throw new NotImplementedException();
                 return CpsOp.GetSField(m.metaObject);
             };
-            handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
-                th.scope_stack.Add(zyg);
-                CpsOp co = th.Scan(zyg[zyg.Length - 1]);
-                th.scope_stack.RemoveAt(th.scope_stack.Count - 1);
-                return co;
-            };
-            handlers["letvar"] = delegate(NamProcessor th, object[] zyg) {
-                return th.AccessLet(zyg); };
-            handlers["scopedlex"] =
-            handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
-                return th.AccessLex(zyg); };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
                 return th.SubyCall(true, zyg); };
             handlers["subcall"] = delegate (NamProcessor th, object[] zyg) {

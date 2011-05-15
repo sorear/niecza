@@ -258,6 +258,9 @@ namespace Niecza {
         public const int ON_PROCEED = 7;
         public const int ON_GOTO = 8;
         public const int ON_NEXTDISPATCH = 9;
+        public const int ON_VARLOOKUP = 10;
+        // ON_VARLOOKUP is kinda special, it's not used for exceptions
+        // but rather for $*FOO and the like; goto = the variable index
         public int[] edata;
         public string[] label_names;
 
@@ -492,6 +495,9 @@ noparams:
                     dylex_filter |= FilterForName(dylexn[i]);
                 }
             }
+            for (int i = 0; i < edata.Length; i += 5)
+                if (edata[i+2] == ON_VARLOOKUP && edata[i+4] >= 0)
+                    dylex_filter |= FilterForName(label_names[edata[i+4]]);
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
@@ -652,8 +658,10 @@ noparams:
             if ((info.dylex_filter & mask) == 0)
                 return false;
             int ix;
-            if (!info.dylex.TryGetValue(name, out ix))
-                return false;
+            if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name)) < 0) {
+                if (!info.dylex.TryGetValue(name, out ix))
+                    return false;
+            }
             switch(ix) {
                 case 0: v = lex0; break;
                 case 1: v = lex1; break;

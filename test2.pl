@@ -77,6 +77,22 @@ use MONKEY_TYPING;
     ok $ok, "default works";
 }
 
+{
+    my @q;
+    sub capture() { push @q, caller.hints('$_') }
+
+    $_ := 5;
+    capture;
+    for 6 { capture }
+    capture given 7;
+    capture;
+
+    is @q[0], 5, 'can capture $CALLER::_ from run-once block';
+    is @q[1], 6, 'can capture $_ from a run-many block';
+    is @q[2], 7, 'can capture temporary $_ from postfix given';
+    is @q[3], 5, '$_ not disturbed by given';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
