@@ -1052,6 +1052,18 @@ my class Match is Cool {
 }
 
 my class Regex is Sub {
+    method Bool() {
+        return False unless defined self;
+        my $fr = caller;
+        # Hack - skip ExitRunloop frame
+        $fr = $fr.caller unless $fr.line;
+        Q:CgOp {
+            (letn res {self.ACCEPTS($fr.hints('$_'))}
+              (set_status (s $*/) {$/})
+              (bif_bool (l res)))
+        };
+    }
+
     method ACCEPTS($st) {
         return $st.^does(self) unless defined self;
         Q:CgOp {

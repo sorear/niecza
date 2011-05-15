@@ -1738,7 +1738,7 @@ ltm:
                 string n = th.info.name;
                 // Mega-Hack: These functions wrap stuff and should
                 // propagate $/
-                if (n == "CORE infix:<~~>") {
+                if (n == "CORE infix:<~~>" || n == "ExitRunloop") {
                     th = th.caller;
                     continue;
                 }

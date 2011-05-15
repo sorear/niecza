@@ -93,6 +93,12 @@ use MONKEY_TYPING;
     is @q[3], 5, '$_ not disturbed by given';
 }
 
+{
+    $_ := "baar";
+    ok (/a+/ ?? True !! False), "Regex.Bool works";
+    is $/.chars, 2, 'Regex.Bool sets $/ properly';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
