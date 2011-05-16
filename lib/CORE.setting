@@ -9,6 +9,9 @@ use MONKEY_TYPING;
 # Fundamental types {{{
 my class Mu {
     method head() { @(self).head }
+    method flattens(\$self:) {
+        Q:CgOp { (box Bool (var_islist {$self})) }
+    }
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
@@ -24,7 +27,7 @@ my class Mu {
     method pred() { defined(self) ?? die("cannot decrement a value of type $.typename") !! -1 }
     method notdef() { !defined(self) }
     method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
-    method perl() { defined(self) ?? self.Str !! self.typename }
+    method perl() { defined(self) ?? "{self.typename}.new(...)" !! self.typename }
     method so() { ?self }
     method not() { !self }
     method RAWCREATE(\|$vars) { Q:CgOp {
@@ -188,7 +191,18 @@ my class Capture {
     has $!positionals;
     has $!named;
 
-    method perl() { "\\(|{ @(self).perl }, |{ %(self).perl })" }
+    method perl() {
+        self // return self.typename;
+        my $pos := Q:CgOp { (box Parcel (getslot positionals fvarlist (@ {self}))) }.perl;
+        $pos = substr($pos, 2, chars($pos) - 3);
+        $pos = substr($pos, 0, chars($pos) - 2) if substr($pos, chars($pos) - 2, 2) eq ', ';
+        my $h := self.hash;
+        if $h {
+            $pos ~= ", " if $pos ne "";
+            $pos ~= "|" ~ $h.perl;
+        }
+        '\(' ~ $pos ~ ')';
+    }
 
     method Capture () { self }
     method list () { @( Q:CgOp { (box Parcel (getslot positionals fvarlist
@@ -201,6 +215,7 @@ my class Capture {
 # }}}
 # Scalar types {{{
 my class Num is Cool {
+    method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS($t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 
@@ -226,7 +241,7 @@ my class Str is Cool {
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
     method substr($from, $len) { substr(self, $from, $len) }
     # XXX .trans
-    method perl() { defined(self) ?? '"' ~ self ~ '"' !! 'Str' }
+    method perl() { defined(self) ?? '"' ~ self ~ '"' !! self.typename }
 }
 
 my class Scalar {
@@ -238,6 +253,8 @@ my class Sub {
 
     # Should be for Block, not Sub
     method ACCEPTS($t) { defined(self) ?? (self)($t) !! $t.^does(self) }
+
+    method perl() { defined(self) ?? '{ ... }' !! self.typename }
 }
 
 my class ClassHOW {
@@ -254,7 +271,7 @@ my class EnumType is Cool { }
 my class Bool is EnumType {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Stringy() { self.key }
-    method perl() { ~self }
+    method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS($t) { defined(self) ?? self !! $t.^does(self) }
     method Numeric() { self ?? 1 !! 0 }
     our constant True  = Q:CgOp { (box Bool (bool 1)) };
@@ -532,6 +549,19 @@ my class Parcel is Cool {
         }
     }
 
+    method perl(\$self:) {
+        $self // return $self.typename;
+        my @tok;
+        @tok.push('$') if !$self.flattens;
+        @tok.push('(');
+        loop (my $i = 0; $i < $self.elems; $i++) {
+            @tok.push(Q:CgOp { (fvarlist_item (cast int (obj_getnum {$i})) (unbox fvarlist (@ {$self}))) }.perl);
+            @tok.push(', ') unless $i == $self.elems - 1 && $i;
+        }
+        @tok.push(')');
+        @tok.join;
+    }
+
     method Numeric() { + @(self) }
     method Str    () { ~ @(self) }
     method Bool   () { ? @(self) }
@@ -604,8 +634,16 @@ my class List is Cool {
         }
     }
 
-    method perl() { defined(self) ?? '[' ~ self.map(*.perl).join(', ') ~ ']'
-        !! self.typename }
+    method perl(\$self:) {
+        $self // return $self.typename;
+        my @tok;
+        @tok.push('(');
+        @tok.push(.perl, ', ') for @$self;
+        @tok.pop if @tok >= 5;
+        @tok.push(').list');
+        @tok.push('.item') if !$self.flattens;
+        @tok.join
+    }
 
     method !shift-item() { Q:CgOp {
         (vvarlist_shift (getslot items vvarlist (@ {self})))
@@ -694,6 +732,11 @@ my class Array is List {
               (newrwlistvar (l sobj)))
         };
     }
+
+    method perl(\$self:) {
+        $self // return $self.typename;
+        "[" ~ $self.map(*.perl).join(', ') ~ "]" ~ ($self.flattens ?? ".list" !! "");
+    }
 }
 
 my class Hash {
@@ -751,7 +794,11 @@ my class Hash {
         };
     }
 
-    method perl () { defined(self) ?? '{' ~ @(self).map(*.perl).join(', ') ~ '}' !! self.typename }
+    method perl(\$self:) {
+        $self // return $self.typename;
+        '{' ~ @($self).map(*.perl).join(', ') ~ '}' ~
+            ($self.flattens ?? ".hash" !! "")
+    }
 }
 
 augment class Any {
@@ -1261,6 +1308,8 @@ my class IO {
         for @paths { $acc = $acc.append($_) }
         $acc
     }
+
+    method perl() { $.path.perl ~ ".IO" }
 
     method f() is unsafe { Q:CgOp { (box Bool (path_file_exists (obj_getstr {$!path}))) } }
     method d() is unsafe { Q:CgOp { (box Bool (path_dir_exists (obj_getstr {$!path}))) } }

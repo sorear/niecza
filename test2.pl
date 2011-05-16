@@ -102,6 +102,38 @@ use MONKEY_TYPING;
         'zero-width split works correctly';
 }
 
+{
+    ok ![1,2,3].flattens, "[1,2,3] non-flatteny";
+    ok [1,2,3].list.flattens, "[1,2,3].list flatteny";
+
+    is Array.perl, "Array", ".perl: Array";
+    is [].perl, "[]", ".perl: []";
+    is [1].perl, "[1]", ".perl: [1]";
+    is [1,2,3].perl, "[1, 2, 3]", ".perl: [1,2,3]";
+    is @([1,2,3]).perl, "[1, 2, 3].list", '.perl: @([1,2,3])';
+
+    is Hash.perl, "Hash", ".perl: Hash";
+    is {a => 1}.perl, '{"a" => 1}', '.perl: {a => 1}';
+    is %({a => 1}).perl, '{"a" => 1}.hash', '.perl: %({a => 1})';
+
+    is Num.perl, "Num", ".perl: Num";
+    is 5.perl, "5", ".perl: 5";
+
+    is Str.perl, "Str", ".perl: Str";
+    is "foo".perl, '"foo"', '.perl: "foo"';
+
+    is Capture.perl, "Capture", '.perl: Capture';
+    is (\1).perl, '\(1)', '.perl: \1';
+    is (\(1, :x)).perl, '\(1, |{"x" => Bool::True})', '.perl: \(1, :x)';
+    is (\(:x)).perl, '\(|{"x" => Bool::True})', '.perl: \(:x)';
+
+    is Parcel.perl, "Parcel", '.perl: Parcel';
+    is ().perl, '()', '.perl: ()';
+    is (1,).perl, '(1, )', '.perl: (1,)';
+    is (1,2,3).perl, '(1, 2, 3)', '.perl: (1,2,3)';
+    is $(1,2,3).perl, '$(1, 2, 3)', '.perl: $(1,2,3)';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
