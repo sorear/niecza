@@ -313,10 +313,10 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
     my $lad = $rxop.lad;
     my ($nrxop, $mb) = OptRxSimple.run($rxop);
     # XXX do this in the signature so it won't be affected by transparent
-    my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self', readonly => True);
+    my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self');
     if defined $goal {
         push @parm, ::Sig::Parameter.new(slot => '$*GOAL', name => '$*GOAL',
-            readonly => True, positional => False, optional => True);
+            positional => False, optional => True);
         unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
             lhs => ::Op::Lexical.new(name => '$*GOAL'),
             rhs => ::Op::StringLiteral.new(text => $goal));
@@ -1797,7 +1797,7 @@ method parameter($/) {
     my $p = $<param_var> // $<named_param>;
 
     make ::Sig::Parameter.new(name => ~$/, :$default,
-        :$optional, :$slurpy, readonly => !$rw, type => ($type // 'Any'),
+        :$optional, :$slurpy, :$rw, type => ($type // 'Any'),
         :$slurpycap, rwtrans => $rwt, |$p.ast);
 }
 
@@ -2550,7 +2550,7 @@ method get_placeholder_sig($/) {
     my @parms;
     for @things -> $t {
         if substr($t, 0, 9) eq '$_ is ref' {
-            push @parms, ::Sig::Parameter.new(optional => True,
+            push @parms, ::Sig::Parameter.new(defouter => True, rwtrans => True,
                 slot => '$_', name => '$_');
         } elsif $t eq '*@_' {
             push @parms, ::Sig::Parameter.new(slurpy => True, slot => '@_',

@@ -230,6 +230,7 @@ class RxOp::CutBrack is RxOp {
 }
 
 augment class CgOp {
+method outerlex ($n) { self._cgop("outerlex", $n) }
 method bif_rand () { self._cgop("bif_rand") }
 }
 

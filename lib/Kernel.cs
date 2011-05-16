@@ -213,6 +213,9 @@ namespace Niecza {
         // maybe should be a hint
         public LAD ltm;
 
+        public int outer_topic_rank;
+        public int outer_topic_key;
+
         // Used for closing runtime-generated SubInfo over values used
         // For vtable wrappers: 0 = unboxed, 1 = boxed
         // For dispatch routines, 0 = parameter list
@@ -240,6 +243,7 @@ namespace Niecza {
         // Value source
         public const int SIG_F_HASDEFAULT = 32;
         public const int SIG_F_OPTIONAL   = 64;
+        public const int SIG_F_DEFOUTER   = 4096;
         public const int SIG_F_POSITIONAL = 128;
         public const int SIG_F_SLURPY_POS = 256;
         public const int SIG_F_SLURPY_NAM = 512;
@@ -381,6 +385,16 @@ namespace Niecza {
                         throw new Exception("Improper null return from sub default for " + PName(rbase));
                     goto gotit;
                 }
+                if ((flags & SIG_F_DEFOUTER) != 0) {
+                    Frame f = th;
+                    if (outer_topic_key < 0) {
+                        src = Kernel.NewROScalar(Kernel.AnyP);
+                        goto gotit;
+                    }
+                    for (int i = 0; i < outer_topic_rank; i++) f = f.outer;
+                    src = (Variable)f.GetDynamic(outer_topic_key);
+                    goto gotit;
+                }
                 if ((flags & SIG_F_OPTIONAL) != 0) {
                     src = Kernel.NewROScalar(type.typeObject);
                     goto gotit;
@@ -498,6 +512,17 @@ noparams:
             for (int i = 0; i < edata.Length; i += 5)
                 if (edata[i+2] == ON_VARLOOKUP && edata[i+4] >= 0)
                     dylex_filter |= FilterForName(label_names[edata[i+4]]);
+
+            SubInfo sc = outer;
+            for (outer_topic_rank = 1; sc != null; sc = sc.outer) {
+                if (sc.dylex != null &&
+                        sc.dylex.TryGetValue("$_", out outer_topic_key))
+                    break;
+                outer_topic_rank++;
+            }
+            if (sc == null)
+                outer_topic_key = -1;
+            //Console.WriteLine("{0} {1} {2}", name, outer_topic_rank, outer_topic_key);
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
@@ -662,20 +687,24 @@ noparams:
                 if (!info.dylex.TryGetValue(name, out ix))
                     return false;
             }
-            switch(ix) {
-                case 0: v = lex0; break;
-                case 1: v = lex1; break;
-                case 2: v = lex2; break;
-                case 3: v = lex3; break;
-                case 4: v = lex4; break;
-                case 5: v = lex5; break;
-                case 6: v = lex6; break;
-                case 7: v = lex7; break;
-                case 8: v = lex8; break;
-                case 9: v = lex9; break;
-                default: v = lexn[ix-10]; break;
-            }
+            v = GetDynamic(ix);
             return true;
+        }
+
+        public object GetDynamic(int ix) {
+            switch(ix) {
+                case 0: return lex0;
+                case 1: return lex1;
+                case 2: return lex2;
+                case 3: return lex3;
+                case 4: return lex4;
+                case 5: return lex5;
+                case 6: return lex6;
+                case 7: return lex7;
+                case 8: return lex8;
+                case 9: return lex9;
+                default: return lexn[ix-10];
+            }
         }
 
         public Variable LexicalFind(string name) {

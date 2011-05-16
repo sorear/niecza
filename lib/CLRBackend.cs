@@ -2559,9 +2559,11 @@ namespace Niecza.CLRBackend {
 
         CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
             bool core = type == "corelex";
+            bool uplex = type == "outerlex";
+            bool upscope = uplex && (scope_stack.Count > 0);
             int uplevel;
 
-            for (int i = (core ? -1 : scope_stack.Count - 1); i >= 0; i--) {
+            for (int i = (core ? -1 : scope_stack.Count - (upscope ? 2 : 1)); i >= 0; i--) {
                 object[] rec = scope_stack[i];
                 for (int j = 2; j < rec.Length - 2; j += 2) {
                     if (JScalar.S(rec[j]) == name) {
@@ -2573,15 +2575,20 @@ namespace Niecza.CLRBackend {
                 }
             }
 
-            Lexical lex = ResolveLex(name, out uplevel, core);
+            Lexical lex = ResolveLex(name, uplex&& !upscope, out uplevel, core);
 
             return CpsOp.LexAccess(lex, uplevel,
                 set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
         }
 
-        Lexical ResolveLex(string name, out int uplevel, bool core) {
+        Lexical ResolveLex(string name, bool upf, out int uplevel, bool core) {
             uplevel = 0;
             StaticSub csr = sub;
+
+            if (upf) {
+                csr = csr.outer.Resolve<StaticSub>();
+                uplevel++;
+            }
 
             while (true) {
                 Lexical r;
@@ -2749,6 +2756,7 @@ namespace Niecza.CLRBackend {
             handlers["letvar"] = delegate(NamProcessor th, object[] zyg) {
                 return th.AccessLet(zyg); };
             handlers["scopedlex"] =
+            handlers["outerlex"] =
             handlers["corelex"] = delegate(NamProcessor th, object[] zyg) {
                 return th.AccessLex(zyg); };
             handlers["compare"] = handlers["arith"] =
@@ -2888,7 +2896,7 @@ dynamic:
                 return th.SubyCall(false, zyg); };
             handlers["_hintset"] = delegate (NamProcessor th, object[] zyg) {
                 int d;
-                Lexical lx = th.ResolveLex(JScalar.S(zyg[1]), out d, false);
+                Lexical lx = th.ResolveLex(JScalar.S(zyg[1]),false,out d,false);
                 FieldInfo peer = (lx is LexCommon) ? ((LexCommon)lx).stg :
                     ((LexHint)lx).stg;
                 return CpsOp.SetField(Tokens.BValue_v, CpsOp.GetSField(peer),
@@ -3697,9 +3705,10 @@ dynamic:
                     sig_r.Add(CpsOp.StringLiteral(n));
                 int ufl = 0;
                 if ((flags & 4) != 0) ufl |= SubInfo.SIG_F_RWTRANS;
-                else if ((flags & 64) == 0) ufl |= SubInfo.SIG_F_READWRITE;
+                else if ((flags & 64) != 0) ufl |= SubInfo.SIG_F_READWRITE;
 
                 if ((flags & 384) != 0) ufl |= SubInfo.SIG_F_BINDLIST;
+                if ((flags & 512) != 0) ufl |= SubInfo.SIG_F_DEFOUTER;
                 if (deflt != null) {
                     ufl |= SubInfo.SIG_F_HASDEFAULT;
                     sig_r.Add(CpsOp.GetSField(deflt.Resolve<StaticSub>().subinfo));

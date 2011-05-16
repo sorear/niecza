@@ -12,11 +12,11 @@ class Parameter {
     has $.rwtrans = False; # Bool
     has $.full_parcel = False; # Bool
     has $.optional = False; # Bool
+    has $.defouter = False; # Bool
     has $.positional = True;
     has $.default; # Body
     has $.mdefault; # Xref; filled in by begin (rw)
-    # not 'is rw' (how meta).
-    has $.readonly = False;
+    has $.rw = False;
     has $.names = []; # Array of Str
     has $.name; # Str
     has $.list = False; # Bool
@@ -27,6 +27,8 @@ class Parameter {
     method !default_get($body) {
         if defined $!mdefault {
             CgOp.call_uncloned_sub(@$!mdefault);
+        } elsif $!defouter {
+            CgOp.outerlex($!slot);
         } elsif $!optional {
             CgOp.scopedlex($!type);
         } else {
@@ -50,13 +52,13 @@ class Parameter {
 
         if (defined $!slot) {
             CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
-                CgOp.newboundvar(+$!readonly, +$!list, $get));
+                CgOp.newboundvar(+(!$!rw), +$!list, $get));
         } else {
             CgOp.sink($get);
         }
     }
 
-    method simple($n) { self.new(name => $n, slot => $n, readonly => True) }
+    method simple($n) { self.new(name => $n, slot => $n) }
 }
 
 has $.params = die "Sig.params required"; # Array of Sig::Parameter

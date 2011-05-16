@@ -272,9 +272,10 @@ augment class Sig::Parameter { #OK exist
         $flags = $flags +| 8   if $.full_parcel;
         $flags = $flags +| 16  if $.optional;
         $flags = $flags +| 32  if $.positional;
-        $flags = $flags +| 64  if $.readonly;
+        $flags = $flags +| 64  if $.rw;
         $flags = $flags +| 128 if $.list;
         $flags = $flags +| 256 if $.hash;
+        $flags = $flags +| 512 if $.defouter;
 
         [
             $.name,
@@ -293,8 +294,8 @@ sub parm_from_nam(@block) {
         slurpy   => ?($flags +& 1),   slurpycap   => ?($flags +& 2),
         rwtrans  => ?($flags +& 4),   full_parcel => ?($flags +& 8),
         optional => ?($flags +& 16),  positional  => ?($flags +& 32),
-        readonly => ?($flags +& 64),  list        => ?($flags +& 128),
-        hash     => ?($flags +& 256),
+        rw       => ?($flags +& 64),  list        => ?($flags +& 128),
+        hash     => ?($flags +& 256), defouter    => ?($flags +& 512),
         name => $name, slot => $slot, names => $names, :$tclass);
 }
 

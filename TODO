@@ -7,8 +7,6 @@ EASY
 
  + $*PROGRAM_NAME
 
- + when {} shouldn't disrupt flow of $_
-
  + $*OUT
 
    Rename at-key, at-pos to "postcircumfix:<[ ]>" etc.
@@ -28,9 +26,8 @@ EASY
 
    Fudge and run your favorite spectest file.
 
-   Stuff spectests are blocking on: "Block", "&hash", "writable $_",
-   "closure for", "ranges of chars", "gather for", constants in signatures,
-   ::T, Int, ...
+   Stuff spectests are blocking on: "Block", "&hash", "closure for",
+   "ranges of chars", "gather for", constants in signatures, ::T, Int, ...
 
 MEDIUM
 

@@ -134,6 +134,31 @@ use MONKEY_TYPING;
     is $(1,2,3).perl, '$(1, 2, 3)', '.perl: $(1,2,3)';
 }
 
+{
+    $_ := 5;
+    if True {
+        is $_, 5, '$_ passes into ifs';
+    }
+
+    if False {
+    } else {
+        is $_, 5, '$_ passes into elses';
+    }
+
+    my $i = 1;
+    while $i-- {
+        is $_, 5, '$_ passes into whiles';
+    }
+    given 8 {
+        default {
+            is $_, 8, '$_ passes into whens/defaults';
+        }
+    }
+    {
+        is $_, 5, '$_ passes into bare blocks';
+    }
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
