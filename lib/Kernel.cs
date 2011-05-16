@@ -414,7 +414,7 @@ gotit:
                     if (rw == src.rw && islist == src.islist) {
                         if (!src.type.HasMRO(type)) {
                             if (quiet) return null;
-                            return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + src.type.name + ", needed " + type.name);
+                            return Kernel.Die(th, "Nominal type check failed in binding " + PName(rbase) + "; got " + src.type.name + ", needed " + type.name);
                         }
                         if (src.whence != null)
                             Kernel.Vivify(src);
@@ -2340,6 +2340,7 @@ slow:
                     new CtxRawNativeDefined());
             Handler_Vonly(MuMO, "Bool", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
+            Handler_Vonly(MuMO, "item", new CtxReturnSelfItem(), null);
             MuMO.FillProtoClass(new string[] { });
             MuMO.Invalidate();
 
@@ -2382,7 +2383,6 @@ slow:
             WrapHandler1(AnyMO, "at-key", new IxAnyAtKey());
             WrapHandler1(AnyMO, "at-pos", new IxAnyAtPos());
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
-            Handler_Vonly(AnyMO, "item", new CtxReturnSelfItem(), null);
             AnyMO.FillProtoClass(new string[] { });
             AnyMO.Invalidate();
 
