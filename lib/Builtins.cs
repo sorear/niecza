@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Niecza {
     public class UpCallee: CrossDomainReceiver {
@@ -404,6 +405,14 @@ public class Builtins {
         long t = DateTime.UtcNow.Ticks;
         double d = ((double)(t - 621355968000000000L)) / 10000000.0;
         return Kernel.BoxAnyMO(d, Kernel.NumMO);
+    }
+
+    private static Random rng = new Random();
+
+    public static Variable GetRandom() {
+        double i;
+        lock (rng) { i = rng.NextDouble(); }
+        return Kernel.BoxAnyMO(i, Kernel.NumMO);
     }
 
     public static bool FileOrDirExists(string path) {

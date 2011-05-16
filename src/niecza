@@ -229,6 +229,10 @@ class RxOp::CutBrack is RxOp {
     method lad() { [ 'Null' ]; }
 }
 
+augment class CgOp {
+method bif_rand () { self._cgop("bif_rand") }
+}
+
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
 

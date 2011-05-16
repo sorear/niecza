@@ -3233,6 +3233,7 @@ dynamic:
             thandlers["bif_numlt"] = SimpleB("NumericLt");
             thandlers["bif_numge"] = SimpleB("NumericGe");
             thandlers["bif_numgt"] = SimpleB("NumericGt");
+            thandlers["bif_rand"] = SimpleB("GetRandom");
             thandlers["bif_streq"] = SimpleB("StringEq");
             thandlers["bif_strne"] = SimpleB("StringNe");
             thandlers["bif_strle"] = SimpleB("StringLe");

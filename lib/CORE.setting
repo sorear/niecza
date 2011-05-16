@@ -1292,6 +1292,8 @@ my class Instant {
 sub term:« now »() {
     Instant.new( val => Q:CgOp { (bif_now) } );
 }
+sub term:« time »() { Q:CgOp { (bif_now) } }
+sub term:« rand »() { Q:CgOp { (bif_rand) } }
 
 my class IO {
     has $.path; # Str
