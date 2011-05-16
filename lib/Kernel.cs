@@ -409,8 +409,7 @@ gotit:
 
                     // XXX $_ stupidity
                     if (rw && !src.rw)
-                        rw = false;
-                        //return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
+                        return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
                     // fast path
                     if (rw == src.rw && islist == src.islist) {
                         if (!src.type.HasMRO(type)) {

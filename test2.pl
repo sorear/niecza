@@ -157,6 +157,9 @@ use MONKEY_TYPING;
     {
         is $_, 5, '$_ passes into bare blocks';
     }
+
+    sub foo($x is rw) { $x }
+    dies_ok { foo 5 }, "cannot rw-bind constant";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
