@@ -1,3 +1,4 @@
+integration/advent2009-day10.t
 integration/lexical-array-in-inner-block.t
 integration/method-calls-and-instantiation.t
 integration/no-indirect-new.t
