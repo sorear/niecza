@@ -4200,6 +4200,7 @@ grammar Q is STD {
             :my $*QSIGIL ::= '@';
             <?before '@'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ] # trap ABORTBRANCH from variable's ::
+            <?after <[ \] } > ) ]> >
         }
     }
 
@@ -4212,6 +4213,7 @@ grammar Q is STD {
             :my $*QSIGIL ::= '%';
             <?before '%'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
+            <?after <[ \] } > ) ]> >
         }
     }
 
@@ -4224,6 +4226,7 @@ grammar Q is STD {
             :my $*QSIGIL ::= '&';
             <?before '&'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
+            <?after <[ \] } > ) ]> >
         }
     }
 

@@ -160,6 +160,9 @@ use MONKEY_TYPING;
 
     sub foo($x is rw) { $x }
     dies_ok { foo 5 }, "cannot rw-bind constant";
+
+    my @foo = 1,2,3; #OK
+    is "@foo", '@foo', '@-vars do not interpolate';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
