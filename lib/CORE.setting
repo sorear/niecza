@@ -953,10 +953,10 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
                 my $ok = True;
                 if @items {
                     take True;
-                    my $last = shift @items;
+                    my Mu $last = shift @items;
                     while @items {
-                        my $next = shift @items;
-                        my $val ::= ($ok &&= $func($last, $next));
+                        my Mu $next = shift @items;
+                        my Mu $val ::= ($ok &&= $func($last, $next));
                         take $val;
                         $last = $next;
                     }
@@ -975,13 +975,13 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         elsif $right {
             gather {
                 while @items >= 2 {
-                    my $right ::= @items.pop;
+                    my Mu $right ::= @items.pop;
                     take $right;
-                    my $left  = @items.pop;
+                    my Mu $left  = @items.pop;
                     @items.push($func($left,$right));
                 }
                 if @items {
-                    my $last ::= @items.shift;
+                    my Mu $last ::= @items.shift;
                     take $last;
                 }
             }
@@ -989,10 +989,10 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         else { # left assoc 
             gather {
                 if @items {
-                    my $cumu ::= @items.shift;
+                    my Mu $cumu ::= @items.shift;
                     take $cumu;
                     while @items {
-                        my $new ::= ($cumu ::= $func($cumu, @items.shift));
+                        my Mu $new ::= ($cumu ::= $func($cumu, @items.shift));
                         take $new;
                     }
                 }
@@ -1013,16 +1013,16 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         }
         elsif $right {
             while @items >= 2 {
-                my $r = @items.pop;
-                my $l = @items.pop;
+                my Mu $r = @items.pop;
+                my Mu $l = @items.pop;
                 @items.push($func($l,$r));
             }
             @items ?? @items[0] !! 0; # XXX identity
         }
         else { # left
             while @items >= 2 {
-                my $l = @items.shift;
-                my $r = @items.shift;
+                my Mu $l = @items.shift;
+                my Mu $r = @items.shift;
                 @items.unshift($func($l,$r));
             }
             @items ?? @items[0] !! 0; # XXX identity
