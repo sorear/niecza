@@ -170,6 +170,18 @@ my class Cool {
     }
     method say() { (~self).say }
     method chars() { chars(self) }
+    method bytes() { chars(self) * 2 }
+    method chomp() {
+        my $s = ~self;
+        my $l = chars($s);
+        --$l if $l && substr($s, $l-1, 1) eq "\x0A";
+        --$l if $l && substr($s, $l-1, 1) eq "\x0D";
+        substr($s,0,$l);
+    }
+    method chop() {
+        my $s = ~self;
+        substr($s, 0, chars($s) - 1)
+    }
     method substr($x,$y) { substr(self,$x,$y) }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
@@ -374,9 +386,11 @@ sub infix:<le>($s1, $s2) { $s1 le $s2 }
 sub infix:<lt>($s1, $s2) { $s1 lt $s2 }
 sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
 sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
-sub lc($s)   { (~$s).lc }
-sub uc($s)   { (~$s).uc }
-sub flip($s) { (~$s).flip }
+sub lc($s)    { (~$s).lc }
+sub uc($s)    { (~$s).uc }
+sub chop($s)  { (~$s).chop }
+sub chomp($s) { (~$s).chomp }
+sub flip($s)  { (~$s).flip }
 sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
 sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
 # this one is horribly wrong and only handles the ref eq case.
