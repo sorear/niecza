@@ -163,6 +163,12 @@ use MONKEY_TYPING;
 
     my @foo = 1,2,3; #OK
     is "@foo", '@foo', '@-vars do not interpolate';
+
+    my $x; my $y;
+    ok $x =:= $x, '$x =:= $x';
+    nok $x =:= $y, '$x !=:= $y';
+    $x := $y;
+    ok $x =:= $y, '$x =:= $y (after $x := $y)';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

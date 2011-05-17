@@ -397,6 +397,9 @@ sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
 sub infix:<===>($l,$r) { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
 } }
+sub infix:<=:=>(\$l,\$r) { Q:CgOp {
+    (box Bool (compare == {$l} {$r}))
+} }
 
 sub _param_role_inst(\|$t) {
     Q:CgOp { (instrole (unbox fvarlist (@ {$t}))) }
@@ -1280,7 +1283,6 @@ sub infix:<|> (\|$args) { die "Junctions NYI" } #OK
 sub infix:<^> (\|$args) { die "Junctions NYI" } #OK
 sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
-sub infix:<=:=> (\$a, \$b) { die "Binding checks NYI" } #OK
 sub infix:<minmax>(\|$args) { die "minmax NYI" } #OK
 sub infix:<...>(\|$args) { die "Series op NYI" } #OK
 sub infix:<...^>(\|$args) { die "Series op NYI" } #OK
