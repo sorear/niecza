@@ -276,6 +276,8 @@ augment class Sig::Parameter { #OK exist
         $flags = $flags +| 128 if $.list;
         $flags = $flags +| 256 if $.hash;
         $flags = $flags +| 512 if $.defouter;
+        $flags = $flags +| 1024 if $.invocant;
+        $flags = $flags +| 2048 if $.multi_ignored;
 
         [
             $.name,
@@ -291,11 +293,12 @@ augment class Sig::Parameter { #OK exist
 sub parm_from_nam(@block) {
     my ($name, $flags, $slot, $names, $mdefault, $tclass) = @block; #OK
     ::Sig::Parameter.new(
-        slurpy   => ?($flags +& 1),   slurpycap   => ?($flags +& 2),
-        rwtrans  => ?($flags +& 4),   full_parcel => ?($flags +& 8),
-        optional => ?($flags +& 16),  positional  => ?($flags +& 32),
-        rw       => ?($flags +& 64),  list        => ?($flags +& 128),
-        hash     => ?($flags +& 256), defouter    => ?($flags +& 512),
+        slurpy   => ?($flags +& 1),    slurpycap     => ?($flags +& 2),
+        rwtrans  => ?($flags +& 4),    full_parcel   => ?($flags +& 8),
+        optional => ?($flags +& 16),   positional    => ?($flags +& 32),
+        rw       => ?($flags +& 64),   list          => ?($flags +& 128),
+        hash     => ?($flags +& 256),  defouter      => ?($flags +& 512),
+        invocant => ?($flags +& 1024), multi_ignored => ?($flags +& 2048),
         name => $name, slot => $slot, names => $names, :$tclass);
 }
 

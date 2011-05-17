@@ -6,17 +6,19 @@ class Parameter {
     # eek too many attributes.  It probably makes sense to use a bitfield or
     # two here.
     has $.slot; # Str
-    has $.slurpy = False; # Bool
-    has $.slurpycap = False; # Bool
+    has Bool $.slurpy = False;
+    has Bool $.slurpycap = False;
     # does not vivify; rw
-    has $.rwtrans = False; # Bool
-    has $.full_parcel = False; # Bool
-    has $.optional = False; # Bool
-    has $.defouter = False; # Bool
-    has $.positional = True;
+    has Bool $.rwtrans = False;
+    has Bool $.full_parcel = False;
+    has Bool $.optional = False;
+    has Bool $.defouter = False;
+    has Bool $.positional = True;
+    has Bool $.invocant = False; # is rw
+    has Bool $.multi_ignored = False; # is rw
     has $.default; # Body
     has $.mdefault; # Xref; filled in by begin (rw)
-    has $.rw = False;
+    has Bool $.rw = False;
     has $.names = []; # Array of Str
     has $.name; # Str
     has $.list = False; # Bool
@@ -62,11 +64,13 @@ class Parameter {
 }
 
 has $.params = die "Sig.params required"; # Array of Sig::Parameter
-has $.explicit_inv = False; # Bool
 
 method for_method() {
-    return self if $!explicit_inv;
-    Sig.new(params => [ Sig::Parameter.simple('self'), @$!params ]);
+    if $!params && $!params.[0].invocant {
+        return self;
+    }
+    Sig.new(params => [ Sig::Parameter.new(name => 'self', :invocant),
+        @$!params ]);
 }
 
 method simple(*@names) {

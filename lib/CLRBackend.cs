@@ -3438,13 +3438,11 @@ dynamic:
             List<string> dylexn = new List<string>();
             List<int> dylexi = new List<int>();
             foreach (KeyValuePair<string, Lexical> kv in sub.lexicals) {
-                if (Lexical.IsDynamicName(kv.Key)) {
-                    int index = (kv.Value is LexVarish) ?
-                        ((LexVarish)kv.Value).index : -1;
-                    if (index >= 0) {
-                        dylexn.Add(kv.Key);
-                        dylexi.Add(index);
-                    }
+                int index = (kv.Value is LexVarish) ?
+                    ((LexVarish)kv.Value).index : -1;
+                if (index >= 0) {
+                    dylexn.Add(kv.Key);
+                    dylexi.Add(index);
                 }
             }
             if (dylexn.Count > 0) {
@@ -3709,6 +3707,8 @@ dynamic:
 
                 if ((flags & 384) != 0) ufl |= SubInfo.SIG_F_BINDLIST;
                 if ((flags & 512) != 0) ufl |= SubInfo.SIG_F_DEFOUTER;
+                if ((flags & 1024) != 0) ufl |= SubInfo.SIG_F_INVOCANT;
+                if ((flags & 2048) != 0) ufl |= SubInfo.SIG_F_MULTI_IGNORED;
                 if (deflt != null) {
                     ufl |= SubInfo.SIG_F_HASDEFAULT;
                     sig_r.Add(CpsOp.GetSField(deflt.Resolve<StaticSub>().subinfo));

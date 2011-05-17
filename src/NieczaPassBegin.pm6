@@ -94,6 +94,7 @@ augment class Sig {
 augment class Sig::Parameter { method begin() { #OK exist
     @*opensubs[*-1].add_my_name($.slot, list => $.list,
         hash => $.hash, noinit => True) if defined $.slot;
+    @*opensubs[*-1].add_my_name('self', :noinit) if $.invocant;
     if defined $.default {
         my $mdefault = $.default.begin;
         $.mdefault = $mdefault.xref;

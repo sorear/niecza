@@ -1752,10 +1752,10 @@ method param_var($/) {
 method parameter($/) {
     my $rw = False;
     my $sorry;
-    my $slurpy;
-    my $slurpycap;
-    my $optional;
-    my $rwt;
+    my $slurpy = False;
+    my $slurpycap = False;
+    my $optional = False;
+    my $rwt = False;
     my $type;
 
     if $<type_constraint> {
@@ -1816,17 +1816,23 @@ method signature($/) {
     }
 
     my $exp = 0;
-    for @( $<param_sep> ) -> $sep {
-        if defined $sep.index(':') {
-            $exp = 1;
-        } elsif !defined $sep.index(',') {
-            $/.CURSOR.sorry("Parameter separator $sep NYI");
-            return Nil;
+    my @p = map *.ast, @( $<parameter> );
+    my @ps = @( $<param_sep> );
+    my $ign = False;
+    loop (my $i = 0; $i < @p; $i++) {
+        @p[$i].multi_ignored = $ign;
+        if $i >= @ps {
+        } elsif defined @ps[$i].index(':') {
+            $/.CURSOR.sorry('Only the first parameter may be invocant') if $i;
+            @p[$i].invocant = True;
+        } elsif defined @ps[$i].index(';;') {
+            $ign = True;
+        } elsif !defined @ps[$i].index(',') {
+            $/.CURSOR.sorry("Parameter separator @ps[$i] NYI");
         }
     }
 
-    make Sig.new(explicit_inv => ?$exp, params =>
-        [map *.ast, @( $<parameter> )]);
+    make Sig.new(params => @p);
 }
 
 method multisig($/) {

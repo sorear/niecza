@@ -847,8 +847,8 @@ rxtest /x [a || aa]: c/, 'x[a||b]:c', ("xac",), ("xaac",);
     is %$obj, "hash", '%$ truncated context';
 
     is "x$$obj", "xitem", '$$ interpolation';
-    is "x@$obj", "xlist", '@$ interpolation';
-    is "x%$obj", "xhash", '%$ interpolation';
+    is "x@$obj.Str()", "xlist", '@$ interpolation';
+    is "x%$obj.Str()", "xhash", '%$ interpolation';
 }
 
 ok "axy" ~~ / a <before x> \w y / , "before is zero-width";

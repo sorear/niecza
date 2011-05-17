@@ -215,6 +215,7 @@ namespace Niecza {
 
         public int outer_topic_rank;
         public int outer_topic_key;
+        public int self_key;
 
         // Used for closing runtime-generated SubInfo over values used
         // For vtable wrappers: 0 = unboxed, 1 = boxed
@@ -233,12 +234,14 @@ namespace Niecza {
 
         // Value processing
         public const int SIG_F_HASTYPE    = 1; // else Kernel.AnyMO
+        public const int SIG_F_MULTI_IGNORED = 16384;
 
         // Value binding
         public const int SIG_F_READWRITE  = 2;
         public const int SIG_F_COPY       = 4;
         public const int SIG_F_RWTRANS    = 8;
         public const int SIG_F_BINDLIST   = 16;
+        public const int SIG_F_INVOCANT   = 8192;
 
         // Value source
         public const int SIG_F_HASDEFAULT = 32;
@@ -431,6 +434,8 @@ gotit:
                     src = new SimpleVariable(false, islist, srco.mo, null, srco);
 bound: ;
                 }
+                if ((flags & SIG_F_INVOCANT) != 0 && self_key >= 0)
+                    th.SetDynamic(self_key, src);
                 switch (slot + 1) {
                     case 0: break;
                     case 1:  th.lex0 = src; break;
@@ -521,6 +526,9 @@ noparams:
             }
             if (sc == null)
                 outer_topic_key = -1;
+            self_key = -1;
+            if (dylex == null || !dylex.TryGetValue("self", out self_key))
+                self_key = -1;
             //Console.WriteLine("{0} {1} {2}", name, outer_topic_rank, outer_topic_key);
         }
 

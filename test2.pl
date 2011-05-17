@@ -169,6 +169,12 @@ use MONKEY_TYPING;
     nok $x =:= $y, '$x !=:= $y';
     $x := $y;
     ok $x =:= $y, '$x =:= $y (after $x := $y)';
+
+    my class A {
+        has $.x;
+        method foo($bar:) { $.x } #OK
+    }
+    is A.new(x => 5).foo, 5, "explicit invocants don't break self";
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
