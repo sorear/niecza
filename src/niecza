@@ -39,6 +39,66 @@ method quote:m  ($/) {
             args => [ mklex($/, '$_'),
                 self.extract_rx_adverbs(True, False, $<quibble>) ]);
 }
+method method_def ($/) {
+    make ::Op::StatementList.new;
+    my $scope = $*SCOPE // 'has';
+    my $type = $<type> ?? ~$<type> !! '';
+    $type = ($type eq ''  ?? 'normal' !!
+             $type eq '^' ?? 'meta' !!
+             $type eq '!' ?? 'private' !!
+             (
+                 $/.CURSOR.sorry("Unhandled method decoration $type");
+                 return Nil;
+             ));
+    $scope = 'anon' if !$<longname>;
+    my $name = $<longname> ?? self.unqual_longname($<longname>,
+        "Qualified method definitions not understood") !! Any; #XXX
+
+    if $<sigil> {
+        $/.CURSOR.sorry("Method sgils NYI");
+        return Nil;
+    }
+    if $type eq 'meta' {
+        $/.CURSOR.sorry("Metamethod mixins NYI");
+        return Nil;
+    }
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
+    }
+
+    if ($scope eq 'augment' || $scope eq 'supersede' || $scope eq 'state') {
+        $/.CURSOR.sorry("Illogical scope $scope for method");
+        return Nil;
+    }
+
+    if ($scope eq 'our') {
+        $/.CURSOR.sorry("Packages NYI");
+        return Nil;
+    }
+    my $sig = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+
+    my $unsafe = False;
+    for @( $<trait> ) -> $t {
+        if $t.ast<nobinder> {
+            $sig = Any;
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
+        } elsif $t.ast<of> {
+        } else {
+            $/.CURSOR.sorry("NYI method trait $t");
+        }
+    }
+
+    my $bl = self.sl_to_block('sub', $<blockoid>.ast,
+        subname => $name, :$unsafe,
+        signature => $sig ?? $sig.for_method !! Any);
+
+    make self.block_to_closure($/, $bl, bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
+        bindmethod => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
+}
 method regex_block($/) {
     if $<onlystar> {
         return Nil;
@@ -137,7 +197,7 @@ method regex_def($/) {
 
     my $endsym;
     for map *.ast, @$<trait> -> $t {
-        if $t<unary> || $t<binary> || $t<defequiv> {
+        if $t<unary> || $t<binary> || $t<defequiv> || $t<of> {
             # Ignored for now
         }
         elsif defined $t<endsym> {
@@ -210,6 +270,65 @@ method regex_def($/) {
             do => ::Op::RegexBody.new(|node($/), pre => @lift,
                 name => ($name // ''), rxop => $ast, canback => $mb)));
 }
+method trait_mod:of ($/) {
+    make { of => self.simple_longname($<typename><longname>) }
+}
+method routine_def ($/) {
+    make ::Op::StatementList.new;
+    if $<sigil> && $<sigil>[0] eq '&*' {
+        $/.CURSOR.sorry("Contextual sub definitions NYI");
+        return Nil;
+    }
+    my $dln = $<deflongname>[0];
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
+    }
+    my @export;
+    my $return_pass = 0;
+    my $signature = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+    my $unsafe = False;
+    for @( $<trait> ) -> $t {
+        if $t.ast.<export> {
+            push @export, @( $t.ast<export> );
+        } elsif $t.ast<nobinder> {
+            $signature = Any;
+        } elsif $t.ast<return_pass> {
+            $return_pass = 1;
+        } elsif $t.ast<of> {
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
+        } else {
+            $/.CURSOR.sorry("Sub trait $t.ast.keys.[0] not available");
+        }
+    }
+    my $scope = !$dln ?? 'anon' !! ($*SCOPE || 'my');
+    my ($m,$p) = $dln ?? self.mangle_longname($dln).<name path> !! ();
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        return Nil;
+    }
+    if $scope eq 'our' {
+        $/.CURSOR.sorry('Package subs NYI');
+        return Nil;
+    } elsif $p {
+        $/.CURSOR.sorry('Defining a non-our sub with a package-qualified name makes no sense');
+        return Nil;
+    }
+
+    make self.block_to_closure($/,
+        bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
+        self.sl_to_block('sub',
+            $<blockoid>.ast,
+            returnable => !$return_pass,
+            subname => $m, :$unsafe,
+            signature => $signature),
+        bindpackages => @export);
+}
+
 method statement_control:default ($/) {
     $<block>.ast.type = 'cond';
     make ::Op::When.new(|node($/), match => mklex($/, 'True'),
