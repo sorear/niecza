@@ -2976,6 +2976,7 @@ dynamic:
             thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(null, Tokens.Kernel_NewTypedScalar,
                     new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyMO) }); };
+            thandlers["newtypedscalar"] = Methody(null, Tokens.Kernel_NewTypedScalar);
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
