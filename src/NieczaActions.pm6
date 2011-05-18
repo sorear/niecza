@@ -300,11 +300,15 @@ method op_for_regex($/, $rxop) {
 }
 
 method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
-method quote:rx ($/) { make self.op_for_regex($/, $<quibble>.ast); }
+method quote:rx ($/) {
+    self.extract_rx_adverbs(False, False, $<quibble>);
+    make self.op_for_regex($/, $<quibble>.ast);
+}
 method quote:m  ($/) {
     make ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
             receiver => self.op_for_regex($/, $<quibble>.ast),
-            args => [ mklex($/, '$_') ]);
+            args => [ mklex($/, '$_'),
+                self.extract_rx_adverbs(True, False, $<quibble>) ]);
 }
 
 method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
@@ -371,13 +375,12 @@ method regex_def($/) {
         return Nil;
     }
 
-    my $isproto;
     my ($basename, $symtext) = ($cname || !defined($name))
         ?? (Str, Str) !! _symtext($name);
 
     my $endsym;
     for map *.ast, @$<trait> -> $t {
-        if $t<unary> || $t<binary> || $t<defequiv> {
+        if $t<unary> || $t<binary> || $t<defequiv> || $t<of> {
             # Ignored for now
         }
         elsif defined $t<endsym> {
@@ -389,12 +392,12 @@ method regex_def($/) {
     }
 
     if $multiness && $multiness eq 'proto' {
-        if $<signature> || !$<regex_block><onlystar> || $scope ne 'has' ||
-                !defined($basename) {
-            $/.CURSOR.sorry("Only simple {*} protoregexes with no parameters are supported");
+        if ($<signature> && $<signature>[0].ast.params) ||
+                !$<regex_block><onlystar> {
+            $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
             return Nil;
         }
-        @*MEMOS[0]<proto_endsym>{$basename} = $endsym;
+        @*MEMOS[0]<proto_endsym>{$basename} = $endsym if $scope eq 'has';
     } else {
         my $m2 = defined($symtext) ?? 'multi' !! 'only';
         if $multiness && $multiness ne $m2 {
@@ -1698,18 +1701,18 @@ method param_sep ($/) {}
 # :: { list : Bool, hash : Bool  slot : Maybe[Str], names : [Str] }
 method named_param($/) {
     my %rt;
-    sub good($a, $b is rw) { $a ~~ /^<[@$%]><[.*!]>?(.*)/ && ($b = [~$0]; True) }
     if $<name> {
         if $<named_param> {
             %rt = %( $<named_param>.ast );
         } else {
             %rt = %( $<param_var>.ast );
+            %rt<names> = []; # completely replace
         }
-        %rt<names> = [ @( %rt<names> // [] ), ~$<name> ];
+        %rt<names> = [ @( %rt<names> // [] ), ~$<name> ]
+            unless %rt<names> && %rt<names>.grep(~$<name>);
     } else {
         %rt = %( $<param_var>.ast );
-        if %rt<slot> && good(%rt<slot>, %rt<names>) {
-        } else {
+        if !%rt<names> {
             $/.CURSOR.sorry("Abbreviated named parameter must have a name");
         }
     }
@@ -1745,7 +1748,8 @@ method param_var($/) {
         make { }
         return Nil;
     }
-    make { list => ($sigil eq '@'), hash => ($sigil eq '%'), :$slot };
+    make { list => ($sigil eq '@'), hash => ($sigil eq '%'), :$slot,
+        names => defined($name) ?? [ $name ] !! [] }
 }
 
 # :: Sig::Parameter
@@ -1913,11 +1917,47 @@ method sibble($/) {
         $repl = $<right>.ast;
     }
     $repl = self.transparent($/, $repl);
-    make mkcall($/, '&_substitute', mklex($/, '$_'), $regex, $repl);
+    make ::Op::CallSub.new(|node($/), invocant => mklex($/,'&_substitute'),
+        args => [ mklex($/, '$_'), $regex, $repl,
+            self.extract_rx_adverbs(True, True, $/) ]);
 }
 method tribble($/) {}
 method babble($/) {}
 method quotepair($/) {}
+
+method extract_rx_adverbs($ismatch, $issubst, $match) {
+    my $qps = ($match ~~ List) ?? $match !! $match<babble><quotepair>;
+    return () if !$qps;
+
+    my @ok;
+    my @nyi;
+    my @args;
+    my @internal = < sigspace s ratchet r ignorecase i >;
+
+    push @nyi, < ignoreaccent a bytes codes graphs chars Perl5 P5 >;
+
+    if $issubst {
+        push @nyi, < sameaccent aa samecase ii th st nd rd nth x >;
+    }
+
+    if $ismatch {
+        push @nyi, < overlap ov exhaustive ex continue c pos p global g rw >;
+    }
+
+    for @$qps -> $qp {
+        if @internal.grep($qp<k>) {
+            # handled by rx compiler
+        } elsif @ok.grep($qp<k>) {
+            push @args, $qp.ast
+        } elsif @nyi.grep($qp<k>) {
+            $qp.CURSOR.sorry("Regex modifier $qp<k> not yet implemented");
+        } else {
+            $qp.CURSOR.sorry("Regex modifier $qp<k> not valid on { $issubst ?? "substitution" !! $ismatch ?? "match" !! "regex literal" }");
+        }
+    }
+
+    @args
+}
 
 method capture($ ) {}
 method capterm($/) {
@@ -2337,6 +2377,12 @@ method statement_control:given ($/) {
         invocant => self.block_to_closure($/, $<xblock>.ast[1], :once));
 }
 
+method statement_control:default ($/) {
+    $<block>.ast.type = 'cond';
+    make ::Op::When.new(|node($/), match => mklex($/, 'True'),
+        body => self.block_to_immediate($/, 'loop', $<block>.ast));
+}
+
 method statement_control:when ($/) {
     $<xblock>.ast[1].type = 'cond';
     make ::Op::When.new(|node($/), match => $<xblock>.ast[0],
@@ -2500,6 +2546,9 @@ method trait_mod:is ($/) {
         $/.CURSOR.sorry($noparm);
     }
 }
+method trait_mod:of ($/) {
+    make { of => self.simple_longname($<typename><longname>) }
+}
 
 method trait ($/) {
     if $<colonpair> {
@@ -2595,6 +2644,7 @@ method routine_def ($/) {
             $signature = Any;
         } elsif $t.ast<return_pass> {
             $return_pass = 1;
+        } elsif $t.ast<of> {
         } elsif $t.ast<unsafe> {
             $unsafe = True;
         } else {
@@ -2673,6 +2723,7 @@ method method_def ($/) {
             $sig = Any;
         } elsif $t.ast<unsafe> {
             $unsafe = True;
+        } elsif $t.ast<of> {
         } else {
             $/.CURSOR.sorry("NYI method trait $t");
         }
