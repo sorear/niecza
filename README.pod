@@ -84,6 +84,9 @@ could be made to work eventually, if it doesn't already.
 Niecza is Copyright 2010 Stefan O'Rear et al.  It may be used and distributed
 under the Artistic License 2.0 (included under LICENSE).
 
+Some files are included from other projects, and have their own copyright
+notices.
+
 =head1 CREDITS AND PRIOR ART
 
 This project was originally a spin-off of experiments done for

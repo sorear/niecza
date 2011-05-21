@@ -231,6 +231,11 @@ my class Num is Cool {
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 
+my class Int is Cool { }
+my class Rat is Cool { }
+my class Complex is Cool { }
+my class FatRat is Cool { }
+
 #TODO use a power from the standard library
 sub infix:<**>($num,$power) {
     my $ret = 1;
