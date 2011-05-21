@@ -961,7 +961,7 @@ noparams:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             Rat r = Kernel.UnboxAny<Rat>(o);
-            return (object.ReferenceEquals(r.bnum, null) ? r.num.ToString() : r.bnum.ToString()) + "/" + r.den.ToString();
+            return r.num.ToString() + "/" + r.den.ToString();
         }
     }
 
@@ -970,7 +970,7 @@ noparams:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             FatRat r = Kernel.UnboxAny<FatRat>(o);
-            return (object.ReferenceEquals(r.bnum, null) ? r.num.ToString() : r.bnum.ToString()) + "/" + (object.ReferenceEquals(r.bden, null) ? r.den.ToString() : r.bden.ToString());
+            return r.num.ToString() + "/" + r.den.ToString();
         }
     }
 

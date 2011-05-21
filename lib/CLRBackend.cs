@@ -746,10 +746,10 @@ namespace Niecza.CLRBackend {
             lineBuffer.Add(lineStack.Count == 0 ? 0 : lineStack[lineStack.Count - 1]);
         }
 
-        public void EmitIntArray(int[] vec) {
+        public void EmitIntArray(Type ty, int[] vec) {
             EmitInt(vec.Length);
             // the mono JIT checks for this exact sequence
-            il.Emit(OpCodes.Newarr, Tokens.Int32);
+            il.Emit(OpCodes.Newarr, ty);
             if (vec.Length != 0) {
                 byte[] buf = new byte[vec.Length * 4];
                 int r = 0;
@@ -788,6 +788,19 @@ namespace Niecza.CLRBackend {
                         il.Emit(OpCodes.Ldc_I4, i);
                     }
                     break;
+            }
+        }
+
+        /* this too */
+        public void EmitLong(long l) {
+            if (l >= int.MinValue && l <= int.MaxValue) {
+                EmitInt((int)l);
+                il.Emit(OpCodes.Conv_I8);
+            } else if (l >= 0 && l <= uint.MaxValue) {
+                EmitInt((int)l);
+                il.Emit(OpCodes.Conv_U8);
+            } else {
+                il.Emit(OpCodes.Ldc_I8, l);
             }
         }
 
@@ -836,6 +849,9 @@ namespace Niecza.CLRBackend {
         public static readonly Type String = typeof(string);
         public static readonly Type Boolean = typeof(bool);
         public static readonly Type Int32 = typeof(int);
+        public static readonly Type Int64 = typeof(long);
+        public static readonly Type UInt32 = typeof(uint);
+        public static readonly Type UInt64 = typeof(ulong);
         public static readonly Type IntPtr = typeof(IntPtr);
         public static readonly Type Double = typeof(double);
         public static readonly Type Frame = typeof(Frame);
@@ -886,6 +902,10 @@ namespace Niecza.CLRBackend {
             typeof(NewHashViviHook).GetConstructor(new Type[] { Variable, String });
         public static readonly ConstructorInfo NewArrayViviHook_ctor =
             typeof(NewArrayViviHook).GetConstructor(new Type[] { Variable, Int32 });
+        public static readonly ConstructorInfo Rat_ctor =
+            typeof(Rat).GetConstructor(new Type[] { typeof(BigInteger), typeof(ulong) });
+        public static readonly ConstructorInfo BigInteger_ctor =
+            typeof(BigInteger).GetConstructor(new Type[] { typeof(int), typeof(uint[]) });
         public static readonly ConstructorInfo CC_ctor =
             CC.GetConstructor(new Type[] { typeof(int[]) });
         public static readonly Dictionary<string,ConstructorInfo> LADctors
@@ -977,6 +997,14 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("AddPhaser");
         public static readonly MethodInfo Kernel_FirePhasers =
             typeof(Kernel).GetMethod("FirePhasers");
+        public static readonly MethodInfo Kernel_BoxAnyMO_Int32 =
+            typeof(Kernel).GetMethod("BoxAnyMO").MakeGenericMethod(typeof(int));
+        public static readonly MethodInfo Kernel_BoxAnyMO_Double =
+            typeof(Kernel).GetMethod("BoxAnyMO").MakeGenericMethod(typeof(double));
+        public static readonly MethodInfo Kernel_BoxAnyMO_Rat =
+            typeof(Kernel).GetMethod("BoxAnyMO").MakeGenericMethod(typeof(Rat));
+        public static readonly MethodInfo Kernel_BoxAnyMO_BigInteger =
+            typeof(Kernel).GetMethod("BoxAnyMO").MakeGenericMethod(typeof(BigInteger));
         public static readonly MethodInfo Builtins_Make =
             typeof(Builtins).GetMethod("Make");
         public static readonly MethodInfo Builtins_MEMap =
@@ -1032,6 +1060,10 @@ namespace Niecza.CLRBackend {
             STable.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
             Kernel.GetField("NumMO");
+        public static readonly FieldInfo Kernel_IntMO =
+            Kernel.GetField("IntMO");
+        public static readonly FieldInfo Kernel_RatMO =
+            Kernel.GetField("RatMO");
         public static readonly FieldInfo Kernel_StrMO =
             Kernel.GetField("StrMO");
         public static readonly FieldInfo Kernel_AnyMO =
@@ -1961,6 +1993,19 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrLongLiteral : ClrOp {
+        long data;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        public ClrLongLiteral(Type ty, long data) {
+            this.data = data;
+            Returns = ty;
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.EmitLong(data);
+        }
+    }
+
     class ClrLabelLiteral : ClrOp {
         CgContext tcx;
         string name;
@@ -1990,7 +2035,7 @@ namespace Niecza.CLRBackend {
             int[] vec = new int[names.Length];
             for (int i = 0; i < vec.Length; i++)
                 vec[i] = tcx.named_cases[names[i]];
-            cx.EmitIntArray(vec);
+            cx.EmitIntArray(Tokens.Int32, vec);
         }
     }
 
@@ -2038,16 +2083,18 @@ namespace Niecza.CLRBackend {
 
     class ClrNewIntArray : ClrOp {
         readonly int[] vec;
-        public ClrNewIntArray(int[] vec) {
+        readonly Type ty;
+        public ClrNewIntArray(Type ty, int[] vec) {
             if (vec.Length >= 0xfc000)
                 throw new ArgumentException();
             Returns = typeof(int[]);
+            this.ty = ty;
             this.vec = vec;
             Constant = true;
         }
         public override ClrOp Sink() { return ClrNoop.Instance; }
         public override void CodeGen(CgContext cx) {
-            cx.EmitIntArray(vec);
+            cx.EmitIntArray(ty, vec);
         }
     }
 
@@ -2307,6 +2354,22 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrIntLiteral(Tokens.Boolean, x ? 1 : 0));
         }
 
+        public static CpsOp LongLiteral(long x) {
+            return new CpsOp(new ClrLongLiteral(Tokens.Int64, x));
+        }
+
+        public static CpsOp ULongLiteral(ulong x) {
+            return new CpsOp(new ClrLongLiteral(Tokens.UInt64, (long)x));
+        }
+
+        public static CpsOp BigIntegerLiteral(BigInteger x) {
+            uint[] w = x.GetWords();
+            int[] ws = new int[w.Length];
+            for (int i = 0; i < w.Length; i++) ws[i] = (int)w[i];
+            return CpsOp.ConstructorCall(Tokens.BigInteger_ctor, new CpsOp[] {
+                CpsOp.IntLiteral(x.Sign), CpsOp.NewIntArray(typeof(uint), ws) });
+        }
+
         public static CpsOp DBDLiteral(MethodInfo x) {
             return new CpsOp(new ClrDBDLiteral(x));
         }
@@ -2448,8 +2511,8 @@ namespace Niecza.CLRBackend {
             });
         }
 
-        public static CpsOp NewIntArray(int[] vec) {
-            return new CpsOp(new ClrNewIntArray(vec));
+        public static CpsOp NewIntArray(Type ty, int[] vec) {
+            return new CpsOp(new ClrNewIntArray(ty, vec));
         }
 
         public static CpsOp StringArray(bool omit, string[] vec) {
@@ -2607,6 +2670,56 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        CpsOp ExactNum(int numbase, string digits) {
+            BigInteger num = BigInteger.Zero;
+            BigInteger den = BigInteger.Zero;
+
+            bool neg = false;
+
+            foreach (char d in digits) {
+                if (d == '-') neg = true;
+                if (d == '_') continue;
+                if (d == '.') {
+                    if (den != BigInteger.Zero)
+                        throw new Exception("two dots in " + digits);
+                    den = BigInteger.One;
+                    continue;
+                }
+                int digval;
+                if (d >= '0' && d <= '9') { digval = d - '0'; }
+                else if (d >= 'a' && d <= 'z') { digval = d + 10 - 'a'; }
+                else if (d >= 'A' && d <= 'Z') { digval = d + 10 - 'A'; }
+                else { throw new Exception("invalid digit in " + digits); }
+
+                if (digval >= numbase) { throw new Exception("out of range digit in " + digits); }
+
+                num *= numbase;
+                den *= numbase;
+                num += digval;
+            }
+
+            if (neg) num = -num;
+
+            // TODO: Reduce to lowest form
+
+            ulong sden;
+            if (!den.AsUInt64(out sden)) {
+                double dval = num.ToFloat64()/ den.ToFloat64();
+                return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Double, new CpsOp[2] { CpsOp.DoubleLiteral(dval), CpsOp.GetSField(Tokens.Kernel_NumMO) });
+            }
+
+            if (sden == 0) {
+                int snum;
+                if (num.AsInt32(out snum)) {
+                    return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Int32, new CpsOp[2] { CpsOp.IntLiteral(snum), CpsOp.GetSField(Tokens.Kernel_IntMO) });
+                }
+                return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_BigInteger, new CpsOp[2] { CpsOp.BigIntegerLiteral(num), CpsOp.GetSField(Tokens.Kernel_IntMO) });
+            }
+
+            return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Rat, new CpsOp[] {
+                CpsOp.ConstructorCall(Tokens.Rat_ctor, new CpsOp[] { CpsOp.BigIntegerLiteral(num), CpsOp.ULongLiteral(sden) }), CpsOp.GetSField(Tokens.Kernel_RatMO) });
+        }
+
         CpsOp MakeDispatch(string prefix) {
             HashSet<string> names = new HashSet<string>();
             List<CpsOp> cands = new List<CpsOp>();
@@ -2710,6 +2823,8 @@ namespace Niecza.CLRBackend {
                 return CpsOp.CharLiteral(JScalar.S(zyg[1])[0]); };
             handlers["double"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.DoubleLiteral(((JScalar)zyg[1]).num); };
+            handlers["exactnum"] = delegate(NamProcessor th, object[] zyg) {
+                return th.ExactNum(JScalar.I(zyg[1]), JScalar.S(zyg[2])); };
             handlers["bool"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
@@ -2928,7 +3043,7 @@ dynamic:
                 for (int i = 0; i < vec.Length; i++)
                     vec[i] = FixInt(z[i+1]);
                 return CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
-                    CpsOp.NewIntArray(vec) });
+                    CpsOp.NewIntArray(Tokens.Int32, vec) });
             };
             handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] strs = new CpsOp[z.Length - 2];
@@ -3405,7 +3520,7 @@ dynamic:
                 int[] ccs = JScalar.IA(1, body);
                 return CpsOp.ConstructorCall(ci, new CpsOp[] {
                     CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
-                        CpsOp.NewIntArray(ccs) }) });
+                        CpsOp.NewIntArray(Tokens.Int32, ccs) }) });
             } else if (head == "Imp" || head == "Dot" || head == "Null" || head == "None" || head == "Dispatcher") {
                 return CpsOp.ConstructorCall(ci, new CpsOp[0]);
             } else if (head == "Str" || head == "StrNoCase" || head == "Param" || head == "Method") {
@@ -3426,14 +3541,14 @@ dynamic:
             CpsOp[] args = new CpsOp[10];
             args[0] = CpsOp.StringLiteral(sub.unit.name + " " +
                     (sub.name == "ANON" ? cpb.mb.Name : sub.name));
-            args[1] = CpsOp.NewIntArray(cpb.cx.lineBuffer.ToArray());
+            args[1] = CpsOp.NewIntArray(Tokens.Int32, cpb.cx.lineBuffer.ToArray());
             args[2] = CpsOp.DBDLiteral(cpb.mb);
             args[3] = (sub.outer != null) ?
                 CpsOp.GetSField(sub.outer.Resolve<StaticSub>().subinfo) :
                 CpsOp.Null(Tokens.SubInfo);
             args[4] = (sub.ltm != null) ? ProcessLAD(sub.ltm) :
                 CpsOp.Null(Tokens.LAD);
-            args[5] = CpsOp.NewIntArray( cpb.cx.ehspanBuffer.ToArray() );
+            args[5] = CpsOp.NewIntArray(Tokens.Int32, cpb.cx.ehspanBuffer.ToArray() );
             args[6] = CpsOp.StringArray( true, cpb.cx.ehlabelBuffer.ToArray() );
             args[7] = CpsOp.IntLiteral( cpb.Spills() );
             List<string> dylexn = new List<string>();
@@ -3448,7 +3563,7 @@ dynamic:
             }
             if (dylexn.Count > 0) {
                 args[8] = CpsOp.StringArray(true, dylexn.ToArray());
-                args[9] = CpsOp.NewIntArray(dylexi.ToArray());
+                args[9] = CpsOp.NewIntArray(Tokens.Int32, dylexi.ToArray());
             } else {
                 args[8] = CpsOp.Null(typeof(string[]));
                 args[9] = CpsOp.Null(typeof(int[]));
@@ -3731,7 +3846,7 @@ dynamic:
                 sig_i.Add(names.Length);
             }
             thaw.Add(CpsOp.SetField(Tokens.SubInfo_sig_i,
-                CpsOp.GetSField(obj.subinfo), CpsOp.NewIntArray(sig_i.ToArray())));
+                CpsOp.GetSField(obj.subinfo), CpsOp.NewIntArray(Tokens.Int32, sig_i.ToArray())));
             thaw.Add(CpsOp.SetField(Tokens.SubInfo_sig_r,
                 CpsOp.GetSField(obj.subinfo), CpsOp.NewArray(typeof(object), sig_r.ToArray())));
         }

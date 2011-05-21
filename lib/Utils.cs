@@ -512,23 +512,20 @@ namespace Niecza {
     }
 
     public sealed class Rat {
-        public readonly long num;
-        public readonly long den;
-        public readonly BigInteger bnum;
+        public readonly BigInteger num;
+        public readonly ulong den;
 
-        public Rat(BigInteger bnum, long num, long den) {
-            this.bnum = bnum; this.num = num; this.den = den;
+        public Rat(BigInteger num, ulong den) {
+            this.num = num; this.den = den;
         }
     }
 
     public sealed class FatRat {
-        public readonly long num;
-        public readonly long den;
-        public readonly BigInteger bnum;
-        public readonly BigInteger bden;
+        public readonly BigInteger num;
+        public readonly BigInteger den;
 
-        public FatRat(BigInteger bnum, long num, BigInteger bden, long den) {
-            this.bnum = bnum; this.num = num; this.bden = bden; this.den = den;
+        public FatRat(BigInteger num, BigInteger den) {
+            this.num = num; this.den = den;
         }
     }
 }

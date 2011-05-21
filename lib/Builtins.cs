@@ -359,16 +359,6 @@ public class Builtins {
         return v;
     }
 
-    // This is a stopgap measure to allow testing before literals
-    // and whatnot are complete.
-    public static Variable NumThings() {
-        List<Variable> lv = new List<Variable>();
-        lv.Add(Kernel.BoxAnyMO<int>(5, Kernel.IntMO));
-        lv.Add(Kernel.BoxAnyMO<BigInteger>(new BigInteger(1,0,0,1), Kernel.IntMO));
-        lv.Add(Kernel.BoxAnyMO<Rat>(new Rat(null, 2, 3), Kernel.RatMO));
-        return Kernel.NewRWListVar(Kernel.BoxRaw<Variable[]>(lv.ToArray(), Kernel.ParcelMO));
-    }
-
     public static VarDeque HashIterRaw(int mode, Variable v) {
         P6any o = NominalCheck("$x", Kernel.AnyMO, v);
         VarHash d = Kernel.UnboxAny<VarHash>(o);
