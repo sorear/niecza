@@ -501,5 +501,34 @@ namespace Niecza {
             return new string(tempCharArray);
         }
     }
-}
 
+    public sealed class Complex {
+        public readonly double re;
+        public readonly double im;
+
+        public Complex(double re, double im) {
+            this.re = re; this.im = im;
+        }
+    }
+
+    public sealed class Rat {
+        public readonly long num;
+        public readonly long den;
+        public readonly BigInteger bnum;
+
+        public Rat(BigInteger bnum, long num, long den) {
+            this.bnum = bnum; this.num = num; this.den = den;
+        }
+    }
+
+    public sealed class FatRat {
+        public readonly long num;
+        public readonly long den;
+        public readonly BigInteger bnum;
+        public readonly BigInteger bden;
+
+        public FatRat(BigInteger bnum, long num, BigInteger bden, long den) {
+            this.bnum = bnum; this.num = num; this.bden = bden; this.den = den;
+        }
+    }
+}

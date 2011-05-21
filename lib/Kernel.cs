@@ -947,6 +947,42 @@ noparams:
         }
     }
 
+    class CtxIntStr : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return o.mo.name + "()"; }
+            else if (o is BoxObject<int>) { return Utils.N2S(Kernel.UnboxAny<int>(o)); }
+            else { return Kernel.UnboxAny<BigInteger>(o).ToString(); }
+        }
+    }
+
+    class CtxRatStr : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return o.mo.name + "()"; }
+            Rat r = Kernel.UnboxAny<Rat>(o);
+            return (object.ReferenceEquals(r.bnum, null) ? r.num.ToString() : r.bnum.ToString()) + "/" + r.den.ToString();
+        }
+    }
+
+    class CtxFatRatStr : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return o.mo.name + "()"; }
+            FatRat r = Kernel.UnboxAny<FatRat>(o);
+            return (object.ReferenceEquals(r.bnum, null) ? r.num.ToString() : r.bnum.ToString()) + "/" + (object.ReferenceEquals(r.bden, null) ? r.den.ToString() : r.bden.ToString());
+        }
+    }
+
+    class CtxComplexStr : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return o.mo.name + "()"; }
+            Complex r = Kernel.UnboxAny<Complex>(o);
+            return Utils.N2S(r.re) + (r.im < 0 ? "" : "+") + Utils.N2S(r.im) + "i";
+        }
+    }
+
     class CtxStrBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -1270,6 +1306,10 @@ noparams:
         public static readonly STable SubMO;
         public static readonly STable StrMO;
         public static readonly STable NumMO;
+        public static readonly STable IntMO;
+        public static readonly STable RatMO;
+        public static readonly STable FatRatMO;
+        public static readonly STable ComplexMO;
         public static readonly STable ArrayMO;
         public static readonly STable CursorMO;
         public static readonly STable MatchMO;
@@ -2342,6 +2382,26 @@ slow:
             Handler_PandCont(NumMO, "pred", new CtxNumSuccish(-1));
             NumMO.FillProtoClass(new string[] { });
             NumMO.Invalidate();
+
+            IntMO = new STable("Int");
+            Handler_PandBox(IntMO, "Str", new CtxIntStr(), StrMO);
+            IntMO.FillProtoClass(new string[] { });
+            IntMO.Invalidate();
+
+            RatMO = new STable("Rat");
+            Handler_PandBox(RatMO, "Str", new CtxRatStr(), StrMO);
+            RatMO.FillProtoClass(new string[] { });
+            RatMO.Invalidate();
+
+            FatRatMO = new STable("FatRat");
+            Handler_PandBox(FatRatMO, "Str", new CtxFatRatStr(), StrMO);
+            FatRatMO.FillProtoClass(new string[] { });
+            FatRatMO.Invalidate();
+
+            ComplexMO = new STable("Complex");
+            Handler_PandBox(ComplexMO, "Str", new CtxComplexStr(), StrMO);
+            ComplexMO.FillProtoClass(new string[] { });
+            ComplexMO.Invalidate();
 
             MuMO = new STable("Mu");
             Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
