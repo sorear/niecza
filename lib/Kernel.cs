@@ -965,7 +965,6 @@ noparams:
             return Kernel.BoxRaw(v + amt, Kernel.NumMO);
         }
     }
-
     class CtxRawNativeNum2Str : ContextHandler<string> {
         public override string Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -979,6 +978,25 @@ noparams:
         }
     }
 
+    class CtxIntSuccish : ContextHandler<P6any> {
+        int amt;
+        public CtxIntSuccish(int amt) { this.amt = amt; }
+        public override P6any Get(Variable obj) {
+            P6any o = obj.Fetch();
+            int v;
+            if (o is BoxObject<BigInteger>) {
+                BigInteger bn = Kernel.UnboxAny<BigInteger>(o) + amt;
+                if (bn.AsInt32(out v))
+                    return Kernel.BoxRaw<int>(v, Kernel.IntMO);
+                else
+                    return Kernel.BoxRaw<BigInteger>(bn, Kernel.IntMO);
+            }
+            v = o.IsDefined() ? Kernel.UnboxAny<int>(o) : 0;
+            if (v == (amt > 0 ? int.MaxValue : int.MinValue))
+                return Kernel.BoxRaw<BigInteger>(amt + (long)v, Kernel.IntMO);
+            return Kernel.BoxRaw(v + amt, Kernel.IntMO);
+        }
+    }
     class CtxIntStr : ContextHandler<string> {
         public override string Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -996,6 +1014,21 @@ noparams:
         }
     }
 
+    class CtxRatSuccish : ContextHandler<P6any> {
+        bool up;
+        public CtxRatSuccish(bool up) { this.up = up; }
+        public override P6any Get(Variable obj) {
+            P6any o = obj.Fetch();
+            Rat rr;
+            if (o.IsDefined()) {
+                Rat ir = Kernel.UnboxAny<Rat>(o);
+                rr = new Rat(up ? ir.num + ir.den : ir.num - ir.den, ir.den);
+            } else {
+                rr = new Rat(up ? BigInteger.One : BigInteger.MinusOne, 1);
+            }
+            return Kernel.BoxRaw<Rat>(rr, Kernel.RatMO);
+        }
+    }
     class CtxRatStr : ContextHandler<string> {
         public override string Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -1013,6 +1046,21 @@ noparams:
         }
     }
 
+    class CtxFatRatSuccish : ContextHandler<P6any> {
+        bool up;
+        public CtxFatRatSuccish(bool up) { this.up = up; }
+        public override P6any Get(Variable obj) {
+            P6any o = obj.Fetch();
+            FatRat rr;
+            if (o.IsDefined()) {
+                FatRat ir = Kernel.UnboxAny<FatRat>(o);
+                rr = new FatRat(up ? ir.num + ir.den : ir.num - ir.den, ir.den);
+            } else {
+                rr = new FatRat(up ? BigInteger.One : BigInteger.MinusOne, BigInteger.One);
+            }
+            return Kernel.BoxRaw<FatRat>(rr, Kernel.FatRatMO);
+        }
+    }
     class CtxFatRatStr : ContextHandler<string> {
         public override string Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -1030,6 +1078,16 @@ noparams:
         }
     }
 
+    class CtxComplexSuccish : ContextHandler<P6any> {
+        double amt;
+        public CtxComplexSuccish(double amt) { this.amt = amt; }
+        public override P6any Get(Variable obj) {
+            P6any o = obj.Fetch();
+            Complex c = o.IsDefined() ? Kernel.UnboxAny<Complex>(o) : null;
+            c = (c == null) ? new Complex(amt, 0) : new Complex(c.re+amt, c.im);
+            return Kernel.BoxRaw(c, Kernel.ComplexMO);
+        }
+    }
     class CtxComplexStr : ContextHandler<string> {
         public override string Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -2452,6 +2510,8 @@ slow:
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(IntMO, "Bool", new CtxIntBool(), BoolMO);
             Handler_PandBox(IntMO, "Str", new CtxIntStr(), StrMO);
+            Handler_PandCont(IntMO, "succ", new CtxIntSuccish(+1));
+            Handler_PandCont(IntMO, "pred", new CtxIntSuccish(-1));
             IntMO.FillProtoClass(new string[] { });
             IntMO.Invalidate();
 
@@ -2460,6 +2520,8 @@ slow:
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(RatMO, "Bool", new CtxRatBool(), BoolMO);
             Handler_PandBox(RatMO, "Str", new CtxRatStr(), StrMO);
+            Handler_PandCont(RatMO, "succ", new CtxRatSuccish(true));
+            Handler_PandCont(RatMO, "pred", new CtxRatSuccish(false));
             RatMO.FillProtoClass(new string[] { });
             RatMO.Invalidate();
 
@@ -2468,6 +2530,8 @@ slow:
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(FatRatMO, "Bool", new CtxFatRatBool(), BoolMO);
             Handler_PandBox(FatRatMO, "Str", new CtxFatRatStr(), StrMO);
+            Handler_PandCont(FatRatMO, "succ", new CtxFatRatSuccish(true));
+            Handler_PandCont(FatRatMO, "pred", new CtxFatRatSuccish(false));
             FatRatMO.FillProtoClass(new string[] { });
             FatRatMO.Invalidate();
 
@@ -2476,6 +2540,8 @@ slow:
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(ComplexMO, "Bool", new CtxComplexBool(), BoolMO);
             Handler_PandBox(ComplexMO, "Str", new CtxComplexStr(), StrMO);
+            Handler_PandCont(ComplexMO, "succ", new CtxComplexSuccish(+1));
+            Handler_PandCont(ComplexMO, "pred", new CtxComplexSuccish(-1));
             ComplexMO.FillProtoClass(new string[] { });
             ComplexMO.Invalidate();
 
