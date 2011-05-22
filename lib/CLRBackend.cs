@@ -2178,7 +2178,7 @@ namespace Niecza.CLRBackend {
             return new CpsOp(stmts.ToArray(), head);
         }
 
-        public static CpsOp Sequence(CpsOp[] terms) {
+        public static CpsOp Sequence(params CpsOp[] terms) {
             if (terms.Length == 0) return new CpsOp(ClrNoop.Instance);
 
             List<ClrOp> stmts = new List<ClrOp>();
@@ -2293,21 +2293,25 @@ namespace Niecza.CLRBackend {
             return new CpsOp(stmts.ToArray(), ClrNoop.Instance);
         }
 
-        public static CpsOp MethodCall(Type cps, MethodInfo tk, CpsOp[] zyg) {
+        public static CpsOp MethodCall(MethodInfo tk, params CpsOp[] zyg) {
+            return CpsCall(null, tk, zyg);
+        }
+
+        public static CpsOp CpsCall(Type cps, MethodInfo tk, params CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
-                return (cps != null) ?
-                    Cps(new ClrMethodCall(true, tk, heads), cps) :
-                    new CpsOp(new ClrMethodCall(false, tk, heads));
+                return (cps == null) ?
+                    new CpsOp(new ClrMethodCall(false, tk, heads)) :
+                    Cps(new ClrMethodCall(true, tk, heads), cps);
             });
         }
 
-        public static CpsOp ConstructorCall(ConstructorInfo tk, CpsOp[] zyg) {
+        public static CpsOp ConstructorCall(ConstructorInfo tk, params CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return new CpsOp(new ClrConstructorCall(tk, heads));
             });
         }
 
-        public static CpsOp CpsReturn(CpsOp[] zyg) {
+        public static CpsOp CpsReturn(params CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return new CpsOp(new ClrCpsReturn(heads.Length > 0 ? heads[0] : null));
             });
@@ -2321,7 +2325,7 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrLabelArray(tcx, labels));
         }
 
-        public static CpsOp Goto(string label, bool iffalse, CpsOp[] zyg) {
+        public static CpsOp Goto(string label, bool iffalse, params CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] heads) {
                 return new CpsOp(new ClrGoto(label, iffalse,
                     heads.Length > 0 ? heads[0] : null));
@@ -2377,8 +2381,8 @@ namespace Niecza.CLRBackend {
             uint[] w = x.GetWords();
             int[] ws = new int[w.Length];
             for (int i = 0; i < w.Length; i++) ws[i] = (int)w[i];
-            return CpsOp.ConstructorCall(Tokens.BigInteger_ctor, new CpsOp[] {
-                CpsOp.ShortLiteral(x.Sign), CpsOp.NewIntArray(typeof(uint), ws) });
+            return CpsOp.ConstructorCall(Tokens.BigInteger_ctor,
+                CpsOp.ShortLiteral(x.Sign), CpsOp.NewIntArray(typeof(uint),ws));
         }
 
         public static CpsOp DBDLiteral(MethodInfo x) {
@@ -2399,7 +2403,7 @@ namespace Niecza.CLRBackend {
             });
         }
 
-        public static CpsOp Operator(Type rt, OpCode op, CpsOp[] zyg) {
+        public static CpsOp Operator(Type rt, OpCode op, params CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
                 return new CpsOp(new ClrOperator(rt, op, heads));
             });
@@ -2427,8 +2431,8 @@ namespace Niecza.CLRBackend {
             });
         }
 
-        public static CpsOp PokeLet(string name, CpsOp[] zyg) {
-            return Primitive(zyg, delegate(ClrOp[] heads) {
+        public static CpsOp PokeLet(string name, CpsOp zyg) {
+            return Primitive(new CpsOp[] { zyg }, delegate(ClrOp[] heads) {
                 return new CpsOp(new ClrPokeLet(name, heads[0]));
             });
         }
@@ -2463,7 +2467,7 @@ namespace Niecza.CLRBackend {
             });
         }
 
-        public static CpsOp SubyCall(bool method, string sig, CpsOp[] zyg) {
+        public static CpsOp SubyCall(bool method, string sig, params CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
                 return CpsOp.Cps(new ClrSubyCall(method, sig, heads), Tokens.Variable);
             });
@@ -2516,7 +2520,7 @@ namespace Niecza.CLRBackend {
         }
 
         // only use this for reference types
-        public static CpsOp NewArray(Type ty, CpsOp[] zyg) {
+        public static CpsOp NewArray(Type ty, params CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] h) {
                 return new CpsOp(new ClrNewArray(ty, h));
             });
@@ -2626,7 +2630,7 @@ namespace Niecza.CLRBackend {
 
             if (let_types.TryGetValue(name, out t)) {
                 return (set_to == null) ? CpsOp.PeekLet(name, t) :
-                    CpsOp.PokeLet(name, new CpsOp[1] { set_to });
+                    CpsOp.PokeLet(name, set_to);
             }
             throw new Exception("No such let " + name);
         }
@@ -2644,7 +2648,7 @@ namespace Niecza.CLRBackend {
                         string lname = JScalar.S(rec[j+1]);
                         return (set_to == null) ?
                             CpsOp.PeekLet(lname, let_types[lname]) :
-                            CpsOp.PokeLet(lname, new CpsOp[1] { set_to });
+                            CpsOp.PokeLet(lname, set_to);
                     }
                 }
             }
@@ -2724,19 +2728,19 @@ namespace Niecza.CLRBackend {
             ulong sden;
             if (!den.AsUInt64(out sden)) {
                 double dval = (double)num / (double)den;
-                return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Double, new CpsOp[2] { CpsOp.DoubleLiteral(dval), CpsOp.GetSField(Tokens.Kernel_NumMO) });
+                return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_Double, CpsOp.DoubleLiteral(dval), CpsOp.GetSField(Tokens.Kernel_NumMO));
             }
 
             if (sden == 0) {
                 int snum;
                 if (num.AsInt32(out snum)) {
-                    return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Int32, new CpsOp[2] { CpsOp.IntLiteral(snum), CpsOp.GetSField(Tokens.Kernel_IntMO) });
+                    return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_Int32, CpsOp.IntLiteral(snum), CpsOp.GetSField(Tokens.Kernel_IntMO));
                 }
-                return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_BigInteger, new CpsOp[2] { CpsOp.BigIntegerLiteral(num), CpsOp.GetSField(Tokens.Kernel_IntMO) });
+                return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_BigInteger, CpsOp.BigIntegerLiteral(num), CpsOp.GetSField(Tokens.Kernel_IntMO));
             }
 
-            return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Rat, new CpsOp[] {
-                CpsOp.ConstructorCall(Tokens.Rat_ctor, new CpsOp[] { CpsOp.BigIntegerLiteral(num), CpsOp.ULongLiteral(sden) }), CpsOp.GetSField(Tokens.Kernel_RatMO) });
+            return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_Rat,
+                CpsOp.ConstructorCall(Tokens.Rat_ctor, CpsOp.BigIntegerLiteral(num), CpsOp.ULongLiteral(sden)), CpsOp.GetSField(Tokens.Kernel_RatMO));
         }
 
         CpsOp MakeDispatch(string prefix) {
@@ -2753,7 +2757,7 @@ namespace Niecza.CLRBackend {
                             !names.Contains(kp.Key)) {
                         names.Add(kp.Key);
                         brk = true;
-                        cands.Add(CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { RawAccessLex("scopedlex", kp.Key, null) }));
+                        cands.Add(CpsOp.MethodCall(Tokens.Variable_Fetch, RawAccessLex("scopedlex", kp.Key, null)));
                     }
                 }
                 if (csr.outer == null) break;
@@ -2762,11 +2766,10 @@ namespace Niecza.CLRBackend {
                 if (brk) cands.Add(CpsOp.Null(Tokens.P6any));
             }
 
-            return CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar,
-                new CpsOp[] { CpsOp.MethodCall(null, Tokens.Kernel_MakeDispatcher,
-                    new CpsOp[] { CpsOp.StringLiteral(prefix),
-                    CpsOp.Null(Tokens.P6any),
-                    CpsOp.NewArray(Tokens.P6any, cands.ToArray()) }) });
+            return CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
+                CpsOp.MethodCall(Tokens.Kernel_MakeDispatcher,
+                    CpsOp.StringLiteral(prefix), CpsOp.Null(Tokens.P6any),
+                    CpsOp.NewArray(Tokens.P6any, cands.ToArray())));
         }
 
         CpsOp Constant(CpsOp val) {
@@ -2852,13 +2855,13 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Label(FixStr(z[1]), true);
             };
             handlers["cgoto"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.Goto(FixStr(z[1]), false, new CpsOp[] { th.Scan(z[2]) });
+                return CpsOp.Goto(FixStr(z[1]), false, th.Scan(z[2]));
             };
             handlers["ncgoto"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.Goto(FixStr(z[1]), true, new CpsOp[] { th.Scan(z[2]) });
+                return CpsOp.Goto(FixStr(z[1]), true, th.Scan(z[2]));
             };
             handlers["goto"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.Goto(FixStr(z[1]), false, new CpsOp[] {});
+                return CpsOp.Goto(FixStr(z[1]), false);
             };
             handlers["xspan"] = delegate(NamProcessor th, object[] z) {
                 List<ClrEhSpan> xn = new List<ClrEhSpan>();
@@ -2898,13 +2901,12 @@ namespace Niecza.CLRBackend {
                     return CpsOp.PolyOp(FixStr(zyg[1]),
                             th.Scan(zyg[2]), th.Scan(zyg[3])); };
             handlers["setslot"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.MethodCall(null, Tokens.P6any_SetSlot, new CpsOp[] {
-                    th.Scan(zyg[2]), th.AnyStr(zyg[1]), th.Scan(zyg[3]) }); };
+                return CpsOp.MethodCall(Tokens.P6any_SetSlot,
+                    th.Scan(zyg[2]), th.AnyStr(zyg[1]), th.Scan(zyg[3])); };
             handlers["getslot"] = delegate(NamProcessor th, object[] zyg) {
                 Type ty = namtype(zyg[2]);
-                return CpsOp.UnboxAny(ty, CpsOp.MethodCall(null,
-                    Tokens.P6any_GetSlot, new CpsOp[] { th.Scan(zyg[3]),
-                        th.AnyStr(zyg[1]) })); };
+                return CpsOp.UnboxAny(ty, CpsOp.MethodCall(Tokens.P6any_GetSlot,
+                    th.Scan(zyg[3]), th.AnyStr(zyg[1]))); };
             handlers["cast"] = delegate(NamProcessor th, object[] zyg) {
                 Type tty = namtype(zyg[1]);
                 CpsOp z = th.Scan(zyg[2]);
@@ -2914,23 +2916,23 @@ namespace Niecza.CLRBackend {
                         || tty == Tokens.Cursor && fty == Tokens.P6any) {
                     return CpsOp.UnboxAny(tty, z);
                 } else if (tty == Tokens.Double && fty == Tokens.Int32) {
-                    return CpsOp.Operator(tty, OpCodes.Conv_R8, new CpsOp[]{z});
+                    return CpsOp.Operator(tty, OpCodes.Conv_R8, z);
                 } else if (tty == Tokens.Int32 && fty == Tokens.Double) {
-                    return CpsOp.Operator(tty, OpCodes.Conv_I4, new CpsOp[]{z});
+                    return CpsOp.Operator(tty, OpCodes.Conv_I4, z);
                 } else {
                     throw new NotImplementedException("cast " + fty + " -> " + tty);
                 }
             };
             handlers["die"] = delegate(NamProcessor th, object[] zyg) {
                 if (zyg[1] is JScalar) {
-                    return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_Die,
-                        new CpsOp[] { CpsOp.StringLiteral(FixStr(zyg[1])) });
+                    return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
+                        CpsOp.StringLiteral(FixStr(zyg[1])));
                 } else {
-                    return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_SFH,
-                        new CpsOp[] { CpsOp.IntLiteral(SubInfo.ON_DIE),
+                    return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_SFH,
+                        CpsOp.IntLiteral(SubInfo.ON_DIE),
                         CpsOp.Null(Tokens.Frame), CpsOp.IntLiteral(-1),
-                        CpsOp.Null(Tokens.String), CpsOp.MethodCall(null,
-                            Tokens.Kernel_NewROScalar, new CpsOp[] { th.Scan(zyg[1]) }) });
+                        CpsOp.Null(Tokens.String), CpsOp.MethodCall(
+                            Tokens.Kernel_NewROScalar, th.Scan(zyg[1])));
                 }
             };
             handlers["control"] = delegate(NamProcessor th, object[] zyg) {
@@ -2960,7 +2962,7 @@ dynamic:
                 z[0] = zyg[1] is JScalar ? CpsOp.IntLiteral(FixInt(zyg[1])) :
                     th.Scan(zyg[1]);
 
-                return CpsOp.MethodCall(Tokens.Variable, Tokens.Kernel_SFH, z);
+                return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_SFH, z);
             };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
@@ -2980,36 +2982,34 @@ dynamic:
                     mo = CpsOp.GetField(Tokens.P6any_mo, th.Scan(zyg[1]));
                 }
                 CpsOp boxee = th.Scan(zyg[2]);
-                return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), new CpsOp[2] { boxee, mo });
+                return CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxAnyMO").MakeGenericMethod(boxee.head.Returns), boxee, mo);
             };
             handlers["unbox"] = delegate(NamProcessor th, object[] zyg) {
                 Type t = namtype(zyg[1]);
                 CpsOp unboxee = th.Scan(zyg[2]);
-                return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("UnboxAny").MakeGenericMethod(t), new CpsOp[1] { unboxee });
+                return CpsOp.MethodCall(Tokens.Kernel.GetMethod("UnboxAny").MakeGenericMethod(t), unboxee);
             };
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp rhs = th.Scan(zyg[3]);
                 bool ro   = JScalar.B(zyg[1]);
                 bool list = JScalar.B(zyg[2]);
-                return CpsOp.MethodCall(Tokens.Variable,
-                        Tokens.Kernel_NewBoundVar, new CpsOp[] {
-                            CpsOp.BoolLiteral(ro),
-                            CpsOp.BoolLiteral(list),
-                            CpsOp.GetSField(Tokens.Kernel_AnyMO),
-                            rhs });
+                return CpsOp.CpsCall(Tokens.Variable,
+                    Tokens.Kernel_NewBoundVar, CpsOp.BoolLiteral(ro),
+                    CpsOp.BoolLiteral(list),
+                    CpsOp.GetSField(Tokens.Kernel_AnyMO), rhs);
             };
             handlers["whileloop"] = delegate(NamProcessor th, object[] z) {
                 bool until = ((JScalar)z[1]).num != 0;
                 bool once  = ((JScalar)z[2]).num != 0;
                 return CpsOp.While(until, once, th.Scan(z[3]), th.Scan(z[4])); };
             handlers["_makesub"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_MakeSub, new CpsOp[]{
+                return CpsOp.MethodCall(Tokens.Kernel_MakeSub,
                     CpsOp.GetSField(((StaticSub)z[1]).subinfo),
-                    CpsOp.CallFrame() }); };
+                    CpsOp.CallFrame()); };
             handlers["_newlabel"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_NewLabelVar, new CpsOp[]{
-                    CpsOp.CallFrame(),
-                    CpsOp.StringLiteral(JScalar.S(z[1])) }); };
+                return CpsOp.MethodCall(Tokens.Kernel_NewLabelVar,
+                        CpsOp.CallFrame(),
+                        CpsOp.StringLiteral(JScalar.S(z[1]))); };
             handlers["_newdispatch"] = delegate(NamProcessor th, object[] z) {
                 return th.MakeDispatch(JScalar.S(z[1])); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
@@ -3034,7 +3034,7 @@ dynamic:
                 FieldInfo peer = (lx is LexCommon) ? ((LexCommon)lx).stg :
                     ((LexHint)lx).stg;
                 return CpsOp.SetField(Tokens.BValue_v, CpsOp.GetSField(peer),
-                    CpsOp.MethodCall(null, Tokens.Kernel_Decontainerize, new CpsOp[] { th.Scan(zyg[2]) })); };
+                    CpsOp.MethodCall(Tokens.Kernel_Decontainerize, th.Scan(zyg[2]))); };
             handlers["letn"] = delegate(NamProcessor th, object[] zyg) {
                 int i = 1;
                 Dictionary<string,Type> old =
@@ -3061,26 +3061,26 @@ dynamic:
                 int[] vec = new int[z.Length - 1];
                 for (int i = 0; i < vec.Length; i++)
                     vec[i] = FixInt(z[i+1]);
-                return CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
-                    CpsOp.NewIntArray(Tokens.Int32, vec) });
+                return CpsOp.ConstructorCall(Tokens.CC_ctor,
+                    CpsOp.NewIntArray(Tokens.Int32, vec));
             };
             handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] strs = new CpsOp[z.Length - 2];
                 for(int i = 0; i < strs.Length; i++)
                     strs[i] = CpsOp.StringLiteral(FixStr(z[i+2]));
                 CpsOp vec = th.Constant(CpsOp.NewArray(Tokens.String, strs));
-                return CpsOp.MethodCall(null, Tokens.RxFrame_PushCapture, new CpsOp[] {
+                return CpsOp.MethodCall(Tokens.RxFrame_PushCapture,
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()), vec,
-                    th.Scan(z[1]) });
+                    th.Scan(z[1]));
             };
             handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] args = new CpsOp[z.Length - 1];
                 for(int i = 0; i < z.Length - 2; i++)
                     args[i+1] = th.Scan(z[i+2]);
                 args[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
-                CpsOp call = CpsOp.MethodCall(null,
+                CpsOp call = CpsOp.MethodCall(
                         Tokens.RxFrame.GetMethod(FixStr(z[1])), args);
-                return CpsOp.Goto("backtrack", true, new CpsOp[] { call });
+                return CpsOp.Goto("backtrack", true, call);
             };
             handlers["const"] = delegate(NamProcessor th, object[] z) {
                 return th.Constant(th.Scan(z[1])); };
@@ -3097,123 +3097,115 @@ dynamic:
                 return CpsOp.NewArray(Tokens.CC, z); };
             thandlers["setbox"] = delegate(CpsOp[] z) {
                 MethodInfo mi = typeof(Kernel).GetMethod("SetBox").MakeGenericMethod(z[1].head.Returns);
-                return CpsOp.MethodCall(null, mi, z); };
+                return CpsOp.MethodCall(mi, z); };
             // yuck.
             thandlers["mrl_count"] = thandlers["fvarlist_length"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Int32, OpCodes.Conv_I4,
-                    new CpsOp[] { CpsOp.Operator(Tokens.IntPtr, OpCodes.Ldlen,
-                        z) });
+                    CpsOp.Operator(Tokens.IntPtr, OpCodes.Ldlen, z));
             };
             handlers["_newoftype"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_NewTypedScalar,
-                    new CpsOp[] { CpsOp.GetSField((FieldInfo)z[1]) }); };
+                return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
+                    CpsOp.GetSField((FieldInfo)z[1])); };
             thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_NewTypedScalar,
-                    new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyMO) }); };
+                return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
+                    CpsOp.GetSField(Tokens.Kernel_AnyMO)); };
             thandlers["newtypedscalar"] = Methody(null, Tokens.Kernel_NewTypedScalar);
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
-                    new CpsOp[] { z[1], z[0] }); };
+                    z[1], z[0]); };
             thandlers["mrl_index"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.P6any, OpCodes.Ldelem_Ref,
-                    new CpsOp[] { z[1], z[0] }); };
+                    z[1], z[0]); };
             thandlers["vvarlist_item"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.VVarList_Item, new CpsOp[]{
-                    z[1], z[0] }); };
+                return CpsOp.MethodCall(Tokens.VVarList_Item, z[1], z[0]); };
             thandlers["varhash_getindex"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.VarHash_get_Item, new CpsOp[]{
-                    z[1], z[0] }); };
+                return CpsOp.MethodCall(Tokens.VarHash_get_Item, z[1], z[0]); };
             thandlers["varhash_setindex"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.VarHash_set_Item, new CpsOp[]{
-                    z[1], z[0], z[2] }); };
+                return CpsOp.MethodCall(Tokens.VarHash_set_Item,
+                    z[1], z[0], z[2]); };
             thandlers["vvarlist_sort"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_SortHelper,
-                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+                return CpsOp.MethodCall(Tokens.Kernel_SortHelper,
+                    CpsOp.CallFrame(), z[0], z[1]); };
             thandlers["bif_make"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Builtins_Make,
-                    new CpsOp[] { CpsOp.CallFrame(), z[0] }); };
+                return CpsOp.MethodCall(Tokens.Builtins_Make,
+                        CpsOp.CallFrame(), z[0]); };
             thandlers["callnext"] = Methody(Tokens.Variable,
                     Tokens.Builtins.GetMethod("CallNext"));
             thandlers["context_get"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_ContextHelper,
-                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+                return CpsOp.MethodCall(Tokens.Kernel_ContextHelper,
+                    CpsOp.CallFrame(), z[0], z[1]); };
             thandlers["status_get"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_StatusHelper,
-                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+                return CpsOp.MethodCall(Tokens.Kernel_StatusHelper,
+                    CpsOp.CallFrame(), z[0], z[1]); };
             thandlers["set_status"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_SetStatus,
-                    new CpsOp[] { CpsOp.CallFrame(), z[0], z[1] }); };
+                return CpsOp.MethodCall( Tokens.Kernel_SetStatus,
+                    CpsOp.CallFrame(), z[0], z[1]); };
             thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
             thandlers["newrwlistvar"] = Methody(null, Tokens.Kernel_NewRWListVar);
             thandlers["iter_hasflat"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_IterHasFlat,
-                    new CpsOp[] { z[0], CpsOp.BoolLiteral(true) }); };
+                return CpsOp.MethodCall(Tokens.Kernel_IterHasFlat,
+                    z[0], CpsOp.BoolLiteral(true)); };
             thandlers["iter_hasarg"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_IterHasFlat,
-                    new CpsOp[] { z[0], CpsOp.BoolLiteral(false) }); };
+                return CpsOp.MethodCall(Tokens.Kernel_IterHasFlat,
+                    z[0], CpsOp.BoolLiteral(false)); };
             thandlers["bif_map"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(Tokens.Variable, Tokens.Builtins_MEMap,
-                        new CpsOp[] { CpsOp.NewArray(Tokens.Variable, z) }); };
+                return CpsOp.CpsCall(Tokens.Variable, Tokens.Builtins_MEMap,
+                        CpsOp.NewArray(Tokens.Variable, z)); };
             thandlers["bif_grep"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(Tokens.Variable, Tokens.Builtins_MEGrep,
-                        new CpsOp[] { CpsOp.NewArray(Tokens.Variable, z) }); };
+                return CpsOp.CpsCall(Tokens.Variable, Tokens.Builtins_MEGrep,
+                        CpsOp.NewArray(Tokens.Variable, z)); };
             thandlers["newrwscalar"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel_NewRWScalar, new CpsOp[]{
-                    CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0] }); };
+                return CpsOp.MethodCall(Tokens.Kernel_NewRWScalar,
+                    CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0]); };
             thandlers["newvsubvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor,
                     CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
-                    CpsOp.ConstructorCall(Tokens.SubViviHook_ctor, new CpsOp[] {
-                        z[1] }), z[2] }); };
+                    CpsOp.ConstructorCall(Tokens.SubViviHook_ctor,
+                        z[1]), z[2]); };
             thandlers["newvhashvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor,
                     CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
-                    CpsOp.ConstructorCall(Tokens.HashViviHook_ctor, new CpsOp[] {
-                        z[1], z[2] }), z[3] }); };
+                    CpsOp.ConstructorCall(Tokens.HashViviHook_ctor,
+                        z[1], z[2]), z[3]); };
             thandlers["newvarrayvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor,
                     CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
-                    CpsOp.ConstructorCall(Tokens.ArrayViviHook_ctor, new CpsOp[] {
-                        z[1], z[2] }), z[3] }); };
+                    CpsOp.ConstructorCall(Tokens.ArrayViviHook_ctor,
+                        z[1], z[2]), z[3]); };
             thandlers["newvnewhashvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor,
                     CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
-                    CpsOp.ConstructorCall(Tokens.NewHashViviHook_ctor, new CpsOp[] {
-                        z[1], z[2] }), z[3] }); };
+                    CpsOp.ConstructorCall(Tokens.NewHashViviHook_ctor,
+                        z[1], z[2]), z[3]); };
             thandlers["newvnewarrayvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, new CpsOp[] {
+                return CpsOp.ConstructorCall(Tokens.SV_ctor,
                     CpsOp.BoolLiteral(true), CpsOp.BoolLiteral(false), z[0],
-                    CpsOp.ConstructorCall(Tokens.NewArrayViviHook_ctor, new CpsOp[] {
-                        z[1], z[2] }), z[3] }); };
+                    CpsOp.ConstructorCall(Tokens.NewArrayViviHook_ctor,
+                        z[1], z[2]), z[3]); };
             thandlers["strbuf_append"] = delegate(CpsOp[] z) {
-                return CpsOp.Sink(CpsOp.MethodCall(null, Tokens.StringBuilder_Append_String, z)); };
+                return CpsOp.Sink(CpsOp.MethodCall(Tokens.StringBuilder_Append_String, z)); };
             thandlers["varhash_delete_key"] = delegate(CpsOp[] z) {
-                return CpsOp.Sink(CpsOp.MethodCall(null, Tokens.VarHash_Remove, z)); };
+                return CpsOp.Sink(CpsOp.MethodCall(Tokens.VarHash_Remove, z)); };
             thandlers["note"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, Tokens.TW_WriteLine, new CpsOp[]{
-                    CpsOp.MethodCall(null, Tokens.Console_get_Error, new CpsOp[0]),
-                    z[0] }); };
+                return CpsOp.MethodCall(Tokens.TW_WriteLine,
+                    CpsOp.MethodCall(Tokens.Console_get_Error), z[0]); };
             ConstructorInfo string_ctor = Tokens.String.GetConstructor(new Type[] {
                     typeof(char), Tokens.Int32 });
             thandlers["str_chr"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(string_ctor, new CpsOp[] {
+                return CpsOp.ConstructorCall(string_ctor,
                     CpsOp.Operator(typeof(char), OpCodes.Conv_U2, z),
-                    CpsOp.IntLiteral(1) });
+                    CpsOp.IntLiteral(1));
             };
             MethodInfo itcommon = Tokens.Builtins.GetMethod("HashIter");
             thandlers["bif_hash_keys"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
-                    CpsOp.IntLiteral(0), z[0] }); };
+                return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(0), z[0]); };
             thandlers["bif_hash_values"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
-                    CpsOp.IntLiteral(1), z[0] }); };
+                return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(1), z[0]); };
             thandlers["bif_hash_kv"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
-                    CpsOp.IntLiteral(2), z[0] }); };
+                return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(2), z[0]); };
             thandlers["bif_hash_pairs"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(null, itcommon, new CpsOp[] {
-                    CpsOp.IntLiteral(3), z[0] }); };
+                return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(3), z[0]); };
             Func<CpsOp[], CpsOp> real_pushcut = RxCall(null, "PushCutGroup");
             handlers["pushcut"] = delegate(NamProcessor th, object[] z) {
                 return real_pushcut(new CpsOp[] { CpsOp.StringLiteral(FixStr(z[1])) }); };
@@ -3225,17 +3217,17 @@ dynamic:
                     x[i-1] = th.Scan(z[i]);
                 x[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
                 string name = JScalar.S(z[1]);
-                return CpsOp.MethodCall((name == "EndWith" || name == "End") ? Tokens.Void : null, Tokens.RxFrame.GetMethod(name), x); };
+                return CpsOp.CpsCall((name == "EndWith" || name == "End") ? Tokens.Void : null, Tokens.RxFrame.GetMethod(name), x); };
             handlers["rxinit"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.SetField(Tokens.Frame_rx, CpsOp.CallFrame(),
-                    CpsOp.ConstructorCall(Tokens.RxFrame_ctor, new CpsOp[] {
+                    CpsOp.ConstructorCall(Tokens.RxFrame_ctor,
                         th.Scan(z[1]), th.Scan(z[2]),
                         CpsOp.BoolLiteral(FixBool(z[3])),
-                        CpsOp.BoolLiteral(FixBool(z[4])) })); };
+                        CpsOp.BoolLiteral(FixBool(z[4])))); };
             handlers["rxpushb"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.MethodCall(null, Tokens.RxFrame_PushBacktrack, new CpsOp[] {
+                return CpsOp.MethodCall(Tokens.RxFrame_PushBacktrack,
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                    CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2])) }); };
+                    CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2]))); };
             handlers["label_table"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.LabelTable(th.cpb.cx, JScalar.SA(1,z)); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
@@ -3263,7 +3255,7 @@ dynamic:
                 for (int i = 0; i < tx.Length; i++)
                     tx[i] = rst[i+1].head.Returns;
                 MethodInfo mi = rst[0].head.Returns.GetMethod(name, tx);
-                return CpsOp.MethodCall(null, mi, rst); };
+                return CpsOp.MethodCall(mi, rst); };
             handlers["rawscall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
                 int ixn = name.LastIndexOf(':');
@@ -3281,7 +3273,7 @@ dynamic:
                 if (cpsrt != null) tx[0] = Tokens.Frame;
                 MethodInfo mi = Type.GetType(name.Substring(0, ix))
                     .GetMethod(name.Substring(ix+1), tx);
-                return CpsOp.MethodCall(cpsrt, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
+                return CpsOp.CpsCall(cpsrt, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
             thandlers["llhow_name"] = FieldGet(Tokens.STable, "name");
@@ -3329,11 +3321,11 @@ dynamic:
             thandlers["path_modified"] = Methody(null, typeof(Builtins).GetMethod("GetModTime"));
             handlers["_parametricrole"] = delegate(NamProcessor th, object[] z) { return th.FillParamRole(); };
             handlers["_addmethod"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.MethodCall(null, Tokens.DMO_AddMethod, new CpsOp[] { th.Scan(z[1]), CpsOp.IntLiteral(JScalar.I(z[2])), th.Scan(z[3]), th.Scan(z[4]) }); };
+                return CpsOp.MethodCall(Tokens.DMO_AddMethod, th.Scan(z[1]), CpsOp.IntLiteral(JScalar.I(z[2])), th.Scan(z[3]), th.Scan(z[4])); };
             thandlers["_invalidate"] = Methody(null, Tokens.STable.GetMethod("Invalidate"));
             handlers["do_require"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("DoRequire"),
-                    new CpsOp[] { CpsOp.StringLiteral(JScalar.S(z[1])) }); };
+                return CpsOp.MethodCall(Tokens.Kernel.GetMethod("DoRequire"),
+                    CpsOp.StringLiteral(JScalar.S(z[1]))); };
             thandlers["obj_is_defined"] = Methody(null, Tokens.P6any.GetMethod("IsDefined"));
             thandlers["how"] = Methody(Tokens.P6any, Tokens.P6any.GetMethod("HOW"));
             thandlers["obj_what"] = Methody(null, Tokens.P6any.GetMethod("GetTypeObject"));
@@ -3470,7 +3462,7 @@ dynamic:
         static Func<CpsOp[], CpsOp> Methody(Type cps, MethodInfo mi) {
             if (mi == null) throw new ArgumentException();
             return delegate(CpsOp[] cpses) {
-                return CpsOp.MethodCall(cps, mi, cpses); };
+                return CpsOp.CpsCall(cps, mi, cpses); };
         }
 
         static Func<CpsOp[], CpsOp> RxCall(Type cps, string name) {
@@ -3479,7 +3471,7 @@ dynamic:
                 CpsOp[] n = new CpsOp[cpses.Length + 1];
                 Array.Copy(cpses, 0, n, 1, cpses.Length);
                 n[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
-                return CpsOp.MethodCall(cps, mi, n); };
+                return CpsOp.CpsCall(cps, mi, n); };
         }
 
         static Func<CpsOp[], CpsOp> Constructy(ConstructorInfo mi) {
@@ -3540,20 +3532,18 @@ dynamic:
 
             if (head == "CC") {
                 int[] ccs = JScalar.IA(1, body);
-                return CpsOp.ConstructorCall(ci, new CpsOp[] {
-                    CpsOp.ConstructorCall(Tokens.CC_ctor, new CpsOp[] {
-                        CpsOp.NewIntArray(Tokens.Int32, ccs) }) });
+                return CpsOp.ConstructorCall(ci,
+                    CpsOp.ConstructorCall(Tokens.CC_ctor,
+                        CpsOp.NewIntArray(Tokens.Int32, ccs)));
             } else if (head == "Imp" || head == "Dot" || head == "Null" || head == "None" || head == "Dispatcher") {
-                return CpsOp.ConstructorCall(ci, new CpsOp[0]);
+                return CpsOp.ConstructorCall(ci);
             } else if (head == "Str" || head == "StrNoCase" || head == "Param" || head == "Method") {
-                return CpsOp.ConstructorCall(ci, new CpsOp[]{
-                    CpsOp.StringLiteral(JScalar.S(body[1])) });
+                return CpsOp.ConstructorCall(ci,
+                    CpsOp.StringLiteral(JScalar.S(body[1])));
             } else if (head == "Opt" || head == "Star" || head == "Plus") {
-                return CpsOp.ConstructorCall(ci, new CpsOp[] {
-                        ProcessLAD(body[1]) });
+                return CpsOp.ConstructorCall(ci, ProcessLAD(body[1]));
             } else if (head == "Sequence" || head == "Any") {
-                return CpsOp.ConstructorCall(ci, new CpsOp[] {
-                    ProcessLADArr(body[1]) });
+                return CpsOp.ConstructorCall(ci, ProcessLADArr(body[1]));
             }
 
             throw new NotImplementedException("ProcessLAD " + head);
@@ -3656,18 +3646,18 @@ dynamic:
             CpsOp[] supers = new CpsOp[pr.superclasses.Length];
             for (int i = 0; i < supers.Length; i++)
                 supers[i] = CpsOp.GetSField(pr.superclasses[i].Resolve<Class>().metaObject);
-            build.Add( CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
+            build.Add( CpsOp.MethodCall(Tokens.DMO_FillRole,
                 mo, CpsOp.NewArray(Tokens.STable, supers),
-                CpsOp.NewArray(Tokens.STable, new CpsOp[0]) }) );
+                CpsOp.NewArray(Tokens.STable)) );
 
             foreach (Method m in pr.methods) {
                 CpsOp name = (m.name != null) ? CpsOp.StringLiteral(m.name) :
                     Scan(new object[] { new JScalar("obj_getstr"), m.cname });
                 CpsOp var  = RawAccessLex("scopedlex", m.var, null);
 
-                build.Add(CpsOp.MethodCall(null, Tokens.DMO_AddMethod,
-                    new CpsOp[] { mo, CpsOp.IntLiteral(m.kind), name,
-                    CpsOp.MethodCall(null, Tokens.Variable_Fetch, new CpsOp[] { var }) }));
+                build.Add(CpsOp.MethodCall(Tokens.DMO_AddMethod,
+                    mo, CpsOp.IntLiteral(m.kind), name,
+                    CpsOp.MethodCall(Tokens.Variable_Fetch, var)));
             }
 
             foreach (Attribute a in pr.attributes) {
@@ -3678,17 +3668,17 @@ dynamic:
                 CpsOp type = a.type == null ?
                     CpsOp.GetSField(Tokens.Kernel_AnyMO) :
                     CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
-                build.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
-                    new CpsOp[] { mo, name, publ, init, type }));
+                build.Add(CpsOp.MethodCall(Tokens.DMO_AddAttribute,
+                    mo, name, publ, init, type));
             }
 
-            build.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate, new CpsOp[] { mo }));
+            build.Add(CpsOp.MethodCall(Tokens.DMO_Invalidate, mo));
             if (sub.sig != null) {
                 object[] rsig = (object[]) sub.sig;
                 foreach (object se in rsig) {
                     string slot = JScalar.S( ((object[])se)[2] );
                     if (slot != null)
-                        build.Add(CpsOp.MethodCall(null, Tokens.VarHash_set_Item, new CpsOp[] { pa, CpsOp.StringLiteral(slot), RawAccessLex("scopedlex", slot, null) }));
+                        build.Add(CpsOp.MethodCall(Tokens.VarHash_set_Item, pa, CpsOp.StringLiteral(slot), RawAccessLex("scopedlex", slot, null)));
                 }
             }
 
@@ -3696,13 +3686,12 @@ dynamic:
             build.Add(CpsOp.SetField(Tokens.P6opaque_slots, to,
                         CpsOp.Null(typeof(object[]))));
             build.Add(CpsOp.SetField(Tokens.DMO_typeObject, mo, to));
-            build.Add(CpsOp.CpsReturn(new CpsOp[] { CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar, new CpsOp[] { to })}));
+            build.Add(CpsOp.CpsReturn(CpsOp.MethodCall(Tokens.Kernel_NewROScalar, to)));
 
             return CpsOp.Let("!mo", CpsOp.ConstructorCall(Tokens.DMO_ctor,
-                        new CpsOp[] { CpsOp.StringLiteral(pr.name) }),
-                    CpsOp.Let("!to", CpsOp.ConstructorCall(Tokens.P6opaque_ctor,
-                            new CpsOp[] { mo }),
-                        CpsOp.Let("!pa", CpsOp.ConstructorCall(Tokens.VarHash.GetConstructor(new Type[0]), new CpsOp[0]),
+                        CpsOp.StringLiteral(pr.name)),
+                    CpsOp.Let("!to", CpsOp.ConstructorCall(Tokens.P6opaque_ctor, mo),
+                        CpsOp.Let("!pa", CpsOp.ConstructorCall(Tokens.VarHash.GetConstructor(new Type[0])),
                             CpsOp.Sequence(build.ToArray()))));
         }
 
@@ -3892,8 +3881,8 @@ dynamic:
             foreach (object o in unit.tdeps) {
                 string dp = JScalar.S(((object[])o)[0]);
                 if (dp == unit.name) continue;
-                thaw.Add(CpsOp.Sink(CpsOp.MethodCall(null, Tokens.Kernel_BootModule, new CpsOp[] {
-                    CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")) })));
+                thaw.Add(CpsOp.Sink(CpsOp.MethodCall(Tokens.Kernel_BootModule,
+                    CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")))));
             }
 
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
@@ -3929,10 +3918,10 @@ dynamic:
                     for (int i = 0; i < super.Length; i++)
                         super[i] = CpsOp.GetSField(r.superclasses[i].Resolve<Class>().metaObject);
 
-                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillRole, new CpsOp[] {
+                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillRole,
                         CpsOp.GetSField(r.metaObject),
                         CpsOp.NewArray(Tokens.STable, super),
-                        CpsOp.NewArray(Tokens.STable, new CpsOp[0]) }));
+                        CpsOp.NewArray(Tokens.STable)));
                 } else if (m is ParametricRole) {
                     // The heavy lifting is done in WrapBody
                 } else if (m is Class) {
@@ -3949,11 +3938,11 @@ dynamic:
                             all_slot.Add(a.name);
                     }
 
-                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_FillClass, new CpsOp[] {
+                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillClass,
                         CpsOp.GetSField(r.metaObject),
                         CpsOp.StringArray(false, all_slot.ToArray()),
                         CpsOp.NewArray(Tokens.STable, super),
-                        CpsOp.NewArray(Tokens.STable, mro) }));
+                        CpsOp.NewArray(Tokens.STable, mro)));
                 }
 
                 thaw.Add(CpsOp.SetSField(m.typeObject,
@@ -3964,9 +3953,8 @@ dynamic:
                         CpsOp.Null(typeof(object[]))));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_typeObject,
                     CpsOp.GetSField(m.metaObject), CpsOp.GetSField(m.typeObject)));
-                thaw.Add(CpsOp.SetSField(m.typeVar, CpsOp.MethodCall(null,
-                    Tokens.Kernel_NewROScalar, new CpsOp[] {
-                        CpsOp.GetSField(m.typeObject) })));
+                thaw.Add(CpsOp.SetSField(m.typeVar, CpsOp.MethodCall(
+                    Tokens.Kernel_NewROScalar, CpsOp.GetSField(m.typeObject))));
 
                 if (kp != null)
                     thaw.Add(CpsOp.SetSField(kp, CpsOp.GetSField(m.typeObject)));
@@ -3978,8 +3966,8 @@ dynamic:
                 if (Verbose > 0) Console.WriteLine("sub2 {0}", obj.name);
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
                 if ((obj.flags & StaticSub.UNSAFE) != 0)
-                    thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_CheckUnsafe,
-                            new CpsOp[] { CpsOp.GetSField(obj.subinfo) }));
+                    thaw.Add(CpsOp.MethodCall(Tokens.Kernel_CheckUnsafe,
+                            CpsOp.GetSField(obj.subinfo)));
                 if (obj.sclass != "Sub") {
                     Class c = (Class) obj.GetCorePackage(obj.sclass);
                     thaw.Add(CpsOp.SetField(Tokens.SubInfo_mo,
@@ -3989,27 +3977,26 @@ dynamic:
 
                 if (obj.protopad != null) {
                     thaw.Add(CpsOp.SetSField(obj.protopad,
-                        CpsOp.ConstructorCall(Tokens.Frame_ctor, new CpsOp[] {
+                        CpsOp.ConstructorCall(Tokens.Frame_ctor,
                             CpsOp.Null(Tokens.Frame),
                             (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
                                 CpsOp.GetSField(obj.outer.Resolve<StaticSub>().protopad)),
-                            CpsOp.GetSField(obj.subinfo) })));
+                            CpsOp.GetSField(obj.subinfo))));
                 }
 
                 if (obj.protosub != null) {
                     thaw.Add(CpsOp.SetSField(obj.protosub,
-                        CpsOp.MethodCall(null, Tokens.Kernel_MakeSub, new CpsOp[] {
+                        CpsOp.MethodCall(Tokens.Kernel_MakeSub,
                             CpsOp.GetSField(obj.subinfo),
                             (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
-                                CpsOp.GetSField(obj.outer.Resolve<StaticSub>().protopad))
-                            })));
+                                CpsOp.GetSField(obj.outer.Resolve<StaticSub>().protopad)))));
 
                     if (obj.parametric_role_hack != null) {
                         ParametricRole pr = obj.parametric_role_hack.
                             Resolve<ParametricRole>();
-                        thaw.Add(CpsOp.MethodCall(null,Tokens.DMO_FillParametricRole,
-                            new CpsOp[] { CpsOp.GetSField(pr.metaObject),
-                                CpsOp.GetSField(obj.protosub) }));
+                        thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillParametricRole,
+                            CpsOp.GetSField(pr.metaObject),
+                            CpsOp.GetSField(obj.protosub)));
                     }
                 }
             });
@@ -4020,8 +4007,8 @@ dynamic:
                 if (m == null) return;
                 foreach (object o in m.exports) {
                     thaw.Add(CpsOp.SetField(Tokens.BValue_v,
-                        CpsOp.MethodCall(null, Tokens.Kernel_GetVar,
-                            new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0,o)) }),
+                        CpsOp.MethodCall(Tokens.Kernel_GetVar,
+                            CpsOp.StringArray(false, JScalar.SA(0,o))),
                         CpsOp.GetSField(m.typeVar)));
                 }
                 if (m is ParametricRole) return;
@@ -4030,12 +4017,12 @@ dynamic:
                 Attribute[] attrs = (m is Class) ? ((Class)m).attributes :
                     ((Role)m).attributes;
                 foreach (Method me in methods) {
-                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_AddMethod, new CpsOp[] {
+                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_AddMethod,
                         CpsOp.GetSField(m.metaObject),
                         CpsOp.IntLiteral(me.kind),
                         CpsOp.StringLiteral(me.name),
                         CpsOp.GetSField(me.body.Resolve<StaticSub>().protosub)
-                    }));
+                    ));
                 }
                 foreach (Attribute a in attrs) {
                     CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.P6any) :
@@ -4043,15 +4030,15 @@ dynamic:
                     CpsOp type = a.type == null ?
                         CpsOp.GetSField(Tokens.Kernel_AnyMO) :
                         CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
-                    thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_AddAttribute,
-                        new CpsOp[] { CpsOp.GetSField(m.metaObject),
+                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_AddAttribute,
+                        CpsOp.GetSField(m.metaObject),
                         CpsOp.StringLiteral(a.name),
-                        CpsOp.BoolLiteral(a.publ), init, type }));
+                        CpsOp.BoolLiteral(a.publ), init, type));
                 }
-                thaw.Add(CpsOp.MethodCall(null, Tokens.DMO_Invalidate,
-                    new CpsOp [] { CpsOp.GetSField(m.metaObject) }));
+                thaw.Add(CpsOp.MethodCall(Tokens.DMO_Invalidate,
+                    CpsOp.GetSField(m.metaObject)));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
-                    CpsOp.MethodCall(null, Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), new CpsOp[] { CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject ) })));
+                    CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject))));
             });
 
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
@@ -4059,17 +4046,17 @@ dynamic:
                 EncodeSignature(thaw, obj);
 
                 if (obj.is_phaser >= 0)
-                    thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_AddPhaser,
-                        new CpsOp[] { CpsOp.IntLiteral(obj.is_phaser),
-                        CpsOp.GetSField(obj.protosub) }));
+                    thaw.Add(CpsOp.MethodCall(Tokens.Kernel_AddPhaser,
+                        CpsOp.IntLiteral(obj.is_phaser),
+                        CpsOp.GetSField(obj.protosub)));
 
                 if (obj.exports != null) {
                     foreach (object o in obj.exports) {
                         thaw.Add(CpsOp.SetField(Tokens.BValue_v,
-                            CpsOp.MethodCall(null, Tokens.Kernel_GetVar,
-                                new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0,o)) }),
-                            CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar,
-                                new CpsOp[] { CpsOp.GetSField(obj.protosub) })));
+                            CpsOp.MethodCall(Tokens.Kernel_GetVar,
+                                CpsOp.StringArray(false, JScalar.SA(0,o))),
+                            CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
+                                CpsOp.GetSField(obj.protosub))));
                     }
                 }
 
@@ -4077,20 +4064,20 @@ dynamic:
                     if (l.Value is LexCommon) {
                         LexCommon lx = (LexCommon)l.Value; /* XXX cname */
                         thaw.Add(CpsOp.SetSField(lx.stg,
-                            CpsOp.MethodCall(null, Tokens.Kernel_GetVar, new CpsOp[] {
-                                CpsOp.StringArray(false, lx.path) })));
+                            CpsOp.MethodCall(Tokens.Kernel_GetVar,
+                                CpsOp.StringArray(false, lx.path))));
                     } else if (l.Value is LexHint) {
                         LexHint lx = (LexHint)l.Value;
                         thaw.Add(CpsOp.SetSField(lx.stg,
-                            CpsOp.MethodCall(null, Tokens.SubInfo_AddHint,
-                                new CpsOp[] { CpsOp.GetSField(obj.subinfo),
-                                    CpsOp.StringLiteral(l.Key) })));
+                            CpsOp.MethodCall(Tokens.SubInfo_AddHint,
+                                CpsOp.GetSField(obj.subinfo),
+                                    CpsOp.StringLiteral(l.Key))));
                     } else if (l.Value is LexSub) {
                         LexSub lx = (LexSub)l.Value;
                         if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
-                        SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(null,
-                            Tokens.Kernel_NewROScalar, new CpsOp[] {
-                                CpsOp.GetSField(lx.def.Resolve<StaticSub>().protosub) }));
+                        SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(
+                            Tokens.Kernel_NewROScalar,
+                                CpsOp.GetSField(lx.def.Resolve<StaticSub>().protosub)));
                     } else if (l.Value is LexSimple) {
                         LexSimple lx = (LexSimple)l.Value;
                         if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
@@ -4099,17 +4086,16 @@ dynamic:
                         if (type != null) {
                             Class c = (Class) obj.GetCorePackage(type);
                             SetProtolex(obj, l.Key, lx, CpsOp.SubyCall(true, "",
-                                new CpsOp[] {
-                                    CpsOp.StringLiteral("new"),
-                                    CpsOp.GetSField(c.typeObject),
-                                    CpsOp.GetSField(c.typeVar) }));
+                                CpsOp.StringLiteral("new"),
+                                CpsOp.GetSField(c.typeObject),
+                                CpsOp.GetSField(c.typeVar)));
                         } else {
                             FieldInfo tc = lx.type == null ?
                                 Tokens.Kernel_AnyMO :
                                 lx.type.Resolve<Class>().metaObject;
-                            SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(null,
-                                Tokens.Kernel_NewTypedScalar, new CpsOp[] {
-                                    CpsOp.GetSField(tc) }));
+                            SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(
+                                Tokens.Kernel_NewTypedScalar,
+                                CpsOp.GetSField(tc)));
                         }
                     }
                 }
@@ -4120,23 +4106,23 @@ dynamic:
                 object[] lea = (object[]) le;
                 string t = ((JScalar)lea[0]).str;
                 if (t == "pkg" || t == "var") {
-                    CpsOp[] sa = new CpsOp[] { CpsOp.StringArray(false, JScalar.SA(0, lea[1])) };
+                    CpsOp sa = CpsOp.StringArray(false, JScalar.SA(0, lea[1]));
                     if (t == "pkg") {
-                        thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_CreatePath, sa));
+                        thaw.Add(CpsOp.MethodCall(Tokens.Kernel_CreatePath, sa));
                     } else {
-                        thaw.Add(CpsOp.Sink(CpsOp.MethodCall(null, Tokens.Kernel_GetVar, sa)));
+                        thaw.Add(CpsOp.Sink(CpsOp.MethodCall(Tokens.Kernel_GetVar, sa)));
                     }
                 }
             }
 
-            thaw.Add(CpsOp.MethodCall(null, Tokens.SubInfo.GetMethod("SetStringHint"), new CpsOp[] {
+            thaw.Add(CpsOp.MethodCall(Tokens.SubInfo.GetMethod("SetStringHint"),
                 CpsOp.GetSField(unit.mainline_ref.Resolve<StaticSub>().subinfo),
-                CpsOp.StringLiteral("$?FILE"), CpsOp.StringLiteral(unit.filename ?? "(eval)") }));
-            thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_FirePhasers,
-                new CpsOp[] { CpsOp.IntLiteral(2), CpsOp.BoolLiteral(false) }));
+                CpsOp.StringLiteral("$?FILE"), CpsOp.StringLiteral(unit.filename ?? "(eval)")));
+            thaw.Add(CpsOp.MethodCall(Tokens.Kernel_FirePhasers,
+                CpsOp.IntLiteral(2), CpsOp.BoolLiteral(false)));
             if (asmain)
-                thaw.Add(CpsOp.MethodCall(null, Tokens.Kernel_FirePhasers,
-                    new CpsOp[] { CpsOp.IntLiteral(0), CpsOp.BoolLiteral(false) }));
+                thaw.Add(CpsOp.MethodCall(Tokens.Kernel_FirePhasers,
+                    CpsOp.IntLiteral(0), CpsOp.BoolLiteral(false)));
             // settings are incomplete modules and have no mainline to run
             if (unit.bottom_ref == null) {
                 Type dty = typeof(Dictionary<string,Object>);
@@ -4147,21 +4133,21 @@ dynamic:
                 string s = unit.setting;
                 StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
                 while (s != null) {
-                    thaw.Add(CpsOp.MethodCall(null, set, new CpsOp[] {
+                    thaw.Add(CpsOp.MethodCall(set,
                         CpsOp.GetField(lex, CpsOp.CallFrame()),
                         CpsOp.StringLiteral("*resume_" + s),
-                        CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar, new CpsOp[] {
-                            CpsOp.GetSField(m.protosub) }) }));
+                        CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
+                            CpsOp.GetSField(m.protosub))));
                     Unit su = CLRBackend.GetUnit(s);
                     s = su.setting;
                     m = su.mainline_ref.Resolve<StaticSub>();
                 }
-                thaw.Add(CpsOp.CpsReturn(new CpsOp[] { CpsOp.SubyCall(false,"",
-                    new CpsOp[] { CpsOp.GetSField(m.protosub) }) }));
+                thaw.Add(CpsOp.CpsReturn(CpsOp.SubyCall(false,"",
+                    CpsOp.GetSField(m.protosub))));
             } else {
-                thaw.Add(CpsOp.CpsReturn(new CpsOp[] {
-                    CpsOp.MethodCall(null, Tokens.Kernel_NewROScalar,
-                        new CpsOp[] { CpsOp.GetSField(Tokens.Kernel_AnyP) }) }));
+                thaw.Add(CpsOp.CpsReturn(
+                    CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
+                        CpsOp.GetSField(Tokens.Kernel_AnyP))));
             }
 
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
