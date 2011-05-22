@@ -848,6 +848,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type Void = typeof(void);
         public static readonly Type String = typeof(string);
         public static readonly Type Boolean = typeof(bool);
+        public static readonly Type Int16 = typeof(short);
         public static readonly Type Int32 = typeof(int);
         public static readonly Type Int64 = typeof(long);
         public static readonly Type UInt32 = typeof(uint);
@@ -905,7 +906,7 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo Rat_ctor =
             typeof(Rat).GetConstructor(new Type[] { typeof(BigInteger), typeof(ulong) });
         public static readonly ConstructorInfo BigInteger_ctor =
-            typeof(BigInteger).GetConstructor(new Type[] { typeof(int), typeof(uint[]) });
+            typeof(BigInteger).GetConstructor(new Type[] { typeof(short), typeof(uint[]) });
         public static readonly ConstructorInfo CC_ctor =
             CC.GetConstructor(new Type[] { typeof(int[]) });
         public static readonly Dictionary<string,ConstructorInfo> LADctors
@@ -2346,6 +2347,10 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrIntLiteral(typeof(char), x));
         }
 
+        public static CpsOp ShortLiteral(int x) {
+            return new CpsOp(new ClrIntLiteral(Tokens.Int16, x));
+        }
+
         public static CpsOp IntLiteral(int x) {
             return new CpsOp(new ClrIntLiteral(Tokens.Int32, x));
         }
@@ -2367,7 +2372,7 @@ namespace Niecza.CLRBackend {
             int[] ws = new int[w.Length];
             for (int i = 0; i < w.Length; i++) ws[i] = (int)w[i];
             return CpsOp.ConstructorCall(Tokens.BigInteger_ctor, new CpsOp[] {
-                CpsOp.IntLiteral(x.Sign), CpsOp.NewIntArray(typeof(uint), ws) });
+                CpsOp.ShortLiteral(x.Sign), CpsOp.NewIntArray(typeof(uint), ws) });
         }
 
         public static CpsOp DBDLiteral(MethodInfo x) {
@@ -2700,11 +2705,19 @@ namespace Niecza.CLRBackend {
 
             if (neg) num = -num;
 
-            // TODO: Reduce to lowest form
+            if (num == BigInteger.Zero)
+                den = BigInteger.One;
+            if (den > BigInteger.One) {
+                BigInteger g = BigInteger.GreatestCommonDivisor(num, den);
+                if (g != BigInteger.One) {
+                    num /= g;
+                    den /= g;
+                }
+            }
 
             ulong sden;
             if (!den.AsUInt64(out sden)) {
-                double dval = num.ToFloat64()/ den.ToFloat64();
+                double dval = (double)num / (double)den;
                 return CpsOp.MethodCall(null, Tokens.Kernel_BoxAnyMO_Double, new CpsOp[2] { CpsOp.DoubleLiteral(dval), CpsOp.GetSField(Tokens.Kernel_NumMO) });
             }
 
