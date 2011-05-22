@@ -408,11 +408,11 @@ sub infix:<le>($s1, $s2) { $s1 le $s2 }
 sub infix:<lt>($s1, $s2) { $s1 lt $s2 }
 sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
 sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
-sub lc($s)    { (~$s).lc }
-sub uc($s)    { (~$s).uc }
-sub chop($s)  { (~$s).chop }
-sub chomp($s) { (~$s).chomp }
-sub flip($s)  { (~$s).flip }
+sub lc($string)    { (~$string).lc }
+sub uc($string)    { (~$string).uc }
+sub chop($string)  { (~$string).chop }
+sub chomp($string) { (~$string).chomp }
+sub flip($string)  { (~$string).flip }
 sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
 sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
 # this one is horribly wrong and only handles the ref eq case.
@@ -925,16 +925,16 @@ sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
 
 sub infix:<< => >>($k, Mu $v) { Pair.RAWCREATE("key", $k, "value", $v) }
 
-sub reverse(*@arr) {
+sub reverse(*@array) {
     my @acc;
-    while @arr { @acc.push(@arr.pop) }
+    while @array { @acc.push(@array.pop) }
     @acc;
 }
 
-sub push(@arr, *@stuff) { @arr.push(@stuff) }
-sub unshift(@arr, *@stuff) { @arr.unshift(@stuff) }
-sub pop(@arr) { @arr.pop }
-sub shift(@arr) { @arr.shift }
+sub push(@array, *@stuff) { @array.push(@stuff) }
+sub unshift(@array, *@stuff) { @array.unshift(@stuff) }
+sub pop(@array) { @array.pop }
+sub shift(@array) { @array.shift }
 sub join($tween, *@stuff) { @stuff.join($tween) }
 
 sub invert(%h) { %h.invert }
