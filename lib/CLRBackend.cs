@@ -174,7 +174,7 @@ namespace Niecza.CLRBackend {
         public Type clrType;
         bool depsBound;
 
-        public Unit(object[] from) {
+        public Unit(object[] from, object[] code) {
             mainline_ref = Xref.from(from[0]);
             name = JScalar.S(from[1]);
             log = from[2] as object[];
@@ -188,7 +188,8 @@ namespace Niecza.CLRBackend {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
                 if (JScalar.S(xr[0]) == "sub") {
-                    xref[i] = new StaticSub(this, xr);
+                    xref[i] = new StaticSub(this, xr, (code != null &&
+                            i < code.Length) ? (object[])code[i] : null);
                 } else {
                     xref[i] = Package.From(xr);
                     (xref[i] as Package).NoteExports(exp_pkg);
@@ -503,26 +504,31 @@ namespace Niecza.CLRBackend {
         public FieldInfo protopad;
         public int nlexn;
 
-        public StaticSub(Unit unit, object[] s) {
+        public StaticSub(Unit unit, object[] s, object[] c) {
             this.unit = unit;
             name = JScalar.S(s[1]);
             outer = Xref.from(s[2]);
             flags = JScalar.I(s[3]);
             zyg = JScalar.IA(0, s[4]);
-            parametric_role_hack = Xref.from(s[5]);
-            augment_hack = s[6];
-            hint_hack = s[7] as object[];
-            is_phaser = JScalar.IN(s[8]);
-            body_of = Xref.from(s[9]);
-            in_class = Xref.from(s[10]);
-            cur_pkg = JScalar.SA(0, s[11]);
-            sclass = JScalar.S(s[12]);
-            ltm = s[13];
-            exports = (object[]) s[14];
-            sig = s[15];
+            sclass = JScalar.S(s[5]);
+            ltm = s[6];
+            exports = (object[]) s[7];
+            sig = s[8];
 
-            object[] r_lexicals = s[16] as object[];
-            body = s[17];
+            object[] r_lexicals = s[9] as object[];
+
+            if (c != null) {
+                parametric_role_hack = Xref.from(c[1]);
+                augment_hack = c[2];
+                hint_hack = c[3] as object[];
+                is_phaser = JScalar.IN(c[4]);
+                body_of = Xref.from(c[5]);
+                in_class = Xref.from(c[6]);
+                cur_pkg = JScalar.SA(0, c[7]);
+                if (c[8] != null) r_lexicals = c[8] as object[];
+                body = c[9];
+            }
+
             lexicals = new List<KeyValuePair<string,Lexical>>();
             l_lexicals = new Dictionary<string,Lexical>();
             for (int i = 0; i < r_lexicals.Length; i++) {
@@ -4222,14 +4228,15 @@ dynamic:
                     return u;
                 string dtx = File.ReadAllText(Path.Combine(Current.dir,
                             name.Replace("::",".") + ".nam"));
-                u = new Unit((object[])Reader.Read(dtx));
+                u = new Unit((object[])Reader.Read(dtx), null);
                 return avail_units[name] = u;
             }
         }
 
         internal static void RunMain(string dir, string contents,
                 string[] argv) {
-            Unit root = new Unit((object[])Reader.Read(contents));
+            Unit root = new Unit((object[])Reader.Read(contents),
+                    (object[])Reader.Read(contents.Substring(contents.IndexOf('\n'))));
             CLRBackend old_Current = Current;
             Dictionary<string,Unit> old_used_units = used_units;
             CLRBackend c = new CLRBackend(dir, root.name, null);
@@ -4266,7 +4273,8 @@ dynamic:
             string outfile  = args[2];
             bool   ismain   = args[3] == "1";
             string tx = File.ReadAllText(Path.Combine(dir, unitfile));
-            Unit root = new Unit((object[])Reader.Read(tx));
+            Unit root = new Unit((object[])Reader.Read(tx),
+                    (object[])Reader.Read(tx.Substring(tx.IndexOf("\n")+1)));
             CLRBackend c = new CLRBackend(dir, root.name.Replace("::","."), outfile);
             Current = c;
 

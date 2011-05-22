@@ -37,6 +37,11 @@ JavaScript.
 Packageoids contain information about the construction of the object, such
 as methods, attributes, superclasses, the C3 MRO, and the name.
 
+Each metaobject is logically divided into a persistant portion and a
+temporary portion.  The persistant portion is required by the compiler
+to parse and generate code for depending modules; the temporary
+portion is not.  This allows less data to be loaded.
+
 =head1 Runtime data objects, by static type
 
 =head2 int
@@ -912,6 +917,11 @@ of "node types" for describing the format of the sequences.  Most node types
 reflect a sequence with a fixed number of children with fixed interpretations.
 No names are used; all access is by index.
 
+A file contains two JSON objects.  The first one is of the "File root"
+type; the second is an array of the temporary parts of meta-objects.
+Meta-objects with no temporary object will be null, or possibly
+omitted if at the end.  Currently only subs use the temporary segment.
+
 =head2 File root
 
     Name            Type    Description
@@ -980,6 +990,16 @@ C<[ name, "var", Xref, ChildNode ]> or C<[ name, "graft", path ]>.
     outer_xref      Xref    OUTER:: sub, may be in a setting unit
     flags           number  [1]
     children        num[]   Supports tree traversals
+    class           string  &?BLOCK.WHAT; "Sub" or "Regex"
+    ltm             LtmNode Only for regexes; stores declarative prefix
+    exports         str[][] List of global names
+    signature       Param[] May be null in exotic cases
+    lexicals        Lex[]   Come in multiple forms[6]
+
+Temporary portion:
+
+    Name            Type    Description
+    xref            Xref    For documentation only
     param_role_hack ...     [2]
     augment_hack    ...     [3]
     hint_hack       ...     [4]
@@ -987,11 +1007,7 @@ C<[ name, "var", Xref, ChildNode ]> or C<[ name, "graft", path ]>.
     body_of         Xref    Only valid in immediate block of class {} et al
     in_class        Xref    Innermost enclosing body_of
     cur_pkg         str[]   OUR:: as a list of names
-    class           string  &?BLOCK.WHAT; "Sub" or "Regex"
-    ltm             LtmNode Only for regexes; stores declarative prefix
-    exports         str[][] List of global names
-    signature       Param[] May be null in exotic cases
-    lexicals        Lex[]   Come in multiple forms
+    lexicals        Lex[]   Come in multiple forms[6]
     nam             ...     See description of opcodes earlier
 
 [1] The following flags are used:
@@ -1017,6 +1033,10 @@ code; will always be seen with a PREINIT phaser.
     0   INIT    Before global mainline
     1   END     Not implemented
     2   PREINIT Before all mainlines
+
+[6] Either the temporary copy will be null, or the primary copy will
+have no items, depending on whether this sub needs to have its
+lexicals inspected by the compiler.
 
 =head2 Lexical definition
 

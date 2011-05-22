@@ -7,8 +7,16 @@ use MONKEY_TYPING;
 
 method run($*unit) {
     my @*subsnam;
+
+    my %*keeplex;
+    my $cursor = $*unit.deref($*unit.bottom_ref // $*unit.mainline.xref);
+    while $cursor {
+        %*keeplex{~$cursor.xref} = True;
+        $cursor = $cursor.outer;
+    }
+
     $*unit.visit_local_subs_postorder(&nam_sub);
-    to-json($*unit.to_nam);
+    to-json($*unit.to_nam) ~ "\n" ~ to-json(@*subsnam);
 }
 
 sub nam_sub($s) {
@@ -21,7 +29,6 @@ sub nam_sub($s) {
     if @labels {
         $code = ::Op::LabelHook.new(labels => @labels, inner => $code);
     }
-    @*subsnam[$s.xref[1]] = $code.cgop($s);
     if $s.parametric_role_hack {
         for @( $*unit.deref($s.parametric_role_hack).methods ) -> $me {
             if $me.name ~~ ::GLOBAL::Op {
@@ -29,9 +36,24 @@ sub nam_sub($s) {
             }
         }
     }
+    @*subsnam[$s.xref[1]] = [
+        $s.xref, # for documentation
+        $s.parametric_role_hack,
+        $s.augment_hack,
+        $s.hint_hack,
+        $s.is_phaser,
+        $s.body_of,
+        $s.in_class,
+        $s.cur_pkg,
+        (%*keeplex{~$s.xref} ?? Any !!
+            [ map { [ $_, @( $s.lexicals{$_}.to_nam ) ] },
+                sort keys $s.lexicals ]),
+        $code.cgop($s),
+    ];
 }
 
 method load($text) {
+    $text := $text.substr(0, $text.index("\n"));
     unit_from_nam(from-json($text));
 }
 
@@ -100,7 +122,7 @@ sub unit_from_nam(@block) {
     $*xid = 0;
     while $*xid < @$xr {
         if ($xr[$*xid] && $xr[$*xid][0] eq 'sub') {
-            for @( $xr[$*xid][16] ) -> $row {
+            for @( $xr[$*xid][9] ) -> $row {
                 my ($k,$v) = lex_from_nam($row);
                 $*xref[$*xid].lexicals{$k} = $v;
             }
@@ -132,27 +154,20 @@ augment class Metamodel::StaticSub { #OK exist
             $.outerx,
             $flags,
             [ map { $_.xref[1] }, @$.zyg ],
-            $.parametric_role_hack,
-            $.augment_hack,
-            $.hint_hack,
-            $.is_phaser,
-            $.body_of,
-            $.in_class,
-            $.cur_pkg,
             $.class,
             $.ltm,
             $.exports,
             ($.signature && [ map { $_.to_nam }, @( $.signature.params ) ]),
-            [ map { [ $_, @( $.lexicals{$_}.to_nam ) ] },
-                sort keys $.lexicals ],
-            @*subsnam[$.xref[1]],
+            (!%*keeplex{~self.xref} ?? [] !!
+                [ map { [ $_, @( $.lexicals{$_}.to_nam ) ] },
+                    sort keys $.lexicals ]),
         ]
     }
 }
 
 sub sub_from_nam(@block) {
-    my ($kind, $name, $outer, $flags, $zyg, $prh, $ah, $hh, $isp, $body, #OK
-        $inc, $crp, $cls, $ltm, $exp, $sig, $rlx, $nam) = @block; #OK
+    my ($kind, $name, $outer, $flags, $zyg, #OK
+        $cls, $ltm, $exp, $sig, $rlx) = @block; #OK
     # Most of these are used only by code-gen.  Lexicals are injected later.
 
     ::Metamodel::StaticSub.CREATE(
