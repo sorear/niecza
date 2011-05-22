@@ -254,6 +254,46 @@ public class Builtins {
         }
     }
 
+    public static bool GetAsInteger(Variable v, out int small,
+            out BigInteger big) {
+        P6any n = v.Fetch().mo.mro_Numeric.Get(v).Fetch();
+        int rk = GetNumRank(n);
+        small = 0;
+
+        if (rk == NR_COMPLEX || rk == NR_FLOAT) {
+            double dbl = 0;
+            if (rk == NR_COMPLEX) {
+                Complex c = Kernel.UnboxAny<Complex>(n);
+                if (c.im != 0)
+                    throw new NieczaException("Complex cannot be used here");
+                dbl = c.re;
+            } else {
+                dbl = Kernel.UnboxAny<double>(n);
+            }
+            ulong bits = (ulong)BitConverter.DoubleToInt64Bits(dbl);
+            big = (bits & ((1UL << 52) - 1)) + (1UL << 52);
+            int power = ((int)((bits >> 52) & 0x7FF)) - 0x433;
+            if (power > 0) big <<= power;
+            else big >>= -power;
+            if ((bits & (1UL << 63)) != 0) big = -big;
+        }
+        else if (rk == NR_FATRAT) {
+            FatRat r = Kernel.UnboxAny<FatRat>(n);
+            big = r.num / r.den;
+        }
+        else if (rk == NR_FIXRAT) {
+            Rat r = Kernel.UnboxAny<Rat>(n);
+            big = r.num / r.den;
+        }
+        else if (rk == NR_BIGINT) {
+            big = Kernel.UnboxAny<BigInteger>(n);
+        }
+        else {
+            big = BigInteger.Zero; small = Kernel.UnboxAny<int>(n); return false;
+        }
+        return true;
+    }
+
     public static void SimplifyFrac(ref BigInteger num, ref BigInteger den) {
         if (den.Sign < 0) {
             den = -den;
@@ -655,6 +695,28 @@ public class Builtins {
             long red = Math.DivRem(v1, v2, out rem);
             if (red < 0 && rem != 0) red--;
             return MakeInt(v1 - v2*red);
+        }
+    }
+
+    public static Variable CoerceToInt(Variable a1) {
+        NominalCheck("$x", Kernel.AnyMO, a1);
+        int small; BigInteger big;
+        return GetAsInteger(a1, out small, out big) ?
+            MakeInt(big) : MakeInt(small);
+    }
+
+    public static Variable CoerceToNum(Variable a1) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            if (v1.im != 0)
+                throw new NieczaException("Complex cannot be used here");
+            return MakeFloat(v1.re);
+        } else {
+            return MakeFloat(PromoteToFloat(r1, n1));
         }
     }
 

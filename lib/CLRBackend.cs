@@ -3389,6 +3389,8 @@ dynamic:
             thandlers["bif_substr3"] = SimpleB("Substr3");
             thandlers["bif_simple_eval"] = SimpleB("SimpleEval");
             thandlers["bif_rat_approx"] = SimpleB("RatApprox");
+            thandlers["bif_coerce_to_int"] = SimpleB("CoerceToInt");
+            thandlers["bif_coerce_to_num"] = SimpleB("CoerceToNum");
 
             thandlers["bif_defined"] = Contexty("mro_defined");
             thandlers["bif_bool"] = Contexty("mro_Bool");

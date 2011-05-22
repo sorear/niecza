@@ -65,6 +65,8 @@ my class Num    { ... }
 my class Str    { ... }
 my class Cool {
     method Rat($eps = 1e-6) { Q:CgOp { (bif_rat_approx {self} {$eps}) } }
+    method Int() { Q:CgOp { (bif_coerce_to_int {self}) } }
+    method Num() { Q:CgOp { (bif_coerce_to_num {self}) } }
 
     method grep(Mu $sm) { grep $sm, @(self) }
     method map($func)   { map $func, @(self) }
@@ -229,10 +231,12 @@ my class Capture {
 # }}}
 # Scalar types {{{
 my class Num is Cool {
+    method Num() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 my class Int is Cool {
+    method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }

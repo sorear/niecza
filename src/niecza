@@ -76,6 +76,8 @@ method newtypedscalar ($t) { self._cgop("newtypedscalar", $t) }
 method bif_rand () { self._cgop("bif_rand") }
 method exactnum ($base, $digits) { self._cgop("exactnum", $base, $digits) }
 method bif_rat_approx ($center, $eps) { self._cgop("bif_rat_approx", $center, $eps) }
+method bif_coerce_to_num ($v) { self._cgop("bif_coerce_to_num", $v) }
+method bif_coerce_to_int ($v) { self._cgop("bif_coerce_to_int", $v) }
 }
 
 my $usage = q:to/EOM/;
