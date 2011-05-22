@@ -87,6 +87,173 @@ public class Builtins {
         return str.Substring(from, l);
     }
 
+    public const int NR_FIXINT  = 0;
+    public const int NR_BIGINT  = 1;
+    public const int NR_FIXRAT  = 2;
+    public const int NR_FATRAT  = 3;
+    public const int NR_FLOAT   = 4;
+    public const int NR_COMPLEX = 5;
+
+    public static int GetNumRank(P6any vret) {
+        if (vret.mo.HasMRO(Kernel.ComplexMO)) return NR_COMPLEX;
+        if (vret.mo.HasMRO(Kernel.NumMO)) return NR_FLOAT;
+        if (vret.mo.HasMRO(Kernel.FatRatMO)) return NR_FATRAT;
+        if (vret.mo.HasMRO(Kernel.RatMO)) return NR_FIXRAT;
+        if (vret.mo.HasMRO(Kernel.IntMO)) {
+            return (vret is BoxObject<BigInteger>) ? NR_BIGINT : NR_FIXINT;
+        }
+        throw new NieczaException("Not a valid primitive number " + vret.mo.name);
+    }
+
+    public static Complex PromoteToComplex(int rank, P6any vret) {
+        Rat r; FatRat fr;
+        if (!vret.IsDefined()) return new Complex(0,0);
+
+        switch (rank) {
+            case NR_FIXINT:
+                return new Complex(Kernel.UnboxAny<int>(vret), 0);
+            case NR_BIGINT:
+                return new Complex((double)Kernel.UnboxAny<BigInteger>(vret), 0);
+            case NR_FIXRAT:
+                r = Kernel.UnboxAny<Rat>(vret);
+                return new Complex((double)r.num / (double)r.den, 0);
+            case NR_FATRAT:
+                fr = Kernel.UnboxAny<FatRat>(vret);
+                return new Complex((double)fr.num / (double)fr.den, 0);
+            case NR_FLOAT:
+                return new Complex(Kernel.UnboxAny<double>(vret), 0);
+            case NR_COMPLEX:
+            default:
+                return Kernel.UnboxAny<Complex>(vret);
+        }
+    }
+
+    public static double PromoteToFloat(int rank, P6any vret) {
+        Rat r; FatRat fr;
+        if (!vret.IsDefined()) return 0;
+
+        switch (rank) {
+            case NR_FIXINT:
+                return Kernel.UnboxAny<int>(vret);
+            case NR_BIGINT:
+                return (double)Kernel.UnboxAny<BigInteger>(vret);
+            case NR_FIXRAT:
+                r = Kernel.UnboxAny<Rat>(vret);
+                return (double)r.num / (double)r.den;
+            case NR_FATRAT:
+                fr = Kernel.UnboxAny<FatRat>(vret);
+                return (double)fr.num / (double)fr.den;
+            case NR_FLOAT:
+            default:
+                return Kernel.UnboxAny<double>(vret);
+        }
+    }
+
+    public static FatRat PromoteToFatRat(int rank, P6any vret) {
+        Rat r;
+        if (!vret.IsDefined()) return new FatRat(BigInteger.Zero,BigInteger.One);
+
+        switch (rank) {
+            case NR_FIXINT:
+                return new FatRat(Kernel.UnboxAny<int>(vret), BigInteger.One);
+            case NR_BIGINT:
+                return new FatRat(Kernel.UnboxAny<BigInteger>(vret), BigInteger.One);
+            case NR_FIXRAT:
+                r = Kernel.UnboxAny<Rat>(vret);
+                return new FatRat(r.num, r.den);
+            case NR_FATRAT:
+            default:
+                return Kernel.UnboxAny<FatRat>(vret);
+        }
+    }
+
+    public static Rat PromoteToFixRat(int rank, P6any vret) {
+        if (!vret.IsDefined()) return new Rat(BigInteger.Zero, 1);
+
+        switch (rank) {
+            case NR_FIXINT:
+                return new Rat(Kernel.UnboxAny<int>(vret), 1);
+            case NR_BIGINT:
+                return new Rat(Kernel.UnboxAny<BigInteger>(vret), 1);
+            case NR_FIXRAT:
+            default:
+                return Kernel.UnboxAny<Rat>(vret);
+        }
+    }
+
+    public static BigInteger PromoteToBigInt(int rank, P6any vret) {
+        if (!vret.IsDefined()) return BigInteger.Zero;
+
+        switch (rank) {
+            case NR_FIXINT:
+                return Kernel.UnboxAny<int>(vret);
+            case NR_BIGINT:
+            default:
+                return Kernel.UnboxAny<BigInteger>(vret);
+        }
+    }
+
+    public static int PromoteToFixInt(int rank, P6any vret) {
+        if (!vret.IsDefined()) return 0;
+        return Kernel.UnboxAny<int>(vret);
+    }
+
+    public static Variable MakeInt(int v) {
+        return Kernel.BoxAnyMO<int>(v, Kernel.IntMO);
+    }
+
+    public static Variable MakeInt(BigInteger v) {
+        int vs;
+        if (v.AsInt32(out vs)) return Kernel.BoxAnyMO<int>(vs, Kernel.IntMO);
+        else return Kernel.BoxAnyMO<BigInteger>(v, Kernel.IntMO);
+    }
+
+    public static Variable MakeInt(long v) {
+        if (v <= (long)int.MaxValue && v >= (long)int.MinValue)
+            return Kernel.BoxAnyMO<int>((int)v, Kernel.IntMO);
+        else return Kernel.BoxAnyMO<BigInteger>(v, Kernel.IntMO);
+    }
+
+    public static void SimplifyFrac(ref BigInteger num, ref BigInteger den) {
+        if (den.Sign < 0) {
+            den = -den;
+            num = -num;
+        }
+        if (num.Sign == 0) {
+            den = BigInteger.One;
+        }
+        if (num.Sign != 0 && den.Sign != 0) {
+            BigInteger g = BigInteger.GreatestCommonDivisor(num, den);
+            if (g != BigInteger.One) {
+                num /= g;
+                den /= g;
+            }
+        }
+    }
+
+    public static Variable MakeFixRat(BigInteger num, BigInteger den) {
+        ulong sden;
+        SimplifyFrac(ref num, ref den);
+        if (den.AsUInt64(out sden) && sden != 0)
+            return Kernel.BoxAnyMO<Rat>(new Rat(num, sden), Kernel.RatMO);
+        return MakeFloat((double)num / (double)den);
+    }
+
+    public static Variable MakeFatRat(BigInteger num, BigInteger den) {
+        SimplifyFrac(ref num, ref den);
+        if (den.Sign != 0)
+            return Kernel.BoxAnyMO<FatRat>(new FatRat(num, den), Kernel.FatRatMO);
+        return MakeFloat(den.Sign * double.PositiveInfinity);
+    }
+
+    public static Variable MakeFloat(double val) {
+        return Kernel.BoxAnyMO<double>(val, Kernel.NumMO);
+    }
+
+    public static Variable MakeComplex(double re, double im) {
+        return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Kernel.ComplexMO);
+    }
+
     public static Variable NumericEq(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
@@ -219,12 +386,39 @@ public class Builtins {
         return new SubstrLValue(v1, r2, r3);
     }
 
-    public static Variable Plus(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        double r1 = o1.mo.mro_raw_Numeric.Get(v1);
-        double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>(r1 + r2, Kernel.NumMO);
+    public static Variable Plus(Variable a1, Variable a2) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
+        int r2 = GetNumRank(n2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            Complex v2 = PromoteToComplex(r2, n2);
+            return MakeComplex(v1.re + v2.re, v1.im + v2.im);
+        }
+        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            return MakeFloat(PromoteToFloat(r1, n1) + PromoteToFloat(r2, n2));
+        }
+        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            FatRat v2 = PromoteToFatRat(r2, n2);
+
+            return MakeFatRat(v1.num*v2.den + v2.num*v1.den, v1.den*v2.den);
+        }
+        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            Rat v2 = PromoteToFixRat(r2, n2);
+
+            return MakeFixRat(v1.num*v2.den + v2.num*v1.den, v1.den*v2.den);
+        }
+        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            return MakeInt(PromoteToBigInt(r1, n1) + PromoteToBigInt(r2, n2));
+        }
+        return MakeInt((long)PromoteToFixInt(r1, n1) +
+                (long)PromoteToFixInt(r2, n2));
     }
 
     public static Variable Minus(Variable v1, Variable v2) {
