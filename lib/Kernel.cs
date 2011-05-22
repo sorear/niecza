@@ -187,6 +187,18 @@ namespace Niecza {
         public BValue(Variable v) { this.v = v; }
     }
 
+    public sealed class RuntimeUnit {
+        public byte[] heap;
+        public RuntimeUnit[] depends;
+        public object[] xref;
+
+        public RuntimeUnit(byte[] heap, RuntimeUnit[] depends, int nx) {
+            this.heap = heap;
+            this.depends = depends;
+            this.xref = new object[nx];
+        }
+    }
+
     // This stores all the invariant stuff about a Sub, i.e. everything
     // except the outer pointer.  Now distinct from protopads
     //

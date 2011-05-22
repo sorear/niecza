@@ -169,10 +169,14 @@ namespace Niecza.CLRBackend {
         public readonly object[] tdeps;
 
         public readonly Dictionary<string, Package> exp_pkg;
+        public readonly Dictionary<string, int> tdep_to_id;
+        public readonly List<Unit> id_to_tdep;
 
         public Assembly clrAssembly;
         public Type clrType;
         bool depsBound;
+        public FieldInfo rtunit;
+        public List<byte> thaw_heap;
 
         public Unit(object[] from, object[] code) {
             mainline_ref = Xref.from(from[0]);
@@ -184,6 +188,9 @@ namespace Niecza.CLRBackend {
             modtime = from[6] == null ? 0 : JScalar.N(from[6]);
             xref = from[7] as object[];
             exp_pkg = new Dictionary<string,Package>();
+            tdep_to_id = new Dictionary<string,int>();
+            id_to_tdep = new List<Unit>();
+            thaw_heap = new List<byte>();
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
@@ -202,10 +209,16 @@ namespace Niecza.CLRBackend {
             if (depsBound) return;
             depsBound = true;
 
+            int i = 0;
             foreach (object x in tdeps) {
                 string n = JScalar.S(((object[]) x)[0]);
-                if (n == name) continue;
+                tdep_to_id[n] = i++;
+                if (n == name) {
+                    id_to_tdep.Add(this);
+                    continue;
+                }
                 Unit o = CLRBackend.GetUnit(n);
+                id_to_tdep.Add(o);
                 o.BindDepends(false);
                 foreach (KeyValuePair<string,Package> kv in o.exp_pkg)
                     exp_pkg[kv.Key] = kv.Value;
@@ -295,6 +308,7 @@ namespace Niecza.CLRBackend {
         }
 
         public void BindFields(Func<string,Type,FieldInfo> binder) {
+            rtunit = binder("UNIT", typeof(RuntimeUnit));
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
@@ -752,22 +766,13 @@ namespace Niecza.CLRBackend {
             lineBuffer.Add(lineStack.Count == 0 ? 0 : lineStack[lineStack.Count - 1]);
         }
 
-        public void EmitIntArray(Type ty, int[] vec) {
-            EmitInt(vec.Length);
+        public void EmitDataArray(Type ty, int ct, byte[] vec) {
+            EmitInt(ct);
             // the mono JIT checks for this exact sequence
             il.Emit(OpCodes.Newarr, ty);
             if (vec.Length != 0) {
-                byte[] buf = new byte[vec.Length * 4];
-                int r = 0;
-                for (int i = 0; i < vec.Length; i++) {
-                    uint d = (uint) vec[i];
-                    buf[r++] = (byte)((d >>  0) & 0xFF);
-                    buf[r++] = (byte)((d >>  8) & 0xFF);
-                    buf[r++] = (byte)((d >> 16) & 0xFF);
-                    buf[r++] = (byte)((d >> 24) & 0xFF);
-                }
                 FieldBuilder fb = tb.DefineInitializedData(
-                        "A" + (CLRBackend.Current.nextarray++), buf, 0);
+                        "A" + (CLRBackend.Current.nextarray++), vec, 0);
                 il.Emit(OpCodes.Dup);
                 il.Emit(OpCodes.Ldtoken, fb);
                 il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
@@ -2039,10 +2044,16 @@ namespace Niecza.CLRBackend {
             Constant = true;
         }
         public override void CodeGen(CgContext cx) {
-            int[] vec = new int[names.Length];
-            for (int i = 0; i < vec.Length; i++)
-                vec[i] = tcx.named_cases[names[i]];
-            cx.EmitIntArray(Tokens.Int32, vec);
+            byte[] vec = new byte[names.Length*4];
+            int j = 0;
+            for (int i = 0; i < names.Length; i++) {
+                uint k = (uint)tcx.named_cases[names[i]];
+                vec[j++] = (byte)k; k >>= 8;
+                vec[j++] = (byte)k; k >>= 8;
+                vec[j++] = (byte)k; k >>= 8;
+                vec[j++] = (byte)k; k >>= 8;
+            }
+            cx.EmitDataArray(Tokens.Int32, vec.Length / 4, vec);
         }
     }
 
@@ -2088,20 +2099,23 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    class ClrNewIntArray : ClrOp {
-        readonly int[] vec;
+    class ClrNewDataArray : ClrOp {
+        readonly byte[] vec;
+        readonly int ct;
         readonly Type ty;
-        public ClrNewIntArray(Type ty, int[] vec) {
-            if (vec.Length >= 0xfc000)
+        public ClrNewDataArray(Type ty, int ct, byte[] vec) {
+            // TODO: automatically cut array into segments
+            if (vec.Length >= 0x3f0000)
                 throw new ArgumentException();
-            Returns = typeof(int[]);
+            Returns = ty.MakeArrayType();
             this.ty = ty;
+            this.ct = ct;
             this.vec = vec;
             Constant = true;
         }
         public override ClrOp Sink() { return ClrNoop.Instance; }
         public override void CodeGen(CgContext cx) {
-            cx.EmitIntArray(ty, vec);
+            cx.EmitDataArray(ty, ct, vec);
         }
     }
 
@@ -2526,8 +2540,21 @@ namespace Niecza.CLRBackend {
             });
         }
 
+        public static CpsOp NewByteArray(Type ty, byte[] vec) {
+            return new CpsOp(new ClrNewDataArray(ty, vec.Length, vec));
+        }
+
         public static CpsOp NewIntArray(Type ty, int[] vec) {
-            return new CpsOp(new ClrNewIntArray(ty, vec));
+            byte[] buf = new byte[vec.Length * 4];
+            int r = 0;
+            for (int i = 0; i < vec.Length; i++) {
+                uint d = (uint) vec[i];
+                buf[r++] = (byte)((d >>  0) & 0xFF);
+                buf[r++] = (byte)((d >>  8) & 0xFF);
+                buf[r++] = (byte)((d >> 16) & 0xFF);
+                buf[r++] = (byte)((d >> 24) & 0xFF);
+            }
+            return new CpsOp(new ClrNewDataArray(ty, vec.Length, buf));
         }
 
         public static CpsOp StringArray(bool omit, string[] vec) {
@@ -4149,6 +4176,16 @@ dynamic:
                     CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
                         CpsOp.GetSField(Tokens.Kernel_AnyP))));
             }
+
+            List<CpsOp> tdep_rtu = new List<CpsOp>();
+            foreach (Unit td in unit.id_to_tdep)
+                tdep_rtu.Add(td == unit ? CpsOp.Null(typeof(RuntimeUnit)) :
+                        CpsOp.GetSField(td.rtunit));
+            thaw.Insert(0, CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
+                typeof(RuntimeUnit).GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
+                CpsOp.NewByteArray(typeof(byte), unit.thaw_heap.ToArray()),
+                CpsOp.NewArray(typeof(RuntimeUnit), tdep_rtu.ToArray()),
+                CpsOp.IntLiteral(unit.xref.Length))));
 
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
             boot.Build(CpsOp.Sequence(thaw.ToArray()));
