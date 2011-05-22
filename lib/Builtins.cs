@@ -412,7 +412,7 @@ public class Builtins {
             Rat v1 = PromoteToFixRat(r1, n1);
             Rat v2 = PromoteToFixRat(r2, n2);
 
-            return MakeFixRat(v1.num*v2.den + v2.num*v1.den, v1.den*v2.den);
+            return MakeFixRat(v1.num*v2.den + v2.num*v1.den, ((BigInteger)v1.den)*v2.den);
         }
         if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
             return MakeInt(PromoteToBigInt(r1, n1) + PromoteToBigInt(r2, n2));
@@ -421,36 +421,172 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Minus(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        double r1 = o1.mo.mro_raw_Numeric.Get(v1);
-        double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>(r1 - r2, Kernel.NumMO);
+    public static Variable Minus(Variable a1, Variable a2) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
+        int r2 = GetNumRank(n2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            Complex v2 = PromoteToComplex(r2, n2);
+            return MakeComplex(v1.re - v2.re, v1.im - v2.im);
+        }
+        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            return MakeFloat(PromoteToFloat(r1, n1) - PromoteToFloat(r2, n2));
+        }
+        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            FatRat v2 = PromoteToFatRat(r2, n2);
+
+            return MakeFatRat(v1.num*v2.den - v2.num*v1.den, v1.den*v2.den);
+        }
+        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            Rat v2 = PromoteToFixRat(r2, n2);
+
+            return MakeFixRat(v1.num*v2.den - v2.num*v1.den, ((BigInteger)v1.den)*v2.den);
+        }
+        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            return MakeInt(PromoteToBigInt(r1, n1) - PromoteToBigInt(r2, n2));
+        }
+        return MakeInt((long)PromoteToFixInt(r1, n1) -
+                (long)PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Mul(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        double r1 = o1.mo.mro_raw_Numeric.Get(v1);
-        double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>(r1 * r2, Kernel.NumMO);
+    public static Variable Mul(Variable a1, Variable a2) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
+        int r2 = GetNumRank(n2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            Complex v2 = PromoteToComplex(r2, n2);
+            return MakeComplex(v1.re*v2.re - v1.im*v2.im, v1.im*v2.re + v1.re*v2.im);
+        }
+        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            return MakeFloat(PromoteToFloat(r1, n1) * PromoteToFloat(r2, n2));
+        }
+        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            FatRat v2 = PromoteToFatRat(r2, n2);
+
+            return MakeFatRat(v1.num*v2.num, v1.den*v2.den);
+        }
+        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            Rat v2 = PromoteToFixRat(r2, n2);
+
+            return MakeFixRat(v1.num*v2.num, ((BigInteger)v1.den)*v2.den);
+        }
+        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            return MakeInt(PromoteToBigInt(r1, n1) * PromoteToBigInt(r2, n2));
+        }
+        return MakeInt((long)PromoteToFixInt(r1, n1) *
+                (long)PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Divide(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        double r1 = o1.mo.mro_raw_Numeric.Get(v1);
-        double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>(r1 / r2, Kernel.NumMO);
+    public static Variable Divide(Variable a1, Variable a2) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
+        int r2 = GetNumRank(n2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            Complex v2 = PromoteToComplex(r2, n2);
+            double sn2 = v2.re*v2.re + v2.im*v2.im;
+            return MakeComplex((v1.re*v2.re + v1.im*v2.im)/sn2,
+                    (v2.re*v1.im - v2.im*v1.re)/sn2);
+        }
+        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            return MakeFloat(PromoteToFloat(r1, n1) / PromoteToFloat(r2, n2));
+        }
+        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            FatRat v2 = PromoteToFatRat(r2, n2);
+
+            return MakeFatRat(v1.num*v2.den, v1.den*v2.num);
+        }
+        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            Rat v2 = PromoteToFixRat(r2, n2);
+
+            return MakeFixRat(v1.num*v2.den, v2.num*v1.den);
+        }
+        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            return MakeFixRat(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2));
+        }
+        return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Mod(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        double r1 = o1.mo.mro_raw_Numeric.Get(v1);
-        double r2 = o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>(r1 - r2 * Math.Floor(r1 / r2), Kernel.NumMO);
+    public static Variable Mod(Variable a1, Variable a2) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
+        int r2 = GetNumRank(n2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            throw new NieczaException("Modulus operation not defined with complex arguments");
+        }
+        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            double v1 = PromoteToFloat(r1, n1);
+            double v2 = PromoteToFloat(r2, n2);
+            return MakeFloat(v1 - v2 * Math.Floor(v1 / v2));
+        }
+        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            FatRat v2 = PromoteToFatRat(r2, n2);
+
+            BigInteger c1 = v1.num*v2.den;
+            BigInteger c2 = v2.num*v1.den;
+            BigInteger cd = v1.den*v2.den;
+
+            BigInteger rem;
+            BigInteger red = BigInteger.DivRem(c1, c2, out rem);
+            if (red.Sign < 0 && rem.Sign != 0) red--;
+
+            return MakeFatRat(c1 - red*cd, cd);
+        }
+        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            Rat v2 = PromoteToFixRat(r2, n2);
+
+            BigInteger c1 = v1.num*v2.den;
+            BigInteger c2 = v2.num*v1.den;
+            BigInteger cd = ((BigInteger)v1.den)*v2.den;
+
+            BigInteger rem;
+            BigInteger red = BigInteger.DivRem(c1, c2, out rem);
+            if (red.Sign < 0 && rem.Sign != 0) red--;
+
+            return MakeFixRat(c1 - red*c2, cd);
+        }
+        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            BigInteger v1 = PromoteToBigInt(r1, n1);
+            BigInteger v2 = PromoteToBigInt(r2, n2);
+            BigInteger rem;
+            BigInteger red = BigInteger.DivRem(v1, v2, out rem);
+            if (red.Sign < 0 && rem.Sign != 0) red--;
+            return MakeInt(v1 - v2*red);
+        }
+        {
+            long v1 = PromoteToFixInt(r1, n1);
+            long v2 = PromoteToFixInt(r2, n2);
+            long rem;
+            long red = Math.DivRem(v1, v2, out rem);
+            if (red < 0 && rem != 0) red--;
+            return MakeInt(v1 - v2*red);
+        }
     }
 
     public static Variable NumAnd(Variable v1, Variable v2) {
