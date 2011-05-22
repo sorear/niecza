@@ -255,63 +255,27 @@ public class Builtins {
     }
 
     public static Variable NumericEq(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Numeric.Get(v1) == o2.mo.mro_raw_Numeric.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return Compare(v1,v2) == 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable NumericLt(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Numeric.Get(v1) < o2.mo.mro_raw_Numeric.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return Compare(v1,v2) < 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable NumericNe(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Numeric.Get(v1) != o2.mo.mro_raw_Numeric.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return Compare(v1,v2) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable NumericLe(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Numeric.Get(v1) <= o2.mo.mro_raw_Numeric.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return Compare(v1,v2) <= 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable NumericGt(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Numeric.Get(v1) > o2.mo.mro_raw_Numeric.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return Compare(v1,v2) > 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable NumericGe(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Numeric.Get(v1) >= o2.mo.mro_raw_Numeric.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return Compare(v1,v2) >= 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable StringEq(Variable v1, Variable v2) {
@@ -454,6 +418,45 @@ public class Builtins {
         }
         return MakeInt((long)PromoteToFixInt(r1, n1) -
                 (long)PromoteToFixInt(r2, n2));
+    }
+
+    public static int Compare(Variable a1, Variable a2) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
+        int r2 = GetNumRank(n2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            Complex v2 = PromoteToComplex(r2, n2);
+            if (v1.re != v2.re)
+                return v1.re > v2.re ? 1 : -1;
+            else
+                return v1.im > v2.im ? 1 : v1.im < v2.im ? -1 : 0;
+        }
+        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            double df = PromoteToFloat(r1, n1) - PromoteToFloat(r2, n2);
+            return df > 0 ? 1 : df < 0 ? -1 : 0;
+        }
+        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            FatRat v2 = PromoteToFatRat(r2, n2);
+
+            return BigInteger.Compare(v1.num*v2.den, v2.num*v1.den);
+        }
+        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            Rat v2 = PromoteToFixRat(r2, n2);
+
+            return BigInteger.Compare(v1.num*v2.den, v2.num*v1.den);
+        }
+        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            return BigInteger.Compare(PromoteToBigInt(r1, n1),
+                    PromoteToBigInt(r2, n2));
+        }
+        return PromoteToFixInt(r1, n1).CompareTo(PromoteToFixInt(r2, n2));
     }
 
     public static Variable Mul(Variable a1, Variable a2) {
