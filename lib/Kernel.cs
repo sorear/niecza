@@ -793,6 +793,38 @@ noparams:
         }
     }
 
+    class CtxCallMethodUnboxNumeric : ContextHandler<double> {
+        string method;
+        public CtxCallMethodUnboxNumeric(string method) { this.method = method; }
+
+        public override double Get(Variable obj) {
+            Variable v = method == null ? obj : Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
+            P6any o = v.Fetch();
+            if (o.mo.HasMRO(Kernel.NumMO)) {
+                return Kernel.UnboxAny<double>(o);
+            } else if (o.mo.HasMRO(Kernel.IntMO)) {
+                if (o is BoxObject<int>) {
+                    return (double)Kernel.UnboxAny<int>(o);
+                } else {
+                    return (double)Kernel.UnboxAny<BigInteger>(o);
+                }
+            } else if (o.mo.HasMRO(Kernel.RatMO)) {
+                Rat r = Kernel.UnboxAny<Rat>(o);
+                return (double)r.num / (double)r.den;
+            } else if (o.mo.HasMRO(Kernel.FatRatMO)) {
+                FatRat r = Kernel.UnboxAny<FatRat>(o);
+                return (double)r.num / (double)r.den;
+            } else if (o.mo.HasMRO(Kernel.ComplexMO)) {
+                Complex r = Kernel.UnboxAny<Complex>(o);
+                if (r.im != 0)
+                    throw new NieczaException("coercion would discard nonzero imaginary part");
+                return r.re;
+            } else {
+                throw new NieczaException("Numeric failed to return core numeric type");
+            }
+        }
+    }
+
     class CtxCallMethod : ContextHandler<Variable> {
         string method;
         public CtxCallMethod(string method) { this.method = method; }
@@ -955,6 +987,14 @@ noparams:
             else { return Kernel.UnboxAny<BigInteger>(o).ToString(); }
         }
     }
+    class CtxIntBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return false; }
+            else if (o is BoxObject<int>) { return Kernel.UnboxAny<int>(o)!=0; }
+            else { return Kernel.UnboxAny<BigInteger>(o) != BigInteger.Zero; }
+        }
+    }
 
     class CtxRatStr : ContextHandler<string> {
         public override string Get(Variable obj) {
@@ -962,6 +1002,14 @@ noparams:
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             Rat r = Kernel.UnboxAny<Rat>(o);
             return r.num.ToString() + "/" + r.den.ToString();
+        }
+    }
+    class CtxRatBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return false; }
+            Rat r = Kernel.UnboxAny<Rat>(o);
+            return r.num != BigInteger.Zero;
         }
     }
 
@@ -973,6 +1021,14 @@ noparams:
             return r.num.ToString() + "/" + r.den.ToString();
         }
     }
+    class CtxFatRatBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return false; }
+            FatRat r = Kernel.UnboxAny<FatRat>(o);
+            return r.num != BigInteger.Zero;
+        }
+    }
 
     class CtxComplexStr : ContextHandler<string> {
         public override string Get(Variable obj) {
@@ -980,6 +1036,14 @@ noparams:
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             Complex r = Kernel.UnboxAny<Complex>(o);
             return Utils.N2S(r.re) + (r.im < 0 ? "" : "+") + Utils.N2S(r.im) + "i";
+        }
+    }
+    class CtxComplexBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) { return false; }
+            Complex r = Kernel.UnboxAny<Complex>(o);
+            return r.re != 0 || r.im != 0;
         }
     }
 
@@ -2374,7 +2438,7 @@ slow:
 
             NumMO = new STable("Num");
             Handler_Vonly(NumMO, "Numeric", new CtxReturnSelf(),
-                    new CtxJustUnbox<double>(0));
+                    new CtxCallMethodUnboxNumeric(null));
             Handler_Vonly(NumMO, "Str", new CtxStrNativeNum2Str(),
                     new CtxRawNativeNum2Str());
             Handler_PandBox(NumMO, "Bool", new CtxNum2Bool(), BoolMO);
@@ -2384,21 +2448,33 @@ slow:
             NumMO.Invalidate();
 
             IntMO = new STable("Int");
+            Handler_Vonly(IntMO, "Numeric", new CtxReturnSelf(),
+                    new CtxCallMethodUnboxNumeric(null));
+            Handler_PandBox(IntMO, "Bool", new CtxIntBool(), BoolMO);
             Handler_PandBox(IntMO, "Str", new CtxIntStr(), StrMO);
             IntMO.FillProtoClass(new string[] { });
             IntMO.Invalidate();
 
             RatMO = new STable("Rat");
+            Handler_Vonly(RatMO, "Numeric", new CtxReturnSelf(),
+                    new CtxCallMethodUnboxNumeric(null));
+            Handler_PandBox(RatMO, "Bool", new CtxRatBool(), BoolMO);
             Handler_PandBox(RatMO, "Str", new CtxRatStr(), StrMO);
             RatMO.FillProtoClass(new string[] { });
             RatMO.Invalidate();
 
             FatRatMO = new STable("FatRat");
+            Handler_Vonly(FatRatMO, "Numeric", new CtxReturnSelf(),
+                    new CtxCallMethodUnboxNumeric(null));
+            Handler_PandBox(FatRatMO, "Bool", new CtxFatRatBool(), BoolMO);
             Handler_PandBox(FatRatMO, "Str", new CtxFatRatStr(), StrMO);
             FatRatMO.FillProtoClass(new string[] { });
             FatRatMO.Invalidate();
 
             ComplexMO = new STable("Complex");
+            Handler_Vonly(ComplexMO, "Numeric", new CtxReturnSelf(),
+                    new CtxCallMethodUnboxNumeric(null));
+            Handler_PandBox(ComplexMO, "Bool", new CtxComplexBool(), BoolMO);
             Handler_PandBox(ComplexMO, "Str", new CtxComplexStr(), StrMO);
             ComplexMO.FillProtoClass(new string[] { });
             ComplexMO.Invalidate();

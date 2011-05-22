@@ -434,7 +434,7 @@ next_method: ;
         public static readonly ContextHandler<bool> RawCallBool
             = new CtxCallMethodUnbox<bool>("Bool");
         public static readonly ContextHandler<double> RawCallNumeric
-            = new CtxCallMethodUnbox<double>("Numeric");
+            = new CtxCallMethodUnboxNumeric("Numeric");
         public static readonly ContextHandler<bool> RawCallDefined
             = new CtxCallMethodUnbox<bool>("defined");
         public static readonly ContextHandler<VarDeque> RawCallIterator
