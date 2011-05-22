@@ -55,11 +55,10 @@ class Builder {
         self!output("1.." ~ $num);
     }
 
-    # XXX multi!
     method plan($x) {
         $!set-plan = 1;
-        if $x ~~ Num {
-            self.expected-tests($x);
+        if $x ~~ Cool {
+            self.expected-tests(+$x);
         } else {
             die "Invalid argument to plan";
         }

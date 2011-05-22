@@ -1083,7 +1083,7 @@ my class Cursor {
         (cast cursor (@ {self}))))) } }
     method cursor($np) { Q:CgOp { (ns (cursor_butpos
         (cast cursor (@ {self}))
-          (cast int (unbox num (@ {$np}))))) } }
+          (cast int (obj_getnum {$np})))) } }
     method orig() { Q:CgOp {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }

@@ -2705,7 +2705,7 @@ namespace Niecza.CLRBackend {
 
             if (neg) num = -num;
 
-            if (num == BigInteger.Zero)
+            if (num == BigInteger.Zero && den.Sign > 0)
                 den = BigInteger.One;
             if (den > BigInteger.One) {
                 BigInteger g = BigInteger.GreatestCommonDivisor(num, den);
