@@ -528,4 +528,99 @@ namespace Niecza {
             this.num = num; this.den = den;
         }
     }
+
+    public sealed class RatApproxer {
+        // This could be optimized a fair amount if it becomes necessary.
+        // In particular, due to common prefixes the code is doing about
+        // four times as much work as it has to; also, it's probably not
+        // necessary to actually store the continued fractions in memory.
+        // http://en.wikipedia.org/w/index.php?title=Continued_fraction&oldid=429751049#Best_rational_within_an_interval
+
+        static List<BigInteger> GetContinuedFraction(BigInteger n, BigInteger d,
+                bool extend) {
+            List<BigInteger> r = new List<BigInteger>();
+            while (d.Sign != 0) {
+                BigInteger nn;
+                r.Add(BigInteger.DivRem(n, d, out nn));
+                n = d;
+                d = nn;
+            }
+            if (extend) {
+                r[r.Count-1]--;
+                r.Add(BigInteger.One);
+            }
+            return r;
+        }
+
+        // entry invariant: 0 < l < h
+        static void CandidateSimplest(BigInteger numl, BigInteger denl, bool xl,
+                BigInteger numh, BigInteger denh, bool xh,
+                ref BigInteger snum, ref BigInteger sden) {
+            List<BigInteger> cfl = GetContinuedFraction(numl, denl, xl);
+            List<BigInteger> cfh = GetContinuedFraction(numh, denh, xh);
+            List<BigInteger> cfo = new List<BigInteger>();
+
+            int i = 0;
+            while (i != cfl.Count && i != cfh.Count && cfl[i] == cfh[i])
+                cfo.Add(cfl[i++]);
+
+            if (i != cfh.Count && (i == cfl.Count || cfl[i] > cfh[i]))
+                cfo.Add(cfh[i] + BigInteger.One);
+            else
+                cfo.Add(cfl[i] + BigInteger.One);
+
+            BigInteger onum = cfo[i];
+            BigInteger oden = BigInteger.One;
+
+            for (i--; i >= 0; i--) {
+                BigInteger t = onum; onum = oden; oden = t;
+                onum += oden * cfo[i];
+            }
+
+            if (oden < sden) {
+                sden = oden;
+                snum = onum;
+            }
+        }
+
+        public static void Simplest(BigInteger numl, BigInteger denl,
+                BigInteger numh, BigInteger denh,
+                out BigInteger numo, out BigInteger deno) {
+            int signl = numl.Sign * denl.Sign;
+            int signh = numh.Sign * denh.Sign;
+
+            if (signl * signh <= 0) {
+                // interval includes 0, automatically simplest
+                numo = BigInteger.Zero;
+                deno = BigInteger.One;
+                return;
+            }
+
+            if (signl < 0) {
+                numl = -numl; numh = -numh;
+            }
+
+            BigInteger gl = BigInteger.GreatestCommonDivisor(numl, denl);
+            numl /= gl; denl /= gl;
+            BigInteger gh = BigInteger.GreatestCommonDivisor(numh, denh);
+            numh /= gh; denh /= gh;
+
+            BigInteger snum = numl;
+            BigInteger sden = denl;
+
+            if (denh < denl) {
+                snum = numh;
+                sden = denh;
+            }
+
+            for (int k = 0; k < 4; k++)
+                CandidateSimplest(numl, denl, (k&1)!=0, numh, denh, (k&2)!=0, ref snum, ref sden);
+
+            if (signl < 0)
+                snum = -snum;
+
+            numo = snum;
+            deno = sden;
+        }
+    }
 }

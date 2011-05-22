@@ -214,6 +214,46 @@ public class Builtins {
         else return Kernel.BoxAnyMO<BigInteger>(v, Kernel.IntMO);
     }
 
+    public static void GetAsRational(Variable v,
+            out BigInteger num, out BigInteger den) {
+        P6any n = v.Fetch().mo.mro_Numeric.Get(v).Fetch();
+        int rk = GetNumRank(n);
+
+        if (rk == NR_COMPLEX || rk == NR_FLOAT) {
+            double dbl = 0;
+            if (rk == NR_COMPLEX) {
+                Complex c = Kernel.UnboxAny<Complex>(n);
+                if (c.im != 0)
+                    throw new NieczaException("Complex cannot be used here");
+                dbl = c.re;
+            } else {
+                dbl = Kernel.UnboxAny<double>(n);
+            }
+            ulong bits = (ulong)BitConverter.DoubleToInt64Bits(dbl);
+            num = (bits & ((1UL << 52) - 1)) + (1UL << 52);
+            den = (1UL << 52);
+            if ((bits & (1UL << 63)) != 0) num = -num;
+            int power = ((int)((bits >> 52) & 0x7FF)) - 0x3FF;
+            if (power > 0) num <<= power;
+            else den <<= -power;
+            SimplifyFrac(ref num, ref den);
+        }
+        else if (rk == NR_FATRAT) {
+            FatRat r = Kernel.UnboxAny<FatRat>(n);
+            num = r.num; den = r.den;
+        }
+        else if (rk == NR_FIXRAT) {
+            Rat r = Kernel.UnboxAny<Rat>(n);
+            num = r.num; den = r.den;
+        }
+        else if (rk == NR_BIGINT) {
+            num = Kernel.UnboxAny<BigInteger>(n); den = BigInteger.One;
+        }
+        else {
+            num = Kernel.UnboxAny<int>(n); den = BigInteger.One;
+        }
+    }
+
     public static void SimplifyFrac(ref BigInteger num, ref BigInteger den) {
         if (den.Sign < 0) {
             den = -den;
@@ -662,6 +702,27 @@ public class Builtins {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return MakeInt(~r1);
+    }
+
+    public static Variable RatApprox(Variable v1, Variable v2) {
+        NominalCheck("$x", Kernel.AnyMO, v1);
+        NominalCheck("$y", Kernel.AnyMO, v2);
+
+        BigInteger nc, dc, ne, de, na, da;
+        GetAsRational(v1, out nc, out dc);
+        GetAsRational(v2, out ne, out de);
+
+        RatApproxer.Simplest(nc*de-ne*dc,dc*de,nc*de+ne*dc,dc*de,out na,out da);
+        SimplifyFrac(ref na, ref da);
+
+        // since the user controls the denominator size here, use FatRat freely
+        // XXX: is it appropriate to return FatRat from a method named Rat?
+        ulong sda;
+        if (da.AsUInt64(out sda)) {
+            return MakeFixRat(na,da);
+        } else {
+            return MakeFatRat(na,da);
+        }
     }
 
     public static Variable PostIncrement(Variable v) {

@@ -64,6 +64,8 @@ my class Regex  { ... }
 my class Num    { ... }
 my class Str    { ... }
 my class Cool {
+    method Rat($eps = 1e-6) { Q:CgOp { (bif_rat_approx {self} {$eps}) } }
+
     method grep(Mu $sm) { grep $sm, @(self) }
     method map($func)   { map $func, @(self) }
     method for (&cb) {
