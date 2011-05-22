@@ -420,6 +420,32 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
+    public static Variable Negate(Variable a1) {
+        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
+        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
+        int r1 = GetNumRank(n1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            return MakeComplex(-v1.re, -v1.im);
+        }
+        if (r1 == NR_FLOAT) {
+            return MakeFloat(-PromoteToFloat(r1, n1));
+        }
+        if (r1 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            return MakeFatRat(-v1.num, v1.den);
+        }
+        if (r1 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            return MakeFixRat(-v1.num, v1.den);
+        }
+        if (r1 == NR_BIGINT) {
+            return MakeInt(-PromoteToBigInt(r1, n1));
+        }
+        return MakeInt(-(long)PromoteToFixInt(r1, n1));
+    }
+
     public static int Compare(Variable a1, Variable a2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
@@ -597,7 +623,7 @@ public class Builtins {
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>((double)(r1 & r2), Kernel.NumMO);
+        return MakeInt(r1 & r2);
     }
 
     public static Variable NumOr(Variable v1, Variable v2) {
@@ -605,7 +631,7 @@ public class Builtins {
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>((double)(r1 | r2), Kernel.NumMO);
+        return MakeInt(r1 | r2);
     }
 
     public static Variable NumXor(Variable v1, Variable v2) {
@@ -613,7 +639,7 @@ public class Builtins {
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>((double)(r1 ^ r2), Kernel.NumMO);
+        return MakeInt(r1 ^ r2);
     }
 
     public static Variable NumLShift(Variable v1, Variable v2) {
@@ -621,7 +647,7 @@ public class Builtins {
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>((double)(r1 << r2), Kernel.NumMO);
+        return MakeInt(r1 << r2);
     }
 
     public static Variable NumRShift(Variable v1, Variable v2) {
@@ -629,13 +655,13 @@ public class Builtins {
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return Kernel.BoxAnyMO<double>((double)(r1 >> r2), Kernel.NumMO);
+        return MakeInt(r1 >> r2);
     }
 
     public static Variable NumCompl(Variable v1) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
-        return Kernel.BoxAnyMO<double>((double)(~r1), Kernel.NumMO);
+        return MakeInt(~r1);
     }
 
     public static Variable PostIncrement(Variable v) {
@@ -653,13 +679,7 @@ public class Builtins {
     public static Variable Chars(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         string r = o1.mo.mro_raw_Str.Get(v);
-        return Kernel.BoxAnyMO((double)r.Length, Kernel.NumMO);
-    }
-
-    public static Variable Negate(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
-        double r = o1.mo.mro_raw_Numeric.Get(v);
-        return Kernel.BoxAnyMO<double>(-r, Kernel.NumMO);
+        return MakeInt(r.Length);
     }
 
     public static Variable Ord(Variable v) {
@@ -667,7 +687,7 @@ public class Builtins {
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
         if (r.Length == 0) return Kernel.NewROScalar(Kernel.AnyP);
-        return Kernel.BoxAnyMO((double)r[0], Kernel.NumMO);
+        return MakeInt((int)r[0]);
     }
 
     public static Variable Chr(Variable v) {
@@ -676,12 +696,11 @@ public class Builtins {
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
     }
 
-    // used in cclass.t; maybe worth exposing
     public static Variable UniCat(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         char c = (char) o1.mo.mro_raw_Numeric.Get(v);
         int ix = (int) char.GetUnicodeCategory(c);
-        return Kernel.BoxAnyMO((double)ix, Kernel.NumMO);
+        return MakeInt(ix);
     }
 
     public static Variable Make(Frame fr, Variable v) {
@@ -730,14 +749,12 @@ public class Builtins {
 
     public static Variable GetModTime(string path) {
         long t = File.GetLastWriteTimeUtc(path).Ticks;
-        double d = ((double)(t - 621355968000000000L)) / 10000000.0;
-        return Kernel.BoxAnyMO(d, Kernel.NumMO);
+        return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
     public static Variable GetTimeOfDay() {
         long t = DateTime.UtcNow.Ticks;
-        double d = ((double)(t - 621355968000000000L)) / 10000000.0;
-        return Kernel.BoxAnyMO(d, Kernel.NumMO);
+        return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
     private static Random rng = new Random();
@@ -745,7 +762,7 @@ public class Builtins {
     public static Variable GetRandom() {
         double i;
         lock (rng) { i = rng.NextDouble(); }
-        return Kernel.BoxAnyMO(i, Kernel.NumMO);
+        return MakeFloat(i);
     }
 
     public static bool FileOrDirExists(string path) {
@@ -777,7 +794,7 @@ public class Builtins {
         string sfn = filename.Fetch().mo.mro_raw_Str.Get(filename);
         //Console.WriteLine("App name {0}", sfn);
         int ret = GetSubDomain().ExecuteAssembly(sfn, null, UnboxLoS(args));
-        return Kernel.BoxAnyMO((double) ret, Kernel.NumMO);
+        return MakeInt(ret);
     }
 
     public static void RunSubtask(string file, string args) {

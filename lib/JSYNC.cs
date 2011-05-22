@@ -34,8 +34,8 @@ public class JsyncWriter {
             WriteBool(Kernel.UnboxAny<bool>(obj));
         } else if (obj.Isa(Kernel.StrMO)) {
             WriteStr(true, Kernel.UnboxAny<string>(obj));
-        } else if (obj.Isa(Kernel.NumMO)) {
-            WriteNum(Kernel.UnboxAny<double>(obj));
+        } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
+            WriteNum(obj.mo.mro_raw_Numeric.Get(Kernel.NewROScalar(obj)));
         } else {
             WriteGeneral(obj);
         }
@@ -813,8 +813,8 @@ public class JsonWriter {
             o.Append("null");
         } else if (obj.Isa(Kernel.BoolMO)) {
             o.Append(Kernel.UnboxAny<bool>(obj) ? "true" : "false");
-        } else if (obj.Isa(Kernel.NumMO)) {
-            o.Append(Utils.N2S(Kernel.UnboxAny<double>(obj)));
+        } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
+            o.Append(Utils.N2S(obj.mo.mro_raw_Numeric.Get(Kernel.NewROScalar(obj))));
         } else if (obj.Isa(Kernel.StrMO)) {
             o.Append('"');
             JsyncWriter.AddStringContents(o, Kernel.UnboxAny<string>(obj));

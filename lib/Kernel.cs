@@ -905,6 +905,16 @@ noparams:
         }
     }
 
+    class CtxBoxifyInty : ContextHandler<Variable> {
+        ContextHandler<double> inner;
+        public CtxBoxifyInty(ContextHandler<double> inner) {
+            this.inner = inner;
+        }
+        public override Variable Get(Variable obj) {
+            return Builtins.MakeInt((long)inner.Get(obj));
+        }
+    }
+
     class CtxContainerize : ContextHandler<Variable> {
         ContextHandler<P6any> inner;
         public CtxContainerize(ContextHandler<P6any> inner) {
@@ -1274,7 +1284,7 @@ noparams:
             VarDeque rest  = (VarDeque) dos.slots[1];
 
             P6any ks = key.Fetch();
-            if (ks.mo != Kernel.NumMO && ks.mo.HasMRO(Kernel.SubMO)) {
+            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.SubMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
                     Kernel.GetInferiorRoot(),
@@ -2165,6 +2175,12 @@ slow:
             WrapHandler0(kl, name, cv, cv, cvu);
         }
 
+        private static void Handler_PandBoxInty(STable kl, string name,
+                ContextHandler<double> cvu) {
+            ContextHandler<Variable> cv = new CtxBoxifyInty(cvu);
+            WrapHandler0(kl, name, cv, cv, cvu);
+        }
+
         private static void Handler_PandCont(STable kl, string name,
                 ContextHandler<P6any> cvu) {
             ContextHandler<Variable> cv = new CtxContainerize(cvu);
@@ -2575,7 +2591,7 @@ slow:
             Handler_PandBox(ListMO, "iterator", new CtxListIterator(),
                     IteratorMO);
             Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
-            Handler_PandBox(ListMO, "Numeric", new CtxListNum(), NumMO);
+            Handler_PandBoxInty(ListMO, "Numeric", new CtxListNum());
             Handler_Vonly(ListMO, "list", new CtxReturnSelfList(), null);
             ListMO.FillProtoClass(new string[] { "items", "rest" });
             ListMO.Invalidate();
