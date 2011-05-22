@@ -29,8 +29,35 @@ use STD;
 use Sig;
 
 augment class NieczaActions {
+method integer($/) {
+    $<decint> andthen make [10, ~$<decint>];
+    $<octint> andthen make [8,  ~$<octint>];
+    $<hexint> andthen make [16, ~$<hexint>];
+    $<binint> andthen make [2,  ~$<binint>];
 }
 
+method dec_number ($/) {
+    if $<escale> { make +((~$/).comb(/<-[_]>/).join("")) }
+    else { make [10, ~$/] }
+}
+
+method number($/) {
+    my $child = $<integer> // $<dec_number> // $<rad_number>;
+    make (defined($child) ?? $child.ast !!
+        $child eq 'NaN' ?? NaN !! Inf);
+}
+}
+
+# XXX should there be a different class for this?
+augment class Op::Num { #OK exist
+    method code($) {
+        if $.value ~~ Array {
+            CgOp.const(CgOp.exactnum(|$.value))
+        } else {
+            CgOp.const(CgOp.box('Num', CgOp.double($.value)))
+        }
+    }
+}
 
 augment class Op::Labelled { #OK exist
     method statement_level() {
@@ -47,6 +74,7 @@ augment class CgOp {
 method outerlex ($n) { self._cgop("outerlex", $n) }
 method newtypedscalar ($t) { self._cgop("newtypedscalar", $t) }
 method bif_rand () { self._cgop("bif_rand") }
+method exactnum ($base, $digits) { self._cgop("exactnum", $base, $digits) }
 }
 
 my $usage = q:to/EOM/;

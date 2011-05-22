@@ -230,11 +230,22 @@ my class Num is Cool {
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
-
-my class Int is Cool { }
-my class Rat is Cool { }
-my class Complex is Cool { }
-my class FatRat is Cool { }
+my class Int is Cool {
+    method perl() { defined(self) ?? ~self !! self.typename }
+    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+}
+my class Rat is Cool {
+    method perl() { defined(self) ?? ~self !! self.typename }
+    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+}
+my class Complex is Cool {
+    method perl() { defined(self) ?? ~self !! self.typename }
+    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+}
+my class FatRat is Cool {
+    method perl() { defined(self) ?? ~self !! self.typename }
+    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+}
 
 #TODO use a power from the standard library
 sub infix:<**>($num,$power) {
