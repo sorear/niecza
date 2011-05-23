@@ -119,6 +119,19 @@ public sealed class Choice {
     }
 }
 
+public class AltInfo {
+    public readonly int[] labels;
+    public readonly LAD[] prefixes;
+    public readonly string dba;
+    //public readonly STable in_class;
+
+    public AltInfo(LAD[] prefixes, string dba, int[] labels) {
+        this.labels = labels;
+        this.prefixes = prefixes;
+        this.dba = dba;
+    }
+}
+
 // extends Frame for a time/space tradeoff
 // we keep the cursor in exploded form to avoid creating lots and lots of
 // cursor objects
@@ -365,13 +378,14 @@ public sealed class RxFrame {
         return (i >= min);
     }
 
-    public void LTMPushAlts(Lexer lx, int[] addrs) {
+    public void LTMPushAlts(Frame fr, AltInfo ai) {
+        Lexer lx = Lexer.GetLexer(fr, GetClass(), ai.prefixes, ai.dba);
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
         PushCutGroup("LTM");
         int[] cases = lx.Run(global.orig_s, st.pos);
         for (int i = cases.Length - 1; i >= 0; i--) {
-            PushBacktrack(addrs[cases[i]]);
+            PushBacktrack(ai.labels[cases[i]]);
         }
     }
 

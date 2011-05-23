@@ -48,6 +48,30 @@ method number($/) {
 }
 }
 
+augment class RxOp::Alt { #OK exist
+    method code($body) {
+        my @ls = map { self.label }, @$.zyg;
+        my @lads = @( $.optimized_lads // (map { $_.lad }, @$.zyg) );
+        my $end = self.label;
+
+        die "check screwed up" unless defined $.dba;
+
+        my @code;
+        push @code, CgOp.ltm_push_alts([@lads], $.dba, [@ls]);
+        push @code, CgOp.goto('backtrack');
+        my $i = 0;
+        while $i < @ls {
+            push @code, CgOp.label(@ls[$i]);
+            push @code, $.zyg[$i].code($body);
+            push @code, CgOp.goto($end) unless $i == @ls - 1;
+            $i++;
+        }
+        push @code, CgOp.label($end);
+        push @code, CgOp.popcut;
+        @code;
+    }
+}
+
 # XXX should there be a different class for this?
 augment class Op::Num { #OK exist
     method code($) {
@@ -71,6 +95,8 @@ class RxOp::CutBrack is RxOp {
 }
 
 augment class CgOp {
+# DELETE label_table, ladconstruct, get_lexer
+method ltm_push_alts (*@x) { self._cgop("ltm_push_alts", @x) }
 method outerlex ($n) { self._cgop("outerlex", $n) }
 method newtypedscalar ($t) { self._cgop("newtypedscalar", $t) }
 method bif_rand () { self._cgop("bif_rand") }

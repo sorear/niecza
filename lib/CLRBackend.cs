@@ -3246,8 +3246,6 @@ dynamic:
                     } else {
                         Console.WriteLine("odd constant box {0}/{1}", typ, chchh);
                     }
-                } else if (chh == "label_table" || chh == "ladconstruct") {
-                    // probably not worth trying to coalesce
                 } else if (chh == "newcc") {
                     StringBuilder sb = new StringBuilder("C");
                     for (int i = 1; i < ch.Length; i++) {
@@ -3423,8 +3421,14 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.RxFrame_PushBacktrack,
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
                     CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2]))); };
-            handlers["label_table"] = delegate(NamProcessor th, object[] z) {
-                return CpsOp.LabelTable(th.cpb.cx, JScalar.SA(1,z)); };
+            handlers["ltm_push_alts"] = delegate(NamProcessor th, object[] z) {
+                CpsOp ai = CpsOp.ConstructorCall(typeof(AltInfo).GetConstructor(new Type[] { typeof(LAD[]), typeof(string), typeof(int[]) }),
+                        th.ProcessLADArr(z[1]),
+                        CpsOp.StringLiteral(JScalar.S(z[2])),
+                        CpsOp.LabelTable(th.cpb.cx, JScalar.SA(0,z[3])));
+                return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
+                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
+                    CpsOp.CallFrame(), th.Constant(ai)); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
             thandlers["rxend"] = RxCall(Tokens.Void, "End");
             thandlers["rxfinalend"] = RxCall(Tokens.Void, "FinalEnd");
@@ -3439,10 +3443,7 @@ dynamic:
             thandlers["rxsetcapsfrom"] = RxCall(null, "SetCapturesFrom");
             thandlers["rxgetpos"] = RxCall(null, "GetPos");
             thandlers["rxcommitgroup"] = RxCall(null, "CommitGroup");
-            thandlers["get_lexer"] = Methody(null, typeof(Lexer).GetMethod("GetLexer"));
             thandlers["run_dispatch"] = Methody(null, typeof(Lexer).GetMethod("RunDispatch"));
-            handlers["ladconstruct"] = delegate(NamProcessor th, object[] z) {
-                return th.ProcessLADArr(z[1]); };
             handlers["rawcall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
                 CpsOp[] rst = JScalar.A<CpsOp>(2, z, th.Scan);
