@@ -258,6 +258,13 @@ namespace Niecza {
             return r;
         }
 
+        public CC[] LoadCCPool(int from) {
+            CC[] pool = new CC[ReadInt(ref from)];
+            for (int i = 0; i < pool.Length; i++)
+                pool[i] = new CC(ReadIntArray(ref from));
+            return pool;
+        }
+
         public string ReadStr(ref int from) {
             int l = ReadShort(ref from);
             if ((l & 2) == 0) l |= (ReadShort(ref from) << 16);

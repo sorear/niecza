@@ -180,6 +180,10 @@ namespace Niecza.CLRBackend {
         public List<byte> thaw_heap;
         public Dictionary<string,int> existing_strings;
 
+        FieldInfo cc_pool;
+        Dictionary<string,int> cc_constant_cache = new Dictionary<string,int>();
+        List<int[]> cc_constants = new List<int[]>();
+
         public Unit(object[] from, object[] code) {
             mainline_ref = Xref.from(from[0]);
             name = JScalar.S(from[1]);
@@ -315,6 +319,7 @@ namespace Niecza.CLRBackend {
 
         public void BindFields(Func<string,Type,FieldInfo> binder) {
             rtunit = binder("UNIT", Tokens.RuntimeUnit);
+            cc_pool = binder("CC", Tokens.CC.MakeArrayType());
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
@@ -419,7 +424,31 @@ namespace Niecza.CLRBackend {
             else throw new NotImplementedException("ProcessLAD " + head);
         }
 
+        public CpsOp CCConst(int[] cc) {
+            StringBuilder code = new StringBuilder();
+            foreach (int x in cc) {
+                code.Append((char)x);
+                code.Append((char)(x>>16));
+            }
+            string fcode = code.ToString();
+            int ix;
+            if (!cc_constant_cache.TryGetValue(fcode, out ix)) {
+                cc_constant_cache[fcode] = ix = cc_constants.Count;
+                cc_constants.Add(cc);
+            }
+            return CpsOp.Operator(Tokens.CC, OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(cc_pool), CpsOp.IntLiteral(ix));
+        }
 
+        public CpsOp EmitCCConsts() {
+            int b = thaw_heap.Count;
+            EmitInt(cc_constants.Count);
+            foreach (int[] cc in cc_constants)
+                EmitIntArray(cc);
+            return CpsOp.SetSField(cc_pool,
+                    CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadCCPool"),
+                        CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
+        }
     }
 
     class Xref {
@@ -3247,12 +3276,7 @@ dynamic:
                         Console.WriteLine("odd constant box {0}/{1}", typ, chchh);
                     }
                 } else if (chh == "newcc") {
-                    StringBuilder sb = new StringBuilder("C");
-                    for (int i = 1; i < ch.Length; i++) {
-                        sb.Append(' ');
-                        sb.Append(JScalar.I(ch[i]));
-                    }
-                    code = sb.ToString();
+                    return th.sub.unit.CCConst(JScalar.IA(1, ch));
                 } else if (chh == "fcclist_new") {
                     StringBuilder sb = new StringBuilder("F");
                     for (int i = 1; i < ch.Length; i++) {
@@ -4334,11 +4358,18 @@ dynamic:
             foreach (Unit td in unit.id_to_tdep)
                 tdep_rtu.Add(td == unit ? CpsOp.Null(Tokens.RuntimeUnit) :
                         CpsOp.GetSField(td.rtunit));
-            thaw[unit_slot] =CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
+            List<CpsOp> unit_load = new List<CpsOp>();
+            unit_load.Add(null);
+            unit_load.Add(unit.EmitCCConsts());
+
+            unit_load[0] = CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
                 Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
                 CpsOp.NewByteArray(typeof(byte), unit.thaw_heap.ToArray()),
                 CpsOp.NewArray(Tokens.RuntimeUnit, tdep_rtu.ToArray()),
                 CpsOp.IntLiteral(unit.xref.Length)));
+
+
+            thaw[unit_slot] = CpsOp.Sequence(unit_load.ToArray());
 
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
             boot.Build(CpsOp.Sequence(thaw.ToArray()));
