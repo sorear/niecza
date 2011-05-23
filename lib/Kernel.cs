@@ -258,6 +258,53 @@ namespace Niecza {
             return r;
         }
 
+        public BigInteger ReadBigInt(ref int from) {
+            sbyte sign = (sbyte) heap[from++];
+            int[] swords = ReadIntArray(ref from);
+            uint[] words = new uint[swords.Length];
+            for (int i = 0; i < swords.Length; i++) words[i] = (uint)swords[i];
+            return new BigInteger(sign, words);
+        }
+
+        public Variable[] LoadVariablePool(int from) {
+            Variable[] pool = new Variable[ReadInt(ref from)];
+            for (int i = 0; i < pool.Length; i++) {
+                byte type = heap[from++];
+                BigInteger tn;
+                ulong tmp = 0;
+                switch(type) {
+                    case 0:
+                        pool[i] = Kernel.BoxAnyMO<string>(ReadStr(ref from),
+                                Kernel.StrMO);
+                        break;
+                    case 1:
+                        tmp = (uint)ReadInt(ref from);
+                        tmp |= (((ulong)(uint)ReadInt(ref from)) << 32);
+                        pool[i] = Kernel.BoxAnyMO<double>(
+                                BitConverter.Int64BitsToDouble((long)tmp),
+                                Kernel.NumMO);
+                        break;
+                    case 2:
+                        pool[i] = Kernel.BoxAnyMO<int>(ReadInt(ref from),
+                                Kernel.IntMO);
+                        break;
+                    case 3:
+                        pool[i] = Kernel.BoxAnyMO(ReadBigInt(ref from),
+                                Kernel.IntMO);
+                        break;
+                    case 4:
+                        tn = ReadBigInt(ref from);
+                        tmp = (uint)ReadInt(ref from);
+                        tmp |= (((ulong)(uint)ReadInt(ref from)) << 32);
+                        pool[i] = Kernel.BoxAnyMO(new Rat(tn, tmp), Kernel.RatMO);
+                        break;
+                    default:
+                        throw new ArgumentException();
+                }
+            }
+            return pool;
+        }
+
         public AltInfo[] LoadAltInfoPool(int from) {
             AltInfo[] pool = new AltInfo[ReadInt(ref from)];
             for (int i = 0; i < pool.Length; i++)

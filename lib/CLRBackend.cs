@@ -171,7 +171,6 @@ namespace Niecza.CLRBackend {
         public readonly Dictionary<string, Package> exp_pkg;
         public readonly Dictionary<string, int> tdep_to_id;
         public readonly List<Unit> id_to_tdep;
-        public readonly Dictionary<string, CpsOp> const_pool;
 
         public Assembly clrAssembly;
         public Type clrType;
@@ -188,6 +187,10 @@ namespace Niecza.CLRBackend {
         Dictionary<string,int> ccl_constant_cache = new Dictionary<string,int>();
         List<int[][]> ccl_constants = new List<int[][]>();
 
+        FieldInfo var_pool;
+        Dictionary<string,int> var_constant_cache = new Dictionary<string,int>();
+        List<string> var_constants = new List<string>();
+
         FieldInfo alt_info_pool;
         List<object> alt_info_constants = new List<object>();
 
@@ -203,7 +206,6 @@ namespace Niecza.CLRBackend {
             exp_pkg = new Dictionary<string,Package>();
             tdep_to_id = new Dictionary<string,int>();
             id_to_tdep = new List<Unit>();
-            const_pool = new Dictionary<string,CpsOp>();
             thaw_heap = new List<byte>();
             existing_strings = new Dictionary<string,int>();
             for (int i = 0; i < xref.Length; i++) {
@@ -329,6 +331,7 @@ namespace Niecza.CLRBackend {
             cc_pool = binder("CC", Tokens.CC.MakeArrayType());
             alt_info_pool = binder("ALTINFO", typeof(AltInfo).MakeArrayType());
             ccl_pool = binder("CCL", Tokens.CC.MakeArrayType().MakeArrayType());
+            var_pool = binder("UVAR", Tokens.Variable.MakeArrayType());
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
@@ -431,6 +434,129 @@ namespace Niecza.CLRBackend {
             else if (head == "Opt" || head == "Star" || head == "Plus") { EmitLAD(body[1]); }
             else if (head == "Sequence" || head == "Any") { EmitLADArr(body[1]); }
             else throw new NotImplementedException("ProcessLAD " + head);
+        }
+
+        void EmitBigInt(BigInteger x) {
+            uint[] w = x.GetWords();
+            int[] ws = new int[w.Length];
+            for (int i = 0; i < w.Length; i++) ws[i] = (int)w[i];
+            EmitByte((byte)x.Sign);
+            EmitIntArray(ws);
+        }
+
+        void EmitExactNum(int numbase, string digits) {
+            BigInteger num = BigInteger.Zero;
+            BigInteger den = BigInteger.Zero;
+
+            bool neg = false;
+
+            foreach (char d in digits) {
+                if (d == '-') neg = true;
+                if (d == '_') continue;
+                if (d == '.') {
+                    if (den != BigInteger.Zero)
+                        throw new Exception("two dots in " + digits);
+                    den = BigInteger.One;
+                    continue;
+                }
+                int digval;
+                if (d >= '0' && d <= '9') { digval = d - '0'; }
+                else if (d >= 'a' && d <= 'z') { digval = d + 10 - 'a'; }
+                else if (d >= 'A' && d <= 'Z') { digval = d + 10 - 'A'; }
+                else { throw new Exception("invalid digit in " + digits); }
+
+                if (digval >= numbase) { throw new Exception("out of range digit in " + digits); }
+
+                num *= numbase;
+                den *= numbase;
+                num += digval;
+            }
+
+            if (neg) num = -num;
+
+            if (num == BigInteger.Zero && den.Sign > 0)
+                den = BigInteger.One;
+            if (den > BigInteger.One) {
+                BigInteger g = BigInteger.GreatestCommonDivisor(num, den);
+                if (g != BigInteger.One) {
+                    num /= g;
+                    den /= g;
+                }
+            }
+
+            ulong sden;
+            if (!den.AsUInt64(out sden)) {
+                long val = BitConverter.DoubleToInt64Bits((double)num / (double)den);
+                EmitByte(1);
+                EmitInt((int)val);
+                EmitInt((int)(val >> 32));
+                return;
+            }
+
+            if (sden == 0) {
+                int snum;
+                if (num.AsInt32(out snum)) {
+                    EmitByte(2);
+                    EmitInt(snum);
+                    return;
+                }
+                EmitByte(3);
+                EmitBigInt(num);
+                return;
+            }
+
+            EmitByte(4);
+            EmitBigInt(num);
+            EmitInt((int)sden);
+            EmitInt((int)(sden >> 32));
+        }
+        public CpsOp VarConst(string code) {
+            int ix;
+            if (!var_constant_cache.TryGetValue(code, out ix)) {
+                var_constant_cache[code] = ix = var_constants.Count;
+                var_constants.Add(code);
+            }
+            return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(var_pool), CpsOp.IntLiteral(ix));
+        }
+
+        public CpsOp VarConstStr(string s) { return VarConst('S' + s); }
+
+        public CpsOp VarConstNum(double n) {
+            char[] c = new char[5];
+            c[0] = 'N';
+            long b = BitConverter.DoubleToInt64Bits(n);
+            c[1] = (char)(b);
+            c[2] = (char)(b >> 16);
+            c[3] = (char)(b >> 32);
+            c[4] = (char)(b >> 48);
+            return VarConst(new string(c));
+        }
+
+        public CpsOp VarConstExact(int bas, string digs) {
+            return VarConst("X" + bas + ',' + digs);
+        }
+
+        public CpsOp EmitVarConsts() {
+            int b = thaw_heap.Count;
+            EmitInt(var_constants.Count);
+            foreach (string code in var_constants) {
+                if (code[0] == 'S') {
+                    EmitByte(0);
+                    EmitStr(code.Substring(1));
+                } else if (code[0] == 'N') {
+                    EmitByte(1);
+                    for (int j = 1; j <= 4; j++) EmitUShort(code[j]);
+                } else if (code[0] == 'X') {
+                    int sep = code.IndexOf(',');
+                    EmitExactNum(int.Parse(code.Substring(1,sep-1)), code.Substring(sep+1));
+                } else {
+                    throw new ArgumentException("wtf? " + code);
+                }
+            }
+            return CpsOp.SetSField(var_pool,
+                    CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadVariablePool"),
+                        CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
         }
 
         public CpsOp CCConst(int[] cc) {
@@ -2617,14 +2743,6 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrLongLiteral(Tokens.UInt64, (long)x));
         }
 
-        public static CpsOp BigIntegerLiteral(BigInteger x) {
-            uint[] w = x.GetWords();
-            int[] ws = new int[w.Length];
-            for (int i = 0; i < w.Length; i++) ws[i] = (int)w[i];
-            return CpsOp.ConstructorCall(Tokens.BigInteger_ctor,
-                CpsOp.ShortLiteral(x.Sign), CpsOp.NewIntArray(typeof(uint),ws));
-        }
-
         public static CpsOp DBDLiteral(MethodInfo x) {
             return new CpsOp(new ClrDBDLiteral(x));
         }
@@ -2939,64 +3057,6 @@ namespace Niecza.CLRBackend {
             }
         }
 
-        CpsOp ExactNum(int numbase, string digits) {
-            BigInteger num = BigInteger.Zero;
-            BigInteger den = BigInteger.Zero;
-
-            bool neg = false;
-
-            foreach (char d in digits) {
-                if (d == '-') neg = true;
-                if (d == '_') continue;
-                if (d == '.') {
-                    if (den != BigInteger.Zero)
-                        throw new Exception("two dots in " + digits);
-                    den = BigInteger.One;
-                    continue;
-                }
-                int digval;
-                if (d >= '0' && d <= '9') { digval = d - '0'; }
-                else if (d >= 'a' && d <= 'z') { digval = d + 10 - 'a'; }
-                else if (d >= 'A' && d <= 'Z') { digval = d + 10 - 'A'; }
-                else { throw new Exception("invalid digit in " + digits); }
-
-                if (digval >= numbase) { throw new Exception("out of range digit in " + digits); }
-
-                num *= numbase;
-                den *= numbase;
-                num += digval;
-            }
-
-            if (neg) num = -num;
-
-            if (num == BigInteger.Zero && den.Sign > 0)
-                den = BigInteger.One;
-            if (den > BigInteger.One) {
-                BigInteger g = BigInteger.GreatestCommonDivisor(num, den);
-                if (g != BigInteger.One) {
-                    num /= g;
-                    den /= g;
-                }
-            }
-
-            ulong sden;
-            if (!den.AsUInt64(out sden)) {
-                double dval = (double)num / (double)den;
-                return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_Double, CpsOp.DoubleLiteral(dval), CpsOp.GetSField(Tokens.Kernel_NumMO));
-            }
-
-            if (sden == 0) {
-                int snum;
-                if (num.AsInt32(out snum)) {
-                    return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_Int32, CpsOp.IntLiteral(snum), CpsOp.GetSField(Tokens.Kernel_IntMO));
-                }
-                return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_BigInteger, CpsOp.BigIntegerLiteral(num), CpsOp.GetSField(Tokens.Kernel_IntMO));
-            }
-
-            return CpsOp.MethodCall(Tokens.Kernel_BoxAnyMO_Rat,
-                CpsOp.ConstructorCall(Tokens.Rat_ctor, CpsOp.BigIntegerLiteral(num), CpsOp.ULongLiteral(sden)), CpsOp.GetSField(Tokens.Kernel_RatMO));
-        }
-
         CpsOp MakeDispatch(string prefix) {
             HashSet<string> names = new HashSet<string>();
             List<CpsOp> cands = new List<CpsOp>();
@@ -3099,8 +3159,6 @@ namespace Niecza.CLRBackend {
                 return CpsOp.CharLiteral(JScalar.S(zyg[1])[0]); };
             handlers["double"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.DoubleLiteral(((JScalar)zyg[1]).num); };
-            handlers["exactnum"] = delegate(NamProcessor th, object[] zyg) {
-                return th.ExactNum(JScalar.I(zyg[1]), JScalar.S(zyg[2])); };
             handlers["bool"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
@@ -3334,19 +3392,19 @@ dynamic:
                 return CpsOp.Goto("backtrack", true, call);
             };
             handlers["const"] = delegate(NamProcessor th, object[] z) {
-                string code = null;
                 object[] ch = z[1] as object[];
                 string chh = JScalar.S(ch[0]);
                 if (chh == "exactnum") {
-                    code = "X" + JScalar.S(ch[1]) + "," + JScalar.S(ch[2]);
+                    return th.sub.unit.VarConstExact(JScalar.I(ch[1]),
+                        JScalar.S(ch[2]));
                 } else if (chh == "box" && ch[1] is JScalar) {
                     string typ = JScalar.S(ch[1]);
                     object[] chch = ch[2] as object[];
                     string chchh = JScalar.S(chch[0]);
                     if (typ == "Str" && chchh == "str") {
-                        code = "S" + JScalar.S(chch[1]);
+                        return th.sub.unit.VarConstStr(JScalar.S(chch[1]));
                     } else if (typ == "Num" && chchh == "double") {
-                        code = "D" + JScalar.S(chch[1]);
+                        return th.sub.unit.VarConstNum(JScalar.N(chch[1]));
                     } else {
                         Console.WriteLine("odd constant box {0}/{1}", typ, chchh);
                     }
@@ -3361,14 +3419,7 @@ dynamic:
                     Console.WriteLine("odd constant {0}", chh);
                 }
 
-                if (code == null)
-                    return th.Constant(th.Scan(z[1]));
-
-                CpsOp r;
-                if (th.sub.unit.const_pool.TryGetValue(code, out r))
-                    return r;
-
-                return th.sub.unit.const_pool[code] = th.Constant(th.Scan(z[1]));
+                return th.Scan(z[1]);
             };
 
             thandlers["return"] = CpsOp.CpsReturn;
@@ -4430,6 +4481,7 @@ dynamic:
             unit_load.Add(unit.EmitCCConsts());
             unit_load.Add(unit.EmitCCListConsts());
             unit_load.Add(unit.EmitAltInfoConsts());
+            unit_load.Add(unit.EmitVarConsts());
 
             unit_load[0] = CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
                 Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
