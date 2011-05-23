@@ -330,6 +330,10 @@ namespace Niecza.CLRBackend {
         }
 
         public void EmitXref(Xref x) {
+            if (x == null) {
+                EmitUShort(0xFFFF);
+                return;
+            }
             EmitUShort(tdep_to_id[x.unit]);
             EmitInt(x.index);
         }
@@ -1150,6 +1154,8 @@ namespace Niecza.CLRBackend {
             typeof(object).GetMethod("ToString", new Type[0]);
         public static readonly MethodInfo RU_LoadStrArray =
             RuntimeUnit.GetMethod("LoadStrArray");
+        public static readonly MethodInfo RU_LoadClassMembers =
+            RuntimeUnit.GetMethod("LoadClassMembers");
         public static readonly MethodInfo RU_LoadSubInfo =
             RuntimeUnit.GetMethod("LoadSubInfo");
         public static readonly MethodInfo RU_LoadSignature =
@@ -4199,29 +4205,23 @@ dynamic:
                     ((Role)m).methods;
                 Attribute[] attrs = (m is Class) ? ((Class)m).attributes :
                     ((Role)m).attributes;
+                int b = unit.thaw_heap.Count;
+                unit.EmitInt(ix);
+                unit.EmitInt(methods.Length);
                 foreach (Method me in methods) {
-                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_AddMethod,
-                        CpsOp.GetSField(m.metaObject),
-                        CpsOp.IntLiteral(me.kind),
-                        CpsOp.StringLiteral(me.name),
-                        CpsOp.GetField(Tokens.SubInfo_protosub,
-                            CpsOp.GetSField(me.body.Resolve<StaticSub>().subinfo))
-                    ));
+                    unit.EmitInt(me.kind);
+                    unit.EmitStr(me.name);
+                    unit.EmitXref(me.body);
                 }
+                unit.EmitInt(attrs.Length);
                 foreach (Attribute a in attrs) {
-                    CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.P6any) :
-                        CpsOp.GetField(Tokens.SubInfo_protosub,
-                            CpsOp.GetSField(a.ibody.Resolve<StaticSub>().subinfo));
-                    CpsOp type = a.type == null ?
-                        CpsOp.GetSField(Tokens.Kernel_AnyMO) :
-                        CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
-                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_AddAttribute,
-                        CpsOp.GetSField(m.metaObject),
-                        CpsOp.StringLiteral(a.name),
-                        CpsOp.BoolLiteral(a.publ), init, type));
+                    unit.EmitStr(a.name);
+                    unit.EmitByte(a.publ ? 1 : 0);
+                    unit.EmitXref(a.ibody);
+                    unit.EmitXref(a.type);
                 }
-                thaw.Add(CpsOp.MethodCall(Tokens.DMO_Invalidate,
-                    CpsOp.GetSField(m.metaObject)));
+                thaw.Add(CpsOp.MethodCall(Tokens.RU_LoadClassMembers,
+                    CpsOp.GetSField(unit.rtunit), CpsOp.IntLiteral(b)));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject))));
             });

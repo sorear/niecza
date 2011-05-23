@@ -209,6 +209,7 @@ namespace Niecza {
 
         public object ReadXref(ref int from) {
             int unit = ReadShort(ref from);
+            if (unit == 0xFFFF) return null;
             RuntimeUnit ru = depends[unit] == null ? this : depends[unit];
             return ru.xref[ReadInt(ref from)];
         }
@@ -326,6 +327,30 @@ namespace Niecza {
             LAD[] r = new LAD[ReadShort(ref from)];
             for (int i = 0; i < r.Length; i++) r[i] = ReadLAD(ref from);
             return r;
+        }
+
+        public void LoadClassMembers(int from) {
+            STable into = (STable) xref[ReadInt(ref from)];
+            int nmethods = ReadInt(ref from);
+
+            for (int i = 0; i < nmethods; i++) {
+                into.AddMethod(ReadInt(ref from), ReadStr(ref from),
+                    ((SubInfo)ReadXref(ref from)).protosub);
+            }
+
+            int nattr = ReadInt(ref from);
+
+            for (int i = 0; i < nattr; i++) {
+                string name = ReadStr(ref from);
+                bool pub = heap[from++] != 0;
+                SubInfo init = ReadXref(ref from) as SubInfo;
+                STable type = ReadXref(ref from) as STable;
+                into.AddAttribute(name, pub,
+                        init != null ? init.protosub : null,
+                        type != null ? type : Kernel.AnyMO);
+            }
+
+            into.Invalidate();
         }
     }
 
