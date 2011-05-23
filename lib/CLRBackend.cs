@@ -171,6 +171,7 @@ namespace Niecza.CLRBackend {
         public readonly Dictionary<string, Package> exp_pkg;
         public readonly Dictionary<string, int> tdep_to_id;
         public readonly List<Unit> id_to_tdep;
+        public readonly Dictionary<string, CpsOp> const_pool;
 
         public Assembly clrAssembly;
         public Type clrType;
@@ -190,6 +191,7 @@ namespace Niecza.CLRBackend {
             exp_pkg = new Dictionary<string,Package>();
             tdep_to_id = new Dictionary<string,int>();
             id_to_tdep = new List<Unit>();
+            const_pool = new Dictionary<string,CpsOp>();
             thaw_heap = new List<byte>();
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
@@ -3194,7 +3196,55 @@ dynamic:
                 return CpsOp.Goto("backtrack", true, call);
             };
             handlers["const"] = delegate(NamProcessor th, object[] z) {
-                return th.Constant(th.Scan(z[1])); };
+                string code = null;
+                object[] ch = z[1] as object[];
+                string chh = JScalar.S(ch[0]);
+                if (chh == "exactnum") {
+                    code = "X" + JScalar.S(ch[1]) + "," + JScalar.S(ch[2]);
+                } else if (chh == "box" && ch[1] is JScalar) {
+                    string typ = JScalar.S(ch[1]);
+                    object[] chch = ch[2] as object[];
+                    string chchh = JScalar.S(chch[0]);
+                    if (typ == "Str" && chchh == "str") {
+                        code = "S" + JScalar.S(chch[1]);
+                    } else if (typ == "Num" && chchh == "double") {
+                        code = "D" + JScalar.S(chch[1]);
+                    } else {
+                        Console.WriteLine("odd constant box {0}/{1}", typ, chchh);
+                    }
+                } else if (chh == "label_table" || chh == "ladconstruct") {
+                    // probably not worth trying to coalesce
+                } else if (chh == "newcc") {
+                    StringBuilder sb = new StringBuilder("C");
+                    for (int i = 1; i < ch.Length; i++) {
+                        sb.Append(' ');
+                        sb.Append(JScalar.I(ch[i]));
+                    }
+                    code = sb.ToString();
+                } else if (chh == "fcclist_new") {
+                    StringBuilder sb = new StringBuilder("F");
+                    for (int i = 1; i < ch.Length; i++) {
+                        sb.Append(',');
+                        object[] chch = ch[i] as object[];
+                        for (int j = 1; j < chch.Length; j++) {
+                            sb.Append(' ');
+                            sb.Append(JScalar.I(chch[j]));
+                        }
+                    }
+                    code = sb.ToString();
+                } else {
+                    Console.WriteLine("odd constant {0}", chh);
+                }
+
+                if (code == null)
+                    return th.Constant(th.Scan(z[1]));
+
+                CpsOp r;
+                if (th.sub.unit.const_pool.TryGetValue(code, out r))
+                    return r;
+
+                return th.sub.unit.const_pool[code] = th.Constant(th.Scan(z[1]));
+            };
 
             thandlers["return"] = CpsOp.CpsReturn;
             thandlers["ternary"] = delegate(CpsOp[] z) {
