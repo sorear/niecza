@@ -258,10 +258,28 @@ namespace Niecza {
             return r;
         }
 
+        public AltInfo[] LoadAltInfoPool(int from) {
+            AltInfo[] pool = new AltInfo[ReadInt(ref from)];
+            for (int i = 0; i < pool.Length; i++)
+                pool[i] = new AltInfo(ReadLADArr(ref from), ReadStr(ref from),
+                    ReadIntArray(ref from));
+            return pool;
+        }
+
         public CC[] LoadCCPool(int from) {
             CC[] pool = new CC[ReadInt(ref from)];
             for (int i = 0; i < pool.Length; i++)
                 pool[i] = new CC(ReadIntArray(ref from));
+            return pool;
+        }
+
+        public CC[][] LoadCCListPool(int from) {
+            CC[][] pool = new CC[ReadInt(ref from)][];
+            for (int i = 0; i < pool.Length; i++) {
+                pool[i] = new CC[ReadInt(ref from)];
+                for (int j = 0; j < pool[i].Length; j++)
+                    pool[i][j] = new CC(ReadIntArray(ref from));
+            }
             return pool;
         }
 

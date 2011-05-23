@@ -184,6 +184,13 @@ namespace Niecza.CLRBackend {
         Dictionary<string,int> cc_constant_cache = new Dictionary<string,int>();
         List<int[]> cc_constants = new List<int[]>();
 
+        FieldInfo ccl_pool;
+        Dictionary<string,int> ccl_constant_cache = new Dictionary<string,int>();
+        List<int[][]> ccl_constants = new List<int[][]>();
+
+        FieldInfo alt_info_pool;
+        List<object> alt_info_constants = new List<object>();
+
         public Unit(object[] from, object[] code) {
             mainline_ref = Xref.from(from[0]);
             name = JScalar.S(from[1]);
@@ -320,6 +327,8 @@ namespace Niecza.CLRBackend {
         public void BindFields(Func<string,Type,FieldInfo> binder) {
             rtunit = binder("UNIT", Tokens.RuntimeUnit);
             cc_pool = binder("CC", Tokens.CC.MakeArrayType());
+            alt_info_pool = binder("ALTINFO", typeof(AltInfo).MakeArrayType());
+            ccl_pool = binder("CCL", Tokens.CC.MakeArrayType().MakeArrayType());
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
@@ -447,6 +456,72 @@ namespace Niecza.CLRBackend {
                 EmitIntArray(cc);
             return CpsOp.SetSField(cc_pool,
                     CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadCCPool"),
+                        CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
+        }
+
+        public CpsOp CCListConst(int[][] ccl) {
+            StringBuilder code = new StringBuilder();
+            foreach (int[] cc in ccl) {
+                code.Append((char)(cc.Length >> 16));
+                code.Append((char)(cc.Length));
+                foreach (int x in cc) {
+                    code.Append((char)x);
+                    code.Append((char)(x>>16));
+                }
+            }
+            string fcode = code.ToString();
+            int ix;
+            if (!ccl_constant_cache.TryGetValue(fcode, out ix)) {
+                ccl_constant_cache[fcode] = ix = ccl_constants.Count;
+                ccl_constants.Add(ccl);
+            }
+            return CpsOp.Operator(Tokens.CC.MakeArrayType(), OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(ccl_pool), CpsOp.IntLiteral(ix));
+        }
+
+        public CpsOp EmitCCListConsts() {
+            int b = thaw_heap.Count;
+            EmitInt(ccl_constants.Count);
+            foreach (int[][] ccl in ccl_constants) {
+                EmitInt(ccl.Length);
+                foreach (int[] cc in ccl)
+                    EmitIntArray(cc);
+            }
+            return CpsOp.SetSField(ccl_pool,
+                    CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadCCListPool"),
+                        CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
+        }
+
+        public CpsOp AltInfoConst(CgContext cx, object lads, string dba, string[] labels) {
+            int ix = alt_info_constants.Count / 4;
+            alt_info_constants.Add(cx);
+            alt_info_constants.Add(lads);
+            alt_info_constants.Add(dba);
+            alt_info_constants.Add(labels);
+
+            return CpsOp.Operator(typeof(AltInfo), OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(alt_info_pool), CpsOp.IntLiteral(ix));
+        }
+
+        public CpsOp EmitAltInfoConsts() {
+            int b = thaw_heap.Count;
+            EmitInt(alt_info_constants.Count / 4);
+            for (int i = 0; i < alt_info_constants.Count; i += 4) {
+                CgContext cx = (CgContext) alt_info_constants[i];
+                object lads = alt_info_constants[i+1];
+                string dba = (string) alt_info_constants[i+2];
+                string[] labels = (string[]) alt_info_constants[i+3];
+
+                EmitLADArr(lads);
+                EmitStr(dba);
+                int[] lids = new int[labels.Length];
+                for (int j = 0; j < labels.Length; j++)
+                    lids[j] = cx.named_cases[labels[j]];
+                EmitIntArray(lids);
+            }
+
+            return CpsOp.SetSField(alt_info_pool,
+                    CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadAltInfoPool"),
                         CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
         }
     }
@@ -3278,16 +3353,10 @@ dynamic:
                 } else if (chh == "newcc") {
                     return th.sub.unit.CCConst(JScalar.IA(1, ch));
                 } else if (chh == "fcclist_new") {
-                    StringBuilder sb = new StringBuilder("F");
-                    for (int i = 1; i < ch.Length; i++) {
-                        sb.Append(',');
-                        object[] chch = ch[i] as object[];
-                        for (int j = 1; j < chch.Length; j++) {
-                            sb.Append(' ');
-                            sb.Append(JScalar.I(chch[j]));
-                        }
-                    }
-                    code = sb.ToString();
+                    int[][] ccl = new int[ch.Length - 1][];
+                    for (int i = 1; i < ch.Length; i++)
+                        ccl[i-1] = JScalar.IA(1, ch[i]);
+                    return th.sub.unit.CCListConst(ccl);
                 } else {
                     Console.WriteLine("odd constant {0}", chh);
                 }
@@ -3446,13 +3515,11 @@ dynamic:
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
                     CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2]))); };
             handlers["ltm_push_alts"] = delegate(NamProcessor th, object[] z) {
-                CpsOp ai = CpsOp.ConstructorCall(typeof(AltInfo).GetConstructor(new Type[] { typeof(LAD[]), typeof(string), typeof(int[]) }),
-                        th.ProcessLADArr(z[1]),
-                        CpsOp.StringLiteral(JScalar.S(z[2])),
-                        CpsOp.LabelTable(th.cpb.cx, JScalar.SA(0,z[3])));
+                CpsOp ai = th.sub.unit.AltInfoConst(th.cpb.cx, z[1],
+                    JScalar.S(z[2]), JScalar.SA(0,z[3]));
                 return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                    CpsOp.CallFrame(), th.Constant(ai)); };
+                    CpsOp.CallFrame(), ai); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
             thandlers["rxend"] = RxCall(Tokens.Void, "End");
             thandlers["rxfinalend"] = RxCall(Tokens.Void, "FinalEnd");
@@ -4361,6 +4428,8 @@ dynamic:
             List<CpsOp> unit_load = new List<CpsOp>();
             unit_load.Add(null);
             unit_load.Add(unit.EmitCCConsts());
+            unit_load.Add(unit.EmitCCListConsts());
+            unit_load.Add(unit.EmitAltInfoConsts());
 
             unit_load[0] = CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
                 Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
