@@ -279,18 +279,42 @@ namespace Niecza {
             return new string(r);
         }
 
-        public SubInfo LoadSubInfo(int from, DynBlockDelegate code, SubInfo outer) {
-            return new SubInfo(
+        public const int MAKE_PROTOPAD = 2;
+        public const int SUB_HAS_TYPE = 4;
+        public const int SUB_IS_UNSAFE = 8;
+        public const int SUB_IS_PARAM_ROLE = 16;
+
+        public SubInfo LoadSubInfo(int from, DynBlockDelegate code) {
+            int ix = ReadInt(ref from);
+            byte spec = heap[from++];
+            SubInfo ns = new SubInfo(
                 ReadStr(ref from), /*name*/
                 ReadIntArray(ref from), /*lines*/
                 code,
-                outer,
+                (SubInfo)ReadXref(ref from), /*outer*/
                 ReadLAD(ref from),
                 ReadIntArray(ref from), /*ehspan*/
                 ReadStrArray(ref from), /*ehlabel*/
                 ReadInt(ref from), /*nspill*/
                 ReadStrArray(ref from), /*dylexn*/
                 ReadIntArray(ref from)); /*dylexi*/
+
+            xref[ix] = ns;
+
+            if ((spec & SUB_IS_UNSAFE) != 0)
+                Kernel.CheckUnsafe(ns);
+            if ((spec & SUB_HAS_TYPE) != 0)
+                ns.mo = (STable) ReadXref(ref from);
+            if ((spec & MAKE_PROTOPAD) != 0)
+                ns.protopad = new Frame(null,
+                    ns.outer == null ? null : ns.outer.protopad, ns);
+            if (ns.outer == null || ns.outer.protopad != null)
+                ns.protosub = Kernel.MakeSub(ns,
+                    ns.outer == null ? null : ns.outer.protopad);
+            if ((spec & SUB_IS_PARAM_ROLE) != 0)
+                ((STable) ReadXref(ref from)).FillParametricRole(ns.protosub);
+
+            return ns;
         }
 
         public LAD LoadLAD(int from) {
@@ -376,6 +400,7 @@ namespace Niecza {
         // for inheriting hints
         public SubInfo outer;
         public P6any protosub;
+        public Frame protopad;
         public string name;
         public Dictionary<string, BValue> hints;
         // maybe should be a hint

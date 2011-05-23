@@ -202,8 +202,10 @@ namespace Niecza.CLRBackend {
                     xref[i] = new StaticSub(this, xr, (code != null &&
                             i < code.Length) ? (object[])code[i] : null);
                 } else {
-                    xref[i] = Package.From(xr);
-                    (xref[i] as Package).NoteExports(exp_pkg);
+                    Package p = Package.From(xr);
+                    xref[i] = p;
+                    p.own_xref = new Xref(name, i, p.name);
+                    p.NoteExports(exp_pkg);
                 }
             }
             tdeps = from[8] as object[];
@@ -428,6 +430,9 @@ namespace Niecza.CLRBackend {
         public static Xref from(object x) {
             return (x == null) ? null : new Xref(x as object[]);
         }
+        public Xref(string unit, int index, string name) {
+            this.unit = unit; this.index = index; this.name = name;
+        }
         public Xref(object[] from) : this(from, 0) {}
         public Xref(object[] from, int ofs) {
             unit  = ((JScalar)from[ofs+0]).str;
@@ -438,6 +443,7 @@ namespace Niecza.CLRBackend {
     }
 
     class Package {
+        public Xref own_xref;
         public readonly string name;
         public readonly string type;
         public readonly object[] exports;
@@ -1171,6 +1177,8 @@ namespace Niecza.CLRBackend {
             BValue.GetField("v");
         public static readonly FieldInfo SubInfo_protosub =
             SubInfo.GetField("protosub");
+        public static readonly FieldInfo SubInfo_protopad =
+            SubInfo.GetField("protopad");
         public static readonly FieldInfo SubInfo_mo =
             SubInfo.GetField("mo");
         public static readonly FieldInfo SubInfo_sig_i =
@@ -3715,21 +3723,32 @@ dynamic:
                 CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
         }
 
-        public CpsOp SubInfoCtor() {
-            CpsOp[] args = new CpsOp[4];
+        public void SubInfoCtor(int ix, List<CpsOp> thaw) {
+            CpsOp[] args = new CpsOp[3];
 
             int b = sub.unit.thaw_heap.Count;
+
+            int spec = 0;
+
+            if ((sub.flags & StaticSub.UNSAFE) != 0)
+                spec |= RuntimeUnit.SUB_IS_UNSAFE;
+            if (sub.sclass != "Sub")
+                spec |= RuntimeUnit.SUB_HAS_TYPE;
+            if (sub.protopad != null)
+                spec |= RuntimeUnit.MAKE_PROTOPAD;
+            if (sub.parametric_role_hack != null)
+                spec |= RuntimeUnit.SUB_IS_PARAM_ROLE;
 
             args[0] = CpsOp.GetSField(sub.unit.rtunit);
             args[1] = CpsOp.IntLiteral(b);
             args[2] = CpsOp.DBDLiteral(cpb.mb);
-            args[3] = (sub.outer != null) ?
-                CpsOp.GetSField(sub.outer.Resolve<StaticSub>().subinfo) :
-                CpsOp.Null(Tokens.SubInfo);
 
+            sub.unit.EmitInt(ix);
+            sub.unit.EmitByte(spec);
             sub.unit.EmitStr(sub.unit.name + " " +
                     (sub.name == "ANON" ? cpb.mb.Name : sub.name));
             sub.unit.EmitIntArray(cpb.cx.lineBuffer.ToArray());
+            sub.unit.EmitXref(sub.outer);
             sub.unit.EmitLAD(sub.ltm);
             sub.unit.EmitIntArray(cpb.cx.ehspanBuffer.ToArray());
             sub.unit.EmitStrArray(cpb.cx.ehlabelBuffer.ToArray());
@@ -3748,7 +3767,18 @@ dynamic:
             sub.unit.EmitStrArray(dylexn.ToArray());
             sub.unit.EmitIntArray(dylexi.ToArray());
 
-            return CpsOp.MethodCall(Tokens.RU_LoadSubInfo, args);
+            if ((spec & RuntimeUnit.SUB_HAS_TYPE) != 0)
+                sub.unit.EmitXref(sub.GetCorePackage(sub.sclass).own_xref);
+
+            if (sub.parametric_role_hack != null)
+                sub.unit.EmitXref(sub.parametric_role_hack);
+
+            thaw.Add(CpsOp.SetSField(sub.subinfo,
+                CpsOp.MethodCall(Tokens.RU_LoadSubInfo, args)));
+            if (sub.protopad != null)
+                thaw.Add(CpsOp.SetSField(sub.protopad,
+                    CpsOp.GetField(Tokens.SubInfo_protopad,
+                        CpsOp.GetSField(sub.subinfo))));
         }
 
         void EnterCode(List<object> frags) {
@@ -4147,47 +4177,7 @@ dynamic:
 
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub2 {0}", obj.name);
-                thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
-                thaw.Add(CpsOp.Operator(Tokens.Void, OpCodes.Stelem_Ref,
-                    CpsOp.GetField(Tokens.RU_xref,CpsOp.GetSField(unit.rtunit)),
-                    CpsOp.IntLiteral(ix), CpsOp.GetSField(obj.subinfo)));
-                if ((obj.flags & StaticSub.UNSAFE) != 0)
-                    thaw.Add(CpsOp.MethodCall(Tokens.Kernel_CheckUnsafe,
-                            CpsOp.GetSField(obj.subinfo)));
-                if (obj.sclass != "Sub") {
-                    Class c = (Class) obj.GetCorePackage(obj.sclass);
-                    thaw.Add(CpsOp.SetField(Tokens.SubInfo_mo,
-                        CpsOp.GetSField(obj.subinfo),
-                        CpsOp.GetSField(c.metaObject)));
-                }
-
-                if (obj.protopad != null) {
-                    thaw.Add(CpsOp.SetSField(obj.protopad,
-                        CpsOp.ConstructorCall(Tokens.Frame_ctor,
-                            CpsOp.Null(Tokens.Frame),
-                            (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
-                                CpsOp.GetSField(obj.outer.Resolve<StaticSub>().protopad)),
-                            CpsOp.GetSField(obj.subinfo))));
-                }
-
-                if (obj.outer == null || (obj.outer.Resolve<StaticSub>().flags
-                            & StaticSub.SPAD_EXISTS) != 0) {
-                    thaw.Add(CpsOp.SetField(Tokens.SubInfo_protosub,
-                        CpsOp.GetSField(obj.subinfo),
-                        CpsOp.MethodCall(Tokens.Kernel_MakeSub,
-                            CpsOp.GetSField(obj.subinfo),
-                            (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
-                                CpsOp.GetSField(obj.outer.Resolve<StaticSub>().protopad)))));
-
-                    if (obj.parametric_role_hack != null) {
-                        ParametricRole pr = obj.parametric_role_hack.
-                            Resolve<ParametricRole>();
-                        thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillParametricRole,
-                            CpsOp.GetSField(pr.metaObject),
-                            CpsOp.GetField(Tokens.SubInfo_protosub,
-                                CpsOp.GetSField(obj.subinfo))));
-                    }
-                }
+                aux[ix].SubInfoCtor(ix, thaw);
             });
 
             unit.VisitPackages(delegate(int ix, Package p) {
