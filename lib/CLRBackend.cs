@@ -308,7 +308,7 @@ namespace Niecza.CLRBackend {
         }
 
         public void BindFields(Func<string,Type,FieldInfo> binder) {
-            rtunit = binder("UNIT", typeof(RuntimeUnit));
+            rtunit = binder("UNIT", Tokens.RuntimeUnit);
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
@@ -323,6 +323,11 @@ namespace Niecza.CLRBackend {
             thaw_heap.Add((byte)xp); xp >>= 8;
             thaw_heap.Add((byte)xp); xp >>= 8;
             thaw_heap.Add((byte)xp); xp >>= 8;
+        }
+
+        public void EmitXref(Xref x) {
+            EmitUShort(tdep_to_id[x.unit]);
+            EmitInt(x.index);
         }
 
         public void EmitByte(int x) {
@@ -951,6 +956,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type RxFrame = typeof(RxFrame);
         public static readonly Type CC = typeof(CC);
         public static readonly Type LAD = typeof(LAD);
+        public static readonly Type RuntimeUnit = typeof(RuntimeUnit);
 
         public static readonly ConstructorInfo SubInfo_ctor =
             SubInfo.GetConstructor(new Type[] {
@@ -1121,6 +1127,16 @@ namespace Niecza.CLRBackend {
             typeof(Console).GetMethod("get_Error");
         public static readonly MethodInfo Object_ToString =
             typeof(object).GetMethod("ToString", new Type[0]);
+        public static readonly MethodInfo RU_LoadStrArray =
+            RuntimeUnit.GetMethod("LoadStrArray");
+        public static readonly MethodInfo RU_LoadSubInfo =
+            RuntimeUnit.GetMethod("LoadSubInfo");
+        public static readonly MethodInfo RU_LoadSignature =
+            RuntimeUnit.GetMethod("LoadSignature");
+        public static readonly MethodInfo RU_LoadLAD =
+            RuntimeUnit.GetMethod("LoadLAD");
+        public static readonly MethodInfo RU_LoadLADArr =
+            RuntimeUnit.GetMethod("LoadLADArr");
 
         public static readonly FieldInfo P6any_mo =
             P6any.GetField("mo");
@@ -1178,6 +1194,7 @@ namespace Niecza.CLRBackend {
             typeof(Frame).GetField("lex8"),
             typeof(Frame).GetField("lex9")
         };
+        public static readonly FieldInfo RU_xref = RuntimeUnit.GetField("xref");
 
         public const int NumInt32 = 2;
         public const int NumInline = 10;
@@ -2629,10 +2646,11 @@ namespace Niecza.CLRBackend {
             if (vec.Length == 0 && omit) {
                 return Null(typeof(string[]));
             } else {
-                CpsOp[] tmp = new CpsOp[vec.Length];
-                for (int i = 0; i < vec.Length; i++)
-                    tmp[i] = CpsOp.StringLiteral(vec[i]);
-                return NewArray(Tokens.String, tmp);
+                Unit u = CLRBackend.Current.unit;
+                int b = u.thaw_heap.Count;
+                u.EmitStrArray(vec);
+                return MethodCall(Tokens.RU_LoadStrArray,
+                        GetSField(u.rtunit), IntLiteral(b));
             }
         }
 
@@ -3612,14 +3630,14 @@ dynamic:
         public CpsOp ProcessLADArr(object l) {
             int o = sub.unit.thaw_heap.Count;
             sub.unit.EmitLADArr(l);
-            return CpsOp.MethodCall(typeof(RuntimeUnit).GetMethod("LoadLADArr"),
+            return CpsOp.MethodCall(Tokens.RU_LoadLADArr,
                 CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
         }
 
         public CpsOp ProcessLAD(object l) {
             int o = sub.unit.thaw_heap.Count;
             sub.unit.EmitLAD(l);
-            return CpsOp.MethodCall(typeof(RuntimeUnit).GetMethod("LoadLAD"),
+            return CpsOp.MethodCall(Tokens.RU_LoadLAD,
                 CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
         }
 
@@ -3656,7 +3674,7 @@ dynamic:
             sub.unit.EmitStrArray(dylexn.ToArray());
             sub.unit.EmitIntArray(dylexi.ToArray());
 
-            return CpsOp.MethodCall(typeof(RuntimeUnit).GetMethod("LoadSubInfo"), args);
+            return CpsOp.MethodCall(Tokens.RU_LoadSubInfo, args);
         }
 
         void EnterCode(List<object> frags) {
@@ -3888,8 +3906,10 @@ dynamic:
 
         void EncodeSignature(List<CpsOp> thaw, StaticSub obj) {
             if (obj.sig == null) return;
+            int b = obj.unit.thaw_heap.Count;
+
             List<int> sig_i   = new List<int>();
-            List<CpsOp> sig_r = new List<CpsOp>();
+            List<object> sig_r = new List<object>();
             object[] rsig = (object[]) obj.sig;
             foreach (object p in rsig) {
                 object[] param = (object[]) p;
@@ -3900,9 +3920,9 @@ dynamic:
                 Xref     deflt = Xref.from(param[4]);
                 Xref     type  = Xref.from(param[5]);
 
-                sig_r.Add(CpsOp.StringLiteral(name));
+                sig_r.Add(name);
                 foreach (string n in names)
-                    sig_r.Add(CpsOp.StringLiteral(n));
+                    sig_r.Add(n);
                 int ufl = 0;
                 if ((flags & 4) != 0) ufl |= SubInfo.SIG_F_RWTRANS;
                 else if ((flags & 64) != 0) ufl |= SubInfo.SIG_F_READWRITE;
@@ -3913,11 +3933,11 @@ dynamic:
                 if ((flags & 2048) != 0) ufl |= SubInfo.SIG_F_MULTI_IGNORED;
                 if (deflt != null) {
                     ufl |= SubInfo.SIG_F_HASDEFAULT;
-                    sig_r.Add(CpsOp.GetSField(deflt.Resolve<StaticSub>().subinfo));
+                    sig_r.Add(deflt);
                 }
                 if (type != null) {
                     ufl |= SubInfo.SIG_F_HASTYPE;
-                    sig_r.Add(CpsOp.GetSField(type.Resolve<Class>().metaObject));
+                    sig_r.Add(type);
                 }
                 if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
                 if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;
@@ -3931,10 +3951,19 @@ dynamic:
                 sig_i.Add(slot == null ? -1 : ((LexVarish)obj.l_lexicals[slot]).index);
                 sig_i.Add(names.Length);
             }
-            thaw.Add(CpsOp.SetField(Tokens.SubInfo_sig_i,
-                CpsOp.GetSField(obj.subinfo), CpsOp.NewIntArray(Tokens.Int32, sig_i.ToArray())));
-            thaw.Add(CpsOp.SetField(Tokens.SubInfo_sig_r,
-                CpsOp.GetSField(obj.subinfo), CpsOp.NewArray(typeof(object), sig_r.ToArray())));
+            obj.unit.EmitIntArray(sig_i.ToArray());
+            obj.unit.EmitInt(sig_r.Count);
+            foreach (object o in sig_r) {
+                if (o is string) {
+                    obj.unit.EmitStr((string)o);
+                } else {
+                    obj.unit.EmitStr(null);
+                    obj.unit.EmitXref((Xref)o);
+                }
+            }
+            thaw.Add(CpsOp.MethodCall(Tokens.RU_LoadSignature,
+                CpsOp.GetSField(obj.unit.rtunit), CpsOp.GetSField(obj.subinfo),
+                CpsOp.IntLiteral(b)));
         }
 
         void SetProtolex(StaticSub obj, string n, LexVarish v, CpsOp init) {
@@ -3959,6 +3988,8 @@ dynamic:
                 thaw.Add(CpsOp.Sink(CpsOp.MethodCall(Tokens.Kernel_BootModule,
                     CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")))));
             }
+            int unit_slot = thaw.Count;
+            thaw.Add(null);
 
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
@@ -3986,6 +4017,9 @@ dynamic:
                         CpsOp.GetSField(km) :
                         CpsOp.ConstructorCall(Tokens.DMO_ctor,
                             new CpsOp[] { CpsOp.StringLiteral(m.name) })));
+                thaw.Add(CpsOp.Operator(Tokens.Void, OpCodes.Stelem_Ref,
+                    CpsOp.GetField(Tokens.RU_xref,CpsOp.GetSField(unit.rtunit)),
+                    CpsOp.IntLiteral(ix), CpsOp.GetSField(m.metaObject)));
 
                 if (m is Role) {
                     Role r = (Role) m;
@@ -4040,6 +4074,9 @@ dynamic:
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub2 {0}", obj.name);
                 thaw.Add(CpsOp.SetSField(obj.subinfo, aux[ix].SubInfoCtor()));
+                thaw.Add(CpsOp.Operator(Tokens.Void, OpCodes.Stelem_Ref,
+                    CpsOp.GetField(Tokens.RU_xref,CpsOp.GetSField(unit.rtunit)),
+                    CpsOp.IntLiteral(ix), CpsOp.GetSField(obj.subinfo)));
                 if ((obj.flags & StaticSub.UNSAFE) != 0)
                     thaw.Add(CpsOp.MethodCall(Tokens.Kernel_CheckUnsafe,
                             CpsOp.GetSField(obj.subinfo)));
@@ -4227,13 +4264,13 @@ dynamic:
 
             List<CpsOp> tdep_rtu = new List<CpsOp>();
             foreach (Unit td in unit.id_to_tdep)
-                tdep_rtu.Add(td == unit ? CpsOp.Null(typeof(RuntimeUnit)) :
+                tdep_rtu.Add(td == unit ? CpsOp.Null(Tokens.RuntimeUnit) :
                         CpsOp.GetSField(td.rtunit));
-            thaw.Insert(0, CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
-                typeof(RuntimeUnit).GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
+            thaw[unit_slot] =CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
+                Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
                 CpsOp.NewByteArray(typeof(byte), unit.thaw_heap.ToArray()),
-                CpsOp.NewArray(typeof(RuntimeUnit), tdep_rtu.ToArray()),
-                CpsOp.IntLiteral(unit.xref.Length))));
+                CpsOp.NewArray(Tokens.RuntimeUnit, tdep_rtu.ToArray()),
+                CpsOp.IntLiteral(unit.xref.Length)));
 
             CpsBuilder boot = new CpsBuilder(this, "BOOT", true);
             boot.Build(CpsOp.Sequence(thaw.ToArray()));

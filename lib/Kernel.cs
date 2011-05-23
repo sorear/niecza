@@ -207,6 +207,29 @@ namespace Niecza {
             return (int)r;
         }
 
+        public object ReadXref(ref int from) {
+            int unit = ReadShort(ref from);
+            RuntimeUnit ru = depends[unit] == null ? this : depends[unit];
+            return ru.xref[ReadInt(ref from)];
+        }
+
+        public void LoadSignature(SubInfo si, int from) {
+            si.sig_i = ReadIntArray(ref from);
+            si.sig_r = new object[ReadInt(ref from)];
+            //Console.WriteLine("{0} {1} {2}", si.name, si.sig_i.Length, si.sig_r.Length);
+            for (int i = 0; i < si.sig_r.Length; i++) {
+                string st = ReadStr(ref from);
+                if (st == null) {
+                    si.sig_r[i] = ReadXref(ref from);
+                    //Console.WriteLine("{0} {1}", si.sig_r[i].GetType(),
+                    //    (si.sig_r[i] is SubInfo) ? ((SubInfo)si.sig_r[i]).name :
+                    //    (si.sig_r[i] is STable) ? ((STable)si.sig_r[i]).name :
+                    //    "<...>");
+                } else
+                    si.sig_r[i] = st;
+            }
+        }
+
         public int ReadShort(ref int from) {
             uint r = 0;
             r |= ((uint)heap[from++] <<  0);
@@ -220,6 +243,10 @@ namespace Niecza {
             int[] r = new int[l];
             for (int i = 0; i < r.Length; i++) r[i] = ReadInt(ref from);
             return r;
+        }
+
+        public string[] LoadStrArray(int from) {
+            return ReadStrArray(ref from);
         }
 
         public string[] ReadStrArray(ref int from) {
