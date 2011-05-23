@@ -325,9 +325,11 @@ augment class Op::SubDef { #OK exist
                 }
                 push @*opensubs[*-1].augment_hack,
                     [ $.multiness, @$.bindmethod, $.symbol, $r ];
+                $!bindlex = True; # need to keep the symbol
             } else {
-                $*unit.deref(@*opensubs[*-1].body_of)\
-                    .add_method($.multiness, |$.bindmethod, $.symbol, $r);
+                my $in = $*unit.deref(@*opensubs[*-1].body_of);
+                $in.add_method($.multiness, |$.bindmethod, $.symbol, $r);
+                $!bindlex = True if $in ~~ ::Metamodel::ParametricRole;
             }
         }
 
