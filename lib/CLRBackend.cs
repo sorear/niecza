@@ -187,6 +187,10 @@ namespace Niecza.CLRBackend {
         Dictionary<string,int> ccl_constant_cache = new Dictionary<string,int>();
         List<int[][]> ccl_constants = new List<int[][]>();
 
+        FieldInfo sl_pool;
+        Dictionary<string,int> sl_constant_cache = new Dictionary<string,int>();
+        List<string[]> sl_constants = new List<string[]>();
+
         FieldInfo var_pool;
         Dictionary<string,int> var_constant_cache = new Dictionary<string,int>();
         List<string> var_constants = new List<string>();
@@ -332,6 +336,7 @@ namespace Niecza.CLRBackend {
             alt_info_pool = binder("ALTINFO", typeof(AltInfo).MakeArrayType());
             ccl_pool = binder("CCL", Tokens.CC.MakeArrayType().MakeArrayType());
             var_pool = binder("UVAR", Tokens.Variable.MakeArrayType());
+            sl_pool = binder("STRLISTS", Tokens.String.MakeArrayType().MakeArrayType());
             VisitSubsPostorder(delegate(int ix, StaticSub sub) {
                 sub.BindFields(ix, binder);
             });
@@ -582,6 +587,34 @@ namespace Niecza.CLRBackend {
                 EmitIntArray(cc);
             return CpsOp.SetSField(cc_pool,
                     CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadCCPool"),
+                        CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
+        }
+
+        public CpsOp StringListConst(string[] sl) {
+            StringBuilder code = new StringBuilder();
+            foreach (string s in sl) {
+                code.Append((char)(s.Length >> 16));
+                code.Append((char)(s.Length));
+                code.Append(s);
+            }
+            string fcode = code.ToString();
+            int ix;
+            if (!sl_constant_cache.TryGetValue(fcode, out ix)) {
+                sl_constant_cache[fcode] = ix = sl_constants.Count;
+                sl_constants.Add(sl);
+            }
+            return CpsOp.Operator(Tokens.String.MakeArrayType(), OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(sl_pool), CpsOp.IntLiteral(ix));
+        }
+
+        public CpsOp EmitStringListConsts() {
+            int b = thaw_heap.Count;
+            EmitInt(sl_constants.Count);
+            foreach (string[] sl in sl_constants) {
+                EmitStrArray(sl);
+            }
+            return CpsOp.SetSField(sl_pool,
+                    CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadStrListPool"),
                         CpsOp.GetSField(rtunit), CpsOp.IntLiteral(b)));
         }
 
@@ -3086,16 +3119,6 @@ namespace Niecza.CLRBackend {
                     CpsOp.NewArray(Tokens.P6any, cands.ToArray())));
         }
 
-        CpsOp Constant(CpsOp val) {
-            if (val.stmts.Length != 0 || val.head.HasCases)
-                throw new ArgumentException();
-            FieldBuilder fb =
-                cpb.tb.DefineField("K" + cpb.module.constants++,
-                        val.head.Returns, FieldAttributes.Static);
-            cpb.module.thaw.Add(CpsOp.SetSField(fb, val));
-            return CpsOp.GetSField(fb);
-        }
-
         CpsOp SubyCall(bool ismethod, object[] zyg) {
             int sh = ismethod ? 3 : 2;
             string sig = ((JScalar) zyg[sh-1]).str;
@@ -3377,10 +3400,10 @@ dynamic:
                     CpsOp.NewIntArray(Tokens.Int32, vec));
             };
             handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
-                CpsOp strs = CpsOp.StringArray(false, JScalar.SA(2,z));
+                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(2,z));
                 return CpsOp.MethodCall(Tokens.RxFrame_PushCapture,
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                    th.Constant(strs), th.Scan(z[1]));
+                    strs, th.Scan(z[1]));
             };
             handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] args = new CpsOp[z.Length - 1];
@@ -4129,7 +4152,6 @@ dynamic:
         internal Unit unit;
         internal string dir;
 
-        internal int constants;
         internal List<CpsOp> thaw = new List<CpsOp>();
 
         public static int Verbose =
@@ -4482,6 +4504,7 @@ dynamic:
             unit_load.Add(unit.EmitCCListConsts());
             unit_load.Add(unit.EmitAltInfoConsts());
             unit_load.Add(unit.EmitVarConsts());
+            unit_load.Add(unit.EmitStringListConsts());
 
             unit_load[0] = CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
                 Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),

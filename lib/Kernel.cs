@@ -320,6 +320,13 @@ namespace Niecza {
             return pool;
         }
 
+        public string[][] LoadStrListPool(int from) {
+            string[][] pool = new string[ReadInt(ref from)][];
+            for (int i = 0; i < pool.Length; i++)
+                pool[i] = ReadStrArray(ref from);
+            return pool;
+        }
+
         public CC[][] LoadCCListPool(int from) {
             CC[][] pool = new CC[ReadInt(ref from)][];
             for (int i = 0; i < pool.Length; i++) {
