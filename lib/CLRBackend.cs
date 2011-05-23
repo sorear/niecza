@@ -178,6 +178,7 @@ namespace Niecza.CLRBackend {
         bool depsBound;
         public FieldInfo rtunit;
         public List<byte> thaw_heap;
+        public Dictionary<string,int> existing_strings;
 
         public Unit(object[] from, object[] code) {
             mainline_ref = Xref.from(from[0]);
@@ -193,6 +194,7 @@ namespace Niecza.CLRBackend {
             id_to_tdep = new List<Unit>();
             const_pool = new Dictionary<string,CpsOp>();
             thaw_heap = new List<byte>();
+            existing_strings = new Dictionary<string,int>();
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
@@ -348,8 +350,29 @@ namespace Niecza.CLRBackend {
 
         public void EmitStr(string s) {
             if (s == null) { EmitUShort(0xFFFF); return; }
-            EmitUShort(s.Length);
-            foreach(char c in s) EmitUShort((int)c);
+            int l;
+            if (existing_strings.TryGetValue(s, out l)) {
+                if (l >= 0x3FFF) {
+                    EmitInt(l * 4 + 1);
+                } else {
+                    EmitUShort(l * 4 + 3);
+                }
+            } else {
+                existing_strings[s] = thaw_heap.Count;
+                bool wide = false;
+                foreach (char c in s) if (c > 0xFF) wide = true;
+                l = s.Length * 8;
+                if (wide) l+= 4;
+                if (l >= 0xFFF0) {
+                    EmitInt(l);
+                } else {
+                    EmitUShort(l + 2);
+                }
+                foreach(char c in s) {
+                    if (wide) EmitUShort((int)c);
+                    else EmitByte((int)c);
+                }
+            }
         }
 
         public void EmitIntArray(int[] s) {
@@ -3178,13 +3201,10 @@ dynamic:
                     CpsOp.NewIntArray(Tokens.Int32, vec));
             };
             handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
-                CpsOp[] strs = new CpsOp[z.Length - 2];
-                for(int i = 0; i < strs.Length; i++)
-                    strs[i] = CpsOp.StringLiteral(FixStr(z[i+2]));
-                CpsOp vec = th.Constant(CpsOp.NewArray(Tokens.String, strs));
+                CpsOp strs = CpsOp.StringArray(false, JScalar.SA(2,z));
                 return CpsOp.MethodCall(Tokens.RxFrame_PushCapture,
-                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()), vec,
-                    th.Scan(z[1]));
+                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
+                    th.Constant(strs), th.Scan(z[1]));
             };
             handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] args = new CpsOp[z.Length - 1];

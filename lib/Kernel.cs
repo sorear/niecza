@@ -259,9 +259,22 @@ namespace Niecza {
 
         public string ReadStr(ref int from) {
             int l = ReadShort(ref from);
+            if ((l & 2) == 0) l |= (ReadShort(ref from) << 16);
             if (l == 0xffff) return null;
-            char[] r = new char[l];
-            for (int i = 0; i < r.Length; i++) r[i] = (char)ReadShort(ref from);
+
+            if ((l & 1) != 0) {
+                int rf = l >> 2;
+                return ReadStr(ref rf);
+            }
+
+            char[] r = new char[l >> 3];
+            if ((l & 4) != 0) {
+                for (int i = 0; i < r.Length; i++)
+                    r[i] = (char)ReadShort(ref from);
+            } else {
+                for (int i = 0; i < r.Length; i++)
+                    r[i] = (char)heap[from++];
+            }
             return new string(r);
         }
 
