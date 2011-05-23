@@ -340,13 +340,21 @@ namespace Niecza.CLRBackend {
         }
 
         public void EmitStr(string s) {
+            if (s == null) { EmitUShort(0xFFFF); return; }
             EmitUShort(s.Length);
             foreach(char c in s) EmitUShort((int)c);
         }
 
         public void EmitIntArray(int[] s) {
+            if (s == null) { EmitInt(-1); return; }
             EmitInt(s.Length);
             foreach(int c in s) EmitInt(c);
+        }
+
+        public void EmitStrArray(string[] s) {
+            if (s == null) { EmitInt(-1); return; }
+            EmitInt(s.Length);
+            foreach(string c in s) EmitStr(c);
         }
 
         public void EmitLADArr(object lad) {
@@ -356,6 +364,10 @@ namespace Niecza.CLRBackend {
         }
 
         public void EmitLAD(object lad) {
+            if (lad == null) {
+                EmitByte(0);
+                return;
+            }
             object[] body = (object[]) lad;
             string head = JScalar.S(body[0]);
 
@@ -3612,19 +3624,25 @@ dynamic:
         }
 
         public CpsOp SubInfoCtor() {
-            CpsOp[] args = new CpsOp[10];
-            args[0] = CpsOp.StringLiteral(sub.unit.name + " " +
-                    (sub.name == "ANON" ? cpb.mb.Name : sub.name));
-            args[1] = CpsOp.NewIntArray(Tokens.Int32, cpb.cx.lineBuffer.ToArray());
+            CpsOp[] args = new CpsOp[4];
+
+            int b = sub.unit.thaw_heap.Count;
+
+            args[0] = CpsOp.GetSField(sub.unit.rtunit);
+            args[1] = CpsOp.IntLiteral(b);
             args[2] = CpsOp.DBDLiteral(cpb.mb);
             args[3] = (sub.outer != null) ?
                 CpsOp.GetSField(sub.outer.Resolve<StaticSub>().subinfo) :
                 CpsOp.Null(Tokens.SubInfo);
-            args[4] = (sub.ltm != null) ? ProcessLAD(sub.ltm) :
-                CpsOp.Null(Tokens.LAD);
-            args[5] = CpsOp.NewIntArray(Tokens.Int32, cpb.cx.ehspanBuffer.ToArray() );
-            args[6] = CpsOp.StringArray( true, cpb.cx.ehlabelBuffer.ToArray() );
-            args[7] = CpsOp.IntLiteral( cpb.Spills() );
+
+            sub.unit.EmitStr(sub.unit.name + " " +
+                    (sub.name == "ANON" ? cpb.mb.Name : sub.name));
+            sub.unit.EmitIntArray(cpb.cx.lineBuffer.ToArray());
+            sub.unit.EmitLAD(sub.ltm);
+            sub.unit.EmitIntArray(cpb.cx.ehspanBuffer.ToArray());
+            sub.unit.EmitStrArray(cpb.cx.ehlabelBuffer.ToArray());
+            sub.unit.EmitInt(cpb.Spills());
+
             List<string> dylexn = new List<string>();
             List<int> dylexi = new List<int>();
             foreach (KeyValuePair<string, Lexical> kv in sub.lexicals) {
@@ -3635,15 +3653,10 @@ dynamic:
                     dylexi.Add(index);
                 }
             }
-            if (dylexn.Count > 0) {
-                args[8] = CpsOp.StringArray(true, dylexn.ToArray());
-                args[9] = CpsOp.NewIntArray(Tokens.Int32, dylexi.ToArray());
-            } else {
-                args[8] = CpsOp.Null(typeof(string[]));
-                args[9] = CpsOp.Null(typeof(int[]));
-            }
+            sub.unit.EmitStrArray(dylexn.ToArray());
+            sub.unit.EmitIntArray(dylexi.ToArray());
 
-            return CpsOp.ConstructorCall(Tokens.SubInfo_ctor, args);
+            return CpsOp.MethodCall(typeof(RuntimeUnit).GetMethod("LoadSubInfo"), args);
         }
 
         void EnterCode(List<object> frags) {

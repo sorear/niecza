@@ -215,15 +215,41 @@ namespace Niecza {
         }
 
         public int[] ReadIntArray(ref int from) {
-            int[] r = new int[ReadInt(ref from)];
+            int l = ReadInt(ref from);
+            if (l == -1) return null;
+            int[] r = new int[l];
             for (int i = 0; i < r.Length; i++) r[i] = ReadInt(ref from);
             return r;
         }
 
+        public string[] ReadStrArray(ref int from) {
+            int l = ReadInt(ref from);
+            if (l == -1) return null;
+            string[] r = new string[l];
+            for (int i = 0; i < r.Length; i++) r[i] = ReadStr(ref from);
+            return r;
+        }
+
         public string ReadStr(ref int from) {
-            char[] r = new char[ReadShort(ref from)];
+            int l = ReadShort(ref from);
+            if (l == 0xffff) return null;
+            char[] r = new char[l];
             for (int i = 0; i < r.Length; i++) r[i] = (char)ReadShort(ref from);
             return new string(r);
+        }
+
+        public SubInfo LoadSubInfo(int from, DynBlockDelegate code, SubInfo outer) {
+            return new SubInfo(
+                ReadStr(ref from), /*name*/
+                ReadIntArray(ref from), /*lines*/
+                code,
+                outer,
+                ReadLAD(ref from),
+                ReadIntArray(ref from), /*ehspan*/
+                ReadStrArray(ref from), /*ehlabel*/
+                ReadInt(ref from), /*nspill*/
+                ReadStrArray(ref from), /*dylexn*/
+                ReadIntArray(ref from)); /*dylexi*/
         }
 
         public LAD LoadLAD(int from) {
