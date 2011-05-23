@@ -561,7 +561,9 @@ my class IterCursor {
 
 sub flat(*@x) { @x }
 
-my class Whatever { }
+my class Whatever {
+    method ACCEPTS(Mu $x) { defined(self) || $x.^isa(Whatever) }
+}
 
 my class EMPTY { }
 
