@@ -337,6 +337,7 @@ namespace Niecza {
         public STable mo;
         // for inheriting hints
         public SubInfo outer;
+        public P6any protosub;
         public string name;
         public Dictionary<string, BValue> hints;
         // maybe should be a hint

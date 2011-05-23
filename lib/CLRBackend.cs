@@ -586,7 +586,6 @@ namespace Niecza.CLRBackend {
         public readonly Dictionary<string,Lexical> l_lexicals;
         public readonly object body;
 
-        public FieldInfo protosub;
         public FieldInfo subinfo;
         public FieldInfo protopad;
         public int nlexn;
@@ -658,9 +657,6 @@ namespace Niecza.CLRBackend {
             subinfo  = binder(Unit.SharedName('I', ix, name), Tokens.SubInfo);
             if ((flags & SPAD_EXISTS) != 0)
                 protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
-            if (outer == null || (outer.Resolve<StaticSub>().flags
-                        & SPAD_EXISTS) != 0)
-                protosub = binder(Unit.SharedName('S', ix, name), Tokens.P6any);
 
             nlexn = 0;
             for (int i = 0; i < lexicals.Count; i++)
@@ -1142,6 +1138,8 @@ namespace Niecza.CLRBackend {
             P6any.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
+        public static readonly FieldInfo SubInfo_protosub =
+            SubInfo.GetField("protosub");
         public static readonly FieldInfo SubInfo_mo =
             SubInfo.GetField("mo");
         public static readonly FieldInfo SubInfo_sig_i =
@@ -4096,8 +4094,10 @@ dynamic:
                             CpsOp.GetSField(obj.subinfo))));
                 }
 
-                if (obj.protosub != null) {
-                    thaw.Add(CpsOp.SetSField(obj.protosub,
+                if (obj.outer == null || (obj.outer.Resolve<StaticSub>().flags
+                            & StaticSub.SPAD_EXISTS) != 0) {
+                    thaw.Add(CpsOp.SetField(Tokens.SubInfo_protosub,
+                        CpsOp.GetSField(obj.subinfo),
                         CpsOp.MethodCall(Tokens.Kernel_MakeSub,
                             CpsOp.GetSField(obj.subinfo),
                             (obj.outer == null ? CpsOp.Null(Tokens.Frame) :
@@ -4108,7 +4108,8 @@ dynamic:
                             Resolve<ParametricRole>();
                         thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillParametricRole,
                             CpsOp.GetSField(pr.metaObject),
-                            CpsOp.GetSField(obj.protosub)));
+                            CpsOp.GetField(Tokens.SubInfo_protosub,
+                                CpsOp.GetSField(obj.subinfo))));
                     }
                 }
             });
@@ -4133,12 +4134,14 @@ dynamic:
                         CpsOp.GetSField(m.metaObject),
                         CpsOp.IntLiteral(me.kind),
                         CpsOp.StringLiteral(me.name),
-                        CpsOp.GetSField(me.body.Resolve<StaticSub>().protosub)
+                        CpsOp.GetField(Tokens.SubInfo_protosub,
+                            CpsOp.GetSField(me.body.Resolve<StaticSub>().subinfo))
                     ));
                 }
                 foreach (Attribute a in attrs) {
                     CpsOp init = a.ibody == null ? CpsOp.Null(Tokens.P6any) :
-                        CpsOp.GetSField(a.ibody.Resolve<StaticSub>().protosub);
+                        CpsOp.GetField(Tokens.SubInfo_protosub,
+                            CpsOp.GetSField(a.ibody.Resolve<StaticSub>().subinfo));
                     CpsOp type = a.type == null ?
                         CpsOp.GetSField(Tokens.Kernel_AnyMO) :
                         CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
@@ -4160,7 +4163,8 @@ dynamic:
                 if (obj.is_phaser >= 0)
                     thaw.Add(CpsOp.MethodCall(Tokens.Kernel_AddPhaser,
                         CpsOp.IntLiteral(obj.is_phaser),
-                        CpsOp.GetSField(obj.protosub)));
+                        CpsOp.GetField(Tokens.SubInfo_protosub,
+                            CpsOp.GetSField(obj.subinfo))));
 
                 if (obj.exports != null) {
                     foreach (object o in obj.exports) {
@@ -4168,7 +4172,8 @@ dynamic:
                             CpsOp.MethodCall(Tokens.Kernel_GetVar,
                                 CpsOp.StringArray(false, JScalar.SA(0,o))),
                             CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
-                                CpsOp.GetSField(obj.protosub))));
+                                CpsOp.GetField(Tokens.SubInfo_protosub,
+                                    CpsOp.GetSField(obj.subinfo)))));
                     }
                 }
 
@@ -4188,8 +4193,8 @@ dynamic:
                         LexSub lx = (LexSub)l.Value;
                         if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
                         SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(
-                            Tokens.Kernel_NewROScalar,
-                                CpsOp.GetSField(lx.def.Resolve<StaticSub>().protosub)));
+                            Tokens.Kernel_NewROScalar, CpsOp.GetField(Tokens.SubInfo_protosub,
+                                CpsOp.GetSField(lx.def.Resolve<StaticSub>().subinfo))));
                     } else if (l.Value is LexSimple) {
                         LexSimple lx = (LexSimple)l.Value;
                         if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
@@ -4249,13 +4254,15 @@ dynamic:
                         CpsOp.GetField(lex, CpsOp.CallFrame()),
                         CpsOp.StringLiteral("*resume_" + s),
                         CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
-                            CpsOp.GetSField(m.protosub))));
+                            CpsOp.GetField(Tokens.SubInfo_protosub,
+                                CpsOp.GetSField(m.subinfo)))));
                     Unit su = CLRBackend.GetUnit(s);
                     s = su.setting;
                     m = su.mainline_ref.Resolve<StaticSub>();
                 }
                 thaw.Add(CpsOp.CpsReturn(CpsOp.SubyCall(false,"",
-                    CpsOp.GetSField(m.protosub))));
+                    CpsOp.GetField(Tokens.SubInfo_protosub,
+                        CpsOp.GetSField(m.subinfo)))));
             } else {
                 thaw.Add(CpsOp.CpsReturn(
                     CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
