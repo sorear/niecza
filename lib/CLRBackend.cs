@@ -316,6 +316,62 @@ namespace Niecza.CLRBackend {
                 pkg.BindFields(ix, binder);
             });
         }
+
+        public void EmitInt(int x) {
+            uint xp = (uint)x;
+            thaw_heap.Add((byte)xp); xp >>= 8;
+            thaw_heap.Add((byte)xp); xp >>= 8;
+            thaw_heap.Add((byte)xp); xp >>= 8;
+            thaw_heap.Add((byte)xp); xp >>= 8;
+        }
+
+        public void EmitByte(int x) {
+            if (x < 0 || x >= 256)
+                throw new ArgumentException();
+            thaw_heap.Add((byte)x);
+        }
+
+        public void EmitUShort(int x) {
+            if (x < 0 || x >= 65536)
+                throw new ArgumentException();
+            uint xp = (uint)x;
+            thaw_heap.Add((byte)xp); xp >>= 8;
+            thaw_heap.Add((byte)xp); xp >>= 8;
+        }
+
+        public void EmitStr(string s) {
+            EmitUShort(s.Length);
+            foreach(char c in s) EmitUShort((int)c);
+        }
+
+        public void EmitIntArray(int[] s) {
+            EmitInt(s.Length);
+            foreach(int c in s) EmitInt(c);
+        }
+
+        public void EmitLADArr(object lad) {
+            object[] lada = (object[]) lad;
+            EmitUShort(lada.Length);
+            foreach(object o in lada) EmitLAD(o);
+        }
+
+        public void EmitLAD(object lad) {
+            object[] body = (object[]) lad;
+            string head = JScalar.S(body[0]);
+
+            if (!Tokens.LADcodes.ContainsKey(head))
+                throw new ArgumentException(head);
+            EmitByte(Tokens.LADcodes[head]);
+
+            if (head == "CC") { EmitIntArray(JScalar.IA(1, body)); }
+            else if (head == "Imp" || head == "Dot" || head == "Null" || head == "None" || head == "Dispatcher") { }
+            else if (head == "Str" || head == "StrNoCase" || head == "Param" || head == "Method") { EmitStr(JScalar.S(body[1])); }
+            else if (head == "Opt" || head == "Star" || head == "Plus") { EmitLAD(body[1]); }
+            else if (head == "Sequence" || head == "Any") { EmitLADArr(body[1]); }
+            else throw new NotImplementedException("ProcessLAD " + head);
+        }
+
+
     }
 
     class Xref {
@@ -920,26 +976,26 @@ namespace Niecza.CLRBackend {
             typeof(BigInteger).GetConstructor(new Type[] { typeof(short), typeof(uint[]) });
         public static readonly ConstructorInfo CC_ctor =
             CC.GetConstructor(new Type[] { typeof(int[]) });
-        public static readonly Dictionary<string,ConstructorInfo> LADctors
-            = _LADctors();
-        private static Dictionary<string,ConstructorInfo> _LADctors() {
-            Dictionary<string,ConstructorInfo> n =
-                new Dictionary<string,ConstructorInfo>();
-            n["CC"] = typeof(LADCC).GetConstructor(new Type[] { CC });
-            n["Str"] = typeof(LADStr).GetConstructor(new Type[] { String });
-            n["Param"] = typeof(LADParam).GetConstructor(new Type[] { String });
-            n["Method"] = typeof(LADMethod).GetConstructor(new Type[] { String });
-            n["Dispatcher"] = typeof(LADDispatcher).GetConstructor(new Type[] { });
-            n["StrNoCase"] = typeof(LADStrNoCase).GetConstructor(new Type[] { String });
-            n["Imp"] = typeof(LADImp).GetConstructor(new Type[] { });
-            n["Dot"] = typeof(LADDot).GetConstructor(new Type[] { });
-            n["None"] = typeof(LADNone).GetConstructor(new Type[] { });
-            n["Null"] = typeof(LADNull).GetConstructor(new Type[] { });
-            n["Plus"] = typeof(LADPlus).GetConstructor(new Type[] { LAD });
-            n["Star"] = typeof(LADStar).GetConstructor(new Type[] { LAD });
-            n["Opt"] = typeof(LADOpt).GetConstructor(new Type[] { LAD });
-            n["Sequence"] = typeof(LADSequence).GetConstructor(new Type[] { typeof(LAD[]) });
-            n["Any"] = typeof(LADAny).GetConstructor(new Type[] { typeof(LAD[]) });
+        public static readonly Dictionary<string,int> LADcodes
+            = _LADcodes();
+        private static Dictionary<string,int> _LADcodes() {
+            Dictionary<string,int> n =
+                new Dictionary<string,int>();
+            n["CC"]  = 1;
+            n["Str"] = 2;
+            n["Param"] = 3;
+            n["Method"] = 4;
+            n["Dispatcher"] = 5;
+            n["StrNoCase"] = 6;
+            n["Imp"] = 7;
+            n["Dot"] = 8;
+            n["None"] = 9;
+            n["Null"] = 10;
+            n["Plus"] = 11;
+            n["Star"] = 12;
+            n["Opt"] = 13;
+            n["Sequence"] = 14;
+            n["Any"] = 15;
             return n;
         }
 
@@ -3541,39 +3597,18 @@ dynamic:
             cpb.Build(Scan(WrapBody()));
         }
 
-        CpsOp ProcessLADArr(object lad) {
-            object[] lada = (object[]) lad;
-            CpsOp[] z = new CpsOp[lada.Length];
-            for (int i = 0; i < z.Length; i++)
-                z[i] = ProcessLAD(lada[i]);
-            return CpsOp.NewArray(Tokens.LAD, z);
+        public CpsOp ProcessLADArr(object l) {
+            int o = sub.unit.thaw_heap.Count;
+            sub.unit.EmitLADArr(l);
+            return CpsOp.MethodCall(typeof(RuntimeUnit).GetMethod("LoadLADArr"),
+                CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
         }
 
-        CpsOp ProcessLAD(object lad) {
-            object[] body = (object[]) lad;
-            string head = FixStr(body[0]);
-
-            if (!Tokens.LADctors.ContainsKey(head))
-                throw new ArgumentException(head);
-            ConstructorInfo ci = Tokens.LADctors[head];
-
-            if (head == "CC") {
-                int[] ccs = JScalar.IA(1, body);
-                return CpsOp.ConstructorCall(ci,
-                    CpsOp.ConstructorCall(Tokens.CC_ctor,
-                        CpsOp.NewIntArray(Tokens.Int32, ccs)));
-            } else if (head == "Imp" || head == "Dot" || head == "Null" || head == "None" || head == "Dispatcher") {
-                return CpsOp.ConstructorCall(ci);
-            } else if (head == "Str" || head == "StrNoCase" || head == "Param" || head == "Method") {
-                return CpsOp.ConstructorCall(ci,
-                    CpsOp.StringLiteral(JScalar.S(body[1])));
-            } else if (head == "Opt" || head == "Star" || head == "Plus") {
-                return CpsOp.ConstructorCall(ci, ProcessLAD(body[1]));
-            } else if (head == "Sequence" || head == "Any") {
-                return CpsOp.ConstructorCall(ci, ProcessLADArr(body[1]));
-            }
-
-            throw new NotImplementedException("ProcessLAD " + head);
+        public CpsOp ProcessLAD(object l) {
+            int o = sub.unit.thaw_heap.Count;
+            sub.unit.EmitLAD(l);
+            return CpsOp.MethodCall(typeof(RuntimeUnit).GetMethod("LoadLAD"),
+                CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
         }
 
         public CpsOp SubInfoCtor() {

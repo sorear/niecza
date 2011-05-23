@@ -197,6 +197,70 @@ namespace Niecza {
             this.depends = depends;
             this.xref = new object[nx];
         }
+
+        public int ReadInt(ref int from) {
+            uint r = 0;
+            r |= ((uint)heap[from++] <<  0);
+            r |= ((uint)heap[from++] <<  8);
+            r |= ((uint)heap[from++] << 16);
+            r |= ((uint)heap[from++] << 24);
+            return (int)r;
+        }
+
+        public int ReadShort(ref int from) {
+            uint r = 0;
+            r |= ((uint)heap[from++] <<  0);
+            r |= ((uint)heap[from++] <<  8);
+            return (int)r;
+        }
+
+        public int[] ReadIntArray(ref int from) {
+            int[] r = new int[ReadInt(ref from)];
+            for (int i = 0; i < r.Length; i++) r[i] = ReadInt(ref from);
+            return r;
+        }
+
+        public string ReadStr(ref int from) {
+            char[] r = new char[ReadShort(ref from)];
+            for (int i = 0; i < r.Length; i++) r[i] = (char)ReadShort(ref from);
+            return new string(r);
+        }
+
+        public LAD LoadLAD(int from) {
+            return ReadLAD(ref from);
+        }
+
+        public LAD[] LoadLADArr(int from) {
+            return ReadLADArr(ref from);
+        }
+
+        public LAD ReadLAD(ref int from) {
+            switch(heap[from++]) {
+                case 0: return null;
+                case 1: return new LADCC(new CC(ReadIntArray(ref from)));
+                case 2: return new LADStr(ReadStr(ref from));
+                case 3: return new LADParam(ReadStr(ref from));
+                case 4: return new LADMethod(ReadStr(ref from));
+                case 5: return new LADDispatcher();
+                case 6: return new LADStrNoCase(ReadStr(ref from));
+                case 7: return new LADImp();
+                case 8: return new LADDot();
+                case 9: return new LADNone();
+                case 10: return new LADNull();
+                case 11: return new LADPlus(ReadLAD(ref from));
+                case 12: return new LADStar(ReadLAD(ref from));
+                case 13: return new LADOpt(ReadLAD(ref from));
+                case 14: return new LADSequence(ReadLADArr(ref from));
+                case 15: return new LADAny(ReadLADArr(ref from));
+                default: throw new ArgumentException();
+            }
+        }
+
+        public LAD[] ReadLADArr(ref int from) {
+            LAD[] r = new LAD[ReadShort(ref from)];
+            for (int i = 0; i < r.Length; i++) r[i] = ReadLAD(ref from);
+            return r;
+        }
     }
 
     // This stores all the invariant stuff about a Sub, i.e. everything
