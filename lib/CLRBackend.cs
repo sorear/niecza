@@ -3341,11 +3341,10 @@ dynamic:
             };
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp rhs = th.Scan(zyg[3]);
-                bool ro   = JScalar.B(zyg[1]);
-                bool list = JScalar.B(zyg[2]);
-                return CpsOp.CpsCall(Tokens.Variable,
-                    Tokens.Kernel_NewBoundVar, CpsOp.BoolLiteral(ro),
-                    CpsOp.BoolLiteral(list),
+                int ro   = JScalar.B(zyg[1]) ? 0 : Kernel.NBV_RW;
+                int list = JScalar.B(zyg[2]) ? Kernel.NBV_LIST : 0;
+                return CpsOp.MethodCall(Tokens.Kernel_NewBoundVar,
+                    CpsOp.IntLiteral(ro+list),
                     CpsOp.GetSField(Tokens.Kernel_AnyMO), rhs);
             };
             handlers["whileloop"] = delegate(NamProcessor th, object[] z) {

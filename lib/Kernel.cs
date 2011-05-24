@@ -2121,16 +2121,17 @@ ltm:
             return new SimpleVariable(false, rhs.islist, v.mo, null, v);
         }
 
-        public static Frame NewBoundVar(Frame th, bool ro, bool islist,
-                STable type, Variable rhs) {
-            if (islist) ro = true;
-            if (!rhs.rw) ro = true;
+        public const int NBV_RO = 0;
+        public const int NBV_RW = 1;
+        public const int NBV_LIST = 2;
+        public static Variable NewBoundVar(int mode, STable type, Variable rhs) {
+            bool rw = rhs.rw && (mode & NBV_RW) != 0;
+            bool islist = (mode & NBV_LIST) != 0;
             // fast path
-            if (ro == !rhs.rw && islist == rhs.islist && rhs.whence == null) {
+            if (rw == rhs.rw && islist == rhs.islist && rhs.whence == null) {
                 if (!rhs.type.HasMRO(type))
-                    return Kernel.Die(th, "Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
-                th.resultSlot = rhs;
-                return th;
+                    throw new NieczaException("Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
+                return rhs;
             }
             // ro = true and rhs.rw = true OR
             // islist != rhs.islist OR
@@ -2139,26 +2140,23 @@ ltm:
             if (!rhs.rw) {
                 P6any v = rhs.Fetch();
                 if (!v.mo.HasMRO(type))
-                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
-                th.resultSlot = new SimpleVariable(false, islist, v.mo, null, v);
-                return th;
+                    throw new NieczaException("Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
+                return new SimpleVariable(false, islist, v.mo, null, v);
             }
             // ro = true and rhw.rw = true OR
             // whence != null
-            if (ro) {
+            if (!rw) {
                 P6any v = rhs.Fetch();
                 if (!v.mo.HasMRO(type))
-                    return Kernel.Die(th, "Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
-                th.resultSlot = new SimpleVariable(false, islist, v.mo, null, rhs.Fetch());
-                return th;
+                    throw new NieczaException("Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
+                return new SimpleVariable(false, islist, v.mo, null, v);
             }
 
             if (!rhs.type.HasMRO(type))
-                return Kernel.Die(th, "Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
+                throw new NieczaException("Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
 
             Vivify(rhs);
-            th.resultSlot = rhs;
-            return th;
+            return rhs;
         }
 
         public static Frame Assign(Frame th, Variable lhs, Variable rhs) {
