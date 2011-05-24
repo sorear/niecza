@@ -2359,6 +2359,20 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrTypeLiteral : ClrOp {
+        readonly Type body;
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        public ClrTypeLiteral(Type body) {
+            this.body = body;
+            Returns = typeof(Type);
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldtoken, body);
+            cx.il.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle"));
+        }
+    }
+
     class ClrDBDLiteral : ClrOp {
         readonly MethodInfo body;
         public override ClrOp Sink() { return ClrNoop.Instance; }
@@ -2776,6 +2790,10 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrLongLiteral(Tokens.UInt64, (long)x));
         }
 
+        public static CpsOp TypeLiteral(Type x) {
+            return new CpsOp(new ClrTypeLiteral(x));
+        }
+
         public static CpsOp DBDLiteral(MethodInfo x) {
             return new CpsOp(new ClrDBDLiteral(x));
         }
@@ -3168,9 +3186,6 @@ namespace Niecza.CLRBackend {
 
             handlers = new Dictionary<string, Func<NamProcessor,object[],CpsOp>>();
             thandlers = new Dictionary<string, Func<CpsOp[], CpsOp>>();
-            Dictionary<string, Func<object[], object>> mhandlers =
-                new Dictionary<string, Func<object[], object>>();
-
 
             handlers["null"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Null(namtype(zyg[1])); };
@@ -3810,10 +3825,6 @@ dynamic:
                     in thandlers) {
                 handlers[kv.Key] = MakeTotalHandler(kv.Value);
             }
-            foreach (KeyValuePair<string, Func<object[], object>> kv
-                    in mhandlers) {
-                handlers[kv.Key] = MakeMacroHandler(kv.Value);
-            }
         }
 
         static Func<CpsOp[], CpsOp> SimpleB(string name) {
@@ -3864,34 +3875,73 @@ dynamic:
             };
         }
 
-        static Func<NamProcessor, object[], CpsOp> MakeMacroHandler(
-                Func<object[], object> real) {
-            return delegate (NamProcessor th, object[] zyg) {
-                return th.Scan(real(zyg)); };
-        }
-
         public void MakeBody() {
             cpb.ReserveLex(sub.nlexn);
             cpb.Build(Scan(WrapBody()));
         }
 
-        public CpsOp ProcessLADArr(object l) {
-            int o = sub.unit.thaw_heap.Count;
-            sub.unit.EmitLADArr(l);
-            return CpsOp.MethodCall(Tokens.RU_LoadLADArr,
-                CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
-        }
+        void EncodeSignature(StaticSub obj) {
+            if (obj.sig == null) {
+                obj.unit.EmitInt(-1);
+                return;
+            }
 
-        public CpsOp ProcessLAD(object l) {
-            int o = sub.unit.thaw_heap.Count;
-            sub.unit.EmitLAD(l);
-            return CpsOp.MethodCall(Tokens.RU_LoadLAD,
-                CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(o));
+            List<int> sig_i   = new List<int>();
+            List<object> sig_r = new List<object>();
+            object[] rsig = (object[]) obj.sig;
+            foreach (object p in rsig) {
+                object[] param = (object[]) p;
+                string   name  = JScalar.S(param[0]);
+                int      flags = JScalar.I(param[1]);
+                string   slot  = JScalar.S(param[2]);
+                string[] names = JScalar.SA(0, param[3]);
+                Xref     deflt = Xref.from(param[4]);
+                Xref     type  = Xref.from(param[5]);
+
+                sig_r.Add(name);
+                foreach (string n in names)
+                    sig_r.Add(n);
+                int ufl = 0;
+                if ((flags & 4) != 0) ufl |= SubInfo.SIG_F_RWTRANS;
+                else if ((flags & 64) != 0) ufl |= SubInfo.SIG_F_READWRITE;
+
+                if ((flags & 384) != 0) ufl |= SubInfo.SIG_F_BINDLIST;
+                if ((flags & 512) != 0) ufl |= SubInfo.SIG_F_DEFOUTER;
+                if ((flags & 1024) != 0) ufl |= SubInfo.SIG_F_INVOCANT;
+                if ((flags & 2048) != 0) ufl |= SubInfo.SIG_F_MULTI_IGNORED;
+                if (deflt != null) {
+                    ufl |= SubInfo.SIG_F_HASDEFAULT;
+                    sig_r.Add(deflt);
+                }
+                if (type != null) {
+                    ufl |= SubInfo.SIG_F_HASTYPE;
+                    sig_r.Add(type);
+                }
+                if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
+                if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;
+                if ((flags & 1) != 0 && (flags & 256) != 0)
+                    ufl |= SubInfo.SIG_F_SLURPY_NAM;
+                if ((flags & 1) != 0 && (flags & 256) == 0)
+                    ufl |= SubInfo.SIG_F_SLURPY_POS;
+                if ((flags & 2) != 0) ufl |= SubInfo.SIG_F_SLURPY_CAP;
+                if ((flags & 8) != 0) ufl |= SubInfo.SIG_F_SLURPY_PCL;
+                sig_i.Add(ufl);
+                sig_i.Add(slot == null ? -1 : ((LexVarish)obj.l_lexicals[slot]).index);
+                sig_i.Add(names.Length);
+            }
+            obj.unit.EmitIntArray(sig_i.ToArray());
+            obj.unit.EmitInt(sig_r.Count);
+            foreach (object o in sig_r) {
+                if (o is string) {
+                    obj.unit.EmitStr((string)o);
+                } else {
+                    obj.unit.EmitStr(null);
+                    obj.unit.EmitXref((Xref)o);
+                }
+            }
         }
 
         public void SubInfoCtor(int ix, List<CpsOp> thaw) {
-            CpsOp[] args = new CpsOp[3];
-
             int b = sub.unit.thaw_heap.Count;
 
             int spec = 0;
@@ -3904,10 +3954,6 @@ dynamic:
                 spec |= RuntimeUnit.MAKE_PROTOPAD;
             if (sub.parametric_role_hack != null)
                 spec |= RuntimeUnit.SUB_IS_PARAM_ROLE;
-
-            args[0] = CpsOp.GetSField(sub.unit.rtunit);
-            args[1] = CpsOp.IntLiteral(b);
-            args[2] = CpsOp.DBDLiteral(cpb.mb);
 
             sub.unit.EmitInt(ix);
             sub.unit.EmitByte(spec);
@@ -3939,8 +3985,19 @@ dynamic:
             if (sub.parametric_role_hack != null)
                 sub.unit.EmitXref(sub.parametric_role_hack);
 
+            /*not used until sub3 time*/
+            EncodeSignature(sub);
+            sub.unit.EmitByte(sub.is_phaser >= 0 ? sub.is_phaser : 0xFF);
+
+            object[] os = sub.exports ?? new object[0];
+            sub.unit.EmitInt(os.Length);
+            foreach (object o in os)
+                sub.unit.EmitStrArray(JScalar.SA(0,o));
+
             thaw.Add(CpsOp.SetSField(sub.subinfo,
-                CpsOp.MethodCall(Tokens.RU_LoadSubInfo, args)));
+                CpsOp.MethodCall(Tokens.RU_LoadSubInfo,
+                    CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(b))));
+
             if (sub.protopad != null)
                 thaw.Add(CpsOp.SetSField(sub.protopad,
                     CpsOp.GetField(Tokens.SubInfo_protopad,
@@ -4173,68 +4230,6 @@ dynamic:
                     TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
         }
 
-        void EncodeSignature(List<CpsOp> thaw, StaticSub obj) {
-            if (obj.sig == null) return;
-            int b = obj.unit.thaw_heap.Count;
-
-            List<int> sig_i   = new List<int>();
-            List<object> sig_r = new List<object>();
-            object[] rsig = (object[]) obj.sig;
-            foreach (object p in rsig) {
-                object[] param = (object[]) p;
-                string   name  = JScalar.S(param[0]);
-                int      flags = JScalar.I(param[1]);
-                string   slot  = JScalar.S(param[2]);
-                string[] names = JScalar.SA(0, param[3]);
-                Xref     deflt = Xref.from(param[4]);
-                Xref     type  = Xref.from(param[5]);
-
-                sig_r.Add(name);
-                foreach (string n in names)
-                    sig_r.Add(n);
-                int ufl = 0;
-                if ((flags & 4) != 0) ufl |= SubInfo.SIG_F_RWTRANS;
-                else if ((flags & 64) != 0) ufl |= SubInfo.SIG_F_READWRITE;
-
-                if ((flags & 384) != 0) ufl |= SubInfo.SIG_F_BINDLIST;
-                if ((flags & 512) != 0) ufl |= SubInfo.SIG_F_DEFOUTER;
-                if ((flags & 1024) != 0) ufl |= SubInfo.SIG_F_INVOCANT;
-                if ((flags & 2048) != 0) ufl |= SubInfo.SIG_F_MULTI_IGNORED;
-                if (deflt != null) {
-                    ufl |= SubInfo.SIG_F_HASDEFAULT;
-                    sig_r.Add(deflt);
-                }
-                if (type != null) {
-                    ufl |= SubInfo.SIG_F_HASTYPE;
-                    sig_r.Add(type);
-                }
-                if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
-                if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;
-                if ((flags & 1) != 0 && (flags & 256) != 0)
-                    ufl |= SubInfo.SIG_F_SLURPY_NAM;
-                if ((flags & 1) != 0 && (flags & 256) == 0)
-                    ufl |= SubInfo.SIG_F_SLURPY_POS;
-                if ((flags & 2) != 0) ufl |= SubInfo.SIG_F_SLURPY_CAP;
-                if ((flags & 8) != 0) ufl |= SubInfo.SIG_F_SLURPY_PCL;
-                sig_i.Add(ufl);
-                sig_i.Add(slot == null ? -1 : ((LexVarish)obj.l_lexicals[slot]).index);
-                sig_i.Add(names.Length);
-            }
-            obj.unit.EmitIntArray(sig_i.ToArray());
-            obj.unit.EmitInt(sig_r.Count);
-            foreach (object o in sig_r) {
-                if (o is string) {
-                    obj.unit.EmitStr((string)o);
-                } else {
-                    obj.unit.EmitStr(null);
-                    obj.unit.EmitXref((Xref)o);
-                }
-            }
-            thaw.Add(CpsOp.MethodCall(Tokens.RU_LoadSignature,
-                CpsOp.GetSField(obj.unit.rtunit), CpsOp.GetSField(obj.subinfo),
-                CpsOp.IntLiteral(b)));
-        }
-
         void SetProtolex(StaticSub obj, string n, LexVarish v, CpsOp init) {
             if ((obj.flags & StaticSub.RUN_ONCE) != 0 && !Lexical.IsDynamicName(n))
                 thaw.Add(CpsOp.SetSField(v.stg, init));
@@ -4264,7 +4259,7 @@ dynamic:
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub1 {0}", obj.name);
                 CpsBuilder cpb = new CpsBuilder(this,
-                    Unit.SharedName('C', ix, obj.name), false);
+                    Unit.SharedName('C', ix, obj.name), true);
                 NamProcessor np = aux[ix] = new NamProcessor(cpb, obj);
                 np.MakeBody();
             });
@@ -4381,27 +4376,11 @@ dynamic:
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject))));
             });
 
+            thaw.Add(CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("FixupSubs"),
+                CpsOp.GetSField(unit.rtunit)));
+
             unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub3 {0}", obj.name);
-                EncodeSignature(thaw, obj);
-
-                if (obj.is_phaser >= 0)
-                    thaw.Add(CpsOp.MethodCall(Tokens.Kernel_AddPhaser,
-                        CpsOp.IntLiteral(obj.is_phaser),
-                        CpsOp.GetField(Tokens.SubInfo_protosub,
-                            CpsOp.GetSField(obj.subinfo))));
-
-                if (obj.exports != null) {
-                    foreach (object o in obj.exports) {
-                        thaw.Add(CpsOp.SetField(Tokens.BValue_v,
-                            CpsOp.MethodCall(Tokens.Kernel_GetVar,
-                                CpsOp.StringArray(false, JScalar.SA(0,o))),
-                            CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
-                                CpsOp.GetField(Tokens.SubInfo_protosub,
-                                    CpsOp.GetSField(obj.subinfo)))));
-                    }
-                }
-
                 foreach (KeyValuePair<string,Lexical> l in obj.lexicals) {
                     if (l.Value is LexCommon) {
                         LexCommon lx = (LexCommon)l.Value; /* XXX cname */
@@ -4507,7 +4486,8 @@ dynamic:
             unit_load.Add(unit.EmitStringListConsts());
 
             unit_load[0] = CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
-                Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
+                Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(Type), typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
+                CpsOp.TypeLiteral(tb),
                 CpsOp.NewByteArray(typeof(byte), unit.thaw_heap.ToArray()),
                 CpsOp.NewArray(Tokens.RuntimeUnit, tdep_rtu.ToArray()),
                 CpsOp.IntLiteral(unit.xref.Length)));

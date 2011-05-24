@@ -188,14 +188,34 @@ namespace Niecza {
     }
 
     public sealed class RuntimeUnit {
+        public Type type;
         public byte[] heap;
         public RuntimeUnit[] depends;
+        public DynBlockDelegate[] methods;
         public object[] xref;
 
-        public RuntimeUnit(byte[] heap, RuntimeUnit[] depends, int nx) {
+        public RuntimeUnit(Type type, byte[] heap, RuntimeUnit[] depends,
+                int nx) {
+            this.type = type;
             this.heap = heap;
             this.depends = depends;
             this.xref = new object[nx];
+            this.methods = new DynBlockDelegate[nx];
+
+            uint d = 0;
+            foreach (MethodInfo mi in type.GetMethods()) {
+                int acc = 0;
+                string n = mi.Name;
+                if (n.Length < 2 || n[0] != 'C' || n[1] == '_') continue;
+                int i = 1;
+                while (i < n.Length && (d = (uint)(n[i] - '0')) < 10) {
+                    acc = acc * 10 + (int)d;
+                    i++;
+                }
+                if (n[i] != '_') continue;
+                methods[acc] = (DynBlockDelegate)
+                    Delegate.CreateDelegate(typeof(DynBlockDelegate), mi);
+            }
         }
 
         public int ReadInt(ref int from) {
@@ -214,8 +234,9 @@ namespace Niecza {
             return ru.xref[ReadInt(ref from)];
         }
 
-        public void LoadSignature(SubInfo si, int from) {
+        public void ReadSignature(SubInfo si, ref int from) {
             si.sig_i = ReadIntArray(ref from);
+            if (si.sig_i == null) return;
             si.sig_r = new object[ReadInt(ref from)];
             //Console.WriteLine("{0} {1} {2}", si.name, si.sig_i.Length, si.sig_r.Length);
             for (int i = 0; i < si.sig_r.Length; i++) {
@@ -363,13 +384,13 @@ namespace Niecza {
         public const int SUB_IS_UNSAFE = 8;
         public const int SUB_IS_PARAM_ROLE = 16;
 
-        public SubInfo LoadSubInfo(int from, DynBlockDelegate code) {
+        public SubInfo LoadSubInfo(int from) {
             int ix = ReadInt(ref from);
             byte spec = heap[from++];
             SubInfo ns = new SubInfo(
                 ReadStr(ref from), /*name*/
                 ReadIntArray(ref from), /*lines*/
-                code,
+                methods[ix],
                 (SubInfo)ReadXref(ref from), /*outer*/
                 ReadLAD(ref from),
                 ReadIntArray(ref from), /*ehspan*/
@@ -393,7 +414,24 @@ namespace Niecza {
             if ((spec & SUB_IS_PARAM_ROLE) != 0)
                 ((STable) ReadXref(ref from)).FillParametricRole(ns.protosub);
 
+            ns.fixups_from = from;
+
             return ns;
+        }
+
+        public void FixupSubs() {
+            for (int i = 0; i < xref.Length; i++) {
+                SubInfo si = xref[i] as SubInfo;
+                if (si == null) continue;
+                int from = si.fixups_from;
+                ReadSignature(si, ref from);
+                int ph = heap[from++];
+                if (ph != 0xFF) Kernel.AddPhaser(ph, si.protosub);
+                int nex = ReadInt(ref from);
+                for (int j = 0; j < nex; j++)
+                    Kernel.GetVar(ReadStrArray(ref from)).v =
+                        Kernel.NewROScalar(si.protosub);
+            }
         }
 
         public LAD LoadLAD(int from) {
@@ -480,6 +518,7 @@ namespace Niecza {
         public SubInfo outer;
         public P6any protosub;
         public Frame protopad;
+        public int fixups_from;
         public string name;
         public Dictionary<string, BValue> hints;
         // maybe should be a hint
