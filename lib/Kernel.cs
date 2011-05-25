@@ -191,7 +191,8 @@ namespace Niecza {
         public Type type;
         public byte[] heap;
         public RuntimeUnit[] depends;
-        public DynBlockDelegate[] methods;
+        public DynBlockDelegate[] methods; /*C*/
+        public FieldInfo[] meta_fields;
         public object[] xref;
 
         public RuntimeUnit(Type type, byte[] heap, RuntimeUnit[] depends,
@@ -201,12 +202,13 @@ namespace Niecza {
             this.depends = depends;
             this.xref = new object[nx];
             this.methods = new DynBlockDelegate[nx];
+            this.meta_fields = new FieldInfo[nx*2];
 
             uint d = 0;
             foreach (MethodInfo mi in type.GetMethods()) {
                 int acc = 0;
                 string n = mi.Name;
-                if (n.Length < 2 || n[0] != 'C' || n[1] == '_') continue;
+                if (n.Length < 2 || n[0] != 'C') continue;
                 int i = 1;
                 while (i < n.Length && (d = (uint)(n[i] - '0')) < 10) {
                     acc = acc * 10 + (int)d;
@@ -215,6 +217,21 @@ namespace Niecza {
                 if (n[i] != '_') continue;
                 methods[acc] = (DynBlockDelegate)
                     Delegate.CreateDelegate(typeof(DynBlockDelegate), mi);
+            }
+            foreach (FieldInfo fi in type.GetFields()) {
+                int acc = 0;
+                string n = fi.Name;
+                int i = 1;
+                while (i < n.Length && (d = (uint)(n[i] - '0')) < 10) {
+                    acc = acc * 10 + (int)d;
+                    i++;
+                }
+                if (n[i] != '_') continue;
+                int index = acc * 2;
+                if (n[0] == 'I') { }
+                else if (n[0] == 'P') { index++; }
+                else { continue; }
+                meta_fields[index] = fi;
             }
         }
 
@@ -384,7 +401,13 @@ namespace Niecza {
         public const int SUB_IS_UNSAFE = 8;
         public const int SUB_IS_PARAM_ROLE = 16;
 
-        public SubInfo LoadSubInfo(int from) {
+        public void LoadAllSubs(int from) {
+            int[] froms = ReadIntArray(ref from);
+            foreach (int f in froms)
+                LoadSubInfo(f);
+        }
+
+        public void LoadSubInfo(int from) {
             int ix = ReadInt(ref from);
             byte spec = heap[from++];
             SubInfo ns = new SubInfo(
@@ -416,7 +439,9 @@ namespace Niecza {
 
             ns.fixups_from = from;
 
-            return ns;
+            meta_fields[ix*2].SetValue(null, ns);
+            if (ns.protopad != null)
+                meta_fields[ix*2+1].SetValue(null, ns.protopad);
         }
 
         public void FixupSubs() {

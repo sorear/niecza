@@ -3970,9 +3970,8 @@ dynamic:
             }
         }
 
-        public void SubInfoCtor(int ix, List<CpsOp> thaw) {
-            int b = sub.unit.thaw_heap.Count;
-
+        public void SubInfoCtor(int ix, List<int> thaw) {
+            thaw.Add(sub.unit.thaw_heap.Count);
             int spec = 0;
 
             if ((sub.flags & StaticSub.UNSAFE) != 0)
@@ -4022,15 +4021,6 @@ dynamic:
             sub.unit.EmitInt(os.Length);
             foreach (object o in os)
                 sub.unit.EmitStrArray(JScalar.SA(0,o));
-
-            thaw.Add(CpsOp.SetSField(sub.subinfo,
-                CpsOp.MethodCall(Tokens.RU_LoadSubInfo,
-                    CpsOp.GetSField(sub.unit.rtunit), CpsOp.IntLiteral(b))));
-
-            if (sub.protopad != null)
-                thaw.Add(CpsOp.SetSField(sub.protopad,
-                    CpsOp.GetField(Tokens.SubInfo_protopad,
-                        CpsOp.GetSField(sub.subinfo))));
         }
 
         void EnterCode(List<object> frags) {
@@ -4364,10 +4354,19 @@ dynamic:
                     thaw.Add(CpsOp.SetSField(km, CpsOp.GetSField(m.metaObject)));
             });
 
+            int sub2_slot = thaw.Count;
+            thaw.Add(null);
+            List<int> sub2_pointers = new List<int>();
+
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub2 {0}", obj.name);
-                aux[ix].SubInfoCtor(ix, thaw);
+                aux[ix].SubInfoCtor(ix, sub2_pointers);
             });
+
+            int sub2_pointers_start = unit.thaw_heap.Count;
+            unit.EmitIntArray(sub2_pointers.ToArray());
+
+            thaw[sub2_slot] = CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadAllSubs"), CpsOp.GetSField(unit.rtunit), CpsOp.IntLiteral(sub2_pointers_start));
 
             unit.VisitPackages(delegate(int ix, Package p) {
                 if (Verbose > 0) Console.WriteLine("pkg3 {0}", p.name);
