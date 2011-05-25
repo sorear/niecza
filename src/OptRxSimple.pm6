@@ -127,7 +127,7 @@ augment class RxOp::Before { #OK exist
             if $z.^isa(::RxOp::Before);
         return ::RxOp::BeforeString.new(str => $z.text)
             if $z.^isa(::RxOp::String);
-        return $z.clone(zerowidth => True)
+        return $z.clone(zerowidth => True, selfcut => True)
             if $z.^isa(::RxOp::Subrule);
         return $z if $z.^isa(::RxOp::ZeroWidthCCs);
         return ::RxOp::ZeroWidthCCs.new(ccs => [$z.cc], :!after, :!neg)
@@ -150,7 +150,7 @@ augment class RxOp::NotBefore { #OK exist
             return ::RxOp::NotBeforeString.new(str => $z.text);
         }
         if $z.^isa(::RxOp::Subrule) {
-            return $z.clone(:zerowidth, negative => !$z.negative);
+            return $z.clone(:zerowidth, negative => !$z.negative, :selfcut);
         }
         if $z.^isa(::RxOp::ZeroWidthCCs) {
             return ::RxOp::ZeroWidthCCs.new(ccs => $z.ccs, after => $z.after,

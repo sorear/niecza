@@ -3503,15 +3503,6 @@ dynamic:
                             JScalar.I(z[4]) * RxFrame.IC_PASS_CAP),
                         th.Scan(z[5])));
             };
-            handlers["rxincorp"] = delegate(NamProcessor th, object[] z) {
-                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(0,z[1]));
-
-                return
-                    CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorporateChild"),
-                        CpsOp.RxFrame(), strs,
-                        CpsOp.BoolLiteral(JScalar.B(z[2])),
-                        th.Scan(z[3]));
-            };
             handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] args = new CpsOp[z.Length - 1];
                 for(int i = 0; i < z.Length - 2; i++)
