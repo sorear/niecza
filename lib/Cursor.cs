@@ -225,6 +225,10 @@ public sealed class RxFrame {
         st.subrule_iter = cl;
     }
 
+    public void InitCursorList(Variable obj) {
+        st.subrule_iter = new VarDeque(obj);
+    }
+
     public Variable GetCursorList() {
         return (Variable)st.subrule_iter;
     }
@@ -239,6 +243,42 @@ public sealed class RxFrame {
 
     public void SetPos(int pos) {
         st.pos = pos;
+    }
+
+    public void IncorporateChild(string[] names, bool passcap, P6any match) {
+        Cursor child = (Cursor) match;
+
+        SetPos(child.pos);
+        if (passcap)
+            SetCapturesFrom(child);
+
+        if (names != null) {
+            if (passcap) child = child.StripCaps();
+            PushCapture(names, Kernel.NewROScalar(child));
+        }
+    }
+
+    public const int IC_ZERO_WIDTH = 1;
+    public const int IC_NEGATIVE = 2;
+    public const int IC_PASS_CAP = 4;
+
+    public bool IncorpCut(string[] names, int mode, Variable list) {
+        Variable match_v = Kernel.GetFirst(list);
+        P6any match = match_v.Fetch();
+        if (match.IsDefined() == ((mode & IC_NEGATIVE) != 0))
+            return false;
+        if ((mode & IC_ZERO_WIDTH) == 0)
+            IncorporateChild(names, (mode & IC_PASS_CAP) != 0, match);
+        return true;
+    }
+
+    public bool IncorpShift(string[] names, bool pass_cap, int label) {
+        if (!Kernel.IterHasFlat(GetCursorIter(), true))
+            return false;
+        PushBacktrack(label);
+        IncorporateChild(names, pass_cap, GetCursorIter().Shift().Fetch());
+        SetCursorList(null);
+        return true;
     }
 
     public int GetPos() {
@@ -420,6 +460,8 @@ public sealed class RxFrame {
     public Cursor MakeCursor() {
         return new Cursor(global, st.ns.klass, this, st.ns, bt, st.pos, st.captures);
     }
+
+    public Variable MakeCursorV() { return Kernel.NewROScalar(MakeCursor()); }
 
     public Cursor MakeMatch() {
         if (Cursor.Trace)

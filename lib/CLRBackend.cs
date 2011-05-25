@@ -3427,6 +3427,27 @@ dynamic:
                     CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
                     strs, th.Scan(z[1]));
             };
+            handlers["rxincorpshift"] = delegate(NamProcessor th, object[] z) {
+                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(0,z[1]));
+
+                return CpsOp.Goto("backtrack", true,
+                    CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpShift"),
+                        CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
+                        strs, CpsOp.BoolLiteral(JScalar.B(z[2])),
+                        CpsOp.LabelId(th.cpb.cx, JScalar.S(z[3]))));
+            };
+            handlers["rxincorpcut"] = delegate(NamProcessor th, object[] z) {
+                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(0,z[1]));
+
+                return CpsOp.Goto("backtrack", true,
+                    CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpCut"),
+                        CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
+                        strs, CpsOp.IntLiteral(
+                            JScalar.I(z[2]) * RxFrame.IC_ZERO_WIDTH +
+                            JScalar.I(z[3]) * RxFrame.IC_NEGATIVE +
+                            JScalar.I(z[4]) * RxFrame.IC_PASS_CAP),
+                        th.Scan(z[5])));
+            };
             handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] args = new CpsOp[z.Length - 1];
                 for(int i = 0; i < z.Length - 2; i++)
