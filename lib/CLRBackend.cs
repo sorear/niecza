@@ -2986,6 +2986,10 @@ namespace Niecza.CLRBackend {
             return new CpsOp(ClrCpsFrame.Instance);
         }
 
+        public static CpsOp RxFrame() {
+            return IsConst(GetField(Tokens.Frame_rx, CallFrame()));
+        }
+
         // only use this for reference types
         public static CpsOp NewArray(Type ty, params CpsOp[] zyg) {
             return Primitive(zyg, delegate (ClrOp[] h) {
@@ -3477,15 +3481,14 @@ dynamic:
             handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
                 CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(2,z));
                 return CpsOp.MethodCall(Tokens.RxFrame_PushCapture,
-                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                    strs, th.Scan(z[1]));
+                    CpsOp.RxFrame(), strs, th.Scan(z[1]));
             };
             handlers["rxincorpshift"] = delegate(NamProcessor th, object[] z) {
                 CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(0,z[1]));
 
                 return CpsOp.Goto("backtrack", true,
                     CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpShift"),
-                        CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
+                        CpsOp.RxFrame(),
                         strs, CpsOp.BoolLiteral(JScalar.B(z[2])),
                         CpsOp.LabelId(th.cpb.cx, JScalar.S(z[3]))));
             };
@@ -3494,8 +3497,7 @@ dynamic:
 
                 return CpsOp.Goto("backtrack", true,
                     CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpCut"),
-                        CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                        strs, CpsOp.IntLiteral(
+                        CpsOp.RxFrame(), strs, CpsOp.IntLiteral(
                             JScalar.I(z[2]) * RxFrame.IC_ZERO_WIDTH +
                             JScalar.I(z[3]) * RxFrame.IC_NEGATIVE +
                             JScalar.I(z[4]) * RxFrame.IC_PASS_CAP),
@@ -3505,7 +3507,7 @@ dynamic:
                 CpsOp[] args = new CpsOp[z.Length - 1];
                 for(int i = 0; i < z.Length - 2; i++)
                     args[i+1] = th.Scan(z[i+2]);
-                args[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
+                args[0] = CpsOp.RxFrame();
                 CpsOp call = CpsOp.MethodCall(
                         Tokens.RxFrame.GetMethod(FixStr(z[1])), args);
                 return CpsOp.Goto("backtrack", true, call);
@@ -3666,12 +3668,12 @@ dynamic:
             handlers["pushcut"] = delegate(NamProcessor th, object[] z) {
                 return real_pushcut(new CpsOp[] { CpsOp.StringLiteral(FixStr(z[1])) }); };
             thandlers["rxframe"] = delegate(CpsOp[] z) {
-                return CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()); };
+                return CpsOp.RxFrame(); };
             handlers["rxcall"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] x = new CpsOp[z.Length - 1];
                 for (int i = 2; i < z.Length; i++)
                     x[i-1] = th.Scan(z[i]);
-                x[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
+                x[0] = CpsOp.RxFrame();
                 string name = JScalar.S(z[1]);
                 return CpsOp.CpsCall((name == "EndWith" || name == "End") ? Tokens.Void : null, Tokens.RxFrame.GetMethod(name), x); };
             handlers["rxinit"] = delegate(NamProcessor th, object[] z) {
@@ -3682,14 +3684,13 @@ dynamic:
                         CpsOp.BoolLiteral(FixBool(z[4])))); };
             handlers["rxpushb"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.RxFrame_PushBacktrack,
-                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
+                    CpsOp.RxFrame(),
                     CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2]))); };
             handlers["ltm_push_alts"] = delegate(NamProcessor th, object[] z) {
                 CpsOp ai = th.sub.unit.AltInfoConst(th.cpb.cx, z[1],
                     JScalar.S(z[2]), JScalar.SA(0,z[3]));
                 return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
-                    CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame()),
-                    CpsOp.CallFrame(), ai); };
+                    CpsOp.RxFrame(), CpsOp.CallFrame(), ai); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
             thandlers["rxend"] = RxCall(Tokens.Void, "End");
             thandlers["rxfinalend"] = RxCall(Tokens.Void, "FinalEnd");
@@ -3926,7 +3927,7 @@ dynamic:
             return delegate(CpsOp[] cpses) {
                 CpsOp[] n = new CpsOp[cpses.Length + 1];
                 Array.Copy(cpses, 0, n, 1, cpses.Length);
-                n[0] = CpsOp.GetField(Tokens.Frame_rx, CpsOp.CallFrame());
+                n[0] = CpsOp.RxFrame();
                 return CpsOp.CpsCall(cps, mi, n); };
         }
 
