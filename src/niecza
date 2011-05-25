@@ -48,7 +48,36 @@ method number($/) {
 }
 }
 
+augment class RxOp { #OK exist
+method ctxopzyg()  { map *.ctxopzyg, @$!zyg }
+}
+
+augment class RxOp::VarString { #OK exist
+    method ctxopzyg() { $!ops, 1 }
+}
+
+augment class RxOp::SetLang { #OK exist
+    method ctxopzyg() { $!expr, 1 }
+}
+
+augment class RxOp::CheckBlock { #OK exist
+    method ctxopzyg() { $!block, 1 }
+}
+
+augment class RxOp::SaveValue { #OK exist
+    method ctxopzyg() { $!block, 1 }
+}
+
+augment class RxOp::VoidBlock { #OK exist
+    method ctxopzyg() { $!block, 0 }
+}
+
+augment class Op::RegexBody { #OK exist
+    method ctxzyg($ ) { (map { $_, 0 }, @$.pre), $.rxop.ctxopzyg }
+}
+
 augment class RxOp::Subrule { #OK exist
+    method ctxopzyg() { defined($!regex) ?? ($!regex, 1) !! () }
     method code($body) {
         my $callf = $!regex ?? $!regex.cgop($body) !!
             CgOp.methodcall(CgOp.rxcall("MakeCursorV"),

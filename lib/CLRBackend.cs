@@ -2611,17 +2611,20 @@ namespace Niecza.CLRBackend {
                 foreach (ClrOp s in zyg[i].stmts)
                     stmts.Add(s);
 
-                bool more_stmts = false;
+                bool effects_before_use = false;
                 for (int j = i + 1; j < zyg.Length; j++)
-                    if (zyg[j].stmts.Length != 0 || !zyg[j].head.Constant)
-                        more_stmts = true;
+                    if (zyg[j].stmts.Length != 0)
+                        effects_before_use = true;
+                for (int j = 0; j < i; j++)
+                    if (!zyg[j].head.Constant)
+                        effects_before_use = true;
 
                 // if we have statements, then we need our head
                 // spilled right away, because interleaving evaluation
                 // (detectably) isn't allowed.
                 // unless, nothing with side effects can possibly
                 // come between.
-                if (!more_stmts || zyg[i].stmts.Length == 0) {
+                if (!effects_before_use || zyg[i].stmts.Length == 0) {
                     args.Add(zyg[i].head);
                 } else {
                     string ln = "!spill" + (CLRBackend.Current.nextspill++);
