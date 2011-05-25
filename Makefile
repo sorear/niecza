@@ -76,7 +76,7 @@ clean:
 	@rm -f run/*.dll.so
 	@rm -fr *~
 
-reboot: all
+half_reboot: all
 	# setup a clean build area
 	rm -rf stage2/ stage3/
 	mkdir -p stage2/obj stage2/run stage2/boot stage2/boot/obj \
@@ -90,7 +90,10 @@ reboot: all
 	    stage2/boot/obj
 	cp -a lib run stage2/boot
 	cd stage2 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
-	cd stage2 && $(MAKE)
+	cp test.pl stage2/
+	cd stage2 && $(MAKE) test
+
+reboot: half_reboot
 	# verify that the new Niecza can build itself correctly
 	cp stage2/obj/Kernel.dll stage2/obj/CrossDomainReceiver.dll \
 	    stage2/obj/CLRBackend.exe stage3/boot/obj
