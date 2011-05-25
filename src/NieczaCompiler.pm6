@@ -11,7 +11,7 @@ has $!main-sn = 0;
 
 has $.unitcache = {};
 
-sub gettimeofday() { now.to-posix }
+sub gettimeofday() { now.to-posix.[0] }
 
 method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode) {
     my %*units;
