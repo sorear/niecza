@@ -2471,6 +2471,18 @@ slow:
             return PackageLookup(cursor, path[path.Length - 1]);
         }
 
+        public static Variable CreateArray() {
+            P6any v = new P6opaque(ArrayMO);
+            v.SetSlot("items", new VarDeque());
+            v.SetSlot("rest", new VarDeque());
+            return NewRWListVar(v);
+        }
+
+        public static Variable CreateHash() {
+            P6any v = BoxRaw(new VarHash(), HashMO);
+            return NewRWListVar(v);
+        }
+
         public static BValue PackageLookup(P6any parent, string name) {
             Dictionary<string,BValue> stash =
                 UnboxAny<Dictionary<string,BValue>>(parent);
@@ -2484,15 +2496,9 @@ slow:
                 newstash["PARENT::"] = new BValue(NewROScalar(parent));
                 return (stash[name] = new BValue(BoxAny<Dictionary<string,BValue>>(newstash, StashP)));
             } else if (name.StartsWith("@")) {
-                Variable n = RunInferior(ArrayP.InvokeMethod(GetInferiorRoot(),
-                            "new", new Variable[] {Kernel.NewROScalar(ArrayP)},
-                            null));
-                return (stash[name] = new BValue(n));
+                return (stash[name] = new BValue(CreateArray()));
             } else if (name.StartsWith("%")) {
-                Variable n = RunInferior(HashP.InvokeMethod(GetInferiorRoot(),
-                            "new", new Variable[] {Kernel.NewROScalar(HashP)},
-                            null));
-                return (stash[name] = new BValue(n));
+                return (stash[name] = new BValue(CreateHash()));
             } else {
                 return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
             }

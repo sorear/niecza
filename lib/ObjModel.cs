@@ -457,6 +457,7 @@ next_method: ;
 
         public P6any how;
         public P6any typeObject;
+        public Variable typeVar;
         public string name;
 
         public LexerCache lexcache;

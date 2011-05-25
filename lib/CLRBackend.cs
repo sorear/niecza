@@ -1355,6 +1355,10 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewRWScalar");
         public static readonly MethodInfo Kernel_NewTypedScalar =
             typeof(Kernel).GetMethod("NewTypedScalar");
+        public static readonly MethodInfo Kernel_CreateArray =
+            typeof(Kernel).GetMethod("CreateArray");
+        public static readonly MethodInfo Kernel_CreateHash =
+            typeof(Kernel).GetMethod("CreateHash");
         public static readonly MethodInfo Kernel_Decontainerize =
             typeof(Kernel).GetMethod("Decontainerize");
         public static readonly MethodInfo Kernel_NewBoundVar =
@@ -3754,6 +3758,8 @@ dynamic:
             thandlers["rxstripcaps"] = Methody(null, Tokens.Cursor.GetMethod("StripCaps"));
 
             thandlers["prog"] = CpsOp.Sequence;
+            thandlers["newarray"] = Methody(null, Tokens.Kernel_CreateArray);
+            thandlers["newhash"] = Methody(null, Tokens.Kernel_CreateHash);
 
             thandlers["bif_gettimeofday"] = SimpleB("GetTimeOfDay");
             thandlers["bif_array_constructor"] = SimpleB("ArrayConstructor");
@@ -4048,11 +4054,9 @@ dynamic:
                         Tokens.Kernel_AnyMO :
                         ls.type.Resolve<Class>().metaObject;
                     if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
-                        string s = ((f & LexSimple.HASH) != 0) ? "Hash" : "Array";
-                        bit = new object[] { new JScalar("methodcall"),
-                            new JScalar("new"), new JScalar(""),
-                            new object[] { new JScalar("fetch"), new object[] { new JScalar("corelex"), new JScalar(s) } },
-                            new object[] { new JScalar("corelex"), new JScalar(s) } };
+                        string s = ((f & LexSimple.HASH) != 0) ?
+                            "newhash" : "newarray";
+                        bit = new object[] { new JScalar(s) };
                     } else {
                         bit = new object[] { new JScalar("_newoftype"), tc };
                     }
@@ -4430,14 +4434,11 @@ dynamic:
                     } else if (l.Value is LexSimple) {
                         LexSimple lx = (LexSimple)l.Value;
                         if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
-                        string type = ((lx.flags & LexSimple.HASH) != 0) ? "Hash" :
-                            ((lx.flags & LexSimple.LIST) != 0) ? "Array" : null;
+                        MethodInfo type =
+                            ((lx.flags & LexSimple.HASH) != 0) ? Tokens.Kernel_CreateHash :
+                            ((lx.flags & LexSimple.LIST) != 0) ? Tokens.Kernel_CreateArray : null;
                         if (type != null) {
-                            Class c = (Class) obj.GetCorePackage(type);
-                            SetProtolex(obj, l.Key, lx, CpsOp.SubyCall(true, "",
-                                CpsOp.StringLiteral("new"),
-                                CpsOp.GetSField(c.typeObject),
-                                CpsOp.GetSField(c.typeVar)));
+                            SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(type));
                         } else {
                             FieldInfo tc = lx.type == null ?
                                 Tokens.Kernel_AnyMO :
@@ -4450,7 +4451,6 @@ dynamic:
                 }
             });
 
-            // this needs to come late so that Array and Hash are available
             foreach (object le in unit.log) {
                 object[] lea = (object[]) le;
                 string t = ((JScalar)lea[0]).str;
