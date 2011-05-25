@@ -2597,10 +2597,15 @@ namespace Niecza.CLRBackend {
 
                 bool more_stmts = false;
                 for (int j = i + 1; j < zyg.Length; j++)
-                    if (zyg[j].stmts.Length != 0)
+                    if (zyg[j].stmts.Length != 0 || !zyg[j].head.Constant)
                         more_stmts = true;
 
-                if (!more_stmts || zyg[i].head.Constant) {
+                // if we have statements, then we need our head
+                // spilled right away, because interleaving evaluation
+                // (detectably) isn't allowed.
+                // unless, nothing with side effects can possibly
+                // come between.
+                if (!more_stmts || zyg[i].stmts.Length == 0) {
                     args.Add(zyg[i].head);
                 } else {
                     string ln = "!spill" + (CLRBackend.Current.nextspill++);
