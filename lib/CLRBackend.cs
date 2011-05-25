@@ -521,8 +521,9 @@ namespace Niecza.CLRBackend {
                 var_constant_cache[code] = ix = var_constants.Count;
                 var_constants.Add(code);
             }
-            return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
-                CpsOp.GetSField(var_pool), CpsOp.IntLiteral(ix));
+            return CpsOp.IsConst(
+                CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
+                    CpsOp.GetSField(var_pool), CpsOp.IntLiteral(ix)));
         }
 
         public CpsOp VarConstStr(string s) { return VarConst('S' + s); }
@@ -576,8 +577,9 @@ namespace Niecza.CLRBackend {
                 cc_constant_cache[fcode] = ix = cc_constants.Count;
                 cc_constants.Add(cc);
             }
-            return CpsOp.Operator(Tokens.CC, OpCodes.Ldelem_Ref,
-                CpsOp.GetSField(cc_pool), CpsOp.IntLiteral(ix));
+            return CpsOp.IsConst(
+                CpsOp.Operator(Tokens.CC, OpCodes.Ldelem_Ref,
+                    CpsOp.GetSField(cc_pool), CpsOp.IntLiteral(ix)));
         }
 
         public CpsOp EmitCCConsts() {
@@ -603,8 +605,9 @@ namespace Niecza.CLRBackend {
                 sl_constant_cache[fcode] = ix = sl_constants.Count;
                 sl_constants.Add(sl);
             }
-            return CpsOp.Operator(Tokens.String.MakeArrayType(), OpCodes.Ldelem_Ref,
-                CpsOp.GetSField(sl_pool), CpsOp.IntLiteral(ix));
+            return CpsOp.IsConst(CpsOp.Operator(Tokens.String.MakeArrayType(),
+                OpCodes.Ldelem_Ref, CpsOp.GetSField(sl_pool),
+                CpsOp.IntLiteral(ix)));
         }
 
         public CpsOp EmitStringListConsts() {
@@ -634,8 +637,8 @@ namespace Niecza.CLRBackend {
                 ccl_constant_cache[fcode] = ix = ccl_constants.Count;
                 ccl_constants.Add(ccl);
             }
-            return CpsOp.Operator(Tokens.CC.MakeArrayType(), OpCodes.Ldelem_Ref,
-                CpsOp.GetSField(ccl_pool), CpsOp.IntLiteral(ix));
+            return CpsOp.IsConst(CpsOp.Operator(Tokens.CC.MakeArrayType(), OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(ccl_pool), CpsOp.IntLiteral(ix)));
         }
 
         public CpsOp EmitCCListConsts() {
@@ -658,8 +661,8 @@ namespace Niecza.CLRBackend {
             alt_info_constants.Add(dba);
             alt_info_constants.Add(labels);
 
-            return CpsOp.Operator(typeof(AltInfo), OpCodes.Ldelem_Ref,
-                CpsOp.GetSField(alt_info_pool), CpsOp.IntLiteral(ix));
+            return CpsOp.IsConst(CpsOp.Operator(typeof(AltInfo), OpCodes.Ldelem_Ref,
+                CpsOp.GetSField(alt_info_pool), CpsOp.IntLiteral(ix)));
         }
 
         public CpsOp EmitAltInfoConsts() {
@@ -1900,6 +1903,19 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrMarkConstant : ClrOp {
+        readonly ClrOp real;
+        public ClrMarkConstant(ClrOp real) {
+            this.real = real;
+            Returns = real.Returns;
+            HasCases = false;
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            real.CodeGen(cx);
+        }
+    }
+
     class ClrNoop : ClrOp {
         private ClrNoop() {
             Returns = Tokens.Void;
@@ -2835,6 +2851,12 @@ namespace Niecza.CLRBackend {
             return CpsOp.Cps(new ClrLabel(name, case_too), Tokens.Void);
         }
 
+        public static CpsOp IsConst(CpsOp real) {
+            if (real.stmts.Length != 0 || real.head.Returns == Tokens.Void)
+                throw new ArgumentException();
+            return new CpsOp(real.stmts, new ClrMarkConstant(real.head));
+        }
+
         // A previous niecza backend had this stuff tie into the
         // lifter, such that var->obj predictably happened as the
         // beginning.  But TimToady says that's not needed.
@@ -2990,10 +3012,7 @@ namespace Niecza.CLRBackend {
                 return Null(typeof(string[]));
             } else {
                 Unit u = CLRBackend.Current.unit;
-                int b = u.thaw_heap.Count;
-                u.EmitStrArray(vec);
-                return MethodCall(Tokens.RU_LoadStrArray,
-                        GetSField(u.rtunit), IntLiteral(b));
+                return u.StringListConst(vec);
             }
         }
 
