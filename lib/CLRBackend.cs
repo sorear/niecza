@@ -1114,7 +1114,7 @@ namespace Niecza.CLRBackend {
             = new Dictionary<string,Label>();
         public string[] let_names = new string[0];
         public Type[] let_types = new Type[0];
-        public LocalBuilder ospill, pspill, nspill;
+        public LocalBuilder ospill, sspill, pspill, nspill;
         public List<int> lineStack = new List<int>();
         public List<int> lineBuffer = new List<int>();
         public List<int> ehspanBuffer = new List<int>();
@@ -1123,6 +1123,11 @@ namespace Niecza.CLRBackend {
         public void make_ospill() {
             if (ospill == null)
                 ospill = il.DeclareLocal(Tokens.Variable);
+        }
+
+        public void make_sspill() {
+            if (sspill == null)
+                sspill = il.DeclareLocal(Tokens.Variable);
         }
 
         public void save_line() {
@@ -1672,8 +1677,8 @@ namespace Niecza.CLRBackend {
         public override void CodeGen(CgContext cx) {
             zyg[0].CodeGen(cx);
             cx.make_ospill();
+            cx.il.Emit(OpCodes.Dup);
             cx.il.Emit(OpCodes.Stloc, cx.ospill);
-            cx.il.Emit(OpCodes.Ldloc, cx.ospill);
             cx.il.Emit(OpCodes.Callvirt, Tokens.Variable_Fetch);
             cx.il.Emit(OpCodes.Ldfld, Tokens.P6any_mo);
             cx.il.Emit(OpCodes.Ldfld, thing);
@@ -2017,11 +2022,17 @@ namespace Niecza.CLRBackend {
                 if (sig[i - min] != '\0')
                     general = true;
             if (!general) {
-                cx.EmitInt(zyg.Length - min);
+                cx.EmitInt(zyg.Length - min + (ismethod ? 1 : 0));
                 cx.il.Emit(OpCodes.Newarr, Tokens.Variable);
+                if (ismethod) {
+                    cx.il.Emit(OpCodes.Dup);
+                    cx.EmitInt(0);
+                    cx.il.Emit(OpCodes.Ldloc, cx.sspill);
+                    cx.il.Emit(OpCodes.Stelem_Ref);
+                }
                 for (int i = min; i < zyg.Length; i++) {
                     cx.il.Emit(OpCodes.Dup);
-                    cx.EmitInt(i - min);
+                    cx.EmitInt(i - min + (ismethod ? 1 : 0));
                     zyg[i].CodeGen(cx);
                     cx.il.Emit(OpCodes.Stelem_Ref);
                 }
@@ -2033,6 +2044,12 @@ namespace Niecza.CLRBackend {
                 cx.il.Emit(OpCodes.Stloc, cx.pspill);
                 cx.il.Emit(OpCodes.Newobj, Tokens.VarHash.GetConstructor(new Type[0]));
                 cx.il.Emit(OpCodes.Stloc, cx.nspill);
+
+                if (ismethod) {
+                    cx.il.Emit(OpCodes.Ldloc, cx.pspill);
+                    cx.il.Emit(OpCodes.Ldloc, cx.sspill);
+                    cx.il.Emit(OpCodes.Call, typeof(List<Variable>).GetMethod("Add"));
+                }
 
                 int csr = 0;
                 int ix  = min;
@@ -2073,6 +2090,12 @@ namespace Niecza.CLRBackend {
             cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
 
             zyg[ismethod ? 1 : 0].CodeGen(cx);
+            if (ismethod) {
+                cx.make_sspill();
+                cx.il.Emit(OpCodes.Dup);
+                cx.il.Emit(OpCodes.Stloc, cx.sspill);
+                cx.il.Emit(OpCodes.Callvirt, Tokens.Variable_Fetch);
+            }
             cx.il.Emit(OpCodes.Ldarg_0);
             if (ismethod)
                 zyg[0].CodeGen(cx);
@@ -2091,10 +2114,9 @@ namespace Niecza.CLRBackend {
         }
 
         public ClrSubyCall(bool ismethod, string sig, ClrOp[] zyg) {
-            if (ismethod) sig = "\0" + sig;
             int i = 0;
             if (ismethod) TypeCheck(zyg[i++].Returns, Tokens.String);
-            TypeCheck(zyg[i++].Returns, Tokens.P6any);
+            TypeCheck(zyg[i++].Returns, ismethod ? Tokens.Variable : Tokens.P6any);
             int j = 0;
             while (j < sig.Length) {
                 string s = sig.Substring(j+1, sig[j]);

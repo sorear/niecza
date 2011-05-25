@@ -118,6 +118,10 @@ class RxOp::CutBrack is RxOp {
 }
 
 augment class CgOp {
+method methodcall($obj, $name, *@args) {
+    my ($sig, $aout) = CgOp._process_arglist(@args);
+    CgOp._cgop('methodcall', $name, $sig, $obj, @$aout);
+}
 method rxincorpcut($caps,$zw,$ng,$pc,$call) { self._cgop("rxincorpcut",$caps,$zw,$ng,$pc,$call) }
 method rxincorpshift($caps,$pc,$label) { self._cgop("rxincorpshift",$caps,$pc,$label) }
 method boxlist($mo,$obj) { self._cgop("boxlist", $mo, $obj) }
