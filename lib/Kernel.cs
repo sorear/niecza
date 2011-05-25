@@ -446,6 +446,18 @@ namespace Niecza {
 
         public void FixupSubs() {
             for (int i = 0; i < xref.Length; i++) {
+                STable mo = xref[i] as STable;
+                if (mo == null) continue;
+                int from = mo.fixups_from;
+
+                int nex = ReadInt(ref from);
+                for (int j = 0; j < nex; j++)
+                    Kernel.GetVar(ReadStrArray(ref from)).v = mo.typeVar;
+
+                ReadClassMembers(mo, ref from);
+            }
+
+            for (int i = 0; i < xref.Length; i++) {
                 SubInfo si = xref[i] as SubInfo;
                 if (si == null) continue;
                 int from = si.fixups_from;
@@ -457,6 +469,47 @@ namespace Niecza {
                     Kernel.GetVar(ReadStrArray(ref from)).v =
                         Kernel.NewROScalar(si.protosub);
             }
+        }
+
+        public STable LoadPackage(int from, STable existing_mo) {
+            int ix = ReadInt(ref from);
+            string name = ReadStr(ref from);
+            STable mo = existing_mo != null ? existing_mo :
+                new STable(name);
+            xref[ix] = mo;
+            STable[] superclasses;
+            STable[] mro;
+            string[] slots;
+
+            switch (heap[from++]) {
+                case 0: //role
+                    superclasses = new STable[ReadInt(ref from)];
+                    for (int i = 0; i < superclasses.Length; i++)
+                        superclasses[i] = (STable)ReadXref(ref from);
+                    mo.FillRole(superclasses, new STable[0]);
+                    break;
+                case 1: //p. role
+                    break;
+                case 2: //class
+                    slots = ReadStrArray(ref from);
+                    superclasses = new STable[ReadInt(ref from)];
+                    for (int i = 0; i < superclasses.Length; i++)
+                        superclasses[i] = (STable)ReadXref(ref from);
+                    mro = new STable[ReadInt(ref from)];
+                    for (int i = 0; i < mro.Length; i++)
+                        mro[i] = (STable)ReadXref(ref from);
+                    mo.FillClass(slots, superclasses, mro);
+                    break;
+                default:
+                    throw new ArgumentException();
+            }
+
+            mo.fixups_from = from;
+
+            mo.typeObject = new P6opaque(mo);
+            ((P6opaque)mo.typeObject).slots = null;
+            mo.typeVar = Kernel.NewROScalar(mo.typeObject);
+            return mo;
         }
 
         public LAD LoadLAD(int from) {
@@ -495,9 +548,9 @@ namespace Niecza {
             return r;
         }
 
-        public void LoadClassMembers(int from) {
-            STable into = (STable) xref[ReadInt(ref from)];
+        public void ReadClassMembers(STable into, ref int from) {
             int nmethods = ReadInt(ref from);
+            if (nmethods < 0) return; // param role
 
             for (int i = 0; i < nmethods; i++) {
                 into.AddMethod(ReadInt(ref from), ReadStr(ref from),

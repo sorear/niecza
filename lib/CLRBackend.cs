@@ -758,14 +758,10 @@ namespace Niecza.CLRBackend {
     }
 
     class ModuleWithTypeObject: Module {
-        public FieldInfo typeObject;
-        public FieldInfo typeVar;
         public FieldInfo metaObject;
 
         public override void BindFields(int ix,
                 Func<string,Type,FieldInfo> binder) {
-            typeObject = binder(Unit.SharedName('T', ix, name), Tokens.P6any);
-            typeVar    = binder(Unit.SharedName('V', ix, name), Tokens.Variable);
             metaObject = binder(Unit.SharedName('M', ix, name), Tokens.STable);
         }
 
@@ -1095,8 +1091,8 @@ namespace Niecza.CLRBackend {
                 return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
                         new ClrOp[] { new ClrGetSField(Tokens.Kernel_AnyP) });
             }
-            return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
-                    new ClrOp[] { new ClrGetSField(p.typeObject) });
+            return new ClrGetField(Tokens.DMO_typeVar,
+                new ClrGetSField(p.metaObject));
         }
         public LexStash(Unit u, object[] l) {
             unit = u;
@@ -1427,6 +1423,8 @@ namespace Niecza.CLRBackend {
             typeof(object).GetMethod("ToString", new Type[0]);
         public static readonly MethodInfo RU_LoadStrArray =
             RuntimeUnit.GetMethod("LoadStrArray");
+        public static readonly MethodInfo RU_LoadPackage =
+            RuntimeUnit.GetMethod("LoadPackage");
         public static readonly MethodInfo RU_LoadClassMembers =
             RuntimeUnit.GetMethod("LoadClassMembers");
         public static readonly MethodInfo RU_LoadSubInfo =
@@ -1456,6 +1454,8 @@ namespace Niecza.CLRBackend {
             P6opaque.GetField("slots");
         public static readonly FieldInfo DMO_typeObject =
             STable.GetField("typeObject");
+        public static readonly FieldInfo DMO_typeVar =
+            STable.GetField("typeVar");
         public static readonly FieldInfo DMO_how =
             STable.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
@@ -4300,60 +4300,73 @@ dynamic:
                     kp = Tokens.Kernel.GetField(m.name + "P");
                     existing_mo = km != null && km.IsInitOnly;
                 }
-                thaw.Add(CpsOp.SetSField(m.metaObject, existing_mo ?
-                        CpsOp.GetSField(km) :
-                        CpsOp.ConstructorCall(Tokens.DMO_ctor,
-                            new CpsOp[] { CpsOp.StringLiteral(m.name) })));
-                thaw.Add(CpsOp.Operator(Tokens.Void, OpCodes.Stelem_Ref,
-                    CpsOp.GetField(Tokens.RU_xref,CpsOp.GetSField(unit.rtunit)),
-                    CpsOp.IntLiteral(ix), CpsOp.GetSField(m.metaObject)));
+                int b = unit.thaw_heap.Count;
+                unit.EmitInt(ix);
+                unit.EmitStr(m.name);
 
                 if (m is Role) {
+                    unit.EmitByte(0);
                     Role r = (Role) m;
-                    CpsOp[] super = new CpsOp[ r.superclasses.Length ];
-                    for (int i = 0; i < super.Length; i++)
-                        super[i] = CpsOp.GetSField(r.superclasses[i].Resolve<Class>().metaObject);
-
-                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillRole,
-                        CpsOp.GetSField(r.metaObject),
-                        CpsOp.NewArray(Tokens.STable, super),
-                        CpsOp.NewArray(Tokens.STable)));
+                    unit.EmitInt(r.superclasses.Length);
+                    foreach (Xref x in r.superclasses)
+                        unit.EmitXref(x);
                 } else if (m is ParametricRole) {
+                    unit.EmitByte(1);
                     // The heavy lifting is done in WrapBody
                 } else if (m is Class) {
+                    unit.EmitByte(2);
                     Class r = (Class) m;
                     List<string> all_slot = new List<string>();
-                    CpsOp[] super = new CpsOp[ r.superclasses.Length ];
-                    CpsOp[] mro   = new CpsOp[ r.linearized_mro.Length ];
-                    for (int i = 0; i < super.Length; i++)
-                        super[i] = CpsOp.GetSField(r.superclasses[i].Resolve<Class>().metaObject );
-                    for (int i = 0; i < mro.Length; i++) {
+                    for (int i = 0; i < r.linearized_mro.Length; i++) {
                         Class p = r.linearized_mro[i].Resolve<Class>();
-                        mro[i] = CpsOp.GetSField(p.metaObject);
                         foreach (Attribute a in p.attributes)
                             all_slot.Add(a.name);
                     }
-
-                    thaw.Add(CpsOp.MethodCall(Tokens.DMO_FillClass,
-                        CpsOp.GetSField(r.metaObject),
-                        CpsOp.StringArray(false, all_slot.ToArray()),
-                        CpsOp.NewArray(Tokens.STable, super),
-                        CpsOp.NewArray(Tokens.STable, mro)));
+                    unit.EmitStrArray(all_slot.ToArray());
+                    unit.EmitInt(r.superclasses.Length);
+                    foreach (Xref x in r.superclasses)
+                        unit.EmitXref(x);
+                    unit.EmitInt(r.linearized_mro.Length);
+                    foreach (Xref x in r.linearized_mro)
+                        unit.EmitXref(x);
                 }
 
-                thaw.Add(CpsOp.SetSField(m.typeObject,
-                    CpsOp.ConstructorCall(Tokens.P6opaque_ctor, new CpsOp[] {
-                        CpsOp.GetSField(m.metaObject) })));
-                thaw.Add(CpsOp.SetField(Tokens.P6opaque_slots,
-                    CpsOp.UnboxAny(Tokens.P6opaque, CpsOp.GetSField(m.typeObject)),
-                        CpsOp.Null(typeof(object[]))));
-                thaw.Add(CpsOp.SetField(Tokens.DMO_typeObject,
-                    CpsOp.GetSField(m.metaObject), CpsOp.GetSField(m.typeObject)));
-                thaw.Add(CpsOp.SetSField(m.typeVar, CpsOp.MethodCall(
-                    Tokens.Kernel_NewROScalar, CpsOp.GetSField(m.typeObject))));
+                unit.EmitInt(m.exports.Length);
+                foreach (object o in m.exports)
+                    unit.EmitStrArray(JScalar.SA(0,o));
+
+                if (m is ParametricRole) {
+                    unit.EmitInt(-1);
+                } else {
+                    Method[] methods = (m is Class) ? ((Class)m).methods :
+                        ((Role)m).methods;
+                    Attribute[] attrs = (m is Class) ? ((Class)m).attributes :
+                        ((Role)m).attributes;
+                    unit.EmitInt(methods.Length);
+                    foreach (Method me in methods) {
+                        unit.EmitInt(me.kind);
+                        unit.EmitStr(me.name);
+                        unit.EmitXref(me.body);
+                    }
+                    unit.EmitInt(attrs.Length);
+                    foreach (Attribute a in attrs) {
+                        unit.EmitStr(a.name);
+                        unit.EmitByte(a.publ ? 1 : 0);
+                        unit.EmitXref(a.ibody);
+                        unit.EmitXref(a.type);
+                    }
+                }
+
+                thaw.Add(CpsOp.SetSField(m.metaObject, CpsOp.MethodCall(
+                    Tokens.RU_LoadPackage,
+                    CpsOp.GetSField(unit.rtunit),
+                    CpsOp.IntLiteral(b),
+                    existing_mo ? CpsOp.GetSField(km) :
+                        CpsOp.Null(Tokens.STable))));
 
                 if (kp != null)
-                    thaw.Add(CpsOp.SetSField(kp, CpsOp.GetSField(m.typeObject)));
+                    thaw.Add(CpsOp.SetSField(kp, CpsOp.GetField(
+                        Tokens.DMO_typeObject, CpsOp.GetSField(m.metaObject))));
                 if (km != null && !km.IsInitOnly)
                     thaw.Add(CpsOp.SetSField(km, CpsOp.GetSField(m.metaObject)));
             });
@@ -4376,34 +4389,7 @@ dynamic:
                 if (Verbose > 0) Console.WriteLine("pkg3 {0}", p.name);
                 ModuleWithTypeObject m = p as ModuleWithTypeObject;
                 if (m == null) return;
-                foreach (object o in m.exports) {
-                    thaw.Add(CpsOp.SetField(Tokens.BValue_v,
-                        CpsOp.MethodCall(Tokens.Kernel_GetVar,
-                            CpsOp.StringArray(false, JScalar.SA(0,o))),
-                        CpsOp.GetSField(m.typeVar)));
-                }
                 if (m is ParametricRole) return;
-                Method[] methods = (m is Class) ? ((Class)m).methods :
-                    ((Role)m).methods;
-                Attribute[] attrs = (m is Class) ? ((Class)m).attributes :
-                    ((Role)m).attributes;
-                int b = unit.thaw_heap.Count;
-                unit.EmitInt(ix);
-                unit.EmitInt(methods.Length);
-                foreach (Method me in methods) {
-                    unit.EmitInt(me.kind);
-                    unit.EmitStr(me.name);
-                    unit.EmitXref(me.body);
-                }
-                unit.EmitInt(attrs.Length);
-                foreach (Attribute a in attrs) {
-                    unit.EmitStr(a.name);
-                    unit.EmitByte(a.publ ? 1 : 0);
-                    unit.EmitXref(a.ibody);
-                    unit.EmitXref(a.type);
-                }
-                thaw.Add(CpsOp.MethodCall(Tokens.RU_LoadClassMembers,
-                    CpsOp.GetSField(unit.rtunit), CpsOp.IntLiteral(b)));
                 thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject))));
             });
