@@ -55,6 +55,7 @@ sub is_simple_var($op) {
 
 our %funcs = (
     '&infix:<=>'           => &do_assign,
+    '&infix:<=>>'          => do_builtin('pair', 2),
     '&postcircumfix:<{ }>' => &do_atkey,
     '&postcircumfix:<[ ]>' => &do_atpos,
     '&chars'               => do_builtin('chars', 1),
@@ -66,6 +67,7 @@ our %funcs = (
     '&infix:<le>'          => do_builtin('strle', 2),
     '&infix:<lt>'          => do_builtin('strlt', 2),
     '&infix:<ne>'          => do_builtin('strne', 2),
+    '&infix:<,>'           => &do_comma,
     '&infix:</>'           => do_builtin('divide', 2),
     '&infix:<->'           => do_builtin('minus', 2),
     '&infix:<*>'           => do_builtin('mul', 2),
@@ -128,6 +130,11 @@ sub do_map_grep($body, $nv, $invname, $op) {
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args > 0;
     return ::Op::Builtin.new(name => substr($invname, 1), args => $args);
+}
+
+sub do_comma($body, $nv, $invname, $op) {
+    return $op unless defined my $args = no_named_params($op);
+    return ::Op::Builtin.new(name => 'comma', args => $args);
 }
 
 sub do_return_take($body, $nv, $invname, $op) {

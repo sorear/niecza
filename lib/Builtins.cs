@@ -963,6 +963,13 @@ public class Builtins {
         return rt;
     }
 
+    public static Variable MakePair(Variable key, Variable value) {
+        P6any l = new P6opaque(Kernel.PairMO);
+        l.SetSlot("key", key);
+        l.SetSlot("value", value);
+        return Kernel.NewROScalar(l);
+    }
+
     public static Variable ArrayConstructor(Variable bits) {
         VarDeque rest  = new VarDeque(bits);
         VarDeque items = new VarDeque();

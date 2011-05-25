@@ -1464,6 +1464,8 @@ namespace Niecza.CLRBackend {
             Kernel.GetField("StrMO");
         public static readonly FieldInfo Kernel_AnyMO =
             Kernel.GetField("AnyMO");
+        public static readonly FieldInfo Kernel_ParcelMO =
+            Kernel.GetField("ParcelMO");
         public static readonly FieldInfo Kernel_AnyP =
             Kernel.GetField("AnyP");
         public static readonly FieldInfo Frame_rx =
@@ -3314,6 +3316,12 @@ dynamic:
 
                 return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_SFH, z);
             };
+            handlers["bif_comma"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.MethodCall(Tokens.Kernel_NewRWListVar,
+                    CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.FVarList),
+                        CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(1, zyg, th.Scan)),
+                        CpsOp.GetSField(Tokens.Kernel_ParcelMO)));
+            };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
                 if (zyg[1] is JScalar) {
@@ -3728,6 +3736,7 @@ dynamic:
 
             thandlers["bif_gettimeofday"] = SimpleB("GetTimeOfDay");
             thandlers["bif_array_constructor"] = SimpleB("ArrayConstructor");
+            thandlers["bif_pair"] = SimpleB("MakePair");
             thandlers["bif_numand"] = SimpleB("NumAnd");
             thandlers["bif_numor"] = SimpleB("NumOr");
             thandlers["bif_numxor"] = SimpleB("NumXor");

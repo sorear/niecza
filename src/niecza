@@ -48,6 +48,54 @@ method number($/) {
 }
 }
 
+augment class RxOp::Subrule { #OK exist
+    method code($body) {
+        my $bt = self.label;
+
+        my $callf = $!regex ?? $!regex.cgop($body) !!
+            CgOp.methodcall(CgOp.newscalar(CgOp.rxcall("MakeCursor")),
+                $!method);
+        my @newcapf = (!$.captures) ?? () !!
+            CgOp.rxpushcapture(
+                ($!passcap ??
+                    CgOp.newscalar(CgOp.rxstripcaps(
+                            CgOp.cast("cursor", CgOp.letvar("k")))) !!
+                    CgOp.letvar("kv")), @$.captures);
+        my @pushcapf = ($!passcap ??
+            (CgOp.rxsetcapsfrom(CgOp.cast("cursor", CgOp.letvar("k")))) !! ()),
+                @newcapf;
+        my @bfargs = 'backtrack', CgOp.obj_is_defined(CgOp.letvar("k"));
+        my $backf = $!negative ?? CgOp.cgoto(@bfargs) !! CgOp.ncgoto(@bfargs);
+        my $updatef = CgOp.prog(@pushcapf,
+            CgOp.rxsetpos(CgOp.cursor_pos(CgOp.cast("cursor",
+                        CgOp.letvar("k")))));
+        $updatef = CgOp.prog() if $!zerowidth;
+
+        my @code;
+
+        if $!selfcut {
+            push @code, CgOp.letn(
+                "kv", CgOp.get_first($callf),
+                "k", CgOp.fetch(CgOp.letvar("kv")),
+                $backf,
+                $updatef);
+        } else {
+            push @code, CgOp.rxcall("SetCursorList", CgOp.vvarlist_new_singleton($callf));
+            push @code, CgOp.label($bt);
+            push @code, CgOp.ncgoto("backtrack", CgOp.iter_hasflat(
+                    CgOp.rxcall("GetCursorIter")));
+            push @code, CgOp.letn(
+                "kv", CgOp.vvarlist_shift(CgOp.rxcall("GetCursorIter")),
+                "k", CgOp.fetch(CgOp.letvar("kv")),
+                CgOp.rxpushb("SUBRULE", $bt),
+                $updatef);
+            push @code, CgOp.rxcall("SetCursorList", CgOp.null("var"));
+        }
+
+        @code;
+    }
+}
+
 augment class RxOp::Alt { #OK exist
     method code($body) {
         my @ls = map { self.label }, @$.zyg;
@@ -95,6 +143,9 @@ class RxOp::CutBrack is RxOp {
 }
 
 augment class CgOp {
+method boxlist($mo,$obj) { self._cgop("boxlist", $mo, $obj) }
+method bif_comma(*@bits) { self._cgop("bif_comma", @bits) }
+method bif_pair($key,$val) { self._cgop("bif_pair", $key, $val) }
 # DELETE label_table, ladconstruct, get_lexer
 method ltm_push_alts (*@x) { self._cgop("ltm_push_alts", @x) }
 method outerlex ($n) { self._cgop("outerlex", $n) }
