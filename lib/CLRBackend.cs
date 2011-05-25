@@ -4357,6 +4357,8 @@ dynamic:
                     }
                 }
 
+                unit.EmitXref(unit.GetCorePackage("ClassHOW").own_xref);
+
                 thaw.Add(CpsOp.SetSField(m.metaObject, CpsOp.MethodCall(
                     Tokens.RU_LoadPackage,
                     CpsOp.GetSField(unit.rtunit),
@@ -4384,15 +4386,6 @@ dynamic:
             unit.EmitIntArray(sub2_pointers.ToArray());
 
             thaw[sub2_slot] = CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadAllSubs"), CpsOp.GetSField(unit.rtunit), CpsOp.IntLiteral(sub2_pointers_start));
-
-            unit.VisitPackages(delegate(int ix, Package p) {
-                if (Verbose > 0) Console.WriteLine("pkg3 {0}", p.name);
-                ModuleWithTypeObject m = p as ModuleWithTypeObject;
-                if (m == null) return;
-                if (m is ParametricRole) return;
-                thaw.Add(CpsOp.SetField(Tokens.DMO_how, CpsOp.GetSField(m.metaObject),
-                    CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.STable), CpsOp.GetSField(m.metaObject), CpsOp.GetSField( ((Class) unit.GetCorePackage("ClassHOW")).metaObject))));
-            });
 
             thaw.Add(CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("FixupSubs"),
                 CpsOp.GetSField(unit.rtunit)));

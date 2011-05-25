@@ -455,6 +455,7 @@ namespace Niecza {
                     Kernel.GetVar(ReadStrArray(ref from)).v = mo.typeVar;
 
                 ReadClassMembers(mo, ref from);
+                mo.how = Kernel.BoxRaw<STable>(mo, ((STable)ReadXref(ref from)));
             }
 
             for (int i = 0; i < xref.Length; i++) {
