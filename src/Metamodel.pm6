@@ -224,7 +224,7 @@ class RefTarget {
 class Package is RefTarget {
     has $.exports; # is rw
 
-    method add_attribute($name, $public, $ivar, $ibody, $tc) { #OK not used
+    method add_attribute($name, $sigil, $public, $ivar, $ibody, $tc) { #OK not used
         die "attribute $name defined in a lowly package";
     }
 
@@ -254,6 +254,7 @@ class Method {
 
 class Attribute {
     has $.name; # Str, required
+    has $.sigil; # Str, required
     has $.public; # Bool
     has $.ivar; # Str
     has $.ibody; # Xref
@@ -267,8 +268,8 @@ class Class is Module {
     has $.linearized_mro; # is rw
     has $!closing;
 
-    method add_attribute($name, $public, $ivar, $ibody, $typeconstraint) {
-        push $.attributes, Metamodel::Attribute.new(:$name,
+    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
+        push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
@@ -356,8 +357,8 @@ class Role is Module {
     has $.methods = [];
     has $.superclasses = [];
 
-    method add_attribute($name, $public, $ivar, $ibody, $typeconstraint) {
-        push $.attributes, Metamodel::Attribute.new(:$name,
+    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
+        push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 
@@ -380,8 +381,8 @@ class ParametricRole is Module {
     has $.methods = [];
     has $.superclasses = [];
 
-    method add_attribute($name, $public, $ivar, $ibody, $typeconstraint) {
-        push $.attributes, Metamodel::Attribute.new(:$name,
+    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
+        push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
     }
 

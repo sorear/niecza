@@ -252,8 +252,6 @@ method vvarlist_to_fvarlist (*@_) { self._cgop("vvarlist_to_fvarlist", @_) }
 method vvarlist_unshift (*@_) { self._cgop("vvarlist_unshift", @_) }
 method vvarlist_unshiftn (*@_) { self._cgop("vvarlist_unshiftn", @_) }
 method whileloop (*@_) { self._cgop("whileloop", @_) }
-method get_lexer (*@_) { self._cgop("get_lexer", @_) }
-method label_table (*@_) { self._cgop("label_table", @_) }
 method mrl_count (*@_) { self._cgop("mrl_count", @_) }
 method mrl_index (*@_) { self._cgop("mrl_index", @_) }
 method treader_open (*@_) { self._cgop("treader_open", @_) }
@@ -284,6 +282,19 @@ method bif_simple_eval($str) { self._cgop("bif_simple_eval", $str) }
 method run_dispatch (*@_) { self._cgop("run_dispatch", @_) }
 method var_get_var ($v) { self._cgop("var_get_var", $v) }
 method var_new_tied ($t,$b,$f,$s) { self._cgop("var_new_tied", $t,$b,$f,$s) }
+method rxincorpcut($caps,$zw,$ng,$pc,$call) { self._cgop("rxincorpcut",$caps,$zw,$ng,$pc,$call) }
+method rxincorpshift($caps,$pc,$label) { self._cgop("rxincorpshift",$caps,$pc,$label) }
+method boxlist($mo,$obj) { self._cgop("boxlist", $mo, $obj) }
+method bif_comma(*@bits) { self._cgop("bif_comma", @bits) }
+method bif_pair($key,$val) { self._cgop("bif_pair", $key, $val) }
+method ltm_push_alts (*@x) { self._cgop("ltm_push_alts", @x) }
+method outerlex ($n) { self._cgop("outerlex", $n) }
+method newtypedscalar ($t) { self._cgop("newtypedscalar", $t) }
+method bif_rand () { self._cgop("bif_rand") }
+method exactnum ($base, $digits) { self._cgop("exactnum", $base, $digits) }
+method bif_rat_approx ($center, $eps) { self._cgop("bif_rat_approx", $center, $eps) }
+method bif_coerce_to_num ($v) { self._cgop("bif_coerce_to_num", $v) }
+method bif_coerce_to_int ($v) { self._cgop("bif_coerce_to_int", $v) }
 
 method double($x) {
     # Hack - prevent JSON syntax errors
@@ -310,7 +321,6 @@ method let($head,$body) {
 }
 
 method cc_expr($cc) { CgOp._cgop('newcc', @( $cc.terms )) }
-method construct_lad(*@trees) { CgOp._cgop('ladconstruct', [@trees]) }
 
 method _process_arglist(*@araw) {
     my @aout;
@@ -335,6 +345,5 @@ method subcall($sub, *@args) {
 
 method methodcall($obj, $name, *@args) {
     my ($sig, $aout) = CgOp._process_arglist(@args);
-    CgOp.let($obj, -> $of {
-        CgOp._cgop('methodcall', $name, $sig, CgOp.fetch($of), $of, @$aout) });
+    CgOp._cgop('methodcall', $name, $sig, $obj, @$aout);
 }

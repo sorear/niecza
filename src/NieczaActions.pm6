@@ -125,25 +125,28 @@ method decint($/) { make from_base($/, 10) }
 method hexint($/) { make from_base($/, 16) }
 method octint($/) { make from_base($/, 8) }
 method binint($/) { make from_base($/, 2) }
+method integer($/) {
+    $<decint> andthen make [10, ~$<decint>];
+    $<octint> andthen make [8,  ~$<octint>];
+    $<hexint> andthen make [16, ~$<hexint>];
+    $<binint> andthen make [2,  ~$<binint>];
+}
 
 method decints($/) { make [ map *.ast, @$<decint> ] }
 method hexints($/) { make [ map *.ast, @$<hexint> ] }
 method octints($/) { make [ map *.ast, @$<octint> ] }
 method binints($/) { make [ map *.ast, @$<binint> ] }
-method integer($/) {
-    make ($<decint> // $<octint> // $<hexint> // $<binint>).ast
-}
 
 method escale ($/) { }
 method dec_number ($/) {
-    make +((~$/).comb(/<-[_]>/).join(""));
+    if $<escale> { make +((~$/).comb(/<-[_]>/).join("")) }
+    else { make [10, ~$/] }
 }
 
-# XXX niecza rats will break this
 method number($/) {
     my $child = $<integer> // $<dec_number> // $<rad_number>;
     make (defined($child) ?? $child.ast !!
-        $child eq 'NaN' ?? ((1/0) / (1/0)) !! (1/0));
+        $child eq 'NaN' ?? NaN !! Inf);
 }
 
 # Value :: Op
@@ -2071,8 +2074,14 @@ method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    if $<trait> || $<post_constraint> || $<postcircumfix> || $<semilist> {
-        $/.CURSOR.sorry("Traits, postconstraints, and shapes on variable declarators NYI");
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
     }
 
     my $scope = $*SCOPE // 'my';
@@ -2112,7 +2121,7 @@ method variable_declarator($/) {
 
     if $scope eq 'has' {
         make ::Op::Attribute.new(|node($/), name => $v<name>,
-            accessor => $t eq '.', :$typeconstraint);
+            sigil => $v<sigil>, accessor => $t eq '.', :$typeconstraint);
     } elsif $scope eq 'state' {
         make ::Op::Lexical.new(|node($/), name => $slot, state_decl => True,
             state_backing => self.gensym, declaring => True, :$typeconstraint,
@@ -2645,6 +2654,7 @@ method routine_def ($/) {
         } elsif $t.ast<return_pass> {
             $return_pass = 1;
         } elsif $t.ast<of> {
+        } elsif $t.ast<rw> {
         } elsif $t.ast<unsafe> {
             $unsafe = True;
         } else {
@@ -2724,6 +2734,7 @@ method method_def ($/) {
         } elsif $t.ast<unsafe> {
             $unsafe = True;
         } elsif $t.ast<of> {
+        } elsif $t.ast<rw> {
         } else {
             $/.CURSOR.sorry("NYI method trait $t");
         }

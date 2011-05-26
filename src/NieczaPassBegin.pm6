@@ -250,7 +250,7 @@ augment class Op::Attribute { #OK exist
             $ibref = $ibody.xref;
         }
         $ns = $*unit.deref($ns);
-        $ns.add_attribute($.name, +$.accessor, $ibvar, $ibref, $tc);
+        $ns.add_attribute($.name, $.sigil, +$.accessor, $ibvar, $ibref, $tc);
         my $nb = ::Metamodel::StaticSub.new(
             transparent=> True,
             unit       => $*unit,

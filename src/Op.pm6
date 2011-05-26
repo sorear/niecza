@@ -473,6 +473,10 @@ class Labelled is Op {
     method code($body) {
         CgOp.prog(CgOp.label("goto_$.name"),$.stmt.cgop_labelled($body,$.name));
     }
+
+    method statement_level() {
+        self.new(name => $.name, stmt => $.stmt.statement_level);
+    }
 }
 
 class When is Op {
@@ -548,7 +552,13 @@ class Control is Op {
 { class Num is Op {
     has $.value = die "Num.value required"; # Numeric
 
-    method code($) { CgOp.const(CgOp.box('Num', CgOp.double($.value))) }
+    method code($) {
+        if $.value ~~ Array {
+            CgOp.const(CgOp.exactnum(|$.value))
+        } else {
+            CgOp.const(CgOp.box('Num', CgOp.double($.value)))
+        }
+    }
 }; }
 
 class Bind is Op {
@@ -613,6 +623,7 @@ class Super is Op {
 
 class Attribute is Op {
     has $.name; # Str
+    has $.sigil;
     has $.accessor; # Bool
     has $.initializer; # Body, is rw
     has $.typeconstraint; # Array of Str
@@ -788,6 +799,7 @@ class RegexBody is Op {
     has $.pre = []; # Array of Op
     has $.canback = True;
 
+    method ctxzyg($ ) { (map { $_, 0 }, @$.pre), $.rxop.ctxopzyg }
     method zyg() { @$.pre, $.rxop.opzyg }
 
     method code($body) {

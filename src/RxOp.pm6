@@ -5,11 +5,12 @@ use CClass;
 
 has $.zyg = []; # Array of RxOp
 
-method opzyg()  { map *.opzyg, @$!zyg }
-method oplift() { map *.oplift, @$!zyg }
-method uncut()  { self }
+method opzyg()    { map *.opzyg, @$!zyg }
+method ctxopzyg() { map *.ctxopzyg, @$!zyg }
+method oplift()   { map *.oplift, @$!zyg }
+method uncut()    { self }
 
-method check()  { for @$!zyg { $_.check } }
+method check()    { for @$!zyg { $_.check } }
 method tocclist() { CClass }
 
 # all that matters is 0-1-infty; $*in_quant valid here
@@ -107,6 +108,7 @@ class String is RxOp {
 class VarString is RxOp {
     has $.param; # Str
     has $.ops = die "RxOp::VarString.ops required"; # Op
+    method ctxopzyg() { $!ops, 1 }
     method opzyg() { $!ops }
 
     method code($body) {
@@ -448,6 +450,7 @@ class Subrule is Capturing {
             captures => $.captures, |%_);
     }
 
+    method ctxopzyg() { defined($!regex) ?? ($!regex, 1) !! () }
     method opzyg() { $!regex // Nil }
 
     method used_caps() {
@@ -472,46 +475,21 @@ class Subrule is Capturing {
     }
 
     method code($body) {
-        my $bt = self.label;
-
         my $callf = $!regex ?? $!regex.cgop($body) !!
-            CgOp.methodcall(CgOp.newscalar(CgOp.rxcall("MakeCursor")),
+            CgOp.methodcall(CgOp.rxcall("MakeCursorV"),
                 $!method);
-        my @newcapf = (!$.captures) ?? () !!
-            CgOp.rxpushcapture(
-                ($!passcap ??
-                    CgOp.newscalar(CgOp.rxstripcaps(
-                            CgOp.cast("cursor", CgOp.letvar("k")))) !!
-                    CgOp.letvar("kv")), @$.captures);
-        my @pushcapf = ($!passcap ??
-            (CgOp.rxsetcapsfrom(CgOp.cast("cursor", CgOp.letvar("k")))) !! ()),
-                @newcapf;
-        my @bfargs = 'backtrack', CgOp.obj_is_defined(CgOp.letvar("k"));
-        my $backf = $!negative ?? CgOp.cgoto(@bfargs) !! CgOp.ncgoto(@bfargs);
-        my $updatef = CgOp.prog(@pushcapf,
-            CgOp.rxsetpos(CgOp.cursor_pos(CgOp.cast("cursor",
-                        CgOp.letvar("k")))));
-        $updatef = CgOp.prog() if $!zerowidth;
 
         my @code;
 
         if $!selfcut {
-            push @code, CgOp.letn(
-                "kv", CgOp.get_first($callf),
-                "k", CgOp.fetch(CgOp.letvar("kv")),
-                $backf,
-                $updatef);
+            push @code, CgOp.rxincorpcut($.captures, +?$!zerowidth,
+                +?$!negative, +?$!passcap, $callf);
         } else {
-            push @code, CgOp.rxcall("SetCursorList", CgOp.vvarlist_new_singleton($callf));
+            my $bt = self.label;
+
+            push @code, CgOp.rxcall("InitCursorList", $callf);
             push @code, CgOp.label($bt);
-            push @code, CgOp.ncgoto("backtrack", CgOp.iter_hasflat(
-                    CgOp.rxcall("GetCursorIter")));
-            push @code, CgOp.letn(
-                "kv", CgOp.vvarlist_shift(CgOp.rxcall("GetCursorIter")),
-                "k", CgOp.fetch(CgOp.letvar("kv")),
-                CgOp.rxpushb("SUBRULE", $bt),
-                $updatef);
-            push @code, CgOp.rxcall("SetCursorList", CgOp.null("var"));
+            push @code, CgOp.rxincorpshift($.captures, +?$!passcap, $bt);
         }
 
         @code;
@@ -544,8 +522,14 @@ class CutRule is RxOp {
     method lad() { [ 'Null' ]; }
 }
 
+class CutBrack is RxOp {
+    method code($) { CgOp.rxcall('CommitGroup', CgOp.str("BRACK")) }
+    method lad() { [ 'Null' ]; }
+}
+
 class SetLang is RxOp {
     has $.expr = die "SetLang.expr required"; #Op
+    method ctxopzyg() { $!expr, 1 }
     method opzyg() { $!expr }
 
     method code($body) {
@@ -565,13 +549,7 @@ class Alt is AltBase {
         die "check screwed up" unless defined $.dba;
 
         my @code;
-        push @code, CgOp.rxcall("LTMPushAlts",
-            CgOp.get_lexer(
-                CgOp.callframe,
-                CgOp.rxcall('GetClass'),
-                CgOp.const(CgOp.construct_lad(@lads)),
-                CgOp.str($.dba)),
-            CgOp.const(CgOp.label_table(@ls)));
+        push @code, CgOp.ltm_push_alts([@lads], $.dba, [@ls]);
         push @code, CgOp.goto('backtrack');
         my $i = 0;
         while $i < @ls {
@@ -590,6 +568,7 @@ class Alt is AltBase {
 
 class CheckBlock is RxOp {
     has $.block = die "CheckBlock.block required"; # Op
+    method ctxopzyg() { $!block, 1 }
     method opzyg() { $!block }
 
     method code($body) {
@@ -602,6 +581,7 @@ class CheckBlock is RxOp {
 class SaveValue is RxOp {
     has $.capid = die "SaveValue.capid required"; # Str
     has $.block = die "SaveValue.block required"; # Op
+    method ctxopzyg() { $!block, 1 }
     method opzyg() { $!block }
 
     method used_caps() {
@@ -614,6 +594,7 @@ class SaveValue is RxOp {
 
 class VoidBlock is RxOp {
     has $.block = die "VoidBlock.block required"; # Op
+    method ctxopzyg() { $!block, 0 }
     method opzyg() { $!block }
 
     method code($body) { CgOp.sink($!block.cgop($body)); }
