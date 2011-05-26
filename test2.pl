@@ -13,6 +13,10 @@ use MONKEY_TYPING;
     is +[ Foo.new(bar => (1,2,4)).bar ], 3, '@.bar initializes with list context';
     is +[ Foo.new(bar => 5).bar ], 1, '@.bar can initialize from a single item';
     is +[ Foo.new.quux ], 3, '@.quux with init list works';
+
+    my $str = '';
+    for 1,2,3,4 -> $x, $y { $str ~= "$x|$y," }
+    is $str, "1|2,3|4,", 'multivariable for works';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
