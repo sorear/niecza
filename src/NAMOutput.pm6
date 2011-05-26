@@ -261,7 +261,7 @@ augment class Metamodel::Method { #OK exist
 
 augment class Metamodel::Attribute { #OK exist
     method to_nam() {
-        [ $.name, $.public, $.ivar, $.ibody, $.typeconstraint ]
+        [ $.name, $.sigil, $.public, $.ivar, $.ibody, $.typeconstraint ]
     }
 }
 
@@ -273,8 +273,8 @@ sub method_from_nam(@block) {
 }
 
 sub attr_from_nam(@block) {
-    my ($name, $public, $ivar, $ibody, $typeconstraint) = @block;
-    ::Metamodel::Attribute.new(:$name, :$public, :$ivar, :$ibody,
+    my ($name, $sigil, $public, $ivar, $ibody, $typeconstraint) = @block;
+    ::Metamodel::Attribute.new(:$name, :$public, :$ivar, :$ibody, :$sigil,
         :$typeconstraint);
 }
 

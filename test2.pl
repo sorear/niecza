@@ -2,6 +2,19 @@
 use Test;
 use MONKEY_TYPING;
 
+{
+    my class Foo {
+        has @.bar;
+        has %.baz;
+        has @.quux = 1,2,3;
+    }
+    isa_ok Foo.new.bar, Array, '@.bar initializes as an array';
+    isa_ok Foo.new.baz, Hash, '%.baz initializes as a hash';
+    is +[ Foo.new(bar => (1,2,4)).bar ], 3, '@.bar initializes with list context';
+    is +[ Foo.new(bar => 5).bar ], 1, '@.bar can initialize from a single item';
+    is +[ Foo.new.quux ], 3, '@.quux with init list works';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

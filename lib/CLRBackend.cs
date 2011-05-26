@@ -797,6 +797,7 @@ namespace Niecza.CLRBackend {
 
     class Attribute {
         public readonly string name;
+        public readonly char   sigil;
         public readonly bool   publ;
         public readonly string ivar;
         public readonly Xref   ibody;
@@ -804,10 +805,11 @@ namespace Niecza.CLRBackend {
 
         public Attribute(object[] x) {
             name  = JScalar.S(x[0]);
-            publ  = JScalar.B(x[1]);
-            ivar  = JScalar.S(x[2]);
-            ibody = Xref.from(x[3]);
-            type  = Xref.from(x[4]);
+            sigil = JScalar.S(x[1])[0];
+            publ  = JScalar.B(x[2]);
+            ivar  = JScalar.S(x[3]);
+            ibody = Xref.from(x[4]);
+            type  = Xref.from(x[5]);
         }
 
         public static Attribute[] fromArray(object x) {
@@ -4154,8 +4156,11 @@ dynamic:
             }
 
             foreach (Attribute a in pr.attributes) {
+                int flags = a.publ ? 1 : 0;
+                if (a.sigil == '@') flags += 2;
+                if (a.sigil == '%') flags += 4;
                 CpsOp name = CpsOp.StringLiteral(a.name);
-                CpsOp publ = CpsOp.BoolLiteral(a.publ);
+                CpsOp publ = CpsOp.IntLiteral(flags);
                 CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.P6any) :
                     RawAccessLex("scopedlex", a.ivar, null);
                 CpsOp type = a.type == null ?
@@ -4400,8 +4405,11 @@ dynamic:
                     }
                     unit.EmitInt(attrs.Length);
                     foreach (Attribute a in attrs) {
+                        int flags = a.publ ? 1 : 0;
+                        if (a.sigil == '@') flags += 2;
+                        if (a.sigil == '%') flags += 4;
                         unit.EmitStr(a.name);
-                        unit.EmitByte(a.publ ? 1 : 0);
+                        unit.EmitByte((byte)flags);
                         unit.EmitXref(a.ibody);
                         unit.EmitXref(a.type);
                     }

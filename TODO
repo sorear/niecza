@@ -35,8 +35,6 @@ MEDIUM
 
  + $obj.?method
 
- + has @!foo; (needs to ignore types for now)
-
  + &hyperunary
 
  + for-loops with multiple parameters

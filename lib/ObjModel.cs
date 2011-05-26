@@ -129,9 +129,13 @@ namespace Niecza {
         public struct AttrInfo {
             public string name;
             public P6any init;
-            public bool publ;
+            public int flags;
             public STable type;
         }
+
+        public const int A_PUBLIC = 1;
+        public const int A_ARRAY  = 2;
+        public const int A_HASH   = 4;
 
         // 0 must be public only
         public const int V_PUBLIC    = 0;
@@ -352,11 +356,11 @@ next_method: ;
             lmethods.Add(mi);
         }
 
-        public void AddAttribute(string name, bool publ, P6any init,
+        public void AddAttribute(string name, int flags, P6any init,
                 STable type) {
             AttrInfo ai;
             ai.name = name;
-            ai.publ = publ;
+            ai.flags = flags;
             ai.init = init;
             ai.type = type;
             local_attr.Add(ai);
@@ -578,9 +582,9 @@ next_method: ;
             mo.AddMethod(flags, name, code);
         }
 
-        public void AddAttribute(string name, bool publ, P6any init,
+        public void AddAttribute(string name, int flags, P6any init,
                 STable type) {
-            mo.AddAttribute(name, publ, init, type);
+            mo.AddAttribute(name, flags, init, type);
         }
 
         public void FillProtoClass(string[] slots) {

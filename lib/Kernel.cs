@@ -562,10 +562,10 @@ namespace Niecza {
 
             for (int i = 0; i < nattr; i++) {
                 string name = ReadStr(ref from);
-                bool pub = heap[from++] != 0;
+                int flags = heap[from++];
                 SubInfo init = ReadXref(ref from) as SubInfo;
                 STable type = ReadXref(ref from) as STable;
-                into.AddAttribute(name, pub,
+                into.AddAttribute(name, flags,
                         init != null ? init.protosub : null,
                         type != null ? type : Kernel.AnyMO);
             }
@@ -2369,17 +2369,27 @@ ltm:
 
             for (int i = mro.Length - 1; i >= 0; i--) {
                 foreach (P6how.AttrInfo a in mro[i].mo.local_attr) {
-                    P6any val;
-                    Variable vx;
-                    if (a.publ && args.TryGetValue(a.name, out vx)) {
-                        val = vx.Fetch();
-                    } else if (a.init == null) {
-                        val = a.type.typeObject;
+                    Variable vx = null;
+                    int kind = a.flags & (P6how.A_ARRAY | P6how.A_HASH);
+                    if ((a.flags & P6how.A_PUBLIC) != 0 &&
+                            args.TryGetValue(a.name, out vx)) {
+                    } else if (a.init != null) {
+                        vx = RunInferior(a.init.Invoke(GetInferiorRoot(),
+                                    Variable.None, null));
+                    } else if (kind == 0) {
+                        vx = a.type.typeVar;
                     } else {
-                        val = RunInferior(a.init.Invoke(GetInferiorRoot(),
-                                    Variable.None, null)).Fetch();
+                        vx = null;
                     }
-                    n.SetSlot(a.name, NewRWScalar(a.type, val));
+                    if (kind == 0) {
+                        n.SetSlot(a.name, NewRWScalar(a.type, vx.Fetch()));
+                    } else {
+                        Variable obj = (kind == P6how.A_HASH) ? CreateHash() :
+                            CreateArray();
+                        if (vx != null)
+                            RunInferior(Assign(GetInferiorRoot(), obj, vx));
+                        n.SetSlot(a.name, obj);
+                    }
                 }
             }
 
