@@ -484,6 +484,8 @@ next_method: ;
         public int nslots = 0;
         public string[] all_slot;
 
+        public int num_rank = -1;
+
         public STable(string name) {
             this.name = name;
             mo = new P6how();
@@ -524,6 +526,19 @@ next_method: ;
             mro_Str = _GetVT("Str") as ContextHandler<Variable> ?? CallStr;
             mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? CallSucc;
             mro_to_clr = _GetVT("to-clr") as ContextHandler<object>;
+
+            if (Kernel.ComplexMO != null && HasMRO(Kernel.ComplexMO))
+                num_rank = Builtins.NR_COMPLEX;
+            else if (Kernel.NumMO != null && HasMRO(Kernel.NumMO))
+                num_rank = Builtins.NR_FLOAT;
+            else if (Kernel.FatRatMO != null && HasMRO(Kernel.FatRatMO))
+                num_rank = Builtins.NR_FATRAT;
+            else if (Kernel.RatMO != null && HasMRO(Kernel.RatMO))
+                num_rank = Builtins.NR_FIXRAT;
+            else if (Kernel.IntMO != null && HasMRO(Kernel.IntMO))
+                num_rank = Builtins.NR_FIXINT;
+            else
+                num_rank = -1;
         }
 
         private object _GetVT(string name) {

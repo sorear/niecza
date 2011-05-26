@@ -94,15 +94,19 @@ public class Builtins {
     public const int NR_FLOAT   = 4;
     public const int NR_COMPLEX = 5;
 
-    public static int GetNumRank(P6any vret) {
-        if (vret.mo.HasMRO(Kernel.ComplexMO)) return NR_COMPLEX;
-        if (vret.mo.HasMRO(Kernel.NumMO)) return NR_FLOAT;
-        if (vret.mo.HasMRO(Kernel.FatRatMO)) return NR_FATRAT;
-        if (vret.mo.HasMRO(Kernel.RatMO)) return NR_FIXRAT;
-        if (vret.mo.HasMRO(Kernel.IntMO)) {
-            return (vret is BoxObject<BigInteger>) ? NR_BIGINT : NR_FIXINT;
+    public static P6any GetNumber(Variable v, P6any o, out int rank) {
+        if (o.mo.num_rank >= 0) {
+            rank = o.mo.num_rank;
+        } else {
+            o = o.mo.mro_Numeric.Get(v).Fetch();
+            rank = o.mo.num_rank;
+            if (rank < 0)
+                throw new NieczaException("Not a valid primitive number " +
+                        o.mo.name);
         }
-        throw new NieczaException("Not a valid primitive number " + vret.mo.name);
+        if (rank == NR_FIXINT && o is BoxObject<BigInteger>)
+            rank = NR_BIGINT;
+        return o;
     }
 
     public static Complex PromoteToComplex(int rank, P6any vret) {
@@ -216,8 +220,8 @@ public class Builtins {
 
     public static void GetAsRational(Variable v,
             out BigInteger num, out BigInteger den) {
-        P6any n = v.Fetch().mo.mro_Numeric.Get(v).Fetch();
-        int rk = GetNumRank(n);
+        int rk;
+        P6any n = GetNumber(v, v.Fetch(), out rk);
 
         if (rk == NR_COMPLEX || rk == NR_FLOAT) {
             double dbl = 0;
@@ -256,8 +260,8 @@ public class Builtins {
 
     public static bool GetAsInteger(Variable v, out int small,
             out BigInteger big) {
-        P6any n = v.Fetch().mo.mro_Numeric.Get(v).Fetch();
-        int rk = GetNumRank(n);
+        int rk;
+        P6any n = GetNumber(v, v.Fetch(), out rk);
         small = 0;
 
         if (rk == NR_COMPLEX || rk == NR_FLOAT) {
@@ -431,12 +435,9 @@ public class Builtins {
     }
 
     public static Variable Plus(Variable a1, Variable a2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
-        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
-        int r2 = GetNumRank(n2);
+        int r1, r2;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -466,12 +467,9 @@ public class Builtins {
     }
 
     public static Variable Minus(Variable a1, Variable a2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
-        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
-        int r2 = GetNumRank(n2);
+        int r1, r2;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -501,9 +499,8 @@ public class Builtins {
     }
 
     public static Variable Negate(Variable a1) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
+        int r1;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -527,12 +524,9 @@ public class Builtins {
     }
 
     public static int Compare(Variable a1, Variable a2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
-        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
-        int r2 = GetNumRank(n2);
+        int r1, r2;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -566,12 +560,9 @@ public class Builtins {
     }
 
     public static Variable Mul(Variable a1, Variable a2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
-        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
-        int r2 = GetNumRank(n2);
+        int r1, r2;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -601,12 +592,9 @@ public class Builtins {
     }
 
     public static Variable Divide(Variable a1, Variable a2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
-        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
-        int r2 = GetNumRank(n2);
+        int r1, r2;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -637,12 +625,9 @@ public class Builtins {
     }
 
     public static Variable Mod(Variable a1, Variable a2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, a2);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
-        P6any n2 = o2.mo.mro_Numeric.Get(a2).Fetch();
-        int r2 = GetNumRank(n2);
+        int r1, r2;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             throw new NieczaException("Modulus operation not defined with complex arguments");
@@ -706,9 +691,8 @@ public class Builtins {
     }
 
     public static Variable CoerceToNum(Variable a1) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, a1);
-        P6any n1 = o1.mo.mro_Numeric.Get(a1).Fetch();
-        int r1 = GetNumRank(n1);
+        int r1;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
