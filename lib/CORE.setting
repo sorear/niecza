@@ -700,6 +700,8 @@ my class List is Cool {
 
     method shift() { self ?? self!shift-item !! Any }
 
+    method pop() { (+self) ?? self!pop-item !! Any }
+
     method eager() { +self; self }
 
     method head() { self ??
@@ -752,11 +754,11 @@ my class List is Cool {
           {Nil})
     } }
 
-    method pop() { +self; self!pop-item; }
-
     method unshift(*@a) {
         for reverse(@a) -> $v { self!unshift-item(anon $new = $v) }
     }
+
+    method kv() { my $i = 0; self.map({ $i++, $_ }) }
 }
 
 my class Array is List {
@@ -834,6 +836,10 @@ my class Hash {
               {Any})
         };
     }
+
+    # Rakudo extensions compatibility - DO NOT USE
+    method delete($key) { self.{$key}:delete }
+    method exists($key) { self.{$key}:exists }
 
     method perl(\$self:) {
         $self // return $self.typename;
@@ -1106,6 +1112,7 @@ my class Match is Cool {
     method flat () { @( self.Capture ) }
     method iterator () { self.flat.iterator }
     method Numeric() { +(~self) }
+    method keys () { keys %(self) }
     method Capture () { Q:CgOp {
         (letn cap (obj_newblank (obj_llhow (@ {Capture})))
           (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
