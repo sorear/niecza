@@ -29,6 +29,191 @@ use STD;
 use Sig;
 
 augment class NieczaActions {
+method method_def ($/) {
+    make ::Op::StatementList.new;
+    my $scope = $*SCOPE // 'has';
+    my $type = $<type> ?? ~$<type> !! '';
+    $type = ($type eq ''  ?? 'normal' !!
+             $type eq '^' ?? 'meta' !!
+             $type eq '!' ?? 'private' !!
+             (
+                 $/.CURSOR.sorry("Unhandled method decoration $type");
+                 return Nil;
+             ));
+    $scope = 'anon' if !$<longname>;
+    my $name = $<longname> ?? self.unqual_longname($<longname>,
+        "Qualified method definitions not understood") !! Any; #XXX
+
+    if $<sigil> {
+        $/.CURSOR.sorry("Method sgils NYI");
+        return Nil;
+    }
+    if $type eq 'meta' {
+        $/.CURSOR.sorry("Metamethod mixins NYI");
+        return Nil;
+    }
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
+    }
+
+    if ($scope eq 'augment' || $scope eq 'supersede' || $scope eq 'state') {
+        $/.CURSOR.sorry("Illogical scope $scope for method");
+        return Nil;
+    }
+
+    if ($scope eq 'our') {
+        $/.CURSOR.sorry("Packages NYI");
+        return Nil;
+    }
+    my $sig = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+
+    my $unsafe = False;
+    for @( $<trait> ) -> $t {
+        if $t.ast<nobinder> {
+            $sig = Any;
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
+        } elsif $t.ast<of> {
+        } elsif $t.ast<rw> {
+        } else {
+            $/.CURSOR.sorry("NYI method trait $t");
+        }
+    }
+
+    my $bl = self.sl_to_block('sub', $<blockoid>.ast,
+        subname => $name, :$unsafe,
+        signature => $sig ?? $sig.for_method !! Any);
+
+    make self.block_to_closure($/, $bl, bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
+        bindmethod => ($scope ne 'anon' ?? [ $type, $name ] !! Any));
+}
+
+method routine_def ($/) {
+    make ::Op::StatementList.new;
+    if $<sigil> && $<sigil>[0] eq '&*' {
+        $/.CURSOR.sorry("Contextual sub definitions NYI");
+        return Nil;
+    }
+    my $dln = $<deflongname>[0];
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
+    }
+    my @export;
+    my $return_pass = 0;
+    my $signature = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+    my $unsafe = False;
+    for @( $<trait> ) -> $t {
+        if $t.ast.<export> {
+            push @export, @( $t.ast<export> );
+        } elsif $t.ast<nobinder> {
+            $signature = Any;
+        } elsif $t.ast<return_pass> {
+            $return_pass = 1;
+        } elsif $t.ast<of> {
+        } elsif $t.ast<rw> {
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
+        } else {
+            $/.CURSOR.sorry("Sub trait $t.ast.keys.[0] not available");
+        }
+    }
+    my $scope = !$dln ?? 'anon' !! ($*SCOPE || 'my');
+    my ($m,$p) = $dln ?? self.mangle_longname($dln).<name path> !! ();
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        return Nil;
+    }
+    if $scope eq 'our' {
+        $/.CURSOR.sorry('Package subs NYI');
+        return Nil;
+    } elsif $p {
+        $/.CURSOR.sorry('Defining a non-our sub with a package-qualified name makes no sense');
+        return Nil;
+    }
+
+    make self.block_to_closure($/,
+        bindlex => ($scope eq 'my'),
+        multiness => ($*MULTINESS || Any),
+        self.sl_to_block('sub',
+            $<blockoid>.ast,
+            returnable => !$return_pass,
+            subname => $m, :$unsafe,
+            signature => $signature),
+        bindpackages => @export);
+}
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        $typeconstraint = self.simple_longname($*OFTYPE<longname>);
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
+
+    if $scope eq 'has' {
+        make ::Op::Attribute.new(|node($/), name => $v<name>,
+            accessor => $t eq '.', :$typeconstraint);
+    } elsif $scope eq 'state' {
+        make ::Op::Lexical.new(|node($/), name => $slot, state_decl => True,
+            state_backing => self.gensym, declaring => True, :$typeconstraint,
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%');
+    } elsif $scope eq 'our' {
+        make ::Op::PackageVar.new(|node($/), name => $slot, slot => $slot,
+            path => [ 'OUR' ]);
+    } else {
+        make ::Op::Lexical.new(|node($/), name => $slot, declaring => True,
+            list => $v<sigil> eq '@', hash => $v<sigil> eq '%', :$typeconstraint);
+    }
+}
+
+
 method integer($/) {
     $<decint> andthen make [10, ~$<decint>];
     $<octint> andthen make [8,  ~$<octint>];
