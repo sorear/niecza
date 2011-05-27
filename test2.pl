@@ -23,6 +23,10 @@ use MONKEY_TYPING;
     class X7140::X1122 { }
     my X7140::X1122 $obj .= new;
     isa_ok $obj, X7140::X1122, 'Type constraints via :: work';
+
+    sub foo(X7140::X1122 $) { }
+    lives_ok { foo($obj) }, 'Parameter :: constraints work (1)';
+    dies_ok { foo(5) }, 'Parameter :: constraints work (1)';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
