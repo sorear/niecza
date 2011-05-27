@@ -27,6 +27,13 @@ use MONKEY_TYPING;
     sub foo(X7140::X1122 $) { }
     lives_ok { foo($obj) }, 'Parameter :: constraints work (1)';
     dies_ok { foo(5) }, 'Parameter :: constraints work (1)';
+
+    sub bar(@x) {} #OK
+    lives_ok { bar <a b c> }, '<> splitting counts as one argument';
+
+    my class Foo { method foo() { 12 } }
+    #is Foo.?foo, 12, '.? works (successful)';
+    #is +[Foo.?bar], 0, '.? works (unsuccessful, list)';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

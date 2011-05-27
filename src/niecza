@@ -29,6 +29,80 @@ use STD;
 use Sig;
 
 augment class NieczaActions {
+sub mkstringycat($/, *@strings) {
+    my @a;
+    for @strings -> $s {
+        my $i = ($s !~~ Op) ?? ::Op::StringLiteral.new(|node($/),
+            text => $s) !! $s;
+
+        # this *might* belong in an optimization pass
+        if @a && @a[*-1] ~~ ::Op::StringLiteral &&
+                $i ~~ ::Op::StringLiteral {
+            @a[*-1] = ::Op::StringLiteral.new(|node($/),
+                text => (@a[*-1].text ~ $i.text));
+        } else {
+            push @a, $i;
+        }
+    }
+    if @a == 0 {
+        return ::Op::StringLiteral.new(|node($/), text => "");
+    } elsif  @a == 1 {
+        return (@a[0] ~~ ::Op::StringLiteral) ?? @a[0] !!
+            mkcall($/, '&prefix:<~>', @a[0]);
+    } else {
+        return mkcall($/, '&infix:<~>', @a);
+    }
+}
+method process_nibble($/, @bits, $prefix?) {
+    my @acc;
+    for @bits -> $n {
+        my $ast = $n.ast;
+
+        if $ast ~~ CClass {
+            $n.CURSOR.sorry("Cannot use a character class in a string");
+            $ast = "";
+        }
+
+        if $ast !~~ Op && defined($prefix) && $prefix ne "" {
+            $ast = $ast.split(/^^<before \h>[ $prefix || \h+ ]/).join("");
+        }
+
+        push @acc, $ast;
+    }
+
+    my $post = $/.CURSOR.postprocessor;
+    make mkstringycat($/, @acc);
+
+    if $post eq 'null' {
+        # already OK
+    }
+    # actually quotewords is a bit trickier than this...
+    elsif $post eq 'words' || $post eq 'quotewords' {
+        my $sl = $/.ast;
+        if !$sl.^isa(::Op::StringLiteral) {
+            make ::Op::CallMethod.new(|node($/), :name<words>, receiver => $sl);
+        }
+        else {
+            my @tok = $sl.text.words;
+            @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
+
+            make ((@tok == 1) ?? @tok[0] !! ::Op::Paren.new(|node($/),
+                inside => ::Op::SimpleParcel.new(|node($/), items => @tok)));
+        }
+    }
+    elsif $post eq 'path' {
+        # TODO could stand to be a lot fancier.
+        make ::Op::CallMethod(|node($/), receiver => $/.ast, :name<IO>);
+    }
+    elsif $post eq 'run' {
+        make mkcall($/, 'rungather', $/.ast);
+    }
+    else {
+        $/.CURSOR.sorry("Unhandled postprocessor $post");
+    }
+
+    $/.ast;
+}
 method simple_longname($/) {
     my $r = self.mangle_longname($/);
     ($r<path>:exists) ?? [ @($r<path>), $r<name> ] !! [ 'MY', $r<name> ];
