@@ -4635,7 +4635,8 @@ dynamic:
                     (object[])Reader.Read(contents.Substring(contents.IndexOf('\n'))));
             CLRBackend old_Current = Current;
             Dictionary<string,Unit> old_used_units = used_units;
-            CLRBackend c = new CLRBackend(dir, root.name, null);
+            string op = Environment.GetEnvironmentVariable("NIECZA_FORCE_SAVE") == null ? null : root.name + "-TEMP.dll";
+            CLRBackend c = new CLRBackend(dir, root.name, op);
             Current = c;
 
             used_units = new Dictionary<string, Unit>();
@@ -4650,6 +4651,8 @@ dynamic:
             root.BindDepends(true);
 
             c.Process(root, true);
+            if (op != null)
+                c.Finish(op);
 
             Type t = c.tb.CreateType();
             used_units = old_used_units; Current = old_Current;
@@ -4660,6 +4663,10 @@ dynamic:
         }
 
         public static void Main(string[] args) {
+            if (args.Length == 3 && args[0] == "-run") {
+                RunMain(args[1], File.ReadAllText(args[2]), new string[0]);
+                return;
+            }
             if (args.Length != 4) {
                 Console.Error.WriteLine("usage : CLRBackend DIR UNITFILE OUTFILE ISMAIN");
                 return;
@@ -4695,6 +4702,11 @@ dynamic:
     // instantiatable for the sake of reflecty loading
     public class DownCallAcceptor: CrossDomainReceiver {
         public override string[] Call(AppDomain up, string[] args) {
+            if (Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null) {
+                Console.WriteLine(args.Length);
+                foreach(string a in args)
+                    Console.WriteLine(a);
+            }
             Builtins.up_domain = up;
             if (args[0] == "post_save") {
                 CLRBackend.Main(new string[] { args[1], args[2], args[3], args[4] });

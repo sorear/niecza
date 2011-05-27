@@ -194,6 +194,7 @@ namespace Niecza {
         public DynBlockDelegate[] methods; /*C*/
         public FieldInfo[] meta_fields;
         public object[] xref;
+        public static bool TraceLoad = Environment.GetEnvironmentVariable("NIECZA_TRACE_LOAD") != null;
 
         public RuntimeUnit(Type type, byte[] heap, RuntimeUnit[] depends,
                 int nx) {
@@ -203,6 +204,29 @@ namespace Niecza {
             this.xref = new object[nx];
             this.methods = new DynBlockDelegate[nx];
             this.meta_fields = new FieldInfo[nx*2];
+
+            if (TraceLoad) {
+                Console.WriteLine("Setting up unit {0}", type.Name);
+                for (int offs = 0; offs < heap.Length; offs += 16) {
+                    Console.Write("{0:X6}   ", offs);
+                    int len = heap.Length - offs;
+                    if (len > 16) len = 16;
+                    for (int col = 0; col < 16; col++) {
+                        if (col >= len)
+                            Console.Write("   ");
+                        else
+                            Console.Write("{0:X2} ", heap[offs+col]);
+                        if (col == 7)
+                            Console.Write(" ");
+                    }
+                    Console.Write("   |");
+                    for (int col = 0; col < len; col++)
+                        Console.Write(
+                            (heap[offs+col] < 32 || heap[offs+col] > 126)
+                                ? '.' : (char)heap[offs+col]);
+                    Console.WriteLine("|");
+                }
+            }
 
             uint d = 0;
             foreach (MethodInfo mi in type.GetMethods()) {
@@ -408,6 +432,7 @@ namespace Niecza {
         }
 
         public void LoadSubInfo(int from) {
+            int _ifrom = from;
             int ix = ReadInt(ref from);
             byte spec = heap[from++];
             SubInfo ns = new SubInfo(
@@ -422,6 +447,8 @@ namespace Niecza {
                 ReadStrArray(ref from), /*dylexn*/
                 ReadIntArray(ref from)); /*dylexi*/
 
+            if (TraceLoad)
+                Console.WriteLine("Installing sub {0} \"{1}\" from {2}", ix, ns.name, _ifrom);
             xref[ix] = ns;
 
             if ((spec & SUB_IS_UNSAFE) != 0)
@@ -449,6 +476,8 @@ namespace Niecza {
                 STable mo = xref[i] as STable;
                 if (mo == null) continue;
                 int from = mo.fixups_from;
+                if (TraceLoad)
+                    Console.WriteLine("Finishing load of package {0} \"{1}\" from {2}", i, mo.name, from);
 
                 int nex = ReadInt(ref from);
                 for (int j = 0; j < nex; j++)
@@ -462,6 +491,8 @@ namespace Niecza {
                 SubInfo si = xref[i] as SubInfo;
                 if (si == null) continue;
                 int from = si.fixups_from;
+                if (TraceLoad)
+                    Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2}", i, si.name, from);
                 ReadSignature(si, ref from);
                 int ph = heap[from++];
                 if (ph != 0xFF) Kernel.AddPhaser(ph, si.protosub);
@@ -473,8 +504,11 @@ namespace Niecza {
         }
 
         public STable LoadPackage(int from, STable existing_mo) {
+            int _ifrom = from;
             int ix = ReadInt(ref from);
             string name = ReadStr(ref from);
+            if (TraceLoad)
+                Console.WriteLine("Installing package {0} \"{1}\" from {2}", ix, name, _ifrom);
             STable mo = existing_mo != null ? existing_mo :
                 new STable(name);
             xref[ix] = mo;

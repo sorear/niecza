@@ -28,6 +28,13 @@ use OptRxSimple;
 use STD;
 use Sig;
 
+augment class NieczaActions {
+method simple_longname($/) {
+    my $r = self.mangle_longname($/);
+    ($r<path>:exists) ?? [ @($r<path>), $r<name> ] !! [ 'MY', $r<name> ];
+}
+}
+
 augment class Op::ForLoop { #OK exist
     method statement_level() {
         my $var = [ map { ::GLOBAL::NieczaActions.gensym },

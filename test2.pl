@@ -19,6 +19,12 @@ use MONKEY_TYPING;
     is $str, "1|2,3|4,", 'multivariable for works';
 }
 
+{
+    class X7140::X1122 { }
+    my X7140::X1122 $obj .= new;
+    isa_ok $obj, X7140::X1122, 'Type constraints via :: work';
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
