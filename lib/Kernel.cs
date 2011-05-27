@@ -666,6 +666,9 @@ namespace Niecza {
         public const int SIG_F_RWTRANS    = 8;
         public const int SIG_F_BINDLIST   = 16;
         public const int SIG_F_INVOCANT   = 8192;
+        public const int SIG_F_IS_COPY    = 32768;
+        public const int SIG_F_IS_LIST    = 65536;
+        public const int SIG_F_IS_HASH    = 131072;
 
         // Value source
         public const int SIG_F_HASDEFAULT = 32;
@@ -830,6 +833,20 @@ namespace Niecza {
                 return Kernel.Die(th, "No value for parameter " + PName(rbase));
 gotit:
                 if ((flags & SIG_F_RWTRANS) != 0) {
+                } else if ((flags & SIG_F_IS_COPY) != 0) {
+                    Variable nvar;
+                    if ((flags & SIG_F_IS_HASH) != 0)
+                        nvar = Kernel.CreateHash();
+                    else if ((flags & SIG_F_IS_LIST) != 0)
+                        nvar = Kernel.CreateArray();
+                    else
+                        nvar = Kernel.NewTypedScalar(type);
+
+                    if (nvar.islist)
+                        Kernel.RunInferior(Kernel.Assign(Kernel.GetInferiorRoot(), nvar, src));
+                    else
+                        nvar.Store(src.Fetch());
+                    src = nvar;
                 } else {
                     bool islist = ((flags & SIG_F_BINDLIST) != 0);
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;

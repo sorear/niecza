@@ -3996,6 +3996,7 @@ dynamic:
                 if ((flags & 512) != 0) ufl |= SubInfo.SIG_F_DEFOUTER;
                 if ((flags & 1024) != 0) ufl |= SubInfo.SIG_F_INVOCANT;
                 if ((flags & 2048) != 0) ufl |= SubInfo.SIG_F_MULTI_IGNORED;
+                if ((flags & 4096) != 0) ufl |= SubInfo.SIG_F_IS_COPY;
                 if (deflt != null) {
                     ufl |= SubInfo.SIG_F_HASDEFAULT;
                     sig_r.Add(deflt);
@@ -4004,6 +4005,8 @@ dynamic:
                     ufl |= SubInfo.SIG_F_HASTYPE;
                     sig_r.Add(type);
                 }
+                if ((flags & 128) != 0) ufl |= SubInfo.SIG_F_IS_LIST;
+                if ((flags & 256) != 0) ufl |= SubInfo.SIG_F_IS_HASH;
                 if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
                 if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;
                 if ((flags & 1) != 0 && (flags & 256) != 0)

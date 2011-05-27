@@ -293,6 +293,7 @@ augment class Sig::Parameter { #OK exist
         $flags = $flags +| 512 if $.defouter;
         $flags = $flags +| 1024 if $.invocant;
         $flags = $flags +| 2048 if $.multi_ignored;
+        $flags = $flags +| 4096 if $.is_copy;
 
         [
             $.name,
@@ -314,6 +315,7 @@ sub parm_from_nam(@block) {
         rw       => ?($flags +& 64),   list          => ?($flags +& 128),
         hash     => ?($flags +& 256),  defouter      => ?($flags +& 512),
         invocant => ?($flags +& 1024), multi_ignored => ?($flags +& 2048),
+        is_copy  => ?($flags +& 4096),
         name => $name, slot => $slot, names => $names, :$tclass);
 }
 

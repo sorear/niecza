@@ -67,6 +67,14 @@ use MONKEY_TYPING;
     is $st, '5Bool::False', 'repeat until (postfix) can take ->';
 }
 
+{
+    sub foo($x is copy) { $x++; $x }
+    is foo(5), 6, "is copy works (non inline)";
+    my $y;
+    for 5 -> $k is copy { $k++; $y = $k }
+    is $y, 6, "is copy works (inline)";
+}
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
