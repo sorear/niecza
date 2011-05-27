@@ -10,6 +10,7 @@ class Parameter {
     has Bool $.slurpycap = False;
     # does not vivify; rw
     has Bool $.rwtrans = False;
+    has Bool $.is_copy = False;
     has Bool $.full_parcel = False;
     has Bool $.optional = False;
     has Bool $.defouter = False;
@@ -46,6 +47,15 @@ class Parameter {
         }
     }
 
+    method do_copy($val) {
+        CgOp.prog(
+            CgOp.scopedlex($!slot, ($!hash ?? CgOp._cgop("newhash") !!
+                $!list ?? CgOp._cgop("newarray") !!
+                CgOp._cgop("newtypedscalar",
+                    CgOp.class_ref("mo", @( $!tclass // 'Any' ))))),
+            CgOp.assign(CgOp.scopedlex($!slot), $val))
+    }
+
     method bind_inline($body, @posr) {
         my $get = $!full_parcel ?? self.parcel_get_inline(@posr) !!
             $!slurpycap ?? self.slurpycap_get_inline(@posr) !!
@@ -54,6 +64,7 @@ class Parameter {
 
         if (defined $!slot) {
             CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
+                $!is_copy ?? self.do_copy($get) !!
                 CgOp.newboundvar(+(!$!rw), +$!list, $get));
         } else {
             CgOp.sink($get);

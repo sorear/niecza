@@ -146,7 +146,7 @@ class CallMethod is CallLike {
     has $.private = False; # Bool
     has $.ppath; # Array of Str
     has $.pclass; # Xref, is rw
-    has $.ismeta = False; # Bool
+    has $.ismeta = ''; # Str
 
     method adverb($adv) {
         Op::CallMethod.new(receiver => $.receiver, name => $.name,
@@ -164,10 +164,18 @@ class CallMethod is CallLike {
             CgOp.subcall(CgOp.stab_privatemethod(
                     CgOp.class_ref('mo', @( $.pclass )), $name),
                 $.receiver.cgop($body), self.argblock($body));
-        } elsif $.ismeta {
+        } elsif $.ismeta eq '^' {
             CgOp.let($.receiver.cgop($body), -> $r {
                 CgOp.methodcall(CgOp.newscalar(CgOp.how(CgOp.fetch($r))),
                     $name, $r, self.argblock($body))});
+        } elsif $.ismeta eq '?' {
+            # TODO maybe use a lower-level check
+            CgOp.let($.receiver.cgop($body), -> $r { CgOp.let($name, -> $n {
+                CgOp.ternary(
+                    CgOp.obj_getbool(CgOp.methodcall(CgOp.newscalar(CgOp.how(
+                        CgOp.fetch($r))), "can", $r, CgOp.box('Str',$n))),
+                    CgOp.methodcall($r, $n, self.argblock($body)),
+                    CgOp.scopedlex('Nil'))})});
         } else {
             CgOp.methodcall($.receiver.cgop($body),
                 $name, self.argblock($body));
@@ -367,9 +375,10 @@ class WhileLoop is Op {
     method code_labelled($body, $l) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
-        CgOp.prog(
+        CgOp.letn('!cond', CgOp.scopedlex('Any'),
             CgOp.whileloop(+$.until, +$.once,
-                CgOp.obj_getbool($.check.cgop($body)),
+                CgOp.prog(CgOp.letvar('!cond', $.check.cgop($body)),
+                    CgOp.obj_getbool(CgOp.letvar('!cond'))),
                 CgOp.sink(CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
                     1, $l, "next$id", 2, $l, "last$id", 3, $l, "redo$id"))),
             CgOp.label("last$id"),
@@ -422,11 +431,12 @@ class ForLoop is Op {
     }
 
     method statement_level() {
-        my $var = ::GLOBAL::NieczaActions.gensym;
+        my $var = [ map { ::GLOBAL::NieczaActions.gensym },
+            0 ..^ +$.sink.body.signature.params ];
         $.sink.once = True;
         ::Op::ImmedForLoop.new(source => $.source, var => $var,
             sink => ::Op::CallSub.new(invocant => $.sink,
-                positionals => [ ::Op::LetVar.new(name => $var) ]));
+                positionals => [ map { ::Op::LetVar.new(name => $_) }, @$var]));
     }
 }
 
@@ -448,14 +458,14 @@ class ImmedForLoop is Op {
 
         CgOp.rnull(CgOp.letn(
             "!iter$id", CgOp.vvarlist_new_empty,
-            $.var, CgOp.null('var'),
+            (map { $_, CgOp.null('var') }, @$.var),
             CgOp.vvarlist_push(CgOp.letvar("!iter$id"),
                 $.source.cgop($body)),
             CgOp.whileloop(0, 0,
                 CgOp.iter_hasflat(CgOp.letvar("!iter$id")),
                 CgOp.prog(
-                    CgOp.letvar($.var,
-                        CgOp.vvarlist_shift(CgOp.letvar("!iter$id"))),
+                    (map { CgOp.letvar($_,
+                        CgOp.vvarlist_shift(CgOp.letvar("!iter$id")))},@$.var),
                     CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
                         $.sink.cgop($body),
                         1, $l, "next$id",

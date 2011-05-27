@@ -607,7 +607,7 @@ method metachar:sym< » > ($/) { make ::RxOp::ZeroWidth.new(type => '>>') }
 
 method metachar:qw ($/) {
     my $cif = $<circumfix>.ast;
-    my @words = $cif.^isa(::Op::SimpleParcel) ?? @( $cif.items ) !! $cif;
+    my @words = $cif.^isa(::Op::Paren) ?? @( $cif.inside.items ) !! $cif;
     @words = map *.text, @words;
 
     make ::RxOp::Alt.new(zyg => [ map { ::RxOp::String.new(text => $_,
@@ -977,8 +977,8 @@ method process_nibble($/, @bits, $prefix?) {
             my @tok = $sl.text.words;
             @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
 
-            make ((@tok == 1) ?? @tok[0] !!
-                ::Op::SimpleParcel.new(|node($/), items => @tok));
+            make ((@tok == 1) ?? @tok[0] !! ::Op::Paren.new(|node($/),
+                inside => ::Op::SimpleParcel.new(|node($/), items => @tok)));
         }
     }
     elsif $post eq 'path' {
@@ -1403,13 +1403,13 @@ method dotty:sym<.*> ($/) {
         make $<dottyop>.ast.meta_assign;
         return;
     }
-    if !$<dottyop>.ast.^isa(::Operator::Method) {
+    if !$<dottyop>.ast.^isa(::Operator::Method) || $<dottyop>.ast.meta {
         $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
         make Operator.funop('&postfix:<++>', 1);
         return Nil;
     }
-    if $<sym> eq '.^' {
-        make $<dottyop>.ast.clone(:meta);
+    if $<sym> eq '.^' || $<sym> eq '.?' {
+        make $<dottyop>.ast.clone(:meta(substr($<sym>,1)));
     } else {
         $/.CURSOR.sorry("NYI dottyop form $<sym>");
         make Operator.funop('&postfix:<++>', 1);
@@ -1423,6 +1423,8 @@ sub qpvalue($ast) {
         join " ", map &qpvalue, @( $ast.items )
     } elsif $ast.^isa(::Op::StringLiteral) {
         $ast.text;
+    } elsif $ast.^isa(::Op::Paren) {
+        qpvalue($ast.inside);
     } else {
         "XXX"
     }
@@ -2340,27 +2342,29 @@ method statement_control:if ($/) {
 }
 
 method statement_control:unless ($/) {
-    make ::Op::Conditional.new(|node($/), check => $<xblock>.ast[0],
-        false => self.block_to_immediate($/, 'cond', $<xblock>.ast[1]));
+    make mklet($<xblock>.ast[0], -> $cond {
+        ::Op::Conditional.new(|node($/), check => $cond,
+            false => self.if_block($/, $cond, $<xblock><pblock>)) });
 }
 
+# Hack - Op::WhileLoop binds the condition to "!cond"
 method statement_control:while ($/) {
     make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
-        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]),
-        :!until, :!once);
+        body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
+            $<xblock><pblock>), :!until, :!once);
 }
 
 method statement_control:until ($/) {
     make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
-        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]),
-        :until, :!once);
+        body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
+            $<xblock><pblock>), :until, :!once);
 }
 
 method statement_control:repeat ($/) {
     my $until = $<wu> eq 'until';
     my $check = $<xblock> ?? $<xblock>.ast[0] !! $<EXPR>.ast;
-    my $body  = self.block_to_immediate($/, 'loop',
-        $<xblock> ?? $<xblock>.ast[1] !! $<pblock>.ast);
+    my $body  = self.if_block($/, ::Op::LetVar.new(name => '!cond'),
+        $<xblock> ?? $<xblock><pblock> !! $<pblock>);
     make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once);
 }
 
