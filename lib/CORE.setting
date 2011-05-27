@@ -367,6 +367,7 @@ sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
 
 sub chars($str) { chars($str) }
 sub substr($str, $start, $len = chars($str) - $start) { substr($str, $start, $len) }
+sub index($haystack,$needle) { $haystack.index($needle) }
 
 sub item(Mu $x) { $x }
 
