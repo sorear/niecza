@@ -30,6 +30,21 @@ use Sig;
 
 # Operator::Method.meta, Op::CallMethod.ismeta now Str
 
+augment class Op::WhileLoop { #OK exist
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.letn('!cond', CgOp.scopedlex('Any'),
+            CgOp.whileloop(+$.until, +$.once,
+                CgOp.prog(CgOp.letvar('!cond', $.check.cgop($body)),
+                    CgOp.obj_getbool(CgOp.letvar('!cond'))),
+                CgOp.sink(CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+                    1, $l, "next$id", 2, $l, "last$id", 3, $l, "redo$id"))),
+            CgOp.label("last$id"),
+            CgOp.corelex('Nil'));
+    }
+}
+
 augment class Op::CallMethod { #OK exist
     method code($body) {
         my $name = ($.name ~~ Op) ?? CgOp.obj_getstr($.name.cgop($body))
@@ -58,6 +73,33 @@ augment class Op::CallMethod { #OK exist
 }
 
 augment class NieczaActions {
+method statement_control:unless ($/) {
+    make mklet($<xblock>.ast[0], -> $cond {
+        ::Op::Conditional.new(|node($/), check => $cond,
+            false => self.if_block($/, $cond, $<xblock><pblock>)) });
+}
+
+# Hack - Op::WhileLoop binds the condition to "!cond"
+method statement_control:while ($/) {
+    make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
+        body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
+            $<xblock><pblock>), :!until, :!once);
+}
+
+method statement_control:until ($/) {
+    make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
+        body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
+            $<xblock><pblock>), :until, :!once);
+}
+
+method statement_control:repeat ($/) {
+    my $until = $<wu> eq 'until';
+    my $check = $<xblock> ?? $<xblock>.ast[0] !! $<EXPR>.ast;
+    my $body  = self.if_block($/, ::Op::LetVar.new(name => '!cond'),
+        $<xblock> ?? $<xblock><pblock> !! $<pblock>);
+    make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once);
+}
+
 method metachar:qw ($/) {
     my $cif = $<circumfix>.ast;
     my @words = $cif.^isa(::Op::Paren) ?? @( $cif.inside.items ) !! $cif;

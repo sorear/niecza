@@ -44,6 +44,27 @@ use MONKEY_TYPING;
     my class Foo { method foo() { 12 } }
     is Foo.?foo, 12, '.? works (successful)';
     is +[Foo.?bar], 0, '.? works (unsuccessful, list)';
+
+    my $k = 2;
+    my $st = '';
+    while $k -> $z { $st ~= $z; $k = False }
+    is $st, '2', 'while loops can take ->';
+
+    $st = ''; $k = False;
+    until $k -> $z { $st ~= $z; $k = True }
+    is $st, 'Bool::False', 'until loops can take ->';
+
+    $st = '';
+    unless False -> $z { $st ~= $z }
+    is $st, 'Bool::False', 'unless can take ->';
+
+    $st = ''; $k = True;
+    repeat until $k -> $z { $st ~= ($z // 5); $k = !$k; }
+    is $st, '5Bool::False', 'repeat until (prefix) can take ->';
+
+    $st = ''; $k = True;
+    repeat -> $z { $st ~= ($z // 5); $k = !$k; } until $k;
+    is $st, '5Bool::False', 'repeat until (postfix) can take ->';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';
