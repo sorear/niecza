@@ -32,8 +32,8 @@ use MONKEY_TYPING;
     lives_ok { bar <a b c> }, '<> splitting counts as one argument';
 
     my class Foo { method foo() { 12 } }
-    #is Foo.?foo, 12, '.? works (successful)';
-    #is +[Foo.?bar], 0, '.? works (unsuccessful, list)';
+    is Foo.?foo, 12, '.? works (successful)';
+    is +[Foo.?bar], 0, '.? works (unsuccessful, list)';
 }
 
 #is $?FILE, 'test.pl', '$?FILE works';

@@ -28,7 +28,54 @@ use OptRxSimple;
 use STD;
 use Sig;
 
+# Operator::Method.meta, Op::CallMethod.ismeta now Str
+
+augment class Op::CallMethod { #OK exist
+    method code($body) {
+        my $name = ($.name ~~ Op) ?? CgOp.obj_getstr($.name.cgop($body))
+            !! CgOp.str($.name);
+        if $.private {
+            CgOp.subcall(CgOp.stab_privatemethod(
+                    CgOp.class_ref('mo', @( $.pclass )), $name),
+                $.receiver.cgop($body), self.argblock($body));
+        } elsif $.ismeta eq '^' {
+            CgOp.let($.receiver.cgop($body), -> $r {
+                CgOp.methodcall(CgOp.newscalar(CgOp.how(CgOp.fetch($r))),
+                    $name, $r, self.argblock($body))});
+        } elsif $.ismeta eq '?' {
+            # TODO maybe use a lower-level check
+            CgOp.let($.receiver.cgop($body), -> $r { CgOp.let($name, -> $n {
+                CgOp.ternary(
+                    CgOp.obj_getbool(CgOp.methodcall(CgOp.newscalar(CgOp.how(
+                        CgOp.fetch($r))), "can", $r, CgOp.box('Str',$n))),
+                    CgOp.methodcall($r, $n, self.argblock($body)),
+                    CgOp.scopedlex('Nil'))})});
+        } else {
+            CgOp.methodcall($.receiver.cgop($body),
+                $name, self.argblock($body));
+        }
+    }
+}
+
 augment class NieczaActions {
+method dotty:sym<.*> ($/) {
+    if $<sym> eq '.=' {
+        make $<dottyop>.ast.meta_assign;
+        return;
+    }
+    if !$<dottyop>.ast.^isa(::Operator::Method) || $<dottyop>.ast.meta {
+        $/.CURSOR.sorry("Modified method calls can only be used with actual methods");
+        make Operator.funop('&postfix:<++>', 1);
+        return Nil;
+    }
+    if $<sym> eq '.^' || $<sym> eq '.?' {
+        make $<dottyop>.ast.clone(:meta(substr($<sym>,1)));
+    } else {
+        $/.CURSOR.sorry("NYI dottyop form $<sym>");
+        make Operator.funop('&postfix:<++>', 1);
+    }
+}
+
 sub qpvalue($ast) {
     if $ast.^isa(::Op::SimpleParcel) {
         join " ", map &qpvalue, @( $ast.items )
