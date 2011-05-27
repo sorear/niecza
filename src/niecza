@@ -29,6 +29,44 @@ use STD;
 use Sig;
 
 augment class NieczaActions {
+sub qpvalue($ast) {
+    if $ast.^isa(::Op::SimpleParcel) {
+        join " ", map &qpvalue, @( $ast.items )
+    } elsif $ast.^isa(::Op::StringLiteral) {
+        $ast.text;
+    } elsif $ast.^isa(::Op::Paren) {
+        qpvalue($ast.inside);
+    } else {
+        "XXX"
+    }
+}
+
+method colonpair($/) {
+    my $n;
+    if !$<v>.^isa(Match) {
+        $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
+    } else {
+        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast) ~ ">";
+    }
+    my $tv = $<v>.^isa(Match) ?? $<v>.ast !!
+        ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');
+
+    if $tv ~~ Str {
+        if substr($<v>,1,1) eq '<' {
+            $tv = ::Op::CallMethod.new(name => 'at-key',
+                receiver => ::Op::ContextVar.new(name => '$*/'),
+                args => [::Op::StringLiteral.new(text => ~$<k>)]);
+        } else {
+            $tv = self.do_variable_reference($/,
+                { sigil => ~$<v><sigil>,
+                    twigil => ($<v><twigil> ?? ~$<v><twigil>[0] !! ''),
+                    name => $<k> });
+        }
+    }
+
+    make { ext => $n, term => ::Op::SimplePair.new(key => $<k>, value => $tv) };
+}
+
 sub mkstringycat($/, *@strings) {
     my @a;
     for @strings -> $s {

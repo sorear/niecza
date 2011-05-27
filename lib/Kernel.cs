@@ -834,7 +834,6 @@ gotit:
                     bool islist = ((flags & SIG_F_BINDLIST) != 0);
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
 
-                    // XXX $_ stupidity
                     if (rw && !src.rw)
                         return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
                     // fast path
