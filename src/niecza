@@ -58,6 +58,14 @@ augment class Op::CallMethod { #OK exist
 }
 
 augment class NieczaActions {
+method metachar:qw ($/) {
+    my $cif = $<circumfix>.ast;
+    my @words = $cif.^isa(::Op::Paren) ?? @( $cif.inside.items ) !! $cif;
+    @words = map *.text, @words;
+
+    make ::RxOp::Alt.new(zyg => [ map { ::RxOp::String.new(text => $_,
+            igcase => %*RX<i>, igmark => %*RX<a>) }, @words ], dba => %*RX<dba>);
+}
 method dotty:sym<.*> ($/) {
     if $<sym> eq '.=' {
         make $<dottyop>.ast.meta_assign;
