@@ -100,9 +100,10 @@ my class Cool {
         push @out, substr($str, $last, (chars($str) - $last));
         @out;
     }
-    method subst($matcher, $replacement, :g(:$global)) {
+    method subst($matcher_, $replacement, :g(:$global)) {
         my $str = ~self;
         my $C = Cursor.new($str);
+        my $matcher = $matcher_ ~~ Regex ?? $matcher_ !! /$matcher_/;
         my $i = 0;
         my $to = 0;
         my $limctr = $global ?? Inf !! 1;
@@ -186,7 +187,7 @@ my class Cool {
         my $s = ~self;
         substr($s, 0, chars($s) - 1)
     }
-    method substr($x,$y) { substr(self,$x,$y) }
+    method substr($x, $y = chars(self)-$x) { substr(self,$x,$y) }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
@@ -273,7 +274,7 @@ my class Str is Cool {
         )
     } }
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
-    method substr($from, $len) { substr(self, $from, $len) }
+    method substr($from, $len = chars(self)-$from) { substr(self, $from, $len) }
     # XXX .trans
     method perl() { defined(self) ?? '"' ~ self ~ '"' !! self.typename }
 }
@@ -561,6 +562,7 @@ my class IterCursor {
 }
 
 sub flat(*@x) { @x }
+sub hash(\|@x) { %(@x.unwrap-single) }
 
 my class Whatever {
     method ACCEPTS(Mu $x) { defined(self) || $x.^isa(Whatever) }
@@ -817,8 +819,13 @@ my class Hash {
               (vvarlist_push (l iter) {$in})
               (whileloop 0 0 (iter_hasflat (l iter))
                 (letn elt (@ (vvarlist_shift (l iter)))
-                  (varhash_setindex (obj_getstr (getslot key var (l elt)))
-                    (l into) (nsw (@ (getslot value var (l elt)))))))
+                  (ternary (obj_isa (l elt) (class_ref mo Pair))
+                    (varhash_setindex (obj_getstr (getslot key var (l elt)))
+                      (l into) (nsw (@ (getslot value var (l elt)))))
+                    (ternary (iter_hasflat (l iter))
+                      (varhash_setindex (obj_getstr (ns (l elt))) (l into)
+                        (nsw (@ (vvarlist_shift (l iter)))))
+                      (sink (die "Unmatched key in Hash.LISTSTORE"))))))
               (setbox (l sobj) (l into))
               (newrwlistvar (l sobj)))
         };

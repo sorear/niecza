@@ -17,6 +17,16 @@ use MONKEY_TYPING;
     my $str = '';
     for 1,2,3,4 -> $x, $y { $str ~= "$x|$y," }
     is $str, "1|2,3|4,", 'multivariable for works';
+
+    is "moo".subst('o','a',:g), "maa", '.subst can take Str';
+    is 'Hello'.substr(1), 'ello', '.substr can take 1 arguaent';
+    is hash((a => 1)).perl, '{"a" => 1}.hash', '&hash works (1)';
+    is hash((a => 1, b => 2)).<b>, 2, '&hash works (2)';
+    is hash({a => 1}).perl, '{"a" => 1}.hash', '&hash works (3)';
+
+    my %hash = "foo", 5;
+    is %hash<foo>, 5, "Hash.LISTSTORE can take keys and values separately";
+    dies_ok { %hash = "pie" }, "keys must be matched";
 }
 
 {
