@@ -1154,14 +1154,16 @@ my class Match is Cool {
     method cursor() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
     method reduced() { Q:CgOp { (box Str (cursor_reduced (cast cursor (@ {self})))) } }
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
+        my $*match;
         Q:CgOp {
-            (cursor_synthetic
-              (cast cursor (@ {$cursor})) (obj_getstr {$method})
-              (cast int (obj_getnum {$from}))
-              (cast int (obj_getnum {$to}))
-              {@captures})
+            (prog
+              (cursor_synthetic
+                (cast cursor (@ {$cursor})) (obj_getstr {$method})
+                (cast int (obj_getnum {$from}))
+                (cast int (obj_getnum {$to}))
+                {@captures})
+              {$*match})
         };
-        $/
     }
 }
 

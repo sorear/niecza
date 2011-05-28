@@ -3811,7 +3811,7 @@ dynamic:
             thandlers["cursor_item"] = Methody(null, Tokens.Cursor.GetMethod("GetKey"));
             thandlers["cursor_unpackcaps"] = Methody(null, Tokens.Cursor.GetMethod("UnpackCaps"));
             thandlers["cursor_O"] = Methody(null, Tokens.Cursor.GetMethod("O"));
-            thandlers["cursor_synthetic"] = Methody(Tokens.Variable, Tokens.Cursor.GetMethod("Synthetic"));
+            thandlers["cursor_synthetic"] = Methody(Tokens.Void, Tokens.Cursor.GetMethod("Synthetic"));
             thandlers["cursor_fresh"] = Methody(null, Tokens.Cursor.GetMethod("FreshClass"));
             thandlers["cursor_unmatch"] = Methody(null, Tokens.Cursor.GetMethod("UnMatch"));
             thandlers["cursor_reduced"] = Methody(null, Tokens.Cursor.GetMethod("Reduced"));
