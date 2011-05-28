@@ -127,3 +127,12 @@ NASTY
    SIMD hyperoperators.
 
    Export Perl 6 code into a CLR .dll
+
+-----
+
+Eval programme
+* SubInfo gets a back reference to unit+index
+* Unit's setting is a sub ref, not just a unit name
+* Can create units under any sub, not just at {YOU_ARE_HERE}
+* create_syml takes a sub ref
+* eval passes back the current sub, gets a sub with appropriate outer
