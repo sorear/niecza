@@ -3677,7 +3677,8 @@ dynamic:
                     x[i-1] = th.Scan(z[i]);
                 x[0] = CpsOp.RxFrame();
                 string name = JScalar.S(z[1]);
-                return CpsOp.MethodCall(Tokens.RxFrame.GetMethod(name), x); };
+                return CpsOp.CpsCall((name == "EndWith" ? Tokens.Void : null),
+                        Tokens.RxFrame.GetMethod(name), x); };
             handlers["rxinit"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.SetField(Tokens.Frame_rx, CpsOp.CallFrame(),
                     CpsOp.ConstructorCall(Tokens.RxFrame_ctor,
