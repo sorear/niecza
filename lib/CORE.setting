@@ -48,6 +48,10 @@ my class Mu {
 
 my class Any is Mu {
     method flat() { @(self) }
+    method Numeric() {
+        die "Cannot use value like $.typename as a number" if defined(self);
+        0;
+    }
 
     method sort($cmp = &infix:<leg>) { @(self).sort($cmp) }
     method first(Mu $filter) { for @(self) { return $_ if $_ ~~ $filter } }
