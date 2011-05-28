@@ -1,0 +1,25 @@
+== For STD/Niecza ==
+
+Calling action methods hurts
+- Try calling them on the loop
+- Try a .^blacklist_fallback method for avoiding <.ws> actions, etc
+
+Experiment with techniques to avoid Variable[] allocation on all calls
+- like a preallocated "outgoing arguments area"
+
+Experiment with "if non-overriden, then replace method" hooks
+
+Experiment with making P6any: Variable
+
+Any.exists-key is missing!
+
+Builtins.start_iteration to avoid creating an extra VarDeque in for @x {}
+
+Avoid PushD if empty(?).  (And avoid CopyAsArray in both)
+
+Avoid slurpies with CgOp.  Try using, I dunno, parcels instead, with
+custom code.
+
+Avoid the full lazy-iterator in JSON if possible.
+
+Avoid RxFrame.End in <ws>.
