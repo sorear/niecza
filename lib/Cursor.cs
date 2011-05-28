@@ -226,7 +226,7 @@ public sealed class RxFrame {
     }
 
     public void InitCursorList(Variable obj) {
-        st.subrule_iter = new VarDeque(obj);
+        st.subrule_iter = Builtins.start_iter(obj);
     }
 
     public Variable GetCursorList() {
@@ -564,7 +564,7 @@ public class Cursor : P6any {
 
     public static Cursor Synthetic(Cursor parent, string method, int from,
             int to, Variable caplist) {
-        VarDeque iter = new VarDeque(caplist);
+        VarDeque iter = Builtins.start_iter(caplist);
         CapInfo ci = null;
         while (Kernel.IterHasFlat(iter, true)) {
             P6any pair = iter.Shift().Fetch();
@@ -1694,7 +1694,7 @@ anew:
                 return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th,
                     new Variable[] { Kernel.NewROScalar(th.rx.MakeCursor()) }, null);
             case 3:
-                th.lex2 = new VarDeque((Variable) th.resultSlot);
+                th.lex2 = Builtins.start_iter((Variable) th.resultSlot);
                 goto case 4;
             case 4:
                 if (!Kernel.IterHasFlat((VarDeque)th.lex2, true))

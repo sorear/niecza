@@ -49,15 +49,13 @@ public class JsyncWriter {
     void WriteArray(P6any obj) {
         int a = nextanchor++;
         anchors[obj] = a;
-        Kernel.RunInferior(obj.InvokeMethod(Kernel.GetInferiorRoot(), "eager",
-                new Variable[] { Kernel.NewROScalar(obj) }, null));
+        VarDeque iter = obj.mo.mro_raw_iterator.Get(Kernel.NewROScalar(obj));
 
         o.AppendFormat("[\"&A{0}\"", a);
         contUsed = true;
-        VarDeque vd = (VarDeque) obj.GetSlot("items");
-        for (int i = 0; i < vd.Count(); i++) {
+        while (Kernel.IterHasFlat(iter, true)) {
             o.Append(',');
-            WriteObj(vd[i].Fetch());
+            WriteObj(iter.Shift().Fetch());
         }
         o.Append(']');
     }
@@ -841,7 +839,7 @@ public class JsonWriter {
             }
             o.Append('}');
         } else if (def && obj.Isa(Kernel.ListMO)) {
-            VarDeque iter = new VarDeque(Kernel.NewRWListVar(obj));
+            VarDeque iter = obj.mo.mro_raw_iterator.Get(Kernel.NewROScalar(obj));
             o.Append('[');
             while (Kernel.IterHasFlat(iter, true)) {
                 if (comma) o.Append(',');

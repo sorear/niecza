@@ -944,7 +944,7 @@ public class Builtins {
 
     public static string[] UnboxLoS(Variable args) {
         List<string> la = new List<string>();
-        VarDeque iter = new VarDeque(args);
+        VarDeque iter = start_iter(args);
         while (Kernel.IterHasFlat(iter, true)) {
             Variable v = iter.Shift();
             la.Add(v.Fetch().mo.mro_raw_Str.Get(v));
@@ -1010,8 +1010,15 @@ public class Builtins {
         return Kernel.NewROScalar(l);
     }
 
+    public static VarDeque start_iter(Variable thing) {
+        if (thing.islist)
+            return thing.Fetch().mo.mro_raw_iterator.Get(thing);
+        else
+            return new VarDeque(thing);
+    }
+
     public static Variable bif_array_constructor(Variable bits) {
-        VarDeque rest  = new VarDeque(bits);
+        VarDeque rest  = start_iter(bits);
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
             items.Push(Kernel.NewRWScalar(Kernel.AnyMO, rest.Shift().Fetch()));
@@ -1101,7 +1108,7 @@ nomore:
         public ZipSource(Variable[] pcl) {
             sources = new VarDeque[pcl.Length];
             for (int i = 0; i < pcl.Length; i++)
-                sources[i] = new VarDeque(pcl[i]);
+                sources[i] = start_iter(pcl[i]);
         }
 
         public override bool TryGet(out Variable[] r, bool block) {
@@ -1132,7 +1139,7 @@ nomore:
             basic_top = new Variable[pcl.Length];
             iter_top  = new Variable[pcl.Length];
             for (int i = 0; i < pcl.Length; i++) {
-                iter[i] = new VarDeque(pcl[i]);
+                iter[i] = start_iter(pcl[i]);
             }
         }
 

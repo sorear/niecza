@@ -84,7 +84,7 @@ namespace Niecza {
         }
 
         protected Variable Slice(Variable obj, Variable key) {
-            VarDeque iter = new VarDeque(key);
+            VarDeque iter = Builtins.start_iter(key);
             List<Variable> items = new List<Variable>();
             while (Kernel.IterHasFlat(iter, true))
                 items.Add(Get(obj, iter.Shift()));

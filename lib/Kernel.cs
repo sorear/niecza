@@ -2449,7 +2449,7 @@ ltm:
         public static Frame PromoteToList(Frame th, Variable v) {
             if (!v.islist) {
                 P6opaque lst = new P6opaque(Kernel.ListMO);
-                lst.slots[0 /*items*/] = new VarDeque(new Variable[] { v });
+                lst.slots[0 /*items*/] = new VarDeque(v);
                 lst.slots[1 /*rest*/ ] = new VarDeque();
                 th.resultSlot = Kernel.NewRWListVar(lst);
                 return th;

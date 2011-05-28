@@ -84,8 +84,16 @@ namespace Niecza {
                 Push(vrs[i]);
         }
 
-        public void PushD(VarDeque vrs) { PushN(vrs.CopyAsArray()); }
-        public void UnshiftD(VarDeque vrs) { UnshiftN(vrs.CopyAsArray()); }
+        public void PushD(VarDeque vrs) {
+            if (vrs == this) { PushN(vrs.CopyAsArray()); return; }
+            for (int i = 0; i < vrs.count; i++)
+                Push(vrs[i]);
+        }
+        public void UnshiftD(VarDeque vrs) {
+            if (vrs == this) { UnshiftN(vrs.CopyAsArray()); return; }
+            for (int i = vrs.count - 1; i >= 0; i--)
+                Unshift(vrs[i]);
+        }
 
         public Variable Shift() {
             int index = head++;
