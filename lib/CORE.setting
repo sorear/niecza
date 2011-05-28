@@ -443,7 +443,6 @@ sub infix:<+^>($x, $y) { Q:CgOp { (bif_numxor {$x} {$y}) } }
 sub infix:<< +< >>($x, $y) { Q:CgOp { (bif_numlshift {$x} {$y}) } }
 sub infix:<< +> >>($x, $y) { Q:CgOp { (bif_numrshift {$x} {$y}) } }
 sub prefix:<< +^ >>($x) { Q:CgOp { (bif_numcompl {$x}) } }
-sub gettimeofday() { Q:CgOp { (bif_gettimeofday) } }
 
 # }}}
 # Flow inspection and control {{{

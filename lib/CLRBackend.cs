@@ -3776,9 +3776,7 @@ dynamic:
             thandlers["path_dir_exists"] = Methody(null, typeof(Directory).GetMethod("Exists"));
             thandlers["path_combine"] = Methody(null, typeof(Path).GetMethod("Combine", new Type[] { Tokens.String, Tokens.String }));
             thandlers["path_change_ext"] = Methody(null, typeof(Path).GetMethod("ChangeExtension", new Type[] { Tokens.String, Tokens.String }));
-            thandlers["path_any_exists"] = Methody(null, typeof(Builtins).GetMethod("FileOrDirExists"));
             thandlers["path_realpath"] = Methody(null, typeof(Path).GetMethod("GetFullPath"));
-            thandlers["path_modified"] = Methody(null, typeof(Builtins).GetMethod("GetModTime"));
             handlers["_parametricrole"] = delegate(NamProcessor th, object[] z) { return th.FillParamRole(); };
             handlers["_addmethod"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.DMO_AddMethod, th.Scan(z[1]), CpsOp.IntLiteral(JScalar.I(z[2])), th.Scan(z[3]), th.Scan(z[4])); };
@@ -3791,7 +3789,6 @@ dynamic:
             thandlers["obj_what"] = Methody(null, Tokens.P6any.GetMethod("GetTypeObject"));
             thandlers["obj_isa"] = Methody(null, Tokens.P6any.GetMethod("Isa"));
             thandlers["obj_does"] = Methody(null, Tokens.P6any.GetMethod("Does"));
-            thandlers["obj_can"] = Methody(null, Tokens.Builtins.GetMethod("can"));
             thandlers["obj_newblank"] = Constructy(Tokens.P6opaque_ctor);
             thandlers["cursor_start"] = Constructy(Tokens.Cursor.GetConstructor(new Type[] { Tokens.P6any, Tokens.String, Tokens.P6any }));
             thandlers["cursor_pos"] = FieldGet(Tokens.Cursor, "pos");
@@ -3812,46 +3809,6 @@ dynamic:
             thandlers["prog"] = CpsOp.Sequence;
             thandlers["newarray"] = Methody(null, Tokens.Kernel_CreateArray);
             thandlers["newhash"] = Methody(null, Tokens.Kernel_CreateHash);
-
-            thandlers["bif_gettimeofday"] = SimpleB("GetTimeOfDay");
-            thandlers["bif_array_constructor"] = SimpleB("ArrayConstructor");
-            thandlers["bif_pair"] = SimpleB("MakePair");
-            thandlers["bif_numand"] = SimpleB("NumAnd");
-            thandlers["bif_numor"] = SimpleB("NumOr");
-            thandlers["bif_numxor"] = SimpleB("NumXor");
-            thandlers["bif_numlshift"] = SimpleB("NumLShift");
-            thandlers["bif_numrshift"] = SimpleB("NumRShift");
-            thandlers["bif_numcompl"] = SimpleB("NumCompl");
-            thandlers["bif_ord"] = SimpleB("Ord");
-            thandlers["bif_chr"] = SimpleB("Chr");
-            thandlers["bif_postinc"] = SimpleB("PostIncrement");
-            thandlers["bif_numeq"] = SimpleB("NumericEq");
-            thandlers["bif_numne"] = SimpleB("NumericNe");
-            thandlers["bif_numle"] = SimpleB("NumericLe");
-            thandlers["bif_numlt"] = SimpleB("NumericLt");
-            thandlers["bif_numge"] = SimpleB("NumericGe");
-            thandlers["bif_numgt"] = SimpleB("NumericGt");
-            thandlers["bif_rand"] = SimpleB("GetRandom");
-            thandlers["bif_streq"] = SimpleB("StringEq");
-            thandlers["bif_strne"] = SimpleB("StringNe");
-            thandlers["bif_strle"] = SimpleB("StringLe");
-            thandlers["bif_strlt"] = SimpleB("StringLt");
-            thandlers["bif_strge"] = SimpleB("StringGe");
-            thandlers["bif_strgt"] = SimpleB("StringGt");
-            thandlers["bif_plus"] = SimpleB("Plus");
-            thandlers["bif_minus"] = SimpleB("Minus");
-            thandlers["bif_mod"] = SimpleB("Mod");
-            thandlers["bif_mul"] = SimpleB("Mul");
-            thandlers["bif_divide"] = SimpleB("Divide");
-            thandlers["bif_not"] = SimpleB("Not");
-            thandlers["bif_now"] = SimpleB("GetTimeOfDay");
-            thandlers["bif_negate"] = SimpleB("Negate");
-            thandlers["bif_chars"] = SimpleB("Chars");
-            thandlers["bif_substr3"] = SimpleB("Substr3");
-            thandlers["bif_simple_eval"] = SimpleB("SimpleEval");
-            thandlers["bif_rat_approx"] = SimpleB("RatApprox");
-            thandlers["bif_coerce_to_int"] = SimpleB("CoerceToInt");
-            thandlers["bif_coerce_to_num"] = SimpleB("CoerceToNum");
 
             thandlers["bif_defined"] = Contexty("mro_defined");
             thandlers["bif_bool"] = Contexty("mro_Bool");
@@ -4266,8 +4223,12 @@ dynamic:
             object[] rnode = (object[]) node;
             string tag = ((JScalar)rnode[0]).str;
             Func<NamProcessor, object[], CpsOp> handler;
-            if (!handlers.TryGetValue(tag, out handler))
-                throw new Exception("Unhandled nam operator " + tag);
+            if (!handlers.TryGetValue(tag, out handler)) {
+                MethodInfo mi = Tokens.Builtins.GetMethod(tag);
+                if (mi == null)
+                    throw new Exception("Unhandled nam operator " + tag);
+                handlers[tag] = handler = MakeTotalHandler(Methody(null, mi));
+            }
             if (CLRBackend.Verbose > 1)
                 Console.WriteLine("enter " + tag);
             CpsOp r = handler(this, rnode);

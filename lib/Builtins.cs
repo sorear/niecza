@@ -338,31 +338,31 @@ public class Builtins {
         return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Kernel.ComplexMO);
     }
 
-    public static Variable NumericEq(Variable v1, Variable v2) {
+    public static Variable bif_numeq(Variable v1, Variable v2) {
         return Compare(v1,v2) == 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    public static Variable NumericLt(Variable v1, Variable v2) {
+    public static Variable bif_numlt(Variable v1, Variable v2) {
         return Compare(v1,v2) < 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    public static Variable NumericNe(Variable v1, Variable v2) {
+    public static Variable bif_numne(Variable v1, Variable v2) {
         return Compare(v1,v2) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    public static Variable NumericLe(Variable v1, Variable v2) {
+    public static Variable bif_numle(Variable v1, Variable v2) {
         return Compare(v1,v2) <= 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    public static Variable NumericGt(Variable v1, Variable v2) {
+    public static Variable bif_numgt(Variable v1, Variable v2) {
         return Compare(v1,v2) > 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    public static Variable NumericGe(Variable v1, Variable v2) {
+    public static Variable bif_numge(Variable v1, Variable v2) {
         return Compare(v1,v2) >= 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    public static Variable StringEq(Variable v1, Variable v2) {
+    public static Variable bif_streq(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Str.Get(v1) == o2.mo.mro_raw_Str.Get(v2)) {
@@ -372,7 +372,7 @@ public class Builtins {
         }
     }
 
-    public static Variable StringNe(Variable v1, Variable v2) {
+    public static Variable bif_strne(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (o1.mo.mro_raw_Str.Get(v1) != o2.mo.mro_raw_Str.Get(v2)) {
@@ -382,7 +382,7 @@ public class Builtins {
         }
     }
 
-    public static Variable StringLt(Variable v1, Variable v2) {
+    public static Variable bif_strlt(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
@@ -393,7 +393,7 @@ public class Builtins {
         }
     }
 
-    public static Variable StringLe(Variable v1, Variable v2) {
+    public static Variable bif_strle(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
@@ -404,7 +404,7 @@ public class Builtins {
         }
     }
 
-    public static Variable StringGe(Variable v1, Variable v2) {
+    public static Variable bif_strge(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
@@ -415,7 +415,7 @@ public class Builtins {
         }
     }
 
-    public static Variable StringGt(Variable v1, Variable v2) {
+    public static Variable bif_strgt(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
@@ -426,7 +426,7 @@ public class Builtins {
         }
     }
 
-    public static Variable Substr3(Variable v1, Variable v2, Variable v3) {
+    public static Variable bif_substr3(Variable v1, Variable v2, Variable v3) {
         P6any o2 = NominalCheck("$start", Kernel.AnyMO, v2);
         P6any o3 = NominalCheck("$chars", Kernel.AnyMO, v3);
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -434,7 +434,7 @@ public class Builtins {
         return new SubstrLValue(v1, r2, r3);
     }
 
-    public static Variable Plus(Variable a1, Variable a2) {
+    public static Variable bif_plus(Variable a1, Variable a2) {
         int r1, r2;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
         P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
@@ -466,7 +466,7 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Minus(Variable a1, Variable a2) {
+    public static Variable bif_minus(Variable a1, Variable a2) {
         int r1, r2;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
         P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
@@ -498,7 +498,7 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Negate(Variable a1) {
+    public static Variable bif_negate(Variable a1) {
         int r1;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
 
@@ -559,7 +559,7 @@ public class Builtins {
         return PromoteToFixInt(r1, n1).CompareTo(PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Mul(Variable a1, Variable a2) {
+    public static Variable bif_mul(Variable a1, Variable a2) {
         int r1, r2;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
         P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
@@ -591,7 +591,7 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Divide(Variable a1, Variable a2) {
+    public static Variable bif_divide(Variable a1, Variable a2) {
         int r1, r2;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
         P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
@@ -624,7 +624,7 @@ public class Builtins {
         return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
-    public static Variable Mod(Variable a1, Variable a2) {
+    public static Variable bif_mod(Variable a1, Variable a2) {
         int r1, r2;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
         P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
@@ -683,14 +683,14 @@ public class Builtins {
         }
     }
 
-    public static Variable CoerceToInt(Variable a1) {
+    public static Variable bif_coerce_to_int(Variable a1) {
         NominalCheck("$x", Kernel.AnyMO, a1);
         int small; BigInteger big;
         return GetAsInteger(a1, out small, out big) ?
             MakeInt(big) : MakeInt(small);
     }
 
-    public static Variable CoerceToNum(Variable a1) {
+    public static Variable bif_coerce_to_num(Variable a1) {
         int r1;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
 
@@ -704,7 +704,7 @@ public class Builtins {
         }
     }
 
-    public static Variable NumAnd(Variable v1, Variable v2) {
+    public static Variable bif_numand(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
@@ -712,7 +712,7 @@ public class Builtins {
         return MakeInt(r1 & r2);
     }
 
-    public static Variable NumOr(Variable v1, Variable v2) {
+    public static Variable bif_numor(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
@@ -720,7 +720,7 @@ public class Builtins {
         return MakeInt(r1 | r2);
     }
 
-    public static Variable NumXor(Variable v1, Variable v2) {
+    public static Variable bif_numxor(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
@@ -728,7 +728,7 @@ public class Builtins {
         return MakeInt(r1 ^ r2);
     }
 
-    public static Variable NumLShift(Variable v1, Variable v2) {
+    public static Variable bif_numlshift(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
@@ -736,7 +736,7 @@ public class Builtins {
         return MakeInt(r1 << r2);
     }
 
-    public static Variable NumRShift(Variable v1, Variable v2) {
+    public static Variable bif_numrshift(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
@@ -744,13 +744,13 @@ public class Builtins {
         return MakeInt(r1 >> r2);
     }
 
-    public static Variable NumCompl(Variable v1) {
+    public static Variable bif_numcompl(Variable v1) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return MakeInt(~r1);
     }
 
-    public static Variable RatApprox(Variable v1, Variable v2) {
+    public static Variable bif_rat_approx(Variable v1, Variable v2) {
         NominalCheck("$x", Kernel.AnyMO, v1);
         NominalCheck("$y", Kernel.AnyMO, v2);
 
@@ -771,25 +771,25 @@ public class Builtins {
         }
     }
 
-    public static Variable PostIncrement(Variable v) {
+    public static Variable bif_postinc(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         AssignV(v, o1.mo.mro_succ.Get(v));
         return Kernel.NewROScalar(o1);
     }
 
-    public static Variable Not(Variable v) {
+    public static Variable bif_not(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         bool r = o1.mo.mro_raw_Bool.Get(v);
         return r ? Kernel.FalseV : Kernel.TrueV;
     }
 
-    public static Variable Chars(Variable v) {
+    public static Variable bif_chars(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         string r = o1.mo.mro_raw_Str.Get(v);
         return MakeInt(r.Length);
     }
 
-    public static Variable Ord(Variable v) {
+    public static Variable bif_ord(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
@@ -797,7 +797,7 @@ public class Builtins {
         return MakeInt((int)r[0]);
     }
 
-    public static Variable Chr(Variable v) {
+    public static Variable bif_chr(Variable v) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
@@ -854,25 +854,25 @@ public class Builtins {
         return Kernel.NewRWListVar(l);
     }
 
-    public static Variable GetModTime(string path) {
+    public static Variable path_modified(string path) {
         long t = File.GetLastWriteTimeUtc(path).Ticks;
         return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
-    public static Variable GetTimeOfDay() {
+    public static Variable bif_now() {
         long t = DateTime.UtcNow.Ticks;
         return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
     private static Random rng = new Random();
 
-    public static Variable GetRandom() {
+    public static Variable bif_rand() {
         double i;
         lock (rng) { i = rng.NextDouble(); }
         return MakeFloat(i);
     }
 
-    public static bool FileOrDirExists(string path) {
+    public static bool path_any_exists(string path) {
         return File.Exists(path) || Directory.Exists(path);
     }
 
@@ -933,7 +933,7 @@ public class Builtins {
         return BoxLoS(r.Call(AppDomain.CurrentDomain, UnboxLoS(list)));
     }
 
-    public static Variable SimpleEval(Variable str) {
+    public static Variable bif_simple_eval(Variable str) {
         if (up_domain == null)
             throw new NieczaException("Cannot eval; no compiler available");
         CrossDomainReceiver r = (CrossDomainReceiver)
@@ -947,14 +947,14 @@ public class Builtins {
         return rt;
     }
 
-    public static Variable MakePair(Variable key, Variable value) {
+    public static Variable bif_pair(Variable key, Variable value) {
         P6any l = new P6opaque(Kernel.PairMO);
         l.SetSlot("key", key);
         l.SetSlot("value", value);
         return Kernel.NewROScalar(l);
     }
 
-    public static Variable ArrayConstructor(Variable bits) {
+    public static Variable bif_array_constructor(Variable bits) {
         VarDeque rest  = new VarDeque(bits);
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
@@ -965,7 +965,7 @@ public class Builtins {
         return Kernel.NewROScalar(l);
     }
 
-    public static int GetArity(P6any fcni) {
+    public static int bif_arity(P6any fcni) {
         if (!fcni.Isa(Kernel.SubMO))
             return 1; // can't introspect fake subs (?)
         SubInfo si = (SubInfo) fcni.GetSlot("info");
@@ -1199,7 +1199,7 @@ again:
         VarDeque iter = new VarDeque(lst);
         Variable fcn = iter.Shift();
         P6any fcni = fcn.Fetch();
-        int arity = GetArity(fcni);
+        int arity = bif_arity(fcni);
 
         Frame fr = th.MakeChild(null, CommonMEMap_I);
         fr.lexi0 = 0;
@@ -1346,7 +1346,7 @@ again:
         return nf;
     }
 
-    public static bool can(P6any obj, string mname) {
+    public static bool obj_can(P6any obj, string mname) {
         return obj.mo.mro_methods.ContainsKey(mname);
     }
 }
