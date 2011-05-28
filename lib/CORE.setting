@@ -30,18 +30,6 @@ my class Mu {
     method perl(Mu $self:) { defined($self) ?? "{$self.typename}.new(...)" !! $self.typename }
     method so(Mu $self:) { ?$self }
     method not(Mu $self:) { !$self }
-    method RAWCREATE(\|$vars) { Q:CgOp {
-        (letn ar  (unbox fvarlist (@ {$vars}))
-              max (fvarlist_length (l ar))
-              i   (int 1)
-              obj (obj_newblank (obj_llhow (@ (fvarlist_item (i 0) (l ar)))))
-          [whileloop 0 0 (< (l i) (l max)) (prog
-              [setslot
-                (unbox str (@ (fvarlist_item (l i) (l ar)))) (l obj)
-                (nsw (@ (fvarlist_item (+ (l i) (int 1)) (l ar))))]
-              [l i (+ (l i) (int 2))])]
-          [ns (l obj)])
-    } }
     method CREATE(Mu $self: *%_) { Q:CgOp { (default_new (@ {$self}) (unbox varhash (@ {%_}))) } }
     method new(Mu $self: *%_) { Q:CgOp { (default_new (@ {$self}) (unbox varhash (@ {%_}))) } }
 }
@@ -926,7 +914,7 @@ sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete, :$p, :$kv) {
 }
 
 my class GatherIterator is IterCursor {
-    has $!frame;
+    has $.frame;
     has $!reify;
 
     method reify() {
@@ -938,18 +926,18 @@ my class GatherIterator is IterCursor {
                     (fvarlist_new)
                     (fvarlist_new
                       (l getv)
-                      {GatherIterator.RAWCREATE("frame", $*nextframe, "reify", Any)}))))
+                      {GatherIterator.new(frame => $*nextframe)}))))
             }));
     }
 }
 
 sub _gather($fr) {
-    &infix:<,>(GatherIterator.RAWCREATE("frame", $fr, "reify", Any)).list
+    &infix:<,>(GatherIterator.new(frame => $fr)).list
 }
 
 sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
 
-sub infix:<< => >>($k, Mu $v) { Pair.RAWCREATE("key", $k, "value", $v) }
+sub infix:<< => >>($k, Mu $v) { $k => $v }
 
 sub reverse(*@array) {
     my @acc;
