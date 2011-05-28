@@ -167,7 +167,7 @@ public sealed class RxFrame {
         rootf = bt = csr.xact;
         this.name = name;
         st.ns = passcut ? csr.nstate :
-            new NState(rootf, "RULE " + name, csr.nstate);
+            new NState(rootf, name, csr.nstate);
         if (passcap)
             st.captures = csr.captures;
         if (Cursor.Trace) {
