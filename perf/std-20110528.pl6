@@ -27,6 +27,10 @@ bench "nulling test", 1000000, sub () {};
 
 my ($x, $y);
 bench "Parcel.LISTSTORE", 1000000, sub () { ($x,$y) = ($y,$x) };
+{
+    "foo" ~~ /f(.)/;
+    bench '$<x>', 1000000, sub () { $0 };
+}
 
 # my $str = "0";
 # $str ~= $str for ^18;
