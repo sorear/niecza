@@ -25,38 +25,41 @@ bench "nulling test", 1000000, sub () {};
     bench "iterate empty list", 1000000, sub () { for @l { } };
 }
 
-my $str = "0";
-$str ~= $str for ^18;
-say $str.chars;
-# $str = substr($str,0,1000000);
+my ($x, $y);
+bench "Parcel.LISTSTORE", 1000000, sub () { ($x,$y) = ($y,$x) };
 
-my grammar GTest {
-    token TOP { <.bit>* }
-    token bit { . }
-}
-
-bench "grammar", 1, sub () { GTest.parse($str) };
-{
-    my class GAct0 {
-    }
-    bench "grammar (no action)", 1, sub () { GTest.parse($str, :actions(GAct0)) };
-}
-
-{
-    my class GAct1 {
-        method bit($ ) { }
-    }
-    bench "grammar (empty action)", 1, sub () { GTest.parse($str, :actions(GAct1)) };
-}
-
-{
-    my class GAct2 {
-        method FALLBACK($ , $ ) { }
-    }
-    bench "grammar (fallback action)", 1, sub () { GTest.parse($str, :actions(GAct2)) };
-}
-
-bench "Any.exists-key", 1000000, sub () { Any<foo>:exists };
-
-my $arr = [1];
-bench "JSON array iteration", 1000000, sub () { to-json($arr) };
+# my $str = "0";
+# $str ~= $str for ^18;
+# say $str.chars;
+# # $str = substr($str,0,1000000);
+# 
+# my grammar GTest {
+#     token TOP { <.bit>* }
+#     token bit { . }
+# }
+# 
+# bench "grammar", 1, sub () { GTest.parse($str) };
+# {
+#     my class GAct0 {
+#     }
+#     bench "grammar (no action)", 1, sub () { GTest.parse($str, :actions(GAct0)) };
+# }
+# 
+# {
+#     my class GAct1 {
+#         method bit($ ) { }
+#     }
+#     bench "grammar (empty action)", 1, sub () { GTest.parse($str, :actions(GAct1)) };
+# }
+# 
+# {
+#     my class GAct2 {
+#         method FALLBACK($ , $ ) { }
+#     }
+#     bench "grammar (fallback action)", 1, sub () { GTest.parse($str, :actions(GAct2)) };
+# }
+# 
+# bench "Any.exists-key", 1000000, sub () { Any<foo>:exists };
+# 
+# my $arr = [1];
+# bench "JSON array iteration", 1000000, sub () { to-json($arr) };

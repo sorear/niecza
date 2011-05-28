@@ -28,6 +28,18 @@ use OptRxSimple;
 use STD;
 use Sig;
 
+augment class Op::SimplePair { #OK exist
+    method code($body) {
+        CgOp.bif_pair(CgOp.const(CgOp.string_var($.key)), $.value.cgop($body));
+    }
+}
+
+augment class Op::SimpleParcel { #OK exist
+    method code($body) {
+        CgOp.bif_comma(map { $_.cgop($body) }, @$.items);
+    }
+}
+
 augment class STD {
 token ws () {
     :my $startpos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {self}))))) };

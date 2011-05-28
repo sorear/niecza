@@ -6,3 +6,11 @@ Experiment with techniques to avoid Variable[] allocation on all calls
 Experiment with "if non-overriden, then replace method" hooks
 
 Experiment with making P6any: Variable
+
+Improve , & => inlining, do away with RAWCREATE
+
+$<foo> should make a postcircumfix call
+
+Make LISTSTORE off-loop?
+
+push, shift, etc off-loop?
