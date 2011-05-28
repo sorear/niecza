@@ -338,6 +338,10 @@ public class Builtins {
         return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Kernel.ComplexMO);
     }
 
+    public static Variable MakeParcel(params Variable[] bits) {
+        return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
+    }
+
     public static Variable bif_numeq(Variable v1, Variable v2) {
         return Compare(v1,v2) == 0 ? Kernel.TrueV : Kernel.FalseV;
     }
@@ -688,6 +692,42 @@ public class Builtins {
         int small; BigInteger big;
         return GetAsInteger(a1, out small, out big) ?
             MakeInt(big) : MakeInt(small);
+    }
+
+    public static Variable bif_divop(int opc, Variable a1, Variable a2) {
+        int small1, small2; BigInteger big1, big2;
+        NominalCheck("$x", Kernel.AnyMO, a1);
+        NominalCheck("$y", Kernel.AnyMO, a2);
+        bool b1 = GetAsInteger(a1, out small1, out big1);
+        bool b2 = GetAsInteger(a2, out small2, out big2);
+
+        if (b1 || b2 || small1 == int.MinValue || small2 == int.MinValue) {
+            if (!b1) big1 = small1;
+            if (!b2) big2 = small2;
+            BigInteger rem;
+            BigInteger red = BigInteger.DivRem(big1, big2, out rem);
+            if (opc >= 4 && red.Sign < 0 && rem.Sign != 0) {
+                red--;
+                rem += big2;
+            }
+            switch (opc & 3) {
+                case 0: return MakeInt(red);
+                case 1: return MakeInt(rem);
+                default: return MakeParcel(MakeInt(red), MakeInt(rem));
+            }
+        } else {
+            int rem = small1 % small2;
+            int red = small1 / small2;
+            if (opc >= 4 && red < 0 && rem != 0) {
+                red--;
+                rem += small2;
+            }
+            switch (opc & 3) {
+                case 0: return MakeInt(red);
+                case 1: return MakeInt(rem);
+                default: return MakeParcel(MakeInt(red), MakeInt(rem));
+            }
+        }
     }
 
     public static Variable bif_coerce_to_num(Variable a1) {
@@ -1172,9 +1212,7 @@ again:
                 if (fnc != null)
                     return fnc.Invoke(th, (Variable[])th.lex3, null);
                 else {
-                    th.resultSlot = Kernel.NewRWListVar(
-                            Kernel.BoxRaw((Variable[])th.lex3,
-                                Kernel.ParcelMO));
+                    th.resultSlot = MakeParcel((Variable[]) th.lex3);
                     goto case 2;
                 }
             case 2:

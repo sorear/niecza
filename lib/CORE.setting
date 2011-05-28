@@ -1306,8 +1306,8 @@ sub infix:<after> ($a, $b) { $a gt $b }
 sub seqop($op) { $op } # TODO: Special case with hyper
 sub reverseop($op) { sub (\$x, \$y) { $op($y, $x) } }
 
-sub infix:<div> ($x,$y) { die "Modulus calculation NYI"; } #OK
-sub infix:<mod> ($x,$y) { die "Modulus calculation NYI"; } #OK
+sub infix:<div> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 4) {$x} {$y}) } }
+sub infix:<mod> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 5) {$x} {$y}) } }
 sub infix:<~&> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~|> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~^> ($x, $y) { die "Buffer bitops NYI"; } #OK
