@@ -1296,6 +1296,117 @@ sub infix:<..^> ($a, $b)  { Range.new($a, $b, :excludes_max) }
 sub infix:<^..> ($a, $b)  { Range.new($a, $b, :excludes_min) }
 sub infix:<^..^> ($a, $b) { Range.new($a, $b, :excludes_min, :excludes_max) }
 
+sub _hyper_type($val) {
+    #FIXME rewrite using roles
+    given $val {
+        when Hash { return 1 }
+        when List { return 2 }
+        when Parcel { return 2 }
+        when Range { return 2 }
+        default { return 0 }
+    }
+}
+
+sub hyperunary(&fun, \$obj) {
+    given _hyper_type($obj) {
+        when 1 {
+            my %out;
+            for $obj.kv -> $k, \$v {
+                %out{$k} = hyperunary(&fun, $v);
+            }
+            return %out;
+        }
+        when 2 {
+            my @out;
+            @out.push: $( hyperunary(&fun, $_) ) for $obj.list;
+            return @out;
+        }
+        when 3 {
+            my @out;
+            @out.push: $( hyperunary(&fun, $_) ) for $obj.list;
+            return $obj.new(@out);
+        }
+        when 0 {
+            return fun($obj);
+        }
+    }
+}
+
+sub _hyper_hash($dwiml, $dwimr, $fun, $left, $right) {
+    my %keys;
+    for $left.keys {
+        %keys{$_} = True if !$dwiml || ($right{$_}:exists);
+    }
+    for $right.keys {
+        %keys{$_} = True if !$dwimr || ($left{$_}:exists);
+    }
+    for %keys.keys {
+        %keys{$_} = hyper($dwiml, $dwimr, $fun, $left{$_}, $right{$_});
+    }
+    %keys
+}
+
+sub _hyper_posi($dwiml, $dwimr, $fun, $left, $right) {
+    my $lex = $left[*-1] ~~ Whatever;
+    my $rex = $right[*-1] ~~ Whatever;
+    my @out;
+    my $ix = 0;
+    loop {
+        my $lend; my $lv; my $rend; my $rv;
+        if $ix >= ($lex ?? $left - 1 !! $left) {
+            $lend = True;
+            $lv := $left[$lex ?? $left - 2 !! $left ?? $ix % $left !! 0];
+        } else {
+            $lv := $left[$ix];
+        }
+        if $ix >= ($rex ?? $right - 1 !! $right) {
+            $rend = True;
+            $rv := $right[$rex ?? $right - 2 !! $right ?? $ix % $right !! 0];
+        } else {
+            $rv := $right[$ix];
+        }
+        last if $lend && $rend;
+        die "Ran off end of non-dwimmy left" if $lend && !$dwiml && !$dwimr;
+        die "Ran off end of non-dwimmy right" if $rend && !$dwiml && !$dwimr;
+        last if $lend && !$dwiml;
+        last if $rend && !$dwimr;
+        @out.push: $( hyper($dwiml, $dwimr, $fun, $lv, $rv) );
+        $ix++;
+    }
+    @out;
+}
+
+sub hyper($dwiml, $dwimr, $fun, \$left, \$right) {
+    constant @htnames = 'scalar', 'Associative', 'Positional', #OK
+        'non-Positional Iterable';
+    my $h1 = _hyper_type($left);
+    my $h2 = _hyper_type($right);
+
+    if $h1 && $h2 && $h1 != $h2 {
+        die "Cannot mix @htnames[$h1] and @htnames[$h2] in hyperop";
+    }
+
+    if $h2 == 0 || $h1 == 0 {
+        if $h1 == 0 && $h2 == 0 { return $fun($left, $right) }
+        if $h2 {
+            if $dwiml {
+                return hyperunary(sub (\$x) { $fun($left,$x) }, $right);
+            }
+        } else {
+            if $dwimr {
+                return hyperunary(sub (\$x) { $fun($x,$right) }, $left);
+            }
+        }
+        die "Non-dwimmy scalar used with complex item";
+    }
+
+    given $h1 {
+        when 1 { return _hyper_hash($dwiml, $dwimr, $fun, $left, $right) }
+        when 2 { return _hyper_posi($dwiml, $dwimr, $fun, @$left, @$right) }
+        when 3 { die "Cannot hyper two unordered collections" }
+    }
+}
+
 sub infix:<%%> ($x,$y) { $x % $y == 0 }
 sub infix:<?&> ($a, $b) { ?($a && $b) }
 sub infix:<?|> ($a, $b) { ?($a || $b) }
