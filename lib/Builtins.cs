@@ -744,6 +744,22 @@ public class Builtins {
         }
     }
 
+    public static Variable bif_sqrt(Variable a1) {
+        int r1;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            double angle = Math.Atan2(v1.im, v1.re) / 2;
+            if (angle < 0) angle += Math.PI;
+            double mag = Math.Sqrt(Math.Sqrt(v1.im*v1.im + v1.re*v1.re));
+            return MakeComplex(mag * Math.Cos(angle), mag * Math.Sin(angle));
+        } else {
+            double val = PromoteToFloat(r1, n1);
+            return (val > 0) ? MakeFloat(Math.Sqrt(val)) : MakeComplex(0, Math.Sqrt(-val));
+        }
+    }
+
     public static Variable bif_numand(Variable v1, Variable v2) {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
         P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);

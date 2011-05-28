@@ -67,6 +67,8 @@ my class Cool {
     method Rat($eps = 1e-6) { Q:CgOp { (bif_rat_approx {self} {$eps}) } }
     method Int() { Q:CgOp { (bif_coerce_to_int {self}) } }
     method Num() { Q:CgOp { (bif_coerce_to_num {self}) } }
+    method abs() { abs self }
+    method sqrt() { sqrt self }
 
     method grep(Mu $sm) { grep $sm, @(self) }
     method map($func)   { map $func, @(self) }
@@ -232,10 +234,16 @@ my class Capture {
 # }}}
 # Scalar types {{{
 my class Num is Cool {
+    our constant pi = 3.14159_26535_89793_238e0;
+    our constant e  = 2.71828_18284_59045_235e0;
+    our constant i  = sqrt(-1);
     method Num() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
+our constant pi = 3.14159_26535_89793_238e0;
+our constant e  = 2.71828_18284_59045_235e0;
+our constant i  = sqrt(-1);
 my class Int is Cool {
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
@@ -804,6 +812,8 @@ my class Hash {
     method list()   { Q:CgOp { (bif_hash_pairs  {self}) } }
     method kv()     { Q:CgOp { (bif_hash_kv     {self}) } }
 
+    method Numeric() { +@(self) }
+
     method invert() {
         my %new;
         for self.keys -> $k { %new{self{$k}} = $k }
@@ -1296,6 +1306,7 @@ sub prefix:<^> ($limit) { 0 ..^ $limit }
 sub prefix:<so> ($item) { ?$item }
 sub infix:<xx> (\$list, $ct) { map { $list }, ^$ct }
 sub prefix:<abs> ($x) { $x > 0 ?? $x !! -$x }
+sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 # XXX 'Order' type
 sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
@@ -1315,7 +1326,7 @@ sub infix:«~<» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:«~>» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
 sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
-sub postfix:<i> ($item) { die "Complex NYI" } #OK
+sub postfix:<i> ($item) { $item * i }
 sub infix:<&> (\|$args) { die "Junctions NYI" } #OK
 sub infix:<|> (\|$args) { die "Junctions NYI" } #OK
 sub infix:<^> (\|$args) { die "Junctions NYI" } #OK
