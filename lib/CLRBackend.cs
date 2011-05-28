@@ -3677,7 +3677,7 @@ dynamic:
                     x[i-1] = th.Scan(z[i]);
                 x[0] = CpsOp.RxFrame();
                 string name = JScalar.S(z[1]);
-                return CpsOp.CpsCall((name == "EndWith" || name == "End") ? Tokens.Void : null, Tokens.RxFrame.GetMethod(name), x); };
+                return CpsOp.MethodCall(Tokens.RxFrame.GetMethod(name), x); };
             handlers["rxinit"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.SetField(Tokens.Frame_rx, CpsOp.CallFrame(),
                     CpsOp.ConstructorCall(Tokens.RxFrame_ctor,
@@ -3694,8 +3694,18 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
                     CpsOp.RxFrame(), CpsOp.CallFrame(), ai); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
-            thandlers["rxend"] = RxCall(Tokens.Void, "End");
-            thandlers["rxfinalend"] = RxCall(Tokens.Void, "FinalEnd");
+            thandlers["rxend"] = delegate(CpsOp[] zyg) {
+                return CpsOp.Sequence(
+                    CpsOp.CpsCall(Tokens.Void,
+                        Tokens.RxFrame.GetMethod("MakeMatch"), CpsOp.RxFrame()),
+                    CpsOp.CpsCall(Tokens.Void,
+                        Tokens.RxFrame.GetMethod("End"), CpsOp.RxFrame())); };
+            thandlers["rxfinalend"] = delegate(CpsOp[] zyg) {
+                return CpsOp.Sequence(
+                    CpsOp.CpsCall(Tokens.Void,
+                        Tokens.RxFrame.GetMethod("MakeMatch"), CpsOp.RxFrame()),
+                    CpsOp.CpsCall(Tokens.Void,
+                        Tokens.RxFrame.GetMethod("FinalEnd"), CpsOp.RxFrame())); };
             thandlers["rxbacktrack"] = RxCall(Tokens.Void, "Backtrack");
             thandlers["rxgetquant"] = RxCall(null, "GetQuant");
             thandlers["rxsetquant"] = RxCall(null, "SetQuant");
@@ -3800,7 +3810,7 @@ dynamic:
             thandlers["cursor_item"] = Methody(null, Tokens.Cursor.GetMethod("GetKey"));
             thandlers["cursor_unpackcaps"] = Methody(null, Tokens.Cursor.GetMethod("UnpackCaps"));
             thandlers["cursor_O"] = Methody(null, Tokens.Cursor.GetMethod("O"));
-            thandlers["cursor_synthetic"] = Methody(null, Tokens.Cursor.GetMethod("Synthetic"));
+            thandlers["cursor_synthetic"] = Methody(Tokens.Variable, Tokens.Cursor.GetMethod("Synthetic"));
             thandlers["cursor_fresh"] = Methody(null, Tokens.Cursor.GetMethod("FreshClass"));
             thandlers["cursor_unmatch"] = Methody(null, Tokens.Cursor.GetMethod("UnMatch"));
             thandlers["cursor_reduced"] = Methody(null, Tokens.Cursor.GetMethod("Reduced"));

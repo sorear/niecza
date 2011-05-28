@@ -12,11 +12,11 @@ public sealed class GState {
 
     public Variable actions;
 
-    internal void CallAction(string name, Cursor match) {
+    internal Frame CallAction(Frame th, string name, Cursor match) {
+        if (actions == null || name == "" || name == null)
+            return th;
         if (Cursor.Trace)
             Console.WriteLine("To call action {0}", name);
-        if (actions == null || name == "" || name == null)
-            return;
         DispatchEnt m;
         P6any actions_p = actions.Fetch();
         Variable[] pos;
@@ -27,13 +27,13 @@ public sealed class GState {
                 Kernel.BoxAnyMO<string>(name, Kernel.StrMO),
                 Kernel.NewROScalar(match) };
         } else {
-            return;
+            return th;
         }
 
-        Frame nf = m.info.Binder(Kernel.GetInferiorRoot()
-                .MakeChild(m.outer, m.info), pos, null, false);
+        Frame nf = m.info.Binder(th.MakeChild(m.outer, m.info),
+                pos, null, false);
         nf.curDisp = m;
-        Kernel.RunInferior(nf);
+        return nf;
     }
 
     public GState(string orig, P6any actions) {
@@ -463,11 +463,14 @@ public sealed class RxFrame {
 
     public Variable MakeCursorV() { return Kernel.NewROScalar(MakeCursor()); }
 
-    public Cursor MakeMatch() {
+    Cursor _matchObj;
+    public Frame MakeMatch(Frame th) {
         if (Cursor.Trace)
             Console.WriteLine("Matching {0} from {1} to {2}",
                     name, from, st.pos);
-        return new Cursor(global, st.ns.klass, from, st.pos, st.captures, ast, name);
+        _matchObj = new Cursor(global, st.ns.klass, from, st.pos,
+                st.captures, ast, name);
+        return global.CallAction(th, name, _matchObj);
     }
 
     public static Variable EmptyList;
@@ -475,11 +478,11 @@ public sealed class RxFrame {
     public Frame FinalEnd(Frame th) {
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
-        th.caller.resultSlot = Kernel.NewROScalar(MakeMatch());
+        th.caller.resultSlot = Kernel.NewROScalar(_matchObj);
         return th.caller;
     }
     public Frame End(Frame th) {
-        return EndWith(th, MakeMatch());
+        return EndWith(th, _matchObj);
     }
     // currently just used for protoregex
     public Frame EndWith(Frame th, Cursor m) {
@@ -547,9 +550,6 @@ public class Cursor : P6any {
         this.mo = Kernel.MatchMO;
         this.save_klass = klass;
         this.reduced = reduced;
-
-        if (reduced != null)
-            g.CallAction(reduced, this);
     }
 
     public Cursor(GState g, STable klass, RxFrame feedback, NState ns, Choice xact, int pos, CapInfo captures) {
@@ -562,8 +562,8 @@ public class Cursor : P6any {
         this.captures = captures;
     }
 
-    public static Cursor Synthetic(Cursor parent, string method, int from,
-            int to, Variable caplist) {
+    public static Frame Synthetic(Frame th, Cursor parent, string method,
+            int from, int to, Variable caplist) {
         VarDeque iter = Builtins.start_iter(caplist);
         CapInfo ci = null;
         while (Kernel.IterHasFlat(iter, true)) {
@@ -573,8 +573,10 @@ public class Cursor : P6any {
             ci = new CapInfo(ci, new string[] {
                     k.Fetch().mo.mro_raw_Str.Get(k) }, v);
         }
-        return new Cursor(parent.global, parent.save_klass, from, to, ci,
+        Cursor r = new Cursor(parent.global, parent.save_klass, from, to, ci,
                 null, method);
+        Kernel.SetStatus(th, "$*/", Kernel.NewROScalar(r));
+        return r.global.CallAction(th, method, r);
     }
 
     public override bool IsDefined() {

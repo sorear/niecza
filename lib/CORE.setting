@@ -1155,12 +1155,13 @@ my class Match is Cool {
     method reduced() { Q:CgOp { (box Str (cursor_reduced (cast cursor (@ {self})))) } }
     method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
         Q:CgOp {
-            (newscalar (cursor_synthetic
-                (cast cursor (@ {$cursor})) (obj_getstr {$method})
-                (cast int (obj_getnum {$from}))
-                (cast int (obj_getnum {$to}))
-                {@captures}))
+            (cursor_synthetic
+              (cast cursor (@ {$cursor})) (obj_getstr {$method})
+              (cast int (obj_getnum {$from}))
+              (cast int (obj_getnum {$to}))
+              {@captures})
         };
+        $/
     }
 }
 
