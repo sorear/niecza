@@ -870,9 +870,6 @@ my class Hash {
 }
 
 augment class Any {
-    method exists-key($) {
-        defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! False
-    }
     method delete-key($) {
         defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! Any
     }

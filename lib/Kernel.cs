@@ -1623,6 +1623,18 @@ noparams:
         }
     }
 
+    class IxAnyExistsKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
+            P6any os = obj.Fetch();
+            if (!os.IsDefined())
+                return Kernel.FalseV;
+            throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
+        }
+    }
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             if (key.islist) {
@@ -3060,6 +3072,7 @@ slow:
             HashMO.Invalidate();
 
             AnyMO = new STable("Any");
+            WrapHandler1(AnyMO, "exists-key", new IxAnyExistsKey());
             WrapHandler1(AnyMO, "at-key", new IxAnyAtKey());
             WrapHandler1(AnyMO, "at-pos", new IxAnyAtPos());
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
