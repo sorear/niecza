@@ -609,28 +609,26 @@ my class Parcel is Cool {
     method Str    () { ~ @(self) }
     method Bool   () { ? @(self) }
 
-    method LISTSTORE(*@in) {
-        my @values = @in;
-
-        # TODO: proper (sized) handling of sub-parcels
+    method LISTSTORE(\$in) {
         Q:CgOp {
-            (rnull
-              (letn i    (i 0)
-                    tgts (unbox fvarlist (@ {self}))
-                    ntgt (fvarlist_length (l tgts))
-                    tgt  (null var)
-                (whileloop 0 0 (< (l i) (l ntgt))
-                  (prog
-                    (l tgt (fvarlist_item (l i) (l tgts)))
-                    (l i (+ (l i) (i 1)))
-                    (ternary (var_islist (l tgt))
-                      (prog
-                        (sink (methodcall (l tgt) LISTSTORE {@values.clone}))
-                        (sink {@values = ()}))
-                      (assign (l tgt) {@values ?? @values.shift !! Any}))))))
+            (letn i    (i 0)
+                  vals (start_iter {$in})
+                  tgts (unbox fvarlist (@ {self}))
+                  ntgt (fvarlist_length (l tgts))
+                  tgt  (null var)
+              (whileloop 0 0 (< (l i) (l ntgt))
+                (prog
+                  (l tgt (fvarlist_item (l i) (l tgts)))
+                  (l i (+ (l i) (i 1)))
+                  (ternary (var_islist (l tgt))
+                    (letn ob (obj_newblank (class_ref mo List))
+                      (iter_to_list (l ob) (l vals))
+                      (l vals (vvarlist_new_empty))
+                      (sink (methodcall (l tgt) LISTSTORE (newrwlistvar (l ob)))))
+                    (assign (l tgt) (ternary (iter_hasflat (l vals))
+                      (vvarlist_shift (l vals)) {Any})))))
+              {self})
         };
-
-        @in;
     }
 }
 
