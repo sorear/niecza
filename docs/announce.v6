@@ -1,0 +1,165 @@
+    Announce: Niecza Perl 6 v6
+
+My summer has started.  That is to say, hacking season.  Many new and
+exciting things are in this release, and I want to see many more.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Breaking changes]
+
+The backend now sometimes reorders function argument evaluation.
+
+"is rw" parameter bindings now carp if the argument is readonly, at
+binding time.
+
+"@var" no longer interpolates.  You need a postcircumfix.
+
+
+
+[Major features]
+
+Numeric types have been expanded and are not just Num but now also
+include Int, Rat, FatRat, and Complex.  Int is, of course, a bignum
+type.  Most numeric operations have been modified to treat the full
+spectrum of types appropriately.  Conversion operators have also
+been added.
+
+$_ semantics are now much closer to the spec.  In particular, blocks
+that declare a $_ now inherit a value from parent blocks, so doing
+"if $_ { say $_ }" will work sensibly now.  $_ is dynamic and can be
+accessed from callees, so ".say if /x/" works now.
+
+.perl is now aware of flattening rules and can, for instance, tell the
+difference between [1] and (my @x = 1).  New .flattens method provides
+the same information programmatically.  (Patrick Michaud)
+
+A prototype (slow) implementation of hyperoperators is now available.
+
+
+
+[Minor new features]
+
+Attributes with @ and % sigils are now supported.
+
+"for" loop blocks can now have multiple parameters.
+
+Multimethods now tiebreak by nesting depth or inheritance position, so
+a multi in a subclass takes precedence over an otherwise tied multi in
+a superclass.  Strictly speaking this should only happen for multis
+with exactly the same signature, but it's an improvement over the old
+state.
+
+proto subs in a subscope now hide multi subs in outer scopes.
+
+Imported parser improvements from the reference grammar include being
+able to generate better errors for "has" outside classes and "self"
+outside methods.  (Larry Wall the legendary punster says, "STD is now
+self-aware.")
+
+Empty signatures on proto regexes are now ignored and no longer cause
+the parse to fail.
+
+default { } blocks are now supported, to complement when { }.
+
+.split will use a given split point only once; no longer will a regex
+that can match the empty string result in an infinite number of empty
+tokens at that point.
+
+The "rand" term is now functional.
+
+Many more setting functions will accept Mu.
+
+"is rw" and "of TYPE" traits on subs are now parsed and ignored.
+
+"self" can now be used even if an explicit invocant is used in the
+signature.
+
+Positional parameters can now be passed by name.  (This went in a
+few hours before the spec change.)
+
+The second argument to Cool.substr is now optional.
+
+The first argument to Cool.subst is now allowed to be Str.
+
+Hashes can now be assigned to like "a", 1; not merely a => 1.
+
+repeat, unless, until, and while now take pointy blocks.
+
+"is copy" parameters are now supported.
+
+Hash now supports the nonstandard exists and delete methods, because
+so much Rakudo-specific code uses them.
+
+$obj.?method() is now supported.
+
+New functions and methods: chomp, chop, Cool.chomp, Cool.chop,
+infix:<=:=>, Match.keys, List.kv, hash, index, Cool.abs, Cool.sqrt,
+sqrt, postfix:<i>, infix:<div>, infix:<mod>, Hash.Numeric.
+
+
+
+[Selected bug fixes]
+
+<<+>> no longer fails to parse. (This was my fault.)
+
+Type constraints are respected even in inline blocks.
+
+List.pop now returns undef instead of dieing when empty.
+
+my A::B $x now works properly.  (Was being parsed as my MY::B $x).
+
+Fixed foo <a b c> being treated as 3 arguments.
+
+
+
+[Very internal changes]
+
+The backend has been reworked to be considerably more data-driven.
+Much less of the startup is done by generated code; instead, small
+pre-written loops load a description.  This reduces work on the
+Mono JIT and is much faster.  Other improvements include rearranging
+NAM files so that ABI info is concentrated in the first 25% and
+generating a coalesced constant pool.  Various aspects of code
+generated for Perl 6 constructs have been simplified.
+
+
+
+[Other]
+
+Not strictly a change here, but worth mentioning: Carl Masak's yapsi
+now can be run on Niecza with minimal changes.  Check out the "niecza"
+branch in git://github.com/masak/niecza
+
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+Ideas welcome!  Focus on more applications?  Focus on speed?  Focus
+on some major cool feature of your choice?
+
+A JVM backend is in the design stages.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-6.zip
+[2] https://github.com/sorear/niecza

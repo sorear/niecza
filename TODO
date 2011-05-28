@@ -7,8 +7,6 @@ EASY
 
  + $*PROGRAM_NAME
 
- + $*OUT
-
    Rename at-key, at-pos to "postcircumfix:<[ ]>" etc.
 
    Add your favorite missing function to the setting, with tests.
@@ -26,16 +24,12 @@ EASY
 
    Fudge and run your favorite spectest file.
 
-   Stuff spectests are blocking on: "Block", "&hash", "closure for",
+   Stuff spectests are blocking on: "Block", "closure for",
    "ranges of chars", "gather for", constants in signatures, ::T, ...
 
 MEDIUM
 
  + qx[]
-
- + $obj.?method
-
- + &hyperunary
 
    Implement your favorite ?-vars.
 
