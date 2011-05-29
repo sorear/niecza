@@ -1141,6 +1141,8 @@ namespace Niecza.CLRBackend {
 
         public void EmitDataArray(Type ty, int ct, byte[] vec) {
             EmitInt(ct);
+            if (CLRBackend.Current.dynamic)
+                throw new Exception("cannot EmitDataArray with dynamic assembly");
             // the mono JIT checks for this exact sequence
             il.Emit(OpCodes.Newarr, ty);
             if (vec.Length != 0) {
@@ -4253,6 +4255,7 @@ dynamic:
         internal AssemblyBuilder ab;
         internal ModuleBuilder mob;
         internal TypeBuilder tb;
+        internal bool dynamic;
 
         [ThreadStatic] internal static CLRBackend Current;
 
@@ -4270,6 +4273,7 @@ dynamic:
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
 
         CLRBackend(string dir, string mobname, string filename) {
+            dynamic = (filename == null);
             AssemblyName an = new AssemblyName(mobname);
             this.dir = dir;
             ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
@@ -4525,13 +4529,22 @@ dynamic:
             unit_load.Add(unit.EmitVarConsts());
             unit_load.Add(unit.EmitStringListConsts());
 
+            CpsOp mkheap;
+            // https://bugzilla.novell.com/show_bug.cgi?id=696817
+            if (CLRBackend.Current.dynamic) {
+                mkheap = CpsOp.Null(typeof(byte[]));
+                RuntimeUnit.RegisterHeap(unit.name, unit.thaw_heap.ToArray());
+            } else {
+                mkheap = CpsOp.NewByteArray(typeof(byte), unit.thaw_heap.ToArray());
+            }
+
             unit_load[0] = CpsOp.SetSField(unit.rtunit, CpsOp.ConstructorCall(
-                Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(Type), typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
+                Tokens.RuntimeUnit.GetConstructor(new Type[] { typeof(string), typeof(Type), typeof(byte[]), typeof(RuntimeUnit[]), typeof(int) }),
+                CpsOp.StringLiteral(unit.name),
                 CpsOp.TypeLiteral(tb),
-                CpsOp.NewByteArray(typeof(byte), unit.thaw_heap.ToArray()),
+                mkheap,
                 CpsOp.NewArray(Tokens.RuntimeUnit, tdep_rtu.ToArray()),
                 CpsOp.IntLiteral(unit.xref.Length)));
-
 
             thaw[unit_slot] = CpsOp.Sequence(unit_load.ToArray());
 

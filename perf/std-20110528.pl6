@@ -25,13 +25,18 @@ bench "nulling test", 1000000, sub () {};
     bench "iterate empty list", 1000000, sub () { for @l { } };
 }
 
-my ($x, $y);
-bench "Parcel.LISTSTORE", 1000000, sub () { ($x,$y) = ($y,$x) };
-{
-    "foo" ~~ /f(.)/;
-    bench '$<x>', 1000000, sub () { $0 };
-}
+my %h; my $x;
+bench "Hash.delete-key", 1000000, sub () { %h<foo>:delete };
+bench "Any.delete-key", 1000000, sub () { $x<foo>:delete };
+bench "Bool.Numeric", 1000000, sub () { +True };
 
+# my ($x, $y);
+# bench "Parcel.LISTSTORE", 1000000, sub () { ($x,$y) = ($y,$x) };
+# {
+#     "foo" ~~ /f(.)/;
+#     bench '$<x>', 1000000, sub () { $0 };
+# }
+# 
 # my $str = "0";
 # $str ~= $str for ^18;
 # say $str.chars;

@@ -188,6 +188,9 @@ namespace Niecza {
     }
 
     public sealed class RuntimeUnit {
+        static Dictionary<string, byte[]> heapreg;
+
+        public string name;
         public Type type;
         public byte[] heap;
         public RuntimeUnit[] depends;
@@ -196,10 +199,39 @@ namespace Niecza {
         public object[] xref;
         public static bool TraceLoad = Environment.GetEnvironmentVariable("NIECZA_TRACE_LOAD") != null;
 
-        public RuntimeUnit(Type type, byte[] heap, RuntimeUnit[] depends,
-                int nx) {
+        public static void HexDump(byte[] heap) {
+            for (int offs = 0; offs < heap.Length; offs += 16) {
+                Console.Write("{0:X6}   ", offs);
+                int len = heap.Length - offs;
+                if (len > 16) len = 16;
+                for (int col = 0; col < 16; col++) {
+                    if (col >= len)
+                        Console.Write("   ");
+                    else
+                        Console.Write("{0:X2} ", heap[offs+col]);
+                    if (col == 7)
+                        Console.Write(" ");
+                }
+                Console.Write("   |");
+                for (int col = 0; col < len; col++)
+                    Console.Write(
+                        (heap[offs+col] < 32 || heap[offs+col] > 126)
+                            ? '.' : (char)heap[offs+col]);
+                Console.WriteLine("|");
+            }
+        }
+
+        public static void RegisterHeap(string name, byte[] heap) {
+            if (heapreg == null)
+                heapreg = new Dictionary<string, byte[]>();
+            heapreg[name] = heap;
+        }
+
+        public RuntimeUnit(string name, Type type, byte[] heap,
+                RuntimeUnit[] depends, int nx) {
+            this.name = name;
             this.type = type;
-            this.heap = heap;
+            this.heap = (heap == null ? heapreg[name] : heap);
             this.depends = depends;
             this.xref = new object[nx];
             this.methods = new DynBlockDelegate[nx];
@@ -207,25 +239,7 @@ namespace Niecza {
 
             if (TraceLoad) {
                 Console.WriteLine("Setting up unit {0}", type.Name);
-                for (int offs = 0; offs < heap.Length; offs += 16) {
-                    Console.Write("{0:X6}   ", offs);
-                    int len = heap.Length - offs;
-                    if (len > 16) len = 16;
-                    for (int col = 0; col < 16; col++) {
-                        if (col >= len)
-                            Console.Write("   ");
-                        else
-                            Console.Write("{0:X2} ", heap[offs+col]);
-                        if (col == 7)
-                            Console.Write(" ");
-                    }
-                    Console.Write("   |");
-                    for (int col = 0; col < len; col++)
-                        Console.Write(
-                            (heap[offs+col] < 32 || heap[offs+col] > 126)
-                                ? '.' : (char)heap[offs+col]);
-                    Console.WriteLine("|");
-                }
+                HexDump(heap);
             }
 
             uint d = 0;
