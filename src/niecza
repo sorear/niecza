@@ -42,6 +42,52 @@ augment class Op::SimpleParcel { #OK exist
 }
 
 augment class STD {
+method nibbler() {
+    my @nibbles;
+    my $from = self.pos;
+    my $to = $from;
+
+    loop {
+        my $here = self.cursor($to);
+        last if head($here.stopper);
+
+        if head($here.starter) -> $starter {
+            push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+                :method<Str>, :captures()) if $from != $to;
+
+            my $nibbler = head(self.cursor($starter.to).nibbler) or return ();
+            my $stopper = head(self.cursor($nibbler.to).stopper) or return ();
+
+            $from = $to = $stopper.to;
+            push @nibbles, $starter;
+            push @nibbles, @( $nibbler<nibbles> );
+            push @nibbles, $stopper;
+        }
+        elsif head($here.escape) -> $escape {
+            push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+                :method<Str>, :captures()) if $from != $to;
+
+            $from = $to = $escape.to;
+            push @nibbles, $escape;
+        }
+        else {
+            $to++;
+        }
+    }
+
+    push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+        :method<Str>, :captures()) if $from != $to || !@nibbles;
+
+    $*LAST_NIBBLE = $to;
+    $*LAST_NIBBLE_START = self.pos;
+    if defined substr(self.orig, self.pos, $to - self.pos).index("\n") {
+        $*LAST_NIBBLE_MULTILINE = $to;
+        $*LAST_NIBBLE_MULTILINE_START = self.pos;
+    }
+
+    Match.synthetic(:cursor(self), from => self.pos, :$to, :method<nibbler>,
+        :captures(nibbles => @nibbles))
+}
 token ws () {
     :my $startpos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {self}))))) };
     :my $stub = return self if @*MEMOS[$startpos]<ws> :exists; #OK
