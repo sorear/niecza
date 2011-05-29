@@ -1915,6 +1915,10 @@ namespace Niecza.CLRBackend {
             HasCases = false;
             Constant = true;
         }
+        // no side effects, huh?
+        public override ClrOp Sink() {
+            return ClrNoop.Instance;
+        }
         public override void CodeGen(CgContext cx) {
             real.CodeGen(cx);
         }
