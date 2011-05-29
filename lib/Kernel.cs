@@ -1045,6 +1045,8 @@ noparams:
 
         public static readonly bool TraceCalls =
             Environment.GetEnvironmentVariable("NIECZA_TRACE_CALLS") != null;
+        public static readonly bool VerboseExceptions =
+            Environment.GetEnvironmentVariable("NIECZA_VERBOSE_EXCEPTIONS") != null;
 
         public Frame MakeChild(Frame outer, SubInfo info) {
             if (reusable_child == null) {
@@ -1111,6 +1113,27 @@ noparams:
             } else {
                 return 0;
             }
+        }
+
+        public Variable GetArgs() {
+            P6any nw = new P6opaque(Kernel.CaptureMO);
+            nw.SetSlot("positionals", pos ?? new Variable[0]);
+            nw.SetSlot("named", named);
+            return Kernel.NewROScalar(nw);
+        }
+
+        public string DescribeArgs() {
+            string ret = null;
+            try {
+                Variable a = GetArgs();
+                Variable sa = Kernel.RunInferior(a.Fetch().InvokeMethod(
+                    Kernel.GetInferiorRoot(), "perl", new Variable[] { a },
+                    null));
+                ret = sa.Fetch().mo.mro_raw_Str.Get(sa);
+            } catch (Exception ex) {
+                ret = "[cannot display arguments: " + ex + "]";
+            }
+            return ret;
         }
 
         public string ExecutingFile() {
@@ -3258,10 +3281,12 @@ slow:
             while (from != upto) {
                 sb.Append(Console.Out.NewLine);
                 try {
-                    sb.AppendFormat("  at {0} line {1} ({2} @ {3})",
+                    sb.AppendFormat("  at {0} line {1} ({2} @ {3}) {4}",
                             new object[] {
                             from.ExecutingFile(), from.ExecutingLine(),
-                            from.info.name, from.ip });
+                            from.info.name, from.ip,
+                            Frame.VerboseExceptions ? from.DescribeArgs() : ""
+                        });
                 } catch (Exception ex) {
                     sb.AppendFormat("  (frame display failed: {0})", ex);
                 }

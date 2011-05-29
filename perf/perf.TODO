@@ -8,13 +8,15 @@ Experiment with "if non-overriden, then replace method" hooks
 Experiment with making P6any: Variable
 
 Make LISTSTORE off-loop?
-
 push, shift, etc off-loop?
 
 Avoid calling a function for trivial attribute (or parameter) defaults
 
 Improve isa, somehow.
 
-Subquadratic nibbling.
+Subquadratic nibbling.  Also improve nibbler's use of GetKey and push.
+
+Reduce redundant Cursor creation for, e.g., { say 2 }
+Reduce ContextHelper use in ws, or make it faster.
 
 81537 Mu.new attr: 14093 RxOp.zyg,
