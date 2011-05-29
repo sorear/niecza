@@ -27,6 +27,7 @@ use Operator;
 use OptRxSimple;
 use STD;
 use Sig;
+use Stash;
 
 augment class Op::SimplePair { #OK exist
     method code($body) {
@@ -73,6 +74,75 @@ token ws () {
 }
 
 augment class STD::P6 { #OK
+    # note: until %*LANG is initialized we can't use <.ws>
+    token comp_unit {
+        :my $*DEBUG = $GLOBAL::DEBUG_STD // 0;
+        :my $*begin_compunit = 1;
+        :my $*endargs = -1;
+        :my %*LANG;
+        :my $*PKGDECL ::= "";
+        :my $*IN_DECL = '';
+        :my $*HAS_SELF = '';
+        :my $*DECLARAND;
+        :my $*OFTYPE;
+        :my $*NEWPKG;
+        :my $*NEWLEX;
+        :my $*QSIGIL ::= '';
+        :my $*IN_META = '';
+        :my $*QUASIMODO;
+        :my $*SCOPE = "";
+        :my $*LEFTSIGIL;
+        :my $*PRECLIM;
+        :my %*MYSTERY = ();
+        :my $*INVOCANT_OK;
+        :my $*INVOCANT_IS;
+        :my $*CURLEX;
+        :my $*MULTINESS = '';
+        :my $*SIGNUM = 0;
+        :my $*MONKEY_TYPING = False;
+        :my %*WORRIES;
+        :my @*WORRIES;
+        :my $*FATALS = 0;
+        :my $*IN_SUPPOSE = False;
+
+        :my $*CURPKG;
+        {
+
+            %*LANG<MAIN>    = ::STD::P6 ;
+            %*LANG<Q>       = ::STD::Q ;
+            %*LANG<Quasi>   = ::STD::Quasi ;
+            %*LANG<Regex>   = ::STD::Regex ;
+            %*LANG<P5>      = ::STD::P5 ;
+            %*LANG<P5Regex> = ::STD::P5::Regex ;
+
+            @*WORRIES = ();
+            self.load_setting($*SETTINGNAME);
+            my $oid = $*SETTING.id;
+            my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
+            $*CURLEX = Stash.new(
+                'OUTER::' => [$oid],
+                '!file' => $*FILE, '!line' => 0,
+                '!id' => [$id],
+            );
+            $STD::ALL.{$id} = $*CURLEX;
+            $*UNIT = $*CURLEX;
+            $STD::ALL.<UNIT> = $*UNIT;
+            self.finishlex;
+            # $¢ = self.cursor_fresh($*CURLEX<$?LANGNAME>);
+        }:s
+        <.unitstart>
+        <statementlist>
+        [ <?unitstopper> || <.panic: "Confused"> ]
+        # "CHECK" time...
+        $<LEX> = { $*CURLEX }
+        {
+            $¢.explain_mystery();
+            if @*WORRIES {
+                note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+            }
+            die "Check failed\n" if $*FATALS;
+        }
+    }
 constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
     token infixish ($in_meta?) {
         :my ($O, $sym);
