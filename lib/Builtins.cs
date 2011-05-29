@@ -849,7 +849,7 @@ public class Builtins {
         P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
-        if (r.Length == 0) return Kernel.NewROScalar(Kernel.AnyP);
+        if (r.Length == 0) return Kernel.AnyMO.typeVar;
         return MakeInt((int)r[0]);
     }
 

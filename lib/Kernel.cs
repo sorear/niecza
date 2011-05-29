@@ -832,7 +832,7 @@ namespace Niecza {
                 if ((flags & SIG_F_DEFOUTER) != 0) {
                     Frame f = th;
                     if (outer_topic_key < 0) {
-                        src = Kernel.NewROScalar(Kernel.AnyP);
+                        src = Kernel.AnyMO.typeVar;
                         goto gotit;
                     }
                     for (int i = 0; i < outer_topic_rank; i++) f = f.outer;
@@ -925,7 +925,7 @@ noparams:
         public BValue AddHint(string name) {
             if (hints == null)
                 hints = new Dictionary<string,BValue>();
-            return hints[name] = new BValue(Kernel.NewROScalar(Kernel.AnyP));
+            return hints[name] = new BValue(Kernel.AnyMO.typeVar);
         }
 
         public void SetStringHint(string name, string value) {
@@ -1175,7 +1175,7 @@ noparams:
                 if (info.GetHint(name, out b))
                     return b.v;
                 else
-                    return Kernel.NewROScalar(Kernel.AnyP);
+                    return Kernel.AnyMO.typeVar;
             }
             uint m = SubInfo.FilterForName(name);
             while (csr != null) {
@@ -1185,7 +1185,7 @@ noparams:
                 }
                 csr = csr.outer;
             }
-            return Kernel.NewROScalar(Kernel.AnyP);
+            return Kernel.AnyMO.typeVar;
         }
 
         public Frame DynamicCaller() {
@@ -1652,7 +1652,7 @@ noparams:
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return Kernel.NewROScalar(Kernel.AnyP);
+                return Kernel.AnyMO.typeVar;
             throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
         }
     }
@@ -1702,7 +1702,7 @@ noparams:
             }
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Kernel.NewROScalar(Kernel.AnyP);
+                return Kernel.AnyMO.typeVar;
 
             Cursor os = (Cursor)o;
             return os.GetKey(key.Fetch().mo.mro_raw_Str.Get(key));
@@ -1716,7 +1716,7 @@ noparams:
 
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Kernel.NewROScalar(Kernel.AnyP);
+                return Kernel.AnyMO.typeVar;
 
             Cursor os = (Cursor)o;
             return os.GetKey(Utils.N2S(key.Fetch().mo.mro_raw_Numeric.Get(key)));
@@ -1752,7 +1752,7 @@ noparams:
     class IxHashDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any os = obj.Fetch();
-            if (!os.IsDefined()) return Kernel.NewROScalar(Kernel.AnyP);
+            if (!os.IsDefined()) return Kernel.AnyMO.typeVar;
             string ks = key.Fetch().mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
@@ -1760,7 +1760,7 @@ noparams:
                 h.Remove(ks);
                 return r;
             } else {
-                return Kernel.NewROScalar(Kernel.AnyP);
+                return Kernel.AnyMO.typeVar;
             }
         }
     }
@@ -1795,13 +1795,13 @@ noparams:
                 items.Push(rest.Shift());
             }
             if (ix < 0)
-                return Kernel.NewROScalar(Kernel.AnyP);
+                return Kernel.AnyMO.typeVar;
             if (items.Count() <= ix) {
                 if (extend) {
                     return new SimpleVariable(true, false, Kernel.AnyMO,
                             new ArrayViviHook(os, ix), Kernel.AnyP);
                 } else {
-                    return Kernel.NewROScalar(Kernel.AnyP);
+                    return Kernel.AnyMO.typeVar;
                 }
             }
             return items[ix];
@@ -1831,7 +1831,7 @@ noparams:
             if (ModulesStarted == null) ModulesStarted = new HashSet<string>();
             if (ModulesFinished == null) ModulesFinished = new HashSet<string>();
             if (ModulesFinished.Contains(name))
-                return NewROScalar(AnyP);
+                return AnyMO.typeVar;
             if (ModulesStarted.Contains(name))
                 throw new NieczaException("Recursive module graph detected at " + name + ": " + JoinS(" ", ModulesStarted));
             ModulesStarted.Add(name);
@@ -2433,7 +2433,7 @@ ltm:
                     .TryGetValue(name, out v)) {
                 return v.v;
             } else {
-                return NewROScalar(AnyP);
+                return AnyMO.typeVar;
             }
         }
 
@@ -2469,7 +2469,7 @@ ltm:
                 th = th.outer;
                 up--;
             }
-            return NewROScalar(AnyP);
+            return AnyMO.typeVar;
         }
 
         public static Variable DefaultNew(P6any proto, VarHash args) {
@@ -2618,7 +2618,7 @@ again:
             if (itemsl.Count() == 0) {
                 VarDeque restl = (VarDeque) dyl.GetSlot("rest");
                 if (restl.Count() == 0) {
-                    return NewROScalar(AnyP);
+                    return AnyMO.typeVar;
                 }
                 goto slow;
             }
@@ -3290,14 +3290,14 @@ slow:
                     tf.curDisp = de;
                     return tf;
                 } else {
-                    tf.caller.resultSlot = Kernel.NewROScalar(Kernel.AnyP);
+                    tf.caller.resultSlot = AnyMO.typeVar;
                     return tf.caller;
                 }
             } else if (type == SubInfo.ON_DIE) {
                 if (tf.lex == null)
                     tf.lex = new Dictionary<string,object>();
                 tf.lex["$*!"] = td;
-                td = Kernel.NewROScalar(Kernel.AnyP);
+                td = AnyMO.typeVar;
             }
             tf.ip = tip;
             tf.resultSlot = td;

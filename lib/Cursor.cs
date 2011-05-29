@@ -607,8 +607,7 @@ public class Cursor : P6any {
             l.slots[1 /*rest*/ ] = new VarDeque();
             return Kernel.NewROScalar(l);
         } else {
-            return caps.Count() != 0 ? caps[0] :
-                Kernel.NewROScalar(Kernel.AnyP);
+            return caps.Count() != 0 ? caps[0] : Kernel.AnyMO.typeVar;
         }
     }
 
