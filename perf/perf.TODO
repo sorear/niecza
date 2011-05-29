@@ -17,6 +17,4 @@ Improve isa, somehow.
 
 Subquadratic nibbling.
 
-81537 Mu.new attr: 14093 RxOp.zyg, 
-
-Missing accelerators: Bool.Numeric, Hash.delete-key, Any.delete-key
+81537 Mu.new attr: 14093 RxOp.zyg,

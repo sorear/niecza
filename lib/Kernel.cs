@@ -1420,6 +1420,13 @@ noparams:
         }
     }
 
+    class CtxBoolRawNumeric : ContextHandler<double> {
+        public override double Get(Variable obj) {
+            P6any o = obj.Fetch();
+            return (o.IsDefined() && Kernel.UnboxAny<bool>(o)) ? 1 : 0;
+        }
+    }
+
     class CtxNumSuccish : ContextHandler<P6any> {
         double amt;
         public CtxNumSuccish(double amt) { this.amt = amt; }
@@ -1637,6 +1644,18 @@ noparams:
         }
     }
 
+    class IxAnyDeleteKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            if (key.islist) {
+                return Slice(obj, key);
+            }
+
+            P6any os = obj.Fetch();
+            if (!os.IsDefined())
+                return Kernel.NewROScalar(Kernel.AnyP);
+            throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
+        }
+    }
     class IxAnyExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             if (key.islist) {
@@ -1726,9 +1745,23 @@ noparams:
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.FalseV;
             string ks = key.Fetch().mo.mro_raw_Str.Get(key);
-            VarHash h =
-                Kernel.UnboxAny<VarHash>(os);
+            VarHash h = Kernel.UnboxAny<VarHash>(os);
             return h.ContainsKey(ks) ? Kernel.TrueV : Kernel.FalseV;
+        }
+    }
+    class IxHashDeleteKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            P6any os = obj.Fetch();
+            if (!os.IsDefined()) return Kernel.NewROScalar(Kernel.AnyP);
+            string ks = key.Fetch().mo.mro_raw_Str.Get(key);
+            VarHash h = Kernel.UnboxAny<VarHash>(os);
+            Variable r;
+            if (h.TryGetValue(ks, out r)) {
+                h.Remove(ks);
+                return r;
+            } else {
+                return Kernel.NewROScalar(Kernel.AnyP);
+            }
         }
     }
 
@@ -2975,6 +3008,7 @@ slow:
             BoolMO = new STable("Bool");
             Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
                     new CtxJustUnbox<bool>(false));
+            Handler_PandBoxInty(BoolMO, "Numeric", new CtxBoolRawNumeric());
             BoolMO.FillProtoClass(new string[] { });
             BoolMO.Invalidate();
             TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
@@ -3078,6 +3112,7 @@ slow:
 
             HashMO = new STable("Hash");
             WrapHandler1(HashMO, "exists-key", new IxHashExistsKey());
+            WrapHandler1(HashMO, "delete-key", new IxHashDeleteKey());
             WrapHandler1(HashMO, "at-key", new IxHashAtKey());
             Handler_PandBox(HashMO, "iterator", new CtxHashIterator(), IteratorMO);
             Handler_PandBox(HashMO, "Bool", new CtxHashBool(), BoolMO);
@@ -3087,6 +3122,7 @@ slow:
 
             AnyMO = new STable("Any");
             WrapHandler1(AnyMO, "exists-key", new IxAnyExistsKey());
+            WrapHandler1(AnyMO, "delete-key", new IxAnyDeleteKey());
             WrapHandler1(AnyMO, "at-key", new IxAnyAtKey());
             WrapHandler1(AnyMO, "at-pos", new IxAnyAtPos());
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);

@@ -308,7 +308,6 @@ my class Bool is EnumType {
     method Stringy() { self.key }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self !! $t.^does(self) }
-    method Numeric() { self ?? 1 !! 0 }
     our constant True  = Q:CgOp { (box Bool (bool 1)) };
     our constant False = Q:CgOp { (box Bool (bool 0)) };
     method succ() { True }
@@ -830,20 +829,6 @@ my class Hash {
         };
     }
 
-    method delete-key($str) {
-        Q:CgOp {
-            (ternary (obj_is_defined (@ {self}))
-              (letn r   (unbox varhash (@ {self}))
-                    k   (obj_getstr {$str})
-                    old (ternary (varhash_contains_key (l r) (l k))
-                                 (varhash_getindex (l k) (l r))
-                                 {Any})
-                (varhash_delete_key (l r) (l k))
-                (l old))
-              {Any})
-        };
-    }
-
     # Rakudo extensions compatibility - DO NOT USE
     method delete($key) { self.{$key}:delete }
     method exists($key) { self.{$key}:exists }
@@ -852,12 +837,6 @@ my class Hash {
         $self // return $self.typename;
         '{' ~ @($self).map(*.perl).join(', ') ~ '}' ~
             ($self.flattens ?? ".hash" !! "")
-    }
-}
-
-augment class Any {
-    method delete-key($) {
-        defined(self) ?? die("Cannot use hash access on an object of type $.typename") !! Any
     }
 }
 
