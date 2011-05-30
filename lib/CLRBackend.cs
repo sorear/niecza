@@ -3827,6 +3827,11 @@ dynamic:
             thandlers["newarray"] = Methody(null, Tokens.Kernel_CreateArray);
             thandlers["newhash"] = Methody(null, Tokens.Kernel_CreateHash);
 
+            thandlers["bif_shift"] = Contexty("mro_shift");
+            thandlers["bif_pop"] = Contexty("mro_pop");
+            thandlers["bif_push"] = Pushy("mro_push");
+            thandlers["bif_unshift"] = Pushy("mro_unshift");
+
             thandlers["bif_defined"] = Contexty("mro_defined");
             thandlers["bif_bool"] = Contexty("mro_Bool");
             thandlers["bif_num"] = Contexty("mro_Numeric");
@@ -3923,6 +3928,17 @@ dynamic:
             MethodInfo g = f.FieldType.GetMethod("Get");
             return delegate(CpsOp[] cpses) {
                 return CpsOp.Contexty(f, g, cpses);
+            };
+        }
+
+        static Func<CpsOp[], CpsOp> Pushy(string name) {
+            FieldInfo f = Tokens.STable.GetField(name);
+            MethodInfo g = f.FieldType.GetMethod("Invoke");
+            return delegate(CpsOp[] cpses) {
+                CpsOp[] args = new CpsOp[cpses.Length - 1];
+                Array.Copy(cpses, 1, args, 0, args.Length);
+                return CpsOp.Contexty(f, g, new CpsOp[2] {
+                    cpses[0], CpsOp.NewArray(Tokens.Variable, args) });
             };
         }
 

@@ -526,7 +526,8 @@ for <
         vvarlist_count vvarlist_from_fvarlist vvarlist_item
         vvarlist_new_empty vvarlist_new_singleton vvarlist_pop
         vvarlist_push vvarlist_shift vvarlist_sort vvarlist_to_fvarlist
-        vvarlist_unshift vvarlist_unshiftn whileloop xspan
+        vvarlist_unshift vvarlist_unshiftn whileloop xspan bif_times
+        bif_divop obj_can bif_sqrt bif_push bif_pop bif_unshift bif_shift
         > -> $name {
     my $fnc = anon sub CgOperator (\|@parcel) {
         Q:CgOp {

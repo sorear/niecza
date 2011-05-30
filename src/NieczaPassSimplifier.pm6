@@ -84,6 +84,7 @@ our %funcs = (
     '&map'                 => &do_map_grep,
     '&next'                => do_nullary_control(1),
     '&not'                 => do_builtin('not', 1),
+    '&pop'                 => do_builtin('pop', 1),
     '&postfix:<++>'        => do_builtin('postinc', 1),
     '&prefix:<?>'          => do_builtin('bool', 1),
     '&prefix:<->'          => do_builtin('negate', 1),
@@ -91,12 +92,15 @@ our %funcs = (
     '&prefix:<+>'          => do_builtin('num', 1),
     '&prefix:<~>'          => do_builtin('str', 1),
     '&proceed'             => do_nullary_control(7),
+    '&push'                => do_builtin('push', 1..*),
     '&redo'                => do_nullary_control(3),
     '&return'              => &do_return_take,
+    '&shift'               => do_builtin('shift', 1),
     '&so'                  => do_builtin('bool', 1),
     '&substr'              => do_builtin('substr3', 3),
     '&succeed'             => do_nullary_control(6),
     '&take'                => &do_return_take,
+    '&unshift'             => do_builtin('unshift', 1..*),
     '&_array_constructor'  => do_builtin('array_constructor', 1),
 );
 
@@ -108,7 +112,7 @@ sub do_assign($body, $nv, $invname, $op) {
 
 sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) {
     return $op unless defined my $args = no_named_params($op);
-    return $op unless $args == $expect;
+    return $op unless $args ~~ $expect;
     return ::Op::Builtin.new(name => $name, args => $args);
 } }
 
