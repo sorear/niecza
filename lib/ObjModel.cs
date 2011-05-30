@@ -68,6 +68,9 @@ namespace Niecza {
     public abstract class InvokeHandler {
         public abstract Frame Invoke(P6any obj, Frame th, Variable[] pos, VarHash named);
     }
+    public abstract class PushyHandler {
+        public abstract Variable Invoke(Variable obj, Variable[] args);
+    }
 
     public abstract class IndexHandler {
         public abstract Variable Get(Variable obj, Variable key);
@@ -429,6 +432,10 @@ next_method: ;
             = new CtxCallMethod("list");
         public static readonly ContextHandler<Variable> CallHash
             = new CtxCallMethod("hash");
+        public static readonly ContextHandler<Variable> CallShift
+            = new CtxCallMethod("shift");
+        public static readonly ContextHandler<Variable> CallPop
+            = new CtxCallMethod("pop");
         public static readonly ContextHandler<P6any> CallPred
             = new CtxCallMethodFetch("pred");
         public static readonly ContextHandler<P6any> CallSucc
@@ -458,6 +465,10 @@ next_method: ;
             = new IxCallMethod("LISTSTORE");
         public static readonly InvokeHandler CallINVOKE
             = new InvokeCallMethod();
+        public static readonly PushyHandler CallPush
+            = new PushyCallMethod("push");
+        public static readonly PushyHandler CallUnshift
+            = new PushyCallMethod("unshift");
 
         public P6how mo;
 
@@ -470,7 +481,8 @@ next_method: ;
         public LexerCache lexcache;
 
         public ContextHandler<Variable> mro_Str, mro_Numeric, mro_Bool,
-                mro_defined, mro_iterator, mro_item, mro_list, mro_hash;
+                mro_defined, mro_iterator, mro_item, mro_list, mro_hash,
+                mro_shift, mro_pop;
         public ContextHandler<P6any> mro_pred, mro_succ;
         public ContextHandler<bool> mro_raw_Bool, mro_raw_defined;
         public ContextHandler<string> mro_raw_Str;
@@ -482,6 +494,7 @@ next_method: ;
                mro_delete_key, mro_LISTSTORE;
 
         public InvokeHandler mro_INVOKE;
+        public PushyHandler mro_push, mro_unshift;
 
         public Dictionary<string, DispatchEnt> mro_methods;
         public Dictionary<string, P6any> private_mro;
@@ -510,6 +523,10 @@ next_method: ;
         }
 
         internal void SetupVTables() {
+            mro_push = _GetVT("push") as PushyHandler ?? CallPush;
+            mro_unshift = _GetVT("unshift") as PushyHandler ?? CallUnshift;
+            mro_shift = _GetVT("shift") as ContextHandler<Variable> ?? CallShift;
+            mro_pop = _GetVT("pop") as ContextHandler<Variable> ?? CallPop;
             mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
             mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
             mro_LISTSTORE = _GetVT("LISTSTORE") as IndexHandler ?? CallLISTSTORE;

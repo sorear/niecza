@@ -594,13 +594,13 @@ my class Parcel is Cool {
     method perl(\$self:) {
         $self // return $self.typename;
         my @tok;
-        @tok.push('$') if !$self.flattens;
-        @tok.push('(');
+        push @tok, '$' if !$self.flattens;
+        push @tok, '(';
         loop (my $i = 0; $i < $self.elems; $i++) {
-            @tok.push(Q:CgOp { (fvarlist_item (cast int (obj_getnum {$i})) (unbox fvarlist (@ {$self}))) }.perl);
-            @tok.push(', ') unless $i == $self.elems - 1 && $i;
+            push @tok, Q:CgOp { (fvarlist_item (cast int (obj_getnum {$i})) (unbox fvarlist (@ {$self}))) }.perl;
+            push @tok, ', ' unless $i == $self.elems - 1 && $i;
         }
-        @tok.push(')');
+        push @tok, ')';
         @tok.join;
     }
 
@@ -655,29 +655,13 @@ my class List is Cool {
     method perl(\$self:) {
         $self // return $self.typename;
         my @tok;
-        @tok.push('(');
-        @tok.push(.perl, ', ') for @$self;
-        @tok.pop if @tok >= 5;
-        @tok.push(').list');
-        @tok.push('.item') if !$self.flattens;
+        push @tok, '(';
+        push @tok, .perl, ', ' for @$self;
+        pop @tok if @tok >= 5;
+        push @tok, ').list';
+        push @tok, '.item' if !$self.flattens;
         @tok.join
     }
-
-    method !shift-item() { Q:CgOp {
-        (vvarlist_shift (getslot items vvarlist (@ {self})))
-    } }
-
-    method !pop-item() { Q:CgOp {
-        (vvarlist_pop (getslot items vvarlist (@ {self})))
-    } }
-
-    method !unshift-item(\$x) { Q:CgOp {
-        (rnull (vvarlist_unshift (getslot items vvarlist (@ {self})) {$x}))
-    } }
-
-    method shift() { self ?? self!shift-item !! Any }
-
-    method pop() { (+self) ?? self!pop-item !! Any }
 
     method eager() { +self; self }
 
@@ -717,22 +701,6 @@ my class List is Cool {
               (vvarlist_append (getslot rest vvarlist (@ {self}))
                 (unbox vvarlist (@ {@items.iterator}))))
         }
-    }
-
-    method push(\|$args) { Q:CgOp {
-        (letn iter (vvarlist_from_fvarlist (unbox fvarlist (@ {$args})))
-              targ (getslot rest vvarlist (@ {self}))
-          (sink (vvarlist_shift (l iter)))
-          (ternary (== (i 0) (vvarlist_count (l targ)))
-            (l targ (getslot items vvarlist (@ {self})))
-            (prog))
-          (whileloop 0 0 (iter_hasflat (l iter))
-            (vvarlist_push (l targ) (nsw (@ (vvarlist_shift (l iter))))))
-          {Nil})
-    } }
-
-    method unshift(*@a) {
-        for reverse(@a) -> $v { self!unshift-item(anon $new = $v) }
     }
 
     method kv() { my $i = 0; self.map({ $i++, $_ }) }
@@ -862,7 +830,7 @@ sub infix:<< => >>($k, Mu $v) { $k => $v }
 
 sub reverse(*@array) {
     my @acc;
-    while @array { @acc.push(@array.pop) }
+    push @acc, pop(@array) while @array;
     @acc;
 }
 
@@ -932,13 +900,13 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         elsif $right {
             gather {
                 while @items >= 2 {
-                    my Mu $right ::= @items.pop;
+                    my Mu $right ::= pop @items;
                     take $right;
-                    my Mu $left  = @items.pop;
-                    @items.push($func($left,$right));
+                    my Mu $left  = pop @items;
+                    push @items, $func($left,$right);
                 }
                 if @items {
-                    my Mu $last ::= @items.shift;
+                    my Mu $last ::= shift @items;
                     take $last;
                 }
             }
@@ -946,10 +914,10 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         else { # left assoc 
             gather {
                 if @items {
-                    my Mu $cumu ::= @items.shift;
+                    my Mu $cumu ::= shift @items;
                     take $cumu;
                     while @items {
-                        my Mu $new ::= ($cumu ::= $func($cumu, @items.shift));
+                        my Mu $new ::= ($cumu ::= $func($cumu, shift @items));
                         take $new;
                     }
                 }
@@ -970,17 +938,17 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         }
         elsif $right {
             while @items >= 2 {
-                my Mu $r = @items.pop;
-                my Mu $l = @items.pop;
-                @items.push($func($l,$r));
+                my Mu $r = pop @items;
+                my Mu $l = pop @items;
+                push @items, $func($l,$r);
             }
             @items ?? @items[0] !! 0; # XXX identity
         }
         else { # left
             while @items >= 2 {
-                my Mu $l = @items.shift;
-                my Mu $r = @items.shift;
-                @items.unshift($func($l,$r));
+                my Mu $l = shift @items;
+                my Mu $r = shift @items;
+                unshift @items, $func($l,$r);
             }
             @items ?? @items[0] !! 0; # XXX identity
         }
@@ -1231,12 +1199,12 @@ sub hyperunary(&fun, \$obj) {
         }
         when 2 {
             my @out;
-            @out.push: $( hyperunary(&fun, $_) ) for $obj.list;
+            push @out, $( hyperunary(&fun, $_) ) for @$obj;
             return @out;
         }
         when 3 {
             my @out;
-            @out.push: $( hyperunary(&fun, $_) ) for $obj.list;
+            push @out, $( hyperunary(&fun, $_) ) for @$obj;
             return $obj.new(@out);
         }
         when 0 {
@@ -1283,7 +1251,7 @@ sub _hyper_posi($dwiml, $dwimr, $fun, $left, $right) {
         die "Ran off end of non-dwimmy right" if $rend && !$dwiml && !$dwimr;
         last if $lend && !$dwiml;
         last if $rend && !$dwimr;
-        @out.push: $( hyper($dwiml, $dwimr, $fun, $lv, $rv) );
+        push @out, $( hyper($dwiml, $dwimr, $fun, $lv, $rv) );
         $ix++;
     }
     @out;
@@ -1396,7 +1364,7 @@ my class IO {
 
     method combine(*@paths) {
         die "Sorry, paths do not form a monoid." unless @paths;
-        my $acc = @paths.shift.IO;
+        my $acc = shift(@paths).IO;
         for @paths { $acc = $acc.append($_) }
         $acc
     }

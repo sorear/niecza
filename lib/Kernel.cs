@@ -1256,6 +1256,18 @@ noparams:
         }
     }
 
+    class PushyCallMethod : PushyHandler {
+        string method;
+        public PushyCallMethod(string method) { this.method = method; }
+
+        public override Variable Invoke(Variable obj, Variable[] args) {
+            Variable[] rargs = new Variable[args.Length + 1];
+            Array.Copy(args, 0, rargs, 1, args.Length);
+            rargs[0] = obj;
+            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, rargs, null));
+        }
+    }
+
     class CtxCallMethodUnbox<T> : ContextHandler<T> {
         string method;
         public CtxCallMethodUnbox(string method) { this.method = method; }
@@ -1462,6 +1474,58 @@ noparams:
             VarDeque r = new VarDeque( (VarDeque) d.slots[0] );
             r.PushD((VarDeque) d.slots[1]);
             return r;
+        }
+    }
+
+    class PopList : ContextHandler<Variable> {
+        public override Variable Get(Variable v) {
+            P6any o = v.Fetch();
+            if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
+            VarDeque items = (VarDeque)o.GetSlot("items");
+            VarDeque rest = (VarDeque)o.GetSlot("rest");
+            while (Kernel.IterHasFlat(rest, false))
+                items.Push(rest.Shift());
+            return (items.Count() != 0) ? items.Pop() : Kernel.AnyMO.typeVar;
+        }
+    }
+    class ShiftList : ContextHandler<Variable> {
+        public override Variable Get(Variable v) {
+            P6any o = v.Fetch();
+            if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
+            VarDeque items = (VarDeque)o.GetSlot("items");
+            VarDeque rest = (VarDeque)o.GetSlot("rest");
+            if (items.Count() != 0)
+                return items.Shift();
+            if (Kernel.IterHasFlat(rest, false))
+                return rest.Shift();
+            return Kernel.AnyMO.typeVar;
+        }
+    }
+    class UnshiftList : PushyHandler {
+        public override Variable Invoke(Variable v, Variable[] args) {
+            P6any o = v.Fetch();
+            if (!o.IsDefined())
+                throw new NieczaException("Cannot push onto type object");
+            VarDeque iter = new VarDeque(args);
+            VarDeque targ = (VarDeque)o.GetSlot("items");
+            VarDeque st = new VarDeque();
+            while (Kernel.IterHasFlat(iter, true))
+                st.Push(Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch()));
+            targ.UnshiftD(st);
+            return v;
+        }
+    }
+    class PushList : PushyHandler {
+        public override Variable Invoke(Variable v, Variable[] args) {
+            P6any o = v.Fetch();
+            if (!o.IsDefined())
+                throw new NieczaException("Cannot push onto type object");
+            VarDeque iter = new VarDeque(args);
+            VarDeque targ = (VarDeque)o.GetSlot("rest");
+            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot("items");
+            while (Kernel.IterHasFlat(iter, true))
+                targ.Push(Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch()));
+            return v;
         }
     }
 
@@ -2824,6 +2888,26 @@ slow:
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
+        private static void WrapPushy(STable kl, string name,
+                PushyHandler cv) {
+            DynBlockDelegate dbd = delegate (Frame th) {
+                Variable[] fullpc = UnboxAny<Variable[]>(
+                        ((Variable)th.lex1).Fetch());
+                Variable[] chop = new Variable[fullpc.Length - 1];
+                Array.Copy(fullpc, 1, chop, 0, chop.Length);
+                th.caller.resultSlot = cv.Invoke((Variable)th.lex0, chop);
+                return th.caller;
+            };
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            si.sig_i = new int[6] {
+                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_SLURPY_PCL, 1, 0
+            };
+            si.sig_r = new object[2] { "self", "$args" };
+            si.param1 = cv;
+            kl.AddMethod(0, name, MakeSub(si, null));
+        }
+
         private static SubInfo IRSI = new SubInfo("InstantiateRole", IRC);
         private static Frame IRC(Frame th) {
             switch (th.ip) {
@@ -3195,6 +3279,10 @@ slow:
 
             ListMO = new STable("List");
             WrapHandler1(ListMO, "at-pos", new IxListAtPos(false));
+            Handler_Vonly(ListMO, "pop", new PopList(), null);
+            Handler_Vonly(ListMO, "shift", new ShiftList(), null);
+            WrapPushy(ListMO, "push", new PushList());
+            WrapPushy(ListMO, "unshift", new UnshiftList());
             Handler_PandBox(ListMO, "iterator", new CtxListIterator(),
                     IteratorMO);
             Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
