@@ -1381,6 +1381,7 @@ my class Instant {
 sub term:« now »() {
     Instant.new( val => Q:CgOp { (bif_now) } );
 }
+sub times() { Q:CgOp { (_cgop bif_times) } }
 sub term:« time »() { Q:CgOp { (bif_now) } }
 sub term:« rand »() { Q:CgOp { (bif_rand) } }
 

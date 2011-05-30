@@ -1,6 +1,7 @@
 using Niecza;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -915,6 +916,14 @@ public class Builtins {
     public static Variable bif_now() {
         long t = DateTime.UtcNow.Ticks;
         return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
+    }
+
+    public static Variable bif_times() {
+        Process p = Process.GetCurrentProcess();
+        Variable[] ret = new Variable[4];
+        ret[0] = ret[2] = MakeFloat(((double)p.UserProcessorTime.Ticks) / 10000000.0);
+        ret[1] = ret[3] = MakeFloat(((double)p.PrivilegedProcessorTime.Ticks) / 10000000.0);
+        return MakeParcel(ret);
     }
 
     private static Random rng = new Random();
