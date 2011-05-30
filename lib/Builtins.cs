@@ -341,27 +341,27 @@ public class Builtins {
     }
 
     public static Variable bif_numeq(Variable v1, Variable v2) {
-        return Compare(v1,v2) == 0 ? Kernel.TrueV : Kernel.FalseV;
+        return (Compare(v1,v2)&O_EQ) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable bif_numlt(Variable v1, Variable v2) {
-        return Compare(v1,v2) < 0 ? Kernel.TrueV : Kernel.FalseV;
+        return (Compare(v1,v2)&O_LT) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable bif_numne(Variable v1, Variable v2) {
-        return Compare(v1,v2) != 0 ? Kernel.TrueV : Kernel.FalseV;
+        return (Compare(v1,v2)&O_NE) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable bif_numle(Variable v1, Variable v2) {
-        return Compare(v1,v2) <= 0 ? Kernel.TrueV : Kernel.FalseV;
+        return (Compare(v1,v2)&O_LE) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable bif_numgt(Variable v1, Variable v2) {
-        return Compare(v1,v2) > 0 ? Kernel.TrueV : Kernel.FalseV;
+        return (Compare(v1,v2)&O_GT) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable bif_numge(Variable v1, Variable v2) {
-        return Compare(v1,v2) >= 0 ? Kernel.TrueV : Kernel.FalseV;
+        return (Compare(v1,v2)&O_GE) != 0 ? Kernel.TrueV : Kernel.FalseV;
     }
 
     public static Variable bif_streq(Variable v1, Variable v2) {
@@ -525,6 +525,12 @@ public class Builtins {
         return MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
+    const int O_LT = 1; const int O_LE = 2; const int O_NE = 4;
+    const int O_EQ = 8; const int O_GE = 16; const int O_GT = 32;
+    const int O_IS_GREATER = O_NE | O_GE | O_GT;
+    const int O_IS_LESS    = O_NE | O_LE | O_LT;
+    const int O_IS_EQUAL   = O_EQ | O_GE | O_LE;
+    const int O_IS_UNORD   = O_NE;
     public static int Compare(Variable a1, Variable a2) {
         int r1, r2;
         P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
@@ -533,32 +539,39 @@ public class Builtins {
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
+            if (double.IsNaN(v1.re) || double.IsNaN(v1.im) ||
+                    double.IsNaN(v2.re) || double.IsNaN(v2.im))
+                return O_IS_UNORD;
             if (v1.re != v2.re)
-                return v1.re > v2.re ? 1 : -1;
+                return v1.re > v2.re ? O_IS_GREATER : O_IS_LESS;
             else
-                return v1.im > v2.im ? 1 : v1.im < v2.im ? -1 : 0;
+                return v1.im > v2.im ? O_IS_GREATER : v1.im < v2.im ? O_IS_LESS : O_IS_EQUAL;
         }
-        if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
-            double df = PromoteToFloat(r1, n1) - PromoteToFloat(r2, n2);
-            return df > 0 ? 1 : df < 0 ? -1 : 0;
+        else if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
+            double d1 = PromoteToFloat(r1, n1);
+            double d2 = PromoteToFloat(r2, n2);
+            if (double.IsNaN(d1) || double.IsNaN(d2)) return O_IS_UNORD;
+            return d1 > d2 ? O_IS_GREATER : d1 < d2 ? O_IS_LESS : O_IS_EQUAL;
         }
-        if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
+        else if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
             FatRat v2 = PromoteToFatRat(r2, n2);
 
-            return BigInteger.Compare(v1.num*v2.den, v2.num*v1.den);
+            r1 = BigInteger.Compare(v1.num*v2.den, v2.num*v1.den);
         }
-        if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
+        else if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
             Rat v2 = PromoteToFixRat(r2, n2);
 
-            return BigInteger.Compare(v1.num*v2.den, v2.num*v1.den);
+            r1 = BigInteger.Compare(v1.num*v2.den, v2.num*v1.den);
         }
-        if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
-            return BigInteger.Compare(PromoteToBigInt(r1, n1),
+        else if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
+            r1 = BigInteger.Compare(PromoteToBigInt(r1, n1),
                     PromoteToBigInt(r2, n2));
         }
-        return PromoteToFixInt(r1, n1).CompareTo(PromoteToFixInt(r2, n2));
+        else
+            r1 = PromoteToFixInt(r1, n1).CompareTo(PromoteToFixInt(r2, n2));
+        return (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
     }
 
     public static Variable bif_mul(Variable a1, Variable a2) {

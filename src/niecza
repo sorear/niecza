@@ -310,6 +310,11 @@ augment class Sig::Parameter { #OK
 }
 
 augment class NieczaActions {
+method number($/) {
+    my $child = $<integer> // $<dec_number> // $<rad_number>;
+    make (defined($child) ?? $child.ast !!
+        $/ eq 'NaN' ?? (0e0/0e0) !! Inf);
+}
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
