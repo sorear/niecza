@@ -28,10 +28,7 @@ public class Builtins {
         if (!lhs.islist) {
             lhs.Store(rhs);
         } else {
-            Frame n = lhs.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
-                    "LISTSTORE",
-                    new Variable[2] { lhs, Kernel.NewROScalar(rhs) }, null);
-            Kernel.RunInferior(n);
+            lhs.Fetch().mo.mro_LISTSTORE.Get(lhs, Kernel.NewROScalar(rhs));
         }
     }
 

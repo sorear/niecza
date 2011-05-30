@@ -20,15 +20,23 @@ sub bench($name, $nr, $f) {
 }
 
 bench "nulling test", 1000000, sub () {};
-{
-    my @l;
-    bench "iterate empty list", 1000000, sub () { for @l { } };
-}
+# {
+#    my @l;
+#    bench "iterate empty list", 1000000, sub () { for @l { } };
+# }
 
-my %h; my $x;
-bench "Hash.delete-key", 1000000, sub () { %h<foo>:delete };
-bench "Any.delete-key", 1000000, sub () { $x<foo>:delete };
-bench "Bool.Numeric", 1000000, sub () { +True };
+my @x; my $y; my $z; my %h;
+bench "scalar assign", 1000000, sub () { $y = 1; $y = 2; $y = 3; $y = 4; $y = 5; $y = 6; $y = 7; $y = 8; $y = 9; $y = 10 };
+bench "list assign (Parcel)", 1000000, sub () { ($y,$z) = ($z,$y) };
+bench "list assign (Array)", 1000000, sub () { @x = 1, 2, 3 };
+bench "list assign (Hash)", 1000000, sub () { %h = "a", 1, "b", 2 };
+bench 'head assign (&head)', 1000000, sub () { $y = head((1,2,3)) };
+bench 'head assign (Parcel)', 1000000, sub () { ($y,) = (1,2,3) };
+
+# my %h; my $x;
+# bench "Hash.delete-key", 1000000, sub () { %h<foo>:delete };
+# bench "Any.delete-key", 1000000, sub () { $x<foo>:delete };
+# bench "Bool.Numeric", 1000000, sub () { +True };
 
 # my ($x, $y);
 # bench "Parcel.LISTSTORE", 1000000, sub () { ($x,$y) = ($y,$x) };

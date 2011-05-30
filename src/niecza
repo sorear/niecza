@@ -119,6 +119,74 @@ token ws () {
 
 }
 
+augment class Op::ShortCircuitAssign { #OK
+    method code($body) {
+        my $sym   = ::GLOBAL::NieczaActions.gensym;
+        my $assn  = CgOp.assign(CgOp.letvar($sym), $.rhs.cgop($body));
+        my $cond  = CgOp.letvar($sym);
+        my $cassn;
+
+        if $.kind eq '&&' {
+            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $assn, $cond);
+        }
+        elsif $.kind eq '||' {
+            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $cond, $assn);
+        }
+        elsif $.kind eq 'andthen' {
+            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $assn, $cond);
+        }
+        elsif $.kind eq '//' {
+            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $cond, $assn);
+        }
+
+        CgOp.letn($sym, $.lhs.cgop($body), $cassn);
+    }
+}
+
+augment class Op::Start { #OK
+    method code($body) {
+        CgOp.ternary(
+            CgOp.obj_getbool(CgOp.scopedlex($.condvar)),
+            CgOp.corelex('Nil'),
+            CgOp.prog(
+                CgOp.sink(CgOp.assign(CgOp.scopedlex($.condvar),
+                    CgOp.box('Bool', CgOp.bool(1)))),
+                $.body.cgop($body)));
+    }
+}
+
+augment class Op::Assign { #OK
+    method code($body) {
+        CgOp.assign($.lhs.cgop($body), $.rhs.cgop($body));
+    }
+}
+
+augment class Sig::Parameter { #OK
+    method do_copy($val) {
+        CgOp.prog(
+            CgOp.scopedlex($!slot, ($!hash ?? CgOp._cgop("newhash") !!
+                $!list ?? CgOp._cgop("newarray") !!
+                CgOp._cgop("newtypedscalar",
+                    CgOp.class_ref("mo", @( $!tclass // 'Any' ))))),
+            CgOp.sink(CgOp.assign(CgOp.scopedlex($!slot), $val)))
+    }
+
+    method bind_inline($body, @posr) {
+        my $get = $!full_parcel ?? self.parcel_get_inline(@posr) !!
+            $!slurpycap ?? self.slurpycap_get_inline(@posr) !!
+            $!slurpy ?? self.slurpy_get_inline(@posr) !!
+            self.single_get_inline($body, @posr);
+
+        if (defined $!slot) {
+            return self.do_copy($get) if $!is_copy;
+            CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
+                CgOp.newboundvar(+(!$!rw), +$!list, $get));
+        } else {
+            CgOp.sink($get);
+        }
+    }
+}
+
 augment class STD::P6 { #OK
     # note: until %*LANG is initialized we can't use <.ws>
     token comp_unit {

@@ -103,21 +103,7 @@ our %funcs = (
 sub do_assign($body, $nv, $invname, $op) {
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 2;
-
-    if (!$nv) {
-        return ::Op::Assign.new(lhs => $args[0], rhs => $args[1]);
-    } elsif (defined(my $name = is_simple_var($args[0]))) {
-        return ::Op::StatementList.new(children => [
-                ::Op::Assign.new(lhs => $args[0], rhs => $args[1]),
-                ::Op::Lexical.new(name => $name)]);
-    } else {
-        my $id = ::GLOBAL::NieczaActions.gensym;
-        return ::Op::Let.new(var => $id, to => $args[0], in =>
-            ::Op::StatementList.new(children => [
-                    ::Op::Assign.new(lhs => ::Op::LetVar.new(name => $id),
-                        rhs => $args[1]),
-                    ::Op::LetVar.new(name => $id)]));
-    }
+    ::Op::Assign.new(lhs => $args[0], rhs => $args[1]);
 }
 
 sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) {

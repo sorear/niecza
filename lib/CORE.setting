@@ -363,7 +363,7 @@ sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])
 } }
 
-sub infix:<=>(\$a, \$b) { Q:CgOp { (prog [assign {$a} {$b}] {$a}) } }
+sub infix:<=>(\$a, \$b) { $a = $b }
 
 sub chars($str) { chars($str) }
 sub substr($str, $start, $len = chars($str) - $start) { substr($str, $start, $len) }
@@ -607,28 +607,6 @@ my class Parcel is Cool {
     method Numeric() { + @(self) }
     method Str    () { ~ @(self) }
     method Bool   () { ? @(self) }
-
-    method LISTSTORE(\$in) {
-        Q:CgOp {
-            (letn i    (i 0)
-                  vals (start_iter {$in})
-                  tgts (unbox fvarlist (@ {self}))
-                  ntgt (fvarlist_length (l tgts))
-                  tgt  (null var)
-              (whileloop 0 0 (< (l i) (l ntgt))
-                (prog
-                  (l tgt (fvarlist_item (l i) (l tgts)))
-                  (l i (+ (l i) (i 1)))
-                  (ternary (var_islist (l tgt))
-                    (letn ob (obj_newblank (class_ref mo List))
-                      (iter_to_list (l ob) (l vals))
-                      (l vals (vvarlist_new_empty))
-                      (sink (methodcall (l tgt) LISTSTORE (newrwlistvar (l ob)))))
-                    (assign (l tgt) (ternary (iter_hasflat (l vals))
-                      (vvarlist_shift (l vals)) {Any})))))
-              {self})
-        };
-    }
 }
 
 constant Nil = Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) };
@@ -761,20 +739,6 @@ my class List is Cool {
 }
 
 my class Array is List {
-    method LISTSTORE(\$in) {
-        Q:CgOp {
-            (letn iter (vvarlist_new_empty)
-                  into (vvarlist_new_empty)
-                  sobj (@ {self})
-              (vvarlist_push (l iter) {$in})
-              (whileloop 0 0 (iter_hasflat (l iter))
-                (vvarlist_push (l into) (vvarlist_shift (l iter))))
-              (setslot items (l sobj) (iter_copy_elems (l into)))
-              (setslot rest  (l sobj) (l iter))
-              (newrwlistvar (l sobj)))
-        };
-    }
-
     method perl(\$self:) {
         $self // return $self.typename;
         "[" ~ $self.map(*.perl).join(', ') ~ "]" ~ ($self.flattens ?? ".list" !! "");
@@ -807,26 +771,6 @@ my class Hash {
         my %new;
         for self.keys -> $k { %new{self{$k}} = $k }
         %new
-    }
-
-    method LISTSTORE(\$in) {
-        Q:CgOp {
-            (letn iter (vvarlist_new_empty)
-                  into (varhash_new)
-                  sobj (@ {self})
-              (vvarlist_push (l iter) {$in})
-              (whileloop 0 0 (iter_hasflat (l iter))
-                (letn elt (@ (vvarlist_shift (l iter)))
-                  (ternary (obj_isa (l elt) (class_ref mo Pair))
-                    (varhash_setindex (obj_getstr (getslot key var (l elt)))
-                      (l into) (nsw (@ (getslot value var (l elt)))))
-                    (ternary (iter_hasflat (l iter))
-                      (varhash_setindex (obj_getstr (ns (l elt))) (l into)
-                        (nsw (@ (vvarlist_shift (l iter)))))
-                      (sink (die "Unmatched key in Hash.LISTSTORE"))))))
-              (setbox (l sobj) (l into))
-              (newrwlistvar (l sobj)))
-        };
     }
 
     # Rakudo extensions compatibility - DO NOT USE

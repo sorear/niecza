@@ -454,6 +454,8 @@ next_method: ;
             = new IxCallMethod("exists-key");
         public static readonly IndexHandler CallDeleteKey
             = new IxCallMethod("delete-key");
+        public static readonly IndexHandler CallLISTSTORE
+            = new IxCallMethod("LISTSTORE");
         public static readonly InvokeHandler CallINVOKE
             = new InvokeCallMethod();
 
@@ -477,7 +479,7 @@ next_method: ;
         public ContextHandler<Variable[]> mro_raw_reify;
         public ContextHandler<object> mro_to_clr;
         public IndexHandler mro_at_pos, mro_at_key, mro_exists_key,
-               mro_delete_key;
+               mro_delete_key, mro_LISTSTORE;
 
         public InvokeHandler mro_INVOKE;
 
@@ -510,6 +512,7 @@ next_method: ;
         internal void SetupVTables() {
             mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
             mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
+            mro_LISTSTORE = _GetVT("LISTSTORE") as IndexHandler ?? CallLISTSTORE;
             mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
             mro_defined = _GetVT("defined") as ContextHandler<Variable> ?? CallDefined;
             mro_delete_key = _GetVT("delete-key") as IndexHandler ?? CallDeleteKey;

@@ -856,11 +856,7 @@ gotit:
                     else
                         nvar = Kernel.NewTypedScalar(type);
 
-                    if (nvar.islist)
-                        Kernel.RunInferior(Kernel.Assign(Kernel.GetInferiorRoot(), nvar, src));
-                    else
-                        nvar.Store(src.Fetch());
-                    src = nvar;
+                    src = Kernel.Assign(nvar, src);
                 } else {
                     bool islist = ((flags & SIG_F_BINDLIST) != 0);
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
@@ -1360,6 +1356,41 @@ noparams:
         }
     }
 
+    class IxParcelLISTSTORE : IndexHandler {
+        public override Variable Get(Variable lhs, Variable rhs) {
+            VarDeque src = Builtins.start_iter(rhs);
+            P6any lhs_o = lhs.Fetch();
+            if (!lhs_o.IsDefined())
+                throw new NieczaException("assigning to undefined parcel");
+
+            Variable[] dsts = Kernel.UnboxAny<Variable[]>(lhs_o);
+            P6any[] srcs = new P6any[dsts.Length];
+
+            for (int i = 0; i < dsts.Length; i++) {
+                Variable d = dsts[i];
+                if (d.islist) {
+                    srcs[i] = new P6opaque(Kernel.ListMO);
+                    Kernel.IterToList(srcs[i], src);
+                    src = new VarDeque();
+                } else {
+                    srcs[i] = Kernel.IterHasFlat(src, true) ?
+                        src.Shift().Fetch() : Kernel.AnyP;
+                }
+            }
+
+            for (int i = 0; i < dsts.Length; i++) {
+                Variable d = dsts[i];
+                if (d.islist) {
+                    d.Fetch().mo.mro_LISTSTORE.Get(d,
+                            Kernel.NewRWListVar(srcs[i]));
+                } else {
+                    d.Store(srcs[i]);
+                }
+            }
+
+            return lhs;
+        }
+    }
     class CtxParcelList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -1409,6 +1440,21 @@ noparams:
         }
     }
 
+    class IxArrayLISTSTORE : IndexHandler {
+        public override Variable Get(Variable lhs, Variable rhs) {
+            P6any lhs_o = lhs.Fetch();
+            if (!lhs_o.IsDefined())
+                throw new NieczaException("LISTSTORE to undefined Array");
+            VarDeque iter = Builtins.start_iter(rhs);
+            VarDeque items = new VarDeque();
+            while (Kernel.IterHasFlat(iter, true))
+                items.Push(Kernel.NewRWScalar(Kernel.AnyMO,
+                    iter.Shift().Fetch()));
+            lhs_o.SetSlot("items", items);
+            lhs_o.SetSlot("rest", iter); /*now empty*/
+            return lhs;
+        }
+    }
     class CtxListIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
             P6opaque d = (P6opaque) obj.Fetch();
@@ -1419,6 +1465,31 @@ noparams:
         }
     }
 
+    class IxHashLISTSTORE : IndexHandler {
+        public override Variable Get(Variable lhs, Variable rhs) {
+            P6any lhs_o = lhs.Fetch();
+            if (!lhs_o.IsDefined())
+                throw new NieczaException("LISTSTORE to undefined Hash");
+            VarHash into = new VarHash();
+            VarDeque iter = Builtins.start_iter(rhs);
+            while (Kernel.IterHasFlat(iter, true)) {
+                P6any elt = iter.Shift().Fetch();
+                if (elt.mo.HasMRO(Kernel.PairMO)) {
+                    Variable k = (Variable) elt.GetSlot("key");
+                    Variable v = (Variable) elt.GetSlot("value");
+                    into[k.Fetch().mo.mro_raw_Str.Get(k)] =
+                        Kernel.NewRWScalar(Kernel.AnyMO, v.Fetch());
+                } else {
+                    if (!Kernel.IterHasFlat(iter, true))
+                        throw new NieczaException("Unmatched key in Hash.LISTSTORE");
+                    into[elt.mo.mro_raw_Str.Get(Kernel.NewROScalar(elt))] =
+                        Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch());
+                }
+            }
+            Kernel.SetBox<VarHash>(lhs_o, into);
+            return lhs;
+        }
+    }
     class CtxHashIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
             return Builtins.HashIterRaw(3, obj);
@@ -2370,18 +2441,16 @@ ltm:
             return rhs;
         }
 
-        public static Frame Assign(Frame th, Variable lhs, Variable rhs) {
+        public static Variable Assign(Variable lhs, Variable rhs) {
             if (!lhs.islist) {
-                if (!lhs.rw) {
-                    return Kernel.Die(th, "assigning to readonly value");
-                }
+                if (!lhs.rw)
+                    throw new NieczaException("assigning to readonly value");
 
                 lhs.Store(rhs.Fetch());
-                return th;
+            } else {
+                lhs.Fetch().mo.mro_LISTSTORE.Get(lhs, rhs);
             }
-
-            return lhs.Fetch().InvokeMethod(th, "LISTSTORE", new Variable[2] { lhs, rhs }, null);
-
+            return lhs;
         }
 
         // ro, not rebindable
@@ -2518,8 +2587,7 @@ ltm:
                     } else {
                         Variable obj = (kind == P6how.A_HASH) ? CreateHash() :
                             CreateArray();
-                        if (vx != null)
-                            RunInferior(Assign(GetInferiorRoot(), obj, vx));
+                        if (vx != null) Assign(obj, vx);
                         n.SetSlot(a.name, obj);
                     }
                 }
@@ -3114,11 +3182,13 @@ slow:
             ParcelMO = new STable("Parcel");
             Handler_PandBox(ParcelMO, "iterator", new CtxParcelIterator(),
                     IteratorMO);
+            WrapHandler1(ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
             Handler_Vonly(ParcelMO, "list", new CtxParcelList(), null);
             ParcelMO.FillProtoClass(new string[] { });
             ParcelMO.Invalidate();
 
             ArrayMO = new STable("Array");
+            WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
             WrapHandler1(ArrayMO, "at-pos", new IxListAtPos(true));
             ArrayMO.Invalidate();
@@ -3134,6 +3204,7 @@ slow:
             ListMO.Invalidate();
 
             HashMO = new STable("Hash");
+            WrapHandler1(HashMO, "LISTSTORE", new IxHashLISTSTORE());
             WrapHandler1(HashMO, "exists-key", new IxHashExistsKey());
             WrapHandler1(HashMO, "delete-key", new IxHashDeleteKey());
             WrapHandler1(HashMO, "at-key", new IxHashAtKey());
