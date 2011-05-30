@@ -146,7 +146,7 @@ method dec_number ($/) {
 method number($/) {
     my $child = $<integer> // $<dec_number> // $<rad_number>;
     make (defined($child) ?? $child.ast !!
-        $child eq 'NaN' ?? NaN !! Inf);
+        $/ eq 'NaN' ?? (0e0/0e0) !! Inf);
 }
 
 # Value :: Op
@@ -194,7 +194,7 @@ method unqual_longname($/, $what, $clean?) {
 
 method simple_longname($/) {
     my $r = self.mangle_longname($/);
-    ($r<rest>:exists) ?? [ @($r<rest>), $r<name> ] !! [ 'MY', $r<name> ];
+    ($r<path>:exists) ?? [ @($r<path>), $r<name> ] !! [ 'MY', $r<name> ];
 }
 
 method mangle_longname($/, $clean?) {
@@ -1442,9 +1442,9 @@ method colonpair($/) {
 
     if $tv ~~ Str {
         if substr($<v>,1,1) eq '<' {
-            $tv = ::Op::CallMethod.new(name => 'at-key',
-                receiver => ::Op::ContextVar.new(name => '$*/'),
-                args => [::Op::StringLiteral.new(text => ~$<k>)]);
+            $tv = mkcall($/, '&postcircumfix:<{ }>',
+                ::Op::ContextVar.new(name => '$*/'),
+                ::Op::StringLiteral.new(text => ~$<k>));
         } else {
             $tv = self.do_variable_reference($/,
                 { sigil => ~$<v><sigil>,
@@ -1669,17 +1669,17 @@ method variable($/) {
         $twigil = '*' if $name eq '/' or $name eq '!';
     } elsif $<index> {
         make { capid => $<index>.ast, term =>
-            ::Op::CallMethod.new(|node($/), name => 'at-pos',
-                receiver => ::Op::ContextVar.new(name => '$*/'),
-                positionals => [ ::Op::Num.new(value => $<index>.ast) ])
+            mkcall($/, '&postcircumfix:<[ ]>',
+                ::Op::ContextVar.new(name => '$*/'),
+                ::Op::Num.new(value => $<index>.ast))
         };
         return Nil;
     } elsif $<postcircumfix> {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
-                ::Op::CallMethod.new(|node($/), name => 'at-key',
-                    receiver    => ::Op::ContextVar.new(name => '$*/'),
-                    positionals => $<postcircumfix>[0].ast.args)
+                mkcall($/, '&postcircumfix:<{ }>',
+                    ::Op::ContextVar.new(name => '$*/'),
+                    @( $<postcircumfix>[0].ast.args))
             };
             return;
         } else {
@@ -1760,6 +1760,7 @@ method param_var($/) {
 # :: Sig::Parameter
 method parameter($/) {
     my $rw = False;
+    my $copy = False;
     my $sorry;
     my $slurpy = False;
     my $slurpycap = False;
@@ -1773,6 +1774,7 @@ method parameter($/) {
 
     for @( $<trait> ) -> $trait {
         if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<copy> { $copy = True }
         elsif $trait.ast<parcel> { $rwt = True }
         elsif $trait.ast<readonly> { $rw = False }
         else {
@@ -1807,7 +1809,7 @@ method parameter($/) {
 
     make ::Sig::Parameter.new(name => ~$/, :$default,
         :$optional, :$slurpy, :$rw, type => ($type // 'Any'),
-        :$slurpycap, rwtrans => $rwt, |$p.ast);
+        :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
 }
 
 # signatures exist in several syntactic contexts so just make an object for now

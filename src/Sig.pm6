@@ -53,7 +53,7 @@ class Parameter {
                 $!list ?? CgOp._cgop("newarray") !!
                 CgOp._cgop("newtypedscalar",
                     CgOp.class_ref("mo", @( $!tclass // 'Any' ))))),
-            CgOp.assign(CgOp.scopedlex($!slot), $val))
+            CgOp.sink(CgOp.assign(CgOp.scopedlex($!slot), $val)))
     }
 
     method bind_inline($body, @posr) {
@@ -63,9 +63,12 @@ class Parameter {
             self.single_get_inline($body, @posr);
 
         if (defined $!slot) {
-            CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
-                $!is_copy ?? self.do_copy($get) !!
-                CgOp.newboundvar(+(!$!rw), +$!list, $get));
+            if $!is_copy {
+                self.do_copy($get);
+            } else {
+                CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
+                    CgOp.newboundvar(+(!$!rw), +$!list, $get));
+            }
         } else {
             CgOp.sink($get);
         }

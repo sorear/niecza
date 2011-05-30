@@ -212,8 +212,7 @@ class SimplePair is Op {
     method zyg() { $.value }
 
     method code($body) {
-        CgOp.subcall(CgOp.fetch(CgOp.corelex('&infix:<=>>')),
-            CgOp.string_var($.key), $.value.cgop($body));
+        CgOp.bif_pair(CgOp.const(CgOp.string_var($.key)), $.value.cgop($body));
     }
 }
 
@@ -226,8 +225,7 @@ class SimpleParcel is Op {
     }
 
     method code($body) {
-        CgOp.subcall(CgOp.fetch(CgOp.corelex('&infix:<,>')),
-            map { $_.cgop($body) }, @$.items);
+        CgOp.bif_comma(map { $_.cgop($body) }, @$.items);
     }
 }
 
@@ -322,19 +320,19 @@ class ShortCircuitAssign is Op {
         my $cassn;
 
         if $.kind eq '&&' {
-            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $assn, CgOp.noop);
+            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $assn, $cond);
         }
         elsif $.kind eq '||' {
-            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), CgOp.noop, $assn);
+            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $cond, $assn);
         }
         elsif $.kind eq 'andthen' {
-            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $assn, CgOp.noop);
+            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $assn, $cond);
         }
         elsif $.kind eq '//' {
-            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), CgOp.noop, $assn);
+            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $cond, $assn);
         }
 
-        CgOp.letn($sym, $.lhs.cgop($body), $cassn, $cond);
+        CgOp.letn($sym, $.lhs.cgop($body), $cassn);
     }
 }
 
@@ -457,10 +455,8 @@ class ImmedForLoop is Op {
         my $id = ::GLOBAL::NieczaActions.genid;
 
         CgOp.rnull(CgOp.letn(
-            "!iter$id", CgOp.vvarlist_new_empty,
+            "!iter$id", CgOp.start_iter($.source.cgop($body)),
             (map { $_, CgOp.null('var') }, @$.var),
-            CgOp.vvarlist_push(CgOp.letvar("!iter$id"),
-                $.source.cgop($body)),
             CgOp.whileloop(0, 0,
                 CgOp.iter_hasflat(CgOp.letvar("!iter$id")),
                 CgOp.prog(
@@ -521,8 +517,8 @@ class Start is Op {
             CgOp.obj_getbool(CgOp.scopedlex($.condvar)),
             CgOp.corelex('Nil'),
             CgOp.prog(
-                CgOp.assign(CgOp.scopedlex($.condvar),
-                    CgOp.box('Bool', CgOp.bool(1))),
+                CgOp.sink(CgOp.assign(CgOp.scopedlex($.condvar),
+                    CgOp.box('Bool', CgOp.bool(1)))),
                 $.body.cgop($body)));
     }
 }
@@ -880,7 +876,7 @@ class Assign is Op {
     method zyg() { $.lhs, $.rhs }
 
     method code($body) {
-        CgOp.rnull(CgOp.assign($.lhs.cgop($body), $.rhs.cgop($body)));
+        CgOp.assign($.lhs.cgop($body), $.rhs.cgop($body));
     }
 }
 

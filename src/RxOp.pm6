@@ -625,10 +625,9 @@ class ProtoRedis is RxOp {
             CgOp.compare('>=', CgOp.letvar("i"),
               CgOp.mrl_count(CgOp.letvar("fns")))),
           CgOp.rxpushb('LTM', 'nextfn'),
-          CgOp.letvar("ks", CgOp.vvarlist_new_singleton(
+          CgOp.letvar("ks", CgOp.start_iter(
             CgOp.subcall(CgOp.mrl_index(CgOp.letvar("i"),
-                CgOp.letvar("fns")), CgOp.newscalar(CgOp.rxcall(
-                    'MakeCursor'))))),
+                CgOp.letvar("fns")), CgOp.rxcall('MakeCursorV')))),
           CgOp.letvar("i", CgOp.arith('+', CgOp.letvar("i"), CgOp.int(1))),
           CgOp.label('nextcsr'),
           CgOp.ncgoto('backtrack', CgOp.iter_hasflat(CgOp.letvar('ks'))),

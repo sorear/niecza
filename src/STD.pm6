@@ -426,54 +426,51 @@ method nibble ($lang) {
 }
 
 # note: polymorphic over many quote languages, we hope
-token nibbler {
-    :my $text = '';
-    :my $from = self.pos;
-    :my $to = $from;
-    :my @nibbles = ();
-    :my $multiline = 0;
-    [ <!before <stopper> >
-        [
-        || <starter> <nibbler> <stopper>
-                        {
-                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
+method nibbler() {
+    my @nibbles;
+    my $from = self.pos;
+    my $to = $from;
 
-                            my $n = $<nibbler>[*-1]<nibbles>;
-                            my @n = @$n;
+    loop {
+        my $here = self.cursor($to);
+        last if head($here.stopper);
 
-                            push @nibbles, $<starter>;
-                            push @nibbles, @n;
-                            push @nibbles, $<stopper>;
+        if head($here.starter) -> $starter {
+            push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+                :method<Str>, :captures()) if $from != $to;
 
-                            $text = '';
-                            $to = $from = $¢.pos;
-                        }
-        || <escape>     {
-                            push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to), :method<Str>, :captures()) if $from != $to;
-                            push @nibbles, $<escape>[*-1];
-                            $text = '';
-                            $to = $from = $¢.pos;
-                        }
-        || .
-                        {
-                            my $ch = substr(self.orig, $¢.pos-1, 1);
-                            $text ~= $ch;
-                            $to = $¢.pos;
-                            if $ch ~~ "\n" {
-                                $multiline++;
-                            }
-                        }
-        ]
-    ]*
-    {
-        push @nibbles, Match.synthetic(:cursor(self), :from($from), :to($to),
-            :method<Str>, :captures()) if $from != $to or !@nibbles;
-        $*LAST_NIBBLE = $¢.pos;
-        $*LAST_NIBBLE_START = self.pos;
-        $*LAST_NIBBLE_MULTILINE = $¢.pos if $multiline;
-        $*LAST_NIBBLE_MULTILINE_START = $¢.pos if $multiline;
+            my $nibbler = head(self.cursor($starter.to).nibbler) or return ();
+            my $stopper = head(self.cursor($nibbler.to).stopper) or return ();
+
+            $from = $to = $stopper.to;
+            push @nibbles, $starter;
+            push @nibbles, @( $nibbler<nibbles> );
+            push @nibbles, $stopper;
+        }
+        elsif head($here.escape) -> $escape {
+            push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+                :method<Str>, :captures()) if $from != $to;
+
+            $from = $to = $escape.to;
+            push @nibbles, $escape;
+        }
+        else {
+            $to++;
+        }
     }
-    $<nibbles> = {@nibbles}
+
+    push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+        :method<Str>, :captures()) if $from != $to || !@nibbles;
+
+    $*LAST_NIBBLE = $to;
+    $*LAST_NIBBLE_START = self.pos;
+    if defined substr(self.orig, self.pos, $to - self.pos).index("\n") {
+        $*LAST_NIBBLE_MULTILINE = $to;
+        $*LAST_NIBBLE_MULTILINE_START = self.pos;
+    }
+
+    Match.synthetic(:cursor(self), from => self.pos, :$to, :method<nibbler>,
+        :captures(nibbles => @nibbles))
 }
 
 token babble ($l) {
@@ -595,36 +592,33 @@ token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
 # Lexer routines #
 ##################
 
-token ws {
+token ws () {
     :my $startpos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {self}))))) };
     :my $stub = return self if @*MEMOS[$startpos]<ws> :exists; #OK
-
     :dba('whitespace')
-    \h+ <![\#\s\\]> { @*MEMOS[ Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) } ]<ws> = $startpos; }   # common case
+    [
+    || \h+ <![\#\s\\]> { @*MEMOS[ Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) } ]<ws> = $startpos; } # common case
     || <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws>:delete; }
             <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
-    ||
-    [
-    | <.unsp>
-    | <.vws> <.heredoc>
-    | <.unv>
-    # | $ { $¢.moreinput }  NIECZA break inf loop
-    ]*
+    || [ <.unsp>
+       | <.vws> <.heredoc>
+       | <.unv>
+       # | $ { $¢.moreinput }  NIECZA break inf loop
+       ]*
 
-    # NOTE that this is only used in the slow path!  The || above is the
-    # top level separator.
-    {
-        my $pos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) };
-        if ($pos == $startpos) {
-            @*MEMOS[$pos]<ws>:delete;
-        }
-        else {
-            @*MEMOS[$pos]<ws> = $startpos;
-            @*MEMOS[$pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
-                if @*MEMOS[$startpos]<endstmt> :exists;
-        }
-    }
+       {
+           my $pos = Q:CgOp { (box Num (cast num (cursor_pos (cast cursor (@ {$¢}))))) };
+           if ($pos == $startpos) {
+               @*MEMOS[$pos]<ws>:delete;
+           }
+           else {
+               @*MEMOS[$pos]<ws> = $startpos;
+               @*MEMOS[$pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
+                   if @*MEMOS[$startpos]<endstmt> :exists;
+           }
+       }
+    ]
 }
 
 token unsp {
@@ -1075,7 +1069,8 @@ grammar P6 is STD {
 
     # Note: we only check for the stopper.  We don't check for ^ because
     # we might be embedded in something else.
-    rule comp_unit {
+    # note: until %*LANG is initialized we can't use <.ws>
+    token comp_unit {
         :my $*DEBUG = $GLOBAL::DEBUG_STD // 0;
         :my $*begin_compunit = 1;
         :my $*endargs = -1;
@@ -1129,7 +1124,7 @@ grammar P6 is STD {
             $ALL.<UNIT> = $*UNIT;
             self.finishlex;
             # $¢ = self.cursor_fresh($*CURLEX<$?LANGNAME>);
-        }
+        }:s
         <.unitstart>
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
@@ -3158,9 +3153,9 @@ grammar P6 is STD {
     }
 
     token infixish ($in_meta?) {
-        :my ($infix, $O, $sym);
+        :my ($O, $sym);
         :temp $*IN_META;
-        :my $stub = ($*IN_META = $*IN_META // $in_meta); #OK not used
+        :my $stub = ($*IN_META = $in_meta // $*IN_META); #OK not used
         <!stdstopper>
         <!infixstopper>
         :dba('infix or meta-infix')
