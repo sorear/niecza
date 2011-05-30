@@ -157,7 +157,9 @@ on stuff on it, or have cool ideas to add to it, both are good.
     Future directions
 
 Ideas welcome!  Focus on more applications?  Focus on speed?  Focus
-on some major cool feature of your choice?
+on some major cool feature of your choice?  Ideas I've had or seen
+so far include full eval support, NativeCall/improved CLR interop,
+a JVM backend, a Parrot backend, grapheme strings, and junctions.
 
 A JVM backend is in the design stages.
 
