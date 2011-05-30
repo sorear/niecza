@@ -72,8 +72,6 @@ S05-metasyntax/changed.t
 S05-metasyntax/null.t
 S05-metasyntax/single-quotes.t
 S06-multi/lexical-multis.t
-S06-multi/positional-vs-named.t
-S06-other/misc.t
 S06-signature/passing-arrays.t
 S06-signature/positional-placeholders.t
 S06-signature/positional.t
