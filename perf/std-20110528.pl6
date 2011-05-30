@@ -20,9 +20,9 @@ sub bench($name, $nr, $f) {
 
 my @arr;
 
-bench "(zeroing array)", 100000, sub () { @arr = () };
-bench "(tenning array)", 100000, sub () { @arr = 0,1,2,3,4,5,6,7,8,9 };
-bench "push", 100000, sub () { @arr = (); push @arr, 1; push @arr, 2; push @arr, 3; push @arr, 4; push @arr, 5; push @arr, 6; push @arr, 7; push @arr, 8; push @arr, 9; push @arr, 10; };
-bench "unshift", 100000, sub () { @arr = (); unshift @arr, 1; unshift @arr, 2; unshift @arr, 3; unshift @arr, 4; unshift @arr, 5; unshift @arr, 6; unshift @arr, 7; unshift @arr, 8; unshift @arr, 9; unshift @arr, 10; };
-bench "pop", 100000, sub () { @arr = 0,1,2,3,4,5,6,7,8,9; pop @arr; pop @arr; pop @arr; pop @arr; pop @arr; pop @arr; pop @arr; pop @arr; pop @arr; pop @arr };
-bench "shift", 100000, sub () { @arr = 0,1,2,3,4,5,6,7,8,9; shift @arr; shift @arr; shift @arr; shift @arr; shift @arr; shift @arr; shift @arr; shift @arr; shift @arr; shift @arr };
+bench "or", 10000000, sub () { 1 +| 2 };
+bench "xor", 10000000, sub () { 1 +^ 2 };
+bench "and", 10000000, sub () { 1 +& 2 };
+bench "lshift", 10000000, sub () { 1 +> 2 };
+bench "rshift", 10000000, sub () { 1 +< 2 };
+bench "compl", 10000000, sub () { +^ 1 };
