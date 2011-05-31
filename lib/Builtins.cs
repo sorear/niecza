@@ -1009,7 +1009,7 @@ public class Builtins {
     }
     public static AppDomain up_domain;
     public static Variable upcall_cb;
-    public static Variable eval_result;
+    public static DynBlockDelegate eval_result;
     public static Variable DownCall(Variable cb, Variable list) {
         GetSubDomain();
         upcall_cb = cb;
@@ -1019,18 +1019,17 @@ public class Builtins {
         return BoxLoS(r.Call(AppDomain.CurrentDomain, UnboxLoS(list)));
     }
 
-    public static Variable bif_simple_eval(Variable str) {
+    public static Frame bif_simple_eval(Frame th, Variable str) {
         if (up_domain == null)
-            throw new NieczaException("Cannot eval; no compiler available");
+            return Kernel.Die(th, "Cannot eval; no compiler available");
         CrossDomainReceiver r = (CrossDomainReceiver)
             up_domain.CreateInstanceAndUnwrap("Kernel", "Niecza.UpCallee");
         string[] msg = r.Call(AppDomain.CurrentDomain, new string[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str) });
         if (msg[0] != "")
-            throw new NieczaException(msg[0]);
-        Variable rt = eval_result;
-        eval_result = null;
-        return rt;
+            return Kernel.Die(th, msg[0]);
+        return th.MakeChild(null, new SubInfo("boot-" +
+                    eval_result.Method.DeclaringType, eval_result));
     }
 
     public static Variable bif_pair(Variable key, Variable value) {

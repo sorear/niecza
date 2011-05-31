@@ -3596,6 +3596,8 @@ dynamic:
             thandlers["bif_make"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Builtins_Make,
                         CpsOp.CallFrame(), z[0]); };
+            thandlers["bif_simple_eval"] = Methody(Tokens.Variable,
+                    Tokens.Builtins.GetMethod("bif_simple_eval"));
             thandlers["you_are_here"] = Methody(Tokens.Variable,
                     Tokens.Builtins.GetMethod("you_are_here"));
             thandlers["callnext"] = Methody(Tokens.Variable,
@@ -4597,19 +4599,6 @@ dynamic:
             il.Emit(OpCodes.Ret);
 
             ab.SetEntryPoint(mb);
-
-            mb = tb.DefineMethod("EVAL", MethodAttributes.Static |
-                    MethodAttributes.Public, Tokens.Variable,
-                    new Type[] { typeof(string[]) });
-            il = mb.GetILGenerator();
-
-            il.Emit(OpCodes.Ldstr, name);
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldnull);
-            il.Emit(OpCodes.Ldftn, boot);
-            il.Emit(OpCodes.Newobj, Tokens.DynBlockDelegate_ctor);
-            il.Emit(OpCodes.Call, Tokens.Kernel_RunLoop);
-            il.Emit(OpCodes.Ret);
         }
 
         [ThreadStatic] static Dictionary<string, Unit> used_units;
@@ -4665,9 +4654,10 @@ dynamic:
             Type t = c.tb.CreateType();
             used_units = old_used_units; Current = old_Current;
 
-            Builtins.eval_result = (Variable) t.InvokeMember("EVAL",
-                    BindingFlags.Public | BindingFlags.Static |
-                    BindingFlags.InvokeMethod, null, null, new object[] { argv });
+            Builtins.eval_result = (DynBlockDelegate)
+                Delegate.CreateDelegate(typeof(DynBlockDelegate), t, "BOOT");
+            if (argv != null)
+                Kernel.RunLoop(root.name, argv, Builtins.eval_result);
         }
 
         public static void Main(string[] args) {
