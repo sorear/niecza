@@ -1,0 +1,3 @@
+for $*ARGFILES.lines {
+    {YOU_ARE_HERE};
+}
