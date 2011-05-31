@@ -31,7 +31,7 @@ method accept($unitname, $ast is rw, :$main, :$run, :$evalmode) {
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;
         $ast = Any;
-        downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam);
+        downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam, @$.run_args);
         return;
     }
     self.save_unit($unitname, $ast);
