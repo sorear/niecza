@@ -1,6 +1,6 @@
 # STD.pm
 #
-# Copyright 2007-2010, Larry Wall
+# Copyright 2007-2011, Larry Wall
 #
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
@@ -25,6 +25,8 @@ our $ALL;
     my $*ACTIONS;         # class or object which defines reduce actions
     my $*SETTINGNAME;     # name of core setting
     my $*TMP_PREFIX;      # where to put tmp files
+    my $*ORIG;            # the original program string
+    my @*ORIG;            # same thing as individual chars
     my @*MEMOS;           # per-position info such as ws and line number
     my $*HIGHWATER;      # where we were last looking for things
     my $*HIGHMESS;       # current parse failure message
@@ -192,15 +194,15 @@ token category:strtonum { <sym> }
 proto token strtonum {*}
 
 token category:quote { <sym> }
-proto token quote {*}
+proto token quote () {*}
 
 token category:prefix { <sym> }
-proto token prefix {*}
+proto token prefix is unary is defequiv(%symbolic_unary) {*}
 
 token category:infix { <sym> }
-proto token infix {*}
+proto token infix is binary is defequiv(%additive) {*}
 
-token category:postfix { <sym> }
+token category:postfix is unary is defequiv(%autoincrement) { <sym> }
 proto token postfix {*}
 
 token category:dotty { <sym> }
@@ -210,7 +212,7 @@ token category:circumfix { <sym> }
 proto token circumfix {*}
 
 token category:postcircumfix { <sym> }
-proto token postcircumfix {*}
+proto token postcircumfix is unary {*}  # unary as far as EXPR knows...
 
 token category:quote_mod { <sym> }
 proto token quote_mod {*}
@@ -237,7 +239,7 @@ token category:regex_declarator { <sym> }
 proto token regex_declarator is endsym<keyspace> {*}
 
 token category:statement_prefix { <sym> }
-proto rule  statement_prefix {*}
+proto rule  statement_prefix () {*}
 
 token category:statement_control { <sym> }
 proto rule  statement_control is endsym<keyspace> {*}
@@ -249,7 +251,7 @@ token category:statement_mod_loop { <sym> }
 proto rule  statement_mod_loop is endsym<nofun> {*}
 
 token category:infix_prefix_meta_operator { <sym> }
-proto token infix_prefix_meta_operator {*}
+proto token infix_prefix_meta_operator is binary {*}
 
 # NIECZA no support for protorx with arguments (since arguments defeat LTM,
 # I have no clue what this should mean)
@@ -257,16 +259,16 @@ proto token infix_prefix_meta_operator {*}
 # proto token infix_postfix_meta_operator ($op) {*}
 
 token category:infix_circumfix_meta_operator { <sym> }
-proto token infix_circumfix_meta_operator {*}
+proto token infix_circumfix_meta_operator is binary {*}
 
 token category:postfix_prefix_meta_operator { <sym> }
-proto token postfix_prefix_meta_operator {*}
+proto token postfix_prefix_meta_operator is unary {*}
 
 token category:prefix_postfix_meta_operator { <sym> }
-proto token prefix_postfix_meta_operator {*}
+proto token prefix_postfix_meta_operator is unary {*}
 
 token category:prefix_circumfix_meta_operator { <sym> }
-proto token prefix_circumfix_meta_operator {*}
+proto token prefix_circumfix_meta_operator is unary {*}
 
 token category:terminator { <sym> }
 proto token terminator {*}
@@ -351,6 +353,12 @@ method peek_delimiters {
     elsif $char ~~ /^\w$/ {
         self.panic("Alphanumeric character is not allowed as delimiter");
     }
+    elsif $char eq '' {
+        self.panic("No delimiter found");
+    }
+    elsif not ord $char {
+        self.panic("Null character is not allowed as delimiter");
+    }
     elsif %STD::close2open{$char} {
         self.panic("Use of a closing delimiter for an opener is reserved");
     }
@@ -360,7 +368,7 @@ method peek_delimiters {
 
     my $rightbrack = %STD::open2close{$char};
     if not defined $rightbrack {
-        return ($char, $char);
+        return $char, $char;
     }
     while substr(self.orig,$pos,1) eq $char {
         $pos++;
@@ -368,7 +376,7 @@ method peek_delimiters {
     my $len = $pos - $startpos;
     my $start = $char x $len;
     my $stop = $rightbrack x $len;
-    return ($start, $stop);
+    return $start, $stop;
 }
 
 role startstop[$start,$stop] {
@@ -498,7 +506,7 @@ token babble ($l) {
 our @herestub_queue;
 
 class Herestub {
-    has $.delim;
+    has Str $.delim;
     has $.orignode;
     has $.lang;
     has $.writeback;
@@ -813,7 +821,7 @@ token rad_number {
     {}           # don't recurse in lexer
     :dba('number in radix notation')
     [
-    || '<'
+    || '<' :s
             [
             | $<coeff> = [                '.' <frac=.alnumint> ]
             | $<coeff> = [<int=.alnumint> '.' <frac=.alnumint> ]
@@ -841,7 +849,7 @@ token terminator:sym<}>
     { '}' <O(|%terminator)> }
 
 # XXX should eventually be derived from current Unicode tables.
-our %open2close = (
+our constant %open2close = (
 "\x0028" => "\x0029",
 "\x003C" => "\x003E",
 "\x005B" => "\x005D",
@@ -1036,7 +1044,7 @@ our %open2close = (
 "\xFF62" => "\xFF63",
 );
 
-our %close2open = invert %STD::open2close;
+our %close2open = invert %open2close;
 
 token opener {
   <[
@@ -1438,7 +1446,7 @@ grammar P6 is STD {
     token statement_control:no {
         :my %*MYSTERY;
         <sym> <.ws>
-        <module_name>[<.keyspace><arglist>]?
+        <module_name>[<.spacey><arglist>]?
         <.ws>
         <.explain_mystery>
     }
@@ -1611,7 +1619,7 @@ grammar P6 is STD {
                         when '%' {
                             $¢.sorry("The () shape syntax in hash declarations is reserved");
                         }
-                        when True { #OK
+                        default {
                             $¢.sorry("The () shape syntax in variable declarations is reserved");
                         }
                     }
@@ -1666,7 +1674,7 @@ grammar P6 is STD {
                 when 'class'   {} # XXX to be replaced by MOP queries
                 when 'grammar' {}
                 when 'role'    {}
-                $¢.worry("'has' declaration outside of class")
+                default { $¢.worry("'has' declaration outside of class") }
             }
         }
         <scoped('has')>
@@ -1711,6 +1719,11 @@ grammar P6 is STD {
         <sym> <.ws>
         [
         || <module_name> <.ws> <EXPR>?
+            {
+                my $*IN_DECL = 'use';
+                my $*SCOPE = 'use';
+                $¢.add_name($<module_name><longname><name>.Str);
+            }
         || <EXPR>
         ]
     }
@@ -1830,7 +1843,7 @@ grammar P6 is STD {
 
     token regex_declarator:regex { <sym> <regex_def('regex', :!r,:!s)> }
     token regex_declarator:token { <sym> <regex_def('token', :r,:!s)> }
-    token regex_declarator:rule  { <sym> <regex_def('rule', :r,:s)> }
+    token regex_declarator:rule  { <sym> <regex_def('rule',  :r,:s)> }
 
     rule multisig {
         :my $signum = 0;
@@ -1905,8 +1918,7 @@ grammar P6 is STD {
                     when 'class'   {} # XXX to be replaced by MOP queries
                     when 'grammar' {}
                     when 'role'    {}
-                    $¢.worry("'$d' declaration outside of class")
-                        if ($*SCOPE || 'has') eq 'has' && $<longname>
+                    default { $¢.worry("'$d' declaration outside of class") if ($*SCOPE || 'has') eq 'has' && $<longname> }
                 }
             }
             { $*IN_DECL = ''; }
@@ -1930,8 +1942,7 @@ grammar P6 is STD {
                 given $*PKGDECL {
                     when 'grammar' {} # XXX to be replaced by MOP queries
                     when 'role'    {}
-                    $¢.worry("'$d' declaration outside of grammar")
-                        if ($*SCOPE || 'has') eq 'has' && $<deflongname>;
+                    default { $¢.worry("'$d' declaration outside of grammar") if ($*SCOPE || 'has') eq 'has' && $<deflongname>; }
                 }
             }
             <.newlex(1)>
@@ -5063,10 +5074,10 @@ grammar Regex is STD {
     token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = $<mod_arg>.Str.Numeric } }
     token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { %*RX<i> = $0 } }
 
-    token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { %*RX<a> = 1 } }
-    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { %*RX<a> = 0 } }
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { %*RX<a> = $<mod_arg>.Str.Numeric } }
-    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { %*RX<a> = $0 } }
+    token mod_internal:sym<:m>    { $<sym>=[':m'|':ignoremark'] » { %*RX<m> = 1 } }
+    token mod_internal:sym<:!m>   { $<sym>=[':!m'|':!ignoremark'] » { %*RX<m> = 0 } }
+    token mod_internal:sym<:m( )> { $<sym>=[':m'|':ignoremark'] <mod_arg> { %*RX<m> = $<mod_arg>.Str.Numeric } }
+    token mod_internal:sym<:0m>   { ':' (\d+) ['m'|'ignoremark'] { %*RX<m> = $0 } }
 
     token mod_internal:sym<:s>    { ':s' 'igspace'? » { %*RX<s> = 1 } }
     token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { %*RX<s> = 0 } }
@@ -5381,7 +5392,7 @@ method add_my_name ($n, $d?, $p?) {
     return self if $name eq '$' or $name eq '@' or $name eq '%';
     return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
     if $shortname ~~ /\:/ {
-        ($shortname,) = ($shortname ~~ /(.*?)\:/);
+        $shortname ~~ s/\:.*//;
     }
 
     # This may just be a lexical alias to "our" and such,
@@ -5393,7 +5404,6 @@ method add_my_name ($n, $d?, $p?) {
         of   => $*OFTYPE,
         scope => $*SCOPE,
     );
-    self.deb("going to install $declaring") if $*DEBUG +& DEBUG::symtab;
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
         self.deb("$name exists, curstash = ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
@@ -5427,8 +5437,8 @@ method add_my_name ($n, $d?, $p?) {
             elsif $name ~~ /^\w/ {
                 self.sorry("Illegal redeclaration of symbol '$name'$loc");
             }
-            elsif $name ~~ /^\&/ {
-                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '&';
+            elsif $name ~~ s/^\&// {
+                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '';
             }
             else {  # XXX eventually check for conformant arrays here
                 self.worry("Useless redeclaration of variable $name$loc");
@@ -5437,10 +5447,8 @@ method add_my_name ($n, $d?, $p?) {
         }
     }
     else {
-        self.deb("installing in $curstash.id() slot $name") if $*DEBUG +& DEBUG::symtab;
         $*DECLARAND = $curstash.{$name} = $declaring;
         $curstash.{$shortname} = $declaring unless $shortname eq $name;
-        self.deb("$curstash.id() now contains $curstash.keys()") if $*DEBUG +& DEBUG::symtab;
         $*DECLARAND<declaredat> = self.pos;
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
@@ -5467,7 +5475,8 @@ method add_our_name ($n) {
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
     self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $*DEBUG +& DEBUG::symtab;
-    $name = ($name ~~ /(.*?)\:[ver|auth]/).[0] // $name;
+    $name ~~ s/\:ver\<.*?\>//;
+    $name ~~ s/\:auth\<.*?\>//;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
         my $c = self.find_top_pkg(@components[0]);
@@ -5490,7 +5499,7 @@ method add_our_name ($n) {
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     if $shortname ~~ /\:/ {
-        ($shortname,) = ($shortname ~~ /^(.*?)\:/);
+        $shortname ~~ s/\:.*//;
     }
 
     my $declaring = $*DECLARAND // NAME.new(
@@ -5525,8 +5534,8 @@ method add_our_name ($n) {
             if $name ~~ /^\w/ {
                 self.sorry("Illegal redeclaration of symbol '$sid'$loc");
             }
-            elsif $name ~~ /^\&/ {
-                self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '&';
+            elsif $name ~~ s/^\&// {
+                self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '';
             }
             else {  # XXX eventually check for conformant arrays here
                 # (redeclaration of identical package vars is not useless)
@@ -5575,22 +5584,22 @@ method explain_mystery() {
     my %unk_types;
     my %unk_routines;
     my $m = '';
-    for keys(%*MYSTERY) -> $unk {
-        my $p = %*MYSTERY{$unk}.<lex>;
-        if self.is_name($unk, $p) {
+    for keys(%*MYSTERY) {
+        my $p = %*MYSTERY{$_}.<lex>;
+        if self.is_name($_, $p) {
             # types may not be post-declared
-            %post_types{$unk} = %*MYSTERY{$unk};
+            %post_types{$_} = %*MYSTERY{$_};
             next;
         }
 
-        next if self.is_known($unk, $p) or self.is_known('&' ~ $unk, $p);
+        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
 
         # just a guess, but good enough to improve error reporting
-        if $unk lt 'a' {
-            %unk_types{$unk} = %*MYSTERY{$unk};
+        if $_ lt 'a' {
+            %unk_types{$_} = %*MYSTERY{$_};
         }
         else {
-            %unk_routines{$unk} = %*MYSTERY{$unk};
+            %unk_routines{$_} = %*MYSTERY{$_};
         }
     }
     if %post_types {
@@ -5688,13 +5697,12 @@ method is_known ($n, $curlex = $*CURLEX) {
 }
 
 method lex_can_find_name ($lex, $name, $varbind) {
-    self.deb("Looking for $name in $lex.id()") if $*DEBUG +& DEBUG::symtab;
+    self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
     if $lex.{$name} {
         self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
         $lex.{$name}<used>++;
         return True;
     }
-    self.deb("$name not found among $lex.keys()") if $*DEBUG +& DEBUG::symtab;
 
     my $outlexid = $lex.<OUTER::>[0];
     return False unless $outlexid;
@@ -5785,7 +5793,7 @@ method add_placeholder($name) {
     if $*CURLEX{$varname} {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
-
+    
     self.add_my_name($varname);
     $*CURLEX{$varname}<used> = 1;
     self;
@@ -5809,7 +5817,7 @@ method check_variable ($variable) {
             $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
             if not $ok {
                 my $id = $name;
-                ($id,) = ($id ~~ /\W ** 0..2 (.*)/);
+                $id ~~ s/^\W\W?//;
                 if $name eq '@_' or $name eq '%_' {
                     $here.add_placeholder($name);
                 }
@@ -5841,7 +5849,7 @@ method check_variable ($variable) {
             given $*HAS_SELF { # XXX to be replaced by MOP queries
                 when 'complete' {}
                 when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
-                $here.sorry("Variable $name used where no 'self' is available");
+                default { $here.sorry("Variable $name used where no 'self' is available"); }
             }
         }
         when '^' {
@@ -5853,11 +5861,11 @@ method check_variable ($variable) {
             $here.add_placeholder($name);
         }
         when '~' {
-            return %*LANG.{substr($name,2,$name.chars - 2)};
+            return %*LANG.{substr($name,2)};
         }
         when '?' {
             if $name ~~ /\:\:/ {
-                my $first; ($first,) = self.canonicalize_name($name);
+                my ($first) = self.canonicalize_name($name);
                 $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
             }
             else {
@@ -5919,7 +5927,7 @@ method lookup_compiler_var($name, $default?) {
 
         return $default if defined $default;
         # (derived grammars should default to nextsame, terminating here)
-        self.worry("Unrecognized variable: $name"); return 0;
+        default { self.worry("Unrecognized variable: $name"); return 0; }
     }
 }
 
@@ -6082,7 +6090,7 @@ method badinfix (Str $bad) {
 token term:sym<miscbad> {
     {} <!{ $*QSIGIL }>
     {
-        my $bad; ($bad,) = $¢.suppose( sub {
+        my ($bad) = $¢.suppose( sub {
             $¢.infixish;
         });
         $*HIGHWATER = -1;
