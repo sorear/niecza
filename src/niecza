@@ -31,7 +31,13 @@ use Sig;
 augment class NieczaActions {
 }
 
-for <
+augment class Op::YouAreHere { #OK
+    method code($ ) {
+        CgOp.you_are_here(CgOp.str($.unitname))
+    }
+}
+
+for < you_are_here
         > -> $name {
     my $fnc = anon sub CgOperator (\|@parcel) {
         Q:CgOp {

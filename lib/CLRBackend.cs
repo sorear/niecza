@@ -3596,6 +3596,8 @@ dynamic:
             thandlers["bif_make"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Builtins_Make,
                         CpsOp.CallFrame(), z[0]); };
+            thandlers["you_are_here"] = Methody(Tokens.Variable,
+                    Tokens.Builtins.GetMethod("you_are_here"));
             thandlers["callnext"] = Methody(Tokens.Variable,
                     Tokens.Builtins.GetMethod("CallNext"));
             thandlers["context_get"] = delegate(CpsOp[] z) {
@@ -4521,9 +4523,7 @@ dynamic:
                     thaw.Add(CpsOp.MethodCall(set,
                         CpsOp.GetField(lex, CpsOp.CallFrame()),
                         CpsOp.StringLiteral("*resume_" + s),
-                        CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
-                            CpsOp.GetField(Tokens.SubInfo_protosub,
-                                CpsOp.GetSField(m.subinfo)))));
+                        CpsOp.GetSField(m.subinfo)));
                     Unit su = CLRBackend.GetUnit(s);
                     s = su.setting;
                     m = su.mainline_ref.Resolve<StaticSub>();

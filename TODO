@@ -16,8 +16,6 @@ EASY
 
    Implement Sub.leave and CallFrame.leave
 
-   Add more benchmarks to perf/.
-
    Character class expressions like [[a .. A] & [\W]]
 
    Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
@@ -73,9 +71,6 @@ HARD
 
    Determine the best way to map Perl6 process-think onto Windows/.NET
    process think.  Then implement &run, &runinstead, and &rungather.
-
-   Replace nam with something that doesn't use as much memory.  (Talk to
-   pmurias to get his experiences.)
 
  +*Implement junctions.  You'll need to add some slightly tricky code
    on the slow path of nominal type checks.  You will also need to fix
