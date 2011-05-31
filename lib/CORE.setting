@@ -1416,6 +1416,30 @@ my class TextReader {
     }
 }
 
+# the following class stolen from Rakudo, but butchered
+class IO::ArgFiles {
+    has $!args;
+    has $!reader;
+
+    method lines() {
+        gather take my $l while ($l = self.get).defined;
+    }
+
+    method get() {
+        unless defined $!args {
+            $!args = [ @*ARGS ];
+            $!reader = $*IN unless $!args;
+        }
+      again:
+        $!reader //= open(shift($!args) // return Str);
+        if defined my $line = $!reader.get {
+            return $line;
+        } else {
+            $!reader = Any;
+            goto again;
+        }
+    }
+}
 sub open($filename) is unsafe {
     Q:CgOp { (box TextReader (treader_open (obj_getstr {$filename}))) }
 }
@@ -1428,6 +1452,7 @@ sub getc($handle) { $handle.getc }
 
 $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
 $PROCESS::OUT ::= TextWriter.new;
+$PROCESS::ARGFILES ::= IO::ArgFiles.new;
 @PROCESS::ARGS = unitem(Q:CgOp { (box Parcel (getargv)) });
 # }}}
 

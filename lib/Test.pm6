@@ -113,6 +113,15 @@ sub eval_lives_ok($code, $why?) is export {
     try { eval $code; $lived = True; }
     $*TEST-BUILDER.ok($lived, $why);
 }
+sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
+    my $test = ($got - $expected).abs <= 1/100000;
+    $*TEST-BUILDER.ok(?$test, $desc);
+    unless $test {
+        $*TEST-BUILDER.note("got:      $got");
+        $*TEST-BUILDER.note("expected: $expected");
+    }
+    ?$test;
+}
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done() is export { $*TEST-BUILDER.done }
 sub skip($reason,$number) is export {

@@ -499,6 +499,8 @@ method parse(:$unitname, :$filename, :$modtime, :$source) {
     if $unitname eq 'CORE' {
         $*SETTINGNAME = 'NULL';
         $*SAFEMODE = False;
+    } elsif $unitname ne 'MAIN' {
+        $*SETTINGNAME = 'CORE';
     }
 
     # XXX temp() or should be contextuals

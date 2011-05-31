@@ -62,6 +62,8 @@ usage: niecza -e 'code'      # run a one-liner
    OR: niecza                # interactive shell
 
 general options:
+   -n                        # short for -L CORN
+   -p                        # short for -L CORP
    -B --backend=NAME         # select backend (nam, dotnet, clisp, hoopl)
    -L --language=NAME        # select your setting
    -v --verbose              # detailed timing info
@@ -94,6 +96,8 @@ GetOptions(:!permute,
     "compile-module|C" => sub { $cmod = True },
     "backend|B=s" => sub { $bcnd = $_ },
     "language|L=s" => sub { $lang = $_ },
+    "p" => sub { $lang = "CORP" },
+    "n" => sub { $lang = "CORN" },
     "verbose|v" => sub { $verb++ },
     "compile|c" => sub { $comp = True },
     "safe" => sub { $safe = True },
