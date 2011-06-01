@@ -75,6 +75,26 @@ use MONKEY_TYPING;
     is $y, 6, "is copy works (inline)";
 }
 
+{
+    is "filename0000.jpg".succ, "filename0001.jpg", "filename0000.jpg test";
+    is "000".succ, "001", "basic succ";
+    is "009".succ, "010", ".succ with carry";
+    is "099".succ, "100", ".succ with cascading carry";
+    is "a99".succ, "b00", ".succ with carry across types";
+    is "z99".succ, "aa00", ".succ with extending (non-digit)";
+    is "99".succ, "100", ".succ with extending (digit)";
+
+    is "001".pred, "000", "basic .pred";
+    is "010".pred, "009", ".pred with borrow";
+    is "100".pred, "099", "cascading borrow";
+    is "b00".pred, "a99", "borrow across types";
+
+    is "--99--".succ, "--100--", "lengthening shifts";
+    is "--00--".succ, "--01--", "not lengthening, no shift";
+    is "00.00".succ, "01.00", "dot sets endpoint";
+
+    is +["a" .. "z"], 26, "char ranges work";
+}
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

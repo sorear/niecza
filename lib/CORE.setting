@@ -1125,9 +1125,12 @@ my class RangeIter is IterCursor {
     has $.exclusive;
 
     method reify() {
-        ($!exclusive ?? ($!current >= $!limit) !! ($!current > $!limit))
-            ?? Nil !! ($!current, RangeIter.new(current => $!current + 1,
-                    limit => $!limit, exclusive => $!exclusive));
+        my $c = $!current;
+        my $cmp = $c cmp $!limit;
+        ($cmp < 0) ?? ($c, RangeIter.new(current => $c.succ,
+                    limit => $!limit, exclusive => $!exclusive)) !!
+        ($cmp > 0) ?? Nil !!
+            ($c,);
     }
 }
 
@@ -1151,7 +1154,7 @@ my class Range is Cool {
     method to() { $.max }
 
     method iterator() {
-        &infix:<,>(RangeIter.new(:current($!excludes_min ?? $!min + 1 !! $!min),
+        &infix:<,>(RangeIter.new(:current($!excludes_min ?? $!min.succ !! $!min),
                       :limit($!max), :exclusive($!excludes_max))).iterator
     }
 
@@ -1176,11 +1179,11 @@ my class Range is Cool {
     }
 
     method !max_test($topic) {
-        $topic < $.max || (!$.excludes_max && !($topic > $.max));
+        $topic before $.max || (!$.excludes_max && !($topic after $.max));
     }
 
     method !min_test($topic) {
-        $.min < $topic || (!$.excludes_min && !($.min > $topic));
+        $.min before $topic || (!$.excludes_min && !($.min after $topic));
     }
 }
 
@@ -1314,10 +1317,14 @@ sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 # XXX 'Order' type
 sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
-sub infix:<cmp> ($a, $b) { $a leg $b }
-sub infix:<eqv> ($a, $b) { $a eq $b }
-sub infix:<before> ($a, $b) { $a lt $b }
-sub infix:<after> ($a, $b) { $a gt $b }
+sub infix:<cmp> ($a, $b) {
+    return $a.WHAT leg $b.WHAT unless $a.WHAT === $b.WHAT;
+    return $a leg $b if $a ~~ Str;
+    return $a - $b;
+}
+sub infix:<eqv> ($a, $b) { ($a cmp $b) == 0 }
+sub infix:<before> ($a, $b) { ($a cmp $b) < 0 }
+sub infix:<after> ($a, $b) { ($a cmp $b) > 0 }
 sub seqop($op) { $op } # TODO: Special case with hyper
 sub reverseop($op) { sub (\$x, \$y) { $op($y, $x) } }
 

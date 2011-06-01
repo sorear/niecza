@@ -1748,6 +1748,111 @@ noparams:
             return !(s == "" || s == "0");
         }
     }
+    class CtxStrSuccish : ContextHandler<P6any> {
+        bool succ;
+        public CtxStrSuccish(bool succ) { this.succ = succ; }
+        // note that most of this table is katakana.  Perhaps there
+        // is a better way.
+        static ushort[] table = {
+            48, 57, 57, 48, 65, 90, 90, 65, 97, 122, 122, 97, 913, 929,
+            937, 931, 931, 937, 929, 913, 945, 961, 969, 963, 963, 969,
+            961, 945, 8544, 8555, 8555, 8544, 8560, 8571, 8571, 8560,
+            9312, 9331, 9331, 9312, 9332, 9351, 9351, 9332, 9372, 9397,
+            9397, 9372, 9856, 9861, 9861, 9856, 12450, 12450, 12531,
+            12452, 12452, 12452, 12450, 12454, 12454, 12454, 12452,
+            12456, 12456, 12456, 12454, 12458, 12458, 12459, 12456,
+            12461, 12461, 12461, 12459, 12463, 12463, 12463, 12461,
+            12465, 12465, 12465, 12463, 12467, 12467, 12467, 12465,
+            12469, 12469, 12469, 12467, 12471, 12471, 12471, 12469,
+            12473, 12473, 12473, 12471, 12475, 12475, 12475, 12473,
+            12477, 12477, 12477, 12475, 12479, 12479, 12479, 12477,
+            12481, 12481, 12481, 12479, 12484, 12484, 12484, 12481,
+            12486, 12486, 12486, 12484, 12488, 12488, 12488, 12486,
+            12490, 12490, 12495, 12488, 12498, 12498, 12498, 12495,
+            12501, 12501, 12501, 12498, 12504, 12504, 12504, 12501,
+            12507, 12507, 12507, 12504, 12510, 12510, 12514, 12507,
+            12516, 12516, 12516, 12514, 12518, 12518, 12518, 12516,
+            12520, 12520, 12525, 12518, 12527, 12527, 12527, 12525,
+            12530, 12530, 12531, 12527, 12450
+        };
+        // would perfect hashing be better?
+        void TableGet(char it, out char prev, out char next) {
+            int al = 0;
+            int ah = table.Length / 4;
+            while (true) {
+                if (al >= ah) {
+                    prev = next = it;
+                    return;
+                }
+                int am = (al + ah) / 2;
+                if (it < (char)table[am*4]) {
+                    ah = am;
+                } else if (it <= (char)table[am*4+1]) {
+                    prev = (it == (char)table[am*4]) ? (char)table[am*4+2] : (char)(it-1);
+                    next = (it == (char)table[am*4+1]) ? (char)table[am*4+3] : (char)(it+1);
+                    return;
+                } else {
+                    al = am+1;
+                }
+            }
+        }
+
+        bool Digitish(char it) {
+            char next, prev;
+            TableGet(it, out prev, out next);
+            return (next != it);
+        }
+
+        public override P6any Get(Variable obj) {
+            P6any obj_o = obj.Fetch();
+            if (!obj_o.IsDefined()) return Kernel.BoxRaw("WTF", Kernel.StrMO);
+            string src = Kernel.UnboxAny<string>(obj_o);
+            int right = src.Length;
+tryagain:
+            while (right != 0 && !Digitish(src[right-1])) right--;
+            if (right == 0) return Kernel.BoxRaw("WTF", Kernel.StrMO);
+            int left = right;
+            while (left != 0 && Digitish(src[left-1])) left--;
+            if (left != 0 && src[left-1] == '.') {
+                right--;
+                goto tryagain;
+            }
+            char[] nbuf = new char[src.Length + 1];
+            for (int i = right; i < src.Length; i++) nbuf[i+1] = src[i];
+
+            int delta = 0;
+            if (succ) {
+                bool carry = true;
+                char zero = '\0';
+                while (carry && right != left) {
+                    char next, prev;
+                    TableGet(src[right-1], out prev, out next);
+                    carry = (next < src[right-1]);
+                    zero = next;
+                    nbuf[right] = next;
+                    right--;
+                }
+                if (carry) {
+                    delta++;
+                    nbuf[left] = zero == '0' ? '1' : zero;
+                }
+            } else {
+                bool borrow = true;
+                while (borrow && right != left) {
+                    char next, prev;
+                    TableGet(src[right-1], out prev, out next);
+                    borrow = (src[right-1] < prev);
+                    nbuf[right] = prev;
+                    right--;
+                }
+                if (borrow)
+                    throw new NieczaException("Magical string decrement underflowed");
+            }
+            for (int i = 0; i < right; i++) nbuf[i+1-delta] = src[i];
+            return Kernel.BoxRaw(new string(nbuf, 1-delta, src.Length+delta),
+                    Kernel.StrMO);
+        }
+    }
 
     class CtxListBool : ContextHandler<bool> {
         public override bool Get(Variable obj) {
@@ -3198,6 +3303,8 @@ slow:
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));
             Handler_PandBox(StrMO, "Bool", new CtxStrBool(), BoolMO);
+            Handler_PandCont(StrMO, "succ", new CtxStrSuccish(true));
+            Handler_PandCont(StrMO, "pred", new CtxStrSuccish(false));
             StrMO.FillProtoClass(new string[] { });
             StrMO.Invalidate();
 
