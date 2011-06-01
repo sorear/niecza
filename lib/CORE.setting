@@ -1329,8 +1329,8 @@ sub infix:<cmp> ($a, $b) {
 sub infix:<eqv> ($a, $b) { ($a cmp $b) == 0 }
 sub infix:<before> ($a, $b) { ($a cmp $b) < 0 }
 sub infix:<after> ($a, $b) { ($a cmp $b) > 0 }
-sub seqop($op) { $op } # TODO: Special case with hyper
-sub reverseop($op) { sub (\$x, \$y) { $op($y, $x) } }
+sub seqop($op, \$x, \$y) { $op($x,$y) } # TODO: Special case with hyper
+sub reverseop($op, \$x, \$y) { $op($y, $x) }
 
 sub infix:<div> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 4) {$x} {$y}) } }
 sub infix:<mod> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 5) {$x} {$y}) } }
