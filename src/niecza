@@ -183,12 +183,14 @@ elsif @*ARGS {
     $c.compile_file($file, !$comp, $stop);
 }
 else {
+    my $*repl_outer;
     while True {
         print "niecza> ";
         my $l = $*IN.get // last;
         my $ok;
         try {
-            $c.compile_string($l, !$comp, $stop, :repl, :evalmode);
+            $c.compile_string($l, !$comp, $stop, :repl, :evalmode,
+                :outer($*repl_outer));
             $ok = True;
         }
         say $! unless $ok;

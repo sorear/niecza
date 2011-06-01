@@ -28,6 +28,7 @@ sub downcall(*@args) {
 
 method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {
     downcall("safemode") if $.safemode;
+    $*repl_outer = $ast.mainline.xref if $repl;
     if $run {
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;
