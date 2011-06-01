@@ -525,6 +525,58 @@ public class Builtins {
         return MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
+    public static Variable bif_abs(Variable a1) {
+        int r1;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            return MakeFloat(Math.Sqrt(v1.re * v1.re + v1.im * v1.im));
+        }
+        if (r1 == NR_FLOAT) {
+            double v1 = PromoteToFloat(r1, n1);
+            return MakeFloat(v1 < 0 ? -v1 : v1);
+        }
+        if (r1 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            return v1.num < 0 ? MakeFatRat(-v1.num, v1.den) : MakeFatRat(v1.num, v1.den);
+        }
+        if (r1 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            return v1.num < 0 ? MakeFixRat(-v1.num, v1.den) : MakeFixRat(v1.num, v1.den);
+        }
+        if (r1 == NR_BIGINT) {
+            BigInteger v1 = PromoteToBigInt(r1, n1);
+            return MakeInt(v1 < 0 ? -v1 : v1);
+        }
+        {
+            long v1 = PromoteToFixInt(r1, n1);
+            return MakeInt(v1 < 0 ? -v1 : v1);
+        }
+    }
+
+    public static Variable bif_complex_re(Variable a1) {
+        int r1;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            return MakeFloat(v1.re);
+        }
+        return MakeInt(-111);
+    }
+
+    public static Variable bif_complex_im(Variable a1) {
+        int r1;
+        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            return MakeFloat(v1.im);
+        }
+        return MakeInt(-111);
+    }
+
     const int O_LT = 1; const int O_LE = 2; const int O_NE = 4;
     const int O_EQ = 8; const int O_GE = 16; const int O_GT = 32;
     const int O_IS_GREATER = O_NE | O_GE | O_GT;

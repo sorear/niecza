@@ -250,6 +250,8 @@ my class Rat is Real {
 my class Complex is Numeric {
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method re() { Q:CgOp { (_cgop bif_complex_re {self}) } }
+    method im() { Q:CgOp { (_cgop bif_complex_im {self}) } }
 }
 my class FatRat is Real {
     method perl() { defined(self) ?? ~self !! self.typename }
@@ -1318,7 +1320,7 @@ sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ $limit }
 sub prefix:<so> ($item) { ?$item }
 sub infix:<xx> (\$list, $ct) { map { $list }, ^$ct }
-sub prefix:<abs> ($x) { $x > 0 ?? $x !! -$x }
+sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
 sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 # XXX 'Order' type
 sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
