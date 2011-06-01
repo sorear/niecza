@@ -295,17 +295,30 @@ my class Str is Cool {
 my class Scalar {
 }
 
-my class Sub {
+my class Callable { }
+my class Code is Callable {
     has $!outer;
     has $!info;
 
-    # Should be for Block, not Sub
-    method ACCEPTS(Mu $t) { defined(self) ?? (self)($t) !! $t.^does(self) }
-    method arity() { Q:CgOp { (box Int (_cgop bif_arity (@ {self}))) } }
     method outer() { Q:CgOp { (ns (getslot outer frame (@ {self}))) } }
-
     method perl() { defined(self) ?? '{ ... }' !! self.typename }
 }
+
+my class Block is Code {
+    method ACCEPTS(Mu $t) { defined(self) ?? (self)($t) !! $t.^does(self) }
+    method count() { Q:CgOp { (box Int (_cgop bif_arity (@ {self}))) } }
+    # arity NYI
+}
+
+my class Routine is Block {
+    # XXX should use outer cap too, but how to remove "self"?
+    method assuming(*@_, *%_) { sub (|$_) { self.(|@_, |%_, |$_) } }
+    # wrap, unwrap, cando, candidates NYI
+}
+
+my class Sub is Routine { }
+my class Method is Routine { }
+my class Submethod is Routine { }
 
 my class ClassHOW {
     method isa(Mu $obj, Mu $type) { Q:CgOp {
@@ -709,7 +722,7 @@ my class List is Cool {
 
     method sort($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
-        if $cmp_.arity == 1 {
+        if $cmp_.count == 1 {
             $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
         }
         my $l = @(self).eager;
@@ -1073,7 +1086,7 @@ my class Match is Cool {
     }
 }
 
-my class Regex is Sub {
+my class Regex is Method {
     method Bool() {
         return False unless defined self;
         my $fr = caller;

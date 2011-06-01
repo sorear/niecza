@@ -268,7 +268,7 @@ method quote:q ($/) { make $<quibble>.ast }
 method quote:Q ($/) { make $<quibble>.ast }
 method quote:s ($/) { make $<pat>.ast }
 
-method transparent($/, $op, :$once = False, :$ltm, :$class = 'Sub',
+method transparent($/, $op, :$once = False, :$ltm, :$class = 'Block',
     :$type = 'sub', :$sig = Sig.simple) {
     ::Op::SubDef.new(|node($/), :$once, body => Body.new(:transparent,
             :$ltm, :$class, :$type, signature => $sig, do => $op));
@@ -282,7 +282,7 @@ method rxembed($/, $op, $trans) {
             body => Body.new(
                 transparent => $trans,
                 type  => 'rxembedded',
-                class => 'Sub',
+                class => 'Block',
                 signature => Sig.simple('$¢'),
                 do => $op)));
 }
@@ -1923,7 +1923,7 @@ method sibble($/) {
     } else {
         $repl = $<right>.ast;
     }
-    $repl = self.transparent($/, $repl);
+    $repl = self.transparent($/, $repl, class => 'Regex');
     make ::Op::CallSub.new(|node($/), invocant => mklex($/,'&_substitute'),
         args => [ mklex($/, '$_'), $regex, $repl,
             self.extract_rx_adverbs(True, True, $/) ]);
@@ -2204,7 +2204,7 @@ method nulltermish($/) {}
 method EXPR($/) { make $<root>.ast }
 method modifier_expr($/) { make $<EXPR>.ast }
 method default_value($/) {
-    make Body.new(transparent => True, do => $<EXPR>.ast);
+    make Body.new(transparent => True, do => $<EXPR>.ast, class => 'Block');
 }
 
 method arglist($/) {
@@ -2582,6 +2582,7 @@ method routine_declarator:submethod ($/) {
     if $/.ast.bindmethod.[0] ne 'normal' {
         $/.CURSOR.sorry("Call pattern decorators cannot be used with submethod");
     }
+    $/.ast.body.class = 'Submethod';
     $/.ast.bindmethod.[0] = 'sub';
 }
 
@@ -2590,11 +2591,12 @@ method gensym() { 'anon_' ~ ($next_anon_id++) }
 method genid()  { ($next_anon_id++) }
 
 method sl_to_block ($type, $ast, :$subname, :$returnable, :$signature,
-        :$unsafe = False) {
+        :$unsafe = False, :$class = 'Block') {
     Body.new(
         name      => $subname // 'ANON',
         returnable=> $returnable // ($type eq 'sub'),
         type      => $type,
+        class     => $class,
         signature => $signature,
         unsafe    => $unsafe,
         do        => $ast);
@@ -2686,6 +2688,7 @@ method routine_def ($/) {
         bindlex => ($scope eq 'my'),
         multiness => ($*MULTINESS || Any),
         self.sl_to_block('sub',
+            :class('Sub'),
             $<blockoid>.ast,
             returnable => !$return_pass,
             subname => $m, :$unsafe,
@@ -2747,6 +2750,7 @@ method method_def ($/) {
     }
 
     my $bl = self.sl_to_block('sub', $<blockoid>.ast,
+        :class('Method'),
         subname => $name, :$unsafe,
         signature => $sig ?? $sig.for_method !! Any);
 

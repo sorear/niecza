@@ -135,6 +135,14 @@ is FatRat.new(10,3).WHAT, FatRat, "FatRat.new returns FatRat";
 ok FatRat.new(10,3).numerator == 10, "FatRat.new(10,3).numerator == 10";
 ok FatRat.new(10,3).denominator == 3, "FatRat.new(10,3).denominator == 3";
 
+class {
+    is (sub () {}).WHAT, Sub, "sub gets correct class";
+    is ({ $_ * $_ }).WHAT, Block, "bare block gets correct class";
+    is /a+/.WHAT, Regex, "regex gets correct class";
+    is (method a () {}).WHAT, Method, "method gets correct class";
+    is (submethod b () {}).WHAT, Submethod, "submethod gets correct class";
+};
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

@@ -22,7 +22,7 @@ EASY
 
    Fudge and run your favorite spectest file.
 
-   Stuff spectests are blocking on: "Block", "closure for",
+   Stuff spectests are blocking on: "closure for",
    "gather for", constants in signatures, ::T, ...
 
 MEDIUM
@@ -35,8 +35,6 @@ MEDIUM
    transcedental functions.
 
   *Implement &?BLOCK and &?ROUTINE.
-
-   Break down Sub into a hierarchy Code->Block->Routine->Sub->Method.
 
    Implement buffer types and binary I/O.
 

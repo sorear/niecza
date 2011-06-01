@@ -1118,7 +1118,7 @@ public class Builtins {
     }
 
     public static int bif_arity(P6any fcni) {
-        if (!fcni.Isa(Kernel.SubMO))
+        if (!fcni.Isa(Kernel.CodeMO))
             return 1; // can't introspect fake subs (?)
         SubInfo si = (SubInfo) fcni.GetSlot("info");
         int[] sig = si.sig_i;

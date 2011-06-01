@@ -230,7 +230,7 @@ augment class Op::ConstantDecl { #OK exist
             outerx     => @*opensubs[*-1].xref,
             name       => $.name,
             cur_pkg    => @*opensubs[*-1].cur_pkg,
-            class      => 'Sub',
+            class      => 'Block',
             run_once   => False,
             is_phaser  => 2,
             hint_hack  => [ @*opensubs[*-1].xref, $.name ],
@@ -273,7 +273,7 @@ augment class Op::Attribute { #OK exist
             outerx     => @*opensubs[*-1].xref,
             name       => $.name,
             cur_pkg    => @*opensubs[*-1].cur_pkg,
-            class      => 'Sub',
+            class      => 'Method',
             signature  => Sig.simple('self'),
             code       => ::Op::GetSlot.new(name => $.name,
                 object => ::Op::Lexical.new(name => 'self')));
@@ -463,7 +463,7 @@ augment class Op::Augment { #OK exist
             name       => 'ANON',
             is_phaser  => 0,
             augment_hack => @ah,
-            class      => 'Sub',
+            class      => 'Block',
             code       => ::Op::StatementList.new(children => []),
             run_once   => $body.run_once);
         $body.create_static_pad;

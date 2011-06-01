@@ -308,7 +308,12 @@ namespace Niecza.CLRBackend {
 
         public Package GetCorePackage(string name) {
             StaticSub r = (bottom_ref ?? mainline_ref).Resolve<StaticSub>();
-            return r.GetCorePackage(name);
+            while (r.unit.name != "CORE")
+                r = r.outer.Resolve<StaticSub>();
+            while (!r.l_lexicals.ContainsKey(name))
+                r = r.outer.Resolve<StaticSub>();
+            LexStash lx = (LexStash)r.l_lexicals[name];
+            return GetPackage(lx.path, 0, lx.path.Length);
         }
 
         public static string SharedName(char type, int ix, string name) {
@@ -962,16 +967,6 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < lexicals.Count; i++)
                 lexicals[i].Value.BindFields(ix, i, this,
                         lexicals[i].Key, binder);
-        }
-
-        public Package GetCorePackage(string name) {
-            StaticSub csr = this;
-            while (csr.unit.name != "CORE")
-                csr = csr.outer.Resolve<StaticSub>();
-            while (!csr.l_lexicals.ContainsKey(name))
-                csr = csr.outer.Resolve<StaticSub>();
-            LexStash lx = (LexStash)csr.l_lexicals[name];
-            return unit.GetPackage(lx.path, 0, lx.path.Length);
         }
     }
 
@@ -3399,7 +3394,7 @@ dynamic:
                     } else if (name == "Num") {
                         mo = CpsOp.GetSField(Tokens.Kernel_NumMO);
                     } else {
-                        Class p = (Class)th.sub.GetCorePackage(name);
+                        Class p = (Class)th.sub.unit.GetCorePackage(name);
                         mo = new CpsOp(new ClrGetSField(p.metaObject));
                     }
                 } else {
@@ -3439,7 +3434,7 @@ dynamic:
                 string kind = FixStr(z[1]);
                 ModuleWithTypeObject m;
                 if (z.Length == 3) {
-                    m = (ModuleWithTypeObject)th.sub.GetCorePackage(FixStr(z[2]));
+                    m = (ModuleWithTypeObject)th.sub.unit.GetCorePackage(FixStr(z[2]));
                 } else {
                     m = (new Xref(z, 2)).Resolve<ModuleWithTypeObject>();
                 }
@@ -4034,8 +4029,7 @@ dynamic:
 
             if ((sub.flags & StaticSub.UNSAFE) != 0)
                 spec |= RuntimeUnit.SUB_IS_UNSAFE;
-            if (sub.sclass != "Sub")
-                spec |= RuntimeUnit.SUB_HAS_TYPE;
+            spec |= RuntimeUnit.SUB_HAS_TYPE;
             if (sub.protopad != null)
                 spec |= RuntimeUnit.MAKE_PROTOPAD;
             if (sub.parametric_role_hack != null)
@@ -4065,8 +4059,7 @@ dynamic:
             sub.unit.EmitStrArray(dylexn.ToArray());
             sub.unit.EmitIntArray(dylexi.ToArray());
 
-            if ((spec & RuntimeUnit.SUB_HAS_TYPE) != 0)
-                sub.unit.EmitXref(sub.GetCorePackage(sub.sclass).own_xref);
+            sub.unit.EmitXref(sub.unit.GetCorePackage(sub.sclass).own_xref);
 
             if (sub.parametric_role_hack != null)
                 sub.unit.EmitXref(sub.parametric_role_hack);

@@ -2059,7 +2059,7 @@ tryagain:
             VarDeque rest  = (VarDeque) dos.slots[1];
 
             P6any ks = key.Fetch();
-            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.SubMO)) {
+            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
                     Kernel.GetInferiorRoot(),
@@ -2177,7 +2177,7 @@ tryagain:
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-            return SubMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
+            return CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
                     th.caller, post, th.named);
         }
 
@@ -2209,7 +2209,7 @@ tryagain:
         public static readonly STable IteratorMO;
         public static readonly STable ScalarMO;
         public static readonly STable StashMO;
-        public static readonly STable SubMO;
+        public static readonly STable CodeMO;
         public static readonly STable StrMO;
         public static readonly STable NumMO;
         public static readonly STable IntMO;
@@ -2230,7 +2230,7 @@ tryagain:
         public static readonly Variable FalseV;
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
-            P6opaque n = new P6opaque(info.mo ?? SubMO);
+            P6opaque n = new P6opaque(info.mo ?? CodeMO);
             n.slots[0] = outer;
             if (outer != null) outer.MarkShared();
             n.slots[1] = info;
@@ -3287,11 +3287,11 @@ slow:
             PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque(),
                 new VarDeque() };
 
-            SubMO = new STable("Sub");
+            CodeMO = new STable("Code");
+            CodeMO.FillProtoClass(new string[] { "outer", "info" });
             SubInvokeSubSI.param1 = new InvokeSub();
-            SubMO.FillProtoClass(new string[] { "outer", "info" });
-            SubMO.AddMethod(0, "INVOKE", MakeSub(SubInvokeSubSI, null));
-            SubMO.Invalidate();
+            CodeMO.AddMethod(0, "INVOKE", MakeSub(SubInvokeSubSI, null));
+            CodeMO.Invalidate();
 
             LabelMO = new STable("Label");
             LabelMO.FillProtoClass(new string[] { "target", "name" });
