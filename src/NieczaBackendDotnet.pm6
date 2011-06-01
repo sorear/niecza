@@ -26,13 +26,14 @@ sub downcall(*@args) {
     Q:CgOp { (rawscall Builtins,Kernel.DownCall {&upcalled} {@args}) }
 }
 
-method accept($unitname, $ast is rw, :$main, :$run, :$evalmode) {
+method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {
     downcall("safemode") if $.safemode;
     if $run {
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;
         $ast = Any;
         downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam, @$.run_args);
+        downcall("replrun") if $repl;
         return;
     }
     self.save_unit($unitname, $ast);

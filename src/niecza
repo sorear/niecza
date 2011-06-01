@@ -186,6 +186,6 @@ else {
     while True {
         print "niecza> ";
         my $l = $*IN.get // last;
-        $c.compile_string("say (" ~ $l ~ ").perl", !$comp, $stop);
+        $c.compile_string($l, !$comp, $stop, :repl, :evalmode);
     }
 }

@@ -13,7 +13,7 @@ has %.units;
 
 sub gettimeofday() { now.to-posix.[0] }
 
-method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode, $outer) {
+method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode, $outer, $repl) {
     my %*units := %.units;
 
     my $*module_loader = sub ($m) { self!load_dependent($m) };
@@ -26,7 +26,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
         $.frontend.typename => { $ast = $.frontend.parse(:$unitname,
             :$filename, :$modtime, :$source, :$outer); },
         (map -> $st { $st.typename => { $ast = $st.invoke($ast) } }, @$.stages),
-        $.backend.typename => { %.units{$unitname} = $ast; $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode) },
+        $.backend.typename => { %.units{$unitname} = $ast; $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl) },
     );
 
     for @steps -> $step {
@@ -47,7 +47,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
 
 method compile_module($module, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_module($module);
-    self!compile($module, $filename, $modtime, $source, False, False, $stop, False, Any);
+    self!compile($module, $filename, $modtime, $source, False, False, $stop, False, Any, False);
 }
 
 method !main_name() {
@@ -57,11 +57,11 @@ method !main_name() {
 
 method compile_file($file, $run, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_file($file);
-    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False, Any);
+    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False, Any, False);
 }
 
-method compile_string($source, $run, $stop = "", :$evalmode = False, :$outer) {
-    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop, $evalmode, $outer);
+method compile_string($source, $run, $stop = "", :$evalmode = False, :$outer, :$repl) {
+    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop, $evalmode, $outer, $repl);
 }
 
 method !up_to_date($mod) {

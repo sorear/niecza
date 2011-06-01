@@ -34,7 +34,7 @@ method run($name) { #OK not used
     die "nam backend does not support running code";
 }
 
-method accept($unitname, $ast is rw, :$main, :$run, :$evalmode) { #OK not used
+method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) { #OK not used
     self.save_unit($unitname, $ast);
     $ast.clear_optrees;
     $ast = Any;
