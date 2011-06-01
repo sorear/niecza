@@ -184,6 +184,7 @@ elsif @*ARGS {
 }
 else {
     my $*repl_outer;
+    $c.compile_string('', !$comp, $stop);
     while True {
         print "niecza> ";
         my $l = $*IN.get // last;
