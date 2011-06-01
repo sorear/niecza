@@ -244,18 +244,27 @@ my class Int is Real {
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 my class Rat is Real {
+    method new($n,$d) { $n / $d }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method numerator() { Q:CgOp { (_cgop bif_rat_nu {self}) } }
+    method denominator() { Q:CgOp { (_cgop bif_rat_de {self}) } }
+    method nude() { [ self.numerator, self.denominator ] }
 }
 my class Complex is Numeric {
+    method new($re,$im) { $re + $im\i }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
     method re() { Q:CgOp { (_cgop bif_complex_re {self}) } }
     method im() { Q:CgOp { (_cgop bif_complex_im {self}) } }
 }
 my class FatRat is Real {
+    method new($n,$d) { FatRat.succ * $n / $d }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method numerator() { Q:CgOp { (_cgop bif_fatrat_nu {self}) } }
+    method denominator() { Q:CgOp { (_cgop bif_fatrat_de {self}) } }
+    method nude() { [ self.numerator, self.denominator ] }
 }
 
 #TODO use a power from the standard library
