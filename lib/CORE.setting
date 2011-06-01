@@ -288,6 +288,8 @@ my class Sub {
 
     # Should be for Block, not Sub
     method ACCEPTS(Mu $t) { defined(self) ?? (self)($t) !! $t.^does(self) }
+    method arity() { Q:CgOp { (box Int (_cgop bif_arity (@ {self}))) } }
+    method outer() { Q:CgOp { (ns (getslot outer frame (@ {self}))) } }
 
     method perl() { defined(self) ?? '{ ... }' !! self.typename }
 }
@@ -453,11 +455,21 @@ my class CallFrame {
             (ns (l c))
             {Any}))
     } }
+    method dynamic-caller() { Q:CgOp {
+        (letn c (_cgop frame_dyn_caller (cast frame (@ {self})))
+          (ternary
+            (!= (l c) (null frame))
+            (ns (l c))
+            {Any}))
+    } }
 
     method file() { Q:CgOp { (box Str (frame_file
         (cast frame (@ {self})))) } }
     method line() { Q:CgOp { (box Num (cast num (frame_line
         (cast frame (@ {self}))))) } }
+    method subname() { Q:CgOp { (box Str (_cgop frame_subname
+        (cast frame (@ {self})))) } } 
+    method args() { Q:CgOp { (_cgop frame_args (cast frame (@ {self}))) } } 
 
     method hints($var) { Q:CgOp { (frame_hint (cast frame (@ {self}))
         (obj_getstr {$var})) } }

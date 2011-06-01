@@ -1061,6 +1061,10 @@ public class Builtins {
         return Kernel.NewROScalar(l);
     }
 
+    public static string frame_subname(Frame fr) {
+        return fr.info.name.Substring(fr.info.name.IndexOf(" ")+1);
+    }
+
     public static int bif_arity(P6any fcni) {
         if (!fcni.Isa(Kernel.SubMO))
             return 1; // can't introspect fake subs (?)

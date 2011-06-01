@@ -3880,6 +3880,8 @@ dynamic:
             thandlers["to_json"] = Methody(null, typeof(JsonWriter).GetMethod("ToJson"));
             thandlers["from_json"] = Methody(null, typeof(JsyncReader).GetMethod("FromJson"));
             thandlers["frame_caller"] = FieldGet(Tokens.Frame, "caller");
+            thandlers["frame_args"] = Methody(null, Tokens.Frame.GetMethod("GetArgs"));
+            thandlers["frame_dyn_caller"] = Methody(null, Tokens.Frame.GetMethod("DynamicCaller"));
             thandlers["frame_file"] = Methody(null, Tokens.Frame.GetMethod("ExecutingFile"));
             thandlers["frame_line"] = Methody(null, Tokens.Frame.GetMethod("ExecutingLine"));
             thandlers["frame_hint"] = Methody(null, Tokens.Frame.GetMethod("LexicalFind"));

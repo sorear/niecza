@@ -72,6 +72,7 @@ S05-metasyntax/changed.t
 S05-metasyntax/null.t
 S05-metasyntax/single-quotes.t
 S06-multi/lexical-multis.t
+S06-advanced_subroutine_features/caller.t
 S06-signature/passing-arrays.t
 S06-signature/positional-placeholders.t
 S06-signature/positional.t
@@ -98,6 +99,7 @@ S32-array/bool.t
 S32-array/push.t
 S32-array/unshift.t
 S32-hash/pairs.t
+S32-num/pi.t
 S32-num/power.t
 S32-str/append.t
 S32-str/bool.t
