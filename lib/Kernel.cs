@@ -1542,9 +1542,15 @@ noparams:
                 throw new NieczaException("LISTSTORE to undefined Hash");
             VarHash into = new VarHash();
             VarDeque iter = Builtins.start_iter(rhs);
+            bool first = true;
             while (Kernel.IterHasFlat(iter, true)) {
                 P6any elt = iter.Shift().Fetch();
-                if (elt.mo.HasMRO(Kernel.PairMO)) {
+                if (first && elt.mo.HasMRO(Kernel.HashMO)) {
+                    foreach(KeyValuePair<string,Variable> kv in
+                            Kernel.UnboxAny<VarHash>(elt)) {
+                        into[kv.Key] = kv.Value;
+                    }
+                } else if (elt.mo.HasMRO(Kernel.PairMO)) {
                     Variable k = (Variable) elt.GetSlot("key");
                     Variable v = (Variable) elt.GetSlot("value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
@@ -1555,6 +1561,7 @@ noparams:
                     into[elt.mo.mro_raw_Str.Get(Kernel.NewROScalar(elt))] =
                         Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch());
                 }
+                first = false;
             }
             Kernel.SetBox<VarHash>(lhs_o, into);
             return lhs;
