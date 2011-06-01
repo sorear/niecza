@@ -33,7 +33,10 @@ method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {
         $ast.clear_optrees;
         $ast = Any;
         downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam, @$.run_args);
-        downcall("replrun") if $repl;
+        if $repl {
+            my ($exn) = downcall("replrun");
+            die $exn if $exn;
+        }
         return;
     }
     self.save_unit($unitname, $ast);

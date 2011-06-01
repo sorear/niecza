@@ -268,7 +268,7 @@ sub infix:<**>($num,$power) {
 my class Str is Cool {
     method ACCEPTS(Mu $t) { defined(self) ?? self eq $t !! $t.^does(self) }
     method chars() { chars(self) }
-    method say() { Q:CgOp {
+    method say() { $PROCESS::OUTPUT_USED := 1; Q:CgOp {
         (prog [say (unbox str (@ {self}))]
               [box Bool (bool 1)]
         )
@@ -351,15 +351,15 @@ sub infix:<< != >>($l,$r) { $l != $r }
 sub infix:<max>($a,$b) { $a < $b ?? $b !! $a }
 sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
 
-sub warn($str) { Q:CgOp {
+sub warn($str) { $PROCESS::OUTPUT_USED := True; Q:CgOp {
     (prog [note (obj_getstr {$str})]
           [box Bool (bool 1)]
     )
 } }
 
-sub say(*@text)   { Q:CgOp { (rnull (say   (obj_getstr {@text.join('')}))) }; True }
-sub print(*@text) { Q:CgOp { (rnull (print (obj_getstr {@text.join('')}))) }; True }
-sub note(*@text)  { Q:CgOp { (rnull (note  (obj_getstr {@text.join('')}))) }; True }
+sub say(*@text)   { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (say   (obj_getstr {@text.join('')}))) }; True }
+sub print(*@text) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (print (obj_getstr {@text.join('')}))) }; True }
+sub note(*@text)  { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (note  (obj_getstr {@text.join('')}))) }; True }
 
 sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])

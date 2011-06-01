@@ -4745,14 +4745,23 @@ dynamic:
                         args[0] == "evalnam" ? null : argv);
                 return new string[0];
             } else if (args[0] == "replrun") {
-                Variable r = Kernel.RunInferior(
-                    Kernel.GetInferiorRoot().MakeChild(null,
-                        new SubInfo("<repl>", Builtins.eval_result)));
-                Variable pl = Kernel.RunInferior(
-                    r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
-                        "perl", new Variable[] { r }, null));
-                Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
-                return new string[0];
+                string ret = "";
+                try {
+                    BValue b = Kernel.GetVar(new string[] { "PROCESS", "$OUTPUT_USED"});
+                    b.v = Kernel.FalseV;
+                    Variable r = Kernel.RunInferior(
+                        Kernel.GetInferiorRoot().MakeChild(null,
+                            new SubInfo("<repl>", Builtins.eval_result)));
+                    if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
+                        Variable pl = Kernel.RunInferior(
+                            r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
+                                "perl", new Variable[] { r }, null));
+                        Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
+                    }
+                } catch (Exception ex) {
+                    ret = ex.Message;
+                }
+                return new string[] { ret };
             } else if (args[0] == "safemode") {
                 Kernel.SaferMode = true;
                 return new string[0];
