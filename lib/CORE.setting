@@ -225,7 +225,9 @@ my class Capture {
 }
 # }}}
 # Scalar types {{{
-my class Num is Cool {
+my class Numeric is Cool { }
+my class Real is Numeric { }
+my class Num is Real {
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
     our constant i  = sqrt(-1);
@@ -236,20 +238,20 @@ my class Num is Cool {
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
 our constant i  = sqrt(-1);
-my class Int is Cool {
+my class Int is Real {
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
-my class Rat is Cool {
+my class Rat is Real {
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
-my class Complex is Cool {
+my class Complex is Numeric {
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
-my class FatRat is Cool {
+my class FatRat is Real {
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
@@ -1322,6 +1324,7 @@ sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
 sub infix:<cmp> ($a, $b) {
+    return $a - $b if $a ~~ Numeric && $b ~~ Numeric;
     return $a.WHAT leg $b.WHAT unless $a.WHAT === $b.WHAT;
     return $a leg $b if $a ~~ Str;
     return $a - $b;
