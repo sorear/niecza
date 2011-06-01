@@ -94,6 +94,9 @@ use MONKEY_TYPING;
     is "00.00".succ, "01.00", "dot sets endpoint";
 
     is +["a" .. "z"], 26, "char ranges work";
+
+    is_deeply [[<za zz az aa>].sort(*.flip)], [<aa za az zz>],
+        'Automatic Schwartzian transform works';
 }
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

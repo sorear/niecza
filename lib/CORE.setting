@@ -41,7 +41,7 @@ my class Any is Mu {
         0;
     }
 
-    method sort($cmp = &infix:<leg>) { @(self).sort($cmp) }
+    method sort($cmp = &infix:<cmp>) { @(self).sort($cmp) }
     method first(Mu $filter) { for @(self) { return $_ if $_ ~~ $filter } }
 
     method !butWHENCE($cr) {
@@ -694,7 +694,11 @@ my class List is Cool {
 
     method Str() { self.join(" ") }
 
-    method sort($cmp = &infix:<leg>) {
+    method sort($cmp_ = &infix:<cmp>) {
+        my $cmp = $cmp_;
+        if $cmp_.arity == 1 {
+            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+        }
         my $l = @(self).eager;
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {List})))
