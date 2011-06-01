@@ -17,19 +17,23 @@ augment class Unit { method begin() {
     my $*unit = ::Metamodel::Unit.new(name => $.name,
         ns => ::Metamodel::Namespace.new,
         filename => $.filename,
-        modtime => $.modtime,
-        setting => ($.setting_name eq 'NULL' ?? Str !! $.setting_name));
+        modtime => $.modtime);
+    if $*niecza_outer_ref {
+        $*unit.setting_ref = $*niecza_outer_ref;
+        $*unit.need_unit($*unit.setting_ref.[0]);
+    } elsif $.setting_name ne 'NULL' {
+        $*unit.need_unit($.setting_name);
+        $*unit.setting_ref = $*unit.get_unit($.setting_name).bottom_ref;
+    }
     %*units{$.name} = $*unit;
     $*unit.tdeps{$.name} = [$.filename, $.modtime];
-
-    $*unit.need_unit($.setting_name) if $.setting_name ne 'NULL';
 
     $*unit.create_stash(['GLOBAL']);
     $*unit.create_stash(['PROCESS']);
 
     my @*opensubs;
     $*unit.mainline = $.mainline.begin(once => True,
-            itop => ($.setting_name ne 'NULL' ?? $*unit.get_unit($.setting_name).bottom_ref !! Any));
+            itop => $*unit.setting_ref);
 
     $*unit;
 } }

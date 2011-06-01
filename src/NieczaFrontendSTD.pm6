@@ -363,6 +363,11 @@ method sys_load_modinfo($module) {
 }
 
 method load_lex($setting) {
+    if $*niecza_outer_ref {
+        my $sub = ::Metamodel::Unit.deref($*niecza_outer_ref);
+        return $sub.unit.create_syml($sub);
+    }
+
     if $setting eq 'NULL' {
         my $id = "MY:file<NULL.pad>:line(1):pos(0)";
         my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
@@ -489,7 +494,7 @@ augment class Cursor {
 has $.lang;
 has $.safemode;
 
-method parse(:$unitname, :$filename, :$modtime, :$source) {
+method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
 
     my $*SETTINGNAME = $.lang;
     my $*SAFEMODE    = $.safemode;
@@ -510,6 +515,7 @@ method parse(:$unitname, :$filename, :$modtime, :$source) {
     $STD::ALL = {};
     @STD::herestub_queue = ();
 
+    my $*niecza_outer_ref = $outer;
     my @*MEMOS;
     my @*LINEMEMOS;
     my $*FILE = { name => $filename };

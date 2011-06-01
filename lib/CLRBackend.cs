@@ -161,7 +161,7 @@ namespace Niecza.CLRBackend {
         public readonly Xref mainline_ref;
         public readonly string name;
         public readonly object[] log;
-        public readonly string setting;
+        public readonly Xref setting_ref;
         public readonly Xref bottom_ref;
         public readonly string filename;
         public readonly double modtime;
@@ -178,6 +178,7 @@ namespace Niecza.CLRBackend {
         public FieldInfo rtunit;
         public List<byte> thaw_heap;
         public Dictionary<string,int> existing_strings;
+        public bool is_eval;
 
         FieldInfo cc_pool;
         Dictionary<string,int> cc_constant_cache = new Dictionary<string,int>();
@@ -202,7 +203,7 @@ namespace Niecza.CLRBackend {
             mainline_ref = Xref.from(from[0]);
             name = JScalar.S(from[1]);
             log = from[2] as object[];
-            setting = JScalar.S(from[3]);
+            setting_ref = Xref.from(from[3]);
             bottom_ref = Xref.from(from[4]);
             filename = JScalar.S(from[5]);
             modtime = from[6] == null ? 0 : JScalar.N(from[6]);
@@ -703,7 +704,7 @@ namespace Niecza.CLRBackend {
         public Xref(object[] from, int ofs) {
             unit  = ((JScalar)from[ofs+0]).str;
             index = (int)((JScalar)from[ofs+1]).num;
-            name  = ((JScalar)from[ofs+2]).str;
+            name  = (from.Length - ofs > 2) ? ((JScalar)from[ofs+2]).str : null;
         }
         public T Resolve<T>() { return (T) CLRBackend.Resolve(this); }
     }
@@ -4322,11 +4323,13 @@ dynamic:
         void Process(Unit unit, bool asmain) {
             this.unit = unit;
 
+            if (Verbose > 0) Console.WriteLine("bind_fields");
             unit.BindFields(delegate(string name, Type type) {
                 return tb.DefineField(name, type, FieldAttributes.Public |
                     FieldAttributes.Static);
             });
 
+            if (Verbose > 0) Console.WriteLine("boot_deps");
             foreach (object o in unit.tdeps) {
                 string dp = JScalar.S(((object[])o)[0]);
                 if (dp == unit.name) continue;
@@ -4336,6 +4339,7 @@ dynamic:
             int unit_slot = thaw.Count;
             thaw.Add(null);
 
+            if (Verbose > 0) Console.WriteLine("[sub1]");
             NamProcessor[] aux = new NamProcessor[unit.xref.Length];
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub1 {0}", obj.name);
@@ -4513,13 +4517,24 @@ dynamic:
                 thaw.Add(CpsOp.MethodCall(Tokens.Kernel_FirePhasers,
                     CpsOp.IntLiteral(0), CpsOp.BoolLiteral(false)));
             // settings are incomplete modules and have no mainline to run
-            if (unit.bottom_ref == null) {
+            if (unit.is_eval) {
+                if (Verbose > 0) Console.WriteLine("mainline_runner(eval)");
+                // XXX this caller's caller thing is a terrible fudge
+                StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
+                thaw.Add(CpsOp.CpsReturn(CpsOp.SubyCall(false,"",
+                    CpsOp.MethodCall(Tokens.Kernel_MakeSub,
+                        CpsOp.GetSField(m.subinfo),
+                        CpsOp.GetField(Tokens.Frame_caller,
+                            CpsOp.GetField(Tokens.Frame_caller,
+                                CpsOp.CallFrame()))))));
+            } else if (unit.bottom_ref == null) {
+                if (Verbose > 0) Console.WriteLine("mainline_runner(norm)");
                 Type dty = typeof(Dictionary<string,Object>);
                 FieldInfo lex = Tokens.Frame.GetField("lex");
                 MethodInfo set = dty.GetMethod("set_Item");
                 thaw.Add(CpsOp.SetField(lex, CpsOp.CallFrame(),
                     CpsOp.ConstructorCall(dty.GetConstructor(new Type[0]), new CpsOp[0])));
-                string s = unit.setting;
+                string s = unit.setting_ref.unit;
                 StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
                 while (s != null) {
                     thaw.Add(CpsOp.MethodCall(set,
@@ -4527,17 +4542,20 @@ dynamic:
                         CpsOp.StringLiteral("*resume_" + s),
                         CpsOp.GetSField(m.subinfo)));
                     Unit su = CLRBackend.GetUnit(s);
-                    s = su.setting;
+                    s = (su.setting_ref != null) ? su.setting_ref.unit : null;
                     m = su.mainline_ref.Resolve<StaticSub>();
                 }
                 thaw.Add(CpsOp.CpsReturn(CpsOp.SubyCall(false,"",
                     CpsOp.GetField(Tokens.SubInfo_protosub,
                         CpsOp.GetSField(m.subinfo)))));
             } else {
+                if (Verbose > 0) Console.WriteLine("mainline_runner(setting)");
                 thaw.Add(CpsOp.CpsReturn(
                     CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
                         CpsOp.GetSField(Tokens.Kernel_AnyP))));
             }
+
+            if (Verbose > 0) Console.WriteLine("constants");
 
             List<CpsOp> tdep_rtu = new List<CpsOp>();
             foreach (Unit td in unit.id_to_tdep)
@@ -4630,6 +4648,8 @@ dynamic:
                 string[] argv) {
             Unit root = new Unit((object[])Reader.Read(contents),
                     (object[])Reader.Read(contents.Substring(contents.IndexOf('\n'))));
+            avail_units[root.name] = root;
+            root.is_eval = (argv == null);
             CLRBackend old_Current = Current;
             Dictionary<string,Unit> old_used_units = used_units;
             string op = Environment.GetEnvironmentVariable("NIECZA_FORCE_SAVE") == null ? null : root.name + "-TEMP.dll";
@@ -4651,11 +4671,12 @@ dynamic:
             if (op != null)
                 c.Finish(op);
 
-            Type t = c.tb.CreateType();
+            root.clrType = c.tb.CreateType();
             used_units = old_used_units; Current = old_Current;
 
             Builtins.eval_result = (DynBlockDelegate)
-                Delegate.CreateDelegate(typeof(DynBlockDelegate), t, "BOOT");
+                Delegate.CreateDelegate(typeof(DynBlockDelegate),
+                    root.clrType, "BOOT");
             if (argv != null)
                 Kernel.RunLoop(root.name, argv, Builtins.eval_result);
         }
@@ -4677,6 +4698,7 @@ dynamic:
             Unit root = new Unit((object[])Reader.Read(tx),
                     (object[])Reader.Read(tx.Substring(tx.IndexOf("\n")+1)));
             CLRBackend c = new CLRBackend(dir, root.name.Replace("::","."), outfile);
+            avail_units[root.name] = root;
             Current = c;
 
             used_units = new Dictionary<string, Unit>();
@@ -4710,6 +4732,10 @@ dynamic:
                 CLRBackend.Main(new string[] { args[1], args[2], args[3], args[4] });
                 return new string[0];
             } else if (args[0] == "runnam" || args[0] == "evalnam") {
+                if (CLRBackend.Verbose > 0) {
+                    Console.WriteLine("Eval code::");
+                    Console.WriteLine(args[2]);
+                }
                 string[] argv = new string[args.Length - 3];
                 Array.Copy(args, 3, argv, 0, argv.Length);
                 CLRBackend.RunMain(args[1], args[2],

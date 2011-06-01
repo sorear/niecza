@@ -9,29 +9,30 @@ has $.frontend;
 has $.verbose;
 has $!main-sn = 0;
 
-has $.unitcache = {};
+has %.units;
 
 sub gettimeofday() { now.to-posix.[0] }
 
-method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode) {
-    my %*units;
+method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode, $outer) {
+    my %*units := %.units;
 
     my $*module_loader = sub ($m) { self!load_dependent($m) };
+    my $*niecza_outer_ref = $outer;
     my $*compiler = self;
     my $*verbose = $.verbose;
 
     my $ast;
     my @steps = (
         $.frontend.typename => { $ast = $.frontend.parse(:$unitname,
-            :$filename, :$modtime, :$source); },
+            :$filename, :$modtime, :$source, :$outer); },
         (map -> $st { $st.typename => { $ast = $st.invoke($ast) } }, @$.stages),
-        $.backend.typename => { $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode) },
+        $.backend.typename => { %.units{$unitname} = $ast; $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode) },
     );
 
     for @steps -> $step {
-        my $start = gettimeofday;
+        my $start = times[0];
         $step.value.();
-        my $time = gettimeofday() - $start;
+        my $time = times[0] - $start;
 
         if $.verbose {
             say "$unitname: $step.key() took $time";
@@ -46,7 +47,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
 
 method compile_module($module, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_module($module);
-    self!compile($module, $filename, $modtime, $source, False, False, $stop, False);
+    self!compile($module, $filename, $modtime, $source, False, False, $stop, False, Any);
 }
 
 method !main_name() {
@@ -56,11 +57,11 @@ method !main_name() {
 
 method compile_file($file, $run, $stop = "") {
     my ($filename, $modtime, $source) = $.module_finder.load_file($file);
-    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False);
+    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False, Any);
 }
 
-method compile_string($source, $run, $stop = "", :$evalmode = False) {
-    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop, $evalmode);
+method compile_string($source, $run, $stop = "", :$evalmode = False, :$outer) {
+    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop, $evalmode, $outer);
 }
 
 method !up_to_date($mod) {
@@ -83,20 +84,19 @@ method !up_to_date($mod) {
 
 method !load_dependent($module) {
     say "Trying to load depended module $module" if $.verbose;
-    my $newmod = $.unitcache{$module} //= $.backend.get_unit($module);
+    my $newmod = %!units{$module} //= $!backend.get_unit($module);
 
     if !defined($newmod) || !self!up_to_date($newmod) {
-        $.unitcache{$module}:delete;
+        %!units{$module}:delete;
         say "(Re)compilation needed" if $.verbose;
         note "[auto-compiling setting]" if $module eq 'CORE';
         self.compile_module($module);
         note "[done]" if $module eq 'CORE';
-        $newmod = $.unitcache{$module} = $.backend.get_unit($module);
+        $newmod = %!units{$module};
     }
 
-    %*units{$module} = $newmod;
     for keys $newmod.tdeps -> $mn {
-        %*units{$mn} //= ($.unitcache{$mn} //= $.backend.get_unit($mn));
+        %*units{$mn} //= $.backend.get_unit($mn);
     }
     say "Loaded $module" if $.verbose;
     $newmod;

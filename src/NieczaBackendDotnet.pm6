@@ -11,7 +11,8 @@ sub upcalled(@strings) {
             my $*IN_EVAL = True;
             # XXX NieczaException is eaten by boundary
             try {
-                $*compiler.compile_string(@strings[1], True, :evalmode);
+                $*compiler.compile_string(@strings[1], True, :evalmode,
+                    :outer([@strings[2], +@strings[3]]));
                 return "";
             }
             return $!;

@@ -237,6 +237,8 @@ namespace Niecza {
             this.methods = new DynBlockDelegate[nx];
             this.meta_fields = new FieldInfo[nx*2];
 
+            Kernel.ModulesFinished.Add(name);
+
             if (TraceLoad) {
                 Console.WriteLine("Setting up unit {0}", type.Name);
                 HexDump(heap);
@@ -464,6 +466,8 @@ namespace Niecza {
             if (TraceLoad)
                 Console.WriteLine("Installing sub {0} \"{1}\" from {2}", ix, ns.name, _ifrom);
             xref[ix] = ns;
+            ns.xref_no = ix;
+            ns.unit = this;
 
             if ((spec & SUB_IS_UNSAFE) != 0)
                 Kernel.CheckUnsafe(ns);
@@ -645,6 +649,8 @@ namespace Niecza {
         public SubInfo outer;
         public P6any protosub;
         public Frame protopad;
+        public RuntimeUnit unit;
+        public int xref_no;
         public int fixups_from;
         public string name;
         public Dictionary<string, BValue> hints;
@@ -1982,8 +1988,8 @@ noparams:
                             GetInferiorRoot(), Variable.None, null));
         }
 
-        private static HashSet<string> ModulesStarted;
-        private static HashSet<string> ModulesFinished;
+        internal static HashSet<string> ModulesStarted;
+        internal static HashSet<string> ModulesFinished;
 
         public static Variable BootModule(string name, DynBlockDelegate dgt) {
             if (ModulesStarted == null) ModulesStarted = new HashSet<string>();
@@ -1996,7 +2002,6 @@ noparams:
             Variable r = Kernel.RunInferior(Kernel.GetInferiorRoot().
                     MakeChild(null, new SubInfo("boot-" + name, dgt)));
             ModulesFinished.Add(name);
-            ModulesStarted.Remove(name);
             return r;
         }
 

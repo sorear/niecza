@@ -1024,8 +1024,12 @@ public class Builtins {
             return Kernel.Die(th, "Cannot eval; no compiler available");
         CrossDomainReceiver r = (CrossDomainReceiver)
             up_domain.CreateInstanceAndUnwrap("Kernel", "Niecza.UpCallee");
+        SubInfo outer = th.caller.info;
         string[] msg = r.Call(AppDomain.CurrentDomain, new string[] { "eval",
-                str.Fetch().mo.mro_raw_Str.Get(str) });
+                str.Fetch().mo.mro_raw_Str.Get(str),
+                (outer.unit == null ? "" : outer.unit.name),
+                outer.xref_no.ToString()
+                });
         if (msg[0] != "")
             return Kernel.Die(th, msg[0]);
         return th.MakeChild(null, new SubInfo("boot-" +

@@ -632,16 +632,16 @@ class StaticSub is RefTarget {
 }
 
 class Unit {
-    has $.mainline; # Metamodel::StaticSub, is rw
-    has $.name; # Str
-    has $.ns; # Metamodel::Namespace
-    has $.setting; # Str
-    has $.bottom_ref; # is rw
+    has Metamodel::StaticSub $.mainline is rw;
+    has Str $.name;
+    has Metamodel::Namespace $.ns;
+    has $.setting_ref is rw;
+    has $.bottom_ref is rw;
     has $.xref = [];
     has $.tdeps = {};
-    has $.filename; # is rw, Str
-    has $.modtime; # is rw, Numeric
-    has $.next_anon_stash = 0; # is rw, Int
+    has Str $.filename is rw;
+    has $.modtime is rw; # Numeric
+    has Int $.next_anon_stash is rw = 0; # is rw, Int
 
     method bind_item($path,$item)    { $!ns.bind_item($path,$item) }
     method bind_graft($path1,$path2) { $!ns.bind_graft($path1,$path2) }
@@ -712,7 +712,7 @@ class Unit {
     # STD-based frontend wants a slightly different representation.
     sub _syml_myname($xr) { "MY:unit<$xr[0]>:xid<$xr[1]>" }
 
-    method create_syml() {
+    method create_syml($from_sub?) {
         my $all = {};
         my $*unit = self;
 
@@ -740,7 +740,7 @@ class Unit {
             }
         });
 
-        my $top = self.deref($.bottom_ref // $.mainline.xref);
+        my $top = $from_sub // self.deref($.bottom_ref // $.mainline.xref);
         #say STDERR "Top = $top";
         my $cursor = $top;
         while $cursor {
@@ -769,7 +769,7 @@ class Unit {
             if ($cursor.unit.bottom_ref && $cursor.unit.name eq 'CORE') {
                 $all<CORE> //= $st;
             }
-            if ($cursor.unit.bottom_ref) {
+            if ($cursor.unit.bottom_ref || $cursor === $from_sub) {
                 $all<SETTING> //= $st;
             }
             $cursor = $cursor.outer;
