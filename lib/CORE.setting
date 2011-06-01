@@ -1129,7 +1129,7 @@ my class RangeIter is IterCursor {
         my $cmp = $c cmp $!limit;
         ($cmp < 0) ?? ($c, RangeIter.new(current => $c.succ,
                     limit => $!limit, exclusive => $!exclusive)) !!
-        ($cmp > 0) ?? Nil !!
+        ($cmp > 0 || $!exclusive) ?? Nil !!
             ($c,);
     }
 }

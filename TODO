@@ -12,7 +12,7 @@ EASY
    Add your favorite missing function to the setting, with tests.
    In particular, I could use: sprintf, dir, write, close, split, ...
 
-   Add $*ARGFILES, %*ENV, your favorite other *-var.
+   Add %*ENV, your favorite other *-var.
 
    Implement Sub.leave and CallFrame.leave
 
@@ -23,7 +23,7 @@ EASY
    Fudge and run your favorite spectest file.
 
    Stuff spectests are blocking on: "Block", "closure for",
-   "ranges of chars", "gather for", constants in signatures, ::T, ...
+   "gather for", constants in signatures, ::T, ...
 
 MEDIUM
 
@@ -48,15 +48,13 @@ MEDIUM
 
    Jump table optimization for when chains.
 
-   Find out what readonly subs are supposed to do with lists, etc and implement
+  *Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 
   *Implement BUILD submethod calling.
 
    Methods with variable names need to call the correct action method.  (See
    the horrible hack in NieczaActions.FALLBACK).
-
-  *Implement -p and -n.
 
    Add :rotate - depends on sized numbers.
 
