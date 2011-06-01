@@ -4302,7 +4302,7 @@ dynamic:
             AssemblyName an = new AssemblyName(mobname);
             this.dir = dir;
             ab = AppDomain.CurrentDomain.DefineDynamicAssembly(an,
-                    (filename == null ? AssemblyBuilderAccess.Run :
+                    (filename == null ? AssemblyBuilderAccess.RunAndSave :
                         AssemblyBuilderAccess.Save), dir);
             mob = filename == null ? ab.DefineDynamicModule(mobname) :
                 ab.DefineDynamicModule(mobname, filename);
@@ -4715,6 +4715,7 @@ dynamic:
             c.Process(root, ismain);
 
             c.Finish(outfile);
+            root.clrType = c.tb.CreateType();
             used_units = null; Current = null;
         }
     }
