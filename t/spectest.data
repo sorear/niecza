@@ -13,6 +13,7 @@ S02-builtin_data_types/nested_pairs.t
 S02-builtin_data_types/parsing-bool.t
 S02-builtin_data_types/subscripts_and_context.t
 S02-lexical-conventions/unicode.t
+S02-literals/hash-interpolation.t
 S02-literals/pair-boolean.t
 S02-literals/string-interpolation.t
 S02-literals/types.t

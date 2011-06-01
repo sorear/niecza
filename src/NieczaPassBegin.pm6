@@ -158,6 +158,12 @@ augment class Op::Use { #OK exist
 
 augment class Op::Lexical { #OK exist
     method begin() {
+        # HACK - a direct reference to &eval or .eval prevents inlining
+        if $.name eq '&eval' {
+            loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
+                $c.strong_used = True;
+            }
+        }
         my $typeconstraint = $.typeconstraint;
         if $typeconstraint {
             $typeconstraint = $*unit.get_item(
@@ -175,6 +181,12 @@ augment class Op::Lexical { #OK exist
 
 augment class Op::CallMethod { #OK exist
     method begin() {
+        # HACK - a direct reference to &eval or .eval prevents inlining
+        if $.name ~~ Str && $.name eq 'eval' {
+            loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
+                $c.strong_used = True;
+            }
+        }
         for self.zyg { $_.begin } # XXX callsame
         if $.private {
             if $.ppath {
