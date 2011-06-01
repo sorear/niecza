@@ -555,26 +555,26 @@ public class Builtins {
         }
     }
 
+    // we don't need to do nominal checking stuff here because this
+    // is in a method, never inlined, and as such the binder had to
+    // already have been called.
     public static Variable bif_complex_re(Variable a1) {
-        int r1;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-
-        if (r1 == NR_COMPLEX) {
-            Complex v1 = PromoteToComplex(r1, n1);
-            return MakeFloat(v1.re);
-        }
-        return MakeInt(-111);
+        return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).re);
     }
-
     public static Variable bif_complex_im(Variable a1) {
-        int r1;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-
-        if (r1 == NR_COMPLEX) {
-            Complex v1 = PromoteToComplex(r1, n1);
-            return MakeFloat(v1.im);
-        }
-        return MakeInt(-111);
+        return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).im);
+    }
+    public static Variable bif_rat_nu(Variable a1) {
+        return MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).num);
+    }
+    public static Variable bif_rat_de(Variable a1) {
+        return MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).den);
+    }
+    public static Variable bif_fatrat_nu(Variable a1) {
+        return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).num);
+    }
+    public static Variable bif_fatrat_de(Variable a1) {
+        return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).den);
     }
 
     const int O_LT = 1; const int O_LE = 2; const int O_NE = 4;
