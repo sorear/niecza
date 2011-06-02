@@ -143,6 +143,44 @@ class {
     is (submethod b () {}).WHAT, Submethod, "submethod gets correct class";
 };
 
+is one(1,2).perl, 'one(1, 2)', '.perl roundtrips one()';
+is any(1,2).perl, 'any(1, 2)', '.perl roundtrips any()';
+is all(1,2).perl, 'all(1, 2)', '.perl roundtrips all()';
+is each(1,2).perl, 'each(1, 2)', '.perl roundtrips each()';
+is none(1,2).perl, 'none(1, 2)', '.perl roundtrips none()';
+
+is (1 & 2).perl, 'all(1, 2)', '& means all';
+is (1 | 2).perl, 'any(1, 2)', '| means any';
+is (1 ^ 2).perl, 'one(1, 2)', '^ means one';
+
+is (1, 2).any.perl, 'any(1, 2)', 'Any.any means any()';
+is (1, 2).one.perl, 'one(1, 2)', 'Any.one means one()';
+is (1, 2).all.perl, 'all(1, 2)', 'Any.all means all()';
+is (1, 2).each.perl, 'each(1, 2)', 'Any.each means each()';
+is (1, 2).none.perl, 'none(1, 2)', 'Any.none means none()';
+
+is { a => True }.any.perl, 'any("a")', 'Hash.any means any(keys)';
+
+ok  ?(all( True,  True)), 'all(True, True)';
+nok ?(all( True, False)), '!all(True, False)';
+nok ?(all(False, False)), '!all(False, False)';
+
+ok  ?(any( True,  True)), 'any(True, True)';
+ok  ?(any( True, False)), 'any(True, False)';
+nok ?(any(False, False)), '!any(False, False)';
+
+nok ?(one( True,  True)), '!one(True, True)';
+ok  ?(one( True, False)), 'one(True, False)';
+nok ?(one(False, False)), '!one(False, False)';
+
+nok ?(none( True,  True)), '!none(True, True)';
+nok ?(none( True, False)), 'none(True, False)';
+ok  ?(none(False, False)), 'none(False, False)';
+
+is ((1 & 3) + 1).perl, 'all(2, 4)', '+ autothreads all';
+is ((1 | 3) + 1).perl, 'any(2, 4)', '+ autothreads any';
+is (1 == (1 | 3)).perl, 'any(Bool::True, Bool::False)', '== autothreads';
+
 #is $?FILE, 'test.pl', '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
