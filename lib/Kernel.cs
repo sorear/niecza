@@ -2211,6 +2211,21 @@ tryagain:
                     th.caller, post, th.named);
         }
 
+        private static SubInfo JunctionFallbackSI = new SubInfo("Junction.FALLBACK", JunctionFallbackC);
+        private static Frame JunctionFallbackC(Frame th) {
+            Variable[] post;
+            string mn = th.pos[1].Fetch().mo.mro_raw_Str.Get(th.pos[1]);
+            post = new Variable[th.pos.Length - 1];
+            Array.Copy(th.pos, 2, post, 1, th.pos.Length - 2);
+            post[0] = th.pos[0];
+            th.caller.resultSlot = Builtins.AutoThread(0, post,
+                delegate(Variable[] postp) {
+                    return RunInferior(postp[0].Fetch().InvokeMethod(
+                        GetInferiorRoot(), mn, postp, th.named));
+                });
+            return th.caller;
+        }
+
         public static Frame Die(Frame caller, string msg) {
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
                     BoxAnyMO<string>(msg, StrMO));
@@ -3348,6 +3363,7 @@ slow:
 
             JunctionMO = new STable("Junction");
             Handler_PandBox(JunctionMO, "Bool", new CtxJunctionBool(), BoolMO);
+            JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
             JunctionMO.FillProtoClass(new string[] { "kind_", "eigenstates_" });
             JunctionMO.Invalidate();
 

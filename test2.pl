@@ -181,7 +181,11 @@ is ((1 & 3) + 1).perl, 'all(2, 4)', '+ autothreads all';
 is ((1 | 3) + 1).perl, 'any(2, 4)', '+ autothreads any';
 is (1 == (1 | 3)).perl, 'any(Bool::True, Bool::False)', '== autothreads';
 
-#is $?FILE, 'test.pl', '$?FILE works';
+is (4 & 9).sqrt.perl, 'all(2, 3)', '.sqrt autothreads';
+is (4 & 9).Bool.perl, 'Bool::True', '.Bool does not autothread';
+is (40 & 90).substr(0,1).perl, 'all("4", "9")', '.substr with arguments autothreads';
+
+ok $?FILE ~~ /test2?\.pl/, '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {
