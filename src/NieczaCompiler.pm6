@@ -8,6 +8,7 @@ has $.stages;
 has $.frontend;
 has $.verbose;
 has $!main-sn = 0;
+has $!discount-time = 0;
 
 has %.units;
 
@@ -29,10 +30,11 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
         $.backend.typename => { %.units{$unitname} = $ast; $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl) },
     );
 
+    my $allstart = times[0] - $!discount-time;
     for @steps -> $step {
-        my $start = times[0];
+        my $start = times[0] - $!discount-time;
         $step.value.();
-        my $time = times[0] - $start;
+        my $time = times[0] - $!discount-time - $start;
 
         if $.verbose {
             say "$unitname: $step.key() took $time";
@@ -43,6 +45,9 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
             last;
         }
     }
+    my $alltime = times[0] - $!discount-time - $allstart;
+    # don't count this time towards any other timing in progress
+    $!discount-time += $alltime;
 }
 
 method compile_module($module, $stop = "") {
