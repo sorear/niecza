@@ -1901,6 +1901,29 @@ tryagain:
         }
     }
 
+    class CtxJunctionBool : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) return false;
+
+            int jtype = Kernel.UnboxAny<int>((P6any) o.GetSlot("kind_"));
+            if (jtype == 4) return true; // XXX
+
+            Variable[] eigen = Kernel.UnboxAny<Variable[]>(
+                    (P6any) o.GetSlot("eigenstates_"));
+            int ntrue = 0, nfalse = 0;
+            foreach (Variable v in eigen)
+                if (v.Fetch().mo.mro_raw_Bool.Get(v)) ntrue++; else nfalse++;
+            switch(jtype) {
+                case 0: return nfalse == 0;
+                case 1: return ntrue == 0;
+                case 2: return ntrue == 1;
+                case 3: return ntrue >= 1;
+                default: throw new ArgumentException();
+            }
+        }
+    }
+
     class CtxMatchStr : ContextHandler<string> {
         public override string Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -2202,7 +2225,6 @@ tryagain:
         }
 
         public static STable PairMO;
-        public static STable JunctionMO;
         public static STable CallFrameMO;
         public static STable CaptureMO;
         public static STable GatherIteratorMO;
@@ -2212,6 +2234,7 @@ tryagain:
         public static P6any EMPTYP;
         public static P6any HashP;
         public static P6any IteratorP;
+        public static readonly STable JunctionMO;
         public static readonly STable LabelMO;
         public static readonly STable AnyMO;
         public static readonly STable IteratorMO;
@@ -3322,6 +3345,11 @@ slow:
             Handler_PandCont(StrMO, "pred", new CtxStrSuccish(false));
             StrMO.FillProtoClass(new string[] { });
             StrMO.Invalidate();
+
+            JunctionMO = new STable("Junction");
+            Handler_PandBox(JunctionMO, "Bool", new CtxJunctionBool(), BoolMO);
+            JunctionMO.FillProtoClass(new string[] { "kind_", "eigenstates_" });
+            JunctionMO.Invalidate();
 
             IteratorMO = new STable("Iterator");
             IteratorMO.FillProtoClass(new string[] { });
