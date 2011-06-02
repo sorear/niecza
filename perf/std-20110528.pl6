@@ -1,5 +1,3 @@
-use JSYNC;
-
 sub timethis($nr, $fun) {
     my $i = -$nr;
     my $start = times[0];
@@ -20,9 +18,5 @@ sub bench($name, $nr, $f) {
 
 my @arr;
 
-bench "or", 10000000, sub () { 1 +| 2 };
-bench "xor", 10000000, sub () { 1 +^ 2 };
-bench "and", 10000000, sub () { 1 +& 2 };
-bench "lshift", 10000000, sub () { 1 +> 2 };
-bench "rshift", 10000000, sub () { 1 +< 2 };
-bench "compl", 10000000, sub () { +^ 1 };
+bench 'modified', 1000000, sub () { 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 };
+bench 'same', 1000000, sub () { 1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1-1 };

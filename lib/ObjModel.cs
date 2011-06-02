@@ -504,6 +504,7 @@ next_method: ;
         public string[] all_slot;
 
         public int num_rank = -1;
+        public bool is_any = false;
 
         public STable(string name) {
             this.name = name;
@@ -563,6 +564,8 @@ next_method: ;
                 num_rank = Builtins.NR_FIXINT;
             else
                 num_rank = -1;
+
+            is_any = Kernel.AnyMO != null && HasMRO(Kernel.AnyMO);
         }
 
         private object _GetVT(string name) {

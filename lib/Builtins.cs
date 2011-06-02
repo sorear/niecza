@@ -25,6 +25,75 @@ public class Builtins {
         return r;
     }
 
+    static void CheckSpecialArg(int ix, ref int pivot, ref uint rank,
+            P6any val) {
+        if (val.mo.is_any) {
+            // fine as is
+        } else if (val.mo.HasMRO(Kernel.JunctionMO)) {
+            int jtype = Kernel.UnboxAny<int>((P6any)val.GetSlot("kind_")) / 2;
+            if ((uint)jtype < rank) {
+                rank = (uint)jtype;
+                pivot = ix;
+            }
+        } else {
+            throw new NieczaException("Nominal type check failed for #" + ix +
+                    " needed Any got " + val.mo.name);
+        }
+    }
+
+    // NOTE: Destructive on avs!  Clone first if you need to.
+    public static Variable AutoThread(int pivot, Variable[] avs,
+            Func<Variable[],Variable> dgt) {
+        P6any j = avs[pivot].Fetch();
+        int jtype = Kernel.UnboxAny<int>((P6any) j.GetSlot("kind_"));
+        P6any listObj = (P6any) j.GetSlot("eigenstates_");
+        P6any newList;
+        if (jtype == 4) {
+            newList = Kernel.RunInferior(MEMap_for_each(
+                Kernel.GetInferiorRoot(), listObj,
+                delegate(Variable vr) {
+                    avs[pivot] = vr;
+                    return dgt(avs);
+                })).Fetch();
+        } else {
+            Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
+            Variable[] nlist = new Variable[list.Length];
+            for (int i = 0; i < list.Length; i++) {
+                avs[pivot] = list[i];
+                nlist[i] = dgt(avs);
+            }
+            newList = Kernel.BoxRaw(nlist, Kernel.ParcelMO);
+        }
+        P6any newJunc = new P6opaque(Kernel.JunctionMO);
+        newJunc.SetSlot("kind_", j.GetSlot("kind_"));
+        newJunc.SetSlot("eigenstates_", newList);
+        return Kernel.NewROScalar(newJunc);
+    }
+
+    // functions containing sub-functions get mangled by the compiler, so
+    // keep the critical path away.
+    public static Variable HandleSpecial2(Variable av0, Variable av1,
+            P6any ao0, P6any ao1, Func<Variable,Variable,Variable> dgt) {
+        uint jrank = uint.MaxValue;
+        int jpivot = -1;
+
+        CheckSpecialArg(0, ref jpivot, ref jrank, ao0);
+        CheckSpecialArg(1, ref jpivot, ref jrank, ao1);
+
+        if (jpivot < 0) return dgt(av0, av1);
+
+        return AutoThread(jpivot, new Variable[] { av0, av1 },
+                delegate(Variable[] nas) { return dgt(nas[0], nas[1]); });
+    }
+
+    public static Variable CheckSpecial2(Variable a1, Variable a2,
+            P6any r1, P6any r2, Func<Variable,Variable,Variable> dgt) {
+        if (r1.mo.is_any && r2.mo.is_any)
+            return null; // fast case - successful bind
+
+        return HandleSpecial2(a1,a2,r1,r2,dgt);
+    }
+
     public static void AssignV(Variable lhs, P6any rhs) {
         if (!lhs.islist) {
             lhs.Store(rhs);
@@ -436,10 +505,14 @@ public class Builtins {
         return new SubstrLValue(v1, r2, r3);
     }
 
+    static Func<Variable,Variable,Variable> bif_plus_d = bif_plus;
     public static Variable bif_plus(Variable a1, Variable a2) {
         int r1, r2;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_plus_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -1287,7 +1360,7 @@ again:
     private static Frame CommonMEMap_C(Frame th) {
         ItemSource src = (ItemSource) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;
-        P6any fnc = (P6any) th.lex2;
+        object fnc = th.lex2;
         int tailmode = th.lexi0;
 
         switch (th.ip) {
@@ -1321,10 +1394,14 @@ again:
                 goto case 1;
             case 1:
                 th.ip = 2;
-                if (fnc != null)
-                    return fnc.Invoke(th, (Variable[])th.lex3, null);
-                else {
+                if (fnc is P6any) {
+                    return ((P6any)fnc).Invoke(th, (Variable[])th.lex3, null);
+                } else if (fnc == null) {
                     th.resultSlot = MakeParcel((Variable[]) th.lex3);
+                    goto case 2;
+                } else {
+                    th.resultSlot = ((Func<Variable,Variable>)fnc).Invoke(
+                        ((Variable[])th.lex3)[0]);
                     goto case 2;
                 }
             case 2:
@@ -1356,6 +1433,18 @@ again:
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
         fr.lex2 = fcni;
+        return fr;
+    }
+
+    public static Frame MEMap_for_each(Frame th, P6any lst,
+            Func<Variable,Variable> fcn) {
+        VarDeque iter = new VarDeque(Kernel.NewRWListVar(lst));
+
+        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        fr.lexi0 = 0;
+        fr.lex0 = new BatchSource(1, iter);
+        fr.lex1 = new VarDeque();
+        fr.lex2 = fcn;
         return fr;
     }
 
