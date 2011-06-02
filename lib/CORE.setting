@@ -41,6 +41,11 @@ my class Any is Mu {
         0;
     }
 
+    method any() { any @(self) }
+    method none() { none @(self) }
+    method all() { all @(self) }
+    method each() { each @(self) }
+    method one() { one @(self) }
     method sort($cmp = &infix:<cmp>) { @(self).sort($cmp) }
     method first(Mu $filter) { for @(self) { return $_ if $_ ~~ $filter } }
 
@@ -759,6 +764,12 @@ my class Hash {
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
     method hash() { unitem(self) }
 
+    method any() { any self.keys }
+    method none() { none self.keys }
+    method all() { all self.keys }
+    method each() { each self.keys }
+    method one() { one self.keys }
+
     method Capture () {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {Capture})))
@@ -826,6 +837,40 @@ my class Pair is Enum {
         $.key ~ "\t" ~ $.value
     }
 }
+
+my class Junction is Mu {
+    has $!kind_;
+    has $!eigenstates_;
+
+    method !create(Mu $: $kind, $eigenstates) { Q:CgOp {
+        (letn ob (obj_newblank (obj_llhow (@ {self})))
+          (setslot kind_ (l ob) (@ {$kind}))
+          (setslot eigenstates_ (l ob) (@ {$eigenstates}))
+          (ns (l ob)))
+    } }
+    method !kind(Mu $:) { Q:CgOp { (ns (getslot kind_ obj (@ {self}))) } }
+    method !eigenstates(Mu $:) { Q:CgOp { (ns (getslot eigenstates_ obj (@ {self}))) } }
+
+    my @kinds = <all none one any each>;
+    method perl(Mu $:) {
+        @kinds[self!kind] ~ "(" ~ join(", ", @$!eigenstates) ~ ")"
+    }
+
+    method from-parcel(Mu $: Int $kind, Mu $pcl) {
+        self!create($kind, $pcl)
+    }
+    method from-list(Mu $: Int $kind, @list) {
+        self!create($kind, Q:CgOp { (box Parcel (vvarlist_to_fvarlist (getslot items vvarlist (@ {@list.eager})))) })
+    }
+}
+sub infix:<&>(\|$p) { Junction.from-parcel(0, $p) }
+sub infix:<^>(\|$p) { Junction.from-parcel(2, $p) }
+sub infix:<|>(\|$p) { Junction.from-parcel(3, $p) }
+sub all(*@p) { Junction.from-list(0, @p) }
+sub none(*@p) { Junction.from-list(1, @p) }
+sub one(*@p) { Junction.from-list(2, @p) }
+sub any(*@p) { Junction.from-list(3, @p) }
+sub each(*@list) { Junction!Junction::create(4, @list) }
 # }}}
 # List utilities {{{
 sub _vivify_array_at_pos(\$self, $ix) {
@@ -1369,9 +1414,6 @@ sub infix:«~>» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
 sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
 sub postfix:<i> ($item) { $item * i }
-sub infix:<&> (\|$args) { die "Junctions NYI" } #OK
-sub infix:<|> (\|$args) { die "Junctions NYI" } #OK
-sub infix:<^> (\|$args) { die "Junctions NYI" } #OK
 sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
 sub infix:<minmax>(\|$args) { die "minmax NYI" } #OK

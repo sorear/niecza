@@ -2202,6 +2202,7 @@ tryagain:
         }
 
         public static STable PairMO;
+        public static STable JunctionMO;
         public static STable CallFrameMO;
         public static STable CaptureMO;
         public static STable GatherIteratorMO;

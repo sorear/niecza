@@ -29,12 +29,8 @@ MEDIUM
 
  + qx[]
 
-   Implement your favorite ?-vars.
-
    Finish the set of Num operators, includig number-theoretic and
    transcedental functions.
-
-  *Implement &?BLOCK and &?ROUTINE.
 
    Implement buffer types and binary I/O.
 
