@@ -853,7 +853,7 @@ my class Junction is Mu {
 
     my @kinds = <all none one any each>;
     method perl(Mu $:) {
-        @kinds[self!kind] ~ "(" ~ join(", ", @$!eigenstates) ~ ")"
+        @kinds[self!kind] ~ "(" ~ join(", ", map { .perl }, @$!eigenstates) ~ ")"
     }
 
     method from-parcel(Mu $: Int $kind, Mu $pcl) {
