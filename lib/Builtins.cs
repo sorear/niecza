@@ -72,6 +72,18 @@ public class Builtins {
 
     // functions containing sub-functions get mangled by the compiler, so
     // keep the critical path away.
+    public static Variable HandleSpecial1(Variable av0, P6any ao0,
+            Func<Variable,Variable> dgt) {
+        uint jrank = uint.MaxValue;
+        int jpivot = -1;
+
+        CheckSpecialArg(0, ref jpivot, ref jrank, ao0);
+
+        if (jpivot < 0) return dgt(av0);
+
+        return AutoThread(jpivot, new Variable[] { av0 },
+                delegate(Variable[] nas) { return dgt(nas[0]); });
+    }
     public static Variable HandleSpecial2(Variable av0, Variable av1,
             P6any ao0, P6any ao1, Func<Variable,Variable,Variable> dgt) {
         uint jrank = uint.MaxValue;
@@ -85,6 +97,29 @@ public class Builtins {
         return AutoThread(jpivot, new Variable[] { av0, av1 },
                 delegate(Variable[] nas) { return dgt(nas[0], nas[1]); });
     }
+    public static Variable HandleSpecial3(Variable av0, Variable av1,
+            Variable av2, P6any ao0, P6any ao1, P6any ao2,
+            Func<Variable,Variable,Variable,Variable> dgt) {
+        uint jrank = uint.MaxValue;
+        int jpivot = -1;
+
+        CheckSpecialArg(0, ref jpivot, ref jrank, ao0);
+        CheckSpecialArg(1, ref jpivot, ref jrank, ao1);
+        CheckSpecialArg(2, ref jpivot, ref jrank, ao2);
+
+        if (jpivot < 0) return dgt(av0, av1, av2);
+
+        return AutoThread(jpivot, new Variable[] { av0, av1, av2 },
+                delegate(Variable[] nas) { return dgt(nas[0], nas[1], nas[2]); });
+    }
+
+    public static Variable CheckSpecial1(Variable a1, P6any r1,
+            Func<Variable,Variable> dgt) {
+        if (r1.mo.is_any)
+            return null; // fast case - successful bind
+
+        return HandleSpecial1(a1,r1,dgt);
+    }
 
     public static Variable CheckSpecial2(Variable a1, Variable a2,
             P6any r1, P6any r2, Func<Variable,Variable,Variable> dgt) {
@@ -92,6 +127,15 @@ public class Builtins {
             return null; // fast case - successful bind
 
         return HandleSpecial2(a1,a2,r1,r2,dgt);
+    }
+
+    public static Variable CheckSpecial3(Variable a1, Variable a2,
+            Variable a3, P6any r1, P6any r2, P6any r3,
+            Func<Variable,Variable,Variable,Variable> dgt) {
+        if (r1.mo.is_any && r2.mo.is_any && r3.mo.is_any)
+            return null; // fast case - successful bind
+
+        return HandleSpecial3(a1,a2,a3,r1,r2,r3,dgt);
     }
 
     public static void AssignV(Variable lhs, P6any rhs) {
@@ -409,94 +453,79 @@ public class Builtins {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
 
+    static Func<Variable,Variable,Variable> bif_numeq_d = bif_numeq;
     public static Variable bif_numeq(Variable v1, Variable v2) {
-        return (Compare(v1,v2)&O_EQ) != 0 ? Kernel.TrueV : Kernel.FalseV;
+        return numcompare(v1, v2, O_IS_EQUAL, bif_numeq_d);
     }
 
-    public static Variable bif_numlt(Variable v1, Variable v2) {
-        return (Compare(v1,v2)&O_LT) != 0 ? Kernel.TrueV : Kernel.FalseV;
-    }
-
+    static Func<Variable,Variable,Variable> bif_numne_d = bif_numne;
     public static Variable bif_numne(Variable v1, Variable v2) {
-        return (Compare(v1,v2)&O_NE) != 0 ? Kernel.TrueV : Kernel.FalseV;
+        return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER, bif_numne_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_numlt_d = bif_numlt;
+    public static Variable bif_numlt(Variable v1, Variable v2) {
+        return numcompare(v1, v2, O_IS_LESS, bif_numlt_d);
+    }
+
+    static Func<Variable,Variable,Variable> bif_numle_d = bif_numle;
     public static Variable bif_numle(Variable v1, Variable v2) {
-        return (Compare(v1,v2)&O_LE) != 0 ? Kernel.TrueV : Kernel.FalseV;
+        return numcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, bif_numle_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_numgt_d = bif_numgt;
     public static Variable bif_numgt(Variable v1, Variable v2) {
-        return (Compare(v1,v2)&O_GT) != 0 ? Kernel.TrueV : Kernel.FalseV;
+        return numcompare(v1, v2, O_IS_GREATER, bif_numgt_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_numge_d = bif_numge;
     public static Variable bif_numge(Variable v1, Variable v2) {
-        return (Compare(v1,v2)&O_GE) != 0 ? Kernel.TrueV : Kernel.FalseV;
+        return numcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, bif_numge_d);
     }
 
+    public static Variable strcompare(Variable v1, Variable v2,
+            int mask, Func<Variable,Variable,Variable> d) {
+        P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        Variable jr = CheckSpecial2(v1, v2, o1, o2, d);
+        if (jr != null) return jr;
+        int diff = string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
+                o2.mo.mro_raw_Str.Get(v2));
+        int mcom = (diff < 0) ? O_IS_LESS : (diff > 0) ? O_IS_GREATER :
+            O_IS_EQUAL;
+        return ((mask & mcom) != 0) ? Kernel.TrueV : Kernel.FalseV;
+    }
+
+    static Func<Variable,Variable,Variable> bif_streq_d = bif_streq;
     public static Variable bif_streq(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Str.Get(v1) == o2.mo.mro_raw_Str.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return strcompare(v1, v2, O_IS_EQUAL, bif_streq_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_strne_d = bif_strne;
     public static Variable bif_strne(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (o1.mo.mro_raw_Str.Get(v1) != o2.mo.mro_raw_Str.Get(v2)) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER, bif_strne_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_strlt_d = bif_strlt;
     public static Variable bif_strlt(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
-                    o2.mo.mro_raw_Str.Get(v2)) < 0) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return strcompare(v1, v2, O_IS_LESS, bif_strlt_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_strle_d = bif_strle;
     public static Variable bif_strle(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
-                    o2.mo.mro_raw_Str.Get(v2)) <= 0) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return strcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, bif_strle_d);
     }
 
-    public static Variable bif_strge(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
-                    o2.mo.mro_raw_Str.Get(v2)) >= 0) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
-    }
-
+    static Func<Variable,Variable,Variable> bif_strgt_d = bif_strgt;
     public static Variable bif_strgt(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
-        if (string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
-                    o2.mo.mro_raw_Str.Get(v2)) > 0) {
-            return Kernel.TrueV;
-        } else {
-            return Kernel.FalseV;
-        }
+        return strcompare(v1, v2, O_IS_GREATER, bif_strgt_d);
     }
 
+    static Func<Variable,Variable,Variable> bif_strge_d = bif_strge;
+    public static Variable bif_strge(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, bif_strge_d);
+    }
+
+    //static Func<Variable,Variable,Variable> bif_substr3_d = bif_substr3;
     public static Variable bif_substr3(Variable v1, Variable v2, Variable v3) {
         P6any o2 = NominalCheck("$start", Kernel.AnyMO, v2);
         P6any o3 = NominalCheck("$chars", Kernel.AnyMO, v3);
@@ -541,10 +570,14 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
+    static Func<Variable,Variable,Variable> bif_minus_d = bif_minus;
     public static Variable bif_minus(Variable a1, Variable a2) {
         int r1, r2;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_minus_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -573,9 +606,13 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
+    static Func<Variable,Variable> bif_negate_d = bif_negate;
     public static Variable bif_negate(Variable a1) {
+        P6any o1 = a1.Fetch();
         int r1;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        Variable jr = CheckSpecial1(a1, o1, bif_negate_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -598,9 +635,13 @@ public class Builtins {
         return MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
+    static Func<Variable,Variable> bif_abs_d = bif_abs;
     public static Variable bif_abs(Variable a1) {
+        P6any o1 = a1.Fetch();
         int r1;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        Variable jr = CheckSpecial1(a1, o1, bif_abs_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -650,33 +691,35 @@ public class Builtins {
         return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).den);
     }
 
-    const int O_LT = 1; const int O_LE = 2; const int O_NE = 4;
-    const int O_EQ = 8; const int O_GE = 16; const int O_GT = 32;
-    const int O_IS_GREATER = O_NE | O_GE | O_GT;
-    const int O_IS_LESS    = O_NE | O_LE | O_LT;
-    const int O_IS_EQUAL   = O_EQ | O_GE | O_LE;
-    const int O_IS_UNORD   = O_NE;
-    public static int Compare(Variable a1, Variable a2) {
-        int r1, r2;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
+    const int O_IS_GREATER = 1;
+    const int O_IS_LESS    = 2;
+    const int O_IS_EQUAL   = 4;
+    const int O_IS_UNORD   = 8;
+    public static Variable numcompare(Variable a1, Variable a2, int mask,
+            Func<Variable,Variable,Variable> dl) {
+        int r1, r2, res=0;
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        Variable jr = CheckSpecial2(a1, a2, o1, o2, dl);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
             if (double.IsNaN(v1.re) || double.IsNaN(v1.im) ||
                     double.IsNaN(v2.re) || double.IsNaN(v2.im))
-                return O_IS_UNORD;
-            if (v1.re != v2.re)
-                return v1.re > v2.re ? O_IS_GREATER : O_IS_LESS;
+                res = O_IS_UNORD;
+            else if (v1.re != v2.re)
+                res = v1.re > v2.re ? O_IS_GREATER : O_IS_LESS;
             else
-                return v1.im > v2.im ? O_IS_GREATER : v1.im < v2.im ? O_IS_LESS : O_IS_EQUAL;
+                res = v1.im > v2.im ? O_IS_GREATER : v1.im < v2.im ? O_IS_LESS : O_IS_EQUAL;
         }
         else if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
             double d1 = PromoteToFloat(r1, n1);
             double d2 = PromoteToFloat(r2, n2);
-            if (double.IsNaN(d1) || double.IsNaN(d2)) return O_IS_UNORD;
-            return d1 > d2 ? O_IS_GREATER : d1 < d2 ? O_IS_LESS : O_IS_EQUAL;
+            if (double.IsNaN(d1) || double.IsNaN(d2)) res = O_IS_UNORD;
+            else res =d1 > d2 ? O_IS_GREATER : d1 < d2 ? O_IS_LESS : O_IS_EQUAL;
         }
         else if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
@@ -696,13 +739,21 @@ public class Builtins {
         }
         else
             r1 = PromoteToFixInt(r1, n1).CompareTo(PromoteToFixInt(r2, n2));
-        return (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
+
+        if (res == 0)
+            res = (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
+
+        return ((mask & res) != 0) ? Kernel.TrueV : Kernel.FalseV;
     }
 
+    static Func<Variable,Variable,Variable> bif_mul_d = bif_mul;
     public static Variable bif_mul(Variable a1, Variable a2) {
         int r1, r2;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_mul_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -731,10 +782,14 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
+    static Func<Variable,Variable,Variable> bif_divide_d = bif_divide;
     public static Variable bif_divide(Variable a1, Variable a2) {
         int r1, r2;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_divide_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -764,10 +819,14 @@ public class Builtins {
         return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
+    static Func<Variable,Variable,Variable> bif_mod_d = bif_mod;
     public static Variable bif_mod(Variable a1, Variable a2) {
         int r1, r2;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
-        P6any n2 = GetNumber(a2, NominalCheck("$y", Kernel.AnyMO, a2), out r2);
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_mod_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             throw new NieczaException("Modulus operation not defined with complex arguments");
@@ -823,17 +882,18 @@ public class Builtins {
         }
     }
 
+    // this is only called from .Int
     public static Variable bif_coerce_to_int(Variable a1) {
-        NominalCheck("$x", Kernel.AnyMO, a1);
         int small; BigInteger big;
         return GetAsInteger(a1, out small, out big) ?
             MakeInt(big) : MakeInt(small);
     }
 
+    // only called from infix for now
+    // when it's not, it'll need to be split anyway, I think
+    // I fumbled spec reading - only 4 and 5 are actually needed
     public static Variable bif_divop(int opc, Variable a1, Variable a2) {
         int small1, small2; BigInteger big1, big2;
-        NominalCheck("$x", Kernel.AnyMO, a1);
-        NominalCheck("$y", Kernel.AnyMO, a2);
         bool b1 = GetAsInteger(a1, out small1, out big1);
         bool b2 = GetAsInteger(a2, out small2, out big2);
 
@@ -866,9 +926,10 @@ public class Builtins {
         }
     }
 
+    // called from .Num
     public static Variable bif_coerce_to_num(Variable a1) {
         int r1;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        P6any n1 = GetNumber(a1, a1.Fetch(), out r1);
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -880,9 +941,13 @@ public class Builtins {
         }
     }
 
+    static Func<Variable,Variable> bif_sqrt_d = bif_sqrt;
     public static Variable bif_sqrt(Variable a1) {
+        P6any o1 = a1.Fetch();
         int r1;
-        P6any n1 = GetNumber(a1, NominalCheck("$x", Kernel.AnyMO, a1), out r1);
+        Variable jr = CheckSpecial1(a1, o1, bif_sqrt_d);
+        if (jr != null) return jr;
+        P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
@@ -896,52 +961,72 @@ public class Builtins {
         }
     }
 
+    static Func<Variable,Variable,Variable> bif_numand_d = bif_numand;
     public static Variable bif_numand(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numand_d);
+        if (jr != null) return jr;
+
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 & r2);
     }
 
+    static Func<Variable,Variable,Variable> bif_numor_d = bif_numor;
     public static Variable bif_numor(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numor_d);
+        if (jr != null) return jr;
+
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 | r2);
     }
 
+    static Func<Variable,Variable,Variable> bif_numxor_d = bif_numxor;
     public static Variable bif_numxor(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numxor_d);
+        if (jr != null) return jr;
+
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 ^ r2);
     }
 
+    static Func<Variable,Variable,Variable> bif_numlshift_d = bif_numlshift;
     public static Variable bif_numlshift(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numlshift_d);
+        if (jr != null) return jr;
+
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 << r2);
     }
 
+    static Func<Variable,Variable,Variable> bif_numrshift_d = bif_numrshift;
     public static Variable bif_numrshift(Variable v1, Variable v2) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
-        P6any o2 = NominalCheck("$y", Kernel.AnyMO, v2);
+        P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numrshift_d);
+        if (jr != null) return jr;
+
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 >> r2);
     }
 
+    static Func<Variable,Variable> bif_numcompl_d = bif_numcompl;
     public static Variable bif_numcompl(Variable v1) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v1);
+        P6any o1 = v1.Fetch();
+        Variable jr = CheckSpecial1(v1, o1, bif_numcompl_d);
+        if (jr != null) return jr;
+
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return MakeInt(~r1);
     }
 
+    // only called from .Rat
     public static Variable bif_rat_approx(Variable v1, Variable v2) {
         NominalCheck("$x", Kernel.AnyMO, v1);
         NominalCheck("$y", Kernel.AnyMO, v2);
@@ -964,7 +1049,7 @@ public class Builtins {
     }
 
     public static Variable bif_postinc(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = v.Fetch();
         AssignV(v, o1.mo.mro_succ.Get(v));
         return Kernel.NewROScalar(o1);
     }
