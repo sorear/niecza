@@ -29,6 +29,62 @@ use STD;
 use Sig;
 
 augment class NieczaActions {
+method do_variable_reference($M, $v) {
+    if $v<term> {
+        return $v<term>;
+    }
+
+    my $tw = $v<twigil>;
+    my $sl = $v<sigil> ~ $tw ~ $v<name>;
+
+    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
+        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
+        return ::Op::StatementList.new;
+    }
+
+    if $tw eq '!' {
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, private => True, receiver => mklex($M, 'self'),
+            ppath => $v<rest>));
+    }
+    elsif $tw eq '.' {
+        if defined $v<rest> {
+            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
+            return ::Op::StatementList.new;
+        }
+
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, receiver => mklex($M, 'self')));
+    }
+    # no twigil in lex name for these
+    elsif $tw eq '^' || $tw eq ':' {
+        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>);
+    }
+    elsif $tw eq '*' {
+        ::Op::ContextVar.new(|node($M), name => $sl);
+    }
+    elsif $tw eq '' || $tw eq '?' {
+        if defined($v<rest>) {
+            ::Op::PackageVar.new(path => $v<rest>, name => $sl,
+                slot => self.gensym, |node($M));
+        } elsif $tw eq '?' && $sl eq '$?POSITION' {
+            mkcall($M, '&infix:<..^>',
+                ::Op::Num.new(|node($M), value => [10, ~$M.from]),
+                ::Op::Num.new(|node($M), value => [10, ~$M.to]));
+        } elsif $tw eq '?' && $sl eq '$?LINE' {
+            ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
+        } elsif $tw eq '?' && $sl eq '&?BLOCK' {
+            ::Op::GetBlock.new(|node($M))
+        } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
+            ::Op::GetBlock.new(|node($M), :routine)
+        } else {
+            ::Op::Lexical.new(|node($M), name => $sl);
+        }
+    }
+    else {
+        $M.CURSOR.sorry("Unhandled reference twigil $tw");
+    }
+}
 }
 
 augment class Op::YouAreHere { #OK
@@ -37,7 +93,30 @@ augment class Op::YouAreHere { #OK
     }
 }
 
-for < you_are_here
+class Op::GetBlock is Op {
+    has Bool $.routine;
+    method code($body is copy) {
+        constant %good = (:Routine, :Submethod, :Regex, :Method, :Sub);
+        my $op = CgOp.callframe;
+        my $pt = $body;
+        loop {
+            die "No current routine" if !$body;
+            last if !$body.transparent &&
+                (!$!routine || %good{$body.class});
+            $body .= outer;
+            $op = CgOp.frame_outer($op);
+        }
+        CgOp.newscalar(CgOp.frame_sub($op));
+    }
+
+    method begin() {
+        loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
+            $c.strong_used = True;
+        }
+    }
+}
+
+for < you_are_here frame_outer frame_sub
         > -> $name {
     my $fnc = anon sub CgOperator (\|@parcel) {
         Q:CgOp {
