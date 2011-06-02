@@ -1675,7 +1675,6 @@ again:
 
         DispatchEnt de = to.curDisp.next;
         P6opaque o = cap as P6opaque;
-        Frame nf = th.MakeChild(de.outer, de.info, de.ip6);
 
         Variable[] p = to.pos;
         VarHash n    = to.named;
@@ -1683,9 +1682,8 @@ again:
             p = (Variable[]) o.slots[0];
             n = o.slots[1] as VarHash;
         }
-        nf = nf.info.Binder(nf, p, n, false);
-        nf.curDisp = de;
-        return nf;
+
+        return de.info.Binder(th, de.outer, de.ip6, p, n, false, de);
     }
 
     public static bool obj_can(P6any obj, string mname) {

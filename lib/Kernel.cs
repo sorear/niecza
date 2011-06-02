@@ -748,8 +748,10 @@ namespace Niecza {
         private string PName(int rbase) {
             return ((string)sig_r[rbase]) + " in " + name;
         }
-        public unsafe Frame Binder(Frame th, Variable[] pos, VarHash named,
-                bool quiet) {
+        public unsafe Frame Binder(Frame caller, Frame outer, P6any sub,
+                Variable[] pos, VarHash named, bool quiet, DispatchEnt de) {
+            Frame th = caller.MakeChild(outer, this, sub);
+            th.curDisp = de;
             th.pos = pos;
             th.named = named;
             // XXX I don't fully understand how this works, but it's
@@ -1252,10 +1254,7 @@ noparams:
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
 
-            Frame n = caller.MakeChild(outer, info, th);
-            n = n.info.Binder(n, pos, named, false);
-
-            return n;
+            return info.Binder(caller, outer, th, pos, named, false, null);
         }
     }
 
@@ -2192,9 +2191,9 @@ tryagain:
 
         public static Frame GatherHelper(Frame th, P6any sub) {
             P6opaque dyo = (P6opaque) sub;
-            Frame n = th.MakeChild((Frame) dyo.slots[0],
-                    (SubInfo) dyo.slots[1], AnyP);
-            n = n.info.Binder(n, Variable.None, null, false);
+            Frame n = (dyo.slots[1] as SubInfo).Binder(th,
+                    (dyo.slots[0] as Frame), dyo, Variable.None, null, false,
+                    null);
             n.MarkSharedChain();
             n.lex = new Dictionary<string,object>();
             n.lex["!return"] = null;
@@ -2536,8 +2535,8 @@ tryagain:
                 //Console.WriteLine((new MMDCandidateLongname(p,0)).LongName());
                 SubInfo si = (SubInfo)p.GetSlot("info");
                 Frame   o  = (Frame)p.GetSlot("outer");
-                Frame nth = th.MakeChild(o, si, p);
-                if (nth.info.Binder(nth, dth.pos, dth.named, true) == null) {
+                if (si.Binder(th, o, p, dth.pos, dth.named, true,
+                            null) == null ) {
                     //Console.WriteLine("NOT BINDABLE");
                 } else {
                     if (tie_state == 0) tie_state = 2;
@@ -2554,10 +2553,8 @@ tryagain:
                 return Kernel.Die(th, "No matching candidates to dispatch for " + dth.info.name);
 
             if (tailcall) th = th.caller;
-            Frame nf = root.info.Binder(th.MakeChild(root.outer, root.info, root.ip6),
-                    dth.pos, dth.named, false);
-            nf.curDisp = root;
-            return nf;
+            return root.info.Binder(th, root.outer, root.ip6,
+                    dth.pos, dth.named, false, root);
         }
 
         private static Frame StandardTypeProtoC(Frame th) {
@@ -3126,9 +3123,7 @@ slow:
             }
         }
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
-            Frame n = th.MakeChild(null, IRSI, AnyP);
-            n = n.info.Binder(n, pcl, null, false);
-            return n;
+            return IRSI.Binder(th, null, null, pcl, null, false, null);
         }
 
         private static STable DoRoleApply(STable b,
@@ -3636,14 +3631,12 @@ slow:
                 if (de != null) {
                     Variable[] p = tf.pos;
                     VarHash n = tf.named;
-                    tf = tf.caller.MakeChild(de.outer, de.info, de.ip6);
                     if (o != null) {
                         p = (Variable[]) o.slots[0];
                         n = o.slots[1] as VarHash;
                     }
-                    tf = tf.info.Binder(tf, p, n, false);
-                    tf.curDisp = de;
-                    return tf;
+                    return de.info.Binder(tf.caller, de.outer, de.ip6, p, n,
+                            false, de);
                 } else {
                     tf.caller.resultSlot = AnyMO.typeVar;
                     return tf.caller;
