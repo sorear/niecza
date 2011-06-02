@@ -1271,8 +1271,6 @@ namespace Niecza.CLRBackend {
             STable.GetConstructor(new Type[] { String });
         public static readonly ConstructorInfo RxFrame_ctor =
             RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean, Boolean });
-        public static readonly ConstructorInfo Frame_ctor =
-            Frame.GetConstructor(new Type[] { Frame, Frame, SubInfo });
         public static readonly ConstructorInfo SV_ctor =
             typeof(SimpleVariable).GetConstructor(new Type[] {
                     Boolean, Boolean, STable, typeof(ViviHook), P6any });
@@ -3875,6 +3873,8 @@ dynamic:
             thandlers["to_json"] = Methody(null, typeof(JsonWriter).GetMethod("ToJson"));
             thandlers["from_json"] = Methody(null, typeof(JsyncReader).GetMethod("FromJson"));
             thandlers["frame_caller"] = FieldGet(Tokens.Frame, "caller");
+            thandlers["frame_outer"] = FieldGet(Tokens.Frame, "outer");
+            thandlers["frame_sub"] = FieldGet(Tokens.Frame, "sub");
             thandlers["frame_args"] = Methody(null, Tokens.Frame.GetMethod("GetArgs"));
             thandlers["frame_dyn_caller"] = Methody(null, Tokens.Frame.GetMethod("DynamicCaller"));
             thandlers["frame_file"] = Methody(null, Tokens.Frame.GetMethod("ExecutingFile"));
@@ -4744,7 +4744,8 @@ dynamic:
                     b.v = Kernel.FalseV;
                     Variable r = Kernel.RunInferior(
                         Kernel.GetInferiorRoot().MakeChild(null,
-                            new SubInfo("<repl>", Builtins.eval_result)));
+                            new SubInfo("<repl>", Builtins.eval_result),
+                            Kernel.AnyP));
                     if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
                         Variable pl = Kernel.RunInferior(
                             r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),

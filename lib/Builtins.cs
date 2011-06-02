@@ -1085,7 +1085,7 @@ public class Builtins {
         if (msg[0] != "")
             return Kernel.Die(th, msg[0]);
         return th.MakeChild(null, new SubInfo("boot-" +
-                    eval_result.Method.DeclaringType, eval_result));
+                    eval_result.Method.DeclaringType, eval_result), Kernel.AnyP);
     }
 
     public static Variable bif_pair(Variable key, Variable value) {
@@ -1351,7 +1351,7 @@ again:
         P6any fcni = fcn.Fetch();
         int arity = bif_arity(fcni);
 
-        Frame fr = th.MakeChild(null, CommonMEMap_I);
+        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
@@ -1369,7 +1369,7 @@ again:
     }
 
     public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, CommonMEMap_I);
+        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
         fr.lex0 = new ZipSource(pcl);
@@ -1378,7 +1378,7 @@ again:
     }
 
     public static Frame MECross(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, CommonMEMap_I);
+        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
         fr.lex0 = new CrossSource(pcl);
@@ -1466,7 +1466,7 @@ again:
         Variable fcn = iter.Shift();
         iter = Kernel.IterFlatten(iter);
 
-        Frame fr = th.MakeChild(null, CommonGrep_I);
+        Frame fr = th.MakeChild(null, CommonGrep_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = iter;
         fr.lex1 = new VarDeque();
@@ -1483,7 +1483,7 @@ again:
 
         DispatchEnt de = to.curDisp.next;
         P6opaque o = cap as P6opaque;
-        Frame nf = th.MakeChild(de.outer, de.info);
+        Frame nf = th.MakeChild(de.outer, de.info, de.ip6);
 
         Variable[] p = to.pos;
         VarHash n    = to.named;

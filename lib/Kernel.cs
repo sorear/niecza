@@ -473,12 +473,13 @@ namespace Niecza {
                 Kernel.CheckUnsafe(ns);
             if ((spec & SUB_HAS_TYPE) != 0)
                 ns.mo = (STable) ReadXref(ref from);
-            if ((spec & MAKE_PROTOPAD) != 0)
-                ns.protopad = new Frame(null,
-                    ns.outer == null ? null : ns.outer.protopad, ns);
             if (ns.outer == null || ns.outer.protopad != null)
                 ns.protosub = Kernel.MakeSub(ns,
                     ns.outer == null ? null : ns.outer.protopad);
+            if ((spec & MAKE_PROTOPAD) != 0)
+                ns.protopad = new Frame(null,
+                    ns.outer == null ? null : ns.outer.protopad, ns,
+                        ns.protosub);
             if ((spec & SUB_IS_PARAM_ROLE) != 0)
                 ((STable) ReadXref(ref from)).FillParametricRole(ns.protosub);
 
@@ -829,7 +830,8 @@ namespace Niecza {
                 }
                 if ((flags & SIG_F_HASDEFAULT) != 0) {
                     Frame thn = Kernel.GetInferiorRoot()
-                        .MakeChild(th, (SubInfo) rbuf[rbase + 1 + names]);
+                        .MakeChild(th, (SubInfo) rbuf[rbase + 1 + names],
+                            Kernel.AnyP);
                     src = Kernel.RunInferior(thn);
                     if (src == null)
                         throw new Exception("Improper null return from sub default for " + PName(rbase));
@@ -1025,6 +1027,7 @@ noparams:
 
         public DispatchEnt curDisp;
         public RxFrame rx;
+        public P6any sub;
 
         public Variable[] pos;
         public VarHash named;
@@ -1034,11 +1037,12 @@ noparams:
         public int flags;
 
         public Frame(Frame caller_, Frame outer_,
-                SubInfo info_) {
+                SubInfo info_, P6any sub_) {
             caller = caller_;
             outer = outer_;
             code = info_.code;
             info = info_;
+            sub = sub_;
             mo = Kernel.CallFrameMO;
             lexn = (info_.nspill > 0) ? new object[info_.nspill] : null;
         }
@@ -1050,7 +1054,7 @@ noparams:
         public static readonly bool VerboseExceptions =
             Environment.GetEnvironmentVariable("NIECZA_VERBOSE_EXCEPTIONS") != null;
 
-        public Frame MakeChild(Frame outer, SubInfo info) {
+        public Frame MakeChild(Frame outer, SubInfo info, P6any sub) {
             if (reusable_child == null) {
                 reusable_child = new Frame();
                 reusable_child.reuser = this;
@@ -1075,6 +1079,7 @@ noparams:
             reusable_child.caller = this;
             reusable_child.outer = outer;
             reusable_child.info = info;
+            reusable_child.sub = sub;
             reusable_child.code = info.code;
             reusable_child.rx = null;
             return reusable_child;
@@ -1245,7 +1250,7 @@ noparams:
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
 
-            Frame n = caller.MakeChild(outer, info);
+            Frame n = caller.MakeChild(outer, info, th);
             n = n.info.Binder(n, pos, named, false);
 
             return n;
@@ -2112,7 +2117,7 @@ tryagain:
                 throw new NieczaException("Recursive module graph detected at " + name + ": " + JoinS(" ", ModulesStarted));
             ModulesStarted.Add(name);
             Variable r = Kernel.RunInferior(Kernel.GetInferiorRoot().
-                    MakeChild(null, new SubInfo("boot-" + name, dgt)));
+                    MakeChild(null, new SubInfo("boot-" + name, dgt), AnyP));
             ModulesFinished.Add(name);
             return r;
         }
@@ -2163,7 +2168,7 @@ tryagain:
         public static Frame GatherHelper(Frame th, P6any sub) {
             P6opaque dyo = (P6opaque) sub;
             Frame n = th.MakeChild((Frame) dyo.slots[0],
-                    (SubInfo) dyo.slots[1]);
+                    (SubInfo) dyo.slots[1], AnyP);
             n = n.info.Binder(n, Variable.None, null, false);
             n.MarkSharedChain();
             n.lex = new Dictionary<string,object>();
@@ -2490,7 +2495,7 @@ tryagain:
                 //Console.WriteLine((new MMDCandidateLongname(p,0)).LongName());
                 SubInfo si = (SubInfo)p.GetSlot("info");
                 Frame   o  = (Frame)p.GetSlot("outer");
-                Frame nth = th.MakeChild(o, si);
+                Frame nth = th.MakeChild(o, si, p);
                 if (nth.info.Binder(nth, dth.pos, dth.named, true) == null) {
                     //Console.WriteLine("NOT BINDABLE");
                 } else {
@@ -2508,7 +2513,7 @@ tryagain:
                 return Kernel.Die(th, "No matching candidates to dispatch for " + dth.info.name);
 
             if (tailcall) th = th.caller;
-            Frame nf = root.info.Binder(th.MakeChild(root.outer, root.info),
+            Frame nf = root.info.Binder(th.MakeChild(root.outer, root.info, root.ip6),
                     dth.pos, dth.named, false);
             nf.curDisp = root;
             return nf;
@@ -2833,7 +2838,7 @@ again:
                 goto again;
             }
             if (inq0.mo.HasMRO(IterCursorMO)) {
-                Frame th = new Frame(null, null, IF_SI);
+                Frame th = new Frame(null, null, IF_SI, Kernel.AnyP);
                 th.lex0 = inq;
                 P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
                 th.lex = new Dictionary<string,object>();
@@ -3080,7 +3085,7 @@ slow:
             }
         }
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
-            Frame n = th.MakeChild(null, IRSI);
+            Frame n = th.MakeChild(null, IRSI, AnyP);
             n = n.info.Binder(n, pcl, null, false);
             return n;
         }
@@ -3237,8 +3242,8 @@ slow:
             Frame l = lfn.cur;
             rlstack = lfn.next;
             return lfn.next.cur = lfn.next.root = ((l == null ?
-                        new Frame(null, null, ExitRunloopSI) :
-                        l.MakeChild(null, ExitRunloopSI)));
+                        new Frame(null, null, ExitRunloopSI, Kernel.AnyP) :
+                        l.MakeChild(null, ExitRunloopSI, AnyP)));
         }
 
         public static Variable RunInferior(Frame f) {
@@ -3584,7 +3589,7 @@ slow:
                 if (de != null) {
                     Variable[] p = tf.pos;
                     VarHash n = tf.named;
-                    tf = tf.caller.MakeChild(de.outer, de.info);
+                    tf = tf.caller.MakeChild(de.outer, de.info, de.ip6);
                     if (o != null) {
                         p = (Variable[]) o.slots[0];
                         n = o.slots[1] as VarHash;

@@ -32,7 +32,7 @@ namespace Niecza {
             DispatchEnt m;
             //Kernel.LogNameLookup(name);
             if (mo.mro_methods.TryGetValue(name, out m)) {
-                Frame nf = m.info.Binder(caller.MakeChild(m.outer, m.info),
+                Frame nf = m.info.Binder(caller.MakeChild(m.outer, m.info, m.ip6),
                         pos, named, false);
                 nf.curDisp = m;
                 return nf;

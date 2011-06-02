@@ -30,7 +30,7 @@ public sealed class GState {
             return th;
         }
 
-        Frame nf = m.info.Binder(th.MakeChild(m.outer, m.info),
+        Frame nf = m.info.Binder(th.MakeChild(m.outer, m.info, m.ip6),
                 pos, null, false);
         nf.curDisp = m;
         return nf;
