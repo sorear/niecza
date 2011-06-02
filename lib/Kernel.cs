@@ -929,6 +929,8 @@ noparams:
         public BValue AddHint(string name) {
             if (hints == null)
                 hints = new Dictionary<string,BValue>();
+            if (hints.ContainsKey(name))
+                return hints[name];
             return hints[name] = new BValue(Kernel.AnyMO.typeVar);
         }
 

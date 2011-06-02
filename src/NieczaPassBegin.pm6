@@ -79,6 +79,9 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
         $metabody.add_my_name('$*/');
     }
     $metabody.add_my_name('$_') if !$top;
+    if $istop {
+        $metabody.add_hint('$?FILE');
+    }
 
     pop @*opensubs if $.transparent;
 
