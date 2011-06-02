@@ -525,10 +525,12 @@ public class Builtins {
         return strcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, bif_strge_d);
     }
 
-    //static Func<Variable,Variable,Variable> bif_substr3_d = bif_substr3;
+    static Func<Variable,Variable,Variable,Variable> bif_substr3_d = bif_substr3;
     public static Variable bif_substr3(Variable v1, Variable v2, Variable v3) {
-        P6any o2 = NominalCheck("$start", Kernel.AnyMO, v2);
-        P6any o3 = NominalCheck("$chars", Kernel.AnyMO, v3);
+        P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
+        Variable jr = CheckSpecial3(v1,v2,v3, o1,o2,o3, bif_substr3_d);
+        if (jr != null) return jr;
+
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
         int r3    = (int)o3.mo.mro_raw_Numeric.Get(v3);
         return new SubstrLValue(v1, r2, r3);
@@ -1054,28 +1056,44 @@ public class Builtins {
         return Kernel.NewROScalar(o1);
     }
 
+    static Func<Variable,Variable> bif_not_d = bif_not;
     public static Variable bif_not(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = v.Fetch();
+        Variable jr = CheckSpecial1(v, o1, bif_not_d);
+        if (jr != null) return jr;
+
         bool r = o1.mo.mro_raw_Bool.Get(v);
         return r ? Kernel.FalseV : Kernel.TrueV;
     }
 
+    static Func<Variable,Variable> bif_chars_d = bif_chars;
     public static Variable bif_chars(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = v.Fetch();
+        Variable jr = CheckSpecial1(v, o1, bif_chars_d);
+        if (jr != null) return jr;
+
         string r = o1.mo.mro_raw_Str.Get(v);
         return MakeInt(r.Length);
     }
 
+    static Func<Variable,Variable> bif_ord_d = bif_ord;
     public static Variable bif_ord(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = v.Fetch();
+        Variable jr = CheckSpecial1(v, o1, bif_ord_d);
+        if (jr != null) return jr;
+
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
         if (r.Length == 0) return Kernel.AnyMO.typeVar;
         return MakeInt((int)r[0]);
     }
 
+    static Func<Variable,Variable> bif_chr_d = bif_chr;
     public static Variable bif_chr(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = v.Fetch();
+        Variable jr = CheckSpecial1(v, o1, bif_chr_d);
+        if (jr != null) return jr;
+
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
     }
