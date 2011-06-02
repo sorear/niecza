@@ -93,6 +93,18 @@ augment class Op::YouAreHere { #OK
     }
 }
 
+class Op::LeaveHook is Op {
+    has $.inner;
+    method zyg() { $.inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+            11, '', "end$id");
+    }
+}
+
 class Op::GetBlock is Op {
     has Bool $.routine;
     method code($body is copy) {

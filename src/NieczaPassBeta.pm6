@@ -120,5 +120,5 @@ sub beta_optimize($body, $op, $inv, $cbody) {
         $nop = ::Op::TopicalHook.new(inner => $nop);
     }
 
-    $nop;
+    $cbody.transparent ?? $nop !! ::Op::LeaveHook.new(inner => $nop);
 }
