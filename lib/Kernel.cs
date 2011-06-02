@@ -1265,7 +1265,7 @@ noparams:
             Variable[] np = new Variable[pos.Length + 1];
             Array.Copy(pos, 0, np, 1, pos.Length);
             np[0] = Kernel.NewROScalar(th);
-            return th.InvokeMethod(caller, "INVOKE", np, named);
+            return th.InvokeMethod(caller, "postcircumfix:<( )>", np, named);
         }
     }
 
@@ -2202,7 +2202,7 @@ tryagain:
             return th;
         }
 
-        private static SubInfo SubInvokeSubSI = new SubInfo("Sub.INVOKE", SubInvokeSubC);
+        private static SubInfo SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>", SubInvokeSubC);
         private static Frame SubInvokeSubC(Frame th) {
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
@@ -3321,7 +3321,7 @@ slow:
             CodeMO = new STable("Code");
             CodeMO.FillProtoClass(new string[] { "outer", "info" });
             SubInvokeSubSI.param1 = new InvokeSub();
-            CodeMO.AddMethod(0, "INVOKE", MakeSub(SubInvokeSubSI, null));
+            CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
             CodeMO.Invalidate();
 
             LabelMO = new STable("Label");

@@ -536,7 +536,7 @@ next_method: ;
             mro_delete_key = _GetVT("delete-key") as IndexHandler ?? CallDeleteKey;
             mro_exists_key = _GetVT("exists-key") as IndexHandler ?? CallExistsKey;
             mro_hash = _GetVT("hash") as ContextHandler<Variable> ?? CallHash;
-            mro_INVOKE = _GetVT("INVOKE") as InvokeHandler ?? CallINVOKE;
+            mro_INVOKE = _GetVT("postcircumfix:<( )>") as InvokeHandler ?? CallINVOKE;
             mro_item = _GetVT("item") as ContextHandler<Variable> ?? CallItem;
             mro_iterator = _GetVT("iterator") as ContextHandler<Variable> ?? CallIterator;
             mro_list = _GetVT("list") as ContextHandler<Variable> ?? CallList;
