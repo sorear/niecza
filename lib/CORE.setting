@@ -404,7 +404,7 @@ sub index($haystack,$needle) { $haystack.index($needle) }
 
 sub item(Mu $x) { $x }
 
-sub prefix:<not>($x) { not($x) }
+sub prefix:<not>(Mu $x) { not($x) }
 sub defined(Mu $x) { defined($x) }
 
 # Buglet in STD: standard infix operators look custom inside the setting, and
@@ -421,6 +421,7 @@ sub prefix:<+>(Mu $v) { +$v }
 sub prefix:<!>(Mu $v) { !$v }
 
 sub not(Mu $v) { not($v) }
+sub so(Mu $v) { so $v }
 
 sub infix:<x>($str, $ct) {
     my $i = +$ct;
@@ -864,7 +865,9 @@ my class Junction is Mu {
     }
 
     method ACCEPTS(Mu $: Mu \$other) {
-        ?(self.FALLBACK("ACCEPTS", $other));
+        defined(self) ??
+            ?(self.FALLBACK("ACCEPTS", $other)) !!
+            $other.^isa(self)
     }
 }
 sub infix:<&>(\|$p) { Junction.from-parcel(0, $p) }

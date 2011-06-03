@@ -482,7 +482,13 @@ public class Builtins {
             int mask, Func<Variable,Variable,Variable> d) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         Variable jr = CheckSpecial2(v1, v2, o1, o2, d);
-        if (jr != null) return jr;
+        if (jr != null) {
+            // treat $x != $y as !($x == $y)
+            if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
+                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
+                    Kernel.TrueV;
+            return jr;
+        }
         int diff = string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                 o2.mo.mro_raw_Str.Get(v2));
         int mcom = (diff < 0) ? O_IS_LESS : (diff > 0) ? O_IS_GREATER :
@@ -495,9 +501,8 @@ public class Builtins {
         return strcompare(v1, v2, O_IS_EQUAL, bif_streq_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_strne_d = bif_strne;
     public static Variable bif_strne(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER, bif_strne_d);
+        return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD, bif_streq_d);
     }
 
     static Func<Variable,Variable,Variable> bif_strlt_d = bif_strlt;

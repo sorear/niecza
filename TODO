@@ -64,11 +64,6 @@ HARD
    Determine the best way to map Perl6 process-think onto Windows/.NET
    process think.  Then implement &run, &runinstead, and &rungather.
 
- +*Implement junctions.  You'll need to add some slightly tricky code
-   on the slow path of nominal type checks.  You will also need to fix
-   the optimized builtins to use nominal type checking.  Bonus points
-   if the optimizer can turn if $x == any(1,3,5) into a loop.
-
    Niecza is probably the ideal platform for prototyping a concurrency
    system which will whirlpool back into the synopses.
 
