@@ -8,30 +8,30 @@ use MONKEY_TYPING;
 
 # Fundamental types {{{
 my class Mu {
-    method head(Mu $self:) { @($self).head }
+    method head() { @(self).head }
     method flattens(\$self:) {
         Q:CgOp { (box Bool (var_islist {$self})) }
     }
-    method typename(Mu $self:) {  # should be ^name
-        Q:CgOp { (box Str (obj_typename (@ {$self}))) }
+    method typename() {  # should be ^name
+        Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
-    method Str(Mu $self:) {
-        my $tn := Q:CgOp { (box Str (obj_typename (@ {$self}))) };
-        if defined($self) {
+    method Str() {
+        my $tn := Q:CgOp { (box Str (obj_typename (@ {self}))) };
+        if defined(self) {
             $tn ~ "()<instance>"
         } else {
             $tn ~ "()"
         }
     }
-    method succ(Mu $self:) { defined($self) ?? die("cannot increment a value of type $self.typename()") !! 1 }
-    method pred(Mu $self:) { defined($self) ?? die("cannot decrement a value of type $self.typename()") !! -1 }
-    method notdef(Mu $self:) { !defined($self) }
-    method ACCEPTS(Mu $self: \$x) { defined($self) ?? $self === $x !! $x.^does($self) }
-    method perl(Mu $self:) { defined($self) ?? "{$self.typename}.new(...)" !! $self.typename }
-    method so(Mu $self:) { ?$self }
-    method not(Mu $self:) { !$self }
-    method CREATE(Mu $self: *%_) { Q:CgOp { (default_new (@ {$self}) (unbox varhash (@ {%_}))) } }
-    method new(Mu $self: *%_) { Q:CgOp { (default_new (@ {$self}) (unbox varhash (@ {%_}))) } }
+    method succ() { defined(self) ?? die("cannot increment a value of type {self.typename()}") !! 1 }
+    method pred() { defined(self) ?? die("cannot decrement a value of type {self.typename()}") !! -1 }
+    method notdef() { !defined(self) }
+    method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
+    method perl() { defined(self) ?? "{self.typename}.new(...)" !! self.typename }
+    method so() { ?self }
+    method not() { !self }
+    method CREATE(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
+    method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
 }
 
 my class Any is Mu {
@@ -843,28 +843,28 @@ my class Junction is Mu {
     has $!kind_;
     has $!eigenstates_;
 
-    method !create(Mu $: $kind, $eigenstates) { Q:CgOp {
+    method !create($kind, $eigenstates) { Q:CgOp {
         (letn ob (obj_newblank (obj_llhow (@ {self})))
           (setslot kind_ (l ob) (@ {$kind}))
           (setslot eigenstates_ (l ob) (@ {$eigenstates}))
           (ns (l ob)))
     } }
-    method !kind(Mu $:) { Q:CgOp { (ns (getslot kind_ obj (@ {self}))) } }
-    method !eigenstates(Mu $:) { Q:CgOp { (ns (getslot eigenstates_ obj (@ {self}))) } }
+    method !kind() { Q:CgOp { (ns (getslot kind_ obj (@ {self}))) } }
+    method !eigenstates() { Q:CgOp { (ns (getslot eigenstates_ obj (@ {self}))) } }
 
     my @kinds = <all none one any each>;
-    method perl(Mu $:) {
+    method perl() {
         @kinds[self!kind] ~ "(" ~ join(", ", map { .perl }, @$!eigenstates) ~ ")"
     }
 
-    method from-parcel(Mu $: Int $kind, Mu $pcl) {
+    method from-parcel(Int $kind, Mu $pcl) {
         self!create($kind, $pcl)
     }
-    method from-list(Mu $: Int $kind, @list) {
+    method from-list(Int $kind, @list) {
         self!create($kind, Q:CgOp { (box Parcel (vvarlist_to_fvarlist (getslot items vvarlist (@ {@list.eager})))) })
     }
 
-    method ACCEPTS(Mu $: Mu \$other) {
+    method ACCEPTS(Mu \$other) {
         defined(self) ??
             ?(self.FALLBACK("ACCEPTS", $other)) !!
             $other.^isa(self)

@@ -40,7 +40,7 @@ augment class Unit { method begin() {
 
 my %type2phaser = ( init => 0, end => 1, begin => 2 );
 
-augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, :$augmenting = False, :$prefix = '', :$gather_hack, :$augment_hack) {
+augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, :$augmenting = False, :$prefix = '', :$gather_hack, :$augment_hack, :$method_of) {
     my $top = @*opensubs ?? @*opensubs[*-1].xref !! $itop;
     my $rtop = $top && $*unit.deref($top);
     my $istop = !@*opensubs;
@@ -71,7 +71,12 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
     push @*opensubs, $metabody; # always visible in the signature XXX
 
     if $.signature {
-        $.signature.begin;
+        if defined($method_of) &&
+                $*unit.deref($method_of) !~~ ::Metamodel::Class {
+            # XXX type checks against roles do not work yet
+            $method_of ::= Any;
+        }
+        $.signature.begin($.returnable, $method_of);
         $metabody.signature = $.signature;
     }
 
@@ -95,10 +100,19 @@ augment class Body { method begin(:$once = False, :$itop, :$body_of, :$cur_pkg, 
 } }
 
 augment class Sig {
-    method begin() { for @$.params { $_.begin } }
+    method begin($ret, $meth) { for @$.params { $_.begin($ret, $meth) } }
 }
 
-augment class Sig::Parameter { method begin() { #OK exist
+augment class Sig::Parameter { method begin($ret, $meth) { #OK exist
+    my $deftype;
+    if $.invocant && defined $meth {
+        $deftype = $meth;
+    } else {
+        my $sname = $ret ?? 'Any' !! 'Mu';
+        $deftype = $ret ?? Any !!
+            $*unit.get_item(@*opensubs[*-1].find_pkg(['MY', $sname]));
+        $.type //= $sname;
+    }
     @*opensubs[*-1].add_my_name($.slot, list => $.list,
         hash => $.hash, noinit => True) if defined $.slot;
     @*opensubs[*-1].add_my_name('self', :noinit) if $.invocant;
@@ -108,8 +122,7 @@ augment class Sig::Parameter { method begin() { #OK exist
         @*opensubs[*-1].add_child($mdefault);
         $!default = Any;
     }
-    # XXX should use a proper undef not 'Any'
-    $.tclass = ($.type ~~ Str) ?? Any !!
+    $.tclass = ($.type ~~ Str) ?? $deftype !!
         $*unit.get_item(@*opensubs[*-1].find_pkg($.type));
 } }
 
@@ -329,6 +342,7 @@ augment class Op::SubDef { #OK exist
         }
         $.bindpackages //= [];
         my $body = $.body.begin(:$prefix,
+            method_of => defined($.bindmethod) ?? @*opensubs[*-1].body_of!!Any,
             once => ($.body.type // '') eq 'voidbare');
         @*opensubs[*-1].add_my_sub($.symbol, $body);
         my $r = $body.xref;
