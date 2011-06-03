@@ -452,9 +452,10 @@ public class Builtins {
         return numcompare(v1, v2, O_IS_EQUAL, bif_numeq_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_numne_d = bif_numne;
     public static Variable bif_numne(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER, bif_numne_d);
+        // NOTE that junctionalization uses == !  See check in numcompare
+        return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD,
+                bif_numeq_d);
     }
 
     static Func<Variable,Variable,Variable> bif_numlt_d = bif_numlt;
@@ -696,7 +697,13 @@ public class Builtins {
         int r1, r2, res=0;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         Variable jr = CheckSpecial2(a1, a2, o1, o2, dl);
-        if (jr != null) return jr;
+        if (jr != null) {
+            // treat $x != $y as !($x == $y)
+            if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
+                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
+                    Kernel.TrueV;
+            return jr;
+        }
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -1050,12 +1057,8 @@ public class Builtins {
         return Kernel.NewROScalar(o1);
     }
 
-    static Func<Variable,Variable> bif_not_d = bif_not;
     public static Variable bif_not(Variable v) {
         P6any o1 = v.Fetch();
-        Variable jr = CheckSpecial1(v, o1, bif_not_d);
-        if (jr != null) return jr;
-
         bool r = o1.mo.mro_raw_Bool.Get(v);
         return r ? Kernel.FalseV : Kernel.TrueV;
     }

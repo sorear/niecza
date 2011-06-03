@@ -198,10 +198,12 @@ is ((2 | 4) + (1 & 2)).perl, 'all(any(3, 5), any(4, 6))',
         'autothreading of multi-arg only sub';
 }
 
-nok "foo" !eq any("foo","bar"), "foo !eq (foo | bar)";
-ok "foo" !eq any("quux","bar"), "foo !eq (quux | bar)";
-nok 2 != any(2, 4), "2 != (2|4)";
-ok 2 != any(0, 4), "2 != (0|4)";
+nok ?("foo" !eq any("foo","bar")), "foo !eq (foo | bar)";
+ok ?("foo" !eq any("quux","bar")), "foo !eq (quux | bar)";
+nok ?(2 != any(2, 4)), "2 != (2|4)";
+ok ?(2 != any(0, 4)), "2 != (0|4)";
+
+ok 2 ~~ any(Int, Num), "junctional ~~ works";
 
 ok $?FILE ~~ /test2?\.pl/, '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

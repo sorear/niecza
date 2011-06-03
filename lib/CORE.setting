@@ -862,6 +862,10 @@ my class Junction is Mu {
     method from-list(Mu $: Int $kind, @list) {
         self!create($kind, Q:CgOp { (box Parcel (vvarlist_to_fvarlist (getslot items vvarlist (@ {@list.eager})))) })
     }
+
+    method ACCEPTS(Mu $: Mu \$other) {
+        ?(self.FALLBACK("ACCEPTS", $other));
+    }
 }
 sub infix:<&>(\|$p) { Junction.from-parcel(0, $p) }
 sub infix:<^>(\|$p) { Junction.from-parcel(2, $p) }
