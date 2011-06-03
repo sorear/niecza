@@ -1,0 +1,2 @@
+#! /bin/sh
+monodis $1 | perl -ne '/IL_(\S*):\s*ret/ and $ret = $1; /end of method (.*)/ and print "$ret\t\t$1\n"'

@@ -1,0 +1,3 @@
+#!/usr/bin/perl
+my $x = ($ARGV[0] =~ s/^-//) ? 1 : 0;
+exec "mono obj/CLRBackend.exe obj $ARGV[0].nam $ARGV[0].".($x?"exe":"dll")." $x";
