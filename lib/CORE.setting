@@ -1394,9 +1394,9 @@ sub infix:<?|> ($a, $b) { ?($a || $b) }
 sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) { !$a }
 sub prefix:<|> (\$item) { $item.Capture }
-sub prefix:<^> ($limit) { 0 ..^ $limit }
+sub prefix:<^> ($limit) { 0 ..^ +$limit }
 sub prefix:<so> ($item) { ?$item }
-sub infix:<xx> (\$list, $ct) { map { $list }, ^$ct }
+sub infix:<xx> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
 sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 # XXX 'Order' type
@@ -1434,7 +1434,7 @@ sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 
-sub eval($str) { Q:CgOp { (bif_simple_eval {$str}) } }
+sub eval($str) is return-pass { Q:CgOp { (bif_simple_eval {$str}) } }
 
 sub rungather($ ) { die "Run NYI" }
 # }}}

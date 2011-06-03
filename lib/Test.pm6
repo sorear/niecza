@@ -103,14 +103,23 @@ sub dies_ok($code,$why?) is export {
     try { $code.(); $lived = True; }
     $*TEST-BUILDER.ok(!$lived, $why);
 }
-sub eval_dies_ok($code, $why?) is export {
+# bit of a hack: forces an inferior runloop to make CONTROL catchable
+my class NoControlEval {
+    method Bool() {
+        my $rn = False;
+        (sub () { eval $*code; $rn++ })();
+        die "illegal return" unless $rn;
+        True;
+    }
+}
+sub eval_dies_ok($*code, $why?) is export {
     my $lived = False;
-    try { eval $code; $lived = True; }
+    try { ?NoControlEval; $lived = True; }
     $*TEST-BUILDER.ok(!$lived, $why);
 }
-sub eval_lives_ok($code, $why?) is export {
+sub eval_lives_ok($*code, $why?) is export {
     my $lived = False;
-    try { eval $code; $lived = True; }
+    try { ?NoControlEval; $lived = True; }
     $*TEST-BUILDER.ok($lived, $why);
 }
 sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
