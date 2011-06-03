@@ -362,10 +362,11 @@ class Conditional is Op {
 }
 
 class WhileLoop is Op {
-    has $.check = die "WhileLoop.check required"; # Op
-    has $.body = die "WhileLoop.body required"; # Op
-    has $.once = die "WhileLoop.once required"; # Bool
-    has $.until = die "WhileLoop.until required"; # Bool
+    has Op $.check = die "WhileLoop.check required";
+    has Op $.body = die "WhileLoop.body required";
+    has Bool $.once = die "WhileLoop.once required";
+    has Bool $.until = die "WhileLoop.until required";
+    has Bool $.need_cond;
     method zyg() { $.check, $.body }
     method ctxzyg($) { $.check, 1, $.body, 0 }
 
@@ -373,14 +374,19 @@ class WhileLoop is Op {
     method code_labelled($body, $l) {
         my $id = ::GLOBAL::NieczaActions.genid;
 
-        CgOp.letn('!cond', CgOp.scopedlex('Any'),
-            CgOp.whileloop(+$.until, +$.once,
-                CgOp.prog(CgOp.letvar('!cond', $.check.cgop($body)),
-                    CgOp.obj_getbool(CgOp.letvar('!cond'))),
+        my $cond = $!need_cond ?? 
+            CgOp.prog(CgOp.letvar('!cond', $.check.cgop($body)),
+                CgOp.obj_getbool(CgOp.letvar('!cond'))) !!
+            CgOp.obj_getbool($.check.cgop($body));
+        my @loop =
+            CgOp.whileloop(+$.until, +$.once, $cond,
                 CgOp.sink(CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
                     1, $l, "next$id", 2, $l, "last$id", 3, $l, "redo$id"))),
             CgOp.label("last$id"),
-            CgOp.corelex('Nil'));
+            CgOp.corelex('Nil');
+
+        $!need_cond ?? CgOp.letn('!cond', CgOp.scopedlex('Any'), @loop) !!
+            CgOp.prog(@loop)
     }
 }
 

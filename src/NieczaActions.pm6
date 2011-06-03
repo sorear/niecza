@@ -2353,21 +2353,24 @@ method statement_control:unless ($/) {
 method statement_control:while ($/) {
     make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
         body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
-            $<xblock><pblock>), :!until, :!once);
+            $<xblock><pblock>), :!until, :!once,
+            :need_cond(defined $<xblock><pblock><lambda>));
 }
 
 method statement_control:until ($/) {
     make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
         body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
-            $<xblock><pblock>), :until, :!once);
+            $<xblock><pblock>), :until, :!once,
+            :need_cond(defined $<xblock><pblock><lambda>));
 }
 
 method statement_control:repeat ($/) {
     my $until = $<wu> eq 'until';
     my $check = $<xblock> ?? $<xblock>.ast[0] !! $<EXPR>.ast;
-    my $body  = self.if_block($/, ::Op::LetVar.new(name => '!cond'),
-        $<xblock> ?? $<xblock><pblock> !! $<pblock>);
-    make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once);
+    my $pb = $<xblock> ?? $<xblock><pblock> !! $<pblock>;
+    my $body  = self.if_block($/, ::Op::LetVar.new(name => '!cond'), $pb);
+    make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once,
+            :need_cond(defined $pb<lambda>));
 }
 
 method statement_control:loop ($/) {
