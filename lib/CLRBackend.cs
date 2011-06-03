@@ -3407,12 +3407,12 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel.GetMethod("UnboxAny").MakeGenericMethod(t), unboxee);
             };
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
-                CpsOp rhs = th.Scan(zyg[3]);
+                CpsOp typ = th.Scan(zyg[3]);
+                CpsOp rhs = th.Scan(zyg[4]);
                 int ro   = JScalar.B(zyg[1]) ? 0 : Kernel.NBV_RW;
                 int list = JScalar.B(zyg[2]) ? Kernel.NBV_LIST : 0;
                 return CpsOp.MethodCall(Tokens.Kernel_NewBoundVar,
-                    CpsOp.IntLiteral(ro+list),
-                    CpsOp.GetSField(Tokens.Kernel_AnyMO), rhs);
+                    CpsOp.IntLiteral(ro+list), typ, rhs);
             };
             handlers["whileloop"] = delegate(NamProcessor th, object[] z) {
                 bool until = ((JScalar)z[1]).num != 0;
@@ -3436,9 +3436,15 @@ dynamic:
                 } else {
                     m = (new Xref(z, 2)).Resolve<ModuleWithTypeObject>();
                 }
-                if (kind != "mo")
-                    throw new NotImplementedException();
-                return CpsOp.GetSField(m.metaObject);
+                if (kind == "mo")
+                    return CpsOp.GetSField(m.metaObject);
+                if (kind == "typeVar")
+                    return CpsOp.GetField(Tokens.DMO_typeVar,
+                            CpsOp.GetSField(m.metaObject));
+                if (kind == "typeObj")
+                    return CpsOp.GetField(Tokens.DMO_typeObject,
+                            CpsOp.GetSField(m.metaObject));
+                throw new NotImplementedException();
             };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
                 return th.SubyCall(true, zyg); };
