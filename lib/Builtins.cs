@@ -107,31 +107,6 @@ public class Builtins {
             avs[jpivot] = n; return dgt(avs[0], avs[1], avs[2]); });
     }
 
-    public static Variable CheckSpecial1(Variable a1, P6any r1,
-            Func<Variable,Variable> dgt) {
-        if (r1.mo.is_any)
-            return null; // fast case - successful bind
-
-        return HandleSpecial1(a1,r1,dgt);
-    }
-
-    public static Variable CheckSpecial2(Variable a1, Variable a2,
-            P6any r1, P6any r2, Func<Variable,Variable,Variable> dgt) {
-        if (r1.mo.is_any && r2.mo.is_any)
-            return null; // fast case - successful bind
-
-        return HandleSpecial2(a1,a2,r1,r2,dgt);
-    }
-
-    public static Variable CheckSpecial3(Variable a1, Variable a2,
-            Variable a3, P6any r1, P6any r2, P6any r3,
-            Func<Variable,Variable,Variable,Variable> dgt) {
-        if (r1.mo.is_any && r2.mo.is_any && r3.mo.is_any)
-            return null; // fast case - successful bind
-
-        return HandleSpecial3(a1,a2,a3,r1,r2,r3,dgt);
-    }
-
     public static void AssignV(Variable lhs, P6any rhs) {
         if (!lhs.islist) {
             lhs.Store(rhs);
@@ -481,8 +456,8 @@ public class Builtins {
     public static Variable strcompare(Variable v1, Variable v2,
             int mask, Func<Variable,Variable,Variable> d) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
-        Variable jr = CheckSpecial2(v1, v2, o1, o2, d);
-        if (jr != null) {
+        if (!(o1.mo.is_any && o2.mo.is_any)) {
+            Variable jr = HandleSpecial2(v1, v2, o1, o2, d);
             // treat $x != $y as !($x == $y)
             if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
                 return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
@@ -528,8 +503,8 @@ public class Builtins {
     static Func<Variable,Variable,Variable,Variable> bif_substr3_d = bif_substr3;
     public static Variable bif_substr3(Variable v1, Variable v2, Variable v3) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
-        Variable jr = CheckSpecial3(v1,v2,v3, o1,o2,o3, bif_substr3_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
+            return HandleSpecial3(v1,v2,v3, o1,o2,o3, bif_substr3_d);
 
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
         int r3    = (int)o3.mo.mro_raw_Numeric.Get(v3);
@@ -540,8 +515,8 @@ public class Builtins {
     public static Variable bif_plus(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
-        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_plus_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1, a2, o1, o2, bif_plus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -576,8 +551,8 @@ public class Builtins {
     public static Variable bif_minus(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
-        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_minus_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1,a2, o1,o2, bif_minus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -612,8 +587,8 @@ public class Builtins {
     public static Variable bif_negate(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
-        Variable jr = CheckSpecial1(a1, o1, bif_negate_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(a1,o1, bif_negate_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -641,8 +616,8 @@ public class Builtins {
     public static Variable bif_abs(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
-        Variable jr = CheckSpecial1(a1, o1, bif_abs_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(a1,o1, bif_abs_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -701,8 +676,8 @@ public class Builtins {
             Func<Variable,Variable,Variable> dl) {
         int r1, r2, res=0;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
-        Variable jr = CheckSpecial2(a1, a2, o1, o2, dl);
-        if (jr != null) {
+        if (!(o1.mo.is_any && o2.mo.is_any)) {
+            Variable jr = HandleSpecial2(a1, a2, o1, o2, dl);
             // treat $x != $y as !($x == $y)
             if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
                 return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
@@ -758,8 +733,8 @@ public class Builtins {
     public static Variable bif_mul(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
-        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_mul_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1,a2, o1,o2, bif_mul_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -794,8 +769,8 @@ public class Builtins {
     public static Variable bif_divide(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
-        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_divide_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1,a2, o1,o2, bif_divide_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -831,8 +806,8 @@ public class Builtins {
     public static Variable bif_mod(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
-        Variable jr = CheckSpecial2(a1, a2, o1, o2, bif_mod_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1,a2, o1,o2, bif_mod_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -953,8 +928,8 @@ public class Builtins {
     public static Variable bif_sqrt(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
-        Variable jr = CheckSpecial1(a1, o1, bif_sqrt_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(a1,o1, bif_sqrt_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -972,8 +947,8 @@ public class Builtins {
     static Func<Variable,Variable,Variable> bif_numand_d = bif_numand;
     public static Variable bif_numand(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
-        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numand_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(v1,v2, o1,o2, bif_numand_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -983,8 +958,8 @@ public class Builtins {
     static Func<Variable,Variable,Variable> bif_numor_d = bif_numor;
     public static Variable bif_numor(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
-        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numor_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(v1,v2, o1,o2, bif_numor_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -994,8 +969,8 @@ public class Builtins {
     static Func<Variable,Variable,Variable> bif_numxor_d = bif_numxor;
     public static Variable bif_numxor(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
-        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numxor_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(v1,v2, o1,o2, bif_numxor_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -1005,8 +980,8 @@ public class Builtins {
     static Func<Variable,Variable,Variable> bif_numlshift_d = bif_numlshift;
     public static Variable bif_numlshift(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
-        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numlshift_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(v1,v2, o1,o2, bif_numlshift_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -1016,8 +991,8 @@ public class Builtins {
     static Func<Variable,Variable,Variable> bif_numrshift_d = bif_numrshift;
     public static Variable bif_numrshift(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
-        Variable jr = CheckSpecial2(v1, v2, o1, o2, bif_numrshift_d);
-        if (jr != null) return jr;
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(v1,v2, o1,o2, bif_numrshift_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -1027,8 +1002,8 @@ public class Builtins {
     static Func<Variable,Variable> bif_numcompl_d = bif_numcompl;
     public static Variable bif_numcompl(Variable v1) {
         P6any o1 = v1.Fetch();
-        Variable jr = CheckSpecial1(v1, o1, bif_numcompl_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v1,o1, bif_numcompl_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return MakeInt(~r1);
@@ -1071,8 +1046,8 @@ public class Builtins {
     static Func<Variable,Variable> bif_chars_d = bif_chars;
     public static Variable bif_chars(Variable v) {
         P6any o1 = v.Fetch();
-        Variable jr = CheckSpecial1(v, o1, bif_chars_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v,o1, bif_chars_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
         return MakeInt(r.Length);
@@ -1081,8 +1056,8 @@ public class Builtins {
     static Func<Variable,Variable> bif_ord_d = bif_ord;
     public static Variable bif_ord(Variable v) {
         P6any o1 = v.Fetch();
-        Variable jr = CheckSpecial1(v, o1, bif_ord_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v,o1, bif_ord_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
@@ -1093,8 +1068,8 @@ public class Builtins {
     static Func<Variable,Variable> bif_chr_d = bif_chr;
     public static Variable bif_chr(Variable v) {
         P6any o1 = v.Fetch();
-        Variable jr = CheckSpecial1(v, o1, bif_chr_d);
-        if (jr != null) return jr;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v,o1, bif_chr_d);
 
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
