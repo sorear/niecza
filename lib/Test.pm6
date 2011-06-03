@@ -76,23 +76,23 @@ $GLOBAL::TEST-BUILDER.reset;
 
 sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }
 sub nok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(!$bool, $tag) }
-sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag) }
+sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag); True }
 sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
-sub isa_ok($obj, $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
+sub isa_ok(Mu $obj, Mu $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
 sub is_deeply($a,$b,$c) is export { is $a.perl, $b.perl, $c }
-sub is($got, $expected, $tag?) is export {
+sub is(Mu $got, Mu $expected, $tag?) is export {
 
     # avoid comparing twice
-    my $equal = $got eq $expected;
+    my $equal = (~$got) eq (~$expected);
 
     $*TEST-BUILDER.ok($equal, $tag);
     if !$equal {
         $*TEST-BUILDER.note('   Failed test');
-        $*TEST-BUILDER.note('          got: '~$got);
-        $*TEST-BUILDER.note('     expected: '~$expected);
+        $*TEST-BUILDER.note('          got: ' ~ ~$got);
+        $*TEST-BUILDER.note('     expected: ' ~ ~$expected);
     }
 }
-sub isnt($got, $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
+sub isnt(Mu $got, Mu $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
 sub lives_ok($code,$why?) is export {
     my $lived = False;
     try { $code.(); $lived = True; }

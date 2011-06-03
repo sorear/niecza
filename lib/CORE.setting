@@ -1200,6 +1200,9 @@ my class Grammar is Cursor {
 }
 # }}}
 # Other operators {{{
+# TODO: these should be macros
+sub WHAT(Mu $x) { $x.WHAT }
+sub HOW(Mu $x) { $x.HOW }
 constant Inf = 1 / 0;
 my class RangeIter is IterCursor {
     has $.current;
