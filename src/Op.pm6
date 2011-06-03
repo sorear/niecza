@@ -38,7 +38,7 @@ method code_labelled($body, $label) { self.code($body) } #OK not used
 # binds.  Further, we don't need to generate the bvalues explicitly, since
 # we know they'll just be bound.
 method code_bvalue($body, $ro, $rhscg) { #OK not used
-    die "Illegal use of $.typename in bvalue context"; # XXX niecza
+    die "Illegal use of {self.WHAT.perl} in bvalue context";
 }
 
 method statement_level() { self }
@@ -633,7 +633,6 @@ class Attribute is Op {
     has $.accessor; # Bool
     has $.initializer; # Body, is rw
     has $.typeconstraint; # Array of Str
-    has $.sigil;
     has $.rw;
 
     method code($) { CgOp.corelex('Nil') }
@@ -702,7 +701,8 @@ class Lexical is Op {
 
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
-            CgOp.scopedlex($.name, CgOp.newboundvar(+?$ro, +(?($.list || $.hash)), $rhscg)),
+            CgOp.scopedlex($.name, defined($ro) ?? CgOp.newboundvar(+?$ro,
+                +(?($.list || $.hash)), $rhscg) !! $rhscg),
             CgOp.scopedlex($.name));
     }
 }
@@ -740,7 +740,8 @@ class PackageVar is Op {
     method code_bvalue($ , $ro, $rhscg) {
         CgOp.prog(
             CgOp.scopedlex($.slot,
-                CgOp.newboundvar(+?$ro, +(?($.list || $.hash)), $rhscg)),
+                defined($ro) ?? CgOp.newboundvar(+?$ro,
+                    +(?($.list || $.hash)), $rhscg) !! $rhscg),
             CgOp.scopedlex($.slot));
     }
 }

@@ -15,3 +15,8 @@ Reduce redundant Cursor creation for, e.g., { say 2 }
 Reduce ContextHelper use in ws, or make it faster.
 
 81537 Mu.new attr: 14093 RxOp.zyg,
+
+Junctions: $x == any($y,$z) could be optimized to a == that knows it
+is dealing with a junction.  Once we have staticer types and can say
+that $x ~~ Any, then the == knows it has *exactly one* junction and
+can statically unroll the correct loop for epic win.

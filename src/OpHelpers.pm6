@@ -20,12 +20,10 @@ sub mkbool($i) is export { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 sub mktemptopic($/, $item, $expr) is export {
     mklet(mklex($/, '$_'), -> $old_ {
         ::Op::StatementList.new(|node($/), children => [
-            # XXX should be a raw bind
-            ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'), rhs => $item),
+            ::Op::Bind.new(:readonly(Bool), lhs=>mklex($/,'$_'), rhs => $item),
             mklet($expr, -> $result {
                 ::Op::StatementList.new(children => [
-                    # XXX should be a raw bind
-                    ::Op::Bind.new(:!readonly, lhs => mklex($/, '$_'),
+                    ::Op::Bind.new(:readonly(Bool), lhs => mklex($/, '$_'),
                         rhs => $old_),
                     $result]) }) ]) });
 }
