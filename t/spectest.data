@@ -24,6 +24,9 @@ S02-whitespace_and_comments/begin_end_pod.t
 S02-whitespace_and_comments/pod-in-multi-line-exprs.t
 S02-whitespace_and_comments/sub-block-parsing.t
 S03-junctions/associative.t
+S03-junctions/autothreading.t
+S03-junctions/boolean-context.t
+S03-junctions/misc.t
 S03-metaops/hyper.t
 S03-metaops/not.t
 S03-metaops/reduce.t
