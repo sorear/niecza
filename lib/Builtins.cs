@@ -42,25 +42,18 @@ public class Builtins {
     }
 
     // NOTE: Destructive on avs!  Clone first if you need to.
-    public static Variable AutoThread(int pivot, Variable[] avs,
-            Func<Variable[],Variable> dgt) {
-        P6any j = avs[pivot].Fetch();
+    public static Variable AutoThread(P6any j, Func<Variable,Variable> dgt) {
         int jtype = Kernel.UnboxAny<int>((P6any) j.GetSlot("kind_"));
         P6any listObj = (P6any) j.GetSlot("eigenstates_");
         P6any newList;
         if (jtype == 4) {
             newList = Kernel.RunInferior(MEMap_for_each(
-                Kernel.GetInferiorRoot(), listObj,
-                delegate(Variable vr) {
-                    avs[pivot] = vr;
-                    return dgt(avs);
-                })).Fetch();
+                Kernel.GetInferiorRoot(), listObj, dgt)).Fetch();
         } else {
             Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
             Variable[] nlist = new Variable[list.Length];
             for (int i = 0; i < list.Length; i++) {
-                avs[pivot] = list[i];
-                nlist[i] = dgt(avs);
+                nlist[i] = dgt(list[i]);
             }
             newList = Kernel.BoxRaw(nlist, Kernel.ParcelMO);
         }
@@ -81,8 +74,7 @@ public class Builtins {
 
         if (jpivot < 0) return dgt(av0);
 
-        return AutoThread(jpivot, new Variable[] { av0 },
-                delegate(Variable[] nas) { return dgt(nas[0]); });
+        return AutoThread(ao0, dgt);
     }
     public static Variable HandleSpecial2(Variable av0, Variable av1,
             P6any ao0, P6any ao1, Func<Variable,Variable,Variable> dgt) {
@@ -94,8 +86,9 @@ public class Builtins {
 
         if (jpivot < 0) return dgt(av0, av1);
 
-        return AutoThread(jpivot, new Variable[] { av0, av1 },
-                delegate(Variable[] nas) { return dgt(nas[0], nas[1]); });
+        Variable[] avs = new Variable[] { av0, av1 };
+        return AutoThread(avs[jpivot].Fetch(), delegate(Variable n) {
+            avs[jpivot] = n; return dgt(avs[0], avs[1]); });
     }
     public static Variable HandleSpecial3(Variable av0, Variable av1,
             Variable av2, P6any ao0, P6any ao1, P6any ao2,
@@ -109,8 +102,9 @@ public class Builtins {
 
         if (jpivot < 0) return dgt(av0, av1, av2);
 
-        return AutoThread(jpivot, new Variable[] { av0, av1, av2 },
-                delegate(Variable[] nas) { return dgt(nas[0], nas[1], nas[2]); });
+        Variable[] avs = new Variable[] { av0, av1, av2 };
+        return AutoThread(avs[jpivot].Fetch(), delegate(Variable n) {
+            avs[jpivot] = n; return dgt(avs[0], avs[1], avs[2]); });
     }
 
     public static Variable CheckSpecial1(Variable a1, P6any r1,

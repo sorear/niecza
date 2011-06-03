@@ -184,6 +184,24 @@ is (1 == (1 | 3)).perl, 'any(Bool::True, Bool::False)', '== autothreads';
 is (4 & 9).sqrt.perl, 'all(2, 3)', '.sqrt autothreads';
 is (4 & 9).Bool.perl, 'Bool::True', '.Bool does not autothread';
 is (40 & 90).substr(0,1).perl, 'all("4", "9")', '.substr with arguments autothreads';
+is ((2 | 4) + (1 & 2)).perl, 'all(any(3, 5), any(4, 6))',
+    '& takes precedence in multiple autothreading';
+
+{
+    sub f1($x) { ?$x }
+    sub f2(Mu $x) { ?$x }
+    sub f3($x,$y) { $x ~ $y }
+    is f1(1 | 0).perl, 'any(Bool::True, Bool::False)',
+        'simple autothreading of only sub';
+    is f2(1 | 0).perl, 'Bool::True', 'non-autothreading of sub that takes Mu';
+    is f3((1 | 0), (1 | 0)).perl, 'any(any("11", "10"), any("01", "00"))',
+        'autothreading of multi-arg only sub';
+}
+
+nok "foo" !eq any("foo","bar"), "foo !eq (foo | bar)";
+ok "foo" !eq any("quux","bar"), "foo !eq (quux | bar)";
+nok 2 != any(2, 4), "2 != (2|4)";
+ok 2 != any(0, 4), "2 != (0|4)";
 
 ok $?FILE ~~ /test2?\.pl/, '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';

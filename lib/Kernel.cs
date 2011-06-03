@@ -754,14 +754,17 @@ namespace Niecza {
             th.curDisp = de;
             th.pos = pos;
             th.named = named;
-            // XXX I don't fully understand how this works, but it's
-            // necessary for inferior runloops from here to work.  Critical
-            // section blah blah.
+            // If we call an inferior runloop from the binder, we need for the
+            // runloop to not overwrite th, which it would if the top frame
+            // stayed 'caller'.
             Kernel.SetTopFrame(th);
             int[] ibuf = sig_i;
             if (ibuf == null) return th;
             int posc = 0;
             HashSet<string> namedc = null;
+            int jun_pivot = -1;
+            string jun_pivot_n = null;
+            int jun_rank = int.MaxValue;
             if (named != null)
                 namedc = new HashSet<string>(named.Keys);
             if (ibuf.Length == 0) goto noparams;
@@ -770,6 +773,8 @@ namespace Niecza {
             int* iend = ic + (ibuf.Length - 2);
             object[] rbuf = sig_r;
             int rc = 0;
+            int obj_src = -1;
+            string obj_src_n = null;
 
             while (ic < iend) {
                 int flags = *(ic++);
@@ -779,6 +784,7 @@ namespace Niecza {
                 rc += (1 + names);
                 if ((flags & SIG_F_HASDEFAULT) != 0) rc++;
                 STable type = Kernel.AnyMO;
+                obj_src = -1;
                 if ((flags & SIG_F_HASTYPE) != 0)
                     type = (STable)rbuf[rc++];
 
@@ -822,11 +828,14 @@ namespace Niecza {
                         if (namedc.Contains(n)) {
                             namedc.Remove(n);
                             src = named[n];
+                            obj_src_n = n;
+                            obj_src = -2;
                             goto gotit;
                         }
                     }
                 }
                 if ((flags & SIG_F_POSITIONAL) != 0 && posc != pos.Length) {
+                    obj_src = posc;
                     src = pos[posc++];
                     goto gotit;
                 }
@@ -870,6 +879,7 @@ gotit:
                 } else {
                     bool islist = ((flags & SIG_F_BINDLIST) != 0);
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
+                    P6any srco;
 
                     if (rw && !src.rw)
                         return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
@@ -877,6 +887,15 @@ gotit:
                     if (rw == src.rw && islist == src.islist) {
                         if (!src.type.HasMRO(type)) {
                             if (quiet) return null;
+                            if (src.Fetch().mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
+                                int jrank = Kernel.UnboxAny<int>((P6any) src.Fetch().GetSlot("kind_")) / 2;
+                                if (jrank < jun_rank) {
+                                    jun_rank = jrank;
+                                    jun_pivot = obj_src;
+                                    jun_pivot_n = obj_src_n;
+                                }
+                                continue;
+                            }
                             return Kernel.Die(th, "Nominal type check failed in binding " + PName(rbase) + "; got " + src.type.name + ", needed " + type.name);
                         }
                         if (src.whence != null)
@@ -886,9 +905,18 @@ gotit:
                     // rw = false and rhs.rw = true OR
                     // rw = false and islist = false and rhs.islist = true OR
                     // rw = false and islist = true and rhs.islist = false
-                    P6any srco = src.Fetch();
+                    srco = src.Fetch();
                     if (!srco.mo.HasMRO(type)) {
                         if (quiet) return null;
+                        if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
+                            int jrank = Kernel.UnboxAny<int>((P6any) srco.GetSlot("kind_")) / 2;
+                            if (jrank < jun_rank) {
+                                jun_rank = jrank;
+                                jun_pivot = obj_src;
+                                jun_pivot_n = obj_src_n;
+                            }
+                            continue;
+                        }
                         return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
                     }
                     src = new SimpleVariable(false, islist, srco.mo, null, srco);
@@ -923,6 +951,27 @@ noparams:
                 if (namedc != null && namedc.Count != 0)
                     m += ", unused named " + Kernel.JoinS(", ", namedc);
                 return Kernel.Die(th, m);
+            }
+
+            if (jun_pivot != -1 && !quiet) {
+                Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
+                        pos[jun_pivot]);
+                caller.resultSlot = Builtins.AutoThread(jct.Fetch(),
+                    delegate(Variable n) {
+                        if (jun_pivot == -2)
+                            named[jun_pivot_n] = n;
+                        else
+                            pos[jun_pivot] = n;
+                        return Kernel.RunInferior(Binder(
+                                Kernel.GetInferiorRoot(),
+                                outer, sub, pos, named, false, de));
+                    });
+                // restore, in case our caller is using this
+                if (jun_pivot == -2)
+                    named[jun_pivot_n] = jct;
+                else
+                    pos[jun_pivot] = jct;
+                return caller;
             }
 
             return th;
@@ -2216,11 +2265,11 @@ tryagain:
             string mn = th.pos[1].Fetch().mo.mro_raw_Str.Get(th.pos[1]);
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 2, post, 1, th.pos.Length - 2);
-            post[0] = th.pos[0];
-            th.caller.resultSlot = Builtins.AutoThread(0, post,
-                delegate(Variable[] postp) {
-                    return RunInferior(postp[0].Fetch().InvokeMethod(
-                        GetInferiorRoot(), mn, postp, th.named));
+            th.caller.resultSlot = Builtins.AutoThread(th.pos[0].Fetch(),
+                delegate(Variable postp) {
+                    post[0] = postp;
+                    return RunInferior(postp.Fetch().InvokeMethod(
+                        GetInferiorRoot(), mn, post, th.named));
                 });
             return th.caller;
         }
