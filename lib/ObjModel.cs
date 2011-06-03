@@ -93,6 +93,11 @@ namespace Niecza {
         }
 
         protected Variable Slice(Variable obj, Variable key) {
+            if (key.Fetch().mo.HasMRO(Kernel.JunctionMO)) {
+                return Builtins.AutoThread(key.Fetch(), delegate (Variable v) {
+                    return Get(obj, v); });
+            }
+
             VarDeque iter = Builtins.start_iter(key);
             List<Variable> items = new List<Variable>();
             while (Kernel.IterHasFlat(iter, true))

@@ -2000,9 +2000,9 @@ tryagain:
 
     class IxAnyDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -2012,9 +2012,9 @@ tryagain:
     }
     class IxAnyExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -2024,9 +2024,9 @@ tryagain:
     }
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -2036,14 +2036,14 @@ tryagain:
     }
     class IxAnyAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
-            int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
+            int ix = (int) ks.mo.mro_raw_Numeric.Get(key);
             if (ix == 0) return obj;
             throw new NieczaException("Invalid index for non-array");
         }
@@ -2051,67 +2051,74 @@ tryagain:
 
     class IxCursorAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
             P6any o = obj.Fetch();
             if (!o.IsDefined())
                 return Kernel.AnyMO.typeVar;
 
             Cursor os = (Cursor)o;
-            return os.GetKey(key.Fetch().mo.mro_raw_Str.Get(key));
+            return os.GetKey(ks.mo.mro_raw_Str.Get(key));
         }
     }
     class IxCursorAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any o = obj.Fetch();
             if (!o.IsDefined())
                 return Kernel.AnyMO.typeVar;
 
             Cursor os = (Cursor)o;
-            return os.GetKey(Utils.N2S(key.Fetch().mo.mro_raw_Numeric.Get(key)));
+            return os.GetKey(Utils.N2S(ks.mo.mro_raw_Numeric.Get(key)));
         }
     }
 
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
-            string ks = key.Fetch().mo.mro_raw_Str.Get(key);
+            string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
-            if (h.TryGetValue(ks, out r))
+            if (h.TryGetValue(kss, out r))
                 return r;
-            return new SimpleVariable(true, false, Kernel.AnyMO, new HashViviHook(os, ks), Kernel.AnyP);
+            return new SimpleVariable(true, false, Kernel.AnyMO,
+                    new HashViviHook(os, kss), Kernel.AnyP);
         }
     }
     class IxHashExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+                return Slice(obj, key);
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.FalseV;
-            string ks = key.Fetch().mo.mro_raw_Str.Get(key);
+            string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
-            return h.ContainsKey(ks) ? Kernel.TrueV : Kernel.FalseV;
+            return h.ContainsKey(kss) ? Kernel.TrueV : Kernel.FalseV;
         }
     }
     class IxHashDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+                return Slice(obj, key);
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.AnyMO.typeVar;
-            string ks = key.Fetch().mo.mro_raw_Str.Get(key);
+            string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
-            if (h.TryGetValue(ks, out r)) {
-                h.Remove(ks);
+            if (h.TryGetValue(kss, out r)) {
+                h.Remove(kss);
                 return r;
             } else {
                 return Kernel.AnyMO.typeVar;
@@ -2124,9 +2131,9 @@ tryagain:
         public IxListAtPos(bool extend) { this.extend = extend; }
 
         public override Variable Get(Variable obj, Variable key) {
-            if (key.islist) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
                 return Slice(obj, key);
-            }
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -2136,7 +2143,6 @@ tryagain:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            P6any ks = key.Fetch();
             if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
