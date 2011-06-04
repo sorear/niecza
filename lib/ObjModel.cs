@@ -137,7 +137,7 @@ namespace Niecza {
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
 
-        public STable[] mro;
+        public STable[] mro = new STable[0];
         public HashSet<STable> isa = new HashSet<STable>();
 
         public struct AttrInfo {

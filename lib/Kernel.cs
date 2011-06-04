@@ -554,6 +554,10 @@ namespace Niecza {
                         mro[i] = (STable)ReadXref(ref from);
                     mo.FillClass(slots, superclasses, mro);
                     break;
+                case 3: //module
+                    break;
+                case 4: //package
+                    break;
                 default:
                     throw new ArgumentException();
             }

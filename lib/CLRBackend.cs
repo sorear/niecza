@@ -719,6 +719,7 @@ namespace Niecza.CLRBackend {
         public readonly string name;
         public readonly string type;
         public readonly object[] exports;
+        public FieldInfo metaObject;
 
         public Package(object[] p) {
             type = ((JScalar)p[0]).str;
@@ -740,8 +741,9 @@ namespace Niecza.CLRBackend {
             }
         }
 
-        public virtual void BindFields(int ix,
-                Func<string,Type,FieldInfo> binder) { }
+        public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
+            metaObject = binder(Unit.SharedName('M', ix, name), Tokens.STable);
+        }
 
         public static Package From(object[] p) {
             string type = ((JScalar)p[0]).str;
@@ -764,17 +766,6 @@ namespace Niecza.CLRBackend {
 
     class Module: Package {
         public Module(object[] p) : base(p) { }
-    }
-
-    class ModuleWithTypeObject: Module {
-        public FieldInfo metaObject;
-
-        public override void BindFields(int ix,
-                Func<string,Type,FieldInfo> binder) {
-            metaObject = binder(Unit.SharedName('M', ix, name), Tokens.STable);
-        }
-
-        public ModuleWithTypeObject(object[] p) : base(p) { }
     }
 
     class Method {
@@ -824,7 +815,7 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    class Class: ModuleWithTypeObject {
+    class Class: Module {
         public readonly Attribute[] attributes;
         public readonly Method[] methods;
         public readonly Xref[] superclasses;
@@ -841,7 +832,7 @@ namespace Niecza.CLRBackend {
         public Grammar(object[] p) : base(p) { }
     }
 
-    class Role: ModuleWithTypeObject {
+    class Role: Module {
         public readonly Attribute[] attributes;
         public readonly Method[] methods;
         public readonly Xref[] superclasses;
@@ -852,7 +843,7 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    class ParametricRole: ModuleWithTypeObject {
+    class ParametricRole: Module {
         public readonly Attribute[] attributes;
         public readonly Method[] methods;
         public readonly Xref[] superclasses;
@@ -1087,11 +1078,7 @@ namespace Niecza.CLRBackend {
             return unit.GetPackage(path, 0, path.Length);
         }
         public override ClrOp GetCode(int up) {
-            ModuleWithTypeObject p = GetPackage() as ModuleWithTypeObject;
-            if (p == null) {
-                return new ClrMethodCall(false, Tokens.Kernel_NewROScalar,
-                        new ClrOp[] { new ClrGetSField(Tokens.Kernel_AnyP) });
-            }
+            Package p = GetPackage();
             return new ClrGetField(Tokens.DMO_typeVar,
                 new ClrGetSField(p.metaObject));
         }
@@ -3430,11 +3417,11 @@ dynamic:
                 return th.MakeDispatch(JScalar.S(z[1])); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
                 string kind = FixStr(z[1]);
-                ModuleWithTypeObject m;
+                Package m;
                 if (z.Length == 3) {
-                    m = (ModuleWithTypeObject)th.sub.unit.GetCorePackage(FixStr(z[2]));
+                    m = th.sub.unit.GetCorePackage(FixStr(z[2]));
                 } else {
-                    m = (new Xref(z, 2)).Resolve<ModuleWithTypeObject>();
+                    m = (new Xref(z, 2)).Resolve<Package>();
                 }
                 if (kind == "mo")
                     return CpsOp.GetSField(m.metaObject);
@@ -4352,33 +4339,30 @@ dynamic:
 
             unit.VisitPackages(delegate(int ix, Package pkg) {
                 if (Verbose > 0) Console.WriteLine("pkg2 {0}", pkg.name);
-                if (!(pkg is ModuleWithTypeObject))
-                    return;
-                ModuleWithTypeObject m = (ModuleWithTypeObject) pkg;
                 FieldInfo km = null;
                 FieldInfo kp = null;
                 bool existing_mo = false;
                 if (unit.name == "CORE") {
-                    km = Tokens.Kernel.GetField(m.name + "MO");
-                    kp = Tokens.Kernel.GetField(m.name + "P");
+                    km = Tokens.Kernel.GetField(pkg.name + "MO");
+                    kp = Tokens.Kernel.GetField(pkg.name + "P");
                     existing_mo = km != null && km.IsInitOnly;
                 }
                 int b = unit.thaw_heap.Count;
                 unit.EmitInt(ix);
-                unit.EmitStr(m.name);
+                unit.EmitStr(pkg.name);
 
-                if (m is Role) {
+                if (pkg is Role) {
                     unit.EmitByte(0);
-                    Role r = (Role) m;
+                    Role r = (Role) pkg;
                     unit.EmitInt(r.superclasses.Length);
                     foreach (Xref x in r.superclasses)
                         unit.EmitXref(x);
-                } else if (m is ParametricRole) {
+                } else if (pkg is ParametricRole) {
                     unit.EmitByte(1);
                     // The heavy lifting is done in WrapBody
-                } else if (m is Class) {
+                } else if (pkg is Class) {
                     unit.EmitByte(2);
-                    Class r = (Class) m;
+                    Class r = (Class) pkg;
                     List<string> all_slot = new List<string>();
                     for (int i = 0; i < r.linearized_mro.Length; i++) {
                         Class p = r.linearized_mro[i].Resolve<Class>();
@@ -4392,19 +4376,21 @@ dynamic:
                     unit.EmitInt(r.linearized_mro.Length);
                     foreach (Xref x in r.linearized_mro)
                         unit.EmitXref(x);
+                } else if (pkg is Module) {
+                    unit.EmitByte(3);
+                } else if (pkg is Package) {
+                    unit.EmitByte(4);
                 }
 
-                unit.EmitInt(m.exports.Length);
-                foreach (object o in m.exports)
+                unit.EmitInt(pkg.exports.Length);
+                foreach (object o in pkg.exports)
                     unit.EmitStrArray(JScalar.SA(0,o));
 
-                if (m is ParametricRole) {
-                    unit.EmitInt(-1);
-                } else {
-                    Method[] methods = (m is Class) ? ((Class)m).methods :
-                        ((Role)m).methods;
-                    Attribute[] attrs = (m is Class) ? ((Class)m).attributes :
-                        ((Role)m).attributes;
+                if (pkg is Role || pkg is Class) {
+                    Method[] methods = (pkg is Class) ? ((Class)pkg).methods :
+                        ((Role)pkg).methods;
+                    Attribute[] attrs = (pkg is Class) ? ((Class)pkg).attributes :
+                        ((Role)pkg).attributes;
                     unit.EmitInt(methods.Length);
                     foreach (Method me in methods) {
                         unit.EmitInt(me.kind);
@@ -4421,11 +4407,13 @@ dynamic:
                         unit.EmitXref(a.ibody);
                         unit.EmitXref(a.type);
                     }
+                } else {
+                    unit.EmitInt(-1);
                 }
 
                 unit.EmitXref(unit.GetCorePackage("ClassHOW").own_xref);
 
-                thaw.Add(CpsOp.SetSField(m.metaObject, CpsOp.MethodCall(
+                thaw.Add(CpsOp.SetSField(pkg.metaObject, CpsOp.MethodCall(
                     Tokens.RU_LoadPackage,
                     CpsOp.GetSField(unit.rtunit),
                     CpsOp.IntLiteral(b),
@@ -4434,9 +4422,9 @@ dynamic:
 
                 if (kp != null)
                     thaw.Add(CpsOp.SetSField(kp, CpsOp.GetField(
-                        Tokens.DMO_typeObject, CpsOp.GetSField(m.metaObject))));
+                        Tokens.DMO_typeObject, CpsOp.GetSField(pkg.metaObject))));
                 if (km != null && !km.IsInitOnly)
-                    thaw.Add(CpsOp.SetSField(km, CpsOp.GetSField(m.metaObject)));
+                    thaw.Add(CpsOp.SetSField(km, CpsOp.GetSField(pkg.metaObject)));
             });
 
             int sub2_slot = thaw.Count;
