@@ -28,6 +28,28 @@ use OptRxSimple;
 use STD;
 use Sig;
 
+class Op::SubsetDef is Op {
+    has Str $.name;
+    has Array $.basetype; # Array of Str
+    has Array $.ourname; # Maybe[Array of Str], else gensymmish
+    has Str $.lexvar;
+    has $.body; # Body
+    has @.exports; # Array of Str
+
+    method code($ ) { CgOp.scopedlex($.lexvar) }
+}
+
+class Op::EnumDef is Op {
+    has Str $.name;
+    has Array $.basetype; # Maybe[Array of Str]
+    has Array $.ourname; # Maybe[Array of Str], else gensymmish
+    has Str $.lexvar;
+    has @.pairs; # Array of Pair[Str,Int|Str]
+    has @.exports; # Array of Str
+
+    method code($ ) { CgOp.methodcall(CgOp.scopedlex($.lexvar), 'enums') }
+}
+
 augment class Op::Lexical { #OK
     method code_bvalue($ , $ro, $rhscg) {
         my $type = CgOp.class_ref('mo', 'Any');
@@ -83,6 +105,146 @@ augment class Sig::Parameter { #OK
 }
 
 augment class NieczaActions {
+method trivial_eval($/, $ast) {
+    if $ast.^isa(::Op::SimpleParcel) {
+        [,] map { self.trivial_eval($/, $_) }, @( $ast.items )
+    } elsif $ast.^isa(::Op::StringLiteral) {
+        $ast.text;
+    } elsif $ast.^isa(::Op::Paren) {
+        self.trivial_eval($/, $ast.inside);
+    } else {
+        $/.CURSOR.sorry("Compile time expression is insufficiently trivial");
+        "XXX"
+    }
+}
+
+method type_declarator:subset ($/) {
+    my $ourname = Array; my $lexvar = self.gensym; my $name;
+    my $scope = $*SCOPE;
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid subset scope $scope");
+        $scope = 'anon';
+    }
+    if $<longname> {
+        $scope ||= 'my';
+        my $r = self.mangle_longname($<longname>[0], True);
+        $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Block name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        if $scope eq 'our' {
+            $ourname = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourname = [ @$ourname, $name ];
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+        }
+    } else {
+        if ($scope || 'anon') ne 'anon' {
+            $/.CURSOR.sorry("Cannot have a non-anon subset with no name");
+        }
+        $name = 'ANON';
+    }
+
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
+        ['MY', 'Any'];
+    my @exports;
+
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } elsif $t<of> {
+            $basetype = $t<of>;
+        } else {
+            $/.CURSOR.sorry("Unsupported subset trait $t.keys()");
+        }
+    }
+
+    my $body = self.transparent($/, $<EXPR> ?? $<EXPR>[0].ast !!
+        mklex($/, 'True'));
+
+    make ::Op::SubsetDef.new(|node($/), :$name, :$lexvar, :$ourname,
+        :$body, :@exports, :$basetype);
+}
+
+method type_declarator:constant ($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    my $scope = $*SCOPE // 'my';
+    my $slot  = ~($<identifier> // $<variable> // self.gensym);
+
+    make ::Op::ConstantDecl.new(|node($/), name => $slot,
+        path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+}
+
+# note: named and unnamed enums are quite different beasts
+method type_declarator:enum ($/) {
+    my $scope = $*SCOPE;
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid enum scope $scope");
+        $scope = 'anon';
+    }
+
+    my @exports;
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } else {
+            $/.CURSOR.sorry("Unsupported enum trait $t.keys()");
+        }
+    }
+
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !! Any;
+
+    my @pairs = self.trivial_eval($/, $<term>.ast);
+    my $last = -1;
+    my ($has_ints, $has_strs);
+    for @pairs {
+        if $_ !~~ Pair {
+            my $key = $_;
+            my $value = $last.succ;
+            $_ = $key => $value;
+        }
+        given $last = .value {
+            when Int { $has_ints = True; }
+            when Str { $has_strs = True; }
+            default  { $/.CURSOR.sorry("Enum values must be Int or Str"); }
+        }
+    }
+    if $has_ints && $has_strs {
+        $/.CURSOR.sorry("Enum may not contain both Int and Str values");
+    }
+
+    if $<name> && $<name>.reduced eq 'longname' && ($scope ||= 'my') ne 'anon' {
+        # Longnamed enum is a kind of type definition
+        my $ourname = Array;
+        my $lexvar = self.gensym;
+        my $r = self.mangle_longname($<longname>[0], True);
+        my $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Enum name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        if $scope eq 'our' {
+            $ourname = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourname = [ @$ourname, $name ];
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+        }
+        make ::Op::EnumDef.new(|node($/), :@pairs, :$ourname, :$lexvar, :$name,
+            :@exports, :$basetype);
+    } else {
+        my $slot  = ~($<name> // self.gensym);
+
+        make ::Op::ConstantDecl.new(|node($/), name => $slot,
+            init => ::Op::CallMethod.new(|node($/), name => 'new',
+                receiver => mklex($/, 'EnumMap'),
+                args => [$<term>.ast]),
+            path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+    }
+}
+
 method parameter($/) {
     my $rw = False;
     my $copy = False;

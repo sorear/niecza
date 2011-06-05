@@ -400,6 +400,22 @@ class Grammar is Class {
     method _defsuper() { 'Grammar' }
 }
 
+# subsets are a bit simpler than roles/grammars/classes, as they have
+# no body and so attributes &c cannot be added to them directly.
+class Subset is Module {
+    # subset <longname>? <trait>* [where <EXPR>]?
+    has $.basetype;
+    # Xref to a sub which will be called once the first time the subset
+    # is used.
+    has $.where;
+}
+
+class Enum is Module {
+    # enum [ <longname> | <variable> ]? <trait> <term>
+    has @.pairs;
+    has $.basetype;
+}
+
 #####
 
 # This is a static lexical; they exist in finite number per unit.  They may
