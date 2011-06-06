@@ -301,6 +301,10 @@ class Class is Module {
     sub c3merge(@onto, @lists) {
         my $ix = 0;
         while $ix < @lists {
+            #say "C3 MRO status ($ix):";
+            #say "Onto: ", @onto.map({ $*unit.deref($_).name }).join(" <- ");
+            #say $_.map({ $*unit.deref($_).name }).join(" <- ") for @lists;
+            #say "---";
             my $l = @lists[$ix];
             if !$l || !c3clear((my $item = $l[0]), @lists) {
                 $ix++;
@@ -333,12 +337,13 @@ class Class is Module {
         }
 
         my @merge;
-        push @merge, [ $.xref, @( $.superclasses ) ];
+        push @merge, [ $.xref ];
         for @$.superclasses -> $x {
             my $d = $*unit.deref($x);
             $d.close unless $d.linearized_mro;
             push @merge, [ @( $d.linearized_mro ) ];
         }
+        push @merge, [ @( $.superclasses ) ];
         my @mro;
         c3merge(@mro, @merge);
         $.linearized_mro = @mro;
