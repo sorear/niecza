@@ -55,11 +55,13 @@ namespace Niecza {
         }
 
         public bool Isa(STable mo) {
-            return this.mo.HasMRO(mo);
+            return mo.isSubset ? mo.mo.CheckSubset(this) :
+                this.mo.HasMRO(mo);
         }
 
         public bool Does(STable mo) {
-            return this.mo.HasMRO(mo);
+            return mo.isSubset ? mo.mo.CheckSubset(this) :
+                this.mo.HasMRO(mo);
         }
 
         public Frame Invoke(Frame c, Variable[] p, VarHash n) {
@@ -114,8 +116,10 @@ namespace Niecza {
     public class P6how {
         public STable stable;
 
-        public bool isRole;
+        public bool isRole, isSubset;
         public P6any roleFactory;
+        public P6any subsetWhereThunk;
+        public Variable subsetFilter;
         public Dictionary<string, P6any> instCache;
         // role type objects have an empty MRO cache so no methods can be
         // called against them; the fallback (NYI) is to pun.
@@ -384,6 +388,27 @@ next_method: ;
             FillClass(slots, new STable[] {}, new STable[] { stable });
         }
 
+        public void FillSubset(STable super) {
+            isSubset = stable.isSubset = true;
+            STable[] mro = new STable[super.mo.mro.Length + 1];
+            Array.Copy(super.mo.mro, 0, mro, 1, mro.Length - 1);
+            mro[0] = stable;
+            FillClass(super.all_slot, new STable[] { super }, mro);
+        }
+
+        public bool CheckSubset(P6any obj) {
+            if (!obj.Does(superclasses[0]))
+                return false;
+            if (subsetFilter == null)
+                subsetFilter = Kernel.RunInferior(subsetWhereThunk.Invoke(
+                    Kernel.GetInferiorRoot(), Variable.None, null));
+            Variable ret = Kernel.RunInferior(subsetFilter.Fetch().
+                InvokeMethod(Kernel.GetInferiorRoot(), "ACCEPTS",
+                    new Variable[] { subsetFilter, Kernel.NewROScalar(obj) },
+                    null));
+            return ret.Fetch().mo.mro_raw_Bool.Get(ret);
+        }
+
         public void FillClass(string[] all_slot, STable[] superclasses,
                 STable[] mro) {
             this.superclasses = new List<STable>(superclasses);
@@ -484,10 +509,11 @@ next_method: ;
         public P6how mo;
 
         public P6any how;
-        public P6any typeObject;
-        public Variable typeVar;
+        public P6any typeObject, initObject;
+        public Variable typeVar, initVar;
         public int fixups_from;
         public string name;
+        public bool isSubset;
 
         public LexerCache lexcache;
 

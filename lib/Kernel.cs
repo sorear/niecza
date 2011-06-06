@@ -127,7 +127,7 @@ namespace Niecza {
             if (!rw) {
                 throw new NieczaException("Writing to readonly scalar");
             }
-            if (!v.mo.HasMRO(type)) {
+            if (!v.Does(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
             }
             if (whence != null) {
@@ -159,7 +159,7 @@ namespace Niecza {
             Variable vr = Kernel.RunInferior(fetch.Invoke(
                 Kernel.GetInferiorRoot(), None, null));
             P6any vl = vr.Fetch();
-            if (!vl.mo.HasMRO(type))
+            if (!vl.Does(type))
                 throw new NieczaException("Tied variable of type " + type +
                         " returned value of type " + vl.mo.name + " instead");
             return vl;
@@ -503,6 +503,8 @@ namespace Niecza {
                     Kernel.GetVar(ReadStrArray(ref from)).v = mo.typeVar;
 
                 ReadClassMembers(mo, ref from);
+                if (mo.mo.isSubset)
+                    mo.mo.subsetWhereThunk = ((SubInfo)ReadXref(ref from)).protosub;
                 mo.how = Kernel.BoxRaw<STable>(mo, ((STable)ReadXref(ref from)));
             }
 
@@ -559,7 +561,7 @@ namespace Niecza {
                 case 4: //package
                     break;
                 case 5: //subset
-                    //mo.FillSubset((STable)ReadXref(ref from));
+                    mo.mo.FillSubset((STable)ReadXref(ref from));
                     break;
                 default:
                     throw new ArgumentException();
@@ -567,9 +569,13 @@ namespace Niecza {
 
             mo.fixups_from = from;
 
-            mo.typeObject = new P6opaque(mo);
+            mo.typeObject = mo.initObject = new P6opaque(mo);
             ((P6opaque)mo.typeObject).slots = null;
-            mo.typeVar = Kernel.NewROScalar(mo.typeObject);
+            mo.typeVar = mo.initVar = Kernel.NewROScalar(mo.typeObject);
+            if (mo.isSubset) {
+                mo.initVar = mo.mo.superclasses[0].initVar;
+                mo.initObject = mo.mo.superclasses[0].initObject;
+            }
             return mo;
         }
 
@@ -866,7 +872,7 @@ namespace Niecza {
                     goto gotit;
                 }
                 if ((flags & SIG_F_OPTIONAL) != 0) {
-                    src = Kernel.NewROScalar(type.typeObject);
+                    src = type.initVar;
                     goto gotit;
                 }
                 if (quiet) return null;
@@ -913,7 +919,7 @@ gotit:
                     // rw = false and islist = false and rhs.islist = true OR
                     // rw = false and islist = true and rhs.islist = false
                     srco = src.Fetch();
-                    if (!srco.mo.HasMRO(type)) {
+                    if (!srco.Does(type)) {
                         if (quiet) return null;
                         if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
                             int jrank = Kernel.UnboxAny<int>((P6any) srco.GetSlot("kind_")) / 2;
@@ -2708,7 +2714,7 @@ ltm:
 
             if (!rhs.rw) {
                 P6any v = rhs.Fetch();
-                if (!v.mo.HasMRO(type))
+                if (!v.Does(type))
                     throw new NieczaException("Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
                 return new SimpleVariable(false, islist, v.mo, null, v);
             }
@@ -2716,7 +2722,7 @@ ltm:
             // whence != null
             if (!rw) {
                 P6any v = rhs.Fetch();
-                if (!v.mo.HasMRO(type))
+                if (!v.Does(type))
                     throw new NieczaException("Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
                 return new SimpleVariable(false, islist, v.mo, null, v);
             }
@@ -2750,7 +2756,7 @@ ltm:
         }
 
         public static Variable NewTypedScalar(STable t) {
-            return new SimpleVariable(true, false, t, null, t.typeObject);
+            return new SimpleVariable(true, false, t, null, t.initObject);
         }
 
         public static Variable NewRWListVar(P6any container) {
@@ -2865,7 +2871,7 @@ ltm:
                         vx = RunInferior(a.init.Invoke(GetInferiorRoot(),
                                     Variable.None, null));
                     } else if (kind == 0) {
-                        vx = a.type.typeVar;
+                        vx = a.type.initVar;
                     } else {
                         vx = null;
                     }
@@ -3207,7 +3213,8 @@ slow:
             n.mo.Invalidate();
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
-            n.typeObject = new P6opaque(n);
+            n.typeObject = n.initObject = new P6opaque(n);
+            n.typeVar = n.initVar = NewROScalar(n.typeObject);
             ((P6opaque)n.typeObject).slots = null;
 
             return n;

@@ -1466,6 +1466,10 @@ namespace Niecza.CLRBackend {
             STable.GetField("typeObject");
         public static readonly FieldInfo DMO_typeVar =
             STable.GetField("typeVar");
+        public static readonly FieldInfo DMO_initObject =
+            STable.GetField("initObject");
+        public static readonly FieldInfo DMO_initVar =
+            STable.GetField("initVar");
         public static readonly FieldInfo DMO_how =
             STable.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
@@ -4187,7 +4191,10 @@ dynamic:
             build.Add(CpsOp.SetField(Tokens.P6opaque_slots, to,
                         CpsOp.Null(typeof(object[]))));
             build.Add(CpsOp.SetField(Tokens.DMO_typeObject, mo, to));
-            build.Add(CpsOp.CpsReturn(CpsOp.MethodCall(Tokens.Kernel_NewROScalar, to)));
+            build.Add(CpsOp.SetField(Tokens.DMO_initObject, mo, to));
+            build.Add(CpsOp.SetField(Tokens.DMO_typeVar, mo, CpsOp.MethodCall(Tokens.Kernel_NewROScalar, to)));
+            build.Add(CpsOp.SetField(Tokens.DMO_initVar, mo, CpsOp.GetField(Tokens.DMO_typeVar, mo)));
+            build.Add(CpsOp.CpsReturn(CpsOp.GetField(Tokens.DMO_typeVar, mo)));
 
             return CpsOp.Let("!mo", CpsOp.ConstructorCall(Tokens.DMO_ctor,
                         CpsOp.StringLiteral(pr.name)),
