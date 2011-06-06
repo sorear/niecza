@@ -169,6 +169,66 @@ method term:name ($/) {
     }
 }
 
+method routine_def ($/) {
+    make ::Op::StatementList.new;
+    if $<sigil> && $<sigil>[0] eq '&*' {
+        $/.CURSOR.sorry("Contextual sub definitions NYI");
+        return Nil;
+    }
+    my $dln = $<deflongname>[0];
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+        return Nil;
+    }
+    my @export;
+    my $return_pass = 0;
+    my $signature = $<multisig> ?? $<multisig>[0].ast !!
+        self.get_placeholder_sig($/);
+    my $unsafe = False;
+    for @( $<trait> ) -> $t {
+        if $t.ast.<export> {
+            push @export, map { ['OUR','EXPORT',$_], @( $t.ast<export> ) };
+        } elsif $t.ast<nobinder> {
+            $signature = Any;
+        } elsif $t.ast<return_pass> {
+            $return_pass = 1;
+        } elsif $t.ast<of> {
+        } elsif $t.ast<rw> {
+        } elsif $t.ast<unsafe> {
+            $unsafe = True;
+        } else {
+            $/.CURSOR.sorry("Sub trait $t.ast.keys.[0] not available");
+        }
+    }
+    my $scope = !$dln ?? 'anon' !! ($*SCOPE || 'my');
+    my ($m,$p) = $dln ?? self.mangle_longname($dln).<name path> !! ();
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        $scope = 'anon';
+    }
+
+    if $p && $scope ne 'our' {
+        $/.CURSOR.sorry('Defining a non-our sub with a package-qualified name makes no sense');
+        $scope = 'our';
+    }
+
+    if $scope eq 'our' {
+        push @export, $p || ['OUR'];
+    }
+
+    make self.block_to_closure($/,
+        bindlex => ($scope eq 'my' || ($scope eq 'our' && !$p)),
+        multiness => ($*MULTINESS || Any),
+        self.sl_to_block('sub',
+            :class('Sub'),
+            $<blockoid>.ast,
+            returnable => !$return_pass,
+            subname => $m, :$unsafe,
+            signature => $signature),
+        bindpackages => @export);
+}
+
 method trivial_eval($/, $ast) {
     if $ast.^isa(::Op::SimpleParcel) {
         [,] map { self.trivial_eval($/, $_) }, @( $ast.items )

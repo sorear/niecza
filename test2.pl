@@ -205,6 +205,19 @@ ok ?(2 != any(0, 4)), "2 != (0|4)";
 
 ok 2 ~~ any(Int, Num), "junctional ~~ works";
 
+{
+    my package Thing {
+        our sub foo() { 42 }
+        is foo(), 42, 'direct call to our sub works';
+        is &OUR::foo.(), 42, 'call via &OUR::foo works';
+        is OUR::foo, 42, 'call via OUR::foo works';
+    }
+
+    is Thing::foo, 42, 'call via Thing::foo works for inside declared sub';
+    our sub Thing::bar() { 84 }
+    is Thing::bar, 84, 'call via Thing::bar for outside declared works';
+}
+
 ok $?FILE ~~ /test2?\.pl/, '$?FILE works';
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 

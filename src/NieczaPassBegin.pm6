@@ -366,9 +366,10 @@ augment class Op::SubDef { #OK exist
             }
         }
 
-        @*opensubs[*-1].add_exports($*unit, $.symbol, $.bindpackages);
-        $body.exports = [ map { [ @($body.cur_pkg), 'EXPORT', $_, $.symbol ] },
-                @$.bindpackages ];
+        @*opensubs[*-1].add_exports($*unit, '&' ~ $.body.name,
+            [ map { $_ == 3 && $_[0] eq 'OUR' && $_[1] eq 'EXPORT' ?? $_[2] !! Nil }, @$.bindpackages ]);
+        $body.exports = [ map { [ @( @*opensubs[*-1].find_pkg($_) ),
+                '&' ~ $.body.name ] }, @$.bindpackages ];
 
         $!body = Body;
     }
