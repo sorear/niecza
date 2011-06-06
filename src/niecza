@@ -116,6 +116,59 @@ augment class Sig::Parameter { #OK
 }
 
 augment class NieczaActions {
+method term:identifier ($/) {
+    my $id  = $<identifier>.ast;
+    my $sal = $<args> ?? ($<args>.ast // []) !! [];
+    # TODO: support zero-D slicels
+
+    if $sal > 1 {
+        $/.CURSOR.sorry("Slicel lists are NYI");
+        make ::Op::StatementList.new;
+        return;
+    }
+
+    my $is_name = $/.CURSOR.is_name(~$<identifier>);
+
+    if $is_name && $<args>.chars == 0 {
+        make ::Op::Lexical.new(|node($/), name => $id);
+        return;
+    }
+
+    my $args = $sal[0] // [];
+
+    make ::Op::CallSub.new(|node($/),
+        invocant => ::Op::Lexical.new(name => $is_name ?? $id !! '&' ~ $id),
+        args => $args);
+}
+method term:name ($/) {
+    my ($id, $path) = self.mangle_longname($<longname>).<name path>;
+
+    $id = '&' ~ $id if $<args>;
+
+    if defined $path {
+        make ::Op::PackageVar.new(|node($/), name => $id,
+            slot => self.gensym, path => $path);
+    } else {
+        make ::Op::Lexical.new(|node($/), name => $id);
+    }
+
+    if $<postcircumfix> {
+        make mkcall($/, '&_param_role_inst', $/.ast,
+            @( $<postcircumfix>[0].ast.args ));
+    } elsif $<args> {
+        my $sal = $<args>.ast // [];
+        # TODO: support zero-D slicels
+
+        if $sal > 1 {
+            $/.CURSOR.sorry("Slicel lists are NYI");
+            return;
+        }
+
+        make ::Op::CallSub.new(|node($/), invocant => $/.ast,
+            args => $sal[0] // []);
+    }
+}
+
 method trivial_eval($/, $ast) {
     if $ast.^isa(::Op::SimpleParcel) {
         [,] map { self.trivial_eval($/, $_) }, @( $ast.items )
