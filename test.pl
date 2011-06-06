@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 1010;
+plan 1008;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -2253,7 +2253,6 @@ class {
 is one(1,2).perl, 'one(1, 2)', '.perl roundtrips one()';
 is any(1,2).perl, 'any(1, 2)', '.perl roundtrips any()';
 is all(1,2).perl, 'all(1, 2)', '.perl roundtrips all()';
-is each(1,2).perl, 'each(1, 2)', '.perl roundtrips each()';
 is none(1,2).perl, 'none(1, 2)', '.perl roundtrips none()';
 
 is (1 & 2).perl, 'all(1, 2)', '& means all';
@@ -2263,7 +2262,6 @@ is (1 ^ 2).perl, 'one(1, 2)', '^ means one';
 is (1, 2).any.perl, 'any(1, 2)', 'Any.any means any()';
 is (1, 2).one.perl, 'one(1, 2)', 'Any.one means one()';
 is (1, 2).all.perl, 'all(1, 2)', 'Any.all means all()';
-is (1, 2).each.perl, 'each(1, 2)', 'Any.each means each()';
 is (1, 2).none.perl, 'none(1, 2)', 'Any.none means none()';
 
 is { a => True }.any.perl, 'any("a")', 'Hash.any means any(keys)';

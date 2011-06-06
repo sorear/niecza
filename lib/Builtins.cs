@@ -45,18 +45,12 @@ public class Builtins {
     public static Variable AutoThread(P6any j, Func<Variable,Variable> dgt) {
         int jtype = Kernel.UnboxAny<int>((P6any) j.GetSlot("kind_"));
         P6any listObj = (P6any) j.GetSlot("eigenstates_");
-        P6any newList;
-        if (jtype == 4) {
-            newList = Kernel.RunInferior(MEMap_for_each(
-                Kernel.GetInferiorRoot(), listObj, dgt)).Fetch();
-        } else {
-            Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
-            Variable[] nlist = new Variable[list.Length];
-            for (int i = 0; i < list.Length; i++) {
-                nlist[i] = dgt(list[i]);
-            }
-            newList = Kernel.BoxRaw(nlist, Kernel.ParcelMO);
+        Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
+        Variable[] nlist = new Variable[list.Length];
+        for (int i = 0; i < list.Length; i++) {
+            nlist[i] = dgt(list[i]);
         }
+        P6any newList = Kernel.BoxRaw(nlist, Kernel.ParcelMO);
         P6any newJunc = new P6opaque(Kernel.JunctionMO);
         newJunc.SetSlot("kind_", j.GetSlot("kind_"));
         newJunc.SetSlot("eigenstates_", newList);

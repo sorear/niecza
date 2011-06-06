@@ -44,7 +44,6 @@ my class Any is Mu {
     method any() { any @(self) }
     method none() { none @(self) }
     method all() { all @(self) }
-    method each() { each @(self) }
     method one() { one @(self) }
     method sort($cmp = &infix:<cmp>) { @(self).sort($cmp) }
     method first(Mu $filter) { for @(self) { return $_ if $_ ~~ $filter } }
@@ -820,7 +819,6 @@ my class Hash {
     method any() { any self.keys }
     method none() { none self.keys }
     method all() { all self.keys }
-    method each() { each self.keys }
     method one() { one self.keys }
 
     method Capture () {
@@ -951,9 +949,9 @@ my class Junction is Mu {
     method !kind() { Q:CgOp { (ns (getslot kind_ obj (@ {self}))) } }
     method !eigenstates() { Q:CgOp { (ns (getslot eigenstates_ obj (@ {self}))) } }
 
-    my @kinds = <all none one any each>;
+    my @kinds = <all none one any>;
     method perl() {
-        @kinds[self!kind] ~ "(" ~ join(", ", map { .perl }, @$!eigenstates) ~ ")"
+        @kinds[self!kind] ~ "(" ~ join(", ", map *.perl, @$!eigenstates) ~ ")"
     }
 
     method from-parcel(Int $kind, Mu $pcl) {
@@ -976,7 +974,6 @@ sub all(*@p) { Junction.from-list(0, @p) }
 sub none(*@p) { Junction.from-list(1, @p) }
 sub one(*@p) { Junction.from-list(2, @p) }
 sub any(*@p) { Junction.from-list(3, @p) }
-sub each(*@list) { Junction!Junction::create(4, @list) }
 # }}}
 # List utilities {{{
 sub _vivify_array_at_pos(\$self, $ix) {
