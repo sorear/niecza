@@ -2329,17 +2329,36 @@ tryagain:
 
         private static SubInfo JunctionFallbackSI = new SubInfo("Junction.FALLBACK", JunctionFallbackC);
         private static Frame JunctionFallbackC(Frame th) {
-            Variable[] post;
-            string mn = th.pos[1].Fetch().mo.mro_raw_Str.Get(th.pos[1]);
-            post = new Variable[th.pos.Length - 1];
-            Array.Copy(th.pos, 2, post, 1, th.pos.Length - 2);
-            th.caller.resultSlot = Builtins.AutoThread(th.pos[0].Fetch(),
-                delegate(Variable postp) {
-                    post[0] = postp;
-                    return RunInferior(postp.Fetch().InvokeMethod(
-                        GetInferiorRoot(), mn, post, th.named));
-                });
-            return th.caller;
+            if (th.ip == 0) {
+                if (!th.pos[0].Fetch().IsDefined())
+                    return Kernel.Die(th, "Cannot autothread an undefined junction");
+                P6opaque jo = (P6opaque)th.pos[0].Fetch();
+                th.lex0 = Kernel.UnboxAny<Variable[]>((P6any)jo.slots[1]);
+                th.lex1 = new Variable[((Variable[])th.lex0).Length];
+                th.lex2 = jo.slots[0];
+                th.lex3 = th.pos[1].Fetch().mo.mro_raw_Str.Get(th.pos[1]);
+                th.lex4 = new Variable[th.pos.Length - 1];
+                Array.Copy(th.pos, 2, (Variable[])th.lex4, 1, th.pos.Length-2);
+            }
+
+            Variable[] src = (Variable[]) th.lex0;
+            Variable[] dst = (Variable[]) th.lex1;
+            if (th.ip > 0)
+                dst[th.ip - 1] = (Variable)th.resultSlot;
+
+            if (th.ip == dst.Length) {
+                P6opaque nj = new P6opaque(Kernel.JunctionMO);
+                nj.slots[0] = th.lex2;
+                nj.slots[1] = Kernel.BoxRaw(dst, Kernel.ParcelMO);
+                th.caller.resultSlot = Kernel.NewROScalar(nj);
+                return th.caller;
+            }
+
+            Variable[] npos = (Variable[]) th.lex4;
+            npos[0] = src[th.ip++];
+
+            return npos[0].Fetch().InvokeMethod(th, (string)th.lex3,
+                    npos, th.named);
         }
 
         public static Frame Die(Frame caller, string msg) {
