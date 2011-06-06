@@ -353,8 +353,8 @@ my class CommonEnum {
 
     method succ() {
         my $index = defined(self) ?? $!index !! 0;
-        return self if $!index == self.enums - 1;
-        self.from-index($!index + 1)
+        return self if $index == self.enums - 1;
+        self.from-index($index + 1)
     }
 
     method pred() {

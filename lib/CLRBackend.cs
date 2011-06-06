@@ -1096,6 +1096,10 @@ namespace Niecza.CLRBackend {
         }
         public override ClrOp GetCode(int up) {
             Package p = GetPackage();
+            if (p == null) {
+                return new ClrGetField(Tokens.DMO_typeVar,
+                    new ClrGetSField(Tokens.Kernel_AnyMO));
+            }
             return new ClrGetField(Tokens.DMO_typeVar,
                 new ClrGetSField(p.metaObject));
         }
