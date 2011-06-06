@@ -125,8 +125,16 @@ method trivial_eval($/, $ast) {
         $ast.text;
     } elsif $ast.^isa(::Op::Paren) {
         self.trivial_eval($/, $ast.inside);
+    } elsif $ast.^isa(::Op::StatementList) {
+        my @l = @( $ast.children ); pop @l;
+        self.trivial_eval($/, $_) for @l;
+        $ast.children ?? self.trivial_eval($/, $ast.children[*-1]) !! Nil;
+    } elsif $ast.^isa(::Op::Num) && $ast.value !~~ Array {
+        $ast.value.Num
+    } elsif $ast.^isa(::Op::Num) && $ast.value ~~ Array && $ast.value[0] == 10 {
+        (+$ast.value[1]).Int # well not quite
     } else {
-        $/.CURSOR.sorry("Compile time expression is insufficiently trivial");
+        $/.CURSOR.sorry("Compile time expression is insufficiently trivial {$ast.WHAT.perl}");
         "XXX"
     }
 }
@@ -184,7 +192,7 @@ method type_declarator:constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    my $scope = $*SCOPE // 'my';
+    my $scope = $*SCOPE || 'our';
     my $slot  = ~($<identifier> // $<variable> // self.gensym);
 
     make ::Op::ConstantDecl.new(|node($/), name => $slot,
@@ -230,7 +238,7 @@ method type_declarator:enum ($/) {
     my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
         [ 'MY', $has_strs ?? 'Str' !! 'Int' ];
 
-    if $<name> && $<name>.reduced eq 'longname' && ($scope ||= 'my') ne 'anon' {
+    if $<name> && $<name>.reduced eq 'longname'&& ($scope ||= 'our') ne 'anon' {
         # Longnamed enum is a kind of type definition
 
         my $ourpath = Array;

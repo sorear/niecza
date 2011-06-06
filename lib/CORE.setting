@@ -359,7 +359,7 @@ my class CommonEnum {
 
     method pred() {
         my $index = defined(self) ?? $!index !! 0;
-        $!index ?? self.from-index($!index - 1) !! self;
+        $index ?? self.from-index($index - 1) !! self;
     }
 
     method from-index($ix) { self._create($ix,self.enums._index_to_value($ix)) }
@@ -906,7 +906,7 @@ my class EnumMap {
             my ($k, $v);
             if $p ~~ Pair {
                 $k ::= $p.key;
-                $v ::= $v.value;
+                $v ::= $p.value;
             } else {
                 $k ::= $p;
                 $v ::= $last.succ;
