@@ -558,6 +558,11 @@ namespace Niecza {
                     break;
                 case 4: //package
                     break;
+                case 5: //subset
+                    //mo.FillSubset((STable)ReadXref(ref from));
+                    break;
+                case 6: //enum
+                    break;
                 default:
                     throw new ArgumentException();
             }
@@ -2298,6 +2303,7 @@ tryagain:
         }
 
         public static STable PairMO;
+        public static STable EnumMapMO;
         public static STable CallFrameMO;
         public static STable CaptureMO;
         public static STable GatherIteratorMO;

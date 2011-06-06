@@ -455,7 +455,12 @@ namespace Niecza.CLRBackend {
             EmitIntArray(ws);
         }
 
-        void EmitExactNum(int numbase, string digits) {
+        public void EmitStrVar(string str) {
+            EmitByte(0);
+            EmitStr(str);
+        }
+
+        public void EmitExactNum(int numbase, string digits) {
             BigInteger num = BigInteger.Zero;
             BigInteger den = BigInteger.Zero;
 
@@ -759,6 +764,10 @@ namespace Niecza.CLRBackend {
                 return new Module(p);
             else if (type == "package")
                 return new Package(p);
+            else if (type == "enum")
+                return new Enum(p);
+            else if (type == "subset")
+                return new Subset(p);
             else
                 throw new Exception("unknown package type " + p);
         }
@@ -851,6 +860,33 @@ namespace Niecza.CLRBackend {
             attributes = Attribute.fromArray(p[3]);
             methods    = Method.fromArray(p[4]);
             superclasses = JScalar.A<Xref>(0, p[5], Xref.from);
+        }
+    }
+
+    class Enum: Module {
+        public readonly Xref basetype;
+        public readonly string[] keys;
+        public readonly string[] values;
+
+        public Enum(object[] p) : base(p) {
+            basetype = Xref.from(p[3]);
+            object[] kv = p[4] as object[];
+            keys   = new string[kv.Length / 2];
+            values = new string[kv.Length / 2];
+            for (int i = 0; i < kv.Length; i += 2) {
+                keys[i/2] = JScalar.S(kv[i]);
+                values[i/2] = JScalar.S(kv[i+1]);
+            }
+        }
+    }
+
+    class Subset: Module {
+        public readonly Xref basetype;
+        public readonly Xref where;
+
+        public Subset(object[] p) : base(p) {
+            basetype = Xref.from(p[3]);
+            where = Xref.from(p[4]);
         }
     }
 
@@ -4090,7 +4126,7 @@ dynamic:
                     object bit;
                     FieldInfo tc = ls.type == null ?
                         Tokens.Kernel_AnyMO :
-                        ls.type.Resolve<Class>().metaObject;
+                        ls.type.Resolve<Package>().metaObject;
                     if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
                         string s = ((f & LexSimple.HASH) != 0) ?
                             "newhash" : "newarray";
@@ -4126,7 +4162,7 @@ dynamic:
 
             CpsOp[] supers = new CpsOp[pr.superclasses.Length];
             for (int i = 0; i < supers.Length; i++)
-                supers[i] = CpsOp.GetSField(pr.superclasses[i].Resolve<Class>().metaObject);
+                supers[i] = CpsOp.GetSField(pr.superclasses[i].Resolve<Package>().metaObject);
             build.Add( CpsOp.MethodCall(Tokens.DMO_FillRole,
                 mo, CpsOp.NewArray(Tokens.STable, supers),
                 CpsOp.NewArray(Tokens.STable)) );
@@ -4151,7 +4187,7 @@ dynamic:
                     RawAccessLex("scopedlex", a.ivar, null);
                 CpsOp type = a.type == null ?
                     CpsOp.GetSField(Tokens.Kernel_AnyMO) :
-                    CpsOp.GetSField(a.type.Resolve<Class>().metaObject);
+                    CpsOp.GetSField(a.type.Resolve<Package>().metaObject);
                 build.Add(CpsOp.MethodCall(Tokens.DMO_AddAttribute,
                     mo, name, publ, init, type));
             }
@@ -4376,6 +4412,11 @@ dynamic:
                     unit.EmitInt(r.linearized_mro.Length);
                     foreach (Xref x in r.linearized_mro)
                         unit.EmitXref(x);
+                } else if (pkg is Subset) {
+                    unit.EmitByte(5);
+                    unit.EmitXref((pkg as Subset).basetype);
+                } else if (pkg is Enum) {
+                    unit.EmitByte(6);
                 } else if (pkg is Module) {
                     unit.EmitByte(3);
                 } else if (pkg is Package) {
@@ -4406,6 +4447,21 @@ dynamic:
                         unit.EmitByte((byte)flags);
                         unit.EmitXref(a.ibody);
                         unit.EmitXref(a.type);
+                    }
+                } else if (pkg is Subset) {
+                    unit.EmitInt(-1);
+                    unit.EmitXref((pkg as Subset).where);
+                } else if (pkg is Enum) {
+                    Enum e = pkg as Enum;
+                    unit.EmitXref(e.basetype);
+                    unit.EmitInt(e.keys.Length);
+                    for (int kix = 0; kix < e.keys.Length; kix++) {
+                        unit.EmitStr(e.keys[kix]);
+                        if (e.values[kix][0] == 'I') {
+                            unit.EmitExactNum(10, e.values[kix].Substring(1));
+                        } else {
+                            unit.EmitStrVar(e.values[kix].Substring(1));
+                        }
                     }
                 } else {
                     unit.EmitInt(-1);
@@ -4475,7 +4531,7 @@ dynamic:
                         } else {
                             FieldInfo tc = lx.type == null ?
                                 Tokens.Kernel_AnyMO :
-                                lx.type.Resolve<Class>().metaObject;
+                                lx.type.Resolve<Package>().metaObject;
                             SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(
                                 Tokens.Kernel_NewTypedScalar,
                                 CpsOp.GetSField(tc)));

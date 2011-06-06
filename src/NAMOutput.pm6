@@ -218,11 +218,11 @@ sub packagely(@block) {
             name => $name,
             exports => $exports,
             basetype => $attr,
-            pairs => (map * => *, @$meth),
+            pairs => (map { $^a => +substr($^b,1) }, @$meth),
         );
     }
     if $type eq 'subset' {
-        return ::Metamodel::Enum.CREATE(
+        return ::Metamodel::Subset.CREATE(
             xref => [ $*uname, $*xid, $name ],
             name => $name,
             exports => $exports,
@@ -276,7 +276,7 @@ augment class Metamodel::Enum { #OK exist
     method to_nam() {
         nextwith(self,
             $.basetype,
-            [ map { .key, .value }, @.pairs ]);
+            [ map { .key, 'I' ~ .value }, @.pairs ]);
     }
 }
 
