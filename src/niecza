@@ -187,7 +187,7 @@ method routine_def ($/) {
     my $unsafe = False;
     for @( $<trait> ) -> $t {
         if $t.ast.<export> {
-            push @export, map { ['OUR','EXPORT',$_], @( $t.ast<export> ) };
+            push @export, map { ['OUR','EXPORT',$_] }, @( $t.ast<export> );
         } elsif $t.ast<nobinder> {
             $signature = Any;
         } elsif $t.ast<return_pass> {
