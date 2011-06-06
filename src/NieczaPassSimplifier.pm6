@@ -88,6 +88,13 @@ our %funcs = (
     '&last'                => do_nullary_control(2),
     '&make'                => do_builtin('make', 1),
     '&map'                 => &do_map_grep,
+    '&infix:<&>'           => do_makejunction(0),
+    '&infix:<^>'           => do_makejunction(2),
+    '&infix:<|>'           => do_makejunction(3),
+    '&all'                 => do_makejunction(8),
+    '&none'                => do_makejunction(9),
+    '&one'                 => do_makejunction(10),
+    '&any'                 => do_makejunction(11),
     '&next'                => do_nullary_control(1),
     '&not'                 => do_builtin('not', 1),
     '&pop'                 => do_builtin('pop', 1),
@@ -147,6 +154,11 @@ sub do_nullary_control($number) { sub ($body, $nv, $ , $op) {
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 0;
     return ::Op::Control.new(:$number, payload => ::Op::Lexical.new(name => 'Nil'));
+} }
+
+sub do_makejunction($typecode) { sub ($body, $nv, $ , $op) {
+    return $op unless defined my $args = no_named_params($op);
+    return ::Op::MakeJunction.new(:$typecode, zyg => @$args);
 } }
 
 sub do_atkey($body, $nv, $invname, $op) {

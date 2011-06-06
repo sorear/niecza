@@ -3393,6 +3393,12 @@ dynamic:
                         CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(1, zyg, th.Scan)),
                         CpsOp.GetSField(Tokens.Kernel_ParcelMO)));
             };
+            handlers["makejunction"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.MethodCall(
+                        Tokens.Builtins.GetMethod("MakeJunction"),
+                        CpsOp.IntLiteral(JScalar.I(zyg[1])),
+                        CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(2, zyg, th.Scan)));
+            };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
                 if (zyg[1] is JScalar) {

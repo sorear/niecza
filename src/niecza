@@ -28,7 +28,16 @@ use OptRxSimple;
 use STD;
 use Sig;
 
-CgOp._register_ops: <
+class Op::MakeJunction is Op {
+    has Int $.typecode = die "MakeJunction.typecode required";
+    has @.zyg;
+
+    method code($body) {
+        CgOp.makejunction($!typecode, map *.cgop($body), @!zyg)
+    }
+}
+
+CgOp._register_ops: < makejunction
 >;
 
 my $usage = q:to/EOM/;

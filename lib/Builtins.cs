@@ -43,7 +43,6 @@ public class Builtins {
 
     // NOTE: Destructive on avs!  Clone first if you need to.
     public static Variable AutoThread(P6any j, Func<Variable,Variable> dgt) {
-        int jtype = Kernel.UnboxAny<int>((P6any) j.GetSlot("kind_"));
         P6any listObj = (P6any) j.GetSlot("eigenstates_");
         Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
         Variable[] nlist = new Variable[list.Length];
@@ -1074,6 +1073,26 @@ public class Builtins {
         char c = (char) o1.mo.mro_raw_Numeric.Get(v);
         int ix = (int) char.GetUnicodeCategory(c);
         return MakeInt(ix);
+    }
+
+    public static Variable MakeJunction(int type, Variable[] elems) {
+        if (type >= 8) {
+            type -= 8;
+            foreach (Variable e in elems)
+                if (e.islist) goto need_flatten;
+            goto flat_enough;
+need_flatten:;
+            VarDeque iter = new VarDeque(elems);
+            VarDeque into = new VarDeque();
+            while (Kernel.IterHasFlat(iter, true))
+                into.Push(iter.Shift());
+            elems = into.CopyAsArray();
+flat_enough:;
+        }
+        P6opaque nj = new P6opaque(Kernel.JunctionMO);
+        nj.slots[0] = Kernel.BoxRaw(type, Kernel.IntMO);
+        nj.slots[1] = Kernel.BoxRaw(elems, Kernel.ParcelMO);
+        return Kernel.NewROScalar(nj);
     }
 
     public static Variable Make(Frame fr, Variable v) {
