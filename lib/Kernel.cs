@@ -969,25 +969,58 @@ noparams:
             if (jun_pivot != -1 && !quiet) {
                 Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
                         pos[jun_pivot]);
-                caller.resultSlot = Builtins.AutoThread(jct.Fetch(),
-                    delegate(Variable n) {
-                        if (jun_pivot == -2)
-                            named[jun_pivot_n] = n;
-                        else
-                            pos[jun_pivot] = n;
-                        return Kernel.RunInferior(Binder(
-                                Kernel.GetInferiorRoot(),
-                                outer, sub, pos, named, false, de));
-                    });
-                // restore, in case our caller is using this
-                if (jun_pivot == -2)
-                    named[jun_pivot_n] = jct;
-                else
-                    pos[jun_pivot] = jct;
-                return caller;
+                th = caller.MakeChild(null, AutoThreadSubSI, Kernel.AnyP);
+
+                P6opaque jo  = (P6opaque) jct.Fetch();
+
+                th.named = named;
+                th.pos = pos;
+                th.lex1 = this;
+                th.lex2 = jun_pivot_n;
+                th.lex3 = jo.slots[0];
+                th.lex4 = Kernel.UnboxAny<Variable[]>((P6any)jo.slots[1]);
+                th.lex5 = outer;
+                th.lex6 = sub;
+                th.lex7 = de;
+                th.lex8 = new Variable[((Variable[])th.lex4).Length];
+                th.lex9 = jct;
+
+                th.lexi0 = jun_pivot;
+                th.lexi1 = 0;
+
+                return th;
             }
 
             return th;
+        }
+
+        static SubInfo AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub", AutoThreadSubC);
+        static Frame AutoThreadSubC(Frame th) {
+            Variable[] src = (Variable[]) th.lex4;
+            Variable[] dst = (Variable[]) th.lex8;
+            if (th.lexi1 > 0)
+                dst[th.lexi1 - 1] = (Variable)th.resultSlot;
+
+            if (th.lexi1 == dst.Length) {
+                P6opaque nj = new P6opaque(Kernel.JunctionMO);
+                nj.slots[0] = th.lex3;
+                nj.slots[1] = Kernel.BoxRaw(dst, Kernel.ParcelMO);
+                // restore, in case our caller is using this
+                if (th.lexi0 == -2)
+                    th.named[(string)th.lex2] = (Variable)th.lex9;
+                else
+                    th.pos[th.lexi0] = (Variable)th.lex9;
+                th.caller.resultSlot = Kernel.NewROScalar(nj);
+                return th.caller;
+            }
+
+            if (th.lexi0 == -2)
+                th.named[(string)th.lex2] = src[th.lexi1++];
+            else
+                th.pos[th.lexi0] = src[th.lexi1++];
+
+            return ((SubInfo)th.lex1).Binder(th, (Frame)th.lex5, (P6any)th.lex6,
+                th.pos, th.named, false, (DispatchEnt)th.lex7);
         }
 
         public BValue AddHint(string name) {
