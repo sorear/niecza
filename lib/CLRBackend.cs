@@ -764,8 +764,6 @@ namespace Niecza.CLRBackend {
                 return new Module(p);
             else if (type == "package")
                 return new Package(p);
-            else if (type == "enum")
-                return new Enum(p);
             else if (type == "subset")
                 return new Subset(p);
             else
@@ -860,23 +858,6 @@ namespace Niecza.CLRBackend {
             attributes = Attribute.fromArray(p[3]);
             methods    = Method.fromArray(p[4]);
             superclasses = JScalar.A<Xref>(0, p[5], Xref.from);
-        }
-    }
-
-    class Enum: Module {
-        public readonly Xref basetype;
-        public readonly string[] keys;
-        public readonly string[] values;
-
-        public Enum(object[] p) : base(p) {
-            basetype = Xref.from(p[3]);
-            object[] kv = p[4] as object[];
-            keys   = new string[kv.Length / 2];
-            values = new string[kv.Length / 2];
-            for (int i = 0; i < kv.Length; i += 2) {
-                keys[i/2] = JScalar.S(kv[i]);
-                values[i/2] = JScalar.S(kv[i+1]);
-            }
         }
     }
 
@@ -4415,8 +4396,6 @@ dynamic:
                 } else if (pkg is Subset) {
                     unit.EmitByte(5);
                     unit.EmitXref((pkg as Subset).basetype);
-                } else if (pkg is Enum) {
-                    unit.EmitByte(6);
                 } else if (pkg is Module) {
                     unit.EmitByte(3);
                 } else if (pkg is Package) {
@@ -4451,18 +4430,6 @@ dynamic:
                 } else if (pkg is Subset) {
                     unit.EmitInt(-1);
                     unit.EmitXref((pkg as Subset).where);
-                } else if (pkg is Enum) {
-                    Enum e = pkg as Enum;
-                    unit.EmitXref(e.basetype);
-                    unit.EmitInt(e.keys.Length);
-                    for (int kix = 0; kix < e.keys.Length; kix++) {
-                        unit.EmitStr(e.keys[kix]);
-                        if (e.values[kix][0] == 'I') {
-                            unit.EmitExactNum(10, e.values[kix].Substring(1));
-                        } else {
-                            unit.EmitStrVar(e.values[kix].Substring(1));
-                        }
-                    }
                 } else {
                     unit.EmitInt(-1);
                 }

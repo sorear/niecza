@@ -561,8 +561,6 @@ namespace Niecza {
                 case 5: //subset
                     //mo.FillSubset((STable)ReadXref(ref from));
                     break;
-                case 6: //enum
-                    break;
                 default:
                     throw new ArgumentException();
             }

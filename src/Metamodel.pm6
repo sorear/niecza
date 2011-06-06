@@ -410,12 +410,6 @@ class Subset is Module {
     has $.where;
 }
 
-class Enum is Module {
-    # enum [ <longname> | <variable> ]? <trait> <term>
-    has @.pairs;
-    has $.basetype;
-}
-
 #####
 
 # This is a static lexical; they exist in finite number per unit.  They may

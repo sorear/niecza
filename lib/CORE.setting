@@ -335,8 +335,60 @@ my class ClassHOW {
     } }
 }
 
-my class EnumType is Cool { }
-my class Bool is EnumType {
+# These should be refactored as roles once those become available
+my class CommonEnum {
+    has $!index;
+
+    method perl()  {
+        defined(self) ?? (self.typename ~ "::" ~ self.key) !! self.typename
+    }
+    method Str()   {
+        defined(self) ?? (self.typename ~ "::" ~ self.key) !!
+            (self.typename ~ "()")
+    }
+    method key()   { self.enums._index_to_key($!index) }
+    method value() { self.enums._index_to_value($!index) }
+    method kv()    { self.key, self.value }
+    method pair()  { self.key => self.value }
+
+    method succ() {
+        my $index = defined(self) ?? $!index !! 0;
+        return self if $!index == self.enums - 1;
+        self.from-index($!index + 1)
+    }
+
+    method pred() {
+        my $index = defined(self) ?? $!index !! 0;
+        $!index ?? self.from-index($!index - 1) !! self;
+    }
+
+    method from-index($ix) { self._create($ix,self.enums._index_to_value($ix)) }
+
+    method postcircumfix:<( )> ($key) {
+        self.from-index(self.enums._lookup($key));
+    }
+}
+
+my class IntBasedEnum is CommonEnum {
+    method Numeric() { Q:CgOp { (box Int (unbox int (@ {self}))) } }
+    method Stringy() { self.key }
+    method _create($ix,$val) { Q:CgOp {
+        (letn obj (box (@ {self}) (unbox int (@ {$val.Int})))
+          (setslot index (@ (l obj)) {$ix.Int})
+          (l obj))
+    } }
+}
+
+my class StrBasedEnum is CommonEnum {
+    method Stringy() { Q:CgOp { (box Str (unbox str (@ {self}))) } }
+    method _create($ix,$val) { Q:CgOp {
+        (letn obj (box (@ {self}) (unbox str (@ {$val.Str})))
+          (setslot index (@ (l obj)) {$ix.Int})
+          (l obj))
+    } }
+}
+
+my class Bool is Cool {
     method Str() { self ?? "Bool::True" !! "Bool::False" }
     method Stringy() { self.key }
     method perl() { defined(self) ?? ~self !! self.typename }
@@ -842,11 +894,14 @@ my class Pair is Enum {
 # XXX This ought to be more read-only
 my class EnumMap {
     has %!by-key;
-    has @!by-value;
+    has %!by-value;
+    has @!values;
+    has @!keys;
 
     method new(*@pairs) {
         self := self.CREATE;
         my $last = -1;
+        my $ixn = 0;
         for @pairs -> $p {
             my ($k, $v);
             if $p ~~ Pair {
@@ -857,21 +912,30 @@ my class EnumMap {
                 $v ::= $last.succ;
             }
             $last = $v;
-            %!by-key{$k} = $v;
-            push @!by-value, ($k => $v);
+            %!by-key{$k} = $ixn;
+            %!by-value{$v} //= $ixn;
+            push @!keys, $k;
+            push @!values, $v;
+            $ixn++;
         }
         unitem(self);
     }
 
-    method iterator() { @!by-value.iterator }
-    method list() { @!by-value }
+    method Numeric() { +@!keys }
+    method _index_to_key($i) { @!keys[$i] }
+    method _index_to_value($i) { @!values[$i] }
+    method _lookup($w) {
+        %!by-key{$w} // %!by-value{$w} // die "No match"
+    }
+    method iterator() { self.list.iterator }
+    method list() { @!keys Z=> @!values }
     method hash() { %!by-key }
-    method keys() { @!by-value».key }
-    method values() { @!by-value».value }
-    method invert() { @!by-value.map({ $^b => $^a }) }
-    method kv() { @!by-value.map({ $^a, $^b }) }
-    method pairs() { @!by-value }
-    method at-key(\$k) { %!by-key.at-key($k) }
+    method keys() { @!keys }
+    method values() { @!values }
+    method invert() { @!values Z=> @!keys }
+    method kv() { @!keys Z @!values }
+    method pairs() { self.list }
+    method at-key(\$k) { @!values[%!by-key.at-key($k)] }
 }
 
 my class Junction is Mu {

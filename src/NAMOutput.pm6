@@ -192,7 +192,6 @@ my %pkgtypes = (
     grammar => ::Metamodel::Grammar,
     role    => ::Metamodel::Role,
     parametricrole => ::Metamodel::ParametricRole,
-    enum    => ::Metamodel::Enum,
     subset  => ::Metamodel::Subset,
 );
 
@@ -212,15 +211,6 @@ augment class Metamodel::Package { #OK exist
 sub packagely(@block) {
     my ($type, $name, $exports, $attr, $meth, $sup, $mro) = @block;
     # these two are nonstandard
-    if $type eq 'enum' {
-        return ::Metamodel::Enum.CREATE(
-            xref => [ $*uname, $*xid, $name ],
-            name => $name,
-            exports => $exports,
-            basetype => $attr,
-            pairs => (map { $^a => +substr($^b,1) }, @$meth),
-        );
-    }
     if $type eq 'subset' {
         return ::Metamodel::Subset.CREATE(
             xref => [ $*uname, $*xid, $name ],
@@ -268,15 +258,6 @@ augment class Metamodel::ParametricRole { #OK exist
             [ map { $_.to_nam }, @$.attributes ],
             [ map { $_.to_nam }, @$.methods ],
             $.superclasses);
-    }
-}
-
-augment class Metamodel::Enum { #OK exist
-    # XXX assumes all pairs are str->small int
-    method to_nam() {
-        nextwith(self,
-            $.basetype,
-            [ map { .key, 'I' ~ .value }, @.pairs ]);
     }
 }
 
