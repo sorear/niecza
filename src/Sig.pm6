@@ -33,7 +33,7 @@ class Parameter {
         } elsif $!defouter {
             CgOp.outerlex($!slot);
         } elsif $!optional {
-            CgOp.scopedlex($!type);
+            CgOp.class_ref('typeVar', @$!tclass);
         } else {
             CgOp.die("No value in $body.name() available for parameter $!name");
         }
@@ -66,14 +66,14 @@ class Parameter {
             if $!is_copy {
                 self.do_copy($get);
             } else {
+                my $type = CgOp.class_ref('mo', @!tclass);
                 CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
-                    CgOp.newboundvar(+(!$!rw), +$!list, $get));
+                    CgOp.newboundvar(+(!$!rw), +$!list, $type, $get));
             }
         } else {
             CgOp.sink($get);
         }
     }
-
     method simple($n) { self.new(name => $n, slot => $n) }
 }
 

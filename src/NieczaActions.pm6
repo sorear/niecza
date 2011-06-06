@@ -1494,11 +1494,7 @@ method term:value ($/) { make $<value>.ast }
 method term:name ($/) {
     my ($id, $path) = self.mangle_longname($<longname>).<name path>;
 
-    if $<args> {
-        $/.CURSOR.sorry("Unsupported form of term:name");
-        make ::Op::StatementList.new;
-        return Nil;
-    }
+    $id = '&' ~ $id if $<args>;
 
     if defined $path {
         make ::Op::PackageVar.new(|node($/), name => $id,
@@ -1510,6 +1506,17 @@ method term:name ($/) {
     if $<postcircumfix> {
         make mkcall($/, '&_param_role_inst', $/.ast,
             @( $<postcircumfix>[0].ast.args ));
+    } elsif $<args> {
+        my $sal = $<args>.ast // [];
+        # TODO: support zero-D slicels
+
+        if $sal > 1 {
+            $/.CURSOR.sorry("Slicel lists are NYI");
+            return;
+        }
+
+        make ::Op::CallSub.new(|node($/), invocant => $/.ast,
+            args => $sal[0] // []);
     }
 }
 
@@ -1521,18 +1528,20 @@ method term:identifier ($/) {
     if $sal > 1 {
         $/.CURSOR.sorry("Slicel lists are NYI");
         make ::Op::StatementList.new;
-        return Nil;
+        return;
     }
 
-    if $/.CURSOR.is_name(~$<identifier>) {
+    my $is_name = $/.CURSOR.is_name(~$<identifier>);
+
+    if $is_name && $<args>.chars == 0 {
         make ::Op::Lexical.new(|node($/), name => $id);
-        return Nil;
+        return;
     }
 
     my $args = $sal[0] // [];
 
     make ::Op::CallSub.new(|node($/),
-        invocant => ::Op::Lexical.new(name => '&' ~ $id),
+        invocant => ::Op::Lexical.new(name => $is_name ?? $id !! '&' ~ $id),
         args => $args);
 }
 
@@ -1612,6 +1621,16 @@ method do_variable_reference($M, $v) {
         if defined($v<rest>) {
             ::Op::PackageVar.new(path => $v<rest>, name => $sl,
                 slot => self.gensym, |node($M));
+        } elsif $tw eq '?' && $sl eq '$?POSITION' {
+            mkcall($M, '&infix:<..^>',
+                ::Op::Num.new(|node($M), value => [10, ~$M.from]),
+                ::Op::Num.new(|node($M), value => [10, ~$M.to]));
+        } elsif $tw eq '?' && $sl eq '$?LINE' {
+            ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
+        } elsif $tw eq '?' && $sl eq '&?BLOCK' {
+            ::Op::GetBlock.new(|node($M))
+        } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
+            ::Op::GetBlock.new(|node($M), :routine)
         } else {
             ::Op::Lexical.new(|node($M), name => $sl);
         }
@@ -1808,7 +1827,7 @@ method parameter($/) {
     my $p = $<param_var> // $<named_param>;
 
     make ::Sig::Parameter.new(name => ~$/, :$default,
-        :$optional, :$slurpy, :$rw, type => ($type // 'Any'),
+        :$optional, :$slurpy, :$rw, type => $type,
         :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
 }
 
@@ -2139,19 +2158,195 @@ method variable_declarator($/) {
     }
 }
 
+method trivial_eval($/, $ast) {
+    if $ast.^isa(::Op::SimpleParcel) {
+        [,] map { self.trivial_eval($/, $_) }, @( $ast.items )
+    } elsif $ast.^isa(::Op::SimplePair) {
+        $ast.key => self.trivial_eval($/, $ast.value)
+    } elsif $ast.^isa(::Op::StringLiteral) {
+        $ast.text;
+    } elsif $ast.^isa(::Op::Paren) {
+        self.trivial_eval($/, $ast.inside);
+    } elsif $ast.^isa(::Op::StatementList) {
+        my @l = @( $ast.children ); pop @l;
+        self.trivial_eval($/, $_) for @l;
+        $ast.children ?? self.trivial_eval($/, $ast.children[*-1]) !! Nil;
+    } elsif $ast.^isa(::Op::Num) && $ast.value !~~ Array {
+        $ast.value.Num
+    } elsif $ast.^isa(::Op::Num) && $ast.value ~~ Array && $ast.value[0] == 10 {
+        (+$ast.value[1]).Int # well not quite
+    } else {
+        $/.CURSOR.sorry("Compile time expression is insufficiently trivial {$ast.WHAT.perl}");
+        "XXX"
+    }
+}
+
+method type_declarator:subset ($/) {
+    my $ourname = Array; my $lexvar = self.gensym; my $name;
+    my $scope = $*SCOPE;
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid subset scope $scope");
+        $scope = 'anon';
+    }
+    if $<longname> {
+        $scope ||= 'my';
+        my $r = self.mangle_longname($<longname>[0], True);
+        $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Block name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        if $scope eq 'our' {
+            $ourname = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourname = [ @$ourname, $name ];
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+        }
+    } else {
+        if ($scope || 'anon') ne 'anon' {
+            $/.CURSOR.sorry("Cannot have a non-anon subset with no name");
+        }
+        $name = 'ANON';
+    }
+
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
+        ['MY', 'Any'];
+    my @exports;
+
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } elsif $t<of> {
+            $basetype = $t<of>;
+        } else {
+            $/.CURSOR.sorry("Unsupported subset trait $t.keys()");
+        }
+    }
+
+    my $body = self.transparent($/, $<EXPR> ?? $<EXPR>[0].ast !!
+        mklex($/, 'True')).body;
+
+    make ::Op::SubsetDef.new(|node($/), :$name, :$lexvar, :$ourname,
+        :$body, :@exports, :$basetype);
+}
+
 method type_declarator:constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    my $scope = $*SCOPE // 'my';
-    if !$<identifier> && !$<variable> {
-        $/.CURSOR.sorry("Anonymous constants NYI"); #wtf?
-        return Nil;
-    }
-    my $slot  = ~($<identifier> // $<variable>);
+    my $scope = $*SCOPE || 'our';
+    my $slot  = ~($<identifier> // $<variable> // self.gensym);
 
     make ::Op::ConstantDecl.new(|node($/), name => $slot,
         path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+}
+
+# note: named and unnamed enums are quite different beasts
+method type_declarator:enum ($/) {
+    my $scope = $*SCOPE;
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid enum scope $scope");
+        $scope = 'anon';
+    }
+
+    my @exports;
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } else {
+            $/.CURSOR.sorry("Unsupported enum trait $t.keys()");
+        }
+    }
+
+    my @pairs = self.trivial_eval($/, $<term>.ast);
+    my $last = -1;
+    my ($has_ints, $has_strs);
+    for @pairs {
+        if $_ !~~ Pair {
+            my $key = $_;
+            my $value = $last.succ;
+            $_ = $key => $value;
+        }
+        given $last = .value {
+            when Int { $has_ints = True; }
+            when Str { $has_strs = True; }
+            default  { $/.CURSOR.sorry("Enum values must be Int or Str"); }
+        }
+    }
+    if $has_ints && $has_strs {
+        $/.CURSOR.sorry("Enum may not contain both Int and Str values");
+    }
+
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
+        [ 'MY', $has_strs ?? 'Str' !! 'Int' ];
+
+    if $<name> && $<name>.reduced eq 'longname'&& ($scope ||= 'our') ne 'anon' {
+        # Longnamed enum is a kind of type definition
+
+        my $ourpath = Array;
+        my $lexvar = self.gensym;
+        my $bindlex = False;
+        my $r = self.mangle_longname($<longname>[0], True);
+        my $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Enum name $<longname> requires our scope");
+            $scope = 'our';
+        }
+
+        if $scope eq 'our' {
+            $ourpath = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            if !($r<path>:exists) {
+                $lexvar  = $name;
+                $bindlex = True;
+            }
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+            $bindlex = True;
+        }
+
+        my @stmts;
+        push @stmts, ::Op::Super.new(name => ($has_strs ?? 'Str' !! 'Int')
+            ~ "BasedEnum");
+        push @stmts, ::Op::Super.new(name => pop($basetype),
+            path => $basetype);
+        push @stmts, self.block_to_closure($/,
+            self.sl_to_block('sub', ::Op::ConstantDecl.new(name => self.gensym,
+                init => ::Op::CallMethod.new(name => 'new',
+                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast]))),
+            bindmethod => ['normal', 'enums']);
+
+        for @pairs {
+            push @stmts, ::Op::ConstantDecl.new(name => .key, path => ["OUR"],
+                init => ::Op::CallSub.new(invocant => mklex($/, $lexvar),
+                    args => [ ::Op::StringLiteral.new(text => .key) ]));
+        }
+
+        my @ostmts;
+        push @ostmts, ::Op::ClassDef.new(|node($/), var => $lexvar, :$name,
+            :@exports, bodyvar => self.gensym, ourpkg => $ourpath,
+            ourvar => $name,
+            body => self.sl_to_block('class',
+                ::Op::StatementList.new(|node($/), children => [@stmts])));
+
+        for @pairs {
+            push @ostmts, ::Op::ConstantDecl.new(name => .key,
+                path => $ourpath,
+                init => ::Op::CallSub.new(invocant => mklex($/, $lexvar),
+                    args => [ ::Op::StringLiteral.new(text => .key) ]));
+        }
+
+        push @ostmts, mklex($/, $lexvar);
+
+        make ::Op::StatementList.new(|node($/), children => [@ostmts]);
+    } else {
+        my $slot  = ~($<name> // self.gensym);
+
+        make ::Op::ConstantDecl.new(|node($/), name => $slot,
+            init => ::Op::CallMethod.new(|node($/), name => 'new',
+                receiver => mklex($/, 'EnumMap'),
+                args => [$<term>.ast]),
+            path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+    }
 }
 
 method package_declarator:class ($/) { make $<package_def>.ast }
@@ -2659,7 +2854,7 @@ method routine_def ($/) {
     my $unsafe = False;
     for @( $<trait> ) -> $t {
         if $t.ast.<export> {
-            push @export, @( $t.ast<export> );
+            push @export, map { ['OUR','EXPORT',$_] }, @( $t.ast<export> );
         } elsif $t.ast<nobinder> {
             $signature = Any;
         } elsif $t.ast<return_pass> {
@@ -2677,18 +2872,20 @@ method routine_def ($/) {
 
     if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' {
         $/.CURSOR.sorry("Illegal scope $scope for subroutine");
-        return Nil;
+        $scope = 'anon';
     }
-    if $scope eq 'our' {
-        $/.CURSOR.sorry('Package subs NYI');
-        return Nil;
-    } elsif $p {
+
+    if $p && $scope ne 'our' {
         $/.CURSOR.sorry('Defining a non-our sub with a package-qualified name makes no sense');
-        return Nil;
+        $scope = 'our';
+    }
+
+    if $scope eq 'our' {
+        push @export, $p || ['OUR'];
     }
 
     make self.block_to_closure($/,
-        bindlex => ($scope eq 'my'),
+        bindlex => ($scope eq 'my' || ($scope eq 'our' && !$p)),
         multiness => ($*MULTINESS || Any),
         self.sl_to_block('sub',
             :class('Sub'),

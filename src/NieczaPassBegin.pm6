@@ -488,3 +488,36 @@ augment class Op::Augment { #OK exist
         $body.add_child($ph);
     }
 }
+
+augment class Op::SubsetDef { #OK exist
+    method begin() {
+        my @ns = $.ourname ?? @( @*opensubs[*-1].find_pkg($.ourname) ) !!
+            $*unit.anon_stash;
+
+        $*unit.create_stash([@ns]);
+        @*opensubs[*-1].add_my_stash($.lexvar, [@ns]);
+        @*opensubs[*-1].add_pkg_exports($*unit, $.name, [@ns], $.exports);
+
+        my $ibody = $.body.begin;
+        @*opensubs[*-1].create_static_pad;
+        @*opensubs[*-1].add_child($ibody);
+
+        my $basetype = $*unit.get_item(@*opensubs[*-1].find_pkg(
+            [@$.basetype]));
+        my $obj  = ::Metamodel::Subset.new(name => $.name,
+            where => $ibody.xref, :$basetype).xref;
+        $*unit.bind_item([@ns], $obj);
+        $*unit.deref($obj).exports = [ [@ns],
+            map { [ @(@*opensubs[*-1].cur_pkg), 'EXPORT', $_, $.name ]},
+                @$.exports ];
+    }
+}
+
+augment class Op::GetBlock { #OK exist
+    method begin() {
+        loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
+            $c.strong_used = True;
+        }
+    }
+}
+

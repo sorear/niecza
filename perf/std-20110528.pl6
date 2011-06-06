@@ -18,9 +18,15 @@ sub bench($name, $nr, $f) {
 
 my @arr;
 
-my Mu $j = 0|1;
-my Mu $j2 = 0|1|2;
-bench 'no-J', 1000000, sub () { 1+1+1+1+1+1+1+1+1+1+1 };
-bench 'no-J-', 1000000, sub () { 1-1-1-1-1-1-1-1-1-1-1 };
-bench 'yes-J', 100000, sub () { $j+1+1+1+1+1+1+1+1+1+1 };
-bench 'yes-J2', 100000, sub () { $j2+1+1+1+1+1+1+1+1+1+1 };
+my Mu $j = any(1..5);
+
+sub onlysub($x) { $x }
+
+bench '|||', 100000, sub () { 1|2|3|4|5 };
+bench 'any(,,)', 10000, sub () { any(1,2,3,4,5) };
+bench 'any(..)', 100000, sub () { any(1..5) };
+bench '3 == any(,,)', 100000, sub () { ( 3 == 1|2|3|4|5 ) ?? True !! False };
+bench 'grep * == 3 equiv', 100000, sub () { ( grep * == 3, 1,2,3,4,5 ) ?? True !! False };
+bench 'grep 3 equiv', 100000, sub () { ( grep 3, 1,2,3,4,5 ) ?? True !! False };
+bench 'onlysub($j)', 100000, sub () { onlysub($j) };
+bench '$j.abs', 100000, sub () { $j.abs };

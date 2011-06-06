@@ -5,7 +5,24 @@ method _cgop(*@bits) {
     [ @bits ];
 }
 
-for <
+method _register_ops(*@ops) {
+    for @ops -> $name {
+        my $fnc = anon sub CgOperator (\|@parcel) {
+            Q:CgOp {
+                (letn arr {[@parcel]}
+                      items (getslot items vvarlist (@ (l arr)))
+                  (sink (vvarlist_shift (l items)))
+                  (vvarlist_unshift (l items) {$name})
+                  (l arr))
+            }
+        };
+        Q:CgOp { (rnull (_cgop _addmethod (obj_llhow (@ {CgOp})) 0
+            (obj_getstr {$name}) (@ {$fnc}))) }
+    }
+    Q:CgOp { (rnull (_cgop _invalidate (obj_llhow (@ {CgOp})))) };
+}
+
+CgOp._register_ops: <
         ann arith assign bget bif_array_constructor bif_at_key bif_at_pos
         bif_bool bif_chars bif_chr bif_coerce_to_int bif_coerce_to_num
         bif_comma bif_cross bif_defined bif_delete_key bif_divide
@@ -59,21 +76,8 @@ for <
         vvarlist_push vvarlist_shift vvarlist_sort vvarlist_to_fvarlist
         vvarlist_unshift vvarlist_unshiftn whileloop xspan bif_times
         bif_divop obj_can bif_sqrt bif_push bif_pop bif_unshift bif_shift
-        newarray newhash
-        > -> $name {
-    my $fnc = anon sub CgOperator (\|@parcel) {
-        Q:CgOp {
-            (letn arr {[@parcel]}
-                  items (getslot items vvarlist (@ (l arr)))
-              (sink (vvarlist_shift (l items)))
-              (vvarlist_unshift (l items) {$name})
-              (l arr))
-        }
-    };
-    Q:CgOp { (rnull (_cgop _addmethod (obj_llhow (@ {CgOp})) 0
-        (obj_getstr {$name}) (@ {$fnc}))) }
-}
-Q:CgOp { (rnull (_cgop _invalidate (obj_llhow (@ {CgOp})))) };
+        newarray newhash you_are_here frame_outer frame_sub
+        >;
 
 method double($x) {
     # Hack - prevent JSON syntax errors

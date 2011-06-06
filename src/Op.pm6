@@ -626,6 +626,17 @@ class RoleDef is ModuleDef {
 class ClassDef is ModuleDef { }
 class GrammarDef is ClassDef { }
 
+class SubsetDef is Op {
+    has Str $.name;
+    has Array $.basetype; # Array of Str
+    has Array $.ourname; # Maybe[Array of Str], else gensymmish
+    has Str $.lexvar;
+    has $.body; # Body
+    has @.exports; # Array of Str
+
+    method code($ ) { CgOp.scopedlex($.lexvar) }
+}
+
 class Super is Op {
     has $.name; # Str
     has $.path; # Array of Str
@@ -706,9 +717,10 @@ class Lexical is Op {
     method code($) { CgOp.scopedlex($.name) }
 
     method code_bvalue($ , $ro, $rhscg) {
+        my $type = CgOp.class_ref('mo', 'Any');
         CgOp.prog(
             CgOp.scopedlex($.name, defined($ro) ?? CgOp.newboundvar(+?$ro,
-                +(?($.list || $.hash)), $rhscg) !! $rhscg),
+                +(?($.list || $.hash)), $type, $rhscg) !! $rhscg),
             CgOp.scopedlex($.name));
     }
 }
@@ -744,10 +756,11 @@ class PackageVar is Op {
     method code($ ) { CgOp.scopedlex($.slot) }
 
     method code_bvalue($ , $ro, $rhscg) {
+        my $type = CgOp.class_ref('mo', 'Any');
         CgOp.prog(
             CgOp.scopedlex($.slot,
                 defined($ro) ?? CgOp.newboundvar(+?$ro,
-                    +(?($.list || $.hash)), $rhscg) !! $rhscg),
+                    +(?($.list || $.hash)), $type, $rhscg) !! $rhscg),
             CgOp.scopedlex($.slot));
     }
 }
@@ -845,12 +858,25 @@ class YouAreHere is Op {
     has $.unitname; # Str
 
     method code($ ) {
-        # this should be a little fancier so closure can work
-        CgOp.subcall(CgOp.fetch(CgOp.context_get(CgOp.str(
-                        '*resume_' ~ $.unitname), CgOp.int(0))));
+        CgOp.you_are_here(CgOp.str($.unitname))
     }
 }
 
+class GetBlock is Op {
+    has Bool $.routine;
+    method code($body is copy) {
+        constant %good = (:Routine, :Submethod, :Regex, :Method, :Sub); #OK
+        my $op = CgOp.callframe;
+        loop {
+            die "No current routine" if !$body;
+            last if !$body.transparent &&
+                (!$!routine || %good{$body.class});
+            $body .= outer;
+            $op = CgOp.frame_outer($op);
+        }
+        CgOp.newscalar(CgOp.frame_sub($op));
+    }
+}
 
 
 ### BEGIN DESUGARING OPS
@@ -937,6 +963,18 @@ class TopicalHook is Op {
 
         CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
             6, '', "end$id");
+    }
+}
+
+class LeaveHook is Op {
+    has $.inner;
+    method zyg() { $.inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+            11, '', "end$id");
     }
 }
 
