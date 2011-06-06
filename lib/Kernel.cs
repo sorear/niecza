@@ -241,7 +241,7 @@ namespace Niecza {
 
             if (TraceLoad) {
                 Console.WriteLine("Setting up unit {0}", type.Name);
-                HexDump(heap);
+                HexDump(this.heap);
             }
 
             uint d = 0;
