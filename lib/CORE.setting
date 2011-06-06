@@ -839,6 +839,41 @@ my class Pair is Enum {
     }
 }
 
+# XXX This ought to be more read-only
+my class EnumMap {
+    has %!by-key;
+    has @!by-value;
+
+    method new(*@pairs) {
+        self := self.CREATE;
+        my $last = -1;
+        for @pairs -> $p {
+            my ($k, $v);
+            if $p ~~ Pair {
+                $k ::= $p.key;
+                $v ::= $v.value;
+            } else {
+                $k ::= $p;
+                $v ::= $last.succ;
+            }
+            $last = $v;
+            %!by-key{$k} = $v;
+            push @!by-value, ($k => $v);
+        }
+        unitem(self);
+    }
+
+    method iterator() { @!by-value.iterator }
+    method list() { @!by-value }
+    method hash() { %!by-key }
+    method keys() { @!by-value».key }
+    method values() { @!by-value».value }
+    method invert() { @!by-value.map({ $^b => $^a }) }
+    method kv() { @!by-value.map({ $^a, $^b }) }
+    method pairs() { @!by-value }
+    method at-key(\$k) { %!by-key.at-key($k) }
+}
+
 my class Junction is Mu {
     has $!kind_;
     has $!eigenstates_;
