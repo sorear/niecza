@@ -119,6 +119,8 @@ augment class NieczaActions {
 method trivial_eval($/, $ast) {
     if $ast.^isa(::Op::SimpleParcel) {
         [,] map { self.trivial_eval($/, $_) }, @( $ast.items )
+    } elsif $ast.^isa(::Op::SimplePair) {
+        $ast.key => self.trivial_eval($/, $ast.value)
     } elsif $ast.^isa(::Op::StringLiteral) {
         $ast.text;
     } elsif $ast.^isa(::Op::Paren) {
