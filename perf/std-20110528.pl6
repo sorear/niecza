@@ -25,12 +25,12 @@ my %h = (1 => True, 2 => True, 3 => True, 4 => True, 5 => True);
 my %h2 = (:a, :b, :c, :d, :e);
 
 bench '|||', 1000000, sub () { 1|2|3|4|5 };
-bench 'any(,,)', 1000000, sub () { any(1,2,3,4,5) };
-bench 'any(..)', 10000, sub () { any(1..5) };
+#bench 'any(,,)', 1000000, sub () { any(1,2,3,4,5) };
+#bench 'any(..)', 10000, sub () { any(1..5) };
 bench '3 == any(,,)', 1000000, sub () { ( 3 == 1|2|3|4|5 ) ?? True !! False };
 bench 'grep 3 equiv', 100000, sub () { ( grep 3, 1,2,3,4,5 ) ?? True !! False };
 bench 'hash equiv', 100000, sub () { ( %h{3} ) ?? True !! False };
-bench 'eq any (str)', 1000000, sub () { ( "a" eq any("a","b","c","d","e") ) ?? True !! False };
-bench 'hash equiv (str)', 100000, sub () { ( %h2{"a"} ) ?? True !! False };
+#bench 'eq any (str)', 1000000, sub () { ( "a" eq any("a","b","c","d","e") ) ?? True !! False };
+#bench 'hash equiv (str)', 100000, sub () { ( %h2{"a"} ) ?? True !! False };
 bench 'onlysub($j)', 100000, sub () { onlysub($j) };
 bench '$j.abs', 100000, sub () { $j.abs };

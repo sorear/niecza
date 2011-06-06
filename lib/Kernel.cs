@@ -901,7 +901,7 @@ gotit:
                         if (!src.type.HasMRO(type)) {
                             if (quiet) return null;
                             if (src.Fetch().mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
-                                int jrank = Kernel.UnboxAny<int>((P6any) src.Fetch().GetSlot("kind_")) / 2;
+                                int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)src.Fetch()).slots[0]) / 2;
                                 if (jrank < jun_rank) {
                                     jun_rank = jrank;
                                     jun_pivot = obj_src;
@@ -922,7 +922,7 @@ gotit:
                     if (!srco.Does(type)) {
                         if (quiet) return null;
                         if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
-                            int jrank = Kernel.UnboxAny<int>((P6any) srco.GetSlot("kind_")) / 2;
+                            int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)srco).slots[0]) / 2;
                             if (jrank < jun_rank) {
                                 jun_rank = jrank;
                                 jun_pivot = obj_src;
@@ -1966,20 +1966,36 @@ tryagain:
         public override bool Get(Variable obj) {
             P6any o = obj.Fetch();
             if (!o.IsDefined()) return false;
+            P6opaque o_ = (P6opaque)o;
 
-            int jtype = Kernel.UnboxAny<int>((P6any) o.GetSlot("kind_"));
+            int jtype = Kernel.UnboxAny<int>((P6any) o_.slots[0]);
             if (jtype == 4) return true; // XXX
 
-            Variable[] eigen = Kernel.UnboxAny<Variable[]>(
-                    (P6any) o.GetSlot("eigenstates_"));
-            int ntrue = 0, nfalse = 0;
-            foreach (Variable v in eigen)
-                if (v.Fetch().mo.mro_raw_Bool.Get(v)) ntrue++; else nfalse++;
+            Variable[] eigen = Kernel.UnboxAny<Variable[]>((P6any) o_.slots[1]);
+            int ix = 0;
+            Variable v;
+            // logic design taken from Rakudo here
             switch(jtype) {
-                case 0: return nfalse == 0;
-                case 1: return ntrue == 0;
-                case 2: return ntrue == 1;
-                case 3: return ntrue >= 1;
+                case 0: //all
+                    if (ix == eigen.Length) return true;
+                    v = eigen[ix++];
+                    if (!v.Fetch().mo.mro_raw_Bool.Get(v)) return false;
+                    goto case 0;
+                case 1: //none
+                    if (ix == eigen.Length) return true;
+                    v = eigen[ix++];
+                    if (v.Fetch().mo.mro_raw_Bool.Get(v)) return false;
+                    goto case 1;
+                case 2: //one, searching for first
+                    if (ix == eigen.Length) return false;
+                    v = eigen[ix++];
+                    if (v.Fetch().mo.mro_raw_Bool.Get(v)) goto case 1;
+                    goto case 2;
+                case 3: //any
+                    if (ix == eigen.Length) return false;
+                    v = eigen[ix++];
+                    if (v.Fetch().mo.mro_raw_Bool.Get(v)) return true;
+                    goto case 3;
                 default: throw new ArgumentException();
             }
         }

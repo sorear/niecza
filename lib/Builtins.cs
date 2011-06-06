@@ -30,7 +30,7 @@ public class Builtins {
         if (val.mo.is_any) {
             // fine as is
         } else if (val.mo.HasMRO(Kernel.JunctionMO)) {
-            int jtype = Kernel.UnboxAny<int>((P6any)val.GetSlot("kind_")) / 2;
+            int jtype = Kernel.UnboxAny<int>((P6any)(val as P6opaque).slots[0]) / 2;
             if ((uint)jtype < rank) {
                 rank = (uint)jtype;
                 pivot = ix;
@@ -43,16 +43,17 @@ public class Builtins {
 
     // NOTE: Destructive on avs!  Clone first if you need to.
     public static Variable AutoThread(P6any j, Func<Variable,Variable> dgt) {
-        P6any listObj = (P6any) j.GetSlot("eigenstates_");
+        P6opaque j_ = (P6opaque)j;
+        P6any listObj = (P6any) j_.slots[1];
         Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
         Variable[] nlist = new Variable[list.Length];
         for (int i = 0; i < list.Length; i++) {
             nlist[i] = dgt(list[i]);
         }
         P6any newList = Kernel.BoxRaw(nlist, Kernel.ParcelMO);
-        P6any newJunc = new P6opaque(Kernel.JunctionMO);
-        newJunc.SetSlot("kind_", j.GetSlot("kind_"));
-        newJunc.SetSlot("eigenstates_", newList);
+        P6opaque newJunc = new P6opaque(Kernel.JunctionMO);
+        newJunc.slots[0] = j_.slots[0];
+        newJunc.slots[1] = newList;
         return Kernel.NewROScalar(newJunc);
     }
 
