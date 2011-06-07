@@ -16,15 +16,21 @@ sub bench($name, $nr, $f) {
     say "$name = {($time - $avg)*1e6}µs [{$time*$nr}s / $nr]";
 }
 
-my @arr;
+my class CEmpty {
+}
 
-my Mu $j = any(1..5);
+my class CAttrs {
+    has $.x;
+    has $.y;
+    has $.z;
+};
 
-sub onlysub($x) { $x }
-my %h = (1 => True, 2 => True, 3 => True, 4 => True, 5 => True);
-my %h2 = (:a, :b, :c, :d, :e);
+my class CAttrInits {
+    has $.x = 1;
+    has $.y = 2;
+    has $.z = 3;
+}
 
-bench '|||', 1000000, sub () { 1|2|3|4|5 };
-#bench 'any(..)', 10000, sub () { any(1..5) };
-bench 'onlysub($j)', 100000, sub () { onlysub($j) };
-bench '$j.abs', 100000, sub () { $j.abs };
+bench "CEmpty.new", 1000000, sub () { CEmpty.new };
+bench "CAttrs.new", 1000000, sub () { CAttrs.new };
+bench "CAttrInits.new", 100000, sub () { CAttrInits.new };

@@ -23,6 +23,7 @@ my class Mu {
             $tn ~ "()"
         }
     }
+    method Stringy() { defined(self) ?? self.Str !! "" }
     method succ() { defined(self) ?? die("cannot increment a value of type {self.typename()}") !! 1 }
     method pred() { defined(self) ?? die("cannot decrement a value of type {self.typename()}") !! -1 }
     method notdef() { !defined(self) }
@@ -951,8 +952,12 @@ my class Junction is Mu {
 
     my @kinds = <all none one any>;
     method perl() {
-        @kinds[self!kind] ~ "(" ~ join(", ", map *.perl, @$!eigenstates) ~ ")"
+        defined(self) ?? (@kinds[self!kind] ~ "(" ~
+            join(", ", map *.perl, @$!eigenstates) ~ ")") !! "Junction"
     }
+
+    method Str() { self.perl }
+    method Stringy() { self.FALLBACK("Stringy") }
 
     method from-parcel(Int $kind, Mu $pcl) {
         self!create($kind, $pcl)
