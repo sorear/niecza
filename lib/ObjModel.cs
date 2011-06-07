@@ -479,11 +479,11 @@ next_method: ;
         public static readonly ContextHandler<string> RawCallStr
             = new CtxCallMethodUnbox<string>("Str");
         public static readonly ContextHandler<bool> RawCallBool
-            = new CtxCallMethodUnbox<bool>("Bool");
+            = new CtxCallMethodUnboxBool("Bool");
         public static readonly ContextHandler<double> RawCallNumeric
             = new CtxCallMethodUnboxNumeric("Numeric");
         public static readonly ContextHandler<bool> RawCallDefined
-            = new CtxCallMethodUnbox<bool>("defined");
+            = new CtxCallMethodUnboxBool("defined");
         public static readonly ContextHandler<VarDeque> RawCallIterator
             = new CtxCallMethodUnbox<VarDeque>("iterator");
         public static readonly ContextHandler<Variable[]> RawCallReify

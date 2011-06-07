@@ -388,22 +388,10 @@ my class StrBasedEnum is CommonEnum {
     } }
 }
 
-my class Bool is Cool {
-    method Str() { self ?? "Bool::True" !! "Bool::False" }
-    method Stringy() { self.key }
-    method perl() { defined(self) ?? ~self !! self.typename }
+my enum Bool < False True >;
+augment class Bool {
     method ACCEPTS(Mu $t) { defined(self) ?? self !! $t.^does(self) }
-    our constant True  = Q:CgOp { (box Bool (bool 1)) };
-    our constant False = Q:CgOp { (box Bool (bool 0)) };
-    method succ() { True }
-    method pred() { False }
-    method key() { self ?? "True" !! "False" }
-    method value() { self ?? 1 !! 0 }
-    method kv() { self.key, self.value }
 }
-# TODO: import
-constant True  = Q:CgOp { (box Bool (bool 1)) };
-constant False = Q:CgOp { (box Bool (bool 0)) };
 # }}}
 # Fundamental scalar operators {{{
 sub infix:<~>(\|$bits) { Q:CgOp {

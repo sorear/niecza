@@ -2579,7 +2579,6 @@ namespace Niecza.CLRBackend {
     class ClrWiden : ClrOp {
         readonly ClrOp z;
         public ClrWiden(Type to, ClrOp z) {
-            TypeCheck(z.Returns, to);
             Returns = to;
             this.z = z;
             this.Constant = z.Constant;
@@ -3342,6 +3341,8 @@ namespace Niecza.CLRBackend {
                     return CpsOp.Operator(tty, OpCodes.Conv_R8, z);
                 } else if (tty == Tokens.Int32 && fty == Tokens.Double) {
                     return CpsOp.Operator(tty, OpCodes.Conv_I4, z);
+                } else if (fty == Tokens.Boolean && tty == Tokens.Int32) {
+                    return CpsOp.Widen(tty, z);
                 } else {
                     throw new NotImplementedException("cast " + fty + " -> " + tty);
                 }

@@ -31,7 +31,7 @@ public class JsyncWriter {
         } else if (obj.Isa(Kernel.HashMO)) {
             WriteHash(obj);
         } else if (obj.Isa(Kernel.BoolMO)) {
-            WriteBool(Kernel.UnboxAny<bool>(obj));
+            WriteBool(Kernel.UnboxAny<int>(obj) != 0);
         } else if (obj.Isa(Kernel.StrMO)) {
             WriteStr(true, Kernel.UnboxAny<string>(obj));
         } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
@@ -269,10 +269,10 @@ public class JsyncReader {
                 return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
             case 't':
                 SkipToken("true");
-                return BoxRW<bool>(true, Kernel.BoolMO);
+                return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.TrueV.Fetch());
             case 'f':
                 SkipToken("false");
-                return BoxRW<bool>(false, Kernel.BoolMO);
+                return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.FalseV.Fetch());
             default:
                 return GetFromNumber();
         }
@@ -379,10 +379,10 @@ public class JsyncReader {
             return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
         } else if (look == 't') {
             SkipToken("true");
-            return BoxRW<bool>(true, Kernel.BoolMO);
+            return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.TrueV.Fetch());
         } else if (look == 'f') {
             SkipToken("false");
-            return BoxRW<bool>(false, Kernel.BoolMO);
+            return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.FalseV.Fetch());
         } else {
             double d;
             string tx = GetJsonNumber();
@@ -810,7 +810,7 @@ public class JsonWriter {
         if (!obj.IsDefined()) {
             o.Append("null");
         } else if (obj.Isa(Kernel.BoolMO)) {
-            o.Append(Kernel.UnboxAny<bool>(obj) ? "true" : "false");
+            o.Append(Kernel.UnboxAny<int>(obj) != 0 ? "true" : "false");
         } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
             o.Append(Utils.N2S(obj.mo.mro_raw_Numeric.Get(Kernel.NewROScalar(obj))));
         } else if (obj.Isa(Kernel.StrMO)) {

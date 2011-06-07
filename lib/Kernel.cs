@@ -1384,6 +1384,15 @@ noparams:
             return Kernel.UnboxAny<T>(v.Fetch());
         }
     }
+    class CtxCallMethodUnboxBool : ContextHandler<bool> {
+        string method;
+        public CtxCallMethodUnboxBool(string method) { this.method = method; }
+
+        public override bool Get(Variable obj) {
+            Variable v = Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
+            return Kernel.UnboxAny<int>(v.Fetch()) != 0;
+        }
+    }
 
     class CtxCallMethodUnboxNumeric : ContextHandler<double> {
         string method;
@@ -1442,6 +1451,14 @@ noparams:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) return dflt;
             return Kernel.UnboxAny<T>(o);
+        }
+    }
+
+    class CtxBoolUnbox : ContextHandler<bool> {
+        public override bool Get(Variable obj) {
+            P6any o = obj.Fetch();
+            if (!o.IsDefined()) return false;
+            return Kernel.UnboxAny<int>(o) != 0;
         }
     }
 
@@ -1689,13 +1706,6 @@ noparams:
     class CtxBoolNativeDefined : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             return obj.Fetch().IsDefined() ? Kernel.TrueV : Kernel.FalseV;
-        }
-    }
-
-    class CtxBoolRawNumeric : ContextHandler<double> {
-        public override double Get(Variable obj) {
-            P6any o = obj.Fetch();
-            return (o.IsDefined() && Kernel.UnboxAny<bool>(o)) ? 1 : 0;
         }
     }
 
@@ -2732,8 +2742,12 @@ ltm:
                 info.code = SaferTrap;
         }
         public static Variable BoxAny<T>(T v, P6any proto) {
-            if (proto == BoolMO.typeObject)
-                return ((bool) (object) v) ? TrueV : FalseV;
+            if (proto == BoolMO.typeObject) {
+                if (v is bool)
+                    return ((bool) (object) v) ? TrueV : FalseV;
+                else
+                    return ((int) (object) v) != 0 ? TrueV : FalseV;
+            }
             return NewROScalar(new BoxObject<T>(v, ((P6opaque)proto).mo));
         }
 
@@ -2742,8 +2756,12 @@ ltm:
         }
 
         public static Variable BoxAnyMO<T>(T v, STable proto) {
-            if (proto == BoolMO)
-                return ((bool) (object) v) ? TrueV : FalseV;
+            if (proto == BoolMO) {
+                if (v is bool)
+                    return ((bool) (object) v) ? TrueV : FalseV;
+                else
+                    return ((int) (object) v) != 0 ? TrueV : FalseV;
+            }
             return NewROScalar(new BoxObject<T>(v, proto));
         }
 
@@ -3478,12 +3496,11 @@ slow:
 
             BoolMO = new STable("Bool");
             Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
-                    new CtxJustUnbox<bool>(false));
-            Handler_PandBoxInty(BoolMO, "Numeric", new CtxBoolRawNumeric());
-            BoolMO.FillProtoClass(new string[] { });
+                    new CtxBoolUnbox());
+            BoolMO.FillProtoClass(new string[] { "index" });
             BoolMO.Invalidate();
-            TrueV  = NewROScalar(BoxRaw<bool>(true,  BoolMO));
-            FalseV = NewROScalar(BoxRaw<bool>(false, BoolMO));
+            TrueV  = NewROScalar(BoxRaw<int>(1, BoolMO));
+            FalseV = NewROScalar(BoxRaw<int>(0, BoolMO));
 
             StrMO = new STable("Str");
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
@@ -3523,6 +3540,8 @@ slow:
             Handler_PandCont(IntMO, "pred", new CtxIntSuccish(-1));
             IntMO.FillProtoClass(new string[] { });
             IntMO.Invalidate();
+            FalseV.Fetch().SetSlot("index", BoxAnyMO(0, IntMO));
+            TrueV.Fetch().SetSlot("index", BoxAnyMO(1, IntMO));
 
             RatMO = new STable("Rat");
             Handler_Vonly(RatMO, "Numeric", new CtxReturnSelf(),
