@@ -1575,12 +1575,12 @@ our sub Niecza::generate-series(@lhs, $rhs, :$exclude-limit) {
 
 our sub Niecza::series-listop(Parcel $lists, $exclude-limit) {
     if $lists.raw_elems <= 1 { return unitem($lists) }
-    my @l := @( $lists.raw_at($lists.raw_elems - 1) );
+    my @l := ( $lists.raw_at($lists.raw_elems - 1), ).flat;
     loop (my $i = $lists.raw_elems - 2; $i >= 0; $i = $i - 1) {
         @l || die "Need something on the RHS";
-        my @mo := &Niecza::generate-series(@( $lists.raw_at($i) ), @l.shift,
+        my @mo := &Niecza::generate-series(($lists.raw_at($i),).flat, @l.shift,
             :$exclude-limit);
-        @l := @( @mo, @l );
+        @l := ( @mo, @l ).flat;
     }
     @l
 }
