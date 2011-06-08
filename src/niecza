@@ -29,6 +29,11 @@ use STD;
 use Sig;
 
 augment class NieczaActions {
+method infix:sym<...> ($/) {
+    # STD parses ...^ in the ... rule
+    make Operator.funop('&infix:<' ~ $/ ~ '>', 2);
+}
+
 method sibble($/) {
     my $regex = self.op_for_regex($/, $<left>.ast);
     my $repl;

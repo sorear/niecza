@@ -673,9 +673,14 @@ my class Array { ... }
 my class Parcel is Cool {
     method flat() { self.iterator.flat }
 
-    method elems() { Q:CgOp {
+    # LoLly usage
+    method raw_elems() { Q:CgOp {
         (box Num (cast num (fvarlist_length (unbox fvarlist (@ {self})))))
     } }
+    method raw_at($ix) {
+        Q:CgOp { (fvarlist_item (cast int (obj_getnum {$ix})) (unbox fvarlist (@ {self}))) }
+    }
+
     method unwrap-single(@self:) { Q:CgOp {
         (letn p (unbox fvarlist (@ {@self}))
           (ternary (== (i 1) (fvarlist_length (l p)))
@@ -695,14 +700,15 @@ my class Parcel is Cool {
         my @tok;
         push @tok, '$' if !$self.flattens;
         push @tok, '(';
-        loop (my $i = 0; $i < $self.elems; $i++) {
-            push @tok, Q:CgOp { (fvarlist_item (cast int (obj_getnum {$i})) (unbox fvarlist (@ {$self}))) }.perl;
-            push @tok, ', ' unless $i == $self.elems - 1 && $i;
+        loop (my $i = 0; $i < $self.raw_elems; $i++) {
+            push @tok, self.raw_at($i).perl;
+            push @tok, ', ' unless $i == $self.raw_elems - 1 && $i;
         }
         push @tok, ')';
         @tok.join;
     }
 
+    method elems  () { + @(self) }
     method Numeric() { + @(self) }
     method Str    () { ~ @(self) }
     method Bool   () { ? @(self) }
@@ -1477,6 +1483,108 @@ sub hyper($dwiml, $dwimr, $fun, \$left, \$right) {
     }
 }
 
+# tweaked from Rakudo
+our sub Niecza::generate-series(@lhs, $rhs, :$exclude-limit) {
+    my sub get-next-closure (@lhs, $limit? ) {
+        die "Need something on the LHS" unless @lhs.elems;
+        die "Need more items on the LHS" if @lhs[*-1] ~~ Code && @lhs[*-1].count != Inf && @lhs.elems - 1 < @lhs[*-1].arity;
+
+        #BEWARE: Here be ugliness
+        if @lhs[* - 1] ~~ Code { # case: (a,b,c,{code}) ... *
+            return @lhs[*-1];
+        }
+        return { .succ } if @lhs.elems == 1 && $limit ~~ Code;
+        return { $_ } if @lhs.elems > 1 && @lhs[*-1] cmp @lhs[*-2] == 0 ;  # case: (a , a) ... *
+
+        if  @lhs[*-1] ~~ Str || $limit ~~ Str {
+            if @lhs[*-1].chars == 1 && $limit.defined && $limit.chars == 1 {
+                return { .ord.succ.chr } if @lhs[*-1] lt  $limit;# case (... , non-number) ... limit
+                return { .ord.pred.chr } if @lhs[*-1] gt  $limit;# case (... , non-number) ... limit
+            }
+            return { .succ } if $limit.defined && @lhs[*-1] lt  $limit;# case (... , non-number) ... limit
+            return { .pred } if $limit.defined && @lhs[*-1] gt  $limit;# case (... , non-number) ... limit
+            return { .pred } if @lhs.elems > 1 && @lhs[*-2] gt  @lhs[*-1];# case (non-number , another-smaller-non-number) ... *
+            return { .succ } ;# case (non-number , another-non-number) ... *
+        }
+        return { .pred } if @lhs.elems == 1 && $limit.defined && $limit before @lhs[* - 1];  # case: (a) ... b where b before a
+        return { .succ } if @lhs.elems == 1 ;  # case: (a) ... *
+
+        my $diff = @lhs[*-1] - @lhs[*-2];
+        return { $_ + $diff } if @lhs.elems == 2 || @lhs[*-2] - @lhs[*-3] == $diff ; #Case Arithmetic series
+
+        if @lhs[*-2] / @lhs[*-3] == @lhs[*-1] / @lhs[*-2] { #Case geometric series
+            my $factor = @lhs[*-2] / @lhs[*-3];
+            if $factor ~~ Rat && $factor.denominator == 1 {
+                $factor = $factor.Int;
+            }
+            return { $_ * $factor } ;
+        }
+        die "Unable to figure out pattern of series";
+    }
+
+    my sub infinite-series (@lhs, $limit ) {
+        gather {
+            my $i = 0;
+            while @lhs[$i+1].defined { take @lhs[$i]; $i++; } #We blindly take all elems of the LHS except last one.
+            if @lhs[$i] !~~ Code { take @lhs[$i]; $i++; }     #We take the last element only when it is not code
+
+            my $next = get-next-closure(@lhs , $limit );
+            my $arity = $next.count;
+            my @args=@lhs[$i-($arity ~~ Inf ?? $i !! $arity) .. $i-1]; #We make sure there are $arity elems in args
+
+            loop {                         #Then we extrapolate using $next and the $args
+                my $current = $next.(|@args) // last;
+                take $current ;
+                if $arity {
+                    @args.push($current) ;
+                    @args.shift if @args.elems > $arity
+                }
+            }
+        }
+    }
+
+    my $limit = ($rhs ~~ Whatever ?? Any !! $rhs);
+    return infinite-series(@lhs , $limit) if $rhs ~~ Whatever; #shortcut infinite series so we avoid the comparisions
+
+    my $series = infinite-series(@lhs , $limit);
+
+    gather {
+        if $limit ~~ Code && $limit.count > 1 {
+            my @limit-args;
+            while $series {
+                @limit-args.shift if @limit-args == $limit.count;
+                my $val = $series.shift;
+                @limit-args.push($val);
+                my $done = @limit-args >= $limit.arity && $limit(|@limit-args);
+                take $val unless $done && $exclude-limit;
+                last if $done;
+            }
+        }
+        else {
+            while $series {
+                my $val = $series.shift();
+                if $val ~~ $limit {
+                    take $val unless $exclude-limit ;
+                    last ;
+                };
+                take $val;
+            }
+        }
+    }
+}
+
+our sub Niecza::series-listop(Parcel $lists, $exclude-limit) {
+    if $lists.raw_elems <= 1 { return unitem($lists) }
+    my @l := @( $lists.raw_at($lists.raw_elems - 1) );
+    loop (my $i = $lists.raw_elems - 2; $i >= 0; $i = $i - 1) {
+        @l || die "Need something on the RHS";
+        my @mo := &Niecza::generate-series(@( $lists.raw_at($i) ), @l.shift,
+            :$exclude-limit);
+        @l := @( @mo, @l );
+    }
+    @l
+}
+
 sub infix:<%%> ($x,$y) { $x % $y == 0 }
 sub infix:<?&> ($a, $b) { ?($a && $b) }
 sub infix:<?|> ($a, $b) { ?($a || $b) }
@@ -1522,8 +1630,8 @@ sub postfix:<i> ($item) { $item * i }
 sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
 sub infix:<minmax>(\|$args) { die "minmax NYI" } #OK
-sub infix:<...>(\|$args) { die "Series op NYI" } #OK
-sub infix:<...^>(\|$args) { die "Series op NYI" } #OK
+sub infix:<...>(\|$lists) { &Niecza::series-listop($lists, False) }
+sub infix:<...^>(\|$lists) { &Niecza::series-listop($lists, True) }
 sub infix:« ==> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK

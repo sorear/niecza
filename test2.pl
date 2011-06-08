@@ -18,6 +18,10 @@ use MONKEY_TYPING;
     is SubBT.new(x => 5, y => 2).get_pie2, 2, "subclass' BUILD in subclass";
 }
 
+is [ 1,2,3 ... 10 ], [1..10];
+is [ 1,2,4 ... 256 ], [map 2 ** *, 0..8];
+is [ 1,1,*+* ...^ *>100 ], [1,1,2,3,5,8,13,21,34,55,89];
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {
