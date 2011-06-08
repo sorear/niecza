@@ -640,6 +640,49 @@ public class Builtins {
         }
     }
 
+    static Func<Variable,Variable> bif_floor_d = bif_floor;
+    public static Variable bif_floor(Variable a1) {
+        P6any o1 = a1.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(a1,o1, bif_floor_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+        if (r1 == NR_COMPLEX) {
+            throw new NieczaException("floor is only defined for Reals, you have a Complex()");
+        }
+        if (r1 == NR_FLOAT) {
+            double v1 = PromoteToFloat(r1, n1);
+            ulong bits = (ulong)BitConverter.DoubleToInt64Bits(v1);
+            BigInteger big = (bits & ((1UL << 52) - 1)) + (1UL << 52);
+            int power = ((int)((bits >> 52) & 0x7FF)) - 0x433;
+            // note: >>= has flooring semantics for signed values
+            if ((bits & (1UL << 63)) != 0) big = -big;
+            if (power > 0) big <<= power;
+            else big >>= -power;
+            return MakeInt(big);
+        }
+        if (r1 == NR_FATRAT) {
+            FatRat v1 = PromoteToFatRat(r1, n1);
+            BigInteger rem;
+            BigInteger red = BigInteger.DivRem(v1.num, v1.den, out rem);
+            if (rem.Sign != 0 && v1.num.Sign < 0)
+                return MakeInt(red - 1);
+            else
+                return MakeInt(red);
+        }
+        if (r1 == NR_FIXRAT) {
+            Rat v1 = PromoteToFixRat(r1, n1);
+            BigInteger rem;
+            BigInteger red = BigInteger.DivRem(v1.num, v1.den, out rem);
+            if (rem.Sign != 0 && v1.num.Sign < 0)
+                return MakeInt(red - 1);
+            else
+                return MakeInt(red);
+        }
+        return Kernel.NewROScalar(n1);
+    }
+
     // we don't need to do nominal checking stuff here because this
     // is in a method, never inlined, and as such the binder had to
     // already have been called.

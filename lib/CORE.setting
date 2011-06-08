@@ -66,7 +66,12 @@ my class Cool {
     method Int() { Q:CgOp { (bif_coerce_to_int {self}) } }
     method Num() { Q:CgOp { (bif_coerce_to_num {self}) } }
     method abs() { abs self }
+    method floor() { floor self }
+    method ceiling() { ceiling self }
+    method round($scale = 1) { round self, $scale }
     method sqrt() { sqrt self }
+    method sign() { sign self }
+    method conjugate() { self }
 
     method grep(Mu $sm) { grep $sm, @(self) }
     method map($func)   { map $func, @(self) }
@@ -271,6 +276,7 @@ my class Complex is Numeric {
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
     method re() { Q:CgOp { (_cgop bif_complex_re {self}) } }
     method im() { Q:CgOp { (_cgop bif_complex_im {self}) } }
+    method conjugate() { self.re - (self.im)i }
 }
 my class FatRat is Real {
     method new($n,$d) { FatRat.succ * $n / $d }
@@ -1481,6 +1487,12 @@ sub prefix:<^> ($limit) { 0 ..^ +$limit }
 sub prefix:<so> ($item) { ?$item }
 sub infix:<xx> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
+sub floor($x) { Q:CgOp { (_cgop bif_floor {$x}) } }
+sub ceiling($x) { -floor(-$x) }
+sub conjugate($x) { $x.conjugate }
+sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
+sub truncate($x) { $x.Int }
+sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 # XXX 'Order' type
 sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
