@@ -1327,7 +1327,12 @@ flat_enough:;
         return fr.info.name.Substring(fr.info.name.IndexOf(" ")+1);
     }
 
-    public static int bif_arity(P6any fcni) {
+    public static Variable bif_count(P6any fcni) {
+        int i = get_count(fcni);
+        return (i == int.MaxValue) ? MakeFloat(double.PositiveInfinity) :
+            MakeInt(i);
+    }
+    public static int get_count(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return 1; // can't introspect fake subs (?)
         SubInfo si = (SubInfo) fcni.GetSlot("info");
@@ -1344,6 +1349,27 @@ flat_enough:;
             arity++;
         }
         return arity;
+    }
+
+    public static Variable bif_arity(P6any fcni) {
+        if (!fcni.Isa(Kernel.CodeMO))
+            return MakeInt(1); // can't introspect fake subs (?)
+        SubInfo si = (SubInfo) fcni.GetSlot("info");
+        int[] sig = si.sig_i;
+        if (sig == null)
+            return MakeInt(1);
+        int arity = 0;
+        for (int i = 0; i < sig.Length; i += SubInfo.SIG_I_RECORD) {
+            int fl = sig[i + SubInfo.SIG_I_FLAGS];
+            if ((fl & (SubInfo.SIG_F_SLURPY_CAP | SubInfo.SIG_F_SLURPY_POS |
+                    SubInfo.SIG_F_SLURPY_PCL | SubInfo.SIG_F_SLURPY_NAM |
+                    SubInfo.SIG_F_OPTIONAL | SubInfo.SIG_F_DEFOUTER |
+                    SubInfo.SIG_F_HASDEFAULT)) != 0)
+                continue;
+            if ((fl & SubInfo.SIG_F_POSITIONAL) == 0) continue;
+            arity++;
+        }
+        return MakeInt(arity);
     }
 
     class ItemSource {
@@ -1563,7 +1589,7 @@ again:
         VarDeque iter = new VarDeque(lst);
         Variable fcn = iter.Shift();
         P6any fcni = fcn.Fetch();
-        int arity = bif_arity(fcni);
+        int arity = get_count(fcni);
 
         Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
         fr.lexi0 = 0;

@@ -326,8 +326,8 @@ my class Code is Callable {
 
 my class Block is Code {
     method ACCEPTS(Mu $t) { defined(self) ?? (self)($t) !! $t.^does(self) }
-    method count() { Q:CgOp { (box Int (_cgop bif_arity (@ {self}))) } }
-    # arity NYI
+    method count() { Q:CgOp { (_cgop bif_count (@ {self})) } }
+    method arity() { Q:CgOp { (_cgop bif_arity (@ {self})) } }
 }
 
 my class Routine is Block {
