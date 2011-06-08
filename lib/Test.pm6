@@ -71,7 +71,7 @@ class Builder {
     }
 }
 
-$GLOBAL::TEST-BUILDER = Builder.CREATE;
+$GLOBAL::TEST-BUILDER = Builder.bless(*);
 $GLOBAL::TEST-BUILDER.reset;
 
 sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }

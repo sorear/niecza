@@ -213,8 +213,9 @@ class RefTarget {
     has $.name = 'ANON';
 
     # TODO BUILD
-    method new(*%_) {
-        my $n = self.CREATE(|%_);
+    method new(:$no_xref, *%_) {
+        my $n = callwith(self, |%_);
+        return $n if $no_xref;
         $n.xref = [ $*unit.name, +$*unit.xref, $n.name ];
         push $*unit.xref, $n;
         $n
@@ -451,7 +452,7 @@ class Lexical {
     class Alias is Lexical {
         has $.to = die "M:L:Alias.to required"; # Str
 
-        method new($to) { self.CREATE(:$to) }
+        method new($to) { nextwith(self, :$to) }
     }
 
     # sub foo { ... }

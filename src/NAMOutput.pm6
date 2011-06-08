@@ -102,7 +102,7 @@ sub unit_from_nam(@block) {
     my ($mlref, $name, $log, $setting, $bottom, $filename, $modtime, $xr,
         $td, $root) = @block;
     my $*uname = $name;
-    my $*unit = ::Metamodel::Unit.CREATE(
+    my $*unit = ::Metamodel::Unit.new(
         name       => $name,
         ns         => ::Metamodel::Namespace.new(log => $log,
             root => stash_fromnam($root)),
@@ -170,7 +170,8 @@ sub sub_from_nam(@block) {
         $cls, $ltm, $exp, $sig, $rlx) = @block; #OK
     # Most of these are used only by code-gen.  Lexicals are injected later.
 
-    ::Metamodel::StaticSub.CREATE(
+    ::Metamodel::StaticSub.new(
+        :no_xref,
         unit => $*unit,
         name => $name,
         xref => [ $*uname, $*xid, $name ],
@@ -212,7 +213,8 @@ sub packagely(@block) {
     my ($type, $name, $exports, $attr, $meth, $sup, $mro) = @block;
     # these two are nonstandard
     if $type eq 'subset' {
-        return ::Metamodel::Subset.CREATE(
+        return ::Metamodel::Subset.new(
+            :no_xref,
             xref => [ $*uname, $*xid, $name ],
             name => $name,
             exports => $exports,
@@ -222,7 +224,8 @@ sub packagely(@block) {
     }
 
     # this relies on .new ignoring unrecognized keys
-    %pkgtypes{$type}.CREATE(
+    %pkgtypes{$type}.new(
+        :no_xref,
         xref => [ $*uname, $*xid, $name ],
         name => $name,
         exports => $exports,

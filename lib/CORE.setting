@@ -31,7 +31,8 @@ my class Mu {
     method perl() { defined(self) ?? "{self.typename}.new(...)" !! self.typename }
     method so() { ?self }
     method not() { !self }
-    method CREATE(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
+    method bless($, *%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
+    method CREATE() { Q:CgOp { (ns (obj_newblank (obj_llhow (@ {self})))) } }
     method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
 }
 
@@ -886,7 +887,7 @@ my class EnumMap {
     has @!keys;
 
     method new(*@pairs) {
-        self := self.CREATE;
+        self := self.bless(*);
         my $last = -1;
         my $ixn = 0;
         for @pairs -> $p {
@@ -1312,7 +1313,7 @@ my class Range is Cool {
     has $.excludes_max = False;
 
     method new($min, $max, :$excludes_min = False, :$excludes_max = False) {
-        unitem(self.CREATE(min => ($min.^isa(Whatever) ?? -Inf !! $min),
+        unitem(self.bless(*, min => ($min.^isa(Whatever) ?? -Inf !! $min),
             max => ($max.^isa(Whatever) ?? Inf !! $max),
             :$excludes_min, :$excludes_max));
     }
