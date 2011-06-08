@@ -28,7 +28,36 @@ use OptRxSimple;
 use STD;
 use Sig;
 
+# $*YOU_ARE_HERE: set is_setting, bottom_ref instead!
+
+augment class NieczaGrammar::P6 { #OK
+    method unitstart() {
+        my $top = $*unit.setting_ref;
+        my $rtop = $top && $*unit.deref($top);
+        $*CURLEX{'!sub'} = ::Metamodel::StaticSub.new(
+            unit => $*unit,
+            outerx => $top,
+            cur_pkg => ['GLOBAL'],
+            name => "mainline",
+            run_once => !$rtop || $rtop.run_once);
+        $*CURLEX{'!sub'}.add_my_name('$_') if !$top;
+        $*CURLEX{'!sub'}.add_hint('$?FILE');
+        $*CURLEX{'!sub'}.signature = Sig.simple();
+
+        %*LANG<Q> = ::NieczaGrammar::Q ;
+        %*LANG<MAIN> = ::NieczaGrammar::P6 ;
+        self;
+    }
+}
+
 augment class NieczaActions {
+method comp_unit($/) {
+    $*CURLEX{'!sub'}.code = $<statementlist>.ast;
+    $*CURLEX{'!sub'}.close;
+
+    make $*unit;
+}
+
 method do_variable_reference($M, $v) {
     if $v<term> {
         return $v<term>;
@@ -253,17 +282,14 @@ else {
 my $stages;
 if $bcnd eq 'clisp' {
     $stages = [
-        NieczaPassBegin.new,
         NieczaPassSimplifier.new,
     ];
 } elsif $bcnd eq 'hoopl' {
     $stages = [
-        NieczaPassBegin.new,
         NieczaPassSimplifier.new,
     ];
 } else {
     $stages = [
-        NieczaPassBegin.new,
         NieczaPassBeta.new,
         NieczaPassSimplifier.new,
     ];
