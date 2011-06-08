@@ -3881,7 +3881,13 @@ dynamic:
             thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");
-            thandlers["default_new"] = Methody(null, Tokens.Kernel.GetMethod("DefaultNew"));
+            thandlers["default_new"] = delegate(CpsOp[] z) {
+                return CpsOp.Sequence(
+                    CpsOp.Label("!again", false),
+                    CpsOp.CpsCall(Tokens.Void, Tokens.Kernel.GetMethod("DefaultNew"), z),
+                    CpsOp.Goto("!again", false),
+                    CpsOp.Null(Tokens.Variable));
+            };
             thandlers["assign"] = Methody(null, Tokens.Kernel.GetMethod("Assign"));
             thandlers["cotake"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("CoTake"));
             thandlers["take"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("Take"));

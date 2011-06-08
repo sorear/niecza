@@ -272,6 +272,7 @@ next_method: ;
             }
 
             SetupPrivates();
+            SetupBuildProgram();
         }
 
         void SetupMRO(P6how k) {
@@ -313,6 +314,32 @@ next_method: ;
                     stable.mro_methods[n] = new DispatchEnt(de, m.impl);
                 }
             }
+        }
+
+        void SetupBuildProgram() {
+            List<P6how.AttrInfo> acc = new List<P6how.AttrInfo>();
+            P6how.AttrInfo n = new P6how.AttrInfo();
+
+            for (int i = mro.Length - 1; i >= 0; i--) {
+                P6any build = null;
+                foreach (MethodInfo m in mro[i].mo.lmethods) {
+                    if (m.Name() == "BUILD" && m.flags == V_SUBMETHOD)
+                        build = m.impl;
+                }
+                foreach (P6how.AttrInfo ai in mro[i].mo.local_attr) {
+                    n = ai;
+                    if (build != null)
+                        n.flags &= ~A_PUBLIC; // BUILD will handle setting
+                    acc.Add(n);
+                }
+                if (build != null) {
+                    n.init  = build;
+                    n.name  = null;
+                    acc.Add(n);
+                }
+            }
+
+            stable.init_program = acc.ToArray();
         }
 
         private void SetMRO(STable[] arr) {
@@ -539,6 +566,7 @@ next_method: ;
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
         public string[] all_slot;
+        public P6how.AttrInfo[] init_program;
 
         public int num_rank = -1;
         public bool is_any = false;
