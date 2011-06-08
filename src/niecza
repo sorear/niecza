@@ -28,6 +28,79 @@ use OptRxSimple;
 use STD;
 use Sig;
 
+augment class NieczaActions {
+method sibble($/) {
+    my $regex = self.op_for_regex($/, $<left>.ast);
+    my $repl;
+    if $<infixish> {
+        if $<infixish> eq '=' {
+            $repl = $<right>.ast;
+        } elsif $<infixish>.ast ~~ ::Operator::CompoundAssign {
+            $repl = $<infixish>.ast.base.with_args($/,
+                mkcall($/, '&prefix:<~>', ::Op::ContextVar.new(name => '$*/')),
+                $<right>.ast);
+        } else {
+            $/.CURSOR.sorry("Unhandled operator in substitution");
+            $repl = mklex($/, 'Any');
+        }
+    } else {
+        $repl = $<right>.ast;
+    }
+    $repl = self.transparent($/, $repl, class => 'Regex');
+    make ::Op::CallMethod.new(|node($/), receiver => mklex($/, '$_'),
+        name => 'subst',
+        args => [ $regex, $repl, self.extract_rx_adverbs(True, True, $/),
+            ::Op::SimplePair.new(key => 'inplace', value => mklex($/,'True'))]);
+}
+
+method quotepair_term($/) {
+    my $v;
+    if $<v> ~~ Match {
+        $v = $<v>.ast
+    } elsif $<v> ~~ Str {
+        $v = ::Op::Num.new(value => [10, $<v>]);
+    } else {
+        $v = mklex($/, $<v> ?? "True" !! "False");
+    }
+    ::Op::SimplePair.new(|node($/), key => $<k>, value => $v);
+}
+
+method extract_rx_adverbs($ismatch, $issubst, $match) {
+    my $qps = ($match ~~ List) ?? $match !! $match<babble><quotepair>;
+    return () if !$qps;
+
+    my @ok;
+    my @nyi;
+    my @args;
+    my @internal = < sigspace s ratchet r ignorecase i >;
+
+    push @nyi, < ignoreaccent a bytes codes graphs chars Perl5 P5 >;
+
+    if $issubst {
+        push @nyi, < sameaccent aa samecase ii th st nd rd nth x >;
+        push @ok,  < g global >;
+    }
+
+    if $ismatch {
+        push @nyi, < overlap ov exhaustive ex continue c pos p global g rw >;
+    }
+
+    for @$qps -> $qp {
+        if @internal.grep($qp<k>) {
+            # handled by rx compiler
+        } elsif @ok.grep($qp<k>) {
+            push @args, self.quotepair_term($qp);
+        } elsif @nyi.grep($qp<k>) {
+            $qp.CURSOR.sorry("Regex modifier $qp<k> not yet implemented");
+        } else {
+            $qp.CURSOR.sorry("Regex modifier $qp<k> not valid on { $issubst ?? "substitution" !! $ismatch ?? "match" !! "regex literal" }");
+        }
+    }
+
+    @args
+}
+}
+
 class Op::MakeJunction is Op {
     has Int $.typecode = die "MakeJunction.typecode required";
     has @.zyg;

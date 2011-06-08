@@ -100,25 +100,33 @@ my class Cool {
         push @out, substr($str, $last, (chars($str) - $last));
         @out;
     }
-    method subst($matcher_, $replacement, :g(:$global)) {
+    method subst(\$: $matcher_, $replacement, :g(:$global), :$inplace) {
         my $str = ~self;
         my $C = Cursor.new($str);
         my $matcher = $matcher_ ~~ Regex ?? $matcher_ !! /$matcher_/;
         my $i = 0;
         my $to = 0;
+        my $changes = 0;
         my $limctr = $global ?? Inf !! 1;
         my @out;
         while $i < chars($str) && $limctr {
             my $M = head($matcher($C.cursor($i++)));
             if $M && $M.chars {
                 Q:CgOp { (rnull (set_status (s '$*/') {$M})) };
+                $changes++;
                 push @out, substr($str,$to,$M.from-$to);
                 push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
                 $to = $i = $M.to;
                 $limctr = $limctr - 1;
             }
         }
-        join "", @out, substr($str,$to,chars($str)-$to);
+        my $res = join "", @out, substr($str,$to,chars($str)-$to);
+        if $inplace {
+            self = $res;
+            ?$changes;
+        } else {
+            $res;
+        }
     }
 
     method index($substring, $pos = 0) {
@@ -1260,18 +1268,6 @@ my class Regex is Method {
               (set_status (s $*/) {Match})
               {Match})
         };
-    }
-}
-
-sub _substitute(\$target, $regex, $repl) {
-    my $st = ~$target;
-    if $regex.ACCEPTS($st) {
-        Q:CgOp { (rnull (set_status (s '$*/') {$/})) };
-        $target = (substr($st, 0, $/.from) ~ $repl() ~
-            substr($st, $/.to, (chars($st) - $/.to)));
-        True;
-    } else {
-        False;
     }
 }
 
