@@ -2944,38 +2944,54 @@ ltm:
         }
 
         public static Frame DefaultNew(Frame th, P6any proto, VarHash args) {
-            P6opaque n = new P6opaque(((P6opaque)proto).mo);
-            P6how.AttrInfo[] prog = n.mo.init_program;
-
-            for (int i = 0; i < prog.Length; i++) {
-                Variable vx = null;
-                int   flags = prog[i].flags;
-                string name = prog[i].name;
-                P6any  init = prog[i].init;
-
-                if (name == null) {
-                    return Die(th, "BUILD nyi");
-                } else if ((flags & P6how.A_PUBLIC) != 0 &&
-                        args.TryGetValue(name, out vx)) {
-                    args.Remove(name);
-                } else if (init != null) {
-                    vx = RunInferior(init.Invoke(GetInferiorRoot(),
-                                Variable.None, null));
-                }
-
-                if ((flags & ~P6how.A_PUBLIC) == 0) {
-                    n.SetSlot(name, NewRWScalar(prog[i].type,
-                        vx != null ? vx.Fetch() : prog[i].type.initObject));
-                } else {
-                    Variable obj = (flags & P6how.A_HASH) != 0 ? CreateHash() :
-                        CreateArray();
-                    if (vx != null) Assign(obj, vx);
-                    n.SetSlot(name, obj);
-                }
+            P6opaque n;
+            P6how.AttrInfo[] prog;
+            int i;
+            if (th.lex9 == null) {
+                th.lex9 = n = new P6opaque(((P6opaque)proto).mo);
+                i = 0;
+                prog = n.mo.init_program;
+            } else {
+                n = (P6opaque) th.lex9;
+                prog = n.mo.init_program;
+                i = th.lexi0;
+                goto value;
             }
 
-            th.caller.resultSlot = NewROScalar(n);
-            return th.caller;
+again:      if (i == prog.Length) {
+                th.caller.resultSlot = NewROScalar(n);
+                return th.caller;
+            }
+
+            Variable vx;
+            if ((prog[i].flags & P6how.A_PUBLIC) != 0 &&
+                    args.TryGetValue(prog[i].name, out vx)) {
+                args.Remove(prog[i].name);
+                th.resultSlot = vx;
+            } else if (prog[i].init == null) {
+                th.resultSlot = null;
+            } else {
+                P6any init = prog[i].init;
+                if (prog[i].name == null)
+                    return Die(th, "BUILD NYI");
+                th.lexi0 = i;
+                return init.Invoke(th, Variable.None, null);
+            }
+
+value:      vx = (Variable) th.resultSlot;
+
+            if ((prog[i].flags & ~P6how.A_PUBLIC) == 0) {
+                n.SetSlot(prog[i].name, NewRWScalar(prog[i].type,
+                    vx != null ? vx.Fetch() : prog[i].type.initObject));
+            } else {
+                Variable obj = (prog[i].flags & P6how.A_HASH) != 0 ?
+                    CreateHash() : CreateArray();
+                if (vx != null) Assign(obj, vx);
+                n.SetSlot(prog[i].name, obj);
+            }
+
+            i++;
+            goto again;
         }
 
         public static Frame PromoteToList(Frame th, Variable v) {
