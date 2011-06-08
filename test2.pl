@@ -2,6 +2,22 @@
 use Test;
 use MONKEY_TYPING;
 
+{
+    my class Bt {
+        has $!pie;
+        method get_pie() { $!pie }
+        submethod BUILD(:$x) { $!pie = $x }
+    }
+    is Bt.new(x => 5).get_pie, 5, "BUILD basically works";
+    my class SubBT is Bt {
+        has $!pie2;
+        method get_pie2() { $!pie2 }
+        submethod BUILD(:$y) { $!pie2 = $y }
+    }
+    is SubBT.new(x => 5, y => 2).get_pie, 5, "superclass' BUILD in subclass";
+    is SubBT.new(x => 5, y => 2).get_pie2, 2, "subclass' BUILD in subclass";
+}
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {

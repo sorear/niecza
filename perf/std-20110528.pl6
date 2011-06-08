@@ -31,6 +31,18 @@ my class CAttrInits {
     has $.z = 3;
 }
 
+my class CBuild {
+    has $.x;
+    has $.y;
+    has $.z;
+    submethod BUILD(:$x, :$y, :$z) {
+        $!x = $x // 1;
+        $!y = $y // 2;
+        $!z = $z // 3;
+    }
+}
+
 bench "CEmpty.new", 1000000, sub () { CEmpty.new };
 bench "CAttrs.new", 1000000, sub () { CAttrs.new };
-bench "CAttrInits.new", 100000, sub () { CAttrInits.new };
+bench "CAttrInits.new", 1000000, sub () { CAttrInits.new };
+bench "CBUILD.new", 1000000, sub () { CBuild.new };

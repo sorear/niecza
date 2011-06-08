@@ -2970,15 +2970,45 @@ again:      if (i == prog.Length) {
                 th.resultSlot = vx;
             } else if (prog[i].init == null) {
                 th.resultSlot = null;
+            } else if (prog[i].name == null) {
+                P6any init = prog[i].init;
+                th.lexi0 = i;
+
+                SubInfo si = (SubInfo) init.GetSlot("info");
+                VarHash build_args = new VarHash();
+                int ic = 0;
+                int oc = 0;
+                while (ic < si.sig_i.Length) {
+                    int fl = si.sig_i[ic + SubInfo.SIG_I_FLAGS];
+                    int nn = si.sig_i[ic + SubInfo.SIG_I_NNAMES];
+                    ic += SubInfo.SIG_I_RECORD;
+
+                    for (int j = 0; j < nn; j++) {
+                        string name = (string) si.sig_r[oc+j+1];
+                        if (args.ContainsKey(name)) {
+                            build_args[name] = args[name];
+                            args.Remove(name);
+                        }
+                    }
+
+                    oc += 1 + nn;
+                    if ((fl & SubInfo.SIG_F_HASTYPE) != 0) oc++;
+                    if ((fl & SubInfo.SIG_F_HASDEFAULT) != 0) oc++;
+                }
+
+                return init.Invoke(th, new Variable[] { NewROScalar(n) },
+                    build_args);
             } else {
                 P6any init = prog[i].init;
-                if (prog[i].name == null)
-                    return Die(th, "BUILD NYI");
                 th.lexi0 = i;
                 return init.Invoke(th, Variable.None, null);
             }
 
 value:      vx = (Variable) th.resultSlot;
+            if (prog[i].name == null) {
+                i++;
+                goto again;
+            }
 
             if ((prog[i].flags & ~P6how.A_PUBLIC) == 0) {
                 n.SetSlot(prog[i].name, NewRWScalar(prog[i].type,
