@@ -18,8 +18,6 @@ EASY
 
    Character class expressions like [[a .. A] & [\W]]
 
-   Binding to values like @PROCESS::ARGS doesn't contextualize correctly.  Fix.
-
    Fudge and run your favorite spectest file.
 
    Stuff spectests are blocking on: "closure for",
@@ -45,8 +43,6 @@ MEDIUM
   *Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 
-  *Implement BUILD submethod calling.
-
    Methods with variable names need to call the correct action method.  (See
    the horrible hack in NieczaActions.FALLBACK).
 
@@ -55,8 +51,6 @@ MEDIUM
    Add Buf bitops.
 
 HARD
-
- + subset declarations.
 
    Design and implement some sort of NFG thing that allows use codes, graphs,
    etc and handles canonical equivalence in regexes.
@@ -70,7 +64,7 @@ HARD
   *Parallel hyperops!  Read the Cilk papers, they seem to have a data
    parallelism model most similar to what Perl 6 needs.
 
-   Understand the Str/Stringy distinctions, and improve stringification
+  *Understand the Str/Stringy distinctions, and improve stringification
    and numification handling for Any.  Develop a warning system.
 
   *Explicitly imprecise error reporting.  In many circumstances niecza

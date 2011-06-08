@@ -16,6 +16,10 @@ use MONKEY_TYPING;
     }
     is SubBT.new(x => 5, y => 2).get_pie, 5, "superclass' BUILD in subclass";
     is SubBT.new(x => 5, y => 2).get_pie2, 2, "subclass' BUILD in subclass";
+
+    my @l;
+    @l := [1,2,3];
+    is +[@l], 3, 'binding to existing list vars works';
 }
 
 is [ 1,2,3 ... 10 ], [1..10];
