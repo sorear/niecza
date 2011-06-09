@@ -326,12 +326,11 @@ method routine_def_1 ($, $/ = $*cursor) {
 }
 
 method routine_def_2 ($, $/ = $*cursor) {
-    # if $<multisig> > 1 {
-    #     $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
-    #     return Nil;
-    # }
-    # my $signature = $<multisig> ?? $<multisig>[0].ast !!
-    #     self.get_placeholder_sig($/);
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("You may only use *one* signature");
+    }
+    $*CURLEX<!sub>.signature =
+        $<multisig> ?? $<multisig>[0].ast !! self.get_placeholder_sig($/);
     self.process_block_traits($/, $<trait>);
 }
 
@@ -842,7 +841,7 @@ method param_var($/) {
     $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, :noinit)
         if defined($slot);
 
-    make { :$list, :$hash, :$slot, 
+    make { :$list, :$hash, :$slot,
         names => defined($name) ?? [ $name ] !! [] }
 }
 }
