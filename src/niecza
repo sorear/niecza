@@ -760,9 +760,9 @@ method INFIX($/) {
         elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
             my $sig = substr($lhs.name, 0, 1);
             if defined '$@&%'.index($sig) {
-                $lhs.init = self.docontext($/, $sig, $rhs)
+                self.init_constant($lhs, self.docontext($/, $sig, $rhs));
             } else {
-                $lhs.init = $rhs;
+                self.init_constant($lhs, $rhs);
             }
             make $lhs;
         }
@@ -860,7 +860,7 @@ method variable_declarator($/) {
     } elsif $scope eq 'state' {
         $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
             :$hash, typeconstraint => $res_tc);
-        make mklex($/, $slot, :$list, :$hash);
+        make mklex($/, $slot, :$list, :$hash, :state_decl);
     } elsif $scope eq 'our' {
         make ::Op::PackageVar.new(|node($/), name => $slot, slot => $slot,
             path => [ 'OUR' ]);
@@ -944,6 +944,40 @@ method thunk_sub($code, :$name) {
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
     $*CURLEX<!sub>.add_child($n);
     $n;
+}
+
+method make_constant($/, $scope, $name, $path) {
+    $scope := $scope || 'our';
+
+    my $slot = ($scope eq 'my' || $scope eq 'our' && !$path) ?? $name !!
+        self.gensym;
+
+    if $path {
+        $*CURLEX<!sub>.add_common_name($slot,
+            $*CURLEX<!sub>.find_pkg($path), $name);
+    } else {
+        $*CURLEX<!sub>.add_hint($slot);
+    }
+
+    ::Op::ConstantDecl.new(|node($/), name => $slot, init => False);
+}
+
+method init_constant($con, $rhs) {
+    my $body = self.thunk_sub($rhs, name => "$con.name() init");
+    $body.is_phaser = 2;
+    $body.hint_hack = [ $*CURLEX<!sub>.xref, $con.name ];
+    $body.outer.create_static_pad;
+    $con.init = True;
+    $con;
+}
+
+method type_declarator:constant ($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    my $name  = ~($<identifier> // $<variable> // self.gensym);
+
+    make self.make_constant($/, $*SCOPE || 'our', $name, Array);
 }
 
 method param_var($/) {
