@@ -226,6 +226,33 @@ method package_def ($/) {
     }
 }
 
+method process_package_traits($/, $export, @tr) {
+    for @tr -> $trait {
+        if $trait.ast.<name>:exists {
+            my $sub = $*CURLEX<!sub>;
+            my ($name, $path) = $trait.ast<name path>;
+
+            $/.CURSOR.sorry("superclass $name declared outside of any class"),
+                next unless $sub.body_of;
+            $/.CURSOR.sorry("superclass $name declared in an augment"),
+                next if $sub.augmenting;
+
+            my $ns = $*unit.deref($sub.body_of);
+            $ns.add_super($*unit.get_item($sub.find_pkg([ @($path // ['MY']),
+                $name ])));
+        } elsif $trait.ast.<export> {
+            if defined $export {
+                push $export, @( $trait.ast.<export> );
+            } else {
+                $/.CURSOR.sorry('Cannot mark a class as exported outside the declarator');
+            }
+        } else {
+            $/.CURSOR.sorry("Non-superclass traits for packageoids NYI");
+        }
+    }
+}
+
+
 method open_package_def($, $/ = $*cursor) {
     my %_decl2mclass = (
         package => ::Metamodel::Package,
@@ -302,14 +329,17 @@ method open_package_def($, $/ = $*cursor) {
 
         $*unit.create_stash([@ns]);
         $sub.outer.add_my_stash($*CURLEX<!outervar>, [@ns]);
-        $sub.outer.add_pkg_exports($*unit, $name, [@ns], @exports);
         my $obj  = $type.new(:$name);
         $*unit.bind_item([@ns], $obj.xref);
-        $obj.exports = [ [@ns],
-            map { [ @($sub.outer.cur_pkg), 'EXPORT', $_, $name ] }, @exports ];
 
         $sub.body_of = $sub.in_class = $obj.xref;
         $sub.cur_pkg = [@ns];
+
+        self.process_package_traits($/, @exports, $<trait>);
+
+        $sub.outer.add_pkg_exports($*unit, $name, [@ns], @exports);
+        $obj.exports = [ [@ns],
+            map { [ @($sub.outer.cur_pkg), 'EXPORT', $_, $name ] }, @exports ];
     }
 }
 
