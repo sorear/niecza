@@ -92,6 +92,46 @@ augment grammar STD::P6 { #OK
             <.getdecl>
         ] || <.panic: "Malformed routine">
     }
+    token method_def_1($*cursor) { <?> }
+    token method_def_2($*cursor) { <?> }
+    rule method_def ($d) {
+        :temp $*CURLEX;
+        :my $*IN_DECL = $d;
+        :my $*DECLARAND;
+        :my $*HAS_SELF = $d eq 'submethod' ?? 'partial' !! 'complete';
+        <.newlex(1)>
+        [
+            [
+            | $<type>=[<[ ! ^ ]>?]<longname>
+              <.method_def_1($/)> [ <multisig> | <trait> ]*
+            | <.method_def_1($/)> <multisig> <trait>*
+            | <sigil> '.'
+                :dba('subscript signature')
+                [
+                | '(' ~ ')' [ <.method_def_1($/)> <signature> ]
+                | '[' ~ ']' [ <.method_def_1($/)> <signature> ]
+                | '{' ~ '}' [ <.method_def_1($/)> <signature> ]
+                  # don't need curlycheck here
+                ]
+                <trait>*
+            | <?>
+            ]
+            <.method_def_2($/)>
+            {
+                given $*PKGDECL {
+                    when 'class'   {} # XXX to be replaced by MOP queries
+                    when 'grammar' {}
+                    when 'role'    {}
+                    default { $¢.worry("'$d' declaration outside of class") if ($*SCOPE || 'has') eq 'has' && $<longname> }
+                }
+            }
+            { $*IN_DECL = ''; }
+            <blockoid>:!s
+            <.checkyada>
+            <.getsig>
+            <.getdecl>
+        ] || <.panic: "Malformed method">
+    }
     token open_package_def($*cursor) { <?> }
     rule package_def {
         :my $longname;
@@ -336,6 +376,39 @@ method routine_def_2 ($, $/ = $*cursor) {
 }
 
 method routine_def ($/) {
+    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    make mklex($/, $*CURLEX<!sub>.outervar);
+}
+
+method method_def_1 ($, $/ = $*cursor) {
+    my $type = $<type> ?? ~$<type> !! '';
+    if $type ne '' && $*HAS_SELF eq 'partial' {
+        $type = '';
+        $/.CURSOR.sorry("Type symbols cannot be used with submethod");
+    }
+
+    my $cx = $<sigil> && $<sigil>[0] eq '&*';
+
+    my ($m,$p) = $<longname> ??
+        self.mangle_longname($<longname>).<name path> !! ();
+
+    self.install_sub($/, $*CURLEX<!sub>, scope => $*SCOPE, name => $m,
+        method_type => ($type eq '^' ?? 'meta' !! $type eq '!' ?? 'private' !!
+            $*HAS_SELF eq 'partial' ?? 'sub' !! 'normal'),
+        path => $p, multiness => $*MULTINESS,
+        :class($*HAS_SELF eq 'partial' ?? 'Submethod' !! 'Method'));
+}
+
+method method_def_2 ($, $/ = $*cursor) {
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("You may only use *one* signature");
+    }
+    $*CURLEX<!sub>.signature =
+        $<multisig> ?? $<multisig>[0].ast !! self.get_placeholder_sig($/);
+    self.process_block_traits($/, $<trait>);
+}
+
+method method_def ($/) {
     $*CURLEX<!sub>.code = $<blockoid>.ast;
     make mklex($/, $*CURLEX<!sub>.outervar);
 }
