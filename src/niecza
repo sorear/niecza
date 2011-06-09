@@ -734,6 +734,71 @@ method extract_rx_adverbs($ismatch, $issubst, $match) {
     @args
 }
 
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    if $fn.assignish {
+        # Assignments to has and state declarators are rewritten into
+        # an appropriate phaser
+        if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+            my $cv = self.gensym;
+            make ::Op::StatementList.new(|node($/), children => [
+                ::Op::Start.new(condvar => $cv, body => $/.ast),
+                ::Op::Lexical.new(name => $lhs.name)]);
+        }
+        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+            $lhs.initializer = self.sl_to_block('bare', $rhs,
+                subname => $lhs.name ~ " init");
+            make $lhs;
+        }
+        elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+            my $sig = substr($lhs.name, 0, 1);
+            if defined '$@&%'.index($sig) {
+                $lhs.init = self.docontext($/, $sig, $rhs)
+            } else {
+                $lhs.init = $rhs;
+            }
+            make $lhs;
+        }
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+
+method add_attribute($/, $name, $sigil, $accessor, $type) {
+    my $ns = $*CURLEX<!sub>.body_of;
+    $/.CURSOR.sorry("Attribute $name declared outside of any class"),
+        return ::Op::StatementList.new unless $ns;
+    $/.CURSOR.sorry("Attribute $name declared in an augment"),
+        return ::Op::StatementList.new if $*CURLEX<!sub>.augmenting;
+
+    $ns = $*unit.deref($ns);
+    $ns.add_attribute($name, $sigil, +$accessor, Any, Any, $type);
+
+    my $nb = ::Metamodel::StaticSub.new(
+        transparent=> True,
+        unit       => $*unit,
+        outerx     => $*CURLEX<!sub>.xref,
+        name       => $name,
+        cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+        class      => 'Method',
+        signature  => Sig.simple('self'),
+        code       => ::Op::GetSlot.new(name => $name,
+            object => ::Op::Lexical.new(name => 'self')));
+    $nb.add_my_name('self', noinit => True);
+    $*CURLEX<!sub>.create_static_pad; # for protosub instance
+    $nb.strong_used = True;
+    $*CURLEX<!sub>.add_my_sub($name ~ '!a', $nb);
+    $ns.add_method('only', 'private', $name, $name ~ '!a', $nb.xref);
+    if $accessor {
+        $ns.add_method('only', 'normal', $name, $name ~ '!a', $nb.xref);
+    }
+
+    ::Op::Attribute.new(name => $name, initializer => False);
+}
+
 method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
@@ -788,8 +853,7 @@ method variable_declarator($/) {
         $*unit.get_item($*CURLEX<!sub>.find_pkg($typeconstraint)) !! Any;
 
     if $scope eq 'has' {
-        make ::Op::Attribute.new(|node($/), name => $v<name>,
-            sigil => $v<sigil>, accessor => $t eq '.', :$typeconstraint);
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.', $res_tc);
     } elsif $scope eq 'state' {
         $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
             :$hash, typeconstraint => $res_tc);
