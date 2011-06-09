@@ -32,6 +32,43 @@ use Sig;
 my package DEBUG {
     our constant symtab = 1;
 }
+
+augment class Operator::Method { #OK
+    method with_args($/, *@args) {
+        if ($.name eq 'HOW' || $.name eq 'WHAT' || $.name eq 'VAR')
+                && !$.private && !$.meta {
+            if $.args {
+                $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
+                return ::Op::StatementList.new;
+            }
+            ::Op::Interrogative.new(|node($/), receiver => @args[0],
+                name => $.name);
+        } else {
+            if defined($.path) && !$.private {
+                $/.CURSOR.sorry("Qualified references to non-private methods NYI");
+            }
+            $*CURLEX<!sub>.noninlinable if $.name eq 'eval';
+            my $pclass;
+            if $.private {
+                if $.path {
+                    $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($.path));
+                } elsif $*CURLEX<!sub>.in_class -> $c {
+                    $pclass = $c;
+                } else {
+                    $/.CURSOR.sorry("Cannot resolve class for private method");
+                }
+            }
+            ::Op::CallMethod.new(|node($/),
+                receiver => @args[0],
+                ismeta   => $.meta,
+                name     => $.name,
+                private  => $.private,
+                pclass   => $pclass,
+                args     => [ @$.args ]);
+        }
+    }
+}
+
 augment grammar STD {
 our $ALL;
 method newlex ($needsig = 0, $once = False) {
@@ -387,8 +424,6 @@ method method_def_1 ($, $/ = $*cursor) {
         $/.CURSOR.sorry("Type symbols cannot be used with submethod");
     }
 
-    my $cx = $<sigil> && $<sigil>[0] eq '&*';
-
     my ($m,$p) = $<longname> ??
         self.mangle_longname($<longname>).<name path> !! ();
 
@@ -688,6 +723,14 @@ method do_variable_reference($M, $v) {
     }
 
     if $tw eq '!' {
+        my $pclass;
+        if $v<rest> {
+            $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($v<rest>));
+        } elsif $*CURLEX<!sub>.in_class -> $c {
+            $pclass = $c;
+        } else {
+            $/.CURSOR.sorry("Cannot resolve class for private method");
+        }
         self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
             name => $v<name>, private => True, receiver => mklex($M, 'self'),
             ppath => $v<rest>));
