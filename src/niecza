@@ -749,9 +749,12 @@ method INFIX($/) {
                 ::Op::Start.new(condvar => $cv, body => $/.ast),
                 ::Op::Lexical.new(name => $lhs.name)]);
         }
-        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
-            $lhs.initializer = self.sl_to_block('bare', $rhs,
-                subname => $lhs.name ~ " init");
+        elsif $lhs.^isa(::Op::Attribute) && !defined($lhs.initializer.ivar) {
+            my $init = self.thunk_sub($rhs,
+                :name($lhs.initializer.name ~ " init"));
+            $lhs.initializer.ivar = self.gensym;
+            $*CURLEX<!sub>.add_my_sub_child($lhs.initializer.ivar, $init);
+            $lhs.initializer.ibody = $init.xref;
             make $lhs;
         }
         elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
@@ -775,7 +778,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         return ::Op::StatementList.new if $*CURLEX<!sub>.augmenting;
 
     $ns = $*unit.deref($ns);
-    $ns.add_attribute($name, $sigil, +$accessor, Any, Any, $type);
+    my $at = $ns.add_attribute($name, $sigil, +$accessor, Any, Any, $type);
 
     my $nb = ::Metamodel::StaticSub.new(
         transparent=> True,
@@ -796,7 +799,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         $ns.add_method('only', 'normal', $name, $name ~ '!a', $nb.xref);
     }
 
-    ::Op::Attribute.new(name => $name, initializer => False);
+    ::Op::Attribute.new(name => $name, initializer => $at);
 }
 
 method variable_declarator($/) {
@@ -900,6 +903,7 @@ method parameter($/) {
     }
 
     my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+    $*unit.deref($default).set_name("$/ init") if $default;
 
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
@@ -928,15 +932,18 @@ method parameter($/) {
 }
 
 method default_value($/) { make self.thunk_sub($<EXPR>.ast).xref }
-method thunk_sub($code) {
-    ::Metamodel::StaticSub.new(
+method thunk_sub($code, :$name) {
+    my $n = ::Metamodel::StaticSub.new(
         outerx => $*CURLEX<!sub>.xref,
         class => 'Code',
         unit => $*unit,
+        name => $name // 'ANON',
         transparent => True,
         code => $code,
         in_class => $*CURLEX<!sub>.in_class,
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
+    $*CURLEX<!sub>.add_child($n);
+    $n;
 }
 
 method param_var($/) {

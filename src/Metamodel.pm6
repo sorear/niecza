@@ -276,6 +276,7 @@ class Class is Module {
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
+        $.attributes.[*-1];
     }
 
     method add_method($multi, $kind, $name, $var, $body) { #OK not used
@@ -370,6 +371,7 @@ class Role is Module {
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
+        $.attributes.[*-1];
     }
 
     method add_method($multi, $kind, $name, $var, $body) { #OK not used
@@ -394,6 +396,7 @@ class ParametricRole is Module {
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
+        $.attributes.[*-1];
     }
 
     method add_method($multi, $kind, $name, $var, $body) { #OK not used
