@@ -520,6 +520,59 @@ method open_package_def($, $/ = $*cursor) {
     }
 }
 
+method signature($/) {
+    if $<type_constraint> {
+        # ignore for now
+    }
+
+    if $<param_var> {
+        make Sig.new(params => [ ::Sig::Parameter.new(
+                name => ~$<param_var>, |$<param_var>.ast,
+                full_parcel => True) ]);
+        return Nil;
+    }
+
+    my @p = map *.ast, @( $<parameter> );
+    my @ps = @( $<param_sep> );
+    my $ign = False;
+    loop (my $i = 0; $i < @p; $i++) {
+        @p[$i].multi_ignored = $ign;
+        if $i >= @ps {
+        } elsif defined @ps[$i].index(':') {
+            $/.CURSOR.sorry('Only the first parameter may be invocant') if $i;
+            $*CURLEX<!sub>.add_my_name('self', :noinit);
+            @p[$i].invocant = True;
+        } elsif defined @ps[$i].index(';;') {
+            $ign = True;
+        } elsif !defined @ps[$i].index(',') {
+            $/.CURSOR.sorry("Parameter separator @ps[$i] NYI");
+        }
+    }
+
+    if $*SIGNUM && $*CURLEX<!sub>.methodof && (!@p || !@p[0].invocant) {
+        $*CURLEX<!sub>.add_my_name('self', :noinit);
+        unshift @p, ::Sig::Parameter.new(name => 'self', :invocant);
+    }
+
+    for @p {
+        if !defined(.tclass) && $*SIGNUM {
+            if .invocant && $*CURLEX<!sub>.methodof {
+                my $cl = $*unit.deref($*CURLEX<!sub>.methodof);
+                # XXX type checking against roles NYI
+                if $cl !~~ ::Metamodel::Role &&
+                        $cl !~~ ::Metamodel::ParametricRole {
+                    .tclass = $cl.xref;
+                }
+            } elsif !$*CURLEX<!sub>.returnable {
+                .tclass = $*unit.get_item($*CURLEX<!sub>.find_pkg(['MY','Mu']));
+            }
+        }
+    }
+
+    make Sig.new(params => @p);
+}
+
+
 method comp_unit($/) {
     $*CURLEX{'!sub'}.code = $<statementlist>.ast;
     $*CURLEX{'!sub'}.close;
@@ -760,7 +813,8 @@ method parameter($/) {
     my $type;
 
     if $<type_constraint> {
-        $type = self.simple_longname($<type_constraint>[0]<typename><longname>);
+        my $t = self.simple_longname($<type_constraint>[0]<typename><longname>);
+        $type = $*unit.get_item($*CURLEX<!sub>.find_pkg($t));
     }
 
     for @( $<trait> ) -> $trait {
@@ -803,10 +857,9 @@ method parameter($/) {
     }
 
     make ::Sig::Parameter.new(name => ~$/, :$default,
-        :$optional, :$slurpy, :$rw, type => $type,
+        :$optional, :$slurpy, :$rw, tclass => $type,
         :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
 }
-
 
 method param_var($/) {
     if $<signature> {
