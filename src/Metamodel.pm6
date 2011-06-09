@@ -338,7 +338,7 @@ class Class is Module {
         if (($.name ne 'Mu' || !$*unit.is_true_setting)
                 && !$.superclasses) {
             self.add_super($*unit.get_item(
-                    @*opensubs[*-1].true_setting.find_pkg(self._defsuper)));
+                $*CURLEX<!sub>.true_setting.find_pkg(self._defsuper)));
         }
 
         my @merge;

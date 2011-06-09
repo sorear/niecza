@@ -190,6 +190,7 @@ augment class NieczaGrammar::P6 { #OK
         $*CURLEX{'!sub'}.add_my_name('$_') if !$top;
         $*CURLEX{'!sub'}.add_hint('$?FILE');
         $*CURLEX{'!sub'}.signature = Sig.simple();
+        $*unit.mainline = $*CURLEX<!sub>;
 
         %*LANG<Q> = ::NieczaGrammar::Q ;
         %*LANG<MAIN> = ::NieczaGrammar::P6 ;
@@ -335,6 +336,7 @@ method routine_def_2 ($, $/ = $*cursor) {
 }
 
 method routine_def ($/) {
+    $*CURLEX<!sub>.code = $<blockoid>.ast;
     make mklex($/, $*CURLEX<!sub>.outervar);
 }
 

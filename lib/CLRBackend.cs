@@ -4570,7 +4570,8 @@ dynamic:
                 MethodInfo set = dty.GetMethod("set_Item");
                 thaw.Add(CpsOp.SetField(lex, CpsOp.CallFrame(),
                     CpsOp.ConstructorCall(dty.GetConstructor(new Type[0]), new CpsOp[0])));
-                string s = unit.setting_ref.unit;
+                string s = (unit.setting_ref != null) ? unit.setting_ref.unit
+                    : null;
                 StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
                 while (s != null) {
                     thaw.Add(CpsOp.MethodCall(set,
