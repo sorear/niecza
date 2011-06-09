@@ -129,7 +129,8 @@ augment grammar STD::P6 { #OK
                         $*begin_compunit = 0;
 
                         # XXX throws away any role sig above
-                        $*CURLEX = $outer;
+                        # worse - breaks CURLEX<!sub> handling
+                        # $*CURLEX = $outer;
 
                         $*UNIT<$?LONGNAME> = $longname<name>.Str;
                     }
