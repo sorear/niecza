@@ -856,9 +856,21 @@ method parameter($/) {
         # TODO: type constraint here
     }
 
-    make ::Sig::Parameter.new(name => ~$/, :$default,
+    make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
         :$optional, :$slurpy, :$rw, tclass => $type,
         :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
+}
+
+method default_value($/) { make self.thunk_sub($<EXPR>.ast).xref }
+method thunk_sub($code) {
+    ::Metamodel::StaticSub.new(
+        outerx => $*CURLEX<!sub>.xref,
+        class => 'Code',
+        unit => $*unit,
+        transparent => True,
+        code => $code,
+        in_class => $*CURLEX<!sub>.in_class,
+        cur_pkg => $*CURLEX<!sub>.cur_pkg);
 }
 
 method param_var($/) {
