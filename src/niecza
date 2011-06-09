@@ -70,6 +70,28 @@ method newlex ($needsig = 0, $once = False) {
 }
 
 augment grammar STD::P6 { #OK
+    token routine_def_1($*cursor) { <?> }
+    token routine_def_2($*cursor) { <?> }
+    rule routine_def ($d) {
+        :temp $*CURLEX;
+        :my $*IN_DECL = $d;
+        :my $*DECLARAND;
+        [
+            [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
+            <.newlex(1)>
+            <.routine_def_1($/)>
+            [ <multisig> | <trait> ]*
+            <.routine_def_2($/)>
+            [ <!before '{'> <.panic: "Malformed block"> ]?
+            <!{
+                $*IN_DECL = '';
+            }>
+            <blockoid>:!s
+            <.checkyada>
+            <.getsig>
+            <.getdecl>
+        ] || <.panic: "Malformed routine">
+    }
     token open_package_def($*cursor) { <?> }
     rule package_def {
         :my $longname;
@@ -176,6 +198,168 @@ augment class NieczaGrammar::P6 { #OK
 }
 
 augment class NieczaActions {
+# this is intended to be called after parsing the longname for a sub,
+# but before the signature.  export, etc are handled by the sub/package
+# trait handler
+method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
+        :$path, :$name is copy, :$method_type is copy, :$contextual is copy) {
+
+    $multiness ||= 'only';
+
+    if !$scope {
+        if !defined($name) {
+            $scope = 'anon';
+        } elsif defined($path) {
+            $scope = 'our';
+        } elsif defined($method_type) {
+            $scope = 'has';
+        } else {
+            $scope = 'my';
+        }
+    }
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' && $scope ne 'has' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        $scope = 'anon';
+    }
+
+    if $scope eq 'has' && !defined($method_type) {
+        $/.CURSOR.sorry('has scope-type is only valid for methods');
+        $scope = 'anon';
+    }
+
+    if $scope ne 'anon' && !defined($name) {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+        $scope = 'anon';
+    }
+
+    if $scope ne 'our' && defined($path) {
+        $/.CURSOR.sorry("Double-colon-qualified subs must be our");
+        $scope = 'our';
+    }
+
+    if $scope eq 'anon' && $multiness ne 'only' {
+        $/.CURSOR.sorry("Multi routines must have a name");
+        $multiness = 'only';
+    }
+
+    if $contextual && (defined($method_type) || $scope ne 'my') {
+        $/.CURSOR.sorry("Context-named routines must by purely my-scoped");
+        $contextual = False;
+    }
+
+    my $method_targ = $method_type && $sub.outer.body_of;
+    if $method_targ {
+        $method_targ = $*unit.deref($method_targ);
+    } elsif defined($method_type) {
+        $/.CURSOR.sorry("Methods must be used in some kind of package");
+        $method_type = 'Str';
+    }
+
+    if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
+            $method_targ !~~ ::Metamodel::ParametricRole) {
+        $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
+        $name = "placeholder";
+    }
+
+    my $bindlex = $scope eq 'my' || ($scope eq 'our' && !$path);
+
+    $sub.set_name(($name ~~ Op) ?? '::($name)' !!
+        defined($method_type) ?? $method_targ.name ~ "." ~ $name !!
+        ($name // 'ANON'));
+    $sub.class = $class;
+    $sub.returnable = True;
+
+    my Str $symbol;
+    if $bindlex && $class eq 'Regex' {
+        $symbol = '&' ~ $name;
+        my $proto = $symbol;
+        $proto ~~ s/\:.*//;
+        $sub.outer.add_dispatcher($proto) if $multiness ne 'only'
+            && !$sub.outer.lexicals.{$proto};
+        $symbol ~= ":(!proto)" if $multiness eq 'proto';
+    } elsif $bindlex {
+        $symbol = '&' ~ $name;
+        $sub.outer.add_dispatcher($symbol) if $multiness ne 'only'
+            && !$sub.outer.lexicals.{$symbol};
+
+        given $multiness {
+            when 'multi' { $symbol ~= ":({ self.gensym })"; }
+            when 'proto' { $symbol ~= ":(!proto)"; }
+        }
+    } else {
+        $symbol = self.gensym;
+    }
+
+    $sub.outervar = $symbol;
+    $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
+    $sub.outer.add_my_sub_child($symbol, $sub);
+
+    if defined($method_type) || $scope eq 'our' {
+        $sub.strong_used = True;
+        $sub.outer.create_static_pad;
+    }
+
+    if defined($method_type) {
+        if $sub.outer.augment_hack {
+            push $sub.outer.augment_hack,
+                [ $multiness, $method_type, $name, $symbol, $sub.xref ];
+        } else {
+            $method_targ.add_method($multiness, $method_type, $name,
+                $symbol, $sub.xref);
+        }
+    }
+
+    if $scope eq 'our' {
+        $sub.exports = [ @($sub.outer.find_pkg($path // ['OUR'])), '&'~$name ];
+    }
+}
+
+method routine_def_1 ($, $/ = $*cursor) {
+    my $cx = $<sigil> && $<sigil>[0] eq '&*';
+
+    my ($m,$p) = $<deflongname>[0] ??
+        self.mangle_longname($<deflongname>[0]).<name path> !! ();
+
+    self.install_sub($/, $*CURLEX<!sub>, scope => $*SCOPE, name => $m,
+        path => $p, contextual => $cx, multiness => $*MULTINESS, :class<Sub>);
+}
+
+method routine_def_2 ($, $/ = $*cursor) {
+    # traits and signatures here
+    # if $<multisig> > 1 {
+    #     $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
+    #     return Nil;
+    # }
+    # my @export;
+    # my $return_pass = 0;
+    # my $signature = $<multisig> ?? $<multisig>[0].ast !!
+    #     self.get_placeholder_sig($/);
+    # my $unsafe = False;
+    # for @( $<trait> ) -> $t {
+    #     if $t.ast.<export> {
+    #         push @export, map { ['OUR','EXPORT',$_] }, @( $t.ast<export> );
+    #     } elsif $t.ast<nobinder> {
+    #         $signature = Any;
+    #     } elsif $t.ast<return_pass> {
+    #         $return_pass = 1;
+    #     } elsif $t.ast<of> {
+    #     } elsif $t.ast<rw> {
+    #     } elsif $t.ast<unsafe> {
+    #         $unsafe = True;
+    #     } else {
+    #         $/.CURSOR.sorry("Sub trait $t.ast.keys.[0] not available");
+    #     }
+    # }
+    # if $scope eq 'our' {
+    #     push @export, $p || ['OUR'];
+    # }
+}
+
+method routine_def ($/) {
+    make mklex($/, $*CURLEX<!sub>.outervar);
+}
+
 my %_decl2class = (
     package => ::Op::PackageDef,
     class   => ::Op::ClassDef,
@@ -298,6 +482,7 @@ method open_package_def($, $/ = $*cursor) {
         $sub.augment_hack = @ah;
         $sub.body_of = $sub.in_class = $so;
         $sub.augmenting = True;
+        $sub.set_name("augment-$dso.name()");
     } else {
         my ($name, $ourpkg);
         my $type = %_decl2mclass{$*PKGDECL};
@@ -338,6 +523,7 @@ method open_package_def($, $/ = $*cursor) {
         self.process_package_traits($/, @exports, $<trait>);
 
         $sub.outer.add_pkg_exports($*unit, $name, [@ns], @exports);
+        $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
         $obj.exports = [ [@ns],
             map { [ @($sub.outer.cur_pkg), 'EXPORT', $_, $name ] }, @exports ];
     }

@@ -209,7 +209,7 @@ class Namespace {
 }
 
 class RefTarget {
-    has $.xref; # is rw
+    has $.xref;
     has $.name = 'ANON';
 
     # TODO BUILD
@@ -219,6 +219,10 @@ class RefTarget {
         $n.xref = [ $*unit.name, +$*unit.xref, $n.name ];
         push $*unit.xref, $n;
         $n
+    }
+
+    method set_name($name) {
+        $!xref[2] = $!name = $name;
     }
 }
 
@@ -510,6 +514,8 @@ class StaticSub is RefTarget {
     has $.class = 'Sub'; # Str
     has $.ltm; # is rw
     has $.exports; # is rw
+    has Str $.outervar is rw; # Xref, used during parse
+    has $.methodof is rw; # Xref, used during parse
 
     method outer() { $!outerx ?? $*unit.deref($!outerx) !! StaticSub }
 
