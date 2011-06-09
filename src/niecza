@@ -72,7 +72,6 @@ method declarator($/) {
         # TODO: keep the original signature around somewhere := can find it
         for @p {
             # TODO: fanciness checks
-            $*CURLEX<!sub>.add_my_name(.slot, list => .list, hash => .hash);
             $_ = mklex($/, .slot, list => .list, hash => .hash);
         }
         make ::Op::SimpleParcel.new(|node($/), items => @p);
@@ -289,7 +288,101 @@ method variable_declarator($/) {
     }
 }
 
+method parameter($/) {
+    my $rw = False;
+    my $copy = False;
+    my $sorry;
+    my $slurpy = False;
+    my $slurpycap = False;
+    my $optional = False;
+    my $rwt = False;
+    my $type;
 
+    if $<type_constraint> {
+        $type = self.simple_longname($<type_constraint>[0]<typename><longname>);
+    }
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<copy> { $copy = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
+
+    if defined $p.ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make ::Sig::Parameter.new(name => ~$/, :$default,
+        :$optional, :$slurpy, :$rw, type => $type,
+        :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
+}
+
+
+method param_var($/) {
+    if $<signature> {
+        $/.CURSOR.sorry('Sub-signatures NYI');
+        make { };
+        return Nil;
+    }
+    my $twigil = $<twigil> ?? ~$<twigil>[0] !! '';
+    my $sigil =  ~$<sigil>;
+    my $list = $sigil eq '@';
+    my $hash = $sigii eq '%';
+    my $name =   $<name> ?? ~$<name>[0] !! Any;
+    $twigil = '*' if $name && ($name eq '/' || $name eq '!');
+
+    my $slot;
+    if $twigil eq '' {
+        $slot = defined($name) ?? ($sigil ~ $name) !! Any;
+    } elsif $twigil eq '*' {
+        $slot = "$sigil*" ~ "$name";
+    } else {
+        $/.CURSOR.sorry("Unhandled parameter twigil $twigil");
+        make { };
+        return Nil;
+    }
+
+    if ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&') {
+        $/.CURSOR.sorry('Non bare scalar targets NYI');
+        make { }
+        return Nil;
+    }
+
+    $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, :noinit)
+        if defined($slot);
+
+    make { :$list, :$hash, :$slot, 
+        names => defined($name) ?? [ $name ] !! [] }
+}
 }
 
 class Op::MakeJunction is Op {
