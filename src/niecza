@@ -326,34 +326,13 @@ method routine_def_1 ($, $/ = $*cursor) {
 }
 
 method routine_def_2 ($, $/ = $*cursor) {
-    # traits and signatures here
     # if $<multisig> > 1 {
     #     $/.CURSOR.sorry("Multiple multisigs (what?) NYI");
     #     return Nil;
     # }
-    # my @export;
-    # my $return_pass = 0;
     # my $signature = $<multisig> ?? $<multisig>[0].ast !!
     #     self.get_placeholder_sig($/);
-    # my $unsafe = False;
-    # for @( $<trait> ) -> $t {
-    #     if $t.ast.<export> {
-    #         push @export, map { ['OUR','EXPORT',$_] }, @( $t.ast<export> );
-    #     } elsif $t.ast<nobinder> {
-    #         $signature = Any;
-    #     } elsif $t.ast<return_pass> {
-    #         $return_pass = 1;
-    #     } elsif $t.ast<of> {
-    #     } elsif $t.ast<rw> {
-    #     } elsif $t.ast<unsafe> {
-    #         $unsafe = True;
-    #     } else {
-    #         $/.CURSOR.sorry("Sub trait $t.ast.keys.[0] not available");
-    #     }
-    # }
-    # if $scope eq 'our' {
-    #     push @export, $p || ['OUR'];
-    # }
+    self.process_block_traits($/, $<trait>);
 }
 
 method routine_def ($/) {
@@ -433,8 +412,22 @@ method process_block_traits($/, @tr) {
             my @exports = @( $tr<export> );
             $sub.outer.add_pkg_exports($*unit, $*unit.deref($pack).name,
                 $sub.cur_pkg, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($*unit, '&' ~ $sub.name, @exports);
+            $sub.exports //= [];
+            push $sub.exports, [ @($sub.outer.find_pkg(
+                ['OUR','EXPORT',$_])), '&' ~ $sub.name ] for @exports;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.signature = Any;
+        } elsif !$pack && $tr<return_pass> {
+            $sub.returnable = False;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.unsafe = True;
         } else {
-            $/.CURSOR.sorry("Unhandled trait for this context");
+            $/.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
         }
     }
 }
