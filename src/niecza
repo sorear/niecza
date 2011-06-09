@@ -410,28 +410,31 @@ method package_def ($/) {
     }
 }
 
-method process_package_traits($/, $export, @tr) {
-    for @tr -> $trait {
-        if $trait.ast.<name>:exists {
-            my $sub = $*CURLEX<!sub>;
-            my ($name, $path) = $trait.ast<name path>;
+method package_declarator:sym<also> ($/) {
+    self.process_block_traits($/, $<trait>);
+    make ::Op::StatementList.new;
+}
+
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for map *.ast, @tr -> $tr {
+        if $pack && ($tr<name>:exists) {
+            my ($name, $path) = $tr<name path>;
 
             $/.CURSOR.sorry("superclass $name declared outside of any class"),
                 next unless $sub.body_of;
             $/.CURSOR.sorry("superclass $name declared in an augment"),
                 next if $sub.augmenting;
 
-            my $ns = $*unit.deref($sub.body_of);
-            $ns.add_super($*unit.get_item($sub.find_pkg([ @($path // ['MY']),
-                $name ])));
-        } elsif $trait.ast.<export> {
-            if defined $export {
-                push $export, @( $trait.ast.<export> );
-            } else {
-                $/.CURSOR.sorry('Cannot mark a class as exported outside the declarator');
-            }
+            $*unit.deref($pack).add_super($*unit.get_item($sub.find_pkg(
+                [ @($path // ['MY']), $name ])));
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_pkg_exports($*unit, $*unit.deref($pack).name,
+                $sub.cur_pkg, @exports);
         } else {
-            $/.CURSOR.sorry("Non-superclass traits for packageoids NYI");
+            $/.CURSOR.sorry("Unhandled trait for this context");
         }
     }
 }
@@ -510,7 +513,6 @@ method open_package_def($, $/ = $*cursor) {
 
         my @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
             $*unit.anon_stash;
-        my @exports;
 
         $*unit.create_stash([@ns]);
         $sub.outer.add_my_stash($*CURLEX<!outervar>, [@ns]);
@@ -520,12 +522,9 @@ method open_package_def($, $/ = $*cursor) {
         $sub.body_of = $sub.in_class = $obj.xref;
         $sub.cur_pkg = [@ns];
 
-        self.process_package_traits($/, @exports, $<trait>);
-
-        $sub.outer.add_pkg_exports($*unit, $name, [@ns], @exports);
+        self.process_block_traits($/, $<trait>);
         $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
-        $obj.exports = [ [@ns],
-            map { [ @($sub.outer.cur_pkg), 'EXPORT', $_, $name ] }, @exports ];
+        $obj.exports = [ [@ns] ];
     }
 }
 
