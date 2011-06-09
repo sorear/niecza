@@ -628,6 +628,10 @@ class StaticSub is RefTarget {
         $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
     }
 
+    method add_my_sub_child($slot, $body) {
+        $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
+    }
+
     method add_pkg_exports($unit, $name, $path2, $tags) {
         for @$tags -> $tag {
             $unit.bind_graft([@$.cur_pkg, 'EXPORT', $tag, $name], $path2);

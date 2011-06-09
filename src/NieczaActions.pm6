@@ -325,7 +325,7 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
         push @parm, ::Sig::Parameter.new(slot => '$*GOAL', name => '$*GOAL',
             positional => False, optional => True);
         unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
-            lhs => ::Op::Lexical.new(name => '$*GOAL'),
+            lhs => mklex($/, '$*GOAL'),
             rhs => ::Op::StringLiteral.new(text => $goal));
     }
     my $subop = self.transparent($/,
@@ -753,7 +753,7 @@ method assertion:name ($/) {
             $<arglist>[0].ast;
 
         my $callop = ::Op::CallMethod.new(|node($/),
-            receiver => ::Op::Lexical.new(name => '$¢'),
+            receiver => mklex($/, '$¢'),
             name => $name,
             args => $args);
 
@@ -1500,7 +1500,7 @@ method term:name ($/) {
         make ::Op::PackageVar.new(|node($/), name => $id,
             slot => self.gensym, path => $path);
     } else {
-        make ::Op::Lexical.new(|node($/), name => $id);
+        make mklex($/, $id);
     }
 
     if $<postcircumfix> {
@@ -1534,18 +1534,18 @@ method term:identifier ($/) {
     my $is_name = $/.CURSOR.is_name(~$<identifier>);
 
     if $is_name && $<args>.chars == 0 {
-        make ::Op::Lexical.new(|node($/), name => $id);
+        make mklex($/, $id);
         return;
     }
 
     my $args = $sal[0] // [];
 
     make ::Op::CallSub.new(|node($/),
-        invocant => ::Op::Lexical.new(name => $is_name ?? $id !! '&' ~ $id),
+        invocant => mklex($/, $is_name ?? $id !! '&' ~ $id),
         args => $args);
 }
 
-method term:sym<self> ($/) { make ::Op::Lexical.new(|node($/), name => 'self') }
+method term:sym<self> ($/) { make mklex($/, 'self') }
 method term:circumfix ($/) { make $<circumfix>.ast }
 method term:scope_declarator ($/) { make $<scope_declarator>.ast }
 method term:multi_declarator ($/) { make $<multi_declarator>.ast }
