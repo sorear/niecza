@@ -228,6 +228,7 @@ class RefTarget {
 
 class Package is RefTarget {
     has $.exports; # is rw
+    has $.closed;
 
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $tc) { #OK not used
         die "attribute $name defined in a lowly package";
@@ -241,7 +242,7 @@ class Package is RefTarget {
         die "superclass $*unit.deref($super).name() defined in a lowly package";
     }
 
-    method close() { }
+    method close() { $!closed = True; }
 }
 
 class Module is Package {
@@ -330,7 +331,7 @@ class Class is Module {
     }
 
     method close() {
-        return Nil if $.linearized_mro;
+        return if $.closed;
         if ($!closing) {
             die "Class hierarchy circularty detected at $.name\n";
         }
@@ -353,6 +354,7 @@ class Class is Module {
         my @mro;
         c3merge(@mro, @merge);
         $.linearized_mro = @mro;
+        nextsame;
     }
 
     method _defsuper() { 'Any' }
@@ -671,6 +673,7 @@ class Unit {
     has Str $.filename is rw;
     has $.modtime is rw; # Numeric
     has Int $.next_anon_stash is rw = 0; # is rw, Int
+    has @.stubbed_stashes; # Pair[Stash,Cursor]
 
     method bind_item($path,$item)    { $!ns.bind_item($path,$item) }
     method bind_graft($path1,$path2) { $!ns.bind_graft($path1,$path2) }
