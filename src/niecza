@@ -277,6 +277,7 @@ method open_package_def($, $/ = $*cursor) {
             $sub.signature = $<signature>.ast;
             $type = ::Metamodel::ParametricRole;
         }
+        my @ns;
         if $<longname> {
             my $r = self.mangle_longname($<longname>[0], True);
             $name = $r<name>;
@@ -287,6 +288,8 @@ method open_package_def($, $/ = $*cursor) {
             if $scope eq 'our' {
                 $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
             }
+            try @ns = $*CURLEX<!sub>.outer.find_pkg(
+                [ @( $r<path> // ['MY'] ), $r<name> ]);
             $*CURLEX<!sub>.outervar = ($scope eq 'anon' || ($r<path>:exists))
                 ?? self.gensym !! $name;
         } else {
@@ -294,11 +297,7 @@ method open_package_def($, $/ = $*cursor) {
             $name = 'ANON';
         }
 
-        my @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
-            $*unit.anon_stash;
-
-        $*unit.create_stash([@ns]);
-        my $old = $*unit.get_item([@ns]);
+        my $old = @ns ?? $*unit.get_item([@ns]) !! Any;
 
         if $old && ($old.[0] ne $*unit.name || $*unit.deref($old).closed) {
             $/.CURSOR.panic("Redefinition of class [@ns]");
@@ -307,6 +306,11 @@ method open_package_def($, $/ = $*cursor) {
         if $old {
             $obj = $*unit.deref($old);
         } else {
+            @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
+                $*unit.anon_stash;
+
+            $*unit.create_stash([@ns]);
+
             $sub.outer.add_my_stash($*CURLEX<!sub>.outervar, [@ns]);
             $obj = $type.new(:$name);
             $obj.exports = [ [@ns] ];
