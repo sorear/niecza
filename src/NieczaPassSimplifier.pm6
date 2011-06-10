@@ -180,13 +180,6 @@ sub do_atpos($body, $nv, $invname, $op) {
     return ::Op::Builtin.new(name => 'at_pos', args => $args);
 }
 
-sub run_subdef($body, $op, $nv) {
-    return $op if $op.bindlex || $nv || $op.bindpackages;
-    $body.delete_lex($op.symbol);
-    $op.symbol = 'Nil';
-    $op
-}
-
 sub run_optree($body, $op, $nv) {
     die "WTF" if !defined $nv;
     my @kids := flat($op.ctxzyg($nv));
@@ -195,8 +188,6 @@ sub run_optree($body, $op, $nv) {
         @kids[$i] = run_optree($body, @kids[$i], @kids[$i+1]);
         $i = $i + 2;
     }
-
-    return run_subdef($body,$op,$nv) if $op.^isa(::Op::SubDef);
 
     return $op unless $op.^isa(::Op::CallSub);
     my $inv = $op.invocant;

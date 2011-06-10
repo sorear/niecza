@@ -31,7 +31,7 @@ use Sig;
 
 augment class Metamodel::StaticSub { #OK
     method noninlinable() {
-        loop (my $c = self; $c.unit === $*unit; $c = $c.outer) {
+        loop (my $c = self; $c && $c.unit === $*unit; $c = $c.outer) {
             $c.strong_used = True;
         }
     }
@@ -99,11 +99,11 @@ method do_variable_reference($M, $v) {
         } elsif $*CURLEX<!sub>.in_class -> $c {
             $pclass = $c;
         } else {
-            $/.CURSOR.sorry("Cannot resolve class for private method");
+            $M.CURSOR.sorry("Cannot resolve class for private method");
         }
         self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
             name => $v<name>, private => True, receiver => mklex($M, 'self'),
-            ppath => $v<rest>));
+            :$pclass));
     }
     elsif $tw eq '.' {
         if defined $v<rest> {
@@ -408,6 +408,26 @@ method type_declarator:enum ($/) {
             ['MY', ($has_strs ?? 'Str' !! 'Int') ~ "BasedEnum"])));
         $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg($basetype)));
 
+        my $nb = ::Metamodel::StaticSub.new(
+            transparent=> True,
+            unit       => $*unit,
+            outerx     => $*CURLEX<!sub>.xref,
+            name       => $name,
+            cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+            class      => 'Method',
+            signature  => Sig.simple('self'),
+            code       => self.init_constant(
+                self.make_constant($/, 'anon', Any, Any),
+                ::Op::CallMethod.new(name => 'new',
+                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+
+        $nb.add_my_name('self', noinit => True);
+        $*CURLEX<!sub>.create_static_pad;
+        $nb.strong_used = True;
+        $*CURLEX<!sub>.add_my_sub($name ~ '!a', $nb);
+        $obj.add_method('only', 'normal', $name, $name ~ '!a', $nb.xref);
+        $obj.close;
+
         for @pairs {
             self.make_constant_into($/, @ns, .key, rhs =>
                 ::Op::CallSub.new(invocant => mklex($/, $lexvar),
@@ -440,6 +460,42 @@ method circumfix:sym<{ }> ($/) {
             ::Op::CallSub.new(|node($/),
                 invocant => ::Op::SubDef.new(body=>Any, symbol=>$var, :once)))
     }
+}
+
+method statement_control:loop ($/) {
+    my $body = self.inliney_call($/, $<block>.ast);
+    # XXX wrong interpretation
+    my $init = $0 && $0[0]<e1>[0] ?? $0[0]<e1>[0].ast !! Any;
+    my $cond = $0 && $0[0]<e2>[0] ?? $0[0]<e2>[0].ast !! Any;
+    my $step = $0 && $0[0]<e3>[0] ?? $0[0]<e3>[0].ast !! Any;
+
+    make ::Op::GeneralLoop.new(|node($/), :$body, :$init, :$cond, :$step);
+}
+
+method block_expr($/, $pb) {
+    my $name = self.gensym;
+    $*CURLEX<!sub>.add_my_sub_child($name, $pb);
+    mklex($/, $name);
+}
+
+method statement_control:for ($/) {
+    make ::Op::ForLoop.new(|node($/), source => $<xblock>.ast[0],
+        sink => ::Op::SubDef.new(:once, symbol =>
+            self.block_expr($/, $<xblock>.ast[1]).name));
+}
+
+method statement_control:given ($/) {
+    make self.inliney_call($/, $<xblock>.ast[1], $<xblock>.ast[0]);
+}
+
+method statement_control:default ($/) {
+    make ::Op::When.new(|node($/), match => mklex($/, 'True'),
+        body => self.inliney_call($/, $<block>.ast));
+}
+
+method statement_control:when ($/) {
+    make ::Op::When.new(|node($/), match => $<xblock>.ast[0],
+        body => self.inliney_call($/, $<xblock>.ast[1]));
 }
 
 method check_hash($/) {
@@ -516,12 +572,64 @@ method param_var($/) {
     make { :$list, :$hash, :$slot,
         names => defined($name) ?? [ $name ] !! [] }
 }
+
+my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
+    '&infix:<...>', '&infix:<=>', '&infix:<xx>'));
+method whatever_precheck($op, *@args) {
+    return ([], @args) if ($op.^isa(Operator) ?? !$op.whatever_curry !! %_nowhatever{$op});
+    my @vars;
+    my @args_ = @args;
+    for @args_ -> $a is rw {
+        die "invalid undef here" if !$a;
+        if $a.^isa(::Op::Whatever) {
+            push @vars, $a.slot;
+            $a = ::Op::Lexical.new(name => $a.slot);
+        } elsif $a.^isa(::Op::WhateverCode) {
+            push @vars, @( $a.vars );
+            $a = ::Op::CallSub.new(
+                invocant => ::Op::Lexical.new(name => $a.slot),
+                args => [ map { ::Op::Lexical.new(name => $_) }, @($a.vars) ]);
+        }
+    }
+    $( @vars ), @args_;
 }
 
-augment class Op::BareBlock { #OK
+method whatever_postcheck($/, $st, $term) {
+    if @$st {
+        my $slot = self.gensym;
+
+        my $body = ::Metamodel::StaticSub.new(
+            outerx => $*CURLEX<!sub>.xref,
+            class => 'WhateverCode',
+            unit => $*unit,
+            transparent => True,
+            code => $term,
+            in_class => $*CURLEX<!sub>.in_class,
+            cur_pkg => $*CURLEX<!sub>.cur_pkg);
+
+        $body.signature = ::GLOBAL::Sig.new(params => [
+            map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]);
+        $body.add_my_name($_, :noinit) for @$st;
+
+        $*CURLEX<!sub>.add_my_sub($slot, $body);
+
+        ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, |node($/));
+    } else {
+        $term;
+    }
+}
+
+}
+
+augment class Op::ForLoop { #OK
     method statement_level() {
-        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => Any, :once,
-            symbol => $!var));
+        my $body = $*CURLEX<!sub>.find_lex($!sink.symbol).body;
+        my $var = [ map { ::GLOBAL::NieczaActions.gensym },
+            0 ..^ +$body.signature.params ];
+        $!sink.once = True;
+        ::Op::ImmedForLoop.new(source => $!source, var => $var,
+            sink => ::Op::CallSub.new(invocant => $!sink,
+                positionals => [ map { ::Op::LetVar.new(name => $_) }, @$var]));
     }
 }
 

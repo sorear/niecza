@@ -16,7 +16,7 @@ grammar CgOp is STD {
     token cgexp:decint { <decint> }
     token cgexp:p6exp { :lang(%*LANG<MAIN>) '{' ~ '}' <statementlist> }
     token cgexp:bad { <!before <[ ) \] ]> > {}
-        [ <?stdstopper> <.panic "Missing cgop"> ]
+        [ <?stdstopper> <.panic: "Missing cgop"> ]
         <.panic: "Unparsable cgop">
     }
 }
