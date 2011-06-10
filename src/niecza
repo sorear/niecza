@@ -288,8 +288,8 @@ method open_package_def($, $/ = $*cursor) {
             if $scope eq 'our' {
                 $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
             }
-            try @ns = $*CURLEX<!sub>.outer.find_pkg(
-                [ @( $r<path> // ['MY'] ), $r<name> ]);
+            try @ns = @( $*CURLEX<!sub>.outer.find_pkg(
+                [ @( $r<path> // ['MY'] ), $r<name> ]) );
             $*CURLEX<!sub>.outervar = ($scope eq 'anon' || ($r<path>:exists))
                 ?? self.gensym !! $name;
         } else {
@@ -844,8 +844,8 @@ method statement_prefix:do ($/) {
 }
 method statement_prefix:gather ($/) {
     $<blast>.ast.gather_hack = True;
-    make ::Op::Gather.new(|node($/), var => self.block_expr($/, $<blast>.ast),
-        body => Any);
+    make ::Op::Gather.new(|node($/), body => Any, var =>
+        self.block_expr($/, $<blast>.ast).name);
 }
 method statement_prefix:try ($/) {
     make ::Op::Try.new(|node($/), body => self.inliney_call($/, $<blast>.ast));

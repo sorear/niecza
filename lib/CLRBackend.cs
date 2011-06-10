@@ -216,6 +216,8 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
+                if (CLRBackend.Verbose > 0)
+                    Console.WriteLine("Loading {0} {1}...", JScalar.S(xr[0]),i);
                 if (JScalar.S(xr[0]) == "sub") {
                     xref[i] = new StaticSub(this, xr, (code != null &&
                             i < code.Length) ? (object[])code[i] : null);
