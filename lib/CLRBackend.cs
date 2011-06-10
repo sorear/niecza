@@ -310,8 +310,18 @@ namespace Niecza.CLRBackend {
             StaticSub r = (bottom_ref ?? mainline_ref).Resolve<StaticSub>();
             while (r.unit.name != "CORE")
                 r = r.outer.Resolve<StaticSub>();
-            while (!r.l_lexicals.ContainsKey(name))
-                r = r.outer.Resolve<StaticSub>();
+            StaticSub rs = r;
+            while (r != null && !r.l_lexicals.ContainsKey(name))
+                r = r.outer != null ? r.outer.Resolve<StaticSub>() : null;
+            if (r == null) {
+                Console.WriteLine("CORE::" + name + " nonexistant!");
+                for (r = rs; r != null; r = r.outer != null ? r.outer.Resolve<StaticSub>() : null) {
+                    Console.WriteLine("-- {0}", r.name);
+                    foreach (string s in r.l_lexicals.Keys)
+                        Console.WriteLine(s);
+                }
+                throw new ArgumentException();
+            }
             LexStash lx = (LexStash)r.l_lexicals[name];
             return GetPackage(lx.path, 0, lx.path.Length);
         }

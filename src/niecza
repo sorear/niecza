@@ -1207,6 +1207,57 @@ method type_declarator:constant ($/) {
     make self.make_constant($/, $*SCOPE || 'our', $name, Array);
 }
 
+method circumfix:sym<{ }> ($/) {
+    my $var = self.gensym;
+    $*CURLEX<!sub>.add_my_sub_child($var, $<pblock>.ast);
+    make ::Op::BareBlock.new(|node($/), :$var, :body(Any));
+
+    if self.check_hash($/) {
+        make mkcall($/, '&_hash_constructor',
+            ::Op::CallSub.new(|node($/),
+                invocant => ::Op::SubDef.new(body=>Any, symbol=>$var, :once)))
+    }
+}
+
+method check_hash($/) {
+    my $do = $<pblock>.ast.code;
+
+    return False unless $do.^isa(::Op::StatementList);
+    return True if $do.children == 0;
+    return False if $do.children > 1;
+
+    $do = $do.children[0];
+    my @bits = $do.^isa(::Op::SimpleParcel) ?? @( $do.items ) !! $do;
+
+    return True if @bits[0].^isa(::Op::SimplePair);
+
+    if @bits[0].^isa(::Op::CallSub) &&
+            @bits[0].invocant.^isa(::Op::Lexical) &&
+            @bits[0].invocant.name eq '&infix:<=>>' {
+        return True;
+    }
+
+    if @bits[0].^isa(::Op::Lexical) && substr(@bits[0].name,0,1) eq '%' {
+        return True;
+    }
+
+    return False;
+}
+
+
+method blockoid($/) {
+    # XXX horrible cheat, but my data structures aren't up to the task of
+    # $::UNIT being a class body &c.
+    if $/ eq '{YOU_ARE_HERE}' {
+        $*unit.bottom_ref = $*CURLEX<!sub>.xref;
+        $*CURLEX<!sub>.strong_used = True;
+        $*CURLEX<!sub>.create_static_pad;
+        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
+    } else {
+        make $<statementlist>.ast;
+    }
+}
+
 method param_var($/) {
     if $<signature> {
         $/.CURSOR.sorry('Sub-signatures NYI');
@@ -1243,6 +1294,13 @@ method param_var($/) {
     make { :$list, :$hash, :$slot,
         names => defined($name) ?? [ $name ] !! [] }
 }
+}
+
+augment class Op::BareBlock { #OK
+    method statement_level() {
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => Any, :once,
+            symbol => $!var));
+    }
 }
 
 class Op::MakeJunction is Op {

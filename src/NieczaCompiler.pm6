@@ -57,8 +57,7 @@ method compile_module($module, $stop = "") {
 
 method !main_name() {
     my $i = $!main-sn++;
-    #$i ?? "MAIN_$i" !! "MAIN";
-    "CORE";
+    $i ?? "MAIN_$i" !! "MAIN";
 }
 
 method compile_file($file, $run, $stop = "") {
