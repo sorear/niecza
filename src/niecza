@@ -258,6 +258,7 @@ method INFIX($/) {
 }
 
 method block($/) {
+    $*CURLEX<!sub>.code = $<blockoid>.ast;
     make $*CURLEX<!sub>
 }
 
