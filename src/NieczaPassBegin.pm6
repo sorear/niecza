@@ -130,14 +130,6 @@ augment class Op {
     method begin() { for self.zyg { $_.begin } }
 }
 
-augment class Op::YouAreHere { #OK exist
-    method begin() {
-        $*unit.bottom_ref = @*opensubs[*-1].xref;
-        @*opensubs[*-1].strong_used = True;
-        @*opensubs[*-1].create_static_pad;
-    }
-}
-
 augment class Op::Use { #OK exist
     method begin() {
         my $name = $.unit;
@@ -172,87 +164,10 @@ augment class Op::Use { #OK exist
     }
 }
 
-augment class Op::Lexical { #OK exist
-    method begin() {
-        # HACK - a direct reference to &eval or .eval prevents inlining
-        if $.name eq '&eval' {
-            loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
-                $c.strong_used = True;
-            }
-        }
-        my $typeconstraint = $.typeconstraint;
-        if $typeconstraint {
-            $typeconstraint = $*unit.get_item(
-                @*opensubs[*-1].find_pkg($typeconstraint));
-        }
-        if $.state_backing {
-            @*opensubs[*-1].add_state_name($.name, $.state_backing,
-                list => $.list, hash => $.hash, :$typeconstraint);
-        } elsif $.declaring {
-            @*opensubs[*-1].add_my_name($.name, list => $.list, hash => $.hash,
-                :$typeconstraint);
-        }
-    }
-}
-
-augment class Op::CallMethod { #OK exist
-    method begin() {
-        # HACK - a direct reference to &eval or .eval prevents inlining
-        if $.name ~~ Str && $.name eq 'eval' {
-            loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
-                $c.strong_used = True;
-            }
-        }
-        for self.zyg { $_.begin } # XXX callsame
-        if $.private {
-            if $.ppath {
-                $.pclass = $*unit.get_item(@*opensubs[*-1].find_pkg($.ppath));
-            } elsif @*opensubs[*-1].in_class {
-                $.pclass = @*opensubs[*-1].in_class;
-            } else {
-                die "unable to resolve class of reference for method";
-            }
-        }
-    }
-}
-
 augment class Op::Labelled { #OK exist
     method begin() {
         @*opensubs[*-1].add_label($.name);
         for self.zyg { $_.begin } # XXX callsame
-    }
-}
-
-augment class Op::ConstantDecl { #OK exist
-    method begin() {
-        if $.path {
-            @*opensubs[*-1].add_common_name($.name,
-                @*opensubs[*-1].find_pkg($.path), $.name);
-        } else {
-            @*opensubs[*-1].add_hint($.name);
-        }
-
-        # Ordinarily this is always set, but the parser checks to ensure it
-        # are slightly fragile, for instance, 4 + constant $x = 5 parses
-        # as (4 + constant $x) = 5
-        if !$.init {
-            die "Malformed constant decl";
-        }
-
-        $.init.begin;
-        my $nb = ::Metamodel::StaticSub.new(
-            transparent=> True,
-            unit       => $*unit,
-            outerx     => @*opensubs[*-1].xref,
-            name       => $.name,
-            cur_pkg    => @*opensubs[*-1].cur_pkg,
-            class      => 'Block',
-            run_once   => False,
-            is_phaser  => 2,
-            hint_hack  => [ @*opensubs[*-1].xref, $.name ],
-            code       => $.init);
-        @*opensubs[*-1].create_static_pad; # for protosub instance
-        @*opensubs[*-1].add_child($nb);
     }
 }
 
@@ -264,128 +179,10 @@ augment class Op::PackageVar { #OK exist
     }
 }
 
-augment class Op::Attribute { #OK exist
-    method begin() {
-        my $ns = @*opensubs[*-1].body_of //
-            die "attribute $.name declared outside of any class";
-        my $tc = $.typeconstraint;
-        if $tc {
-            $tc = $*unit.get_item(@*opensubs[*-1].find_pkg($tc));
-        }
-        die "attribute $.name declared in an augment"
-            if @*opensubs[*-1].augmenting;
-        my ($ibref, $ibvar);
-        if $.initializer {
-            my $ibody = $.initializer.begin;
-            $ibvar = ::GLOBAL::NieczaActions.gensym;
-            @*opensubs[*-1].add_my_sub($ibvar, $ibody);
-            $ibref = $ibody.xref;
-        }
-        $ns = $*unit.deref($ns);
-        $ns.add_attribute($.name, $.sigil, +$.accessor, $ibvar, $ibref, $tc);
-        my $nb = ::Metamodel::StaticSub.new(
-            transparent=> True,
-            unit       => $*unit,
-            outerx     => @*opensubs[*-1].xref,
-            name       => $.name,
-            cur_pkg    => @*opensubs[*-1].cur_pkg,
-            class      => 'Method',
-            signature  => Sig.simple('self'),
-            code       => ::Op::GetSlot.new(name => $.name,
-                object => ::Op::Lexical.new(name => 'self')));
-        $nb.add_my_name('self', noinit => True);
-        @*opensubs[*-1].create_static_pad; # for protosub instance
-        $nb.strong_used = True;
-        @*opensubs[*-1].add_my_sub($.name ~ '!a', $nb);
-        $ns.add_method('only', 'private', $.name, $.name ~ '!a', $nb.xref);
-        if $.accessor {
-            $ns.add_method('only', 'normal', $.name, $.name ~ '!a', $nb.xref);
-        }
-    }
-}
-
-augment class Op::Super { #OK exist
-    method begin() {
-        my $ns   = $*unit.deref(@*opensubs[*-1].body_of //
-            die "superclass $.name declared outside of any class");
-        die "superclass $.name declared in an augment"
-            if @*opensubs[*-1].augmenting;
-        $ns.add_super($*unit.get_item(@*opensubs[*-1].find_pkg([ @( $.path // ['MY'] ), $.name ])));
-    }
-}
-
-augment class Op::SubDef { #OK exist
-    method begin() {
-        my $prefix = '';
-        if defined $.bindmethod {
-            $prefix = $*unit.deref(@*opensubs[*-1].body_of).name ~ ".";
-        }
-        $.multiness //= 'only';
-        if $.bindlex && $.body.class eq 'Regex' {
-            $.symbol = '&' ~ $.body.name;
-            my $proto = $.symbol;
-            $proto ~~ s/\:.*//;
-            @*opensubs[*-1].add_dispatcher($proto) if $.multiness ne 'only'
-                && !@*opensubs[*-1].lexicals.{$proto};
-            $.symbol ~= ":(!proto)" if $.multiness eq 'proto';
-        } elsif $.bindlex {
-            $.symbol = '&' ~ $.body.name;
-            @*opensubs[*-1].add_dispatcher($.symbol) if $.multiness ne 'only'
-                && !@*opensubs[*-1].lexicals.{$.symbol};
-
-            given $.multiness {
-                when 'multi' { $.symbol ~= ":({ ::GLOBAL::NieczaActions.gensym })"; }
-                when 'proto' { $.symbol ~= ":(!proto)"; }
-            }
-        } else {
-            $.symbol = ::GLOBAL::NieczaActions.gensym;
-        }
-        $.bindpackages //= [];
-        my $body = $.body.begin(:$prefix,
-            method_of => defined($.bindmethod) ?? @*opensubs[*-1].body_of!!Any,
-            once => ($.body.type // '') eq 'voidbare');
-        @*opensubs[*-1].add_my_sub($.symbol, $body);
-        my $r = $body.xref;
-        if $.bindpackages || defined $.bindmethod {
-            $body.strong_used = True;
-        }
-        @*opensubs[*-1].create_static_pad if $body.strong_used;
-
-        if defined $.bindmethod {
-            if @*opensubs[*-1].augment_hack {
-                if $.bindmethod[1] ~~ Op {
-                    die "Computed names are legal only in parametric roles";
-                }
-                push @*opensubs[*-1].augment_hack,
-                    [ $.multiness, @$.bindmethod, $.symbol, $r ];
-                $!bindlex = True; # need to keep the symbol
-            } else {
-                my $in = $*unit.deref(@*opensubs[*-1].body_of);
-                $in.add_method($.multiness, |$.bindmethod, $.symbol, $r);
-                $!bindlex = True if $in ~~ ::Metamodel::ParametricRole;
-            }
-        }
-
-        @*opensubs[*-1].add_exports($*unit, '&' ~ $.body.name,
-            [ map { $_ == 3 && $_[0] eq 'OUR' && $_[1] eq 'EXPORT' ?? $_[2] !! Nil }, @$.bindpackages ]);
-        $body.exports = [ map { [ @( @*opensubs[*-1].find_pkg($_) ),
-                '&' ~ $.body.name ] }, @$.bindpackages ];
-
-        $!body = Body;
-    }
-}
-
 augment class Op::VoidPhaser { #OK exist
     method begin() {
         @*opensubs[*-1].create_static_pad;
         @*opensubs[*-1].add_child($.body.begin);
-        $!body = Body;
-    }
-}
-
-augment class Op::BareBlock { #OK exist
-    method begin() {
-        @*opensubs[*-1].add_my_sub($.var, $.body.begin);
         $!body = Body;
     }
 }
@@ -409,83 +206,6 @@ augment class Op::Start { #OK exist
     method begin() {
         @*opensubs[*-1].add_state_name(Str, $.condvar);
         for self.zyg { $_.begin } # XXX callsame
-    }
-}
-
-# XXX symbolic class referencing
-my %pclasses = (
-    ::Op::PackageDef.typename => ::Metamodel::Package,
-    ::Op::ModuleDef.typename => ::Metamodel::Module,
-    ::Op::ClassDef.typename => ::Metamodel::Class,
-    ::Op::GrammarDef.typename => ::Metamodel::Grammar,
-    ::Op::RoleDef.typename => ::Metamodel::Role
-);
-
-augment class Op::PackageDef { #OK exist
-    method begin() {
-        my $pclass = %pclasses{self.typename}; #XXX
-
-        if $pclass === ::Metamodel::Role && $.signature {
-            $pclass = ::Metamodel::ParametricRole;
-            $.body.signature = $.signature;
-        }
-
-        my @ns = $.ourpkg ??
-            (@( @*opensubs[*-1].find_pkg($.ourpkg) ), $.ourvar) !!
-            $*unit.anon_stash;
-        my $n = pop(@ns);
-
-        $*unit.create_stash([@ns, $n]);
-        @*opensubs[*-1].add_my_stash($.var, [ @ns, $n ]);
-        @*opensubs[*-1].add_pkg_exports($*unit, $.name, [ @ns, $n ], $.exports);
-        if !$.stub {
-            my $obj  = $pclass.new(name => $.name).xref;
-            $*unit.bind_item([ @ns, $n ], $obj);
-            my $body = $.body.begin(body_of => $obj, cur_pkg => [ @ns, $n ],
-                once => ($pclass !=== ::Metamodel::ParametricRole));
-            $*unit.deref($obj).close;
-            $*unit.deref($obj).exports = [
-                    [ @ns, $n ],
-                    map { [ @(@*opensubs[*-1].cur_pkg), 'EXPORT', $_, $.var ]},
-                        @$.exports ];
-
-            if $pclass === ::Metamodel::ParametricRole {
-                $body.parametric_role_hack = $obj;
-                $body.add_my_name('*params', noinit => True);
-                $body.create_static_pad;
-            }
-            @*opensubs[*-1].add_my_sub($.bodyvar, $body);
-        }
-    }
-}
-
-augment class Op::Augment { #OK exist
-    method begin() {
-        # XXX shouldn't we distinguish augment class Foo { } from ::Foo ?
-        my $pkg = @*opensubs[*-1].find_pkg([ @$.pkg, $.name ]);
-        my $so = $*unit.get_item($pkg);
-        my $dso = $*unit.deref($so);
-        if $dso.^isa(::Metamodel::Role) {
-            die "illegal augment of a role";
-        }
-        my @ah = $so;
-        my $body = $.body.begin(augment_hack => @ah,
-            body_of => $so, augmenting => True, once => True, cur_pkg => $pkg);
-        $body.augment_hack = Any;
-        @*opensubs[*-1].add_my_sub($.bodyvar, $body);
-
-        my $ph = ::Metamodel::StaticSub.new(
-            unit       => $*unit,
-            outerx     => $body.xref,
-            cur_pkg    => [ 'GLOBAL' ],
-            name       => 'ANON',
-            is_phaser  => 0,
-            augment_hack => @ah,
-            class      => 'Block',
-            code       => ::Op::StatementList.new(children => []),
-            run_once   => $body.run_once);
-        $body.create_static_pad;
-        $body.add_child($ph);
     }
 }
 

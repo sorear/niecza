@@ -584,48 +584,6 @@ class Bind is Op {
     }
 }
 
-class Augment is Op {
-    has $.name; # Str
-    has $.bodyvar; # Str
-    has $.body; # Body
-    has $.pkg; # Array of Str
-
-    method code($ ) {
-        CgOp.subcall(CgOp.fetch(CgOp.scopedlex($.bodyvar)));
-    }
-}
-
-class PackageDef is Op {
-    has $.name; # Str
-    has $.var = die "PackageDef.var required"; # Str
-    has $.bodyvar; # Str
-    has $.stub = False; # Bool
-    has $.body; # Body
-    has $.exports = []; # Array of Str
-    has $.ourpkg; # Array of Str
-    has $.ourvar; # Str
-
-    method code($ ) {
-        if $.stub {
-            CgOp.scopedlex($.var);
-        } else {
-            CgOp.prog(
-                CgOp.sink(CgOp.subcall(CgOp.fetch(
-                            CgOp.scopedlex($.bodyvar)))),
-                CgOp.scopedlex($.var));
-        }
-    }
-}
-
-class ModuleDef is PackageDef { }
-class RoleDef is ModuleDef {
-    has $.signature; # Sig
-
-    method code($ ) { $.signature ?? CgOp.scopedlex($.var) !! nextsame }
-}
-class ClassDef is ModuleDef { }
-class GrammarDef is ClassDef { }
-
 class SubsetDef is Op {
     has Str $.name;
     has Array $.basetype; # Array of Str
@@ -637,20 +595,10 @@ class SubsetDef is Op {
     method code($ ) { CgOp.scopedlex($.lexvar) }
 }
 
-class Super is Op {
-    has $.name; # Str
-    has $.path; # Array of Str
-
-    method code($) { CgOp.corelex('Nil') }
-}
-
+# just a little hook for rewriting
 class Attribute is Op {
     has $.name; # Str
-    has $.sigil;
-    has $.accessor; # Bool
-    has $.initializer; # Body, is rw
-    has $.typeconstraint; # Array of Str
-    has $.rw;
+    has $.initializer; # Metamodel::Attribute
 
     method code($) { CgOp.corelex('Nil') }
 }
@@ -671,48 +619,29 @@ class WhateverCode is Op {
 
 class BareBlock is Op {
     has $.var = die "BareBlock.var required"; # Str
-    has $.body = die "BareBlock.body required"; # Body
 
-    method code($) { CgOp.scopedlex($.var) }
+    method code($) { CgOp.scopedlex($!var) }
 
     method statement_level() {
-        $.body.type = 'voidbare';
-        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => $.body, :once));
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => Any, :once,
+            symbol => $!var));
     }
 }
 
+# vestigal form for beta
 class SubDef is Op {
-    has $.body = die "SubDef.body required"; # Body
-
-    # often a gensym; will be set to the "correct" symbol if it is being
-    # used as a lexical; set by begin
     has $.symbol; # Str, is rw
-
-    has $.multiness; # proto, only, multi, Any=null
-    has $.bindlex; # Bool
-    has $.bindpackages; # Array of Array of Str to install in
-    # used for 'our' and 'is export'
-    has $.bindmethod; # named array blocky thing
-
-    # Is candidate for beta-optimization.  Not compatible with method_too,
-    # exports, ltm
     has $.once = False; # is rw, Bool
 
-    method zyg() { ($.bindmethod && ($.bindmethod[1] ~~ Op)) ?? $.bindmethod[1] !! () }
-
-    method code($) { CgOp.scopedlex($.symbol // 'Any') }
+    method code($) { CgOp.scopedlex($.symbol) }
 }
 
 class Lexical is Op {
     has $.name = die "Lexical.name required"; # Str
     has $.state_decl = False; # Bool
 
-    has $.declaring; # Bool
     has $.list; # Bool
     has $.hash; # Bool
-    has $.typeconstraint; # Array of Str
-
-    has $.state_backing; # Str
 
     method code($) { CgOp.scopedlex($.name) }
 
@@ -728,7 +657,6 @@ class Lexical is Op {
 class ConstantDecl is Op {
     has $.name = die "ConstantDecl.name required"; # Str
     has $.init; # Op, is rw
-    has $.path; # Array
 
     method code($ ) { CgOp.scopedlex($.name) }
 }
