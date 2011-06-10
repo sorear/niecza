@@ -164,21 +164,6 @@ augment class Op::Use { #OK exist
     }
 }
 
-augment class Op::Labelled { #OK exist
-    method begin() {
-        @*opensubs[*-1].add_label($.name);
-        for self.zyg { $_.begin } # XXX callsame
-    }
-}
-
-augment class Op::VoidPhaser { #OK exist
-    method begin() {
-        @*opensubs[*-1].create_static_pad;
-        @*opensubs[*-1].add_child($.body.begin);
-        $!body = Body;
-    }
-}
-
 augment class Op::SubsetDef { #OK exist
     method begin() {
         my @ns = $.ourname ?? @( @*opensubs[*-1].find_pkg($.ourname) ) !!
@@ -202,12 +187,3 @@ augment class Op::SubsetDef { #OK exist
                 @$.exports ];
     }
 }
-
-augment class Op::GetBlock { #OK exist
-    method begin() {
-        loop (my $c = @*opensubs[*-1]; $c.unit === $*unit; $c = $c.outer) {
-            $c.strong_used = True;
-        }
-    }
-}
-

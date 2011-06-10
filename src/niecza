@@ -500,8 +500,10 @@ method do_variable_reference($M, $v) {
         } elsif $tw eq '?' && $sl eq '$?LINE' {
             ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
         } elsif $tw eq '?' && $sl eq '&?BLOCK' {
+            $*CURLEX<!sub>.noninlinable;
             ::Op::GetBlock.new(|node($M))
         } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
+            $*CURLEX<!sub>.noninlinable;
             ::Op::GetBlock.new(|node($M), :routine)
         } else {
             mklex($M, $sl, :$hash, :$list);
@@ -511,6 +513,63 @@ method do_variable_reference($M, $v) {
         $M.CURSOR.sorry("Unhandled reference twigil $tw");
     }
 }
+
+method statement($/) {
+    if $<label> {
+        $*CURLEX<!sub>.add_label(~$<label><identifier>);
+        make ::Op::Labelled.new(|node($/), name => ~$<label><identifier>,
+            stmt => $<statement>.ast);
+        return;
+    }
+
+    make ($<statement_control> ?? $<statement_control>.ast !!
+        $<EXPR> ?? $<EXPR>.ast !! ::Op::StatementList.new);
+
+    if $<statement_mod_cond> {
+        my ($sym, $exp) = @( $<statement_mod_cond>[0].ast );
+
+        if $sym eq 'if' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                true => $/.ast, false => Any);
+        } elsif $sym eq 'unless' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                false => $/.ast, true => Any);
+        } elsif $sym eq 'when' {
+            make ::Op::Conditional.new(|node($/),
+                check => ::Op::CallMethod.new(name => 'ACCEPTS',
+                    receiver => $exp, positionals => [ mklex($/, '$_') ]),
+                true => $/.ast, false => Any);
+        } else {
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+    }
+
+    if $<statement_mod_loop> {
+        my ($sym, $exp) = @( $<statement_mod_loop>[0].ast );
+
+        if $sym eq 'while' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => False, once => False);
+        } elsif $sym eq 'until' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => True, once => False);
+        } elsif $sym eq 'given' {
+            make mktemptopic($/, $exp, $/.ast);
+        } elsif $sym eq 'for' {
+            # XXX laziness, comprehensions
+            my $var = self.gensym;
+            make ::Op::ImmedForLoop.new(|node($/), :$var, source => $exp,
+                sink => mktemptopic($/, ::Op::LetVar.new(name => $var), $/.ast));
+        } else {
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+    }
+}
+
 
 method infix:sym<...> ($/) {
     # STD parses ...^ in the ... rule
@@ -857,6 +916,31 @@ method statement_prefix:START ($/) {
     make ::Op::Start.new(|node($/), condvar => $cv, body =>
         self.inliney_call($/, $<blast>.ast));
 }
+
+# TODO: retain and return a value
+method statement_prefix:INIT ($/) {
+    $<blast>.ast.is_phaser = 0;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+# XXX 'As soon as possible' isn't quite soon enough here
+method statement_prefix:BEGIN ($/) {
+    $<blast>.ast.is_phaser = 2;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:CHECK ($/) {
+    $<blast>.ast.is_phaser = 2;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+
+method statement_prefix:END ($/) {
+    $<blast>.ast.is_phaser = 1;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+
 
 method statement_control:loop ($/) {
     my $body = self.inliney_call($/, $<block>.ast);
