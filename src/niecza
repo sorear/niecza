@@ -261,6 +261,15 @@ method block($/) {
     $*CURLEX<!sub>.code = $<blockoid>.ast;
     make $*CURLEX<!sub>
 }
+method embeddedblock($/) {
+    my $sym = self.gensym;
+    $*CURLEX<!sub>.code = $<statementlist>.ast;
+    $*CURLEX<!sub>.outer.add_my_sub_child($sym, $*CURLEX<!sub>);
+    $*CURLEX<!sub>.signature = Sig.simple();
+    make ::Op::CallSub.new(|node($/),
+        invocant => ::Op::SubDef.new(body => Any, symbol => $sym, :once),
+        positionals => []);
+}
 
 # :: Body
 method pblock($/) {
