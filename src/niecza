@@ -77,6 +77,108 @@ method declarator($/) {
          $<type_declarator>.ast;
 }
 
+method package_var($/, $slot, $name, $path, :$list, :$hash) {
+    $*CURLEX<!sub>.add_common_name($slot,
+        $*CURLEX<!sub>.find_pkg($path), $name);
+    ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
+}
+
+method term:name ($/) {
+    my ($id, $path) = self.mangle_longname($<longname>).<name path>;
+
+    $id = '&' ~ $id if $<args>;
+
+    if defined $path {
+        make self.package_var($/, self.gensym, $id, $path);
+    } else {
+        make mklex($/, $id);
+    }
+
+    if $<postcircumfix> {
+        make mkcall($/, '&_param_role_inst', $/.ast,
+            @( $<postcircumfix>[0].ast.args ));
+    } elsif $<args> {
+        my $sal = $<args>.ast // [];
+        # TODO: support zero-D slicels
+
+        if $sal > 1 {
+            $/.CURSOR.sorry("Slicel lists are NYI");
+            return;
+        }
+
+        make ::Op::CallSub.new(|node($/), invocant => $/.ast,
+            args => $sal[0] // []);
+    }
+}
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        $typeconstraint = self.simple_longname($*OFTYPE<longname>);
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
+    my $res_tc = $typeconstraint ??
+        $*unit.get_item($*CURLEX<!sub>.find_pkg($typeconstraint)) !! Any;
+
+    if $scope eq 'has' {
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.', $res_tc);
+    } elsif $scope eq 'state' {
+        $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
+            :$hash, typeconstraint => $res_tc);
+        make mklex($/, $slot, :$list, :$hash, :state_decl);
+    } elsif $scope eq 'our' {
+        make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
+    } else {
+        $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
+            typeconstraint => $res_tc);
+        make mklex($/, $slot, :$list, :$hash);
+    }
+}
+
 method do_variable_reference($M, $v) {
     if $v<term> {
         return $v<term>;
@@ -123,9 +225,8 @@ method do_variable_reference($M, $v) {
     }
     elsif $tw eq '' || $tw eq '?' {
         if defined($v<rest>) {
-            ::Op::PackageVar.new(path => $v<rest>, name => $sl,
-                hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'),
-                slot => self.gensym, |node($M));
+            self.package_var($M, self.gensym, $sl, $v<rest>,
+                hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'))
         } elsif $tw eq '?' && $sl eq '$?POSITION' {
             mkcall($M, '&infix:<..^>',
                 ::Op::Num.new(|node($M), value => [10, ~$M.from]),

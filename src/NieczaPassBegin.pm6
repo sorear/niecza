@@ -171,14 +171,6 @@ augment class Op::Labelled { #OK exist
     }
 }
 
-augment class Op::PackageVar { #OK exist
-    method begin() {
-        # cache the lookup here
-        @*opensubs[*-1].add_common_name($.slot,
-            @*opensubs[*-1].find_pkg($.path), $.name);
-    }
-}
-
 augment class Op::VoidPhaser { #OK exist
     method begin() {
         @*opensubs[*-1].create_static_pad;
