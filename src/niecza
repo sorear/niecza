@@ -115,11 +115,63 @@ augment class NieczaGrammar::P6 { #OK
 }
 
 augment class NieczaActions {
-method comp_unit($/) {
-    $*CURLEX{'!sub'}.code = $<statementlist>.ast;
-    $*CURLEX{'!sub'}.close;
+method thunk_sub($code, :$params = [], :$name, :$class) {
+    my $n = ::Metamodel::StaticSub.new(
+        outerx => $*CURLEX<!sub>.xref,
+        class => $class // 'Block',
+        unit => $*unit,
+        name => $name // 'ANON',
+        transparent => True,
+        code => $code,
+        in_class => $*CURLEX<!sub>.in_class,
+        cur_pkg => $*CURLEX<!sub>.cur_pkg);
+    $n.signature = Sig.simple(@$params);
+    $n.add_my_name($_, :noinit) for @$params;
+    $n.add_my_name('$*/') if $class eq 'Regex';
+    $*CURLEX<!sub>.add_child($n);
+    $n;
+}
 
-    make $*unit;
+method rxembed($/, $op, $) {
+    self.inliney_call($/,
+        self.thunk_sub($op, params => ['$¢']),
+        ::Op::MakeCursor.new);
+}
+
+method op_for_regex($/, $rxop) {
+    my @lift = $rxop.oplift;
+    {
+        my $*paren = 0;
+        my $*dba = 'anonymous rule';
+        my $*symtext;
+        my $*endsym;
+        $rxop.check
+    }
+    my ($orxop, $mb) = OptRxSimple.run($rxop);
+    self.block_expr($/, self.thunk_sub(::Op::RegexBody.new(|node($/),
+            canback => $mb, pre => @lift, rxop => $orxop),
+        class => 'Regex', params => ['self']));
+}
+
+method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
+        :$passcap = False) {
+    my @lift = $rxop.oplift;
+    my $lad = $rxop.lad;
+    my ($nrxop, $mb) = OptRxSimple.run($rxop);
+    if defined $goal {
+        unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
+            lhs => mklex($/, '$*GOAL'),
+            rhs => ::Op::StringLiteral.new(text => $goal));
+    }
+    my $subop = self.thunk_sub(
+        ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut, :$passcap,
+            rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
+        params => ['self']);
+    $subop.add_my_name('$*GOAL') if defined($goal);
+    $subop = ::Op::CallSub.new(|node($/), invocant => self.block_expr($/, $subop),
+        positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
+    ::RxOp::Subrule.new(regex => $subop, :$passcap, _passcapzyg => $nrxop,
+        _passcapltm => $lad);
 }
 
 method package_def ($/) {
@@ -478,7 +530,7 @@ method sibble($/) {
     } else {
         $repl = $<right>.ast;
     }
-    $repl = self.transparent($/, $repl, class => 'Regex');
+    $repl = self.block_expr($/, self.thunk_sub($repl));
     make ::Op::CallMethod.new(|node($/), receiver => mklex($/, '$_'),
         name => 'subst',
         args => [ $regex, $repl, self.extract_rx_adverbs(True, True, $/),
@@ -783,6 +835,25 @@ method circumfix:sym<{ }> ($/) {
     }
 }
 
+method statement_prefix:do ($/) {
+    make self.inliney_call($/, $<blast>.ast);
+}
+method statement_prefix:gather ($/) {
+    $<blast>.ast.gather_hack = True;
+    make ::Op::Gather.new(|node($/), var => self.block_expr($/, $<blast>.ast),
+        body => Any);
+}
+method statement_prefix:try ($/) {
+    make ::Op::Try.new(|node($/), body => self.inliney_call($/, $<blast>.ast));
+}
+
+method statement_prefix:START ($/) {
+    my $cv = self.gensym;
+    $*CURLEX<!sub>.add_state_name(Str, $cv);
+    make ::Op::Start.new(|node($/), condvar => $cv, body =>
+        self.inliney_call($/, $<blast>.ast));
+}
+
 method statement_control:loop ($/) {
     my $body = self.inliney_call($/, $<block>.ast);
     # XXX wrong interpretation
@@ -792,6 +863,41 @@ method statement_control:loop ($/) {
 
     make ::Op::GeneralLoop.new(|node($/), :$body, :$init, :$cond, :$step);
 }
+
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    if $fn.assignish {
+        # Assignments to has and state declarators are rewritten into
+        # an appropriate phaser
+        if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+            my $cv = self.gensym;
+            $*CURLEX<!sub>.add_state_name($cv);
+            make ::Op::StatementList.new(|node($/), children => [
+                ::Op::Start.new(condvar => $cv, body => $/.ast),
+                ::Op::Lexical.new(name => $lhs.name)]);
+        }
+        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
+            $lhs.initializer = self.sl_to_block('bare', $rhs,
+                subname => $lhs.name ~ " init");
+            make $lhs;
+        }
+        elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+            my $sig = substr($lhs.name, 0, 1);
+            if defined '$@&%'.index($sig) {
+                $lhs.init = self.docontext($/, $sig, $rhs)
+            } else {
+                $lhs.init = $rhs;
+            }
+            make $lhs;
+        }
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+
 
 method block_expr($/, $pb) {
     my $name = self.gensym;

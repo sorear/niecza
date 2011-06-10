@@ -179,28 +179,6 @@ augment class Op::VoidPhaser { #OK exist
     }
 }
 
-augment class Op::Gather { #OK exist
-    method begin() {
-        @*opensubs[*-1].add_my_sub($.var, $.body.begin(gather_hack => True));
-        $!body = Body;
-    }
-}
-
-augment class Op::WhateverCode { #OK exist
-    method begin() {
-        my $body = Body.new(transparent => True, do => $.ops,
-            signature => Sig.simple(@$.vars));
-        @*opensubs[*-1].add_my_sub($.slot, $body.begin);
-    }
-}
-
-augment class Op::Start { #OK exist
-    method begin() {
-        @*opensubs[*-1].add_state_name(Str, $.condvar);
-        for self.zyg { $_.begin } # XXX callsame
-    }
-}
-
 augment class Op::SubsetDef { #OK exist
     method begin() {
         my @ns = $.ourname ?? @( @*opensubs[*-1].find_pkg($.ourname) ) !!
