@@ -116,12 +116,23 @@ class Method is Operator {
             if defined($.path) && !$.private {
                 $/.CURSOR.sorry("Qualified references to non-private methods NYI");
             }
+            $*CURLEX<!sub>.noninlinable if $.name eq 'eval';
+            my $pclass;
+            if $.private {
+                if $.path {
+                    $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($.path));
+                } elsif $*CURLEX<!sub>.in_class -> $c {
+                    $pclass = $c;
+                } else {
+                    $/.CURSOR.sorry("Cannot resolve class for private method");
+                }
+            }
             ::Op::CallMethod.new(|node($/),
                 receiver => @args[0],
                 ismeta   => $.meta,
                 name     => $.name,
                 private  => $.private,
-                ppath    => $.path,
+                pclass   => $pclass,
                 args     => [ @$.args ]);
         }
     }

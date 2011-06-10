@@ -1738,6 +1738,7 @@ grammar P6 is STD {
         [ <trait>+ || <.panic: "No valid trait found after also"> ]
     }
 
+    token open_package_def($*cursor) { <?> }
     rule package_def {
         :my $longname;
         :my $*IN_DECL = 'package';
@@ -1752,13 +1753,14 @@ grammar P6 is STD {
         { $*SCOPE ||= 'our'; }
         [
             [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
-            <.newlex>
+            <.newlex(0, ($*PKGDECL//'') ne 'role')>
             [ :dba('generic role')
                 <?{ ($*PKGDECL//'') eq 'role' }>
-                '[' ~ ']' <signature>
+                '[' ~ ']' <signature(1)>
                 { $*IN_DECL = ''; }
             ]?
             <trait>*
+            <.open_package_def($/)>
             <.getdecl>
             [
             || <?before '{'>
@@ -1795,7 +1797,8 @@ grammar P6 is STD {
                         $*begin_compunit = 0;
 
                         # XXX throws away any role sig above
-                        $*CURLEX = $outer;
+                        # worse - breaks CURLEX<!sub> handling
+                        # $*CURLEX = $outer;
 
                         $*UNIT<$?LONGNAME> = $longname<name>.Str;
                     }
@@ -1873,6 +1876,8 @@ grammar P6 is STD {
         return self;
     }
 
+    token routine_def_1($*cursor) { <?> }
+    token routine_def_2($*cursor) { <?> }
     rule routine_def ($d) {
         :temp $*CURLEX;
         :my $*IN_DECL = $d;
@@ -1880,7 +1885,9 @@ grammar P6 is STD {
         [
             [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
             <.newlex(1)>
+            <.routine_def_1($/)>
             [ <multisig> | <trait> ]*
+            <.routine_def_2($/)>
             [ <!before '{'> <.panic: "Malformed block"> ]?
             <!{
                 $*IN_DECL = '';
@@ -1892,6 +1899,8 @@ grammar P6 is STD {
         ] || <.panic: "Malformed routine">
     }
 
+    token method_def_1($*cursor) { <?> }
+    token method_def_2($*cursor) { <?> }
     rule method_def ($d) {
         :temp $*CURLEX;
         :my $*IN_DECL = $d;
@@ -1900,19 +1909,21 @@ grammar P6 is STD {
         <.newlex(1)>
         [
             [
-            | $<type>=[<[ ! ^ ]>?]<longname> [ <multisig> | <trait> ]*
-            | <multisig> <trait>*
+            | $<type>=[<[ ! ^ ]>?]<longname>
+              <.method_def_1($/)> [ <multisig> | <trait> ]*
+            | <.method_def_1($/)> <multisig> <trait>*
             | <sigil> '.'
                 :dba('subscript signature')
                 [
-                | '(' ~ ')' <signature>
-                | '[' ~ ']' <signature>
-                | '{' ~ '}' <signature> # don't need curlycheck here
-                | <?before '<'> <postcircumfix>
+                | '(' ~ ')' [ <.method_def_1($/)> <signature> ]
+                | '[' ~ ']' [ <.method_def_1($/)> <signature> ]
+                | '{' ~ '}' [ <.method_def_1($/)> <signature> ]
+                  # don't need curlycheck here
                 ]
                 <trait>*
             | <?>
             ]
+            <.method_def_2($/)>
             {
                 given $*PKGDECL {
                     when 'class'   {} # XXX to be replaced by MOP queries
@@ -5139,8 +5150,9 @@ grammar Regex is STD {
 # Symbol tables #
 #################
 
-method newlex ($needsig = 0) {
+method newlex ($needsig = 0, $once = False) {
     my $oid = $*CURLEX.id;
+    my $osub = $*CURLEX<!sub>;
     $ALL.{$oid} === $*CURLEX or die "internal error: current lex id is invalid";
     my $line = self.lineof(self.pos);
     my $id;
@@ -5161,6 +5173,14 @@ method newlex ($needsig = 0) {
     $*CURLEX.<!NEEDSIG> = 1 if $needsig;
     $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $ALL.{$id} = $*CURLEX;
+    $*CURLEX<!sub> = ::Metamodel::StaticSub.new(
+        unit => $*unit,
+        outerx => $osub.xref,
+        in_class => $osub.in_class,
+        cur_pkg => $osub.cur_pkg,
+        run_once => $once && $osub.run_once
+    );
+    $osub.add_child($*CURLEX<!sub>);
     self;
 }
 
@@ -5175,22 +5195,53 @@ method finishlex {
 
 method getsig {
     my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
-    my $sig;
     if $*CURLEX.<!NEEDSIG>:delete {
+        my @parms;
+        if $*CURLEX<!sub>.methodof {
+            my $cl = $*unit.deref($*CURLEX<!sub>.methodof);
+            # XXX type checking against roles NYI
+            if $cl !~~ ::Metamodel::Role &&
+                    $cl !~~ ::Metamodel::ParametricRole {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
+                    tclass => $cl.xref);
+            } else {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
+            }
+            $*CURLEX<!sub>.add_my_name('self', :noinit);
+        }
+
         if $pv {
             my $h_ = $pv.<%_>:delete;
             my $a_ = $pv.<@_>:delete;
-            $sig = join ', ', (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) });
-            $sig ~= ', *@_' if $a_;
-            $sig ~= ', *%_' if $h_;
+            for (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) }) -> $pn is copy {
+                my $positional = True;
+                if substr($pn,0,1) eq ':' {
+                    $pn = substr($pn,1);
+                    $positional = False;
+                }
+                my $list = substr($pn,0,1) eq '@';
+                my $hash = substr($pn,0,1) eq '%';
+                push @parms, ::Sig::Parameter.new(slot => $pn, :$list, :$hash,
+                    name => $pn, :$positional, names => [ substr($pn,1) ]);
+                $*CURLEX<!sub>.add_my_name($pn, :noinit, :$list, :$hash);
+            }
+            if $a_ {
+                push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
+                    :slurpy, :list);
+                $*CURLEX<!sub>.add_my_name('@_', :noinit, :list);
+            }
+            if $h_ {
+                push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
+                    :slurpy, :hash);
+                $*CURLEX<!sub>.add_my_name('%_', :noinit, :hash);
+            }
         }
         else {
-            $sig = '$_ is ref = OUTER::<$_>';
+            push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
+                :defouter, :rwtrans);
+            $*CURLEX<!sub>.add_my_name('$_', :noinit);
         }
-        $*CURLEX.<$?SIGNATURE> = $sig;
-    }
-    else {
-        $sig = $*CURLEX.<$?SIGNATURE>;
+        $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
     }
     # NIECZA immutable cursors
     # self.<sig> = $sig;
