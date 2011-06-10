@@ -424,8 +424,8 @@ method type_declarator:enum ($/) {
         $nb.add_my_name('self', noinit => True);
         $*CURLEX<!sub>.create_static_pad;
         $nb.strong_used = True;
-        $*CURLEX<!sub>.add_my_sub($name ~ '!a', $nb);
-        $obj.add_method('only', 'normal', $name, $name ~ '!a', $nb.xref);
+        $*CURLEX<!sub>.add_my_sub($lexvar ~ '!enums', $nb);
+        $obj.add_method('only', 'normal', 'enums', $lexvar ~ '!enums', $nb.xref);
         $obj.close;
 
         for @pairs {
@@ -476,6 +476,10 @@ method block_expr($/, $pb) {
     my $name = self.gensym;
     $*CURLEX<!sub>.add_my_sub_child($name, $pb);
     mklex($/, $name);
+}
+
+method term:lambda ($/) {
+    make self.block_expr($/, $<pblock>.ast);
 }
 
 method statement_control:for ($/) {
