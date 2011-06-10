@@ -510,8 +510,7 @@ method method_def_2 ($, $/ = $*cursor) {
     if $<multisig> > 1 {
         $/.CURSOR.sorry("You may only use *one* signature");
     }
-    $*CURLEX<!sub>.signature =
-        $<multisig> ?? $<multisig>[0].ast !! self.get_placeholder_sig($/);
+    $*CURLEX<!sub>.signature = $<multisig> ?? $<multisig>[0].ast !! Any;
     self.process_block_traits($/, $<trait>);
 }
 
@@ -708,10 +707,12 @@ method signature($/) {
     }
 
     if $<param_var> {
-        make Sig.new(params => [ ::Sig::Parameter.new(
+        my $sig = Sig.new(params => [ ::Sig::Parameter.new(
                 name => ~$<param_var>, |$<param_var>.ast,
                 full_parcel => True) ]);
-        return Nil;
+        $*CURLEX<!sub>.signature = $sig if $*SIGNUM;
+        make $sig;
+        return;
     }
 
     my @p = map *.ast, @( $<parameter> );
@@ -751,7 +752,9 @@ method signature($/) {
         }
     }
 
-    make Sig.new(params => @p);
+    my $sig = Sig.new(params => @p);
+    $*CURLEX<!sub>.signature = $sig if $*SIGNUM;
+    make $sig;
 }
 
 
@@ -1132,6 +1135,42 @@ method thunk_sub($code, :$name) {
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
     $*CURLEX<!sub>.add_child($n);
     $n;
+}
+
+method block($/) {
+    make $*CURLEX<!sub>
+}
+
+# :: Body
+method pblock($/) {
+    #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
+    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    make $*CURLEX<!sub>;
+}
+
+# returns Body of 0 args
+method blast($/) {
+    if $<block> {
+        make $<block>.ast;
+    } else {
+        make self.thunk_sub($<statement>.ast);
+    }
+}
+
+method inliney_call($/, $block, *@parms) {
+    my $sym = self.gensym;
+    $*CURLEX<!sub>.add_my_sub_child($sym, $block);
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::SubDef.new(body => Any, symbol => $sym, :once),
+        positionals => @parms);
+}
+
+method if_block($/, $cond, $pb) {
+    if defined $pb<lambda> {
+        make self.inliney_call($/, $pb.ast, $cond);
+    } else {
+        make self.inliney_call($/, $pb.ast);
+    }
 }
 
 method make_constant($/, $scope, $name, $path) {
