@@ -432,6 +432,7 @@ method open_package_def($, $/ = $*cursor) {
         my @ah = $so;
         $sub.augment_hack = @ah;
         $sub.body_of = $sub.in_class = $so;
+        $sub.cur_pkg = $pkg;
         $sub.augmenting = True;
         $sub.set_name("augment-$dso.name()");
     } else {
