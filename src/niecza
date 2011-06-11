@@ -972,6 +972,20 @@ augment class Op::BareBlock { #OK
     }
 }
 
+augment class Operator {
+method wrap_in_function($/) {
+    my @args;
+    my $i = -self.arity;
+    while $i++ { push @args, ::GLOBAL::NieczaActions.gensym }
+    my $do = self.with_args($/, map { mklex($/, $_) }, @args);
+    ::GLOBAL::NieczaActions.block_expr($/,
+        ::GLOBAL::NieczaActions.thunk_sub($do, params => @args));
+}
+}
+
+augment class Operator::PostCall { #OK
+    method as_function($/) { self.wrap_in_function($/) }
+}
 
 
 my $usage = q:to/EOM/;
