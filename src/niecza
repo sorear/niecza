@@ -802,7 +802,7 @@ method regex_def($/) {
     }
 
     if $*CURLEX<!multi> eq 'proto' {
-        if ($<signature> && $<signature>.ast.params) ||
+        if ($<signature> && $<signature>[0].ast.params != 1) ||
                 !$<regex_block><onlystar> {
             $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
         }
