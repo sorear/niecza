@@ -1037,18 +1037,18 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
     rxtest /^ [x**y] $/, 'x**y', ('x','xyx','xyxyx'), ('','xy','yx');
 }
 
+my $x8484;
 {
-    my $x;
     (class { method foo() {
-        $x = 1;
+        $x8484 = 1;
     } }).foo;
-    ok $x, "changes made in the protolexpad are visible at runtime";
+    ok $x8484, "changes made in the protolexpad are visible at runtime";
 }
 
+my $x1903;
 {
-    my $x;
-    my $unclonable-sub = (class { method foo() { sub () { $x } } }).foo;
-    $x = 42;
+    my $unclonable-sub = (class { method foo() { sub () { $x1903 } } }).foo;
+    $x1903 = 42;
     ok $unclonable-sub() == 42, "mainlines are not cloned";
 }
 
