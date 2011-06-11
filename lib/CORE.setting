@@ -966,7 +966,7 @@ my class Junction is Mu {
             join(", ", map -> Mu $x { $x.perl }, @$!eigenstates) ~ ")") !! "Junction"
     }
 
-    method Str() { self.perl }
+    method Str() { defined(self) ?? self.perl !! "Junction()" }
     method Stringy() { self.FALLBACK("Stringy") }
 
     method from-parcel(Int $kind, Mu $pcl) {
@@ -1593,7 +1593,7 @@ sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) { !$a }
 sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ +$limit }
-sub prefix:<so> ($item) { ?$item }
+sub prefix:<so> (Mu $item) { ?$item }
 sub infix:<xx> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
 sub floor($x) { Q:CgOp { (_cgop bif_floor {$x}) } }
