@@ -115,7 +115,65 @@ augment class NieczaGrammar::P6 { #OK
 }
 
 augment class NieczaActions {
+method type_declarator:subset ($/) {
+    my $ourname = Array; my $lexvar = self.gensym; my $name;
+    my $scope = $*SCOPE;
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid subset scope $scope");
+        $scope = 'anon';
+    }
+    if $<longname> {
+        $scope ||= 'my';
+        my $r = self.mangle_longname($<longname>[0], True);
+        $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Block name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        if $scope eq 'our' {
+            $ourname = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourname = [ @$ourname, $name ];
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+        }
+    } else {
+        if ($scope || 'anon') ne 'anon' {
+            $/.CURSOR.sorry("Cannot have a non-anon subset with no name");
+        }
+        $name = 'ANON';
+    }
 
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
+        ['MY', 'Any'];
+    my @exports;
+
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } elsif $t<of> {
+            $basetype = $t<of>;
+        } else {
+            $/.CURSOR.sorry("Unsupported subset trait $t.keys()");
+        }
+    }
+
+    my $body = self.thunk_sub($<EXPR> ?? $<EXPR>[0].ast !! mklex($/, 'True'));
+
+    my @ns = $ourname ?? @( $*CURLEX<!sub>.find_pkg($ourname) ) !!
+        $*unit.anon_stash;
+
+    $*unit.create_stash([@ns]);
+    $*CURLEX<!sub>.add_my_stash($lexvar, [@ns]);
+    $*CURLEX<!sub>.add_pkg_exports($*unit, $name, [@ns], @exports);
+    $*CURLEX<!sub>.create_static_pad;
+
+    $basetype = $*unit.get_item($*CURLEX<!sub>.find_pkg([@$basetype]));
+    my $obj = ::Metamodel::Subset.new(:$name, where => $body.xref, :$basetype);
+    $*unit.bind_item([@ns], $obj.xref);
+    $obj.exports = [ [@ns] ];
+
+    make mklex($/, $lexvar);
+}
 }
 
 augment class Op::ForLoop { #OK
