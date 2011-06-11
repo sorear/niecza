@@ -533,6 +533,57 @@ method signature($/) {
     make $sig;
 }
 
+method statement_control:use ($/) {
+    make ::Op::StatementList.new;
+    return if $<version>; # just ignore these
+
+    my $name = $<module_name>.ast<name>;
+    my $args = $<arglist> ?? $<arglist>.ast !! [];
+
+    if defined $<module_name>.ast.<args> {
+        $/.CURSOR.sorry("'use' of an instantiated role not yet understood");
+        return;
+    }
+
+    if $args {
+        $/.CURSOR.sorry("'use' with arguments NYI");
+        return;
+    }
+
+    if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
+        return;
+    }
+
+    my $u2 = $*unit.need_unit($name);
+
+    my @can = @( $u2.mainline.find_pkg([$name.split('::')]) );
+    my @exp = (@can, 'EXPORT', 'DEFAULT');
+
+    # XXX I am not sure how need binding should work in the :: case
+    if $name !~~ /"::"/ {
+        $*CURLEX<!sub>.lexicals{$name} =
+            ::Metamodel::Lexical::Stash.new(path => @can);
+    }
+
+    for $*unit.list_stash(@exp) -> $tup {
+        my $uname = $tup[0];
+        my $lex;
+        if $tup[1] eq 'var' {
+            if $tup[2] && !$tup[2][0] {
+                $lex = ::Metamodel::Lexical::Common.new(path => @exp, name => $uname);
+            } elsif $tup[2] {
+                $lex = ::Metamodel::Lexical::Stash.new(path => [@exp, $uname]);
+            }
+        } elsif $tup[1] eq 'graft' {
+            $lex = ::Metamodel::Lexical::Stash.new(path => $tup[2]);
+        } else {
+            die "weird return";
+        }
+
+        $*CURLEX<!sub>.lexicals{$uname} = $lex;
+    }
+}
+
 }
 
 augment class Op::ForLoop { #OK
