@@ -30,6 +30,41 @@ use Stash;
 use Sig;
 
 augment grammar STD {
+our $ALL;
+method newlex ($needsig = 0, $once = False) {
+    my $oid = $*CURLEX.id;
+    my $osub = $*CURLEX<!sub>;
+    $ALL.{$oid} === $*CURLEX or die "internal error: current lex id is invalid";
+    my $line = self.lineof(self.pos);
+    my $id;
+    if $*NEWLEX {
+        $*NEWLEX.<OUTER::> = $*CURLEX.idref;
+        $*CURLEX = $*NEWLEX;
+        $*NEWLEX = 0;
+        $id = $*CURLEX.id;
+    }
+    else {
+        $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
+        $*CURLEX = Stash.new(
+            'OUTER::' => [$oid],
+            '!file' => $*FILE, '!line' => $line,
+            '!id' => [$id],
+        );
+    }
+    $*CURLEX.<!NEEDSIG> = 1 if $needsig;
+    $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
+    $ALL.{$id} = $*CURLEX;
+    $*CURLEX<!sub> = ::Metamodel::StaticSub.new(
+        unit => $*unit,
+        class => 'Block',
+        outerx => $osub.xref,
+        in_class => $osub.in_class,
+        cur_pkg => $osub.cur_pkg,
+        run_once => $once && $osub.run_once
+    );
+    $osub.add_child($*CURLEX<!sub>);
+    self;
+}
 token embeddedblock {
     # encapsulate braided languages
     :temp %*LANG;
