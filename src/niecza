@@ -930,6 +930,22 @@ augment class Sig::Parameter { #OK
     }
 }
 
+augment class Operator::Temp { #OK
+    method with_args($/, *@args) {
+        my $rarg = @args[0];
+        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
+            $/.CURSOR.sorry('Non-contextual case of temp NYI');
+            return ::Op::StatementList.new;
+        }
+        my $hash = substr($rarg.name,0,1) eq '%';
+        my $list = substr($rarg.name,0,1) eq '@';
+        $*CURLEX<!sub>.add_my_name($rarg.name, :$hash, :$list);
+        mkcall($/, '&infix:<=>',
+            ::Op::Lexical.new(name => $rarg.name, :$hash, :$list),
+            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+    }
+}
+
 class Op::MakeJunction is Op {
     has Int $.typecode = die "MakeJunction.typecode required";
     has @.zyg;
