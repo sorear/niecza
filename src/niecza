@@ -340,6 +340,58 @@ method open_package_def($, $/ = $*cursor) {
     }
 }
 
+method package_def ($/) {
+    my $sub = $*CURLEX<!sub>;
+
+    my $bodyvar = self.gensym;
+    $sub.outer.add_my_sub_child($bodyvar, $sub);
+    $sub.code = ($<blockoid> // $<statementlist>).ast;
+
+    if $sub.augmenting {
+        my $ah = $sub.augment_hack;
+        $sub.augment_hack = Any;
+
+        my $ph = ::Metamodel::StaticSub.new(
+            unit       => $*unit,
+            outerx     => $sub.xref,
+            cur_pkg    => [ 'GLOBAL' ],
+            name       => 'ANON',
+            is_phaser  => 0,
+            augment_hack => $ah,
+            class      => 'Code',
+            code       => ::Op::StatementList.new(children => []),
+            run_once   => $sub.run_once);
+        $sub.create_static_pad;
+        $sub.add_child($ph);
+
+        make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
+    }
+    else {
+        my $obj = $*unit.deref($sub.body_of);
+
+        if $*DECLARAND<stub> {
+            push $*unit.stubbed_stashes, ($obj => $/.CURSOR);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
+        }
+        else {
+            $obj.close;
+
+            if $obj ~~ ::Metamodel::ParametricRole {
+                $sub.parametric_role_hack = $obj.xref;
+                $sub.add_my_name('*params', :noinit);
+                $sub.create_static_pad;
+
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                    ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
+        }
+    }
+}
+
 
 method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
     my $n = ::Metamodel::StaticSub.new(
