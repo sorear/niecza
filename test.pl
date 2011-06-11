@@ -698,6 +698,7 @@ end
         "foo !~~ [fo*:|foo]x";
     is $x, '12', "will backtrack into shorter token";
 
+    our $x6474;
     my grammar G5 {
         token a { foo }
         token b { foobar }
@@ -713,12 +714,12 @@ end
     ok G5.parse('Exxyxx'), 'recursivity does not crash LTM';
 
     my grammar G6 {
-        token a   { fo* { $x = 1 } }
-        token b   { foo { $x = 2 } }
+        token a   { fo* { $x6474 = 1 } }
+        token b   { foo { $x6474 = 2 } }
         token TOP { <a> | <b> }
     }
     G6.parse("foo");
-    is $x, 2, "prefix length testing works in subrules";
+    is $x6474, 2, "prefix length testing works in subrules";
 }
 
 {
@@ -1038,17 +1039,17 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
 }
 
 {
-    my $x;
+    our $x8484;
     (class { method foo() {
-        $x = 1;
+        $x8484 = 1;
     } }).foo;
-    ok $x, "changes made in the protolexpad are visible at runtime";
+    ok $x8484, "changes made in the protolexpad are visible at runtime";
 }
 
 {
-    my $x;
-    my $unclonable-sub = (class { method foo() { sub () { $x } } }).foo;
-    $x = 42;
+    our $x1903;
+    my $unclonable-sub = (class { method foo() { sub () { $x1903 } } }).foo;
+    $x1903 = 42;
     ok $unclonable-sub() == 42, "mainlines are not cloned";
 }
 
@@ -1088,20 +1089,20 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
 ok "abc" ~~ / :dba("foo") abc /, ":dba doesn't affect parsing";
 
 {
-    my $log = '';
+    our $log9434 = '';
     my grammar B {
-        token a { { $log ~= 'A' } }
-        token b { { $log ~= 'B' } }
-        token c { { $log ~= 'C' } }
+        token a { { $log9434 ~= 'A' } }
+        token b { { $log9434 ~= 'B' } }
+        token c { { $log9434 ~= 'C' } }
     }
     my grammar A {
-        token a { { $log ~= 'a' } }
-        token b { { $log ~= 'b' } }
-        token c { { $log ~= 'c' } }
+        token a { { $log9434 ~= 'a' } }
+        token b { { $log9434 ~= 'b' } }
+        token c { { $log9434 ~= 'c' } }
         token TOP { x <.a> [ :lang(B) <.b> ] <.c> x }
     }
     A.parse("xx");
-    is $log, 'aBc', ':lang has the expected effect';
+    is $log9434, 'aBc', ':lang has the expected effect';
 }
 
 {
@@ -1505,13 +1506,13 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    my $str;
-    INIT $str = '';
-    $str ~= 1;
-    INIT $str ~= 2;
-    $str ~= 3;
-    INIT $str ~= 4;
-    is $str, '2413', 'INIT blocks run in correct order';
+    our $str8646;
+    INIT $str8646 = '';
+    $str8646 ~= 1;
+    INIT $str8646 ~= 2;
+    $str8646 ~= 3;
+    INIT $str8646 ~= 4;
+    is $str8646, '2413', 'INIT blocks run in correct order';
 }
 
 {
@@ -1787,7 +1788,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    package Foo7426 { ... }
+    package Foo7426 { }
     class Foo7426::Inner {
         method pie() { 32 }
     }

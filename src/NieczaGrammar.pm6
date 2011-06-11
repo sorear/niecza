@@ -16,7 +16,7 @@ grammar CgOp is STD {
     token cgexp:decint { <decint> }
     token cgexp:p6exp { :lang(%*LANG<MAIN>) '{' ~ '}' <statementlist> }
     token cgexp:bad { <!before <[ ) \] ]> > {}
-        [ <?stdstopper> <.panic "Missing cgop"> ]
+        [ <?stdstopper> <.panic: "Missing cgop"> ]
         <.panic: "Unparsable cgop">
     }
 }
@@ -30,8 +30,21 @@ grammar Q is STD::Q { #} {
 
 grammar P6 is STD::P6 {
     method unitstart() {
-        %*LANG<Q> = NieczaGrammar::Q ;
-        %*LANG<MAIN> = NieczaGrammar::P6 ;
+        my $top = $*unit.setting_ref;
+        my $rtop = $top && $*unit.deref($top);
+        $*CURLEX{'!sub'} = ::Metamodel::StaticSub.new(
+            unit => $*unit,
+            outerx => $top,
+            cur_pkg => ['GLOBAL'],
+            name => "mainline",
+            run_once => !$rtop || $rtop.run_once);
+        $*CURLEX{'!sub'}.add_my_name('$_') if !$top;
+        $*CURLEX{'!sub'}.add_hint('$?FILE');
+        $*CURLEX{'!sub'}.signature = ::GLOBAL::Sig.simple();
+        $*unit.mainline = $*CURLEX<!sub>;
+
+        %*LANG<Q> = ::NieczaGrammar::Q ;
+        %*LANG<MAIN> = ::NieczaGrammar::P6 ;
         self;
     }
 }

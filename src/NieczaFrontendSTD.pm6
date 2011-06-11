@@ -539,6 +539,22 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
+    my $*unit = ::Metamodel::Unit.new(name => $unitname,
+        ns => ::Metamodel::Namespace.new, :$filename, :$modtime);
+
+    if $*niecza_outer_ref {
+        $*unit.setting_ref = $*niecza_outer_ref;
+        $*unit.need_unit($*unit.setting_ref.[0]);
+    } elsif $*SETTINGNAME ne 'NULL' {
+        $*unit.need_unit($*SETTINGNAME);
+        $*unit.setting_ref = $*unit.get_unit($*SETTINGNAME).bottom_ref;
+    }
+    %*units{$unitname} = $*unit;
+    $*unit.tdeps{$unitname} = [$filename, $modtime];
+
+    $*unit.create_stash(['GLOBAL']);
+    $*unit.create_stash(['PROCESS']);
+
     my $ast = NieczaGrammar.parse($source, actions => NieczaActions).ast;
 
     $STD::ALL = $save_all;

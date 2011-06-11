@@ -66,7 +66,7 @@ class Parameter {
             if $!is_copy {
                 self.do_copy($get);
             } else {
-                my $type = CgOp.class_ref('mo', @!tclass);
+                my $type = CgOp.class_ref('mo', @($!tclass || 'Any'));
                 CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
                     CgOp.newboundvar(+(!$!rw), +$!list, $type, $get));
             }

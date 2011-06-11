@@ -464,7 +464,7 @@ namespace Niecza {
                 ReadIntArray(ref from)); /*dylexi*/
 
             if (TraceLoad)
-                Console.WriteLine("Installing sub {0} \"{1}\" from {2}", ix, ns.name, _ifrom);
+                Console.WriteLine("Installing sub {0} \"{1}\" from {2:X}", ix, ns.name, _ifrom);
             xref[ix] = ns;
             ns.xref_no = ix;
             ns.unit = this;
@@ -496,7 +496,48 @@ namespace Niecza {
                 if (mo == null) continue;
                 int from = mo.fixups_from;
                 if (TraceLoad)
-                    Console.WriteLine("Finishing load of package {0} \"{1}\" from {2}", i, mo.name, from);
+                    Console.WriteLine("Finishing load of package {0} \"{1}\" from {2:X}", i, mo.name, from);
+                STable[] superclasses;
+                STable[] mro;
+                string[] slots;
+
+                switch (heap[from++]) {
+                    case 0: //role
+                        superclasses = new STable[ReadInt(ref from)];
+                        for (int j = 0; j < superclasses.Length; j++)
+                            superclasses[j] = (STable)ReadXref(ref from);
+                        mo.FillRole(superclasses, new STable[0]);
+                        break;
+                    case 1: //p. role
+                        break;
+                    case 2: //class
+                        slots = ReadStrArray(ref from);
+                        superclasses = new STable[ReadInt(ref from)];
+                        for (int j = 0; j < superclasses.Length; j++)
+                            superclasses[j] = (STable)ReadXref(ref from);
+                        mro = new STable[ReadInt(ref from)];
+                        for (int j = 0; j < mro.Length; j++)
+                            mro[j] = (STable)ReadXref(ref from);
+                        mo.FillClass(slots, superclasses, mro);
+                        break;
+                    case 3: //module
+                        break;
+                    case 4: //package
+                        break;
+                    case 5: //subset
+                        mo.mo.FillSubset((STable)ReadXref(ref from));
+                        break;
+                    default:
+                        throw new ArgumentException();
+                }
+
+                if (mo.isSubset) {
+                    mo.initVar = mo.mo.superclasses[0].initVar;
+                    mo.initObject = mo.mo.superclasses[0].initObject;
+                } else {
+                    mo.initVar = mo.typeVar;
+                    mo.initObject = mo.typeObject;
+                }
 
                 int nex = ReadInt(ref from);
                 for (int j = 0; j < nex; j++)
@@ -505,22 +546,28 @@ namespace Niecza {
                 ReadClassMembers(mo, ref from);
                 if (mo.mo.isSubset)
                     mo.mo.subsetWhereThunk = ((SubInfo)ReadXref(ref from)).protosub;
-                mo.how = Kernel.BoxRaw<STable>(mo, ((STable)ReadXref(ref from)));
+                mo.how = new BoxObject<STable>(mo, ((STable)ReadXref(ref from)), 0);
             }
+
+            // bulk inform objects that thaw is complete...
+            P6how.BulkRevalidate(xref);
 
             for (int i = 0; i < xref.Length; i++) {
                 SubInfo si = xref[i] as SubInfo;
                 if (si == null) continue;
                 int from = si.fixups_from;
                 if (TraceLoad)
-                    Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2}", i, si.name, from);
+                    Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2:X}", i, si.name, from);
                 ReadSignature(si, ref from);
+                if (TraceLoad) Console.WriteLine("Sig loaded");
                 int ph = heap[from++];
                 if (ph != 0xFF) Kernel.AddPhaser(ph, si.protosub);
                 int nex = ReadInt(ref from);
+                if (TraceLoad) Console.WriteLine("loading exports...");
                 for (int j = 0; j < nex; j++)
                     Kernel.GetVar(ReadStrArray(ref from)).v =
                         Kernel.NewROScalar(si.protosub);
+                if (TraceLoad) Console.WriteLine("exports loaded");
             }
         }
 
@@ -529,53 +576,17 @@ namespace Niecza {
             int ix = ReadInt(ref from);
             string name = ReadStr(ref from);
             if (TraceLoad)
-                Console.WriteLine("Installing package {0} \"{1}\" from {2}", ix, name, _ifrom);
+                Console.WriteLine("Installing package {0} \"{1}\" from {2:X}", ix, name, _ifrom);
             STable mo = existing_mo != null ? existing_mo :
                 new STable(name);
             xref[ix] = mo;
-            STable[] superclasses;
-            STable[] mro;
-            string[] slots;
 
-            switch (heap[from++]) {
-                case 0: //role
-                    superclasses = new STable[ReadInt(ref from)];
-                    for (int i = 0; i < superclasses.Length; i++)
-                        superclasses[i] = (STable)ReadXref(ref from);
-                    mo.FillRole(superclasses, new STable[0]);
-                    break;
-                case 1: //p. role
-                    break;
-                case 2: //class
-                    slots = ReadStrArray(ref from);
-                    superclasses = new STable[ReadInt(ref from)];
-                    for (int i = 0; i < superclasses.Length; i++)
-                        superclasses[i] = (STable)ReadXref(ref from);
-                    mro = new STable[ReadInt(ref from)];
-                    for (int i = 0; i < mro.Length; i++)
-                        mro[i] = (STable)ReadXref(ref from);
-                    mo.FillClass(slots, superclasses, mro);
-                    break;
-                case 3: //module
-                    break;
-                case 4: //package
-                    break;
-                case 5: //subset
-                    mo.mo.FillSubset((STable)ReadXref(ref from));
-                    break;
-                default:
-                    throw new ArgumentException();
-            }
+            mo.typeObject = new P6opaque(mo, 0);
+            ((P6opaque)mo.typeObject).slots = null;
+            mo.typeVar = Kernel.NewROScalar(mo.typeObject);
 
             mo.fixups_from = from;
 
-            mo.typeObject = mo.initObject = new P6opaque(mo);
-            ((P6opaque)mo.typeObject).slots = null;
-            mo.typeVar = mo.initVar = Kernel.NewROScalar(mo.typeObject);
-            if (mo.isSubset) {
-                mo.initVar = mo.mo.superclasses[0].initVar;
-                mo.initObject = mo.mo.superclasses[0].initObject;
-            }
             return mo;
         }
 
@@ -635,8 +646,6 @@ namespace Niecza {
                         init != null ? init.protosub : null,
                         type != null ? type : Kernel.AnyMO);
             }
-
-            into.Invalidate();
         }
     }
 
@@ -2422,7 +2431,7 @@ tryagain:
         public static readonly Variable FalseV;
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
-            P6opaque n = new P6opaque(info.mo ?? CodeMO);
+            P6opaque n = new P6opaque(info.mo ?? CodeMO, 2);
             n.slots[0] = outer;
             if (outer != null) outer.MarkShared();
             n.slots[1] = info;
@@ -3164,7 +3173,7 @@ slow:
         }
 
         public static Variable CreateArray() {
-            P6any v = new P6opaque(ArrayMO);
+            P6any v = new P6opaque(ArrayMO, 2);
             v.SetSlot("items", new VarDeque());
             v.SetSlot("rest", new VarDeque());
             return NewRWListVar(v);

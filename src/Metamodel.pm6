@@ -209,7 +209,7 @@ class Namespace {
 }
 
 class RefTarget {
-    has $.xref; # is rw
+    has $.xref;
     has $.name = 'ANON';
 
     # TODO BUILD
@@ -220,10 +220,15 @@ class RefTarget {
         push $*unit.xref, $n;
         $n
     }
+
+    method set_name($name) {
+        $!xref[2] = $!name = $name;
+    }
 }
 
 class Package is RefTarget {
     has $.exports; # is rw
+    has $.closed;
 
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $tc) { #OK not used
         die "attribute $name defined in a lowly package";
@@ -237,7 +242,7 @@ class Package is RefTarget {
         die "superclass $*unit.deref($super).name() defined in a lowly package";
     }
 
-    method close() { }
+    method close() { $!closed = True; }
 }
 
 class Module is Package {
@@ -272,6 +277,7 @@ class Class is Module {
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
+        $.attributes.[*-1];
     }
 
     method add_method($multi, $kind, $name, $var, $body) { #OK not used
@@ -325,7 +331,7 @@ class Class is Module {
     }
 
     method close() {
-        return Nil if $.linearized_mro;
+        return if $.closed;
         if ($!closing) {
             die "Class hierarchy circularty detected at $.name\n";
         }
@@ -334,7 +340,7 @@ class Class is Module {
         if (($.name ne 'Mu' || !$*unit.is_true_setting)
                 && !$.superclasses) {
             self.add_super($*unit.get_item(
-                    @*opensubs[*-1].true_setting.find_pkg(self._defsuper)));
+                $*CURLEX<!sub>.true_setting.find_pkg(self._defsuper)));
         }
 
         my @merge;
@@ -348,6 +354,7 @@ class Class is Module {
         my @mro;
         c3merge(@mro, @merge);
         $.linearized_mro = @mro;
+        nextsame;
     }
 
     method _defsuper() { 'Any' }
@@ -366,6 +373,7 @@ class Role is Module {
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
+        $.attributes.[*-1];
     }
 
     method add_method($multi, $kind, $name, $var, $body) { #OK not used
@@ -390,6 +398,7 @@ class ParametricRole is Module {
     method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
             :$public, :$ivar, :$ibody, :$typeconstraint);
+        $.attributes.[*-1];
     }
 
     method add_method($multi, $kind, $name, $var, $body) { #OK not used
@@ -510,6 +519,8 @@ class StaticSub is RefTarget {
     has $.class = 'Sub'; # Str
     has $.ltm; # is rw
     has $.exports; # is rw
+    has Str $.outervar is rw; # Xref, used during parse
+    has $.methodof is rw; # Xref, used during parse
 
     method outer() { $!outerx ?? $*unit.deref($!outerx) !! StaticSub }
 
@@ -533,6 +544,12 @@ class StaticSub is RefTarget {
         return Nil if $.spad_exists;
         $.spad_exists = True;
         $.outer.create_static_pad if $.outer;
+    }
+
+    method noninlinable() {
+        loop (my $c = self; $c && $c.unit === $*unit; $c = $c.outer) {
+            $c.strong_used = True;
+        }
     }
 
     method topicalizer() {
@@ -628,6 +645,10 @@ class StaticSub is RefTarget {
         $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
     }
 
+    method add_my_sub_child($slot, $body) {
+        $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
+    }
+
     method add_pkg_exports($unit, $name, $path2, $tags) {
         for @$tags -> $tag {
             $unit.bind_graft([@$.cur_pkg, 'EXPORT', $tag, $name], $path2);
@@ -658,6 +679,7 @@ class Unit {
     has Str $.filename is rw;
     has $.modtime is rw; # Numeric
     has Int $.next_anon_stash is rw = 0; # is rw, Int
+    has @.stubbed_stashes; # Pair[Stash,Cursor]
 
     method bind_item($path,$item)    { $!ns.bind_item($path,$item) }
     method bind_graft($path1,$path2) { $!ns.bind_graft($path1,$path2) }

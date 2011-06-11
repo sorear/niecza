@@ -13,7 +13,10 @@ sub mkcall($/, $name, *@positionals) is export {
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
 
-sub mklex($/, $name) is export { ::Op::Lexical.new(|node($/), :$name); }
+sub mklex($/, $name, *%_) is export {
+    $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
+    ::Op::Lexical.new(|node($/), :$name, |%_);
+}
 
 sub mkbool($i) is export { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 

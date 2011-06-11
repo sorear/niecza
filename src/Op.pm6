@@ -144,13 +144,12 @@ class CallMethod is CallLike {
     has $.receiver = die "CallMethod.receiver required"; # Op
     has $.name = die "CallMethod.name required"; # Op | Str
     has $.private = False; # Bool
-    has $.ppath; # Array of Str
     has $.pclass; # Xref, is rw
     has $.ismeta = ''; # Str
 
     method adverb($adv) {
         Op::CallMethod.new(receiver => $.receiver, name => $.name,
-            private => $.private, ppath => $.ppath, pclass => $.pclass,
+            private => $.private, pclass => $.pclass,
             ismeta => $.ismeta, args => [ self.getargs, $adv ])
     }
 
@@ -435,11 +434,12 @@ class ForLoop is Op {
     }
 
     method statement_level() {
+        my $body = $*CURLEX<!sub>.find_lex($!sink.symbol).body;
         my $var = [ map { ::GLOBAL::NieczaActions.gensym },
-            0 ..^ +$.sink.body.signature.params ];
-        $.sink.once = True;
-        ::Op::ImmedForLoop.new(source => $.source, var => $var,
-            sink => ::Op::CallSub.new(invocant => $.sink,
+            0 ..^ +$body.signature.params ];
+        $!sink.once = True;
+        ::Op::ImmedForLoop.new(source => $!source, var => $var,
+            sink => ::Op::CallSub.new(invocant => $!sink,
                 positionals => [ map { ::Op::LetVar.new(name => $_) }, @$var]));
     }
 }
@@ -529,12 +529,6 @@ class Start is Op {
     }
 }
 
-class VoidPhaser is Op {
-    has $.body = die "VoidPhaser.body required"; # Body
-
-    method code($ ) { CgOp.corelex('Nil') }
-}
-
 class Try is Op {
     has $.body = die "Try.body required"; # Op
     method zyg() { $.body }
@@ -561,6 +555,15 @@ class Control is Op {
     }
 }
 
+class MakeJunction is Op {
+    has Int $.typecode = die "MakeJunction.typecode required";
+    has @.zyg;
+
+    method code($body) {
+        CgOp.makejunction($!typecode, map *.cgop($body), @!zyg)
+    }
+}
+
 { class Num is Op {
     has $.value = die "Num.value required"; # Numeric
 
@@ -584,73 +587,10 @@ class Bind is Op {
     }
 }
 
-class Augment is Op {
-    has $.name; # Str
-    has $.bodyvar; # Str
-    has $.body; # Body
-    has $.pkg; # Array of Str
-
-    method code($ ) {
-        CgOp.subcall(CgOp.fetch(CgOp.scopedlex($.bodyvar)));
-    }
-}
-
-class PackageDef is Op {
-    has $.name; # Str
-    has $.var = die "PackageDef.var required"; # Str
-    has $.bodyvar; # Str
-    has $.stub = False; # Bool
-    has $.body; # Body
-    has $.exports = []; # Array of Str
-    has $.ourpkg; # Array of Str
-    has $.ourvar; # Str
-
-    method code($ ) {
-        if $.stub {
-            CgOp.scopedlex($.var);
-        } else {
-            CgOp.prog(
-                CgOp.sink(CgOp.subcall(CgOp.fetch(
-                            CgOp.scopedlex($.bodyvar)))),
-                CgOp.scopedlex($.var));
-        }
-    }
-}
-
-class ModuleDef is PackageDef { }
-class RoleDef is ModuleDef {
-    has $.signature; # Sig
-
-    method code($ ) { $.signature ?? CgOp.scopedlex($.var) !! nextsame }
-}
-class ClassDef is ModuleDef { }
-class GrammarDef is ClassDef { }
-
-class SubsetDef is Op {
-    has Str $.name;
-    has Array $.basetype; # Array of Str
-    has Array $.ourname; # Maybe[Array of Str], else gensymmish
-    has Str $.lexvar;
-    has $.body; # Body
-    has @.exports; # Array of Str
-
-    method code($ ) { CgOp.scopedlex($.lexvar) }
-}
-
-class Super is Op {
-    has $.name; # Str
-    has $.path; # Array of Str
-
-    method code($) { CgOp.corelex('Nil') }
-}
-
+# just a little hook for rewriting
 class Attribute is Op {
     has $.name; # Str
-    has $.sigil;
-    has $.accessor; # Bool
-    has $.initializer; # Body, is rw
-    has $.typeconstraint; # Array of Str
-    has $.rw;
+    has $.initializer; # Metamodel::Attribute
 
     method code($) { CgOp.corelex('Nil') }
 }
@@ -671,48 +611,36 @@ class WhateverCode is Op {
 
 class BareBlock is Op {
     has $.var = die "BareBlock.var required"; # Str
-    has $.body = die "BareBlock.body required"; # Body
 
-    method code($) { CgOp.scopedlex($.var) }
+    method code($) { CgOp.scopedlex($!var) }
 
     method statement_level() {
-        $.body.type = 'voidbare';
-        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => $.body, :once));
+        # This cheat relies on the fact that we can't have any lexicals put
+        # into this block until after the compile is done, so the usual
+        # issues with changing lexical representation don't apply :)
+        my $body = $*CURLEX<!sub>.find_lex($!var).body;
+        if $body.code ~~ ::Op::YouAreHere {
+            $body.run_once = $body.outer.run_once;
+        }
+
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(:once, symbol => $!var));
     }
 }
 
+# vestigal form for beta
 class SubDef is Op {
-    has $.body = die "SubDef.body required"; # Body
-
-    # often a gensym; will be set to the "correct" symbol if it is being
-    # used as a lexical; set by begin
     has $.symbol; # Str, is rw
-
-    has $.multiness; # proto, only, multi, Any=null
-    has $.bindlex; # Bool
-    has $.bindpackages; # Array of Array of Str to install in
-    # used for 'our' and 'is export'
-    has $.bindmethod; # named array blocky thing
-
-    # Is candidate for beta-optimization.  Not compatible with method_too,
-    # exports, ltm
     has $.once = False; # is rw, Bool
 
-    method zyg() { ($.bindmethod && ($.bindmethod[1] ~~ Op)) ?? $.bindmethod[1] !! () }
-
-    method code($) { CgOp.scopedlex($.symbol // 'Any') }
+    method code($) { CgOp.scopedlex($.symbol) }
 }
 
 class Lexical is Op {
     has $.name = die "Lexical.name required"; # Str
     has $.state_decl = False; # Bool
 
-    has $.declaring; # Bool
     has $.list; # Bool
     has $.hash; # Bool
-    has $.typeconstraint; # Array of Str
-
-    has $.state_backing; # Str
 
     method code($) { CgOp.scopedlex($.name) }
 
@@ -728,7 +656,6 @@ class Lexical is Op {
 class ConstantDecl is Op {
     has $.name = die "ConstantDecl.name required"; # Str
     has $.init; # Op, is rw
-    has $.path; # Array
 
     method code($ ) { CgOp.scopedlex($.name) }
 }
@@ -765,12 +692,6 @@ class PackageVar is Op {
     }
 }
 
-class Use is Op {
-    has $.unit = die "Use.unit required"; # Str
-
-    method code($ ) { CgOp.corelex('Nil') }
-}
-
 class Require is Op {
     has $.unit = die "Require.unit required"; # Str
 
@@ -785,7 +706,6 @@ class Take is Op {
 }
 
 class Gather is Op {
-    has $.body = die "Gather.body required"; # Body
     has $.var  = die "Gather.var required"; # Str
 
     method code($ ) {

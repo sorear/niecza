@@ -339,6 +339,7 @@ my class Routine is Block {
 my class Sub is Routine { }
 my class Method is Routine { }
 my class Submethod is Routine { }
+my class WhateverCode is Block { }
 
 my class ClassHOW {
     method isa(Mu $obj, Mu $type) { Q:CgOp {
@@ -386,6 +387,7 @@ my class CommonEnum {
 
 my class IntBasedEnum is CommonEnum {
     method Numeric() { Q:CgOp { (box Int (unbox int (@ {self}))) } }
+    method Int() { self.Numeric }
     method Stringy() { self.key }
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox int (@ {$val.Int})))
@@ -572,9 +574,9 @@ my class Label {
     has $!name;
 
     method goto() { _lexotic(8, self, ()) }
-    method next(\|@pcl) { _lexotic(1, self, @pcl.unwrap-single) }
-    method last(\|@pcl) { _lexotic(2, self, @pcl.unwrap-single) }
-    method redo(\|@pcl) { _lexotic(3, self, @pcl.unwrap-single) }
+    method next() { _lexotic(1, self, ()) }
+    method last() { _lexotic(2, self, ()) }
+    method redo() { _lexotic(3, self, ()) }
 }
 
 # XXX multi dispatch
@@ -824,7 +826,6 @@ my class Array is List {
 
 my class Hash {
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
-    method hash() { unitem(self) }
 
     method any() { any self.keys }
     method none() { none self.keys }
@@ -962,10 +963,10 @@ my class Junction is Mu {
     my @kinds = <all none one any>;
     method perl() {
         defined(self) ?? (@kinds[self!kind] ~ "(" ~
-            join(", ", map *.perl, @$!eigenstates) ~ ")") !! "Junction"
+            join(", ", map -> Mu $x { $x.perl }, @$!eigenstates) ~ ")") !! "Junction"
     }
 
-    method Str() { self.perl }
+    method Str() { defined(self) ?? self.perl !! "Junction()" }
     method Stringy() { self.FALLBACK("Stringy") }
 
     method from-parcel(Int $kind, Mu $pcl) {
@@ -1592,7 +1593,7 @@ sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) { !$a }
 sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ +$limit }
-sub prefix:<so> ($item) { ?$item }
+sub prefix:<so> (Mu $item) { ?$item }
 sub infix:<xx> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
 sub floor($x) { Q:CgOp { (_cgop bif_floor {$x}) } }

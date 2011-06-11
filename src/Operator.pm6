@@ -4,7 +4,6 @@
 #
 class Operator;
 
-use Body;
 use Sig;
 use OpHelpers;
 
@@ -38,8 +37,8 @@ method wrap_in_function($/) {
     my $i = -self.arity;
     while $i++ { push @args, ::GLOBAL::NieczaActions.gensym }
     my $do = self.with_args($/, map { mklex($/, $_) }, @args);
-    ::Op::SubDef.new(|node($/), body => Body.new(
-        :transparent, signature => Sig.simple(@args), :$do));
+    ::GLOBAL::NieczaActions.block_expr($/,
+        ::GLOBAL::NieczaActions.thunk_sub($do, params => @args));
 }
 
 class Function is Operator {
@@ -84,7 +83,7 @@ class PostCall is Operator {
             args => [ @$.args ]);
     }
 
-    method as_function($/) { self.wrap_in_function($/, 1) }
+    method as_function($/) { self.wrap_in_function($/) }
     method arity() { 1 }
 }
 
@@ -116,12 +115,23 @@ class Method is Operator {
             if defined($.path) && !$.private {
                 $/.CURSOR.sorry("Qualified references to non-private methods NYI");
             }
+            $*CURLEX<!sub>.noninlinable if $.name eq 'eval';
+            my $pclass;
+            if $.private {
+                if $.path {
+                    $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($.path));
+                } elsif $*CURLEX<!sub>.in_class -> $c {
+                    $pclass = $c;
+                } else {
+                    $/.CURSOR.sorry("Cannot resolve class for private method");
+                }
+            }
             ::Op::CallMethod.new(|node($/),
                 receiver => @args[0],
                 ismeta   => $.meta,
                 name     => $.name,
                 private  => $.private,
-                ppath    => $.path,
+                pclass   => $pclass,
                 args     => [ @$.args ]);
         }
     }
@@ -208,10 +218,11 @@ class Temp is Operator {
             $/.CURSOR.sorry('Non-contextual case of temp NYI');
             return ::Op::StatementList.new;
         }
+        my $hash = substr($rarg.name,0,1) eq '%';
+        my $list = substr($rarg.name,0,1) eq '@';
+        $*CURLEX<!sub>.add_my_name($rarg.name, :$hash, :$list);
         mkcall($/, '&infix:<=>',
-            ::Op::Lexical.new(name => $rarg.name, declaring => True,
-                        hash => substr($rarg.name,0,1) eq '%',
-                        list => substr($rarg.name,0,1) eq '@'),
+            ::Op::Lexical.new(name => $rarg.name, :$hash, :$list),
             ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
     }
 }

@@ -216,6 +216,8 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
+                if (CLRBackend.Verbose > 0)
+                    Console.WriteLine("Loading {0} {1}...", JScalar.S(xr[0]),i);
                 if (JScalar.S(xr[0]) == "sub") {
                     xref[i] = new StaticSub(this, xr, (code != null &&
                             i < code.Length) ? (object[])code[i] : null);
@@ -310,8 +312,18 @@ namespace Niecza.CLRBackend {
             StaticSub r = (bottom_ref ?? mainline_ref).Resolve<StaticSub>();
             while (r.unit.name != "CORE")
                 r = r.outer.Resolve<StaticSub>();
-            while (!r.l_lexicals.ContainsKey(name))
-                r = r.outer.Resolve<StaticSub>();
+            StaticSub rs = r;
+            while (r != null && !r.l_lexicals.ContainsKey(name))
+                r = r.outer != null ? r.outer.Resolve<StaticSub>() : null;
+            if (r == null) {
+                Console.WriteLine("CORE::" + name + " nonexistant!");
+                for (r = rs; r != null; r = r.outer != null ? r.outer.Resolve<StaticSub>() : null) {
+                    Console.WriteLine("-- {0}", r.name);
+                    foreach (string s in r.l_lexicals.Keys)
+                        Console.WriteLine(s);
+                }
+                throw new ArgumentException();
+            }
             LexStash lx = (LexStash)r.l_lexicals[name];
             return GetPackage(lx.path, 0, lx.path.Length);
         }
@@ -4405,6 +4417,7 @@ dynamic:
                     unit.EmitByte(2);
                     Class r = (Class) pkg;
                     List<string> all_slot = new List<string>();
+                    // TODO: compute this in the compiler
                     for (int i = 0; i < r.linearized_mro.Length; i++) {
                         Class p = r.linearized_mro[i].Resolve<Class>();
                         foreach (Attribute a in p.attributes)
@@ -4570,7 +4583,8 @@ dynamic:
                 MethodInfo set = dty.GetMethod("set_Item");
                 thaw.Add(CpsOp.SetField(lex, CpsOp.CallFrame(),
                     CpsOp.ConstructorCall(dty.GetConstructor(new Type[0]), new CpsOp[0])));
-                string s = unit.setting_ref.unit;
+                string s = (unit.setting_ref != null) ? unit.setting_ref.unit
+                    : null;
                 StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
                 while (s != null) {
                     thaw.Add(CpsOp.MethodCall(set,

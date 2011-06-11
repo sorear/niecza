@@ -3,12 +3,9 @@ use Op;
 use RxOp;
 use CClass;
 use CgOp;
-use Body;
-use Unit;
 use JSYNC;
 use NAMOutput;
 use NieczaFrontendSTD;
-use NieczaPassBegin;
 use NieczaPassBeta;
 use NieczaPassSimplifier;
 use NieczaBackendNAM;
@@ -26,155 +23,10 @@ use OpHelpers;
 use Operator;
 use OptRxSimple;
 use STD;
+use Stash;
 use Sig;
 
-augment class NieczaActions {
-method do_variable_reference($M, $v) {
-    if $v<term> {
-        return $v<term>;
-    }
-
-    my $tw = $v<twigil>;
-    my $sl = $v<sigil> ~ $tw ~ $v<name>;
-
-    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
-        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
-        return ::Op::StatementList.new;
-    }
-
-    if $tw eq '!' {
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
-            name => $v<name>, private => True, receiver => mklex($M, 'self'),
-            ppath => $v<rest>));
-    }
-    elsif $tw eq '.' {
-        if defined $v<rest> {
-            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
-            return ::Op::StatementList.new;
-        }
-
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
-            name => $v<name>, receiver => mklex($M, 'self')));
-    }
-    # no twigil in lex name for these
-    elsif $tw eq '^' || $tw eq ':' {
-        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>,
-            hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'));
-    }
-    elsif $tw eq '*' {
-        ::Op::ContextVar.new(|node($M), name => $sl);
-    }
-    elsif $tw eq '' || $tw eq '?' {
-        if defined($v<rest>) {
-            ::Op::PackageVar.new(path => $v<rest>, name => $sl,
-                hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'),
-                slot => self.gensym, |node($M));
-        } elsif $tw eq '?' && $sl eq '$?POSITION' {
-            mkcall($M, '&infix:<..^>',
-                ::Op::Num.new(|node($M), value => [10, ~$M.from]),
-                ::Op::Num.new(|node($M), value => [10, ~$M.to]));
-        } elsif $tw eq '?' && $sl eq '$?LINE' {
-            ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
-        } elsif $tw eq '?' && $sl eq '&?BLOCK' {
-            ::Op::GetBlock.new(|node($M))
-        } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
-            ::Op::GetBlock.new(|node($M), :routine)
-        } else {
-            ::Op::Lexical.new(|node($M), name => $sl,
-                hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'));
-        }
-    }
-    else {
-        $M.CURSOR.sorry("Unhandled reference twigil $tw");
-    }
-}
-method infix:sym<...> ($/) {
-    # STD parses ...^ in the ... rule
-    make Operator.funop('&infix:<' ~ $/ ~ '>', 2);
-}
-
-method sibble($/) {
-    my $regex = self.op_for_regex($/, $<left>.ast);
-    my $repl;
-    if $<infixish> {
-        if $<infixish> eq '=' {
-            $repl = $<right>.ast;
-        } elsif $<infixish>.ast ~~ ::Operator::CompoundAssign {
-            $repl = $<infixish>.ast.base.with_args($/,
-                mkcall($/, '&prefix:<~>', ::Op::ContextVar.new(name => '$*/')),
-                $<right>.ast);
-        } else {
-            $/.CURSOR.sorry("Unhandled operator in substitution");
-            $repl = mklex($/, 'Any');
-        }
-    } else {
-        $repl = $<right>.ast;
-    }
-    $repl = self.transparent($/, $repl, class => 'Regex');
-    make ::Op::CallMethod.new(|node($/), receiver => mklex($/, '$_'),
-        name => 'subst',
-        args => [ $regex, $repl, self.extract_rx_adverbs(True, True, $/),
-            ::Op::SimplePair.new(key => 'inplace', value => mklex($/,'True'))]);
-}
-
-method quotepair_term($/) {
-    my $v;
-    if $<v> ~~ Match {
-        $v = $<v>.ast
-    } elsif $<v> ~~ Str {
-        $v = ::Op::Num.new(value => [10, $<v>]);
-    } else {
-        $v = mklex($/, $<v> ?? "True" !! "False");
-    }
-    ::Op::SimplePair.new(|node($/), key => $<k>, value => $v);
-}
-
-method extract_rx_adverbs($ismatch, $issubst, $match) {
-    my $qps = ($match ~~ List) ?? $match !! $match<babble><quotepair>;
-    return () if !$qps;
-
-    my @ok;
-    my @nyi;
-    my @args;
-    my @internal = < sigspace s ratchet r ignorecase i >;
-
-    push @nyi, < ignoreaccent a bytes codes graphs chars Perl5 P5 >;
-
-    if $issubst {
-        push @nyi, < sameaccent aa samecase ii th st nd rd nth x >;
-        push @ok,  < g global >;
-    }
-
-    if $ismatch {
-        push @nyi, < overlap ov exhaustive ex continue c pos p global g rw >;
-    }
-
-    for @$qps -> $qp {
-        if @internal.grep($qp<k>) {
-            # handled by rx compiler
-        } elsif @ok.grep($qp<k>) {
-            push @args, self.quotepair_term($qp);
-        } elsif @nyi.grep($qp<k>) {
-            $qp.CURSOR.sorry("Regex modifier $qp<k> not yet implemented");
-        } else {
-            $qp.CURSOR.sorry("Regex modifier $qp<k> not valid on { $issubst ?? "substitution" !! $ismatch ?? "match" !! "regex literal" }");
-        }
-    }
-
-    @args
-}
-}
-
-class Op::MakeJunction is Op {
-    has Int $.typecode = die "MakeJunction.typecode required";
-    has @.zyg;
-
-    method code($body) {
-        CgOp.makejunction($!typecode, map *.cgop($body), @!zyg)
-    }
-}
-
-CgOp._register_ops: < makejunction
+CgOp._register_ops: <
 >;
 
 my $usage = q:to/EOM/;
@@ -253,17 +105,14 @@ else {
 my $stages;
 if $bcnd eq 'clisp' {
     $stages = [
-        NieczaPassBegin.new,
         NieczaPassSimplifier.new,
     ];
 } elsif $bcnd eq 'hoopl' {
     $stages = [
-        NieczaPassBegin.new,
         NieczaPassSimplifier.new,
     ];
 } else {
     $stages = [
-        NieczaPassBegin.new,
         NieczaPassBeta.new,
         NieczaPassSimplifier.new,
     ];
