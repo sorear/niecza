@@ -367,10 +367,15 @@ next_method: ;
         }
 
         public void Invalidate() {
-            List<object> notify = subclasses.GetSubscribers();
+            BulkRevalidate(subclasses.GetSubscribers());
+        }
+
+        public static void BulkRevalidate(IEnumerable<object> set) {
             HashSet<STable> dirty = new HashSet<STable>();
-            foreach (object k in notify) dirty.Add((STable)k);
-            foreach (object k in notify) ((STable)k).mo.RevalidateTree(dirty);
+            foreach (object k in set)
+                if (k is STable) dirty.Add((STable)k);
+            foreach (object k in set)
+                if (k is STable) ((STable)k).mo.RevalidateTree(dirty);
         }
 
         public void AddMethod(int flags, string name, P6any code) {
@@ -448,15 +453,12 @@ next_method: ;
             foreach (string an in all_slot) {
                 stable.slotMap[an] = stable.nslots++;
             }
-
-            Invalidate();
         }
 
         public void FillRole(STable[] superclasses, STable[] cronies) {
             this.superclasses = new List<STable>(superclasses);
             local_does = cronies;
             isRole = true;
-            Revalidate(); // need to call directly as we aren't in any mro list
             SetMRO(Kernel.AnyMO.mo.mro);
         }
 
@@ -464,7 +466,6 @@ next_method: ;
             isRole = true;
             roleFactory = factory;
             instCache = new Dictionary<string, P6any>();
-            Revalidate();
             SetMRO(Kernel.AnyMO.mo.mro);
         }
     }
@@ -705,6 +706,12 @@ next_method: ;
             this.slots = (klass.nslots != 0) ? new object[klass.nslots] : null;
         }
 
+        // for thawing, if klass is uninitialized
+        public P6opaque(STable klass, int na) {
+            this.mo = klass;
+            this.slots = (na != 0) ? new object[na] : null;
+        }
+
         public override void SetSlot(string name, object obj) {
             if (slots == null)
                 throw new NieczaException("Attempted to access slot " + name +
@@ -727,5 +734,6 @@ next_method: ;
     public class BoxObject<T> : P6opaque {
         public T value;
         public BoxObject(T x, STable klass) : base(klass) { value = x; }
+        public BoxObject(T x, STable klass, int na) : base(klass,na) { value = x; }
     }
 }

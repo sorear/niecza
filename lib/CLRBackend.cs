@@ -4417,6 +4417,7 @@ dynamic:
                     unit.EmitByte(2);
                     Class r = (Class) pkg;
                     List<string> all_slot = new List<string>();
+                    // TODO: compute this in the compiler
                     for (int i = 0; i < r.linearized_mro.Length; i++) {
                         Class p = r.linearized_mro[i].Resolve<Class>();
                         foreach (Attribute a in p.attributes)
