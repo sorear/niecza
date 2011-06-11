@@ -1,4 +1,4 @@
-class NieczaPassBeta;
+class OptBeta;
 
 use CgOp;
 
@@ -6,38 +6,15 @@ use CgOp;
 # (-> $x { block })($y), due to control structures and regexes.  Try to clean
 # that up here.
 
-method invoke($*unit) {
-    # XXX enter and sigs need love
-    $*unit.visit_local_subs_postorder(-> $su {
-        $su.code = run_optree($su, $su.code)
-    });
-    $*unit;
-}
-
-sub run_optree($body, $op) {
-
-    for $op.zyg {
-        $_ = run_optree($body, $_);
-    }
-
-    return $op unless $op.^isa(::Op::CallSub) && no_named_params($op);
-    my $inv = $op.invocant;
-    return $op unless $inv.^isa(::Op::SubDef) && $inv.once;
-    my $cbody = $body.find_lex($inv.symbol) or return $op;
+method make_call($var, *@params) {
+    my $nonopt = ::Op::CallSub.new(
+        positionals => [ @params ],
+        invocant => ::Op::Lexical.new(name => $var));
+    my $cbody = $*CURLEX<!sub>.find_lex($var) or return $nonopt;
     $cbody = $cbody.body;
-    return $op unless is_removable_body($cbody);
+    return $nonopt unless is_removable_body($cbody);
 
-    beta_optimize($body, $op, $inv, $cbody);
-}
-
-sub no_named_params($op) {
-    if defined $op.args {
-        for @( $op.args ) {
-            # XXX flattening check?
-            return False if $_.^isa(::Op::SimplePair);
-        }
-    }
-    return True;
+    beta_optimize($*CURLEX<!sub>, $var, $cbody, @params);
 }
 
 sub is_removable_body($body) {
@@ -73,12 +50,12 @@ sub is_removable_body($body) {
 }
 
 # Applicability already checked
-sub beta_optimize($body, $op, $inv, $cbody) {
+sub beta_optimize($body, $symbol, $cbody, @inpos) {
     # Bind the arguments to gensyms so they won't be shadowed by anything in
     # the function
-    my @args = map { [ $_, ::GLOBAL::NieczaActions.gensym ] }, @( $op.positionals );
+    my @args = map { [ $_, ::GLOBAL::NieczaActions.gensym ] }, @inpos;
 
-    $body.delete_lex($inv.symbol);
+    $body.delete_lex($symbol);
     $*unit.xref.[$cbody.xref[1]] = Any;
     {
         my $c = $cbody.outer.zyg;

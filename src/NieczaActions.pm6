@@ -4,7 +4,6 @@ use Op;
 use RxOp;
 use Sig;
 use CClass;
-use OptRxSimple;
 use OpHelpers;
 use Operator;
 
@@ -281,7 +280,7 @@ method op_for_regex($/, $rxop) {
         my $*endsym;
         $rxop.check
     }
-    my ($orxop, $mb) = OptRxSimple.run($rxop);
+    my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
     self.block_expr($/, self.thunk_sub(::Op::RegexBody.new(|node($/),
             canback => $mb, pre => @lift, rxop => $orxop),
         class => 'Regex', params => ['self']));
@@ -303,7 +302,7 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
         :$passcap = False) {
     my @lift = $rxop.oplift;
     my $lad = $rxop.lad;
-    my ($nrxop, $mb) = OptRxSimple.run($rxop);
+    my ($nrxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
     if defined $goal {
         unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
             lhs => mklex($/, '$*GOAL'),
@@ -399,8 +398,8 @@ method regex_def($/) {
         $ast.check;
     }
     my @lift = $ast.oplift;
-    $*CURLEX<!sub>.ltm = OptRxSimple.run_lad($ast.lad);
-    ($ast, my $mb) = OptRxSimple.run($ast);
+    $*CURLEX<!sub>.ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
+    ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
     $*CURLEX<!sub>.add_my_name('$*/');
     $*CURLEX<!sub>.code = ::Op::RegexBody.new(|node($/), pre => @lift,
         name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb);
@@ -1075,8 +1074,7 @@ method circumfix:sym<{ }> ($/) {
 
     if self.check_hash($/) {
         make mkcall($/, '&_hash_constructor',
-            ::Op::CallSub.new(|node($/),
-                invocant => ::Op::SubDef.new(symbol=>$var, :once)))
+            ::GLOBAL::OptBeta.make_call($var));
     }
 }
 
@@ -2741,8 +2739,7 @@ method statement_control:loop ($/) {
 
 method statement_control:for ($/) {
     make ::Op::ForLoop.new(|node($/), source => $<xblock>.ast[0],
-        sink => ::Op::SubDef.new(:once, symbol =>
-            self.block_expr($/, $<xblock>.ast[1]).name));
+        sink => self.block_expr($/, $<xblock>.ast[1]).name);
 }
 
 method statement_control:given ($/) {
@@ -3028,9 +3025,7 @@ method block_expr($/, $pb) {
 method inliney_call($/, $block, *@parms) {
     my $sym = self.gensym;
     $*CURLEX<!sub>.add_my_sub_child($sym, $block);
-    ::Op::CallSub.new(|node($/),
-        invocant => ::Op::SubDef.new(symbol => $sym, :once),
-        positionals => @parms);
+    ::GLOBAL::OptBeta.make_call($sym, @parms);
 }
 
 # this is intended to be called after parsing the longname for a sub,

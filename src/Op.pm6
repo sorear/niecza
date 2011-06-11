@@ -423,24 +423,22 @@ class GeneralLoop is Op {
 }
 
 class ForLoop is Op {
-    has $.source = die "ForLoop.source required"; # Op
-    has $.sink = die "ForLoop.sink required"; # Op
+    has Op $.source = die "ForLoop.source required";
+    has Str $.sink = die "ForLoop.sink required";
     method zyg() { $.source, $.sink }
 
     method code($body) {
-        CgOp.methodcall(
-            CgOp.subcall(CgOp.fetch(CgOp.corelex('&flat')),
-                $.source.cgop($body)), 'map', $.sink.cgop($body));
+        CgOp.methodcall(CgOp.subcall(CgOp.fetch(CgOp.corelex('&flat')),
+                $.source.cgop($body)), 'map', CgOp.scopedlex($!sin));
     }
 
     method statement_level() {
-        my $body = $*CURLEX<!sub>.find_lex($!sink.symbol).body;
+        my $body = $*CURLEX<!sub>.find_lex($!sink).body;
         my $var = [ map { ::GLOBAL::NieczaActions.gensym },
             0 ..^ +$body.signature.params ];
-        $!sink.once = True;
         ::Op::ImmedForLoop.new(source => $!source, var => $var,
-            sink => ::Op::CallSub.new(invocant => $!sink,
-                positionals => [ map { ::Op::LetVar.new(name => $_) }, @$var]));
+            sink => ::GLOBAL::OptBeta.make_call($!sink,
+                map { ::Op::LetVar.new(name => $_) }, @$var));
     }
 }
 
@@ -623,7 +621,7 @@ class BareBlock is Op {
             $body.run_once = $body.outer.run_once;
         }
 
-        ::Op::CallSub.new(invocant => ::Op::SubDef.new(:once, symbol => $!var));
+        ::GLOBAL::OptBeta.make_call($!var);
     }
 }
 

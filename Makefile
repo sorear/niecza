@@ -18,9 +18,9 @@ csxdr=CrossDomainReceiver.cs
 libunits=CORE JSYNC
 srcunits=CClass CgOp Op OpHelpers Sig RxOp NAME Stash STD NieczaGrammar \
 	 Metamodel OptRxSimple NAMOutput Operator NieczaActions \
-	 NieczaFrontendSTD NieczaPassBeta NieczaPassSimplifier \
-	 NieczaPathSearch NieczaBackendNAM NieczaBackendDotnet \
-	 NieczaBackendClisp NieczaBackendHoopl NieczaCompiler GetOptLong
+	 NieczaFrontendSTD NieczaPassSimplifier OptBeta NieczaPathSearch \
+	 NieczaBackendNAM NieczaBackendDotnet NieczaBackendClisp \
+	 NieczaBackendHoopl NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
 	@git describe --tags > VERSION
@@ -125,7 +125,7 @@ help:
 	@echo 'help       this list of targets'
 	@echo ''
 
-# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/\1.nam: boot/obj/\2.nam|'
+# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/\1.nam: boot/obj/\2.nam|' | grep -v MONKEY_TYPING
 boot/obj/Metamodel.nam: boot/obj/NAME.nam
 boot/obj/Metamodel.nam: boot/obj/Stash.nam
 boot/obj/NAMOutput.nam: boot/obj/JSYNC.nam
@@ -135,7 +135,6 @@ boot/obj/NieczaActions.nam: boot/obj/Op.nam
 boot/obj/NieczaActions.nam: boot/obj/RxOp.nam
 boot/obj/NieczaActions.nam: boot/obj/Sig.nam
 boot/obj/NieczaActions.nam: boot/obj/CClass.nam
-boot/obj/NieczaActions.nam: boot/obj/OptRxSimple.nam
 boot/obj/NieczaActions.nam: boot/obj/OpHelpers.nam
 boot/obj/NieczaActions.nam: boot/obj/Operator.nam
 boot/obj/NieczaBackendClisp.nam: boot/obj/NieczaBackendNAM.nam
@@ -149,10 +148,10 @@ boot/obj/NieczaFrontendSTD.nam: boot/obj/Stash.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaGrammar.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaActions.nam
 boot/obj/NieczaGrammar.nam: boot/obj/STD.nam
-boot/obj/NieczaPassBeta.nam: boot/obj/CgOp.nam
 boot/obj/Operator.nam: boot/obj/Sig.nam
 boot/obj/Operator.nam: boot/obj/OpHelpers.nam
 boot/obj/Op.nam: boot/obj/CgOp.nam
+boot/obj/OptBeta.nam: boot/obj/CgOp.nam
 boot/obj/OptRxSimple.nam: boot/obj/RxOp.nam
 boot/obj/RxOp.nam: boot/obj/CgOp.nam
 boot/obj/RxOp.nam: boot/obj/CClass.nam

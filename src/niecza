@@ -1,30 +1,28 @@
-use Metamodel;
-use Op;
-use RxOp;
+use MONKEY_TYPING;
 use CClass;
 use CgOp;
-use JSYNC;
-use NAMOutput;
-use NieczaFrontendSTD;
-use NieczaPassBeta;
-use NieczaPassSimplifier;
-use NieczaBackendNAM;
-use NieczaBackendDotnet;
-use NieczaBackendClisp;
-use NieczaBackendHoopl;
-use NieczaPathSearch;
-use NieczaCompiler;
-
-use MONKEY_TYPING;
-
 use GetOptLong;
+use JSYNC;
+use Metamodel;
+use NAMOutput;
 use NieczaActions;
-use OpHelpers;
+use NieczaBackendClisp;
+use NieczaBackendDotnet;
+use NieczaBackendHoopl;
+use NieczaBackendNAM;
+use NieczaCompiler;
+use NieczaFrontendSTD;
+use NieczaPassSimplifier;
+use NieczaPathSearch;
+use Op;
 use Operator;
+use OpHelpers;
+use OptBeta;
 use OptRxSimple;
-use STD;
-use Stash;
+use RxOp;
 use Sig;
+use Stash;
+use STD;
 
 CgOp._register_ops: <
 >;
@@ -102,22 +100,6 @@ else {
     exit 1;
 }
 
-my $stages;
-if $bcnd eq 'clisp' {
-    $stages = [
-        NieczaPassSimplifier.new,
-    ];
-} elsif $bcnd eq 'hoopl' {
-    $stages = [
-        NieczaPassSimplifier.new,
-    ];
-} else {
-    $stages = [
-        NieczaPassBeta.new,
-        NieczaPassSimplifier.new,
-    ];
-}
-
 my $c = NieczaCompiler.new(
     module_finder => NieczaPathSearch.new(
         path => @lib,
@@ -126,7 +108,7 @@ my $c = NieczaCompiler.new(
         lang => $lang,
         safemode => $safe,
     ),
-    stages => $stages,
+    stages => [ NieczaPassSimplifier.new ],
     backend => $backend,
     verbose => $verb,
 );
