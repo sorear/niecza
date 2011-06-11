@@ -1787,7 +1787,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    package Foo7426 { ... }
+    package Foo7426 { }
     class Foo7426::Inner {
         method pie() { 32 }
     }
