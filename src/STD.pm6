@@ -740,9 +740,10 @@ token embeddedblock {
 
     :dba('embedded block')
 
+    '{' ::
     <.newlex>
     <.finishlex>
-    '{' :: [ :lang(%*LANG<MAIN>) <statementlist> ]
+    [ :lang(%*LANG<MAIN>) <statementlist> ]
     [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
 }
 
@@ -1940,6 +1941,8 @@ grammar P6 is STD {
         ] || <.panic: "Malformed method">
     }
 
+    token regex_def_1($*cursor) { <?> }
+    token regex_def_2($*cursor) { <?> }
     rule regex_def ($d, :$r, :$s) {
         :temp $*CURLEX;
         :my $*IN_DECL = $d;
@@ -1957,7 +1960,9 @@ grammar P6 is STD {
                 }
             }
             <.newlex(1)>
+            <.regex_def_1($/)>
             [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
+            <.regex_def_2($/)>
             [ <!before '{'> <.panic: "Malformed block"> ]?
             { $*IN_DECL = ''; }
             <.finishlex>
@@ -5175,6 +5180,7 @@ method newlex ($needsig = 0, $once = False) {
     $ALL.{$id} = $*CURLEX;
     $*CURLEX<!sub> = ::Metamodel::StaticSub.new(
         unit => $*unit,
+        class => 'Block',
         outerx => $osub.xref,
         in_class => $osub.in_class,
         cur_pkg => $osub.cur_pkg,
@@ -5195,12 +5201,14 @@ method finishlex {
 
 method getsig {
     my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
+    state %method = (:Method, :Submethod, :Regex);
     if $*CURLEX.<!NEEDSIG>:delete {
         my @parms;
-        if $*CURLEX<!sub>.methodof {
-            my $cl = $*unit.deref($*CURLEX<!sub>.methodof);
+        if %method{$*CURLEX<!sub>.class} {
+            my $cl = $*CURLEX<!sub>.methodof &&
+                $*unit.deref($*CURLEX<!sub>.methodof);
             # XXX type checking against roles NYI
-            if $cl !~~ ::Metamodel::Role &&
+            if $cl && $cl !~~ ::Metamodel::Role &&
                     $cl !~~ ::Metamodel::ParametricRole {
                 push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
                     tclass => $cl.xref);
@@ -5675,6 +5683,12 @@ method explain_mystery() {
         }
     }
     self.sorry($m) if $m;
+
+    for $*unit.stubbed_stashes {
+        next if .key.closed;
+        .value.sorry("Package was stubbed but not defined");
+    }
+
     self;
 }
 

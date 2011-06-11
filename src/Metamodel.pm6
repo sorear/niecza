@@ -546,6 +546,12 @@ class StaticSub is RefTarget {
         $.outer.create_static_pad if $.outer;
     }
 
+    method noninlinable() {
+        loop (my $c = self; $c && $c.unit === $*unit; $c = $c.outer) {
+            $c.strong_used = True;
+        }
+    }
+
     method topicalizer() {
         $.signature && ?( grep { .slot && .slot eq '$_' }, @( $.signature.params ) )
     }

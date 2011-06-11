@@ -313,8 +313,7 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
     }
     my $subop = self.thunk_sub(
         ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut, :$passcap,
-            rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
-        params => ['self']);
+            rxop => $nrxop), ltm => $lad, class => 'Regex', params => ['self']);
     $subop.add_my_name('$*GOAL') if defined($goal);
     $subop = ::Op::CallSub.new(|node($/), invocant => self.block_expr($/, $subop),
         positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
@@ -332,39 +331,38 @@ method regex_block($/) {
     make $<nibble>.ast;
 }
 
-method regex_def($/) {
+method regex_def_1 ($, $/ = $*cursor) {
     sub _symtext($name) {
         ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
             ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
             ($name, Str);
     }
-    my ($name, $path) = $<deflongname> ??
-        self.mangle_longname($<deflongname>[0]).<name path> !! Nil;
-    my $cname;
-    if defined($path) && $path == 0 && $name.^isa(Op) {
-        $cname = $name;
-        $name = ~$<deflongname>[0];
-        $path = Any;
+
+    my ($m,$p) = $<deflongname> ??
+        self.mangle_longname($<deflongname>).<name path> !! ();
+    my $multiness = $*MULTINESS || 'only';
+
+    $*CURLEX<!name> = $m;
+    if $m ~~ Op {
+        $*CURLEX<!name> = $*CURLEX<!cleanname> = '::($name)';
+    } elsif defined $m {
+        $*CURLEX<!cleanname !sym> = _symtext($m);
+        $multiness = 'multi' if defined $*CURLEX<!sym>;
     }
+    $*CURLEX<!multi> = $multiness;
 
-    my $multiness = $*MULTINESS || Any;
+    self.install_sub($/, $*CURLEX<!sub>, scope => $*SCOPE, name => $m,
+        method_type => (($*SCOPE || 'has') eq 'has') ?? 'normal' !! Any,
+        path => $p, :$multiness, class => 'Regex');
+}
 
-    my $scope = (!defined($name)) ?? "anon" !! ($*SCOPE || "has");
-
+method regex_def_2 ($, $/ = $*cursor) {
     if $<signature> > 1 {
-        $/.CURSOR.sorry("Multiple signatures on a regex NYI");
-        return Nil;
+        $/.CURSOR.sorry("Too many signatures on regex");
     }
+}
 
-    if $cname && $scope ne 'has' {
-        $/.CURSOR.sorry("Only has regexes may have computed names");
-        make ::Op::StatementList.new;
-        return Nil;
-    }
-
-    my ($basename, $symtext) = ($cname || !defined($name))
-        ?? (Str, Str) !! _symtext($name);
-
+method regex_def($/) {
     my $endsym;
     for map *.ast, @$<trait> -> $t {
         if $t<unary> || $t<binary> || $t<defequiv> || $t<of> {
@@ -378,67 +376,37 @@ method regex_def($/) {
         }
     }
 
-    if $multiness && $multiness eq 'proto' {
-        if ($<signature> && $<signature>[0].ast.params) ||
+    if $*CURLEX<!multi> eq 'proto' {
+        if ($<signature> && $<signature>[0].ast.params != 1) ||
                 !$<regex_block><onlystar> {
             $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
-            return Nil;
         }
-        @*MEMOS[0]<proto_endsym>{$basename} = $endsym if $scope eq 'has';
+        @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} = $endsym
+            if defined $*CURLEX<!cleanname>;
     } else {
-        my $m2 = defined($symtext) ?? 'multi' !! 'only';
-        if $multiness && $multiness ne $m2 {
-            $/.CURSOR.sorry("Inferred multiness disagrees with explicit");
-        }
-        $multiness = $m2;
-        $endsym //= @*MEMOS[0]<proto_endsym>{$basename} if defined $basename;
-    }
-
-    if defined($path) && $scope ne 'our' {
-        $/.CURSOR.sorry("Putting a regex in a package requires using the our scope.");
-        return Nil;
-    }
-
-    my $sig = $<signature> ?? $<signature>[0].ast !! Sig.simple;
-
-    if $scope eq 'state' || $scope eq 'supercede' || $scope eq 'augment' {
-        $/.CURSOR.sorry("Nonsensical scope $scope for regex");
-        return Nil;
-    }
-
-    if $scope eq 'our' {
-        $/.CURSOR.sorry("our regexes NYI");
-        return Nil;
+        $endsym //= @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} if
+            defined $*CURLEX<!cleanname>;
     }
 
     my $ast = $<regex_block>.ast;
-    if $multiness eq 'proto' {
-        $ast = ::RxOp::ProtoRedis.new(name => $name);
+    if $*CURLEX<!multi> eq 'proto' {
+        $ast = ::RxOp::ProtoRedis.new(name => $*CURLEX<!name>);
     }
 
     {
         my $*paren = 0;
-        my $*symtext = $symtext;
+        my $*symtext = $*CURLEX<!sym>;
         my $*endsym = $endsym;
-        my $*dba = $name // 'anonymous regex';
+        my $*dba = $*CURLEX<!name> // 'anonymous regex';
         $ast.check;
     }
-    my $lad = OptRxSimple.run_lad($ast.lad);
     my @lift = $ast.oplift;
+    $*CURLEX<!sub>.ltm = OptRxSimple.run_lad($ast.lad);
     ($ast, my $mb) = OptRxSimple.run($ast);
-    make ::Op::SubDef.new(|node($/),
-        :$multiness,
-        bindlex => ($scope ne 'anon' && $scope ne 'has'),
-        bindmethod => ($scope eq 'has' ?? ['normal', $cname // $name] !! Any),
-        body => Body.new(
-            ltm   => $lad,
-            returnable => True,
-            class => 'Regex',
-            type  => 'regex',
-            name  => $name // 'ANONrx',
-            signature => $sig.for_method,
-            do => ::Op::RegexBody.new(|node($/), pre => @lift,
-                name => ($name // ''), rxop => $ast, canback => $mb)));
+    $*CURLEX<!sub>.add_my_name('$*/');
+    $*CURLEX<!sub>.code = ::Op::RegexBody.new(|node($/), pre => @lift,
+        name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb);
+    make mklex($/, $*CURLEX<!sub>.outervar);
 }
 
 method regex_declarator:regex ($/) { make $<regex_def>.ast }
@@ -509,7 +477,8 @@ method quantifier:sym<~> ($/) {
 }
 method quantifier:sym<**> ($/) {
     # XXX can't handle normspace well since it's not labelled 1*/2*
-    my $h = $<embeddedblock> ?? { min => 0, cond => $<embeddedblock>.ast } !!
+    my $h = $<embeddedblock> ?? { min => 0, cond =>
+                self.inliney_call($/, $<embeddedblock>.ast) } !!
             $<quantified_atom> ?? { min => 1, sep => $<quantified_atom>.ast } !!
             { min => +~$0, max => ($1 ?? +~$1 !!
                 defined($/.index('..')) ?? Any !! +~$0) };
@@ -556,12 +525,11 @@ method metachar:sigwhite ($/) {
 method metachar:unsp ($/) { make ::RxOp::Sequence.new }
 
 method metachar:sym<{ }> ($/) {
-    my $inv = $<embeddedblock>.ast.invocant;
-    $inv.body.type = 'rxembedded';
-    $inv.body.signature = Sig.simple('$¢');
-    $inv.once = True;
-    $inv = ::Op::CallSub.new(|node($/), invocant => $inv, positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
-    make ::RxOp::VoidBlock.new(block => $inv);
+    $<embeddedblock>.ast.signature = Sig.simple('$¢');
+    $<embeddedblock>.ast.add_my_name('$¢', :noinit);
+
+    make ::RxOp::VoidBlock.new(block => self.inliney_call($/,
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
 }
 
 method metachar:mod ($/) {
@@ -781,12 +749,11 @@ method assertion:sym<!> ($/) {
 }
 
 method assertion:sym<{ }> ($/) {
-    my $inv = $<embeddedblock>.ast.invocant;
-    $inv.body.type = 'rxembedded';
-    $inv.body.signature = Sig.simple('$¢');
-    $inv.once = True;
-    $inv = ::Op::CallSub.new(|node($/), invocant => $inv, positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
-    make ::RxOp::CheckBlock.new(block => $inv);
+    $<embeddedblock>.ast.signature = Sig.simple('$¢');
+    $<embeddedblock>.ast.add_my_name('$¢', :noinit);
+
+    make ::RxOp::CheckBlock.new(block => self.inliney_call($/,
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
 }
 
 method assertion:sym<[> ($/) { self.do_cclass($/) }
@@ -893,7 +860,7 @@ method backslash:v ($/) { make $CClass::VSpace; post_backslash($/) }
 method backslash:w ($/) { make $CClass::Word; post_backslash($/) }
 
 method escape:sym<\\> ($/) { make $<item>.ast }
-method escape:sym<{ }> ($/) { make $<embeddedblock>.ast }
+method escape:sym<{ }> ($/) { make self.inliney_call($/, $<embeddedblock>.ast) }
 method escape:sym<$> ($/) { make $<EXPR>.ast }
 method escape:sym<@> ($/) { make $<EXPR>.ast }
 method escape:sym<%> ($/) { make $<EXPR>.ast }
@@ -1801,7 +1768,7 @@ method param_var($/) {
         return Nil;
     }
 
-    $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, :noinit)
+    $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, noinit => ?($*SIGNUM))
         if defined($slot);
 
     make { :$list, :$hash, :$slot,
@@ -1901,7 +1868,8 @@ method signature($/) {
         }
     }
 
-    if $*SIGNUM && $*CURLEX<!sub>.methodof && (!@p || !@p[0].invocant) {
+    state %mlike = (:Method, :Submethod, :Regex);
+    if $*SIGNUM && %mlike{$*CURLEX<!sub>.class} && (!@p || !@p[0].invocant) {
         $*CURLEX<!sub>.add_my_name('self', :noinit);
         unshift @p, ::Sig::Parameter.new(name => 'self', :invocant);
     }
@@ -2093,13 +2061,9 @@ method blockoid($/) {
 }
 method lambda($/) {}
 method embeddedblock($/) {
-    my $sym = self.gensym;
     $*CURLEX<!sub>.code = $<statementlist>.ast;
-    $*CURLEX<!sub>.outer.add_my_sub_child($sym, $*CURLEX<!sub>);
     $*CURLEX<!sub>.signature = Sig.simple();
-    make ::Op::CallSub.new(|node($/),
-        invocant => ::Op::SubDef.new(body => Any, symbol => $sym, :once),
-        positionals => []);
+    make $*CURLEX<!sub>;
 }
 
 method sigil:sym<&> ($/) {}
@@ -2339,11 +2303,22 @@ method type_declarator:subset ($/) {
         }
     }
 
-    my $body = self.transparent($/, $<EXPR> ?? $<EXPR>[0].ast !!
-        mklex($/, 'True')).body;
+    my $body = self.thunk_sub($<EXPR> ?? $<EXPR>[0].ast !! mklex($/, 'True'));
 
-    make ::Op::SubsetDef.new(|node($/), :$name, :$lexvar, :$ourname,
-        :$body, :@exports, :$basetype);
+    my @ns = $ourname ?? @( $*CURLEX<!sub>.find_pkg($ourname) ) !!
+        $*unit.anon_stash;
+
+    $*unit.create_stash([@ns]);
+    $*CURLEX<!sub>.add_my_stash($lexvar, [@ns]);
+    $*CURLEX<!sub>.add_pkg_exports($*unit, $name, [@ns], @exports);
+    $*CURLEX<!sub>.create_static_pad;
+
+    $basetype = $*unit.get_item($*CURLEX<!sub>.find_pkg([@$basetype]));
+    my $obj = ::Metamodel::Subset.new(:$name, where => $body.xref, :$basetype);
+    $*unit.bind_item([@ns], $obj.xref);
+    $obj.exports = [ [@ns] ];
+
+    make mklex($/, $lexvar);
 }
 
 method make_constant($/, $scope, $name, $path) {
@@ -2489,7 +2464,7 @@ method type_declarator:enum ($/) {
         }
 
         for @pairs {
-            self.init_constant(self.make_constant($/, $scope, .key, $r<path>),
+            self.init_constant(self.make_constant($/, $scope, .key, Any),
                 ::Op::CallSub.new(invocant => mklex($/, $lexvar),
                     args => [ ::Op::StringLiteral.new(text => .key) ]));
         }
@@ -2497,7 +2472,7 @@ method type_declarator:enum ($/) {
         make mklex($/, $lexvar);
     } else {
         make self.init_constant(
-            self.make_constant($/, $scope, $<name> && ~$<name>, Any),
+            self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>, Any),
             ::Op::CallMethod.new(|node($/), name => 'new',
                 receiver => mklex($/, 'EnumMap'),
                 args => [$<term>.ast])),
@@ -2547,6 +2522,8 @@ method process_block_traits($/, @tr) {
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
             $sub.outer.add_exports($*unit, '&' ~ $sub.name, @exports);
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
             $sub.exports //= [];
             push $sub.exports, [ @($sub.outer.find_pkg(
                 ['OUR','EXPORT',$_])), '&' ~ $sub.name ] for @exports;
@@ -2571,7 +2548,7 @@ method nulltermish($/) {}
 method EXPR($/) { make $<root>.ast }
 method modifier_expr($/) { make $<EXPR>.ast }
 method default_value($/) { make self.thunk_sub($<EXPR>.ast).xref }
-method thunk_sub($code, :$params = [], :$name, :$class) {
+method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
     my $n = ::Metamodel::StaticSub.new(
         outerx => $*CURLEX<!sub>.xref,
         class => $class // 'Block',
@@ -2579,6 +2556,7 @@ method thunk_sub($code, :$params = [], :$name, :$class) {
         name => $name // 'ANON',
         transparent => True,
         code => $code,
+        ltm => $ltm,
         in_class => $*CURLEX<!sub>.in_class,
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
     $n.signature = Sig.simple(@$params);
@@ -2785,28 +2763,53 @@ method statement_control:when ($/) {
 
 method statement_control:use ($/) {
     make ::Op::StatementList.new;
-    if $<version> {
-        return Nil;
-    }
+    return if $<version>; # just ignore these
 
     my $name = $<module_name>.ast<name>;
     my $args = $<arglist> ?? $<arglist>.ast !! [];
 
     if defined $<module_name>.ast.<args> {
         $/.CURSOR.sorry("'use' of an instantiated role not yet understood");
-        return Nil;
+        return;
     }
 
     if $args {
         $/.CURSOR.sorry("'use' with arguments NYI");
-        return Nil;
+        return;
     }
 
     if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
-        return Nil;
+        return;
     }
 
-    make ::Op::Use.new(|node($/), unit => $name);
+    my $u2 = $*unit.need_unit($name);
+
+    my @can = @( $u2.mainline.find_pkg([$name.split('::')]) );
+    my @exp = (@can, 'EXPORT', 'DEFAULT');
+
+    # XXX I am not sure how need binding should work in the :: case
+    if $name !~~ /"::"/ {
+        $*CURLEX<!sub>.lexicals{$name} =
+            ::Metamodel::Lexical::Stash.new(path => @can);
+    }
+
+    for $*unit.list_stash(@exp) -> $tup {
+        my $uname = $tup[0];
+        my $lex;
+        if $tup[1] eq 'var' {
+            if $tup[2] && !$tup[2][0] {
+                $lex = ::Metamodel::Lexical::Common.new(path => @exp, name => $uname);
+            } elsif $tup[2] {
+                $lex = ::Metamodel::Lexical::Stash.new(path => [@exp, $uname]);
+            }
+        } elsif $tup[1] eq 'graft' {
+            $lex = ::Metamodel::Lexical::Stash.new(path => $tup[2]);
+        } else {
+            die "weird return";
+        }
+
+        $*CURLEX<!sub>.lexicals{$uname} = $lex;
+    }
 }
 
 method open_package_def($, $/ = $*cursor) {
@@ -2853,6 +2856,7 @@ method open_package_def($, $/ = $*cursor) {
         my @ah = $so;
         $sub.augment_hack = @ah;
         $sub.body_of = $sub.in_class = $so;
+        $sub.cur_pkg = $pkg;
         $sub.augmenting = True;
         $sub.set_name("augment-$dso.name()");
     } else {
@@ -2873,8 +2877,9 @@ method open_package_def($, $/ = $*cursor) {
             if $scope eq 'our' {
                 $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
             }
-            try @ns = @( $*CURLEX<!sub>.outer.find_pkg(
-                [ @( $r<path> // ['MY'] ), $r<name> ]) );
+            if !$r<path> && ($*CURLEX<!sub>.outer.lexicals.{$r<name>} ~~ ::Metamodel::Lexical::Stash) {
+                @ns = @( $*CURLEX<!sub>.outer.find_pkg(['MY',$r<name>]) );
+            }
             $*CURLEX<!sub>.outervar = ($scope eq 'anon' || ($r<path>:exists))
                 ?? self.gensym !! $name;
         } else {
@@ -2951,11 +2956,13 @@ method package_def ($/) {
                 $sub.parametric_role_hack = $obj.xref;
                 $sub.add_my_name('*params', :noinit);
                 $sub.create_static_pad;
-            }
 
-            make ::Op::StatementList.new(|node($/), children => [
-                ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
-                ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                    ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
         }
     }
 }
@@ -3059,6 +3066,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$path, :$name is copy, :$method_type is copy, :$contextual is copy) {
 
     $multiness ||= 'only';
+    $path := Any if $name ~~ Op; #Hack
 
     if !$scope {
         if !defined($name) {
@@ -3102,12 +3110,14 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         $contextual = False;
     }
 
+    $method_type = Str if $scope eq 'anon';
+
     my $method_targ = $method_type && $sub.outer.body_of;
     if $method_targ {
         $method_targ = $*unit.deref($method_targ);
     } elsif defined($method_type) {
         $/.CURSOR.sorry("Methods must be used in some kind of package");
-        $method_type = 'Str';
+        $method_type = Str;
     }
 
     if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||

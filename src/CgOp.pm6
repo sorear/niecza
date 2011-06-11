@@ -76,7 +76,7 @@ CgOp._register_ops: <
         vvarlist_push vvarlist_shift vvarlist_sort vvarlist_to_fvarlist
         vvarlist_unshift vvarlist_unshiftn whileloop xspan bif_times
         bif_divop obj_can bif_sqrt bif_push bif_pop bif_unshift bif_shift
-        newarray newhash you_are_here frame_outer frame_sub
+        newarray newhash you_are_here frame_outer frame_sub makejunction
         >;
 
 method double($x) {

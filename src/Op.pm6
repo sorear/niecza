@@ -435,11 +435,12 @@ class ForLoop is Op {
     }
 
     method statement_level() {
+        my $body = $*CURLEX<!sub>.find_lex($!sink.symbol).body;
         my $var = [ map { ::GLOBAL::NieczaActions.gensym },
-            0 ..^ +$.sink.body.signature.params ];
-        $.sink.once = True;
-        ::Op::ImmedForLoop.new(source => $.source, var => $var,
-            sink => ::Op::CallSub.new(invocant => $.sink,
+            0 ..^ +$body.signature.params ];
+        $!sink.once = True;
+        ::Op::ImmedForLoop.new(source => $!source, var => $var,
+            sink => ::Op::CallSub.new(invocant => $!sink,
                 positionals => [ map { ::Op::LetVar.new(name => $_) }, @$var]));
     }
 }
@@ -561,6 +562,15 @@ class Control is Op {
     }
 }
 
+class MakeJunction is Op {
+    has Int $.typecode = die "MakeJunction.typecode required";
+    has @.zyg;
+
+    method code($body) {
+        CgOp.makejunction($!typecode, map *.cgop($body), @!zyg)
+    }
+}
+
 { class Num is Op {
     has $.value = die "Num.value required"; # Numeric
 
@@ -623,6 +633,14 @@ class BareBlock is Op {
     method code($) { CgOp.scopedlex($!var) }
 
     method statement_level() {
+        # This cheat relies on the fact that we can't have any lexicals put
+        # into this block until after the compile is done, so the usual
+        # issues with changing lexical representation don't apply :)
+        my $body = $*CURLEX<!sub>.find_lex($!var).body;
+        if $body.code ~~ ::Op::YouAreHere {
+            $body.run_once = $body.outer.run_once;
+        }
+
         ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => Any, :once,
             symbol => $!var));
     }
