@@ -464,7 +464,7 @@ namespace Niecza {
                 ReadIntArray(ref from)); /*dylexi*/
 
             if (TraceLoad)
-                Console.WriteLine("Installing sub {0} \"{1}\" from {2}", ix, ns.name, _ifrom);
+                Console.WriteLine("Installing sub {0} \"{1}\" from {2:X}", ix, ns.name, _ifrom);
             xref[ix] = ns;
             ns.xref_no = ix;
             ns.unit = this;
@@ -496,7 +496,7 @@ namespace Niecza {
                 if (mo == null) continue;
                 int from = mo.fixups_from;
                 if (TraceLoad)
-                    Console.WriteLine("Finishing load of package {0} \"{1}\" from {2}", i, mo.name, from);
+                    Console.WriteLine("Finishing load of package {0} \"{1}\" from {2:X}", i, mo.name, from);
                 STable[] superclasses;
                 STable[] mro;
                 string[] slots;
@@ -557,14 +557,17 @@ namespace Niecza {
                 if (si == null) continue;
                 int from = si.fixups_from;
                 if (TraceLoad)
-                    Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2}", i, si.name, from);
+                    Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2:X}", i, si.name, from);
                 ReadSignature(si, ref from);
+                if (TraceLoad) Console.WriteLine("Sig loaded");
                 int ph = heap[from++];
                 if (ph != 0xFF) Kernel.AddPhaser(ph, si.protosub);
                 int nex = ReadInt(ref from);
+                if (TraceLoad) Console.WriteLine("loading exports...");
                 for (int j = 0; j < nex; j++)
                     Kernel.GetVar(ReadStrArray(ref from)).v =
                         Kernel.NewROScalar(si.protosub);
+                if (TraceLoad) Console.WriteLine("exports loaded");
             }
         }
 
@@ -573,7 +576,7 @@ namespace Niecza {
             int ix = ReadInt(ref from);
             string name = ReadStr(ref from);
             if (TraceLoad)
-                Console.WriteLine("Installing package {0} \"{1}\" from {2}", ix, name, _ifrom);
+                Console.WriteLine("Installing package {0} \"{1}\" from {2:X}", ix, name, _ifrom);
             STable mo = existing_mo != null ? existing_mo :
                 new STable(name);
             xref[ix] = mo;

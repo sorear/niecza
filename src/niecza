@@ -490,6 +490,46 @@ method open_package_def($, $/ = $*cursor) {
     }
 }
 
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for map *.ast, @tr -> $tr {
+        if $pack && ($tr<name>:exists) {
+            my ($name, $path) = $tr<name path>;
+
+            $/.CURSOR.sorry("superclass $name declared outside of any class"),
+                next unless $sub.body_of;
+            $/.CURSOR.sorry("superclass $name declared in an augment"),
+                next if $sub.augmenting;
+
+            $*unit.deref($pack).add_super($*unit.get_item($sub.find_pkg(
+                [ @($path // ['MY']), $name ])));
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_pkg_exports($*unit, $*unit.deref($pack).name,
+                $sub.cur_pkg, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($*unit, '&' ~ $sub.name, @exports);
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
+            $sub.exports //= [];
+            push $sub.exports, [ @($sub.outer.find_pkg(
+                ['OUR','EXPORT',$_])), '&' ~ $sub.name ] for @exports;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.signature = Any;
+        } elsif !$pack && $tr<return_pass> {
+            $sub.returnable = False;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.unsafe = True;
+        } else {
+            $/.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+        }
+    }
+}
+
 method package_def ($/) {
     my $sub = $*CURLEX<!sub>;
 
@@ -786,6 +826,8 @@ method regex_def_2 ($, $/ = $*cursor) {
         $/.CURSOR.sorry("Too many signatures on regex");
     }
 }
+
+
 
 method regex_def($/) {
     my $endsym;
