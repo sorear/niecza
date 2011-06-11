@@ -268,17 +268,10 @@ method quote:q ($/) { make $<quibble>.ast }
 method quote:Q ($/) { make $<quibble>.ast }
 method quote:s ($/) { make $<pat>.ast }
 
-method rxembed($/, $op, $trans) {
-    ::Op::CallSub.new(|node($/),
-        positionals => [ ::Op::MakeCursor.new(|node($/)) ],
-        invocant => ::Op::SubDef.new(|node($/),
-            once => True,
-            body => Body.new(
-                transparent => $trans,
-                type  => 'rxembedded',
-                class => 'Block',
-                signature => Sig.simple('$¢'),
-                do => $op)));
+method rxembed($/, $op, $) {
+    self.inliney_call($/,
+        self.thunk_sub($op, params => ['$¢']),
+        ::Op::MakeCursor.new);
 }
 
 method op_for_regex($/, $rxop) {
@@ -291,9 +284,9 @@ method op_for_regex($/, $rxop) {
         $rxop.check
     }
     my ($orxop, $mb) = OptRxSimple.run($rxop);
-    self.transparent($/, ::Op::RegexBody.new(|node($/), canback => $mb,
-            pre => @lift, rxop => $orxop),
-        class => 'Regex', type => 'regex', sig => Sig.simple.for_method);
+    self.block_expr($/, self.thunk_sub(::Op::RegexBody.new(|node($/),
+            canback => $mb, pre => @lift, rxop => $orxop),
+        class => 'Regex', params => ['self']));
 }
 
 method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
@@ -313,20 +306,17 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
     my @lift = $rxop.oplift;
     my $lad = $rxop.lad;
     my ($nrxop, $mb) = OptRxSimple.run($rxop);
-    # XXX do this in the signature so it won't be affected by transparent
-    my @parm = ::Sig::Parameter.new(slot => 'self', name => 'self');
     if defined $goal {
-        push @parm, ::Sig::Parameter.new(slot => '$*GOAL', name => '$*GOAL',
-            positional => False, optional => True);
         unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
             lhs => mklex($/, '$*GOAL'),
             rhs => ::Op::StringLiteral.new(text => $goal));
     }
-    my $subop = self.transparent($/,
+    my $subop = self.thunk_sub(
         ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut, :$passcap,
             rxop => $nrxop), ltm => $lad, class => 'Regex', type => 'regex',
-        sig => Sig.new(params => @parm));
-    $subop = ::Op::CallSub.new(|node($/), invocant => $subop,
+        params => ['self']);
+    $subop.add_my_name('$*GOAL') if defined($goal);
+    $subop = ::Op::CallSub.new(|node($/), invocant => self.block_expr($/, $subop),
         positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
     ::RxOp::Subrule.new(regex => $subop, :$passcap, _passcapzyg => $nrxop,
         _passcapltm => $lad);
@@ -1089,7 +1079,7 @@ method circumfix:sym<[ ]> ($/) {
 # XXX This fails to catch {; ... } because it runs after empty statement
 # elimination.
 method check_hash($/) {
-    my $do = $<pblock>.ast.do;
+    my $do = $<pblock>.ast.code;
 
     return False unless $do.^isa(::Op::StatementList);
     return True if $do.children == 0;
@@ -1114,14 +1104,14 @@ method check_hash($/) {
 }
 
 method circumfix:sym<{ }> ($/) {
-    $<pblock>.ast.type = 'bare';
-    make ::Op::BareBlock.new(|node($/), var => self.gensym,
-        body => $<pblock>.ast);
+    my $var = self.gensym;
+    $*CURLEX<!sub>.add_my_sub_child($var, $<pblock>.ast);
+    make ::Op::BareBlock.new(|node($/), :$var, :body(Any));
 
     if self.check_hash($/) {
         make mkcall($/, '&_hash_constructor',
-            ::Op::CallSub.new(|node($/), invocant =>
-                    self.block_to_closure($/, $<pblock>.ast, once => True)));
+            ::Op::CallSub.new(|node($/),
+                invocant => ::Op::SubDef.new(body=>Any, symbol=>$var, :once)))
     }
 }
 
@@ -1188,6 +1178,10 @@ my %loose2tight = (
     'orelse' => '//', 'and' => '&&', 'or' => '||',
 );
 
+method infix:sym<...> ($/) {
+    # STD parses ...^ in the ... rule
+    make Operator.funop('&infix:<' ~ $/ ~ '>', 2);
+}
 method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
 method infix:sym<,>($/) { make ::Operator::Comma.new }
 method infix:sym<:=>($/) { make ::Operator::Binding.new(:!readonly) }
@@ -1215,21 +1209,25 @@ method INFIX($/) {
         # an appropriate phaser
         if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
             my $cv = self.gensym;
+            $*CURLEX<!sub>.add_state_name(Str, $cv);
             make ::Op::StatementList.new(|node($/), children => [
                 ::Op::Start.new(condvar => $cv, body => $/.ast),
                 ::Op::Lexical.new(name => $lhs.name)]);
         }
-        elsif $lhs.^isa(::Op::Attribute) && !$lhs.initializer {
-            $lhs.initializer = self.sl_to_block('bare', $rhs,
-                subname => $lhs.name ~ " init");
+        elsif $lhs.^isa(::Op::Attribute) && !defined($lhs.initializer.ivar) {
+            my $init = self.thunk_sub($rhs,
+                :name($lhs.initializer.name ~ " init"));
+            $lhs.initializer.ivar = self.gensym;
+            $*CURLEX<!sub>.add_my_sub_child($lhs.initializer.ivar, $init);
+            $lhs.initializer.ibody = $init.xref;
             make $lhs;
         }
         elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
             my $sig = substr($lhs.name, 0, 1);
             if defined '$@&%'.index($sig) {
-                $lhs.init = self.docontext($/, $sig, $rhs)
+                self.init_constant($lhs, self.docontext($/, $sig, $rhs));
             } else {
-                $lhs.init = $rhs;
+                self.init_constant($lhs, $rhs);
             }
             make $lhs;
         }
@@ -1467,7 +1465,9 @@ method whatever_precheck($op, *@args) {
             $a = ::Op::Lexical.new(name => $a.slot);
         } elsif $a.^isa(::Op::WhateverCode) {
             push @vars, @( $a.vars );
-            $a = $a.ops;
+            $a = ::Op::CallSub.new(
+                invocant => ::Op::Lexical.new(name => $a.slot),
+                args => [ map { ::Op::Lexical.new(name => $_) }, @($a.vars) ]);
         }
     }
     $( @vars ), @args_;
@@ -1475,8 +1475,24 @@ method whatever_precheck($op, *@args) {
 
 method whatever_postcheck($/, $st, $term) {
     if @$st {
-        ::Op::WhateverCode.new(ops => $term, vars => $st,
-            slot => self.gensym, |node($/));
+        my $slot = self.gensym;
+
+        my $body = ::Metamodel::StaticSub.new(
+            outerx => $*CURLEX<!sub>.xref,
+            class => 'WhateverCode',
+            unit => $*unit,
+            transparent => True,
+            code => $term,
+            in_class => $*CURLEX<!sub>.in_class,
+            cur_pkg => $*CURLEX<!sub>.cur_pkg);
+
+        $body.signature = ::GLOBAL::Sig.new(params => [
+            map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]);
+        $body.add_my_name($_, :noinit) for @$st;
+
+        $*CURLEX<!sub>.add_my_sub($slot, $body);
+
+        ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, |node($/));
     } else {
         $term;
     }
@@ -1485,14 +1501,19 @@ method whatever_postcheck($/, $st, $term) {
 # term :: Op
 method term:value ($/) { make $<value>.ast }
 
+method package_var($/, $slot, $name, $path, :$list, :$hash) {
+    $*CURLEX<!sub>.add_common_name($slot,
+        $*CURLEX<!sub>.find_pkg($path), $name);
+    ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
+}
+
 method term:name ($/) {
     my ($id, $path) = self.mangle_longname($<longname>).<name path>;
 
     $id = '&' ~ $id if $<args>;
 
     if defined $path {
-        make ::Op::PackageVar.new(|node($/), name => $id,
-            slot => self.gensym, path => $path);
+        make self.package_var($/, self.gensym, $id, $path);
     } else {
         make mklex($/, $id);
     }
@@ -1562,8 +1583,7 @@ method term:sym<*> ($/) {
     make ::Op::Whatever.new(|node($/), slot => self.gensym)
 }
 method term:lambda ($/) {
-    $<pblock>.ast.type = 'pointy';
-    make self.block_to_closure($/, $<pblock>.ast);
+    make self.block_expr($/, $<pblock>.ast);
 }
 
 method term:colonpair ($/) {
@@ -1584,6 +1604,8 @@ method do_variable_reference($M, $v) {
 
     my $tw = $v<twigil>;
     my $sl = $v<sigil> ~ $tw ~ $v<name>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
 
     if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
         $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
@@ -1591,9 +1613,17 @@ method do_variable_reference($M, $v) {
     }
 
     if $tw eq '!' {
+        my $pclass;
+        if $v<rest> {
+            $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($v<rest>));
+        } elsif $*CURLEX<!sub>.in_class -> $c {
+            $pclass = $c;
+        } else {
+            $M.CURSOR.sorry("Cannot resolve class for private method");
+        }
         self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
             name => $v<name>, private => True, receiver => mklex($M, 'self'),
-            ppath => $v<rest>));
+            :$pclass));
     }
     elsif $tw eq '.' {
         if defined $v<rest> {
@@ -1606,15 +1636,15 @@ method do_variable_reference($M, $v) {
     }
     # no twigil in lex name for these
     elsif $tw eq '^' || $tw eq ':' {
-        ::Op::Lexical.new(|node($M), name => $v<sigil> ~ $v<name>);
+        mklex($M, $v<sigil> ~ $v<name>, :$hash, :$list);
     }
     elsif $tw eq '*' {
         ::Op::ContextVar.new(|node($M), name => $sl);
     }
     elsif $tw eq '' || $tw eq '?' {
         if defined($v<rest>) {
-            ::Op::PackageVar.new(path => $v<rest>, name => $sl,
-                slot => self.gensym, |node($M));
+            self.package_var($M, self.gensym, $sl, $v<rest>,
+                hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'))
         } elsif $tw eq '?' && $sl eq '$?POSITION' {
             mkcall($M, '&infix:<..^>',
                 ::Op::Num.new(|node($M), value => [10, ~$M.from]),
@@ -1622,11 +1652,13 @@ method do_variable_reference($M, $v) {
         } elsif $tw eq '?' && $sl eq '$?LINE' {
             ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
         } elsif $tw eq '?' && $sl eq '&?BLOCK' {
+            $*CURLEX<!sub>.noninlinable;
             ::Op::GetBlock.new(|node($M))
         } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
+            $*CURLEX<!sub>.noninlinable;
             ::Op::GetBlock.new(|node($M), :routine)
         } else {
-            ::Op::Lexical.new(|node($M), name => $sl);
+            mklex($M, $sl, :$hash, :$list);
         }
     }
     else {
@@ -1747,6 +1779,8 @@ method param_var($/) {
     }
     my $twigil = $<twigil> ?? ~$<twigil>[0] !! '';
     my $sigil =  ~$<sigil>;
+    my $list = $sigil eq '@';
+    my $hash = $sigil eq '%';
     my $name =   $<name> ?? ~$<name>[0] !! Any;
     $twigil = '*' if $name && ($name eq '/' || $name eq '!');
 
@@ -1766,7 +1800,11 @@ method param_var($/) {
         make { }
         return Nil;
     }
-    make { list => ($sigil eq '@'), hash => ($sigil eq '%'), :$slot,
+
+    $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, :noinit)
+        if defined($slot);
+
+    make { :$list, :$hash, :$slot,
         names => defined($name) ?? [ $name ] !! [] }
 }
 
@@ -1965,14 +2003,27 @@ method sibble($/) {
     } else {
         $repl = $<right>.ast;
     }
-    $repl = self.transparent($/, $repl, class => 'Regex');
-    make ::Op::CallSub.new(|node($/), invocant => mklex($/,'&_substitute'),
-        args => [ mklex($/, '$_'), $regex, $repl,
-            self.extract_rx_adverbs(True, True, $/) ]);
+    $repl = self.block_expr($/, self.thunk_sub($repl));
+    make ::Op::CallMethod.new(|node($/), receiver => mklex($/, '$_'),
+        name => 'subst',
+        args => [ $regex, $repl, self.extract_rx_adverbs(True, True, $/),
+            ::Op::SimplePair.new(key => 'inplace', value => mklex($/,'True'))]);
 }
 method tribble($/) {}
 method babble($/) {}
 method quotepair($/) {}
+
+method quotepair_term($/) {
+    my $v;
+    if $<v> ~~ Match {
+        $v = $<v>.ast
+    } elsif $<v> ~~ Str {
+        $v = ::Op::Num.new(value => [10, $<v>]);
+    } else {
+        $v = mklex($/, $<v> ?? "True" !! "False");
+    }
+    ::Op::SimplePair.new(|node($/), key => $<k>, value => $v);
+}
 
 method extract_rx_adverbs($ismatch, $issubst, $match) {
     my $qps = ($match ~~ List) ?? $match !! $match<babble><quotepair>;
@@ -1987,6 +2038,7 @@ method extract_rx_adverbs($ismatch, $issubst, $match) {
 
     if $issubst {
         push @nyi, < sameaccent aa samecase ii th st nd rd nth x >;
+        push @ok,  < g global >;
     }
 
     if $ismatch {
@@ -1997,7 +2049,7 @@ method extract_rx_adverbs($ismatch, $issubst, $match) {
         if @internal.grep($qp<k>) {
             # handled by rx compiler
         } elsif @ok.grep($qp<k>) {
-            push @args, $qp.ast
+            push @args, self.quotepair_term($qp);
         } elsif @nyi.grep($qp<k>) {
             $qp.CURSOR.sorry("Regex modifier $qp<k> not yet implemented");
         } else {
@@ -2031,6 +2083,9 @@ method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
     if $/ eq '{YOU_ARE_HERE}' {
+        $*unit.bottom_ref = $*CURLEX<!sub>.xref;
+        $*CURLEX<!sub>.strong_used = True;
+        $*CURLEX<!sub>.create_static_pad;
         make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
     } else {
         make $<statementlist>.ast;
@@ -2038,9 +2093,13 @@ method blockoid($/) {
 }
 method lambda($/) {}
 method embeddedblock($/) {
-    make self.block_to_immediate($/, 'bare',
-        self.sl_to_block('bare', $<statementlist>.ast,
-            signature => Sig.simple()));
+    my $sym = self.gensym;
+    $*CURLEX<!sub>.code = $<statementlist>.ast;
+    $*CURLEX<!sub>.outer.add_my_sub_child($sym, $*CURLEX<!sub>);
+    $*CURLEX<!sub>.signature = Sig.simple();
+    make ::Op::CallSub.new(|node($/),
+        invocant => ::Op::SubDef.new(body => Any, symbol => $sym, :once),
+        positionals => []);
 }
 
 method sigil:sym<&> ($/) {}
@@ -2091,11 +2150,10 @@ method declarator($/) {
         # TODO: keep the original signature around somewhere := can find it
         for @p {
             # TODO: fanciness checks
-            $_ = ::Op::Lexical.new(|node($/), name => $_.slot, list => $_.list,
-                hash => $_.hash, declaring => True);
+            $_ = mklex($/, .slot, list => .list, hash => .hash);
         }
         make ::Op::SimpleParcel.new(|node($/), items => @p);
-        return Nil;
+        return;
     }
     make $<variable_declarator> ?? $<variable_declarator>.ast !!
          $<routine_declarator>  ?? $<routine_declarator>.ast !!
@@ -2208,15 +2266,13 @@ method variable_declarator($/) {
             :$hash, typeconstraint => $res_tc);
         make mklex($/, $slot, :$list, :$hash, :state_decl);
     } elsif $scope eq 'our' {
-        make ::Op::PackageVar.new(|node($/), name => $slot, slot => $slot,
-            path => [ 'OUR' ]);
+        make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
     } else {
         $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
             typeconstraint => $res_tc);
         make mklex($/, $slot, :$list, :$hash);
     }
 }
-
 
 method trivial_eval($/, $ast) {
     if $ast.^isa(::Op::SimpleParcel) {
@@ -2290,15 +2346,45 @@ method type_declarator:subset ($/) {
         :$body, :@exports, :$basetype);
 }
 
+method make_constant($/, $scope, $name, $path) {
+    $scope := $scope || 'our';
+
+    my $slot = ($scope eq 'my' || $scope eq 'our' && !$path) ?? $name !!
+        self.gensym;
+
+    if $scope eq 'our' {
+        $*CURLEX<!sub>.add_common_name($slot,
+            $*CURLEX<!sub>.find_pkg($path // ['OUR']), $name);
+    } else {
+        $*CURLEX<!sub>.add_hint($slot);
+    }
+
+    ::Op::ConstantDecl.new(|node($/), name => $slot, init => False);
+}
+
+method make_constant_into($/, $rpath, $name, $rhs) {
+    my $slot = self.gensym;
+    $*CURLEX<!sub>.add_common_name($slot, $rpath, $name);
+    self.init_constant(::Op::ConstantDecl.new(|node($/), name => $slot,
+        init => False), $rhs);
+}
+
+method init_constant($con, $rhs) {
+    my $body = self.thunk_sub($rhs, name => "$con.name() init");
+    $body.is_phaser = 2;
+    $body.hint_hack = [ $*CURLEX<!sub>.xref, $con.name ];
+    $body.outer.create_static_pad;
+    $con.init = True;
+    $con;
+}
+
 method type_declarator:constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    my $scope = $*SCOPE || 'our';
-    my $slot  = ~($<identifier> // $<variable> // self.gensym);
+    my $name  = ~($<identifier> // $<variable> // self.gensym);
 
-    make ::Op::ConstantDecl.new(|node($/), name => $slot,
-        path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+    make self.make_constant($/, $*SCOPE || 'our', $name, Array);
 }
 
 # note: named and unnamed enums are quite different beasts
@@ -2364,48 +2450,57 @@ method type_declarator:enum ($/) {
             $bindlex = True;
         }
 
-        my @stmts;
-        push @stmts, ::Op::Super.new(name => ($has_strs ?? 'Str' !! 'Int')
-            ~ "BasedEnum");
-        push @stmts, ::Op::Super.new(name => pop($basetype),
-            path => $basetype);
-        push @stmts, self.block_to_closure($/,
-            self.sl_to_block('sub', ::Op::ConstantDecl.new(name => self.gensym,
-                init => ::Op::CallMethod.new(name => 'new',
-                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast]))),
-            bindmethod => ['normal', 'enums']);
+        my @ns = $ourpath ?? (@( $*CURLEX<!sub>.find_pkg($ourpath) ), $name) !!
+            $*unit.anon_stash;
+        $*unit.create_stash([@ns]);
+        $*CURLEX<!sub>.add_my_stash($lexvar, [@ns]);
+        my $obj  = ::Metamodel::Class.new(:$name);
+        $obj.exports = [ [@ns] ];
+        $*unit.bind_item([@ns], $obj.xref);
+
+        $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg(
+            ['MY', ($has_strs ?? 'Str' !! 'Int') ~ "BasedEnum"])));
+        $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg($basetype)));
+
+        my $nb = ::Metamodel::StaticSub.new(
+            transparent=> True,
+            unit       => $*unit,
+            outerx     => $*CURLEX<!sub>.xref,
+            name       => $name,
+            cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+            class      => 'Method',
+            signature  => Sig.simple('self'),
+            code       => self.init_constant(
+                self.make_constant($/, 'anon', Any, Any),
+                ::Op::CallMethod.new(name => 'new',
+                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+
+        $nb.add_my_name('self', noinit => True);
+        $*CURLEX<!sub>.create_static_pad;
+        $nb.strong_used = True;
+        $*CURLEX<!sub>.add_my_sub($lexvar ~ '!enums', $nb);
+        $obj.add_method('only', 'normal', 'enums', $lexvar ~ '!enums', $nb.xref);
+        $obj.close;
 
         for @pairs {
-            push @stmts, ::Op::ConstantDecl.new(name => .key, path => ["OUR"],
-                init => ::Op::CallSub.new(invocant => mklex($/, $lexvar),
+            self.make_constant_into($/, @ns, .key, rhs =>
+                ::Op::CallSub.new(invocant => mklex($/, $lexvar),
                     args => [ ::Op::StringLiteral.new(text => .key) ]));
         }
 
-        my @ostmts;
-        push @ostmts, ::Op::ClassDef.new(|node($/), var => $lexvar, :$name,
-            :@exports, bodyvar => self.gensym, ourpkg => $ourpath,
-            ourvar => $name,
-            body => self.sl_to_block('class',
-                ::Op::StatementList.new(|node($/), children => [@stmts])));
-
         for @pairs {
-            push @ostmts, ::Op::ConstantDecl.new(name => .key,
-                path => $ourpath,
-                init => ::Op::CallSub.new(invocant => mklex($/, $lexvar),
+            self.init_constant(self.make_constant($/, $scope, .key, $r<path>),
+                ::Op::CallSub.new(invocant => mklex($/, $lexvar),
                     args => [ ::Op::StringLiteral.new(text => .key) ]));
         }
 
-        push @ostmts, mklex($/, $lexvar);
-
-        make ::Op::StatementList.new(|node($/), children => [@ostmts]);
+        make mklex($/, $lexvar);
     } else {
-        my $slot  = ~($<name> // self.gensym);
-
-        make ::Op::ConstantDecl.new(|node($/), name => $slot,
-            init => ::Op::CallMethod.new(|node($/), name => 'new',
+        make self.init_constant(
+            self.make_constant($/, $scope, $<name> && ~$<name>, Any),
+            ::Op::CallMethod.new(|node($/), name => 'new',
                 receiver => mklex($/, 'EnumMap'),
-                args => [$<term>.ast]),
-            path => ($scope eq 'our' ?? [ 'OUR' ] !! Array));
+                args => [$<term>.ast])),
     }
 }
 
@@ -2476,16 +2571,19 @@ method nulltermish($/) {}
 method EXPR($/) { make $<root>.ast }
 method modifier_expr($/) { make $<EXPR>.ast }
 method default_value($/) { make self.thunk_sub($<EXPR>.ast).xref }
-method thunk_sub($code, :$name) {
+method thunk_sub($code, :$params = [], :$name, :$class) {
     my $n = ::Metamodel::StaticSub.new(
         outerx => $*CURLEX<!sub>.xref,
-        class => 'Code',
+        class => $class // 'Block',
         unit => $*unit,
         name => $name // 'ANON',
         transparent => True,
         code => $code,
         in_class => $*CURLEX<!sub>.in_class,
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
+    $n.signature = Sig.simple(@$params);
+    $n.add_my_name($_, :noinit) for @$params;
+    $n.add_my_name('$*/') if $class eq 'Regex';
     $*CURLEX<!sub>.add_child($n);
     $n;
 }
@@ -2518,9 +2616,10 @@ method args($/) {
 
 method statement($/) {
     if $<label> {
+        $*CURLEX<!sub>.add_label(~$<label><identifier>);
         make ::Op::Labelled.new(|node($/), name => ~$<label><identifier>,
             stmt => $<statement>.ast);
-        return Nil;
+        return;
     }
 
     make ($<statement_control> ?? $<statement_control>.ast !!
@@ -2601,11 +2700,9 @@ method module_name:normal ($/) {
 # iff it has a lambda symbol.
 method if_block($/, $cond, $pb) {
     if defined $pb<lambda> {
-        my $true_block = self.block_to_closure($pb, $pb.ast, once => True);
-        ::Op::CallSub.new(|node($/), invocant => $true_block,
-            positionals => [$cond]);
+        make self.inliney_call($/, $pb.ast, $cond);
     } else {
-        self.block_to_immediate($/, 'cond', $pb.ast);
+        make self.inliney_call($/, $pb.ast);
     }
 }
 
@@ -2657,7 +2754,7 @@ method statement_control:repeat ($/) {
 }
 
 method statement_control:loop ($/) {
-    my $body = self.block_to_immediate($/, 'loop', $<block>.ast);
+    my $body = self.inliney_call($/, $<block>.ast);
     # XXX wrong interpretation
     my $init = $0 && $0[0]<e1>[0] ?? $0[0]<e1>[0].ast !! Any;
     my $cond = $0 && $0[0]<e2>[0] ?? $0[0]<e2>[0].ast !! Any;
@@ -2667,27 +2764,23 @@ method statement_control:loop ($/) {
 }
 
 method statement_control:for ($/) {
-    $<xblock>.ast[1].type = 'loop';
     make ::Op::ForLoop.new(|node($/), source => $<xblock>.ast[0],
-        sink => self.block_to_closure($/, $<xblock>.ast[1]));
+        sink => ::Op::SubDef.new(:once, symbol =>
+            self.block_expr($/, $<xblock>.ast[1]).name));
 }
 
 method statement_control:given ($/) {
-    $<xblock>.ast[1].type = 'immed';
-    make ::Op::CallSub.new(|node($/), positionals => [ $<xblock>.ast[0] ],
-        invocant => self.block_to_closure($/, $<xblock>.ast[1], :once));
+    make self.inliney_call($/, $<xblock>.ast[1], $<xblock>.ast[0]);
 }
 
 method statement_control:default ($/) {
-    $<block>.ast.type = 'cond';
     make ::Op::When.new(|node($/), match => mklex($/, 'True'),
-        body => self.block_to_immediate($/, 'loop', $<block>.ast));
+        body => self.inliney_call($/, $<block>.ast));
 }
 
 method statement_control:when ($/) {
-    $<xblock>.ast[1].type = 'cond';
     make ::Op::When.new(|node($/), match => $<xblock>.ast[0],
-        body => self.block_to_immediate($/, 'loop', $<xblock>.ast[1]));
+        body => self.inliney_call($/, $<xblock>.ast[1]));
 }
 
 method statement_control:use ($/) {
@@ -2769,6 +2862,7 @@ method open_package_def($, $/ = $*cursor) {
             $sub.signature = $<signature>.ast;
             $type = ::Metamodel::ParametricRole;
         }
+        my @ns;
         if $<longname> {
             my $r = self.mangle_longname($<longname>[0], True);
             $name = $r<name>;
@@ -2779,28 +2873,40 @@ method open_package_def($, $/ = $*cursor) {
             if $scope eq 'our' {
                 $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
             }
-            # just a convenient place to stash it for now.
-            $*CURLEX<!outervar> = ($scope eq 'anon' || ($r<path>:exists))
+            try @ns = @( $*CURLEX<!sub>.outer.find_pkg(
+                [ @( $r<path> // ['MY'] ), $r<name> ]) );
+            $*CURLEX<!sub>.outervar = ($scope eq 'anon' || ($r<path>:exists))
                 ?? self.gensym !! $name;
         } else {
-            $*CURLEX<!outervar> = self.gensym;
+            $*CURLEX<!sub>.outervar = self.gensym;
             $name = 'ANON';
         }
 
-        my @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
-            $*unit.anon_stash;
+        my $old = @ns ?? $*unit.get_item([@ns]) !! Any;
 
-        $*unit.create_stash([@ns]);
-        $sub.outer.add_my_stash($*CURLEX<!outervar>, [@ns]);
-        my $obj  = $type.new(:$name);
-        $*unit.bind_item([@ns], $obj.xref);
+        if $old && ($old.[0] ne $*unit.name || $*unit.deref($old).closed) {
+            $/.CURSOR.panic("Redefinition of class [@ns]");
+        }
+        my $obj;
+        if $old {
+            $obj = $*unit.deref($old);
+        } else {
+            @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
+                $*unit.anon_stash;
+
+            $*unit.create_stash([@ns]);
+
+            $sub.outer.add_my_stash($*CURLEX<!sub>.outervar, [@ns]);
+            $obj = $type.new(:$name);
+            $obj.exports = [ [@ns] ];
+            $*unit.bind_item([@ns], $obj.xref);
+        }
 
         $sub.body_of = $sub.in_class = $obj.xref;
         $sub.cur_pkg = [@ns];
 
         self.process_block_traits($/, $<trait>);
         $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
-        $obj.exports = [ [@ns] ];
     }
 }
 
@@ -2832,17 +2938,25 @@ method package_def ($/) {
     }
     else {
         my $obj = $*unit.deref($sub.body_of);
-        $obj.close;
 
-        if $obj ~~ ::Metamodel::ParametricRole {
-            $sub.parametric_role_hack = $obj.xref;
-            $sub.add_my_name('*params', :noinit);
-            $sub.create_static_pad;
+        if $*DECLARAND<stub> {
+            push $*unit.stubbed_stashes, ($obj => $/.CURSOR);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
         }
+        else {
+            $obj.close;
 
-        make ::Op::StatementList.new(|node($/), children => [
-            ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
-            ::Op::Lexical.new(name => $*CURLEX<!outervar>) ]);
+            if $obj ~~ ::Metamodel::ParametricRole {
+                $sub.parametric_role_hack = $obj.xref;
+                $sub.add_my_name('*params', :noinit);
+                $sub.create_static_pad;
+            }
+
+            make ::Op::StatementList.new(|node($/), children => [
+                ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+        }
     }
 }
 
@@ -2900,6 +3014,19 @@ my $next_anon_id = 0;
 method gensym() { 'anon_' ~ ($next_anon_id++) }
 method genid()  { ($next_anon_id++) }
 
+method block_expr($/, $pb) {
+    my $name = self.gensym;
+    $*CURLEX<!sub>.add_my_sub_child($name, $pb);
+    mklex($/, $name);
+}
+
+method inliney_call($/, $block, *@parms) {
+    my $sym = self.gensym;
+    $*CURLEX<!sub>.add_my_sub_child($sym, $block);
+    ::Op::CallSub.new(|node($/),
+        invocant => ::Op::SubDef.new(body => Any, symbol => $sym, :once),
+        positionals => @parms);
+}
 # method sl_to_block ($type, $ast, :$subname, :$returnable, :$signature,
 #         :$unsafe = False, :$class = 'Block') {
 #     Body.new(
@@ -3038,7 +3165,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     }
 
     if $scope eq 'our' {
-        $sub.exports = [ @($sub.outer.find_pkg($path // ['OUR'])), '&'~$name ];
+        $sub.exports = [[@($sub.outer.find_pkg($path // ['OUR'])), '&'~$name]];
     }
 }
 
@@ -3096,14 +3223,16 @@ method method_def ($/) {
     make mklex($/, $*CURLEX<!sub>.outervar);
 }
 
-method block($/) { make self.sl_to_block('', $<blockoid>.ast); }
+method block($/) {
+    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    make $*CURLEX<!sub>
+}
 
 # :: Body
 method pblock($/) {
     #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
-    make self.sl_to_block('', $<blockoid>.ast,
-        signature => ($<signature> ?? $<signature>.ast !!
-            self.get_placeholder_sig($/)));
+    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    make $*CURLEX<!sub>;
 }
 
 method xblock($/) { make [ $<EXPR>.ast, $<pblock>.ast ] }
@@ -3113,48 +3242,51 @@ method blast($/) {
     if $<block> {
         make $<block>.ast;
     } else {
-        make Body.new(
-            transparent => True,
-            do   => $<statement>.ast);
+        make self.thunk_sub($<statement>.ast);
     }
 }
 
 method statement_prefix:do ($/) {
-    make self.block_to_immediate($/, 'do', $<blast>.ast);
+    make self.inliney_call($/, $<blast>.ast);
 }
 method statement_prefix:gather ($/) {
-    $<blast>.ast.type = 'gather';
-    make ::Op::Gather.new(|node($/), var => self.gensym, body => $<blast>.ast);
+    $<blast>.ast.gather_hack = True;
+    make ::Op::Gather.new(|node($/), body => Any, var =>
+        self.block_expr($/, $<blast>.ast).name);
 }
 method statement_prefix:try ($/) {
-    make ::Op::Try.new(|node($/), body =>
-        self.block_to_immediate($/, 'try', $<blast>.ast));
+    make ::Op::Try.new(|node($/), body => self.inliney_call($/, $<blast>.ast));
 }
 
 method statement_prefix:START ($/) {
     my $cv = self.gensym;
+    $*CURLEX<!sub>.add_state_name(Str, $cv);
     make ::Op::Start.new(|node($/), condvar => $cv, body =>
-        self.block_to_immediate($/, 'phaser', $<blast>.ast));
+        self.inliney_call($/, $<blast>.ast));
 }
 
 # TODO: retain and return a value
 method statement_prefix:INIT ($/) {
-    $<blast>.ast.type = 'init';
-    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
+    $<blast>.ast.is_phaser = 0;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
 }
 # XXX 'As soon as possible' isn't quite soon enough here
 method statement_prefix:BEGIN ($/) {
-    $<blast>.ast.type = 'begin';
-    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
+    $<blast>.ast.is_phaser = 2;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
 }
 method statement_prefix:CHECK ($/) {
-    $<blast>.ast.type = 'begin';
-    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
+    $<blast>.ast.is_phaser = 2;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
 }
 
 method statement_prefix:END ($/) {
-    $<blast>.ast.type = 'end';
-    make ::Op::VoidPhaser.new(|node($/), body => $<blast>.ast);
+    $<blast>.ast.is_phaser = 1;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
 }
 
 method comp_unit($/) {
