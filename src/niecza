@@ -29,7 +29,22 @@ use STD;
 use Stash;
 use Sig;
 
-augment class STD {
+augment grammar STD {
+token embeddedblock {
+    # encapsulate braided languages
+    :temp %*LANG;
+    :my $*SIGNUM;
+    :my $*GOAL ::= '}';
+    :temp $*CURLEX;
+
+    :dba('embedded block')
+
+    '{' ::
+    <.newlex>
+    <.finishlex>
+    [ :lang(%*LANG<MAIN>) <statementlist> ]
+    [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
+}
 method explain_mystery() {
     my %post_types;
     my %unk_types;
