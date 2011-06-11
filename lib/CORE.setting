@@ -387,6 +387,7 @@ my class CommonEnum {
 
 my class IntBasedEnum is CommonEnum {
     method Numeric() { Q:CgOp { (box Int (unbox int (@ {self}))) } }
+    method Int() { self.Numeric }
     method Stringy() { self.key }
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox int (@ {$val.Int})))
