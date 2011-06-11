@@ -823,6 +823,42 @@ method statement_control:use ($/) {
         $*CURLEX<!sub>.lexicals{$uname} = $lex;
     }
 }
+method param_var($/) {
+    if $<signature> {
+        $/.CURSOR.sorry('Sub-signatures NYI');
+        make { };
+        return Nil;
+    }
+    my $twigil = $<twigil> ?? ~$<twigil>[0] !! '';
+    my $sigil =  ~$<sigil>;
+    my $list = $sigil eq '@';
+    my $hash = $sigil eq '%';
+    my $name =   $<name> ?? ~$<name>[0] !! Any;
+    $twigil = '*' if $name && ($name eq '/' || $name eq '!');
+
+    my $slot;
+    if $twigil eq '' {
+        $slot = defined($name) ?? ($sigil ~ $name) !! Any;
+    } elsif $twigil eq '*' {
+        $slot = "$sigil*" ~ "$name";
+    } else {
+        $/.CURSOR.sorry("Unhandled parameter twigil $twigil");
+        make { };
+        return Nil;
+    }
+
+    if ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&') {
+        $/.CURSOR.sorry('Non bare scalar targets NYI');
+        make { }
+        return Nil;
+    }
+
+    $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, noinit => ?($*SIGNUM))
+        if defined($slot);
+
+    make { :$list, :$hash, :$slot,
+        names => defined($name) ?? [ $name ] !! [] }
+}
 
 }
 
