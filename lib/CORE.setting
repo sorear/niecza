@@ -339,6 +339,7 @@ my class Routine is Block {
 my class Sub is Routine { }
 my class Method is Routine { }
 my class Submethod is Routine { }
+my class WhateverCode is Block { }
 
 my class ClassHOW {
     method isa(Mu $obj, Mu $type) { Q:CgOp {
@@ -572,9 +573,9 @@ my class Label {
     has $!name;
 
     method goto() { _lexotic(8, self, ()) }
-    method next(\|@pcl) { _lexotic(1, self, @pcl.unwrap-single) }
-    method last(\|@pcl) { _lexotic(2, self, @pcl.unwrap-single) }
-    method redo(\|@pcl) { _lexotic(3, self, @pcl.unwrap-single) }
+    method next() { _lexotic(1, self, ()) }
+    method last() { _lexotic(2, self, ()) }
+    method redo() { _lexotic(3, self, ()) }
 }
 
 # XXX multi dispatch
@@ -824,7 +825,6 @@ my class Array is List {
 
 my class Hash {
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
-    method hash() { unitem(self) }
 
     method any() { any self.keys }
     method none() { none self.keys }

@@ -547,6 +547,27 @@ augment class Op::ForLoop { #OK
     }
 }
 
+augment class Sig::Parameter { #OK
+    method bind_inline($body, @posr) {
+        my $get = $!full_parcel ?? self.parcel_get_inline(@posr) !!
+            $!slurpycap ?? self.slurpycap_get_inline(@posr) !!
+            $!slurpy ?? self.slurpy_get_inline(@posr) !!
+            self.single_get_inline($body, @posr);
+
+        if (defined $!slot) {
+            if $!is_copy {
+                self.do_copy($get);
+            } else {
+                my $type = CgOp.class_ref('mo', @($!tclass || 'Any'));
+                CgOp.scopedlex($!slot, $!rwtrans ?? $get !!
+                    CgOp.newboundvar(+(!$!rw), +$!list, $type, $get));
+            }
+        } else {
+            CgOp.sink($get);
+        }
+    }
+}
+
 class Op::MakeJunction is Op {
     has Int $.typecode = die "MakeJunction.typecode required";
     has @.zyg;
