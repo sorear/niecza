@@ -4,7 +4,6 @@
 #
 class Operator;
 
-use Body;
 use Sig;
 use OpHelpers;
 

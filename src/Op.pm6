@@ -144,13 +144,12 @@ class CallMethod is CallLike {
     has $.receiver = die "CallMethod.receiver required"; # Op
     has $.name = die "CallMethod.name required"; # Op | Str
     has $.private = False; # Bool
-    has $.ppath; # Array of Str
     has $.pclass; # Xref, is rw
     has $.ismeta = ''; # Str
 
     method adverb($adv) {
         Op::CallMethod.new(receiver => $.receiver, name => $.name,
-            private => $.private, ppath => $.ppath, pclass => $.pclass,
+            private => $.private, pclass => $.pclass,
             ismeta => $.ismeta, args => [ self.getargs, $adv ])
     }
 
@@ -530,12 +529,6 @@ class Start is Op {
     }
 }
 
-class VoidPhaser is Op {
-    has $.body = die "VoidPhaser.body required"; # Body
-
-    method code($ ) { CgOp.corelex('Nil') }
-}
-
 class Try is Op {
     has $.body = die "Try.body required"; # Op
     method zyg() { $.body }
@@ -594,17 +587,6 @@ class Bind is Op {
     }
 }
 
-class SubsetDef is Op {
-    has Str $.name;
-    has Array $.basetype; # Array of Str
-    has Array $.ourname; # Maybe[Array of Str], else gensymmish
-    has Str $.lexvar;
-    has $.body; # Body
-    has @.exports; # Array of Str
-
-    method code($ ) { CgOp.scopedlex($.lexvar) }
-}
-
 # just a little hook for rewriting
 class Attribute is Op {
     has $.name; # Str
@@ -641,8 +623,7 @@ class BareBlock is Op {
             $body.run_once = $body.outer.run_once;
         }
 
-        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => Any, :once,
-            symbol => $!var));
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(:once, symbol => $!var));
     }
 }
 
@@ -711,12 +692,6 @@ class PackageVar is Op {
     }
 }
 
-class Use is Op {
-    has $.unit = die "Use.unit required"; # Str
-
-    method code($ ) { CgOp.corelex('Nil') }
-}
-
 class Require is Op {
     has $.unit = die "Require.unit required"; # Str
 
@@ -731,7 +706,6 @@ class Take is Op {
 }
 
 class Gather is Op {
-    has $.body = die "Gather.body required"; # Body
     has $.var  = die "Gather.var required"; # Str
 
     method code($ ) {

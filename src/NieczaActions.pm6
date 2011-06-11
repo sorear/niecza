@@ -2,8 +2,6 @@ class NieczaActions;
 
 use Op;
 use RxOp;
-use Body;
-use Unit;
 use Sig;
 use CClass;
 use OptRxSimple;
@@ -1073,12 +1071,12 @@ method check_hash($/) {
 method circumfix:sym<{ }> ($/) {
     my $var = self.gensym;
     $*CURLEX<!sub>.add_my_sub_child($var, $<pblock>.ast);
-    make ::Op::BareBlock.new(|node($/), :$var, :body(Any));
+    make ::Op::BareBlock.new(|node($/), :$var);
 
     if self.check_hash($/) {
         make mkcall($/, '&_hash_constructor',
             ::Op::CallSub.new(|node($/),
-                invocant => ::Op::SubDef.new(body=>Any, symbol=>$var, :once)))
+                invocant => ::Op::SubDef.new(symbol=>$var, :once)))
     }
 }
 
@@ -3031,33 +3029,9 @@ method inliney_call($/, $block, *@parms) {
     my $sym = self.gensym;
     $*CURLEX<!sub>.add_my_sub_child($sym, $block);
     ::Op::CallSub.new(|node($/),
-        invocant => ::Op::SubDef.new(body => Any, symbol => $sym, :once),
+        invocant => ::Op::SubDef.new(symbol => $sym, :once),
         positionals => @parms);
 }
-# method sl_to_block ($type, $ast, :$subname, :$returnable, :$signature,
-#         :$unsafe = False, :$class = 'Block') {
-#     Body.new(
-#         name      => $subname // 'ANON',
-#         returnable=> $returnable // ($type eq 'sub'),
-#         type      => $type,
-#         class     => $class,
-#         signature => $signature,
-#         unsafe    => $unsafe,
-#         do        => $ast);
-# }
-# 
-# method block_to_immediate($/, $type, $blk) {
-#     $blk.type = $type;
-#     ::Op::CallSub.new(|node($/),
-#         invocant => self.block_to_closure($/, $blk, once => True),
-#         positionals => []);
-# }
-# 
-# method block_to_closure($/, $body, :$bindlex, :$bindmethod, :$once,
-#         :$bindpackages = [], :$multiness) {
-#     ::Op::SubDef.new(|node($/), :$bindlex, :$bindmethod, :$body, :$once,
-#         :$bindpackages, :$multiness);
-# }
 
 # this is intended to be called after parsing the longname for a sub,
 # but before the signature.  export, etc are handled by the sub/package
@@ -3261,8 +3235,8 @@ method statement_prefix:do ($/) {
 }
 method statement_prefix:gather ($/) {
     $<blast>.ast.gather_hack = True;
-    make ::Op::Gather.new(|node($/), body => Any, var =>
-        self.block_expr($/, $<blast>.ast).name);
+    make ::Op::Gather.new(|node($/),
+        var => self.block_expr($/, $<blast>.ast).name);
 }
 method statement_prefix:try ($/) {
     make ::Op::Try.new(|node($/), body => self.inliney_call($/, $<blast>.ast));
