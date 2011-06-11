@@ -807,7 +807,6 @@ method quantifier:sym<**> ($/) {
     $h<mod> = $<quantmod>.ast;
     make $h;
 }
-
 method statement_control:use ($/) {
     make ::Op::StatementList.new;
     return if $<version>; # just ignore these
@@ -957,6 +956,23 @@ class Op::MakeJunction is Op {
 
 CgOp._register_ops: < makejunction
 >;
+
+augment class Op::BareBlock { #OK
+    method statement_level() {
+        # This cheat relies on the fact that we can't have any lexicals put
+        # into this block until after the compile is done, so the usual
+        # issues with changing lexical representation don't apply :)
+        my $body = $*CURLEX<!sub>.find_lex($!var).body;
+        if $body.code ~~ ::Op::YouAreHere {
+            $body.run_once = $body.outer.run_once;
+        }
+
+        ::Op::CallSub.new(invocant => ::Op::SubDef.new(body => Any, :once,
+            symbol => $!var));
+    }
+}
+
+
 
 my $usage = q:to/EOM/;
 niecza -- a command line wrapper for Niecza
