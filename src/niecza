@@ -24,6 +24,187 @@ use Sig;
 use Stash;
 use STD;
 
+# Almost all longname and most identifier uses in Perl6 can be divided into
+# two groups.
+#
+# DECLARATIVE references, like class Foo::Bar::Baz {}, have an ending token,
+# and the remainder identifies a stash.  Leading :: is ignored; if 0 tokens,
+# anon is forced, if 1, scope-sensitive special behavior, if 2+, our required.
+# Evaluating a declarative reference returns a (stash,name) pair.
+#
+# REFERENTIAL names, like $Foo::Bar::baz, are interpreted as referring to a
+# single variable; in many cases this is used to look for a type object.
+# Referential names default to MY:: if 1 token and 0 leading colon.
+# Evaluating a referential name returns or binds a variable.
+#
+# The one exception seems to be method calls, which take a referential name
+# plus an extra identifier to name the method.
+#
+# Functions for handling names in actions:
+#
+#   package_var: Basic function for handling referential names, produces Op.
+#
+#   immed_ref: Like package_var in a BEGIN context.
+#
+#   decl_expr:
+#
+#   immed_decl:
+
+augment grammar STD {
+our $ALL;
+my package DEBUG {
+    our constant symtab = 2;
+}
+
+# is_name($NAME, $PAD = $*CURLEX)
+# returns True if the referential name could succeed at runtime.  Used
+# to make compile-time guesses; should be liberal.
+#  - called from label on an <identifier> to check uniqueness
+#  - called from typename to validate names not starting with :: (longname)
+#  - term:identifier to distinguish constants from subs (<identifier>)
+#  - ditto, term:name (<longname>)
+#  - add_name, to check augments (longname-ish)
+#  - explain_mystery (any %*MYSTERY = identifier or longname)
+#  - called from add_routine to check if a sub name is a type name
+
+method is_name($longname, $curlex = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("is_name $longname") if $deb;
+    if defined($longname.index("::(")) {
+        self.deb("computed name gets a free pass") if $deb;
+        return True;
+    }
+    my @parts = $longname.split('::');
+    unshift @parts, 'MY' if @parts == 1;
+    shift @parts if @parts[0] eq '';
+
+    self.deb("reparsed: @parts.perl()") if $deb;
+    return False if !@parts;
+    my @pkg;
+
+    if @parts[0] eq 'OUR' {
+        @pkg = @( $curlex<!sub>.cur_pkg );
+        shift @parts;
+    } elsif @parts[0] eq 'PROCESS' or @parts[0] eq 'GLOBAL' {
+        @pkg = shift @parts;
+    } elsif @parts[0] eq 'MY' {
+        return False if @parts == 1;
+        my $lexical = self._lookup_lex_for_std($curlex, @parts[1]);
+        unless defined $lexical {
+            self.deb("Lexical @parts[1] not found") if $deb;
+            return False;
+        }
+        if $lexical ~~ ::Metamodel::Lexical::Stash {
+            shift @parts; shift @parts;
+            @pkg = @( $lexical.path );
+        }
+        else {
+            return @parts == 2;
+        }
+    } else {
+        my $lexical = self._lookup_lex_for_std($curlex, @parts[0]);
+        if !defined $lexical {
+            @pkg = 'GLOBAL';
+        } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
+            @pkg = @( $lexical.path );
+            shift @parts;
+        } else {
+            return @parts == 1;
+        }
+    }
+
+    my $ret = ?( $*unit.get_item([ @pkg, @parts ]) );
+    self.deb($ret) if $deb;
+    $ret;
+}
+
+# functions much like Metamodel::StaticSub.find_lex, but sets <used> and
+# makes OUTER:: aliases...
+# note: does NOT follow ::Alias lexicals, since the ::Alias is the real
+# user visible lex in most cases
+method _lookup_lex_for_std($lex is copy, $name) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("Lookup $name") if $deb;
+    my $sub = $lex<!sub>;
+    loop {
+        if $sub.lexicals{$name}:exists {
+            $lex{$name}<used> = 1 if $lex{$name}:exists;
+            self.deb("Found in $sub.name()") if $deb;
+            return $sub.lexicals{$name};
+        }
+        $sub = $sub.outer || last;
+        $lex = $lex<OUTER::>[0];
+        $lex = $lex && $ALL{$lex};
+    }
+    self.deb("Not found") if $deb;
+    return Any;
+}
+
+}
+
+augment class NieczaActions {
+
+method label($/) {
+    $*CURLEX<!sub>.add_label(~$<identifier>);
+    make ~$<identifier>;
+}
+
+method statement($/) {
+    if $<label> {
+        make ::Op::Labelled.new(|node($/), name => $<label>.ast,
+            stmt => $<statement>.ast);
+        return;
+    }
+
+    make ($<statement_control> ?? $<statement_control>.ast !!
+        $<EXPR> ?? $<EXPR>.ast !! ::Op::StatementList.new);
+
+    if $<statement_mod_cond> {
+        my ($sym, $exp) = @( $<statement_mod_cond>[0].ast );
+
+        if $sym eq 'if' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                true => $/.ast, false => Any);
+        } elsif $sym eq 'unless' {
+            make ::Op::Conditional.new(|node($/), check => $exp,
+                false => $/.ast, true => Any);
+        } elsif $sym eq 'when' {
+            make ::Op::Conditional.new(|node($/),
+                check => ::Op::CallMethod.new(name => 'ACCEPTS',
+                    receiver => $exp, positionals => [ mklex($/, '$_') ]),
+                true => $/.ast, false => Any);
+        } else {
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+    }
+
+    if $<statement_mod_loop> {
+        my ($sym, $exp) = @( $<statement_mod_loop>[0].ast );
+
+        if $sym eq 'while' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => False, once => False);
+        } elsif $sym eq 'until' {
+            make ::Op::WhileLoop.new(|node($/), check => $exp,
+                body => $/.ast, until => True, once => False);
+        } elsif $sym eq 'given' {
+            make mktemptopic($/, $exp, $/.ast);
+        } elsif $sym eq 'for' {
+            # XXX laziness, comprehensions
+            my $var = self.gensym;
+            make ::Op::ImmedForLoop.new(|node($/), :$var, source => $exp,
+                sink => mktemptopic($/, ::Op::LetVar.new(name => $var), $/.ast));
+        } else {
+            $/.CURSOR.sorry("Unhandled statement modifier $sym");
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+    }
+}
+}
+
 CgOp._register_ops: <
 >;
 

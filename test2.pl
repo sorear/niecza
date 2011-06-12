@@ -26,6 +26,11 @@ is [ 1,2,3 ... 10 ], [1..10];
 is [ 1,2,4 ... 256 ], [map 2 ** *, 0..8];
 is [ 1,1,*+* ...^ *>100 ], [1,1,2,3,5,8,13,21,34,55,89];
 
+eval_lives_ok q[
+    class F2855::G7136 { ... }
+    class F2855::G7136 { }
+], "can stub then define nested classes";
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {

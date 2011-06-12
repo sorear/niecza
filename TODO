@@ -74,10 +74,6 @@ HARD
    Design something to deal with the last remnants of cursor mutability
    in STD.pm6.
 
-  *"Immediate mode metamodel" - Metamodel::StaticSub object should be
-   constructed by the closing brace at the latest.  This will require
-   a lot of STD hacking and is required for BEGIN to work.
-
   *Finish roles.
 
    MY::, CALLER::, OUTER::, UNIT:: et al
@@ -101,3 +97,14 @@ NASTY
    SIMD hyperoperators.
 
    Export Perl 6 code into a CLR .dll
+
+STD $*CURLEX consumers:
+  - getsig
+  - is_name
+  - find_stash
+  - get_top_pkg
+  - add_my_name
+  - is_known
+  - add_placeholder
+  - check_variable
+  - lookup_compiler_var
