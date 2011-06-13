@@ -98,7 +98,7 @@ augment grammar STD::P6 { #OK
 augment grammar STD {
 our $ALL;
 my package DEBUG {
-    our constant symtab = 2;
+    our constant symtab = 1;
 }
 
 
@@ -125,6 +125,8 @@ method is_name($longname, $curlex = $*CURLEX) {
     unshift @parts, 'MY' if @parts == 1;
     shift @parts if @parts[0] eq '';
     pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
+
+    @parts[*-1] = $/ ~ @parts[*-1] if @parts && @parts[0] ~~ s/^(\W\W?)//;
 
     self.deb("reparsed: @parts.perl()") if $deb;
     return False if !@parts;
@@ -256,92 +258,8 @@ method check_variable ($variable) {
 }
 
 method is_known ($n, $curlex = $*CURLEX) {
-    my $name = $n;
-    self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
-    return True if $*CURPKG.{$name};
-    return False if $name ~~ /\:\:\(/;
-    my $curpkg = $*CURPKG;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return True if @components[0] eq 'COMPILING::';
-        return True if @components[0] eq 'CALLER::';
-        return True if @components[0] eq 'CONTEXT::';
-        if $curpkg = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
-            shift @components;
-        }
-        else {
-            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
-            $curpkg = $*GLOBAL;
-        }
-        while @components > 1 {
-            my $pkg = shift @components;
-            self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
-            $curpkg = $curpkg.{$pkg};
-            return False unless $curpkg;
-            try {
-                my $outlexid = $curpkg.[0];
-                return False unless $outlexid;
-                $curpkg = $ALL.{$outlexid};
-                return False unless $curpkg;
-            };
-            self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
-        }
-    }
-
-    $name = shift(@components)//'';
-    self.deb("Final component is $name") if $*DEBUG +& DEBUG::symtab;
-    return True if $name eq '';
-    if $curpkg.{$name} {
-        self.deb("Found") if $*DEBUG +& DEBUG::symtab;
-        $curpkg.{$name}<used>++;
-        return True;
-    }
-    # leading components take us non-lexical?  assume we can't know
-    return False if $curpkg !=== $*CURPKG and $curpkg<!id>[0] ~~ /^GLOBAL($|\:\:)/;
-
-    my $varbind = { truename => '???' };
-    return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
-    self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
-
-    return False;
-}
-
-method lex_can_find_name ($lex, $name, $varbind) {
-    self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
-    if $lex.{$name} {
-        self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
-        $lex.{$name}<used>++;
-        return True;
-    }
-
-    my $outlexid = $lex.<OUTER::>[0];
-    return False unless $outlexid;
-    my $outlex = $ALL.{$outlexid};
-
-    if self.lex_can_find_name($outlex,$name,$varbind) {
-        # fake up an alias to outer symbol to catch reclaration
-        my $outname = $outlex.{$name}<name>;
-        my $outfile = $outlex.{$name}<file>;
-        my $outline = $outlex.{$name}<line>;
-        $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
-        $outname = "OUTER::" ~ $outname;
-        $lex.{$name} = NAME.new(
-            olex => $lex.idref,
-            name => $outname,
-            file => $outfile, line => $outline,
-            rebind => self.line,
-            varbind => $varbind,
-            mult => 'only',
-            scope => $lex.{$name}<scope>,
-        );
-        # the innermost lex sets this last to get correct # of OUTER::s
-        $varbind.<truename> = $outname;
-        return True;
-    }
-
-    return False;
+    return self.is_name($n, $curlex);
 }
 
 
@@ -475,6 +393,8 @@ method lookup_compiler_var($name) {
 method _lookup_lex_for_std($lex is copy, $name) {
     my $deb = $*DEBUG +& DEBUG::symtab;
     self.deb("Lookup $name") if $deb;
+    my $varbind = { truename => '???' };
+    self.lex_can_find_name($lex, $name, $varbind); # set up OUTER:: stuff
     my $sub = $lex<!sub>;
     loop {
         if $sub.lexicals{$name}:exists {
@@ -489,6 +409,7 @@ method _lookup_lex_for_std($lex is copy, $name) {
     self.deb("Not found") if $deb;
     return Any;
 }
+
 
 }
 
