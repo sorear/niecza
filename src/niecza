@@ -5,6 +5,7 @@ use GetOptLong;
 use JSYNC;
 use Metamodel;
 use NAMOutput;
+use NAME;
 use NieczaActions;
 use NieczaBackendClisp;
 use NieczaBackendDotnet;
@@ -40,6 +41,8 @@ use STD;
 # The one exception seems to be method calls, which take a referential name
 # plus an extra identifier to name the method.
 #
+# Trailing :: is forbidden when declaring and means .WHO when referencing.
+#
 # Functions for handling names in actions:
 #
 #   package_var: Basic function for handling referential names, produces Op.
@@ -50,11 +53,55 @@ use STD;
 #
 #   immed_decl:
 
+constant %term            = (:dba('term')            , :prec<z=>);
+augment grammar STD::P6 { #OK
+    token term:name
+    {
+        :my $name;
+        :my $pos;
+        <longname>
+        {
+            $name = $<longname>.Str;
+            $pos = $¢.pos;
+        }
+        [
+        ||  <?{
+                $¢.is_name($name) or substr($name,0,2) eq '::'
+            }>
+            { $¢.check_nodecl($name); }
+
+            # parametric type?
+            :dba('type parameter')
+            <.unsp>? [ <?before '['> <postcircumfix> ]?
+
+            :dba('namespace variable lookup')
+            [
+                <?after '::'>
+                <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
+            ]?
+
+        # unrecognized names are assumed to be post-declared listops.
+        || <args> { self.add_mystery($<longname>,$pos,'termish') unless $<args><invocant>; }
+            {
+                if $*BORG and $*BORG.<block> {
+                    if not $*BORG.<name> {
+                        $*BORG.<culprit> = self.cursor($pos);
+                        $*BORG.<name> = $*BORG<name> // $name;
+                    }
+                }
+            }
+        ]
+        <O(|%term)>
+    }
+}
+
 augment grammar STD {
 our $ALL;
 my package DEBUG {
     our constant symtab = 2;
 }
+
+
 
 # is_name($NAME, $PAD = $*CURLEX)
 # returns True if the referential name could succeed at runtime.  Used
@@ -77,6 +124,7 @@ method is_name($longname, $curlex = $*CURLEX) {
     my @parts = $longname.split('::');
     unshift @parts, 'MY' if @parts == 1;
     shift @parts if @parts[0] eq '';
+    pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
 
     self.deb("reparsed: @parts.perl()") if $deb;
     return False if !@parts;
@@ -117,6 +165,308 @@ method is_name($longname, $curlex = $*CURLEX) {
     self.deb($ret) if $deb;
     $ret;
 }
+
+# check_variable($M)
+#   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
+#         ...
+#   $M is anon(sigil,twigil,desigilname) or anon(sigil<desigilname>) (colonpair)
+#   $M is synthetic(<longname>::<postcircumfix>) (term:name)
+# check_variable should handle ALL of the possible sorries resulting from
+# a referential variable use.  Even term:variable is too early, since we may
+# backtrack if $*QSIGIL ne '$' and no posfix.
+
+# I don't like the way this is factored, since do_variable_reference has to
+# redo a lot of the same scanning.
+method check_variable ($variable) {
+    return () unless defined $variable;
+    my $name = $variable.Str;
+    my $here = self.cursor($variable.from);
+    self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
+    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    ($first,$twigil) = ($twigil, '') if $first eq '';
+    given $twigil {
+        when '' {
+            my $ok = 0;
+            $ok ||= $*IN_DECL;
+            $ok ||= $sigil eq '&';
+            $ok ||= $first lt 'A';
+            $ok ||= $first eq '¢';
+            $ok ||= self.is_known($name);
+            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+            if not $ok {
+                my $id = $name;
+                $id ~~ s/^\W\W?//;
+                if $name eq '@_' or $name eq '%_' {
+                    $here.add_placeholder($name);
+                }
+                else {  # guaranteed fail now
+                    if my $scope = @*MEMOS[$variable.from]<declend> {
+                        return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                    }
+                    elsif $id !~~ /\:\:/ {
+                        if self.is_known('@' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                        }
+                        elsif self.is_known('%' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                        }
+                    }
+                    return $here.sorry("Variable $name is not predeclared");
+                }
+            }
+            else {
+                self._lookup_lex_for_std($*CURLEX, $name);
+            }
+        }
+        when '!' {
+            if not $*HAS_SELF { # XXX to be replaced by MOP queries
+                $here.sorry("Variable $name used where no 'self' is available");
+            }
+        }
+        when '.' {
+            given $*HAS_SELF { # XXX to be replaced by MOP queries
+                when 'complete' {}
+                when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
+                default { $here.sorry("Variable $name used where no 'self' is available"); }
+            }
+        }
+        when '^' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
+        }
+        when ':' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
+        }
+        when '~' {
+            return %*LANG.{substr($name,2)};
+        }
+        when '?' {
+            if $name ~~ /\:\:/ {
+                my ($first) = self.canonicalize_name($name);
+                $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+            }
+            else {
+                # search upward through languages to STD
+                $here.lookup_compiler_var($name);
+            }
+        }
+    }
+    self;
+}
+
+method is_known ($n, $curlex = $*CURLEX) {
+    my $name = $n;
+    self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
+    return True if $*QUASIMODO;
+    return True if $*CURPKG.{$name};
+    return False if $name ~~ /\:\:\(/;
+    my $curpkg = $*CURPKG;
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
+        return True if @components[0] eq 'COMPILING::';
+        return True if @components[0] eq 'CALLER::';
+        return True if @components[0] eq 'CONTEXT::';
+        if $curpkg = self.find_top_pkg(@components[0]) {
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
+            shift @components;
+        }
+        else {
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
+            $curpkg = $*GLOBAL;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
+            $curpkg = $curpkg.{$pkg};
+            return False unless $curpkg;
+            try {
+                my $outlexid = $curpkg.[0];
+                return False unless $outlexid;
+                $curpkg = $ALL.{$outlexid};
+                return False unless $curpkg;
+            };
+            self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
+        }
+    }
+
+    $name = shift(@components)//'';
+    self.deb("Final component is $name") if $*DEBUG +& DEBUG::symtab;
+    return True if $name eq '';
+    if $curpkg.{$name} {
+        self.deb("Found") if $*DEBUG +& DEBUG::symtab;
+        $curpkg.{$name}<used>++;
+        return True;
+    }
+    # leading components take us non-lexical?  assume we can't know
+    return False if $curpkg !=== $*CURPKG and $curpkg<!id>[0] ~~ /^GLOBAL($|\:\:)/;
+
+    my $varbind = { truename => '???' };
+    return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
+    self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
+
+    return False;
+}
+
+method lex_can_find_name ($lex, $name, $varbind) {
+    self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
+    if $lex.{$name} {
+        self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
+        $lex.{$name}<used>++;
+        return True;
+    }
+
+    my $outlexid = $lex.<OUTER::>[0];
+    return False unless $outlexid;
+    my $outlex = $ALL.{$outlexid};
+
+    if self.lex_can_find_name($outlex,$name,$varbind) {
+        # fake up an alias to outer symbol to catch reclaration
+        my $outname = $outlex.{$name}<name>;
+        my $outfile = $outlex.{$name}<file>;
+        my $outline = $outlex.{$name}<line>;
+        $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
+        $outname = "OUTER::" ~ $outname;
+        $lex.{$name} = NAME.new(
+            olex => $lex.idref,
+            name => $outname,
+            file => $outfile, line => $outline,
+            rebind => self.line,
+            varbind => $varbind,
+            mult => 'only',
+            scope => $lex.{$name}<scope>,
+        );
+        # the innermost lex sets this last to get correct # of OUTER::s
+        $varbind.<truename> = $outname;
+        return True;
+    }
+
+    return False;
+}
+
+
+method getsig {
+    my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
+    state %method = (:Method, :Submethod, :Regex);
+    if $*CURLEX.<!NEEDSIG>:delete {
+        my @parms;
+        if %method{$*CURLEX<!sub>.class} {
+            my $cl = $*CURLEX<!sub>.methodof &&
+                $*unit.deref($*CURLEX<!sub>.methodof);
+            # XXX type checking against roles NYI
+            if $cl && $cl !~~ ::Metamodel::Role &&
+                    $cl !~~ ::Metamodel::ParametricRole {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
+                    tclass => $cl.xref);
+            } else {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
+            }
+            $*CURLEX<!sub>.add_my_name('self', :noinit);
+        }
+
+        if $pv {
+            my $h_ = $pv.<%_>:delete;
+            my $a_ = $pv.<@_>:delete;
+            for (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) }) -> $pn is copy {
+                my $positional = True;
+                if substr($pn,0,1) eq ':' {
+                    $pn = substr($pn,1);
+                    $positional = False;
+                }
+                my $list = substr($pn,0,1) eq '@';
+                my $hash = substr($pn,0,1) eq '%';
+                push @parms, ::Sig::Parameter.new(slot => $pn, :$list, :$hash,
+                    name => $pn, :$positional, names => [ substr($pn,1) ]);
+            }
+            if $a_ {
+                push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
+                    :slurpy, :list);
+            }
+            if $h_ {
+                push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
+                    :slurpy, :hash);
+            }
+        }
+        else {
+            push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
+                :defouter, :rwtrans);
+            $*CURLEX<!sub>.add_my_name('$_', :noinit);
+        }
+        $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
+    }
+    # NIECZA immutable cursors
+    # self.<sig> = $sig;
+    # self.<lex> = $*CURLEX.idref;
+    if ($*DECLARAND<mult>//'') ne 'proto' {
+        for keys %$*CURLEX {
+            my $desc = $*CURLEX{$_};
+            next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
+            next if $desc !~~ Hash;
+            next if $desc<used>;
+            next if $desc<rebind>;
+            next if $desc<dynamic>;
+            next if $desc<scope> eq 'our';
+            next if $desc<scope> eq 'state';
+            next if $desc<stub>;
+            next unless $_ ~~ /<[\$\@\%\&]>\w/;
+            my $pos = $desc<declaredat> // self.pos;
+            self.cursor($pos).worry("$_ is declared but not used");
+        }
+    }
+    self;
+}
+method add_placeholder($name) {
+    my $decl = $*CURLEX.<!IN_DECL> // '';
+    $decl = ' ' ~ $decl if $decl;
+    my $*IN_DECL = 'variable';
+
+    if $*SIGNUM {
+        return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
+    }
+    elsif my $siggy = $*CURLEX.<$?SIGNATURE> {
+        return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
+    }
+    if not $*CURLEX.<!NEEDSIG> {
+        if $*CURLEX === $*UNIT {
+            return self.sorry("Placeholder variable $name may not be used outside of a block");
+        }
+        return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
+    }
+    if $name ~~ /\:\:/ {
+        return self.sorry("Placeholder variable $name may not be package qualified");
+    }
+
+    my $varname = $name;
+    my $twigil = '';
+    my $signame = $varname;
+    if $varname ~~ s/<[ ^ : ]>// {
+        $twigil = $/.Str;
+        $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
+    }
+    return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
+
+    if $*CURLEX{$varname} {
+        return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
+    }
+    $*CURLEX<!sub>.add_my_name($varname, :noinit,
+        list => substr($varname,0,1) eq '@',
+        hash => substr($varname,0,1) eq '%');
+    self.add_my_name($varname);
+    $*CURLEX{$varname}<used> = 1;
+    self;
+}
+
+
+method lookup_compiler_var($name) {
+    state %builtin_hints = < $?LINE $?POSITION &?BLOCK &?ROUTINE > Z=> True;
+
+    unless %builtin_hints{$name} ||
+            defined self._lookup_lex_for_std($*CURLEX, $name)
+    {
+        self.sorry("Unrecognized variable: $name");
+    }
+}
+
 
 # functions much like Metamodel::StaticSub.find_lex, but sets <used> and
 # makes OUTER:: aliases...
