@@ -1477,6 +1477,7 @@ method term:value ($/) { make $<value>.ast }
 
 method package_var($/, $slot, $name, $path, :$list, :$hash) {
     $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
         $*CURLEX<!sub>.add_common_name($slot,
             $*CURLEX<!sub>.find_pkg($path), $name, |mnode($/));
     });
@@ -1778,6 +1779,7 @@ method param_var($/) {
     }
 
     $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
         $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, |mnode($/),
             noinit => ?($*SIGNUM)) if defined($slot);
     });
@@ -2249,6 +2251,7 @@ method variable_declarator($/) {
         make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.', $res_tc);
     } elsif $scope eq 'state' {
         $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
             $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
                 :$hash, typeconstraint => $res_tc, |mnode($/));
         });
@@ -2257,6 +2260,7 @@ method variable_declarator($/) {
         make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
     } else {
         $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
             $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
                 typeconstraint => $res_tc, |mnode($/));
         });
@@ -2357,6 +2361,7 @@ method make_constant($/, $scope, $name, $path) {
         self.gensym;
 
     $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
         if $scope eq 'our' {
             $*CURLEX<!sub>.add_common_name($slot,
                 $*CURLEX<!sub>.find_pkg($path // ['OUR']), $name, |mnode($/));
@@ -3160,14 +3165,17 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             $symbol ~= ":(!proto)" if $multiness eq 'proto';
         } elsif $bindlex {
             $symbol = '&' ~ $name;
-            $sub.outer.add_dispatcher($symbol, |mnode($/))
-                if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol};
+            if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol} {
+                $/.CURSOR.check_categorical($symbol);
+                $sub.outer.add_dispatcher($symbol, |mnode($/))
+            }
 
             given $multiness {
                 when 'multi' { $symbol ~= ":({ self.gensym })"; }
                 when 'proto' { $symbol ~= ":(!proto)"; }
             }
         } else {
+            $/.CURSOR.check_categorical($symbol);
             $symbol = self.gensym;
         }
 

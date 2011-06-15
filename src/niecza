@@ -174,6 +174,10 @@ method is_name($longname, $curlex = $*CURLEX) {
     $ret;
 }
 
+method check_categorical ($name) {
+    self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
+}
+
 method add_my_name ($n, $d?, $p?) {
     my $name = $n;
     self.deb("add_my_name $name in ", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
@@ -194,7 +198,6 @@ method add_my_name ($n, $d?, $p?) {
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
-    return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
     if $shortname ~~ /\:/ {
         $shortname ~~ s/\:.*//;
     }
@@ -447,6 +450,7 @@ method add_placeholder($name) {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
     self.trymop({
+        self.check_categorical($varname);
         $*CURLEX<!sub>.add_my_name($varname, :noinit, |mnode(self),
             list => substr($varname,0,1) eq '@',
             hash => substr($varname,0,1) eq '%');

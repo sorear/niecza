@@ -114,3 +114,7 @@ Other stuff to do after:
   - cnperl6 prototyping...
   - CLR: KISS and then play with async I/O, possibly including soric
   - Fix up name handling
+  - fix stubbing of qualified packages
+  - fix { my $x } crash
+  - blast/statement_level
+  - is tighter/looser/equiv

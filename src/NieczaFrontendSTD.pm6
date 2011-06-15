@@ -33,7 +33,6 @@ role bracket_categorical[$name,$sym1,$sym2,$O] {
 method add_categorical($name) {
     # Signature extension, not categorical
     if $name ~~ /^\w+\:\(/ {
-        self.add_my_name($name);
         return self;
     }
     # CORE names are hardcoded
