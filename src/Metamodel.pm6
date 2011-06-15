@@ -441,6 +441,7 @@ class Subset is Module {
 class Lexical {
     has $.file;
     has $.line;
+    has $.pos;
 
     # my $foo, @foo, %foo, &foo
     class Simple is Lexical {
@@ -665,11 +666,11 @@ class StaticSub is RefTarget {
         self.add_lex($slot, Metamodel::Lexical::Dispatch.new(|%params));
     }
 
-    method add_common_name($slot, $path, $name, :$file, :$line) {
+    method add_common_name($slot, $path, $name, :$file, :$line, :$pos) {
         $*unit.create_stash($path);
         $*unit.create_var([ @$path, $name ]);
         self.add_lex($slot, Metamodel::Lexical::Common.new(:$path, :$name,
-            :$file, :$line));
+            :$file, :$line, :$pos));
     }
 
     method add_state_name($slot, $back, *%param) {

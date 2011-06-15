@@ -7,6 +7,12 @@ use CClass;
 use OpHelpers;
 use Operator;
 
+sub mnode($M) {
+    $M.^isa(Match) ??
+        { file => $*FILE<name>, line => $M.CURSOR.lineof($M.from), pos => $M.from } !!
+        { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
+}
+
 # XXX Niecza  Needs improvement
 method FALLBACK($meth, $/) {
     if $meth eq '::($name)' { # XXX STD miscompilation
@@ -524,7 +530,7 @@ method metachar:unsp ($/) { make ::RxOp::Sequence.new }
 method metachar:sym<{ }> ($/) {
     $/.CURSOR.trymop({
         $<embeddedblock>.ast.signature = Sig.simple('$¢');
-        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |node($/));
+        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
     });
 
     make ::RxOp::VoidBlock.new(block => self.inliney_call($/,
@@ -750,7 +756,7 @@ method assertion:sym<!> ($/) {
 method assertion:sym<{ }> ($/) {
     $/.CURSOR.trymop({
         $<embeddedblock>.ast.signature = Sig.simple('$¢');
-        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |node($/));
+        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
     });
 
     make ::RxOp::CheckBlock.new(block => self.inliney_call($/,
@@ -1472,7 +1478,7 @@ method term:value ($/) { make $<value>.ast }
 method package_var($/, $slot, $name, $path, :$list, :$hash) {
     $/.CURSOR.trymop({
         $*CURLEX<!sub>.add_common_name($slot,
-            $*CURLEX<!sub>.find_pkg($path), $name, |node($/));
+            $*CURLEX<!sub>.find_pkg($path), $name, |mnode($/));
     });
     ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
 }
@@ -1772,7 +1778,7 @@ method param_var($/) {
     }
 
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, |node($/),
+        $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, |mnode($/),
             noinit => ?($*SIGNUM)) if defined($slot);
     });
 
@@ -1864,7 +1870,7 @@ method signature($/) {
         if $i >= @ps {
         } elsif defined @ps[$i].index(':') {
             $/.CURSOR.sorry('Only the first parameter may be invocant') if $i;
-            $*CURLEX<!sub>.add_my_name('self', :noinit, |node($/));
+            $*CURLEX<!sub>.add_my_name('self', :noinit, |mnode($/));
             @p[$i].invocant = True;
         } elsif defined @ps[$i].index(';;') {
             $ign = True;
@@ -1875,7 +1881,7 @@ method signature($/) {
 
     state %mlike = (:Method, :Submethod, :Regex);
     if $*SIGNUM && %mlike{$*CURLEX<!sub>.class} && (!@p || !@p[0].invocant) {
-        $*CURLEX<!sub>.add_my_name('self', :noinit, |node($/));
+        $*CURLEX<!sub>.add_my_name('self', :noinit, |mnode($/));
         unshift @p, ::Sig::Parameter.new(name => 'self', :invocant);
     }
 
@@ -2174,7 +2180,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
     my $at;
 
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_my_sub($name ~ '!a', $nb, |node($/));
+        $*CURLEX<!sub>.add_my_sub($name ~ '!a', $nb, |mnode($/));
         $ns.add_method('only', 'private', $name, $name ~ '!a', $nb.xref);
         if $accessor {
             $ns.add_method('only', 'normal', $name, $name ~ '!a', $nb.xref);
@@ -2244,7 +2250,7 @@ method variable_declarator($/) {
     } elsif $scope eq 'state' {
         $/.CURSOR.trymop({
             $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
-                :$hash, typeconstraint => $res_tc, |node($/));
+                :$hash, typeconstraint => $res_tc, |mnode($/));
         });
         make mklex($/, $slot, :$list, :$hash, :state_decl);
     } elsif $scope eq 'our' {
@@ -2252,7 +2258,7 @@ method variable_declarator($/) {
     } else {
         $/.CURSOR.trymop({
             $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
-                typeconstraint => $res_tc, |node($/));
+                typeconstraint => $res_tc, |mnode($/));
         });
         make mklex($/, $slot, :$list, :$hash);
     }
@@ -2330,7 +2336,7 @@ method type_declarator:subset ($/) {
 
     $/.CURSOR.trymop({
         $*unit.create_stash([@ns]);
-        $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |node($/));
+        $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |mnode($/));
         $*CURLEX<!sub>.add_pkg_exports($*unit, $name, [@ns], @exports);
         $*CURLEX<!sub>.create_static_pad;
 
@@ -2353,9 +2359,9 @@ method make_constant($/, $scope, $name, $path) {
     $/.CURSOR.trymop({
         if $scope eq 'our' {
             $*CURLEX<!sub>.add_common_name($slot,
-                $*CURLEX<!sub>.find_pkg($path // ['OUR']), $name, |node($/));
+                $*CURLEX<!sub>.find_pkg($path // ['OUR']), $name, |mnode($/));
         } else {
-            $*CURLEX<!sub>.add_hint($slot, |node($/));
+            $*CURLEX<!sub>.add_hint($slot, |mnode($/));
         }
     });
 
@@ -2365,7 +2371,7 @@ method make_constant($/, $scope, $name, $path) {
 method make_constant_into($/, $rpath, $name, $rhs) {
     my $slot = self.gensym;
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_common_name($slot, $rpath, $name, |node($/));
+        $*CURLEX<!sub>.add_common_name($slot, $rpath, $name, |mnode($/));
     });
     self.init_constant(::Op::ConstantDecl.new(|node($/), name => $slot,
         init => False), $rhs);
@@ -2456,7 +2462,7 @@ method type_declarator:enum ($/) {
             my @ns = $ourpath ?? (@( $*CURLEX<!sub>.find_pkg($ourpath) ), $name) !!
                 $*unit.anon_stash;
             $*unit.create_stash([@ns]);
-            $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |node($/));
+            $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |mnode($/));
             my $obj  = ::Metamodel::Class.new(:$name);
             $obj.exports = [ [@ns] ];
             $*unit.bind_item([@ns], $obj.xref);
@@ -2482,7 +2488,7 @@ method type_declarator:enum ($/) {
             $*CURLEX<!sub>.create_static_pad;
             $nb.strong_used = True;
             $*CURLEX<!sub>.add_child($nb);
-            $*CURLEX<!sub>.add_my_sub($lexvar ~ '!enums', $nb, |node($/));
+            $*CURLEX<!sub>.add_my_sub($lexvar ~ '!enums', $nb, |mnode($/));
             $obj.add_method('only', 'normal', 'enums', $lexvar ~ '!enums',
                 $nb.xref);
             $obj.close;
@@ -2935,7 +2941,7 @@ method open_package_def($, $/ = $*cursor) {
 
             $/.CURSOR.trymop({
                 $sub.outer.add_my_stash($*CURLEX<!sub>.outervar, [@ns],
-                    |node($/));
+                    |mnode($/));
                 $obj = $type.new(:$name);
                 $obj.exports = [ [@ns] ];
                 $*unit.bind_item([@ns], $obj.xref);
@@ -3149,12 +3155,12 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             $symbol = '&' ~ $name;
             my $proto = $symbol;
             $proto ~~ s/\:.*//;
-            $sub.outer.add_dispatcher($proto, |node($/))
+            $sub.outer.add_dispatcher($proto, |mnode($/))
                 if $multiness ne 'only' && !$sub.outer.lexicals.{$proto};
             $symbol ~= ":(!proto)" if $multiness eq 'proto';
         } elsif $bindlex {
             $symbol = '&' ~ $name;
-            $sub.outer.add_dispatcher($symbol, |node($/))
+            $sub.outer.add_dispatcher($symbol, |mnode($/))
                 if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol};
 
             given $multiness {
@@ -3167,7 +3173,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 
         $sub.outervar = $symbol;
         $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
-        $sub.outer.add_my_sub($symbol, $sub, |node($/));
+        $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
 
         if defined($method_type) || $scope eq 'our' {
             $sub.strong_used = True;

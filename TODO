@@ -100,14 +100,7 @@ NASTY
 
 STD $*CURLEX consumers:
   - getsig
-  + is_name
-  - find_stash
-  - get_top_pkg
-  - add_my_name
-  + is_known
-  - add_placeholder
-  + check_variable
-  + lookup_compiler_var
+(also do add_our_name)
 
 <used>:
   - param_var

@@ -25,6 +25,12 @@ use Sig;
 use Stash;
 use STD;
 
+sub mnode($M) {
+    $M.^isa(Match) ??
+        { file => $*FILE<name>, line => $M.CURSOR.lineof($M.from), pos => $M.from } !!
+        { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
+}
+
 # Almost all longname and most identifier uses in Perl6 can be divided into
 # two groups.
 #
@@ -215,32 +221,6 @@ method add_my_name ($n, $d?, $p?) {
             $old<signum> = $*SIGNUM;
         }
         else {
-            my $ofile = $old.file // 0;
-            my $oline = $old.line // '???';
-            my $loc = '';
-            if $ofile {
-                if $ofile !=== $*FILE {
-                    my $oname = $ofile<name>;
-                    $loc = " (see $oname line $oline)";
-                }
-                else {
-                    $loc = " (see line $oline)";
-                }
-            }
-            if $old.olex {
-                my $rebind = $old<rebind>;
-                my $truename = $old<varbind><truename>;
-                self.sorry("Lexical symbol '$name' is already bound to an outer symbol$loc;\n  the implicit outer binding at line $rebind must be rewritten as $truename\n  before you can unambiguously declare a new '$name' in this scope");
-            }
-            elsif $name ~~ /^\w/ {
-                self.sorry("Illegal redeclaration of symbol '$name'$loc");
-            }
-            elsif $name ~~ s/^\&// {
-                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '';
-            }
-            else {  # XXX eventually check for conformant arrays here
-                self.worry("Useless redeclaration of variable $name$loc");
-            }
             return self;
         }
     }
@@ -408,28 +388,26 @@ method getsig {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
                 :defouter, :rwtrans);
             self.trymop({
-                $*CURLEX<!sub>.add_my_name('$_', :noinit, |node(self));
+                $*CURLEX<!sub>.add_my_name('$_', :noinit, |mnode(self));
             });
         }
         $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
     }
-    # NIECZA immutable cursors
-    # self.<sig> = $sig;
-    # self.<lex> = $*CURLEX.idref;
-    if ($*DECLARAND<mult>//'') ne 'proto' {
-        for keys %$*CURLEX {
-            my $desc = $*CURLEX{$_};
-            next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
-            next if $desc !~~ Hash;
-            next if $desc<used>;
-            next if $desc<rebind>;
-            next if $desc<dynamic>;
-            next if $desc<scope> eq 'our';
-            next if $desc<scope> eq 'state';
-            next if $desc<stub>;
-            next unless $_ ~~ /<[\$\@\%\&]>\w/;
-            my $pos = $desc<declaredat> // self.pos;
-            self.cursor($pos).worry("$_ is declared but not used");
+
+    my regex interesting () {
+        <!before anon_ >
+        <!before <[ \$ \@ \% ]> _ >
+        <?before <[ \$ \@ \% \& ]> \w >
+    }
+
+    if ($*CURLEX<!multi>//'') ne 'proto' {
+        my $lu = $*CURLEX<!sub>.lexicals-used;
+        for $*CURLEX<!sub>.lexicals.kv -> $k, $desc {
+            next unless interesting(Cursor.new($k));
+            next if $lu{$k};
+            # next if $[_/!] declared automatically "dynamic" TODO
+            next unless defined $desc.pos;
+            self.cursor($desc.pos).worry("$k is declared but not used");
         }
     }
     self;
@@ -469,7 +447,7 @@ method add_placeholder($name) {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
     self.trymop({
-        $*CURLEX<!sub>.add_my_name($varname, :noinit, |node(self),
+        $*CURLEX<!sub>.add_my_name($varname, :noinit, |mnode(self),
             list => substr($varname,0,1) eq '@',
             hash => substr($varname,0,1) eq '%');
     });
@@ -517,6 +495,8 @@ method _lookup_lex_for_std($lex is copy, $name) {
                     ($*FILE<name> => self.lineof(self.pos));
                 $sub2 = $sub2.outer;
             }
+            $sub2.lexicals-used{$name} //=
+                ($*FILE<name> => self.lineof(self.pos)) if $sub2 === $sub;
 
             self.deb("Found in $sub.name()") if $deb;
             return $sub.lexicals{$name};
@@ -536,7 +516,7 @@ augment class NieczaActions {
 
 method label($/) {
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_label(~$<identifier>, |node($/));
+        $*CURLEX<!sub>.add_label(~$<identifier>, |mnode($/));
     });
     make ~$<identifier>;
 }
