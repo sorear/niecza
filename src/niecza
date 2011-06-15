@@ -168,6 +168,105 @@ method is_name($longname, $curlex = $*CURLEX) {
     $ret;
 }
 
+method add_my_name ($n, $d?, $p?) {
+    my $name = $n;
+    self.deb("add_my_name $name in ", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
+    return self if $name ~~ /\:\:\(/;
+    my $curstash = $*CURLEX;
+    my @components = self.canonicalize_name($name);
+    my $sid = $curstash.id // '???';
+    while @components > 1 {
+        my $pkg = shift @components;
+        $sid ~= "::$pkg";
+        my $newstash = $curstash.{$pkg} //= Stash.new(
+            'PARENT::' => $curstash.idref,
+            '!stub' => 1,
+            '!id' => [$sid] );
+        self.deb("Adding new package $pkg in ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
+        $curstash = $newstash;
+    }
+    $name = my $shortname = shift @components;
+    return self unless defined $name and $name ne '';
+    return self if $name eq '$' or $name eq '@' or $name eq '%';
+    return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
+    if $shortname ~~ /\:/ {
+        $shortname ~~ s/\:.*//;
+    }
+
+    # This may just be a lexical alias to "our" and such,
+    # so reuse $*DECLARAND pointer if it's there.
+    my $declaring = $d // NAME.new(
+        name => $name,
+        file => $*FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+        of   => $*OFTYPE,
+        scope => $*SCOPE,
+    );
+    my $old = $curstash.{$name};
+    if $old and $old<line> and not $old<stub> {
+        self.deb("$name exists, curstash = ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
+        my $omult = $old<mult> // '';
+        if $declaring === $old {}  # already did this, probably enum
+        elsif $*SCOPE eq 'use' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
+        elsif $*PKGDECL eq 'role' {}
+        elsif $*SIGNUM and $old<signum> and $*SIGNUM != $old<signum> {
+            $old<signum> = $*SIGNUM;
+        }
+        else {
+            my $ofile = $old.file // 0;
+            my $oline = $old.line // '???';
+            my $loc = '';
+            if $ofile {
+                if $ofile !=== $*FILE {
+                    my $oname = $ofile<name>;
+                    $loc = " (see $oname line $oline)";
+                }
+                else {
+                    $loc = " (see line $oline)";
+                }
+            }
+            if $old.olex {
+                my $rebind = $old<rebind>;
+                my $truename = $old<varbind><truename>;
+                self.sorry("Lexical symbol '$name' is already bound to an outer symbol$loc;\n  the implicit outer binding at line $rebind must be rewritten as $truename\n  before you can unambiguously declare a new '$name' in this scope");
+            }
+            elsif $name ~~ /^\w/ {
+                self.sorry("Illegal redeclaration of symbol '$name'$loc");
+            }
+            elsif $name ~~ s/^\&// {
+                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '';
+            }
+            else {  # XXX eventually check for conformant arrays here
+                self.worry("Useless redeclaration of variable $name$loc");
+            }
+            return self;
+        }
+    }
+    else {
+        $*DECLARAND = $curstash.{$name} = $declaring;
+        $curstash.{$shortname} = $declaring unless $shortname eq $name;
+        $*DECLARAND<declaredat> = self.pos;
+        $*DECLARAND<inlex> = $curstash.idref;
+        $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
+        $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
+        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %*MYSTERY{substr($name,1)};
+        if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
+            $curstash.{"\&$shortname"} //= $curstash.{$shortname};
+            $curstash.{"\&$shortname"}<used> = 1;
+            $sid ~= "::$name";
+            if $name !~~ /\:\</ {
+                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
+                    'PARENT::' => $curstash.idref,
+                    '!file' => $*FILE, '!line' => self.line,
+                    '!id' => [$sid] ));
+            }
+        }
+    }
+    self;
+}
+
 # check_variable($M)
 #   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
 #         ...
@@ -308,7 +407,9 @@ method getsig {
         else {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
                 :defouter, :rwtrans);
-            $*CURLEX<!sub>.add_my_name('$_', :noinit);
+            self.trymop({
+                $*CURLEX<!sub>.add_my_name('$_', :noinit, |node(self));
+            });
         }
         $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
     }
@@ -335,6 +436,7 @@ method getsig {
 }
 method add_placeholder($name) {
     my $decl = $*CURLEX.<!IN_DECL> // '';
+    my $sub = $*CURLEX<!sub>;
     $decl = ' ' ~ $decl if $decl;
     my $*IN_DECL = 'variable';
 
@@ -363,14 +465,17 @@ method add_placeholder($name) {
     }
     return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
 
-    if $*CURLEX{$varname} {
+    if $sub.lexicals-used.{$varname} || $sub.lexicals.{$varname} {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
-    $*CURLEX<!sub>.add_my_name($varname, :noinit,
-        list => substr($varname,0,1) eq '@',
-        hash => substr($varname,0,1) eq '%');
+    self.trymop({
+        $*CURLEX<!sub>.add_my_name($varname, :noinit, |node(self),
+            list => substr($varname,0,1) eq '@',
+            hash => substr($varname,0,1) eq '%');
+    });
     self.add_my_name($varname);
     $*CURLEX{$varname}<used> = 1;
+    $*CURLEX<!sub>.lexicals-used{$varname} = True;
     self;
 }
 
@@ -385,6 +490,12 @@ method lookup_compiler_var($name) {
     }
 }
 
+method trymop($f) {
+    my $*worry = sub ($m) { self.worry($m) };
+    unless try { $f(); True } {
+        self.sorry($!)
+    }
+}
 
 # functions much like Metamodel::StaticSub.find_lex, but sets <used> and
 # makes OUTER:: aliases...
@@ -396,9 +507,17 @@ method _lookup_lex_for_std($lex is copy, $name) {
     my $varbind = { truename => '???' };
     self.lex_can_find_name($lex, $name, $varbind); # set up OUTER:: stuff
     my $sub = $lex<!sub>;
+    my $sub2 = $sub;
     loop {
         if $sub.lexicals{$name}:exists {
             $lex{$name}<used> = 1 if $lex{$name}:exists;
+
+            until $sub2 === $sub || $sub2.lexicals-used{$name} {
+                $sub2.lexicals-used{$name} //=
+                    ($*FILE<name> => self.lineof(self.pos));
+                $sub2 = $sub2.outer;
+            }
+
             self.deb("Found in $sub.name()") if $deb;
             return $sub.lexicals{$name};
         }
@@ -416,7 +535,9 @@ method _lookup_lex_for_std($lex is copy, $name) {
 augment class NieczaActions {
 
 method label($/) {
-    $*CURLEX<!sub>.add_label(~$<identifier>);
+    $/.CURSOR.trymop({
+        $*CURLEX<!sub>.add_label(~$<identifier>, |node($/));
+    });
     make ~$<identifier>;
 }
 

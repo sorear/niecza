@@ -1,9 +1,18 @@
 # first half of the file - begin augments are in Begin.pm6
 
-module Metamodel;
+class Metamodel;
 
 use NAME;
 use Stash;
+
+method locstr($fo, $lo, $fn, $ln) {
+    $fo := $fo // '???';
+    $lo := $lo // '???';
+    $fn := $fn // '???';
+    $ln := $ln // '???';
+
+    $fn eq $fo ?? " (see line $lo)" !! " (see $fo line $lo)";
+}
 
 ### NIECZA COMPILER METAMODEL
 # The metamodel exists to create a timeline inside the compiler.  Previously,
@@ -430,6 +439,9 @@ class Subset is Module {
 # This is a static lexical; they exist in finite number per unit.  They may
 # occupy specific slots in pads, or globals, or something else entirely.
 class Lexical {
+    has $.file;
+    has $.line;
+
     # my $foo, @foo, %foo, &foo
     class Simple is Lexical {
         has $.list   = False; # Bool
@@ -460,8 +472,6 @@ class Lexical {
     # mostly for state
     class Alias is Lexical {
         has $.to = die "M:L:Alias.to required"; # Str
-
-        method new($to) { nextwith(self, :$to) }
     }
 
     # sub foo { ... }
@@ -494,7 +504,7 @@ class StaticSub is RefTarget {
     has $.run_once = False; # Bool
     has $.spad_exists = False; # Bool
     has $.transparent = False; # Bool; ignored by OUTER::
-    has $.lexicals = {};
+    has %.lexicals;
     has $.code; # Op, is rw
     has $.signature; # Sig, is rw
     has $.zyg = []; # Array of Metamodel::StaticSub
@@ -519,8 +529,13 @@ class StaticSub is RefTarget {
     has $.class = 'Sub'; # Str
     has $.ltm; # is rw
     has $.exports; # is rw
+
+    # used during parse only
     has Str $.outervar is rw; # Xref, used during parse
     has $.methodof is rw; # Xref, used during parse
+    has %.lexicals-used;
+    # not just local lexicals, but all in parse; from current or any inside
+    # block
 
     method outer() { $!outerx ?? $*unit.deref($!outerx) !! StaticSub }
 
@@ -588,7 +603,7 @@ class StaticSub is RefTarget {
     }
 
     method find_lex($name) {
-        my $l = $.lexicals{$name};
+        my $l = %!lexicals{$name};
         if $l {
             return $l.^isa(Metamodel::Lexical::Alias) ??
                 self.find_lex($l.to) !! $l;
@@ -597,56 +612,82 @@ class StaticSub is RefTarget {
     }
 
     method delete_lex($name) {
-        my $l = $.lexicals{$name};
+        my $l = %!lexicals{$name};
         if $l {
             if $l.^isa(Metamodel::Lexical::Alias) { self.delete_lex($l.to) }
-            else { $.lexicals{$name}:delete }
+            else { %!lexicals{$name}:delete }
         } else {
             $.outer && $.outer.delete_lex($name);
         }
     }
 
+    method add_lex($slot, $item) {
+        if %!lexicals{$slot} -> $o {
+            my $l = Metamodel.locstr($o.file, $o.line, $item.file, $item.line);
+            if $slot ~~ /^\w/ {
+                die "Illegal redeclaration of symbol '$slot'$l";
+            } elsif $slot ~~ /^\&/ {
+                die "Illegal redeclaration of routine '$slot.substr(1)'$l";
+            } else {
+                $*worry.("Useless redeclaration of variable $slot$l");
+                return;
+            }
+        }
+        # We don't know in advance if $_ exists.  This is OK.
+        # TODO: The semantics are off here.  $_ should be in every block.
+        elsif $slot ne '$_' && %!lexicals-used{$slot} -> $p {
+            my $truename = $slot;
+            my $c = self;
+            while $c && !$c.lexicals{$slot} {
+                $truename ~~ s/<?before \w>/OUTER::/;
+                $c = $c.outer;
+            }
+            die "Lexical tracking inconsistency" unless $c;
+            my $o = $c.lexicals{$slot};
+            die "Lexical symbol '$slot' is already bound to an outer symbol{Metamodel.locstr($o.file, $o.line, $item.file, $item.line)};\n  the implicit outer binding at line $p.value() must be rewritten as $truename\n  before you can unambiguously declare a new '$slot' in this scope";
+        }
+        %!lexicals{$slot} = $item;
+    }
+
     method add_my_name($slot, *%param) {
-        $.lexicals{$slot} = Metamodel::Lexical::Simple.new(|%param);
+        self.add_lex($slot, Metamodel::Lexical::Simple.new(|%param));
     }
 
-    method add_hint($slot) {
-        $.lexicals{$slot} = Metamodel::Lexical::Hint.new;
+    method add_hint($slot, *%params) {
+        self.add_lex($slot, Metamodel::Lexical::Hint.new(|%params));
     }
 
-    method add_label($slot) {
-        $.lexicals{$slot} = Metamodel::Lexical::Label.new;
+    method add_label($slot, *%params) {
+        self.add_lex($slot, Metamodel::Lexical::Label.new(|%params));
     }
 
-    method add_dispatcher($slot) {
-        $.lexicals{$slot} = Metamodel::Lexical::Dispatch.new;
+    method add_dispatcher($slot, *%params) {
+        self.add_lex($slot, Metamodel::Lexical::Dispatch.new(|%params));
     }
 
-    method add_common_name($slot, $path, $name) {
+    method add_common_name($slot, $path, $name, :$file, :$line) {
         $*unit.create_stash($path);
         $*unit.create_var([ @$path, $name ]);
-        $.lexicals{$slot} = Metamodel::Lexical::Common.new(:$path, :$name);
+        self.add_lex($slot, Metamodel::Lexical::Common.new(:$path, :$name,
+            :$file, :$line));
     }
 
     method add_state_name($slot, $back, *%param) {
         # outermost sub isn't cloned so a fallback to my is safe
         my $up = $.outer // self;
         $up.lexicals{$back} = Metamodel::Lexical::Simple.new(|%param);
-        $.lexicals{$slot} = Metamodel::Lexical::Alias.new($back)
-            if defined($slot);
+        if defined($slot) {
+            self.add_lex($slot, Metamodel::Lexical::Alias.new(to => $back,
+                |%param));
+    }
     }
 
-    method add_my_stash($slot, $path) {
-        $.lexicals{$slot} = Metamodel::Lexical::Stash.new(:$path);
+    method add_my_stash($slot, $path, *%params) {
+        self.add_lex($slot, Metamodel::Lexical::Stash.new(:$path, |%params));
     }
 
-    method add_my_sub($slot, $body) {
-        self.add_child($body);
-        $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
-    }
-
-    method add_my_sub_child($slot, $body) {
-        $.lexicals{$slot} = Metamodel::Lexical::SubDef.new(:$body);
+    method add_my_sub($slot, $body, *%params) {
+        self.add_lex($slot, Metamodel::Lexical::SubDef.new(:$body, |%params));
     }
 
     method add_pkg_exports($unit, $name, $path2, $tags) {

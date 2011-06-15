@@ -1,6 +1,6 @@
 module OpHelpers;
 
-sub node($M) is export { { line => $M.cursor.lineof($M.to) } }
+sub node($M) is export { { line => $M.CURSOR.lineof($M.pos) } }
 
 sub mklet($value, $body) is export {
     my $var = ::GLOBAL::NieczaActions.gensym;

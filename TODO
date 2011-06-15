@@ -100,11 +100,24 @@ NASTY
 
 STD $*CURLEX consumers:
   - getsig
-  - is_name
+  + is_name
   - find_stash
   - get_top_pkg
   - add_my_name
-  - is_known
+  + is_known
   - add_placeholder
-  - check_variable
-  - lookup_compiler_var
+  + check_variable
+  + lookup_compiler_var
+
+<used>:
+  - param_var
+  - getsig
+  - add_my_name
+  - add_our_name
+  - add_placeholder
+
+Other stuff to do after:
+  - $_ handling: declare in *every* sub, empty/defouter according to returnable
+  - cnperl6 prototyping...
+  - CLR: KISS and then play with async I/O, possibly including soric
+  - Fix up name handling

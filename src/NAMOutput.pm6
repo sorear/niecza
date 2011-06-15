@@ -179,7 +179,6 @@ sub sub_from_nam(@block) {
         run_once => ?($flags +& 1),
         spad_exists => ?($flags +& 2),
         transparent => ?($flags +& 64),
-        lexicals => {},
         zyg => [],
         class => $cls,
         ltm => $ltm,
