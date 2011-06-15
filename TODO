@@ -98,17 +98,6 @@ NASTY
 
    Export Perl 6 code into a CLR .dll
 
-STD $*CURLEX consumers:
-  - getsig
-(also do add_our_name)
-
-<used>:
-  - param_var
-  - getsig
-  - add_my_name
-  - add_our_name
-  - add_placeholder
-
 Other stuff to do after:
   - $_ handling: declare in *every* sub, empty/defouter according to returnable
   - cnperl6 prototyping...
@@ -117,4 +106,5 @@ Other stuff to do after:
   - fix stubbing of qualified packages
   - fix { my $x } crash
   - blast/statement_level
+  - checking redeclaration of our symbols, methods, attributes...
   - is tighter/looser/equiv

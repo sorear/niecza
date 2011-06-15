@@ -2,9 +2,6 @@
 
 class Metamodel;
 
-use NAME;
-use Stash;
-
 method locstr($fo, $lo, $fn, $ln) {
     $fo := $fo // '???';
     $lo := $lo // '???';
@@ -787,83 +784,5 @@ class Unit {
         }
         $.ns.add_from($u2name);
         $u2;
-    }
-
-    # STD-based frontend wants a slightly different representation.
-    sub _syml_myname($xr) { "MY:unit<$xr[0]>:xid<$xr[1]>" }
-
-    method create_syml($from_sub?) {
-        my $all = {};
-        my $*unit = self;
-
-        if (self.get_unit($.name) !=== self) {
-            die "Local unit cache inconsistant";
-        }
-
-        $.ns.visit_stashes(sub (@path) {
-            return Nil unless @path;
-            my $tag = join("", map { $_ ~ "::" }, @path);
-            my $st = $all{$tag} = Stash.new('!id' => [$tag]);
-            my @ppath = @path;
-            my $name = pop @ppath;
-            my $ptag = join("", map { $_ ~ "::" }, @ppath);
-            if $ptag ne '' {
-                $st<PARENT::> = [ $ptag ];
-                $all{$ptag}{$name ~ '::'} = $st;
-            }
-            for self.list_stash(@path) -> $tok {
-                if $tok[1] eq 'var' {
-                    my $name = $tok[0];
-                    $st{$name} = NAME.new( name => $name );
-                    $st{'&' ~ $name} = $st{$name} if $name !~~ /^<[\$\@\%\&]>/;
-                }
-            }
-        });
-
-        my $top = $from_sub // self.deref($.bottom_ref // $.mainline.xref);
-        #say STDERR "Top = $top";
-        my $cursor = $top;
-        while $cursor {
-            my $id = _syml_myname($cursor.xref);
-            #say STDERR "Creating $cursor [$id]";
-            $all{$id} = Stash.new( '!id' => [ $id ] );
-            $cursor = $cursor.outer;
-        }
-
-        $cursor = $top;
-        while $cursor {
-            my $st = $all{_syml_myname($cursor.xref)};
-            #say STDERR "Populating $cursor";
-            for sort keys $cursor.lexicals -> $name {
-                my $lx = $cursor.lexicals{$name};
-                $st{$name} = NAME.new( name => $name );
-                $st{'&' ~ $name} = $st{$name} if $name !~~ /^<[\$\@\%\&]>/;
-
-                if $lx.^isa(Metamodel::Lexical::Stash) {
-                    my @cpath = $.ns.stash_canon($lx.path);
-                    $st{$name ~ '::'} = $all{join "", map { $_ ~ "::" },
-                        $.ns.stash_canon(@cpath)};
-                }
-            }
-            $st<OUTER::> = $cursor.outer ?? $all{_syml_myname($cursor.outerx)}<!id> !! [];
-            if ($cursor.unit.bottom_ref && $cursor.unit.name eq 'CORE') {
-                $all<CORE> //= $st;
-            }
-            if ($cursor.unit.bottom_ref || $cursor === $from_sub) {
-                $all<SETTING> //= $st;
-            }
-            $cursor = $cursor.outer;
-        }
-        #say STDERR "UNIT ", $self->mainline;
-        #$all->{'UNIT'} = $subt{$self->mainline};
-        {
-            my @nbits = @( $.mainline.find_pkg([$.name.split('::')]) );
-            @nbits = $.ns.stash_canon(@nbits);
-            # XXX wrong, but makes STD importing work
-            # say STDERR (YAML::XS::Dump @nbits);
-            $all<UNIT> = $all{join "", map { $_ ~ '::' }, @nbits};
-        }
-        # say STDERR (YAML::XS::Dump("Regenerated syml for " . $self->name, $all));
-        $all;
     }
 }

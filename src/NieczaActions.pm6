@@ -2990,7 +2990,7 @@ method package_def ($/) {
     else {
         my $obj = $*unit.deref($sub.body_of);
 
-        if $*DECLARAND<stub> {
+        if $<stub> {
             push $*unit.stubbed_stashes, ($obj => $/.CURSOR);
 
             make mklex($/, $*CURLEX<!sub>.outervar);
@@ -3165,17 +3165,19 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             $symbol ~= ":(!proto)" if $multiness eq 'proto';
         } elsif $bindlex {
             $symbol = '&' ~ $name;
+            $/.CURSOR.check_categorical($symbol);
             if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol} {
-                $/.CURSOR.check_categorical($symbol);
                 $sub.outer.add_dispatcher($symbol, |mnode($/))
             }
 
             given $multiness {
                 when 'multi' { $symbol ~= ":({ self.gensym })"; }
                 when 'proto' { $symbol ~= ":(!proto)"; }
+                default {
+                    $/.CURSOR.check_categorical($symbol);
+                }
             }
         } else {
-            $/.CURSOR.check_categorical($symbol);
             $symbol = self.gensym;
         }
 

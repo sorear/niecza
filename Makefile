@@ -16,11 +16,11 @@ csxdr=CrossDomainReceiver.cs
 .PHONY: help
 
 libunits=CORE JSYNC
-srcunits=CClass CgOp Op OpHelpers Sig RxOp NAME Stash STD NieczaGrammar \
-	 Metamodel OptRxSimple NAMOutput Operator NieczaActions \
-	 NieczaFrontendSTD NieczaPassSimplifier OptBeta NieczaPathSearch \
-	 NieczaBackendNAM NieczaBackendDotnet NieczaBackendClisp \
-	 NieczaBackendHoopl NieczaCompiler GetOptLong
+srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
+	 OptRxSimple NAMOutput Operator NieczaActions NieczaFrontendSTD \
+	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendNAM \
+	 NieczaBackendDotnet NieczaBackendClisp NieczaBackendHoopl \
+	 NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
 	@git describe --tags > VERSION

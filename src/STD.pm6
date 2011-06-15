@@ -7,15 +7,16 @@
 
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
-use NAME;
-use Stash;
+sub mnode($M) {
+    $M.^isa(Match) ??
+        { file => $*FILE<name>, line => $M.CURSOR.lineof($M.from), pos => $M.from } !!
+        { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
+}
 
 package DEBUG {
     our constant symtab = 1;
     our constant EXPR   = 2;
 }
-
-our $ALL;
 
 =begin comment
 
@@ -41,7 +42,6 @@ our $ALL;
     my $*PROCESS;         # the PROCESS scope
     my $*UNIT;            # the UNIT scope
     my $*CURLEX;          # current lexical scope info
-    my $*CURPKG;          # current package scope
 
     my %*MYSTERY;     # names we assume may be post-declared functions
 
@@ -53,9 +53,6 @@ our $ALL;
     my $*SCOPE = "";      # (d) which scope declarator we're under
     my $*MULTINESS;       # (d) which multi declarator we're under
     my $*PKGDECL ::= "";         # (d) current package declarator
-    my $*NEWPKG;      # (u/d) new package being declared
-    my $*NEWLEX;      # (u/d) new lex info being declared
-    my $*DECLARAND;   # (u/d) new object associated with declaration
 
     my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
     my $*IN_REDUCE;   # (d) attempting to parse an [op] construct
@@ -1087,10 +1084,7 @@ grammar P6 is STD {
         :my $*PKGDECL ::= "";
         :my $*IN_DECL = '';
         :my $*HAS_SELF = '';
-        :my $*DECLARAND;
         :my $*OFTYPE;
-        :my $*NEWPKG;
-        :my $*NEWLEX;
         :my $*QSIGIL ::= '';
         :my $*IN_META = '';
         :my $*QUASIMODO;
@@ -1109,7 +1103,6 @@ grammar P6 is STD {
         :my $*FATALS = 0;
         :my $*IN_SUPPOSE = False;
 
-        :my $*CURPKG;
         {
 
             %*LANG<MAIN>    = ::STD::P6 ;
@@ -1120,25 +1113,14 @@ grammar P6 is STD {
             %*LANG<P5Regex> = ::STD::P5::Regex ;
 
             @*WORRIES = ();
-            self.load_setting($*SETTINGNAME);
-            my $oid = $*SETTING.id;
-            my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-            $*CURLEX = Stash.new(
-                'OUTER::' => [$oid],
-                '!file' => $*FILE, '!line' => 0,
-                '!id' => [$id],
-            );
-            $ALL.{$id} = $*CURLEX;
+            $*CURLEX = { };
             $*UNIT = $*CURLEX;
-            $ALL.<UNIT> = $*UNIT;
             self.finishlex;
-            # $¢ = self.cursor_fresh($*CURLEX<$?LANGNAME>);
         }:s
         <.unitstart>
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
         # "CHECK" time...
-        $<LEX> = { $*CURLEX }
         {
             $¢.explain_mystery();
             if @*WORRIES {
@@ -1211,7 +1193,7 @@ grammar P6 is STD {
         [ <?before '{' > || <.panic: "Missing block"> ]
         <.newlex>
         <blockoid>
-        <.checkyada>
+        $<stub>={$¢.checkyada}
     }
 
     token blockoid {
@@ -1299,10 +1281,6 @@ grammar P6 is STD {
         [ <?{ $¢.is_name($label = $<identifier>.Str) }>
           <.worry("Redeclaration of '$label'")>
         ]?
-
-        # add label as a pseudo constant
-        { $¢.add_constant($label,self.label_id); }
-
     }
 
     token statement {
@@ -1383,17 +1361,10 @@ grammar P6 is STD {
     #####################
 
     token statement_control:need {
-        :my $longname;
         <sym>:s
         [
         |<version>
         |<module_name>
-            {
-                my $*IN_DECL = 'use';
-                my $*SCOPE = 'use';
-                $longname = $<module_name>[*-1]<longname>;
-                $¢.do_need($longname<name>);
-            }
         ] ** ','
     }
 
@@ -1403,15 +1374,7 @@ grammar P6 is STD {
         :my $*SCOPE = 'use';
         <sym> <.ws>
         <term>
-        [
-        || <.spacey> <arglist>
-            {
-                my %*MYSTERY;
-                $¢.do_import($<term>, $<arglist>);
-                $¢.explain_mystery();
-            }
-        || { $¢.do_import($<term>, ''); }
-        ]
+        [ <.spacey> <arglist> ]?
         <.ws>
     }
 
@@ -1431,13 +1394,7 @@ grammar P6 is STD {
                     $*MONKEY_TYPING = True;
                 }
             }
-            [
-            || <.spacey> <arglist>
-                {
-                    $¢.do_use($longname<name>, $<arglist>);
-                }
-            || { $¢.do_use($longname<name>, ''); }
-            ]
+            [ <.spacey> <arglist> ]?
         ]
         <.ws>
         <.explain_mystery>
@@ -1596,12 +1553,10 @@ grammar P6 is STD {
 
     token variable_declarator {
         :my $*IN_DECL = 'variable';
-        :my $*DECLARAND;
         :my $var;
         <variable>
         {
             $var = $<variable>.Str;
-            $¢.add_variable($var);
             $*IN_DECL = '';
         }
         [   # Is it a shaped array or hash declaration?
@@ -1634,7 +1589,6 @@ grammar P6 is STD {
 
         <trait>*
         <post_constraint>*
-        <.getdecl>
     }
 
     rule scoped ($*SCOPE) {
@@ -1720,11 +1674,6 @@ grammar P6 is STD {
         <sym> <.ws>
         [
         || <module_name> <.ws> <EXPR>?
-            {
-                my $*IN_DECL = 'use';
-                my $*SCOPE = 'use';
-                $¢.add_name($<module_name><longname><name>.Str);
-            }
         || <EXPR>
         ]
     }
@@ -1744,16 +1693,12 @@ grammar P6 is STD {
         :my $longname;
         :my $*IN_DECL = 'package';
         :my $*HAS_SELF = '';
-        :my $*DECLARAND;
-        :my $*NEWPKG;
-        :my $*NEWLEX;
-        :temp $*CURPKG;
         :temp $*CURLEX;
         :temp $*SCOPE;
         :my $outer = $*CURLEX;
         { $*SCOPE ||= 'our'; }
         [
-            [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
+            [ <longname> { $longname = $<longname>[0]; } ]?
             <.newlex(0, ($*PKGDECL//'') ne 'role')>
             [ :dba('generic role')
                 <?{ ($*PKGDECL//'') eq 'role' }>
@@ -1762,29 +1707,12 @@ grammar P6 is STD {
             ]?
             <trait>*
             <.open_package_def($/)>
-            <.getdecl>
             [
             || <?before '{'>
                 [
-                {
-                    # figure out the actual full package name (nested in outer package)
-                    if $longname and $*NEWPKG {
-                        my $shortname = $longname.<name>.Str;
-                        if $*SCOPE eq 'our' {
-                            $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                            self.deb("added our " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
-                        }
-                        else {
-                            $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                            self.deb("added my " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
-                        }
-                    }
-                    $*begin_compunit = 0;
-                    $*UNIT<$?LONGNAME> ||= $longname ?? $longname<name>.Str !! '';
-                }
-                { $*IN_DECL = ''; }
+                { $*begin_compunit = 0; $*IN_DECL = ''; }
                 <blockoid>
-                <.checkyada>
+                $<stub>={$¢.checkyada}
                 ]
             || <?before ';'>
                 [
@@ -1793,17 +1721,9 @@ grammar P6 is STD {
                         $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                         $outer === $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
                         $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
-                        my $shortname = $longname.<name>.Str;
-                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
                         $*begin_compunit = 0;
-
-                        # XXX throws away any role sig above
-                        # worse - breaks CURLEX<!sub> handling
-                        # $*CURLEX = $outer;
-
-                        $*UNIT<$?LONGNAME> = $longname<name>.Str;
+                        $*IN_DECL = '';
                     }
-                    { $*IN_DECL = ''; }
                     <statementlist>     # whole rest of file, presumably
                 || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
                 ]
@@ -1863,9 +1783,9 @@ grammar P6 is STD {
             my $statements = self.<blockoid><statementlist><statement>;
             my $startsym = $statements[0]<EXPR><root><sym> // '';
             given $startsym {
-                when '...' { $*DECLARAND<stub> = 1 }
-                when '!!!' { $*DECLARAND<stub> = 1 }
-                when '???' { $*DECLARAND<stub> = 1 }
+                when '...' { return 1 }
+                when '!!!' { return 1 }
+                when '???' { return 1 }
                 when '*' {
                     if $*MULTINESS eq 'proto' and $statements.elems == 1 {
                         self.<blockoid>:delete;
@@ -1874,7 +1794,7 @@ grammar P6 is STD {
                 }
             }
         }
-        return self;
+        return 0;
     }
 
     token routine_def_1($*cursor) { <?> }
@@ -1894,9 +1814,8 @@ grammar P6 is STD {
                 $*IN_DECL = '';
             }>
             <blockoid>:!s
-            <.checkyada>
+            $<stub>={$¢.checkyada}
             <.getsig>
-            <.getdecl>
         ] || <.panic: "Malformed routine">
     }
 
@@ -1935,9 +1854,8 @@ grammar P6 is STD {
             }
             { $*IN_DECL = ''; }
             <blockoid>:!s
-            <.checkyada>
+            $<stub>={$¢.checkyada}
             <.getsig>
-            <.getdecl>
         ] || <.panic: "Malformed method">
     }
 
@@ -1968,7 +1886,6 @@ grammar P6 is STD {
             <.finishlex>
             <regex_block>:!s
             <.getsig>
-            <.getdecl>
         ] || <.panic: "Malformed regex">
     }
 
@@ -1983,9 +1900,8 @@ grammar P6 is STD {
             [ <!before '{'> <.panic: "Malformed block"> ]?
             { $*IN_DECL = ''; }
             <blockoid>:!s
-            <.checkyada>
+            $<stub>={$¢.checkyada}
             <.getsig>
-            <.getdecl>
         ] || <.panic: "Malformed macro">
     }
 
@@ -1999,13 +1915,6 @@ grammar P6 is STD {
 
     token trait_mod:is {
         <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
-        {
-            if $*DECLARAND {
-                my $traitname = $<longname>.Str;
-                # XXX eventually will use multiple dispatch
-                $*DECLARAND{$traitname} = self.gettrait($traitname, $<circumfix>);
-            }
-        }
     }
     token trait_mod:hides {
         <sym>:s <module_name>
@@ -2020,8 +1929,6 @@ grammar P6 is STD {
 
     token trait_mod:of {
         ['of'|'returns']<.keyspace>:s <typename>
-        [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
-        { $*DECLARAND<of> = $<typename>.Str; }
     }
     token trait_mod:as      { <sym>:s <typename> }
     token trait_mod:handles { <sym>:s <term> }
@@ -2483,7 +2390,7 @@ grammar P6 is STD {
         :dba('new name to be defined')
         <name>
         [
-        | <colonpair>+ { $¢.add_categorical(substr(self.orig, self.pos, $¢.pos - self.pos)) if $*IN_DECL; }
+        | <colonpair>+
         | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
         ]
     }
@@ -2510,12 +2417,7 @@ grammar P6 is STD {
         | <longname>
           <?{
             my $longname = $<longname>.Str;
-            if substr($longname, 0, 2) eq '::' {
-                $¢.add_my_name(substr($longname, 2));
-            }
-            else {
-                $¢.is_name($longname)
-            }
+            substr($longname, 0, 2) eq '::' || $¢.is_name($longname)
           }>
         ]
         # parametric type?
@@ -2792,7 +2694,7 @@ grammar P6 is STD {
         :my $*DECLARAND;
         <sym> :s
         [
-            [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
+            [ <longname> ]?
             { $*IN_DECL = ''; }
             <trait>*
             [where <EXPR(item %item_assignment)> ]?    # (EXPR can parse multiple where clauses)
@@ -2805,14 +2707,13 @@ grammar P6 is STD {
         :my $*DECLARAND;
         <sym> <.ws>
         [
-        | <name=longname> { $¢.add_name($<name>.Str); }
-        | <name=variable> { $¢.add_variable($<name>.Str); }
+        | <name=longname>
+        | <name=variable>
         | <?>
         ]
         { $*IN_DECL = ''; }
         <.ws>
         <trait>* <?before <[ < ( « ]> > <term> <.ws>
-            {$¢.add_enum($<name>, $<term>.Str); }
     }
 
     token type_declarator:constant {
@@ -2821,8 +2722,8 @@ grammar P6 is STD {
         <sym> <.ws>
 
         [
-        | <identifier> { $¢.add_name($<identifier>.Str); }
-        | <variable> { $¢.add_variable($<variable>.Str); }
+        | <identifier>
+        | <variable>
         | <?>
         ]
         { $*IN_DECL = ''; }
@@ -2835,8 +2736,6 @@ grammar P6 is STD {
         || <?before <-[\n=]>*'='> <.panic: "Malformed constant"> # probable initializer later
         || <.sorry: "Missing initializer on constant declaration">
         ]
-
-        <.getdecl>
     }
 
 
@@ -2845,8 +2744,6 @@ grammar P6 is STD {
         [
         | <value>
         | <typename>
-            [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
-            { $*DECLARAND<of> = $<typename>.Str; }
         | where <.ws> <EXPR(item %item_assignment)>
         ]
         <.ws>
@@ -2869,11 +2766,11 @@ grammar P6 is STD {
         | <name=.identifier> '(' <.ws>
             [ <named_param> | <param_var> <.ws> ]
             [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
-        | <param_var(1)>
+        | <param_var>
         ]
     }
 
-    token param_var($named = 0) {
+    token param_var {
         :dba('formal parameter')
         [
         | '[' ~ ']' <signature>
@@ -2907,10 +2804,6 @@ grammar P6 is STD {
                 $vname ~= $n;
                 given $twigil {
                     when '' {
-                        self.add_my_name($vname) if $n ne '';
-                        # :$param is often used as a multi matcher without $param used in body
-                        #   so don't count as "declared but not used"
-                        $*CURLEX{$vname}<used> = 1 if $named and $n;
                     }
                     when '.' {
                     }
@@ -2918,7 +2811,7 @@ grammar P6 is STD {
                     }
                     when '*' {
                     }
-                    when True { #OK
+                    default {
                         self.panic("You may not use the $twigil twigil in a signature");
                     }
                 }
@@ -2975,8 +2868,6 @@ grammar P6 is STD {
         <trait>*
 
         <post_constraint>*
-
-        <.getdecl>
 
         [
             <default_value> {
@@ -5156,28 +5047,10 @@ grammar Regex is STD {
 #################
 
 method newlex ($needsig = 0, $once = False) {
-    my $oid = $*CURLEX.id;
     my $osub = $*CURLEX<!sub>;
-    $ALL.{$oid} === $*CURLEX or die "internal error: current lex id is invalid";
-    my $line = self.lineof(self.pos);
-    my $id;
-    if $*NEWLEX {
-        $*NEWLEX.<OUTER::> = $*CURLEX.idref;
-        $*CURLEX = $*NEWLEX;
-        $*NEWLEX = 0;
-        $id = $*CURLEX.id;
-    }
-    else {
-        $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
-        $*CURLEX = Stash.new(
-            'OUTER::' => [$oid],
-            '!file' => $*FILE, '!line' => $line,
-            '!id' => [$id],
-        );
-    }
-    $*CURLEX.<!NEEDSIG> = 1 if $needsig;
-    $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
-    $ALL.{$id} = $*CURLEX;
+    $*CURLEX = { };
+    $*CURLEX<!NEEDSIG> = 1 if $needsig;
+    $*CURLEX<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $*CURLEX<!sub> = ::Metamodel::StaticSub.new(
         unit => $*unit,
         class => 'Block',
@@ -5191,10 +5064,11 @@ method newlex ($needsig = 0, $once = False) {
 }
 
 method finishlex {
-    my $line = self.lineof(self.pos);
-    $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    # XXX
+    # my $line = self.lineof(self.pos);
+    # $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    # $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    # $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
     $*SIGNUM = 0;
     self;
 }
@@ -5231,393 +5105,108 @@ method getsig {
                 my $hash = substr($pn,0,1) eq '%';
                 push @parms, ::Sig::Parameter.new(slot => $pn, :$list, :$hash,
                     name => $pn, :$positional, names => [ substr($pn,1) ]);
-                $*CURLEX<!sub>.add_my_name($pn, :noinit, :$list, :$hash);
             }
             if $a_ {
                 push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
                     :slurpy, :list);
-                $*CURLEX<!sub>.add_my_name('@_', :noinit, :list);
             }
             if $h_ {
                 push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
                     :slurpy, :hash);
-                $*CURLEX<!sub>.add_my_name('%_', :noinit, :hash);
             }
         }
         else {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
                 :defouter, :rwtrans);
-            $*CURLEX<!sub>.add_my_name('$_', :noinit);
+            self.trymop({
+                $*CURLEX<!sub>.add_my_name('$_', :noinit, |mnode(self));
+            });
         }
         $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
     }
-    # NIECZA immutable cursors
-    # self.<sig> = $sig;
-    # self.<lex> = $*CURLEX.idref;
-    if ($*DECLARAND<mult>//'') ne 'proto' {
-        for keys %$*CURLEX {
-            my $desc = $*CURLEX{$_};
-            next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
-            next if $desc !~~ Hash;
-            next if $desc<used>;
-            next if $desc<rebind>;
-            next if $desc<dynamic>;
-            next if $desc<scope> eq 'our';
-            next if $desc<scope> eq 'state';
-            next if $desc<stub>;
-            next unless $_ ~~ /<[\$\@\%\&]>\w/;
-            my $pos = $desc<declaredat> // self.pos;
-            self.cursor($pos).worry("$_ is declared but not used");
+
+    my regex interesting () {
+        <!before anon_ >
+        <!before <[ \$ \@ \% ]> _ >
+        <?before <[ \$ \@ \% \& ]> \w >
+    }
+
+    if ($*CURLEX<!multi>//'') ne 'proto' {
+        my $lu = $*CURLEX<!sub>.lexicals-used;
+        for $*CURLEX<!sub>.lexicals.kv -> $k, $desc {
+            next unless interesting(Cursor.new($k));
+            next if $lu{$k};
+            # next if $[_/!] declared automatically "dynamic" TODO
+            next unless defined $desc.pos;
+            self.cursor($desc.pos).worry("$k is declared but not used");
         }
     }
     self;
 }
 
-method getdecl {
-    # NIECZA immutable cursors
-    # self.<decl> = $*DECLARAND;
-    self;
-}
+# is_name($NAME, $PAD = $*CURLEX)
+# returns True if the referential name could succeed at runtime.  Used
+# to make compile-time guesses; should be liberal.
+#  - called from label on an <identifier> to check uniqueness
+#  - called from typename to validate names not starting with :: (longname)
+#  - term:identifier to distinguish constants from subs (<identifier>)
+#  - ditto, term:name (<longname>)
+#  - add_name, to check augments (longname-ish)
+#  - explain_mystery (any %*MYSTERY = identifier or longname)
+#  - called from add_routine to check if a sub name is a type name
 
-method is_name ($n, $curlex = $*CURLEX) {
-    my $name = $n;
-    self.deb("is_name $name") if $*DEBUG +& DEBUG::symtab;
+method is_name($longname, $curlex = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("is_name $longname") if $deb;
+    if defined($longname.index("::(")) {
+        self.deb("computed name gets a free pass") if $deb;
+        return True;
+    }
+    my @parts = $longname.split('::');
+    unshift @parts, 'MY' if @parts == 1;
+    shift @parts if @parts[0] eq '';
+    pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
 
-    my $curpkg = $*CURPKG;
-    return True if $name ~~ /\:\:\(/;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return True if @components[0] eq 'COMPILING::';
-        return True if @components[0] eq 'CALLER::';
-        return True if @components[0] eq 'CONTEXT::';
-        if $curpkg = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
-            shift @components;
+    @parts[*-1] = $/ ~ @parts[*-1] if @parts && @parts[0] ~~ s/^(\W\W?)//;
+
+    self.deb("reparsed: @parts.perl()") if $deb;
+    return False if !@parts;
+    my @pkg;
+
+    if @parts[0] eq 'OUR' {
+        @pkg = @( $curlex<!sub>.cur_pkg );
+        shift @parts;
+    } elsif @parts[0] eq 'PROCESS' or @parts[0] eq 'GLOBAL' {
+        @pkg = shift @parts;
+    } elsif @parts[0] eq 'MY' {
+        return False if @parts == 1;
+        my $lexical = self._lookup_lex_for_std($curlex, @parts[1]);
+        unless defined $lexical {
+            self.deb("Lexical @parts[1] not found") if $deb;
+            return False;
+        }
+        if $lexical ~~ ::Metamodel::Lexical::Stash {
+            shift @parts; shift @parts;
+            @pkg = @( $lexical.path );
         }
         else {
-            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
-            $curpkg = $*GLOBAL;
+            return @parts == 2;
         }
-        while @components > 1 {
-            my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg};
-            return False unless defined $curpkg;
-            if $curpkg ~~ List {
-                my $outlexid = $curpkg.[0] // return False;
-                $curpkg = $ALL.{$outlexid} // return False;
-            }
-            self.deb("Found $pkg okay") if $*DEBUG +& DEBUG::symtab;
+    } else {
+        my $lexical = self._lookup_lex_for_std($curlex, @parts[0]);
+        if !defined $lexical {
+            @pkg = 'GLOBAL';
+        } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
+            @pkg = @( $lexical.path );
+            shift @parts;
+        } else {
+            return @parts == 1;
         }
-    }
-    $name = shift(@components)//'';
-    self.deb("Looking for $name") if $*DEBUG +& DEBUG::symtab;
-    return True if $name eq '';
-    my $lex = $curlex;
-    while $lex {
-        self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
-        if $lex.{$name} {
-            self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
-            $lex.{$name}<used> = 1;
-            return True;
-        }
-        my $oid = $lex.<OUTER::>[0] || last;
-        $lex = $ALL.{$oid};
-    }
-    return True if $curpkg.{$name};
-    return True if $*GLOBAL.{$name};
-    self.deb("$name not found") if $*DEBUG +& DEBUG::symtab;
-    return False;
-}
-
-method find_stash ($n, $crlex = $*CURLEX) {
-    my $name = $n;
-    my $curlex = $crlex;
-    self.deb("find_stash $name") if $*DEBUG +& DEBUG::symtab;
-
-    return Any if $name ~~ /\:\:\(/;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return Any if @components[0] eq 'COMPILING::';
-        return Any if @components[0] eq 'CALLER::';
-        return Any if @components[0] eq 'CONTEXT::';
-        if $curlex = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
-            shift @components;
-        }
-        else {
-            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
-            $curlex = $*GLOBAL;
-        }
-        while @components > 1 {
-            my $lex = shift @components;
-            $curlex = $curlex.{$lex};
-            return Any unless $curlex;
-            try {
-                my $outlexid = $curlex.[0];
-                return Any unless $outlexid;
-                $curlex = $ALL.{$outlexid};
-                return Any unless $curlex;
-            };
-            self.deb("Found $lex okay") if $*DEBUG +& DEBUG::symtab;
-        }
-    }
-    $name = shift(@components)//'';
-    return $curlex if $name eq '';
-
-    my $lex = $curlex;
-    my $old;
-    while $lex {
-        return $old if $old = $lex.{$name};
-        my $oid = $lex.<OUTER::>[0] || last;
-        $lex = $ALL.{$oid};
-    }
-    return $old if $old = $curlex.{$name};
-    return $old if $old = $*GLOBAL.{$name};
-    return Any;
-}
-
-method find_top_pkg ($name) {
-    self.deb("find_top_pkg $name") if $*DEBUG +& DEBUG::symtab;
-    $name ~= '::' unless $name ~~ /\:\:$/;
-    if $name eq 'OUR::' {
-        return $*CURPKG;
-    }
-    elsif $name eq 'MY::' {
-        return $*CURLEX;
-    }
-    elsif $name eq 'OUTER::' {
-        return $ALL.{$*CURLEX.<OUTER::>[0]};
-    }
-    elsif $name eq 'CORE::' {
-        return $*CORE;
-    }
-    elsif $name eq 'SETTING::' {
-        return $*SETTING;
-    }
-    elsif $name eq 'UNIT::' {
-        return $*UNIT;
-    }
-    # everything is somewhere in lexical scope (we hope)
-    my $lex = $*CURLEX;
-    while $lex {
-        return $lex.{$name} if $lex.{$name};
-        my $oid = $lex.<OUTER::>[0] || last;
-        $lex = $ALL.{$oid};
-    }
-    return 0;
-}
-
-method add_name ($name) {
-    my $scope = $*SCOPE || 'my';
-    my $pkgdecl = $*PKGDECL || 'symbol';
-    return self if $scope eq 'anon' or $pkgdecl eq 'slang';
-    self.deb("Adding $scope $name") if $*DEBUG +& DEBUG::symtab;
-    if $scope eq 'augment' or $scope eq 'supersede' {
-        self.is_name($name) or
-            self.worry("Cannot $scope $pkgdecl $name because it doesn't exist");
-        $*MONKEY_TYPING or
-            self.sorry("Cannot $scope $pkgdecl $name without MONKEY_TYPING");
-    }
-    else {
-        if $scope eq 'our' {
-            self.add_our_name($name);
-        }
-        else {
-            self.add_my_name($name);
-        }
-    }
-    self;
-}
-
-method add_my_name ($n, $d?, $p?) {
-    my $name = $n;
-    self.deb("add_my_name $name in ", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
-    return self if $name ~~ /\:\:\(/;
-    my $curstash = $*CURLEX;
-    my @components = self.canonicalize_name($name);
-    my $sid = $curstash.id // '???';
-    while @components > 1 {
-        my $pkg = shift @components;
-        $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= Stash.new(
-            'PARENT::' => $curstash.idref,
-            '!stub' => 1,
-            '!id' => [$sid] );
-        self.deb("Adding new package $pkg in ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
-        $curstash = $newstash;
-    }
-    $name = my $shortname = shift @components;
-    return self unless defined $name and $name ne '';
-    return self if $name eq '$' or $name eq '@' or $name eq '%';
-    return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
-    if $shortname ~~ /\:/ {
-        $shortname ~~ s/\:.*//;
     }
 
-    # This may just be a lexical alias to "our" and such,
-    # so reuse $*DECLARAND pointer if it's there.
-    my $declaring = $d // NAME.new(
-        name => $name,
-        file => $*FILE, line => self.line,
-        mult => ($*MULTINESS||'only'),
-        of   => $*OFTYPE,
-        scope => $*SCOPE,
-    );
-    my $old = $curstash.{$name};
-    if $old and $old<line> and not $old<stub> {
-        self.deb("$name exists, curstash = ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
-        my $omult = $old<mult> // '';
-        if $declaring === $old {}  # already did this, probably enum
-        elsif $*SCOPE eq 'use' {}
-        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
-        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
-        elsif $*PKGDECL eq 'role' {}
-        elsif $*SIGNUM and $old<signum> and $*SIGNUM != $old<signum> {
-            $old<signum> = $*SIGNUM;
-        }
-        else {
-            my $ofile = $old.file // 0;
-            my $oline = $old.line // '???';
-            my $loc = '';
-            if $ofile {
-                if $ofile !=== $*FILE {
-                    my $oname = $ofile<name>;
-                    $loc = " (see $oname line $oline)";
-                }
-                else {
-                    $loc = " (see line $oline)";
-                }
-            }
-            if $old.olex {
-                my $rebind = $old<rebind>;
-                my $truename = $old<varbind><truename>;
-                self.sorry("Lexical symbol '$name' is already bound to an outer symbol$loc;\n  the implicit outer binding at line $rebind must be rewritten as $truename\n  before you can unambiguously declare a new '$name' in this scope");
-            }
-            elsif $name ~~ /^\w/ {
-                self.sorry("Illegal redeclaration of symbol '$name'$loc");
-            }
-            elsif $name ~~ s/^\&// {
-                self.sorry("Illegal redeclaration of routine '$name'$loc") unless $name eq '';
-            }
-            else {  # XXX eventually check for conformant arrays here
-                self.worry("Useless redeclaration of variable $name$loc");
-            }
-            return self;
-        }
-    }
-    else {
-        $*DECLARAND = $curstash.{$name} = $declaring;
-        $curstash.{$shortname} = $declaring unless $shortname eq $name;
-        $*DECLARAND<declaredat> = self.pos;
-        $*DECLARAND<inlex> = $curstash.idref;
-        $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
-        $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
-        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %*MYSTERY{substr($name,1)};
-        if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
-            $curstash.{"\&$shortname"} //= $curstash.{$shortname};
-            $curstash.{"\&$shortname"}<used> = 1;
-            $sid ~= "::$name";
-            if $name !~~ /\:\</ {
-                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
-                    'PARENT::' => $curstash.idref,
-                    '!file' => $*FILE, '!line' => self.line,
-                    '!id' => [$sid] ));
-            }
-        }
-    }
-    self;
-}
-
-method add_our_name ($n) {
-    my $name = $n;
-    self.deb("add_our_name $name in " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
-    return self if $name ~~ /\:\:\(/;
-    my $curstash = $*CURPKG;
-    self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $*DEBUG +& DEBUG::symtab;
-    $name ~~ s/\:ver\<.*?\>//;
-    $name ~~ s/\:auth\<.*?\>//;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        my $c = self.find_top_pkg(@components[0]);
-        if $c {
-            shift @components;
-            $curstash = $c;
-        }
-    }
-    my $sid = $curstash.id // '???';
-    while @components > 1 {
-        my $pkg = shift @components;
-        $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= Stash.new(
-            'PARENT::' => $curstash.idref,
-            '!stub' => 1,
-            '!id' => [$sid] );
-        $curstash = $newstash;
-        self.deb("Adding new package $pkg in $curstash ") if $*DEBUG +& DEBUG::symtab;
-    }
-    $name = my $shortname = shift @components;
-    return self unless defined $name and $name ne '';
-    if $shortname ~~ /\:/ {
-        $shortname ~~ s/\:.*//;
-    }
-
-    my $declaring = $*DECLARAND // NAME.new(
-        name => $name,
-        file => $*FILE, line => self.line,
-        mult => ($*MULTINESS||'only'),
-        of   => $*OFTYPE,
-        scope => $*SCOPE,
-    );
-    my $old = $curstash.{$name};
-    if $old and $old<line> and not $old<stub> {
-        my $omult = $old<mult> // '';
-        if $declaring === $old {} # already did it somehow
-        elsif $*SCOPE eq 'use' {}
-        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
-        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
-        elsif $*PKGDECL eq 'role' {}
-        else {
-            my $ofile = $old.file // 0;
-            my $oline = $old.line // '???';
-            my $loc = '';
-            if $ofile {
-                if $ofile !=== $*FILE {
-                    my $oname = $ofile<name>;
-                    $loc = " (from $oname line $oline)";
-                }
-                else {
-                    $loc = " (from line $oline)";
-                }
-            }
-            $sid = self.clean_id($sid, $name);
-            if $name ~~ /^\w/ {
-                self.sorry("Illegal redeclaration of symbol '$sid'$loc");
-            }
-            elsif $name ~~ s/^\&// {
-                self.sorry("Illegal redeclaration of routine '$sid'$loc") unless $name eq '';
-            }
-            else {  # XXX eventually check for conformant arrays here
-                # (redeclaration of identical package vars is not useless)
-            }
-            return self;
-        }
-    }
-    else {
-        $*DECLARAND = $curstash.{$name} = $declaring;
-        $curstash.{$shortname} //= $declaring unless $shortname eq $name;
-        $*DECLARAND<inpkg> = $curstash.idref;
-        if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
-            $curstash.{"\&$shortname"} //= $declaring;
-            $curstash.{"\&$shortname"}<used> = 1;
-            $sid ~= "::$name";
-            $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
-                'PARENT::' => $curstash.idref,
-                '!file' => $*FILE, '!line' => self.line,
-                '!id' => [$sid] );
-        }
-    }
-    self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
-    self;
+    my $ret = ?( $*unit.get_item([ @pkg, @parts ]) );
+    self.deb($ret) if $deb;
+    $ret;
 }
 
 method add_mystery ($token,$pos,$ctx) {
@@ -5692,178 +5281,27 @@ method explain_mystery() {
     self;
 }
 
-method load_setting ($setting) {
-    $ALL = self.load_lex($setting);
-
-    $*CORE = $ALL<CORE>;
-    $*CORE.<!id> //= ['CORE'];
-
-    $*SETTING = $ALL<SETTING>;
-    $*CURLEX = $*SETTING;
-
-    $*GLOBAL = $*CORE.<GLOBAL::> = Stash.new(
-        '!file' => $*FILE, '!line' => 1,
-        '!id' => ['GLOBAL'],
-    );
-    $*CURPKG = $*GLOBAL;
-}
-
 method is_known ($n, $curlex = $*CURLEX) {
-    my $name = $n;
-    self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
-    return True if $*CURPKG.{$name};
-    return False if $name ~~ /\:\:\(/;
-    my $curpkg = $*CURPKG;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return True if @components[0] eq 'COMPILING::';
-        return True if @components[0] eq 'CALLER::';
-        return True if @components[0] eq 'CONTEXT::';
-        if $curpkg = self.find_top_pkg(@components[0]) {
-            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
-            shift @components;
-        }
-        else {
-            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
-            $curpkg = $*GLOBAL;
-        }
-        while @components > 1 {
-            my $pkg = shift @components;
-            self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
-            $curpkg = $curpkg.{$pkg};
-            return False unless $curpkg;
-            try {
-                my $outlexid = $curpkg.[0];
-                return False unless $outlexid;
-                $curpkg = $ALL.{$outlexid};
-                return False unless $curpkg;
-            };
-            self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
-        }
-    }
-
-    $name = shift(@components)//'';
-    self.deb("Final component is $name") if $*DEBUG +& DEBUG::symtab;
-    return True if $name eq '';
-    if $curpkg.{$name} {
-        self.deb("Found") if $*DEBUG +& DEBUG::symtab;
-        $curpkg.{$name}<used>++;
-        return True;
-    }
-    # leading components take us non-lexical?  assume we can't know
-    return False if $curpkg !=== $*CURPKG and $curpkg<!id>[0] ~~ /^GLOBAL($|\:\:)/;
-
-    my $varbind = { truename => '???' };
-    return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
-    self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
-
-    return False;
-}
-
-method lex_can_find_name ($lex, $name, $varbind) {
-    self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
-    if $lex.{$name} {
-        self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
-        $lex.{$name}<used>++;
-        return True;
-    }
-
-    my $outlexid = $lex.<OUTER::>[0];
-    return False unless $outlexid;
-    my $outlex = $ALL.{$outlexid};
-
-    if self.lex_can_find_name($outlex,$name,$varbind) {
-        # fake up an alias to outer symbol to catch reclaration
-        my $outname = $outlex.{$name}<name>;
-        my $outfile = $outlex.{$name}<file>;
-        my $outline = $outlex.{$name}<line>;
-        $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
-        $outname = "OUTER::" ~ $outname;
-        $lex.{$name} = NAME.new(
-            olex => $lex.idref,
-            name => $outname,
-            file => $outfile, line => $outline,
-            rebind => self.line,
-            varbind => $varbind,
-            mult => 'only',
-            scope => $lex.{$name}<scope>,
-        );
-        # the innermost lex sets this last to get correct # of OUTER::s
-        $varbind.<truename> = $outname;
-        return True;
-    }
-
-    return False;
+    return self.is_name($n, $curlex);
 }
 
 method add_routine ($name) {
     @*MEMOS[self.pos]<wasname> = $name if self.is_name($name);
-    my $vname = '&' ~ $name;
-    self.add_name($vname);
     self;
 }
 
-method add_variable ($name) {
-    my $scope = $*SCOPE || 'our';
-    return self if $scope eq 'anon';
-    if $scope eq 'our' {
-        self.add_our_name($name);
-    }
-    else {
-        self.add_my_name($name);
-    }
-    self;
-}
+# check_variable($M)
+#   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
+#         ...
+#   $M is anon(sigil,twigil,desigilname) or anon(sigil<desigilname>) (colonpair)
+#   $M is synthetic(<longname>::<postcircumfix>) (term:name)
+# check_variable should handle ALL of the possible sorries resulting from
+# a referential variable use.  Even term:variable is too early, since we may
+# backtrack if $*QSIGIL ne '$' and no posfix.
 
-method add_constant($name,$value) {
-    my $*IN_DECL = 'constant';
-    self.deb("add_constant $name = $value in", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
-    my $*DECLARAND;
-    self.add_my_name($name);
-    $*DECLARAND<value> = $value;
-    self;
-}
-
-method add_placeholder($name) {
-    my $decl = $*CURLEX.<!IN_DECL> // '';
-    $decl = ' ' ~ $decl if $decl;
-    my $*IN_DECL = 'variable';
-
-    if $*SIGNUM {
-        return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
-    }
-    elsif my $siggy = $*CURLEX.<$?SIGNATURE> {
-        return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
-    }
-    if not $*CURLEX.<!NEEDSIG> {
-        if $*CURLEX === $*UNIT {
-            return self.sorry("Placeholder variable $name may not be used outside of a block");
-        }
-        return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
-    }
-    if $name ~~ /\:\:/ {
-        return self.sorry("Placeholder variable $name may not be package qualified");
-    }
-
-    my $varname = $name;
-    my $twigil = '';
-    my $signame = $varname;
-    if $varname ~~ s/<[ ^ : ]>// {
-        $twigil = $/.Str;
-        $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
-    }
-    return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
-
-    if $*CURLEX{$varname} {
-        return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
-    }
-    
-    self.add_my_name($varname);
-    $*CURLEX{$varname}<used> = 1;
-    self;
-}
-
+# I don't like the way this is factored, since do_variable_reference has to
+# redo a lot of the same scanning.
 method check_variable ($variable) {
     return () unless defined $variable;
     my $name = $variable.Str;
@@ -5901,8 +5339,8 @@ method check_variable ($variable) {
                     return $here.sorry("Variable $name is not predeclared");
                 }
             }
-            elsif $*CURLEX{$name} {
-                $*CURLEX{$name}<used>++;
+            else {
+                self._lookup_lex_for_std($*CURLEX, $name);
             }
         }
         when '!' {
@@ -5930,71 +5368,73 @@ method check_variable ($variable) {
         }
         when '?' {
             if $name ~~ /\:\:/ {
-                my ($first) = self.canonicalize_name($name);
-                $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+                # TODO: $?CALLER::x makes sense!  also CONTEXT,OUTER,MY,SETTING,CORE
+                $here.worry("Unrecognized variable: $name");
             }
             else {
                 # search upward through languages to STD
-                my $v = $here.lookup_compiler_var($name);
-                # $variable.<value> = $v if $v; XXX IMMUTABLE MATCHES
+                $here.lookup_compiler_var($name);
             }
         }
     }
     self;
 }
 
-method lookup_compiler_var($name, $default?) {
+method lookup_compiler_var($name) {
+    state %builtin_hints = < $?LINE $?POSITION &?BLOCK &?ROUTINE > Z=> True;
 
-    # see if they did "constant $?FOO = something" earlier
-    my $lex = $*CURLEX.{$name};
-    if defined $lex {
-        if $lex.<thunk>:exists {
-            return $lex.<thunk>.();
-        }
-        else {
-            return $lex.<value>;
-        }
-    }
-
-    given $name {
-        when '$?FILE'     { return $*FILE<name>; }
-        when '$?LINE'     { return self.lineof(self.pos); }
-        when '$?POSITION' { return self.pos; }
-
-        when '$?LANG'     { return item %*LANG; }
-
-        when '$?LEXINFO'   { return $*CURLEX; }
-
-        when '$?PACKAGE'  { return $*CURPKG; }
-        when '$?MODULE'   { return $*CURPKG; } #  XXX should scan
-        when '$?CLASS'    { return $*CURPKG; } #  XXX should scan
-        when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
-        when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
-
-        when '$?PACKAGENAME' { return $*CURPKG.id }
-
-        when '$?OS'       { return 'unimpl'; }
-        when '$?DISTRO'   { return 'unimpl'; }
-        when '$?VM'       { return 'unimpl'; }
-        when '$?XVM'      { return 'unimpl'; }
-        when '$?PERL'     { return 'unimpl'; }
-
-        when '$?USAGE'    { return 'unimpl'; }
-
-        when '&?ROUTINE'  { return 'unimpl'; }
-        when '&?BLOCK'    { return 'unimpl'; }
-
-        when '%?CONFIG'    { return 'unimpl'; }
-        when '%?DEEPMAGIC' { return 'unimpl'; }
-
-        my $dynvar = self.lookup_dynvar($name);
-        return $dynvar if defined $dynvar;
-
-        return $default if defined $default;
-        # (derived grammars should default to nextsame, terminating here)
-        default { self.worry("Unrecognized variable: $name"); return 0; }
+    unless %builtin_hints{$name} ||
+            defined self._lookup_lex_for_std($*CURLEX, $name)
+    {
+        self.sorry("Unrecognized variable: $name");
     }
 }
+
+
+method add_placeholder($name) {
+    my $decl = $*CURLEX.<!IN_DECL> // '';
+    my $sub = $*CURLEX<!sub>;
+    $decl = ' ' ~ $decl if $decl;
+    my $*IN_DECL = 'variable';
+
+    if $*SIGNUM {
+        return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
+    }
+    elsif my $siggy = $*CURLEX.<$?SIGNATURE> {
+        return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
+    }
+    if not $*CURLEX.<!NEEDSIG> {
+        if $*CURLEX === $*UNIT {
+            return self.sorry("Placeholder variable $name may not be used outside of a block");
+        }
+        return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
+    }
+    if $name ~~ /\:\:/ {
+        return self.sorry("Placeholder variable $name may not be package qualified");
+    }
+
+    my $varname = $name;
+    my $twigil = '';
+    my $signame = $varname;
+    if $varname ~~ s/<[ ^ : ]>// {
+        $twigil = $/.Str;
+        $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
+    }
+    return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
+
+    if $sub.lexicals-used.{$varname} || $sub.lexicals.{$varname} {
+        return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
+    }
+    self.trymop({
+        self.check_categorical($varname);
+        $*CURLEX<!sub>.add_my_name($varname, :noinit, |mnode(self),
+            list => substr($varname,0,1) eq '@',
+            hash => substr($varname,0,1) eq '%');
+    });
+    $*CURLEX<!sub>.lexicals-used{$varname} = True;
+    self;
+}
+
 
 ####################
 # Service Routines #

@@ -1,7 +1,6 @@
 class NieczaFrontendSTD;
 
 use STD;
-use Stash;
 use NieczaGrammar;
 use NieczaActions;
 
@@ -81,57 +80,6 @@ method add_categorical($name) {
     self.cursor_fresh(%*LANG<MAIN>);
 }
 
-method add_enum($type,$expr) {
-    return self unless $type;
-    return self unless $expr;
-    my $typename = $type.Str;
-    my $*IN_DECL ::= 'constant';
-    # XXX complete kludge, really need to eval EXPR
-    # $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
-    for $expr.comb(/ <[ a..z A..Z _ ]> \w* /) -> $n {
-        self.add_name($typename ~ "::$n");
-        self.add_name($n);
-    }
-    self
-}
-
-method canonicalize_name($n) {
-    my $M;
-    my $name = $n;
-    if $M = head(/(< $ @ % & >)( \^ || \: <!before \:> )/(Cursor.new($name))) {
-        $name = $M[0] ~ substr($name, $M.to);
-    }
-    if $name.chars >= 2 && substr($name, $name.chars - 2, 2) ~~ / \: < U D _ > / {
-        $name = $name.substr(0, $name.chars - 2);
-    }
-    return $name unless $name ~~ /::/;
-    self.panic("Cannot canonicalize a run-time name at compile time: $name") if $name ~~ / '::(' /;
-
-    if $name ~~ /^ (< $ @ % & > < ! * = ? : ^ . >?) (.* '::')/ {
-        $name = $1 ~ "<" ~ $0 ~ substr($name, $/.to) ~ ">";
-    }
-    my $vname;
-    if ($name ~~ /'::<'/) && $name.substr($name.chars - 1, 1) eq '>' {
-        $name = substr($name, 0, $/.from);
-        $vname = substr($name, $/.to, $name.chars - $/.to - 1);
-    }
-    my @components;
-    while $name ~~ / '::' / {
-        push @components, $name.substr(0, $/.to);
-        $name = substr($name, $/.to);
-    }
-    push @components, $name;
-    shift(@components) while @components and @components[0] eq '';
-    if (defined $vname) {
-        if @components {
-            my $last := @components[* - 1];
-            $last ~= '::' if $last.chars < 2 || $last.substr($last.chars - 2, 2) ne '::';
-        }
-        push(@components, $vname) if defined $vname;
-    }
-    @components;
-}
-
 method locmess () {
     my $pos = self.pos;
     my $line = self.lineof($pos);
@@ -185,140 +133,6 @@ method mark_sinks(@sl) { #OK not used
     self
 }
 
-method gettrait($traitname,$param) {
-    my $text;
-    if @$param {
-        $text = $param.[0].Str;
-        ($text ~~ s/^\<(.*)\>$/$0/) ||
-            ($text ~~ s/^\((.*)\)$/$0/);
-    }
-    if ($traitname eq 'export') {
-        if (defined $text) {
-            while $text ~~ s/\:// { }
-        }
-        else {
-            $text = 'DEFAULT';
-        }
-        self.set_export($text);
-        $text;
-    }
-    elsif (defined $text) {
-        $text;
-    }
-    else {
-        1;
-    }
-}
-
-method set_export($text) {
-    my $textpkg = $text ~ '::';
-    my $name = $*DECLARAND<name>;
-    my $xlex = $STD::ALL{ $*DECLARAND<inlex>[0] };
-    $*DECLARAND<export> = $text;
-    my $sid = $*CURLEX.idref;
-    my $x = $xlex<EXPORT::> // Stash.new( 'PARENT::' => $sid, '!id' => [$sid.[0] ~ '::EXPORT'] );
-    $xlex<EXPORT::> = $x;
-    $x{$textpkg} = $x{$textpkg} // Stash.new( 'PARENT::' => $x.idref, '!id' => [$sid.[0] ~ '::EXPORT::' ~ $text] );
-    $x{$textpkg}{$name} = $*DECLARAND;
-    $x{$textpkg}{'&'~$name} = $*DECLARAND
-            if $name ~~ /^\w/ and $*IN_DECL ne 'constant';
-    self;
-}
-
-# only used for error reporting
-method clean_id ($idx, $name) {
-    my $id = $idx;
-    my $file = $*FILE<name>;
-
-    $id ~= '::';
-    $id ~~ s/^'MY:file<CORE.setting>'.*?'::'/CORE::/;
-    $id ~~ s/^MY\:file\<\w+\.setting\>.*?\:\:/SETTING::/;
-    $id ~~ s/^MY\:file\<$file\>$/UNIT/;
-    $id ~~ s/\:pos\(\d+\)//;
-    $id ~= "<$name>";
-    $id;
-}
-
-class LABEL {
-    has $.file;
-    has $.pos;
-}
-
-method label_id() {
-    my $l = LABEL.new;
-    $l.pos = self.pos;
-    $l.file = $*FILE<name>;
-    $l;
-}
-
-method do_import($m, $args) { #, perl6.vim stupidity
-    my @imports;
-    my $module = $m.Str;
-    if $module ~~ /(class|module|role|package)\s+(\S+)/ {
-        $module = ~$1;
-    }
-
-    my $pkg = self.find_stash($module);
-    if $pkg<really> {
-        $pkg = $pkg<really><UNIT>;
-    }
-    else {
-        $pkg = self.find_stash($module ~ '::');
-    }
-    if $args {
-        my $text = $args.Str;
-        return self unless $text;
-        while $text ~~ s/^\s*\:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?\<(.*?)\>\,?// {
-            my $scope = lc($0 // 'my');
-            my $imports = $1.Str;
-            my $*SCOPE = $scope;
-            @imports = $imports.comb(/\S+/);
-            for @imports -> $i {
-                my $imp = $i;
-                if $pkg {
-                    if $imp ~~ s/^\:// {
-                        my @tagimports;
-                        try { @tagimports = $pkg<EXPORT::>{$imp}.keys }
-                        self.do_import_aliases($pkg, @tagimports);
-                    }
-                    elsif $pkg{$imp}<export> {
-                        self.add_my_name($imp, $pkg{$imp});
-                    }
-                    elsif $pkg{'&'~$imp}<export> {
-                        $imp = '&' ~ $imp;
-                        self.add_my_name($imp, $pkg{$imp});
-                    }
-                    elsif $pkg{$imp} {
-                        self.worry("Cannot import $imp because it's not exported by $module");
-                        next;
-                    }
-                }
-                else {
-                    self.add_my_name($imp);
-                }
-            }
-        }
-    }
-    else {
-        return self unless $pkg;
-        try { @imports = $pkg<EXPORT::><DEFAULT::>.keys };
-        my $*SCOPE = 'my';
-        self.do_import_aliases($pkg, @imports);
-    }
-
-    self;
-}
-method do_import_aliases($pkg, *@names) {
-#    say "attempting to import @names";
-    for @names -> $n {
-        next if $n ~~ /^\!/;
-        next if $n ~~ /^PARENT\:\:/;
-        next if $n ~~ /^OUTER\:\:/;
-        self.add_my_name($n, $pkg{$n});
-    }
-    self;
-}
-
 method you_are_here() { $*YOU_WERE_HERE = $*CURLEX; self }
 method lineof ($p) {
     return 1 unless defined $p;
@@ -334,49 +148,6 @@ method lineof ($p) {
 
 method lookup_dynvar($) { Any } # NYI
 method check_old_cclass($) { } # NYI
-method do_use($module,$args) {
-    self.do_need($module);
-    self.do_import($module,$args);
-    self;
-}
-
-method do_need($mo) {
-    my $module = $mo.Str;
-    my $topsym;
-    $topsym = self.sys_load_modinfo($module);
-    if !defined $topsym {
-        self.panic("Could not load $module");
-    }
-    self.add_my_name($module);
-    $*DECLARAND<really> = $topsym;
-    self;
-}
-
-method sys_load_modinfo($module) {
-    # These are handled within the grammar
-    if $module eq 'MONKEY_TYPING' || $module eq 'lib' ||
-            $module eq 'fatal' {
-        return { };
-    }
-    $*module_loader.($module).create_syml;
-}
-
-method load_lex($setting) {
-    if $*niecza_outer_ref {
-        my $sub = ::Metamodel::Unit.deref($*niecza_outer_ref);
-        return $sub.unit.create_syml($sub);
-    }
-
-    if $setting eq 'NULL' {
-        my $id = "MY:file<NULL.pad>:line(1):pos(0)";
-        my $core = Stash.new('!id' => [$id], '!file' => 'NULL.pad',
-            '!line' => 1);
-        return Stash.new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
-            'SETTING' => $core, $id => $core);
-    }
-
-    $*module_loader.($setting).create_syml;
-}
 
 method sorry (Str $s) {
     self.deb("sorry $s") if $*DEBUG;
