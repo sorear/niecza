@@ -100,8 +100,8 @@ Other stuff to do after:
   - cnperl6 prototyping...
   - CLR: KISS and then play with async I/O, possibly including soric
   - Fix up name handling
-  - fix stubbing of qualified packages
+  + fix stubbing of qualified packages
   - fix { my $x } crash
-  - blast/statement_level
-  - checking redeclaration of our symbols, methods, attributes...
+  + blast/statement_level
+  + checking redeclaration of our symbols, methods, attributes...
   - is tighter/looser/equiv
