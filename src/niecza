@@ -325,6 +325,192 @@ method open_package_def($, $/ = $*cursor) {
     }
 }
 
+method type_declarator:subset ($/) {
+    my $ourname = Array; my $lexvar = self.gensym; my $name;
+    my $scope = $*SCOPE || 'our';
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid subset scope $scope");
+        $scope = 'anon';
+    }
+    if $<longname> {
+        $scope ||= 'my';
+        my $r = self.mangle_longname($<longname>[0], True);
+        $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Block name $<longname> requires our scope");
+            $scope = 'our';
+        }
+        if $scope eq 'our' {
+            $ourname = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            $ourname = [ @$ourname, $name ];
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+        }
+    } else {
+        if ($scope || 'anon') ne 'anon' {
+            $/.CURSOR.sorry("Cannot have a non-anon subset with no name");
+        }
+        $name = 'ANON';
+    }
+
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
+        ['MY', 'Any'];
+    my @exports;
+
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } elsif $t<of> {
+            $basetype = $t<of>;
+        } else {
+            $/.CURSOR.sorry("Unsupported subset trait $t.keys()");
+        }
+    }
+
+    my $body = self.thunk_sub($<EXPR> ?? $<EXPR>[0].ast !! mklex($/, 'True'));
+
+    my @ns = $ourname ?? @( $*CURLEX<!sub>.find_pkg($ourname) ) !!
+        $*unit.anon_stash;
+
+    $/.CURSOR.trymop({
+        $*unit.create_stash([@ns]);
+        $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |mnode($/));
+        $*CURLEX<!sub>.add_pkg_exports($*unit, $name, [@ns], @exports);
+        $*CURLEX<!sub>.create_static_pad;
+
+        $basetype = $*unit.get_item($*CURLEX<!sub>.find_pkg([@$basetype]));
+        my $obj = ::Metamodel::Subset.new(:$name, where => $body.xref,
+            :$basetype);
+        $*unit.bind_item([@ns], $obj.xref);
+        $obj.exports = [ [@ns] ];
+    });
+
+    make mklex($/, $lexvar);
+}
+
+
+method type_declarator:enum ($/) {
+    my $scope = $*SCOPE || 'our';
+    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid enum scope $scope");
+        $scope = 'anon';
+    }
+
+    my @exports;
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } else {
+            $/.CURSOR.sorry("Unsupported enum trait $t.keys()");
+        }
+    }
+
+    my @pairs = self.trivial_eval($/, $<term>.ast);
+    my $last = -1;
+    my ($has_ints, $has_strs);
+    for @pairs {
+        if $_ !~~ Pair {
+            my $key = $_;
+            my $value = $last.succ;
+            $_ = $key => $value;
+        }
+        given $last = .value {
+            when Int { $has_ints = True; }
+            when Str { $has_strs = True; }
+            default  { $/.CURSOR.sorry("Enum values must be Int or Str"); }
+        }
+    }
+    if $has_ints && $has_strs {
+        $/.CURSOR.sorry("Enum may not contain both Int and Str values");
+    }
+
+    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
+        [ 'MY', $has_strs ?? 'Str' !! 'Int' ];
+
+    if $<name> && $<name>.reduced eq 'longname'&& ($scope ||= 'our') ne 'anon' {
+        # Longnamed enum is a kind of type definition
+
+        my $ourpath = Array;
+        my $lexvar = self.gensym;
+        my $bindlex = False;
+        my $r = self.mangle_longname($<longname>[0], True);
+        my $name = $r<name>;
+        if ($r<path>:exists) && $scope ne 'our' {
+            $/.CURSOR.sorry("Enum name $<longname> requires our scope");
+            $scope = 'our';
+        }
+
+        if $scope eq 'our' {
+            $ourpath = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            if !($r<path>:exists) {
+                $lexvar  = $name;
+                $bindlex = True;
+            }
+        } elsif $scope eq 'my' {
+            $lexvar  = $name;
+            $bindlex = True;
+        }
+
+        $/.CURSOR.trymop({
+            my @ns = $ourpath ?? (@( $*CURLEX<!sub>.find_pkg($ourpath) ), $name) !!
+                $*unit.anon_stash;
+            $*unit.create_stash([@ns]);
+            $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |mnode($/));
+            my $obj  = ::Metamodel::Class.new(:$name);
+            $obj.exports = [ [@ns] ];
+            $*unit.bind_item([@ns], $obj.xref);
+
+            $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg(
+                ['MY', ($has_strs ?? 'Str' !! 'Int') ~ "BasedEnum"])));
+            $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg($basetype)));
+
+            my $nb = ::Metamodel::StaticSub.new(
+                transparent=> True,
+                unit       => $*unit,
+                outerx     => $*CURLEX<!sub>.xref,
+                outer_direct => $*CURLEX<!sub>,
+                name       => $name,
+                cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+                class      => 'Method',
+                signature  => Sig.simple('self'),
+                code       => self.init_constant(
+                    self.make_constant($/, 'anon', Any, Any),
+                    ::Op::CallMethod.new(name => 'new',
+                        receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+
+            $nb.add_my_name('self', noinit => True);
+            $*CURLEX<!sub>.create_static_pad;
+            $nb.strong_used = True;
+            $*CURLEX<!sub>.add_child($nb);
+            $*CURLEX<!sub>.add_my_sub($lexvar ~ '!enums', $nb, |mnode($/));
+            $obj.add_method('only', 'normal', 'enums', $lexvar ~ '!enums',
+                $nb.xref);
+            $obj.close;
+
+            for @pairs {
+                self.make_constant_into($/, @ns, .key, rhs =>
+                    ::Op::CallSub.new(invocant => mklex($/, $lexvar),
+                        args => [ ::Op::StringLiteral.new(text => .key) ]));
+            }
+
+            for @pairs {
+                self.init_constant(self.make_constant($/, $scope, .key, Any),
+                    ::Op::CallSub.new(invocant => mklex($/, $lexvar),
+                        args => [ ::Op::StringLiteral.new(text => .key) ]));
+            }
+        });
+
+        make mklex($/, $lexvar);
+    } else {
+        make self.init_constant(
+            self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>, Any),
+            ::Op::CallMethod.new(|node($/), name => 'new',
+                receiver => mklex($/, 'EnumMap'),
+                args => [$<term>.ast])),
+    }
+}
+
+
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$path, :$name is copy, :$method_type is copy, :$contextual is copy) {
 
