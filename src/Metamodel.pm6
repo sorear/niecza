@@ -650,6 +650,9 @@ class StaticSub is RefTarget {
             die "Lexical symbol '$slot' is already bound to an outer symbol{Metamodel.locstr($o.file, $o.line, $item.file, $item.line)};\n  the implicit outer binding at line $p.value() must be rewritten as $truename\n  before you can unambiguously declare a new '$slot' in this scope";
         }
         %!lexicals{$slot} = $item;
+        if substr($slot,0,1) eq '&' && (%*MYSTERY{substr($slot,1)}:exists) {
+            %!lexicals-used{$slot} = True;
+        }
     }
 
     method add_my_name($slot, *%param) {
