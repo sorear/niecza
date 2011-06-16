@@ -29,6 +29,27 @@ sub mnode($M) {
         { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
 }
 
+augment grammar STD {
+method newlex ($needsig = 0, $once = False) {
+    my $osub = $*CURLEX<!sub>;
+    $*CURLEX = { };
+    $*CURLEX<!NEEDSIG> = 1 if $needsig;
+    $*CURLEX<!IN_DECL> = $*IN_DECL if $*IN_DECL;
+    $*CURLEX<!sub> = ::Metamodel::StaticSub.new(
+        unit => $*unit,
+        class => 'Block',
+        outerx => $osub.xref,
+        outer_direct => $osub,
+        in_class => $osub.in_class,
+        cur_pkg => $osub.cur_pkg,
+        run_once => $once && $osub.run_once
+    );
+    $osub.add_child($*CURLEX<!sub>);
+    self;
+}
+
+}
+
 augment grammar STD::P6 { #OK
     token comp_unit {
         :my $*DEBUG = $GLOBAL::DEBUG_STD // 0;

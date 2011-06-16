@@ -126,8 +126,6 @@ help:
 	@echo ''
 
 # grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/\1.nam: boot/obj/\2.nam|' | grep -v MONKEY_TYPING
-boot/obj/Metamodel.nam: boot/obj/NAME.nam
-boot/obj/Metamodel.nam: boot/obj/Stash.nam
 boot/obj/NAMOutput.nam: boot/obj/JSYNC.nam
 boot/obj/NAMOutput.nam: boot/obj/Metamodel.nam
 boot/obj/NAMOutput.nam: boot/obj/Sig.nam
@@ -144,7 +142,6 @@ boot/obj/NieczaBackendHoopl.nam: boot/obj/NieczaBackendNAM.nam
 boot/obj/NieczaBackendNAM.nam: boot/obj/NAMOutput.nam
 boot/obj/NieczaCompiler.nam: boot/obj/JSYNC.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/STD.nam
-boot/obj/NieczaFrontendSTD.nam: boot/obj/Stash.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaGrammar.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaActions.nam
 boot/obj/NieczaGrammar.nam: boot/obj/STD.nam
@@ -156,5 +153,3 @@ boot/obj/OptRxSimple.nam: boot/obj/RxOp.nam
 boot/obj/RxOp.nam: boot/obj/CgOp.nam
 boot/obj/RxOp.nam: boot/obj/CClass.nam
 boot/obj/Sig.nam: boot/obj/CgOp.nam
-boot/obj/STD.nam: boot/obj/NAME.nam
-boot/obj/STD.nam: boot/obj/Stash.nam

@@ -1453,6 +1453,7 @@ method whatever_postcheck($/, $st, $term) {
 
         my $body = ::Metamodel::StaticSub.new(
             outerx => $*CURLEX<!sub>.xref,
+            outer_direct => $*CURLEX<!sub>,
             class => 'WhateverCode',
             unit => $*unit,
             transparent => True,
@@ -2170,6 +2171,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         transparent=> True,
         unit       => $*unit,
         outerx     => $*CURLEX<!sub>.xref,
+        outer_direct => $*CURLEX<!sub>,
         name       => $name,
         cur_pkg    => $*CURLEX<!sub>.cur_pkg,
         class      => 'Method',
@@ -2481,6 +2483,7 @@ method type_declarator:enum ($/) {
                 transparent=> True,
                 unit       => $*unit,
                 outerx     => $*CURLEX<!sub>.xref,
+                outer_direct => $*CURLEX<!sub>,
                 name       => $name,
                 cur_pkg    => $*CURLEX<!sub>.cur_pkg,
                 class      => 'Method',
@@ -2596,6 +2599,7 @@ method default_value($/) { make self.thunk_sub($<EXPR>.ast).xref }
 method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
     my $n = ::Metamodel::StaticSub.new(
         outerx => $*CURLEX<!sub>.xref,
+        outer_direct => $*CURLEX<!sub>,
         class => $class // 'Block',
         unit => $*unit,
         name => $name // 'ANON',
@@ -2976,6 +2980,7 @@ method package_def ($/) {
         my $ph = ::Metamodel::StaticSub.new(
             unit       => $*unit,
             outerx     => $sub.xref,
+            outer_direct => $*CURLEX<!sub>,
             cur_pkg    => [ 'GLOBAL' ],
             name       => 'ANON',
             is_phaser  => 0,

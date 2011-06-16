@@ -499,6 +499,9 @@ class Lexical {
 class StaticSub is RefTarget {
     has $.unit; # Metamodel::Unit
     has $.outerx; # Xref
+    # points directly to the outer so that explain_mystery doesn't need
+    # to worry about inlining...
+    has $.outer_direct;
     has $.run_once = False; # Bool
     has $.spad_exists = False; # Bool
     has $.transparent = False; # Bool; ignored by OUTER::
@@ -535,7 +538,9 @@ class StaticSub is RefTarget {
     # not just local lexicals, but all in parse; from current or any inside
     # block
 
-    method outer() { $!outerx ?? $*unit.deref($!outerx) !! StaticSub }
+    method outer() {
+        $!outer_direct //= ($!outerx ?? $*unit.deref($!outerx) !! StaticSub)
+    }
 
     method true_setting() {
         my $cursor = self;
