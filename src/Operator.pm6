@@ -27,9 +27,8 @@ method meta_fun($/, $fun, $arity, *@extra) {
         preargs => [ @extra, self.as_function($/) ])
 }
 
-method funop($name, $arity, *@args) {
-    ::Operator::Function.new(function => ::Op::Lexical.new(name => $name),
-        args => @args, :$arity)
+method funop($/, $name, $arity, *@args) {
+    ::Operator::Function.new(function => mklex($/, $name), :@args, :$arity)
 }
 
 method wrap_in_function($/) {
