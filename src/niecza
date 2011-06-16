@@ -216,6 +216,114 @@ augment grammar STD::P6 { #OK
 #   immed_decl:
 
 augment class NieczaActions {
+method open_package_def($, $/ = $*cursor) {
+    my %_decl2mclass = (
+        package => ::Metamodel::Package,
+        class   => ::Metamodel::Class,
+        module  => ::Metamodel::Module,
+        grammar => ::Metamodel::Grammar,
+        role    => ::Metamodel::Role,
+    );
+    my $sub = $*CURLEX<!sub>;
+
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+
+    my $scope = $*SCOPE;
+    if !$<longname> {
+        $scope = 'anon';
+    }
+
+    if $scope eq 'supersede' {
+        $/.CURSOR.sorry('Supercede is not yet supported');
+        $scope = 'our';
+    }
+    if $scope eq 'has' || $scope eq 'state' {
+        $/.CURSOR.sorry("Illogical scope $scope for package block");
+        $scope = 'our';
+    }
+
+    if $scope eq 'augment' {
+        my $r = self.mangle_longname($<longname>[0], True);
+        my $name = $r<name>;
+        my @augpkg = @( $r<path> // ['MY'] );
+
+        my $pkg = $sub.outer.find_pkg([ @augpkg, $name ]);
+        my $so  = $*unit.get_item($pkg);
+        my $dso = $*unit.deref($so);
+
+        if $dso.^isa(::Metamodel::Role) {
+            $/.CURSOR.panic("Illegal augment of a role");
+        }
+
+        my @ah = $so;
+        $sub.augment_hack = @ah;
+        $sub.body_of = $sub.in_class = $so;
+        $sub.cur_pkg = $pkg;
+        $sub.augmenting = True;
+        $sub.set_name("augment-$dso.name()");
+    } else {
+        my ($name, $ourpkg);
+        my $type = %_decl2mclass{$*PKGDECL};
+        if ($*PKGDECL//'role') eq 'role' && $<signature> {
+            $sub.signature = $<signature>.ast;
+            $type = ::Metamodel::ParametricRole;
+        }
+        my @ns;
+        if $<longname> {
+            my $r = self.mangle_longname($<longname>[0], True);
+            $name = $r<name>;
+            if ($r<path>:exists) && $scope ne 'our' {
+                $/.CURSOR.sorry("Block name $<longname> requires our scope");
+                $scope = 'our';
+            }
+            if $scope eq 'our' {
+                $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
+            }
+            try @ns = @( $sub.outer.find_pkg(
+                $r<path> ?? [ @($r<path>), $r<name> ] !! [ 'MY', $r<name> ]) );
+            $sub.outervar = ($scope eq 'anon' || ($r<path>:exists))
+                ?? self.gensym !! $name;
+        } else {
+            $sub.outervar = self.gensym;
+            $name = 'ANON';
+        }
+
+        my $old = @ns ?? $*unit.get_item([@ns]) !! Any;
+
+        if $old && ($old.[0] ne $*unit.name || $*unit.deref($old).closed) {
+            $/.CURSOR.panic("Redefinition of class [@ns]");
+        }
+        my $obj;
+        if $old {
+            $obj = $*unit.deref($old);
+            # we may need to make a new alias
+            # XXX we might try looking for a reusable one, changing outervar?
+            $/.CURSOR.trymop({
+                $sub.outer.add_my_stash($sub.outervar, [@ns], |mnode($/));
+            }) unless $sub.outer.lexicals{$sub.outervar};
+        } else {
+            @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
+                $*unit.anon_stash;
+
+            $*unit.create_stash([@ns]);
+
+            $/.CURSOR.trymop({
+                $sub.outer.add_my_stash($sub.outervar, [@ns], |mnode($/));
+                $obj = $type.new(:$name);
+                $obj.exports = [ [@ns] ];
+                $*unit.bind_item([@ns], $obj.xref);
+            });
+        }
+
+        $sub.body_of = $sub.in_class = $obj.xref;
+        $sub.cur_pkg = [@ns];
+
+        self.process_block_traits($/, $<trait>);
+        $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
+    }
+}
 
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$path, :$name is copy, :$method_type is copy, :$contextual is copy) {
