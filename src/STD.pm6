@@ -5,7 +5,9 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
-grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
+# note: rather heavily modified -sorear
+
+grammar STD:ver<6.0.0.alpha>:auth<cpan:SOREAR>;
 
 sub mnode($M) {
     $M.^isa(Match) ??
@@ -741,6 +743,7 @@ token embeddedblock {
     <.newlex>
     <.finishlex>
     [ :lang(%*LANG<MAIN>) <statementlist> ]
+    <.getsig>
     [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
 }
 
@@ -1193,6 +1196,7 @@ grammar P6 is STD {
         [ <?before '{' > || <.panic: "Missing block"> ]
         <.newlex>
         <blockoid>
+        <.getsig>
         $<stub>={$¢.checkyada}
     }
 
@@ -1729,6 +1733,7 @@ grammar P6 is STD {
                 ]
             || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
             ]
+            <.getsig>
         ] || <.panic: "Malformed $*PKGDECL">
     }
 
@@ -3966,7 +3971,6 @@ grammar P6 is STD {
             [
                 <?after '::'>
                 <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
-                { $*VAR = Match.synthetic(:cursor($¢), :from(self.pos), :to($¢.pos), :captures(), :method<Str>) }
             ]?
 
         # unrecognized names are assumed to be post-declared listops.
@@ -5180,7 +5184,7 @@ method is_name($longname, $curlex = $*CURLEX) {
         @pkg = shift @parts;
     } elsif @parts[0] eq 'MY' {
         return False if @parts == 1;
-        my $lexical = self._lookup_lex_for_std($curlex, @parts[1]);
+        my $lexical = self.lookup_lex(@parts[1], $curlex);
         unless defined $lexical {
             self.deb("Lexical @parts[1] not found") if $deb;
             return False;
@@ -5193,7 +5197,7 @@ method is_name($longname, $curlex = $*CURLEX) {
             return @parts == 2;
         }
     } else {
-        my $lexical = self._lookup_lex_for_std($curlex, @parts[0]);
+        my $lexical = self.lookup_lex(@parts[0], $curlex);
         if !defined $lexical {
             @pkg = 'GLOBAL';
         } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
@@ -5340,7 +5344,7 @@ method check_variable ($variable) {
                 }
             }
             else {
-                self._lookup_lex_for_std($*CURLEX, $name);
+                self.mark_used($name);
             }
         }
         when '!' {
@@ -5383,13 +5387,72 @@ method check_variable ($variable) {
 method lookup_compiler_var($name) {
     state %builtin_hints = < $?LINE $?POSITION &?BLOCK &?ROUTINE > Z=> True;
 
-    unless %builtin_hints{$name} ||
-            defined self._lookup_lex_for_std($*CURLEX, $name)
+    unless %builtin_hints{$name} || defined self.lookup_lex($name)
     {
         self.sorry("Unrecognized variable: $name");
     }
 }
 
+method check_categorical ($name) {
+    self.deb("check_categorical $name") if $*DEBUG +& DEBUG::symtab;
+    self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
+}
+
+method trymop($f) {
+    my $*worry = sub ($m) { self.worry($m) };
+    unless try { $f(); True } {
+        self.sorry($!)
+    }
+}
+
+# functions much like Metamodel::StaticSub.find_lex, but sets <used> and
+# makes OUTER:: aliases...
+# note: does NOT follow ::Alias lexicals, since the ::Alias is the real
+# user visible lex in most cases
+method lookup_lex($name, $lex is copy = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("Lookup $name") if $deb;
+    my $sub = $lex<!sub>;
+    my $sub2 = $sub;
+    loop {
+        if $sub.lexicals{$name}:exists {
+            until $sub2 === $sub || $sub2.lexicals-used{$name} {
+                $sub2.lexicals-used{$name} //=
+                    ($*FILE<name> => self.lineof(self.pos));
+                $sub2 = $sub2.outer;
+            }
+            $sub2.lexicals-used{$name} //=
+                ($*FILE<name> => self.lineof(self.pos)) if $sub2 === $sub;
+
+            self.deb("Found in $sub.name()") if $deb;
+            return $sub.lexicals{$name};
+        }
+        $sub = $sub.outer || last;
+    }
+    self.deb("Not found") if $deb;
+    return Any;
+}
+
+method mark_used($name) {
+    (my $sub) = (my $sub2) = $*CURLEX<!sub>;
+
+    while $sub {
+        if $sub.lexicals{$name} || $sub.lexicals-used{$name} {
+            $sub.lexicals-used{$name} //=
+                ($*FILE<name> => self.lineof(self.pos));
+
+            while $sub2 !=== $sub {
+                $sub2.lexicals-used{$name} =
+                    ($*FILE<name> => self.lineof(self.pos));
+                $sub2 .= outer;
+            }
+
+            return;
+        }
+
+        $sub .= outer;
+    }
+}
 
 method add_placeholder($name) {
     my $decl = $*CURLEX.<!IN_DECL> // '';
@@ -5434,7 +5497,6 @@ method add_placeholder($name) {
     $*CURLEX<!sub>.lexicals-used{$varname} = True;
     self;
 }
-
 
 ####################
 # Service Routines #

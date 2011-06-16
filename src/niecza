@@ -57,115 +57,6 @@ sub mnode($M) {
 #
 #   immed_decl:
 
-constant %term            = (:dba('term')            , :prec<z=>);
-augment grammar STD::P6 { #OK
-    token term:name
-    {
-        :my $name;
-        :my $pos;
-        <longname>
-        {
-            $name = $<longname>.Str;
-            $pos = $¢.pos;
-        }
-        [
-        ||  <?{
-                $¢.is_name($name) or substr($name,0,2) eq '::'
-            }>
-            { $¢.check_nodecl($name); }
-
-            # parametric type?
-            :dba('type parameter')
-            <.unsp>? [ <?before '['> <postcircumfix> ]?
-
-            :dba('namespace variable lookup')
-            [
-                <?after '::'>
-                <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
-            ]?
-
-        # unrecognized names are assumed to be post-declared listops.
-        || <args> { self.add_mystery($<longname>,$pos,'termish') unless $<args><invocant>; }
-            {
-                if $*BORG and $*BORG.<block> {
-                    if not $*BORG.<name> {
-                        $*BORG.<culprit> = self.cursor($pos);
-                        $*BORG.<name> = $*BORG<name> // $name;
-                    }
-                }
-            }
-        ]
-        <O(|%term)>
-    }
-}
-
-augment grammar STD {
-my package DEBUG {
-    our constant symtab = 1;
-}
-
-method check_categorical ($name) {
-    self.deb("check_categorical $name") if $*DEBUG +& DEBUG::symtab;
-    self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
-}
-
-method trymop($f) {
-    my $*worry = sub ($m) { self.worry($m) };
-    unless try { $f(); True } {
-        self.sorry($!)
-    }
-}
-
-# functions much like Metamodel::StaticSub.find_lex, but sets <used> and
-# makes OUTER:: aliases...
-# note: does NOT follow ::Alias lexicals, since the ::Alias is the real
-# user visible lex in most cases
-method _lookup_lex_for_std($lex is copy, $name) {
-    my $deb = $*DEBUG +& DEBUG::symtab;
-    self.deb("Lookup $name") if $deb;
-    my $sub = $lex<!sub>;
-    my $sub2 = $sub;
-    loop {
-        if $sub.lexicals{$name}:exists {
-            until $sub2 === $sub || $sub2.lexicals-used{$name} {
-                $sub2.lexicals-used{$name} //=
-                    ($*FILE<name> => self.lineof(self.pos));
-                $sub2 = $sub2.outer;
-            }
-            $sub2.lexicals-used{$name} //=
-                ($*FILE<name> => self.lineof(self.pos)) if $sub2 === $sub;
-
-            self.deb("Found in $sub.name()") if $deb;
-            return $sub.lexicals{$name};
-        }
-        $sub = $sub.outer || last;
-    }
-    self.deb("Not found") if $deb;
-    return Any;
-}
-
-method mark_used($name) {
-    (my $sub) = (my $sub2) = $*CURLEX<!sub>;
-
-    while $sub {
-        if $sub.lexicals{$name} || $sub.lexicals-used{$name} {
-            $sub.lexicals-used{$name} //=
-                ($*FILE<name> => self.lineof(self.pos));
-
-            while $sub2 !=== $sub {
-                $sub2.lexicals-used{$name} =
-                    ($*FILE<name> => self.lineof(self.pos));
-                $sub2 .= outer;
-            }
-
-            return;
-        }
-
-        $sub .= outer;
-    }
-}
-}
-
 augment class NieczaActions {
 
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
@@ -296,6 +187,120 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     });
 }
 
+method package_var($/, $slot, $name, $path, :$list, :$hash) {
+    $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
+        $*CURLEX<!sub>.add_common_name($slot,
+            $*CURLEX<!sub>.find_pkg($path), $name, |mnode($/));
+        $*CURLEX<!sub>.lexicals-used{$slot} = True;
+    });
+    ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
+}
+
+method comp_unit($/) {
+    $/.CURSOR.getsig;
+
+    $*CURLEX{'!sub'}.code = $<statementlist>.ast;
+    $*CURLEX{'!sub'}.close;
+
+    make $*unit;
+}
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        $typeconstraint = self.simple_longname($*OFTYPE<longname>);
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
+    my $res_tc = $typeconstraint ??
+        $*unit.get_item($*CURLEX<!sub>.find_pkg($typeconstraint)) !! Any;
+
+    if $scope eq 'has' {
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.', $res_tc);
+    } elsif $scope eq 'state' {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
+                :$hash, typeconstraint => $res_tc, |mnode($/));
+        });
+        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash,
+            :state_decl);
+    } elsif $scope eq 'our' {
+        make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
+    } else {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
+                typeconstraint => $res_tc, |mnode($/));
+        });
+        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+    }
+}
+
+
+method blockoid($/) {
+    # XXX horrible cheat, but my data structures aren't up to the task of
+    # $::UNIT being a class body &c.
+    if $/ eq '{YOU_ARE_HERE}' {
+        $*unit.bottom_ref = $*CURLEX<!sub>.xref;
+        $*CURLEX<!sub>.strong_used = True;
+        $*CURLEX<!sub>.create_static_pad;
+
+        loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
+            # this isn't *quite* right, as it will cause declaring
+            # anything more in the same scope to fail.
+            $/.CURSOR.mark_used($_) for $l.lexicals.keys;
+        }
+
+        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
+    } else {
+        make $<statementlist>.ast;
+    }
+}
 
 method label($/) {
     $/.CURSOR.trymop({

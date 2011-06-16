@@ -71,9 +71,6 @@ HARD
    doesn't actually have an exact line number; it should be able to
    report a range.
 
-   Design something to deal with the last remnants of cursor mutability
-   in STD.pm6.
-
   *Finish roles.
 
    MY::, CALLER::, OUTER::, UNIT:: et al
