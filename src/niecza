@@ -29,6 +29,63 @@ sub mnode($M) {
         { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
 }
 
+augment grammar STD::P6 { #OK
+    token comp_unit {
+        :my $*DEBUG = $GLOBAL::DEBUG_STD // 0;
+        :my $*begin_compunit = 1;
+        :my $*endargs = -1;
+        :my %*LANG;
+        :my $*PKGDECL ::= "";
+        :my $*IN_DECL = '';
+        :my $*HAS_SELF = '';
+        :my $*OFTYPE;
+        :my $*QSIGIL ::= '';
+        :my $*IN_META = '';
+        :my $*QUASIMODO;
+        :my $*SCOPE = "";
+        :my $*LEFTSIGIL;
+        :my $*PRECLIM;
+        :my %*MYSTERY = ();
+        :my $*INVOCANT_OK;
+        :my $*INVOCANT_IS;
+        :my $*CURLEX;
+        :my $*MULTINESS = '';
+        :my $*SIGNUM = 0;
+        :my $*MONKEY_TYPING = False;
+        :my %*WORRIES;
+        :my @*WORRIES;
+        :my $*FATALS = 0;
+        :my $*IN_SUPPOSE = False;
+
+        {
+
+            %*LANG<MAIN>    = ::STD::P6 ;
+            %*LANG<Q>       = ::STD::Q ;
+            %*LANG<Quasi>   = ::STD::Quasi ;
+            %*LANG<Regex>   = ::STD::Regex ;
+            %*LANG<P5>      = ::STD::P5 ;
+            %*LANG<P5Regex> = ::STD::P5::Regex ;
+
+            @*WORRIES = ();
+            $*CURLEX = { };
+            $*UNIT = $*CURLEX;
+            self.finishlex;
+        }:s
+        <.unitstart>
+        <statementlist>
+        [ <?unitstopper> || <.panic: "Confused"> ]
+        <.getsig>
+        # "CHECK" time...
+        {
+            $¢.explain_mystery();
+            if @*WORRIES {
+                note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+            }
+            die "Check failed\n" if $*FATALS;
+        }
+    }
+}
+
 # Almost all longname and most identifier uses in Perl6 can be divided into
 # two groups.
 #
@@ -195,15 +252,6 @@ method package_var($/, $slot, $name, $path, :$list, :$hash) {
         $*CURLEX<!sub>.lexicals-used{$slot} = True;
     });
     ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
-}
-
-method comp_unit($/) {
-    $/.CURSOR.getsig;
-
-    $*CURLEX{'!sub'}.code = $<statementlist>.ast;
-    $*CURLEX{'!sub'}.close;
-
-    make $*unit;
 }
 
 method variable_declarator($/) {
