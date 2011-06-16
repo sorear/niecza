@@ -100,7 +100,6 @@ augment grammar STD::P6 { #OK
 }
 
 augment grammar STD {
-our $ALL;
 my package DEBUG {
     our constant symtab = 1;
 }
@@ -128,8 +127,6 @@ method _lookup_lex_for_std($lex is copy, $name) {
     my $sub2 = $sub;
     loop {
         if $sub.lexicals{$name}:exists {
-            $lex{$name}<used> = 1 if $lex{$name}:exists;
-
             until $sub2 === $sub || $sub2.lexicals-used{$name} {
                 $sub2.lexicals-used{$name} //=
                     ($*FILE<name> => self.lineof(self.pos));
@@ -142,15 +139,163 @@ method _lookup_lex_for_std($lex is copy, $name) {
             return $sub.lexicals{$name};
         }
         $sub = $sub.outer || last;
-        $lex = $lex<OUTER::>[0];
-        $lex = $lex && $ALL{$lex};
     }
     self.deb("Not found") if $deb;
     return Any;
 }
+
+method mark_used($name) {
+    (my $sub) = (my $sub2) = $*CURLEX<!sub>;
+
+    while $sub {
+        if $sub.lexicals{$name} || $sub.lexicals-used{$name} {
+            $sub.lexicals-used{$name} //=
+                ($*FILE<name> => self.lineof(self.pos));
+
+            while $sub2 !=== $sub {
+                $sub2.lexicals-used{$name} =
+                    ($*FILE<name> => self.lineof(self.pos));
+                $sub2 .= outer;
+            }
+
+            return;
+        }
+
+        $sub .= outer;
+    }
+}
 }
 
 augment class NieczaActions {
+
+method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
+        :$path, :$name is copy, :$method_type is copy, :$contextual is copy) {
+
+    $multiness ||= 'only';
+    $path := Any if $name ~~ Op; #Hack
+
+    if !$scope {
+        if !defined($name) {
+            $scope = 'anon';
+        } elsif defined($path) {
+            $scope = 'our';
+        } elsif defined($method_type) {
+            $scope = 'has';
+        } else {
+            $scope = 'my';
+        }
+    }
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' && $scope ne 'has' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        $scope = 'anon';
+    }
+
+    if $scope eq 'has' && !defined($method_type) {
+        $/.CURSOR.sorry('has scope-type is only valid for methods');
+        $scope = 'anon';
+    }
+
+    if $scope ne 'anon' && !defined($name) {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+        $scope = 'anon';
+    }
+
+    if $scope ne 'our' && defined($path) {
+        $/.CURSOR.sorry("Double-colon-qualified subs must be our");
+        $scope = 'our';
+    }
+
+    if $scope eq 'anon' && $multiness ne 'only' {
+        $/.CURSOR.sorry("Multi routines must have a name");
+        $multiness = 'only';
+    }
+
+    if $contextual && (defined($method_type) || $scope ne 'my') {
+        $/.CURSOR.sorry("Context-named routines must by purely my-scoped");
+        $contextual = False;
+    }
+
+    $method_type = Str if $scope eq 'anon';
+
+    my $method_targ = $method_type && $sub.outer.body_of;
+    if $method_targ {
+        $method_targ = $*unit.deref($method_targ);
+    } elsif defined($method_type) {
+        $/.CURSOR.sorry("Methods must be used in some kind of package");
+        $method_type = Str;
+    }
+
+    if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
+            $method_targ !~~ ::Metamodel::ParametricRole) {
+        $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
+        $name = "placeholder";
+    }
+
+    my $bindlex = $scope eq 'my' || ($scope eq 'our' && !$path);
+
+    $sub.set_name(($name ~~ Op) ?? '::($name)' !!
+        defined($method_type) ?? $method_targ.name ~ "." ~ $name !!
+        ($name // 'ANON'));
+    $sub.class = $class;
+    $sub.returnable = True;
+
+    my Str $symbol;
+    $/.CURSOR.trymop({
+        if $bindlex && $class eq 'Regex' {
+            $symbol = '&' ~ $name;
+            my $proto = $symbol;
+            $proto ~~ s/\:.*//;
+            $sub.outer.add_dispatcher($proto, |mnode($/))
+                if $multiness ne 'only' && !$sub.outer.lexicals.{$proto};
+            $symbol ~= ":(!proto)" if $multiness eq 'proto';
+        } elsif $bindlex {
+            $symbol = '&' ~ $name;
+            $/.CURSOR.check_categorical($symbol);
+            if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol} {
+                $sub.outer.add_dispatcher($symbol, |mnode($/))
+            }
+
+            given $multiness {
+                when 'multi' { $symbol ~= ":({ self.gensym })"; }
+                when 'proto' { $symbol ~= ":(!proto)"; }
+                default {
+                    $/.CURSOR.check_categorical($symbol);
+                }
+            }
+        } else {
+            $symbol = self.gensym;
+        }
+
+        $sub.outervar = $symbol;
+        $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
+        $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
+
+        if $multiness ne 'only' {
+            $sub.outer.lexicals-used{$symbol} = True;
+        }
+
+        if defined($method_type) || $scope eq 'our' {
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
+        }
+
+        if defined($method_type) {
+            if $sub.outer.augment_hack {
+                push $sub.outer.augment_hack,
+                    [ $multiness, $method_type, $name, $symbol, $sub.xref ];
+            } else {
+                $method_targ.add_method($multiness, $method_type, $name,
+                    $symbol, $sub.xref);
+            }
+        }
+
+        if $scope eq 'our' {
+            $sub.exports = [[@($sub.outer.find_pkg($path // ['OUR'])), '&'~$name]];
+        }
+    });
+}
+
 
 method label($/) {
     $/.CURSOR.trymop({

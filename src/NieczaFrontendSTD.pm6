@@ -13,8 +13,6 @@ augment class Match {
 }
 
 augment class STD {
-our $ALL;
-
 my %term            = (:dba('term')            , :prec<z=>);
 my %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
 my %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>, :pure);
@@ -133,7 +131,7 @@ method mark_sinks(@sl) { #OK not used
     self
 }
 
-method you_are_here() { $*YOU_WERE_HERE = $*CURLEX; self }
+method you_are_here() { self }
 method lineof ($p) {
     return 1 unless defined $p;
     my $line = @*LINEMEMOS[$p];
@@ -266,23 +264,21 @@ has $.safemode;
 
 method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
 
-    my $*SETTINGNAME = $.lang;
     my $*SAFEMODE    = $.safemode;
     my $*UNITNAME    = $unitname;
     my $*modtime     = $modtime;
 
+    my $lang = $!lang;
     if $unitname eq 'CORE' {
-        $*SETTINGNAME = 'NULL';
+        $lang = 'NULL';
         $*SAFEMODE = False;
     } elsif $unitname ne 'MAIN' {
-        $*SETTINGNAME = 'CORE';
+        $lang = 'CORE';
     }
 
     # XXX temp() or should be contextuals
     my @save_herestub = @STD::herestub_queue;
-    my $save_all = $STD::ALL;
 
-    $STD::ALL = {};
     @STD::herestub_queue = ();
 
     my $*niecza_outer_ref = $outer;
@@ -306,7 +302,7 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     my $*LAST_NIBBLE_MULTILINE = 0;
     my $*LAST_NIBBLE_MULTILINE_START = 0;
     my $*GOAL = "(eof)";
-    my $*SETTING; my $*CORE; my $*GLOBAL; my $*UNIT; my $*YOU_WERE_HERE;
+    my $*UNIT;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
     my $*unit = ::Metamodel::Unit.new(name => $unitname,
@@ -315,9 +311,9 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     if $*niecza_outer_ref {
         $*unit.setting_ref = $*niecza_outer_ref;
         $*unit.need_unit($*unit.setting_ref.[0]);
-    } elsif $*SETTINGNAME ne 'NULL' {
-        $*unit.need_unit($*SETTINGNAME);
-        $*unit.setting_ref = $*unit.get_unit($*SETTINGNAME).bottom_ref;
+    } elsif $lang ne 'NULL' {
+        $*unit.need_unit($lang);
+        $*unit.setting_ref = $*unit.get_unit($lang).bottom_ref;
     }
     %*units{$unitname} = $*unit;
     $*unit.tdeps{$unitname} = [$filename, $modtime];
@@ -327,7 +323,6 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
 
     my $ast = NieczaGrammar.parse($source, actions => NieczaActions).ast;
 
-    $STD::ALL = $save_all;
     @STD::herestub_queue = @save_herestub;
 
     $ast;

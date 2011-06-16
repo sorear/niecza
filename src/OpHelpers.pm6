@@ -9,11 +9,14 @@ sub mklet($value, $body) is export {
 }
 
 sub mkcall($/, $name, *@positionals) is export {
+    $/.CURSOR.mark_used($name);
+    $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
     ::Op::CallSub.new(|node($/),
         invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
 }
 
 sub mklex($/, $name, *%_) is export {
+    $/.CURSOR.mark_used($name);
     $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
     ::Op::Lexical.new(|node($/), :$name, |%_);
 }
