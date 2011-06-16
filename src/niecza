@@ -30,6 +30,86 @@ sub mnode($M) {
 }
 
 augment grammar STD {
+my package DEBUG { our constant symtab = 2; }
+method check_variable ($variable) {
+    return () unless defined $variable;
+    my $name = $variable.Str;
+    my $here = self.cursor($variable.from);
+    self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
+    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    ($first,$twigil) = ($twigil, '') if $first eq '';
+    given $twigil {
+        when '' {
+            my $ok = 0;
+            $ok ||= $*IN_DECL;
+            $ok ||= $first lt 'A';
+            $ok ||= $first eq '¢';
+            $ok ||= self.is_known($name);
+            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+            if not $ok {
+                my $id = $name;
+                $id ~~ s/^\W\W?//;
+                if $sigil eq '&' {
+                    $here.add_mystery(Match.synthetic(:cursor(self), :method('Str'), :captures(), :from($variable.from+1), :to($variable.to)), self.pos, 'var')
+                }
+                elsif $name eq '@_' or $name eq '%_' {
+                    $here.add_placeholder($name);
+                }
+                else {  # guaranteed fail now
+                    if my $scope = @*MEMOS[$variable.from]<declend> {
+                        return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                    }
+                    elsif $id !~~ /\:\:/ {
+                        if self.is_known('@' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                        }
+                        elsif self.is_known('%' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                        }
+                    }
+                    return $here.sorry("Variable $name is not predeclared");
+                }
+            }
+            else {
+                self.mark_used($name);
+            }
+        }
+        when '!' {
+            if not $*HAS_SELF { # XXX to be replaced by MOP queries
+                $here.sorry("Variable $name used where no 'self' is available");
+            }
+        }
+        when '.' {
+            given $*HAS_SELF { # XXX to be replaced by MOP queries
+                when 'complete' {}
+                when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
+                default { $here.sorry("Variable $name used where no 'self' is available"); }
+            }
+        }
+        when '^' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
+        }
+        when ':' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
+        }
+        when '~' {
+            return %*LANG.{substr($name,2)};
+        }
+        when '?' {
+            if $name ~~ /\:\:/ {
+                # TODO: $?CALLER::x makes sense!  also CONTEXT,OUTER,MY,SETTING,CORE
+                $here.worry("Unrecognized variable: $name");
+            }
+            else {
+                # search upward through languages to STD
+                $here.lookup_compiler_var($name);
+            }
+        }
+    }
+    self;
+}
 method newlex ($needsig = 0, $once = False) {
     my $osub = $*CURLEX<!sub>;
     $*CURLEX = { };
