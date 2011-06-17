@@ -32,8 +32,8 @@ eval_lives_ok q[
 ], "can stub then define nested classes";
 
 {
-    # my @l = gather for 1,2 { take $_ };
-    # is ~@l, "1 2", "gather for works";
+    my @l = gather for 1,2 { take $_ };
+    is ~@l, "1 2", "gather for works";
 
     # eval_dies_ok 'class { has $!foo; has $!foo; }',
     #     "double attribute declaration caught";

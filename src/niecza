@@ -23,6 +23,16 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class NieczaActions {
+method blast($/) {
+    if $<block> {
+        make $<block>.ast;
+    } else {
+        make self.thunk_sub($<statement>.ast.statement_level);
+    }
+}
+}
+
 CgOp._register_ops: <
 >;
 
