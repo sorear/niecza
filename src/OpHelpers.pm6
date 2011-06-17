@@ -1,5 +1,11 @@
 module OpHelpers;
 
+sub mnode($M) is export {
+    $M.^isa(Match) ??
+        { file => $*FILE<name>, line => $M.CURSOR.lineof($M.from), pos => $M.from } !!
+        { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
+}
+
 sub node($M) is export { { line => $M.CURSOR.lineof($M.pos) } }
 
 sub mklet($value, $body) is export {
@@ -33,4 +39,3 @@ sub mktemptopic($/, $item, $expr) is export {
                         rhs => $old_),
                     $result]) }) ]) });
 }
-

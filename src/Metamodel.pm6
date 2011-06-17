@@ -34,6 +34,34 @@ method locstr($fo, $lo, $fn, $ln) {
 # $*unit: current unit for new objects to attach to
 # %*units: maps unit names to unit objects
 
+# Almost all longname and most identifier uses in Perl6 can be divided into
+# two groups.
+#
+# DECLARATIVE references, like class Foo::Bar::Baz {}, have an ending token,
+# and the remainder identifies a stash.  Leading :: is ignored; if 0 tokens,
+# anon is forced, if 1, scope-sensitive special behavior, if 2+, our required.
+# Evaluating a declarative reference returns a (stash,name) pair.
+#
+# REFERENTIAL names, like $Foo::Bar::baz, are interpreted as referring to a
+# single variable; in many cases this is used to look for a type object.
+# Referential names default to MY:: if 1 token and 0 leading colon.
+# Evaluating a referential name returns or binds a variable.
+#
+# The one exception seems to be method calls, which take a referential name
+# plus an extra identifier to name the method.
+#
+# Trailing :: is forbidden when declaring and means .WHO when referencing.
+#
+# Functions for handling names in actions:
+#
+#   package_var: Basic function for handling referential names, produces Op.
+#
+#   immed_ref: Like package_var in a BEGIN context.
+#
+#   decl_expr:
+#
+#   immed_decl:
+
 # A stash is an object like Foo::.  Foo and Foo:: are closely related, but
 # generally must be accessed separately due to constants (which have Foo but
 # not Foo::) and stub packages (vice versa).
