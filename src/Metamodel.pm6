@@ -150,6 +150,18 @@ class Namespace {
         $rinto;
     }
 
+    sub _merge_item($i1, $i2, *@path) {
+        my $nn1 = $i1[0] && $i1[0][0];
+        my $nn2 = $i2[0] && $i2[0][0];
+        if $nn1 && $nn2 && ($i1[0][0] ne $i2[0][0] || $i1[0][1] != $i2[0][1]) {
+            die "Two definitions found for package symbol [{@path}]\n\n" ~
+                "  first at $i1[1] line $i1[2]\n" ~
+                "  second at $i2[1] line $i2[2]";
+        }
+
+        ($nn1 ?? $i1 !! $nn2 ?? $i2 !! ($i1 // $i2))
+    }
+
     sub _merge($rinto_, $rfrom, @path) {
         my $rinto = _hash_constructor( %$rinto_ );
         for sort keys $rfrom -> $k {
@@ -170,13 +182,8 @@ class Namespace {
                     unless join("\0", @($i1[1])) eq join("\0", @($i2[1]));
             }
             if $i1[0] eq 'var' {
-                my $nn1 = $i1[1] && $i1[1][0];
-                my $nn2 = $i2[1] && $i2[1][0];
-                die "Non-stub packages cannot be merged " ~ join(" ", @path, $k)
-                    if $nn1 && $nn2 && ($i1[1][0] ne $i2[1][0] ||
-                        $i1[1][1] != $i2[1][1]);
                 $rinto{$k} = ['var',
-                    ($nn1 ?? $i1[1] !! $nn2 ?? $i2[1] !! ($i1[1] // $i2[1])),
+                    _merge_item($i1[1], $i2[1], @path, $k),
                     ((defined($i1[2]) && defined($i2[2])) ??
                         _merge($i1[2], $i2[2], [@path, $k]) !!
                     _dclone($i1[2] // $i2[2]))];
@@ -199,7 +206,7 @@ class Namespace {
         }
         if !$i[1] {
             $.log.push([ 'var', [ @$u,$n ] ]);
-            $i[1] = ['',0];
+            $i[1] = [['',0],'',0];
         }
     }
 
@@ -210,18 +217,18 @@ class Namespace {
         if $i[0] eq 'graft' {
             self.get_item($i[1]);
         } elsif $i[0] eq 'var' {
-            $i[1];
+            $i[1][0];
         }
     }
 
     # Bind an unmergable thing (non-stub package) into a stash.
-    method bind_item($path, $item) {
+    method bind_item($path, $item, :$file = '???', :$line = '???', :$pos) {
         my ($c,$u,$n) = self!lookup_common([], $path); #OK not used
         my $i = $c{$n} //= ['var',Any,Any];
-        if $i[0] ne 'var' || $i[1] && $i[1][0] {
-            die "Collision installing pkg $path";
+        if $i[0] ne 'var' {
+            die "Installing item at $path, collide with graft";
         }
-        $i[1] = $item;
+        $i[1] = _merge_item($i[1], [$item,$file,$line], @$path);
     }
 
     # Bind a graft into a stash
@@ -757,12 +764,12 @@ class Unit {
     has Int $.next_anon_stash is rw = 0; # is rw, Int
     has @.stubbed_stashes; # Pair[Stash,Cursor]
 
-    method bind_item($path,$item)    { $!ns.bind_item($path,$item) }
-    method bind_graft($path1,$path2) { $!ns.bind_graft($path1,$path2) }
-    method create_stash(@path)       { $!ns.create_stash(@path) }
-    method create_var(@path)         { $!ns.create_var(@path) }
-    method list_stash(@path)         { $!ns.list_stash(@path) }
-    method get_item(@path)           { $!ns.get_item(@path) }
+    method bind_item($path,$item,*%_) { $!ns.bind_item($path,$item,|%_) }
+    method bind_graft($path1,$path2)  { $!ns.bind_graft($path1,$path2) }
+    method create_stash(@path)        { $!ns.create_stash(@path) }
+    method create_var(@path)          { $!ns.create_var(@path) }
+    method list_stash(@path)          { $!ns.list_stash(@path) }
+    method get_item(@path)            { $!ns.get_item(@path) }
 
     method is_true_setting() { $.name eq 'CORE' }
 

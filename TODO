@@ -21,7 +21,7 @@ EASY
    Fudge and run your favorite spectest file.
 
    Stuff spectests are blocking on: "closure for",
-   "gather for", constants in signatures, ::T, ...
+   constants in signatures, ::T, ...
 
 MEDIUM
 
@@ -104,5 +104,4 @@ Other stuff to do after:
   - jnthnian packages
   - pm's = hack
   - fix { my $x } crash
-  + blast/statement_level
   + checking redeclaration of our symbols, methods, attributes...
