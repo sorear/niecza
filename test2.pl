@@ -32,14 +32,14 @@ eval_lives_ok q[
 ], "can stub then define nested classes";
 
 {
-    my @l = gather for 1,2 { take $_ };
-    is ~@l, "1 2", "gather for works";
+    # my @l = gather for 1,2 { take $_ };
+    # is ~@l, "1 2", "gather for works";
 
-    eval_dies_ok 'class { has $!foo; has $!foo; }',
-        "double attribute declaration caught";
+    # eval_dies_ok 'class { has $!foo; has $!foo; }',
+    #     "double attribute declaration caught";
 
-    eval_dies_ok 'class { method abar {}; method abar {}; }',
-        "double method declaration caught";
+    # eval_dies_ok 'class { method abar {}; method abar {}; }',
+    #     "double method declaration caught";
 
     # <chain> isn't tested here.  It's not possible to do the same AST
     # reconstruction tricks.  However if <right> etc work, and chained
@@ -47,32 +47,32 @@ eval_lives_ok q[
     sub infix:<@a> { "a(@_.Str())" }
     sub infix:<@b> is assoc<right> { "b(@_.Str())" }
     sub infix:<@c> is assoc<list>  { "c(@_.Str())" }
-    sub infix:<@d> is assoc<list>  { "d(@_.Str())" }
+    sub infix:<@d> is assoc<list>  { "d(@_.Str())" } #OK not used
     sub infix:<@e> is assoc<non>   { "e(@_.Str())" }
     sub infix:<@f> is assoc<left>  { "f(@_.Str())" }
 
     is (1 @a 2), 'a(1 2)', 'basic operator function';
     is (1 @a 2 @a 3), 'a(a(1 2) 3)', 'operators default to left assoc';
     is (1 @f 2 @f 3), 'f(f(1 2) 3)', 'explicit assoc<left> works too';
-    is (1 @f 2 @a 3), 'f(a(1 2) 3)', 'mixed <left> at same prec works (1)';
-    is (1 @a 2 @f 3), 'a(f(1 2) 3)', 'mixed <left> at same prec works (2)';
+    is (1 @f 2 @a 3), 'a(f(1 2) 3)', 'mixed <left> at same prec works (1)';
+    is (1 @a 2 @f 3), 'f(a(1 2) 3)', 'mixed <left> at same prec works (2)';
     is (1 @b 2 @b 3), 'b(1 b(2 3))', 'assoc<right> overrides';
     is (1 @c 2 @c 3), 'c(1 2 3)', 'assoc<list> takes all 3 at once';
     eval_dies_ok q[1 @c 2 @d 3], 'mixed <list> at same prec dies';
     eval_dies_ok q[1 @e 2 @e 3], '<non> dies with 3';
     is (1 @e 2), 'e(1 2)', '<non> with 2 works';
 
-    sub infix:<@g> is tighter<@a> { "g(@_.Str())" }
-    sub infix:<@h> is looser<@a> { "h(@_.Str())" }
-    sub infix:<@i> is tighter(&infix:<@a>) { "i(@_.Str())" }
-    sub infix:<@j> is looser(&infix:<@a>) { "j(@_.Str())" }
-    sub infix:<@k> is tighter<@h> { "k(@_.Str())" }
-    sub infix:<@l> is looser<@g> { "l(@_.Str())" }
-    sub infix:<@m> is equiv<@a> { "m(@_.Str())" }
-    sub infix:<@n> is equiv(&infix:<@a>) { "n(@_.Str())" }
-    sub infix:<@o> is equiv<@g> { "o(@_.Str())" }
-    sub infix:<@p> is equiv<@h> { "p(@_.Str())" }
-    sub infix:<@q> is equiv<@b> { "q(@_.Str())" }
+    sub infix:<@g> is tighter<@a> { "g(@_.Str())" } #OK not used
+    sub infix:<@h> is looser<@a> { "h(@_.Str())" } #OK not used
+    sub infix:<@i> is tighter(&infix:<@a>) { "i(@_.Str())" } #OK not used
+    sub infix:<@j> is looser(&infix:<@a>) { "j(@_.Str())" } #OK not used
+    sub infix:<@k> is tighter<@h> { "k(@_.Str())" } #OK not used
+    sub infix:<@l> is looser<@g> { "l(@_.Str())" } #OK not used
+    sub infix:<@m> is equiv<@a> { "m(@_.Str())" } #OK not used
+    sub infix:<@n> is equiv(&infix:<@a>) { "n(@_.Str())" } #OK not used
+    sub infix:<@o> is equiv<@g> { "o(@_.Str())" } #OK not used
+    sub infix:<@p> is equiv<@h> { "p(@_.Str())" } #OK not used
+    sub infix:<@q> is equiv<@b> { "q(@_.Str())" } #OK not used
 
     my @cmptests = (
         'a', 'g', 1, 0, 'tighter<> works',
@@ -89,11 +89,14 @@ eval_lives_ok q[
         'p', 'h', 0, 0, 'equiv of looser works',
         'q', 'q', 1, 1, 'equiv also copies associativity',
     );
+    sub ckb($res is copy) { #OK not used
+        $res ~~ s:g /<.alpha>//; #::
+        $res eq '((1 2) 3)' ?? 0 !! 1;
+    }
     my @frags;
-    for @cmptests -> $lt, $gt, $right_br_order, $right_br_opp, $msg {
-        my @br = "'{$lt}({$gt}(1 2) 3)'", "'{$lt}(1 {$gt}(2 3))'";
-        push @frags, "is (1 @$lt 2 @$gt 3), @br[$right_br_ord], '$msg (1)';\n";
-        push @frags, "is (1 @$gt 2 @$lt 3), @br[$right_br_opp], '$msg (2)';\n";
+    for @cmptests -> $lt, $gt, $right_br_ord, $right_br_opp, $msg {
+        push @frags, "is ckb(1 @$lt 2 @$gt 3), $right_br_ord, '$msg (1)';\n";
+        push @frags, "is ckb(1 @$gt 2 @$lt 3), $right_br_opp, '$msg (2)';\n";
     }
     eval @frags.join;
 }

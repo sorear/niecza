@@ -709,6 +709,7 @@ method process_block_traits($/, @tr) {
             my $rel = $tr.keys.[0];
             my $to  = $tr.values.[0];
             $to = $to.inside if $to ~~ ::Op::Paren;
+            $to = $to.children[0] if $to ~~ ::Op::StatementList && $to.children == 1;
 
             my $oprec;
             if $to ~~ ::Op::Lexical {

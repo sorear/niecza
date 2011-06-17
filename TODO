@@ -106,4 +106,3 @@ Other stuff to do after:
   - fix { my $x } crash
   + blast/statement_level
   + checking redeclaration of our symbols, methods, attributes...
-  + is tighter/looser/equiv
