@@ -22,7 +22,7 @@ my %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uass
 # TODO: allow variable :dba()s
 
 method cat_O($cat, $sym) {
-    my $name = "{$cat}:<$sym>";
+    my $name = "&{$cat}:<$sym>";
     self.function_O($name) // self.default_O($cat, $sym);
 }
 

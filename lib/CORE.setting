@@ -288,7 +288,7 @@ my class FatRat is Real {
 }
 
 #TODO use a power from the standard library
-sub infix:<**>($num,$power) {
+sub infix:<**>($num,$power) is Niecza::absprec<w=> is assoc<right> {
     my $ret = 1;
     my $p = $power;
     while ($p > 0) {
@@ -411,7 +411,7 @@ augment class Bool {
 }
 # }}}
 # Fundamental scalar operators {{{
-sub infix:<~>(\|$bits) { Q:CgOp {
+sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
     (letn buf (strbuf_new)
           i   (int 0)
           ar  (unbox fvarlist (@ {$bits}))
@@ -425,19 +425,19 @@ sub infix:<~>(\|$bits) { Q:CgOp {
 
 sub infix:<+>($l,$r) { $l + $r }
 sub infix:<->($l,$r) { $l - $r }
-sub infix:<*>($l,$r) { $l * $r }
-sub infix:</>($l,$r) { $l / $r }
-sub infix:<%>($l,$r) { $l % $r }
+sub infix:<*> is Niecza::absprec<u=> ($l,$r) { $l * $r }
+sub infix:</> is equiv<*> ($l,$r) { $l / $r }
+sub infix:<%> is equiv<*> ($l,$r) { $l % $r }
 
-sub infix:<< < >>($l,$r)  { $l <  $r }
-sub infix:<< > >>($l,$r)  { $l >  $r }
-sub infix:<< <= >>($l,$r) { $l <= $r }
-sub infix:<< >= >>($l,$r) { $l >= $r }
-sub infix:<< == >>($l,$r) { $l == $r }
-sub infix:<< != >>($l,$r) { $l != $r }
+sub infix:<< == >>($l,$r) is Niecza::absprec<m=> is assoc<chain> { $l == $r }
+sub infix:<< != >>($l,$r) is equiv<chain> { $l != $r }
+sub infix:<< < >>($l,$r)  is equiv<chain> { $l <  $r }
+sub infix:<< > >>($l,$r)  is equiv<chain> { $l >  $r }
+sub infix:<< <= >>($l,$r) is equiv<chain> { $l <= $r }
+sub infix:<< >= >>($l,$r) is equiv<chain> { $l >= $r }
 
-sub infix:<max>($a,$b) { $a < $b ?? $b !! $a }
-sub infix:<min>($a,$b) { $a > $b ?? $b !! $a }
+sub infix:<max>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a < $b ?? $b !! $a }
+sub infix:<min>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a > $b ?? $b !! $a }
 
 sub warn($str) { $PROCESS::OUTPUT_USED := True; Q:CgOp {
     (prog [note (obj_getstr {$str})]
@@ -453,7 +453,7 @@ sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])
 } }
 
-sub infix:<=>(\$a, \$b) { $a = $b }
+sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> { $a = $b }
 
 sub chars($str) { chars($str) }
 sub substr($str, $start, $len = chars($str) - $start) { substr($str, $start, $len) }
@@ -461,15 +461,13 @@ sub index($haystack,$needle) { $haystack.index($needle) }
 
 sub item(Mu $x) { $x }
 
-sub prefix:<not>(Mu $x) { not($x) }
+sub prefix:<not> is Niecza::absprec<h=> (Mu $x) { not($x) }
 sub defined(Mu $x) { defined($x) }
 
-# Buglet in STD: standard infix operators look custom inside the setting, and
-# forget their precedence.
-sub prefix:<-->($v is rw) { $v = $v.pred; $v }
-sub prefix:<++>($v is rw) { $v = $v.succ; $v }
-sub postfix:<-->($v is rw) { my $old = $v; $v = $v.pred; $old }
-sub postfix:<++>($v is rw) { my $old = $v; $v = $v.succ; $old }
+sub prefix:<-->  is Niecza::absprec<x=> ($v is rw) { $v = $v.pred; $v }
+sub prefix:<++>  is Niecza::absprec<x=> ($v is rw) { $v = $v.succ; $v }
+sub postfix:<--> is Niecza::absprec<x=> ($v is rw) { my $old = $v; $v = $v.pred; $old }
+sub postfix:<++> is Niecza::absprec<x=> ($v is rw) { my $old = $v; $v = $v.succ; $old }
 
 sub prefix:<~>(Mu $v) { ~$v }
 sub prefix:<?>(Mu $v) { ?$v }
@@ -480,7 +478,7 @@ sub prefix:<!>(Mu $v) { !$v }
 sub not(Mu $v) { not($v) }
 sub so(Mu $v) { so $v }
 
-sub infix:<x>($str, $ct) {
+sub infix:<x> is Niecza::absprec<s=> ($str, $ct) {
     my $i = +$ct;
     my $j = ''; # XXX use strbuf
     while $i >= 1 {
@@ -490,16 +488,16 @@ sub infix:<x>($str, $ct) {
     $j;
 }
 
-sub infix:<leg>($s1, $s2) {
+sub infix:<leg> is Niecza::absprec<n=> is assoc<non> ($s1, $s2) {
     Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }
 }
 
-sub infix:<ge>($s1, $s2) { $s1 ge $s2 }
-sub infix:<gt>($s1, $s2) { $s1 gt $s2 }
-sub infix:<le>($s1, $s2) { $s1 le $s2 }
-sub infix:<lt>($s1, $s2) { $s1 lt $s2 }
-sub infix:<eq>($s1, $s2) { $s1 eq $s2 }
-sub infix:<ne>($s1, $s2) { $s1 ne $s2 }
+sub infix:<ge>($s1, $s2) is equiv<==> { $s1 ge $s2 }
+sub infix:<gt>($s1, $s2) is equiv<==> { $s1 gt $s2 }
+sub infix:<le>($s1, $s2) is equiv<==> { $s1 le $s2 }
+sub infix:<lt>($s1, $s2) is equiv<==> { $s1 lt $s2 }
+sub infix:<eq>($s1, $s2) is equiv<==> { $s1 eq $s2 }
+sub infix:<ne>($s1, $s2) is equiv<==> { $s1 ne $s2 }
 sub lc($string)    { (~$string).lc }
 sub uc($string)    { (~$string).uc }
 sub chop($string)  { (~$string).chop }
@@ -508,10 +506,10 @@ sub flip($string)  { (~$string).flip }
 sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
 sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
 # this one is horribly wrong and only handles the ref eq case.
-sub infix:<===>($l,$r) { Q:CgOp {
+sub infix:<===>($l,$r) is equiv<==> { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
 } }
-sub infix:<=:=>(\$l,\$r) { Q:CgOp {
+sub infix:<=:=>(\$l,\$r) is equiv<==> { Q:CgOp {
     (box Bool (compare == {$l} {$r}))
 } }
 
@@ -519,19 +517,19 @@ sub _param_role_inst(\|$t) {
     Q:CgOp { (instrole (unbox fvarlist (@ {$t}))) }
 }
 
-sub infix:<but>($obj, $role) { Q:CgOp {
+sub infix:<but>($obj, $role) is equiv<leg> { Q:CgOp {
     (ns (stab_what (role_apply (obj_llhow (@ {$obj})) (obj_llhow (@ {$role})))))
 } }
 
-sub infix:<~~>($t,$m) { $m.ACCEPTS($t) }
+sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
 
 sub ord($x) { Q:CgOp { (bif_ord {$x}) } }
 sub chr($x) { Q:CgOp { (bif_chr {$x}) } }
-sub infix:<+&>($x, $y) { Q:CgOp { (bif_numand {$x} {$y}) } }
+sub infix:<+&> is Niecza::absprec<u=> ($x, $y) { Q:CgOp { (bif_numand {$x} {$y}) } }
 sub infix:<+|>($x, $y) { Q:CgOp { (bif_numor {$x} {$y}) } }
 sub infix:<+^>($x, $y) { Q:CgOp { (bif_numxor {$x} {$y}) } }
-sub infix:<< +< >>($x, $y) { Q:CgOp { (bif_numlshift {$x} {$y}) } }
-sub infix:<< +> >>($x, $y) { Q:CgOp { (bif_numrshift {$x} {$y}) } }
+sub infix:<< +< >>($x, $y) is Niecza::absprec<u=> { Q:CgOp { (bif_numlshift {$x} {$y}) } }
+sub infix:<< +> >>($x, $y) is Niecza::absprec<u=> { Q:CgOp { (bif_numrshift {$x} {$y}) } }
 sub prefix:<< +^ >>($x) { Q:CgOp { (bif_numcompl {$x}) } }
 
 # }}}
@@ -979,9 +977,12 @@ my class Junction is Mu {
             $other.^isa(self)
     }
 }
-sub infix:<&>(\|$p) { Junction.from-parcel(0, $p) }
-sub infix:<^>(\|$p) { Junction.from-parcel(2, $p) }
-sub infix:<|>(\|$p) { Junction.from-parcel(3, $p) }
+sub infix:<&> is Niecza::absprec<q=> is assoc<list>
+    (\|$p) { Junction.from-parcel(0, $p) }
+sub infix:<^> is Niecza::absprec<p=> is assoc<list>
+    (\|$p) { Junction.from-parcel(2, $p) }
+sub infix:<|> is Niecza::absprec<p=> is assoc<list>
+    (\|$p) { Junction.from-parcel(3, $p) }
 sub all  (*@p) { all @p }
 sub none (*@p) { none @p }
 sub one  (*@p) { one @p }
@@ -1028,7 +1029,7 @@ sub _gather($fr) {
 
 sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
 
-sub infix:<< => >>($k, Mu $v) { $k => $v }
+sub infix:<< => >>($k, Mu $v) is equiv<=> { $k => $v }
 
 sub reverse(*@array) {
     my @acc;
@@ -1061,11 +1062,11 @@ sub _newtiedscalar(Mu $type, $bind, $fetch, $store) {
     Q:CgOp { (var_new_tied (obj_llhow (@ {$type})) (@ {$bind}) (@ {$fetch}) (@ {$store})) }
 }
 
-sub infix:<Z>(\|$pcl) {
-    Q:CgOp { (bif_zip (b 0) (unbox fvarlist (@ {$pcl}))) }
-}
-sub infix:<X>(\|$pcl) {
+sub infix:<X>(\|$pcl) is Niecza::absprec<f=> is assoc<list> {
     Q:CgOp { (bif_cross (b 0) (unbox fvarlist (@ {$pcl}))) }
+}
+sub infix:<Z>(\|$pcl) is equiv<X> {
+    Q:CgOp { (bif_zip (b 0) (unbox fvarlist (@ {$pcl}))) }
 }
 sub zipop(\|$pcl) {
     Q:CgOp { (bif_zip (b 1) (unbox fvarlist (@ {$pcl}))) }
@@ -1368,10 +1369,10 @@ my class Range is Cool {
     }
 }
 
-sub infix:<..> ($a, $b)   { Range.new($a, $b) }
-sub infix:<..^> ($a, $b)  { Range.new($a, $b, :excludes_max) }
-sub infix:<^..> ($a, $b)  { Range.new($a, $b, :excludes_min) }
-sub infix:<^..^> ($a, $b) { Range.new($a, $b, :excludes_min, :excludes_max) }
+sub infix:<..> is equiv<leg> ($a, $b)   { Range.new($a, $b) }
+sub infix:<..^> is equiv<leg> ($a, $b)  { Range.new($a, $b, :excludes_max) }
+sub infix:<^..> is equiv<leg> ($a, $b)  { Range.new($a, $b, :excludes_min) }
+sub infix:<^..^> is equiv<leg> ($a, $b) { Range.new($a, $b, :excludes_min, :excludes_max) }
 
 sub _hyper_type($val) {
     #FIXME rewrite using roles
@@ -1586,15 +1587,15 @@ our sub Niecza::series-listop(Parcel $lists, $exclude-limit) {
     @l
 }
 
-sub infix:<%%> ($x,$y) { $x % $y == 0 }
-sub infix:<?&> ($a, $b) { ?($a && $b) }
+sub infix:<%%> is Niecza::absprec<u=> ($x,$y) { $x % $y == 0 }
+sub infix:<?&> is Niecza::absprec<u=> ($a, $b) { ?($a && $b) }
 sub infix:<?|> ($a, $b) { ?($a || $b) }
 sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) { !$a }
 sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ +$limit }
-sub prefix:<so> (Mu $item) { ?$item }
-sub infix:<xx> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
+sub prefix:<so> is Niecza::absprec<h=> (Mu $item) { ?$item }
+sub infix:<xx> is Niecza::absprec<s=> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
 sub floor($x) { Q:CgOp { (_cgop bif_floor {$x}) } }
 sub ceiling($x) { -floor(-$x) }
@@ -1604,22 +1605,22 @@ sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
 # XXX 'Order' type
-sub infix:« <=> » ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
+sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
-sub infix:<cmp> ($a, $b) {
+sub infix:<cmp> is equiv<leg> ($a, $b) {
     return $a - $b if $a ~~ Numeric && $b ~~ Numeric;
     return $a.WHAT leg $b.WHAT unless $a.WHAT === $b.WHAT;
     return $a leg $b if $a ~~ Str;
     return $a - $b;
 }
-sub infix:<eqv> ($a, $b) { ($a cmp $b) == 0 }
-sub infix:<before> ($a, $b) { ($a cmp $b) < 0 }
-sub infix:<after> ($a, $b) { ($a cmp $b) > 0 }
+sub infix:<eqv> is equiv<==> ($a, $b) { ($a cmp $b) == 0 }
+sub infix:<before> ($a, $b) is equiv<==> { ($a cmp $b) < 0 }
+sub infix:<after> ($a, $b) is equiv<==> { ($a cmp $b) > 0 }
 sub seqop($op, \$x, \$y) { $op($x,$y) } # TODO: Special case with hyper
 sub reverseop($op, \$x, \$y) { $op($y, $x) }
 
-sub infix:<div> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 4) {$x} {$y}) } }
-sub infix:<mod> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 5) {$x} {$y}) } }
+sub infix:<div> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 4) {$x} {$y}) } }
+sub infix:<mod> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 5) {$x} {$y}) } }
 sub infix:<~&> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~|> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~^> ($x, $y) { die "Buffer bitops NYI"; } #OK
@@ -1627,12 +1628,12 @@ sub infix:«~<» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:«~>» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
 sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
-sub postfix:<i> ($item) { $item * i }
+sub postfix:<i> is Niecza::absprec<y=> ($item) { $item * i }
 sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
-sub infix:<minmax>(\|$args) { die "minmax NYI" } #OK
-sub infix:<...>(\|$lists) { &Niecza::series-listop($lists, False) }
-sub infix:<...^>(\|$lists) { &Niecza::series-listop($lists, True) }
+sub infix:<minmax> is equiv<X> (\|$args) { die "minmax NYI" } #OK
+sub infix:<...> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, False) }
+sub infix:<...^> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, True) }
 sub infix:« ==> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
@@ -1764,6 +1765,6 @@ $PROCESS::ARGFILES ::= IO::ArgFiles.new;
 
 # This needs to be at the end because it screws up the parsing of everything
 # after it.
-sub infix:<,>(\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
+sub infix:<,> is Niecza::absprec<g=> is assoc<list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 
 {YOU_ARE_HERE}

@@ -391,6 +391,28 @@ method type_declarator:subset ($/) {
     make mklex($/, $lexvar);
 }
 
+method FALLBACK($meth, $/) {
+    my $S = $<sym>;
+    if $meth eq '::($name)' { # XXX STD miscompilation
+        $meth := $<name>;
+    }
+
+    if substr($meth,0,7) eq 'prefix:' {
+        make Operator.funop($/, q:s'&prefix:<$S>', 1);
+    } elsif substr($meth,0,14) eq 'postcircumfix:' {
+        make Operator.funop($/, q:s'&postcircumfix:<$S>', 1, @( $<semilist>.ast ));
+    } elsif substr($meth,0,10) eq 'circumfix:' {
+        make mkcall($/, q:s'&circumfix:<$S>', @( $<semilist>.ast ));
+    } elsif substr($meth,0,8) eq 'postfix:' {
+        make Operator.funop($/, q:s'&postfix:<$S>', 1);
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make Operator.funop($/, q:s'&infix:<$S>', 2);
+    } elsif substr($meth,0,5) eq 'term:' {
+        make mkcall($/, q:s'&term:<$S>');
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
+}
 
 method type_declarator:enum ($/) {
     my $scope = $*SCOPE || 'our';
@@ -586,6 +608,14 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     $sub.class = $class;
     $sub.returnable = True;
 
+    (sub () {
+        my $std = $/.CURSOR;
+        if $sub.name ~~ /^(\w+)\:\<(.*)\>$/ {
+            my %new = %( $std.default_O(~$0, ~$1) );
+            $sub.prec_info = %new;
+        }
+    }).();
+
     my Str $symbol;
     $/.CURSOR.trymop({
         if $bindlex && $class eq 'Regex' {
@@ -645,16 +675,17 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 method process_block_traits($/, @tr) {
     my $sub = $*CURLEX<!sub>;
     my $pack = $sub.body_of;
-    for map *.ast, @tr -> $tr {
+    for @tr -> $T {
+        my $tr = $T.ast;
         if $pack && ($tr<name>:exists) {
             my ($name, $path) = $tr<name path>;
 
-            $/.CURSOR.sorry("superclass $name declared outside of any class"),
+            $T.CURSOR.sorry("superclass $name declared outside of any class"),
                 next unless $sub.body_of;
-            $/.CURSOR.sorry("superclass $name declared in an augment"),
+            $T.CURSOR.sorry("superclass $name declared in an augment"),
                 next if $sub.augmenting;
 
-            $/.CURSOR.trymop({
+            $T.CURSOR.trymop({
                 $*unit.deref($pack).add_super($*unit.get_item($sub.find_pkg(
                     [ @($path // ['MY']), $name ])));
             });
@@ -674,6 +705,48 @@ method process_block_traits($/, @tr) {
                 ['OUR','EXPORT',$_])), '&' ~ $sub.name ] for @exports;
         } elsif !$pack && $tr<nobinder> {
             $sub.signature = Any;
+        } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
+            my $rel = $tr.keys.[0];
+            my $to  = $tr.values.[0];
+            $to = $to.inside if $to ~~ ::Op::Paren;
+
+            my $oprec;
+            if $to ~~ ::Op::Lexical {
+                $oprec = $T.CURSOR.function_O($to.name);
+            } elsif $to ~~ ::Op::StringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            } else {
+                $T.CURSOR.sorry("Cannot interpret operator reference");
+                next;
+            }
+            unless $oprec {
+                $T.CURSOR.sorry("No precedence available for reference target");
+                next;
+            }
+            my %new = %$oprec;
+            $sub.prec_info = %new;
+            $sub.prec_info.<prec> ~~ s/\=/<=/ if $rel eq 'looser';
+            $sub.prec_info.<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+        } elsif !$pack && $tr<assoc> {
+            my $arg = ~self.trivial_eval($T, $tr<assoc>);
+            unless $sub.prec_info {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            my @valid = < left right non list unary chain >;
+            unless grep $arg, @valid {
+                $T.CURSOR.sorry("Invalid associativity $arg");
+                next;
+            }
+            $sub.prec_info.<assoc> = $arg;
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
+            unless $sub.prec_info {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            $sub.prec_info.<prec> = $arg;
+            $sub.prec_info.<dba> = "like $sub.name()";
         } elsif !$pack && $tr<return_pass> {
             $sub.returnable = False;
         } elsif !$pack && $tr<of> {
@@ -681,12 +754,98 @@ method process_block_traits($/, @tr) {
         } elsif !$pack && $tr<unsafe> {
             $sub.unsafe = True;
         } else {
-            $/.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+            $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
         }
     }
 }
 
+method trait_mod:is ($/) {
+    my $trait = ~$<longname>;
+    my $noparm;
 
+    if $/.CURSOR.is_name($trait) {
+        make self.mangle_longname($<longname>);
+        $noparm = 'Superclasses cannot have parameters';
+    } elsif $trait eq 'export' {
+        make { export => [ 'DEFAULT', 'ALL' ] };
+        $noparm = 'Export tags NYI';
+    } elsif $trait eq 'endsym' {
+        my $text;
+        if !$<circumfix> || !$<circumfix>[0].ast.^isa(::Op::StringLiteral) {
+            $/.CURSOR.sorry("Argument to endsym must be a literal string");
+        } else {
+            $text = $<circumfix>[0].ast.text;
+        }
+        make { endsym => $text };
+    } elsif $trait eq 'rawcall' {
+        make { nobinder => True };
+    } elsif $trait eq 'return-pass' { # &return special
+        make { return_pass => 1 };
+    } elsif $trait eq 'parcel' {
+        make { rwt => 1 };
+    } elsif $<circumfix> {
+        make { $trait => $<circumfix>.ast };
+    } else {
+        make { $trait => True };
+    }
+
+    if $noparm && $<circumfix> {
+        $/.CURSOR.sorry($noparm);
+    }
+}
+
+method package_def ($/) {
+    my $sub = $*CURLEX<!sub>;
+
+    my $bodyvar = self.gensym;
+    $sub.outer.add_my_sub($bodyvar, $sub);
+    $sub.code = ($<blockoid> // $<statementlist>).ast;
+
+    if $sub.augmenting {
+        my $ah = $sub.augment_hack;
+        $sub.augment_hack = Any;
+
+        my $ph = ::Metamodel::StaticSub.new(
+            unit       => $*unit,
+            outerx     => $sub.xref,
+            outer_direct => $*CURLEX<!sub>,
+            cur_pkg    => [ 'GLOBAL' ],
+            name       => 'ANON',
+            is_phaser  => 0,
+            augment_hack => $ah,
+            class      => 'Code',
+            code       => ::Op::StatementList.new(children => []),
+            run_once   => $sub.run_once);
+        $sub.create_static_pad;
+        $sub.add_child($ph);
+
+        make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
+    }
+    else {
+        my $obj = $*unit.deref($sub.body_of);
+
+        if $<stub> {
+            push $*unit.stubbed_stashes, ($obj => $/.CURSOR);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
+        }
+        else {
+            $/.CURSOR.trymop({ $obj.close; });
+
+            if $obj ~~ ::Metamodel::ParametricRole {
+                $sub.parametric_role_hack = $obj.xref;
+                $sub.add_my_name('*params', :noinit);
+                $sub.create_static_pad;
+
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                    ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
+        }
+    }
+}
 
 method routine_def ($/) {
     $*CURLEX<!sub>.code = $<blockoid>.ast;
