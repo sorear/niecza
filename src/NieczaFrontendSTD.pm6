@@ -20,11 +20,67 @@ my %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>, :pure)
 my %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>, :pure);
 
 # TODO: allow variable :dba()s
-role sym_categorical[$name,$sym,$O] {
-    token ::($name) () { $sym $<O>={$O} $<sym>={$sym} }
+
+method cat_O($cat, $sym) {
+    my $name = "{$cat}:<$sym>";
+    self.function_O($name) // self.default_O($cat, $sym);
 }
-role bracket_categorical[$name,$sym1,$sym2,$O] {
-    token ::($name) () { :my $*GOAL = $sym2; $sym1 {}:s [ :lang($¢.unbalanced($sym2)) <semilist> ] [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ] $<O>={$O} $<sym>={[$sym1,$sym2]} }
+
+method function_O($name) {
+    my $lex = self.lookup_lex($name);
+
+    if $lex ~~ ::Metamodel::Lexical::Dispatch {
+        $lex = self.lookup_lex($name ~ ":(!proto)");
+    }
+
+    my $sub;
+
+    if $lex ~~ ::Metamodel::Lexical::Common {
+        $sub = $*unit.deref($*unit.get_item([ @($lex.path), $lex.name ]));
+    } elsif $lex ~~ ::Metamodel::Lexical::SubDef {
+        $sub = $lex.body;
+    }
+
+    if $sub ~~ ::Metamodel::StaticSub {
+        return $sub.prec_info;
+    } else {
+        return Any;
+    }
+}
+
+method default_O($cat, $sym) {
+    given $cat {
+        when 'infix'         { return %additive }
+        when 'prefix'        {
+            return ($sym ~~ /^\W/) ?? %symbolic_unary !! %named_unary
+        }
+        when 'postfix'       { return %methodcall }
+        when 'circumfix'     { return %term }
+        when 'postcircumfix' { return %methodcall }
+        when 'term'          { return %term }
+        default {
+            self.sorry("Cannot extend category:$cat with subs");
+            return %additive
+        }
+    }
+}
+
+role sym_categorical[$name, $cat,$sym] {
+    token ::($name) () {
+        $sym $<sym>={$sym} $<name>={$name}
+        $<O>={ self.cat_O($cat, $sym) }
+    }
+}
+
+role bracket_categorical[$name,$cat,$sym1,$sym2] {
+    token ::($name) () {
+        :my $*GOAL = $sym2;
+        $sym1 {}:s
+        $<name>={$name}
+        [ :lang($¢.unbalanced($sym2)) <semilist> ]
+        [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ]
+        $<O>={ self.cat_O($cat, "$sym1 $sym2") } $<sym>={ [$sym1,$sym2] }
+    }
 }
 
 method add_categorical($name) {
@@ -34,46 +90,18 @@ method add_categorical($name) {
     }
     # CORE names are hardcoded
     return self if $*UNITNAME eq 'CORE';
-    return self unless ($name ~~ /^(\w+)\: <?[ \< \« ]> /);
+    return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
     my $cat = ~$0;
-    my $sym = substr($name, $/.to);
-    if $sym ~~ /^\<\< .*: <?after \>\>>$/ {
-        $sym = substr($sym, 2, $sym.chars - 4);
-    }
-    elsif $sym ~~ /^\< .*: <?after \>>$/ {
-        $sym = substr($sym, 1, $sym.chars - 2);
-    }
-    elsif $sym ~~ /^\« .*: <?after \»>$/ {
-        $sym = substr($sym, 1, $sym.chars - 2);
-    }
+    my $sym = ~$1;
 
-    $sym ~~ s/^\s*//;
-    $sym ~~ s/\s*$//;
-
-    my $O;
-
-    if $cat eq 'infix'            { $O = %additive }
-    elsif $cat eq 'prefix'        {
-        $O = ($sym ~~ /^\W/) ?? %symbolic_unary !! %named_unary
-    }
-    elsif $cat eq 'postfix'       { $O = %methodcall }
-    elsif $cat eq 'circumfix'     { $O = %term }
-    elsif $cat eq 'postcircumfix' { $O = %methodcall }
-    elsif $cat eq 'term'          { $O = %term }
-    else {
-        self.sorry("Cannot extend category:$name with subs");
-        return self;
-    }
-
-    # XXX to do this right requires .comb and .trans
     if $sym ~~ /\s+/ {
         my $sym1 = $sym.substr(0, $/.from);
         my $sym2 = $sym.substr($/.to, $sym.chars - $/.to);
-        my $cname = $cat ~ ":<$sym1 $sym2>";
-        %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[$cname, $sym1, $sym2, $O];
+        %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[
+            "{$cat}:sym<$sym1 $sym2>", $cat, $sym1, $sym2];
     } else {
-        my $cname = $cat ~ ":<$sym>";
-        %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[$cname, $sym, $O];
+        %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[
+            "{$cat}:sym<$sym>", $cat, $sym];
     }
     self.cursor_fresh(%*LANG<MAIN>);
 }

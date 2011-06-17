@@ -501,35 +501,36 @@ class StaticSub is RefTarget {
     has $.outerx; # Xref
     # points directly to the outer so that explain_mystery doesn't need
     # to worry about inlining...
-    has $.outer_direct;
-    has $.run_once = False; # Bool
-    has $.spad_exists = False; # Bool
-    has $.transparent = False; # Bool; ignored by OUTER::
+    has $.outer_direct is rw;
+    has Bool $.run_once is rw = False;
+    has Bool $.spad_exists is rw = False;
+    has Bool $.transparent = False; # ignored by OUTER::
     has %.lexicals;
-    has $.code; # Op, is rw
-    has $.signature; # Sig, is rw
+    has $.code is rw; # Op
+    has $.signature is rw; # Sig
     has $.zyg = []; # Array of Metamodel::StaticSub
 
     # inject a take EMPTY
-    has $.gather_hack = False; # Bool
-    # inject a role constructor
-    has $.parametric_role_hack; # Xref, is rw
+    has Bool $.gather_hack is rw = False;
+    # inject a role constructor (Xref)
+    has $.parametric_role_hack is rw;
     # some tuples for method definitions; munged into a phaser
-    has $.augment_hack; # Array, is rw
+    has $.augment_hack is rw;
     # emit code to assign to a hint; [ $subref, $name ]
-    has $.hint_hack; # Array, is rw
+    has $.hint_hack is rw;
 
-    has $.is_phaser; # Int, is rw
-    has $.strong_used = False; # Bool, is rw; prevents elision
-    has $.body_of; # Xref of Package
-    has $.in_class; # Xref of Package
-    has $.cur_pkg; # Array of Str
-    has $.returnable = False; # Bool; catches &return
-    has $.augmenting = False; # Bool; traps add_attribute
-    has $.unsafe = False; # Bool; disallowed in safe mode
-    has $.class = 'Sub'; # Str
-    has $.ltm; # is rw
-    has $.exports; # is rw
+    has $.is_phaser is rw; # Int
+    has Bool $.strong_used is rw = False; # Bool, is rw; prevents elision
+    has $.body_of is rw; # Xref of Package
+    has $.in_class is rw; # Xref of Package
+    has $.cur_pkg is rw; # Array of Str
+    has Bool $.returnable is rw = False; # catches &return
+    has Bool $.augmenting is rw = False; # traps add_attribute
+    has Bool $.unsafe is rw = False; # disallowed in safe mode
+    has Str $.class is rw = 'Sub';
+    has $.ltm is rw;
+    has $.exports is rw;
+    has $.prec_info is rw;
 
     # used during parse only
     has Str $.outervar is rw; # Xref, used during parse

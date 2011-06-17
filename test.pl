@@ -812,7 +812,7 @@ end
     is $x, 7, "metaop += works";
 
     sub testx:sym«foo bar»() { 42 }
-    is &testx:sym<<foo bar>>(), 42, "can use french quotes in declarations";
+    is &testx:sym<foo bar>(), 42, "can use french quotes in declarations";
 
     sub foo(Str $x) { $x ~ $x }
     is foo("bar"), "barbar", "can parse type constraints";
