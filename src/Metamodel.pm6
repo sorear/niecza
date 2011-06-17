@@ -271,18 +271,6 @@ class Package is RefTarget {
     has $.exports; # is rw
     has $.closed;
 
-    method add_attribute($name, $sigil, $public, $ivar, $ibody, $tc) { #OK not used
-        die "attribute $name defined in a lowly package";
-    }
-
-    method add_method($multi, $kind, $name, $var, $body) { #OK not used
-        die "method $name defined in a lowly package";
-    }
-
-    method add_super($super) {
-        die "superclass $*unit.deref($super).name() defined in a lowly package";
-    }
-
     method close() { $!closed = True; }
 }
 
@@ -297,6 +285,8 @@ class Method {
     has $.multi = die "Method.multi is required"; # Str
     has $.var; # Str
     has $.body; # Xref
+    has $.file;
+    has $.line;
 }
 
 class Attribute {
@@ -306,6 +296,8 @@ class Attribute {
     has $.ivar; # Str
     has $.ibody; # Xref
     has $.typeconstraint; # Xref
+    has $.file;
+    has $.line;
 }
 
 class Class is Module {
@@ -315,14 +307,23 @@ class Class is Module {
     has $.linearized_mro; # is rw
     has $!closing;
 
-    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
+    method add_attribute($name, $sigil, $public, $ivar, $ibody,
+            $typeconstraint, :$file, :$line, :$pos) { #OK not used
+        if grep $name eq *.name, @($!attributes) -> $O {
+            die "Two definitions of attribute $name" ~ Metamodel.locstr($O[0].file, $O[0].line, $file, $line);
+        }
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
-            :$public, :$ivar, :$ibody, :$typeconstraint);
+            :$public, :$ivar, :$ibody, :$typeconstraint, :$file, :$line);
         $.attributes.[*-1];
     }
 
-    method add_method($multi, $kind, $name, $var, $body) { #OK not used
-        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind, :$multi);
+    method add_method($multi, $kind, $name, $var, $body, :$file, :$line, :$pos) { #OK not used
+        if $name ~~ Str && $multi eq 'only' &&
+                grep { $name eq .name && $kind eq .kind }, @($!methods) -> $O {
+            die "Two definitions of method $name" ~ Metamodel.locstr($O[0].file, $O[0].line, $file, $line);
+        }
+        push $.methods, Metamodel::Method.new(:$name, :$body, :$kind, :$multi,
+            :$file, :$line);
     }
 
     method add_super($targ) {
@@ -411,18 +412,25 @@ class Role is Module {
     has $.methods = [];
     has $.superclasses = [];
 
-    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
+    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint, :$file, :$line, :$pos) { #OK not used
+        if grep $name eq *.name, @($!attributes) -> $O {
+            die "Two definitions of attribute $name" ~ Metamodel.locstr($O[0].file, $O[0].line, $file, $line);
+        }
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
-            :$public, :$ivar, :$ibody, :$typeconstraint);
+            :$public, :$ivar, :$ibody, :$typeconstraint, :$file, :$line);
         $.attributes.[*-1];
     }
 
-    method add_method($multi, $kind, $name, $var, $body) { #OK not used
+    method add_method($multi, $kind, $name, $var, $body, :$file, :$line, :$pos) { #OK not used
+        if $name ~~ Str && $multi eq 'only' &&
+                grep { $name eq .name && $kind eq .kind }, @($!methods) -> $O {
+            die "Two definitions of method $name" ~ Metamodel.locstr($O[0].file, $O[0].line, $file, $line);
+        }
         if $name !~~ Str {
             die "Computed names are legal only in parametric roles";
         }
         push $.methods, Metamodel::Method.new(:$name, :$body, :$kind,
-            :$multi);
+            :$multi, :$file, :$line);
     }
 
     method add_super($targ) {
@@ -436,14 +444,21 @@ class ParametricRole is Module {
     has $.methods = [];
     has $.superclasses = [];
 
-    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint) {
+    method add_attribute($name, $sigil, $public, $ivar, $ibody, $typeconstraint, :$file, :$line, :$pos) { #OK not used
+        if grep $name eq *.name, @($!attributes) -> $O {
+            die "Two definitions of attribute $name" ~ Metamodel.locstr($O[0].file, $O[0].line, $file, $line);
+        }
         push $.attributes, Metamodel::Attribute.new(:$name, :$sigil,
-            :$public, :$ivar, :$ibody, :$typeconstraint);
+            :$public, :$ivar, :$ibody, :$typeconstraint, :$file, :$line);
         $.attributes.[*-1];
     }
 
-    method add_method($multi, $kind, $name, $var, $body) { #OK not used
-        push $.methods, ::Metamodel::Method.new(:$name, :$body, :$var, :$kind, :$multi);
+    method add_method($multi, $kind, $name, $var, $body, :$file, :$line, :$pos) { #OK not used
+        if $name ~~ Str && $multi eq 'only' &&
+                grep { $name eq .name && $kind eq .kind }, @($!methods) -> $O {
+            die "Two definitions of method $name" ~ Metamodel.locstr($O[0].file, $O[0].line, $file, $line);
+        }
+        push $.methods, ::Metamodel::Method.new(:$name, :$body, :$var, :$kind, :$multi, :$file, :$line);
     }
 
     method add_super($targ) {
