@@ -2882,7 +2882,7 @@ method statement_control:use ($/) {
     my @exp = (@can, 'EXPORT', 'DEFAULT');
 
     # XXX I am not sure how need binding should work in the :: case
-    if $name !~~ /"::"/ {
+    if !defined($name.index('::')) {
         $*CURLEX<!sub>.lexicals{$name} =
             ::Metamodel::Lexical::Stash.new(path => @can);
     }
@@ -2903,6 +2903,7 @@ method statement_control:use ($/) {
         }
 
         $*CURLEX<!sub>.lexicals{$uname} = $lex;
+        $/.CURSOR.check_categorical($uname);
     }
 }
 

@@ -170,6 +170,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 
         if $scope eq 'our' {
             $sub.exports = [[@($sub.outer.find_pkg($path // ['OUR'])), '&'~$name]];
+            $*unit.bind_item($sub.exports.[0], $sub.xref, |mnode($/));
         }
     });
 }
@@ -552,8 +553,12 @@ method process_block_traits($/, @tr) {
             $sub.outer.lexicals-used{$sub.outervar} = True
                 if defined $sub.outervar;
             $sub.exports //= [];
-            push $sub.exports, [ @($sub.outer.find_pkg(
-                ['OUR','EXPORT',$_])), '&' ~ $sub.name ] for @exports;
+            for @exports {
+                my $pkg = [ @($sub.outer.find_pkg(['OUR','EXPORT',$_])),
+                    '&' ~ $sub.name ];
+                push $sub.exports, $pkg;
+                $*unit.bind_item($pkg, $sub.xref, |mnode($T));
+            }
         } elsif !$pack && $tr<nobinder> {
             $sub.signature = Any;
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
@@ -611,6 +616,57 @@ method process_block_traits($/, @tr) {
     }
 }
 
+method statement_control:use ($/) {
+    make ::Op::StatementList.new;
+    return if $<version>; # just ignore these
+
+    my $name = $<module_name>.ast<name>;
+    my $args = $<arglist> ?? $<arglist>.ast !! [];
+
+    if defined $<module_name>.ast.<args> {
+        $/.CURSOR.sorry("'use' of an instantiated role not yet understood");
+        return;
+    }
+
+    if $args {
+        $/.CURSOR.sorry("'use' with arguments NYI");
+        return;
+    }
+
+    if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
+        return;
+    }
+
+    my $u2 = $*unit.need_unit($name);
+
+    my @can = @( $u2.mainline.find_pkg([$name.split('::')]) );
+    my @exp = (@can, 'EXPORT', 'DEFAULT');
+
+    # XXX I am not sure how need binding should work in the :: case
+    if !defined($name.index('::')) {
+        $*CURLEX<!sub>.lexicals{$name} =
+            ::Metamodel::Lexical::Stash.new(path => @can);
+    }
+
+    for $*unit.list_stash(@exp) -> $tup {
+        my $uname = $tup[0];
+        my $lex;
+        if $tup[1] eq 'var' {
+            if $tup[2] && (!$tup[2][0][0] || $*unit.deref($tup[2][0]) ~~ ::Metamodel::StaticSub) {
+                $lex = ::Metamodel::Lexical::Common.new(path => @exp, name => $uname);
+            } elsif $tup[2] {
+                $lex = ::Metamodel::Lexical::Stash.new(path => [@exp, $uname]);
+            }
+        } elsif $tup[1] eq 'graft' {
+            $lex = ::Metamodel::Lexical::Stash.new(path => $tup[2]);
+        } else {
+            die "weird return";
+        }
+
+        $*CURLEX<!sub>.lexicals{$uname} = $lex;
+        $/.CURSOR.check_categorical($uname);
+    }
+}
 
 }
 
