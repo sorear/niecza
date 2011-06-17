@@ -282,7 +282,7 @@ method open_package_def($, $/ = $*cursor) {
                 $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
             }
             if $r<path> {
-                try @ns = @( $sub.outer.find_pkg([ @$r<path>, $r<name> ]) );
+                try @ns = @( $sub.outer.find_pkg([ @($r<path>), $r<name> ]) );
             } elsif $sub.outer.lexicals{$r<name>} {
                 try @ns = @( $sub.outer.find_pkg([ 'MY', $r<name> ]) );
             }
