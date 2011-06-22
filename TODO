@@ -104,4 +104,3 @@ Other stuff to do after:
   - jnthnian packages
   - pm's = hack
   - fix { my $x } crash
-  + checking redeclaration of our symbols, methods, attributes...

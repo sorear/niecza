@@ -441,6 +441,23 @@ namespace Niecza {
         public const int SUB_IS_UNSAFE = 8;
         public const int SUB_IS_PARAM_ROLE = 16;
 
+        public void LoadStashes(int from) {
+            int ct = ReadInt(ref from);
+            for (int i = 0; i < ct; i++) {
+                string who  = ReadStr(ref from);
+                string name = ReadStr(ref from);
+                object what = ReadXref(ref from);
+
+                BValue slot = Kernel.GetVar(who, name);
+                if (what == null) continue;
+
+                Variable item = (what is SubInfo) ?
+                    Kernel.NewROScalar(((SubInfo)what).protosub) :
+                    ((STable)what).typeVar;
+                slot.v = Kernel.StashyMerge(slot.v, item, who, name);
+            }
+        }
+
         public void LoadAllSubs(int from) {
             int[] froms = ReadIntArray(ref from);
             foreach (int f in froms)
@@ -523,6 +540,7 @@ namespace Niecza {
                     case 3: //module
                         break;
                     case 4: //package
+                        mo.mo.isPackage = true;
                         break;
                     case 5: //subset
                         mo.mo.FillSubset((STable)ReadXref(ref from));
@@ -538,10 +556,6 @@ namespace Niecza {
                     mo.initVar = mo.typeVar;
                     mo.initObject = mo.typeObject;
                 }
-
-                int nex = ReadInt(ref from);
-                for (int j = 0; j < nex; j++)
-                    Kernel.GetVar(ReadStrArray(ref from)).v = mo.typeVar;
 
                 ReadClassMembers(mo, ref from);
                 if (mo.mo.isSubset)
@@ -562,12 +576,6 @@ namespace Niecza {
                 if (TraceLoad) Console.WriteLine("Sig loaded");
                 int ph = heap[from++];
                 if (ph != 0xFF) Kernel.AddPhaser(ph, si.protosub);
-                int nex = ReadInt(ref from);
-                if (TraceLoad) Console.WriteLine("loading exports...");
-                for (int j = 0; j < nex; j++)
-                    Kernel.GetVar(ReadStrArray(ref from)).v =
-                        Kernel.NewROScalar(si.protosub);
-                if (TraceLoad) Console.WriteLine("exports loaded");
             }
         }
 
@@ -575,12 +583,14 @@ namespace Niecza {
             int _ifrom = from;
             int ix = ReadInt(ref from);
             string name = ReadStr(ref from);
+            string how  = ReadStr(ref from);
             if (TraceLoad)
                 Console.WriteLine("Installing package {0} \"{1}\" from {2:X}", ix, name, _ifrom);
             STable mo = existing_mo != null ? existing_mo :
                 new STable(name);
             xref[ix] = mo;
 
+            mo.how = Kernel.GetStash(how);
             mo.typeObject = new P6opaque(mo, 0);
             ((P6opaque)mo.typeObject).slots = null;
             mo.typeVar = Kernel.NewROScalar(mo.typeObject);
@@ -3157,21 +3167,6 @@ slow:
                         GetInferiorRoot(), "head", new Variable[] {lst}, null));
         }
 
-        // TODO: Runtime access to grafts
-        public static void CreatePath(string[] path) {
-            P6any cursor = RootO;
-            foreach (string n in path)
-                cursor = PackageLookup(cursor, n + "::").v.Fetch();
-        }
-
-        public static BValue GetVar(string[] path) {
-            P6any cursor = RootO;
-            for (int i = 0; i < path.Length - 1; i++) {
-                cursor = PackageLookup(cursor, path[i] + "::").v.Fetch();
-            }
-            return PackageLookup(cursor, path[path.Length - 1]);
-        }
-
         public static Variable CreateArray() {
             P6any v = new P6opaque(ArrayMO, 2);
             v.SetSlot("items", new VarDeque());
@@ -3184,6 +3179,25 @@ slow:
             return NewRWListVar(v);
         }
 
+        public static Variable StashyMerge(Variable o, Variable n, string d1, string d2) {
+            if (n.rw || n.islist) return o;
+            if (o.rw || o.islist) return n;
+
+            P6any oo = o.Fetch();
+            P6any nn = n.Fetch();
+
+            if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.how == nn.mo.how) {
+                if (oo.mo.mo.isPackage) return n;
+                if (nn.mo.mo.isPackage) return o;
+            }
+
+            throw new NieczaException("Funny merge failure " + d1 + "::" + d2);
+        }
+
+        public static BValue GetVar(string who, string name) {
+            return PackageLookup(GetStash(who), name);
+        }
+
         public static BValue PackageLookup(P6any parent, string name) {
             Dictionary<string,BValue> stash =
                 UnboxAny<Dictionary<string,BValue>>(parent);
@@ -3191,11 +3205,6 @@ slow:
 
             if (stash.TryGetValue(name, out v)) {
                 return v;
-            } else if (name.EndsWith("::")) {
-                Dictionary<string,BValue> newstash =
-                    new Dictionary<string,BValue>();
-                newstash["PARENT::"] = new BValue(NewROScalar(parent));
-                return (stash[name] = new BValue(BoxAny<Dictionary<string,BValue>>(newstash, StashP)));
             } else if (name.StartsWith("@")) {
                 return (stash[name] = new BValue(CreateArray()));
             } else if (name.StartsWith("%")) {
@@ -3533,6 +3542,7 @@ slow:
             }
         }
 
+        static Dictionary<string, P6any> stashes;
         public static P6any RootO;
         // used as the fallbacks for $*FOO
         public static P6any GlobalO;
@@ -3708,9 +3718,17 @@ slow:
             ScalarMO = new STable("Scalar");
             ScalarMO.FillProtoClass(new string[] { });
 
-            RootO = BoxRaw(new Dictionary<string,BValue>(), StashMO);
-            GlobalO = PackageLookup(RootO, "GLOBAL::").v.Fetch();
-            ProcessO = PackageLookup(RootO, "PROCESS::").v.Fetch();
+            stashes  = new Dictionary<string,P6any>();
+            RootO    = GetStash("");
+            GlobalO  = GetStash("::GLOBAL");
+            ProcessO = GetStash("::PROCESS");
+        }
+
+        public static P6any GetStash(string name) {
+            P6any o;
+            if (stashes.TryGetValue(name, out o))
+                return o;
+            return stashes[name] = BoxRaw(new Dictionary<string,BValue>(), StashMO);
         }
 
         public static Dictionary<string, int> usedNames = new Dictionary<string, int>();

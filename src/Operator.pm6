@@ -91,11 +91,11 @@ class Method is Operator {
     has $.args = [];
     has $.meta; # Bool
     has $.private; # Bool
-    has $.path; # Array of Str
+    has $.package; # Xref
 
     method clone(*%_) {
         self.new(name => $!name, args => $!args, meta => $!meta,
-            private => $!private, path => $!path, |%_);
+            private => $!private, package => $!package, |%_);
     }
 
     method as_function($/) { self.wrap_in_function($/) }
@@ -111,14 +111,14 @@ class Method is Operator {
             ::Op::Interrogative.new(|node($/), receiver => @args[0],
                 name => $.name);
         } else {
-            if defined($.path) && !$.private {
+            if defined($.package) && !$.private {
                 $/.CURSOR.sorry("Qualified references to non-private methods NYI");
             }
             $*CURLEX<!sub>.noninlinable if $.name eq 'eval';
             my $pclass;
             if $.private {
-                if $.path {
-                    $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($.path));
+                if $.package {
+                    $pclass = $.package;
                 } elsif $*CURLEX<!sub>.in_class -> $c {
                     $pclass = $c;
                 } else {

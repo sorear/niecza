@@ -116,7 +116,7 @@ namespace Niecza {
     public class P6how {
         public STable stable;
 
-        public bool isRole, isSubset;
+        public bool isRole, isSubset, isPackage;
         public P6any roleFactory;
         public P6any subsetWhereThunk;
         public Variable subsetFilter;

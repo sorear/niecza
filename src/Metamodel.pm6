@@ -29,10 +29,10 @@ method locstr($fo, $lo, $fn, $ln) {
 #
 # This graph is a lot more random than the old trees were...
 
-# While manipulating metamodel bits, these contextuals are needed:
-# @*opensubs: stack of non-transparent subs, new lexicals go in [*-1]
+# While manipulating metamodel bits during BEGIN, these contextuals are needed:
 # $*unit: current unit for new objects to attach to
 # %*units: maps unit names to unit objects
+# $*CURSUB<!sub>: the top non-transparent sub
 
 # Almost all longname and most identifier uses in Perl6 can be divided into
 # two groups.
@@ -62,9 +62,8 @@ method locstr($fo, $lo, $fn, $ln) {
 #
 #   immed_decl:
 
-# A stash is an object like Foo::.  Foo and Foo:: are closely related, but
-# generally must be accessed separately due to constants (which have Foo but
-# not Foo::) and stub packages (vice versa).
+# A stash is an object like Foo::.  Stashes are named to allow them to be
+# sensibly named across merges.
 #
 # 'my' stashes are really 'our' stashes with gensym mergable names.  Because
 # stashes have no identity beyond their contents and set of names, they don't
@@ -74,178 +73,101 @@ method locstr($fo, $lo, $fn, $ln) {
 # keep the paths around, instead.
 #
 # This object holds the stash universe for a unit.
+# XXX forward decls are a little broken
+my $Package;
 class Namespace {
-    # root points to a graph of hashes each representing one package.
-    # Each such hash has keys for each member; the values are arrayrefs:
-    # ["graft", [@path]]: A graft
-    # ["var", $meta, $sub]: A common variable and/or subpackage; either
-    # field may be undef.
+    # all maps stash names to stashes.  Stashes are represented as simple
+    # hashes here; the values are always arrays like [$xref, $file, $line].
+    # $xref may be undefined to indicate a stash entry with no compile-time
+    # value (our $x, my $x is export).
     #
-    # Paths do not start from GLOBAL; they start from an unnamed package
-    # which contains GLOBAL, and also lexical namespaces (MAIN 15 etc).
-    has $.root = {}; # is rw
+    # Stash names are keyed like "GLOBAL::Foo::Bar" or "MAIN:15".  Stashes
+    # outside GLOBAL or PROCESS are anonymous packages, for my aliasing.
+    has %.all;
 
     # Records *local* operations, so they may be stored and used to
     # set up the runtime stashes.  Read-only log access is part of the
     # public API.
-    has $.log = [];
+    #
+    # Each entry is an arrayref of the form [$who, $name, $xref, $file, $line].
+    has @.log;
 
-    method !lookup_common($used, @path_) {
-        my $cursor = $.root;
-        my @path = @path_;
-        while @path > 1 {
-            my $k = shift @path;
-            if ($cursor{$k} && $cursor{$k}[0] eq 'graft') {
-                ($cursor, $used) = self!lookup_common([], [ @($cursor{$k}[1]), '' ]);
-                next;
-            }
+    # This is set up post-creation by NieczaGrammar.  It points to a package
+    # with a who of ''.
+    has $.root is rw;
 
-            $cursor{$k} //= ['var',Any,Any];
-            if !defined $cursor{$k}[2] {
-                $.log.push(['pkg',[@$used, $k]]);
-                $cursor{$k}[2] = {};
-            }
-            $cursor = $cursor{$k}[2];
-            push @$used, $k;
+    method _merge_item($i1, $i2, $who, $name) {
+        # supress absent entries
+        return $i2 unless defined $i1;
+        return $i1 unless defined $i2;
+
+        # suppress simple COMMONs if no absent
+        return $i2 unless defined $i1[0];
+        return $i1 unless defined $i2[0];
+
+        # ooh, we now know we have no COMMONs
+        my $item1 = $*unit.deref($i1[0]);
+        my $item2 = $*unit.deref($i2[0]);
+
+        return $i1 if $item1 === $item2;
+
+        if $item1.^isa($Package) && $item2.^isa($Package) &&
+                $item1.who eq $item2.who &&
+                ($item1.WHAT === $Package || $item2.WHAT === $Package) {
+            return $i1;
         }
-        @($cursor, $used, @path);
+
+        die "Two definitions found for symbol {$who}::$name\n\n" ~
+                "  first at $i1[1] line $i1[2]\n" ~
+                "  second at $i2[1] line $i2[2]";
     }
 
-    method stash_cname(@path) {
-        self!lookup_common([], @path)[1,2];
+    method exists($who, $item) {
+        return ?(%!all{$who}{$item});
     }
 
-    method stash_canon(@path) {
-        my ($npath, $nhead) = self.stash_cname(@path);
-        @$npath, $nhead;
+    method get($who, $item) {
+        return %!all{$who}{$item}[0]
     }
 
-    method visit_stashes($cb) {
-        sub visitor($node, @path) {
-            $cb([@path]);
-            for sort keys $node -> $k {
-                if $node{$k}[0] eq 'var' && defined $node{$k}[2] {
-                    visitor($node{$k}[2], [ @path, $k ]);
-                }
+    method bind($who, $name, $item, :$file, :$line, :$pos) { #OK not used
+        my $slot := %!all{$who}{$name};
+        $slot = self._merge_item($slot, [ $item,
+                $file // '???', $line // '???' ], $who, $name);
+        push @!log, [ $who, $name, $item, $file, $line ];
+    }
+
+    method get_pkg($from is copy, *@names, :$auto) {
+        for @names {
+            my $sl = self.get($from.who, $_);
+            my $pkg;
+            if $sl && $sl[0] && ($pkg = $*unit.deref($sl)).^isa($Package) {
+            } elsif !$auto {
+                die "Name component $_ not found in $from.who()";
+            } else {
+                $pkg = $Package.new(name => $_, who => $from.who ~ '::' ~ $_);
+                self.bind($from.who, $_, $pkg.xref);
             }
+            $from = $pkg;
         }
-        visitor($.root, []);
+        $from;
     }
 
     # Add a new unit set to the from-set and checks mergability
     method add_from($from) {
-        $!root = _merge($!root, %*units{$from}.ns.root, []);
-    }
-
-    sub _dclone($tree) {
-        return $tree unless defined $tree;
-        my $rinto = { };
-        for keys $tree -> $k {
-            my $i = $tree{$k};
-            if $i[0] eq 'var' {
-                $i = ['var', $i[1], _dclone($i[2])];
-            }
-            $rinto{$k} = $i;
-        }
-        $rinto;
-    }
-
-    sub _merge_item($i1, $i2, *@path) {
-        my $nn1 = $i1[0] && $i1[0][0];
-        my $nn2 = $i2[0] && $i2[0][0];
-        if $nn1 && $nn2 && ($i1[0][0] ne $i2[0][0] || $i1[0][1] != $i2[0][1]) {
-            die "Two definitions found for package symbol [{@path}]\n\n" ~
-                "  first at $i1[1] line $i1[2]\n" ~
-                "  second at $i2[1] line $i2[2]";
-        }
-
-        ($nn1 ?? $i1 !! $nn2 ?? $i2 !! ($i1 // $i2))
-    }
-
-    sub _merge($rinto_, $rfrom, @path) {
-        my $rinto = _hash_constructor( %$rinto_ );
-        for sort keys $rfrom -> $k {
-            if !$rinto{$k} {
-                $rinto{$k} = $rfrom{$k};
-                if $rinto{$k}[0] eq 'var' {
-                    $rinto{$k} = ['var', $rinto{$k}[1], _dclone($rinto{$k}[2]) ];
-                }
-                next;
-            }
-            my $i1 = $rinto{$k};
-            my $i2 = $rfrom{$k};
-            if $i1[0] ne $i2[0] {
-                die "Merge type conflict " ~ join(" ", $i1[0], $i2[0], @path, $k);
-            }
-            if $i1[0] eq 'graft' {
-                die "Grafts cannot be merged " ~ join(" ", @path, $k)
-                    unless join("\0", @($i1[1])) eq join("\0", @($i2[1]));
-            }
-            if $i1[0] eq 'var' {
-                $rinto{$k} = ['var',
-                    _merge_item($i1[1], $i2[1], @path, $k),
-                    ((defined($i1[2]) && defined($i2[2])) ??
-                        _merge($i1[2], $i2[2], [@path, $k]) !!
-                    _dclone($i1[2] // $i2[2]))];
-            }
-        }
-        return $rinto;
-    }
-
-    # Create or reuse a (stub) package for a given path
-    method create_stash(@path) {
-        self!lookup_common([], [@path, '']);
-    }
-
-    # Create or reuse a variable for a given path
-    method create_var(@path) {
-        my ($c,$u,$n) = self!lookup_common([], @path);
-        my $i = $c{$n} //= ['var',Any,Any];
-        if $i[0] ne 'var' {
-            die "Collision with non-variable on @path";
-        }
-        if !$i[1] {
-            $.log.push([ 'var', [ @$u,$n ] ]);
-            $i[1] = [['',0],'',0];
+        for %*units{$from}.ns.log -> $logent {
+            # not using bind since we don't want this in the log
+            my $slot := %!all{$logent[0]}{$logent[1]};
+            $slot = self._merge_item($slot, [ $logent[2], $logent[3],
+                    $logent[4] ], $logent[0], $logent[1]);
         }
     }
 
-    # Lookup by name; returns undef if not found
-    method get_item(@path) {
-        my ($c,$u,$n) = self!lookup_common([], @path); #OK not used
-        my $i = $c{$n} or return Any;
-        if $i[0] eq 'graft' {
-            self.get_item($i[1]);
-        } elsif $i[0] eq 'var' {
-            $i[1][0];
-        }
-    }
-
-    # Bind an unmergable thing (non-stub package) into a stash.
-    method bind_item($path, $item, :$file = '???', :$line = '???', :$pos) {
-        my ($c,$u,$n) = self!lookup_common([], $path); #OK not used
-        my $i = $c{$n} //= ['var',Any,Any];
-        if $i[0] ne 'var' {
-            die "Installing item at $path, collide with graft";
-        }
-        $i[1] = _merge_item($i[1], [$item,$file,$line], @$path);
-    }
-
-    # Bind a graft into a stash
-    method bind_graft($path1, $path2) {
-        my ($c,$u,$n) = self!lookup_common([], $path1);
-        if $c{$n} {
-            die "Collision installing graft $path1 -> $path2";
-        }
-        push $.log, [ 'graft', [ @$u, $n ], $path2 ];
-        $c{$n} = ['graft', $path2];
-    }
-
-    # List objects in a stash for use by the importer; returns tuples
-    # of [name, var] etc
-    method list_stash(@path) {
-        my $c = self!lookup_common([], [@path, ''])[0];
-        map { [ $_, @( $c{$_} ) ] }, sort keys $c;
+    # List objects in a stash for use by the importer; returns pairs
+    # of [name, xref]
+    method list_stash($who) {
+        my $h = %!all{$who};
+        map -> $a { $a => $h{$a}[0] }, sort keys $h;
     }
 }
 
@@ -268,11 +190,12 @@ class RefTarget {
 }
 
 class Package is RefTarget {
-    has $.exports; # is rw
     has $.closed;
+    has $.who;
 
     method close() { $!closed = True; }
 }
+$Package = Package;
 
 class Module is Package {
 }
@@ -381,8 +304,7 @@ class Class is Module {
 
         if (($.name ne 'Mu' || !$*unit.is_true_setting)
                 && !$.superclasses) {
-            self.add_super($*unit.get_item(
-                $*CURLEX<!sub>.true_setting.find_pkg(self._defsuper)));
+            self.add_super($*CURLEX<!sub>.compile_get_pkg(self._defsuper).xref);
         }
 
         my @merge;
@@ -399,7 +321,7 @@ class Class is Module {
         nextsame;
     }
 
-    method _defsuper() { 'Any' }
+    method _defsuper() { 'CORE', 'Any' }
 }
 
 # roles come in two types; Role objects are used for simple roles, while roles
@@ -468,17 +390,17 @@ class ParametricRole is Module {
 }
 
 class Grammar is Class {
-    method _defsuper() { 'Grammar' }
+    method _defsuper() { 'CORE', 'Grammar' }
 }
 
 # subsets are a bit simpler than roles/grammars/classes, as they have
 # no body and so attributes &c cannot be added to them directly.
 class Subset is Module {
     # subset <longname>? <trait>* [where <EXPR>]?
-    has $.basetype;
+    has $.basetype is rw;
     # Xref to a sub which will be called once the first time the subset
     # is used.
-    has $.where;
+    has $.where is rw;
 }
 
 #####
@@ -513,7 +435,7 @@ class Lexical {
 
     # our...
     class Common is Lexical {
-        has $.path = die "M:L:Common.path required"; # Array of Str
+        has $.pkg  = die "M:L:Common.path required"; # Xref to Package
         has $.name = die "M:L:Common.name required"; # Str
     }
 
@@ -527,10 +449,10 @@ class Lexical {
         has $.body; # Metamodel::StaticSub
     }
 
-    # my class Foo { } or our class Foo { }; either case, the true stash lives in
-    # stashland
+    # my class Foo { } or our class Foo { }; either case, the true
+    # stash lives in stashland.  Actually this points at a package now.
     class Stash is Lexical {
-        has $.path; # Array of Str
+        has $.pkg; # Xref
     }
 }
 
@@ -570,16 +492,15 @@ class StaticSub is RefTarget {
     has $.hint_hack is rw;
 
     has $.is_phaser is rw; # Int
-    has Bool $.strong_used is rw = False; # Bool, is rw; prevents elision
-    has $.body_of is rw; # Xref of Package
+    has Bool $.strong_used is rw = False; # prevents elision
+    has $.body_of  is rw; # Xref of Package
     has $.in_class is rw; # Xref of Package
-    has $.cur_pkg is rw; # Array of Str
+    has $.cur_pkg  is rw; # Xref of Package
     has Bool $.returnable is rw = False; # catches &return
     has Bool $.augmenting is rw = False; # traps add_attribute
     has Bool $.unsafe is rw = False; # disallowed in safe mode
     has Str $.class is rw = 'Sub';
     has $.ltm is rw;
-    has $.exports is rw;
     has $.prec_info is rw;
 
     # used during parse only
@@ -597,6 +518,16 @@ class StaticSub is RefTarget {
         my $cursor = self;
         while $cursor && !$cursor.unit.is_true_setting {
             $cursor = $cursor.outer;
+        }
+        $cursor || self;
+    }
+
+    method to_unit() {
+        my $cursor = self;
+        my $unit = self.unit;
+        my $outer;
+        while ($outer = $cursor.outer) && $outer.unit === $unit {
+            $cursor = $outer
         }
         $cursor;
     }
@@ -625,35 +556,58 @@ class StaticSub is RefTarget {
         $.signature && ?( grep { .slot && .slot eq '$_' }, @( $.signature.params ) )
     }
 
-    method find_lex_pkg($name) {
-        my $toplex = self.find_lex($name) // return Array;
-        if !$toplex.^isa(Metamodel::Lexical::Stash) {
-            die "$name is declared as a non-package";
+    # helper for compile_get_pkg; handles stuff like SETTING::OUTER::Foo,
+    # recursively.
+    method _lexy_ref(*@names, :$auto) {
+        @names || die "Cannot use a lexical psuedopackage as a compile time package reference";
+        self // die "Passed top of lexical tree";
+        given shift @names {
+            when 'OUTER'   { return self.outer._lexy_ref(@names, :$auto) }
+            when 'SETTING' { return self.to_unit.outer._lexy_ref(@names, :$auto) }
+            when 'UNIT'    { return self.to_unit._lexy_ref(@names, :$auto) }
+            when 'CALLER'  { die "Cannot use CALLER in a compile time name" }
+            default {
+                my $lex = self.find_lex($_);
+                $lex // die "No lexical found for $_";
+                $lex.^isa(Metamodel::Lexical::Stash) || die "Lexical $_ is not a package";
+                return $*unit.get_pkg($*unit.deref($lex.pkg), @names, :$auto);
+            }
         }
-        $toplex.path;
     }
 
-    method find_pkg($names) {
-        my @names = $names ~~ Str ?? ('MY', $names) !! @$names;
-        for @names { $_ = substr($_, 0, chars($_)-2) if chars($_) >= 2 && substr($_, chars($_)-2, 2) eq '::' } # XXX
-        my @tp;
-        if @names[0] eq 'OUR' {
-            @tp = @$.cur_pkg;
-            shift @names;
-        } elsif @names[0] eq 'PROCESS' or @names[0] eq 'GLOBAL' {
-            @tp = shift @names;
-        } elsif @names[0] eq 'MY' {
-            @tp = @( self.find_lex_pkg(@names[1]) // die "{@names} doesn't seem to exist" );
-            shift @names;
-            shift @names;
-        } elsif my $p = self.find_lex_pkg(@names[0]) {
-            @tp = @$p;
-            shift @names;
+    # returns direct reference to package, or dies
+    method compile_get_pkg(*@names, :$auto) {
+        @names || die "Cannot make a compile time reference to the semantic root package";
+        my $n0 = shift(@names);
+        if $n0 eq 'OUR' {
+            return $*unit.get_pkg($*unit.deref($!cur_pkg), @names, :$auto);
+        } elsif $n0 eq 'PROCESS' or $n0 eq 'GLOBAL' {
+            return $*unit.abs_pkg($n0, @names, :$auto);
+        } elsif $n0 eq 'COMPILING' or $n0 eq 'DYNAMIC' or $n0 eq 'CALLER' {
+            # Yes, COMPILING is right here.  Because COMPILING is only valid
+            # when recursively running code within the compiler, but this
+            # function is only called directly from the compiler.  The closest
+            # it comes to making sense is if you use eval in a macro.  Don't
+            # do that, okay?
+            die "Pseudo package $n0 may not be used in compile time reference";
+        } elsif $n0 eq 'MY' {
+            return self._lexy_ref(@names, :$auto);
+        } elsif $n0 eq 'CORE' {
+            return self.true_setting._lexy_ref(@names, :$auto);
+        } elsif $n0 eq 'OUTER' or $n0 eq 'SETTING' or $n0 eq 'UNIT' {
+            return self._lexy_ref($n0, @names, :$auto);
+        } elsif $n0 ne 'PARENT' && self.find_lex($n0) {
+            return self._lexy_ref($n0, @names, :$auto);
+        } elsif $n0 ~~ /^\W/ {
+            return $*unit.get_pkg($*unit.deref($!cur_pkg), $n0, @names, :$auto);
         } else {
-            @tp = 'GLOBAL';
+            return $*unit.abs_pkg('GLOBAL', $n0, @names, :$auto);
         }
+    }
 
-        [ @tp, @names ];
+    method bind_our_name($path, $name, $item, *%_) {
+        my $pkg = self.compile_get_pkg($path ?? @$path !! 'OUR', :auto);
+        $*unit.bind($pkg, $name, $item, |%_);
     }
 
     method find_lex($name) {
@@ -722,10 +676,10 @@ class StaticSub is RefTarget {
         self.add_lex($slot, Metamodel::Lexical::Dispatch.new(|%params));
     }
 
-    method add_common_name($slot, $path, $name, :$file, :$line, :$pos) {
-        $*unit.create_stash($path);
-        $*unit.create_var([ @$path, $name ]);
-        self.add_lex($slot, Metamodel::Lexical::Common.new(:$path, :$name,
+    method add_common_name($slot, $pkg, $name, :$file, :$line, :$pos) {
+        $*unit.bind($*unit.deref($pkg), $name, Any, :$file, :$line)
+            unless $*unit.ns.exists($*unit.deref($pkg).who, $name);
+        self.add_lex($slot, Metamodel::Lexical::Common.new(:$pkg, :$name,
             :$file, :$line, :$pos));
     }
 
@@ -736,29 +690,21 @@ class StaticSub is RefTarget {
         if defined($slot) {
             self.add_lex($slot, Metamodel::Lexical::Alias.new(to => $back,
                 |%param));
-    }
+        }
     }
 
-    method add_my_stash($slot, $path, *%params) {
-        self.add_lex($slot, Metamodel::Lexical::Stash.new(:$path, |%params));
+    method add_my_stash($slot, $pkg, *%params) {
+        self.add_lex($slot, Metamodel::Lexical::Stash.new(:$pkg, |%params));
     }
 
     method add_my_sub($slot, $body, *%params) {
         self.add_lex($slot, Metamodel::Lexical::SubDef.new(:$body, |%params));
     }
 
-    method add_pkg_exports($unit, $name, $path2, $tags) {
+    method add_exports($name, $xref, $tags) {
         for @$tags -> $tag {
-            $unit.bind_graft([@$.cur_pkg, 'EXPORT', $tag, $name], $path2);
-        }
-        +$tags;
-    }
-
-    # NOTE: This only marks the variables as used.  The code generator
-    # still has to spit out assignments for these!
-    method add_exports($unit, $name, $tags) {
-        for @$tags -> $tag {
-            $unit.create_var([ @$.cur_pkg, 'EXPORT', $tag, $name ]);
+            $*unit.bind($*unit.get_pkg($*unit.deref($!cur_pkg), 'EXPORT',
+                $tag, :auto), $name, $xref);
         }
         +$tags;
     }
@@ -779,14 +725,15 @@ class Unit {
     has Int $.next_anon_stash is rw = 0; # is rw, Int
     has @.stubbed_stashes; # Pair[Stash,Cursor]
 
-    method bind_item($path,$item,*%_) { $!ns.bind_item($path,$item,|%_) }
-    method bind_graft($path1,$path2)  { $!ns.bind_graft($path1,$path2) }
-    method create_stash(@path)        { $!ns.create_stash(@path) }
-    method create_var(@path)          { $!ns.create_var(@path) }
-    method list_stash(@path)          { $!ns.list_stash(@path) }
-    method get_item(@path)            { $!ns.get_item(@path) }
+    method bind($pkg,$name,$item,*%_)   { $!ns.bind($pkg.who,$name,$item,|%_) }
+    method list_stash($pkg)             { $!ns.list_stash($pkg.who) }
+    method get($pkg,$name)              { $!ns.get($pkg.who,$name) }
+    method get_pkg($pkg,*@names,:$auto) { $!ns.get_pkg($pkg,@names,:$auto) }
+    method abs_pkg(*@names, :$auto) {
+        $!ns.get_pkg($*unit.deref($!ns.root),@names,:$auto)
+    }
 
-    method is_true_setting() { $.name eq 'CORE' }
+    method is_true_setting() { $!name eq 'CORE' }
 
     method get_unit($name) { %*units{$name} }
 
@@ -835,13 +782,17 @@ class Unit {
     }
 
     method need_unit($u2name) {
+        return $.tdeps{$u2name} if $.tdeps{$u2name};
         my $u2 = %*units{$u2name} //= $*module_loader.($u2name);
         $.tdeps{$u2name} = [ $u2.filename, $u2.modtime ];
+        my @new = $u2name;
         for keys $u2.tdeps -> $k {
+            next if $.tdeps{$k};
+            push @new, $k;
             %*units{$k} //= $*module_loader.($k);
-            $.tdeps{$k} //= $u2.tdeps{$k};
+            $.tdeps{$k} = $u2.tdeps{$k};
         }
-        $.ns.add_from($u2name);
+        $!ns.add_from($_) for @new;
         $u2;
     }
 }

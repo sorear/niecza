@@ -1322,7 +1322,11 @@ method PRE($/) {
 method methodop($/) {
     if $<longname> {
         my $c = self.mangle_longname($<longname>);
-        make ::Operator::Method.new(name => $c<name>, path => $c<path>);
+        my $package;
+        $/.CURSOR.trymop({
+            $package = $*CURLEX<!sub>.compile_get_pkg(@($c<path>)).xref;
+        });
+        make ::Operator::Method.new(name => $c<name>, :$package);
     } elsif $<quote> {
         make ::Operator::Method.new(name => $<quote>.ast);
     } elsif $<variable> {

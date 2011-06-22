@@ -35,11 +35,11 @@ eval_lives_ok q[
     my @l = gather for 1,2 { take $_ };
     is ~@l, "1 2", "gather for works";
 
-    # eval_dies_ok 'class { has $!foo; has $!foo; }',
-    #     "double attribute declaration caught";
+    eval_dies_ok 'class { has $!foo; has $!foo; }',
+        "double attribute declaration caught";
 
-    # eval_dies_ok 'class { method abar {}; method abar {}; }',
-    #     "double method declaration caught";
+    eval_dies_ok 'class { method abar {}; method abar {}; }',
+        "double method declaration caught";
 
     # <chain> isn't tested here.  It's not possible to do the same AST
     # reconstruction tricks.  However if <right> etc work, and chained

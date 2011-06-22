@@ -1213,6 +1213,23 @@ flat_enough:;
         return File.Exists(path) || Directory.Exists(path);
     }
 
+    static string[] split_on_colons(string path) {
+        List<string> l = new List<string>();
+        int ix = -2;
+        do {
+            int nix = path.IndexOf("::", ix+2);
+            l.Add(nix < 0 ? path.Substring(ix+2) :
+                    path.Substring(ix+2, nix - (ix+2)));
+            ix = nix;
+        } while (ix >= 0);
+        return l.ToArray();
+    }
+
+    public static Variable dynamic_package_var(Frame th, string path) {
+        string[] toks = split_on_colons(path);
+        return null;
+    }
+
     public static Variable BoxLoS(string[] los) {
         VarDeque items = new VarDeque();
         foreach (string i in los)

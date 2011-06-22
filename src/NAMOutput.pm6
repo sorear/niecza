@@ -8,13 +8,6 @@ use MONKEY_TYPING;
 method run($*unit) {
     my @*subsnam;
 
-    my %*keeplex;
-    my $cursor = $*unit.deref($*unit.bottom_ref // $*unit.mainline.xref);
-    while $cursor {
-        %*keeplex{~$cursor.xref} = True;
-        $cursor = $cursor.outer;
-    }
-
     $*unit.visit_local_subs_postorder(&nam_sub);
     to-json($*unit.to_nam) ~ "\n" ~ to-json(@*subsnam);
 }
@@ -45,9 +38,6 @@ sub nam_sub($s) {
         $s.body_of,
         $s.in_class,
         $s.cur_pkg,
-        (%*keeplex{~$s.xref} ?? Any !!
-            [ map { [ $_, @( $s.lexicals{$_}.to_nam ) ] },
-                sort keys $s.lexicals ]),
         $code.cgop($s),
     ];
 }
@@ -60,57 +50,34 @@ method load($text) {
 augment class Metamodel::Unit { #OK exist
     method to_nam() {
         [
-            $.mainline.xref,
             $.name,
-            $.ns.log,
+            [ map { [$_, @( $.tdeps{$_} )] }, sort keys $.tdeps ],
+            $.mainline.xref,
             $.setting_ref,
             $.bottom_ref,
             $.filename,
             $.modtime,
+            $.ns.root,
+            [ $.ns.log ],
             [ map { $_ && $_.to_nam }, @$.xref ],
-            [ map { [$_, @( $.tdeps{$_} )] }, sort keys $.tdeps ],
-            stash_tonam($.ns.root),
         ]
     }
 }
 
-sub stash_tonam($hr) {
-    my @out;
-    for sort keys $hr -> $key {
-        my $value = [ $key, @( $hr{$key} ) ];
-        if $value[1] eq 'var' && $value[3] {
-            $value[3] = stash_tonam($value[3]);
-        }
-        push @out, $value;
-    }
-    $( @out );
-}
-
-sub stash_fromnam(@block) {
-    my %out;
-    for @block -> $row {
-        my ($key, @rest) = @$row;
-        if @rest[0] eq 'var' && @rest[2] {
-            @rest[2] = stash_fromnam(@rest[2]);
-        }
-        %out{$key} = @rest;
-    }
-    $( %out );
-}
-
 sub unit_from_nam(@block) {
-    my ($mlref, $name, $log, $setting, $bottom, $filename, $modtime, $xr,
-        $td, $root) = @block;
+    my ($name, $td, $mlref, $setting, $bottom, $filename, $modtime,
+        $nsroot, $nslog, $xr) = @block;
     my $*uname = $name;
     my $*unit = ::Metamodel::Unit.new(
         name       => $name,
-        ns         => ::Metamodel::Namespace.new(log => $log,
-            root => stash_fromnam($root)),
+        ns         => ::Metamodel::Namespace.new(log => @$nslog,
+            root => $nsroot),
         setting_ref => $setting,
         bottom_ref => $bottom,
         filename   => $filename,
         modtime    => $modtime,
         tdeps      => _hash_constructor(map { (shift($_) => $_) }, @$td));
+
     my $*xref = $*unit.xref;
     my $*xid = 0;
     while $*xid < @$xr {
@@ -122,7 +89,7 @@ sub unit_from_nam(@block) {
     $*xid = 0;
     while $*xid < @$xr {
         if ($xr[$*xid] && $xr[$*xid][0] eq 'sub') {
-            for @( $xr[$*xid][9] ) -> $row {
+            for @( $xr[$*xid][8] ) -> $row {
                 my ($k,$v) = lex_from_nam($row);
                 $*xref[$*xid].lexicals{$k} = $v;
             }
@@ -156,11 +123,9 @@ augment class Metamodel::StaticSub { #OK exist
             [ map { $_.xref[1] }, @$.zyg ],
             $.class,
             $.ltm,
-            $.exports,
             ($.signature && [ map { $_.to_nam }, @( $.signature.params ) ]),
-            (!%*keeplex{~self.xref} ?? [] !!
-                [ map { [ $_, @( $.lexicals{$_}.to_nam ) ] },
-                    sort keys $.lexicals ]),
+            [ map { [ $_, @( $.lexicals{$_}.to_nam ) ] },
+                sort keys $.lexicals ],
             $.prec_info,
         ]
     }
@@ -168,7 +133,7 @@ augment class Metamodel::StaticSub { #OK exist
 
 sub sub_from_nam(@block) {
     my ($kind, $name, $outer, $flags, $zyg, #OK
-        $cls, $ltm, $exp, $sig, $rlx, $prec) = @block; #OK
+        $cls, $ltm, $sig, $rlx, $prec) = @block; #OK
     # Most of these are used only by code-gen.  Lexicals are injected later.
 
     ::Metamodel::StaticSub.new(
@@ -204,21 +169,19 @@ augment class Metamodel::Package { #OK exist
         [
             %typecodes{self.typename},
             $.name,
-            $.exports,
+            $.who,
             @more
         ]
     }
 }
 
 sub packagely(@block) {
-    my ($type, $name, $exports, $attr, $meth, $sup, $mro) = @block;
+    my ($type, $name, $who, $attr, $meth, $sup, $mro) = @block;
     # these two are nonstandard
     if $type eq 'subset' {
         return ::Metamodel::Subset.new(
-            :no_xref,
+            :no_xref, :$name, :$who,
             xref => [ $*uname, $*xid, $name ],
-            name => $name,
-            exports => $exports,
             basetype => $attr,
             where => $meth,
         );
@@ -226,10 +189,8 @@ sub packagely(@block) {
 
     # this relies on .new ignoring unrecognized keys
     %pkgtypes{$type}.new(
-        :no_xref,
+        :no_xref, :$name, :$who,
         xref => [ $*uname, $*xid, $name ],
-        name => $name,
-        exports => $exports,
         attributes => $attr && [ map &attr_from_nam, @$attr ],
         methods => $meth && [ map &method_from_nam, @$meth ],
         superclasses => $sup,
@@ -348,7 +309,7 @@ augment class Metamodel::Lexical::Simple { #OK exist
         $.typeconstraint] }
 }
 augment class Metamodel::Lexical::Common { #OK exist
-    method to_nam() { ['common', @$.path, $.name ] }
+    method to_nam() { ['common', $.pkg, $.name ] }
 }
 augment class Metamodel::Lexical::Alias { #OK exist
     method to_nam() { ['alias', $.to] }
@@ -366,15 +327,15 @@ augment class Metamodel::Lexical::SubDef { #OK exist
     method to_nam() { ['sub', @( $.body.xref ) ] }
 }
 augment class Metamodel::Lexical::Stash { #OK exist
-    method to_nam() { ['stash', @$.path ] }
+    method to_nam() { ['stash', @( $.pkg ) ] }
 }
 
 sub lex_from_nam(@block) {
     my ($name, $type, @xtra) = @block;
     return ($name, ::Metamodel::Lexical::Simple.new)
                         if $type eq 'simple';
-    return ($name, ::Metamodel::Lexical::Common.new(name => pop(@xtra),
-        path => @xtra)) if $type eq 'common';
+    return ($name, ::Metamodel::Lexical::Common.new(name => @xtra[1],
+        pkg => @xtra[0])) if $type eq 'common';
     return ($name, ::Metamodel::Lexical::Alias.new(to => @xtra[0]))
                         if $type eq 'alias';
     return ($name, ::Metamodel::Lexical::Hint.new)
@@ -385,7 +346,7 @@ sub lex_from_nam(@block) {
                         if $type eq 'dispatch';
     return ($name, ::Metamodel::Lexical::SubDef.new(body => $*xref[@xtra[1]]))
                         if $type eq 'sub';
-    return ($name, ::Metamodel::Lexical::Stash.new(path => @xtra))
+    return ($name, ::Metamodel::Lexical::Stash.new(pkg => @xtra))
                         if $type eq 'stash';
     die "weird lex type $type";
 }

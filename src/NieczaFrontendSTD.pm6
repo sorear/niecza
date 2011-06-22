@@ -36,7 +36,7 @@ method function_O($name) {
     my $sub;
 
     if $lex ~~ ::Metamodel::Lexical::Common {
-        $sub = $*unit.deref($*unit.get_item([ @($lex.path), $lex.name ]));
+        $sub = $*unit.deref($*unit.get($*unit.deref($lex.pkg), $lex.name));
     } elsif $lex ~~ ::Metamodel::Lexical::SubDef {
         $sub = $lex.body;
     }
@@ -346,8 +346,13 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     %*units{$unitname} = $*unit;
     $*unit.tdeps{$unitname} = [$filename, $modtime];
 
-    $*unit.create_stash(['GLOBAL']);
-    $*unit.create_stash(['PROCESS']);
+    if $*unit.setting_ref {
+        $*unit.ns.root = $*unit.deref($*unit.setting_ref).unit.ns.root;
+    } else {
+        $*unit.ns.root = ::Metamodel::Package.new(name => 'ROOT', who => '').xref;
+        $*unit.abs_pkg('GLOBAL', :auto);
+        $*unit.abs_pkg('PROCESS', :auto);
+    }
 
     my $ast = NieczaGrammar.parse($source, actions => NieczaActions).ast;
 

@@ -159,8 +159,9 @@ namespace Niecza.CLRBackend {
     // associated with either an Assembly or an AssemblyBuilder.
     class Unit {
         public readonly Xref mainline_ref;
+        public readonly Xref nsroot;
         public readonly string name;
-        public readonly object[] log;
+        public readonly object[] nslog;
         public readonly Xref setting_ref;
         public readonly Xref bottom_ref;
         public readonly string filename;
@@ -168,7 +169,6 @@ namespace Niecza.CLRBackend {
         public readonly object[] xref;
         public readonly object[] tdeps;
 
-        public readonly Dictionary<string, Package> exp_pkg;
         public readonly Dictionary<string, int> tdep_to_id;
         public readonly List<Unit> id_to_tdep;
 
@@ -200,15 +200,17 @@ namespace Niecza.CLRBackend {
         List<object> alt_info_constants = new List<object>();
 
         public Unit(object[] from, object[] code) {
-            mainline_ref = Xref.from(from[0]);
-            name = JScalar.S(from[1]);
-            log = from[2] as object[];
+            name = JScalar.S(from[0]);
+            tdeps = from[1] as object[];
+            mainline_ref = Xref.from(from[2]);
             setting_ref = Xref.from(from[3]);
             bottom_ref = Xref.from(from[4]);
             filename = JScalar.S(from[5]);
             modtime = from[6] == null ? 0 : JScalar.N(from[6]);
-            xref = from[7] as object[];
-            exp_pkg = new Dictionary<string,Package>();
+            nsroot = Xref.from(from[7]);
+            nslog = from[8] as object[];
+            xref = from[9] as object[];
+
             tdep_to_id = new Dictionary<string,int>();
             id_to_tdep = new List<Unit>();
             thaw_heap = new List<byte>();
@@ -225,10 +227,8 @@ namespace Niecza.CLRBackend {
                     Package p = Package.From(xr);
                     xref[i] = p;
                     p.own_xref = new Xref(name, i, p.name);
-                    p.NoteExports(exp_pkg);
                 }
             }
-            tdeps = from[8] as object[];
         }
 
         public void BindDepends(bool ismain) {
@@ -246,8 +246,6 @@ namespace Niecza.CLRBackend {
                 Unit o = CLRBackend.GetUnit(n);
                 id_to_tdep.Add(o);
                 o.BindDepends(false);
-                foreach (KeyValuePair<string,Package> kv in o.exp_pkg)
-                    exp_pkg[kv.Key] = kv.Value;
             }
 
             if (ismain) return;
@@ -295,19 +293,6 @@ namespace Niecza.CLRBackend {
                 DoVisitSubsPreorder(z, cb);
         }
 
-        public Package GetPackage(string[] strs, int f, int l) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < l; i++) {
-                string rxes = strs[i+f];
-                sb.Append((char)(rxes.Length >> 16));
-                sb.Append((char)(rxes.Length & 0xFFFF));
-                sb.Append(rxes);
-            }
-            Package p;
-            exp_pkg.TryGetValue(sb.ToString(), out p);
-            return p;
-        }
-
         public Package GetCorePackage(string name) {
             StaticSub r = (bottom_ref ?? mainline_ref).Resolve<StaticSub>();
             while (r.unit.name != "CORE")
@@ -325,7 +310,7 @@ namespace Niecza.CLRBackend {
                 throw new ArgumentException();
             }
             LexStash lx = (LexStash)r.l_lexicals[name];
-            return GetPackage(lx.path, 0, lx.path.Length);
+            return lx.GetPackage();
         }
 
         public static string SharedName(char type, int ix, string name) {
@@ -735,27 +720,13 @@ namespace Niecza.CLRBackend {
         public Xref own_xref;
         public readonly string name;
         public readonly string type;
-        public readonly object[] exports;
+        public readonly string who;
         public FieldInfo metaObject;
 
         public Package(object[] p) {
             type = ((JScalar)p[0]).str;
             name = ((JScalar)p[1]).str;
-            exports = (object[]) p[2];
-        }
-
-        internal void NoteExports(Dictionary<string,Package> dp) {
-            foreach (object x in exports) {
-                object[] rx = (object[]) x;
-                StringBuilder sb = new StringBuilder();
-                foreach (object rxe in rx) {
-                    string rxes = ((JScalar) rxe).str;
-                    sb.Append((char)(rxes.Length >> 16));
-                    sb.Append((char)(rxes.Length & 0xFFFF));
-                    sb.Append(rxes);
-                }
-                dp[sb.ToString()] = this;
-            }
+            who  = ((JScalar)p[2]).str;
         }
 
         public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
@@ -905,7 +876,6 @@ namespace Niecza.CLRBackend {
         public readonly string[] cur_pkg;
         public readonly string sclass;
         public readonly object ltm;
-        public readonly object[] exports;
         public readonly object sig;
         public readonly List<KeyValuePair<string,Lexical>> lexicals;
         public readonly Dictionary<string,Lexical> l_lexicals;
@@ -923,10 +893,9 @@ namespace Niecza.CLRBackend {
             zyg = JScalar.IA(0, s[4]);
             sclass = JScalar.S(s[5]);
             ltm = s[6];
-            exports = (object[]) s[7];
-            sig = s[8];
+            sig = s[7];
 
-            object[] r_lexicals = s[9] as object[];
+            object[] r_lexicals = s[8] as object[];
 
             if (c != null) {
                 parametric_role_hack = Xref.from(c[1]);
@@ -936,8 +905,7 @@ namespace Niecza.CLRBackend {
                 body_of = Xref.from(c[5]);
                 in_class = Xref.from(c[6]);
                 cur_pkg = JScalar.SA(0, c[7]);
-                if (c[8] != null) r_lexicals = c[8] as object[];
-                body = c[9];
+                body = c[8];
             }
 
             lexicals = new List<KeyValuePair<string,Lexical>>();
@@ -996,7 +964,9 @@ namespace Niecza.CLRBackend {
         public virtual ClrOp SetCode(int up, ClrOp head) {
             throw new Exception("Lexicals of type " + this + " cannot be bound");
         }
+        public abstract void EmitInfo(Unit to);
         public abstract ClrOp GetCode(int up);
+        /* names which are kept in the pad for quick runtime access */
         public static bool IsDynamicName(string name) {
             if (name == "$_") return true;
             if (name.Length < 2) return false;
@@ -1006,7 +976,7 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    class LexVarish : Lexical {
+    abstract class LexVarish : Lexical {
         public int index;
         public FieldInfo stg;
 
@@ -1018,6 +988,14 @@ namespace Niecza.CLRBackend {
         public override ClrOp SetCode(int up, ClrOp to) {
             return (index >= 0) ? (ClrOp)new ClrPadSet(up, index, to)
                                 : new ClrSetSField(stg, to);
+        }
+
+        public abstract byte TypeCode();
+        public override void EmitInfo(Unit to) {
+            to.EmitByte(TypeCode());
+            to.EmitInt(index);
+            if (index < 0)
+                to.EmitStr(stg.Name);
         }
 
         public override void BindFields(int six, int lix, StaticSub sub,
@@ -1039,6 +1017,7 @@ namespace Niecza.CLRBackend {
         public readonly int flags;
         public readonly Xref type;
 
+        public override byte TypeCode() { return 0; }
         public LexSimple(object[] l) {
             flags = JScalar.I(l[2]);
             type = Xref.from(l[3]);
@@ -1047,9 +1026,20 @@ namespace Niecza.CLRBackend {
 
     class LexLabel : LexVarish {
         public LexLabel(object[] l) { }
+        public override byte TypeCode() { return 1; }
     }
+
     class LexDispatch : LexVarish {
         public LexDispatch(object[] l) { }
+        public override byte TypeCode() { return 2; }
+    }
+
+    class LexSub : LexVarish {
+        public readonly Xref def;
+        public LexSub(object[] l) {
+            def = new Xref(l, 2);
+        }
+        public override byte TypeCode() { return 3; }
     }
 
     class LexHint : Lexical {
@@ -1063,13 +1053,18 @@ namespace Niecza.CLRBackend {
                 string name, Func<string,Type,FieldInfo> binder) {
             stg = binder(Unit.SharedName('B', six, name), Tokens.BValue);
         }
+        public override void EmitInfo(Unit to) {
+            to.EmitByte(4);
+        }
     }
 
     class LexCommon : Lexical {
-        public readonly string[] path;
+        public readonly Xref package;
+        public readonly string name;
         public FieldInfo stg;
         public LexCommon(object[] l) {
-            path = JScalar.SA(2, l);
+            package = Xref.from(l[2]);
+            name = JScalar.S(l[3]);
         }
         public override ClrOp GetCode(int up) {
             return new ClrGetField(Tokens.BValue_v,
@@ -1079,16 +1074,14 @@ namespace Niecza.CLRBackend {
             return new ClrSetField(Tokens.BValue_v,
                     new ClrGetSField(stg), to);
         }
+        public override void EmitInfo(Unit to) {
+            to.EmitByte(5);
+            to.EmitXref(package);
+            to.EmitStr(name);
+        }
         public override void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) {
             stg = binder(Unit.SharedName('B', six, name), Tokens.BValue);
-        }
-    }
-
-    class LexSub : LexVarish {
-        public readonly Xref def;
-        public LexSub(object[] l) {
-            def = new Xref(l, 2);
         }
     }
 
@@ -1097,27 +1090,29 @@ namespace Niecza.CLRBackend {
         public LexAlias(object[] l) {
             to = JScalar.S(l[2]);
         }
+        public override void EmitInfo(Unit to) {
+            to.EmitByte(6);
+            to.EmitStr(this.to);
+        }
         public override ClrOp GetCode(int up) { throw new NotImplementedException(); }
     }
 
     class LexStash : Lexical {
         public readonly Unit unit;
-        public readonly string[] path;
-        public Package GetPackage() {
-            return unit.GetPackage(path, 0, path.Length);
+        public readonly Xref package;
+        public override void EmitInfo(Unit to) {
+            to.EmitByte(7);
+            to.EmitXref(package);
         }
+        public Package GetPackage() { return package.Resolve<Package>(); }
         public override ClrOp GetCode(int up) {
             Package p = GetPackage();
-            if (p == null) {
-                return new ClrGetField(Tokens.DMO_typeVar,
-                    new ClrGetSField(Tokens.Kernel_AnyMO));
-            }
             return new ClrGetField(Tokens.DMO_typeVar,
-                new ClrGetSField(p.metaObject));
+                    new ClrGetSField(p.metaObject));
         }
         public LexStash(Unit u, object[] l) {
             unit = u;
-            path = JScalar.SA(2, l);
+            package = new Xref(l, 2);
         }
     }
 
@@ -1381,6 +1376,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("CreateArray");
         public static readonly MethodInfo Kernel_CreateHash =
             typeof(Kernel).GetMethod("CreateHash");
+        public static readonly MethodInfo Kernel_GetVar =
+            typeof(Kernel).GetMethod("GetVar");
         public static readonly MethodInfo Kernel_Decontainerize =
             typeof(Kernel).GetMethod("Decontainerize");
         public static readonly MethodInfo Kernel_NewBoundVar =
@@ -1395,10 +1392,6 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("SetStatus");
         public static readonly MethodInfo Kernel_SortHelper =
             typeof(Kernel).GetMethod("SortHelper");
-        public static readonly MethodInfo Kernel_GetVar =
-            typeof(Kernel).GetMethod("GetVar");
-        public static readonly MethodInfo Kernel_CreatePath =
-            typeof(Kernel).GetMethod("CreatePath");
         public static readonly MethodInfo Kernel_AddPhaser =
             typeof(Kernel).GetMethod("AddPhaser");
         public static readonly MethodInfo Kernel_FirePhasers =
@@ -4110,11 +4103,6 @@ dynamic:
             /*not used until sub3 time*/
             EncodeSignature(sub);
             sub.unit.EmitByte(sub.is_phaser >= 0 ? sub.is_phaser : 0xFF);
-
-            object[] os = sub.exports ?? new object[0];
-            sub.unit.EmitInt(os.Length);
-            foreach (object o in os)
-                sub.unit.EmitStrArray(JScalar.SA(0,o));
         }
 
         void EnterCode(List<object> frags) {
@@ -4403,6 +4391,7 @@ dynamic:
                 int b = unit.thaw_heap.Count;
                 unit.EmitInt(ix);
                 unit.EmitStr(pkg.name);
+                unit.EmitStr(pkg.who);
 
                 if (pkg is Role) {
                     unit.EmitByte(0);
@@ -4438,10 +4427,6 @@ dynamic:
                 } else if (pkg is Package) {
                     unit.EmitByte(4);
                 }
-
-                unit.EmitInt(pkg.exports.Length);
-                foreach (object o in pkg.exports)
-                    unit.EmitStrArray(JScalar.SA(0,o));
 
                 if (pkg is Role || pkg is Class) {
                     Method[] methods = (pkg is Class) ? ((Class)pkg).methods :
@@ -4511,7 +4496,8 @@ dynamic:
                         LexCommon lx = (LexCommon)l.Value; /* XXX cname */
                         thaw.Add(CpsOp.SetSField(lx.stg,
                             CpsOp.MethodCall(Tokens.Kernel_GetVar,
-                                CpsOp.StringArray(false, lx.path))));
+                                CpsOp.StringLiteral(lx.package.Resolve<Package>().who),
+                                CpsOp.StringLiteral(lx.name))));
                     } else if (l.Value is LexHint) {
                         LexHint lx = (LexHint)l.Value;
                         thaw.Add(CpsOp.SetSField(lx.stg,
@@ -4544,18 +4530,15 @@ dynamic:
                 }
             });
 
-            foreach (object le in unit.log) {
+            int stash_base = unit.thaw_heap.Count;
+            unit.EmitInt(unit.nslog.Length);
+            foreach (object le in unit.nslog) {
                 object[] lea = (object[]) le;
-                string t = ((JScalar)lea[0]).str;
-                if (t == "pkg" || t == "var") {
-                    CpsOp sa = CpsOp.StringArray(false, JScalar.SA(0, lea[1]));
-                    if (t == "pkg") {
-                        thaw.Add(CpsOp.MethodCall(Tokens.Kernel_CreatePath, sa));
-                    } else {
-                        thaw.Add(CpsOp.Sink(CpsOp.MethodCall(Tokens.Kernel_GetVar, sa)));
-                    }
-                }
+                unit.EmitStr(JScalar.S(lea[0])); //who
+                unit.EmitStr(JScalar.S(lea[1])); //name
+                unit.EmitXref(Xref.from(lea[2])); //what
             }
+            thaw.Add(CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("LoadStashes"), CpsOp.GetSField(unit.rtunit), CpsOp.IntLiteral(stash_base)));
 
             thaw.Add(CpsOp.MethodCall(Tokens.SubInfo.GetMethod("SetStringHint"),
                 CpsOp.GetSField(unit.mainline_ref.Resolve<StaticSub>().subinfo),
@@ -4795,7 +4778,7 @@ dynamic:
             } else if (args[0] == "replrun") {
                 string ret = "";
                 try {
-                    BValue b = Kernel.GetVar(new string[] { "PROCESS", "$OUTPUT_USED"});
+                    BValue b = Kernel.PackageLookup(Kernel.ProcessO, "$OUTPUT_USED");
                     b.v = Kernel.FalseV;
                     Variable r = Kernel.RunInferior(
                         Kernel.GetInferiorRoot().MakeChild(null,
