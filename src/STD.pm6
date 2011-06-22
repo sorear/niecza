@@ -5169,7 +5169,6 @@ method is_name($longname, $curlex = $*CURLEX) {
         return True;
     }
     my @parts = $longname.split('::');
-    unshift @parts, 'MY' if @parts == 1;
     shift @parts if @parts[0] eq '';
     pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
 
@@ -5177,13 +5176,14 @@ method is_name($longname, $curlex = $*CURLEX) {
 
     self.deb("reparsed: @parts.perl()") if $deb;
     return False if !@parts;
-    my @pkg;
+
+    my $pkg;
 
     if @parts[0] eq 'OUR' {
-        @pkg = @( $curlex<!sub>.cur_pkg );
+        $pkg = $*unit.deref($curlex<!sub>.cur_pkg);
         shift @parts;
     } elsif @parts[0] eq 'PROCESS' or @parts[0] eq 'GLOBAL' {
-        @pkg = shift @parts;
+        $pkg = $*unit.abs_pkg(shift @parts);
     } elsif @parts[0] eq 'MY' {
         return False if @parts == 1;
         my $lexical = self.lookup_lex(@parts[1], $curlex);
@@ -5193,7 +5193,7 @@ method is_name($longname, $curlex = $*CURLEX) {
         }
         if $lexical ~~ ::Metamodel::Lexical::Stash {
             shift @parts; shift @parts;
-            @pkg = @( $lexical.path );
+            $pkg = $*unit.deref($lexical.pkg);
         }
         else {
             return @parts == 2;
@@ -5201,18 +5201,23 @@ method is_name($longname, $curlex = $*CURLEX) {
     } else {
         my $lexical = self.lookup_lex(@parts[0], $curlex);
         if !defined $lexical {
-            @pkg = 'GLOBAL';
+            return False if @parts == 1; # $x doesn't mean GLOBAL
+            $pkg = $*unit.abs_pkg('GLOBAL');
         } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
-            @pkg = @( $lexical.path );
+            $pkg = $*unit.deref($lexical.pkg);
             shift @parts;
         } else {
             return @parts == 1;
         }
     }
 
-    my $ret = ?( $*unit.get_item([ @pkg, @parts ]) );
-    self.deb($ret) if $deb;
-    $ret;
+    for @parts {
+        return False if !$pkg || !$*unit.ns.exists($pkg.who, $_);
+        $pkg = $*unit.ns.get($pkg.who, $_);
+        $pkg = $pkg && $*unit.deref($pkg);
+    }
+
+    return True;
 }
 
 method add_mystery ($token,$pos,$ctx) {
@@ -5280,7 +5285,7 @@ method explain_mystery() {
     self.sorry($m) if $m;
 
     for $*unit.stubbed_stashes {
-        next if .key.closed;
+        next if .key.closed || .key.WHAT === ::GLOBAL::Metamodel::Package;
         .value.sorry("Package was stubbed but not defined");
     }
 

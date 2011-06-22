@@ -190,7 +190,7 @@ method unqual_longname($/, $what, $clean?) {
 
 method simple_longname($/) {
     my $r = self.mangle_longname($/);
-    ($r<path>:exists) ?? [ @($r<path>), $r<name> ] !! [ 'MY', $r<name> ];
+    [ @( $r<path> // [] ), $r<name> ]
 }
 
 method mangle_longname($/, $clean?) {
@@ -1325,7 +1325,7 @@ method methodop($/) {
         my $package;
         $/.CURSOR.trymop({
             $package = $*CURLEX<!sub>.compile_get_pkg(@($c<path>)).xref;
-        });
+        }) if $c<path>;
         make ::Operator::Method.new(name => $c<name>, :$package);
     } elsif $<quote> {
         make ::Operator::Method.new(name => $<quote>.ast);
@@ -1477,7 +1477,8 @@ method package_var($/, $slot, $name, $path, :$list, :$hash) {
     $/.CURSOR.trymop({
         $/.CURSOR.check_categorical($slot);
         $*CURLEX<!sub>.add_common_name($slot,
-            $*CURLEX<!sub>.find_pkg($path), $name, |mnode($/));
+            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref,
+            $name, |mnode($/));
         $*CURLEX<!sub>.lexicals-used{$slot} = True;
     });
     ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
@@ -1591,7 +1592,7 @@ method do_variable_reference($M, $v) {
     if $tw eq '!' {
         my $pclass;
         if $v<rest> {
-            $pclass = $*unit.get_item($*CURLEX<!sub>.find_pkg($v<rest>));
+            $pclass = $*CURLEX<!sub>.compile_get_pkg(@($v<rest>)).xref;
         } elsif $*CURLEX<!sub>.in_class -> $c {
             $pclass = $c;
         } else {
@@ -1800,7 +1801,7 @@ method parameter($/) {
 
     if $<type_constraint> {
         my $t = self.simple_longname($<type_constraint>[0]<typename><longname>);
-        $type = $*unit.get_item($*CURLEX<!sub>.find_pkg($t));
+        $type = $*CURLEX<!sub>.compile_get_pkg(@$t).xref;
     }
 
     for @( $<trait> ) -> $trait {
@@ -1896,7 +1897,7 @@ method signature($/) {
                     .tclass = $cl.xref;
                 }
             } elsif !$*CURLEX<!sub>.returnable {
-                .tclass = $*unit.get_item($*CURLEX<!sub>.find_pkg(['MY','Mu']));
+                .tclass = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
             }
         }
     }
@@ -2189,12 +2190,16 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
     my $at;
 
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_my_sub($name ~ '!a', $nb, |mnode($/));
-        $ns.add_method('only', 'private', $name, $name ~ '!a', $nb.xref);
+        my $ac = self.gensym;
+        $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
+        $at = $ns.add_attribute($name, $sigil, +$accessor, Any, Any, $type,
+            |mnode($/));
+        $ns.add_method('only', 'private', $name, $ac, $nb.xref,
+            |mnode($/));
         if $accessor {
-            $ns.add_method('only', 'normal', $name, $name ~ '!a', $nb.xref);
+            $ns.add_method('only', 'normal', $name, $ac, $nb.xref,
+                |mnode($/));
         }
-        $at = $ns.add_attribute($name, $sigil, +$accessor, Any, Any, $type);
     });
 
     $at ?? ::Op::Attribute.new(name => $name, initializer => $at) !!
@@ -2252,7 +2257,7 @@ method variable_declarator($/) {
     # otherwise identical to my
     my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
     my $res_tc = $typeconstraint ??
-        $*unit.get_item($*CURLEX<!sub>.find_pkg($typeconstraint)) !! Any;
+        $*CURLEX<!sub>.compile_get_pkg(@$typeconstraint).xref !! Any;
 
     if $scope eq 'has' {
         make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.', $res_tc);
@@ -2300,35 +2305,10 @@ method trivial_eval($/, $ast) {
 }
 
 method type_declarator:subset ($/) {
-    my $ourname = Array; my $lexvar = self.gensym; my $name;
-    my $scope = $*SCOPE || 'our';
-    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
-        $/.CURSOR.sorry("Invalid subset scope $scope");
-        $scope = 'anon';
-    }
-    if $<longname> {
-        $scope ||= 'my';
-        my $r = self.mangle_longname($<longname>[0], True);
-        $name = $r<name>;
-        if ($r<path>:exists) && $scope ne 'our' {
-            $/.CURSOR.sorry("Block name $<longname> requires our scope");
-            $scope = 'our';
-        }
-        if $scope eq 'our' {
-            $ourname = ($r<path>:exists) ?? $r<path> !! ['OUR'];
-            $ourname = [ @$ourname, $name ];
-        } elsif $scope eq 'my' {
-            $lexvar  = $name;
-        }
-    } else {
-        if ($scope || 'anon') ne 'anon' {
-            $/.CURSOR.sorry("Cannot have a non-anon subset with no name");
-        }
-        $name = 'ANON';
-    }
+    my $r = $<longname> && self.mangle_longname($<longname>[0], True);
 
     my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
-        ['MY', 'Any'];
+        ['Any'];
     my @exports;
 
     for map *.ast, @$<trait> -> $t {
@@ -2343,36 +2323,32 @@ method type_declarator:subset ($/) {
 
     my $body = self.thunk_sub($<EXPR> ?? $<EXPR>[0].ast !! mklex($/, 'True'));
 
-    my @ns = $ourname ?? @( $*CURLEX<!sub>.find_pkg($ourname) ) !!
-        $*unit.anon_stash;
+    my ($lexvar, $obj) = "Any";
 
     $/.CURSOR.trymop({
-        $*unit.create_stash([@ns]);
-        $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |mnode($/));
-        $*CURLEX<!sub>.add_pkg_exports($*unit, $name, [@ns], @exports);
+        ($lexvar, $obj) = self.do_new_package($/, scope => $*SCOPE,
+            name => $r<name>, path => $r<path>, class => ::Metamodel::Subset,
+            :@exports);
+
         $*CURLEX<!sub>.create_static_pad;
 
-        $basetype = $*unit.get_item($*CURLEX<!sub>.find_pkg([@$basetype]));
-        my $obj = ::Metamodel::Subset.new(:$name, where => $body.xref,
-            :$basetype);
-        $*unit.bind_item([@ns], $obj.xref);
-        $obj.exports = [ [@ns] ];
+        $obj.basetype = $*CURLEX<!sub>.compile_get_pkg(@$basetype).xref;
+        $obj.where = $body.xref;
     });
 
     make mklex($/, $lexvar);
 }
 
-method make_constant($/, $scope, $name, $path) {
+method make_constant($/, $scope, $name) {
     $scope := $scope || 'our';
 
-    my $slot = ($scope eq 'my' || $scope eq 'our' && !$path) ?? $name !!
-        self.gensym;
+    my $slot = ($scope eq 'my' || $scope eq 'our') ?? $name !! self.gensym;
 
     $/.CURSOR.trymop({
         $/.CURSOR.check_categorical($slot);
         if $scope eq 'our' {
-            $*CURLEX<!sub>.add_common_name($slot,
-                $*CURLEX<!sub>.find_pkg($path // ['OUR']), $name, |mnode($/));
+            $*CURLEX<!sub>.add_common_name($slot, $*CURLEX<!sub>.cur_pkg,
+                $name, |mnode($/));
         } else {
             $*CURLEX<!sub>.add_hint($slot, |mnode($/));
         }
@@ -2381,10 +2357,10 @@ method make_constant($/, $scope, $name, $path) {
     ::Op::ConstantDecl.new(|node($/), name => $slot, init => False);
 }
 
-method make_constant_into($/, $rpath, $name, $rhs) {
+method make_constant_into($/, $pkg, $name, $rhs) {
     my $slot = self.gensym;
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_common_name($slot, $rpath, $name, |mnode($/));
+        $*CURLEX<!sub>.add_common_name($slot, $pkg.xref, $name, |mnode($/));
     });
     self.init_constant(::Op::ConstantDecl.new(|node($/), name => $slot,
         init => False), $rhs);
@@ -2405,16 +2381,12 @@ method type_declarator:constant ($/) {
     }
     my $name  = ~($<identifier> // $<variable> // self.gensym);
 
-    make self.make_constant($/, $*SCOPE || 'our', $name, Array);
+    make self.make_constant($/, $*SCOPE, $name);
 }
 
 # note: named and unnamed enums are quite different beasts
 method type_declarator:enum ($/) {
     my $scope = $*SCOPE || 'our';
-    if $scope && $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
-        $/.CURSOR.sorry("Invalid enum scope $scope");
-        $scope = 'anon';
-    }
 
     my @exports;
     for map *.ast, @$<trait> -> $t {
@@ -2445,76 +2417,55 @@ method type_declarator:enum ($/) {
     }
 
     my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
-        [ 'MY', $has_strs ?? 'Str' !! 'Int' ];
+        [$has_strs ?? 'Str' !! 'Int'];
+    my $kindtype = $has_strs ?? 'StrBasedEnum' !! 'IntBasedEnum';
 
-    if $<name> && $<name>.reduced eq 'longname'&& ($scope ||= 'our') ne 'anon' {
+    if $<name> && $<name>.reduced eq 'longname' && $scope ne 'anon' {
         # Longnamed enum is a kind of type definition
 
-        my $ourpath = Array;
-        my $lexvar = self.gensym;
-        my $bindlex = False;
-        my $r = self.mangle_longname($<longname>[0], True);
-        my $name = $r<name>;
-        if ($r<path>:exists) && $scope ne 'our' {
-            $/.CURSOR.sorry("Enum name $<longname> requires our scope");
-            $scope = 'our';
-        }
+        my $r = self.mangle_longname($<name>, True);
 
-        if $scope eq 'our' {
-            $ourpath = ($r<path>:exists) ?? $r<path> !! ['OUR'];
-            if !($r<path>:exists) {
-                $lexvar  = $name;
-                $bindlex = True;
-            }
-        } elsif $scope eq 'my' {
-            $lexvar  = $name;
-            $bindlex = True;
-        }
-
+        my ($lexvar, $obj);
         $/.CURSOR.trymop({
-            my @ns = $ourpath ?? (@( $*CURLEX<!sub>.find_pkg($ourpath) ), $name) !!
-                $*unit.anon_stash;
-            $*unit.create_stash([@ns]);
-            $*CURLEX<!sub>.add_my_stash($lexvar, [@ns], |mnode($/));
-            my $obj  = ::Metamodel::Class.new(:$name);
-            $obj.exports = [ [@ns] ];
-            $*unit.bind_item([@ns], $obj.xref);
+            ($lexvar, $obj) = self.do_new_package($/, :$scope,
+                class => ::Metamodel::Class, name => $r<name>,
+                path => $r<path>, :@exports);
 
-            $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg(
-                ['MY', ($has_strs ?? 'Str' !! 'Int') ~ "BasedEnum"])));
-            $obj.add_super($*unit.get_item($*CURLEX<!sub>.find_pkg($basetype)));
+            $obj.add_super($*CURLEX<!sub>.compile_get_pkg($kindtype).xref);
+            $obj.add_super($*CURLEX<!sub>.compile_get_pkg(@$basetype).xref);
 
             my $nb = ::Metamodel::StaticSub.new(
                 transparent=> True,
                 unit       => $*unit,
                 outerx     => $*CURLEX<!sub>.xref,
                 outer_direct => $*CURLEX<!sub>,
-                name       => $name,
+                name       => $r<name> ~ '.enums',
                 cur_pkg    => $*CURLEX<!sub>.cur_pkg,
                 class      => 'Method',
                 signature  => Sig.simple('self'),
                 code       => self.init_constant(
-                    self.make_constant($/, 'anon', Any, Any),
+                    self.make_constant($/, 'anon', Any),
                     ::Op::CallMethod.new(name => 'new',
                         receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
 
+            my $nbvar = self.gensym;
             $nb.add_my_name('self', noinit => True);
             $*CURLEX<!sub>.create_static_pad;
             $nb.strong_used = True;
             $*CURLEX<!sub>.add_child($nb);
-            $*CURLEX<!sub>.add_my_sub($lexvar ~ '!enums', $nb, |mnode($/));
-            $obj.add_method('only', 'normal', 'enums', $lexvar ~ '!enums',
-                $nb.xref);
+            $*CURLEX<!sub>.add_my_sub($nbvar, $nb, |mnode($/));
+            $obj.add_method('only', 'normal', 'enums', $nbvar,
+                $nb.xref, |mnode($/));
             $obj.close;
 
             for @pairs {
-                self.make_constant_into($/, @ns, .key, rhs =>
+                self.make_constant_into($/, $obj, .key, rhs =>
                     ::Op::CallSub.new(invocant => mklex($/, $lexvar),
                         args => [ ::Op::StringLiteral.new(text => .key) ]));
             }
 
             for @pairs {
-                self.init_constant(self.make_constant($/, $scope, .key, Any),
+                self.init_constant(self.make_constant($/, $scope, .key),
                     ::Op::CallSub.new(invocant => mklex($/, $lexvar),
                         args => [ ::Op::StringLiteral.new(text => .key) ]));
             }
@@ -2523,7 +2474,7 @@ method type_declarator:enum ($/) {
         make mklex($/, $lexvar);
     } else {
         make self.init_constant(
-            self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>, Any),
+            self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>),
             ::Op::CallMethod.new(|node($/), name => 'new',
                 receiver => mklex($/, 'EnumMap'),
                 args => [$<term>.ast])),
@@ -2564,25 +2515,23 @@ method process_block_traits($/, @tr) {
                 next unless $sub.body_of;
             $T.CURSOR.sorry("superclass $name declared in an augment"),
                 next if $sub.augmenting;
+            $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
+                next if !$*unit.deref($pack).^can('add_super');
 
             $T.CURSOR.trymop({
-                $*unit.deref($pack).add_super($*unit.get_item($sub.find_pkg(
-                    [ @($path // ['MY']), $name ])));
+                $*unit.deref($pack).add_super($sub.compile_get_pkg(
+                    @($path // []), $name).xref);
             });
         } elsif $pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_pkg_exports($*unit, $*unit.deref($pack).name,
-                $sub.cur_pkg, @exports);
+            $sub.outer.add_exports($*unit.deref($pack).name, $pack, @exports);
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports($*unit, '&' ~ $sub.name, @exports);
+            $sub.outer.add_exports('&'~$sub.name, $sub.xref, @exports);
             $sub.strong_used = True;
             $sub.outer.create_static_pad;
             $sub.outer.lexicals-used{$sub.outervar} = True
                 if defined $sub.outervar;
-            $sub.exports //= [];
-            push $sub.exports, [ @($sub.outer.find_pkg(
-                ['OUR','EXPORT',$_])), '&' ~ $sub.name ] for @exports;
         } elsif !$pack && $tr<nobinder> {
             $sub.signature = Any;
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
@@ -2882,37 +2831,94 @@ method statement_control:use ($/) {
 
     my $u2 = $*unit.need_unit($name);
 
-    my @can = @( $u2.mainline.find_pkg([$name.split('::')]) );
-    my @exp = (@can, 'EXPORT', 'DEFAULT');
+    my $module = $u2.mainline.compile_get_pkg($name.split('::'));
+    my $exp;
+    try $exp = $*unit.get_pkg($module, 'EXPORT', 'DEFAULT');
 
-    # XXX I am not sure how need binding should work in the :: case
+    # in the :: case, $module will usually be visible via GLOBAL
     if !defined($name.index('::')) {
-        $*CURLEX<!sub>.lexicals{$name} =
-            ::Metamodel::Lexical::Stash.new(path => @can);
+        $*CURLEX<!sub>.add_my_stash($name, $module.xref);
     }
 
-    for $*unit.list_stash(@exp) -> $tup {
-        my $uname = $tup[0];
-        my $lex;
-        if $tup[1] eq 'var' {
-            if $tup[2] && !$tup[2][0] {
-                $lex = ::Metamodel::Lexical::Common.new(path => @exp, name => $uname);
-            } elsif $tup[2] {
-                $lex = ::Metamodel::Lexical::Stash.new(path => [@exp, $uname]);
-            }
-        } elsif $tup[1] eq 'graft' {
-            $lex = ::Metamodel::Lexical::Stash.new(path => $tup[2]);
-        } else {
-            die "weird return";
-        }
+    return unless $exp;
 
-        $*CURLEX<!sub>.lexicals{$uname} = $lex;
-        $/.CURSOR.check_categorical($uname);
+    my $h = $/.CURSOR;
+    for $*unit.list_stash($exp) -> $tup {
+        my $uname = $tup.key;
+        my $obj   = $tup.value && $*unit.deref($tup.value);
+
+        if !$obj || $obj ~~ ::Metamodel::StaticSub {
+            $*CURLEX<!sub>.add_common_name($uname, $exp.xref, $uname);
+        } else {
+            $*CURLEX<!sub>.add_my_stash($uname, $obj.xref);
+        }
+        $h.check_categorical($uname);
+        $h = $h.cursor_fresh(%*LANG<MAIN>);
     }
 }
 
+method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$path!,
+        :$name!, :$class!, :$exports) {
+
+    $scope := $scope || 'our';
+    if $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid packageoid scope $scope");
+        $scope := 'anon';
+    }
+
+    if defined($path) && $scope ne 'our' {
+        $/.CURSOR.sorry("Pathed definitions require our scope");
+        $scope := 'our';
+    }
+
+    if !$name {
+        $scope := 'anon';
+        $name  := 'ANON';
+        $path  := Any;
+    }
+
+    my $npkg;
+    my $lexname;
+    $/.CURSOR.trymop({
+        my $old;
+        if $scope ne 'anon' && !$path && $sub.lexicals.{$name} -> $l {
+            die "Cannot resume definition - $name not a packageoid"
+                unless $l ~~ ::Metamodel::Lexical::Stash;
+            $old = $*unit.deref($l.pkg);
+        } elsif defined $path {
+            my $ppkg;
+            try $ppkg = $sub.compile_get_pkg(@$path);
+            my $xr = $ppkg && $*unit.get($ppkg, $name);
+            $old = $xr && $*unit.deref($xr);
+        }
+
+        my $lexed_already;
+
+        if $old && $old.WHAT === $class && !$old.closed {
+            $npkg = $old;
+            $lexed_already = True;
+        } elsif $scope eq 'our' {
+            my $ppkg = $sub.compile_get_pkg($path ?? @$path !! 'OUR', :auto);
+            $npkg = $class.new(:$name, who => $ppkg.who ~ '::' ~ $name);
+            $*unit.bind($ppkg, $name, $npkg.xref, |mnode($/));
+        } else {
+            my $id = $*unit.anon_stash;
+            $npkg = $class.new(:$name, who => "::$id");
+            $*unit.bind($*unit.abs_pkg(), $id, $npkg.xref, |mnode($/));
+        }
+
+        $lexname = (!$lexed_already && $scope ne 'anon' && !defined($path))
+            ?? $name !! self.gensym;
+
+        $sub.add_my_stash($lexname, $npkg.xref, |mnode($/));
+        $sub.add_exports($name, $npkg.xref, $exports) if $exports;
+    });
+
+    $lexname, $npkg
+}
+
 method open_package_def($, $/ = $*cursor) {
-    my %_decl2mclass = (
+    state %_decl2mclass = (
         package => ::Metamodel::Package,
         class   => ::Metamodel::Class,
         module  => ::Metamodel::Module,
@@ -2925,101 +2931,39 @@ method open_package_def($, $/ = $*cursor) {
         $/.CURSOR.sorry("Multi variables NYI");
     }
 
-    my $scope = $*SCOPE;
-    if !$<longname> {
-        $scope = 'anon';
-    }
+    my $r = $<longname> && self.mangle_longname($<longname>[0], True);
 
-    if $scope eq 'supersede' {
-        $/.CURSOR.sorry('Supercede is not yet supported');
-        $scope = 'our';
-    }
-    if $scope eq 'has' || $scope eq 'state' {
-        $/.CURSOR.sorry("Illogical scope $scope for package block");
-        $scope = 'our';
-    }
+    if $*SCOPE eq 'augment' && $r {
+        $/.CURSOR.trymop({
+            my $obj = $sub.outer.compile_get_pkg(@( $r<path> // [] ), $r<name>, :auto);
 
-    if $scope eq 'augment' {
-        my $r = self.mangle_longname($<longname>[0], True);
-        my $name = $r<name>;
-        my @augpkg = @( $r<path> // ['MY'] );
+            if $obj.^isa(::Metamodel::Role) {
+                die "Illegal augment of a role";
+            }
 
-        my $pkg = $sub.outer.find_pkg([ @augpkg, $name ]);
-        my $so  = $*unit.get_item($pkg);
-        my $dso = $*unit.deref($so);
-
-        if $dso.^isa(::Metamodel::Role) {
-            $/.CURSOR.panic("Illegal augment of a role");
-        }
-
-        my @ah = $so;
-        $sub.augment_hack = @ah;
-        $sub.body_of = $sub.in_class = $so;
-        $sub.cur_pkg = $pkg;
-        $sub.augmenting = True;
-        $sub.set_name("augment-$dso.name()");
+            $sub.augment_hack = [ $obj.xref ];
+            $sub.body_of = $sub.in_class = $sub.cur_pkg = $obj.xref;
+            $sub.augmenting = True;
+            $sub.set_name("augment-$obj.name()");
+        });
     } else {
-        my ($name, $ourpkg);
         my $type = %_decl2mclass{$*PKGDECL};
         if ($*PKGDECL//'role') eq 'role' && $<signature> {
             $sub.signature = $<signature>.ast;
             $type = ::Metamodel::ParametricRole;
         }
-        my @ns;
-        if $<longname> {
-            my $r = self.mangle_longname($<longname>[0], True);
-            $name = $r<name>;
-            if ($r<path>:exists) && $scope ne 'our' {
-                $/.CURSOR.sorry("Block name $<longname> requires our scope");
-                $scope = 'our';
-            }
-            if $scope eq 'our' {
-                $ourpkg = ($r<path>:exists) ?? $r<path> !! ['OUR'];
-            }
-            if $r<path> {
-                try @ns = @( $sub.outer.find_pkg([ @($r<path>), $r<name> ]) );
-            } elsif $sub.outer.lexicals{$r<name>} {
-                try @ns = @( $sub.outer.find_pkg([ 'MY', $r<name> ]) );
-            }
-            $sub.outervar = ($scope eq 'anon' || ($r<path>:exists))
-                ?? self.gensym !! $name;
-        } else {
-            $sub.outervar = self.gensym;
-            $name = 'ANON';
-        }
 
-        my $old = @ns ?? $*unit.get_item([@ns]) !! Any;
+        $/.CURSOR.trymop({
+            my ($lexvar, $obj) = self.do_new_package($/, sub => $sub.outer,
+                class => $type, name => $r<name>, path => $r<path>,
+                scope => $*SCOPE);
 
-        if $old && ($old.[0] ne $*unit.name || $*unit.deref($old).closed) {
-            $/.CURSOR.panic("Redefinition of class [@ns]");
-        }
-        my $obj;
-        if $old {
-            $obj = $*unit.deref($old);
-            # we may need to make a new alias
-            # XXX we might try looking for a reusable one, changing outervar?
-            $/.CURSOR.trymop({
-                $sub.outer.add_my_stash($sub.outervar, [@ns], |mnode($/));
-            }) unless $sub.outer.lexicals{$sub.outervar};
-        } else {
-            @ns = $ourpkg ?? (@( $sub.outer.find_pkg($ourpkg) ), $name) !!
-                $*unit.anon_stash;
+            $sub.outervar = $lexvar;
+            $sub.body_of = $sub.in_class = $sub.cur_pkg = $obj.xref;
 
-            $*unit.create_stash([@ns]);
-
-            $/.CURSOR.trymop({
-                $sub.outer.add_my_stash($sub.outervar, [@ns], |mnode($/));
-                $obj = $type.new(:$name);
-                $obj.exports = [ [@ns] ];
-                $*unit.bind_item([@ns], $obj.xref);
-            });
-        }
-
-        $sub.body_of = $sub.in_class = $obj.xref;
-        $sub.cur_pkg = [@ns];
-
-        self.process_block_traits($/, $<trait>);
-        $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
+            self.process_block_traits($/, $<trait>);
+            $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
+        });
     }
 }
 
@@ -3038,7 +2982,7 @@ method package_def ($/) {
             unit       => $*unit,
             outerx     => $sub.xref,
             outer_direct => $*CURLEX<!sub>,
-            cur_pkg    => [ 'GLOBAL' ],
+            cur_pkg    => $sub.cur_pkg,
             name       => 'ANON',
             is_phaser  => 0,
             augment_hack => $ah,
@@ -3206,6 +3150,12 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         $method_type = Str;
     }
 
+    if $method_targ && !$method_targ.^can('add_method') {
+        $/.CURSOR.sorry("A {$method_targ.WHAT} cannot have methods added");
+        $method_type = Str;
+        $method_targ = Any;
+    }
+
     if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
             $method_targ !~~ ::Metamodel::ParametricRole) {
         $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
@@ -3274,12 +3224,12 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
                     [ $multiness, $method_type, $name, $symbol, $sub.xref ];
             } else {
                 $method_targ.add_method($multiness, $method_type, $name,
-                    $symbol, $sub.xref);
+                    $symbol, $sub.xref, |mnode($/));
             }
         }
 
         if $scope eq 'our' {
-            $sub.exports = [[@($sub.outer.find_pkg($path // ['OUR'])), '&'~$name]];
+            $sub.outer.bind_our_name($path, "&$name", $sub.xref);
         }
     });
 }
@@ -3357,7 +3307,7 @@ method blast($/) {
     if $<block> {
         make $<block>.ast;
     } else {
-        make self.thunk_sub($<statement>.ast);
+        make self.thunk_sub($<statement>.ast.statement_level);
     }
 }
 
