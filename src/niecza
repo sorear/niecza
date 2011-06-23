@@ -23,6 +23,8 @@ use RxOp;
 use Sig;
 use STD;
 
+grammar STD::P5 { }
+grammar STD::P5::Regex { }
 augment grammar STD::P6 { #OK
     token label { <identifier> ':' <?before \s> <.ws> }
 }
