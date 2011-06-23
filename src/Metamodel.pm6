@@ -782,7 +782,7 @@ class Unit {
     }
 
     method need_unit($u2name) {
-        return $.tdeps{$u2name} if $.tdeps{$u2name};
+        return %*units{$u2name} if $.tdeps{$u2name};
         my $u2 = %*units{$u2name} //= $*module_loader.($u2name);
         $.tdeps{$u2name} = [ $u2.filename, $u2.modtime ];
         my @new = $u2name;

@@ -99,8 +99,5 @@ Other stuff to do after:
   - $_ handling: declare in *every* sub, empty/defouter according to returnable
   - cnperl6 prototyping...
   - CLR: KISS and then play with async I/O, possibly including soric
-  - Fix up name handling
-  - package to class steal
-  - jnthnian packages
   - pm's = hack
   - fix { my $x } crash
