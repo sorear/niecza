@@ -448,6 +448,9 @@ namespace Niecza {
                 string name = ReadStr(ref from);
                 object what = ReadXref(ref from);
 
+                if (TraceLoad)
+                    Console.WriteLine("Creating stash slot {0} {1}", who, name);
+
                 BValue slot = Kernel.GetVar(who, name);
                 if (what == null) continue;
 
@@ -583,14 +586,14 @@ namespace Niecza {
             int _ifrom = from;
             int ix = ReadInt(ref from);
             string name = ReadStr(ref from);
-            string how  = ReadStr(ref from);
+            string who  = ReadStr(ref from);
             if (TraceLoad)
                 Console.WriteLine("Installing package {0} \"{1}\" from {2:X}", ix, name, _ifrom);
             STable mo = existing_mo != null ? existing_mo :
                 new STable(name);
             xref[ix] = mo;
 
-            mo.how = Kernel.GetStash(how);
+            mo.who = Kernel.GetStash(who);
             mo.typeObject = new P6opaque(mo, 0);
             ((P6opaque)mo.typeObject).slots = null;
             mo.typeVar = Kernel.NewROScalar(mo.typeObject);
@@ -3186,12 +3189,15 @@ slow:
             P6any oo = o.Fetch();
             P6any nn = n.Fetch();
 
-            if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.how == nn.mo.how) {
+            if (oo == nn) return o;
+
+            if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.who == nn.mo.who) {
                 if (oo.mo.mo.isPackage) return n;
                 if (nn.mo.mo.isPackage) return o;
             }
 
-            throw new NieczaException("Funny merge failure " + d1 + "::" + d2);
+            throw new NieczaException("Funny merge failure " + d1 + "::" + d2 +
+                    " (" + oo.mo.name + ", " + nn.mo.name + ")");
         }
 
         public static BValue GetVar(string who, string name) {

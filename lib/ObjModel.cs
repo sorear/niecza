@@ -536,7 +536,7 @@ next_method: ;
 
         public P6how mo;
 
-        public P6any how;
+        public P6any how, who;
         public P6any typeObject, initObject;
         public Variable typeVar, initVar;
         public int fixups_from;
