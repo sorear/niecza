@@ -23,6 +23,10 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD::P6 { #OK
+    token label { <identifier> ':' <?before \s> <.ws> }
+}
+
 augment class NieczaActions {
 }
 
