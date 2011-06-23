@@ -7,9 +7,6 @@ class Operator;
 use Sig;
 use OpHelpers;
 
-has $.whatever_curry;
-has $.assignish;
-
 method with_args ($/, *@_) { !!! }
 
 method as_function($/) {
