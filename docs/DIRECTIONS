@@ -10,20 +10,16 @@ What we have
 
 Data model: Containers are available for r/w parameter aliasing.  Most
 of the basic types are available, including Num, Str, Bool, Array,
-Hash, Sub, Regex, Cursor, Any, Mu, etc.
+Int, Hash, Sub, Regex, Cursor, Any, Mu, etc.
 
-The underlying infrastructure for active containers exists, but nothing
-like tie() is available at this time.  Lazy autovivification per S09 is
+The underlying infrastructure for active containers exists, but Proxy
+is still spelled _newtiedscalar.  Lazy autovivification per S09 is
 supported, but using a Rakudo-like Any!Any::butWHENCE API.
-
-Int, Complex, Rat etc are *not* available at this time.  All numbers
-are forced to floating point representation.
 
 Control model: Coroutine control flow (gather / take) is supported.
 Control exceptions are available, and support lexotic and dynamic
-operation, although it is not possible to name loops at this time.
-Dynamically scoped dispatcher control is available via nextwith;
-callwith is not yet available.  There is no multiple dispatch.
+operation.  Dynamically scoped dispatcher control is available
+via nextwith and callwith.
 
 Type system: Nominal type checking for arguments and containers is
 available.  Type checking is based on superclasses only; runtime role
@@ -44,33 +40,4 @@ blocks, cut operators, cross-rule cut operators, quantifiers
 including ~ setting $*GOAL, :dba, automaton-based LTM, variables,
 capture operators, :i on literals, etc.
 
-Notable missing features include <.SUPER::name> and <&name>.
-
-Syntax: Based on STD.pm6 as compiled by viv, so should be pretty solid.
-Unimplemented rules will give an error message.
-
 Odds and ends: A JSYNC loader/saver was created
-
-Future directions
-=================
-
-* Finish getting STD up and running
-
-  - STD already compiles but doesn't pass 96% of roast yet
-  - If nothing else, this is a good stress test
-
-* Solve the &eval problem
-
-  - This is a tricky one.  We need to somehow make the compiler
-    available at runtime, which means rewriting it off Perl 5.  I see
-    three options:
-    - Perl 6.  Pro: Cool.  Con: Slow to compile, slow to run.
-    - C#.  Pro: Fast to compile and run.  Con: Limits portability.
-    - Custom language.  Pro: Portable and fastish.  Con: Hard, and NQPlike.
-
-* Start passing lots of roast tests
-
-* World domination
-
-Tasks from lhf.txt do not fit into the timeline and can be done by anyone
-when tuits permit.
