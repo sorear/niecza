@@ -25,11 +25,193 @@ use STD;
 
 grammar STD::P5 { }
 grammar STD::P5::Regex { }
+
 augment grammar STD::P6 { #OK
     token label { <identifier> ':' <?before \s> <.ws> }
 }
 
 augment class NieczaActions {
+method quantified_atom($/) { # :: RxOp
+    my $atom = $<atom>.ast;
+    my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;
+
+    return Nil unless $atom;
+
+    if %*RX<r> {
+        # no quantifier at all?  treat it as :
+        $q //= { mod => '' };
+        # quantifier without explicit :? / :! gets :
+        $q<mod> //= '';
+    }
+
+    if defined $q<min> {
+        my @z = $atom;
+        push @z, $q<sep> if defined $q<sep>;
+        $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
+            nonlisty => $q<nonlisty>, closure => $q<closure>,
+            zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
+    }
+
+    if defined($q<mod>) && $q<mod> eq '' {
+        $atom = ::RxOp::Cut.new(zyg => [$atom]);
+    }
+
+    if defined $q<tilde> {
+        my ($closer, $inner) = @( $q<tilde> );
+        $closer = $closer.zyg[0] if $closer.^isa(::RxOp::Cut) &&
+            $closer.zyg[0].^isa(::RxOp::String);
+        if !$closer.^isa(::RxOp::String) {
+            $/.CURSOR.sorry("Non-literal closers for ~ NYI");
+            make ::RxOp::None.new;
+            return Nil;
+        }
+        $inner = self.encapsulate_regex($/, $inner, passcut => True,
+            goal => $closer.text, passcap => True);
+        $atom = ::RxOp::Sequence.new(zyg => [$atom,
+            ::RxOp::Tilde.new(closer => $closer.text, dba => %*RX<dba>,
+                zyg => [$inner])]);
+    }
+
+    make $atom;
+}
+
+method quantifier:sym<**> ($/) {
+    my $h = $<embeddedblock> ?? { min => 0, closure =>
+                self.inliney_call($/, $<embeddedblock>.ast) } !!
+            $<quantified_atom> ?? { min => 1, sep => $<quantified_atom>.ast } !!
+            { min => +~$0, max => ($1 ?? +~$1 !!
+                defined($/.index('..')) ?? Any !! +~$0) };
+    $h<mod> = $<quantmod>.ast;
+    $h<general> = True;
+    $h<space> = ?($<normspace>);
+    make $h;
+}
+}
+
+augment class RxOp::Quantifier { #OK
+    method mincode($body, $min, $max) {
+        my @code;
+
+        my $exit = self.label;
+        my $add  = self.label;
+
+        push @code, CgOp.rxopenquant;
+        push @code, CgOp.goto($exit);
+        push @code, CgOp.label($add);
+        push @code, CgOp.cgoto('backtrack', CgOp.compare('>=',
+                CgOp.rxgetquant, $max)) if $!closure || defined ($!max);
+        if $.zyg[1] && !$!closure && $!min {
+            push @code, $.zyg[1].code($body);
+            push @code, CgOp.label($exit);
+            push @code, $.zyg[0].code($body);
+            push @code, CgOp.rxincquant;
+        } else {
+            push @code, CgOp.ternary(CgOp.compare('!=', CgOp.rxgetquant,
+                CgOp.int(0)), $.zyg[1].code($body), CgOp.prog()) if $.zyg[1];
+            push @code, $.zyg[0].code($body);
+            push @code, CgOp.rxincquant;
+            push @code, CgOp.label($exit);
+        }
+        push @code, CgOp.rxpushb('QUANT', $add);
+        push @code, CgOp.cgoto('backtrack', CgOp.compare('<',
+                CgOp.rxgetquant, $min)) if $!closure || $!min > 0;
+        push @code, CgOp.sink(CgOp.rxclosequant);
+
+        @code;
+    }
+
+    method code($body) {
+        my $min = $!closure ?? CgOp.letvar('!min') !! CgOp.int($!min);
+        my $max = $!closure ?? CgOp.letvar('!max') !! CgOp.int($!max);
+
+        my @code = $!minimal
+            ?? self.mincode($body, $min, $max)
+            !! self.maxcode($body, $min, $max);
+
+        return @code unless $!closure;
+
+        return CgOp.letn(
+            '!range', $!closure.code($body),
+            '!min', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
+                        CgOp.letvar('!range'), 'niecza_quantifier_min'))),
+            '!max', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
+                        CgOp.letvar('!range'), 'niecza_quantifier_max'))),
+            @code);
+    }
+
+    method maxcode($body, $min, $max) {
+        my @code;
+
+        my $exit   = self.label;
+        my $repeat = self.label;
+        my $middle = self.label;
+
+        # get the degenerate cases out the way
+        if defined $!max {
+            return CgOp.goto('backtrack') if $!max < $!min;
+            return CgOp.prog() if $!max == 0;
+            return $.zyg[0].code($body) if $!max == 1 && $!min == 1;
+        }
+
+        my $usequant = $!closure || (defined($!max) && $!max != 1) ||
+            ($!min > 1) || ($!min && $.zyg[1]);
+        my $userep   = $!closure || !(defined($!max) && $!max == 1);
+
+        push @code, CgOp.rxopenquant if $usequant;
+        push @code, CgOp.goto($middle) if !$!closure && $!min;
+        push @code, CgOp.label($repeat) if $userep;
+        # min == 0 or quant >= 1
+        if $!closure || $!min > 1 {
+            # only allow exiting if min met
+            push @code, CgOp.ternary(CgOp.compare('>=', CgOp.rxgetquant, $min),
+                CgOp.rxpushb('QUANT', $exit), CgOp.prog());
+        } else {
+            # min automatically met
+            push @code, CgOp.rxpushb('QUANT', $exit);
+        }
+
+        # if userep false, quant == 0
+        if $!closure || defined($!max) && $userep {
+            push @code, CgOp.cgoto('backtrack', CgOp.compare('>=',
+                    CgOp.rxgetquant, $max));
+        }
+
+        if $.zyg[1] && ($!closure || $!min == 0) {
+            push @code, CgOp.cgoto($middle,
+                CgOp.compare('==', CgOp.rxgetquant, CgOp.int(0)));
+        }
+        push @code, $.zyg[1].code($body) if $.zyg[1];
+        push @code, CgOp.label($middle) if $.zyg[1] || (!$!closure && $!min);
+        push @code, $.zyg[0].code($body);
+        push @code, CgOp.rxincquant if $usequant;
+        if $userep {
+            push @code, CgOp.goto($repeat);
+        } else {
+            # quant == 1
+            # userep implies max == 1, min == 0; fall through
+        }
+        push @code, CgOp.label($exit);
+        push @code, CgOp.sink(CgOp.rxclosequant) if $usequant;
+
+        @code;
+    }
+
+    method lad() {
+        return [ 'Imp' ] if $!minimal || $!closure;
+        my $mi = $!min;
+        my $ma = $!max // -1;
+        my $str;
+        if $mi == 0 && $ma == -1 { $str = 'Star' }
+        if $mi == 1 && $ma == -1 { $str = 'Plus' }
+        if $mi == 0 && $ma ==  1 { $str = 'Opt' }
+
+        if $str {
+            [ $str, $.zyg[0].lad ];
+        } else {
+            [ 'Imp' ];
+        }
+    }
+
 }
 
 CgOp._register_ops: <

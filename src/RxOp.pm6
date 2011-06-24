@@ -122,7 +122,10 @@ class Quantifier is RxOp {
     has $.minimal = die "RxOp::Quantifier.minimal required"; # Bool
     has $.min = die "RxOp::Quantifier.min required"; # Int
     has $.max; # Int
+    has $.closure;
     has $.nonlisty;
+
+    method opzyg() { $!closure // () }
 
     method used_caps() {
         temp $*in_quant;
