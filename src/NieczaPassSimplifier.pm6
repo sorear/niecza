@@ -54,40 +54,15 @@ sub is_simple_var($op) {
 }
 
 our %funcs = (
-    '&infix:<=>'           => &do_assign,
-    '&infix:<=>>'          => do_builtin('pair', 2),
     '&postcircumfix:<{ }>' => &do_atkey,
     '&postcircumfix:<[ ]>' => &do_atpos,
-    '&chars'               => do_builtin('chars', 1),
-    '&defined'             => do_builtin('defined', 1),
-    '&grep'                => &do_map_grep,
-    '&infix:<eq>'          => do_builtin('streq', 2),
-    '&infix:<ge>'          => do_builtin('strge', 2),
-    '&infix:<gt>'          => do_builtin('strgt', 2),
-    '&infix:<le>'          => do_builtin('strle', 2),
-    '&infix:<lt>'          => do_builtin('strlt', 2),
-    '&infix:<ne>'          => do_builtin('strne', 2),
-    '&infix:<,>'           => &do_comma,
-    '&infix:</>'           => do_builtin('divide', 2),
-    '&infix:<->'           => do_builtin('minus', 2),
-    '&infix:<*>'           => do_builtin('mul', 2),
-    '&infix:<%>'           => do_builtin('mod', 2),
-    '&infix:<==>'          => do_builtin('numeq', 2),
-    '&infix:<>=>'          => do_builtin('numge', 2),
-    '&infix:<>>'           => do_builtin('numgt', 2),
-    '&infix:<<=>'          => do_builtin('numle', 2),
-    '&infix:<<>'           => do_builtin('numlt', 2),
-    '&infix:<!=>'          => do_builtin('numne', 2),
-    '&infix:<+>'           => do_builtin('plus', 2),
-    '&infix:<+&>'          => do_builtin('numand', 2),
-    '&infix:<+|>'          => do_builtin('numor', 2),
-    '&infix:<+^>'          => do_builtin('numxor', 2),
-    '&infix:<+<>'          => do_builtin('numlshift', 2),
-    '&infix:<+>>'          => do_builtin('numrshift', 2),
-    '&prefix:<+^>'         => do_builtin('numcompl', 1),
+
     '&last'                => do_nullary_control(2),
-    '&make'                => do_builtin('make', 1),
-    '&map'                 => &do_map_grep,
+    '&next'                => do_nullary_control(1),
+    '&proceed'             => do_nullary_control(7),
+    '&redo'                => do_nullary_control(3),
+    '&succeed'             => do_nullary_control(6),
+
     '&infix:<&>'           => do_makejunction(0),
     '&infix:<^>'           => do_makejunction(2),
     '&infix:<|>'           => do_makejunction(3),
@@ -95,52 +70,18 @@ our %funcs = (
     '&none'                => do_makejunction(9),
     '&one'                 => do_makejunction(10),
     '&any'                 => do_makejunction(11),
-    '&next'                => do_nullary_control(1),
-    '&not'                 => do_builtin('not', 1),
-    '&pop'                 => do_builtin('pop', 1),
-    '&postfix:<++>'        => do_builtin('postinc', 1),
-    '&prefix:<?>'          => do_builtin('asbool', 1),
-    '&prefix:<->'          => do_builtin('negate', 1),
-    '&prefix:<!>'          => do_builtin('not', 1),
-    '&prefix:<+>'          => do_builtin('num', 1),
-    '&prefix:<~>'          => do_builtin('asstr', 1),
-    '&proceed'             => do_nullary_control(7),
-    '&push'                => do_builtin('push', 1..*),
-    '&redo'                => do_nullary_control(3),
+
     '&return'              => &do_return_take,
-    '&shift'               => do_builtin('shift', 1),
-    '&so'                  => do_builtin('asbool', 1),
-    '&substr'              => do_builtin('substr3', 3),
-    '&succeed'             => do_nullary_control(6),
     '&take'                => &do_return_take,
-    '&unshift'             => do_builtin('unshift', 1..*),
-    '&_array_constructor'  => do_builtin('array_constructor', 1),
 );
 
-sub do_assign($body, $nv, $invname, $op) {
-    return $op unless defined my $args = no_named_params($op);
-    return $op unless $args == 2;
-    ::Op::Assign.new(lhs => $args[0], rhs => $args[1]);
-}
-
-sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) {
+sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args ~~ $expect;
     return ::Op::Builtin.new(name => $name, args => $args);
 } }
 
-sub do_map_grep($body, $nv, $invname, $op) {
-    return $op unless defined my $args = no_named_params($op);
-    return $op unless $args > 0;
-    return ::Op::Builtin.new(name => substr($invname, 1), args => $args);
-}
-
-sub do_comma($body, $nv, $invname, $op) {
-    return $op unless defined my $args = no_named_params($op);
-    return ::Op::Builtin.new(name => 'comma', args => $args);
-}
-
-sub do_return_take($body, $nv, $invname, $op) {
+sub do_return_take($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     my $parcel = ($args == 1 ?? $args[0] !!
         ::Op::CallSub.new(invocant => ::Op::Lexical.new(name => '&infix:<,>'),
@@ -150,18 +91,18 @@ sub do_return_take($body, $nv, $invname, $op) {
         ::Op::Control.new(payload => $parcel, number => 4));
 }
 
-sub do_nullary_control($number) { sub ($body, $nv, $ , $op) {
+sub do_nullary_control($number) { sub ($body, $nv, $ , $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 0;
     return ::Op::Control.new(:$number, payload => ::Op::Lexical.new(name => 'Nil'));
 } }
 
-sub do_makejunction($typecode) { sub ($body, $nv, $ , $op) {
+sub do_makejunction($typecode) { sub ($body, $nv, $ , $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return ::Op::MakeJunction.new(:$typecode, zyg => @$args);
 } }
 
-sub do_atkey($body, $nv, $invname, $op) {
+sub do_atkey($body, $nv, $invname, $op) { #OK not used
     my ($args, %named) = capture_params($op);
     return $op unless defined($args) && $args == 2;
     my $delete = %named<delete>:delete;
@@ -174,7 +115,7 @@ sub do_atkey($body, $nv, $invname, $op) {
             $exists ?? 'exists_key' !! 'at_key'), args => $args);
 }
 
-sub do_atpos($body, $nv, $invname, $op) {
+sub do_atpos($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 2;
     return ::Op::Builtin.new(name => 'at_pos', args => $args);
@@ -194,8 +135,16 @@ sub run_optree($body, $op, $nv) {
     return $op unless $inv.^isa(::Op::Lexical);
     my $invname = $inv.name;
     my $inv_lex = $body.find_lex($invname);
-    return $op unless $inv_lex && $inv_lex.^isa(::Metamodel::Lexical::SubDef)
-        && $inv_lex.body.unit.is_true_setting;
+    return $op unless $inv_lex && $inv_lex.^isa(::Metamodel::Lexical::SubDef);
+
+    if $inv_lex.body.extend<builtin> -> $B {
+        return $op unless defined my $args = no_named_params($op);
+        return $op unless $args >= $B[1] &&
+            (!defined($B[2]) || $args <= $B[2]);
+        return ::Op::Builtin.new(name => $B[0], args => $args);
+    }
+
+    return $op unless $inv_lex.body.unit.is_true_setting;
     return $op unless my $func = %funcs{$invname};
 
     $func($body, $nv, $invname, $op);

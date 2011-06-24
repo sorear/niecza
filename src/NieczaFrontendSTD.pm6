@@ -42,7 +42,7 @@ method function_O($name) {
     }
 
     if $sub ~~ ::Metamodel::StaticSub {
-        return $sub.prec_info;
+        return $sub.extend<prec>;
     } else {
         return Any;
     }

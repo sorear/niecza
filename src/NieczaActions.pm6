@@ -2554,12 +2554,12 @@ method process_block_traits($/, @tr) {
                 next;
             }
             my %new = %$oprec;
-            $sub.prec_info = %new;
-            $sub.prec_info.<prec> ~~ s/\=/<=/ if $rel eq 'looser';
-            $sub.prec_info.<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+            $sub.extend.<prec> = %new;
+            $sub.extend.<prec><prec> ~~ s/\=/<=/ if $rel eq 'looser';
+            $sub.extend.<prec><prec> ~~ s/\=/>=/ if $rel eq 'tighter';
         } elsif !$pack && $tr<assoc> {
             my $arg = ~self.trivial_eval($T, $tr<assoc>);
-            unless $sub.prec_info {
+            unless $sub.extend<prec> {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
                 next;
             }
@@ -2568,15 +2568,18 @@ method process_block_traits($/, @tr) {
                 $T.CURSOR.sorry("Invalid associativity $arg");
                 next;
             }
-            $sub.prec_info.<assoc> = $arg;
+            $sub.extend.<prec><assoc> = $arg;
         } elsif !$pack && $tr<Niecza::absprec> {
             my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
-            unless $sub.prec_info {
+            unless $sub.extend.<prec> {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
                 next;
             }
-            $sub.prec_info.<prec> = $arg;
-            $sub.prec_info.<dba> = "like $sub.name()";
+            $sub.extend.<prec><prec> = $arg;
+            $sub.extend.<prec><dba> = "like $sub.name()";
+        } elsif !$pack && $tr<Niecza::builtin> {
+            $sub.extend.<builtin> = [
+                self.trivial_eval($T, $tr<Niecza::builtin>) ];
         } elsif !$pack && $tr<return_pass> {
             $sub.returnable = False;
         } elsif !$pack && $tr<of> {
@@ -3174,7 +3177,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         my $std = $/.CURSOR;
         if $sub.name ~~ /^(\w+)\:\<(.*)\>$/ {
             my %new = %( $std.default_O(~$0, ~$1) );
-            $sub.prec_info = %new;
+            $sub.extend.<prec> = %new;
         }
     }).();
 

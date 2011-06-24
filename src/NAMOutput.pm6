@@ -126,14 +126,14 @@ augment class Metamodel::StaticSub { #OK exist
             ($.signature && [ map { $_.to_nam }, @( $.signature.params ) ]),
             [ map { [ $_, @( $.lexicals{$_}.to_nam ) ] },
                 sort keys $.lexicals ],
-            $.prec_info,
+            $.extend,
         ]
     }
 }
 
 sub sub_from_nam(@block) {
     my ($kind, $name, $outer, $flags, $zyg, #OK
-        $cls, $ltm, $sig, $rlx, $prec) = @block; #OK
+        $cls, $ltm, $sig, $rlx, $ext) = @block; #OK
     # Most of these are used only by code-gen.  Lexicals are injected later.
 
     ::Metamodel::StaticSub.new(
@@ -145,7 +145,7 @@ sub sub_from_nam(@block) {
         run_once => ?($flags +& 1),
         spad_exists => ?($flags +& 2),
         transparent => ?($flags +& 64),
-        prec_info => $prec,
+        extend => $ext,
         zyg => [],
         class => $cls,
         ltm => $ltm,

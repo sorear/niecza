@@ -501,7 +501,9 @@ class StaticSub is RefTarget {
     has Bool $.unsafe is rw = False; # disallowed in safe mode
     has Str $.class is rw = 'Sub';
     has $.ltm is rw;
-    has $.prec_info is rw;
+    # a place to hang off extra stuff that's not used for most subs
+    # currently: "prec" for operators, "builtin" for primitives
+    has $.extend is rw;
 
     # used during parse only
     has Str $.outervar is rw; # Xref, used during parse

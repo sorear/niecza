@@ -87,16 +87,16 @@ namespace Niecza.CLRBackend {
             while (true) {
                 i = input[ix];
                 if (i == '\t' || i == ' ' || i == '\r' || i == '\n' ||
-                        i == ',') {
+                        i == ',' || i == ':') {
                     ix++;
                     continue;
                 }
-                if (i == '[') {
+                if (i == '[' || i == '{') {
                     containers.Add(new List<object>());
                     ix++;
                     continue;
                 }
-                if (i == ']') {
+                if (i == ']' || i == '}') {
                     object[] r = containers[containers.Count - 1].ToArray();
                     containers.RemoveAt(containers.Count - 1);
                     if (containers.Count == 0) return r;
@@ -146,7 +146,7 @@ namespace Niecza.CLRBackend {
                 while (true) {
                     i = input[ix];
                     if (i == ',' || i == '\r' || i == '\t' || i == '\n' ||
-                            i == ' ' || i == ']')
+                            i == ' ' || i == ']' || i == '}')
                         break;
                     ix++;
                 }
