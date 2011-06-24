@@ -416,35 +416,35 @@ public class Builtins {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
 
-    static Func<Variable,Variable,Variable> bif_numeq_d = bif_numeq;
-    public static Variable bif_numeq(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_EQUAL, bif_numeq_d);
+    static Func<Variable,Variable,Variable> numeq_d = numeq;
+    public static Variable numeq(Variable v1, Variable v2) {
+        return numcompare(v1, v2, O_IS_EQUAL, numeq_d);
     }
 
-    public static Variable bif_numne(Variable v1, Variable v2) {
+    public static Variable numne(Variable v1, Variable v2) {
         // NOTE that junctionalization uses == !  See check in numcompare
         return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD,
-                bif_numeq_d);
+                numeq_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_numlt_d = bif_numlt;
-    public static Variable bif_numlt(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_LESS, bif_numlt_d);
+    static Func<Variable,Variable,Variable> numlt_d = numlt;
+    public static Variable numlt(Variable v1, Variable v2) {
+        return numcompare(v1, v2, O_IS_LESS, numlt_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_numle_d = bif_numle;
-    public static Variable bif_numle(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, bif_numle_d);
+    static Func<Variable,Variable,Variable> numle_d = numle;
+    public static Variable numle(Variable v1, Variable v2) {
+        return numcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, numle_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_numgt_d = bif_numgt;
-    public static Variable bif_numgt(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_GREATER, bif_numgt_d);
+    static Func<Variable,Variable,Variable> numgt_d = numgt;
+    public static Variable numgt(Variable v1, Variable v2) {
+        return numcompare(v1, v2, O_IS_GREATER, numgt_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_numge_d = bif_numge;
-    public static Variable bif_numge(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, bif_numge_d);
+    static Func<Variable,Variable,Variable> numge_d = numge;
+    public static Variable numge(Variable v1, Variable v2) {
+        return numcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, numge_d);
     }
 
     public static Variable strcompare(Variable v1, Variable v2,
@@ -465,52 +465,52 @@ public class Builtins {
         return ((mask & mcom) != 0) ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    static Func<Variable,Variable,Variable> bif_streq_d = bif_streq;
-    public static Variable bif_streq(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_EQUAL, bif_streq_d);
+    static Func<Variable,Variable,Variable> streq_d = streq;
+    public static Variable streq(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_EQUAL, streq_d);
     }
 
-    public static Variable bif_strne(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD, bif_streq_d);
+    public static Variable strne(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD, streq_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_strlt_d = bif_strlt;
-    public static Variable bif_strlt(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_LESS, bif_strlt_d);
+    static Func<Variable,Variable,Variable> strlt_d = strlt;
+    public static Variable strlt(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_LESS, strlt_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_strle_d = bif_strle;
-    public static Variable bif_strle(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, bif_strle_d);
+    static Func<Variable,Variable,Variable> strle_d = strle;
+    public static Variable strle(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, strle_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_strgt_d = bif_strgt;
-    public static Variable bif_strgt(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_GREATER, bif_strgt_d);
+    static Func<Variable,Variable,Variable> strgt_d = strgt;
+    public static Variable strgt(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_GREATER, strgt_d);
     }
 
-    static Func<Variable,Variable,Variable> bif_strge_d = bif_strge;
-    public static Variable bif_strge(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, bif_strge_d);
+    static Func<Variable,Variable,Variable> strge_d = strge;
+    public static Variable strge(Variable v1, Variable v2) {
+        return strcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, strge_d);
     }
 
-    static Func<Variable,Variable,Variable,Variable> bif_substr3_d = bif_substr3;
-    public static Variable bif_substr3(Variable v1, Variable v2, Variable v3) {
+    static Func<Variable,Variable,Variable,Variable> substr3_d = substr3;
+    public static Variable substr3(Variable v1, Variable v2, Variable v3) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
-            return HandleSpecial3(v1,v2,v3, o1,o2,o3, bif_substr3_d);
+            return HandleSpecial3(v1,v2,v3, o1,o2,o3, substr3_d);
 
         int r2    = (int)o2.mo.mro_raw_Numeric.Get(v2);
         int r3    = (int)o3.mo.mro_raw_Numeric.Get(v3);
         return new SubstrLValue(v1, r2, r3);
     }
 
-    static Func<Variable,Variable,Variable> bif_plus_d = bif_plus;
-    public static Variable bif_plus(Variable a1, Variable a2) {
+    static Func<Variable,Variable,Variable> plus_d = plus;
+    public static Variable plus(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1, a2, o1, o2, bif_plus_d);
+            return HandleSpecial2(a1, a2, o1, o2, plus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -541,12 +541,12 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable,Variable> bif_minus_d = bif_minus;
-    public static Variable bif_minus(Variable a1, Variable a2) {
+    static Func<Variable,Variable,Variable> minus_d = minus;
+    public static Variable minus(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, bif_minus_d);
+            return HandleSpecial2(a1,a2, o1,o2, minus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -577,12 +577,12 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable> bif_negate_d = bif_negate;
-    public static Variable bif_negate(Variable a1) {
+    static Func<Variable,Variable> negate_d = negate;
+    public static Variable negate(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, bif_negate_d);
+            return HandleSpecial1(a1,o1, negate_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -606,12 +606,12 @@ public class Builtins {
         return MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
-    static Func<Variable,Variable> bif_abs_d = bif_abs;
-    public static Variable bif_abs(Variable a1) {
+    static Func<Variable,Variable> abs_d = abs;
+    public static Variable abs(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, bif_abs_d);
+            return HandleSpecial1(a1,o1, abs_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -640,12 +640,12 @@ public class Builtins {
         }
     }
 
-    static Func<Variable,Variable> bif_floor_d = bif_floor;
-    public static Variable bif_floor(Variable a1) {
+    static Func<Variable,Variable> floor_d = floor;
+    public static Variable floor(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, bif_floor_d);
+            return HandleSpecial1(a1,o1, floor_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -686,22 +686,22 @@ public class Builtins {
     // we don't need to do nominal checking stuff here because this
     // is in a method, never inlined, and as such the binder had to
     // already have been called.
-    public static Variable bif_complex_re(Variable a1) {
+    public static Variable complex_re(Variable a1) {
         return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).re);
     }
-    public static Variable bif_complex_im(Variable a1) {
+    public static Variable complex_im(Variable a1) {
         return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).im);
     }
-    public static Variable bif_rat_nu(Variable a1) {
+    public static Variable rat_nu(Variable a1) {
         return MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).num);
     }
-    public static Variable bif_rat_de(Variable a1) {
+    public static Variable rat_de(Variable a1) {
         return MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).den);
     }
-    public static Variable bif_fatrat_nu(Variable a1) {
+    public static Variable fatrat_nu(Variable a1) {
         return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).num);
     }
-    public static Variable bif_fatrat_de(Variable a1) {
+    public static Variable fatrat_de(Variable a1) {
         return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).den);
     }
 
@@ -766,12 +766,12 @@ public class Builtins {
         return ((mask & res) != 0) ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    static Func<Variable,Variable,Variable> bif_mul_d = bif_mul;
-    public static Variable bif_mul(Variable a1, Variable a2) {
+    static Func<Variable,Variable,Variable> mul_d = mul;
+    public static Variable mul(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, bif_mul_d);
+            return HandleSpecial2(a1,a2, o1,o2, mul_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -802,12 +802,12 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable,Variable> bif_divide_d = bif_divide;
-    public static Variable bif_divide(Variable a1, Variable a2) {
+    static Func<Variable,Variable,Variable> divide_d = divide;
+    public static Variable divide(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, bif_divide_d);
+            return HandleSpecial2(a1,a2, o1,o2, divide_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -839,12 +839,12 @@ public class Builtins {
         return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable,Variable> bif_mod_d = bif_mod;
-    public static Variable bif_mod(Variable a1, Variable a2) {
+    static Func<Variable,Variable,Variable> mod_d = mod;
+    public static Variable mod(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, bif_mod_d);
+            return HandleSpecial2(a1,a2, o1,o2, mod_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -903,7 +903,7 @@ public class Builtins {
     }
 
     // this is only called from .Int
-    public static Variable bif_coerce_to_int(Variable a1) {
+    public static Variable coerce_to_int(Variable a1) {
         int small; BigInteger big;
         return GetAsInteger(a1, out small, out big) ?
             MakeInt(big) : MakeInt(small);
@@ -912,7 +912,7 @@ public class Builtins {
     // only called from infix for now
     // when it's not, it'll need to be split anyway, I think
     // I fumbled spec reading - only 4 and 5 are actually needed
-    public static Variable bif_divop(int opc, Variable a1, Variable a2) {
+    public static Variable divop(int opc, Variable a1, Variable a2) {
         int small1, small2; BigInteger big1, big2;
         bool b1 = GetAsInteger(a1, out small1, out big1);
         bool b2 = GetAsInteger(a2, out small2, out big2);
@@ -947,7 +947,7 @@ public class Builtins {
     }
 
     // called from .Num
-    public static Variable bif_coerce_to_num(Variable a1) {
+    public static Variable coerce_to_num(Variable a1) {
         int r1;
         P6any n1 = GetNumber(a1, a1.Fetch(), out r1);
 
@@ -961,12 +961,12 @@ public class Builtins {
         }
     }
 
-    static Func<Variable,Variable> bif_sqrt_d = bif_sqrt;
-    public static Variable bif_sqrt(Variable a1) {
+    static Func<Variable,Variable> sqrt_d = sqrt;
+    public static Variable sqrt(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, bif_sqrt_d);
+            return HandleSpecial1(a1,o1, sqrt_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -981,73 +981,73 @@ public class Builtins {
         }
     }
 
-    static Func<Variable,Variable,Variable> bif_numand_d = bif_numand;
-    public static Variable bif_numand(Variable v1, Variable v2) {
+    static Func<Variable,Variable,Variable> numand_d = numand;
+    public static Variable numand(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, bif_numand_d);
+            return HandleSpecial2(v1,v2, o1,o2, numand_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 & r2);
     }
 
-    static Func<Variable,Variable,Variable> bif_numor_d = bif_numor;
-    public static Variable bif_numor(Variable v1, Variable v2) {
+    static Func<Variable,Variable,Variable> numor_d = numor;
+    public static Variable numor(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, bif_numor_d);
+            return HandleSpecial2(v1,v2, o1,o2, numor_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 | r2);
     }
 
-    static Func<Variable,Variable,Variable> bif_numxor_d = bif_numxor;
-    public static Variable bif_numxor(Variable v1, Variable v2) {
+    static Func<Variable,Variable,Variable> numxor_d = numxor;
+    public static Variable numxor(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, bif_numxor_d);
+            return HandleSpecial2(v1,v2, o1,o2, numxor_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 ^ r2);
     }
 
-    static Func<Variable,Variable,Variable> bif_numlshift_d = bif_numlshift;
-    public static Variable bif_numlshift(Variable v1, Variable v2) {
+    static Func<Variable,Variable,Variable> numlshift_d = numlshift;
+    public static Variable numlshift(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, bif_numlshift_d);
+            return HandleSpecial2(v1,v2, o1,o2, numlshift_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 << r2);
     }
 
-    static Func<Variable,Variable,Variable> bif_numrshift_d = bif_numrshift;
-    public static Variable bif_numrshift(Variable v1, Variable v2) {
+    static Func<Variable,Variable,Variable> numrshift_d = numrshift;
+    public static Variable numrshift(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, bif_numrshift_d);
+            return HandleSpecial2(v1,v2, o1,o2, numrshift_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 >> r2);
     }
 
-    static Func<Variable,Variable> bif_numcompl_d = bif_numcompl;
-    public static Variable bif_numcompl(Variable v1) {
+    static Func<Variable,Variable> numcompl_d = numcompl;
+    public static Variable numcompl(Variable v1) {
         P6any o1 = v1.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v1,o1, bif_numcompl_d);
+            return HandleSpecial1(v1,o1, numcompl_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return MakeInt(~r1);
     }
 
     // only called from .Rat
-    public static Variable bif_rat_approx(Variable v1, Variable v2) {
+    public static Variable rat_approx(Variable v1, Variable v2) {
         NominalCheck("$x", Kernel.AnyMO, v1);
         NominalCheck("$y", Kernel.AnyMO, v2);
 
@@ -1068,33 +1068,33 @@ public class Builtins {
         }
     }
 
-    public static Variable bif_postinc(Variable v) {
+    public static Variable postinc(Variable v) {
         P6any o1 = v.Fetch();
         AssignV(v, o1.mo.mro_succ.Get(v));
         return Kernel.NewROScalar(o1);
     }
 
-    public static Variable bif_not(Variable v) {
+    public static Variable not(Variable v) {
         P6any o1 = v.Fetch();
         bool r = o1.mo.mro_raw_Bool.Get(v);
         return r ? Kernel.FalseV : Kernel.TrueV;
     }
 
-    static Func<Variable,Variable> bif_chars_d = bif_chars;
-    public static Variable bif_chars(Variable v) {
+    static Func<Variable,Variable> chars_d = chars;
+    public static Variable chars(Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, bif_chars_d);
+            return HandleSpecial1(v,o1, chars_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
         return MakeInt(r.Length);
     }
 
-    static Func<Variable,Variable> bif_ord_d = bif_ord;
-    public static Variable bif_ord(Variable v) {
+    static Func<Variable,Variable> ord_d = ord;
+    public static Variable ord(Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, bif_ord_d);
+            return HandleSpecial1(v,o1, ord_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
@@ -1102,11 +1102,11 @@ public class Builtins {
         return MakeInt((int)r[0]);
     }
 
-    static Func<Variable,Variable> bif_chr_d = bif_chr;
-    public static Variable bif_chr(Variable v) {
+    static Func<Variable,Variable> chr_d = chr;
+    public static Variable chr(Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, bif_chr_d);
+            return HandleSpecial1(v,o1, chr_d);
 
         double r = o1.mo.mro_raw_Numeric.Get(v);
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
@@ -1188,12 +1188,12 @@ flat_enough:;
         return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
-    public static Variable bif_now() {
+    public static Variable now() {
         long t = DateTime.UtcNow.Ticks;
         return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
-    public static Variable bif_times() {
+    public static Variable times() {
         Process p = Process.GetCurrentProcess();
         Variable[] ret = new Variable[4];
         ret[0] = ret[2] = MakeFloat(((double)p.UserProcessorTime.Ticks) / 10000000.0);
@@ -1203,7 +1203,7 @@ flat_enough:;
 
     private static Random rng = new Random();
 
-    public static Variable bif_rand() {
+    public static Variable rand() {
         double i;
         lock (rng) { i = rng.NextDouble(); }
         return MakeFloat(i);
@@ -1298,7 +1298,7 @@ flat_enough:;
         return BoxLoS(r.Call(AppDomain.CurrentDomain, UnboxLoS(list)));
     }
 
-    public static Frame bif_simple_eval(Frame th, Variable str) {
+    public static Frame simple_eval(Frame th, Variable str) {
         if (up_domain == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
         CrossDomainReceiver r = (CrossDomainReceiver)
@@ -1315,7 +1315,7 @@ flat_enough:;
                     eval_result.Method.DeclaringType, eval_result), Kernel.AnyP);
     }
 
-    public static Variable bif_pair(Variable key, Variable value) {
+    public static Variable pair(Variable key, Variable value) {
         P6any l = new P6opaque(Kernel.PairMO);
         l.SetSlot("key", key);
         l.SetSlot("value", value);
@@ -1329,7 +1329,7 @@ flat_enough:;
             return new VarDeque(thing);
     }
 
-    public static Variable bif_array_constructor(Variable bits) {
+    public static Variable array_constructor(Variable bits) {
         VarDeque rest  = start_iter(bits);
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
@@ -1344,7 +1344,7 @@ flat_enough:;
         return fr.info.name.Substring(fr.info.name.IndexOf(" ")+1);
     }
 
-    public static Variable bif_count(P6any fcni) {
+    public static Variable count(P6any fcni) {
         int i = get_count(fcni);
         return (i == int.MaxValue) ? MakeFloat(double.PositiveInfinity) :
             MakeInt(i);
@@ -1368,7 +1368,7 @@ flat_enough:;
         return arity;
     }
 
-    public static Variable bif_arity(P6any fcni) {
+    public static Variable arity(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
         SubInfo si = (SubInfo) fcni.GetSlot("info");

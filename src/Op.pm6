@@ -62,7 +62,11 @@ method statement_level() { self }
             return $node.cgop($body) if $node ~~ Op;
             return $node if $node !~~ List;
             my ($cmd, @vals) = @$node;
-            ::GLOBAL::CgOp."$cmd"(|(map &rec, @vals));
+            if ::GLOBAL::CgOp.^can($cmd) {
+                ::GLOBAL::CgOp."$cmd"(|(map &rec, @vals));
+            } else {
+                ::GLOBAL::CgOp._cgop($cmd, |(map &rec, @vals));
+            }
         }
         rec($.optree);
     }
@@ -211,7 +215,7 @@ class SimplePair is Op {
     method zyg() { $.value }
 
     method code($body) {
-        CgOp.bif_pair(CgOp.const(CgOp.string_var($.key)), $.value.cgop($body));
+        CgOp._cgop("pair", CgOp.const(CgOp.string_var($.key)), $.value.cgop($body));
     }
 }
 
@@ -224,7 +228,7 @@ class SimpleParcel is Op {
     }
 
     method code($body) {
-        CgOp.bif_comma(map { $_.cgop($body) }, @$.items);
+        CgOp._cgop("comma", map { $_.cgop($body) }, @$.items);
     }
 }
 
@@ -841,7 +845,7 @@ class Builtin is Op {
 
     method code($body) {
         my @a = (map { $_.cgop($body) }, @$.args);
-        CgOp."bif_$.name"(|@a);
+        CgOp._cgop($!name, |@a);
     }
 }
 

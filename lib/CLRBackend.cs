@@ -3393,7 +3393,7 @@ dynamic:
 
                 return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_SFH, z);
             };
-            handlers["bif_comma"] = delegate(NamProcessor th, object[] zyg) {
+            handlers["comma"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWListVar,
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.FVarList),
                         CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(1, zyg, th.Scan)),
@@ -3617,11 +3617,11 @@ dynamic:
             thandlers["vvarlist_sort"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_SortHelper,
                     CpsOp.CallFrame(), z[0], z[1]); };
-            thandlers["bif_make"] = delegate(CpsOp[] z) {
+            thandlers["make"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Builtins_Make,
                         CpsOp.CallFrame(), z[0]); };
-            thandlers["bif_simple_eval"] = Methody(Tokens.Variable,
-                    Tokens.Builtins.GetMethod("bif_simple_eval"));
+            thandlers["simple_eval"] = Methody(Tokens.Variable,
+                    Tokens.Builtins.GetMethod("simple_eval"));
             thandlers["you_are_here"] = Methody(Tokens.Variable,
                     Tokens.Builtins.GetMethod("you_are_here"));
             thandlers["callnext"] = Methody(Tokens.Variable,
@@ -3643,10 +3643,10 @@ dynamic:
             thandlers["iter_hasarg"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_IterHasFlat,
                     z[0], CpsOp.BoolLiteral(false)); };
-            thandlers["bif_map"] = delegate(CpsOp[] z) {
+            thandlers["map"] = delegate(CpsOp[] z) {
                 return CpsOp.CpsCall(Tokens.Variable, Tokens.Builtins_MEMap,
                         CpsOp.NewArray(Tokens.Variable, z)); };
-            thandlers["bif_grep"] = delegate(CpsOp[] z) {
+            thandlers["grep"] = delegate(CpsOp[] z) {
                 return CpsOp.CpsCall(Tokens.Variable, Tokens.Builtins_MEGrep,
                         CpsOp.NewArray(Tokens.Variable, z)); };
             thandlers["newrwscalar"] = delegate(CpsOp[] z) {
@@ -3692,13 +3692,13 @@ dynamic:
                     CpsOp.IntLiteral(1));
             };
             MethodInfo itcommon = Tokens.Builtins.GetMethod("HashIter");
-            thandlers["bif_hash_keys"] = delegate(CpsOp[] z) {
+            thandlers["hash_keys"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(0), z[0]); };
-            thandlers["bif_hash_values"] = delegate(CpsOp[] z) {
+            thandlers["hash_values"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(1), z[0]); };
-            thandlers["bif_hash_kv"] = delegate(CpsOp[] z) {
+            thandlers["hash_kv"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(2), z[0]); };
-            thandlers["bif_hash_pairs"] = delegate(CpsOp[] z) {
+            thandlers["hash_pairs"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(itcommon, CpsOp.IntLiteral(3), z[0]); };
             Func<CpsOp[], CpsOp> real_pushcut = RxCall(null, "PushCutGroup");
             handlers["pushcut"] = delegate(NamProcessor th, object[] z) {
@@ -3855,18 +3855,18 @@ dynamic:
             thandlers["newarray"] = Methody(null, Tokens.Kernel_CreateArray);
             thandlers["newhash"] = Methody(null, Tokens.Kernel_CreateHash);
 
-            thandlers["bif_shift"] = Contexty("mro_shift");
-            thandlers["bif_pop"] = Contexty("mro_pop");
-            thandlers["bif_push"] = Pushy("mro_push");
-            thandlers["bif_unshift"] = Pushy("mro_unshift");
+            thandlers["shift"] = Contexty("mro_shift");
+            thandlers["pop"] = Contexty("mro_pop");
+            thandlers["push"] = Pushy("mro_push");
+            thandlers["unshift"] = Pushy("mro_unshift");
 
-            thandlers["bif_defined"] = Contexty("mro_defined");
-            thandlers["bif_bool"] = Contexty("mro_Bool");
-            thandlers["bif_num"] = Contexty("mro_Numeric");
-            thandlers["bif_str"] = Contexty("mro_Str");
-            thandlers["bif_item"] = Contexty("mro_item");
-            thandlers["bif_list"] = Contexty("mro_list");
-            thandlers["bif_hash"] = Contexty("mro_hash");
+            thandlers["defined"] = Contexty("mro_defined");
+            thandlers["asbool"] = Contexty("mro_Bool");
+            thandlers["num"] = Contexty("mro_Numeric");
+            thandlers["asstr"] = Contexty("mro_Str");
+            thandlers["item"] = Contexty("mro_item");
+            thandlers["list"] = Contexty("mro_list");
+            thandlers["hash"] = Contexty("mro_hash");
             thandlers["obj_asdef"] = Contexty("mro_defined");
             thandlers["obj_asbool"] = Contexty("mro_Bool");
             thandlers["obj_asnum"] = Contexty("mro_Numeric");
@@ -3875,12 +3875,12 @@ dynamic:
             thandlers["obj_getdef"] = Contexty("mro_raw_defined");
             thandlers["obj_getnum"] = Contexty("mro_raw_Numeric");
             thandlers["obj_getstr"] = Contexty("mro_raw_Str");
-            thandlers["bif_at_key"] = thandlers["obj_at_key"] = Contexty("mro_at_key");
-            thandlers["bif_at_pos"] = thandlers["obj_at_pos"] = Contexty("mro_at_pos");
-            thandlers["bif_exists_key"] = thandlers["obj_exists_key"] = Contexty("mro_exists_key");
-            thandlers["bif_delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
-            thandlers["bif_cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
-            thandlers["bif_zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
+            thandlers["at_key"] = thandlers["obj_at_key"] = Contexty("mro_at_key");
+            thandlers["at_pos"] = thandlers["obj_at_pos"] = Contexty("mro_at_pos");
+            thandlers["exists_key"] = thandlers["obj_exists_key"] = Contexty("mro_exists_key");
+            thandlers["delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
+            thandlers["cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
+            thandlers["zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
             thandlers["var_get_var"] = Methody(null, Tokens.Variable.GetMethod("GetVar"));
             thandlers["var_new_tied"] = Constructy(typeof(TiedVariable).GetConstructor(new Type[] { Tokens.STable, Tokens.P6any, Tokens.P6any, Tokens.P6any }));
             thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));

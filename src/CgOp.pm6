@@ -23,18 +23,8 @@ method _register_ops(*@ops) {
 }
 
 CgOp._register_ops: <
-        ann arith assign bget bif_array_constructor bif_at_key bif_at_pos
-        bif_bool bif_chars bif_chr bif_coerce_to_int bif_coerce_to_num
-        bif_comma bif_cross bif_defined bif_delete_key bif_divide
-        bif_exists_key bif_gettimeofday bif_grep bif_hash bif_hash_keys
-        bif_hash_kv bif_hash_pairs bif_hash_values bif_item bif_list
-        bif_make bif_map bif_minus bif_mod bif_mul bif_negate bif_not
-        bif_now bif_num bif_numand bif_numcompl bif_numeq bif_numge
-        bif_numgt bif_numle bif_numlshift bif_numlt bif_numne bif_numor
-        bif_numrshift bif_numxor bif_ord bif_pair bif_plus bif_postinc
-        bif_rand bif_rat_approx bif_simple_eval bif_str bif_streq
-        bif_strge bif_strgt bif_strle bif_strlt bif_strne bif_substr3
-        bif_zip bool box boxlist bset callframe callnext call_uncloned_sub
+        ann arith assign bget
+        bool box boxlist bset callframe callnext call_uncloned_sub
         cast cgoto char class_ref compare const context_get control
         corelex cotake cursor_ast cursor_backing cursor_butpos cursor_dows
         cursor_fresh cursor_from cursor_item cursor_O cursor_pos
@@ -74,8 +64,8 @@ CgOp._register_ops: <
         vvarlist_count vvarlist_from_fvarlist vvarlist_item
         vvarlist_new_empty vvarlist_new_singleton vvarlist_pop
         vvarlist_push vvarlist_shift vvarlist_sort vvarlist_to_fvarlist
-        vvarlist_unshift vvarlist_unshiftn whileloop xspan bif_times
-        bif_divop obj_can bif_sqrt bif_push bif_pop bif_unshift bif_shift
+        vvarlist_unshift vvarlist_unshiftn whileloop xspan times
+        divop obj_can sqrt push pop unshift shift
         newarray newhash you_are_here frame_outer frame_sub makejunction
         >;
 

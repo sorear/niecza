@@ -62,9 +62,9 @@ my class Regex  { ... }
 my class Num    { ... }
 my class Str    { ... }
 my class Cool {
-    method Rat($eps = 1e-6) { Q:CgOp { (bif_rat_approx {self} {$eps}) } }
-    method Int() { Q:CgOp { (bif_coerce_to_int {self}) } }
-    method Num() { Q:CgOp { (bif_coerce_to_num {self}) } }
+    method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
+    method Int() { Q:CgOp { (coerce_to_int {self}) } }
+    method Num() { Q:CgOp { (coerce_to_num {self}) } }
     method abs() { abs self }
     method floor() { floor self }
     method ceiling() { ceiling self }
@@ -268,24 +268,24 @@ my class Rat is Real {
     method new($n,$d) { $n / $d }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
-    method numerator() { Q:CgOp { (_cgop bif_rat_nu {self}) } }
-    method denominator() { Q:CgOp { (_cgop bif_rat_de {self}) } }
+    method numerator() { Q:CgOp { (rat_nu {self}) } }
+    method denominator() { Q:CgOp { (rat_de {self}) } }
     method nude() { [ self.numerator, self.denominator ] }
 }
 my class Complex is Numeric {
     method new($re,$im) { $re + $im\i }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
-    method re() { Q:CgOp { (_cgop bif_complex_re {self}) } }
-    method im() { Q:CgOp { (_cgop bif_complex_im {self}) } }
+    method re() { Q:CgOp { (complex_re {self}) } }
+    method im() { Q:CgOp { (complex_im {self}) } }
     method conjugate() { self.re - (self.im)i }
 }
 my class FatRat is Real {
     method new($n,$d) { FatRat.succ * $n / $d }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
-    method numerator() { Q:CgOp { (_cgop bif_fatrat_nu {self}) } }
-    method denominator() { Q:CgOp { (_cgop bif_fatrat_de {self}) } }
+    method numerator() { Q:CgOp { (fatrat_nu {self}) } }
+    method denominator() { Q:CgOp { (fatrat_de {self}) } }
     method nude() { [ self.numerator, self.denominator ] }
 }
 
@@ -328,8 +328,8 @@ my class Code is Callable {
 
 my class Block is Code {
     method ACCEPTS(Mu $t) { defined(self) ?? (self)($t) !! $t.^does(self) }
-    method count() { Q:CgOp { (_cgop bif_count (@ {self})) } }
-    method arity() { Q:CgOp { (_cgop bif_arity (@ {self})) } }
+    method count() { Q:CgOp { (count (@ {self})) } }
+    method arity() { Q:CgOp { (arity (@ {self})) } }
 }
 
 my class Routine is Block {
@@ -349,7 +349,7 @@ my class ClassHOW {
     } }
     method does(Mu $obj, Mu $role) { self.isa($obj, $role) } #no roles yet
     method can(Mu $obj, $name) { Q:CgOp {
-        (box Bool (_cgop obj_can (@ {$obj}) (obj_getstr {$name})))
+        (box Bool (obj_can (@ {$obj}) (obj_getstr {$name})))
     } }
 }
 
@@ -525,14 +525,14 @@ sub infix:<but>($obj, $role) is equiv<leg> { Q:CgOp {
 
 sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
 
-sub ord($x) { Q:CgOp { (bif_ord {$x}) } }
-sub chr($x) { Q:CgOp { (bif_chr {$x}) } }
-sub infix:<+&> is Niecza::absprec<u=> ($x, $y) { Q:CgOp { (bif_numand {$x} {$y}) } }
-sub infix:<+|>($x, $y) { Q:CgOp { (bif_numor {$x} {$y}) } }
-sub infix:<+^>($x, $y) { Q:CgOp { (bif_numxor {$x} {$y}) } }
-sub infix:<< +< >>($x, $y) is Niecza::absprec<u=> { Q:CgOp { (bif_numlshift {$x} {$y}) } }
-sub infix:<< +> >>($x, $y) is Niecza::absprec<u=> { Q:CgOp { (bif_numrshift {$x} {$y}) } }
-sub prefix:<< +^ >>($x) { Q:CgOp { (bif_numcompl {$x}) } }
+sub ord($x) { Q:CgOp { (ord {$x}) } }
+sub chr($x) { Q:CgOp { (chr {$x}) } }
+sub infix:<+&> is Niecza::absprec<u=> ($x, $y) { Q:CgOp { (numand {$x} {$y}) } }
+sub infix:<+|>($x, $y) { Q:CgOp { (numor {$x} {$y}) } }
+sub infix:<+^>($x, $y) { Q:CgOp { (numxor {$x} {$y}) } }
+sub infix:<< +< >>($x, $y) is Niecza::absprec<u=> { Q:CgOp { (numlshift {$x} {$y}) } }
+sub infix:<< +> >>($x, $y) is Niecza::absprec<u=> { Q:CgOp { (numrshift {$x} {$y}) } }
+sub prefix:<< +^ >>($x) { Q:CgOp { (numcompl {$x}) } }
 
 # }}}
 # Flow inspection and control {{{
@@ -545,7 +545,7 @@ my class CallFrame {
             {Any}))
     } }
     method dynamic-caller() { Q:CgOp {
-        (letn c (_cgop frame_dyn_caller (cast frame (@ {self})))
+        (letn c (frame_dyn_caller (cast frame (@ {self})))
           (ternary
             (!= (l c) (null frame))
             (ns (l c))
@@ -556,9 +556,9 @@ my class CallFrame {
         (cast frame (@ {self})))) } }
     method line() { Q:CgOp { (box Num (cast num (frame_line
         (cast frame (@ {self}))))) } }
-    method subname() { Q:CgOp { (box Str (_cgop frame_subname
+    method subname() { Q:CgOp { (box Str (frame_subname
         (cast frame (@ {self})))) } } 
-    method args() { Q:CgOp { (_cgop frame_args (cast frame (@ {self}))) } } 
+    method args() { Q:CgOp { (frame_args (cast frame (@ {self}))) } } 
 
     method hints($var) { Q:CgOp { (frame_hint (cast frame (@ {self}))
         (obj_getstr {$var})) } }
@@ -842,11 +842,11 @@ my class Hash {
         }
     }
 
-    method keys()   { Q:CgOp { (bif_hash_keys   {self}) } }
-    method values() { Q:CgOp { (bif_hash_values {self}) } }
-    method pairs()  { Q:CgOp { (bif_hash_pairs  {self}) } }
-    method list()   { Q:CgOp { (bif_hash_pairs  {self}) } }
-    method kv()     { Q:CgOp { (bif_hash_kv     {self}) } }
+    method keys()   { Q:CgOp { (hash_keys   {self}) } }
+    method values() { Q:CgOp { (hash_values {self}) } }
+    method pairs()  { Q:CgOp { (hash_pairs  {self}) } }
+    method list()   { Q:CgOp { (hash_pairs  {self}) } }
+    method kv()     { Q:CgOp { (hash_kv     {self}) } }
 
     method Numeric() { +@(self) }
 
@@ -1065,16 +1065,16 @@ sub _newtiedscalar(Mu $type, $bind, $fetch, $store) {
 }
 
 sub infix:<X>(\|$pcl) is Niecza::absprec<f=> is assoc<list> {
-    Q:CgOp { (bif_cross (b 0) (unbox fvarlist (@ {$pcl}))) }
+    Q:CgOp { (cross (b 0) (unbox fvarlist (@ {$pcl}))) }
 }
 sub infix:<Z>(\|$pcl) is equiv<X> {
-    Q:CgOp { (bif_zip (b 0) (unbox fvarlist (@ {$pcl}))) }
+    Q:CgOp { (zip (b 0) (unbox fvarlist (@ {$pcl}))) }
 }
 sub zipop(\|$pcl) {
-    Q:CgOp { (bif_zip (b 1) (unbox fvarlist (@ {$pcl}))) }
+    Q:CgOp { (zip (b 1) (unbox fvarlist (@ {$pcl}))) }
 }
 sub crossop(\|$pcl) {
-    Q:CgOp { (bif_cross (b 1) (unbox fvarlist (@ {$pcl}))) }
+    Q:CgOp { (cross (b 1) (unbox fvarlist (@ {$pcl}))) }
 }
 sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
     if $triangle {
@@ -1258,7 +1258,7 @@ my class Regex is Method {
         Q:CgOp {
             (letn res {self.ACCEPTS($fr.hints('$_'))}
               (set_status (s $*/) {$/})
-              (bif_bool (l res)))
+              (asbool (l res)))
         };
     }
 
@@ -1606,14 +1606,14 @@ sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ +$limit }
 sub prefix:<so> is Niecza::absprec<h=> (Mu $item) { ?$item }
 sub infix:<xx> is Niecza::absprec<s=> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
-sub prefix:<abs> ($x) { Q:CgOp { (_cgop bif_abs {$x}) } }
-sub floor($x) { Q:CgOp { (_cgop bif_floor {$x}) } }
+sub prefix:<abs> ($x) { Q:CgOp { (abs {$x}) } }
+sub floor($x) { Q:CgOp { (floor {$x}) } }
 sub ceiling($x) { -floor(-$x) }
 sub conjugate($x) { $x.conjugate }
 sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
 sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
-sub sqrt($x) { Q:CgOp { (_cgop bif_sqrt {$x}) } }
+sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
 # XXX 'Order' type
 sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
@@ -1629,8 +1629,8 @@ sub infix:<after> ($a, $b) is equiv<==> { ($a cmp $b) > 0 }
 sub seqop($op, \$x, \$y) { $op($x,$y) } # TODO: Special case with hyper
 sub reverseop($op, \$x, \$y) { $op($y, $x) }
 
-sub infix:<div> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 4) {$x} {$y}) } }
-sub infix:<mod> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (_cgop bif_divop (i 5) {$x} {$y}) } }
+sub infix:<div> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (divop (i 4) {$x} {$y}) } }
+sub infix:<mod> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (divop (i 5) {$x} {$y}) } }
 sub infix:<~&> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~|> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~^> ($x, $y) { die "Buffer bitops NYI"; } #OK
@@ -1649,7 +1649,7 @@ sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 
-sub eval($str) is return-pass { Q:CgOp { (bif_simple_eval {$str}) } }
+sub eval($str) is return-pass { Q:CgOp { (simple_eval {$str}) } }
 
 sub rungather($ ) { die "Run NYI" }
 # }}}
@@ -1664,11 +1664,11 @@ my class Instant {
     method to-posix() { ($!val, False) }
 }
 sub term:« now »() {
-    Instant.new( val => Q:CgOp { (bif_now) } );
+    Instant.new( val => Q:CgOp { (now) } );
 }
-sub times() { Q:CgOp { (_cgop bif_times) } }
-sub term:« time »() { Q:CgOp { (bif_now) } }
-sub term:« rand »() { Q:CgOp { (bif_rand) } }
+sub times() { Q:CgOp { (times) } }
+sub term:« time »() { Q:CgOp { (now) } }
+sub term:« rand »() { Q:CgOp { (rand) } }
 
 my class IO {
     has $.path; # Str

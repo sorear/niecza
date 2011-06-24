@@ -205,45 +205,45 @@ treated as no name; such handlers can only be reached anonymously.
 
 =head3 arith
 
-=head3 bif_divide
+=head3 divide
 
-=head3 bif_minus
+=head3 minus
 
-=head3 bif_mod
+=head3 mod
 
-=head3 bif_mul
+=head3 mul
 
-=head3 bif_negate
+=head3 negate
 
-=head3 bif_numand
+=head3 numand
 
-=head3 bif_numcompl
+=head3 numcompl
 
-=head3 bif_numeq
+=head3 numeq
 
-=head3 bif_numge
+=head3 numge
 
-=head3 bif_numgt
+=head3 numgt
 
-=head3 bif_numle
+=head3 numle
 
-=head3 bif_numlshift
+=head3 numlshift
 
-=head3 bif_numlt
+=head3 numlt
 
-=head3 bif_numne
+=head3 numne
 
-=head3 bif_numor
+=head3 numor
 
-=head3 bif_numrshift
+=head3 numrshift
 
-=head3 bif_numxor
+=head3 numxor
 
-=head3 bif_plus(var $left,var $right) is pure
+=head3 plus(var $left,var $right) is pure
 
 Adds $left and $right together.
 
-=head3 bif_postinc
+=head3 postinc
 
 =head3 double
 
@@ -316,25 +316,25 @@ the first rw binding, per the autovivification protocol.
 
 =head2 Operations on strings
 
-=head3 bif_chars
+=head3 chars
 
-=head3 bif_chr
+=head3 chr
 
-=head3 bif_ord
+=head3 ord
 
-=head3 bif_streq
+=head3 streq
 
-=head3 bif_strge
+=head3 strge
 
-=head3 bif_strgt
+=head3 strgt
 
-=head3 bif_strle
+=head3 strle
 
-=head3 bif_strlt
+=head3 strlt
 
-=head3 bif_strne
+=head3 strne
 
-=head3 bif_substr3
+=head3 substr3
 
 =head3 char
 
@@ -363,7 +363,7 @@ the first rw binding, per the autovivification protocol.
 
 =head2 Regex engine operations
 
-=head3 bif_make
+=head3 make
 
 =head3 cursor_ast
 
@@ -454,18 +454,18 @@ the first rw binding, per the autovivification protocol.
 
 =head2 Operations on Perl 6 lists
 
-=head3 bif_array_constructor
+=head3 array_constructor
 
-=head3 bif_cross($usefun,$fvarlist)
+=head3 cross($usefun,$fvarlist)
 
 Implements C<X> or C<Xop>; if C<$usefun> is true, the first item in
 C<$fvarlist> is taken as a function reference.
 
-=head3 bif_grep
+=head3 grep
 
-=head3 bif_map
+=head3 map
 
-=head3 bif_zip($usefun,$fvarlist)
+=head3 zip($usefun,$fvarlist)
 
 Implements C<Z> or C<Zop>; if C<$usefun> is true, the first item in
 C<$fvarlist> is taken as a function reference.
@@ -574,7 +574,7 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 =head2 Operations involving the operating system
 
-=head3 bif_gettimeofday
+=head3 gettimeofday
 
 =head3 exit
 
@@ -617,27 +617,27 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 =head2 Operations invoking the context system
 
-=head3 bif_at_key
+=head3 at_key
 
-=head3 bif_at_pos
+=head3 at_pos
 
-=head3 bif_bool
+=head3 asbool
 
-=head3 bif_defined
+=head3 defined
 
-=head3 bif_delete_key
+=head3 delete_key
 
-=head3 bif_exists_key
+=head3 exists_key
 
-=head3 bif_hash
+=head3 hash
 
-=head3 bif_item
+=head3 item
 
-=head3 bif_list
+=head3 list
 
-=head3 bif_num
+=head3 num
 
-=head3 bif_str
+=head3 asstr
 
 =head3 obj_asbool
 
@@ -668,13 +668,13 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 =head2 Operations on hashes
 
-=head3 bif_hash_keys
+=head3 hash_keys
 
-=head3 bif_hash_kv
+=head3 hash_kv
 
-=head3 bif_hash_pairs
+=head3 hash_pairs
 
-=head3 bif_hash_values
+=head3 hash_values
 
 =head3 varhash_clear
 
@@ -795,7 +795,7 @@ repeat..while.  If C<$until> is passed, the condition is inverted.
 
 =head2 Operations on booleans
 
-=head3 bif_not
+=head3 not
 
 =head3 bool
 
