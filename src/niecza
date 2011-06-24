@@ -47,6 +47,16 @@ method quantified_atom($/) { # :: RxOp
     if defined $q<min> {
         my @z = $atom;
         push @z, $q<sep> if defined $q<sep>;
+        # parsing quirk, x #`(1) ** #`(2) y, the 1* position is counted
+        # as $<normspace> but the 2* is parsed by the quantifier
+        if $q<general> && %*RX<s> && ($q<space> || $<normspace>) {
+            if @z[1] {
+                @z[1] = ::RxOp::Sequence.new(zyg => [
+                    ::RxOp::Sigspace.new, @z[1], ::RxOp::Sigspace.new]);
+            } else {
+                push @z, ::RxOp::Sigspace.new;
+            }
+        }
         $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
             nonlisty => $q<nonlisty>, closure => $q<closure>,
             zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
