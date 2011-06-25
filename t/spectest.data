@@ -35,6 +35,7 @@ S03-operators/binding-scalars.t
 S03-operators/bit.t
 S03-operators/chained-declarators.t
 S03-operators/not.t
+S03-operators/overflow.t
 S03-operators/range-basic.t
 S03-operators/relational.t
 S03-operators/repeat.t

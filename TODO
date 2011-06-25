@@ -20,7 +20,7 @@ EASY
 
    Fudge and run your favorite spectest file.
 
-   Stuff spectests are blocking on: "closure for",
+   Stuff spectests are blocking on: "closure for", :16(),
    constants in signatures, ::T, ...
 
 MEDIUM
