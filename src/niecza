@@ -26,6 +26,17 @@ use STD;
 grammar STD::P5 { }
 grammar STD::P5::Regex { }
 
+augment grammar STD {
+method lookup_compiler_var($name) {
+    state %builtin_hints = < $?LINE $?POSITION &?BLOCK &?ROUTINE > X=> True;
+
+    unless %builtin_hints{$name} || defined self.lookup_lex($name)
+    {
+        self.sorry("Unrecognized variable: $name");
+    }
+}
+}
+
 augment grammar STD::P6 { #OK
     token label { <identifier> ':' <?before \s> <.ws> }
 }
