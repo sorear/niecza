@@ -31,6 +31,25 @@ augment grammar STD::P6 { #OK
 }
 
 augment class NieczaActions {
+method make_constant($/, $scope, $name) {
+    # hints must be lexically scoped
+    $scope := $scope || (substr($name,1,1) eq '?' ?? 'my' !! 'our');
+
+    my $slot = ($scope eq 'my' || $scope eq 'our') ?? $name !! self.gensym;
+
+    $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
+        if $scope eq 'our' {
+            $*CURLEX<!sub>.add_common_name($slot, $*CURLEX<!sub>.cur_pkg,
+                $name, |mnode($/));
+        } else {
+            $*CURLEX<!sub>.add_hint($slot, |mnode($/));
+        }
+    });
+
+    ::Op::ConstantDecl.new(|node($/), name => $slot, init => False);
+}
+
 method quantified_atom($/) { # :: RxOp
     my $atom = $<atom>.ast;
     my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;
