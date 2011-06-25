@@ -18,6 +18,9 @@ S02-literals/pair-boolean.t
 S02-literals/string-interpolation.t
 S02-literals/types.t
 S02-literals/underscores.t
+S02-magicals/block.t
+S02-magicals/file_line.t
+S02-magicals/sub.t
 S02-names_and_variables/contextual.t
 S02-names/identifier.t
 S02-whitespace_and_comments/begin_end_pod.t
