@@ -914,33 +914,8 @@ gotit:
                 } else {
                     bool islist = ((flags & SIG_F_BINDLIST) != 0);
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
-                    P6any srco;
+                    P6any srco  = src.Fetch();
 
-                    if (rw && !src.rw)
-                        return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
-                    // fast path
-                    if (rw == src.rw && islist == src.islist) {
-                        if (!src.type.HasMRO(type)) {
-                            if (quiet) return null;
-                            if (src.Fetch().mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
-                                int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)src.Fetch()).slots[0]) / 2;
-                                if (jrank < jun_rank) {
-                                    jun_rank = jrank;
-                                    jun_pivot = obj_src;
-                                    jun_pivot_n = obj_src_n;
-                                }
-                                continue;
-                            }
-                            return Kernel.Die(th, "Nominal type check failed in binding " + PName(rbase) + "; got " + src.type.name + ", needed " + type.name);
-                        }
-                        if (src.whence != null)
-                            Kernel.Vivify(src);
-                        goto bound;
-                    }
-                    // rw = false and rhs.rw = true OR
-                    // rw = false and islist = false and rhs.islist = true OR
-                    // rw = false and islist = true and rhs.islist = false
-                    srco = src.Fetch();
                     if (!srco.Does(type)) {
                         if (quiet) return null;
                         if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
@@ -952,9 +927,26 @@ gotit:
                             }
                             continue;
                         }
-                        return Kernel.Die(th, "Nominal type check failed in binding" + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
+                        return Kernel.Die(th, "Nominal type check failed in binding " + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
                     }
-                    src = new SimpleVariable(false, islist, srco.mo, null, srco);
+
+                    if (rw) {
+                        if (src.rw) {
+                            // this will be a functional RW binding
+                            if (src.whence != null)
+                                Kernel.Vivify(src);
+                            goto bound;
+                        } else {
+                            if (quiet) return null;
+                            return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
+                        }
+                    }
+                    else {
+                        if (!src.rw && islist == src.islist)
+                            goto bound;
+                        src = new SimpleVariable(false, islist, srco.mo,
+                                null, srco);
+                    }
 bound: ;
                 }
                 if ((flags & SIG_F_INVOCANT) != 0 && self_key >= 0)
@@ -2809,37 +2801,24 @@ ltm:
         public const int NBV_LIST = 2;
         public static Variable NewBoundVar(int mode, STable type, Variable rhs) {
             bool rw = rhs.rw && (mode & NBV_RW) != 0;
-            bool islist = (mode & NBV_LIST) != 0;
-            // fast path
-            if (rw == rhs.rw && islist == rhs.islist && rhs.whence == null) {
-                if (!rhs.type.HasMRO(type))
-                    throw new NieczaException("Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
+            // we always have to fetch, because of subsets (XXX?)
+            P6any rhso = rhs.Fetch();
+            if (!rhso.Does(type))
+                throw new NieczaException("Nominal type check failed in nonparameter binding; got " + rhso.mo.name + ", needed " + type.name);
+
+            if (rw) {
+                // working RW bind implies !rhs.islist, !islist; will return
+                // rhs if successful
+                if (rhs.whence != null) Vivify(rhs);
                 return rhs;
             }
-            // ro = true and rhs.rw = true OR
-            // islist != rhs.islist OR
-            // whence != null (and rhs.rw = true)
 
-            if (!rhs.rw) {
-                P6any v = rhs.Fetch();
-                if (!v.Does(type))
-                    throw new NieczaException("Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
-                return new SimpleVariable(false, islist, v.mo, null, v);
-            }
-            // ro = true and rhw.rw = true OR
-            // whence != null
-            if (!rw) {
-                P6any v = rhs.Fetch();
-                if (!v.Does(type))
-                    throw new NieczaException("Nominal type check failed in binding; got " + v.mo.name + ", needed " + type.name);
-                return new SimpleVariable(false, islist, v.mo, null, v);
-            }
+            bool islist = (mode & NBV_LIST) != 0;
+            // if source is !rw, we may not need to fetch it
+            if (!rhs.rw && islist == rhs.islist)
+                return rhs;
 
-            if (!rhs.type.HasMRO(type))
-                throw new NieczaException("Nominal type check failed in binding; got " + rhs.type.name + ", needed " + type.name);
-
-            Vivify(rhs);
-            return rhs;
+            return new SimpleVariable(false, islist, rhso.mo, null, rhso);
         }
 
         public static Variable Assign(Variable lhs, Variable rhs) {
