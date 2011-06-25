@@ -77,7 +77,8 @@ sub beta_optimize($body, $symbol, $cbody, @inpos) {
         my $to = $d.noinit ?? CgOp.null('var') !!
                  $d.hash   ?? CgOp.newblankhash !!
                  $d.list   ?? CgOp.newblanklist !!
-                              CgOp.newtypedscalar(CgOp.class_ref("mo", $d.typeconstraint ?? @($d.typeconstraint) !! "Any"));
+                 $d.typeconstraint ?? CgOp.newtypedscalar(CgOp.class_ref("mo", @($d.typeconstraint))) !!
+                              CgOp.newblankrwscalar();
         push @scope, $dn, $nm;
         push @let, [$nm, ::Op::CgOp.new(op => $to)];
     }

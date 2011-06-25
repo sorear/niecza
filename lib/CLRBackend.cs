@@ -3595,10 +3595,10 @@ dynamic:
             };
             handlers["_newoftype"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
-                    CpsOp.GetSField((FieldInfo)z[1])); };
+                        (CpsOp)z[1]); };
             thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
-                    CpsOp.GetSField(Tokens.Kernel_AnyMO)); };
+                    CpsOp.Null(Tokens.STable)); };
             thandlers["newtypedscalar"] = Methody(null, Tokens.Kernel_NewTypedScalar);
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
@@ -4126,9 +4126,9 @@ dynamic:
                     if ((f & LexSimple.NOINIT) != 0) continue;
 
                     object bit;
-                    FieldInfo tc = ls.type == null ?
-                        Tokens.Kernel_AnyMO :
-                        ls.type.Resolve<Package>().metaObject;
+                    CpsOp tc = ls.type == null ?
+                        CpsOp.Null(Tokens.STable) :
+                        CpsOp.GetSField(ls.type.Resolve<Package>().metaObject);
                     if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
                         string s = ((f & LexSimple.HASH) != 0) ?
                             "newhash" : "newarray";

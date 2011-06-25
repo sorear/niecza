@@ -101,6 +101,30 @@ eval_lives_ok q[
     eval @frags.join;
 }
 
+{
+    lives_ok { my $x; $x = Mu },
+        "can assign Mu to default-typed variable (noninline)";
+    lives_ok { if 1 { my $x; $x = Mu } },
+        "can assign Mu to default-typed variable (inline)";
+    dies_ok { my Any $x; $x = Mu },
+        "cannot assign Mu to Any-typed variable (noninline)";
+    dies_ok { if 1 { my Any $x; $x = Mu } },
+        "cannot assign Mu to Any-typed variable (inline)";
+    ok { my $x; $x }.() === Any,
+        "default-typed variable receives Any (noninline)";
+    ok { if 1 { my $x; $x } }.() === Any,
+        "default-typed variable receives Any (inline)";
+
+    lives_ok { my @x; push @x, Mu }, "can push Mu";
+    lives_ok { my @x; push @x, 5; @x[0] = Mu }, "push creates Mu-ready vars";
+    lives_ok { my @x; unshift @x, Mu }, "can unshift Mu";
+    lives_ok { my @x; unshift @x, 5; @x[0] = Mu }, "unshift creates Mu-ready vars";
+    lives_ok { my $x; $x[0] = Mu }, "array creation autoviv supports Mu";
+    lives_ok { my @x; @x[0] = Mu }, "element creation autoviv supports Mu";
+    lives_ok { my $x; $x<a> = Mu }, "hash creation autoviv supports Mu";
+    lives_ok { my %x; %x<a> = Mu }, "hash element creation autoviv supports Mu";
+}
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {
