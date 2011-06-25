@@ -93,7 +93,7 @@ namespace Niecza {
         public override void Do(Variable toviv) {
             VarDeque vd = (VarDeque) ary.GetSlot("items");
             while (vd.Count() <= key)
-                vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
+                vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
         }
     }
@@ -105,7 +105,7 @@ namespace Niecza {
         public override void Do(Variable toviv) {
             VarDeque vd = new VarDeque();
             while (vd.Count() <= key)
-                vd.Push(Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP));
+                vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
             P6opaque d = new P6opaque(Kernel.ArrayMO);
             d.slots[0] = vd;
@@ -657,7 +657,7 @@ namespace Niecza {
                 STable type = ReadXref(ref from) as STable;
                 into.AddAttribute(name, flags,
                         init != null ? init.protosub : null,
-                        type != null ? type : Kernel.AnyMO);
+                        type);
             }
         }
     }
@@ -1598,8 +1598,7 @@ noparams:
             VarDeque iter = Builtins.start_iter(rhs);
             VarDeque items = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
-                items.Push(Kernel.NewRWScalar(Kernel.AnyMO,
-                    iter.Shift().Fetch()));
+                items.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             lhs_o.SetSlot("items", items);
             lhs_o.SetSlot("rest", iter); /*now empty*/
             return lhs;
@@ -1648,7 +1647,7 @@ noparams:
             VarDeque targ = (VarDeque)o.GetSlot("items");
             VarDeque st = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
-                st.Push(Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch()));
+                st.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             targ.UnshiftD(st);
             return v;
         }
@@ -1662,7 +1661,7 @@ noparams:
             VarDeque targ = (VarDeque)o.GetSlot("rest");
             if (targ.Count() == 0) targ = (VarDeque)o.GetSlot("items");
             while (Kernel.IterHasFlat(iter, true))
-                targ.Push(Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch()));
+                targ.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             return v;
         }
     }
@@ -1686,12 +1685,12 @@ noparams:
                     Variable k = (Variable) elt.GetSlot("key");
                     Variable v = (Variable) elt.GetSlot("value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
-                        Kernel.NewRWScalar(Kernel.AnyMO, v.Fetch());
+                        Kernel.NewMuScalar(v.Fetch());
                 } else {
                     if (!Kernel.IterHasFlat(iter, true))
                         throw new NieczaException("Unmatched key in Hash.LISTSTORE");
                     into[elt.mo.mro_raw_Str.Get(Kernel.NewROScalar(elt))] =
-                        Kernel.NewRWScalar(Kernel.AnyMO, iter.Shift().Fetch());
+                        Kernel.NewMuScalar(iter.Shift().Fetch());
                 }
                 first = false;
             }
@@ -2177,7 +2176,7 @@ tryagain:
             Variable r;
             if (h.TryGetValue(kss, out r))
                 return r;
-            return new SimpleVariable(true, false, Kernel.AnyMO,
+            return new SimpleVariable(true, false, Kernel.MuMO,
                     new HashViviHook(os, kss), Kernel.AnyP);
         }
     }
@@ -2244,7 +2243,7 @@ tryagain:
                 return Kernel.AnyMO.typeVar;
             if (items.Count() <= ix) {
                 if (extend) {
-                    return new SimpleVariable(true, false, Kernel.AnyMO,
+                    return new SimpleVariable(true, false, Kernel.MuMO,
                             new ArrayViviHook(os, ix), Kernel.AnyP);
                 } else {
                     return Kernel.AnyMO.typeVar;
@@ -2842,7 +2841,15 @@ ltm:
             return new SimpleVariable(true, false, t, null, obj);
         }
 
+        public static Variable NewMuScalar(P6any obj) {
+            return new SimpleVariable(true, false, MuMO, null, obj);
+        }
+
         public static Variable NewTypedScalar(STable t) {
+            if (t == null)
+                return new SimpleVariable(true, false, MuMO, null,
+                        AnyMO.typeObject);
+
             return new SimpleVariable(true, false, t, null, t.initObject);
         }
 
@@ -2862,7 +2869,7 @@ ltm:
         public static VarDeque IterCopyElems(VarDeque vals) {
             VarDeque nv = new VarDeque();
             for (int i = 0; i < vals.Count(); i++)
-                nv.Push(NewRWScalar(AnyMO, vals[i].Fetch()));
+                nv.Push(NewMuScalar(vals[i].Fetch()));
             return nv;
         }
 
@@ -3012,8 +3019,12 @@ value:      vx = (Variable) th.resultSlot;
             }
 
             if ((prog[i].flags & ~P6how.A_PUBLIC) == 0) {
-                n.SetSlot(prog[i].name, NewRWScalar(prog[i].type,
-                    vx != null ? vx.Fetch() : prog[i].type.initObject));
+                if (prog[i].type == null)
+                    n.SetSlot(prog[i].name, NewMuScalar(
+                        vx != null ? vx.Fetch() : AnyMO.typeObject));
+                else
+                    n.SetSlot(prog[i].name, NewRWScalar(prog[i].type,
+                        vx != null ? vx.Fetch() : prog[i].type.initObject));
             } else {
                 Variable obj = (prog[i].flags & P6how.A_HASH) != 0 ?
                     CreateHash() : CreateArray();
@@ -3086,8 +3097,8 @@ again:
                 P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
                 th.lex = new Dictionary<string,object>();
                 th.lex["!return"] = null;
-                thunk.slots[0] = NewRWScalar(AnyMO, th);
-                thunk.slots[1] = NewRWScalar(AnyMO, AnyP);
+                thunk.slots[0] = NewMuScalar(th);
+                thunk.slots[1] = NewMuScalar(AnyP);
                 outq.Push(NewROScalar(thunk));
                 return outq;
             }
@@ -3195,7 +3206,7 @@ slow:
             } else if (name.StartsWith("%")) {
                 return (stash[name] = new BValue(CreateHash()));
             } else {
-                return (stash[name] = new BValue(NewRWScalar(AnyMO, AnyP)));
+                return (stash[name] = new BValue(NewTypedScalar(null)));
             }
         }
 

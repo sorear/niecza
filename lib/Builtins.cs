@@ -1333,7 +1333,7 @@ flat_enough:;
         VarDeque rest  = start_iter(bits);
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
-            items.Push(Kernel.NewRWScalar(Kernel.AnyMO, rest.Shift().Fetch()));
+            items.Push(Kernel.NewMuScalar(rest.Shift().Fetch()));
         P6any l = new P6opaque(Kernel.ArrayMO);
         l.SetSlot("rest", rest);
         l.SetSlot("items", items);
@@ -1551,8 +1551,8 @@ again:
                     th.lex = new Dictionary<string,object>();
                     th.lex["!return"] = null;
                     th.MarkSharedChain();
-                    thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
-                    thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+                    thunk.slots[0] = Kernel.NewMuScalar(th);
+                    thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
                     P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
@@ -1680,8 +1680,8 @@ again:
                             th.lex = new Dictionary<string,object>();
                             th.lex["!return"] = null;
                             th.MarkSharedChain();
-                            thunk.slots[0] = Kernel.NewRWScalar(Kernel.AnyMO, th);
-                            thunk.slots[1] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+                            thunk.slots[0] = Kernel.NewMuScalar(th);
+                            thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
                             P6opaque lst = new P6opaque(Kernel.ListMO);
                             lst.slots[0] = outq;
                             lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));

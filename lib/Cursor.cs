@@ -495,8 +495,8 @@ public sealed class RxFrame {
             th.lex = new Dictionary<string,object>();
             th.lex["!return"] = null;
             P6opaque it  = new P6opaque(Kernel.GatherIteratorMO);
-            it.slots[0 /*frame*/] = Kernel.NewRWScalar(Kernel.AnyMO, th);
-            it.slots[1 /*reify*/] = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+            it.slots[0 /*frame*/] = Kernel.NewMuScalar(th);
+            it.slots[1 /*reify*/] = Kernel.NewMuScalar(Kernel.AnyP);
             VarDeque iss = new VarDeque();
             iss.Push(Kernel.NewROScalar(it));
             P6opaque lst = new P6opaque(Kernel.ListMO);
@@ -686,7 +686,7 @@ public class Cursor : P6any {
         Cursor nw = At(pos);
         foreach (KeyValuePair<string,Variable> kv in caps)
             nw.captures = new CapInfo(nw.captures, new string[] { kv.Key },
-                    Kernel.NewRWScalar(Kernel.AnyMO, kv.Value.Fetch()));
+                    Kernel.NewMuScalar(kv.Value.Fetch()));
         VarDeque ks = new VarDeque();
 
         P6opaque lst = new P6opaque(Kernel.ListMO);

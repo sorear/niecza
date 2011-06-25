@@ -251,8 +251,7 @@ public class JsyncReader {
     }
 
     static Variable BoxRW<T>(T o, STable mo) {
-        P6opaque dyo = new BoxObject<T>(o, mo);
-        return Kernel.NewRWScalar(Kernel.AnyMO, dyo);
+        return Kernel.NewMuScalar(new BoxObject<T>(o, mo));
     }
 
     Variable GetObj() {
@@ -266,13 +265,13 @@ public class JsyncReader {
                 return GetFromString();
             case 'n':
                 SkipToken("null");
-                return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+                return Kernel.NewMuScalar(Kernel.AnyP);
             case 't':
                 SkipToken("true");
-                return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.TrueV.Fetch());
+                return Kernel.NewMuScalar(Kernel.TrueV.Fetch());
             case 'f':
                 SkipToken("false");
-                return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.FalseV.Fetch());
+                return Kernel.NewMuScalar(Kernel.FalseV.Fetch());
             default:
                 return GetFromNumber();
         }
@@ -376,13 +375,13 @@ public class JsyncReader {
             return BoxRW<string>(GetJsonString(), Kernel.StrMO);
         } else if (look == 'n') {
             SkipToken("null");
-            return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+            return Kernel.NewMuScalar(Kernel.AnyP);
         } else if (look == 't') {
             SkipToken("true");
-            return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.TrueV.Fetch());
+            return Kernel.NewMuScalar(Kernel.TrueV.Fetch());
         } else if (look == 'f') {
             SkipToken("false");
-            return Kernel.NewRWScalar(Kernel.AnyMO, Kernel.FalseV.Fetch());
+            return Kernel.NewMuScalar(Kernel.FalseV.Fetch());
         } else {
             double d;
             string tx = GetJsonNumber();
@@ -471,7 +470,7 @@ public class JsyncReader {
         List<Variable> lv;
         if (!anchorrefs.TryGetValue(name, out lv))
             anchorrefs[name] = lv = new List<Variable>();
-        Variable n = Kernel.NewRWScalar(Kernel.AnyMO, Kernel.AnyP);
+        Variable n = Kernel.NewMuScalar(Kernel.AnyP);
         lv.Add(n);
         return n;
     }
@@ -660,7 +659,7 @@ public class JsyncReader {
                 foreach (string key in zyg.Keys) {
                     Err("Attribute " + key + " not present in " + dyo.mo.name);
                 }
-                obj = Kernel.NewRWScalar(Kernel.AnyMO, dyo);
+                obj = Kernel.NewMuScalar(dyo);
             }
         } else {
             obj = BoxRW<VarHash>(zyg, Kernel.HashMO);
