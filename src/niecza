@@ -41,7 +41,90 @@ augment grammar STD::P6 { #OK
     token label { <identifier> ':' <?before \s> <.ws> }
 }
 
+#>
+
+augment class Op {
+    method to_bind($/, $ro, $rhs) { #OK not used
+        $/.CURSOR.sorry("Cannot use bind operator with this LHS");
+        ::Op::StatementList.new;
+    }
+}
+
+augment class Op::Paren { #OK
+    method to_bind($/, $ro, $rhs) { $!inside.to_bind($/, $ro, $rhs); }
+}
+
+augment class Op::Lexical { #OK
+    method to_bind($/, $ro, $rhs) {
+        my $lex = $*CURLEX<!sub>.find_lex($!name) or
+            ($/.CURSOR.sorry("Cannot find definition for binding???"),
+                return ::Op::StatementList.new);
+        my $list = False;
+        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
+        given $lex {
+            when ::Metamodel::Lexical::Simple {
+                $list = .list || .hash;
+                $type = .typeconstraint // $type;
+            }
+            when ::Metamodel::Lexical::Common {
+                $list = substr($!name,0,1) eq '%' || substr($!name,0,1) eq '@';
+            }
+            default {
+                nextsame;
+            }
+        }
+        ::Op::LexicalBind.new(name => $!name, :$ro, :$rhs, :$list, :$type);
+    }
+}
+
+#KILL Op::PackageVar Op::Bind
+augment class Op::CallSub { #OK
+    method to_bind($/, $ro, $rhs) {
+        if $!invocant ~~ ::Op::Lexical && substr($!invocant.name, 0, 15)
+                eq '&postcircumfix:' {
+            return self.adverb(::Op::SimplePair.new(key => 'BIND_VALUE',
+                value => $ro ?? ::Op::ROify.new(child => $rhs) !! $rhs));
+        }
+        nextsame;
+    }
+}
+
+class Op::LexicalBind is Op {
+    has Str $.name;
+    has Bool $.ro;
+    has Bool $.list;
+    has $.type; # Xref
+    has $.rhs; # Op
+    method zyg() { $.rhs }
+
+    method code($body) {
+        CgOp.prog(
+            CgOp.scopedlex($!name, !defined($!type) ?? $!rhs.cgop($body) !!
+                    CgOp.newboundvar(+$!ro, +$!list,
+                        CgOp.class_ref('mo', @($!type)), $!rhs.cgop($body))),
+            CgOp.scopedlex($!name))
+    }
+}
+
+class Op::ROify is Op {
+    has $.child;
+    method zyg() { $.child }
+    method code($body) { CgOp.newscalar(CgOp.fetch($!child.cgop($body))) }
+}
+
 augment class NieczaActions {
+
+method package_var($/, $slot, $name, $path, :$list, :$hash) {
+    $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
+        $*CURLEX<!sub>.add_common_name($slot,
+            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref,
+            $name, |mnode($/));
+        $*CURLEX<!sub>.lexicals-used{$slot} = True;
+    });
+    ::Op::Lexical.new(|node($/), name => $slot);
+}
+
 method make_constant($/, $scope, $name) {
     # hints must be lexically scoped
     $scope := $scope || (substr($name,1,1) eq '?' ?? 'my' !! 'our');

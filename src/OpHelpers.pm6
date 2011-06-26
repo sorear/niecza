@@ -32,10 +32,9 @@ sub mkbool($i) is export { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 sub mktemptopic($/, $item, $expr) is export {
     mklet(mklex($/, '$_'), -> $old_ {
         ::Op::StatementList.new(|node($/), children => [
-            ::Op::Bind.new(:readonly(Bool), lhs=>mklex($/,'$_'), rhs => $item),
+            ::Op::LexicalBind.new(:name<$_>, rhs => $item),
             mklet($expr, -> $result {
                 ::Op::StatementList.new(children => [
-                    ::Op::Bind.new(:readonly(Bool), lhs => mklex($/, '$_'),
-                        rhs => $old_),
+                    ::Op::LexicalBind.new(:name<$_>, rhs => $old_),
                     $result]) }) ]) });
 }

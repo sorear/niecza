@@ -181,8 +181,7 @@ class Binding is Operator {
     has $.readonly; # Bool
 
     method with_args($/, *@args) {
-        ::Op::Bind.new(|node($/), readonly => $.readonly, lhs => @args[0],
-            rhs => @args[1]);
+        @args[0].to_bind($/, ?$!readonly, @args[1]);
     }
 
     method assignish() { True }
