@@ -7,8 +7,6 @@ EASY
 
  + $*PROGRAM_NAME
 
-   Rename at-key, at-pos to "postcircumfix:<[ ]>" etc.
-
    Add your favorite missing function to the setting, with tests.
    In particular, I could use: sprintf, dir, write, close, split, ...
 

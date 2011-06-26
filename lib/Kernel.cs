@@ -2075,11 +2075,37 @@ tryagain:
 
     class IxCallMethod : IndexHandler {
         string name;
-        public IxCallMethod(string name) { this.name = name; }
+        VarHash named;
+        public IxCallMethod(string name, string adv) {
+            this.name = name;
+            if (adv != null) {
+                named = new VarHash();
+                named[adv] = Kernel.TrueV;
+            }
+        }
         public override Variable Get(Variable obj, Variable key) {
             return (Variable) Kernel.RunInferior(
                     obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), name,
-                        new Variable[] { obj, key }, null));
+                        new Variable[] { obj, key }, named));
+        }
+    }
+
+    class KeySlicer : IndexHandler {
+        int mode; IndexHandler bas;
+        public KeySlicer(int mode, IndexHandler bas) {
+            this.mode = mode; this.bas = bas;
+        }
+
+        public override Variable Get(Variable obj, Variable key) {
+            P6any ks = key.Fetch();
+            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+                return Slice(obj, key);
+
+            switch (mode) {
+                case 0:  return key;
+                case 1:  return Builtins.MakeParcel(key, bas.Get(obj, key));
+                default: return Builtins.pair(key, bas.Get(obj, key));
+            }
         }
     }
 
@@ -3286,6 +3312,59 @@ slow:
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
+        private static Variable DispIndexy(IndexHandler at, IndexHandler exist,
+                IndexHandler del, VarHash n, Variable self, Variable index) {
+
+            if (n == null) goto def;
+            if (del != null && n.ContainsKey("exists"))
+                return exist.Get(self, index);
+            if (del != null && n.ContainsKey("delete"))
+                return del.Get(self, index);
+
+            if (n.ContainsKey("k"))
+                return new KeySlicer(0, at).Get(self, index);
+            if (n.ContainsKey("kv"))
+                return new KeySlicer(1, at).Get(self, index);
+            if (n.ContainsKey("p"))
+                return new KeySlicer(2, at).Get(self, index);
+
+def:        return at.Get(self, index);
+        }
+
+        private static void WrapIndexy(STable kl, string name,
+                IndexHandler at, IndexHandler exist, IndexHandler del) {
+            DynBlockDelegate dbd = delegate (Frame th) {
+                th.caller.resultSlot = DispIndexy(at, exist, del, th.named,
+                    (Variable)th.lex0, (Variable)th.lex1);
+                return th.caller;
+            };
+
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            if (del != null) {
+                si.sig_i = new int[21] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1
+                };
+                si.sig_r = new object[12] { "self", "$index", "exists", "exists", "delete", "delete", "k", "k", "kv", "kv", "p", "p" };
+            } else {
+                si.sig_i = new int[15] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1
+                };
+                si.sig_r = new object[8] { "self", "$index", "k", "k", "kv", "kv", "p", "p" };
+            }
+            si.param1 = new object[] { at, exist, del };
+            kl.AddMethod(0, name, MakeSub(si, null));
+        }
+
         private static SubInfo IRSI = new SubInfo("InstantiateRole", IRC);
         private static Frame IRC(Frame th) {
             switch (th.ip) {
@@ -3661,11 +3740,15 @@ slow:
             ArrayMO = new STable("Array");
             WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
+            WrapIndexy(ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
+                    null, null);
             WrapHandler1(ArrayMO, "at-pos", new IxListAtPos(true));
             ArrayMO.Invalidate();
 
             ListMO = new STable("List");
             WrapHandler1(ListMO, "at-pos", new IxListAtPos(false));
+            WrapIndexy(ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
+                    null, null);
             Handler_Vonly(ListMO, "pop", new PopList(), null);
             Handler_Vonly(ListMO, "shift", new ShiftList(), null);
             WrapPushy(ListMO, "push", new PushList());
@@ -3683,6 +3766,8 @@ slow:
             WrapHandler1(HashMO, "exists-key", new IxHashExistsKey());
             WrapHandler1(HashMO, "delete-key", new IxHashDeleteKey());
             WrapHandler1(HashMO, "at-key", new IxHashAtKey());
+            WrapIndexy(HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
+                    new IxHashExistsKey(), new IxHashDeleteKey());
             Handler_PandBox(HashMO, "iterator", new CtxHashIterator(), IteratorMO);
             Handler_PandBox(HashMO, "Bool", new CtxHashBool(), BoolMO);
             Handler_Vonly(HashMO, "hash", new CtxReturnSelfList(), null);
@@ -3695,18 +3780,30 @@ slow:
             WrapHandler1(AnyMO, "at-key", new IxAnyAtKey());
             WrapHandler1(AnyMO, "at-pos", new IxAnyAtPos());
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
+            WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
+                    null, null);
+            WrapIndexy(AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
+                    new IxAnyExistsKey(), new IxAnyDeleteKey());
             AnyMO.FillProtoClass(new string[] { });
             AnyMO.Invalidate();
 
             CursorMO = new STable("Cursor");
             WrapHandler1(CursorMO, "at-key", new IxCursorAtKey());
             WrapHandler1(CursorMO, "at-pos", new IxCursorAtPos());
+            WrapIndexy(CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
+                    AnyMO.mro_exists_key, AnyMO.mro_delete_key);
+            WrapIndexy(CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
+                    null, null);
             CursorMO.FillProtoClass(new string[] { });
             CursorMO.Invalidate();
 
             MatchMO = new STable("Match");
             WrapHandler1(MatchMO, "at-key", new IxCursorAtKey());
             WrapHandler1(MatchMO, "at-pos", new IxCursorAtPos());
+            WrapIndexy(MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
+                    AnyMO.mro_exists_key, AnyMO.mro_delete_key);
+            WrapIndexy(MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
+                    null, null);
             Handler_PandBox(MatchMO, "Str", new CtxMatchStr(), StrMO);
             MatchMO.FillProtoClass(new string[] { });
             MatchMO.Invalidate();

@@ -518,15 +518,15 @@ next_method: ;
             = new CtxCallMethodUnbox<Variable[]>("reify");
         public static readonly ContextHandler<object> CallToCLR = new MuToCLR();
         public static readonly IndexHandler CallAtPos
-            = new IxCallMethod("at-pos");
+            = new IxCallMethod("postcircumfix:<[ ]>", null);
         public static readonly IndexHandler CallAtKey
-            = new IxCallMethod("at-key");
+            = new IxCallMethod("postcircumfix:<{ }>", null);
         public static readonly IndexHandler CallExistsKey
-            = new IxCallMethod("exists-key");
+            = new IxCallMethod("postcircumfix:<{ }>", "exists");
         public static readonly IndexHandler CallDeleteKey
-            = new IxCallMethod("delete-key");
+            = new IxCallMethod("postcircumfix:<{ }>", "delete");
         public static readonly IndexHandler CallLISTSTORE
-            = new IxCallMethod("LISTSTORE");
+            = new IxCallMethod("LISTSTORE", null);
         public static readonly InvokeHandler CallINVOKE
             = new InvokeCallMethod();
         public static readonly PushyHandler CallPush
@@ -594,13 +594,13 @@ next_method: ;
             mro_unshift = _GetVT("unshift") as PushyHandler ?? CallUnshift;
             mro_shift = _GetVT("shift") as ContextHandler<Variable> ?? CallShift;
             mro_pop = _GetVT("pop") as ContextHandler<Variable> ?? CallPop;
-            mro_at_key = _GetVT("at-key") as IndexHandler ?? CallAtKey;
-            mro_at_pos = _GetVT("at-pos") as IndexHandler ?? CallAtPos;
+            mro_at_key = _GetVTi("postcircumfix:<{ }>", 0) as IndexHandler ?? CallAtKey;
+            mro_at_pos = _GetVTi("postcircumfix:<[ ]>", 0) as IndexHandler ?? CallAtPos;
             mro_LISTSTORE = _GetVT("LISTSTORE") as IndexHandler ?? CallLISTSTORE;
             mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
             mro_defined = _GetVT("defined") as ContextHandler<Variable> ?? CallDefined;
-            mro_delete_key = _GetVT("delete-key") as IndexHandler ?? CallDeleteKey;
-            mro_exists_key = _GetVT("exists-key") as IndexHandler ?? CallExistsKey;
+            mro_delete_key = _GetVTi("postcircumfix:<{ }>", 2) as IndexHandler ?? CallDeleteKey;
+            mro_exists_key = _GetVTi("postcircumfix:<{ }>", 1) as IndexHandler ?? CallExistsKey;
             mro_hash = _GetVT("hash") as ContextHandler<Variable> ?? CallHash;
             mro_INVOKE = _GetVT("postcircumfix:<( )>") as InvokeHandler ?? CallINVOKE;
             mro_item = _GetVT("item") as ContextHandler<Variable> ?? CallItem;
@@ -638,6 +638,13 @@ next_method: ;
             DispatchEnt de;
             mro_methods.TryGetValue(name, out de);
             return de == null ? null : de.info.param1;
+        }
+
+        private object _GetVTi(string name, int ix) {
+            DispatchEnt de;
+            mro_methods.TryGetValue(name, out de);
+            object[] ri = de == null ? null : de.info.param1 as object[];
+            return ri == null ? null : ri[ix];
         }
 
         private object _GetVTU(string name) {

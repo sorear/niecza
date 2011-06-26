@@ -207,11 +207,7 @@ my class Cool {
     method ucfirst() { ucfirst(self) }
     method lcfirst() { lcfirst(self) }
 
-    method at-pos(\$self: $ix) {
-        defined($self)
-            ?? $self.list.at-pos($ix)
-            !! _vivify_array_at_pos($self, $ix)
-    }
+    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
     method elems() { self.flat.elems }
     method iterator() { self.flat.iterator }
     method join($sep = "") { self.flat.join($sep) }
@@ -688,6 +684,7 @@ my class Array { ... }
 
 my class Parcel is Cool {
     method flat() { self.iterator.flat }
+    method list() { self.iterator.list }
 
     # LoLly usage
     method raw_elems() { Q:CgOp {
@@ -1009,16 +1006,12 @@ sub _vivify_array_at_pos(\$self, $ix) {
     Q:CgOp { (newvnewarrayvar (class_ref mo Any) {$self} (cast int (obj_getnum {$ix})) (@ {Any})) };
 }
 
-sub postcircumfix:<[ ]>(\$container, $index) {
-    $container.at-pos($index)
+sub postcircumfix:<[ ]>(\$container, $index, *%adverbs) {
+    $container.postcircumfix:<[ ]>($index, |%adverbs)
 }
 
-sub postcircumfix:<{ }>(\$container, $key, :$exists, :$delete, :$p, :$kv) {
-    $exists ?? $container.exists-key($key) !!
-    $delete ?? $container.delete-key($key) !!
-    $p      ?? $key => $container.at-key($key) !!
-    $kv     ?? ($key,   $container.at-key($key)) !!
-    $container.at-key($key)
+sub postcircumfix:<{ }>(\$container, $index, *%adverbs) {
+    $container.postcircumfix:<{ }>($index, |%adverbs)
 }
 
 my class GatherIterator is IterCursor {
