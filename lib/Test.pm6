@@ -76,6 +76,7 @@ $GLOBAL::TEST-BUILDER.reset;
 
 sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }
 sub nok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(!$bool, $tag) }
+sub skip_rest($tag?) is export { } #OK
 sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag); True }
 sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
 sub isa_ok(Mu $obj, Mu $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
@@ -122,6 +123,7 @@ sub eval_lives_ok($*code, $why?) is export {
     try { ?NoControlEval; $lived = True; }
     $*TEST-BUILDER.ok($lived, $why);
 }
+sub diag($str) is export { $*TEST-BUILDER.note($str) }
 sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
     my $test = ($got - $expected).abs <= 1/100000;
     $*TEST-BUILDER.ok(?$test, $desc);

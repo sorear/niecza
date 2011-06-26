@@ -860,6 +860,7 @@ my class Hash {
     method kv()     { Q:CgOp { (hash_kv     {self}) } }
 
     method Numeric() { +@(self) }
+    method Str() { @(self).map(* ~ "\n").join }
 
     method invert() {
         my %new;
