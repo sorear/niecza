@@ -80,6 +80,10 @@ namespace Niecza {
         public abstract Variable Invoke(Variable obj, Variable[] args);
     }
 
+    public abstract class BindHandler {
+        public abstract Variable Bind(Variable obj, Variable key, Variable to);
+    }
+
     public abstract class IndexHandler {
         public abstract Variable Get(Variable obj, Variable key);
 
@@ -557,6 +561,7 @@ next_method: ;
         public ContextHandler<object> mro_to_clr;
         public IndexHandler mro_at_pos, mro_at_key, mro_exists_key,
                mro_delete_key, mro_LISTSTORE;
+        public BindHandler mro_bind_pos, mro_bind_key;
 
         public InvokeHandler mro_INVOKE;
         public PushyHandler mro_push, mro_unshift;
@@ -596,6 +601,8 @@ next_method: ;
             mro_pop = _GetVT("pop") as ContextHandler<Variable> ?? CallPop;
             mro_at_key = _GetVTi("postcircumfix:<{ }>", 0) as IndexHandler ?? CallAtKey;
             mro_at_pos = _GetVTi("postcircumfix:<[ ]>", 0) as IndexHandler ?? CallAtPos;
+            mro_bind_key = _GetVTi("postcircumfix:<{ }>", 3) as BindHandler;
+            mro_bind_pos = _GetVTi("postcircumfix:<[ ]>", 3) as BindHandler;
             mro_LISTSTORE = _GetVT("LISTSTORE") as IndexHandler ?? CallLISTSTORE;
             mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
             mro_defined = _GetVT("defined") as ContextHandler<Variable> ?? CallDefined;

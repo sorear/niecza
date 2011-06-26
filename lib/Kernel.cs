@@ -2133,6 +2133,24 @@ tryagain:
             throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
         }
     }
+    class IxAnyBindKey : BindHandler {
+        public override Variable Bind(Variable obj, Variable key, Variable to) {
+            P6any os = obj.Fetch();
+            if (os.IsDefined())
+                throw new NieczaException("Cannot use hash binding on an object of type " + os.mo.name);
+            obj.Store(Kernel.BoxRaw(new VarHash(), Kernel.HashMO));
+            return Kernel.HashMO.mro_bind_key.Bind(obj, key, to);
+        }
+    }
+    class IxAnyBindPos : BindHandler {
+        public override Variable Bind(Variable obj, Variable key, Variable to) {
+            P6any os = obj.Fetch();
+            if (os.IsDefined())
+                throw new NieczaException("Cannot use array binding on an object of type " + os.mo.name);
+            obj.Store(Kernel.CreateArray().Fetch());
+            return Kernel.ArrayMO.mro_bind_key.Bind(obj, key, to);
+        }
+    }
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
@@ -2188,6 +2206,18 @@ tryagain:
         }
     }
 
+    class IxHashBindKey : BindHandler {
+        public override Variable Bind(Variable obj, Variable key, Variable to) {
+            P6any ks = key.Fetch();
+            P6any os = obj.Fetch();
+            if (!os.IsDefined())
+                obj.Store(os = Kernel.BoxRaw(new VarHash(), Kernel.HashMO));
+            string kss = ks.mo.mro_raw_Str.Get(key);
+            VarHash h = Kernel.UnboxAny<VarHash>(os);
+
+            return h[kss] = Kernel.NewBoundVar(Kernel.NBV_RW, Kernel.MuMO, to);
+        }
+    }
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
@@ -2276,6 +2306,36 @@ tryagain:
                 }
             }
             return items[ix];
+        }
+    }
+
+    class IxListBindPos : BindHandler {
+        public override Variable Bind(Variable obj, Variable key, Variable to) {
+            P6any ks = key.Fetch();
+            P6any os = obj.Fetch();
+            if (!os.IsDefined())
+                obj.Store(os = Kernel.CreateArray().Fetch());
+
+            P6opaque dos = (P6opaque) os;
+            VarDeque items = (VarDeque) dos.slots[0];
+            VarDeque rest  = (VarDeque) dos.slots[1];
+
+            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
+                Variable nr = os.mo.mro_Numeric.Get(obj);
+                key = Kernel.RunInferior(ks.Invoke(Kernel.GetInferiorRoot(),
+                    new Variable[] { nr }, null));
+            }
+
+            int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
+            while (items.Count() <= ix && Kernel.IterHasFlat(rest, false)) {
+                items.Push(rest.Shift());
+            }
+            if (ix < 0)
+                throw new NieczaException("binding to out of range slot " + ix);
+            while (items.Count() <= ix) {
+                items.Push(Kernel.NewTypedScalar(null));
+            }
+            return items[ix] = Kernel.NewBoundVar(Kernel.NBV_RW, Kernel.MuMO, to);
         }
     }
 
@@ -3313,7 +3373,8 @@ slow:
         }
 
         private static Variable DispIndexy(IndexHandler at, IndexHandler exist,
-                IndexHandler del, VarHash n, Variable self, Variable index) {
+                IndexHandler del, BindHandler bind, VarHash n,
+                Variable self, Variable index) {
 
             if (n == null) goto def;
             if (del != null && n.ContainsKey("exists"))
@@ -3327,41 +3388,46 @@ slow:
                 return new KeySlicer(1, at).Get(self, index);
             if (n.ContainsKey("p"))
                 return new KeySlicer(2, at).Get(self, index);
+            if (n.ContainsKey("BIND_VALUE"))
+                return bind.Bind(self, index, n["BIND_VALUE"]);
 
 def:        return at.Get(self, index);
         }
 
         private static void WrapIndexy(STable kl, string name,
-                IndexHandler at, IndexHandler exist, IndexHandler del) {
+                IndexHandler at, IndexHandler exist, IndexHandler del,
+                BindHandler bind) {
             DynBlockDelegate dbd = delegate (Frame th) {
-                th.caller.resultSlot = DispIndexy(at, exist, del, th.named,
-                    (Variable)th.lex0, (Variable)th.lex1);
+                th.caller.resultSlot = DispIndexy(at, exist, del, bind,
+                    th.named, (Variable)th.lex0, (Variable)th.lex1);
                 return th.caller;
             };
 
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
             if (del != null) {
-                si.sig_i = new int[21] {
+                si.sig_i = new int[24] {
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1
                 };
-                si.sig_r = new object[12] { "self", "$index", "exists", "exists", "delete", "delete", "k", "k", "kv", "kv", "p", "p" };
+                si.sig_r = new object[14] { "self", "$index", "exists", "exists", "delete", "delete", "k", "k", "kv", "kv", "p", "p", "BIND_VALUE", "BIND_VALUE" };
             } else {
-                si.sig_i = new int[15] {
+                si.sig_i = new int[18] {
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1
                 };
-                si.sig_r = new object[8] { "self", "$index", "k", "k", "kv", "kv", "p", "p" };
+                si.sig_r = new object[10] { "self", "$index", "k", "k", "kv", "kv", "p", "p", "BIND_VALUE", "BIND_VALUE" };
             }
-            si.param1 = new object[] { at, exist, del };
+            si.param1 = new object[] { at, exist, del, bind };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -3741,14 +3807,12 @@ def:        return at.Get(self, index);
             WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
             ArrayMO.FillProtoClass(new string[] { "items", "rest" });
             WrapIndexy(ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
-                    null, null);
-            WrapHandler1(ArrayMO, "at-pos", new IxListAtPos(true));
+                    null, null, new IxListBindPos());
             ArrayMO.Invalidate();
 
             ListMO = new STable("List");
-            WrapHandler1(ListMO, "at-pos", new IxListAtPos(false));
             WrapIndexy(ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
-                    null, null);
+                    null, null, new IxListBindPos());
             Handler_Vonly(ListMO, "pop", new PopList(), null);
             Handler_Vonly(ListMO, "shift", new ShiftList(), null);
             WrapPushy(ListMO, "push", new PushList());
@@ -3763,11 +3827,9 @@ def:        return at.Get(self, index);
 
             HashMO = new STable("Hash");
             WrapHandler1(HashMO, "LISTSTORE", new IxHashLISTSTORE());
-            WrapHandler1(HashMO, "exists-key", new IxHashExistsKey());
-            WrapHandler1(HashMO, "delete-key", new IxHashDeleteKey());
-            WrapHandler1(HashMO, "at-key", new IxHashAtKey());
             WrapIndexy(HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
-                    new IxHashExistsKey(), new IxHashDeleteKey());
+                    new IxHashExistsKey(), new IxHashDeleteKey(),
+                    new IxHashBindKey());
             Handler_PandBox(HashMO, "iterator", new CtxHashIterator(), IteratorMO);
             Handler_PandBox(HashMO, "Bool", new CtxHashBool(), BoolMO);
             Handler_Vonly(HashMO, "hash", new CtxReturnSelfList(), null);
@@ -3775,35 +3837,30 @@ def:        return at.Get(self, index);
             HashMO.Invalidate();
 
             AnyMO = new STable("Any");
-            WrapHandler1(AnyMO, "exists-key", new IxAnyExistsKey());
-            WrapHandler1(AnyMO, "delete-key", new IxAnyDeleteKey());
-            WrapHandler1(AnyMO, "at-key", new IxAnyAtKey());
-            WrapHandler1(AnyMO, "at-pos", new IxAnyAtPos());
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
             WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
-                    null, null);
+                    null, null, new IxAnyBindPos());
             WrapIndexy(AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
-                    new IxAnyExistsKey(), new IxAnyDeleteKey());
+                    new IxAnyExistsKey(), new IxAnyDeleteKey(),
+                    new IxAnyBindKey());
             AnyMO.FillProtoClass(new string[] { });
             AnyMO.Invalidate();
 
             CursorMO = new STable("Cursor");
-            WrapHandler1(CursorMO, "at-key", new IxCursorAtKey());
-            WrapHandler1(CursorMO, "at-pos", new IxCursorAtPos());
             WrapIndexy(CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
-                    AnyMO.mro_exists_key, AnyMO.mro_delete_key);
+                    AnyMO.mro_exists_key, AnyMO.mro_delete_key,
+                    AnyMO.mro_bind_key);
             WrapIndexy(CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
-                    null, null);
+                    null, null, AnyMO.mro_bind_pos);
             CursorMO.FillProtoClass(new string[] { });
             CursorMO.Invalidate();
 
             MatchMO = new STable("Match");
-            WrapHandler1(MatchMO, "at-key", new IxCursorAtKey());
-            WrapHandler1(MatchMO, "at-pos", new IxCursorAtPos());
             WrapIndexy(MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
-                    AnyMO.mro_exists_key, AnyMO.mro_delete_key);
+                    AnyMO.mro_exists_key, AnyMO.mro_delete_key,
+                    AnyMO.mro_bind_key);
             WrapIndexy(MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
-                    null, null);
+                    null, null, AnyMO.mro_bind_pos);
             Handler_PandBox(MatchMO, "Str", new CtxMatchStr(), StrMO);
             MatchMO.FillProtoClass(new string[] { });
             MatchMO.Invalidate();

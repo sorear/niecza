@@ -955,7 +955,7 @@ my class EnumMap {
     method invert() { @!values Z=> @!keys }
     method kv() { @!keys Z @!values }
     method pairs() { self.list }
-    method at-key(\$k) { @!values[%!by-key.at-key($k)] }
+    method postcircumfix:<{ }>(\$k) { @!values[%!by-key.{$k}] }
 }
 
 my class Junction is Mu {
