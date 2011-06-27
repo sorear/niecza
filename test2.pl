@@ -125,6 +125,15 @@ eval_lives_ok q[
     lives_ok { my %x; %x<a> = Mu }, "hash element creation autoviv supports Mu";
 }
 
+# regression test from thou
+{
+    my $x = 'Bar';
+    my $in = qq:to [A] ;
+ Foo $x
+A
+    is $in.substr(0,8), ' Foo Bar', "spaces preserved after heredoc interpolation";
+}
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {

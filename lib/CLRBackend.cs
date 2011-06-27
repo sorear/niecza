@@ -4712,7 +4712,9 @@ dynamic:
                     root.clrType, "BOOT");
             if (argv != null) {
                 Kernel.RunLoop(root.name, argv, Builtins.eval_result);
-                CLRBackend.last_repl_frame = Kernel.GetLastMainlineFrame();
+                try {
+                    CLRBackend.last_repl_frame = Kernel.GetLastMainlineFrame();
+                } catch (Exception) {}
             }
         }
 
