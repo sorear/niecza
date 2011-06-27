@@ -1766,4 +1766,33 @@ again:
     public static bool obj_can(P6any obj, string mname) {
         return obj.mo.mro_methods.ContainsKey(mname);
     }
+
+    // Used mostly to initialize $*PID et al
+    public static string programName;
+    public static string execName;
+
+    public static Variable getenv(string str) {
+        return Kernel.BoxAnyMO(Environment.GetEnvironmentVariable(str), Kernel.StrMO);
+    }
+
+    public static void setenv(string key, string val) {
+        Environment.SetEnvironmentVariable(key, val);
+    }
+
+    public static Variable sysquery(int ix) {
+        switch (ix) {
+            case 0: return BoxLoS(Kernel.commandArgs);
+            case 1: return Kernel.BoxAnyMO(programName ?? AppDomain.CurrentDomain.FriendlyName, Kernel.StrMO);
+            case 2: return Kernel.BoxAnyMO(execName, Kernel.StrMO);
+            case 3: return Kernel.BoxAnyMO(AppDomain.CurrentDomain.BaseDirectory, Kernel.StrMO);
+            case 4: {
+                VarHash ret = new VarHash();
+                foreach (System.Collections.DictionaryEntry de in Environment.GetEnvironmentVariables()) {
+                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, Kernel.StrMO);
+                }
+                return Kernel.BoxAnyMO(ret, Kernel.HashMO);
+            }
+            default: return null;
+        }
+    }
 }

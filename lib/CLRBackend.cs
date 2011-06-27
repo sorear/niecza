@@ -3803,7 +3803,6 @@ dynamic:
             thandlers["exit"] = Methody(null, Tokens.Environment_Exit);
             thandlers["slurp"] = Methody(null, typeof(File).GetMethod("ReadAllText", new Type[] { Tokens.String }));
             thandlers["spew"] = Methody(null, typeof(File).GetMethod("WriteAllText", new Type[] { Tokens.String, Tokens.String }));
-            thandlers["getargv"] = Methody(null, Tokens.Kernel.GetMethod("ArgsHelper"));
             thandlers["vvarlist_to_fvarlist"] = Methody(null, Tokens.VVarList.GetMethod("CopyAsArray"));
             thandlers["vvarlist_shift"] = Methody(null, Tokens.VVarList.GetMethod("Shift"));
             thandlers["vvarlist_pop"] = Methody(null, Tokens.VVarList.GetMethod("Pop"));
@@ -4774,6 +4773,10 @@ dynamic:
                 Array.Copy(args, 3, argv, 0, argv.Length);
                 CLRBackend.RunMain(args[1], args[2],
                         args[0] == "evalnam" ? null : argv);
+                return new string[0];
+            } else if (args[0] == "setnames") {
+                Builtins.execName = args[1];
+                Builtins.programName = args[2];
                 return new string[0];
             } else if (args[0] == "replrun") {
                 string ret = "";

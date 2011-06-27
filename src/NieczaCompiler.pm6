@@ -61,6 +61,7 @@ method !main_name() {
 }
 
 method compile_file($file, $run, $stop = "") {
+    my $*orig_file = $file; # XXX
     my ($filename, $modtime, $source) = $.module_finder.load_file($file);
     self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False, Any, False);
 }

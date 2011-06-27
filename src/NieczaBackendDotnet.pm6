@@ -30,6 +30,8 @@ method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {
     downcall("safemode") if $.safemode;
     $*repl_outer = $ast.mainline.xref if $repl;
     if $run {
+        downcall("setnames", $*PROGRAM_NAME // '???',
+            $*orig_file // '(eval)') unless $repl;
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;
         $ast = Any;

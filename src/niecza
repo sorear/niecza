@@ -144,6 +144,104 @@ method make_constant($/, $scope, $name) {
     ::Op::ConstantDecl.new(|node($/), name => $slot, init => False);
 }
 
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for @tr -> $T {
+        my $tr = $T.ast;
+        if $pack && ($tr<name>:exists) {
+            my ($name, $path) = $tr<name path>;
+
+            $T.CURSOR.sorry("superclass $name declared outside of any class"),
+                next unless $sub.body_of;
+            $T.CURSOR.sorry("superclass $name declared in an augment"),
+                next if $sub.augmenting;
+            $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
+                next if !$*unit.deref($pack).^can('add_super');
+
+            $T.CURSOR.trymop({
+                $*unit.deref($pack).add_super($sub.compile_get_pkg(
+                    @($path // []), $name).xref);
+            });
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($*unit.deref($pack).name, $pack, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports('&'~$sub.name, $sub.xref, @exports);
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
+            $sub.outer.lexicals-used{$sub.outervar} = True
+                if defined $sub.outervar;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.signature = Any;
+        } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
+            my $rel = $tr.keys.[0];
+            my $to  = $tr.values.[0];
+            $to = $to.inside if $to ~~ ::Op::Paren;
+            $to = $to.children[0] if $to ~~ ::Op::StatementList && $to.children == 1;
+
+            my $oprec;
+            if $to ~~ ::Op::Lexical {
+                $oprec = $T.CURSOR.function_O($to.name);
+            } elsif $to ~~ ::Op::StringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            } else {
+                $T.CURSOR.sorry("Cannot interpret operator reference");
+                next;
+            }
+            unless $sub.extend<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $oprec {
+                $T.CURSOR.sorry("No precedence available for reference target");
+                next;
+            }
+            if $rel eq 'equiv' {
+                my %copy = %$oprec;
+                $sub.extend.<prec> = %copy;
+            } else {
+                $sub.extend.<prec><prec> = $oprec.<prec>;
+            }
+            $sub.extend.<prec><prec> ~~ s/\=/<=/ if $rel eq 'looser';
+            $sub.extend.<prec><prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+        } elsif !$pack && $tr<assoc> {
+            my $arg = ~self.trivial_eval($T, $tr<assoc>);
+            unless $sub.extend<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            my @valid = < left right non list unary chain >;
+            unless grep $arg, @valid {
+                $T.CURSOR.sorry("Invalid associativity $arg");
+                next;
+            }
+            $sub.extend.<prec><assoc> = $arg;
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
+            unless $sub.extend.<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            $sub.extend.<prec><prec> = $arg;
+            $sub.extend.<prec><dba> = "like $sub.name()";
+        } elsif !$pack && $tr<Niecza::builtin> {
+            $sub.extend.<builtin> = [
+                self.trivial_eval($T, $tr<Niecza::builtin>) ];
+        } elsif !$pack && $tr<return_pass> {
+            $sub.returnable = False;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.unsafe = True;
+        } else {
+            $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+        }
+    }
+}
+
+
 method quantified_atom($/) { # :: RxOp
     my $atom = $<atom>.ast;
     my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;
