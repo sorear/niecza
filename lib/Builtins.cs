@@ -577,6 +577,101 @@ public class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
+    // Untested and probably unusable in the near term
+    public static BigInteger big_pow(BigInteger v1, BigInteger v2) {
+        int CHUNK = 2000000000;
+        int margin = (int) (v2 % (BigInteger) CHUNK);
+        BigInteger number_chunks = (v2 - margin) / CHUNK;
+        BigInteger margin_pow = BigInteger.Pow(v1, margin);
+        BigInteger result = margin_pow;
+        if (number_chunks > 0) {
+            BigInteger chunk_pow = margin_pow * BigInteger.Pow(v1, CHUNK - margin);
+            for (BigInteger i = 0; i < number_chunks; i++) {
+                result *= chunk_pow;
+            }
+        }
+        return result;
+    }
+
+    static Func<Variable,Variable,Variable> pow_d = pow;
+    public static Variable pow(Variable a1, Variable a2) {
+        int r1, r2;
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1, a2, o1, o2, pow_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
+
+        if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            Complex v2 = PromoteToComplex(r2, n2);
+            return MakeComplex(-1.0, -1.0); // Must implement
+        }
+        if (r1 == NR_FLOAT || (r2 != NR_BIGINT && r2 != NR_FIXINT)) {
+            return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
+        }
+
+        if (r2 == NR_FIXINT) {
+            int v2 = PromoteToFixInt(r2, n2);
+            if (v2 >= 0) {
+                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
+                    return MakeInt(BigInteger.Pow(PromoteToBigInt(r1, n1), v2));
+                }
+                if (r1 == NR_FATRAT) {
+                    FatRat v1 = PromoteToFatRat(r1, n1);
+                    return MakeFatRat(BigInteger.Pow(v1.num, v2), BigInteger.Pow(v1.den, v2));
+                }
+                if (r1 == NR_FIXRAT) {
+                    Rat v1 = PromoteToFixRat(r1, n1);
+                    return MakeFatRat(BigInteger.Pow((BigInteger)v1.num, v2), BigInteger.Pow(v1.den, v2));
+                }
+            } else {
+                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
+                    return MakeFixRat(1, BigInteger.Pow(PromoteToBigInt(r1, n1), -v2));
+                }
+                if (r1 == NR_FATRAT) {
+                    FatRat v1 = PromoteToFatRat(r1, n1);
+                    return MakeFatRat(BigInteger.Pow(v1.den, -v2), BigInteger.Pow(v1.num, -v2));
+                }
+                if (r1 == NR_FIXRAT) {
+                    Rat v1 = PromoteToFixRat(r1, n1);
+                    return MakeFatRat(BigInteger.Pow((BigInteger)v1.den, -v2), BigInteger.Pow(v1.num, -v2));
+                }
+            }
+        }
+
+        if (r2 == NR_BIGINT) {
+            BigInteger v2 = PromoteToBigInt(r2, n2);
+            if (v2 >= 0) {
+                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
+                    return MakeInt(big_pow(PromoteToBigInt(r1, n1), v2));
+                }
+                if (r1 == NR_FATRAT) {
+                    FatRat v1 = PromoteToFatRat(r1, n1);
+                    return MakeFatRat(big_pow(v1.num, v2), big_pow(v1.den, v2));
+                }
+                if (r1 == NR_FIXRAT) {
+                    Rat v1 = PromoteToFixRat(r1, n1);
+                    return MakeFatRat(big_pow((BigInteger)v1.num, v2), big_pow(v1.den, v2));
+                }
+            } else {
+                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
+                    return MakeFixRat(1, big_pow(PromoteToBigInt(r1, n1), -v2));
+                }
+                if (r1 == NR_FATRAT) {
+                    FatRat v1 = PromoteToFatRat(r1, n1);
+                    return MakeFatRat(big_pow(v1.den, -v2), big_pow(v1.num, -v2));
+                }
+                if (r1 == NR_FIXRAT) {
+                    Rat v1 = PromoteToFixRat(r1, n1);
+                    return MakeFatRat(big_pow((BigInteger)v1.den, -v2), big_pow(v1.num, -v2));
+                }
+            }
+        }
+
+        return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
+    }
+
     static Func<Variable,Variable> negate_d = negate;
     public static Variable negate(Variable a1) {
         P6any o1 = a1.Fetch();

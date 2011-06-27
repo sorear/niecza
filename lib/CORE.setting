@@ -285,17 +285,6 @@ my class FatRat is Real {
     method nude() { [ self.numerator, self.denominator ] }
 }
 
-#TODO use a power from the standard library
-sub infix:<**>($num,$power) is Niecza::absprec<w=> is assoc<right> {
-    my $ret = 1;
-    my $p = $power;
-    while ($p > 0) {
-        $ret *= $num;
-        $p--;
-    }
-    $ret;
-}
-
 my class Str is Cool {
     method ACCEPTS(Mu $t) { defined(self) ?? self eq $t !! $t.^does(self) }
     method chars() { chars(self) }
@@ -426,6 +415,7 @@ sub infix:<->($l,$r) is Niecza::builtin('minus',2,2) { $l - $r }
 sub infix:<*> is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> ($l,$r) { $l * $r }
 sub infix:</> is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
 sub infix:<%> is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
+sub infix:<**> is Niecza::builtin('pow',2,2)  is Niecza::absprec<w=> is assoc<right> ($l,$r) { $l ** $r }
 
 sub infix:<< == >>($l,$r) is Niecza::builtin('numeq',2,2)
     is Niecza::absprec<m=> is assoc<chain> { $l == $r }
