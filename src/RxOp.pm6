@@ -140,7 +140,7 @@ class Quantifier is RxOp {
         %r;
     }
 
-    method mincode($body) {
+    method mincode($body, $min, $max) {
         my @code;
 
         my $exit = self.label;
@@ -150,56 +150,71 @@ class Quantifier is RxOp {
         push @code, CgOp.goto($exit);
         push @code, CgOp.label($add);
         push @code, CgOp.cgoto('backtrack', CgOp.compare('>=',
-                CgOp.rxgetquant, CgOp.int($!max))) if defined ($!max);
-        if $.zyg[1] {
+                CgOp.rxgetquant, $max)) if $!closure || defined ($!max);
+        if $.zyg[1] && !$!closure && $!min {
             push @code, $.zyg[1].code($body);
             push @code, CgOp.label($exit);
             push @code, $.zyg[0].code($body);
             push @code, CgOp.rxincquant;
         } else {
+            push @code, CgOp.ternary(CgOp.compare('!=', CgOp.rxgetquant,
+                CgOp.int(0)), $.zyg[1].code($body), CgOp.prog()) if $.zyg[1];
             push @code, $.zyg[0].code($body);
             push @code, CgOp.rxincquant;
             push @code, CgOp.label($exit);
         }
         push @code, CgOp.rxpushb('QUANT', $add);
         push @code, CgOp.cgoto('backtrack', CgOp.compare('<',
-                CgOp.rxgetquant, CgOp.int($!min))) if $!min > 0;
+                CgOp.rxgetquant, $min)) if $!closure || $!min > 0;
         push @code, CgOp.sink(CgOp.rxclosequant);
 
         @code;
     }
 
     method code($body) {
-        my @code;
+        my $min = $!closure ?? CgOp.letvar('!min') !! CgOp.int($!min);
+        my $max = $!closure ?? CgOp.letvar('!max') !! CgOp.int($!max);
 
-        return self.mincode($body) if $!minimal;
+        my @code = $!minimal
+            ?? self.mincode($body, $min, $max)
+            !! self.maxcode($body, $min, $max);
+
+        return @code unless $!closure;
+
+        return CgOp.letn(
+            '!range', $!closure.code($body),
+            '!min', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
+                        CgOp.letvar('!range'), 'niecza_quantifier_min'))),
+            '!max', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
+                        CgOp.letvar('!range'), 'niecza_quantifier_max'))),
+            @code);
+    }
+
+    method maxcode($body, $min, $max) {
+        my @code;
 
         my $exit   = self.label;
         my $repeat = self.label;
         my $middle = self.label;
 
-        my $min = $!min;
-        my $max = $!max;
-
         # get the degenerate cases out the way
-        if defined $max {
-            return CgOp.goto('backtrack') if $max < $min;
-            return CgOp.prog() if $max == 0;
-            return $.zyg[0].code($body) if $max == 1 && $min == 1;
+        if defined $!max {
+            return CgOp.goto('backtrack') if $!max < $!min;
+            return CgOp.prog() if $!max == 0;
+            return $.zyg[0].code($body) if $!max == 1 && $!min == 1;
         }
 
-        my $usequant = (defined($max) && $max != 1) || ($min > 1);
-        my $userep   = !(defined($max) && $max == 1);
+        my $usequant = $!closure || (defined($!max) && $!max != 1) ||
+            ($!min > 1) || ($!min && $.zyg[1]);
+        my $userep   = $!closure || !(defined($!max) && $!max == 1);
 
         push @code, CgOp.rxopenquant if $usequant;
-        push @code, CgOp.goto($middle) if $min;
+        push @code, CgOp.goto($middle) if !$!closure && $!min;
         push @code, CgOp.label($repeat) if $userep;
         # min == 0 or quant >= 1
-        if $min > 1 {
+        if $!closure || $!min > 1 {
             # only allow exiting if min met
-            push @code, CgOp.ternary(CgOp.compare('>=',
-                    CgOp.rxgetquant,
-                    CgOp.int($min)),
+            push @code, CgOp.ternary(CgOp.compare('>=', CgOp.rxgetquant, $min),
                 CgOp.rxpushb('QUANT', $exit), CgOp.prog());
         } else {
             # min automatically met
@@ -207,13 +222,17 @@ class Quantifier is RxOp {
         }
 
         # if userep false, quant == 0
-        if defined($max) && $userep {
+        if $!closure || defined($!max) && $userep {
             push @code, CgOp.cgoto('backtrack', CgOp.compare('>=',
-                    CgOp.rxgetquant, CgOp.int($max)));
+                    CgOp.rxgetquant, $max));
         }
 
+        if $.zyg[1] && ($!closure || $!min == 0) {
+            push @code, CgOp.cgoto($middle,
+                CgOp.compare('==', CgOp.rxgetquant, CgOp.int(0)));
+        }
         push @code, $.zyg[1].code($body) if $.zyg[1];
-        push @code, CgOp.label($middle) if $min;
+        push @code, CgOp.label($middle) if $.zyg[1] || (!$!closure && $!min);
         push @code, $.zyg[0].code($body);
         push @code, CgOp.rxincquant if $usequant;
         if $userep {
@@ -229,7 +248,7 @@ class Quantifier is RxOp {
     }
 
     method lad() {
-        return [ 'Imp' ] if $!minimal;
+        return [ 'Imp' ] if $!minimal || $!closure;
         my $mi = $!min;
         my $ma = $!max // -1;
         my $str;

@@ -303,8 +303,7 @@ method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
     my $lad = $rxop.lad;
     my ($nrxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
     if defined $goal {
-        unshift @lift, ::Op::Bind.new(|node($/), readonly => True,
-            lhs => mklex($/, '$*GOAL'),
+        unshift @lift, ::Op::LexicalBind.new(|node($/), :name<$*GOAL>,
             rhs => ::Op::StringLiteral.new(text => $goal));
     }
     my $subop = self.thunk_sub(
@@ -435,8 +434,18 @@ method quantified_atom($/) { # :: RxOp
     if defined $q<min> {
         my @z = $atom;
         push @z, $q<sep> if defined $q<sep>;
+        # parsing quirk, x #`(1) ** #`(2) y, the 1* position is counted
+        # as $<normspace> but the 2* is parsed by the quantifier
+        if $q<general> && %*RX<s> && ($q<space> || $<normspace>) {
+            if @z[1] {
+                @z[1] = ::RxOp::Sequence.new(zyg => [
+                    ::RxOp::Sigspace.new, @z[1], ::RxOp::Sigspace.new]);
+            } else {
+                push @z, ::RxOp::Sigspace.new;
+            }
+        }
         $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
-            nonlisty => $q<nonlisty>,
+            nonlisty => $q<nonlisty>, closure => $q<closure>,
             zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
     }
 
@@ -472,13 +481,14 @@ method quantifier:sym<~> ($/) {
     make { tilde => [ map *.ast, @($<quantified_atom>) ] }
 }
 method quantifier:sym<**> ($/) {
-    # XXX can't handle normspace well since it's not labelled 1*/2*
-    my $h = $<embeddedblock> ?? { min => 0, cond =>
+    my $h = $<embeddedblock> ?? { min => 0, closure =>
                 self.inliney_call($/, $<embeddedblock>.ast) } !!
             $<quantified_atom> ?? { min => 1, sep => $<quantified_atom>.ast } !!
             { min => +~$0, max => ($1 ?? +~$1 !!
                 defined($/.index('..')) ?? Any !! +~$0) };
     $h<mod> = $<quantmod>.ast;
+    $h<general> = True;
+    $h<space> = ?($<normspace>);
     make $h;
 }
 
@@ -906,7 +916,10 @@ method process_nibble($/, @bits, $prefix?) {
         }
 
         if $ast !~~ Op && defined($prefix) && $prefix ne "" {
-            $ast = $ast.split(/^^<before \h>[ $prefix || \h+ ]/).join("");
+            my $start_nl = !$n.from || ("\r\n".index(
+                substr($/.orig, $n.from-1, 1).defined));
+            $ast = $ast.split(/ ^^ [ <?{ $start_nl }> || <?after <[\r\n]> > ]
+                <before \h>[ $prefix || \h+ ]/).join("");
         }
 
         push @acc, $ast;
@@ -1481,7 +1494,7 @@ method package_var($/, $slot, $name, $path, :$list, :$hash) {
             $name, |mnode($/));
         $*CURLEX<!sub>.lexicals-used{$slot} = True;
     });
-    ::Op::PackageVar.new(|node($/), :$slot, :$name, :$path, :$list, :$hash);
+    ::Op::Lexical.new(|node($/), name => $slot);
 }
 
 method term:name ($/) {
@@ -2340,7 +2353,8 @@ method type_declarator:subset ($/) {
 }
 
 method make_constant($/, $scope, $name) {
-    $scope := $scope || 'our';
+    # hints must be lexically scoped
+    $scope := $scope || (substr($name,1,1) eq '?' ?? 'my' !! 'our');
 
     my $slot = ($scope eq 'my' || $scope eq 'our') ?? $name !! self.gensym;
 
@@ -2549,12 +2563,20 @@ method process_block_traits($/, @tr) {
                 $T.CURSOR.sorry("Cannot interpret operator reference");
                 next;
             }
+            unless $sub.extend<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
             unless $oprec {
                 $T.CURSOR.sorry("No precedence available for reference target");
                 next;
             }
-            my %new = %$oprec;
-            $sub.extend.<prec> = %new;
+            if $rel eq 'equiv' {
+                my %copy = %$oprec;
+                $sub.extend.<prec> = %copy;
+            } else {
+                $sub.extend.<prec><prec> = $oprec.<prec>;
+            }
             $sub.extend.<prec><prec> ~~ s/\=/<=/ if $rel eq 'looser';
             $sub.extend.<prec><prec> ~~ s/\=/>=/ if $rel eq 'tighter';
         } elsif !$pack && $tr<assoc> {

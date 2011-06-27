@@ -19,6 +19,11 @@ method cgop($body) {
     }
 }
 
+method to_bind($/, $ro, $rhs) { #OK not used
+    $/.CURSOR.sorry("Cannot use bind operator with this LHS");
+    ::Op::StatementList.new;
+}
+
 # ick
 method cgop_labelled($body, $label) {
     if (defined $.line) {
@@ -29,17 +34,6 @@ method cgop_labelled($body, $label) {
 }
 
 method code_labelled($body, $label) { self.code($body) } #OK not used
-
-# A few words on the nature of bvalues
-# A bvalue cannot escape a sub; the return would always extract the
-# Variable.  Most ops don't return bvalues, nor expect them.  To avoid
-# the overhead of every Op::Lexical returning a bvalue, we do a very
-# primitive escape analysis here; only generate bvalues on the LHS of
-# binds.  Further, we don't need to generate the bvalues explicitly, since
-# we know they'll just be bound.
-method code_bvalue($body, $ro, $rhscg) { #OK not used
-    die "Illegal use of {self.WHAT.perl} in bvalue context";
-}
 
 method statement_level() { self }
 
@@ -143,6 +137,15 @@ class CallSub is CallLike {
     method code($body) {
         CgOp.subcall(CgOp.fetch($.invocant.cgop($body)), self.argblock($body));
     }
+
+    method to_bind($/, $ro, $rhs) {
+        if $!invocant ~~ ::Op::Lexical && substr($!invocant.name, 0, 15)
+                eq '&postcircumfix:' {
+            return self.adverb(::Op::SimplePair.new(key => 'BIND_VALUE',
+                value => $ro ?? ::Op::ROify.new(child => $rhs) !! $rhs));
+        }
+        nextsame;
+    }
 }
 
 class CallMethod is CallLike {
@@ -203,10 +206,7 @@ class Paren is Op {
     method ctxzyg($f) { $.inside, $f }
 
     method code($body) { $.inside.cgop($body) }
-
-    method code_bvalue($body, $ro, $rhscg) {
-        $.inside.code_bvalue($body, $ro, $rhscg)
-    }
+    method to_bind($/, $ro, $rhs) { $!inside.to_bind($/, $ro, $rhs); }
 }
 
 class SimplePair is Op {
@@ -579,17 +579,6 @@ class MakeJunction is Op {
     }
 }; }
 
-class Bind is Op {
-    has $.readonly = die "Bind.readonly required"; #Bool
-    has $.lhs      = die "Bind.lhs required"; #Op
-    has $.rhs      = die "Bind.rhs required"; #Op
-    method zyg() { $.lhs, $.rhs }
-
-    method code($body) {
-        $.lhs.code_bvalue($body, $.readonly, $.rhs.cgop($body))
-    }
-}
-
 # just a little hook for rewriting
 class Attribute is Op {
     has $.name; # Str
@@ -647,12 +636,25 @@ class Lexical is Op {
 
     method code($) { CgOp.scopedlex($.name) }
 
-    method code_bvalue($ , $ro, $rhscg) {
-        my $type = CgOp.class_ref('mo', 'Any');
-        CgOp.prog(
-            CgOp.scopedlex($.name, defined($ro) ?? CgOp.newboundvar(+?$ro,
-                +(?($.list || $.hash)), $type, $rhscg) !! $rhscg),
-            CgOp.scopedlex($.name));
+    method to_bind($/, $ro, $rhs) {
+        my $lex = $*CURLEX<!sub>.find_lex($!name) or
+            ($/.CURSOR.sorry("Cannot find definition for binding???"),
+                return ::Op::StatementList.new);
+        my $list = False;
+        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
+        given $lex {
+            when ::Metamodel::Lexical::Simple {
+                $list = .list || .hash;
+                $type = .typeconstraint // $type;
+            }
+            when ::Metamodel::Lexical::Common {
+                $list = substr($!name,0,1) eq '%' || substr($!name,0,1) eq '@';
+            }
+            default {
+                nextsame;
+            }
+        }
+        ::Op::LexicalBind.new(name => $!name, :$ro, :$rhs, :$list, :$type);
     }
 }
 
@@ -671,27 +673,6 @@ class ContextVar is Op {
         my @a = (CgOp.str($.name), CgOp.int($.uplevel));
         ($.name eq '$*/' || $.name eq '$*!') ??
             CgOp.status_get(|@a) !! CgOp.context_get(|@a);
-    }
-}
-
-class PackageVar is Op {
-    has $.name = die "PackageVar.name required"; # Str
-    has $.slot = die "PackageVar.slot required"; # Str
-    has $.path = die "PackageVar.path required"; # Array of Str
-    has $.list = False; # Bool
-    has $.hash = False; # Bool
-
-    # TODO: Design and reimplement dynamic-ish $CALLER::, $MY::
-
-    method code($ ) { CgOp.scopedlex($.slot) }
-
-    method code_bvalue($ , $ro, $rhscg) {
-        my $type = CgOp.class_ref('mo', 'Any');
-        CgOp.prog(
-            CgOp.scopedlex($.slot,
-                defined($ro) ?? CgOp.newboundvar(+?$ro,
-                    +(?($.list || $.hash)), $type, $rhscg) !! $rhscg),
-            CgOp.scopedlex($.slot));
     }
 }
 
@@ -912,4 +893,27 @@ class LabelHook is Op {
         CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
             map({ 8, $_, "goto_$_" }, @$.labels));
     }
+}
+
+class LexicalBind is Op {
+    has Str $.name;
+    has Bool $.ro;
+    has Bool $.list;
+    has $.type; # Xref
+    has $.rhs; # Op
+    method zyg() { $.rhs }
+
+    method code($body) {
+        CgOp.prog(
+            CgOp.scopedlex($!name, !defined($!type) ?? $!rhs.cgop($body) !!
+                    CgOp.newboundvar(+$!ro, +$!list,
+                        CgOp.class_ref('mo', @($!type)), $!rhs.cgop($body))),
+            CgOp.scopedlex($!name))
+    }
+}
+
+class ROify is Op {
+    has $.child;
+    method zyg() { $.child }
+    method code($body) { CgOp.newscalar(CgOp.fetch($!child.cgop($body))) }
 }

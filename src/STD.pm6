@@ -1070,6 +1070,12 @@ token opener {
   ]>
 }
 
+grammar P5 is STD {
+}
+
+grammar P5::Regex is STD {
+}
+
 grammar P6 is STD {
 
     ###################
@@ -1278,15 +1284,7 @@ grammar P6 is STD {
         ]
     }
 
-
-    token label {
-        :my $label;
-        <identifier> ':' <?before \s> <.ws>
-
-        [ <?{ $¢.is_name($label = $<identifier>.Str) }>
-          <.worry("Redeclaration of '$label'")>
-        ]?
-    }
+    token label { <identifier> ':' <?before \s> <.ws> }
 
     token statement {
         :my $*endargs = -1;
@@ -5394,7 +5392,7 @@ method check_variable ($variable) {
 }
 
 method lookup_compiler_var($name) {
-    state %builtin_hints = < $?LINE $?POSITION &?BLOCK &?ROUTINE > Z=> True;
+    state %builtin_hints = < $?LINE $?POSITION &?BLOCK &?ROUTINE > X=> True;
 
     unless %builtin_hints{$name} || defined self.lookup_lex($name)
     {
