@@ -26,8 +26,15 @@ README for details.
 
 [Breaking changes]
 
-INVOKE has been renamed postcircumfix:<( )>, at_key and at_pos likewise.
-You will need to change any classes that overrode one or more.
+To facilitate S13-style definitions, the methods implementing postcircumfix
+operators have been renamed:
+
+    If you had...   Change to:
+    INVOKE          postcircumfix:<( )>
+    at-key          postcircumfix:<{ }>
+    at-pos          postcircumfix:<[ ]>
+
+(Rakudo style at_key and at_pos support is planned soon.)
 
 Constants now default to our scope, not my.
 
@@ -117,6 +124,8 @@ Complex.im.
 
 New setting functions: lines, floor, ceiling, round, truncate, conjugate,
 sign, (Solomon Foster) abs.
+
+infix:<**> now works in many more cases.  (Solomon Foster)
 
 
 [Selected bug fixes]
