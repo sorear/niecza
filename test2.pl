@@ -129,9 +129,9 @@ eval_lives_ok q[
 {
     my $x = 'Bar';
     my $in = qq:to [A] ;
- Foo $x
-A
-    is $in.substr(0,8), ' Foo Bar', "spaces preserved after heredoc interpolation";
+  $x  Foo
+  A
+    is $in.substr(0,8), 'Bar  Foo', "spaces preserved after heredoc interpolation";
 }
 
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
