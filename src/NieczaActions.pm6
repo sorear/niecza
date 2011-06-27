@@ -916,8 +916,8 @@ method process_nibble($/, @bits, $prefix?) {
         }
 
         if $ast !~~ Op && defined($prefix) && $prefix ne "" {
-            my $start_nl = !$n.from || ("\r\n".index(
-                substr($/.orig, $n.from-1, 1).defined));
+            my $start_nl = !$n.from || "\r\n".index(
+                substr($n.orig, $n.from-1, 1)).defined;
             $ast = $ast.split(/ ^^ [ <?{ $start_nl }> || <?after <[\r\n]> > ]
                 <before \h>[ $prefix || \h+ ]/).join("");
         }

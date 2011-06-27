@@ -648,7 +648,7 @@ class Lexical is Op {
                 $type = .typeconstraint // $type;
             }
             when ::Metamodel::Lexical::Common {
-                $list = substr($!name,0,1) eq '%' || substr($!name,0,1) eq '@';
+                $list = substr(.name,0,1) eq '%' || substr(.name,0,1) eq '@';
             }
             default {
                 nextsame;

@@ -134,6 +134,13 @@ eval_lives_ok q[
     is $in.substr(0,8), 'Bar  Foo', "spaces preserved after heredoc interpolation";
 }
 
+{
+    ok @*ARGS.flattens, '@*ARGS is a flatteny thing';
+    ok %*ENV.flattens, '%*ENV is a flatteny thing';
+    @Y8158::z := [1,2,3];
+    ok @Y8158::z.flattens, 'binding to @foo::bar works';
+}
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {

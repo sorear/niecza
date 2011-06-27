@@ -1782,8 +1782,8 @@ INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
     $PROCESS::OUT ::= TextWriter.new;
     $PROCESS::ARGFILES ::= IO::ArgFiles.new;
-    @PROCESS::ARGS ::= Q:CgOp { (sysquery (i 0)) };
-    %PROCESS::ENV ::= Q:CgOp { (sysquery (i 4)) };
+    @PROCESS::ARGS = Q:CgOp { (sysquery (i 0)) };
+    %PROCESS::ENV = Q:CgOp { (sysquery (i 4)) };
     $PROCESS::EXECUTABLE_NAME ::= Q:CgOp { (sysquery (i 2)) };
     $PROCESS::PROGRAM_NAME ::= Q:CgOp { (sysquery (i 1)) };
     $PROCESS::BASE_DIRECTORY ::= Q:CgOp { (sysquery (i 3)) };
