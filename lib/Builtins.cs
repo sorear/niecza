@@ -605,8 +605,16 @@ public class Builtins {
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
-            return MakeComplex(-1.0, -1.0); // Must implement
+            double r = Math.Sqrt(v1.re * v1.re + v1.im * v1.im);
+            double theta = Math.Atan2(v1.im, v1.re);
+            // Log z = ln r + iθ
+            // ($a.log * $b).exp;
+            double lp_re = Math.Log(r)*v2.re - theta*v2.im;
+            double lp_im = theta*v2.re + Math.Log(r)*v2.im;
+            return MakeComplex(Math.Exp(lp_re) * Math.Cos(lp_im),
+                               Math.Exp(lp_re) * Math.Sin(lp_im));
         }
+
         if (r1 == NR_FLOAT || (r2 != NR_BIGINT && r2 != NR_FIXINT)) {
             return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
         }
@@ -623,7 +631,7 @@ public class Builtins {
                 }
                 if (r1 == NR_FIXRAT) {
                     Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFatRat(BigInteger.Pow((BigInteger)v1.num, v2), BigInteger.Pow(v1.den, v2));
+                    return MakeFixRat(BigInteger.Pow((BigInteger)v1.num, v2), BigInteger.Pow(v1.den, v2));
                 }
             } else {
                 if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
@@ -635,7 +643,7 @@ public class Builtins {
                 }
                 if (r1 == NR_FIXRAT) {
                     Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFatRat(BigInteger.Pow((BigInteger)v1.den, -v2), BigInteger.Pow(v1.num, -v2));
+                    return MakeFixRat(BigInteger.Pow((BigInteger)v1.den, -v2), BigInteger.Pow(v1.num, -v2));
                 }
             }
         }
@@ -652,7 +660,7 @@ public class Builtins {
                 }
                 if (r1 == NR_FIXRAT) {
                     Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFatRat(big_pow((BigInteger)v1.num, v2), big_pow(v1.den, v2));
+                    return MakeFixRat(big_pow((BigInteger)v1.num, v2), big_pow(v1.den, v2));
                 }
             } else {
                 if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
@@ -664,7 +672,7 @@ public class Builtins {
                 }
                 if (r1 == NR_FIXRAT) {
                     Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFatRat(big_pow((BigInteger)v1.den, -v2), big_pow(v1.num, -v2));
+                    return MakeFixRat(big_pow((BigInteger)v1.den, -v2), big_pow(v1.num, -v2));
                 }
             }
         }
