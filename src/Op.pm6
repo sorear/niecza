@@ -113,7 +113,8 @@ class CallLike is Op {
             if $a.^isa(::Op::SimplePair) {
                 push @out, ":" ~ $a.key, $a.value.cgop($body);
             } elsif $a.^isa(::Op::CallSub) && $a.invocant.^isa(::Op::Lexical)
-                    && $a.invocant.name eq '&prefix:<|>' {
+                    && $a.invocant.name eq '&prefix:<|>'
+                    && $a.positionals == 1 {
                 push @out, 'flatcap', CgOp.fetch(CgOp.methodcall(
                     $a.positionals[0].cgop($body), 'Capture'));
             } else {
