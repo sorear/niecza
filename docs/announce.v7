@@ -1,0 +1,146 @@
+    Announce: Niecza Perl 6 v7
+
+This is the seventh release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.  I am pleased to note that Niecza is
+starting to attract attention from the broader community.  However,
+this probably means a better name is needed; "Niecza" was OK as a
+project name but is LTA for talking about.  Suggestions are welcome.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Breaking changes]
+
+INVOKE has been renamed postcircumfix:<( )>, at_key and at_pos likewise.
+You will need to change any classes that overrode one or more.
+
+Constants now default to our scope, not my.
+
+
+
+[Major features]
+
+eval has been overhauled.  It now provides access to lexical variables in the
+surrounding scope, can return values to the surrounding scope, and can use
+control operators.  This includes the ability to use operators in the
+surrounding scope.
+
+Similarly the REPL now supports variables carrying over between lines, and
+automatically prints values if you do not call an output function.  The REPL
+will catch exceptions and syntax errors; the only major features it's missing
+now are editing and autocompletion.
+
+Junctions are now implemented.
+
+Subset and enum are available, completing the standard roster of type
+declarators.  As usual, no BEGIN means enum initializers are limited.
+Bool is an enum now.
+
+Handling of packages has been considerably redone.  Foo::Bar now goes through
+the WHO slot on Foo, like it was always supposed to.  Packages can now be
+overwritten by non-packages if necessary.
+
+Niecza's parser has been modified to not keep a redundant second copy of the
+symbol table, improving a number of corner cases (most notably the requirement
+to use ::Foo::Bar with imported classes) and improving warnings.
+
+Everything that can produce compile errors (except compiler bugs) is now
+checked for during the parse, and results in a SORRY, not a random exception.
+
+Object creation now supports BUILD submethods and has been greatly optimized;
+it also uses CREATE, new, and bless as documented.
+
+Sequence operators (... and ...^) are now supported.
+
+Operator precedence traits (looser, tighter, equiv, assoc) are now supported.
+
+
+
+[Minor new features]
+
+It is now possible to use {YOU_ARE_HERE} in a loop; the -n and -p options
+are now supported.
+
+Magical increment/decrement of Str is now available.
+
+Polymorphic comparison operators are starting to be stubbed in.
+
+Sort can now take arity-one callbacks.
+
+Assigning a single hash to a hash no longer dies.
+
+Block parameters now default to Mu, and invocants to ::?CLASS.
+
+Our subs are now supported.
+
+It is now possible to bind to array and hash elements.
+
+Packages and modules are now treated like classes, returning a type object
+(which !~~ Mu, so is fairly useless), not Any.
+
+:g/:global adverb to s/// now available.
+
+Error messages (with line information) are now generated for duplicate
+definitions of methods, attributes, and our-scoped symbols.
+
+The ** quantifier now supports blocks on the right side, and properly handles
+spaces around it.
+
+Variables except parameters now default to a type of Mu but an initial value
+of Any.
+
+New setting variables: $*ARGFILES, %*ENV, $*PROGRAM_NAME.
+
+New classes: Callable, Code, Block, Routine, Submethod, Method, EnumMap
+
+&?BLOCK, &?ROUTINE, $?POSITION, $?FILE, and $?LINE are now supported.
+
+New methods: Block.arity, Block.count, Code.outer, CallFrame.args,
+CallFrame.subname, CallFrame.dynamic-caller, Rat.numerator,
+Rat.denominator, Rat.nude, FatRat.new, (Solomon Foster) Complex.re,
+Complex.im.
+
+New setting functions: lines, floor, ceiling, round, truncate, conjugate,
+sign, (Solomon Foster) abs.
+
+
+[Selected bug fixes]
+
+Multiple inheritance now actually works.
+
+
+[Very internal changes]
+
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+Next month will see a major focus on spectests.  Solomon Foster thinks
+I can quadruple passing tests in a week; I'm not sure about that but
+hope to at least do so in a month.  Other features that are planned for
+next month include transparent use of CLR libraries, Buf, roles, and
+pseudo packages like OUTER::.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-7.zip
+[2] https://github.com/sorear/niecza
