@@ -5,12 +5,8 @@ items are required for yapsi.
 
 EASY
 
- + $*PROGRAM_NAME
-
    Add your favorite missing function to the setting, with tests.
    In particular, I could use: sprintf, dir, write, close, split, ...
-
-   Add %*ENV, your favorite other *-var.
 
    Implement Sub.leave and CallFrame.leave
 

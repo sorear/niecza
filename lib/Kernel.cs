@@ -2960,13 +2960,6 @@ ltm:
         }
 
         public static string[] commandArgs;
-        public static Variable[] ArgsHelper() {
-            List<Variable> lv = new List<Variable>();
-            foreach (string s in commandArgs) {
-                lv.Add(BoxAnyMO<string>(s, StrMO));
-            }
-            return lv.ToArray();
-        }
 
         public static VarDeque SortHelper(Frame th, P6any cb, VarDeque from) {
             Variable[] tmp = from.CopyAsArray();
@@ -3627,6 +3620,12 @@ def:        return at.Get(self, index);
         [ThreadStatic] static LastFrameNode rlstack;
         public static void SetTopFrame(Frame f) {
             rlstack.cur = f;
+        }
+
+        // MEGA HACK - This captures references to frames for the REPL
+        // Used from CLRBackend.exe
+        public static Frame GetLastMainlineFrame() {
+            return rlstack.next.root.reusable_child.reusable_child;
         }
 
         // it is an error to throw an exception between GetInferiorRoot

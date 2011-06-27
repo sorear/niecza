@@ -4311,6 +4311,7 @@ dynamic:
         internal bool dynamic;
 
         [ThreadStatic] internal static CLRBackend Current;
+        [ThreadStatic] internal static Frame last_repl_frame;
 
         internal int nextarray;
         internal int nextspill;
@@ -4709,8 +4710,10 @@ dynamic:
             Builtins.eval_result = (DynBlockDelegate)
                 Delegate.CreateDelegate(typeof(DynBlockDelegate),
                     root.clrType, "BOOT");
-            if (argv != null)
+            if (argv != null) {
                 Kernel.RunLoop(root.name, argv, Builtins.eval_result);
+                CLRBackend.last_repl_frame = Kernel.GetLastMainlineFrame();
+            }
         }
 
         public static void Main(string[] args) {
@@ -4783,10 +4786,13 @@ dynamic:
                 try {
                     BValue b = Kernel.PackageLookup(Kernel.ProcessO, "$OUTPUT_USED");
                     b.v = Kernel.FalseV;
+                    // hack to simulate a settingish environment
+                    Kernel.SetTopFrame(CLRBackend.last_repl_frame);
                     Variable r = Kernel.RunInferior(
                         Kernel.GetInferiorRoot().MakeChild(null,
                             new SubInfo("<repl>", Builtins.eval_result),
                             Kernel.AnyP));
+                    CLRBackend.last_repl_frame = Kernel.GetLastMainlineFrame();
                     if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
                         Variable pl = Kernel.RunInferior(
                             r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
