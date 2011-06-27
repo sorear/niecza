@@ -141,6 +141,34 @@ eval_lives_ok q[
     ok @Y8158::z.flattens, 'binding to @foo::bar works';
 }
 
+# from colomon
+{
+    isa_ok 1 ** 2, Int, "1 squared is an Int";
+    is 1 ** 2, 1, "1 squared is 1";
+
+    isa_ok 2 ** 3, Int, "2 ** 3 is an Int";
+    is 2 ** 3, 8, "2 ** 3 is 8";
+    isa_ok (2/3) ** 3, Rat, "(2/3) ** 3 is a Rat";
+    is (2/3) ** 3, 8 / 27, "(2/3) ** 3 is 8 / 27";
+    isa_ok FatRat.new(2, 3) ** 3, FatRat, "FatRat.new(2, 3) ** 3 is a FatRat";
+    is FatRat.new(2, 3) ** 3, 8 / 27, "FatRat.new(2, 3) ** 3 is 8 / 27";
+    isa_ok 2.54e0 ** 3, Num, "2.54e0 ** 3 is an Num";
+    is 2.54e0 ** 3, 16.387064e0, "2.54e0 ** 3 is 16.387064e0";
+
+    isa_ok 2 ** -3, Rat, "2 ** -3 is an Rat"; # spec?
+    is 2 ** -3, 1/8, "2 ** -3 is 1/8";
+    isa_ok (2/3) ** -3, Rat, "(2/3) ** -3 is a Rat";
+    is (2/3) ** -3, 27 / 8, "(2/3) ** -3 is 27 / 8";
+    isa_ok FatRat.new(2, 3) ** -3, FatRat, "FatRat.new(2, 3) ** -3 is a FatRat";
+    is FatRat.new(2, 3) ** -3, 27 / 8, "FatRat.new(2, 3) ** -3 is 27 / 8";
+    isa_ok 2.54e0 ** -3, Num, "2.54e0 ** -3 is an Num";
+    is_approx (2.54e0 ** -3), 0.0610237440947323, "2.54e0 ** -3 is 0.0610237440947323, more or less";
+
+    is_approx 1i ** 2, -1, "1i ** 2 is -1"; 
+    is_approx 1i ** 3, -1i, "1i ** 3 is -i"; 
+    is_approx 1i ** 4, 1, "1i ** 4 is 1"; 
+}
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {
