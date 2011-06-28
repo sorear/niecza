@@ -219,7 +219,11 @@ my class Cool {
         $self = substr($str, 0, chars($str)-1);
         $end;
     }
-    method substr($x, $y = chars(self)-$x) { substr(self,$x,$y) }
+    method substr(\$self: $x, $y?, $repl?) {
+        defined($repl) ??
+            substr($self, $x, $y // (chars($self)-$x)) = $repl !!
+            substr($self, $x, $y // (chars($self)-$x))
+    }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
@@ -236,9 +240,12 @@ my class Capture {
     has $!positionals;
     has $!named;
 
+    method Parcel() {
+        Q:CgOp { (box Parcel (getslot positionals fvarlist (@ {self}))) }
+    }
     method perl() {
         self // return self.typename;
-        my $pos := Q:CgOp { (box Parcel (getslot positionals fvarlist (@ {self}))) }.perl;
+        my $pos = self.Parcel.perl;
         $pos = substr($pos, 2, chars($pos) - 3);
         $pos = substr($pos, 0, chars($pos) - 2) if substr($pos, chars($pos) - 2, 2) eq ', ';
         my $h := self.hash;
@@ -250,8 +257,13 @@ my class Capture {
     }
 
     method Capture () { self }
-    method list () { @( Q:CgOp { (box Parcel (getslot positionals fvarlist
-        (@ {self}))) } ) }
+    method item () {
+        if self.hash || self.Parcel.raw_elems != 1 {
+            die "Can only use .item on captures representing a single value"
+        }
+        self.Parcel.raw_at(0)
+    }
+    method list () { @(self.Parcel) }
     method hash () { unitem( Q:CgOp {
         (letn h (getslot named varhash (@ {self}))
           (ternary (== (l h) (null varhash)) {{}} (box Hash (l h))))
@@ -469,7 +481,11 @@ sub exit($status = 0) { Q:CgOp {
 sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builtin('assign',2,2) { $a = $b }
 
 sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
-sub substr($str, $start, $len = chars($str) - $start) is Niecza::builtin('substr3', 3, 3) { substr($str, $start, $len) }
+sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
+    defined($repl) ??
+        substr($str, $start, $len // (chars($str)-$start)) = $repl !!
+        substr($str, $start, $len // (chars($str)-$start))
+}
 sub index($haystack,$needle,$pos?) { $haystack.index($needle,$pos) }
 sub rindex($haystack,$needle,$pos?) { $haystack.rindex($needle,$pos) }
 sub comb($matcher,$str,$limit?,:$match) { (~$str).comb($matcher,$limit,:$match) }
