@@ -84,14 +84,14 @@ my class Cool {
         };
     }
 
-    method split($matcher, $limit = 1_000_000_000, :$all?) {
+    method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
         my $str = ~self;
         my $C = Cursor.new($str);
         my @out;
         my $i = 0;
         my $last = 0;
-        my $limctr = $limit;
+        my $limctr = $limit // Inf;
         my $M;
         while ($i <= chars $str) && ($limctr > 1) {
             $M = head($matchrx($C.cursor($i++)));
@@ -133,10 +133,11 @@ my class Cool {
             $res;
         }
     }
+    method capitalize() { self.lc.subst(:g, /\w+/, { ucfirst $0 }) }
 
-    method index($substring, $pos = 0) {
+    method index($substring, $pos?) {
         my $str = ~self;
-        my $fromc = $pos;
+        my $fromc = defined($pos) ?? ($pos min chars $str) !! 0;
         my $len = chars $substring;
         my $maxi = chars($str) - $len;
         while $fromc <= $maxi {
@@ -161,14 +162,15 @@ my class Cool {
         Num; # XXX StrPos
     }
 
-    my $char = /./;
-    method comb($matcher = $char, $limit = 1_000_000_000, :$match) {
+    my $_char = /./;
+    method comb($matcher?, $limit?, :$match) {
         my $str = ~self;
         my $C = Cursor.new($str);
         my $i = 0;
-        my $limctr = $limit;
+        $matcher := $matcher // $_char;
+        my $limctr = $limit // Inf;
         my @out;
-        while ($i < chars $str) && $limctr {
+        while ($i < chars $str) && $limctr > 0 {
             my $M = head($matcher($C.cursor($i++)));
             if $M {
                 $i max= $M.to;
@@ -188,6 +190,7 @@ my class Cool {
     }
     method say() { (~self).say }
     method chars() { chars(self) }
+    method codes() { chars(self) }
     method bytes() { chars(self) * 2 }
     method chomp() {
         my $s = ~self;
@@ -196,9 +199,25 @@ my class Cool {
         --$l if $l && substr($s, $l-1, 1) eq "\x0D";
         substr($s,0,$l);
     }
+    method p5chomp($self is rw:) {
+        my $s = ~$self;
+        my $l = chars($s);
+        my $ol = $l;
+        --$l if $l && substr($s, $l-1, 1) eq "\x0A";
+        --$l if $l && substr($s, $l-1, 1) eq "\x0D";
+        $self = substr($s,0,$l);
+        $ol - $l;
+    }
     method chop() {
         my $s = ~self;
         substr($s, 0, chars($s) - 1)
+    }
+    method p5chop($self is rw:) {
+        my $str = ~$self;
+        return '' if $str eq '';
+        my $end = substr($str, chars($str)-1, 1);
+        $self = substr($str, 0, chars($str)-1);
+        $end;
     }
     method substr($x, $y = chars(self)-$x) { substr(self,$x,$y) }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
@@ -451,7 +470,10 @@ sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builti
 
 sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
 sub substr($str, $start, $len = chars($str) - $start) is Niecza::builtin('substr3', 3, 3) { substr($str, $start, $len) }
-sub index($haystack,$needle) { $haystack.index($needle) }
+sub index($haystack,$needle,$pos?) { $haystack.index($needle,$pos) }
+sub rindex($haystack,$needle,$pos?) { $haystack.rindex($needle,$pos) }
+sub comb($matcher,$str,$limit?,:$match) { (~$str).comb($matcher,$limit,:$match) }
+sub split($matcher,$str,$limit?,:$all) { (~$str).split($matcher,$limit,:$all) }
 
 sub item(Mu $x) { $x }
 
@@ -502,6 +524,9 @@ sub lc($string)    { (~$string).lc }
 sub uc($string)    { (~$string).uc }
 sub chop($string)  { (~$string).chop }
 sub chomp($string) { (~$string).chomp }
+sub capitalize($string) { (~$string).capitalize }
+sub p5chop(*@strs) { my $r = ''; $r = .p5chop for @strs; $r }
+sub p5chomp(*@strs) { my $r = 0; $r += .p5chomp for @strs; $r }
 sub flip($string)  { (~$string).flip }
 sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
 sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
