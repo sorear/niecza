@@ -61,6 +61,7 @@ my class Cursor { ... }
 my class Regex  { ... }
 my class Num    { ... }
 my class Str    { ... }
+my class Code   { ... }
 my class Cool {
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
     method Int() { Q:CgOp { (coerce_to_int {self}) } }
@@ -219,10 +220,13 @@ my class Cool {
         $self = substr($str, 0, chars($str)-1);
         $end;
     }
-    method substr(\$self: $x, $y?, $repl?) {
+    method substr(\$str: $start, $len?, $repl?) {
+        $start := $start(chars $str) if $start.^does(Code);
+        $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
+            $len // (chars($str) - $start);
         defined($repl) ??
-            substr($self, $x, $y // (chars($self)-$x)) = $repl !!
-            substr($self, $x, $y // (chars($self)-$x))
+            substr($str, $start, $len) = $repl !!
+            substr($str, $start, $len)
     }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
@@ -482,9 +486,12 @@ sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builti
 
 sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
 sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
+    $start := $start(chars $str) if $start.^does(Code);
+    $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
+        $len // (chars($str) - $start);
     defined($repl) ??
-        substr($str, $start, $len // (chars($str)-$start)) = $repl !!
-        substr($str, $start, $len // (chars($str)-$start))
+        substr($str, $start, $len) = $repl !!
+        substr($str, $start, $len)
 }
 sub index($haystack,$needle,$pos?) { $haystack.index($needle,$pos) }
 sub rindex($haystack,$needle,$pos?) { $haystack.rindex($needle,$pos) }
