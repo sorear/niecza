@@ -709,7 +709,10 @@ my class IterCursor {
 }
 
 sub flat(*@x) { @x }
-sub hash(\|@x) { %(@x.unwrap-single) }
+sub hash(|$cap) {
+    (%$cap || $cap.Parcel.raw_elems != 1) ??
+        %( @$cap, %$cap ) !! %( $$cap )
+}
 
 my class Whatever {
     method ACCEPTS(Mu $x) { defined(self) || $x.^isa(Whatever) }
