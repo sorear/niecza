@@ -650,8 +650,8 @@ sub goto ($x)  { _lexotic(8, $x, ()) }
 sub return(\|@pcl) is return-pass { Q:CgOp {
     (control 4 (null frame) (int -1) (null str) {@pcl.unwrap-single})
 } }
-sub succeed() {
-    Q:CgOp { (control 6 (null frame) (int -1) (null str) {()}) }
+sub succeed(\|@pcl) {
+    Q:CgOp { (control 6 (null frame) (int -1) (null str) {@pcl.unwrap-single}) }
 }
 sub proceed() {
     Q:CgOp { (control 7 (null frame) (int -1) (null str) {()}) }

@@ -61,7 +61,6 @@ our %funcs = (
     '&next'                => do_nullary_control(1),
     '&proceed'             => do_nullary_control(7),
     '&redo'                => do_nullary_control(3),
-    '&succeed'             => do_nullary_control(6),
 
     '&infix:<&>'           => do_makejunction(0),
     '&infix:<^>'           => do_makejunction(2),
@@ -72,6 +71,7 @@ our %funcs = (
     '&any'                 => do_makejunction(11),
 
     '&return'              => &do_return_take,
+    '&succeed'             => &do_return_take,
     '&take'                => &do_return_take,
 );
 
@@ -88,7 +88,8 @@ sub do_return_take($body, $nv, $invname, $op) { #OK not used
             positionals => [@$args]));
     return ($invname eq '&take' ??
         ::Op::Take.new(value => $parcel) !!
-        ::Op::Control.new(payload => $parcel, number => 4));
+        ::Op::Control.new(payload => $parcel,
+            number => $invname eq '&return' ?? 4 !! 6));
 }
 
 sub do_nullary_control($number) { sub ($body, $nv, $ , $op) { #OK not used

@@ -36,6 +36,20 @@ class Op::DoOnceLoop is Op {
     }
 }
 
+augment class Op::When {
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
+                $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
+            CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
+                    CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
+                        CgOp.null('str'), $.body.cgop($body))),
+                7, '', "end$id"),
+            CgOp.corelex('Nil'));
+    }
+}
+
 augment class NieczaActions {
 method statement_prefix:do ($/) {
     make Op::DoOnceLoop.new(|node($/),
