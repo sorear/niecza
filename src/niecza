@@ -23,7 +23,24 @@ use RxOp;
 use Sig;
 use STD;
 
+class Op::DoOnceLoop is Op {
+    has Op $.body = die "DoOnceLoop.body required";
+    method zyg() { $!body }
+
+    method code($body) { self.code_labelled($body,'') }
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+            1, $l, "next$id", 2, $l, "next$id", 3, $l, "redo$id");
+    }
+}
+
 augment class NieczaActions {
+method statement_prefix:do ($/) {
+    make Op::DoOnceLoop.new(|node($/),
+        body => self.inliney_call($/, $<blast>.ast));
+}
 }
 
 CgOp._register_ops: <
