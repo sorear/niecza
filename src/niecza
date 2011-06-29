@@ -23,6 +23,45 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD::P6 {
+    token pblock () {
+        :temp $*CURLEX;
+        :dba('parameterized block')
+        [<?before <.lambda> | '{' > ||
+            {
+                if $*BORG and $*BORG.<block> {
+                    if $*BORG.<name> {
+                        my $m = "Function '" ~ $*BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                        $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $*BORG.<name> ~ "')");
+                    }
+                    else {
+                        my $m = "Expression needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                        $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by expression)");
+                    }
+                }
+                elsif %*MYSTERY {
+                    $¢.panic("Missing block (apparently gobbled by undeclared routine?)");
+                }
+                else {
+                    $¢.panic("Missing block");
+                }
+            }
+        ]
+        [
+        | <lambda>
+            <.newlex(1)>
+            { $*CURLEX<!rw_lambda> = True if $<lambda> eq '<->' }
+            <signature(1)>
+            <blockoid>
+            <.getsig>
+        | <?before '{'>
+            <.newlex(1)>
+            <blockoid>
+            <.getsig>
+        ]
+    }
+}
+
 class Op::DoOnceLoop is Op {
     has Op $.body = die "DoOnceLoop.body required";
     method zyg() { $!body }
@@ -51,6 +90,67 @@ augment class Op::When {
 }
 
 augment class NieczaActions {
+method parameter($/) {
+    my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
+    my $copy = False;
+    my $sorry;
+    my $slurpy = False;
+    my $slurpycap = False;
+    my $optional = False;
+    my $rwt = False;
+    my $type;
+
+    if $<type_constraint> {
+        my $t = self.simple_longname($<type_constraint>[0]<typename><longname>);
+        $type = $*CURLEX<!sub>.compile_get_pkg(@$t).xref;
+    }
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<copy> { $copy = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+    $*unit.deref($default).set_name("$/ init") if $default;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
+
+    if defined $p.ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
+        :$optional, :$slurpy, :$rw, tclass => $type,
+        :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
+}
+
+
 method statement_prefix:do ($/) {
     make Op::DoOnceLoop.new(|node($/),
         body => self.inliney_call($/, $<blast>.ast));
