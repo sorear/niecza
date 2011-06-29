@@ -126,7 +126,9 @@ public class Builtins {
 
         public override P6any Fetch() {
             string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
-            return Kernel.BoxRaw<string>(Builtins.LaxSubstring2(str, from, length), Kernel.StrMO);
+            string sub = Builtins.LaxSubstring2(str, from, length);
+            return sub == null ? Kernel.StrMO.typeObject :
+                Kernel.BoxRaw(sub,Kernel.StrMO);
         }
 
         public override void Store(P6any v) {
@@ -146,18 +148,15 @@ public class Builtins {
     }
 
     public static string LaxSubstring(string str, int from) {
-        if (from <= 0)
-            return str;
-        if (from >= str.Length)
-            return "";
+        if (from < 0 || from > str.Length)
+            return null;
         return str.Substring(from);
     }
 
     public static string LaxSubstring2(string str, int from, int l) {
-        if (from <= 0) from = 0;
-        if (from >= str.Length) from = str.Length;
+        if (from < 0 || from > str.Length) return null;
         if (l >= str.Length - from) l = str.Length - from;
-        if (l < 0) l = 0;
+        if (l < 0) return null;
         return str.Substring(from, l);
     }
 
