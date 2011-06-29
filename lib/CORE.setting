@@ -2,10 +2,6 @@
 my module CORE;
 use MONKEY_TYPING;
 
-# Note that a few of these functions are defined as themselves.  That
-# means that the true definitions are in the optimizer, and the subs
-# are only used for non-primitivizable cases.
-
 # Fundamental types {{{
 my class Mu {
     method head() { @(self).head }
@@ -43,6 +39,61 @@ my class Any is Mu {
         0;
     }
 
+    # This needs a way of taking a user-defined comparison
+    # specifier, but AFAIK nothing has been spec'd yet.
+    # CHEAT: Almost certainly should be hashed on something
+    # other than the stringification of the objects.
+    method uniq() {
+        my %seen;
+        gather for @(self) {
+             unless %seen{$_} {
+                 take $_;
+                 %seen{$_} = 1;
+             }
+        }
+    }
+
+    method kv() {
+        my $i = 0;
+        gather for @(self) -> \$value {
+            my $key = $i++;
+            take $key;
+            take $value;
+        }
+    }
+
+    method keys() {
+        my $i = 0;
+        gather for @(self) -> $value {
+            my $key = $i++;
+            take $key;
+        }
+    }
+
+    method values() {
+        gather for @(self) -> \$value {
+            take $value;
+        }
+    }
+
+    method pairs() {
+        self.kv.map(-> $key, \$value { $key => $value; });
+    }
+
+    method grep(Mu $sm) { grep $sm, @(self) }
+    method map($func)   { map $func, @(self) }
+    method for (&cb) {
+        Q:CgOp {
+            (rnull (letn it (unbox vvarlist (@ {self.iterator}))
+                  cb (@ {&cb})
+              (whileloop 0 0 (iter_hasflat (l it))
+                (sink (subcall (l cb) (vvarlist_shift (l it)))))))
+        };
+    }
+    method elems() { self.flat.elems }
+    method iterator() { self.flat.iterator }
+    method join($sep = "") { self.flat.join($sep) }
+
     method any() { any @(self) }
     method none() { none @(self) }
     method all() { all @(self) }
@@ -73,17 +124,6 @@ my class Cool {
     method sqrt() { sqrt self }
     method sign() { sign self }
     method conjugate() { self }
-
-    method grep(Mu $sm) { grep $sm, @(self) }
-    method map($func)   { map $func, @(self) }
-    method for (&cb) {
-        Q:CgOp {
-            (rnull (letn it (unbox vvarlist (@ {self.iterator}))
-                  cb (@ {&cb})
-              (whileloop 0 0 (iter_hasflat (l it))
-                (sink (subcall (l cb) (vvarlist_shift (l it)))))))
-        };
-    }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -233,11 +273,6 @@ my class Cool {
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
     method ucfirst() { ucfirst(self) }
     method lcfirst() { lcfirst(self) }
-
-    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
-    method elems() { self.flat.elems }
-    method iterator() { self.flat.iterator }
-    method join($sep = "") { self.flat.join($sep) }
 }
 
 my class Capture {
@@ -726,6 +761,7 @@ my class Array { ... }
 my class Parcel is Cool {
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
+    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
 
     # LoLly usage
     method raw_elems() { Q:CgOp {
@@ -839,7 +875,7 @@ my class List is Cool {
         $t // '';
     }
 
-    method Str() { self.join(" ") }
+    method Str() { defined(self) ?? self.join(" ") !! nextsame }
 
     method sort($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
@@ -1383,6 +1419,7 @@ my class Range is Cool {
 
     method list() { self.iterator.list }
     method flat() { self.iterator.flat }
+    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
 
     method bounds() { $.min, $.max }
     method from() { $.min }
