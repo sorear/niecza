@@ -33,6 +33,9 @@ my class Mu {
 }
 
 my class Any is Mu {
+    method isa(\$other) { self.^isa($other) }
+    method does(\$other) { self.^does($other) }
+    method can($method) { self.^can($method) }
     method flat() { @(self) }
     method Numeric() {
         die "Cannot use value like $.typename as a number" if defined(self);
@@ -64,7 +67,7 @@ my class Any is Mu {
 
     method keys() {
         my $i = 0;
-        gather for @(self) -> $value {
+        gather for @(self) -> $value { #OK not used
             my $key = $i++;
             take $key;
         }
@@ -688,7 +691,8 @@ sub return(\|@pcl) is return-pass { Q:CgOp {
 sub succeed(\|@pcl) {
     Q:CgOp { (control 6 (null frame) (int -1) (null str) {@pcl.unwrap-single}) }
 }
-sub proceed() {
+sub proceed() { proceed }
+sub term:<proceed>() {
     Q:CgOp { (control 7 (null frame) (int -1) (null str) {()}) }
 }
 sub nextsame() {

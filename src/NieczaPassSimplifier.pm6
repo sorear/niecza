@@ -60,6 +60,7 @@ our %funcs = (
     '&last'                => do_nullary_control(2),
     '&next'                => do_nullary_control(1),
     '&proceed'             => do_nullary_control(7),
+    '&term:<proceed>'      => do_nullary_control(7),
     '&redo'                => do_nullary_control(3),
 
     '&infix:<&>'           => do_makejunction(0),
