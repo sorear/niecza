@@ -127,6 +127,7 @@ my class Cool {
     method sqrt() { sqrt self }
     method sign() { sign self }
     method conjugate() { self }
+    method sin() { Q:CgOp { (sin {self}) } }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -345,6 +346,7 @@ my class Complex is Numeric {
     method new($re,$im) { $re + $im\i }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method Complex() { self }
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
     method conjugate() { self.re - (self.im)i }
@@ -1862,6 +1864,8 @@ sub get($handle = $*IN) { $handle.get }
 sub lines($filehandle = $*IN) { $filehandle.lines }
 sub prompt($msg) { print $msg; $*IN.get }
 sub getc($handle) { $handle.getc }
+
+sub sin($x) { $x.sin }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
