@@ -62,6 +62,23 @@ augment grammar STD::P6 {
     }
 }
 
+augment class Sig::Parameter {
+    method simple($n) { self.new(name => $n, slot => $n, :rwtrans) }
+}
+
+augment class Operator::CompoundAssign {
+    method with_args($/, *@rest) {
+        my $left = shift @rest;
+        if $left.^isa(::Op::Lexical) {
+            my $nlft = ::Op::Lexical.new(|node($/), name => $left.name);
+            mkcall($/, '&infix:<=>', $left, $.base.with_args($/, $nlft, @rest));
+        } else {
+            mklet($left, -> $ll {
+                mkcall($/, '&infix:<=>', $ll, $.base.with_args($/, $ll, @rest)) });
+        }
+    }
+}
+
 class Op::DoOnceLoop is Op {
     has Op $.body = die "DoOnceLoop.body required";
     method zyg() { $!body }
