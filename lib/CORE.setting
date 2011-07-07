@@ -127,6 +127,11 @@ my class Cool {
     method sqrt() { sqrt self }
     method sign() { sign self }
     method conjugate() { self }
+    multi method exp() { Q:CgOp { (exp {self}) } }
+    multi method exp($base) { $base ** self }
+    method ln() { Q:CgOp { (ln {self}) } }
+    multi method log() { self.ln }
+    multi method log($base) { self.ln / $base.ln }
     method sin() { Q:CgOp { (sin {self}) } }
 
     method split($matcher, $limit?, :$all?) {

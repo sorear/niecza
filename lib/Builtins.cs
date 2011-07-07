@@ -760,6 +760,45 @@ public class Builtins {
         }
     }
 
+    static Func<Variable,Variable> ln_d = ln;
+    public static Variable ln(Variable a1) {
+        P6any o1 = a1.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(a1,o1, ln_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+        if (r1 == NR_COMPLEX) {
+            // Log z = ln r + iθ
+            Complex v1 = PromoteToComplex(r1, n1);
+            return MakeComplex(Math.Log(Math.Sqrt(v1.re * v1.re + v1.im * v1.im)),
+                               Math.Atan2(v1.im, v1.re));
+        }
+        {
+            double v1 = PromoteToFloat(r1, n1);
+            return MakeFloat(Math.Log(v1));
+        }
+    }
+
+    static Func<Variable,Variable> exp_d = exp;
+    public static Variable exp(Variable a1) {
+        P6any o1 = a1.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(a1,o1, exp_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+        if (r1 == NR_COMPLEX) {
+            Complex v1 = PromoteToComplex(r1, n1);
+            return MakeComplex(Math.Exp(v1.re) * Math.Cos(v1.im),
+                               Math.Exp(v1.re) * Math.Sin(v1.im));
+        }
+        {
+            double v1 = PromoteToFloat(r1, n1);
+            return MakeFloat(Math.Exp(v1));
+        }
+    }
+
     static Func<Variable,Variable> sin_d = sin;
     public static Variable sin(Variable a1) {
         P6any o1 = a1.Fetch();
