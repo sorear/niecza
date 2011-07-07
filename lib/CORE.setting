@@ -1320,8 +1320,11 @@ my class Match is Cool {
     method ast () { Q:CgOp { (ns (cursor_ast (cast cursor (@ {self})))) } }
     method chars() { defined(self) ?? $.to - $.from !! 0 }
     method perl() {
-        !defined(self) ?? self.typename !!
-        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @(self).perl }) named({ %(self).perl })>"
+        self // nextsame;
+        my @pos = @(self);
+        @pos = () if @pos == 1 && @pos[0] === self;
+
+        "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @pos.perl }) named({ %(self).perl })>"
     }
     method CURSOR() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
     method cursor() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
