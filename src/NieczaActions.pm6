@@ -1127,14 +1127,6 @@ method infix_circumfix_meta_operator:sym«<< >>» ($/) {
         mkbool(substr($/,chars($/)-2,2) eq '>>'));
 }
 
-method prefix_circumfix_meta_operator:reduce ($/) {
-    my $assoc = $<s><op><O><assoc>;
-    my $op = $<s><op>.ast;
-    my $tr = substr($/,1,1) eq '\\';
-    make $op.meta_fun($/, '&reduceop', 1, mkbool($tr), mkbool($assoc eq 'list'),
-        mkbool($assoc eq 'right'), mkbool($assoc eq 'chain'));
-}
-
 method postfix_prefix_meta_operator:sym< » > ($/) { } #handled in POST
 method prefix_postfix_meta_operator:sym< « > ($/) { } #handled in PRE
 
@@ -1586,6 +1578,18 @@ method term:colonpair ($/) {
 }
 
 method term:fatarrow ($/) { make $<fatarrow>.ast }
+
+method term:reduce ($/) {
+    my $assoc = $<op><O><assoc>;
+    make Op::CallSub.new(|node($/),
+        invocant => mklex($/, '&reduceop'),
+        args => [
+            mkbool($<triangle> ne ''), mkbool($assoc eq 'list'),
+            mkbool($assoc eq 'right'), mkbool($assoc eq 'chain'),
+            $<op>.ast.as_function($/), @( $<args>.ast.[0] // [] )
+        ]);
+}
+
 
 method do_variable_reference($M, $v) {
     if $v<term> {

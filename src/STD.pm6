@@ -266,9 +266,6 @@ proto token postfix_prefix_meta_operator is unary {*}
 token category:prefix_postfix_meta_operator { <sym> }
 proto token prefix_postfix_meta_operator is unary {*}
 
-token category:prefix_circumfix_meta_operator { <sym> }
-proto token prefix_circumfix_meta_operator is unary {*}
-
 token category:terminator { <sym> }
 proto token terminator {*}
 
@@ -1964,8 +1961,7 @@ grammar P6 is STD {
         :my $*VAR;
         :dba('prefix or term')
         [
-        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
-            [ <?{ $<term> }> || <term> || <.panic("Prefix requires an argument")> ]
+        | <PRE>+ [ <term> || <.panic("Prefix requires an argument")> ]
         | <term>
         ]
 
@@ -3065,8 +3061,6 @@ grammar P6 is STD {
         [
         | <prefix>
             $<O> = {$<prefix><O>} $<sym> = {$<prefix><sym>}
-        | <prefix_circumfix_meta_operator>
-            $<O> = {$<prefix_circumfix_meta_operator><O>} $<sym> = {$<prefix_circumfix_meta_operator>.Str}
         ]
         # XXX assuming no precedence change
 
@@ -3166,38 +3160,21 @@ grammar P6 is STD {
         self;
     }
 
-    regex prefix_circumfix_meta_operator:reduce {
+    regex term:reduce {
         :my $*IN_REDUCE = 1;
         :my ($op, $term);
         <?before '['\S+']'>
-        $<s> = (
-            '['
-            [
-            || <op=.infixish('red')> <?before ']'>
-            || \\<op=.infixish('tri')> <?before ']'>
-            || <!>
-            ]
-            ']' ['«'|<?>]
-        )
-        { $op = $<s><op>; }
+        '[' $<triangle>=['\\'?] <op=.infixish('red')> ']' {}
 
-        <.can_meta($op, "reduce with")>
+        <.can_meta($<op>, "reduce with")>
 
         [
-        || <!{ $op<O><diffy> }>
-        || <?{ $op<O><assoc> eq 'chain' }>
-        || <.sorry("Cannot reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
+        || <!{ $<op><O><diffy> }>
+        || <?{ $<op><O><assoc> eq 'chain' }>
+        || <.sorry("Cannot reduce with " ~ $<op><sym> ~ " because " ~ $<op><O><dba> ~ " operators are diffy and not chaining")>
         ]
 
-        [
-        || <?before '('>
-        || <?before \s+ [ <?stdstopper> { $term = 1 } ]? >
-        || { $term = 1 }
-        ]
-
-        <O(|%($op<O>), |%list_prefix, assoc => 'unary', uassoc => 'left', term => $term)>
-        $<sym> = {$<s>.Str}
-
+        <args>
     }
 
     token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
