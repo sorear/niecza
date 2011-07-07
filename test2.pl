@@ -169,6 +169,17 @@ eval_lives_ok q[
     is_approx 1i ** 4, 1, "1i ** 4 is 1"; 
 }
 
+{
+    "x" ~~ /./;
+    $/.perl; # regression; failure mode was infinite loop
+    my $x = 1;
+    2 R+= $x;
+    is $x, 3, 'R+= works';
+
+    sub foo(@y is copy) { +@y }
+    is foo([1,2,4]), 3, '@y is copy works with non-flatteny values';
+}
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {

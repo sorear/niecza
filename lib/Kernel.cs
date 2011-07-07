@@ -718,7 +718,6 @@ namespace Niecza {
 
         // Value binding
         public const int SIG_F_READWRITE  = 2;
-        public const int SIG_F_COPY       = 4;
         public const int SIG_F_RWTRANS    = 8;
         public const int SIG_F_BINDLIST   = 16;
         public const int SIG_F_INVOCANT   = 8192;
@@ -902,15 +901,14 @@ namespace Niecza {
 gotit:
                 if ((flags & SIG_F_RWTRANS) != 0) {
                 } else if ((flags & SIG_F_IS_COPY) != 0) {
-                    Variable nvar;
                     if ((flags & SIG_F_IS_HASH) != 0)
-                        nvar = Kernel.CreateHash();
+                        src = Kernel.Assign(Kernel.CreateHash(),
+                            Kernel.NewRWListVar(src.Fetch()));
                     else if ((flags & SIG_F_IS_LIST) != 0)
-                        nvar = Kernel.CreateArray();
+                        src = Kernel.Assign(Kernel.CreateArray(),
+                            Kernel.NewRWListVar(src.Fetch()));
                     else
-                        nvar = Kernel.NewTypedScalar(type);
-
-                    src = Kernel.Assign(nvar, src);
+                        src = Kernel.Assign(Kernel.NewTypedScalar(type), src);
                 } else {
                     bool islist = ((flags & SIG_F_BINDLIST) != 0);
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
