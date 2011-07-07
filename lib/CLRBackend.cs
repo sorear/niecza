@@ -178,7 +178,7 @@ namespace Niecza.CLRBackend {
         public FieldInfo rtunit;
         public List<byte> thaw_heap;
         public Dictionary<string,int> existing_strings;
-        public bool is_eval;
+        public bool is_eval, is_mainish;
 
         FieldInfo cc_pool;
         Dictionary<string,int> cc_constant_cache = new Dictionary<string,int>();
@@ -3450,6 +3450,8 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel_NewLabelVar,
                         CpsOp.CallFrame(),
                         CpsOp.StringLiteral(JScalar.S(z[1]))); };
+            handlers["_cpsop"] = delegate(NamProcessor th, object[] z) {
+                return z[1] as CpsOp; };
             handlers["_newdispatch"] = delegate(NamProcessor th, object[] z) {
                 return th.MakeDispatch(JScalar.S(z[1])); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
@@ -4106,6 +4108,16 @@ dynamic:
 
         void EnterCode(List<object> frags) {
             List<object> latefrags = new List<object>();
+
+            if (sub == sub.unit.mainline_ref.Resolve<StaticSub>() &&
+                    sub.unit.is_mainish) {
+                FieldInfo fi = CLRBackend.Current.tb.DefineField(
+                        "RTFRAME", typeof(Frame),
+                        FieldAttributes.Public | FieldAttributes.Static);
+                frags.Add(new object[] { new JScalar("_cpsop"),
+                    CpsOp.SetSField(fi, CpsOp.CallFrame()) });
+            }
+
             foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
                 if ((sub.flags & StaticSub.RUN_ONCE) != 0 &&
                         (sub.flags & StaticSub.SPAD_EXISTS) != 0 &&
@@ -4311,7 +4323,7 @@ dynamic:
         internal bool dynamic;
 
         [ThreadStatic] internal static CLRBackend Current;
-        [ThreadStatic] internal static Frame last_repl_frame;
+        [ThreadStatic] internal static Frame repl_frame;
 
         internal int nextarray;
         internal int nextspill;
@@ -4551,14 +4563,25 @@ dynamic:
             // settings are incomplete modules and have no mainline to run
             if (unit.is_eval) {
                 if (Verbose > 0) Console.WriteLine("mainline_runner(eval)");
-                // XXX this caller's caller thing is a terrible fudge
+                // XXX this caller's caller thing is a fudge
                 StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
+                FieldInfo rtf = m.outer.Resolve<StaticSub>().unit.clrType.GetField("RTFRAME");
+                CpsOp fb;
+                if (rtf == null) {
+                    fb = CpsOp.GetField(Tokens.SubInfo_protopad,
+                            CpsOp.GetSField(m.outer.Resolve<StaticSub>().subinfo));
+                } else {
+                    fb = CpsOp.GetSField(rtf);
+                }
+                CpsOp norm = CpsOp.GetField(Tokens.Frame_caller,
+                        CpsOp.GetField(Tokens.Frame_caller,
+                            CpsOp.CallFrame()));
+                CpsOp of = CpsOp.Ternary(
+                    CpsOp.Operator(typeof(bool), OpCodes.Ceq, norm, CpsOp.Null(Tokens.Frame)),
+                    fb, norm);
                 thaw.Add(CpsOp.CpsReturn(CpsOp.SubyCall(false,"",
                     CpsOp.MethodCall(Tokens.Kernel_MakeSub,
-                        CpsOp.GetSField(m.subinfo),
-                        CpsOp.GetField(Tokens.Frame_caller,
-                            CpsOp.GetField(Tokens.Frame_caller,
-                                CpsOp.CallFrame()))))));
+                        CpsOp.GetSField(m.subinfo), of))));
             } else if (unit.bottom_ref == null) {
                 if (Verbose > 0) Console.WriteLine("mainline_runner(norm)");
                 Type dty = typeof(Dictionary<string,Object>);
@@ -4683,6 +4706,7 @@ dynamic:
                     (object[])Reader.Read(contents.Substring(contents.IndexOf('\n'))));
             avail_units[root.name] = root;
             root.is_eval = (argv == null);
+            root.is_mainish = true;
             CLRBackend old_Current = Current;
             Dictionary<string,Unit> old_used_units = used_units;
             string op = Environment.GetEnvironmentVariable("NIECZA_FORCE_SAVE") == null ? null : root.name + "-TEMP.dll";
@@ -4712,9 +4736,6 @@ dynamic:
                     root.clrType, "BOOT");
             if (argv != null) {
                 Kernel.RunLoop(root.name, argv, Builtins.eval_result);
-                try {
-                    CLRBackend.last_repl_frame = Kernel.GetLastMainlineFrame();
-                } catch (Exception) {}
             }
         }
 
@@ -4789,12 +4810,10 @@ dynamic:
                     BValue b = Kernel.PackageLookup(Kernel.ProcessO, "$OUTPUT_USED");
                     b.v = Kernel.FalseV;
                     // hack to simulate a settingish environment
-                    Kernel.SetTopFrame(CLRBackend.last_repl_frame);
                     Variable r = Kernel.RunInferior(
                         Kernel.GetInferiorRoot().MakeChild(null,
                             new SubInfo("<repl>", Builtins.eval_result),
                             Kernel.AnyP));
-                    CLRBackend.last_repl_frame = Kernel.GetLastMainlineFrame();
                     if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
                         Variable pl = Kernel.RunInferior(
                             r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
