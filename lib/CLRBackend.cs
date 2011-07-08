@@ -968,7 +968,7 @@ namespace Niecza.CLRBackend {
         public abstract ClrOp GetCode(int up);
         /* names which are kept in the pad for quick runtime access */
         public static bool IsDynamicName(string name) {
-            if (name == "$_") return true;
+            if (name == "$_" || name == "$/" || name == "$!") return true;
             if (name.Length < 2) return false;
             if (name[0] == '*' || name[0] == '?') return true;
             if (name[1] == '*' || name[1] == '?') return true;
@@ -1011,6 +1011,8 @@ namespace Niecza.CLRBackend {
     }
 
     class LexSimple : LexVarish {
+        public const int ROINIT = 8;
+        public const int DEFOUTER = 16;
         public const int NOINIT = 4;
         public const int LIST = 2;
         public const int HASH = 1;
@@ -3631,9 +3633,6 @@ dynamic:
             thandlers["context_get"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_ContextHelper,
                     CpsOp.CallFrame(), z[0], z[1]); };
-            thandlers["status_get"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(Tokens.Kernel_StatusHelper,
-                    CpsOp.CallFrame(), z[0], z[1]); };
             thandlers["set_status"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall( Tokens.Kernel_SetStatus,
                     CpsOp.CallFrame(), z[0], z[1]); };
@@ -4140,7 +4139,13 @@ dynamic:
                     CpsOp tc = ls.type == null ?
                         CpsOp.Null(Tokens.STable) :
                         CpsOp.GetSField(ls.type.Resolve<Package>().metaObject);
-                    if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
+                    if ((f & LexSimple.ROINIT) != 0) {
+                        bit = new object[] { new JScalar("class_ref"),
+                            new JScalar("typeVar"), new JScalar("Any") };
+                    } else if ((f & LexSimple.DEFOUTER) != 0) {
+                        bit = new object[] { new JScalar("outerlex"),
+                            new JScalar(kv.Key) };
+                    } else if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
                         string s = ((f & LexSimple.HASH) != 0) ?
                             "newhash" : "newarray";
                         bit = new object[] { new JScalar(s) };
@@ -4530,6 +4535,10 @@ dynamic:
                             ((lx.flags & LexSimple.LIST) != 0) ? Tokens.Kernel_CreateArray : null;
                         if (type != null) {
                             SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(type));
+                        } else if ((lx.flags & (LexSimple.ROINIT | LexSimple.DEFOUTER)) != 0) {
+                            SetProtolex(obj, l.Key, lx, CpsOp.GetField(
+                                Tokens.DMO_typeVar, CpsOp.GetSField(
+                                    Tokens.Kernel_AnyMO)));
                         } else {
                             FieldInfo tc = lx.type == null ?
                                 Tokens.Kernel_AnyMO :

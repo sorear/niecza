@@ -1202,7 +1202,7 @@ public class LADParam : LAD {
 
         object o;
 
-        if (!outer.TryGetDynamic("*params", uint.MaxValue, out o)) {
+        if (!outer.TryGetDynamic("*params", 0, out o)) {
             reason = "no parameter block";
             goto imp;
         }

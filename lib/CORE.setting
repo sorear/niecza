@@ -167,7 +167,7 @@ my class Cool {
         while $i < chars($str) && $limctr {
             my $M = head($matcher($C.cursor($i++)));
             if $M && $M.chars {
-                Q:CgOp { (rnull (set_status (s '$*/') {$M})) };
+                Q:CgOp { (rnull (set_status (s '$/') {$M})) };
                 $changes++;
                 push @out, substr($str,$to,$M.from-$to);
                 push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
@@ -1358,7 +1358,7 @@ my class Regex is Method {
         $fr = $fr.caller unless $fr.line;
         Q:CgOp {
             (letn res {self.ACCEPTS($fr.hints('$_'))}
-              (set_status (s $*/) {$/})
+              (set_status (s $/) {$/})
               (asbool (l res)))
         };
     }
@@ -1379,10 +1379,10 @@ my class Regex is Method {
                     (subcall (@ {self}) (ns (l csr)))))
                 (ternary (iter_hasflat (l iter))
                   (letn val (vvarlist_shift (l iter))
-                    (set_status (s $*/) (l val))
+                    (set_status (s $/) (l val))
                     (return (newrwlistvar (@ (l val))) (l val)))
                   (prog))))
-              (set_status (s $*/) {Match})
+              (set_status (s $/) {Match})
               {Match})
         };
     }
@@ -1394,7 +1394,7 @@ my class Grammar is Cursor {
     method parse($text, :$rule = "TOP", :$actions) {
         my $match = (head grep { $_.to == chars $text },
             self.new($text, $actions)."$rule"()) // self;
-        Q:CgOp { (rnull (set_status (s '$*/') {$match})) };
+        Q:CgOp { (rnull (set_status (s '$/') {$match})) };
         $match;
     }
 }

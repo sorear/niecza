@@ -23,7 +23,190 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD {
+method getsig {
+    my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
+    state %method = (:Method, :Submethod, :Regex);
+    if $*CURLEX.<!NEEDSIG>:delete {
+        my @parms;
+        if %method{$*CURLEX<!sub>.class} {
+            my $cl = $*CURLEX<!sub>.methodof &&
+                $*unit.deref($*CURLEX<!sub>.methodof);
+            # XXX type checking against roles NYI
+            if $cl && $cl !~~ ::Metamodel::Role &&
+                    $cl !~~ ::Metamodel::ParametricRole {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
+                    tclass => $cl.xref);
+            } else {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
+            }
+            $*CURLEX<!sub>.add_my_name('self', :noinit);
+        }
+
+        if $pv {
+            my $h_ = $pv.<%_>:delete;
+            my $a_ = $pv.<@_>:delete;
+            for (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) }) -> $pn is copy {
+                my $positional = True;
+                if substr($pn,0,1) eq ':' {
+                    $pn = substr($pn,1);
+                    $positional = False;
+                }
+                my $list = substr($pn,0,1) eq '@';
+                my $hash = substr($pn,0,1) eq '%';
+                push @parms, ::Sig::Parameter.new(slot => $pn, :$list, :$hash,
+                    name => $pn, :$positional, names => [ substr($pn,1) ]);
+            }
+            if $a_ {
+                push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
+                    :slurpy, :list);
+            }
+            if $h_ {
+                push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
+                    :slurpy, :hash);
+            }
+        }
+        else {
+            push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
+                :defouter, :rwtrans);
+            self.trymop({
+                $*CURLEX<!sub>.lexicals<$_>.noinit = True;
+                $*CURLEX<!sub>.lexicals<$_>.defouter = False;
+            });
+        }
+        $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
+    }
+
+    my regex interesting () {
+        <!before anon_ >
+        <!before <[ \$ \@ \% ]> _ >
+        <?before <[ \$ \@ \% \& ]> \w >
+    }
+
+    if ($*CURLEX<!multi>//'') ne 'proto' {
+        my $lu = $*CURLEX<!sub>.lexicals-used;
+        for $*CURLEX<!sub>.lexicals.kv -> $k, $desc {
+            next unless interesting(Cursor.new($k));
+            next if $lu{$k};
+            # next if $[_/!] declared automatically "dynamic" TODO
+            next unless defined $desc.pos;
+            self.cursor($desc.pos).worry("$k is declared but not used");
+        }
+    }
+    self;
+}
+    method finishlex() {
+        my $sub = $*CURLEX<!sub>;
+        if $sub.is_routine {
+            $sub.add_my_name('$/', :roinit) unless $sub.lexicals<$/>:exists;
+            $sub.add_my_name('$!', :roinit) unless $sub.lexicals<$!>:exists;
+        }
+        $sub.add_my_name('$_', :defouter(!$sub.is_routine ||
+            $sub === $sub.to_unit)) unless $sub.lexicals<$_>:exists;
+
+        self;
+    }
+}
+
 augment grammar STD::P6 {
+    rule package_def {
+        :my $longname;
+        :my $*IN_DECL = 'package';
+        :my $*HAS_SELF = '';
+        :temp $*CURLEX;
+        :temp $*SCOPE;
+        :my $outer = $*CURLEX;
+        { $*SCOPE ||= 'our'; }
+        [
+            [ <longname> { $longname = $<longname>[0]; } ]?
+            <.newlex(0, ($*PKGDECL//'') ne 'role')>
+            [ :dba('generic role')
+                <?{ ($*PKGDECL//'') eq 'role' }>
+                '[' ~ ']' <signature(1)>
+                { $*IN_DECL = ''; }
+            ]?
+            <trait>*
+            <.open_package_def($/)>
+            [
+            || <?before '{'>
+                [
+                { $*begin_compunit = 0; $*IN_DECL = ''; }
+                <blockoid>
+                $<stub>={$¢.checkyada}
+                ]
+            || <?before ';'>
+                [
+                || <?{ $*begin_compunit }>
+                    {
+                        $longname orelse $¢.panic("Compilation unit cannot be anonymous");
+                        $outer === $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
+                        $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
+                        $*begin_compunit = 0;
+                        $*IN_DECL = '';
+                    }
+                    <.finishlex>
+                    <statementlist>     # whole rest of file, presumably
+                || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
+                ]
+            || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
+            ]
+            <.getsig>
+        ] || <.panic: "Malformed $*PKGDECL">
+    }
+    token comp_unit {
+        :my $*DEBUG = $GLOBAL::DEBUG_STD // 0;
+        :my $*begin_compunit = 1;
+        :my $*endargs = -1;
+        :my %*LANG;
+        :my $*PKGDECL ::= "";
+        :my $*IN_DECL = '';
+        :my $*HAS_SELF = '';
+        :my $*OFTYPE;
+        :my $*QSIGIL ::= '';
+        :my $*IN_META = '';
+        :my $*QUASIMODO;
+        :my $*SCOPE = "";
+        :my $*LEFTSIGIL;
+        :my $*PRECLIM;
+        :my %*MYSTERY = ();
+        :my $*INVOCANT_OK;
+        :my $*INVOCANT_IS;
+        :my $*CURLEX;
+        :my $*MULTINESS = '';
+        :my $*SIGNUM = 0;
+        :my $*MONKEY_TYPING = False;
+        :my %*WORRIES;
+        :my @*WORRIES;
+        :my $*FATALS = 0;
+        :my $*IN_SUPPOSE = False;
+
+        {
+
+            %*LANG<MAIN>    = ::STD::P6 ;
+            %*LANG<Q>       = ::STD::Q ;
+            %*LANG<Quasi>   = ::STD::Quasi ;
+            %*LANG<Regex>   = ::STD::Regex ;
+            %*LANG<P5>      = ::STD::P5 ;
+            %*LANG<P5Regex> = ::STD::P5::Regex ;
+
+            @*WORRIES = ();
+            $*CURLEX = { };
+            $*UNIT = $*CURLEX;
+        }:s
+        <.unitstart>
+        <.finishlex>
+        <statementlist>
+        [ <?unitstopper> || <.panic: "Confused"> ]
+        <.getsig>
+        # "CHECK" time...
+        {
+            $¢.explain_mystery();
+            if @*WORRIES {
+                note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+            }
+            die "Check failed\n" if $*FATALS;
+        }
+    }
     token pblock () {
         :temp $*CURLEX;
         :dba('parameterized block')

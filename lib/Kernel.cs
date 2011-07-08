@@ -1278,11 +1278,23 @@ noparams:
             }
         }
 
+        public bool TryBindDynamic(string name, uint mask, object to) {
+            if ((info.dylex_filter & mask) != mask)
+                return false;
+            int ix;
+            if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name)) < 0) {
+                if (!info.dylex.TryGetValue(name, out ix))
+                    return false;
+            }
+            SetDynamic(ix, to);
+            return true;
+        }
+
         public bool TryGetDynamic(string name, uint mask, out object v) {
             v = null;
             if (lex != null && lex.TryGetValue(name, out v))
                 return true;
-            if ((info.dylex_filter & mask) == 0)
+            if ((info.dylex_filter & mask) != mask)
                 return false;
             int ix;
             if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name)) < 0) {
@@ -1327,6 +1339,17 @@ noparams:
                 csr = csr.outer;
             }
             return Kernel.AnyMO.typeVar;
+        }
+
+        public void LexicalBind(string name, Variable to) {
+            Frame csr = this;
+            uint m = SubInfo.FilterForName(name);
+            while (csr != null) {
+                if (csr.TryBindDynamic(name, m, to))
+                    return;
+                csr = csr.outer;
+            }
+            throw new NieczaException("cannot bind " + name + " in " + info.name);
         }
 
         public Frame DynamicCaller() {
@@ -2396,7 +2419,7 @@ tryagain:
 
             Frame r = (Frame) c.lex["!return"];
             c.lex["!return"] = null;
-            r.SetDynamic(r.info.dylex["$*nextframe"], NewROScalar(th));
+            r.LexicalBind("$*nextframe", NewROScalar(th));
             r.resultSlot = payload;
             th.resultSlot = payload;
             return r;
@@ -3005,27 +3028,7 @@ ltm:
                 }
                 break;
             }
-            int ix;
-            if (th.info.dylex != null &&
-                    th.info.dylex.TryGetValue(name, out ix)) {
-                th.SetDynamic(ix, v);
-            }
-            if (th.lex == null)
-                th.lex = new Dictionary<string,object>();
-            th.lex[name] = v;
-        }
-
-        public static Variable StatusHelper(Frame th, string name, int up) {
-            object rt;
-            uint m = SubInfo.FilterForName(name);
-            while (th != null) {
-                if (up <= 0 && th.TryGetDynamic(name, m, out rt)) {
-                    return (Variable)rt;
-                }
-                th = th.outer;
-                up--;
-            }
-            return AnyMO.typeVar;
+            th.LexicalBind(name, v);
         }
 
         public static Frame DefaultNew(Frame th, P6any proto, VarHash args) {
@@ -4016,9 +4019,7 @@ def:        return at.Get(self, index);
                     return tf.caller;
                 }
             } else if (type == SubInfo.ON_DIE) {
-                if (tf.lex == null)
-                    tf.lex = new Dictionary<string,object>();
-                tf.lex["$*!"] = td;
+                tf.LexicalBind("$!", (Variable)td);
                 td = AnyMO.typeVar;
             }
             tf.ip = tip;

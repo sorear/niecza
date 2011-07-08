@@ -35,6 +35,7 @@ grammar P6 is STD::P6 {
         $*CURLEX{'!sub'} = ::Metamodel::StaticSub.new(
             unit => $*unit,
             outerx => $top,
+            class => 'Routine',
             cur_pkg => $*unit.abs_pkg('GLOBAL').xref,
             name => "mainline",
             run_once => !$rtop || $rtop.run_once);

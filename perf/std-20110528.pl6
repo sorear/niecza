@@ -16,33 +16,14 @@ sub bench($name, $nr, $f) {
     say "$name = {($time - $avg)*1e6}µs [{$time*$nr}s / $nr]";
 }
 
-my class CEmpty {
-}
+"foo" ~~ /./;
 
-my class CAttrs {
-    has $.x;
-    has $.y;
-    has $.z;
-};
+my $f1 = sub () { $/ };
+my $f2 = sub () { };
+my $f3 = { $/ };
+my $f4 = {; };
 
-my class CAttrInits {
-    has $.x = 1;
-    has $.y = 2;
-    has $.z = 3;
-}
-
-my class CBuild {
-    has $.x;
-    has $.y;
-    has $.z;
-    submethod BUILD(:$x, :$y, :$z) {
-        $!x = $x // 1;
-        $!y = $y // 2;
-        $!z = $z // 3;
-    }
-}
-
-bench "CEmpty.new", 1000000, sub () { CEmpty.new };
-bench "CAttrs.new", 1000000, sub () { CAttrs.new };
-bench "CAttrInits.new", 1000000, sub () { CAttrInits.new };
-bench "CBUILD.new", 1000000, sub () { CBuild.new };
+bench 'use $/ (sub)', 1000000, sub () { $f1() };
+bench 'baseline (sub)', 1000000, sub () { $f2() };
+bench 'use $/ (block)', 1000000, sub () { $f3() };
+bench 'baseline (block)', 1000000, sub () { $f4() };

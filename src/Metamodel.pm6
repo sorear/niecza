@@ -414,9 +414,11 @@ class Lexical {
 
     # my $foo, @foo, %foo, &foo
     class Simple is Lexical {
-        has $.list   = False; # Bool
-        has $.hash   = False; # Bool
-        has $.noinit = False; # Bool
+        has Bool $.list   = False;
+        has Bool $.hash   = False;
+        has Bool $.noinit = False;
+        has Bool $.defouter = False;
+        has Bool $.roinit = False;
         has $.typeconstraint; # Xref
     }
 
@@ -532,6 +534,11 @@ class StaticSub is RefTarget {
             $cursor = $outer
         }
         $cursor;
+    }
+
+    method is_routine() {
+        state %routine = (:Routine, :Sub, :Submethod, :Method, :Regex);
+        %routine{$!class}
     }
 
     method add_child($z) { push $.zyg, $z }

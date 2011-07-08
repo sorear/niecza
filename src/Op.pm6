@@ -670,9 +670,7 @@ class ContextVar is Op {
     has $.uplevel = 0; # Int
 
     method code($ ) {
-        my @a = (CgOp.str($.name), CgOp.int($.uplevel));
-        ($.name eq '$*/' || $.name eq '$*!') ??
-            CgOp.status_get(|@a) !! CgOp.context_get(|@a);
+        CgOp.context_get(CgOp.str($!name), CgOp.int($!uplevel));
     }
 }
 
@@ -706,8 +704,8 @@ class Gather is Op {
 class MakeCursor is Op {
     method code($ ) {
         CgOp.prog(
-            CgOp.scopedlex('$*/', CgOp.newscalar(CgOp.rxcall('MakeCursor'))),
-            CgOp.scopedlex('$*/'));
+            CgOp.scopedlex('$/', CgOp.newscalar(CgOp.rxcall('MakeCursor'))),
+            CgOp.scopedlex('$/'));
     }
 }
 

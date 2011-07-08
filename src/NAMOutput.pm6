@@ -305,8 +305,8 @@ sub parm_from_nam(@block) {
 }
 
 augment class Metamodel::Lexical::Simple { #OK exist
-    method to_nam() { ['simple', 4 * $.noinit + 2 * $.list + 1 * $.hash,
-        $.typeconstraint] }
+    method to_nam() { ['simple', 4 * $!noinit + 2 * $!list + 1 * $!hash +
+            8 * $!roinit + 16 * $!defouter, $!typeconstraint] }
 }
 augment class Metamodel::Lexical::Common { #OK exist
     method to_nam() { ['common', $.pkg, $.name ] }

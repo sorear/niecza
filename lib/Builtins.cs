@@ -1320,7 +1320,7 @@ flat_enough:;
     public static Variable Make(Frame fr, Variable v) {
         if (fr.info.name == "CORE make")
             fr = fr.caller;
-        Cursor c = (Cursor) Kernel.StatusHelper(fr, "$*/", 0).Fetch();
+        Cursor c = (Cursor) fr.LexicalFind("$/").Fetch();
         c.Make(v);
         return v;
     }

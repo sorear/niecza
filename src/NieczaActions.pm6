@@ -398,7 +398,6 @@ method regex_def($/) {
     my @lift = $ast.oplift;
     $*CURLEX<!sub>.ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
     ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
-    $*CURLEX<!sub>.add_my_name('$*/');
     $*CURLEX<!sub>.code = ::Op::RegexBody.new(|node($/), pre => @lift,
         name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb);
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
@@ -1410,7 +1409,7 @@ method colonpair($/) {
     if $tv ~~ Str {
         if substr($<v>,1,1) eq '<' {
             $tv = mkcall($/, '&postcircumfix:<{ }>',
-                ::Op::ContextVar.new(name => '$*/'),
+                ::Op::Lexical.new(name => '$/'),
                 ::Op::StringLiteral.new(text => ~$<k>));
         } else {
             $tv = self.do_variable_reference($/,
@@ -1705,11 +1704,10 @@ method variable($/) {
         }
     } elsif $<special_variable> {
         $name = substr(~$<special_variable>, 1);
-        $twigil = '*' if $name eq '/' or $name eq '!';
     } elsif $<index> {
         make { capid => $<index>.ast, term =>
             mkcall($/, '&postcircumfix:<[ ]>',
-                ::Op::ContextVar.new(name => '$*/'),
+                ::Op::Lexical.new(name => '$/'),
                 ::Op::Num.new(value => $<index>.ast))
         };
         return Nil;
@@ -1717,7 +1715,7 @@ method variable($/) {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
                 mkcall($/, '&postcircumfix:<{ }>',
-                    ::Op::ContextVar.new(name => '$*/'),
+                    ::Op::Lexical.new(name => '$/'),
                     @( $<postcircumfix>[0].ast.args))
             };
             return;
@@ -1776,7 +1774,6 @@ method param_var($/) {
     my $list = $sigil eq '@';
     my $hash = $sigil eq '%';
     my $name =   $<name> ?? ~$<name>[0] !! Any;
-    $twigil = '*' if $name && ($name eq '/' || $name eq '!');
 
     my $slot;
     if $twigil eq '' {
@@ -1992,7 +1989,7 @@ method sibble($/) {
             $repl = $<right>.ast;
         } elsif $<infixish>.ast ~~ ::Operator::CompoundAssign {
             $repl = $<infixish>.ast.base.with_args($/,
-                mkcall($/, '&prefix:<~>', ::Op::ContextVar.new(name => '$*/')),
+                mkcall($/, '&prefix:<~>', ::Op::Lexical.new(name => '$/')),
                 $<right>.ast);
         } else {
             $/.CURSOR.sorry("Unhandled operator in substitution");
@@ -2639,7 +2636,6 @@ method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
     $n.signature = Sig.simple(@$params);
     $n.add_my_name($_, :noinit) for @$params;
-    $n.add_my_name('$*/') if $class eq 'Regex';
     $*CURLEX<!sub>.add_child($n);
     $n;
 }

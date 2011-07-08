@@ -75,6 +75,8 @@ sub beta_optimize($body, $symbol, $cbody, @inpos) {
         my $d = $cbody.lexicals{$dn};
         my $nm = ::GLOBAL::NieczaActions.gensym;
         my $to = $d.noinit ?? CgOp.null('var') !!
+                 $d.roinit ?? CgOp.scopedlex('Any') !!
+                 $d.defouter ?? CgOp.scopedlex($dn) !!
                  $d.hash   ?? CgOp.newblankhash !!
                  $d.list   ?? CgOp.newblanklist !!
                  $d.typeconstraint ?? CgOp.newtypedscalar(CgOp.class_ref("mo", @($d.typeconstraint))) !!

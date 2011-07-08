@@ -90,9 +90,6 @@ NASTY
    Export Perl 6 code into a CLR .dll
 
 Other stuff to do after:
-  - $_ handling: declare in *every* sub, empty/defouter according to returnable
-    TimToady thinks only Routines should have $/ and $!, maybe?.
   - cnperl6 prototyping...
   - CLR: KISS and then play with async I/O, possibly including soric
   - pm's = hack
-  - fix { my $x } crash
