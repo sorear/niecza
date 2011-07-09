@@ -280,9 +280,11 @@ method op_for_regex($/, $rxop) {
         $rxop.check
     }
     my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
-    self.block_expr($/, self.thunk_sub(::Op::RegexBody.new(|node($/),
+    my $sub = self.thunk_sub(::Op::RegexBody.new(|node($/),
             canback => $mb, pre => @lift, rxop => $orxop),
-        class => 'Regex', params => ['self']));
+        class => 'Regex', params => ['self']);
+    $sub.add_my_name('$/');
+    self.block_expr($/, $sub);
 }
 
 method quote:sym</ /> ($/) { make self.op_for_regex($/, $<nibble>.ast) }
@@ -1217,20 +1219,20 @@ method CHAIN($/) {
 
     my ($st, @vargs) = self.whatever_precheck(@ops[0], @args);
 
-    sub reduce() {
+    sub reduce($/) {
         my $fa = shift @vargs;
         my $fo = shift @ops;
         if @ops {
             mklet($fa, -> $lhs { mklet(@vargs[0], -> $rhs {
                 @vargs[0] = $rhs;
                 ::Op::ShortCircuit.new(|node($/), kind => '&&', args =>
-                    [ $fo.with_args($/, $lhs, $rhs), reduce() ]) }) })
+                    [ $fo.with_args($/, $lhs, $rhs), reduce($/) ]) }) })
         } else {
             $fo.with_args($/, $fa, @vargs[0])
         }
     }
 
-    make self.whatever_postcheck($/, $st, reduce());
+    make self.whatever_postcheck($/, $st, reduce($/));
 }
 
 method LIST($/) {
@@ -3195,8 +3197,8 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     $sub.class = $class;
     $sub.returnable = True;
 
+    my $std = $/.CURSOR;
     (sub () {
-        my $std = $/.CURSOR;
         if $sub.name ~~ /^(\w+)\:\<(.*)\>$/ {
             my %new = %( $std.default_O(~$0, ~$1) );
             $sub.extend.<prec> = %new;
