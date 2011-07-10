@@ -23,6 +23,12 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class Op::ContextVar {
+    method code($ ) {
+        CgOp.context_get($!name, +$!uplevel);
+    }
+}
+
 augment grammar STD {
 method getsig {
     my $pv = $*CURLEX.{'%?PLACEHOLDERS'};

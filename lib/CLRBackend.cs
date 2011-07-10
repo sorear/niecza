@@ -3137,13 +3137,9 @@ namespace Niecza.CLRBackend {
             throw new Exception("No such let " + name);
         }
 
-        CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
-            bool core = type == "corelex";
-            bool uplex = type == "outerlex";
-            bool upscope = uplex && (scope_stack.Count > 0);
-            int uplevel;
-
-            for (int i = (core ? -1 : scope_stack.Count - (upscope ? 2 : 1)); i >= 0; i--) {
+        CpsOp CheckScopes(string name, ref int outer, CpsOp set_to) {
+            for (int i = scope_stack.Count - 1; i >= 0; i--) {
+                if (outer > 0) { outer--; continue; }
                 object[] rec = scope_stack[i];
                 for (int j = 2; j < rec.Length - 2; j += 2) {
                     if (JScalar.S(rec[j]) == name) {
@@ -3154,8 +3150,19 @@ namespace Niecza.CLRBackend {
                     }
                 }
             }
+            return null;
+        }
 
-            Lexical lex = ResolveLex(name, uplex&& !upscope, out uplevel, core);
+        CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
+            bool core = type == "corelex";
+            int outer = (type == "outerlex") ? 1 : 0;
+            int uplevel;
+
+            CpsOp r;
+            if (!core && (r = CheckScopes(name, ref outer, set_to)) != null)
+                return r;
+
+            Lexical lex = ResolveLex(name, outer>0, out uplevel, core);
 
             return CpsOp.LexAccess(lex, uplevel,
                 set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
@@ -3630,9 +3637,17 @@ dynamic:
                     Tokens.Builtins.GetMethod("you_are_here"));
             thandlers["callnext"] = Methody(Tokens.Variable,
                     Tokens.Builtins.GetMethod("CallNext"));
-            thandlers["context_get"] = delegate(CpsOp[] z) {
+            handlers["context_get"] = delegate(NamProcessor th, object[] z) {
+                string name = JScalar.S(z[1]);
+                int outer = JScalar.I(z[2]);
+                CpsOp r1 = th.CheckScopes(name, ref outer, null);
+                if (r1 != null) return r1;
+                Lexical l;
+                if (outer == 0 && th.sub.l_lexicals.TryGetValue(name, out l))
+                    return CpsOp.LexAccess(l, 0, new CpsOp[0]);
                 return CpsOp.MethodCall(Tokens.Kernel_ContextHelper,
-                    CpsOp.CallFrame(), z[0], z[1]); };
+                    CpsOp.CallFrame(), CpsOp.StringLiteral(name),
+                    CpsOp.IntLiteral(outer)); };
             thandlers["set_status"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall( Tokens.Kernel_SetStatus,
                     CpsOp.CallFrame(), z[0], z[1]); };
