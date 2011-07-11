@@ -374,7 +374,6 @@ my class Str is Cool {
         )
     } }
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
-    method substr($from, $len = chars(self)-$from) { substr(self, $from, $len) }
     # XXX .trans
     method perl() { defined(self) ?? '"' ~ self ~ '"' !! self.typename }
 }
