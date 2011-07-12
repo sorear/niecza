@@ -554,9 +554,8 @@ method variable_declarator($/) {
         $*CURLEX<!sub>.add_state_name(Str, $cv);
         make mklet($/.ast, -> $ll {
             Op::StatementList.new(|node($/), children => [
-                Op::Start.new(condvar => $cv, body => mkcall($/, '&infix:<=>',
-                    $ll, self.inliney_call($/, $start))),
-                $ll ]) });
+                Op::Start.new(condvar => $cv, body =>
+                    self.inliney_call($/, $start, $ll)), $ll ]) });
     }
 }
 
