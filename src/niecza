@@ -296,6 +296,156 @@ augment class Op::When {
 }
 
 augment class NieczaActions {
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
+
+    my ($name, $rest);
+    my $dsosl = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        Any;
+    if defined($dsosl) && defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return;
+    } elsif defined $dsosl {
+        ($name, $rest) = $dsosl<name path>;
+    } elsif $<infixish> {
+        make { term => $<infixish>.ast.as_function($/) };
+        return;
+    } elsif $<name> {
+        # Both these cases are marked XXX in STD.  I agree.  What are they for?
+        if $<name>[0].ast<dc> {
+            $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
+            make { term => ::Op::StatementList.new };
+            return;
+        }
+        if substr(~$/,0,3) eq '$::' {
+            $rest = $<name>[0].ast.<names>;
+            $name = pop $rest;
+        } else {
+            if $<name>[0].ast<names> > 1 {
+                $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
+                make { term => ::Op::StatementList.new };
+                return;
+            }
+            $name = $<name>[0].ast<names>[0];
+            $twigil = ':';
+        }
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            mkcall($/, '&postcircumfix:<[ ]>',
+                ::Op::Lexical.new(name => '$/'),
+                ::Op::Num.new(value => $<index>.ast))
+        };
+        return Nil;
+    } elsif $<longname> {
+        $/.CURSOR.sorry('::<> syntax NYI');
+        make { term => ::Op::StatementList.new };
+        return;
+    } elsif $<postcircumfix> {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
+                mkcall($/, '&postcircumfix:<{ }>',
+                    ::Op::Lexical.new(name => '$/'),
+                    @( $<postcircumfix>[0].ast.args))
+            };
+            return;
+        } else {
+            make { term => self.docontext($/, $sigil, $<postcircumfix>[0].ast.args[0]) };
+            return;
+        }
+    } else {
+        $name = '';
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
+    };
+}
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        $typeconstraint = self.simple_longname($*OFTYPE<longname>);
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if !defined($v<name>) && $scope ne any < my anon state > {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+    }
+
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon' || !defined($v<name>))
+        ?? self.gensym !! $name;
+    my $res_tc = $typeconstraint ??
+        $*CURLEX<!sub>.compile_get_pkg(@$typeconstraint).xref !! Any;
+
+    if $scope eq 'has' {
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.', $res_tc);
+    } elsif $scope eq 'state' {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
+                :$hash, typeconstraint => $res_tc, |mnode($/));
+        });
+        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash,
+            :state_decl);
+    } elsif $scope eq 'our' {
+        make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
+    } else {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
+                typeconstraint => $res_tc, |mnode($/));
+        });
+        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+    }
+}
+
+
 method parameter($/) {
     my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
     my $copy = False;

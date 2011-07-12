@@ -2357,8 +2357,6 @@ grammar P6 is STD {
             | <twigil>? <sublongname> { $name = $<sublongname>.Str }
             | :dba('infix noun') '[' ~ ']' <infixish('[]')>
             ]
-        || '$::' <name>? # XXX
-        || '$:' <name> # XXX
         || [
             | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
             | <special_variable>
