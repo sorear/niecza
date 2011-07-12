@@ -3183,6 +3183,7 @@ namespace Niecza.CLRBackend {
                         csr.l_lexicals.TryGetValue(name, out r)) {
                     if (r is LexAlias) {
                         name = (r as LexAlias).to;
+                        continue;
                     } else {
                         return r;
                     }

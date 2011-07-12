@@ -634,7 +634,7 @@ class StaticSub is RefTarget {
             if $l.^isa(Metamodel::Lexical::Alias) { self.delete_lex($l.to) }
             else { %!lexicals{$name}:delete }
         } else {
-            $.outer && $.outer.delete_lex($name);
+            $.outer && $.outer.unit === $.unit && $.outer.delete_lex($name);
         }
     }
 
@@ -694,7 +694,7 @@ class StaticSub is RefTarget {
 
     method add_state_name($slot, $back, *%param) {
         # outermost sub isn't cloned so a fallback to my is safe
-        my $up = $.outer // self;
+        my $up = (self === self.to_unit) ?? self !! self.outer;
         $up.lexicals{$back} = Metamodel::Lexical::Simple.new(|%param);
         if defined($slot) {
             self.add_lex($slot, Metamodel::Lexical::Alias.new(to => $back,
