@@ -392,6 +392,11 @@ method INFIX($/) {
     }
     make self.whatever_postcheck($/, $st, $/.ast);
 }
+
+method trait_mod:will ($/) {
+    make { ~$<identifier> => $<pblock>.ast };
+}
+
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
@@ -465,8 +470,14 @@ method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
+
+    my $scope = $*SCOPE // 'my';
+
+    my $start;
     for @$<trait> -> $t {
         if $t.ast<rw> {
+        } elsif $t.ast<start> && $*SCOPE eq 'state' {
+            $start = $t.ast<start>;
         } else {
             $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
         }
@@ -474,8 +485,6 @@ method variable_declarator($/) {
     if $<post_constraint> || $<postcircumfix> || $<semilist> {
         $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
     }
-
-    my $scope = $*SCOPE // 'my';
 
     if $scope eq 'augment' || $scope eq 'supersede' {
         $/.CURSOR.sorry("Illogical scope $scope for simple variable");
@@ -538,6 +547,16 @@ method variable_declarator($/) {
                 typeconstraint => $res_tc, |mnode($/));
         });
         make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+    }
+
+    if $start {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($/.ast, -> $ll {
+            Op::StatementList.new(|node($/), children => [
+                Op::Start.new(condvar => $cv, body => mkcall($/, '&infix:<=>',
+                    $ll, self.inliney_call($/, $start))),
+                $ll ]) });
     }
 }
 
