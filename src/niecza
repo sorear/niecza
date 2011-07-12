@@ -30,6 +30,105 @@ augment class Op::ContextVar {
 }
 
 augment grammar STD {
+method sorry (Str $s) {
+    self.deb("sorry $s") if $*DEBUG;
+    die $s if $*IN_EVAL;
+    note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
+        unless $*IN_SUPPOSE or $*FATALS++;
+    if $s {
+        my $m = $s;
+        $m ~= self.locmess ~ "\n" unless $m ~~ /\n$/;
+        if $*FATALS > 10 or $*IN_SUPPOSE {
+            die $m;
+        }
+        else {
+            note $m unless %*WORRIES{$m}++;
+        }
+    }
+    self;
+}
+method panic (Str $s) {
+    die "Recursive panic" if $*IN_PANIC;
+    $*IN_PANIC++;
+    self.deb("panic $s") if $*DEBUG;
+    my $m = ''; # NIECZA
+    my $here = self;
+
+    my $first = $here.lineof($*LAST_NIBBLE_START);
+    my $last = $here.lineof($*LAST_NIBBLE);
+    if $first != $last {
+        if $here.lineof($here.pos) == $last {
+            $m ~= "(Possible runaway string from line $first)\n";
+        }
+        else {
+            $first = $here.lineof($*LAST_NIBBLE_MULTILINE_START);
+            $last = $here.lineof($*LAST_NIBBLE_MULTILINE);
+            # the bigger the string (in lines), the further back we suspect it
+            if $here.lineof($here.pos) - $last < $last - $first  {
+                $m ~= "(Possible runaway string from line $first to line $last)\n";
+            }
+        }
+    }
+
+    $m ~= $s;
+
+    if substr(self.orig,$here.pos,1) ~~ /\)|\]|\}|\»/ {
+        $m ~~ s|Confused|Unexpected closing bracket|;
+    }
+
+    $m ~= $here.locmess;
+    $m ~= "\n" unless $m ~~ /\n$/;
+
+    my $endpos = $here.pos;
+    my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
+
+    my @t = $here.suppose( sub { $here.term } );
+    my @v = $here.suppose( sub { $here.variable } );
+    my @i = $here.suppose( sub { $here.identifier } );
+
+    if @v && @*MEMOS[$startpos]<nodecl> -> $type {
+        $m ~~ s|Confused|Bare type $type cannot declare @v[0] without a preceding scope declarator such as 'my'|;
+    }
+    elsif @*MEMOS[$startpos]<wasname> -> $type {
+        my $name = @i[0].Str;
+        my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
+        my $d = $*IN_DECL;
+        $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
+        $m ~~ s|'Malformed block'|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
+    }
+    elsif @t {
+        if self.lineof($startpos) != self.lineof($endpos) {
+            $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+        }
+        elsif @*MEMOS[$startpos]<baremeth> {
+            $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
+        }
+        elsif @*MEMOS[$startpos]<arraycomp> {
+            $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
+        }
+        else {
+            $m ~~ s|Confused|Two terms in a row|;
+        }
+    }
+
+    if @*WORRIES {
+        $m ~= "Other potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+    }
+
+    $*IN_PANIC--;
+    die $m if $*IN_SUPPOSE || $*IN_EVAL;     # just throw the exception back to the supposer
+    $*IN_PANIC++;
+
+    note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
+        unless $*FATALS++;
+    note $m;
+    self.explain_mystery();
+
+    $*IN_PANIC--;
+    die "Parse failed" if $*in_repl;
+    note "Parse failed\n";
+    exit 1;
+}
 method getsig {
     my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
     state %method = (:Method, :Submethod, :Regex);

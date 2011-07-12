@@ -21,6 +21,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
     my $*niecza_outer_ref = $outer;
     my $*compiler = self;
     my $*verbose = $.verbose;
+    my $*in_repl = $repl;
 
     my $ast;
     my @steps = (
