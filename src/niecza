@@ -115,6 +115,14 @@ method getsig {
 }
 
 augment grammar STD::P6 {
+    token capterm {
+        '\\'
+        [
+        | '(' ~ ')' <capture>?
+        | <?before \S> <termish>
+        | {} <.panic: "You can't backslash that">
+        ]
+    }
     rule package_def {
         :my $longname;
         :my $*IN_DECL = 'package';
