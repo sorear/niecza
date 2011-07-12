@@ -303,7 +303,95 @@ augment class Op::When {
     }
 }
 
+class Op::StateDecl is Op {
+    has Op $.inside;
+    method zyg() { $!inside }
+    method ctxzyg($f) { $!inside, $f }
+
+    method code($body) { $!inside.cgop($body) }
+    method to_bind($/, $ro, $rhs) { $!inside.to_bind($/, $ro, $rhs); }
+}
+
 augment class NieczaActions {
+method declarator($/) {
+    if $<signature> {
+        temp $*SCOPE ||= 'my';
+        my $sub = $*CURLEX<!sub>;
+
+        my @p = @( $<signature>.ast.params );
+        # TODO: keep the original signature around somewhere := can find it
+        # TODO: fanciness checks
+        for @p -> \$param {
+            my $slot = $param.slot;
+            $sub.delete_lex($slot) if defined($slot);
+            $slot //= self.gensym;
+            $slot = self.gensym if $*SCOPE eq 'anon';
+            my $list = $param.list;
+            my $hash = $param.hash;
+            my $type = $param.tclass;
+
+            if $*SCOPE eq 'state' {
+                $sub.add_state_name($slot, self.gensym, :$list, :$hash,
+                    typeconstraint => $type, |mnode($/));
+                $param = Op::Lexical.new(name => $slot, |node($/));
+            } elsif $*SCOPE eq 'our' {
+                $param = self.package_var($/, $slot, $slot, ['OUR'], :$list,
+                    :$hash);
+            } else {
+                $sub.add_my_name($slot, :$list, :$hash,
+                    typeconstraint => $type, |mnode($/));
+                $param = Op::Lexical.new(name => $slot, |node($/));
+            }
+        }
+        make Op::SimpleParcel.new(|node($/), items => @p);
+        make Op::StateDecl.new(|node($/), inside => $/.ast)
+            if $*SCOPE eq 'state';
+        return;
+    }
+    make $<variable_declarator> ?? $<variable_declarator>.ast !!
+         $<routine_declarator>  ?? $<routine_declarator>.ast !!
+         $<regex_declarator>    ?? $<regex_declarator>.ast !!
+         $<type_declarator>.ast;
+}
+
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    if $fn.assignish {
+        # Assignments to has and state declarators are rewritten into
+        # an appropriate phaser
+        if $lhs.^isa(Op::StateDecl) {
+            my $cv = self.gensym;
+            $*CURLEX<!sub>.add_state_name(Str, $cv);
+            make mklet($lhs, -> $ll {
+                Op::StatementList.new(|node($/), children => [
+                    Op::Start.new(condvar => $cv, body =>
+                        $fn.with_args($/, $ll, $rhs)),
+                    $ll]) });
+        }
+        elsif $lhs.^isa(::Op::Attribute) && !defined($lhs.initializer.ivar) {
+            my $init = self.thunk_sub($rhs,
+                :name($lhs.initializer.name ~ " init"));
+            $lhs.initializer.ivar = self.gensym;
+            $*CURLEX<!sub>.add_my_sub($lhs.initializer.ivar, $init);
+            $lhs.initializer.ibody = $init.xref;
+            make $lhs;
+        }
+        elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
+            my $sig = substr($lhs.name, 0, 1);
+            if defined '$@&%'.index($sig) {
+                self.init_constant($lhs, self.docontext($/, $sig, $rhs));
+            } else {
+                self.init_constant($lhs, $rhs);
+            }
+            make $lhs;
+        }
+    }
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
@@ -439,8 +527,8 @@ method variable_declarator($/) {
             $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
                 :$hash, typeconstraint => $res_tc, |mnode($/));
         });
-        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash,
-            :state_decl);
+        make Op::StateDecl.new(|node($/), inside =>
+            Op::Lexical.new(|node($/), name => $slot, :$list, :$hash));
     } elsif $scope eq 'our' {
         make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
     } else {
