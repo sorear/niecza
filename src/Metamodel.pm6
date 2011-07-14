@@ -550,9 +550,9 @@ class StaticSub is RefTarget {
     }
 
     method create_static_pad() {
-        return Nil if $.spad_exists;
-        $.spad_exists = True;
-        $.outer.create_static_pad if $.outer;
+        return Nil if $!spad_exists;
+        $!spad_exists = True;
+        $.outer.create_static_pad if $.outer && $.outer.unit === $!unit;
     }
 
     method noninlinable() {

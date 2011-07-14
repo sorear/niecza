@@ -38,7 +38,7 @@ grammar P6 is STD::P6 {
             class => 'Routine',
             cur_pkg => $*unit.abs_pkg('GLOBAL').xref,
             name => "mainline",
-            run_once => !$rtop || $rtop.run_once);
+            run_once => (?$*niecza_outer_ref) || !$rtop || $rtop.run_once);
         $*CURLEX{'!sub'}.add_my_name('$_') if !$top;
         $*CURLEX{'!sub'}.add_hint('$?FILE');
         $*CURLEX{'!sub'}.signature = ::GLOBAL::Sig.simple();

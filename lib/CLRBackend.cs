@@ -979,16 +979,29 @@ namespace Niecza.CLRBackend {
     abstract class LexVarish : Lexical {
         public int index;
         public FieldInfo stg;
+        public StaticSub owner;
+
+        ClrOp GetProtoFrame() {
+            if (owner.protopad != null)
+                return new ClrGetSField(owner.protopad);
+            StaticSub rs = CLRBackend.Current.unit.mainline_ref.Resolve<StaticSub>();
+            ClrOp r = new ClrGetSField(rs.protopad);
+            while (rs != owner) {
+                rs = rs.outer.Resolve<StaticSub>();
+                r = new ClrGetField(Tokens.Frame_outer, r);
+            }
+            return r;
+        }
 
         public override ClrOp GetCode(int up, bool proto) {
             return (index < 0) ? (ClrOp) new ClrGetSField(stg) :
-                proto ? (ClrOp) new ClrProtoGet(index, new ClrGetSField(stg)) :
+                proto ? (ClrOp) new ClrProtoGet(index, GetProtoFrame()) :
                 new ClrPadGet(up, index);
         }
 
         public override ClrOp SetCode(int up, bool proto, ClrOp to) {
             return (index < 0) ? (ClrOp)new ClrSetSField(stg, to) :
-                proto ? new ClrProtoSet(index, new ClrGetSField(stg), to) :
+                proto ? new ClrProtoSet(index, GetProtoFrame(), to) :
                 (ClrOp)new ClrPadSet(up, index, to);
         }
 
@@ -1002,9 +1015,9 @@ namespace Niecza.CLRBackend {
 
         public override void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) {
+            owner = sub;
             if (IsDynamicName(name) || (sub.flags & StaticSub.RUN_ONCE) == 0) {
                 index = sub.nlexn++;
-                stg = sub.protopad;
             } else {
                 index = -1;
                 stg = binder(Unit.SharedName('L', six, name), Tokens.Variable);
@@ -4097,6 +4110,8 @@ dynamic:
 
             if ((sub.flags & StaticSub.UNSAFE) != 0)
                 spec |= RuntimeUnit.SUB_IS_UNSAFE;
+            if (sub == sub.unit.mainline_ref.Resolve<StaticSub>())
+                spec |= RuntimeUnit.SUB_MAINLINE;
             if ((sub.flags & StaticSub.RUN_ONCE) != 0)
                 spec |= RuntimeUnit.SUB_RUN_ONCE;
             spec |= RuntimeUnit.SUB_HAS_TYPE;
@@ -4517,6 +4532,26 @@ dynamic:
                     thaw.Add(CpsOp.SetSField(km, CpsOp.GetSField(pkg.metaObject)));
             });
 
+            if (unit.is_eval) {
+                // XXX this caller's caller thing is a fudge
+                StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
+                FieldInfo rtf = m.outer.Resolve<StaticSub>().unit.clrType.GetField("RTFRAME");
+                CpsOp fb;
+                if (rtf == null) {
+                    fb = CpsOp.GetField(Tokens.SubInfo_protopad,
+                            CpsOp.GetSField(m.outer.Resolve<StaticSub>().subinfo));
+                } else {
+                    fb = CpsOp.GetSField(rtf);
+                }
+                CpsOp norm = CpsOp.GetField(Tokens.Frame_caller,
+                        CpsOp.GetField(Tokens.Frame_caller,
+                            CpsOp.CallFrame()));
+                CpsOp of = CpsOp.Ternary(
+                    CpsOp.Operator(typeof(bool), OpCodes.Ceq, norm, CpsOp.Null(Tokens.Frame)),
+                    fb, norm);
+                thaw.Add(CpsOp.SetField(Tokens.RuntimeUnit.GetField("context_pad"), CpsOp.GetSField(unit.rtunit), of));
+            }
+
             int sub2_slot = thaw.Count;
             thaw.Add(null);
             List<int> sub2_pointers = new List<int>();
@@ -4613,25 +4648,10 @@ dynamic:
             // settings are incomplete modules and have no mainline to run
             if (unit.is_eval) {
                 if (Verbose > 0) Console.WriteLine("mainline_runner(eval)");
-                // XXX this caller's caller thing is a fudge
                 StaticSub m = unit.mainline_ref.Resolve<StaticSub>();
-                FieldInfo rtf = m.outer.Resolve<StaticSub>().unit.clrType.GetField("RTFRAME");
-                CpsOp fb;
-                if (rtf == null) {
-                    fb = CpsOp.GetField(Tokens.SubInfo_protopad,
-                            CpsOp.GetSField(m.outer.Resolve<StaticSub>().subinfo));
-                } else {
-                    fb = CpsOp.GetSField(rtf);
-                }
-                CpsOp norm = CpsOp.GetField(Tokens.Frame_caller,
-                        CpsOp.GetField(Tokens.Frame_caller,
-                            CpsOp.CallFrame()));
-                CpsOp of = CpsOp.Ternary(
-                    CpsOp.Operator(typeof(bool), OpCodes.Ceq, norm, CpsOp.Null(Tokens.Frame)),
-                    fb, norm);
                 thaw.Add(CpsOp.CpsReturn(CpsOp.SubyCall(false,"",
-                    CpsOp.MethodCall(Tokens.Kernel_MakeSub,
-                        CpsOp.GetSField(m.subinfo), of))));
+                    CpsOp.GetField(Tokens.SubInfo_protosub,
+                        CpsOp.GetSField(m.subinfo)))));
             } else if (unit.bottom_ref == null) {
                 if (Verbose > 0) Console.WriteLine("mainline_runner(norm)");
                 Type dty = typeof(Dictionary<string,Object>);

@@ -197,6 +197,7 @@ namespace Niecza {
         public DynBlockDelegate[] methods; /*C*/
         public FieldInfo[] meta_fields;
         public object[] xref;
+        public Frame context_pad;
         public static bool TraceLoad = Environment.GetEnvironmentVariable("NIECZA_TRACE_LOAD") != null;
 
         public static void HexDump(byte[] heap) {
@@ -441,6 +442,7 @@ namespace Niecza {
         public const int SUB_HAS_TYPE = 4;
         public const int SUB_IS_UNSAFE = 8;
         public const int SUB_IS_PARAM_ROLE = 16;
+        public const int SUB_MAINLINE = 32;
 
         public void LoadStashes(int from) {
             int ct = ReadInt(ref from);
@@ -496,15 +498,21 @@ namespace Niecza {
                 ns.run_once = true;
             if ((spec & SUB_HAS_TYPE) != 0)
                 ns.mo = (STable) ReadXref(ref from);
-            if (ns.outer == null || ns.outer.protopad != null)
-                ns.protosub = Kernel.MakeSub(ns,
-                    ns.outer == null ? null : ns.outer.protopad);
+
+            Frame out_pad = ns.outer == null ? null : ns.outer.protopad;
+
+            if ((spec & SUB_MAINLINE) != 0)
+                out_pad = context_pad ?? out_pad;
+
+            if (out_pad != null || ns.outer == null)
+                ns.protosub = Kernel.MakeSub(ns, out_pad);
             if ((spec & MAKE_PROTOPAD) != 0)
-                ns.protopad = new Frame(null,
-                    ns.outer == null ? null : ns.outer.protopad, ns,
-                        ns.protosub);
+                ns.protopad = new Frame(null, out_pad, ns, ns.protosub);
             if ((spec & SUB_IS_PARAM_ROLE) != 0)
                 ((STable) ReadXref(ref from)).FillParametricRole(ns.protosub);
+
+            if (TraceLoad && ns.protopad != null) Console.WriteLine("created protopad");
+            if (TraceLoad && out_pad != null) Console.WriteLine("has out_pad");
 
             ns.fixups_from = from;
 
