@@ -23,6 +23,87 @@ use RxOp;
 use Sig;
 use STD;
 
+class Op::FlipFlop is Op {
+    has Op $.lhs;
+    has Op $.rhs;
+
+    has Bool $.excl_lhs;
+    has Bool $.excl_rhs;
+    has Bool $.sedlike;
+
+    has Str $.state_var;
+
+    method zyg() { $!lhs, $!rhs }
+
+    method code($body) {
+        my @code;
+        my $flop  = "flop" ~ ::GLOBAL::NieczaActions.genid;
+        my $check = "check" ~ ::GLOBAL::NieczaActions.genid;
+        my $end   = "end" ~ ::GLOBAL::NieczaActions.genid;
+
+        my $use_hide = $!excl_lhs && !$!sedlike;
+
+        push @code, CgOp.cgoto($flop,
+            CgOp.obj_getbool(CgOp.scopedlex($!state_var)));
+        push @code, CgOp.ncgoto($end, CgOp.obj_getbool($!lhs.cgop($body)));
+
+        if $!sedlike {
+            push @code, CgOp.sink(CgOp._cgop("preinc",
+                CgOp.scopedlex($!state_var)));
+            push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+                CgOp.scopedlex($!state_var))) unless $!excl_lhs;
+            push @code, CgOp.goto($end);
+        }
+        else {
+            push @code, CgOp.letvar("!hide", CgOp.int(1)) if $use_hide;
+        }
+
+        push @code, CgOp.label($flop);
+        push @code, CgOp.sink(CgOp._cgop("preinc",
+            CgOp.scopedlex($!state_var)));
+        push @code, CgOp.ncgoto($check, CgOp.obj_getbool($!rhs.cgop($body)));
+        push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+            CgOp.scopedlex($!state_var))) unless $!excl_rhs;
+        push @code, CgOp.sink(CgOp.assign(CgOp.scopedlex($!state_var),
+            CgOp.const(CgOp.exactnum(10, 0))));
+        push @code, CgOp.goto($end);
+
+        push @code, CgOp.label($check);
+        # reached if !flopping, !ret will NOT be set at this point, we
+        # may be in a lhs if !sedlike
+        push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+            CgOp.scopedlex($!state_var)));
+
+        push @code, CgOp.label($end);
+        push @code, CgOp.ternary(
+                CgOp.compare('==', CgOp.letvar('!hide'), CgOp.int(1)),
+                CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),CgOp.string_var(''))),
+                CgOp.prog()) if $use_hide;
+
+        CgOp.letn(
+            '!ret', CgOp.newrwscalar(CgOp.fetch(CgOp.string_var(''))),
+            ($use_hide ?? ('!hide', CgOp.int(0)) !! ()),
+            @code,
+            CgOp.letvar('!ret'));
+    }
+}
+
+class Operator::FlipFlop is Operator {
+    has Bool $.excl_lhs;
+    has Bool $.excl_rhs;
+    has Bool $.sedlike;
+
+    method with_args($/, *@args) {
+        my $state_var = ::GLOBAL::NieczaActions.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $state_var);
+        @args[1] := mklex($/, 'False') if @args[1].^isa(Op::Whatever);
+        Op::FlipFlop.new(|node($/), :$state_var, :$!excl_lhs, :$!excl_rhs,
+            :$!sedlike, :lhs(@args[0]), :rhs(@args[1]))
+    }
+
+    method whatever_curry() { False }
+}
+
 augment class Op::ContextVar {
     method code($ ) {
         CgOp.context_get($!name, +$!uplevel);
@@ -412,6 +493,16 @@ class Op::StateDecl is Op {
 }
 
 augment class NieczaActions {
+method infix:sym<ff>($/) { make Operator::FlipFlop.new() }
+method infix:sym<fff>($/) { make Operator::FlipFlop.new(:sedlike) }
+method infix:sym<ff^>($/) { make Operator::FlipFlop.new(:excl_rhs) }
+method infix:sym<fff^>($/) { make Operator::FlipFlop.new(:excl_rhs, :sedlike) }
+method infix:sym<^ff>($/) { make Operator::FlipFlop.new(:excl_lhs) }
+method infix:sym<^fff>($/) { make Operator::FlipFlop.new(:excl_lhs, :sedlike) }
+method infix:sym<^ff^>($/) { make Operator::FlipFlop.new(:excl_lhs, :excl_rhs) }
+method infix:sym<^fff^>($/) { make Operator::FlipFlop.new(:excl_lhs,
+    :excl_rhs, :sedlike) }
+
 method declarator($/) {
     if $<signature> {
         temp $*SCOPE ||= 'my';

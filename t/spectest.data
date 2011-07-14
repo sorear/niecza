@@ -41,6 +41,7 @@ S03-operators/binding-nested.t
 S03-operators/binding-scalars.t
 S03-operators/bit.t
 S03-operators/chained-declarators.t
+S03-operators/flip-flop.t
 S03-operators/not.t
 S03-operators/overflow.t
 S03-operators/range-basic.t
