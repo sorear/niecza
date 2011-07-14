@@ -1252,6 +1252,22 @@ public class Builtins {
         return Kernel.NewROScalar(o1);
     }
 
+    public static Variable preinc(Variable v) {
+        AssignV(v, v.Fetch().mo.mro_succ.Get(v));
+        return v;
+    }
+
+    public static Variable postdec(Variable v) {
+        P6any o1 = v.Fetch();
+        AssignV(v, o1.mo.mro_pred.Get(v));
+        return Kernel.NewROScalar(o1);
+    }
+
+    public static Variable predec(Variable v) {
+        AssignV(v, v.Fetch().mo.mro_pred.Get(v));
+        return v;
+    }
+
     public static Variable not(Variable v) {
         P6any o1 = v.Fetch();
         bool r = o1.mo.mro_raw_Bool.Get(v);

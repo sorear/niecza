@@ -547,9 +547,9 @@ sub item(Mu $x) { $x }
 sub prefix:<not> is Niecza::absprec<h=> (Mu $x) { not($x) }
 sub defined(Mu $x) is Niecza::builtin('defined',1,1) { defined($x) }
 
-sub prefix:<-->  is Niecza::absprec<x=> ($v is rw) { $v = $v.pred; $v }
-sub prefix:<++>  is Niecza::absprec<x=> ($v is rw) { $v = $v.succ; $v }
-sub postfix:<--> is Niecza::absprec<x=> ($v is rw) { my $old = $v; $v = $v.pred; $old }
+sub prefix:<-->  is Niecza::absprec<x=> is Niecza::builtin('predec',1,1) ($v is rw) { $v = $v.pred; $v }
+sub prefix:<++>  is Niecza::absprec<x=> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
+sub postfix:<--> is Niecza::absprec<x=> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
 sub postfix:<++> is Niecza::absprec<x=> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
 
 sub prefix:<~>(Mu $v) is Niecza::builtin('asstr', 1, 1) { ~$v }
