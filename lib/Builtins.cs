@@ -1817,6 +1817,7 @@ again:
 
     public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
         Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
         fr.lex0 = new ZipSource(pcl);
@@ -1826,6 +1827,7 @@ again:
 
     public static Frame MECross(Frame th, bool with, Variable[] pcl) {
         Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
         fr.lex0 = new CrossSource(pcl);

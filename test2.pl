@@ -180,6 +180,8 @@ eval_lives_ok q[
     is foo([1,2,4]), 3, '@y is copy works with non-flatteny values';
 }
 
+lives_ok { ^2 X ^2 }, 'X works on Ranges';
+
 #is $?ORIG.substr(0,5), '# vim', '$?ORIG works';
 
 # {
