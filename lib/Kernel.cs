@@ -238,7 +238,7 @@ namespace Niecza {
             this.methods = new DynBlockDelegate[nx];
             this.meta_fields = new FieldInfo[nx*2];
 
-            Kernel.ModulesFinished.Add(name);
+            Kernel.ModulesFinished[name] = this;
 
             if (TraceLoad) {
                 Console.WriteLine("Setting up unit {0}", type.Name);
@@ -2397,25 +2397,25 @@ tryagain:
                             GetInferiorRoot(), Variable.None, null));
         }
 
-        internal static HashSet<string> ModulesStarted;
-        internal static HashSet<string> ModulesFinished;
+        internal static HashSet<string> ModulesStarted = new HashSet<string>();
+        internal static Dictionary<string,RuntimeUnit> ModulesFinished =
+            new Dictionary<string,RuntimeUnit>();
 
         public static Variable BootModule(string name, DynBlockDelegate dgt) {
-            if (ModulesStarted == null) ModulesStarted = new HashSet<string>();
-            if (ModulesFinished == null) ModulesFinished = new HashSet<string>();
-            if (ModulesFinished.Contains(name))
+            if (ModulesFinished.ContainsKey(name))
                 return AnyMO.typeVar;
             if (ModulesStarted.Contains(name))
                 throw new NieczaException("Recursive module graph detected at " + name + ": " + JoinS(" ", ModulesStarted));
             ModulesStarted.Add(name);
             Variable r = Kernel.RunInferior(Kernel.GetInferiorRoot().
                     MakeChild(null, new SubInfo("boot-" + name, dgt), AnyP));
-            ModulesFinished.Add(name);
+            if (!ModulesFinished.ContainsKey(name))
+                ModulesFinished[name] = null;
             return r;
         }
 
         public static void DoRequire(string name) {
-            if (ModulesFinished.Contains(name))
+            if (ModulesFinished.ContainsKey(name))
                 return;
             Assembly a = Assembly.Load(name);
             Type t = a.GetType(name);
@@ -3043,7 +3043,7 @@ ltm:
                 string n = th.info.name;
                 // Mega-Hack: These functions wrap stuff and should
                 // propagate $/
-                if (n == "CORE infix:<~~>" || n == "ExitRunloop") {
+                if (n == "CORE infix:<~~>" || n == "ExitRunloop" || n == "KERNEL AutoThreadSub") {
                     th = th.caller;
                     continue;
                 }

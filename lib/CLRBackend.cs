@@ -4569,7 +4569,7 @@ dynamic:
             thaw.Add(CpsOp.MethodCall(Tokens.RuntimeUnit.GetMethod("FixupSubs"),
                 CpsOp.GetSField(unit.rtunit)));
 
-            unit.VisitSubsPostorder(delegate(int ix, StaticSub obj) {
+            unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub3 {0}", obj.name);
                 foreach (KeyValuePair<string,Lexical> l in obj.lexicals) {
                     if (l.Value is LexCommon) {
