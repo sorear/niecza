@@ -3151,7 +3151,7 @@ namespace Niecza.CLRBackend {
 
         CpsOp AccessLex(object[] zyg) {
             return RawAccessLex( JScalar.S(zyg[0]), JScalar.S(zyg[1]),
-                (zyg.Length > 2 ? Scan(zyg[2]) : null) );
+                (zyg.Length > 2 ? Scan(zyg[2]) : null), false);
         }
 
         CpsOp AccessLet(object[] zyg) {
@@ -3182,18 +3182,18 @@ namespace Niecza.CLRBackend {
             return null;
         }
 
-        CpsOp RawAccessLex(string type, string name, CpsOp set_to) {
+        CpsOp RawAccessLex(string type, string name, CpsOp set_to, bool proto) {
             bool core = type == "corelex";
             int outer = (type == "outerlex") ? 1 : 0;
             int uplevel;
 
             CpsOp r;
-            if (!core && (r = CheckScopes(name, ref outer, set_to)) != null)
+            if (!core && !proto && (r = CheckScopes(name, ref outer, set_to)) != null)
                 return r;
 
             Lexical lex = ResolveLex(name, outer>0, out uplevel, core);
 
-            return CpsOp.LexAccess(lex, uplevel, false,
+            return CpsOp.LexAccess(lex, uplevel, proto,
                 set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
         }
 
@@ -3224,7 +3224,7 @@ namespace Niecza.CLRBackend {
             }
         }
 
-        CpsOp MakeDispatch(string prefix) {
+        internal CpsOp MakeDispatch(string prefix, bool proto) {
             HashSet<string> names = new HashSet<string>();
             List<CpsOp> cands = new List<CpsOp>();
             string filter = prefix + ":";
@@ -3238,7 +3238,7 @@ namespace Niecza.CLRBackend {
                             !names.Contains(kp.Key)) {
                         names.Add(kp.Key);
                         brk = true;
-                        cands.Add(CpsOp.MethodCall(Tokens.Variable_Fetch, RawAccessLex("scopedlex", kp.Key, null)));
+                        cands.Add(CpsOp.MethodCall(Tokens.Variable_Fetch, RawAccessLex("scopedlex", kp.Key, null, proto)));
                     }
                 }
                 if (csr.outer == null) break;
@@ -3492,7 +3492,7 @@ dynamic:
             handlers["_cpsop"] = delegate(NamProcessor th, object[] z) {
                 return z[1] as CpsOp; };
             handlers["_newdispatch"] = delegate(NamProcessor th, object[] z) {
-                return th.MakeDispatch(JScalar.S(z[1])); };
+                return th.MakeDispatch(JScalar.S(z[1]), false); };
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
                 string kind = FixStr(z[1]);
                 Package m;
@@ -4235,7 +4235,7 @@ dynamic:
             foreach (Method m in pr.methods) {
                 CpsOp name = (m.name != null) ? CpsOp.StringLiteral(m.name) :
                     Scan(new object[] { new JScalar("obj_getstr"), m.cname });
-                CpsOp var  = RawAccessLex("scopedlex", m.var, null);
+                CpsOp var  = RawAccessLex("scopedlex", m.var, null, false);
 
                 build.Add(CpsOp.MethodCall(Tokens.DMO_AddMethod,
                     mo, CpsOp.IntLiteral(m.kind), name,
@@ -4249,7 +4249,7 @@ dynamic:
                 CpsOp name = CpsOp.StringLiteral(a.name);
                 CpsOp publ = CpsOp.IntLiteral(flags);
                 CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.P6any) :
-                    RawAccessLex("scopedlex", a.ivar, null);
+                    RawAccessLex("scopedlex", a.ivar, null, false);
                 CpsOp type = a.type == null ?
                     CpsOp.GetSField(Tokens.Kernel_AnyMO) :
                     CpsOp.GetSField(a.type.Resolve<Package>().metaObject);
@@ -4263,11 +4263,11 @@ dynamic:
                 foreach (object se in rsig) {
                     string slot = JScalar.S( ((object[])se)[2] );
                     if (slot != null)
-                        build.Add(CpsOp.MethodCall(Tokens.VarHash_set_Item, pa, CpsOp.StringLiteral(slot), RawAccessLex("scopedlex", slot, null)));
+                        build.Add(CpsOp.MethodCall(Tokens.VarHash_set_Item, pa, CpsOp.StringLiteral(slot), RawAccessLex("scopedlex", slot, null, false)));
                 }
             }
 
-            build.Add(RawAccessLex("scopedlex", "*params", pa));
+            build.Add(RawAccessLex("scopedlex", "*params", pa, false));
             build.Add(CpsOp.SetField(Tokens.P6opaque_slots, to,
                         CpsOp.Null(typeof(object[]))));
             build.Add(CpsOp.SetField(Tokens.DMO_typeObject, mo, to));
@@ -4571,6 +4571,7 @@ dynamic:
 
             unit.VisitSubsPreorder(delegate(int ix, StaticSub obj) {
                 if (Verbose > 0) Console.WriteLine("sub3 {0}", obj.name);
+                List<CpsOp> latefrags = new List<CpsOp>();
                 foreach (KeyValuePair<string,Lexical> l in obj.lexicals) {
                     if (l.Value is LexCommon) {
                         LexCommon lx = (LexCommon)l.Value; /* XXX cname */
@@ -4590,6 +4591,18 @@ dynamic:
                         SetProtolex(lx, CpsOp.MethodCall(
                                 Tokens.Kernel_NewROScalar, CpsOp.GetField(Tokens.SubInfo_protosub,
                                 CpsOp.GetSField(lx.def.Resolve<StaticSub>().subinfo))));
+                    } else if (l.Value is LexDispatch) {
+                        LexDispatch lx = (LexDispatch)l.Value;
+                        if (obj.protopad == null) continue;
+                        latefrags.Add(CpsOp.LexAccess(lx,0,true, new CpsOp[] {
+                            aux[ix].MakeDispatch(l.Key, true) }));
+                    } else if (l.Value is LexLabel) {
+                        LexLabel lx = (LexLabel)l.Value;
+                        if (obj.protopad == null) continue;
+                        SetProtolex(lx, CpsOp.MethodCall(
+                            Tokens.Kernel_NewLabelVar,
+                            CpsOp.GetSField(obj.protopad),
+                            CpsOp.StringLiteral(l.Key)));
                     } else if (l.Value is LexSimple) {
                         LexSimple lx = (LexSimple)l.Value;
                         if (obj.protopad == null) continue;
@@ -4625,6 +4638,7 @@ dynamic:
                         }
                     }
                 }
+                foreach (CpsOp o in latefrags) thaw.Add(o);
             });
 
             int stash_base = unit.thaw_heap.Count;
