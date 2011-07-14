@@ -436,6 +436,7 @@ namespace Niecza {
             return new string(r);
         }
 
+        public const int SUB_RUN_ONCE = 1;
         public const int MAKE_PROTOPAD = 2;
         public const int SUB_HAS_TYPE = 4;
         public const int SUB_IS_UNSAFE = 8;
@@ -491,6 +492,8 @@ namespace Niecza {
 
             if ((spec & SUB_IS_UNSAFE) != 0)
                 Kernel.CheckUnsafe(ns);
+            if ((spec & SUB_RUN_ONCE) != 0)
+                ns.run_once = true;
             if ((spec & SUB_HAS_TYPE) != 0)
                 ns.mo = (STable) ReadXref(ref from);
             if (ns.outer == null || ns.outer.protopad != null)
@@ -693,6 +696,7 @@ namespace Niecza {
         // maybe should be a hint
         public LAD ltm;
 
+        public bool run_once;
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;
@@ -784,7 +788,16 @@ namespace Niecza {
         }
         public unsafe Frame Binder(Frame caller, Frame outer, P6any sub,
                 Variable[] pos, VarHash named, bool quiet, DispatchEnt de) {
-            Frame th = caller.MakeChild(outer, this, sub);
+            Frame th;
+            if (run_once) {
+                th = protopad;
+                th.caller = caller;
+                th.ip = 0;
+                if (Frame.TraceCalls)
+                    Console.WriteLine("{0}\t{1}", caller.info.name, name);
+            } else {
+                th = caller.MakeChild(outer, this, sub);
+            }
             th.curDisp = de;
             th.pos = pos;
             th.named = named;

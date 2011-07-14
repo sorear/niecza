@@ -948,7 +948,7 @@ namespace Niecza.CLRBackend {
 
         public void BindFields(int ix, Func<string,Type,FieldInfo> binder) {
             subinfo  = binder(Unit.SharedName('I', ix, name), Tokens.SubInfo);
-            if ((flags & SPAD_EXISTS) != 0)
+            if ((flags & (SPAD_EXISTS | RUN_ONCE)) != 0)
                 protopad = binder(Unit.SharedName('P', ix, name), Tokens.Frame);
 
             nlexn = 0;
@@ -961,11 +961,11 @@ namespace Niecza.CLRBackend {
     abstract class Lexical {
         public virtual void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) { }
-        public virtual ClrOp SetCode(int up, ClrOp head) {
+        public virtual ClrOp SetCode(int up, bool proto, ClrOp head) {
             throw new Exception("Lexicals of type " + this + " cannot be bound");
         }
         public abstract void EmitInfo(Unit to);
-        public abstract ClrOp GetCode(int up);
+        public abstract ClrOp GetCode(int up, bool proto);
         /* names which are kept in the pad for quick runtime access */
         public static bool IsDynamicName(string name) {
             if (name == "$_" || name == "$/" || name == "$!") return true;
@@ -980,14 +980,16 @@ namespace Niecza.CLRBackend {
         public int index;
         public FieldInfo stg;
 
-        public override ClrOp GetCode(int up) {
-            return (index >= 0) ? (ClrOp)new ClrPadGet(up, index)
-                                : new ClrGetSField(stg);
+        public override ClrOp GetCode(int up, bool proto) {
+            return (index < 0) ? (ClrOp) new ClrGetSField(stg) :
+                proto ? (ClrOp) new ClrProtoGet(index, new ClrGetSField(stg)) :
+                new ClrPadGet(up, index);
         }
 
-        public override ClrOp SetCode(int up, ClrOp to) {
-            return (index >= 0) ? (ClrOp)new ClrPadSet(up, index, to)
-                                : new ClrSetSField(stg, to);
+        public override ClrOp SetCode(int up, bool proto, ClrOp to) {
+            return (index < 0) ? (ClrOp)new ClrSetSField(stg, to) :
+                proto ? new ClrProtoSet(index, new ClrGetSField(stg), to) :
+                (ClrOp)new ClrPadSet(up, index, to);
         }
 
         public abstract byte TypeCode();
@@ -1002,6 +1004,7 @@ namespace Niecza.CLRBackend {
                 string name, Func<string,Type,FieldInfo> binder) {
             if (IsDynamicName(name) || (sub.flags & StaticSub.RUN_ONCE) == 0) {
                 index = sub.nlexn++;
+                stg = sub.protopad;
             } else {
                 index = -1;
                 stg = binder(Unit.SharedName('L', six, name), Tokens.Variable);
@@ -1047,7 +1050,7 @@ namespace Niecza.CLRBackend {
     class LexHint : Lexical {
         public FieldInfo stg;
         public LexHint(object[] l) {}
-        public override ClrOp GetCode(int up) {
+        public override ClrOp GetCode(int up, bool proto) {
             return new ClrGetField(Tokens.BValue_v,
                     new ClrGetSField(stg));
         }
@@ -1068,11 +1071,11 @@ namespace Niecza.CLRBackend {
             package = Xref.from(l[2]);
             name = JScalar.S(l[3]);
         }
-        public override ClrOp GetCode(int up) {
+        public override ClrOp GetCode(int up, bool proto) {
             return new ClrGetField(Tokens.BValue_v,
                     new ClrGetSField(stg));
         }
-        public override ClrOp SetCode(int up, ClrOp to) {
+        public override ClrOp SetCode(int up, bool proto, ClrOp to) {
             return new ClrSetField(Tokens.BValue_v,
                     new ClrGetSField(stg), to);
         }
@@ -1096,7 +1099,7 @@ namespace Niecza.CLRBackend {
             to.EmitByte(6);
             to.EmitStr(this.to);
         }
-        public override ClrOp GetCode(int up) { throw new NotImplementedException(); }
+        public override ClrOp GetCode(int up, bool proto) { throw new NotImplementedException(); }
     }
 
     class LexStash : Lexical {
@@ -1107,7 +1110,7 @@ namespace Niecza.CLRBackend {
             to.EmitXref(package);
         }
         public Package GetPackage() { return package.Resolve<Package>(); }
-        public override ClrOp GetCode(int up) {
+        public override ClrOp GetCode(int up, bool proto) {
             Package p = GetPackage();
             return new ClrGetField(Tokens.DMO_typeVar,
                     new ClrGetSField(p.metaObject));
@@ -1917,6 +1920,24 @@ namespace Niecza.CLRBackend {
             this.ix = ix;
             this.zyg1 = zyg1;
             this.zyg2 = zyg2;
+        }
+    }
+
+    class ClrProtoGet : ClrOp {
+        public readonly int ix;
+        public readonly ClrOp zyg;
+
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        public override void CodeGen(CgContext cx) {
+            zyg.CodeGen(cx);
+            cx.EmitGetlex(ix + Tokens.NumInt32, Tokens.Variable);
+        }
+
+        public ClrProtoGet(int ix, ClrOp zyg) {
+            TypeCheck(zyg.Returns, Tokens.Frame);
+            Returns = Tokens.Variable;
+            this.ix = ix;
+            this.zyg = zyg;
         }
     }
 
@@ -2947,10 +2968,11 @@ namespace Niecza.CLRBackend {
             return new CpsOp(stmts.ToArray(), body.head);
         }
 
-        public static CpsOp LexAccess(Lexical l, int up, CpsOp[] zyg) {
+        public static CpsOp LexAccess(Lexical l, int up, bool p, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
-                return new CpsOp((heads.Length >= 1) ? l.SetCode(up, heads[0]) :
-                    l.GetCode(up));
+                return new CpsOp((heads.Length >= 1)
+                    ? l.SetCode(up, p, heads[0])
+                    : l.GetCode(up, p));
             });
         }
 
@@ -2979,12 +3001,6 @@ namespace Niecza.CLRBackend {
         public static CpsOp SetSField(FieldInfo fi, CpsOp zyg) {
             return Primitive(new CpsOp[1] { zyg }, delegate(ClrOp[] heads) {
                 return new CpsOp(new ClrSetSField(fi, heads[0]));
-            });
-        }
-
-        public static CpsOp SetProtoPad(int ix, CpsOp za, CpsOp zb) {
-            return Primitive(new CpsOp[2] { za, zb }, delegate(ClrOp[] heads) {
-                return new CpsOp(new ClrProtoSet(ix, heads[0], heads[1]));
             });
         }
 
@@ -3164,7 +3180,7 @@ namespace Niecza.CLRBackend {
 
             Lexical lex = ResolveLex(name, outer>0, out uplevel, core);
 
-            return CpsOp.LexAccess(lex, uplevel,
+            return CpsOp.LexAccess(lex, uplevel, false,
                 set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
         }
 
@@ -3645,7 +3661,7 @@ dynamic:
                 if (r1 != null) return r1;
                 Lexical l;
                 if (outer == 0 && th.sub.l_lexicals.TryGetValue(name, out l))
-                    return CpsOp.LexAccess(l, 0, new CpsOp[0]);
+                    return CpsOp.LexAccess(l, 0, false, new CpsOp[0]);
                 return CpsOp.MethodCall(Tokens.Kernel_ContextHelper,
                     CpsOp.CallFrame(), CpsOp.StringLiteral(name),
                     CpsOp.IntLiteral(outer)); };
@@ -4081,6 +4097,8 @@ dynamic:
 
             if ((sub.flags & StaticSub.UNSAFE) != 0)
                 spec |= RuntimeUnit.SUB_IS_UNSAFE;
+            if ((sub.flags & StaticSub.RUN_ONCE) != 0)
+                spec |= RuntimeUnit.SUB_RUN_ONCE;
             spec |= RuntimeUnit.SUB_HAS_TYPE;
             if (sub.protopad != null)
                 spec |= RuntimeUnit.MAKE_PROTOPAD;
@@ -4134,10 +4152,8 @@ dynamic:
             }
 
             foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
-                if ((sub.flags & StaticSub.RUN_ONCE) != 0 &&
-                        (sub.flags & StaticSub.SPAD_EXISTS) != 0 &&
-                        !Lexical.IsDynamicName(kv.Key))
-                    continue;
+                if ((sub.flags & StaticSub.RUN_ONCE) != 0)
+                    continue; // we'll just use the static pad
 
                 if (kv.Value is LexSub) {
                     LexSub ls = (LexSub) kv.Value;
@@ -4374,12 +4390,8 @@ dynamic:
                     TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
         }
 
-        void SetProtolex(StaticSub obj, string n, LexVarish v, CpsOp init) {
-            if ((obj.flags & StaticSub.RUN_ONCE) != 0 && !Lexical.IsDynamicName(n))
-                thaw.Add(CpsOp.SetSField(v.stg, init));
-            else
-                thaw.Add(CpsOp.SetProtoPad(v.index,
-                    CpsOp.GetSField(obj.protopad), init));
+        void SetProtolex(Lexical v, CpsOp init) {
+            thaw.Add(CpsOp.LexAccess(v, -1, true, new CpsOp[] { init }));
         }
 
         void Process(Unit unit, bool asmain) {
@@ -4539,27 +4551,40 @@ dynamic:
                                     CpsOp.StringLiteral(l.Key))));
                     } else if (l.Value is LexSub) {
                         LexSub lx = (LexSub)l.Value;
-                        if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
-                        SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(
-                            Tokens.Kernel_NewROScalar, CpsOp.GetField(Tokens.SubInfo_protosub,
+                        if (obj.protopad == null) continue;
+                        SetProtolex(lx, CpsOp.MethodCall(
+                                Tokens.Kernel_NewROScalar, CpsOp.GetField(Tokens.SubInfo_protosub,
                                 CpsOp.GetSField(lx.def.Resolve<StaticSub>().subinfo))));
                     } else if (l.Value is LexSimple) {
                         LexSimple lx = (LexSimple)l.Value;
-                        if ((obj.flags & StaticSub.SPAD_EXISTS) == 0) continue;
+                        if (obj.protopad == null) continue;
                         MethodInfo type =
                             ((lx.flags & LexSimple.HASH) != 0) ? Tokens.Kernel_CreateHash :
                             ((lx.flags & LexSimple.LIST) != 0) ? Tokens.Kernel_CreateArray : null;
                         if (type != null) {
-                            SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(type));
-                        } else if ((lx.flags & (LexSimple.ROINIT | LexSimple.DEFOUTER)) != 0) {
-                            SetProtolex(obj, l.Key, lx, CpsOp.GetField(
+                            SetProtolex(lx, CpsOp.MethodCall(type));
+                        } else if ((lx.flags & LexSimple.DEFOUTER) != 0) {
+                            StaticSub oi = obj.outer.Resolve<StaticSub>();
+                            Lexical li = null;
+                            string ln = l.Key;
+                            while (true) {
+                                if (!oi.l_lexicals.TryGetValue(ln, out li))
+                                    oi = oi.outer.Resolve<StaticSub>();
+                                else if (li is LexAlias)
+                                    ln = (li as LexAlias).to;
+                                else
+                                    break;
+                            }
+                            SetProtolex(lx, CpsOp.LexAccess(li, 0,true, new CpsOp[0]));
+                        } else if ((lx.flags & LexSimple.ROINIT) != 0) {
+                            SetProtolex(lx, CpsOp.GetField(
                                 Tokens.DMO_typeVar, CpsOp.GetSField(
                                     Tokens.Kernel_AnyMO)));
                         } else {
                             FieldInfo tc = lx.type == null ?
                                 Tokens.Kernel_AnyMO :
                                 lx.type.Resolve<Package>().metaObject;
-                            SetProtolex(obj, l.Key, lx, CpsOp.MethodCall(
+                            SetProtolex(lx, CpsOp.MethodCall(
                                 Tokens.Kernel_NewTypedScalar,
                                 CpsOp.GetSField(tc)));
                         }
