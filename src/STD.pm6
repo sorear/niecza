@@ -1121,9 +1121,9 @@ grammar P6 is STD {
             @*WORRIES = ();
             $*CURLEX = { };
             $*UNIT = $*CURLEX;
-            self.finishlex;
         }:s
         <.unitstart>
+        <.finishlex>
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
         <.getsig>
@@ -1170,6 +1170,7 @@ grammar P6 is STD {
         [
         | <lambda>
             <.newlex(1)>
+            { $*CURLEX<!rw_lambda> = True if $<lambda> eq '<->' }
             <signature(1)>
             <blockoid>
             <.getsig>
@@ -1724,6 +1725,7 @@ grammar P6 is STD {
                         $*begin_compunit = 0;
                         $*IN_DECL = '';
                     }
+                    <.finishlex>
                     <statementlist>     # whole rest of file, presumably
                 || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
                 ]
@@ -2627,7 +2629,7 @@ grammar P6 is STD {
     token capterm {
         '\\'
         [
-        | '(' <capture>? ')'
+        | '(' ~ ')' <capture>?
         | <?before \S> <termish>
         | {} <.panic: "You can't backslash that">
         ]
@@ -5042,13 +5044,16 @@ method newlex ($needsig = 0, $once = False) {
     self;
 }
 
-method finishlex {
-    # XXX
-    # my $line = self.lineof(self.pos);
-    # $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    # $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
-    # $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+method finishlex() {
+    my $sub = $*CURLEX<!sub>;
+    if $sub.is_routine {
+        $sub.add_my_name('$/', :roinit) unless $sub.lexicals<$/>:exists;
+        $sub.add_my_name('$!', :roinit) unless $sub.lexicals<$!>:exists;
+    }
+    $sub.add_my_name('$_', :defouter(!$sub.is_routine ||
+        $sub === $sub.to_unit)) unless $sub.lexicals<$_>:exists;
     $*SIGNUM = 0;
+
     self;
 }
 
@@ -5098,7 +5103,8 @@ method getsig {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
                 :defouter, :rwtrans);
             self.trymop({
-                $*CURLEX<!sub>.add_my_name('$_', :noinit, |mnode(self));
+                $*CURLEX<!sub>.lexicals<$_>.noinit = True;
+                $*CURLEX<!sub>.lexicals<$_>.defouter = False;
             });
         }
         $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
@@ -5488,7 +5494,7 @@ method panic (Str $s) {
     die "Recursive panic" if $*IN_PANIC;
     $*IN_PANIC++;
     self.deb("panic $s") if $*DEBUG;
-    my $m;
+    my $m = ''; # NIECZA
     my $here = self;
 
     my $first = $here.lineof($*LAST_NIBBLE_START);
@@ -5516,40 +5522,36 @@ method panic (Str $s) {
     $m ~= $here.locmess;
     $m ~= "\n" unless $m ~~ /\n$/;
 
-    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
-        my @t = $here.suppose( sub { $here.term } );
-        if @t {
-            my $endpos = $here.pos;
-            my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
+    my $endpos = $here.pos;
+    my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
 
-            if self.lineof($startpos) != self.lineof($endpos) {
-                $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
-            }
-            elsif @*MEMOS[$here.pos - 1]<baremeth> {
-                $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
-            }
-            elsif @*MEMOS[$here.pos - 1]<arraycomp> {
-                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
-            }
-            else {
-                $m ~~ s|Confused|Two terms in a row|;
-            }
-        }
-        elsif my $type = @*MEMOS[$here.pos - 1]<nodecl> {
-            my @t = $here.suppose( sub { $here.variable } );
-            if @t {
-                my $variable = @t[0].Str;
-                $m ~~ s|Confused|Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'|;
-            }
-        }
+    my @t = $here.suppose( sub { $here.term } );
+    my @v = $here.suppose( sub { $here.variable } );
+    my @i = $here.suppose( sub { $here.identifier } );
+
+    if @v && @*MEMOS[$startpos]<nodecl> -> $type {
+        $m ~~ s|Confused|Bare type $type cannot declare @v[0] without a preceding scope declarator such as 'my'|;
     }
-    elsif my $type = @*MEMOS[$here.pos - 1]<wasname> {
-        my @t = $here.suppose( sub { $here.identifier } );
-        my $name = @t[0].Str;
+    elsif @*MEMOS[$startpos]<wasname> -> $type {
+        my $name = @i[0].Str;
         my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
         my $d = $*IN_DECL;
         $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
-        $m ~~ s|Malformed block|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
+        $m ~~ s|'Malformed block'|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
+    }
+    elsif @t {
+        if self.lineof($startpos) != self.lineof($endpos) {
+            $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+        }
+        elsif @*MEMOS[$startpos]<baremeth> {
+            $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
+        }
+        elsif @*MEMOS[$startpos]<arraycomp> {
+            $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
+        }
+        else {
+            $m ~~ s|Confused|Two terms in a row|;
+        }
     }
 
     if @*WORRIES {
@@ -5557,7 +5559,7 @@ method panic (Str $s) {
     }
 
     $*IN_PANIC--;
-    die $m if $*IN_SUPPOSE;     # just throw the exception back to the supposer
+    die $m if $*IN_SUPPOSE || $*IN_EVAL;     # just throw the exception back to the supposer
     $*IN_PANIC++;
 
     note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
@@ -5566,6 +5568,7 @@ method panic (Str $s) {
     self.explain_mystery();
 
     $*IN_PANIC--;
+    die "Parse failed" if $*in_repl;
     note "Parse failed\n";
     exit 1;
 }
@@ -5592,6 +5595,7 @@ method worry (Str $s) {
 
 method sorry (Str $s) {
     self.deb("sorry $s") if $*DEBUG;
+    die $s if $*IN_EVAL;
     note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
         unless $*IN_SUPPOSE or $*FATALS++;
     if $s {

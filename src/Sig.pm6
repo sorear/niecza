@@ -74,7 +74,7 @@ class Parameter {
             CgOp.sink($get);
         }
     }
-    method simple($n) { self.new(name => $n, slot => $n) }
+    method simple($n) { self.new(name => $n, slot => $n, :rwtrans) }
 }
 
 has $.params = die "Sig.params required"; # Array of Sig::Parameter

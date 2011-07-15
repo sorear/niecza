@@ -505,9 +505,8 @@ class When is Op {
         CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
                 $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
             CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
-                    CgOp.sink($.body.cgop($body)),
                     CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
-                        CgOp.null('str'), CgOp.corelex('Nil'))),
+                        CgOp.null('str'), $.body.cgop($body))),
                 7, '', "end$id"),
             CgOp.corelex('Nil'));
     }
@@ -669,9 +668,7 @@ class ContextVar is Op {
     has $.name = die "ContextVar.name required"; # Str
     has $.uplevel = 0; # Int
 
-    method code($ ) {
-        CgOp.context_get(CgOp.str($!name), CgOp.int($!uplevel));
-    }
+    method code($ ) { CgOp.context_get($!name, +$!uplevel); }
 }
 
 class Require is Op {
@@ -914,4 +911,91 @@ class ROify is Op {
     has $.child;
     method zyg() { $.child }
     method code($body) { CgOp.newscalar(CgOp.fetch($!child.cgop($body))) }
+}
+
+class Op::StateDecl is Op {
+    has Op $.inside;
+    method zyg() { $!inside }
+    method ctxzyg($f) { $!inside, $f }
+
+    method code($body) { $!inside.cgop($body) }
+    method to_bind($/, $ro, $rhs) { $!inside.to_bind($/, $ro, $rhs); }
+}
+
+class Op::DoOnceLoop is Op {
+    has Op $.body = die "DoOnceLoop.body required";
+    method zyg() { $!body }
+
+    method code($body) { self.code_labelled($body,'') }
+    method code_labelled($body, $l) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+            1, $l, "next$id", 2, $l, "next$id", 3, $l, "redo$id");
+    }
+}
+
+class Op::FlipFlop is Op {
+    has Op $.lhs;
+    has Op $.rhs;
+
+    has Bool $.excl_lhs;
+    has Bool $.excl_rhs;
+    has Bool $.sedlike;
+
+    has Str $.state_var;
+
+    method zyg() { $!lhs, $!rhs }
+
+    method code($body) {
+        my @code;
+        my $flop  = "flop" ~ ::GLOBAL::NieczaActions.genid;
+        my $check = "check" ~ ::GLOBAL::NieczaActions.genid;
+        my $end   = "end" ~ ::GLOBAL::NieczaActions.genid;
+
+        my $use_hide = $!excl_lhs && !$!sedlike;
+
+        push @code, CgOp.cgoto($flop,
+            CgOp.obj_getbool(CgOp.scopedlex($!state_var)));
+        push @code, CgOp.ncgoto($end, CgOp.obj_getbool($!lhs.cgop($body)));
+
+        if $!sedlike {
+            push @code, CgOp.sink(CgOp._cgop("preinc",
+                CgOp.scopedlex($!state_var)));
+            push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+                CgOp.scopedlex($!state_var))) unless $!excl_lhs;
+            push @code, CgOp.goto($end);
+        }
+        else {
+            push @code, CgOp.letvar("!hide", CgOp.int(1)) if $use_hide;
+        }
+
+        push @code, CgOp.label($flop);
+        push @code, CgOp.sink(CgOp._cgop("preinc",
+            CgOp.scopedlex($!state_var)));
+        push @code, CgOp.ncgoto($check, CgOp.obj_getbool($!rhs.cgop($body)));
+        push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+            CgOp.scopedlex($!state_var))) unless $!excl_rhs;
+        push @code, CgOp.sink(CgOp.assign(CgOp.scopedlex($!state_var),
+            CgOp.const(CgOp.exactnum(10, 0))));
+        push @code, CgOp.goto($end);
+
+        push @code, CgOp.label($check);
+        # reached if !flopping, !ret will NOT be set at this point, we
+        # may be in a lhs if !sedlike
+        push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+            CgOp.scopedlex($!state_var)));
+
+        push @code, CgOp.label($end);
+        push @code, CgOp.ternary(
+                CgOp.compare('==', CgOp.letvar('!hide'), CgOp.int(1)),
+                CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),CgOp.string_var(''))),
+                CgOp.prog()) if $use_hide;
+
+        CgOp.letn(
+            '!ret', CgOp.newrwscalar(CgOp.fetch(CgOp.string_var(''))),
+            ($use_hide ?? ('!hide', CgOp.int(0)) !! ()),
+            @code,
+            CgOp.letvar('!ret'));
+    }
 }

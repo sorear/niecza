@@ -1154,6 +1154,15 @@ method infix:sym<...> ($/) {
     # STD parses ...^ in the ... rule
     make Operator.funop($/, '&infix:<' ~ $/ ~ '>', 2);
 }
+method infix:sym<ff>($/) { make Operator::FlipFlop.new() }
+method infix:sym<fff>($/) { make Operator::FlipFlop.new(:sedlike) }
+method infix:sym<ff^>($/) { make Operator::FlipFlop.new(:excl_rhs) }
+method infix:sym<fff^>($/) { make Operator::FlipFlop.new(:excl_rhs, :sedlike) }
+method infix:sym<^ff>($/) { make Operator::FlipFlop.new(:excl_lhs) }
+method infix:sym<^fff>($/) { make Operator::FlipFlop.new(:excl_lhs, :sedlike) }
+method infix:sym<^ff^>($/) { make Operator::FlipFlop.new(:excl_lhs, :excl_rhs) }
+method infix:sym<^fff^>($/) { make Operator::FlipFlop.new(:excl_lhs,
+    :excl_rhs, :sedlike) }
 method infix:sym<~~> ($/) { make ::Operator::SmartMatch.new }
 method infix:sym<,>($/) { make ::Operator::Comma.new }
 method infix:sym<:=>($/) { make ::Operator::Binding.new(:!readonly) }
@@ -1179,12 +1188,14 @@ method INFIX($/) {
     if $fn.assignish {
         # Assignments to has and state declarators are rewritten into
         # an appropriate phaser
-        if $lhs.^isa(::Op::Lexical) && $lhs.state_decl {
+        if $lhs.^isa(Op::StateDecl) {
             my $cv = self.gensym;
             $*CURLEX<!sub>.add_state_name(Str, $cv);
-            make ::Op::StatementList.new(|node($/), children => [
-                ::Op::Start.new(condvar => $cv, body => $/.ast),
-                ::Op::Lexical.new(name => $lhs.name)]);
+            make mklet($lhs, -> $ll {
+                Op::StatementList.new(|node($/), children => [
+                    Op::Start.new(condvar => $cv, body =>
+                        $fn.with_args($/, $ll, $rhs)),
+                    $ll]) });
         }
         elsif $lhs.^isa(::Op::Attribute) && !defined($lhs.initializer.ivar) {
             my $init = self.thunk_sub($rhs,
@@ -1685,6 +1696,9 @@ method variable($/) {
         return;
     } elsif defined $dsosl {
         ($name, $rest) = $dsosl<name path>;
+    } elsif $<infixish> {
+        make { term => $<infixish>.ast.as_function($/) };
+        return;
     } elsif $<name> {
         # Both these cases are marked XXX in STD.  I agree.  What are they for?
         if $<name>[0].ast<dc> {
@@ -1713,6 +1727,10 @@ method variable($/) {
                 ::Op::Num.new(value => $<index>.ast))
         };
         return Nil;
+    } elsif $<longname> {
+        $/.CURSOR.sorry('::<> syntax NYI');
+        make { term => ::Op::StatementList.new };
+        return;
     } elsif $<postcircumfix> {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
@@ -1726,9 +1744,7 @@ method variable($/) {
             return;
         }
     } else {
-        $/.CURSOR.sorry("Non-simple variables NYI");
-        make { term => ::Op::StatementList.new };
-        return;
+        $name = '';
     }
 
     make {
@@ -1806,7 +1822,7 @@ method param_var($/) {
 
 # :: Sig::Parameter
 method parameter($/) {
-    my $rw = False;
+    my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
     my $copy = False;
     my $sorry;
     my $slurpy = False;
@@ -2146,13 +2162,37 @@ method scoped($/) {
 # :: Op
 method declarator($/) {
     if $<signature> {
+        temp $*SCOPE ||= 'my';
+        my $sub = $*CURLEX<!sub>;
+
         my @p = @( $<signature>.ast.params );
         # TODO: keep the original signature around somewhere := can find it
-        for @p {
-            # TODO: fanciness checks
-            $_ = mklex($/, .slot, list => .list, hash => .hash);
+        # TODO: fanciness checks
+        for @p -> \$param {
+            my $slot = $param.slot;
+            $sub.delete_lex($slot) if defined($slot);
+            $slot //= self.gensym;
+            $slot = self.gensym if $*SCOPE eq 'anon';
+            my $list = $param.list;
+            my $hash = $param.hash;
+            my $type = $param.tclass;
+
+            if $*SCOPE eq 'state' {
+                $sub.add_state_name($slot, self.gensym, :$list, :$hash,
+                    typeconstraint => $type, |mnode($/));
+                $param = Op::Lexical.new(name => $slot, |node($/));
+            } elsif $*SCOPE eq 'our' {
+                $param = self.package_var($/, $slot, $slot, ['OUR'], :$list,
+                    :$hash);
+            } else {
+                $sub.add_my_name($slot, :$list, :$hash,
+                    typeconstraint => $type, |mnode($/));
+                $param = Op::Lexical.new(name => $slot, |node($/));
+            }
         }
-        make ::Op::SimpleParcel.new(|node($/), items => @p);
+        make Op::SimpleParcel.new(|node($/), items => @p);
+        make Op::StateDecl.new(|node($/), inside => $/.ast)
+            if $*SCOPE eq 'state';
         return;
     }
     make $<variable_declarator> ?? $<variable_declarator>.ast !!
@@ -2226,8 +2266,14 @@ method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
+
+    my $scope = $*SCOPE // 'my';
+
+    my $start;
     for @$<trait> -> $t {
         if $t.ast<rw> {
+        } elsif $t.ast<start> && $*SCOPE eq 'state' {
+            $start = $t.ast<start>;
         } else {
             $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
         }
@@ -2235,8 +2281,6 @@ method variable_declarator($/) {
     if $<post_constraint> || $<postcircumfix> || $<semilist> {
         $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
     }
-
-    my $scope = $*SCOPE // 'my';
 
     if $scope eq 'augment' || $scope eq 'supersede' {
         $/.CURSOR.sorry("Illogical scope $scope for simple variable");
@@ -2265,13 +2309,18 @@ method variable_declarator($/) {
         $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
     }
 
+    if !defined($v<name>) && $scope ne any < my anon state > {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+    }
+
     if defined $v<rest> {
         $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
     }
 
     my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
     # otherwise identical to my
-    my $slot = ($scope eq 'anon') ?? self.gensym !! $name;
+    my $slot = ($scope eq 'anon' || !defined($v<name>))
+        ?? self.gensym !! $name;
     my $res_tc = $typeconstraint ??
         $*CURLEX<!sub>.compile_get_pkg(@$typeconstraint).xref !! Any;
 
@@ -2283,8 +2332,8 @@ method variable_declarator($/) {
             $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
                 :$hash, typeconstraint => $res_tc, |mnode($/));
         });
-        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash,
-            :state_decl);
+        make Op::StateDecl.new(|node($/), inside =>
+            Op::Lexical.new(|node($/), name => $slot, :$list, :$hash));
     } elsif $scope eq 'our' {
         make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
     } else {
@@ -2294,6 +2343,15 @@ method variable_declarator($/) {
                 typeconstraint => $res_tc, |mnode($/));
         });
         make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+    }
+
+    if $start {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($/.ast, -> $ll {
+            Op::StatementList.new(|node($/), children => [
+                Op::Start.new(condvar => $cv, body =>
+                    self.inliney_call($/, $start, $ll)), $ll ]) });
     }
 }
 
@@ -3047,6 +3105,10 @@ method package_def ($/) {
     }
 }
 
+method trait_mod:will ($/) {
+    make { ~$<identifier> => $<pblock>.ast };
+}
+
 method trait_mod:is ($/) {
     my $trait = ~$<longname>;
     my $noparm;
@@ -3339,7 +3401,8 @@ method blast($/) {
 }
 
 method statement_prefix:do ($/) {
-    make self.inliney_call($/, $<blast>.ast);
+    make Op::DoOnceLoop.new(|node($/),
+        body => self.inliney_call($/, $<blast>.ast));
 }
 method statement_prefix:gather ($/) {
     $<blast>.ast.gather_hack = True;

@@ -134,6 +134,22 @@ class Method is Operator {
     method whatever_curry() { True }
 }
 
+class Operator::FlipFlop is Operator {
+    has Bool $.excl_lhs;
+    has Bool $.excl_rhs;
+    has Bool $.sedlike;
+
+    method with_args($/, *@args) {
+        my $state_var = ::GLOBAL::NieczaActions.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $state_var);
+        @args[1] := mklex($/, 'False') if @args[1].^isa(Op::Whatever);
+        Op::FlipFlop.new(|node($/), :$state_var, :$!excl_lhs, :$!excl_rhs,
+            :$!sedlike, :lhs(@args[0]), :rhs(@args[1]))
+    }
+
+    method whatever_curry() { False }
+}
+
 class ShortCircuit is Operator {
     has $.kind; # Str
 
@@ -147,7 +163,8 @@ class ShortCircuit is Operator {
 class CompoundAssign is Operator {
     has $.base; # Operator
 
-    method with_args($/, $left, *@rest) {
+    method with_args($/, *@rest) {
+        my $left = shift @rest;
         if $left.^isa(::Op::Lexical) {
             my $nlft = ::Op::Lexical.new(|node($/), name => $left.name);
             mkcall($/, '&infix:<=>', $left, $.base.with_args($/, $nlft, @rest));
