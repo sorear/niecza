@@ -1,12 +1,14 @@
 class NieczaPathSearch;
 
-has $.path;
+has @.path;
 
 # Given Foo::Bar, find ($?FILE, $modtime, $text)
 method load_module($name) {
     my $sub = "".IO.combine($name.split('::'));
 
-    for @$.path -> $pe {
+    my @path = @*INC, @!path;
+
+    for @path -> $pe {
         for <pm6 pm setting> -> $ext {
             my $fn = $pe.IO.append($sub).but-extension($ext);
             if $fn.f {
@@ -18,7 +20,7 @@ method load_module($name) {
         }
     }
 
-    die "Unable to locate module $name in @$.path";
+    die "Unable to locate module $name in @path";
 }
 
 method load_file($name) {

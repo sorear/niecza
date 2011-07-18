@@ -22,6 +22,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
     my $*compiler = self;
     my $*verbose = $.verbose;
     my $*in_repl = $repl;
+    my @*INC;
 
     my $ast;
     my @steps = (

@@ -24,6 +24,28 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+method statement_prefix:BEGIN ($/) {
+    $<blast>.ast.is_phaser = 2;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+
+    # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
+    repeat while False {
+        my $c = $<blast>.ast.code;
+
+        last unless $c ~~ Op::StatementList;
+        last unless $c.children == 1;
+        my $d = $c.children.[0];
+        last unless $d ~~ Op::CallMethod;
+        last unless $d.receiver ~~ Op::ContextVar;
+        last unless $d.receiver.name eq '@*INC';
+        last if $d.private || $d.ismeta;
+        last unless $d.name eq any <push unshift>;
+        last unless +$d.getargs == 1;
+        last unless defined my $str = self.trivial_eval($/, $d.getargs.[0]);
+        @*INC."$d.name()"($str);
+    }
+}
 }
 
 CgOp._register_ops: <
@@ -84,6 +106,7 @@ GetOptions(:!permute,
     "help|h" => sub { say $usage; exit 0 },
 );
 
+my @*INC;
 my $backend;
 if $bcnd eq 'nam' {
     $backend = NieczaBackendNAM.new(obj_dir => $odir);
