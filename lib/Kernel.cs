@@ -492,10 +492,9 @@ namespace Niecza {
             ns.xref_no = ix;
             ns.unit = this;
 
+            ns.special = spec;
             if ((spec & SUB_IS_UNSAFE) != 0)
                 Kernel.CheckUnsafe(ns);
-            if ((spec & SUB_RUN_ONCE) != 0)
-                ns.run_once = true;
             if ((spec & SUB_HAS_TYPE) != 0)
                 ns.mo = (STable) ReadXref(ref from);
 
@@ -704,7 +703,7 @@ namespace Niecza {
         // maybe should be a hint
         public LAD ltm;
 
-        public bool run_once;
+        public int special;
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;
@@ -797,7 +796,7 @@ namespace Niecza {
         public unsafe Frame Binder(Frame caller, Frame outer, P6any sub,
                 Variable[] pos, VarHash named, bool quiet, DispatchEnt de) {
             Frame th;
-            if (run_once) {
+            if ((special & RuntimeUnit.SUB_RUN_ONCE) != 0) {
                 th = protopad;
                 th.caller = caller;
                 th.ip = 0;
@@ -2391,6 +2390,160 @@ tryagain:
                 items.Push(Kernel.NewTypedScalar(null));
             }
             return items[ix] = Kernel.NewBoundVar(Kernel.NBV_RW, Kernel.MuMO, to);
+        }
+    }
+
+    public struct StashCursor {
+        public const int WHO  = 0; // use p1(P6any)
+        public const int LEX  = 1; // p1(Frame) p2(int, depth)
+        public const int ROOT = 2; // p1(Frame) p2(int)
+        public const int DYNA = 3; // p1&p2
+
+        int type;
+        object p1;
+        int p2;
+
+        public StashCursor(Frame fr, int depth) {
+            this.type = ROOT;
+            this.p1 = fr;
+            this.p2 = depth;
+        }
+
+        void Core(string key, bool final, out StashCursor sc, out Variable v,
+                Variable bind_to) {
+            v = null;
+            sc = this;
+            if (type == DYNA) {
+                // DYNAMIC::{key}, no special names used
+                throw new NieczaException("DYNA NYI");
+            }
+            else if (type == WHO) {
+                // only special type is PARENT, maybe not even that?
+                P6any who = (P6any) p1;
+                if (bind_to != null) {
+                    who.mo.mro_bind_key.Bind(Kernel.NewROScalar(who),
+                        Kernel.BoxAnyMO(key, Kernel.StrMO), bind_to);
+                    return;
+                }
+                v = who.mo.mro_at_key.Get(Kernel.NewROScalar(who),
+                    Kernel.BoxAnyMO(key, Kernel.StrMO));
+
+                if (final) return;
+
+                throw new NieczaException("VIV NYI");
+            }
+            else if (type == ROOT) {
+                // semantic root, handles most of the special names
+                if (key == "OUR") {
+                    throw new NieczaException("OUR NYI");
+                } else if (key == "GLOBAL") {
+                    sc.p1 = Kernel.GlobalO;
+                    sc.type = WHO;
+                    goto have_sc;
+                } else if (key == "PROCESS") {
+                    sc.p1 = Kernel.ProcessO;
+                    sc.type = WHO;
+                    goto have_sc;
+                } else if (key == "UNIT" || key == "OUTER" ||
+                        key == "SETTING" || key == "CALLER") {
+                    StashCursor n = sc;
+                    n.type = LEX;
+                    n.Core(key, final, out sc, out v, bind_to);
+                    return;
+                } else if (key == "CORE") {
+                    Frame cfr = (Frame) p1;
+                    while (cfr != null && (cfr.info.unit == null ||
+                                cfr.info.unit.name != "CORE"))
+                        cfr = cfr.outer;
+                    if (cfr == null)
+                        throw new NieczaException("No CORE available here");
+                    sc.type = LEX;
+                    sc.p1 = cfr;
+                    goto have_sc;
+                } else if (key == "MY") {
+                    sc.type = LEX;
+                    goto have_sc;
+                } else if (key == "COMPILING") {
+                    throw new NieczaException("Cannot use COMPILING outside BEGIN scope");
+                } else if (key == "DYNAMIC") {
+                    sc.type = DYNA;
+                    goto have_sc;
+                } else {
+                    StashCursor n = default(StashCursor);
+                    n.type = WHO;
+                    n.p1 = (key == "PARENT" || key.Length > 0 &&
+                            "$&@%".IndexOf(key[0]) >= 0)
+                        ? null // OUR NYI
+                        : Kernel.GlobalO;
+                    n.Core(key, final, out sc, out v, bind_to);
+                    return;
+                }
+            }
+            else if (type == LEX) {
+                Frame cfr = (Frame) p1;
+                if (key == "OUTER") {
+                    if (p2 > 0) sc.p2--;
+                    else if (cfr.outer != null) sc.p1 = cfr.outer;
+                    else throw new NieczaException("No more outer frames");
+
+                    goto have_sc;
+                }
+                else if (key == "UNIT") {
+                    while (cfr.outer != null &&
+                            (cfr.info.special & RuntimeUnit.SUB_MAINLINE) == 0)
+                        cfr = cfr.outer;
+                    sc.p1 = cfr;
+                    sc.p2 = 0;
+                    goto have_sc;
+                }
+                else if (key == "CALLER") {
+                    if (p2 > 0) sc.p2--;
+                    else {
+                        cfr = cfr.caller;
+                        if (cfr != null && cfr.info == Kernel.ExitRunloopSI)
+                            cfr = cfr.caller;
+                        if (cfr == null)
+                            throw new NieczaException("No more calling frames");
+                        sc.p2 = 0;
+                        sc.p1 = cfr;
+                    }
+                    goto have_sc;
+                }
+                else if (key == "SETTING") {
+                    while (cfr.outer != null &&
+                            (cfr.info.special & RuntimeUnit.SUB_MAINLINE) == 0)
+                        cfr = cfr.outer;
+                    if (cfr.outer == null)
+                        throw new NieczaException("No more outer settings");
+                    sc.p1 = cfr.outer;
+                    sc.p2 = 0;
+                    goto have_sc;
+                }
+                else {
+                    throw new NieczaException("MY NYI");
+                }
+            }
+            else {
+                throw new NieczaException("corrupt StashCursor");
+            }
+
+have_sc:
+            if (!final) return;
+            throw new NieczaException("PP NYI");
+        }
+
+        public StashCursor NonFinal(string key) {
+            StashCursor r1;
+            Variable r2;
+            Core(key, false, out r1, out r2, null);
+            return r1;
+        }
+
+        public Variable Final(string key, Variable bind_to) {
+            StashCursor r1;
+            Variable r2;
+            Core(key, true, out r1, out r2, bind_to);
+            return r2;
         }
     }
 
