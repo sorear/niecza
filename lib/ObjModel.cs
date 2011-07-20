@@ -87,6 +87,12 @@ namespace Niecza {
     public abstract class IndexHandler {
         public abstract Variable Get(Variable obj, Variable key);
 
+        public virtual P6any GetWHO(P6any obj, string key) {
+            Variable r = Get(Kernel.NewROScalar(obj),
+                    Kernel.BoxAnyMO(key, Kernel.StrMO));
+            return r.Fetch().mo.who;
+        }
+
         public static Variable ViviHash(Variable obj, Variable key) {
             return new SimpleVariable(true, false, Kernel.MuMO,
                     new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),

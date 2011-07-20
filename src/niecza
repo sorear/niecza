@@ -23,6 +23,58 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class Op::Interrogative {
+    method code($body) {
+        my $c;
+        given $!name {
+            when "VAR" {
+                return CgOp.var_get_var($!receiver.cgop($body));
+            }
+            $c = CgOp.fetch($.receiver.cgop($body));
+            when "HOW" { $c = CgOp.how($c); }
+            when "WHO" { $c = CgOp.who($c); }
+            when "WHAT" { $c = CgOp.obj_what($c); }
+            default { die "Invalid interrogative $_"; }
+        }
+        CgOp.newscalar($c);
+    }
+}
+
+augment class Operator::Method {
+    method with_args($/, *@args) {
+        if $!name eq any(< HOW WHAT WHO VAR >) && !$!private && !$!meta {
+            if $!args {
+                $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
+                return Op::StatementList.new;
+            }
+            Op::Interrogative.new(|node($/), receiver => @args[0],
+                name => $.name);
+        } else {
+            if defined($!package) && !$!private {
+                $/.CURSOR.sorry("Qualified references to non-private methods NYI");
+            }
+            $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
+            my $pclass;
+            if $.private {
+                if $.package {
+                    $pclass = $.package;
+                } elsif $*CURLEX<!sub>.in_class -> $c {
+                    $pclass = $c;
+                } else {
+                    $/.CURSOR.sorry("Cannot resolve class for private method");
+                }
+            }
+            ::Op::CallMethod.new(|node($/),
+                receiver => @args[0],
+                ismeta   => $.meta,
+                name     => $.name,
+                private  => $.private,
+                pclass   => $pclass,
+                args     => [ @$.args ]);
+        }
+    }
+}
+
 augment class NieczaActions {
 method statement_prefix:BEGIN ($/) {
     $<blast>.ast.is_phaser = 2;
@@ -48,7 +100,7 @@ method statement_prefix:BEGIN ($/) {
 }
 }
 
-CgOp._register_ops: <
+CgOp._register_ops: < who
 >;
 
 my $usage = q:to/EOM/;

@@ -922,6 +922,11 @@ my class Array is List {
     }
 }
 
+# Not connected to Hash because Stash contains bvalues while Hash
+# holds values directly.
+my class Stash {
+}
+
 my class Hash {
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
 

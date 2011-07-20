@@ -1991,4 +1991,6 @@ again:
             default: return null;
         }
     }
+
+    public static P6any who(P6any obj) { return obj.mo.who; }
 }

@@ -2248,6 +2248,59 @@ tryagain:
         }
     }
 
+    class IxStashBindKey : BindHandler {
+        internal static void StashCommon(Variable obj, Variable key,
+                out Dictionary<string, BValue> dd, out string kk) {
+            P6any ks = key.Fetch();
+            kk = ks.mo.mro_raw_Str.Get(key);
+            P6any os = obj.Fetch();
+            if (!os.IsDefined())
+                throw new NieczaException("indexing an undefined Stash");
+            dd = Kernel.UnboxAny<Dictionary<string, BValue>>(os);
+        }
+
+        public override Variable Bind(Variable obj, Variable key, Variable to) {
+            string kk;
+            Dictionary<string,BValue> dd;
+            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
+
+            return Kernel.PackageLookup(obj.Fetch(), kk).v = to;
+        }
+    }
+    class IxStashAtKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            string kk;
+            Dictionary<string,BValue> dd;
+            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
+
+            return Kernel.PackageLookup(obj.Fetch(), kk).v;
+        }
+    }
+    class IxStashExistsKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            string kk;
+            Dictionary<string,BValue> dd;
+            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
+
+            return dd.ContainsKey(kk) ? Kernel.TrueV : Kernel.FalseV;
+        }
+    }
+    class IxStashDeleteKey : IndexHandler {
+        public override Variable Get(Variable obj, Variable key) {
+            string kk;
+            Dictionary<string,BValue> dd;
+            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
+
+            BValue r;
+            if (dd.TryGetValue(kk, out r)) {
+                dd.Remove(kk);
+                return r.v;
+            } else {
+                return Kernel.AnyMO.typeVar;
+            }
+        }
+    }
+
     class IxHashBindKey : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
             P6any ks = key.Fetch();
@@ -3807,6 +3860,9 @@ def:        return at.Get(self, index);
             MuMO.Invalidate();
 
             StashMO = new STable("Stash");
+            WrapIndexy(StashMO, "postcircumfix:<{ }>", new IxStashAtKey(),
+                    new IxStashExistsKey(), new IxStashDeleteKey(),
+                    new IxStashBindKey());
             StashMO.FillProtoClass(new string[] { });
             StashP = new P6opaque(StashMO);
 
