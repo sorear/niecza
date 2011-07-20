@@ -83,6 +83,29 @@ my class Any is Mu {
         self.kv.map(-> $key, \$value { $key => $value; });
     }
 
+    # NOTE: These functions are called by the default postcircumfixes, *after*
+    # processing slicing and adverbs.  So you should probably override these
+    # instead.  However, for speed, Array, Hash et al override the
+    # postcircumfixes instead, and so you can't change their behavior using
+    # delete_key and company in subclasses.
+    method delete_key($) {
+        die "Cannot use hash access on an object of type {self.WHAT.perl}"
+    }
+    method exists_key($) {
+        die "Cannot use hash access on an object of type {self.WHAT.perl}"
+    }
+    method at_key($) {
+        die "Cannot use hash access on an object of type {self.WHAT.perl}"
+    }
+    method bind_key($, \$) {
+        die "Cannot use hash access on an object of type {self.WHAT.perl}"
+    }
+
+    method at_pos($key) { self.list.at_pos($key) }
+    method bind_pos($, \$) {
+        die "Cannot use hash access on an object of type {self.WHAT.perl}"
+    }
+
     method grep(Mu $sm) { grep $sm, @(self) }
     method map($func)   { map $func, @(self) }
     method for (&cb) {
@@ -925,6 +948,19 @@ my class Array is List {
 # Not connected to Hash because Stash contains bvalues while Hash
 # holds values directly.
 my class Stash {
+    method at_key($key)        {
+        Q:CgOp { (stash_at_key (@ {self}) (obj_getstr {$key})) } }
+    method bind_key($key, \$to) {
+        Q:CgOp { (stash_bind_key (@ {self}) (obj_getstr {$key}) {$to}) } }
+    method delete_key($key)    {
+        Q:CgOp { (stash_delete_key (@ {self}) (obj_getstr {$key})) } }
+    method exists_key($key)    {
+        Q:CgOp { (stash_exists_key (@ {self}) (obj_getstr {$key})) } }
+}
+
+my class LexicalWHO {
+    has $!frame;
+    has $!index;
 }
 
 my class Hash {

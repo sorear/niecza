@@ -1993,4 +1993,25 @@ again:
     }
 
     public static P6any who(P6any obj) { return obj.mo.who; }
+
+    public static Variable stash_exists_key(P6any st, string key) {
+        var dd = Kernel.UnboxAny<Dictionary<string,BValue>>(st);
+        return dd.ContainsKey(key) ? Kernel.TrueV : Kernel.FalseV;
+    }
+
+    public static Variable stash_at_key(P6any st, string key) {
+        return Kernel.PackageLookup(st, key).v;
+    }
+
+    public static Variable stash_bind_key(P6any st, string key, Variable to) {
+        return Kernel.PackageLookup(st, key).v = to;
+    }
+
+    public static Variable stash_delete_key(P6any st, string key) {
+        var dd = Kernel.UnboxAny<Dictionary<string,BValue>>(st);
+        BValue r;
+        if (!dd.TryGetValue(key, out r)) return Kernel.AnyMO.typeVar;
+        dd.Remove(key);
+        return r.v;
+    }
 }

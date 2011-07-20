@@ -2160,7 +2160,8 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return Kernel.AnyMO.typeVar;
-            throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
+            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                "delete_key", new Variable[] { obj, key }, null));
         }
     }
     class IxAnyExistsKey : IndexHandler {
@@ -2172,14 +2173,16 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return Kernel.FalseV;
-            throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
+            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                "exists_key", new Variable[] { obj, key }, null));
         }
     }
     class IxAnyBindKey : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
             P6any os = obj.Fetch();
             if (os.IsDefined())
-                throw new NieczaException("Cannot use hash binding on an object of type " + os.mo.name);
+                return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                    "bind_key", new Variable[] { obj, key, to }, null));
             obj.Store(Kernel.BoxRaw(new VarHash(), Kernel.HashMO));
             return Kernel.HashMO.mro_bind_key.Bind(obj, key, to);
         }
@@ -2188,7 +2191,8 @@ tryagain:
         public override Variable Bind(Variable obj, Variable key, Variable to) {
             P6any os = obj.Fetch();
             if (os.IsDefined())
-                throw new NieczaException("Cannot use array binding on an object of type " + os.mo.name);
+                return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                    "bind_pos", new Variable[] { obj, key, to }, null));
             obj.Store(Kernel.CreateArray().Fetch());
             return Kernel.ArrayMO.mro_bind_key.Bind(obj, key, to);
         }
@@ -2202,7 +2206,8 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviHash(obj, key);
-            throw new NieczaException("Cannot use hash access on an object of type " + os.mo.name);
+            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                "at_key", new Variable[] { obj, key }, null));
         }
     }
     class IxAnyAtPos : IndexHandler {
@@ -2214,9 +2219,17 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
-            int ix = (int) ks.mo.mro_raw_Numeric.Get(key);
-            if (ix == 0) return obj;
-            throw new NieczaException("Invalid index for non-array");
+            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
+                Variable elts = Kernel.RunInferior(os.InvokeMethod(
+                        Kernel.GetInferiorRoot(), "elems",
+                        new Variable[] { obj }, null));
+                return Get(obj, Kernel.RunInferior(ks.Invoke(
+                    Kernel.GetInferiorRoot(),
+                    new Variable[] { elts }, null)));
+            }
+
+            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
+                "at_pos", new Variable[] { obj, key }, null));
         }
     }
 
@@ -2245,59 +2258,6 @@ tryagain:
 
             Cursor os = (Cursor)o;
             return os.GetKey(Utils.N2S(ks.mo.mro_raw_Numeric.Get(key)));
-        }
-    }
-
-    class IxStashBindKey : BindHandler {
-        internal static void StashCommon(Variable obj, Variable key,
-                out Dictionary<string, BValue> dd, out string kk) {
-            P6any ks = key.Fetch();
-            kk = ks.mo.mro_raw_Str.Get(key);
-            P6any os = obj.Fetch();
-            if (!os.IsDefined())
-                throw new NieczaException("indexing an undefined Stash");
-            dd = Kernel.UnboxAny<Dictionary<string, BValue>>(os);
-        }
-
-        public override Variable Bind(Variable obj, Variable key, Variable to) {
-            string kk;
-            Dictionary<string,BValue> dd;
-            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
-
-            return Kernel.PackageLookup(obj.Fetch(), kk).v = to;
-        }
-    }
-    class IxStashAtKey : IndexHandler {
-        public override Variable Get(Variable obj, Variable key) {
-            string kk;
-            Dictionary<string,BValue> dd;
-            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
-
-            return Kernel.PackageLookup(obj.Fetch(), kk).v;
-        }
-    }
-    class IxStashExistsKey : IndexHandler {
-        public override Variable Get(Variable obj, Variable key) {
-            string kk;
-            Dictionary<string,BValue> dd;
-            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
-
-            return dd.ContainsKey(kk) ? Kernel.TrueV : Kernel.FalseV;
-        }
-    }
-    class IxStashDeleteKey : IndexHandler {
-        public override Variable Get(Variable obj, Variable key) {
-            string kk;
-            Dictionary<string,BValue> dd;
-            IxStashBindKey.StashCommon(obj, key, out dd, out kk);
-
-            BValue r;
-            if (dd.TryGetValue(kk, out r)) {
-                dd.Remove(kk);
-                return r.v;
-            } else {
-                return Kernel.AnyMO.typeVar;
-            }
         }
     }
 
@@ -3860,9 +3820,6 @@ def:        return at.Get(self, index);
             MuMO.Invalidate();
 
             StashMO = new STable("Stash");
-            WrapIndexy(StashMO, "postcircumfix:<{ }>", new IxStashAtKey(),
-                    new IxStashExistsKey(), new IxStashDeleteKey(),
-                    new IxStashBindKey());
             StashMO.FillProtoClass(new string[] { });
             StashP = new P6opaque(StashMO);
 
