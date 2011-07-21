@@ -1730,7 +1730,7 @@ again:
                 2, 3, SubInfo.ON_NEXT, 0, 0,
                 2, 3, SubInfo.ON_REDO, 1, 0,
                 2, 3, SubInfo.ON_LAST, 3, 0,
-            }, new string[] { "" }, 0, null, null);
+            }, new string[] { "" }, 0);
     private static Frame CommonMEMap_C(Frame th) {
         ItemSource src = (ItemSource) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;
@@ -1856,7 +1856,7 @@ again:
                 2, 3, SubInfo.ON_NEXT, 0, 0,
                 2, 3, SubInfo.ON_REDO, 1, 0,
                 2, 3, SubInfo.ON_LAST, 3, 0,
-            }, new string[] { "" }, 0, null, null);
+            }, new string[] { "" }, 0);
     private static Frame CommonGrep_C(Frame th) {
         VarDeque src = (VarDeque) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;

@@ -572,7 +572,7 @@ public class Cursor : P6any {
         }
         Cursor r = new Cursor(parent.global, parent.save_klass, from, to, ci,
                 null, method);
-        th.SetDynamic(th.info.dylex["$*match"], Kernel.NewROScalar(r));
+        th.info.dylex["$*match"].Set(th, Kernel.NewROScalar(r));
         return r.global.CallAction(th, method, r);
     }
 

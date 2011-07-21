@@ -196,6 +196,7 @@ namespace Niecza {
         public RuntimeUnit[] depends;
         public DynBlockDelegate[] methods; /*C*/
         public FieldInfo[] meta_fields;
+        public Dictionary<string,FieldInfo> lex_fields;
         public object[] xref;
         public Frame context_pad;
         public static bool TraceLoad = Environment.GetEnvironmentVariable("NIECZA_TRACE_LOAD") != null;
@@ -237,6 +238,7 @@ namespace Niecza {
             this.xref = new object[nx];
             this.methods = new DynBlockDelegate[nx];
             this.meta_fields = new FieldInfo[nx*2];
+            this.lex_fields = new Dictionary<string,FieldInfo>();
 
             Kernel.ModulesFinished[name] = this;
 
@@ -271,7 +273,7 @@ namespace Niecza {
                 int index = acc * 2;
                 if (n[0] == 'I') { }
                 else if (n[0] == 'P') { index++; }
-                else { continue; }
+                else { lex_fields[n] = fi; continue; }
                 meta_fields[index] = fi;
             }
         }
@@ -474,6 +476,7 @@ namespace Niecza {
             int _ifrom = from;
             int ix = ReadInt(ref from);
             byte spec = heap[from++];
+
             SubInfo ns = new SubInfo(
                 ReadStr(ref from), /*name*/
                 ReadIntArray(ref from), /*lines*/
@@ -482,12 +485,41 @@ namespace Niecza {
                 ReadLAD(ref from),
                 ReadIntArray(ref from), /*ehspan*/
                 ReadStrArray(ref from), /*ehlabel*/
-                ReadInt(ref from), /*nspill*/
-                ReadStrArray(ref from), /*dylexn*/
-                ReadIntArray(ref from)); /*dylexi*/
+                ReadInt(ref from)); /*nspill*/
 
             if (TraceLoad)
                 Console.WriteLine("Installing sub {0} \"{1}\" from {2:X}", ix, ns.name, _ifrom);
+
+            int dylexc = ReadInt(ref from);
+            ns.dylex = new Dictionary<string,LexInfo>();
+
+            LexInfo li = null;
+            for (int i = 0; i < dylexc; i++) {
+                string name = ReadStr(ref from);
+                ns.dylex_filter |= SubInfo.FilterForName(name);
+                switch (heap[from++]) {
+                    case 0: li = new LISlot(ReadInt(ref from)); break;
+                    case 1: li = new LIField(lex_fields[ReadStr(ref from)]); break;
+                    case 2: li = new LIBField(lex_fields[ReadStr(ref from)]); break;
+                    case 3: li = new LIAlias(ReadStr(ref from)); break;
+                    case 4: li = new LIPackage((STable)ReadXref(ref from)); break;
+                    default: throw new ArgumentException("dylex typecode");
+                }
+                ns.dylex[name] = li;
+            }
+
+            SubInfo sc = ns.outer;
+            for (ns.outer_topic_rank = 1; sc != null; sc = sc.outer) {
+                if (sc.dylex != null && sc.dylex.TryGetValue("$_", out li))
+                    break;
+                ns.outer_topic_rank++;
+            }
+            ns.outer_topic_key = (li is LISlot) ? (li as LISlot).slot : -1;
+            ns.self_key = -1;
+            if (ns.dylex != null && ns.dylex.TryGetValue("self", out li) &&
+                    li is LISlot)
+                ns.self_key = (li as LISlot).slot;
+            //Console.WriteLine("{0} {1} {2}", name, outer_topic_rank, outer_topic_key);
             xref[ix] = ns;
             ns.xref_no = ix;
             ns.unit = this;
@@ -585,6 +617,7 @@ namespace Niecza {
                 int from = si.fixups_from;
                 if (TraceLoad)
                     Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2:X}", i, si.name, from);
+                si.cur_pkg = ((STable)ReadXref(ref from)).who;
                 ReadSignature(si, ref from);
                 if (TraceLoad) Console.WriteLine("Sig loaded");
                 int ph = heap[from++];
@@ -672,6 +705,60 @@ namespace Niecza {
         }
     }
 
+    public abstract class LexInfo {
+        public abstract object Get(Frame f);
+        public virtual void Set(Frame f, object to) {
+            throw new NieczaException("Variable cannot be bound");
+        }
+    }
+
+    public class LISlot : LexInfo {
+        public readonly int slot;
+        public LISlot(int slot) { this.slot = slot; }
+        public override object Get(Frame f) { return f.GetDynamic(slot); }
+        public override void Set(Frame f, object to) { f.SetDynamic(slot,to); }
+    }
+
+    public class LIField : LexInfo {
+        FieldInfo fi;
+        public LIField(FieldInfo fi) { this.fi = fi; }
+        public override object Get(Frame f) { return fi.GetValue(null); }
+        public override void Set(Frame f, object to) { fi.SetValue(null, to); }
+    }
+
+    public class LIBField : LexInfo {
+        FieldInfo fi;
+        public LIBField(FieldInfo fi) { this.fi = fi; }
+        public override object Get(Frame f) {
+            return ((BValue)fi.GetValue(null)).v;
+        }
+        public override void Set(Frame f, object to) {
+            ((BValue)fi.GetValue(null)).v = (Variable)to;
+        }
+    }
+
+    public class LIAlias : LexInfo {
+        string name;
+        public LIAlias(string name) { this.name = name; }
+        object Common(Frame f, bool set, object to) {
+            Frame cr = f;
+            LexInfo li = null;
+            while (cr.info.dylex == null ||
+                    !cr.info.dylex.TryGetValue(name, out li))
+                cr = cr.outer;
+            if (!set) return li.Get(cr);
+            else { li.Set(cr, to); return null; }
+        }
+        public override object Get(Frame f) { return Common(f,false,null); }
+        public override void Set(Frame f, object to) { Common(f,true,to); }
+    }
+
+    public class LIPackage : LexInfo {
+        STable pkg;
+        public LIPackage(STable pkg) { this.pkg = pkg; }
+        public override object Get(Frame f) { return pkg.typeVar; }
+    }
+
     // This stores all the invariant stuff about a Sub, i.e. everything
     // except the outer pointer.  Now distinct from protopads
     //
@@ -687,7 +774,7 @@ namespace Niecza {
         public object[] sig_r;
 
         // Standard metadata
-        public Dictionary<string, int> dylex;
+        public Dictionary<string, LexInfo> dylex;
         public uint dylex_filter; // (32,1) Bloom on hash code
         public int[] lines;
         public STable mo;
@@ -704,6 +791,7 @@ namespace Niecza {
         public LAD ltm;
 
         public int special;
+        public P6any cur_pkg;
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;
@@ -1080,13 +1168,14 @@ noparams:
         }
 
         public static uint FilterForName(string name) {
+            if (name.Length < 2 || name[1] != '*') return 0;
             uint hash = (uint)(name.GetHashCode() * FILTER_SALT);
             return 1u << (int)(hash >> 27);
         }
 
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
-                int nspill, string[] dylexn, int[] dylexi) {
+                int nspill) {
             this.lines = lines;
             this.code = code;
             this.outer = outer;
@@ -1095,34 +1184,14 @@ noparams:
             this.edata = edata;
             this.label_names = label_names;
             this.nspill = nspill;
-            if (dylexn != null) {
-                dylex = new Dictionary<string, int>();
-                for (int i = 0; i < dylexn.Length; i++) {
-                    dylex[dylexn[i]] = dylexi[i];
-                    dylex_filter |= FilterForName(dylexn[i]);
-                }
-            }
+            this.dylex = new Dictionary<string,LexInfo>();
             for (int i = 0; i < edata.Length; i += 5)
                 if (edata[i+2] == ON_VARLOOKUP && edata[i+4] >= 0)
                     dylex_filter |= FilterForName(label_names[edata[i+4]]);
-
-            SubInfo sc = outer;
-            for (outer_topic_rank = 1; sc != null; sc = sc.outer) {
-                if (sc.dylex != null &&
-                        sc.dylex.TryGetValue("$_", out outer_topic_key))
-                    break;
-                outer_topic_rank++;
-            }
-            if (sc == null)
-                outer_topic_key = -1;
-            self_key = -1;
-            if (dylex == null || !dylex.TryGetValue("self", out self_key))
-                self_key = -1;
-            //Console.WriteLine("{0} {1} {2}", name, outer_topic_rank, outer_topic_key);
         }
 
         public SubInfo(string name, DynBlockDelegate code) :
-            this(name, null, code, null, null, new int[0], null, 0, null, null) { }
+            this(name, null, code, null, null, new int[0], null, 0) { }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -1302,11 +1371,14 @@ noparams:
             if ((info.dylex_filter & mask) != mask)
                 return false;
             int ix;
-            if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name)) < 0) {
-                if (!info.dylex.TryGetValue(name, out ix))
-                    return false;
-            }
-            SetDynamic(ix, to);
+            LexInfo li;
+            if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name)) >= 0)
+                SetDynamic(ix, to);
+            else if (info.dylex.TryGetValue(name, out li))
+                li.Set(this, to);
+            else
+                return false;
+
             return true;
         }
 
@@ -1316,12 +1388,17 @@ noparams:
                 return true;
             if ((info.dylex_filter & mask) != mask)
                 return false;
+
             int ix;
-            if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name)) < 0) {
-                if (!info.dylex.TryGetValue(name, out ix))
-                    return false;
-            }
-            v = GetDynamic(ix);
+            LexInfo li;
+
+            if ((ix = info.FindControlEnt(ip, SubInfo.ON_VARLOOKUP, name))>=0)
+                v = GetDynamic(ix);
+            else if (info.dylex.TryGetValue(name, out li))
+                v = li.Get(this);
+            else
+                return false;
+
             return true;
         }
 
@@ -2708,6 +2785,7 @@ have_sc:
         public static readonly STable IteratorMO;
         public static readonly STable ScalarMO;
         public static readonly STable StashMO;
+        public static STable PseudoStashMO;
         public static readonly STable CodeMO;
         public static readonly STable StrMO;
         public static readonly STable NumMO;
@@ -3973,7 +4051,7 @@ def:        return at.Get(self, index);
             MuMO.Invalidate();
 
             StashMO = new STable("Stash");
-            StashMO.FillProtoClass(new string[] { });
+            StashMO.FillProtoClass(new string[] { "name" });
             StashP = new P6opaque(StashMO);
 
             ParcelMO = new STable("Parcel");
@@ -4059,7 +4137,9 @@ def:        return at.Get(self, index);
             P6any o;
             if (stashes.TryGetValue(name, out o))
                 return o;
-            return stashes[name] = BoxRaw(new Dictionary<string,BValue>(), StashMO);
+            o = BoxRaw(new Dictionary<string,BValue>(), StashMO);
+            o.SetSlot("name", BoxAnyMO(name, StrMO));
+            return stashes[name] = o;
         }
 
         public static Dictionary<string, int> usedNames = new Dictionary<string, int>();

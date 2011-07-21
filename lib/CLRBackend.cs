@@ -873,7 +873,7 @@ namespace Niecza.CLRBackend {
         public readonly int is_phaser;
         public readonly Xref body_of;
         public readonly Xref in_class;
-        public readonly string[] cur_pkg;
+        public readonly Xref cur_pkg;
         public readonly string sclass;
         public readonly object ltm;
         public readonly object sig;
@@ -904,7 +904,7 @@ namespace Niecza.CLRBackend {
                 is_phaser = JScalar.IN(c[4]);
                 body_of = Xref.from(c[5]);
                 in_class = Xref.from(c[6]);
-                cur_pkg = JScalar.SA(0, c[7]);
+                cur_pkg = Xref.from(c[7]);
                 body = c[8];
             }
 
@@ -1005,12 +1005,9 @@ namespace Niecza.CLRBackend {
                 (ClrOp)new ClrPadSet(up, index, to);
         }
 
-        public abstract byte TypeCode();
         public override void EmitInfo(Unit to) {
-            to.EmitByte(TypeCode());
-            to.EmitInt(index);
-            if (index < 0)
-                to.EmitStr(stg.Name);
+            if (index < 0) { to.EmitByte(1); to.EmitStr(stg.Name); }
+            else { to.EmitByte(0); to.EmitInt(index); }
         }
 
         public override void BindFields(int six, int lix, StaticSub sub,
@@ -1035,7 +1032,6 @@ namespace Niecza.CLRBackend {
         public readonly int flags;
         public readonly Xref type;
 
-        public override byte TypeCode() { return 0; }
         public LexSimple(object[] l) {
             flags = JScalar.I(l[2]);
             type = Xref.from(l[3]);
@@ -1044,12 +1040,10 @@ namespace Niecza.CLRBackend {
 
     class LexLabel : LexVarish {
         public LexLabel(object[] l) { }
-        public override byte TypeCode() { return 1; }
     }
 
     class LexDispatch : LexVarish {
         public LexDispatch(object[] l) { }
-        public override byte TypeCode() { return 2; }
     }
 
     class LexSub : LexVarish {
@@ -1057,7 +1051,6 @@ namespace Niecza.CLRBackend {
         public LexSub(object[] l) {
             def = new Xref(l, 2);
         }
-        public override byte TypeCode() { return 3; }
     }
 
     class LexHint : Lexical {
@@ -1072,7 +1065,8 @@ namespace Niecza.CLRBackend {
             stg = binder(Unit.SharedName('B', six, name), Tokens.BValue);
         }
         public override void EmitInfo(Unit to) {
-            to.EmitByte(4);
+            to.EmitByte(2);
+            to.EmitStr(stg.Name);
         }
     }
 
@@ -1093,9 +1087,8 @@ namespace Niecza.CLRBackend {
                     new ClrGetSField(stg), to);
         }
         public override void EmitInfo(Unit to) {
-            to.EmitByte(5);
-            to.EmitXref(package);
-            to.EmitStr(name);
+            to.EmitByte(2);
+            to.EmitStr(stg.Name);
         }
         public override void BindFields(int six, int lix, StaticSub sub,
                 string name, Func<string,Type,FieldInfo> binder) {
@@ -1109,7 +1102,7 @@ namespace Niecza.CLRBackend {
             to = JScalar.S(l[2]);
         }
         public override void EmitInfo(Unit to) {
-            to.EmitByte(6);
+            to.EmitByte(3);
             to.EmitStr(this.to);
         }
         public override ClrOp GetCode(int up, bool proto) { throw new NotImplementedException(); }
@@ -1119,7 +1112,7 @@ namespace Niecza.CLRBackend {
         public readonly Unit unit;
         public readonly Xref package;
         public override void EmitInfo(Unit to) {
-            to.EmitByte(7);
+            to.EmitByte(4);
             to.EmitXref(package);
         }
         public Package GetPackage() { return package.Resolve<Package>(); }
@@ -4131,18 +4124,11 @@ dynamic:
             sub.unit.EmitStrArray(cpb.cx.ehlabelBuffer.ToArray());
             sub.unit.EmitInt(cpb.Spills());
 
-            List<string> dylexn = new List<string>();
-            List<int> dylexi = new List<int>();
-            foreach (KeyValuePair<string, Lexical> kv in sub.lexicals) {
-                int index = (kv.Value is LexVarish) ?
-                    ((LexVarish)kv.Value).index : -1;
-                if (index >= 0) {
-                    dylexn.Add(kv.Key);
-                    dylexi.Add(index);
-                }
+            sub.unit.EmitInt(sub.l_lexicals.Count);
+            foreach (KeyValuePair<string, Lexical> kv in sub.l_lexicals) {
+                sub.unit.EmitStr(kv.Key);
+                kv.Value.EmitInfo(sub.unit);
             }
-            sub.unit.EmitStrArray(dylexn.ToArray());
-            sub.unit.EmitIntArray(dylexi.ToArray());
 
             sub.unit.EmitXref(sub.unit.GetCorePackage(sub.sclass).own_xref);
 
@@ -4150,6 +4136,7 @@ dynamic:
                 sub.unit.EmitXref(sub.parametric_role_hack);
 
             /*not used until sub3 time*/
+            sub.unit.EmitXref(sub.cur_pkg);
             EncodeSignature(sub);
             sub.unit.EmitByte(sub.is_phaser >= 0 ? sub.is_phaser : 0xFF);
         }

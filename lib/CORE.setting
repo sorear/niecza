@@ -948,6 +948,8 @@ my class Array is List {
 # Not connected to Hash because Stash contains bvalues while Hash
 # holds values directly.
 my class Stash {
+    has $.name;
+
     method at_key($key)        {
         Q:CgOp { (stash_at_key (@ {self}) (obj_getstr {$key})) } }
     method bind_key($key, \$to) {
@@ -958,9 +960,8 @@ my class Stash {
         Q:CgOp { (stash_exists_key (@ {self}) (obj_getstr {$key})) } }
 }
 
-my class LexicalWHO {
-    has $!frame;
-    has $!index;
+my class PseudoStash {
+    has $.name;
 }
 
 my class Hash {
