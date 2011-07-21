@@ -1146,6 +1146,7 @@ namespace Niecza.CLRBackend {
         public List<int> lineBuffer = new List<int>();
         public List<int> ehspanBuffer = new List<int>();
         public List<string> ehlabelBuffer = new List<string>();
+        public List<LocalBuilder> scratches = new List<LocalBuilder>();
 
         public void make_ospill() {
             if (ospill == null)
@@ -1281,6 +1282,7 @@ namespace Niecza.CLRBackend {
         public static readonly Type CC = typeof(CC);
         public static readonly Type LAD = typeof(LAD);
         public static readonly Type RuntimeUnit = typeof(RuntimeUnit);
+        public static readonly Type StashCursor = typeof(StashCursor);
 
         public static readonly ConstructorInfo SubInfo_ctor =
             SubInfo.GetConstructor(new Type[] {
@@ -1316,6 +1318,8 @@ namespace Niecza.CLRBackend {
             typeof(BigInteger).GetConstructor(new Type[] { typeof(short), typeof(uint[]) });
         public static readonly ConstructorInfo CC_ctor =
             CC.GetConstructor(new Type[] { typeof(int[]) });
+        public static readonly ConstructorInfo SC_ctor =
+            StashCursor.GetConstructor(new Type[] { typeof(Frame), typeof(int) });
         public static readonly Dictionary<string,int> LADcodes
             = _LADcodes();
         private static Dictionary<string,int> _LADcodes() {
@@ -1598,14 +1602,31 @@ namespace Niecza.CLRBackend {
                 cx.EmitInt(cx.next_case);
                 cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
             }
+            int scratch_ix = -1;
+            LocalBuilder scratch_lb = null;
             int i = 0;
             if (!Method.IsStatic) {
                 ClrOp o = Zyg[i++];
                 o.CodeGen(cx);
-                // XXX this doesn't work quite right if the method is
-                // defined on the value type itself
-                if (o.Returns.IsValueType && !Method.IsStatic)
-                    cx.il.Emit(OpCodes.Box, o.Returns);
+                if (o.Returns.IsValueType) {
+                    if (Method.DeclaringType == o.Returns) {
+                        scratch_ix = 0;
+                        while (scratch_ix < cx.scratches.Count &&
+                                cx.scratches[scratch_ix].LocalType != o.Returns)
+                            scratch_ix++;
+
+                        if (scratch_ix == cx.scratches.Count)
+                            cx.scratches.Add(cx.il.DeclareLocal(o.Returns));
+
+                        scratch_lb = cx.scratches[scratch_ix];
+                        cx.scratches[scratch_ix] = null;
+
+                        cx.il.Emit(OpCodes.Stloc, scratch_lb);
+                        cx.il.Emit(OpCodes.Ldloca, scratch_lb);
+                    }
+                    else
+                        cx.il.Emit(OpCodes.Box, o.Returns);
+                }
             }
             // this needs to come AFTER the invocant
             if (HasCases)
@@ -1621,6 +1642,8 @@ namespace Niecza.CLRBackend {
                 cx.il.MarkLabel(cx.cases[cx.next_case++]);
                 cx.save_line();
             }
+            if (scratch_ix >= 0)
+                cx.scratches[scratch_ix] = scratch_lb;
         }
 
         public override void ListCases(CgContext cx) {
@@ -3608,6 +3631,14 @@ dynamic:
 
                 return th.Scan(z[1]);
             };
+            handlers["sc_root"] = delegate(NamProcessor th, object[] z) {
+                return CpsOp.ConstructorCall(Tokens.SC_ctor,
+                        CpsOp.CallFrame(), CpsOp.IntLiteral(
+                            th.scope_stack.Count));
+            };
+
+            thandlers["sc_nonfinal"] = Methody(null, Tokens.StashCursor.GetMethod("NonFinal"));
+            thandlers["sc_final"] = Methody(null, Tokens.StashCursor.GetMethod("Final"));
 
             thandlers["return"] = CpsOp.CpsReturn;
             thandlers["ternary"] = delegate(CpsOp[] z) {

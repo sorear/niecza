@@ -2609,17 +2609,35 @@ have_sc:
             throw new NieczaException("PP NYI");
         }
 
-        public StashCursor NonFinal(string key) {
-            StashCursor r1;
-            Variable r2;
-            Core(key, false, out r1, out r2, null);
+        void ReparseCore(string key, bool final, string sigil, bool reparse,
+                out StashCursor sc, out Variable v, Variable bind_to) {
+            sc = this;
+            int ix1 = 0;
+            StashCursor r;
+            if (reparse) while (true) {
+                int ix2 = key.IndexOf("::", ix1);
+                if (ix2 < 0) {
+                    key = key.Substring(ix1);
+                    break;
+                }
+                sc.Core(key.Substring(ix1, ix2-ix1), false, out r, out v, null);
+                ix1 = ix2+2;
+                sc = r;
+            }
+            if (sigil != null) key = sigil + key;
+            sc.Core(key, final, out sc, out v, bind_to);
+        }
+
+        public StashCursor NonFinal(string key, bool reparse) {
+            StashCursor r1; Variable r2;
+            ReparseCore(key, false, null, reparse, out r1, out r2, null);
             return r1;
         }
 
-        public Variable Final(string key, Variable bind_to) {
-            StashCursor r1;
-            Variable r2;
-            Core(key, true, out r1, out r2, bind_to);
+        public Variable Final(string key, string sigil, bool reparse,
+                Variable bind_to) {
+            StashCursor r1; Variable r2;
+            ReparseCore(key, true, sigil, reparse, out r1, out r2, bind_to);
             return r2;
         }
     }
