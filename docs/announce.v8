@@ -1,0 +1,102 @@
+    Announce: Niecza Perl 6 v8
+
+This is the eighth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.  No major general updates; having
+courted alternatives I feel satisfied with the name "Niecza" again.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Breaking changes]
+
+
+
+
+[Major features]
+
+$_ $/ $! are more in line with the spec.  In particular they are
+automatically declared in all Routines, and normal references are
+lexical, not dynamic.
+
+Rakudo-style fallback of postcircumfixes to
+{at,delete,bind,exists}_{key,pos} is now implemented.
+
+
+[Minor new features]
+
+[+] is now parsed as a listop, rather than an ad-hoc
+half-PREfix half-term.
+
+$$var now functions for captures created using \$var.
+
+substr has been extended to support calling with 4 arguments and with
+WhateverCode closures.
+
+<-> now generates rw parameters.
+
+Parameters in blocks now default to Mu.
+
+term:<proceed> is now available.
+
+Added names: term:<proceed>, Complex.Complex,
+
+(Solomon Foster) ln, log, exp, sin
+
+$*foo is a simple lexical fetch if there is $*foo in the current scope.
+
+Improvements to variables: The name can now be omitted; state-variables
+are processed correctly when parenthesized or at the top level; will
+start is implemented.
+
+Flipflop operators are now supported.  (Many thanks to Fitz Elliott for
+taking the time to work out the dark corners in the spec and write
+comprehensive tests.)
+
+
+[Selected bug fixes]
+
+do { } is now properly handled as a loop, and responds to labels and
+control operators.
+
+given/when no longer eats implicit return values
+(Example: "say given 5 { when Int { 42 } }")
+
+
+
+[Very internal changes]
+
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+(Yes, this is the same as last month...)
+
+Next month will see a major focus on spectests.  Solomon Foster thinks
+I can quadruple passing tests in a week; I'm not sure about that but
+hope to at least do so in a month.  Other features that are planned for
+next month include transparent use of CLR libraries, Buf, roles, and
+pseudo packages like OUTER::.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-8.zip
+[2] https://github.com/sorear/niecza
