@@ -104,7 +104,8 @@ reboot: half_reboot
 	cd stage3 && $(MAKE) test
 	# yay, stage2/ looks like a good new bootstrap version
 	# clean up the stuff that should NOT go into the boot
-	cd stage2 && rm -rf lib/*.cs obj/* src boot VERSION FETCH_URL
+	cd stage2 && rm -rf lib/*.cs obj/* src boot VERSION FETCH_URL \
+	    Makefile test.pl
 	cp obj/CrossDomainReceiver.dll obj/Kernel.dll obj/CLRBackend.exe \
 	    stage2/obj
 	cp -a LICENSE README.pod docs/ stage2/
