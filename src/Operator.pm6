@@ -142,8 +142,8 @@ class Operator::FlipFlop is Operator {
     method with_args($/, *@args) {
         my $state_var = ::GLOBAL::NieczaActions.gensym;
         $*CURLEX<!sub>.add_state_name(Str, $state_var);
-        @args[1] := mklex($/, 'False') if @args[1].^isa(Op::Whatever);
-        Op::FlipFlop.new(|node($/), :$state_var, :$!excl_lhs, :$!excl_rhs,
+        @args[1] := mklex($/, 'False') if @args[1].^isa(::Op::Whatever);
+        ::Op::FlipFlop.new(|node($/), :$state_var, :$!excl_lhs, :$!excl_rhs,
             :$!sedlike, :lhs(@args[0]), :rhs(@args[1]))
     }
 
