@@ -22,11 +22,6 @@ README for details.
 
 
 
-[Breaking changes]
-
-
-
-
 [Major features]
 
 $_ $/ $! are more in line with the spec.  In particular they are
@@ -75,10 +70,6 @@ control operators.
 
 given/when no longer eats implicit return values
 (Example: "say given 5 { when Int { 42 } }")
-
-
-
-[Very internal changes]
 
 
 
