@@ -865,6 +865,29 @@ namespace Niecza {
             }
         }
 
+        public int GetInlineSlot(int ip, string name, int depth) {
+            int end = 0;
+            // ON_VARLOOKUP nodes are created in a set of 0 or more,
+            // followed by a nameless one that marks the depth.
+            // Find the correct end-node for the passed depth
+            while (end < edata.Length) {
+                if (edata[end+2] == ON_VARLOOKUP && edata[end+4] < 0 &&
+                        edata[end+3] == depth && ip >= edata[end] &&
+                        ip < edata[end+1])
+                    break;
+                end += 5;
+            }
+            if (end == edata.Length) return -1;
+            while (true) {
+                end -= 5;
+                if (end < 0 || edata[end+2] != ON_VARLOOKUP ||
+                        edata[end+4] < 0) // we've passed the end
+                    return -1;
+                if (name.Equals(label_names[edata[end+4]]))
+                    return edata[end+3];
+            }
+        }
+
         public int FindControlEnt(int ip, int ty, string name) {
             for (int i = 0; i < edata.Length; i+=5) {
                 if (ip < edata[i] || ip >= edata[i+1])
@@ -872,6 +895,8 @@ namespace Niecza {
                 if (ty != edata[i+2])
                     continue;
                 if (name != null && (edata[i+4] < 0 || !name.Equals(label_names[edata[i+4]])))
+                    continue;
+                if (name == null && ty == ON_VARLOOKUP && edata[i+4] >= 0)
                     continue;
                 return edata[i+3];
             }
@@ -2486,28 +2511,126 @@ tryagain:
             this.p2 = depth;
         }
 
+        public static Variable MakePackage(string name, P6any who) {
+            STable st = new STable(name);
+            st.who = who;
+            st.typeObject = st.initObject = new P6opaque(st, 0);
+            ((P6opaque)st.typeObject).slots = null;
+            st.typeVar = st.initVar = Kernel.NewROScalar(st.typeObject);
+            st.mo.isPackage = true;
+            // XXX should be PackageHOW
+            st.how = new BoxObject<STable>(st, Kernel.AnyMO.how.mo, 0);
+            return st.typeVar;
+        }
+
+        bool HasCaller() {
+            Frame f = (Frame)p1;
+            if (p2 == 0) {
+                f = f.caller;
+                if (f != null && f.info == Kernel.ExitRunloopSI) f = f.caller;
+                if (f == null) return false;
+            }
+            return true;
+        }
+
+        StashCursor ToCaller() {
+            StashCursor r = this;
+            Frame f = (Frame)p1;
+            if (r.p2 > 0) r.p2--;
+            else {
+                f = f.caller;
+                if (f != null && f.info == Kernel.ExitRunloopSI) f = f.caller;
+                if (f == null)
+                    throw new NieczaException("No more calling frames");
+                r.p1 = f;
+            }
+            return r;
+        }
+
+        SubInfo ToInfo() { return (p1 as Frame).info; }
+
+        StashCursor ToOuter() {
+            StashCursor r = this;
+            if (r.p2 > 0) { r.p2--; }
+            else {
+                Frame f = ((Frame) r.p1).outer;
+                r.p1 = f;
+                if (f == null)
+                    throw new NieczaException("No more outer frames");
+                r.p2 = f.info.FindControlEnt(f.ip, SubInfo.ON_VARLOOKUP, null);
+                if (r.p2 < 0) r.p2 = 0;
+            }
+            return r;
+        }
+
+        bool TryLexOut(string key, bool rbar_w, ref Variable o) {
+            StashCursor sc = this;
+            while (true) {
+                if (sc.TryLex(key, rbar_w, ref o)) return true;
+                if ((sc.p1 as Frame).outer == null && sc.p2 == 0)
+                    return false;
+                sc = sc.ToOuter();
+            }
+        }
+
+        bool TryLex(string key, bool rbar_w, ref Variable o) {
+            Frame f = (Frame)p1;
+            if (p2 > 0) {
+                int ix = f.info.GetInlineSlot(f.ip, key, p2);
+                if (ix < 0) return false;
+
+                if (rbar_w) f.SetDynamic(ix, o);
+                else o = (Variable)f.GetDynamic(ix);
+            }
+            else {
+                LexInfo li;
+                if (!f.info.dylex.TryGetValue(key, out li)) return false;
+
+                if (rbar_w) li.Set(f, o);
+                else o = (Variable)li.Get(f);
+            }
+            return true;
+        }
+
         void Core(string key, bool final, out StashCursor sc, out Variable v,
                 Variable bind_to) {
             v = null;
             sc = this;
             if (type == DYNA) {
                 // DYNAMIC::{key}, no special names used
-                throw new NieczaException("DYNA NYI");
+                goto get_dynamic;
             }
             else if (type == WHO) {
                 // only special type is PARENT, maybe not even that?
                 P6any who = (P6any) p1;
+                Variable whov = Kernel.NewROScalar(who);
+                Variable keyv = Kernel.BoxAnyMO(key, Kernel.StrMO);
                 if (bind_to != null) {
-                    who.mo.mro_bind_key.Bind(Kernel.NewROScalar(who),
-                        Kernel.BoxAnyMO(key, Kernel.StrMO), bind_to);
+                    who.mo.mro_bind_key.Bind(whov, keyv, bind_to);
                     return;
                 }
-                v = who.mo.mro_at_key.Get(Kernel.NewROScalar(who),
-                    Kernel.BoxAnyMO(key, Kernel.StrMO));
+                v = who.mo.mro_at_key.Get(whov, keyv);
 
                 if (final) return;
 
-                throw new NieczaException("VIV NYI");
+                if (v.rw && !v.Fetch().IsDefined()) {
+                    Variable vname = Kernel.RunInferior(who.InvokeMethod(
+                        Kernel.GetInferiorRoot(), "name",
+                        new Variable[] { whov }, null));
+                    string name = vname.Fetch().mo.mro_raw_Str.Get(vname);
+                    P6any new_who = Kernel.GetStash(name + "::" + key);
+                    who.mo.mro_bind_key.Bind(whov, keyv,
+                        MakePackage(key, new_who));
+                    sc.p1 = new_who;
+                    return;
+                }
+                else if (v.rw || v.Fetch().IsDefined()) {
+                    throw new NieczaException(key + " does not point to a package");
+                }
+                else {
+                    sc.p1 = v.Fetch().mo.who;
+                    return;
+                }
             }
             else if (type == ROOT) {
                 // semantic root, handles most of the special names
@@ -2528,14 +2651,9 @@ tryagain:
                     n.Core(key, final, out sc, out v, bind_to);
                     return;
                 } else if (key == "CORE") {
-                    Frame cfr = (Frame) p1;
-                    while (cfr != null && (cfr.info.unit == null ||
-                                cfr.info.unit.name != "CORE"))
-                        cfr = cfr.outer;
-                    if (cfr == null)
-                        throw new NieczaException("No CORE available here");
                     sc.type = LEX;
-                    sc.p1 = cfr;
+                    while (sc.ToInfo().unit == null ||
+                            sc.ToInfo().unit.name != "CORE") sc = sc.ToOuter();
                     goto have_sc;
                 } else if (key == "MY") {
                     sc.type = LEX;
@@ -2557,47 +2675,40 @@ tryagain:
                 }
             }
             else if (type == LEX) {
-                Frame cfr = (Frame) p1;
                 if (key == "OUTER") {
-                    if (p2 > 0) sc.p2--;
-                    else if (cfr.outer != null) sc.p1 = cfr.outer;
-                    else throw new NieczaException("No more outer frames");
-
+                    sc = sc.ToOuter();
                     goto have_sc;
                 }
                 else if (key == "UNIT") {
-                    while (cfr.outer != null &&
-                            (cfr.info.special & RuntimeUnit.SUB_MAINLINE) == 0)
-                        cfr = cfr.outer;
-                    sc.p1 = cfr;
-                    sc.p2 = 0;
+                    while (sc.p2 > 0 || (sc.ToInfo().special &
+                                RuntimeUnit.SUB_MAINLINE) == 0)
+                        sc = sc.ToOuter();
                     goto have_sc;
                 }
                 else if (key == "CALLER") {
-                    if (p2 > 0) sc.p2--;
-                    else {
-                        cfr = cfr.caller;
-                        if (cfr != null && cfr.info == Kernel.ExitRunloopSI)
-                            cfr = cfr.caller;
-                        if (cfr == null)
-                            throw new NieczaException("No more calling frames");
-                        sc.p2 = 0;
-                        sc.p1 = cfr;
-                    }
+                    sc = sc.ToCaller();
                     goto have_sc;
                 }
                 else if (key == "SETTING") {
-                    while (cfr.outer != null &&
-                            (cfr.info.special & RuntimeUnit.SUB_MAINLINE) == 0)
-                        cfr = cfr.outer;
-                    if (cfr.outer == null)
-                        throw new NieczaException("No more outer settings");
-                    sc.p1 = cfr.outer;
-                    sc.p2 = 0;
+                    while (sc.p2 > 0 || (sc.ToInfo().special &
+                                RuntimeUnit.SUB_MAINLINE) == 0)
+                        sc = sc.ToOuter();
+                    sc = sc.ToOuter();
                     goto have_sc;
                 }
+                else if (key.Length >= 2 && key[1] == '*') {
+                    goto get_dynamic;
+                }
                 else {
-                    throw new NieczaException("MY NYI");
+                    v = bind_to;
+                    if (TryLexOut(key, bind_to != null, ref v)) {
+                        if (bind_to != null) return;
+                        goto have_v;
+                    }
+                    if (bind_to != null)
+                        throw new NieczaException("No slot to bind");
+                    v = Kernel.AnyMO.typeVar;
+                    goto have_v;
                 }
             }
             else {
@@ -2607,6 +2718,37 @@ tryagain:
 have_sc:
             if (!final) return;
             throw new NieczaException("PP NYI");
+
+have_v:
+            if (final) return;
+            throw new NieczaException("VIV NYI");
+
+get_dynamic:
+            v = bind_to;
+            while (true) {
+                if (sc.TryLex(key, (bind_to != null), ref v)) {
+                    if (bind_to != null) return;
+                    goto have_v;
+                }
+                if (!sc.HasCaller())
+                    break;
+                sc = sc.ToCaller();
+            }
+            if (key.Length >= 2 && key[1] == '*') {
+                key = key.Remove(1,1);
+                BValue bv;
+
+                if (Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.GlobalO).
+                        TryGetValue(key, out bv) ||
+                    Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.ProcessO).
+                        TryGetValue(key, out bv)) {
+
+                    if (bind_to != null) { bv.v = bind_to; return; }
+                    else { v = bv.v; goto have_v; }
+                }
+            }
+            if (bind_to != null) throw new NieczaException("No slot to bind");
+            v = Kernel.AnyMO.typeVar;
         }
 
         void ReparseCore(string key, bool final, string sigil, bool reparse,
