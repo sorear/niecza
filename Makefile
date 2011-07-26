@@ -43,7 +43,8 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
 	mkdir boot
 	wget --no-check-certificate -Oboot/niecza.zip $$(cat FETCH_URL)
 	cd boot && unzip niecza.zip
-	$(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
+	$(RUN_CLR) boot/run/Niecza.exe -C CORE
+	$(RUN_CLR) boot/run/Niecza.exe -C JSYNC
 	touch .fetch-stamp
 
 obj/CrossDomainReceiver.dll: $(patsubst %,lib/%,$(csxdr))
