@@ -1,13 +1,10 @@
 =head1 ABOUT
 
-This is 'Niecza', which will eventually be a Perl 6 implementation focusing
-on optimization research.  It targets the Common Language Runtime (ECMA-335;
-implementations are "Mono" and ".NET"). 
+This is 'Niecza', which will is a Perl 6 implementation focusing on
+optimization and efficient implementation research.  It targets the
+Common Language Runtime (ECMA-335; implementations are "Mono" and ".NET").
 
-There is also a Common Lisp backend in the works.
-
-To see the current state of the art, the best documentation is the testsuite,
-C<test.pl>.
+For a list of supported features, see L<http://perl6.org/compilers/features>.
 
 =head1 DEPENDENCIES (RUNTIME)
 
@@ -59,7 +56,7 @@ unzip
 
 =head1 USING
 
-    $ make
+    $ make # only if using a source copy
     ... snip build spam ...
     $ mono run/Niecza.exe
     niecza> say 2 + 2
@@ -81,8 +78,8 @@ could be made to work eventually, if it doesn't already.
 
 =head1 COPYRIGHT AND LICENSE
 
-Niecza is Copyright 2010 Stefan O'Rear et al.  It may be used and distributed
-under the Artistic License 2.0 (included under LICENSE).
+Niecza is Copyright 2010-2011 Stefan O'Rear et al.  It may be used and
+distributed under the Artistic License 2.0 (included under LICENSE).
 
 Some files are included from other projects, and have their own copyright
 notices.
