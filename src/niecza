@@ -76,6 +76,272 @@ augment class Operator::Method {
 }
 
 augment class NieczaActions {
+
+sub mkstringycat($/, *@strings) {
+    my @a;
+    for @strings -> $s {
+        my $i = ($s !~~ Op) ?? ::Op::StringLiteral.new(|node($/),
+            text => $s) !! $s;
+
+        # this *might* belong in an optimization pass
+        if @a && @a[*-1] ~~ ::Op::StringLiteral &&
+                $i ~~ ::Op::StringLiteral {
+            @a[*-1] = ::Op::StringLiteral.new(|node($/),
+                text => (@a[*-1].text ~ $i.text));
+        } else {
+            push @a, $i;
+        }
+    }
+    if @a == 0 {
+        return ::Op::StringLiteral.new(|node($/), text => "");
+    } elsif  @a == 1 {
+        return (@a[0] ~~ ::Op::StringLiteral) ?? @a[0] !!
+            mkcall($/, '&prefix:<~>', @a[0]);
+    } else {
+        return mkcall($/, '&infix:<~>', @a);
+    }
+}
+
+
+# this is to be the one place where names are processed
+
+# MODES
+# declaring: returns (Package, Str) or Op(defer, returns full Str)
+# method:    returns Op(defer, returns full Str)
+# reference: returns Package or Op(defer, bvalish lexicoid)
+
+# OPTIONS
+# clean:     remove :sym<xyz>
+
+method process_name($/, :$declaring, :$defer, :$method, :$clean, :$sigil!) {
+
+    return () unless defined $/;
+
+    my @ns = @( $<name>.ast<names> );
+    my $dc = $<name>.ast.<dc>;
+    my $ext = '';
+
+    if !$clean {
+        for @( $<colonpair> ) {
+            $ext ~= $_.ast<ext> // (
+                $_.CURSOR.sorry("Invalid colonpair for name extension");
+                "";
+            )
+        }
+    }
+
+    if !$defer {
+        for @ns {
+            if $_.^isa(Op) {
+                $_ = self.trivial_eval($/, $_);
+                if $_ ~~ Cool {
+                    $_ = ~$_;
+                } else {
+                    $_ = "XXX";
+                    $/.CURSOR.sorry("Name components must evaluate to strings");
+                }
+            }
+        }
+    }
+
+    if $declaring {
+        die "Unimplemented" if $defer;
+        return () unless @ns;
+        my $head = $sigil ~ pop(@ns) ~ $ext;
+        return Any, $head unless @ns;
+
+        # the remainder is assumed to name an existing or new package
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, :auto);
+        });
+        return $pkg, $head;
+    }
+    else {
+        die "NYI";
+    }
+}
+
+method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
+        :$longname, :$method_type is copy, :$contextual is copy) {
+
+    $multiness ||= 'only';
+    my ($pkg, $name) = self.process_name($longname, :declaring, :sigil(""));
+
+    if !$scope {
+        if !defined($name) {
+            $scope = 'anon';
+        } elsif defined($pkg) {
+            $scope = 'our';
+        } elsif defined($method_type) {
+            $scope = 'has';
+        } else {
+            $scope = 'my';
+        }
+    }
+
+    if $class eq 'Regex' {
+        my $/;
+        $*CURLEX<!name> = $name;
+        $*CURLEX<!cleanname !sym> =
+            ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name, Str);
+        $multiness = 'multi' if defined $*CURLEX<!sym>;
+        $*CURLEX<!multi> = $multiness;
+    }
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' && $scope ne 'has' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        $scope = 'anon';
+    }
+
+    if $scope eq 'has' && !defined($method_type) {
+        $/.CURSOR.sorry('has scope-type is only valid for methods');
+        $scope = 'anon';
+    }
+
+    if $scope ne 'anon' && !defined($name) {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+        $scope = 'anon';
+    }
+
+    if $scope ne 'our' && defined($pkg) {
+        $/.CURSOR.sorry("Double-colon-qualified subs must be our");
+        $scope = 'our';
+    }
+
+    if $scope eq 'anon' && $multiness ne 'only' {
+        $/.CURSOR.sorry("Multi routines must have a name");
+        $multiness = 'only';
+    }
+
+    if $contextual && (defined($method_type) || $scope ne 'my') {
+        $/.CURSOR.sorry("Context-named routines must by purely my-scoped");
+        $contextual = False;
+    }
+
+    $method_type = Str if $scope eq 'anon';
+
+    my $method_targ = $method_type && $sub.outer.body_of;
+    if $method_targ {
+        $method_targ = $*unit.deref($method_targ);
+    } elsif defined($method_type) {
+        $/.CURSOR.sorry("Methods must be used in some kind of package");
+        $method_type = Str;
+    }
+
+    if $method_targ && !$method_targ.^can('add_method') {
+        $/.CURSOR.sorry("A {$method_targ.WHAT} cannot have methods added");
+        $method_type = Str;
+        $method_targ = Any;
+    }
+
+    if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
+            $method_targ !~~ ::Metamodel::ParametricRole) {
+        $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
+        $name = "placeholder";
+    }
+
+    my $bindlex = $scope eq 'my' || ($scope eq 'our' && !$pkg);
+
+    $sub.set_name(defined($method_type) ?? $method_targ.name ~ "." ~ $name !!
+        ($name // 'ANON'));
+    $sub.class = $class;
+    $sub.returnable = True;
+
+    my $std = $/.CURSOR;
+    {
+        my $/;
+        if $sub.name ~~ /^(\w+)\:\<(.*)\>$/ {
+            my %new = %( $std.default_O(~$0, ~$1) );
+            $sub.extend.<prec> = %new;
+        }
+    }
+
+    my Str $symbol;
+    $/.CURSOR.trymop({
+        if $bindlex && $class eq 'Regex' {
+            $symbol = '&' ~ $name;
+            my $proto = $symbol;
+            $proto ~~ s/\:.*//;
+            $sub.outer.add_dispatcher($proto, |mnode($/))
+                if $multiness ne 'only' && !$sub.outer.lexicals.{$proto};
+            $symbol ~= ":(!proto)" if $multiness eq 'proto';
+        } elsif $bindlex {
+            $symbol = '&' ~ $name;
+            $/.CURSOR.check_categorical($symbol);
+            if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol} {
+                $sub.outer.add_dispatcher($symbol, |mnode($/))
+            }
+
+            given $multiness {
+                when 'multi' { $symbol ~= ":({ self.gensym })"; }
+                when 'proto' { $symbol ~= ":(!proto)"; }
+                default {
+                    $/.CURSOR.check_categorical($symbol);
+                }
+            }
+        } else {
+            $symbol = self.gensym;
+        }
+
+        $sub.outervar = $symbol;
+        $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
+        $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
+
+        if $multiness ne 'only' || $scope eq 'our' || $method_type {
+            $sub.outer.lexicals-used{$symbol} = True;
+        }
+
+        if defined($method_type) || $scope eq 'our' {
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
+        }
+
+        if defined($method_type) {
+            if $sub.outer.augment_hack {
+                push $sub.outer.augment_hack,
+                    [ $multiness, $method_type, $name, $symbol, $sub.xref ];
+            } else {
+                $method_targ.add_method($multiness, $method_type, $name,
+                    $symbol, $sub.xref, |mnode($/));
+            }
+        }
+
+        if $scope eq 'our' {
+            $sub.outer.bind_our_name($pkg, "&$name", $sub.xref);
+        }
+    });
+}
+
+method regex_def_1 ($, $/ = $*cursor) {
+    self.install_sub($/, $*CURLEX<!sub>, scope => $*SCOPE, class => 'Regex',
+        method_type => (($*SCOPE || 'has') eq 'has') ?? 'normal' !! Any,
+        longname => $<deflongname>, multiness => $*MULTINESS);
+}
+
+method routine_def_1 ($, $/ = $*cursor) {
+    self.install_sub($/, $*CURLEX<!sub>, scope => $*SCOPE, class => 'Sub',
+        longname => $<deflongname>, multiness => $*MULTINESS,
+        contextual => ($<sigil> && $<sigil> eq '&*'));
+}
+
+method method_def_1 ($, $/ = $*cursor) {
+    my $type = $<type> ?? ~$<type> !! '';
+    if $type ne '' && $*HAS_SELF eq 'partial' {
+        $type = '';
+        $/.CURSOR.sorry("Type symbols cannot be used with submethod");
+    }
+
+    self.install_sub($/, $*CURLEX<!sub>, scope => $*SCOPE,
+        method_type => ($type eq '^' ?? 'meta' !! $type eq '!' ?? 'private' !!
+            $*HAS_SELF eq 'partial' ?? 'sub' !! 'normal'),
+        longname => $<longname>, multiness => $*MULTINESS,
+        :class($*HAS_SELF eq 'partial' ?? 'Submethod' !! 'Method'));
+}
+
+
 method statement_prefix:BEGIN ($/) {
     $<blast>.ast.is_phaser = 2;
     $*CURLEX<!sub>.create_static_pad;

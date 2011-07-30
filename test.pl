@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 1008;
+plan 1007;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1345,12 +1345,6 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    our role R5634[$x] {
-        regex ::($x) { foo }
-    }
-
-    ok (Grammar but OUR::R5634["TOP"]).parse("foo"), "roles with dynamic regex names work";
-
     my $M;
     my $t;
     $M = ("a()" ~~ / <alpha> '(' ~ ')' { $t = $<alpha>.Str } /);
