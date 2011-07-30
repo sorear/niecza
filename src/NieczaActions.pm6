@@ -8,11 +8,10 @@ use OpHelpers;
 use Operator;
 
 # XXX Niecza  Needs improvement
+method sym_categorical($/) { self.FALLBACK($<name>, $/) }
+method bracket_categorical($/) { self.FALLBACK($<name>, $/) }
 method FALLBACK($meth, $/) {
     my $S = $<sym>;
-    if $meth eq '::($name)' { # XXX STD miscompilation
-        $meth := $<name>;
-    }
 
     if substr($meth,0,7) eq 'prefix:' {
         make Operator.funop($/, q:s'&prefix:<$S>', 1);

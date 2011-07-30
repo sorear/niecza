@@ -65,22 +65,10 @@ method default_O($cat, $sym) {
     }
 }
 
-role sym_categorical[$name, $cat,$sym] {
-    token ::($name) () {
-        $sym $<sym>={$sym} $<name>={$name}
-        $<O>={ self.cat_O($cat, $sym) }
-    }
+role sym_categorical[$name,$cat,$sym] { #OK not used
 }
 
-role bracket_categorical[$name,$cat,$sym1,$sym2] {
-    token ::($name) () {
-        :my $*GOAL = $sym2;
-        $sym1 {}:s
-        $<name>={$name}
-        [ :lang($¢.unbalanced($sym2)) <semilist> ]
-        [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ]
-        $<O>={ self.cat_O($cat, "$sym1 $sym2") } $<sym>={ [$sym1,$sym2] }
-    }
+role bracket_categorical[$name,$cat,$sym1,$sym2] { #OK not used
 }
 
 method add_categorical($name) {
@@ -93,16 +81,34 @@ method add_categorical($name) {
     return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
     my $cat = ~$0;
     my $sym = ~$1;
+    my $role;
 
     if $sym ~~ /\s+/ {
         my $sym1 = $sym.substr(0, $/.from);
         my $sym2 = $sym.substr($/.to, $sym.chars - $/.to);
-        %*LANG<MAIN> = self.WHAT but OUR::bracket_categorical[
+        $role = OUR::bracket_categorical[
             "{$cat}:sym<$sym1 $sym2>", $cat, $sym1, $sym2];
+        my token bracket_categorical () {
+            :my $*GOAL = $sym2;
+            $sym1 {}:s
+            $<name>={$name}
+            [ :lang($¢.unbalanced($sym2)) <semilist> ]
+            [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ]
+            $<O>={ self.cat_O($cat, "$sym1 $sym2") } $<sym>={ [$sym1,$sym2] }
+        }
+        Q:CgOp { (rnull (_addmethod (obj_llhow (@ {$role})) 8
+            (obj_getstr {"{$cat}:sym<$sym1 $sym2>"}) (@ {&bracket_categorical}))) };
     } else {
-        %*LANG<MAIN> = self.WHAT but OUR::sym_categorical[
-            "{$cat}:sym<$sym>", $cat, $sym];
+        $role = OUR::sym_categorical["{$cat}:sym<$sym>", $cat, $sym];
+        my token sym_categorical () {
+            $sym $<sym>={$sym} $<name>={$name}
+            $<O>={ self.cat_O($cat, $sym) }
+        }
+        Q:CgOp { (rnull (_addmethod (obj_llhow (@ {$role})) 8
+            (obj_getstr {"{$cat}:sym<$sym>"}) (@ {&sym_categorical}))) };
     }
+    Q:CgOp { (rnull (_invalidate (obj_llhow (@ {$role})))) };
+    %*LANG<MAIN> = self.WHAT but $role;
     self.cursor_fresh(%*LANG<MAIN>);
 }
 
