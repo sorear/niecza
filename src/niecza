@@ -203,8 +203,8 @@ method type_declarator:enum ($/) {
         $/.CURSOR.sorry("Enum may not contain both Int and Str values");
     }
 
-    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
-        [$has_strs ?? 'Str' !! 'Int'];
+    my ($basetype) = self.process_name($*OFTYPE<longname>);
+    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', $has_strs ?? 'Str' !! 'Int');
     my $kindtype = $has_strs ?? 'StrBasedEnum' !! 'IntBasedEnum';
 
     if $<name> && $<name>.reduced eq 'longname' && $scope ne 'anon' {
@@ -216,7 +216,7 @@ method type_declarator:enum ($/) {
                 class => ::Metamodel::Class, name => $<longname>, :@exports);
 
             $obj.add_super($*CURLEX<!sub>.compile_get_pkg($kindtype).xref);
-            $obj.add_super($*CURLEX<!sub>.compile_get_pkg(@$basetype).xref);
+            $obj.add_super($basetype.xref);
 
             my $nb = ::Metamodel::StaticSub.new(
                 transparent=> True,
@@ -267,8 +267,8 @@ method type_declarator:enum ($/) {
 
 
 method type_declarator:subset ($/) {
-    my $basetype = $*OFTYPE ?? self.simple_longname($*OFTYPE<longname>) !!
-        ['Any'];
+    my ($basetype) = self.process_name($*OFTYPE<longname>);
+    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', 'Any');
     my @exports;
 
     for map *.ast, @$<trait> -> $t {
@@ -292,7 +292,7 @@ method type_declarator:subset ($/) {
 
         $*CURLEX<!sub>.create_static_pad;
 
-        $obj.basetype = $*CURLEX<!sub>.compile_get_pkg(@$basetype).xref;
+        $obj.basetype = $basetype.xref;
         $obj.where = $body.xref;
     });
 
@@ -404,6 +404,162 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
     $lexname, $npkg
 }
 
+method trait_mod:of ($/) {
+    make { of => self.process_name($<typename><longname>) }
+}
+
+method parameter($/) {
+    my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
+    my $copy = False;
+    my $sorry;
+    my $slurpy = False;
+    my $slurpycap = False;
+    my $optional = False;
+    my $rwt = False;
+    my $type;
+
+    if $<type_constraint> {
+        ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
+        $type &&= $type.xref;
+    }
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<copy> { $copy = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+    $*unit.deref($default).set_name("$/ init") if $default;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
+
+    if defined $p.ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
+        :$optional, :$slurpy, :$rw, tclass => $type,
+        :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
+}
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    my $start;
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } elsif $t.ast<start> && $*SCOPE eq 'state' {
+            $start = $t.ast<start>;
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        ($typeconstraint) = self.process_name($*OFTYPE<longname>);
+        $typeconstraint &&= $typeconstraint.xref;
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if !defined($v<name>) && $scope ne any < my anon state > {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+    }
+
+    if defined $v<rest> {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon' || !defined($v<name>))
+        ?? self.gensym !! $name;
+
+    if $scope eq 'has' {
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.',
+            $typeconstraint);
+    } elsif $scope eq 'state' {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
+                :$hash, :$typeconstraint, |mnode($/));
+        });
+        make Op::StateDecl.new(|node($/), inside =>
+            Op::Lexical.new(|node($/), name => $slot, :$list, :$hash));
+    } elsif $scope eq 'our' {
+        make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
+    } else {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
+                :$typeconstraint, |mnode($/));
+        });
+        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+    }
+
+    if $start {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($/.ast, -> $ll {
+            Op::StatementList.new(|node($/), children => [
+                Op::Start.new(condvar => $cv, body =>
+                    self.inliney_call($/, $start, $ll)), $ll ]) });
+    }
+}
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$longname, :$method_type is copy, :$contextual is copy) {
 
