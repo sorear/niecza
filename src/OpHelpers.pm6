@@ -38,3 +38,28 @@ sub mktemptopic($/, $item, $expr) is export {
                     ::Op::LexicalBind.new(:name<$_>, rhs => $old_),
                     $result]) }) ]) });
 }
+
+sub mkstringycat($/, *@strings) is export {
+    my @a;
+    for @strings -> $s {
+        my $i = ($s !~~ ::GLOBAL::Op) ?? ::Op::StringLiteral.new(|node($/),
+            text => $s) !! $s;
+
+        # this *might* belong in an optimization pass
+        if @a && @a[*-1] ~~ ::Op::StringLiteral &&
+                $i ~~ ::Op::StringLiteral {
+            @a[*-1] = ::Op::StringLiteral.new(|node($/),
+                text => (@a[*-1].text ~ $i.text));
+        } else {
+            push @a, $i;
+        }
+    }
+    if @a == 0 {
+        return ::Op::StringLiteral.new(|node($/), text => "");
+    } elsif  @a == 1 {
+        return (@a[0] ~~ ::Op::StringLiteral) ?? @a[0] !!
+            mkcall($/, '&prefix:<~>', @a[0]);
+    } else {
+        return mkcall($/, '&infix:<~>', @a);
+    }
+}

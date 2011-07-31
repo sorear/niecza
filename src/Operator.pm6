@@ -99,19 +99,18 @@ class Method is Operator {
     method arity() { 1 }
 
     method with_args($/, *@args) {
-        if ($.name eq 'HOW' || $.name eq 'WHAT' || $.name eq 'VAR')
-                && !$.private && !$.meta {
-            if $.args {
+        if $!name eq any(< HOW WHAT WHO VAR >) && !$!private && !$!meta {
+            if $!args {
                 $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
                 return ::Op::StatementList.new;
             }
             ::Op::Interrogative.new(|node($/), receiver => @args[0],
                 name => $.name);
         } else {
-            if defined($.package) && !$.private {
+            if defined($!package) && !$!private {
                 $/.CURSOR.sorry("Qualified references to non-private methods NYI");
             }
-            $*CURLEX<!sub>.noninlinable if $.name eq 'eval';
+            $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
             my $pclass;
             if $.private {
                 if $.package {

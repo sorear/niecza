@@ -239,18 +239,16 @@ class Interrogative is Op {
     method zyg() { $.receiver }
 
     method code($body) {
-        if $.name eq "VAR" {
-            return CgOp.var_get_var($.receiver.cgop($body));
-        }
-        my $c = CgOp.fetch($.receiver.cgop($body));
-        if $.name eq "HOW" {
-            $c = CgOp.how($c);
-        }
-        elsif $.name eq "WHAT" {
-            $c = CgOp.obj_what($c);
-        }
-        else {
-            die "Invalid interrogative $.name";
+        my $c;
+        given $!name {
+            when "VAR" {
+                return CgOp.var_get_var($!receiver.cgop($body));
+            }
+            $c = CgOp.fetch($.receiver.cgop($body));
+            when "HOW" { $c = CgOp.how($c); }
+            when "WHO" { $c = CgOp.who($c); }
+            when "WHAT" { $c = CgOp.obj_what($c); }
+            default { die "Invalid interrogative $_"; }
         }
         CgOp.newscalar($c);
     }
