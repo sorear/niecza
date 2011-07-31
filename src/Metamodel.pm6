@@ -1,5 +1,3 @@
-# first half of the file - begin augments are in Begin.pm6
-
 class Metamodel;
 
 method locstr($fo, $lo, $fn, $ln) {
@@ -615,8 +613,7 @@ class StaticSub is RefTarget {
     }
 
     method bind_our_name($path, $name, $item, *%_) {
-        my $pkg = $path ~~ Metamodel::Package ?? $path !!
-            self.compile_get_pkg($path ?? @$path !! 'OUR', :auto);
+        my $pkg = self.compile_get_pkg($path ?? @$path !! 'OUR', :auto);
         $*unit.bind($pkg, $name, $item, |%_);
     }
 
