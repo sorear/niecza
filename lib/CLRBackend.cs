@@ -2430,6 +2430,7 @@ namespace Niecza.CLRBackend {
         public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrStringLiteral(string data) {
             this.data = data;
+            if (data == null) throw new ArgumentNullException();
             Returns = Tokens.String;
             Constant = true;
         }

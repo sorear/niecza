@@ -471,7 +471,115 @@ method variable_declarator($/) {
     }
 }
 
-method process_name($/, :$declaring, :$defer, :$method, :$clean) {
+method term:name ($/) {
+    my ($name) = self.process_name($<longname>, :defer);
+
+    if $<args> {
+        $name<name>  = '&' ~ $name<name> if $name<name>;
+        $name<iname> = mkstringycat($/, '&', $name<iname>) if $name<iname>;
+    }
+
+    if $name<iname> {
+        make ::Op::IndirectVar.new(|node($/), name => $name<iname>);
+    }
+    elsif $name<pkg> {
+        make self.package_var($/, self.gensym, $name<name>, $name<pkg>);
+    } else {
+        make mklex($/, $name<name>);
+    }
+
+    if $<postcircumfix> {
+        make mkcall($/, '&_param_role_inst', $/.ast,
+            @( $<postcircumfix>[0].ast.args ));
+    } elsif $<args> {
+        my $sal = $<args>.ast // [];
+        # TODO: support zero-D slicels
+
+        if $sal > 1 {
+            $/.CURSOR.sorry("Slicel lists are NYI");
+            return;
+        }
+
+        make ::Op::CallSub.new(|node($/), invocant => $/.ast,
+            args => $sal[0] // []);
+    }
+}
+
+method assertion:name ($/) {
+    my ($pname) = self.process_name($<longname>, :defer);
+    my $name = ~$<longname>;
+
+    if !$pname {
+        $pname = { name => 'alpha' };
+        $/.CURSOR.sorry('Method call requires a method name');
+    }
+
+    if $<assertion> {
+        make $<assertion>.ast;
+    } elsif $name eq 'sym' {
+        make ::RxOp::Sym.new(igcase => %*RX<i>, igmark => %*RX<a>);
+    } elsif $name eq 'before' {
+        make ::RxOp::Before.new(zyg => [$<nibbler>[0].ast]);
+        return Nil;
+    } elsif $name eq 'after' {
+        my @l = $<nibbler>[0].ast.tocclist;
+        if grep { !defined $_ }, @l {
+            $/.CURSOR.sorry("Unsuppored elements in after list");
+            make ::RxOp::Sequence.new;
+            return Nil;
+        }
+        make ::RxOp::ZeroWidthCCs.new(neg => False, after => True, ccs => @l);
+        return Nil;
+    } elsif !$<nibbler> && !$<arglist> && !$pname<pkg> && !$pname<iname> {
+        make ::RxOp::Subrule.new(method => $pname<name>);
+    } else {
+        my $args = $<nibbler> ??
+            [ self.op_for_regex($/, $<nibbler>.ast) ] !!
+            $<arglist> ?? $<arglist>.ast !! [];
+
+        if $pname<iname> {
+            $/.CURSOR.sorry('Indirect method calls NYI');
+            $pname = {name => 'alpha'};
+        }
+
+        my $callop = ::Operator::Method.new(name => $pname<name>, :$args,
+            package => $pname<pkg> && $pname<pkg>.xref)\
+                .with_args($/, mklex($/, '$¢'));
+
+        my $regex = self.rxembed($/, $callop, True);
+
+        make ::RxOp::Subrule.new(regex => $regex);
+    }
+    make self.rxcapturize($/, ~$<longname>, $/.ast);
+}
+
+
+method methodop($/) {
+    if $<longname> {
+        my ($c) = self.process_name($<longname>, :defer);
+        make ::Operator::Method.new(name => 'die');
+        unless $c {
+            $/.CURSOR.sorry("Method call requires a name");
+            return;
+        }
+        if $c<iname> {
+            $/.CURSOR.sorry("Indirectly named method calls NYI");
+            return;
+        }
+        make ::Operator::Method.new(name => $c<name>,
+            package => $c<pkg> && $c<pkg>.xref);
+    } elsif $<quote> {
+        make ::Operator::Method.new(name => $<quote>.ast);
+    } elsif $<variable> {
+        make ::Operator::Function.new(function =>
+            self.do_variable_reference($/, $<variable>.ast));
+    }
+
+    $/.ast.args = $<args>[0].ast[0] if $<args>[0];
+    $/.ast.args = $<arglist>[0].ast if $<arglist>[0];
+}
+
+method process_name($/, :$declaring, :$defer, :$clean) {
     return () unless defined $/;
 
     my @ns = @( $<name>.ast<names> );
@@ -516,11 +624,10 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean) {
         });
         return $pkg, $head;
     }
-    elsif !$method {
+    else {
         if $defer {
-            # XXX - the values returned here are interpreted only by
-            # the variable rule.  I would like to combine logic eventually,
-            # when I figure out better how.
+            # The stuff returned here is processed by the variable rule,
+            # and also by method call generation
 
             goto "dyn" if $trail;
             goto "dyn" if $_.^isa(Op) for @ns;
@@ -548,9 +655,6 @@ dyn:
             $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, $head);
         });
         return $pkg;
-    }
-    else {
-        die "Unimplemented";
     }
 }
 
