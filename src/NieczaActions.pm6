@@ -157,7 +157,7 @@ method label($/) {
 
 # Either String Op
 method morename($/) {
-    make ($<identifier>[0] ?? $<identifier>[0].ast !! $<EXPR>[0].ast);
+    make ($<identifier> ?? $<identifier>.ast !! $<EXPR> ?? $<EXPR>.ast !! Any);
 }
 
 method typename($ ) { }
@@ -173,20 +173,6 @@ method name($/) {
 method longname($ ) { } # look at the children yourself
 method deflongname($ ) { }
 
-# Turns a name like ::Foo::Bar:sym[ 'x' ] into
-# { name => 'Bar:sym<x>', path => [ 'Foo '] }
-# path can be undefined for a simple name like $x, which goes straight to pad
-# pass $clean if you want to ignore adverbs entirely - currently needed for
-# package names
-method unqual_longname($/, $what, $clean?) {
-    my $h = self.mangle_longname($/, $clean);
-    if $h<path> {
-        $/.CURSOR.sorry($what);
-        return "";
-    }
-    return $h<name>;
-}
-
 # this is to be the one place where names are processed
 
 # MODES
@@ -197,13 +183,13 @@ method unqual_longname($/, $what, $clean?) {
 # OPTIONS
 # clean:     remove :sym<xyz>
 
-method process_name($/, :$declaring, :$defer, :$method, :$clean, :$sigil = '') {
-
+method process_name($/, :$declaring, :$defer, :$clean) {
     return () unless defined $/;
 
     my @ns = @( $<name>.ast<names> );
-    my $dc = $<name>.ast.<dc>;
     my $ext = '';
+    my $trail = @ns && !defined @ns[*-1];
+    pop @ns if $trail;
 
     if !$clean {
         for @( $<colonpair> ) {
@@ -214,24 +200,25 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean, :$sigil = '') {
         }
     }
 
-    if !$defer {
-        for @ns {
-            if $_.^isa(Op) {
-                $_ = self.trivial_eval($/, $_);
-                if $_ ~~ Cool {
-                    $_ = ~$_;
-                } else {
-                    $_ = "XXX";
-                    $/.CURSOR.sorry("Name components must evaluate to strings");
-                }
-            }
+    for $defer ?? () !! @ns.grep(Op) {
+        $_ = ~self.trivial_eval($/, $_);
+        # XXX should this always stringify?
+        if $_ ~~ Cool {
+            $_ = ~$_;
+        } else {
+            $_ = "XXX";
+            $/.CURSOR.sorry("Name components must evaluate to strings");
         }
     }
 
     if $declaring {
+        # class :: is ... { } is a placeholder for a lack of name
+        return () if $trail && !@ns;
+        $/.CURSOR.sorry("Illegal explicit declaration of a symbol table")
+            if $trail;
         die "Unimplemented" if $defer;
         return () unless @ns;
-        my $head = $sigil ~ pop(@ns) ~ $ext;
+        my $head = pop(@ns) ~ $ext;
         return Any, $head unless @ns;
 
         # the remainder is assumed to name an existing or new package
@@ -241,37 +228,39 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean, :$sigil = '') {
         });
         return $pkg, $head;
     }
-    elsif !$method {
-        die "Unimplemented" if $defer;
+    else {
+        if $defer {
+            # The stuff returned here is processed by the variable rule,
+            # and also by method call generation
+
+            goto "dyn" if $trail;
+            goto "dyn" if $_.^isa(Op) for @ns;
+            my $pkg;
+            my @tail = @ns;
+            my $head = pop(@tail) ~ $ext;
+            return { name => $head } unless @tail;
+            try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
+            goto "dyn" unless $pkg;
+
+            return { name => $head, pkg => $pkg };
+dyn:
+            my @bits = map { $_, '::' }, @ns;
+            pop @bits if @bits;
+            push @bits, '::' if $trail;
+            return { iname => mkstringycat($/, @bits) };
+        }
+
+        $/.CURSOR.sorry("Class required, but symbol table name used instead")
+            if $trail;
         return () unless @ns;
-        my $head = $sigil ~ pop(@ns) ~ $ext;
+        my $head = pop(@ns) ~ $ext;
         my $pkg;
         $/.CURSOR.trymop({
             $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, $head);
         });
         return $pkg;
     }
-    else {
-        die "Unimplemented";
-    }
 }
-method mangle_longname($/, $clean?) {
-    my @ns = @( $<name>.ast<names> );
-    my $n = pop @ns;
-
-    if !$clean {
-        for @( $<colonpair> ) {
-            $n ~= $_.ast<ext> // (
-                $_.CURSOR.sorry("Invalid colonpair for name extension");
-                "";
-            )
-        }
-    }
-
-    my @path = ($<name>.ast.<dc> || @ns) ?? (path => @ns) !! ();
-    { name => $n, @path };
-}
-
 method subshortname($/) {
     if $<colonpair> {
         my $n = ~$<category>;
@@ -300,7 +289,7 @@ method desigilname($/) {
     if $<variable> {
         make { ind => self.do_variable_reference($/, $<variable>.ast) };
     } else {
-        make self.mangle_longname($<longname>);
+        make self.process_name($<longname>, :defer);
     }
 }
 
@@ -732,9 +721,16 @@ method decapturize($/) {
 method cclass_elem($ ) {}
 
 method assertion:name ($/) {
-    my $name = self.unqual_longname($<longname>, "Qualified method calls NYI");
+    my ($pname) = self.process_name($<longname>, :defer);
+    my $name = ~$<longname>;
+
+    if !$pname {
+        $pname = { name => 'alpha' };
+        $/.CURSOR.sorry('Method call requires a method name');
+    }
+
     if $<assertion> {
-        make $<assertion>[0].ast;
+        make $<assertion>.ast;
     } elsif $name eq 'sym' {
         make ::RxOp::Sym.new(igcase => %*RX<i>, igmark => %*RX<a>);
     } elsif $name eq 'before' {
@@ -749,23 +745,27 @@ method assertion:name ($/) {
         }
         make ::RxOp::ZeroWidthCCs.new(neg => False, after => True, ccs => @l);
         return Nil;
-    } elsif !$<nibbler>[0] && !$<arglist>[0] {
-        make ::RxOp::Subrule.new(method => $name);
+    } elsif !$<nibbler> && !$<arglist> && !$pname<pkg> && !$pname<iname> {
+        make ::RxOp::Subrule.new(method => $pname<name>);
     } else {
         my $args = $<nibbler> ??
-            [ self.op_for_regex($/, $<nibbler>[0].ast) ] !!
-            $<arglist>[0].ast;
+            [ self.op_for_regex($/, $<nibbler>.ast) ] !!
+            $<arglist> ?? $<arglist>.ast !! [];
 
-        my $callop = ::Op::CallMethod.new(|node($/),
-            receiver => mklex($/, '$¢'),
-            name => $name,
-            args => $args);
+        if $pname<iname> {
+            $/.CURSOR.sorry('Indirect method calls NYI');
+            $pname = {name => 'alpha'};
+        }
+
+        my $callop = ::Operator::Method.new(name => $pname<name>, :$args,
+            package => $pname<pkg> && $pname<pkg>.xref)\
+                .with_args($/, mklex($/, '$¢'));
 
         my $regex = self.rxembed($/, $callop, True);
 
         make ::RxOp::Subrule.new(regex => $regex);
     }
-    make self.rxcapturize($/, $name, $/.ast);
+    make self.rxcapturize($/, ~$<longname>, $/.ast);
 }
 
 # actually we need a few more special cases here.
@@ -1357,12 +1357,18 @@ method PRE($/) {
 
 method methodop($/) {
     if $<longname> {
-        my $c = self.mangle_longname($<longname>);
-        my $package;
-        $/.CURSOR.trymop({
-            $package = $*CURLEX<!sub>.compile_get_pkg(@($c<path>)).xref;
-        }) if $c<path>;
-        make ::Operator::Method.new(name => $c<name>, :$package);
+        my ($c) = self.process_name($<longname>, :defer);
+        make ::Operator::Method.new(name => 'die');
+        unless $c {
+            $/.CURSOR.sorry("Method call requires a name");
+            return;
+        }
+        if $c<iname> {
+            $/.CURSOR.sorry("Indirectly named method calls NYI");
+            return;
+        }
+        make ::Operator::Method.new(name => $c<name>,
+            package => $c<pkg> && $c<pkg>.xref);
     } elsif $<quote> {
         make ::Operator::Method.new(name => $<quote>.ast);
     } elsif $<variable> {
@@ -1509,26 +1515,32 @@ method whatever_postcheck($/, $st, $term) {
 # term :: Op
 method term:value ($/) { make $<value>.ast }
 
-method package_var($/, $slot, $name, $path, :$list, :$hash) {
+method package_var($/, $slot, $name, $path) {
     $/.CURSOR.trymop({
         $/.CURSOR.check_categorical($slot);
-        $*CURLEX<!sub>.add_common_name($slot,
-            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref,
-            $name, |mnode($/));
+        my $ref = $path.^can('xref') ?? $path.xref !!
+            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref;
+        $*CURLEX<!sub>.add_common_name($slot, $ref, $name, |mnode($/));
         $*CURLEX<!sub>.lexicals-used{$slot} = True;
     });
     ::Op::Lexical.new(|node($/), name => $slot);
 }
 
 method term:name ($/) {
-    my ($id, $path) = self.mangle_longname($<longname>).<name path>;
+    my ($name) = self.process_name($<longname>, :defer);
 
-    $id = '&' ~ $id if $<args>;
+    if $<args> {
+        $name<name>  = '&' ~ $name<name> if $name<name>;
+        $name<iname> = mkstringycat($/, '&', $name<iname>) if $name<iname>;
+    }
 
-    if defined $path {
-        make self.package_var($/, self.gensym, $id, $path);
+    if $name<iname> {
+        make ::Op::IndirectVar.new(|node($/), name => $name<iname>);
+    }
+    elsif $name<pkg> {
+        make self.package_var($/, self.gensym, $name<name>, $name<pkg>);
     } else {
-        make mklex($/, $id);
+        make mklex($/, $name<name>);
     }
 
     if $<postcircumfix> {
@@ -1621,7 +1633,6 @@ method term:reduce ($/) {
         ]);
 }
 
-
 method do_variable_reference($M, $v) {
     if $v<term> {
         return $v<term>;
@@ -1632,15 +1643,15 @@ method do_variable_reference($M, $v) {
     my $list = $v<sigil> eq '@';
     my $hash = $v<sigil> eq '%';
 
-    if defined($v<rest>) && $tw ~~ /<[*=~?^:]>/ {
+    if defined($v<pkg>) && $tw ~~ /<[*=~?^:]>/ {
         $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
         return ::Op::StatementList.new;
     }
 
     if $tw eq '!' {
         my $pclass;
-        if $v<rest> {
-            $pclass = $*CURLEX<!sub>.compile_get_pkg(@($v<rest>)).xref;
+        if $v<pkg> {
+            $pclass = $v<pkg>.xref;
         } elsif $*CURLEX<!sub>.in_class -> $c {
             $pclass = $c;
         } else {
@@ -1651,7 +1662,7 @@ method do_variable_reference($M, $v) {
             :$pclass));
     }
     elsif $tw eq '.' {
-        if defined $v<rest> {
+        if defined $v<pkg> {
             $M.CURSOR.sorry('$.Foo::bar syntax NYI');
             return ::Op::StatementList.new;
         }
@@ -1667,9 +1678,8 @@ method do_variable_reference($M, $v) {
         ::Op::ContextVar.new(|node($M), name => $sl);
     }
     elsif $tw eq '' || $tw eq '?' {
-        if defined($v<rest>) {
-            self.package_var($M, self.gensym, $sl, $v<rest>,
-                hash => ($v<sigil> eq '%'), list => ($v<sigil> eq '@'))
+        if defined($v<pkg>) {
+            self.package_var($M, self.gensym, $sl, $v<pkg>);
         } elsif $tw eq '?' && $sl eq '$?POSITION' {
             mkcall($M, '&infix:<..^>',
                 ::Op::Num.new(|node($M), value => [10, ~$M.from]),
@@ -1706,37 +1716,22 @@ method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
 
-    my ($name, $rest);
-    my $dsosl = $<desigilname> ?? $<desigilname>.ast !!
+    my ($name, $pkg);
+    my ($dsosl) = $<desigilname> ?? $<desigilname>.ast !!
         $<sublongname> ?? $<sublongname>.ast !!
         Any;
-    if defined($dsosl) && defined($dsosl<ind>) {
+    if defined($dsosl<ind>) {
         make { term => self.docontext($/, $sigil, $dsosl<ind>) };
         return;
+    } elsif defined($dsosl<iname>) {
+        make { term => ::Op::IndirectVar.new(|node($/),
+            name => mkstringycat($/, $sigil ~ $twigil, $dsosl<iname>)) };
+        return;
     } elsif defined $dsosl {
-        ($name, $rest) = $dsosl<name path>;
+        ($name, $pkg) = $dsosl<name pkg>;
     } elsif $<infixish> {
         make { term => $<infixish>.ast.as_function($/) };
         return;
-    } elsif $<name> {
-        # Both these cases are marked XXX in STD.  I agree.  What are they for?
-        if $<name>[0].ast<dc> {
-            $/.CURSOR.sorry("*ONE* pair of leading colons SHALL BE ENOUGH");
-            make { term => ::Op::StatementList.new };
-            return;
-        }
-        if substr(~$/,0,3) eq '$::' {
-            $rest = $<name>[0].ast.<names>;
-            $name = pop $rest;
-        } else {
-            if $<name>[0].ast<names> > 1 {
-                $/.CURSOR.sorry("Nonsensical attempt to qualify a self-declared named parameter detected");
-                make { term => ::Op::StatementList.new };
-                return;
-            }
-            $name = $<name>[0].ast<names>[0];
-            $twigil = ':';
-        }
     } elsif $<special_variable> {
         $name = substr(~$<special_variable>, 1);
     } elsif $<index> {
@@ -1767,7 +1762,7 @@ method variable($/) {
     }
 
     make {
-        sigil => $sigil, twigil => $twigil, name => $name, rest => $rest
+        sigil => $sigil, twigil => $twigil, name => $name, pkg => $pkg
     };
 }
 
@@ -2201,8 +2196,7 @@ method declarator($/) {
                     typeconstraint => $type, |mnode($/));
                 $param = Op::Lexical.new(name => $slot, |node($/));
             } elsif $*SCOPE eq 'our' {
-                $param = self.package_var($/, $slot, $slot, ['OUR'], :$list,
-                    :$hash);
+                $param = self.package_var($/, $slot, $slot, ['OUR']);
             } else {
                 $sub.add_my_name($slot, :$list, :$hash,
                     typeconstraint => $type, |mnode($/));
@@ -2333,7 +2327,7 @@ method variable_declarator($/) {
         $/.CURSOR.sorry("Scope $scope requires a name");
     }
 
-    if defined $v<rest> {
+    if defined($v<pkg>) || defined($v<iname>) {
         $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
     }
 
@@ -2354,7 +2348,7 @@ method variable_declarator($/) {
         make Op::StateDecl.new(|node($/), inside =>
             Op::Lexical.new(|node($/), name => $slot, :$list, :$hash));
     } elsif $scope eq 'our' {
-        make self.package_var($/, $slot, $slot, ['OUR'], :$list, :$hash);
+        make self.package_var($/, $slot, $slot, ['OUR']);
     } else {
         $/.CURSOR.trymop({
             $/.CURSOR.check_categorical($slot);
@@ -2597,19 +2591,18 @@ method process_block_traits($/, @tr) {
     my $pack = $sub.body_of;
     for @tr -> $T {
         my $tr = $T.ast;
-        if $pack && ($tr<name>:exists) {
-            my ($name, $path) = $tr<name path>;
+        if $pack && $tr<name> {
+            my $super = $tr<name>;
 
-            $T.CURSOR.sorry("superclass $name declared outside of any class"),
+            $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
                 next unless $sub.body_of;
-            $T.CURSOR.sorry("superclass $name declared in an augment"),
+            $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
                 next if $sub.augmenting;
             $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
                 next if !$*unit.deref($pack).^can('add_super');
 
             $T.CURSOR.trymop({
-                $*unit.deref($pack).add_super($sub.compile_get_pkg(
-                    @($path // []), $name).xref);
+                $*unit.deref($pack).add_super($super.xref);
             });
         } elsif $pack && $tr<export> {
             my @exports = @( $tr<export> );
@@ -3123,7 +3116,8 @@ method trait_mod:is ($/) {
     my $noparm;
 
     if $/.CURSOR.is_name($trait) {
-        make self.mangle_longname($<longname>);
+        my ($name) = self.process_name($<longname>);
+        make { name => $name };
         $noparm = 'Superclasses cannot have parameters';
     } elsif $trait eq 'export' {
         make { export => [ 'DEFAULT', 'ALL' ] };
@@ -3194,7 +3188,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$longname, :$method_type is copy, :$contextual is copy) {
 
     $multiness ||= 'only';
-    my ($pkg, $name) = self.process_name($longname, :declaring, :sigil(""));
+    my ($pkg, $name) = self.process_name($longname, :declaring);
 
     if !$scope {
         if !defined($name) {
