@@ -2751,36 +2751,39 @@ get_dynamic:
             v = Kernel.AnyMO.typeVar;
         }
 
-        void ReparseCore(string key, bool final, string sigil, bool reparse,
-                out StashCursor sc, out Variable v, Variable bind_to) {
-            sc = this;
-            int ix1 = 0;
+        public Variable Indirect(string key, bool bind_ro, Variable bind_to) {
+            StashCursor sc = this;
             StashCursor r;
-            if (reparse) while (true) {
+            Variable v;
+            int ix1 = 0;
+            string sigil = "";
+            while (true) {
                 int ix2 = key.IndexOf("::", ix1);
                 if (ix2 < 0) {
                     key = key.Substring(ix1);
                     break;
                 }
-                sc.Core(key.Substring(ix1, ix2-ix1), false, out r, out v, null);
+                string elt = key.Substring(ix1, ix2 - ix1);
+                while (elt.Length > 0 && "$&@%?=.!*~".IndexOf(elt[0]) >= 0) {
+                    sigil = sigil + elt.Substring(0,1);
+                    elt = elt.Substring(1);
+                }
                 ix1 = ix2+2;
-                sc = r;
+
+                if (elt != "") {
+                    sc.Core(elt, false, out r, out v, null);
+                    sc = r;
+                }
             }
-            if (sigil != null) key = sigil + key;
-            sc.Core(key, final, out sc, out v, bind_to);
-        }
-
-        public StashCursor NonFinal(string key, bool reparse) {
-            StashCursor r1; Variable r2;
-            ReparseCore(key, false, null, reparse, out r1, out r2, null);
-            return r1;
-        }
-
-        public Variable Final(string key, string sigil, bool reparse,
-                Variable bind_to) {
-            StashCursor r1; Variable r2;
-            ReparseCore(key, true, sigil, reparse, out r1, out r2, bind_to);
-            return r2;
+            key = sigil + key;
+            if (bind_to != null) {
+                bool list = key != "" && (key[0] == '@' || key[0] == '%');
+                bind_to = Kernel.NewBoundVar(list ? Kernel.NBV_LIST :
+                    bind_ro ? Kernel.NBV_RO : Kernel.NBV_RW, Kernel.MuMO,
+                    bind_to); // XXX should use types maybe?
+            }
+            sc.Core(key, true, out r, out v, bind_to);
+            return v;
         }
     }
 

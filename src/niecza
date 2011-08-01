@@ -30,7 +30,12 @@ class Op::IndirectVar is Op {
     has Op $.bind;
     method zyg() { $!name }
 
-    method code($body) { die "NYI" }
+    method code($body) {
+        CgOp.sc_indir(CgOp.sc_root(), CgOp.obj_getstr($!name.cgop($body)),
+            CgOp.bool($!bind_ro ?? 1 !! 0),
+            $!bind ?? $!bind.cgop($body) !! CgOp.null('var'))
+    }
+
     method to_bind($/, $ro, $rhs) { self.new(name => $!name, bind_ro => $ro,
         bind => $rhs) }
 }
@@ -39,7 +44,7 @@ class Op::IndirectVar is Op {
 augment class NieczaActions {
 }
 
-CgOp._register_ops: < who
+CgOp._register_ops: < who sc_root sc_indir
 >;
 
 my $usage = q:to/EOM/;

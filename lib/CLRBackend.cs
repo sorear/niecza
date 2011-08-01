@@ -3638,8 +3638,7 @@ dynamic:
                             th.scope_stack.Count));
             };
 
-            thandlers["sc_nonfinal"] = Methody(null, Tokens.StashCursor.GetMethod("NonFinal"));
-            thandlers["sc_final"] = Methody(null, Tokens.StashCursor.GetMethod("Final"));
+            thandlers["sc_indir"] = Methody(null, Tokens.StashCursor.GetMethod("Indirect"));
 
             thandlers["return"] = CpsOp.CpsReturn;
             thandlers["ternary"] = delegate(CpsOp[] z) {
