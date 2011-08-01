@@ -187,11 +187,6 @@ method unqual_longname($/, $what, $clean?) {
     return $h<name>;
 }
 
-method simple_longname($/) {
-    my $r = self.mangle_longname($/);
-    [ @( $r<path> // [] ), $r<name> ]
-}
-
 # this is to be the one place where names are processed
 
 # MODES
