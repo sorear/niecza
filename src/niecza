@@ -199,6 +199,10 @@ method desigilname($/) {
     }
 }
 
+method morename($/) {
+    make ($<identifier> ?? $<identifier>.ast !! $<EXPR> ?? $<EXPR>.ast !! Any);
+}
+
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
@@ -472,6 +476,8 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean) {
 
     my @ns = @( $<name>.ast<names> );
     my $ext = '';
+    my $trail = @ns && !defined @ns[*-1];
+    pop @ns if $trail;
 
     if !$clean {
         for @( $<colonpair> ) {
@@ -494,6 +500,10 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean) {
     }
 
     if $declaring {
+        # class :: is ... { } is a placeholder for a lack of name
+        return () if $trail && !@ns;
+        $/.CURSOR.sorry("Illegal explicit declaration of a symbol table")
+            if $trail;
         die "Unimplemented" if $defer;
         return () unless @ns;
         my $head = pop(@ns) ~ $ext;
@@ -512,6 +522,7 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean) {
             # the variable rule.  I would like to combine logic eventually,
             # when I figure out better how.
 
+            goto "dyn" if $trail;
             goto "dyn" if $_.^isa(Op) for @ns;
             my $pkg;
             my @tail = @ns;
@@ -524,9 +535,12 @@ method process_name($/, :$declaring, :$defer, :$method, :$clean) {
 dyn:
             my @bits = map { $_, '::' }, @ns;
             pop @bits if @bits;
+            push @bits, '::' if $trail;
             return { iname => mkstringycat($/, @bits) };
         }
 
+        $/.CURSOR.sorry("Class required, but symbol table name used instead")
+            if $trail;
         return () unless @ns;
         my $head = pop(@ns) ~ $ext;
         my $pkg;
