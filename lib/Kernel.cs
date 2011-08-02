@@ -617,7 +617,7 @@ namespace Niecza {
                 int from = si.fixups_from;
                 if (TraceLoad)
                     Console.WriteLine("Finishing load of sub {0} \"{1}\" from {2:X}", i, si.name, from);
-                si.cur_pkg = ((STable)ReadXref(ref from)).who;
+                si.cur_pkg = ((STable)ReadXref(ref from));
                 ReadSignature(si, ref from);
                 if (TraceLoad) Console.WriteLine("Sig loaded");
                 int ph = heap[from++];
@@ -791,7 +791,7 @@ namespace Niecza {
         public LAD ltm;
 
         public int special;
-        public P6any cur_pkg;
+        public STable cur_pkg;
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;
@@ -2674,7 +2674,8 @@ tryagain:
             else if (type == ROOT) {
                 // semantic root, handles most of the special names
                 if (key == "OUR") {
-                    throw new NieczaException("OUR NYI");
+                    v = ToInfo().cur_pkg.typeVar;
+                    goto have_v;
                 } else if (key == "GLOBAL") {
                     sc.p1 = Kernel.GlobalO;
                     sc.type = WHO;
@@ -2712,7 +2713,7 @@ tryagain:
                     n.type = WHO;
                     n.p1 = (key == "PARENT" || key.Length > 0 &&
                             "$&@%".IndexOf(key[0]) >= 0)
-                        ? null // OUR NYI
+                        ? ToInfo().cur_pkg.who
                         : Kernel.GlobalO;
                     n.Core(key, final, out sc, out v, bind_to);
                     return;
