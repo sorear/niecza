@@ -42,6 +42,151 @@ class Op::IndirectVar is Op {
 
 
 augment class NieczaActions {
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    my $start;
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } elsif $t.ast<dynamic> {
+        } elsif $t.ast<start> && $*SCOPE eq 'state' {
+            $start = $t.ast<start>;
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        ($typeconstraint) = self.process_name($*OFTYPE<longname>);
+        $typeconstraint &&= $typeconstraint.xref;
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    }
+
+    if !defined($v<name>) && $scope ne any < my anon state > {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+    }
+
+    if defined($v<pkg>) || defined($v<iname>) {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon' || !defined($v<name>))
+        ?? self.gensym !! $name;
+
+    if $scope eq 'has' {
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.',
+            $typeconstraint);
+    } elsif $scope eq 'state' {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
+                :$hash, :$typeconstraint, |mnode($/));
+        });
+        make Op::StateDecl.new(|node($/), inside =>
+            Op::Lexical.new(|node($/), name => $slot, :$list, :$hash));
+    } elsif $scope eq 'our' {
+        make self.package_var($/, $slot, $slot, ['OUR']);
+    } else {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
+                :$typeconstraint, |mnode($/));
+        });
+        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+    }
+
+    if $start {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($/.ast, -> $ll {
+            Op::StatementList.new(|node($/), children => [
+                Op::Start.new(condvar => $cv, body =>
+                    self.inliney_call($/, $start, $ll)), $ll ]) });
+    }
+}
+
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
+
+    my ($name, $pkg);
+    my ($dsosl) = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        $<longname> ?? self.process_name($<longname>, :defer) !!
+        Any;
+    if defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return;
+    } elsif defined($dsosl<iname>) {
+        make { term => ::Op::IndirectVar.new(|node($/),
+            name => mkstringycat($/, $sigil ~ $twigil, $dsosl<iname>)) };
+        return;
+    } elsif defined $dsosl {
+        ($name, $pkg) = $dsosl<name pkg>;
+    } elsif $<infixish> {
+        make { term => $<infixish>.ast.as_function($/) };
+        return;
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            mkcall($/, '&postcircumfix:<[ ]>',
+                ::Op::Lexical.new(name => '$/'),
+                ::Op::Num.new(value => $<index>.ast))
+        };
+        return Nil;
+    } elsif $<postcircumfix> {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
+                mkcall($/, '&postcircumfix:<{ }>',
+                    ::Op::Lexical.new(name => '$/'),
+                    @( $<postcircumfix>[0].ast.args))
+            };
+            return;
+        } else {
+            make { term => self.docontext($/, $sigil, $<postcircumfix>[0].ast.args[0]) };
+            return;
+        }
+    } else {
+        $name = '';
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, pkg => $pkg
+    };
+}
+
 }
 
 CgOp._register_ops: < who sc_root sc_indir

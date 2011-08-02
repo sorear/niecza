@@ -74,6 +74,7 @@ class Builder {
 $GLOBAL::TEST-BUILDER = Builder.bless(*);
 $GLOBAL::TEST-BUILDER.reset;
 
+sub cmp_ok(\$a, $fn, \$b, $tag?) is export { ok($fn($a, $b), $tag); }
 sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }
 sub nok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(!$bool, $tag) }
 sub skip_rest($tag?) is export { } #OK
