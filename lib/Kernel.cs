@@ -2544,6 +2544,8 @@ tryagain:
                 if (f == null)
                     throw new NieczaException("No more calling frames");
                 r.p1 = f;
+                r.p2 = f.info.FindControlEnt(f.ip, SubInfo.ON_VARLOOKUP, null);
+                if (r.p2 < 0) r.p2 = 0;
             }
             return r;
         }
@@ -2558,8 +2560,7 @@ tryagain:
                 r.p1 = f;
                 if (f == null)
                     throw new NieczaException("No more outer frames");
-                r.p2 = f.info.FindControlEnt(f.ip, SubInfo.ON_VARLOOKUP, null);
-                if (r.p2 < 0) r.p2 = 0;
+                r.p2 = 0;
             }
             return r;
         }
