@@ -2565,12 +2565,41 @@ tryagain:
 
         bool TryLexOut(string key, bool rbar_w, ref Variable o) {
             StashCursor sc = this;
+            if (key.Length >= 2 && key[1] == '*') {
+                return TryDynamic(key, rbar_w, ref o);
+            }
             while (true) {
                 if (sc.TryLex(key, rbar_w, ref o)) return true;
                 if ((sc.p1 as Frame).outer == null && sc.p2 == 0)
                     return false;
                 sc = sc.ToOuter();
             }
+        }
+
+        bool TryDynamic(string key, bool rbar_w, ref Variable o) {
+            StashCursor sc = this;
+            while (true) {
+                if (sc.TryLex(key, rbar_w, ref o)) {
+                    return true;
+                }
+                if (!sc.HasCaller())
+                    break;
+                sc = sc.ToCaller();
+            }
+            if (key.Length >= 2 && key[1] == '*') {
+                key = key.Remove(1,1);
+                BValue bv;
+
+                if (Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.GlobalO).
+                        TryGetValue(key, out bv) ||
+                    Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.ProcessO).
+                        TryGetValue(key, out bv)) {
+
+                    if (rbar_w) { bv.v = o; } else { o = bv.v; }
+                    return true;
+                }
+            }
+            return false;
         }
 
         bool TryLex(string key, bool rbar_w, ref Variable o) {
@@ -2598,7 +2627,15 @@ tryagain:
             sc = this;
             if (type == DYNA) {
                 // DYNAMIC::{key}, no special names used
-                goto get_dynamic;
+                v = bind_to;
+                if (TryDynamic(key, (bind_to != null), ref v)) {
+                    if (bind_to != null) return;
+                    goto have_v;
+                }
+                if (bind_to != null)
+                    throw new NieczaException("No slot to bind");
+                v = Kernel.AnyMO.typeVar;
+                goto have_v;
             }
             else if (type == WHO) {
                 // only special type is PARENT, maybe not even that?
@@ -2664,6 +2701,11 @@ tryagain:
                     sc.type = DYNA;
                     goto have_sc;
                 } else {
+                    v = bind_to;
+                    if (TryLexOut(key, bind_to != null, ref v)) {
+                        if (bind_to != null) return;
+                        goto have_v;
+                    }
                     StashCursor n = default(StashCursor);
                     n.type = WHO;
                     n.p1 = (key == "PARENT" || key.Length > 0 &&
@@ -2696,9 +2738,6 @@ tryagain:
                     sc = sc.ToOuter();
                     goto have_sc;
                 }
-                else if (key.Length >= 2 && key[1] == '*') {
-                    goto get_dynamic;
-                }
                 else {
                     v = bind_to;
                     if (TryLexOut(key, bind_to != null, ref v)) {
@@ -2717,38 +2756,18 @@ tryagain:
 
 have_sc:
             if (!final) return;
-            throw new NieczaException("PP NYI");
+            if (bind_to != null)
+                throw new NieczaException("cannot bind a psuedo package");
+            v = MakePackage(key, Kernel.BoxRaw(sc, Kernel.PseudoStashMO));
+            return;
 
 have_v:
             if (final) return;
-            throw new NieczaException("VIV NYI");
-
-get_dynamic:
-            v = bind_to;
-            while (true) {
-                if (sc.TryLex(key, (bind_to != null), ref v)) {
-                    if (bind_to != null) return;
-                    goto have_v;
-                }
-                if (!sc.HasCaller())
-                    break;
-                sc = sc.ToCaller();
-            }
-            if (key.Length >= 2 && key[1] == '*') {
-                key = key.Remove(1,1);
-                BValue bv;
-
-                if (Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.GlobalO).
-                        TryGetValue(key, out bv) ||
-                    Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.ProcessO).
-                        TryGetValue(key, out bv)) {
-
-                    if (bind_to != null) { bv.v = bind_to; return; }
-                    else { v = bv.v; goto have_v; }
-                }
-            }
-            if (bind_to != null) throw new NieczaException("No slot to bind");
-            v = Kernel.AnyMO.typeVar;
+            if (v.rw || v.Fetch().IsDefined())
+                throw new NieczaException(key + " is not a stash");
+            sc.type = WHO;
+            sc.p1 = v.Fetch().mo.who;
+            return;
         }
 
         public Variable Indirect(string key, bool bind_ro, Variable bind_to) {
