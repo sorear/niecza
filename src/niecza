@@ -42,6 +42,46 @@ class Op::IndirectVar is Op {
 
 
 augment class NieczaActions {
+method term:name ($/) {
+    my ($name) = self.process_name($<longname>, :defer);
+
+    if $<args> {
+        $name<name>  = '&' ~ $name<name> if $name<name>;
+        $name<iname> = mkstringycat($/, '&', $name<iname>) if $name<iname>;
+    }
+
+    if $name<iname> {
+        make ::Op::IndirectVar.new(|node($/), name => $name<iname>);
+    }
+    elsif $name<pkg> {
+        make self.package_var($/, self.gensym, $name<name>, $name<pkg>);
+    } else {
+        make mklex($/, $name<name>);
+    }
+
+    my @pc = @( $<postcircumfix> );
+    if @pc && @pc[0].substr(0,1) eq '[' {
+        make mkcall($/, '&_param_role_inst', $/.ast, @( @pc[0].ast.args ));
+        shift @pc;
+    } elsif $<args> {
+        my $sal = $<args>.ast // [];
+        # TODO: support zero-D slicels
+
+        if $sal > 1 {
+            $/.CURSOR.sorry("Slicel lists are NYI");
+            return;
+        }
+
+        make ::Op::CallSub.new(|node($/), invocant => $/.ast,
+            args => $sal[0] // []);
+    }
+
+    if @pc {
+        make @pc[0].ast.with_args($/, $/.ast);
+    }
+}
+
+
 method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");

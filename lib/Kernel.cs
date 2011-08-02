@@ -2761,7 +2761,7 @@ have_sc:
             if (bind_to != null)
                 throw new NieczaException("cannot bind a psuedo package");
             {
-                P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
+                P6any who = Kernel.BoxRaw(this, Kernel.PseudoStashMO);
                 who.SetSlot("name", Kernel.BoxAnyMO(key, Kernel.StrMO));
                 v = MakePackage(key, who);
             }
@@ -2789,6 +2789,7 @@ have_v:
             Variable v;
             int ix1 = 0;
             string sigil = "";
+            string last = "ROOT";
             while (true) {
                 int ix2 = key.IndexOf("::", ix1);
                 if (ix2 < 0) {
@@ -2804,10 +2805,20 @@ have_v:
 
                 if (elt != "") {
                     sc.Core(elt, false, out r, out v, null);
+                    last = elt;
                     sc = r;
                 }
             }
             key = sigil + key;
+            if (key == "") {
+                if (bind_to != null)
+                    throw new NieczaException("Cannot bind to a stash");
+                if (sc.type == WHO)
+                    return Kernel.NewROScalar((P6any) sc.p1);
+                P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
+                who.SetSlot("name", Kernel.BoxAnyMO(last, Kernel.StrMO));
+                return Kernel.NewROScalar(who);
+            }
             if (bind_to != null) {
                 bool list = key != "" && (key[0] == '@' || key[0] == '%');
                 bind_to = Kernel.NewBoundVar(list ? Kernel.NBV_LIST :
