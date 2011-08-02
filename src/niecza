@@ -23,6 +23,121 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD {
+my package DEBUG { our constant symtab = 1 }
+
+method lookup_lex($name, $lex is copy = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("Lookup $name") if $deb;
+    my $sub = $lex.^isa(Hash) ?? $lex<!sub> !! $lex;
+    my $sub2 = $sub;
+    loop {
+        if $sub.lexicals{$name}:exists {
+            until $sub2 === $sub || $sub2.lexicals-used{$name} {
+                $sub2.lexicals-used{$name} //=
+                    ($*FILE<name> => self.lineof(self.pos));
+                $sub2 = $sub2.outer;
+            }
+            $sub2.lexicals-used{$name} //=
+                ($*FILE<name> => self.lineof(self.pos)) if $sub2 === $sub;
+
+            self.deb("Found in $sub.name()") if $deb;
+            return $sub.lexicals{$name};
+        }
+        $sub = $sub.outer || last;
+    }
+    self.deb("Not found") if $deb;
+    return Any;
+}
+
+method is_name($longname, $curlex = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("is_name $longname") if $deb;
+    if defined($longname.index("::(")) {
+        self.deb("computed name gets a free pass") if $deb;
+        return True;
+    }
+    my @parts = $longname.split('::');
+    shift @parts if @parts[0] eq '';
+    pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
+
+    @parts[*-1] = $/ ~ @parts[*-1] if @parts && @parts[0] ~~ s/^(\W\W?)//;
+
+    self.deb("reparsed: @parts.perl()") if $deb;
+    return True if !@parts;
+
+    my ($pkg, $sub);
+
+    given @parts[0] {
+        when 'OUR' {
+            $pkg = $*unit.deref($curlex<!sub>.cur_pkg);
+            shift @parts;
+            goto "packagey";
+        }
+        when 'PROCESS' | 'GLOBAL' {
+            $pkg = $*unit.abs_pkg(shift @parts);
+            goto "packagey";
+        }
+        when 'MY'      { $sub = $curlex<!sub>;                 goto "lexy"; }
+        when 'OUTER'   { $sub = $curlex<!sub>.?outer;          goto "lexy"; }
+        when 'UNIT'    { $sub = $curlex<!sub>.?to_unit;        goto "lexy"; }
+        when 'CORE'    { $sub = $curlex<!sub>.?true_setting;   goto "lexy"; }
+        when 'SETTING' { $sub = $curlex<!sub>.?to_unit.?outer; goto "lexy"; }
+
+        when 'COMPILING' | 'DYNAMIC' | 'CALLER' { return True }
+
+        default {
+            my $lexical = self.lookup_lex(@parts[0], $curlex);
+            if !defined($lexical) || @parts[0] eq 'PARENT' {
+                return False if @parts == 1; # $x doesn't mean GLOBAL
+                $pkg = (@parts[0] ~~ /^\W/) ??
+                    $*unit.deref($curlex<!sub>.cur_pkg) !!
+                    $*unit.abs_pkg('GLOBAL');
+            } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
+                $pkg = $*unit.deref($lexical.pkg);
+                shift @parts;
+            } else {
+                return @parts == 1;
+            }
+            goto "packagey";
+        }
+    }
+
+lexy:
+    shift @parts;
+    return False unless $sub;
+    return True unless @parts;
+    given @parts[0] {
+        when 'OUTER'   { $sub = $sub.?outer;          goto "lexy"; }
+        when 'UNIT'    { $sub = $sub.?to_unit;        goto "lexy"; }
+        when 'SETTING' { $sub = $sub.?to_unit.?outer; goto "lexy"; }
+        when 'CALLER'  { return True; }
+    }
+
+    my $lexical = self.lookup_lex(@parts[0], $sub);
+    unless defined $lexical {
+        self.deb("Lexical @parts[0] not found") if $deb;
+        return False;
+    }
+    if $lexical ~~ ::Metamodel::Lexical::Stash {
+        shift @parts;
+        $pkg = $*unit.deref($lexical.pkg);
+        goto "packagey";
+    }
+    else {
+        return @parts == 1;
+    }
+
+packagey:
+    for @parts {
+        return False if !$pkg || !$*unit.ns.exists($pkg.who, $_);
+        $pkg = $*unit.ns.get($pkg.who, $_);
+        $pkg = $pkg && $*unit.deref($pkg);
+    }
+
+    return True;
+}
+}
 
 class Op::IndirectVar is Op {
     has Op $.name;
@@ -42,6 +157,118 @@ class Op::IndirectVar is Op {
 
 
 augment class NieczaActions {
+method process_name($/, :$declaring, :$defer, :$clean) {
+    return () unless defined $/;
+
+    my @ns = @( $<name>.ast<names> );
+    my $ext = '';
+    my $trail = @ns && !defined @ns[*-1];
+    pop @ns if $trail;
+
+    if !$clean {
+        for @( $<colonpair> ) {
+            $ext ~= $_.ast<ext> // (
+                $_.CURSOR.sorry("Invalid colonpair for name extension");
+                "";
+            )
+        }
+    }
+
+    for $defer ?? () !! @ns.grep(Op) {
+        $_ = ~self.trivial_eval($/, $_);
+        # XXX should this always stringify?
+        if $_ ~~ Cool {
+            $_ = ~$_;
+        } else {
+            $_ = "XXX";
+            $/.CURSOR.sorry("Name components must evaluate to strings");
+        }
+    }
+
+    if $declaring {
+        # class :: is ... { } is a placeholder for a lack of name
+        return () if $trail && !@ns;
+        $/.CURSOR.sorry("Illegal explicit declaration of a symbol table")
+            if $trail;
+        die "Unimplemented" if $defer;
+        return () unless @ns;
+        my $head = pop(@ns) ~ $ext;
+        return Any, $head unless @ns;
+
+        # the remainder is assumed to name an existing or new package
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, :auto);
+        });
+        return $pkg, $head;
+    }
+    else {
+        if $defer {
+            # The stuff returned here is processed by the variable rule,
+            # and also by method call generation
+
+            goto "dyn" if $trail;
+            goto "dyn" if $_.^isa(Op) for @ns;
+            my $pkg;
+            my @tail = @ns;
+            my $head = pop(@tail) ~ $ext;
+            unless @tail {
+                goto "dyn" if $head eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT >;
+                return { name => $head } unless @tail;
+            }
+            try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
+            goto "dyn" unless $pkg;
+
+            return { name => $head, pkg => $pkg };
+dyn:
+            my @bits = map { $_, '::' }, @ns;
+            pop @bits if @bits;
+            push @bits, '::' if $trail;
+            return { iname => mkstringycat($/, @bits) };
+        }
+
+        $/.CURSOR.sorry("Class required, but symbol table name used instead")
+            if $trail;
+        return () unless @ns;
+        my $head = pop(@ns) ~ $ext;
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, $head);
+        });
+        return $pkg;
+    }
+}
+
+method term:identifier ($/) {
+    my $id  = $<identifier>.ast;
+    my $sal = $<args> ?? ($<args>.ast // []) !! [];
+    # TODO: support zero-D slicels
+
+    if $sal > 1 {
+        $/.CURSOR.sorry("Slicel lists are NYI");
+        make ::Op::StatementList.new;
+        return;
+    }
+
+    if $id eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT > {
+        make Op::IndirectVar.new(|node($/),
+            name => Op::StringLiteral.new(text => $id));
+        return;
+    }
+    my $is_name = $/.CURSOR.is_name(~$<identifier>);
+
+    if $is_name && $<args>.chars == 0 {
+        make mklex($/, $id);
+        return;
+    }
+
+    my $args = $sal[0] // [];
+
+    make ::Op::CallSub.new(|node($/),
+        invocant => mklex($/, $is_name ?? $id !! '&' ~ $id),
+        args => $args);
+}
+
 method term:name ($/) {
     my ($name) = self.process_name($<longname>, :defer);
 
