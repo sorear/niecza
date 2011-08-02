@@ -962,6 +962,11 @@ my class Stash {
 
 my class PseudoStash {
     has $.name;
+
+    method at_key($key)        {
+        Q:CgOp { (pstash_at_key (@ {self}) (obj_getstr {$key})) } }
+    method bind_key($key, \$to) {
+        Q:CgOp { (pstash_bind_key (@ {self}) (obj_getstr {$key}) {$to}) } }
 }
 
 my class Hash {

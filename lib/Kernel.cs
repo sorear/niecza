@@ -2520,6 +2520,7 @@ tryagain:
             st.mo.isPackage = true;
             // XXX should be PackageHOW
             st.how = new BoxObject<STable>(st, Kernel.AnyMO.how.mo, 0);
+            st.mo.Revalidate();
             return st.typeVar;
         }
 
@@ -2643,7 +2644,7 @@ tryagain:
                 Variable whov = Kernel.NewROScalar(who);
                 Variable keyv = Kernel.BoxAnyMO(key, Kernel.StrMO);
                 if (bind_to != null) {
-                    who.mo.mro_bind_key.Bind(whov, keyv, bind_to);
+                    v = who.mo.mro_bind_key.Bind(whov, keyv, bind_to);
                     return;
                 }
                 v = who.mo.mro_at_key.Get(whov, keyv);
@@ -2758,7 +2759,11 @@ have_sc:
             if (!final) return;
             if (bind_to != null)
                 throw new NieczaException("cannot bind a psuedo package");
-            v = MakePackage(key, Kernel.BoxRaw(sc, Kernel.PseudoStashMO));
+            {
+                P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
+                who.SetSlot("name", Kernel.BoxAnyMO(key, Kernel.StrMO));
+                v = MakePackage(key, who);
+            }
             return;
 
 have_v:
@@ -2768,6 +2773,13 @@ have_v:
             sc.type = WHO;
             sc.p1 = v.Fetch().mo.who;
             return;
+        }
+
+        internal Variable Raw(string key, Variable bind_to) {
+            Variable r;
+            StashCursor sc;
+            Core(key, true, out sc, out r, bind_to);
+            return r;
         }
 
         public Variable Indirect(string key, bool bind_ro, Variable bind_to) {

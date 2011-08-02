@@ -1997,4 +1997,12 @@ again:
         dd.Remove(key);
         return r.v;
     }
+
+    public static Variable pstash_at_key(P6any st, string key) {
+        return Kernel.UnboxAny<StashCursor>(st).Raw(key, null);
+    }
+
+    public static Variable pstash_bind_key(P6any st, string key, Variable to) {
+        return Kernel.UnboxAny<StashCursor>(st).Raw(key, to);
+    }
 }
