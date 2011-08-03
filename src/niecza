@@ -157,6 +157,21 @@ class Op::IndirectVar is Op {
 
 
 augment class NieczaActions {
+method circumfix:sym<( )> ($/) {
+    my @kids = @( $<semilist>.ast );
+    if @kids == 1 && @kids[0].^isa(::Op::WhateverCode) {
+        # XXX in cases like * > (2 + *), we *don't* want the parens to disable
+        # syntactic specialization, since they're required for grouping
+        make @kids[0];
+    } elsif !@kids {
+        # an empty StatementList returns Nil, but () needs to be defined...
+        make ::Op::Paren.new(|node($/), inside =>
+            ::Op::SimpleParcel.new(items => []));
+    } else {
+        make ::Op::StatementList.new(|node($/), children => @kids);
+    }
+}
+
 method process_name($/, :$declaring, :$defer, :$clean) {
     return () unless defined $/;
 

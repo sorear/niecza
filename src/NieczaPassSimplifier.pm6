@@ -85,6 +85,7 @@ sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) { #OK not used
 sub do_return_take($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     my $parcel = ($args == 1 ?? $args[0] !!
+        $args == 0 ?? ::Op::Lexical.new(name => 'Nil') !!
         ::Op::CallSub.new(invocant => ::Op::Lexical.new(name => '&infix:<,>'),
             positionals => [@$args]));
     return ($invname eq '&take' ??

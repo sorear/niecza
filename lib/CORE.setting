@@ -434,11 +434,11 @@ my class Submethod is Routine { }
 my class WhateverCode is Block { }
 
 my class ClassHOW {
-    method isa(Mu $obj, Mu $type) { Q:CgOp {
+    method isa(\$obj, \$type) { Q:CgOp {
         (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))
     } }
-    method does(Mu $obj, Mu $role) { self.isa($obj, $role) } #no roles yet
-    method can(Mu $obj, $name) { Q:CgOp {
+    method does(\$obj, \$role) { self.isa($obj, $role) } #no roles yet
+    method can(\$obj, $name) { Q:CgOp {
         (box Bool (obj_can (@ {$obj}) (obj_getstr {$name})))
     } }
 }
@@ -802,6 +802,13 @@ my class EMPTY { }
 my class List { ... }
 my class Array { ... }
 
+my class Nil is Cool {
+    method new() { Nil }
+    method iterator() { ().iterator }
+    method gist() { 'Nil' }
+    method Str() { '' }
+}
+
 my class Parcel is Cool {
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
@@ -817,8 +824,10 @@ my class Parcel is Cool {
 
     method unwrap-single(@self:) { Q:CgOp {
         (letn p (unbox fvarlist (@ {@self}))
-          (ternary (== (i 1) (fvarlist_length (l p)))
-            (fvarlist_item (i 0) (l p)) {@self}))
+              l (fvarlist_length (l p))
+          (ternary (== (i 0) (l l)) {Nil}
+            (ternary (== (i 1) (l l))
+              (fvarlist_item (i 0) (l p)) {@self})))
     } }
 
     method Capture () {
@@ -855,8 +864,6 @@ my class Parcel is Cool {
         @tok.join(" ");
     }
 }
-
-constant Nil = Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) };
 
 my class List is Cool {
     has @!items;

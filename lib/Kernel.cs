@@ -127,6 +127,9 @@ namespace Niecza {
             if (!rw) {
                 throw new NieczaException("Writing to readonly scalar");
             }
+            if (v == Kernel.NilP) {
+                v = type.initObject;
+            }
             if (!v.Does(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
             }
@@ -643,6 +646,11 @@ namespace Niecza {
 
             mo.fixups_from = from;
 
+            if (this.name == "CORE" && name == "Nil") {
+                // this anomalous type object is iterable
+                mo.typeVar = Kernel.NewRWListVar(mo.typeObject);
+            }
+
             return mo;
         }
 
@@ -1006,6 +1014,7 @@ namespace Niecza {
                     src = pos[posc++];
                     goto gotit;
                 }
+get_default:
                 if ((flags & SIG_F_HASDEFAULT) != 0) {
                     Frame thn = Kernel.GetInferiorRoot()
                         .MakeChild(th, (SubInfo) rbuf[rbase + 1 + names],
@@ -1047,6 +1056,13 @@ gotit:
                     bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
                     P6any srco  = src.Fetch();
 
+                    // XXX: in order for calling methods on Nil to work,
+                    // self needs to be ignored here.
+                    if (srco == Kernel.NilP && obj_src != -1 &&
+                            (flags & SIG_F_INVOCANT) == 0) {
+                        obj_src = -1;
+                        goto get_default;
+                    }
                     if (!srco.Does(type)) {
                         if (quiet) return null;
                         if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
@@ -2981,6 +2997,7 @@ have_v:
         public static STable CaptureMO;
         public static STable GatherIteratorMO;
         public static STable IterCursorMO;
+        public static P6any NilP;
         public static P6any AnyP;
         public static P6any ArrayP;
         public static P6any EMPTYP;

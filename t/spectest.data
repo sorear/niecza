@@ -10,6 +10,7 @@ S02-builtin_data_types/bool.t
 S02-builtin_data_types/catch_type_cast_mismatch.t
 S02-builtin_data_types/flattening.t
 S02-builtin_data_types/nested_pairs.t
+S02-builtin_data_types/nil.t
 S02-builtin_data_types/parsing-bool.t
 S02-builtin_data_types/subscripts_and_context.t
 S02-lexical-conventions/unicode.t
