@@ -352,7 +352,7 @@ my class Num is Real {
     our constant i  = sqrt(-1);
     method Num() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
@@ -362,12 +362,12 @@ my class Int is Real {
     method niecza_quantifier_min() { self }
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 my class Rat is Real {
     method new($n,$d) { $n / $d }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
     method nude() { [ self.numerator, self.denominator ] }
@@ -375,7 +375,7 @@ my class Rat is Real {
 my class Complex is Numeric {
     method new($re,$im) { $re + $im\i }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method Complex() { self }
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
@@ -384,14 +384,14 @@ my class Complex is Numeric {
 my class FatRat is Real {
     method new($n,$d) { FatRat.succ * $n / $d }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(Mu $t) { defined(self) ?? self == $t !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method numerator() { Q:CgOp { (fatrat_nu {self}) } }
     method denominator() { Q:CgOp { (fatrat_de {self}) } }
     method nude() { [ self.numerator, self.denominator ] }
 }
 
 my class Str is Cool {
-    method ACCEPTS(Mu $t) { defined(self) ?? self eq $t !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self eq $t !! $t.^does(self) }
     method chars() { chars(self) }
     method say() { $PROCESS::OUTPUT_USED := 1; Q:CgOp {
         (prog [say (unbox str (@ {self}))]
@@ -417,7 +417,7 @@ my class Code is Callable {
 }
 
 my class Block is Code {
-    method ACCEPTS(Mu $t) { defined(self) ?? (self)($t) !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? (self)($t) !! $t.^does(self) }
     method count() { Q:CgOp { (count (@ {self})) } }
     method arity() { Q:CgOp { (arity (@ {self})) } }
 }
@@ -499,7 +499,7 @@ my class StrBasedEnum is CommonEnum {
 
 my enum Bool < False True >;
 augment class Bool {
-    method ACCEPTS(Mu $t) { defined(self) ?? self !! $t.^does(self) }
+    method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
 }
 # }}}
 # Fundamental scalar operators {{{
@@ -578,22 +578,22 @@ sub split($matcher,$str,$limit?,:$all) { (~$str).split($matcher,$limit,:$all) }
 
 sub item(Mu $x) { $x }
 
-sub prefix:<not> is Niecza::absprec<h=> (Mu $x) { not($x) }
-sub defined(Mu $x) is Niecza::builtin('defined',1,1) { defined($x) }
+sub prefix:<not> is Niecza::absprec<h=> (\$x) { not($x) }
+sub defined(\$x) is Niecza::builtin('defined',1,1) { defined($x) }
 
 sub prefix:<-->  is Niecza::absprec<x=> is Niecza::builtin('predec',1,1) ($v is rw) { $v = $v.pred; $v }
 sub prefix:<++>  is Niecza::absprec<x=> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
 sub postfix:<--> is Niecza::absprec<x=> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
 sub postfix:<++> is Niecza::absprec<x=> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
 
-sub prefix:<~>(Mu $v) is Niecza::builtin('asstr', 1, 1) { ~$v }
-sub prefix:<?>(Mu $v) is Niecza::builtin('asbool', 1, 1) { ?$v }
-sub prefix:<->(Mu $v) is Niecza::builtin('negate', 1, 1) { -$v }
-sub prefix:<+>(Mu $v) is Niecza::builtin('num', 1, 1) { +$v }
-sub prefix:<!>(Mu $v) is Niecza::builtin('not', 1, 1) { !$v }
+sub prefix:<~>(\$v) is Niecza::builtin('asstr', 1, 1) { ~$v }
+sub prefix:<?>(\$v) is Niecza::builtin('asbool', 1, 1) { ?$v }
+sub prefix:<->(\$v) is Niecza::builtin('negate', 1, 1) { -$v }
+sub prefix:<+>(\$v) is Niecza::builtin('num', 1, 1) { +$v }
+sub prefix:<!>(\$v) is Niecza::builtin('not', 1, 1) { !$v }
 
-sub not(Mu $v) is Niecza::builtin('not', 1, 1)    { not($v) }
-sub so(Mu $v)  is Niecza::builtin('asbool', 1, 1) { so $v }
+sub not(\$v) is Niecza::builtin('not', 1, 1)    { not($v) }
+sub so(\$v)  is Niecza::builtin('asbool', 1, 1) { so $v }
 
 sub infix:<x> is Niecza::absprec<s=> ($str, $ct) {
     my $i = +$ct;
@@ -706,7 +706,7 @@ my class Label {
 }
 
 # XXX multi dispatch
-sub _lexotic ($id, $x, Mu $val) {
+sub _lexotic ($id, $x, \$val) {
     Q:CgOp {
         (letn fr (null frame)
               nm (null str)
@@ -763,7 +763,7 @@ sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
 # Array: mutable list of read-write scalar boxes
 
 sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
-sub head(\$x) { for $x -> Mu $elt { return $elt }; Any }
+sub head(\$x) { for $x -> \$elt { return $elt }; Any }
 
 my class Iterator {
     method list () {
@@ -794,7 +794,7 @@ sub hash(|$cap) {
 }
 
 my class Whatever {
-    method ACCEPTS(Mu $x) { defined(self) || $x.^isa(Whatever) }
+    method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
 }
 
 my class EMPTY { }
@@ -807,9 +807,17 @@ my class Nil is Cool {
     method iterator() { ().iterator }
     method gist() { 'Nil' }
     method Str() { '' }
+    method flat() { self.iterator.flat }
+    method list() { self.iterator.list }
+    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method Capture () { ().Capture }
+    method elems  () { 0 }
+    method Numeric() { 0 }
+    method Bool   () { False }
 }
 
 my class Parcel is Cool {
+    method ACCEPTS(\$what) { defined(self) ?? self.flat.ACCEPTS($what) !! nextsame }
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
     method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
@@ -932,6 +940,17 @@ my class List is Cool {
             $t = (defined($t) ?? ($t ~ $sep ~ $x) !! ~$x);
         }
         $t // '';
+    }
+
+    method ACCEPTS(\$topic) {
+        self // nextsame;
+        my @t = $topic.list;
+        # TODO: Whatever-DWIMmery
+        return False unless self.elems == @t.elems;
+        for ^self.elems {
+            return False unless self.at_pos($_) === @t[$_];
+        }
+        True;
     }
 
     method Str()  { defined(self) ?? self.join(" ") !! nextsame }
@@ -1136,12 +1155,12 @@ my class Junction is Mu {
     my @kinds = <all none one any>;
     method perl() {
         defined(self) ?? (@kinds[self!kind] ~ "(" ~
-            join(", ", map -> Mu $x { $x.perl }, @$!eigenstates) ~ ")") !! "Junction"
+            join(", ", map -> \$x { $x.perl }, @$!eigenstates) ~ ")") !! "Junction"
     }
 
     method Str() { defined(self) ?? self.perl !! "Junction()" }
 
-    method from-parcel(Int $kind, Mu $pcl) {
+    method from-parcel(Int $kind, \$pcl) {
         self!create($kind, $pcl)
     }
 
@@ -1473,8 +1492,8 @@ my class Grammar is Cursor {
 # }}}
 # Other operators {{{
 # TODO: these should be macros
-sub WHAT(Mu $x) { $x.WHAT }
-sub HOW(Mu $x) { $x.HOW }
+sub WHAT(\$x) { $x.WHAT }
+sub HOW(\$x) { $x.HOW }
 constant Inf = 1 / 0;
 my class RangeIter is IterCursor {
     has $.current;
@@ -1778,7 +1797,7 @@ sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) { !$a }
 sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ +$limit }
-sub prefix:<so> is Niecza::absprec<h=> (Mu $item) { ?$item }
+sub prefix:<so> is Niecza::absprec<h=> (\$item) { ?$item }
 sub infix:<xx> is Niecza::absprec<s=> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (abs {$x}) } }
 sub abs($x) { Q:CgOp { (abs {$x}) } }

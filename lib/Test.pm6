@@ -82,7 +82,7 @@ sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag); True }
 sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
 sub isa_ok(Mu $obj, Mu $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
 sub is_deeply($a,$b,$c) is export { is $a.perl, $b.perl, $c }
-sub is(Mu $got, Mu $expected, $tag?) is export {
+sub is(\$got, \$expected, $tag?) is export {
 
     # avoid comparing twice
     my $equal = (~$got) eq (~$expected);
