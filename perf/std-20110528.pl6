@@ -16,14 +16,5 @@ sub bench($name, $nr, $f) {
     say "$name = {($time - $avg)*1e6}µs [{$time*$nr}s / $nr]";
 }
 
-"foo" ~~ /./;
-
-my $f1 = sub () { $/ };
-my $f2 = sub () { };
-my $f3 = { $/ };
-my $f4 = {; };
-
-bench 'use $/ (sub)', 1000000, sub () { $f1() };
-bench 'baseline (sub)', 1000000, sub () { $f2() };
-bench 'use $/ (block)', 1000000, sub () { $f3() };
-bench 'baseline (block)', 1000000, sub () { $f4() };
+my $f = sub () { };
+bench 'sub call', 1000000, sub () { $f() };

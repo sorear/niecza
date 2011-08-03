@@ -1172,7 +1172,7 @@ noparams:
                 else
                     th.pos[th.lexi0] = (Variable)th.lex9;
                 th.caller.resultSlot = Kernel.NewROScalar(nj);
-                return th.caller;
+                return th.Return();
             }
 
             if (th.lexi0 == -2)
@@ -1503,6 +1503,10 @@ noparams:
             while (f != null) { ix++; f = f.caller; }
             while (spacey.Count <= ix) { spacey.Add(new String(' ', spacey.Count * 2)); }
             return spacey[ix];
+        }
+
+        public Frame Return() {
+            return caller;
         }
     }
 
@@ -2941,7 +2945,7 @@ have_v:
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
             return CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
-                    th.caller, post, th.named);
+                    th.Return(), post, th.named);
         }
 
         private static SubInfo JunctionFallbackSI = new SubInfo("Junction.FALLBACK", JunctionFallbackC);
@@ -2968,7 +2972,7 @@ have_v:
                 nj.slots[0] = th.lex2;
                 nj.slots[1] = Kernel.BoxRaw(dst, Kernel.ParcelMO);
                 th.caller.resultSlot = Kernel.NewROScalar(nj);
-                return th.caller;
+                return th.Return();
             }
 
             Variable[] npos = (Variable[]) th.lex4;
@@ -3308,7 +3312,7 @@ have_v:
             if (root == null)
                 return Kernel.Die(th, "No matching candidates to dispatch for " + dth.info.name);
 
-            if (tailcall) th = th.caller;
+            if (tailcall) th = th.Return();
             return root.info.Binder(th, root.outer, root.ip6,
                     dth.pos, dth.named, false, root);
         }
@@ -3537,7 +3541,7 @@ ltm:
 
 again:      if (i == prog.Length) {
                 th.caller.resultSlot = NewROScalar(n);
-                return th.caller;
+                return th.Return();
             }
 
             Variable vx;
@@ -3806,7 +3810,7 @@ slow:
                 ContextHandler<Variable> cv, object cvb, object cvu) {
             DynBlockDelegate dbd = delegate (Frame th) {
                 th.caller.resultSlot = cv.Get((Variable)th.lex0);
-                return th.caller;
+                return th.Return();
             };
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
             si.sig_i = new int[3] {
@@ -3823,7 +3827,7 @@ slow:
             DynBlockDelegate dbd = delegate (Frame th) {
                 th.caller.resultSlot = cv.Get((Variable)th.lex0,
                         (Variable)th.lex1);
-                return th.caller;
+                return th.Return();
             };
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
             si.sig_i = new int[6] {
@@ -3843,7 +3847,7 @@ slow:
                 Variable[] chop = new Variable[fullpc.Length - 1];
                 Array.Copy(fullpc, 1, chop, 0, chop.Length);
                 th.caller.resultSlot = cv.Invoke((Variable)th.lex0, chop);
-                return th.caller;
+                return th.Return();
             };
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
             si.sig_i = new int[6] {
@@ -3883,7 +3887,7 @@ def:        return at.Get(self, index);
             DynBlockDelegate dbd = delegate (Frame th) {
                 th.caller.resultSlot = DispIndexy(at, exist, del, bind,
                     th.named, (Variable)th.lex0, (Variable)th.lex1);
-                return th.caller;
+                return th.Return();
             };
 
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
@@ -3941,7 +3945,7 @@ def:        return at.Get(self, index);
                         }
                         if (!cache_ok) {
                             return ((STable) th.lex0).mo.roleFactory.
-                                Invoke(th.caller, to_pass, null);
+                                Invoke(th.Return(), to_pass, null);
                         }
                         th.lex1 = s;
                         bool ok;
@@ -3951,7 +3955,7 @@ def:        return at.Get(self, index);
                                 TryGetValue((string) th.lex1, out r);
                         if (ok) {
                             th.caller.resultSlot = NewROScalar(r);
-                            return th.caller;
+                            return th.Return();
                         }
                         th.ip = 1;
                         return ((STable) th.lex0).mo.roleFactory.
@@ -3963,7 +3967,7 @@ def:        return at.Get(self, index);
                             = ((Variable) th.resultSlot).Fetch();
                     }
                     th.caller.resultSlot = th.resultSlot;
-                    return th.caller;
+                    return th.Return();
                 default:
                     return Die(th, "Invalid IP");
             }

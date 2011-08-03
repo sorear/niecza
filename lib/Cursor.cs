@@ -201,7 +201,7 @@ public sealed class RxFrame {
                 th.caller.resultSlot = EmptyList;
             }
 
-            return th.caller;
+            return th.Return();
         } else {
             th.ip = bt.ip;
             st = bt.st;
@@ -476,7 +476,7 @@ public sealed class RxFrame {
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
         th.caller.resultSlot = Kernel.NewROScalar(_matchObj);
-        return th.caller;
+        return th.Return();
     }
     public Frame End(Frame th) {
         return EndWith(th, _matchObj);
@@ -504,7 +504,7 @@ public sealed class RxFrame {
             lst.slots[1 /*rest*/ ] = iss;
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
         }
-        return th.caller;
+        return th.Return();
     }
 }
 

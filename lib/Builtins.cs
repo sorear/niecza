@@ -1747,7 +1747,7 @@ again:
                     lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
                     th.lexi0 = 1;
-                    return th.caller;
+                    return th.Return();
                 }
                 if (pen == null) {
                     if (tailmode != 0)
@@ -1756,7 +1756,7 @@ again:
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
-                    return th.caller;
+                    return th.Return();
                 }
                 th.lex3 = pen;
                 th.ip = 1;
@@ -1878,7 +1878,7 @@ again:
                             lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
                             th.caller.resultSlot = Kernel.NewRWListVar(lst);
                             th.lexi0 = 1;
-                            return th.caller;
+                            return th.Return();
                         }
                     }
                     pen = src.Shift();
@@ -1890,7 +1890,7 @@ again:
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
-                    return th.caller;
+                    return th.Return();
                 }
                 th.lex3 = pen;
                 th.ip = 1;

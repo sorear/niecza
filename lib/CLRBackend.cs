@@ -1469,6 +1469,8 @@ namespace Niecza.CLRBackend {
             RuntimeUnit.GetMethod("LoadLAD");
         public static readonly MethodInfo RU_LoadLADArr =
             RuntimeUnit.GetMethod("LoadLADArr");
+        public static readonly MethodInfo Frame_Return =
+            Frame.GetMethod("Return");
 
         public static readonly FieldInfo P6any_mo =
             P6any.GetField("mo");
@@ -2420,7 +2422,7 @@ namespace Niecza.CLRBackend {
                 cx.il.Emit(OpCodes.Stfld, Tokens.Frame_resultSlot);
             }
             cx.il.Emit(OpCodes.Ldarg_0);
-            cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_caller);
+            cx.il.Emit(OpCodes.Call, Tokens.Frame_Return);
             cx.il.Emit(OpCodes.Ret);
         }
     }
