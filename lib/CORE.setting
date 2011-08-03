@@ -11,15 +11,17 @@ my class Mu {
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
+    method gist() { defined(self) ?? self.perl !! self.typename ~ '()' }
+    method Stringy() { self.Str }
     method Str() {
-        my $tn := Q:CgOp { (box Str (obj_typename (@ {self}))) };
         if defined(self) {
+            my $tn := Q:CgOp { (box Str (obj_typename (@ {self}))) };
             $tn ~ "()<instance>"
         } else {
-            $tn ~ "()"
+            warn "Use of uninitialized value in string context";
+            ""
         }
     }
-    method Stringy() { defined(self) ?? self.Str !! "" }
     method succ() { defined(self) ?? die("cannot increment a value of type {self.typename()}") !! 1 }
     method pred() { defined(self) ?? die("cannot decrement a value of type {self.typename()}") !! -1 }
     method notdef() { !defined(self) }
@@ -396,6 +398,7 @@ my class Str is Cool {
               [box Bool (bool 1)]
         )
     } }
+    method gist() { defined(self) ?? self !! nextsame }
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
     # XXX .trans
     method perl() { defined(self) ?? '"' ~ self ~ '"' !! self.typename }
@@ -447,7 +450,7 @@ my class CommonEnum {
     method perl()  {
         defined(self) ?? (self.typename ~ "::" ~ self.key) !! self.typename
     }
-    method Str()   {
+    method gist()   {
         defined(self) ?? (self.typename ~ "::" ~ self.key) !!
             (self.typename ~ "()")
     }
@@ -477,7 +480,8 @@ my class CommonEnum {
 my class IntBasedEnum is CommonEnum {
     method Numeric() { Q:CgOp { (box Int (unbox int (@ {self}))) } }
     method Int() { self.Numeric }
-    method Stringy() { self.key }
+    method Str() { defined(self) ?? self.key !! nextsame }
+    method Stringy() { defined(self) ?? self.key !! nextsame }
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox int (@ {$val.Int})))
           (setslot index (@ (l obj)) {$ix.Int})
@@ -486,7 +490,6 @@ my class IntBasedEnum is CommonEnum {
 }
 
 my class StrBasedEnum is CommonEnum {
-    method Stringy() { Q:CgOp { (box Str (unbox str (@ {self}))) } }
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox str (@ {$val.Str})))
           (setslot index (@ (l obj)) {$ix.Int})
@@ -541,9 +544,17 @@ sub warn($str) { $PROCESS::OUTPUT_USED := True; Q:CgOp {
     )
 } }
 
-sub say(*@text)   { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (say   (obj_getstr {@text.join('')}))) }; True }
-sub print(*@text) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (print (obj_getstr {@text.join('')}))) }; True }
-sub note(*@text)  { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (note  (obj_getstr {@text.join('')}))) }; True }
+sub gist(\|@items) { @items.gist }
+our sub Niecza::gistcat(\|@items) {
+    my @tok;
+    loop (my $i = 0; $i < @items.raw_elems; $i++) {
+        push @tok, @items.raw_at($i).gist;
+    }
+    @tok.join;
+}
+sub say(|$c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (say     (obj_getstr {Niecza::gistcat(|$c)}))) }; True }
+sub print(|$c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (print (obj_getstr {Niecza::gistcat(|$c)}))) }; True }
+sub note(|$c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (note   (obj_getstr {Niecza::gistcat(|$c)}))) }; True }
 
 sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])
@@ -835,6 +846,14 @@ my class Parcel is Cool {
     method Numeric() { + @(self) }
     method Str    () { ~ @(self) }
     method Bool   () { ? @(self) }
+    method gist   () {
+        self // nextsame;
+        my @tok;
+        loop (my $i = 0; $i < self.raw_elems; $i++) {
+            push @tok, self.raw_at($i).gist;
+        }
+        @tok.join(" ");
+    }
 }
 
 constant Nil = Q:CgOp { (newrwlistvar (@ (box Parcel (fvarlist_new)))) };
@@ -908,7 +927,8 @@ my class List is Cool {
         $t // '';
     }
 
-    method Str() { defined(self) ?? self.join(" ") !! nextsame }
+    method Str()  { defined(self) ?? self.join(" ") !! nextsame }
+    method gist() { defined(self) ?? self.join(" ") !! nextsame }
 
     method sort($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
@@ -1113,7 +1133,6 @@ my class Junction is Mu {
     }
 
     method Str() { defined(self) ?? self.perl !! "Junction()" }
-    method Stringy() { self.FALLBACK("Stringy") }
 
     method from-parcel(Int $kind, Mu $pcl) {
         self!create($kind, $pcl)

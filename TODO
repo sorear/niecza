@@ -37,12 +37,11 @@ MEDIUM
   *Find out what readonly subs are supposed to do with lists, etc and implement
    that.  Also add return-rw, take-rw, and the is rw trait for subs and attrs.
 
-   Methods with variable names need to call the correct action method.  (See
-   the horrible hack in NieczaActions.FALLBACK).
-
    Add :rotate - depends on sized numbers.
 
    Add Buf bitops.
+
+   Implement warning exceptions.
 
 HARD
 
@@ -58,16 +57,11 @@ HARD
   *Parallel hyperops!  Read the Cilk papers, they seem to have a data
    parallelism model most similar to what Perl 6 needs.
 
-  *Understand the Str/Stringy distinctions, and improve stringification
-   and numification handling for Any.  Develop a warning system.
-
   *Explicitly imprecise error reporting.  In many circumstances niecza
    doesn't actually have an exact line number; it should be able to
    report a range.
 
   *Finish roles.
-
-   MY::, CALLER::, OUTER::, UNIT:: et al
 
    Study Nil and find the correct way to integrate it into Niecza.
 
