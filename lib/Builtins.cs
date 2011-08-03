@@ -1044,7 +1044,8 @@ public class Builtins {
 
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(c1, c2, out rem);
-            if (red.Sign < 0 && rem.Sign != 0) red--;
+            if (c2.Sign > 0 && rem.Sign < 0) red--;
+            if (c2.Sign < 0 && rem.Sign > 0) red++;
 
             return MakeFatRat(c1 - red*cd, cd);
         }
@@ -1058,7 +1059,8 @@ public class Builtins {
 
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(c1, c2, out rem);
-            if (red.Sign < 0 && rem.Sign != 0) red--;
+            if (c2.Sign > 0 && rem.Sign < 0) red--;
+            if (c2.Sign < 0 && rem.Sign > 0) red++;
 
             return MakeFixRat(c1 - red*c2, cd);
         }
@@ -1067,7 +1069,8 @@ public class Builtins {
             BigInteger v2 = PromoteToBigInt(r2, n2);
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(v1, v2, out rem);
-            if (red.Sign < 0 && rem.Sign != 0) red--;
+            if (v2.Sign > 0 && rem.Sign < 0) red--;
+            if (v2.Sign < 0 && rem.Sign > 0) red++;
             return MakeInt(v1 - v2*red);
         }
         {
@@ -1075,7 +1078,8 @@ public class Builtins {
             long v2 = PromoteToFixInt(r2, n2);
             long rem;
             long red = Math.DivRem(v1, v2, out rem);
-            if (red < 0 && rem != 0) red--;
+            if (v2 > 0 && rem < 0) red--;
+            if (v2 < 0 && rem > 0) red++;
             return MakeInt(v1 - v2*red);
         }
     }
@@ -1100,9 +1104,13 @@ public class Builtins {
             if (!b2) big2 = small2;
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(big1, big2, out rem);
-            if (opc >= 4 && red.Sign < 0 && rem.Sign != 0) {
+            if (opc >= 4 && big2.Sign > 0 && rem.Sign < 0) {
                 red--;
                 rem += big2;
+            }
+            if (opc >= 4 && big2.Sign < 0 && rem.Sign > 0) {
+                red++;
+                rem -= big2;
             }
             switch (opc & 3) {
                 case 0: return MakeInt(red);
@@ -1112,9 +1120,13 @@ public class Builtins {
         } else {
             int rem = small1 % small2;
             int red = small1 / small2;
-            if (opc >= 4 && red < 0 && rem != 0) {
+            if (opc >= 4 && small2 > 0 && rem < 0) {
                 red--;
                 rem += small2;
+            }
+            if (opc >= 4 && small2 < 0 && rem > 0) {
+                red++;
+                rem -= small2;
             }
             switch (opc & 3) {
                 case 0: return MakeInt(red);
