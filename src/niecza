@@ -160,56 +160,34 @@ enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
 }
 
 augment class NieczaActions {
-method statement_prefix:CATCH ($/) {
-    if any($*CURLEX<!sub>.children).is_phaser == ::Metamodel::Phaser::CATCH {
-        $/.CURSOR.sorry("Limit one CATCH phaser per block, please.");
-    }
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::CATCH;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:CONTROL ($/) {
-    if any($*CURLEX<!sub>.children).is_phaser == ::Metamodel::Phaser::CONTROL {
-        $/.CURSOR.sorry("Limit one CONTROL phaser per block, please.");
-    }
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::CONTROL;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:PRE ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::PRE;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:POST ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::POST;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:KEEP ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::KEEP;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:UNDO ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNDO;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:ENTER ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::ENTER;
-    make ::Op::StatementList.new;
-}
-method statement_prefix:LEAVE ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::LEAVE;
-    make ::Op::StatementList.new;
-}
+sub phaser($/, $ph, :$unique, :$topic, :$csp) {
+    my $sub = $<blast>.ast;
+    $sub.is_phaser = +::Metamodel::Phaser.($ph);
 
-method statement_prefix:CHECK ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
-    $*CURLEX<!sub>.create_static_pad;
-    make ::Op::StatementList.new;
-}
+    $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
+        if $unique && any($sub.outer.children).is_phaser == $sub.is_phaser;
 
-method statement_prefix:END ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::END;
-    $*CURLEX<!sub>.create_static_pad;
+    if $topic {
+        $sub.lexicals.<$_> // $sub.add_my_name('$_');
+        $sub.lexicals.<$_>.noinit   = True;
+        $sub.lexicals.<$_>.defouter = False;
+        $sub.signature = Sig.simple('$_');
+    }
+    $*CURLEX<!sub>.create_static_pad if $csp;
     make ::Op::StatementList.new;
 }
+method statement_prefix:CATCH ($/) { phaser($/, 'CATCH', :unique, :topic) }
+method statement_prefix:CONTROL ($/) { phaser($/, 'CONTROL', :unique, :topic) }
+method statement_prefix:PRE ($/) { phaser($/, 'PRE') }
+method statement_prefix:POST ($/) { phaser($/, 'POST', :topic) }
+method statement_prefix:KEEP ($/) { phaser($/, 'KEEP', :topic) }
+method statement_prefix:UNDO ($/) { phaser($/, 'UNDO', :topic) }
+method statement_prefix:ENTER ($/) { phaser($/, 'ENTER') }
+method statement_prefix:LEAVE ($/) { phaser($/, 'LEAVE', :topic) }
+
+method statement_prefix:CHECK ($/) { phaser($/, 'CHECK', :csp) }
+method statement_prefix:END ($/) { phaser($/, 'END', :csp) }
+method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 
 method init_constant($con, $rhs) {
     my $body = self.thunk_sub($rhs, name => "$con.name() init");
@@ -220,11 +198,6 @@ method init_constant($con, $rhs) {
     $con;
 }
 
-method statement_prefix:INIT ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::INIT;
-    $*CURLEX<!sub>.create_static_pad;
-    make ::Op::StatementList.new;
-}
 method statement_prefix:BEGIN ($/) {
     $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
     $*CURLEX<!sub>.create_static_pad;
