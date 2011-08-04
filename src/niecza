@@ -156,10 +156,49 @@ class Op::IndirectVar is Op {
 }
 
 augment class Metamodel {
-enum Phaser < INIT END UNIT_INIT >;
+enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
 }
 
 augment class NieczaActions {
+method statement_prefix:CATCH ($/) {
+    if any($*CURLEX<!sub>.children).is_phaser == ::Metamodel::Phaser::CATCH {
+        $/.CURSOR.sorry("Limit one CATCH phaser per block, please.");
+    }
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::CATCH;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:CONTROL ($/) {
+    if any($*CURLEX<!sub>.children).is_phaser == ::Metamodel::Phaser::CONTROL {
+        $/.CURSOR.sorry("Limit one CONTROL phaser per block, please.");
+    }
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::CONTROL;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:PRE ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::PRE;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:POST ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::POST;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:KEEP ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::KEEP;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:UNDO ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNDO;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:ENTER ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::ENTER;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:LEAVE ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::LEAVE;
+    make ::Op::StatementList.new;
+}
+
 method statement_prefix:CHECK ($/) {
     $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
     $*CURLEX<!sub>.create_static_pad;
