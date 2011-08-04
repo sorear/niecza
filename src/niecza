@@ -226,7 +226,7 @@ method package_def ($/) {
             outer_direct => $*CURLEX<!sub>,
             cur_pkg    => $sub.cur_pkg,
             name       => 'ANON',
-            is_phaser  => +::Metamodel::Phaser::INIT;
+            is_phaser  => +::Metamodel::Phaser::INIT,
             augment_hack => $ah,
             class      => 'Code',
             code       => ::Op::StatementList.new(children => []),

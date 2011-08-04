@@ -2860,11 +2860,20 @@ have_v:
             PhaserBanks[i].Push(NewROScalar(v));
         }
 
+        // not listed: BEGIN, CHECK (cannot be implemented in this model),
+        // START (desugared using state), FIRST, NEXT, LAST (use masak code)
         public const int PHASER_INIT = 0;
         public const int PHASER_END = 1;
         public const int PHASER_UNIT_INIT = 2;
-
-        public const int PHASER_TYPES = 3;
+        public const int PHASER_KEEP = 3;
+        public const int PHASER_UNDO = 4;
+        public const int PHASER_LEAVE = 5;
+        public const int PHASER_ENTER = 6;
+        public const int PHASER_PRE = 7;
+        public const int PHASER_POST = 8;
+        public const int PHASER_CATCH = 9;
+        public const int PHASER_CONTROL = 10;
+        public const int PHASER_TYPES = 11;
 
         public static void FirePhasers(int i, bool lifo) {
             while (PhaserBanks[i].Count() != 0)

@@ -125,7 +125,7 @@ sub do_atpos($body, $nv, $invname, $op) { #OK not used
 }
 
 sub run_optree($body, $op, $nv) {
-    die "WTF" if !defined $nv;
+    die "WTF in $body.name() / $body.xref()" if !defined $op;
     my @kids := flat($op.ctxzyg($nv));
     my $i = 0;
     while $i < @kids {
