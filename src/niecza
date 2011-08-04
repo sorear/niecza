@@ -155,8 +155,113 @@ class Op::IndirectVar is Op {
         bind => $rhs) }
 }
 
+augment class Metamodel {
+enum Phaser < INIT END UNIT_INIT >;
+}
 
 augment class NieczaActions {
+method statement_prefix:CHECK ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+
+method statement_prefix:END ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::END;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+
+method init_constant($con, $rhs) {
+    my $body = self.thunk_sub($rhs, name => "$con.name() init");
+    $body.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
+    $body.hint_hack = [ $*CURLEX<!sub>.xref, $con.name ];
+    $body.outer.create_static_pad;
+    $con.init = True;
+    $con;
+}
+
+method statement_prefix:INIT ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::INIT;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+}
+method statement_prefix:BEGIN ($/) {
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
+    $*CURLEX<!sub>.create_static_pad;
+    make ::Op::StatementList.new;
+
+    # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
+    repeat while False {
+        my $c = $<blast>.ast.code;
+
+        last unless $c ~~ Op::StatementList;
+        last unless $c.children == 1;
+        my $d = $c.children.[0];
+        last unless $d ~~ Op::CallMethod;
+        last unless $d.receiver ~~ Op::ContextVar;
+        last unless $d.receiver.name eq '@*INC';
+        last if $d.private || $d.ismeta;
+        last unless $d.name eq any <push unshift>;
+        last unless +$d.getargs == 1;
+        last unless defined my $str = self.trivial_eval($/, $d.getargs.[0]);
+        @*INC."$d.name()"($str);
+    }
+}
+
+method package_def ($/) {
+    my $sub = $*CURLEX<!sub>;
+
+    my $bodyvar = self.gensym;
+    $sub.outer.add_my_sub($bodyvar, $sub);
+    $sub.code = ($<blockoid> // $<statementlist>).ast;
+
+    if $sub.augmenting {
+        my $ah = $sub.augment_hack;
+        $sub.augment_hack = Any;
+
+        my $ph = ::Metamodel::StaticSub.new(
+            unit       => $*unit,
+            outerx     => $sub.xref,
+            outer_direct => $*CURLEX<!sub>,
+            cur_pkg    => $sub.cur_pkg,
+            name       => 'ANON',
+            is_phaser  => +::Metamodel::Phaser::INIT;
+            augment_hack => $ah,
+            class      => 'Code',
+            code       => ::Op::StatementList.new(children => []),
+            run_once   => $sub.run_once);
+        $sub.create_static_pad;
+        $sub.add_child($ph);
+
+        make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
+    }
+    else {
+        my $obj = $*unit.deref($sub.body_of);
+
+        if $<stub> {
+            push $*unit.stubbed_stashes, ($obj => $/.CURSOR);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
+        }
+        else {
+            $/.CURSOR.trymop({ $obj.close; });
+
+            if $obj ~~ ::Metamodel::ParametricRole {
+                $sub.parametric_role_hack = $obj.xref;
+                $sub.add_my_name('*params', :noinit);
+                $sub.create_static_pad;
+
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                    ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
+        }
+    }
+}
+
 method circumfix:sym<( )> ($/) {
     my @kids = @( $<semilist>.ast );
     if @kids == 1 && @kids[0].^isa(::Op::WhateverCode) {

@@ -4675,10 +4675,10 @@ dynamic:
                 CpsOp.GetSField(unit.mainline_ref.Resolve<StaticSub>().subinfo),
                 CpsOp.StringLiteral("$?FILE"), CpsOp.StringLiteral(unit.filename ?? "(eval)")));
             thaw.Add(CpsOp.MethodCall(Tokens.Kernel_FirePhasers,
-                CpsOp.IntLiteral(2), CpsOp.BoolLiteral(false)));
+                CpsOp.IntLiteral(Kernel.PHASER_UNIT_INIT), CpsOp.BoolLiteral(false)));
             if (asmain)
                 thaw.Add(CpsOp.MethodCall(Tokens.Kernel_FirePhasers,
-                    CpsOp.IntLiteral(0), CpsOp.BoolLiteral(false)));
+                    CpsOp.IntLiteral(Kernel.PHASER_INIT), CpsOp.BoolLiteral(false)));
             // settings are incomplete modules and have no mainline to run
             if (unit.is_eval) {
                 if (Verbose > 0) Console.WriteLine("mainline_runner(eval)");

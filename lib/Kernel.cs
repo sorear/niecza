@@ -2860,6 +2860,12 @@ have_v:
             PhaserBanks[i].Push(NewROScalar(v));
         }
 
+        public const int PHASER_INIT = 0;
+        public const int PHASER_END = 1;
+        public const int PHASER_UNIT_INIT = 2;
+
+        public const int PHASER_TYPES = 3;
+
         public static void FirePhasers(int i, bool lifo) {
             while (PhaserBanks[i].Count() != 0)
                 RunInferior((lifo ? PhaserBanks[i].Pop() :
@@ -4177,8 +4183,9 @@ def:        return at.Get(self, index);
         public static P6any ProcessO;
 
         static Kernel() {
-            PhaserBanks = new VarDeque[] { new VarDeque(), new VarDeque(),
-                new VarDeque() };
+            PhaserBanks = new VarDeque[PHASER_TYPES];
+            for (int i = 0; i < PHASER_TYPES; i++)
+                PhaserBanks[i] = new VarDeque();
 
             CodeMO = new STable("Code");
             CodeMO.FillProtoClass(new string[] { "outer", "info" });
