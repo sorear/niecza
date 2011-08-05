@@ -2017,4 +2017,30 @@ again:
     public static Variable pstash_bind_key(P6any st, string key, Variable to) {
         return Kernel.UnboxAny<StashCursor>(st).Raw(key, to);
     }
+
+    static SubInfo TEMP_SI = new SubInfo("KERNEL Scalar.TEMP", TEMP_C);
+    static Frame TEMP_C(Frame th) {
+        ((Variable)th.outer.lex0).Store((P6any)th.outer.lex1);
+        return th.Return();
+    }
+
+    public static Variable temporize(Variable v, Frame fr, int mode) {
+        int type = (mode & 1) != 0 ? LeaveHook.UNDO : LeaveHook.UNDO + LeaveHook.KEEP;
+        if ((mode & 2) != 0) {
+            fr.PushLeave(type, v.Fetch());
+        }
+        else if (v.islist) {
+            fr.PushLeave(type, Kernel.RunInferior(v.Fetch().InvokeMethod(
+                    Kernel.GetInferiorRoot(), "TEMP",
+                    new Variable[] { v }, null)).Fetch());
+        }
+        else {
+            Frame o = new Frame();
+            o.lex0 = v;
+            o.lex1 = v.Fetch();
+            fr.PushLeave(type, Kernel.MakeSub(TEMP_SI, o));
+        }
+
+        return v;
+    }
 }

@@ -1319,6 +1319,7 @@ noparams:
             reusable_child.ip = 0;
             reusable_child.resultSlot = null;
             reusable_child.lexn = (info.nspill != 0) ? new object[info.nspill] : null;
+            reusable_child.on_leave = null;
             reusable_child.lex = null;
             reusable_child.lex0 = null;
             reusable_child.lex1 = null;

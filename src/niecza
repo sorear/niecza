@@ -139,6 +139,14 @@ packagey:
 }
 }
 
+class Op::Temporize is Op {
+    has Op $.var;
+    has Int $.mode;
+    method zyg() { $!var }
+    method code($body) { CgOp.temporize($!var.code($body), CgOp.callframe,
+        CgOp.int($!mode)) }
+}
+
 class Op::IndirectVar is Op {
     has Op $.name;
     has Bool $.bind_ro;
@@ -159,7 +167,37 @@ augment class Metamodel {
 enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
 }
 
+class Operator::Let is Operator {
+    method with_args($/, *@args) {
+        $*CURLEX<!sub>.noninlinable;
+        return ::Op::Temporize.new(|node($/), mode => 1, var => @args[0]);
+    }
+}
+
+augment class Operator::Temp {
+    method with_args($/, *@args) {
+        my $rarg = @args[0];
+        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
+            $*CURLEX<!sub>.noninlinable;
+            return ::Op::Temporize.new(|node($/), mode => 0, var => $rarg);
+        }
+        my $hash = substr($rarg.name,0,1) eq '%';
+        my $list = substr($rarg.name,0,1) eq '@';
+        $*CURLEX<!sub>.add_my_name($rarg.name, :$hash, :$list);
+        mkcall($/, '&infix:<=>',
+            ::Op::Lexical.new(name => $rarg.name, :$hash, :$list),
+            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+    }
+}
+
 augment class NieczaActions {
+method statement_control:TEMP ($/) {
+    $*CURLEX<!sub>.noninlinable;
+    make ::Op::Temporize.new(|node($/), mode => 2,
+        var => self.inliney_call($/, $<block>.ast));
+}
+method prefix:let ($/) { make ::Operator::Let.new }
+
 sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     my $sub = $<blast>.ast;
     $sub.outer.noninlinable;
@@ -589,7 +627,7 @@ method variable($/) {
 
 }
 
-CgOp._register_ops: < who sc_root sc_indir
+CgOp._register_ops: < who sc_root sc_indir temporize
 >;
 
 my $usage = q:to/EOM/;
