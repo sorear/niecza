@@ -4247,8 +4247,8 @@ dynamic:
                     a(j("obj_getbool"), a(j("subcall"), j(""),
                             a(j("_makesub"), z))),
                     a(j("prog")),
-                    a(j("sink"),a("die",
-                            "Precondition failed in " + sub.name))));
+                    a(j("sink"),a(j("die"),
+                            j("Precondition failed in " + sub.name)))));
             }
 
             foreach (StaticSub z in sub.GetPhasers(Kernel.PHASER_POST)) {

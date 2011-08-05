@@ -62,6 +62,9 @@ S03-smartmatch/any-str.t
 S04-declarations/multiple.t
 S04-declarations/my.t
 S04-declarations/state.t
+S04-phasers/enter-leave.t
+S04-phasers/keep-undo.t
+S04-phasers/pre-post.t
 S04-statement-modifiers/for.t
 S04-statement-modifiers/given.t
 S04-statement-modifiers/if.t
