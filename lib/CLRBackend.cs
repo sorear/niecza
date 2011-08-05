@@ -956,6 +956,16 @@ namespace Niecza.CLRBackend {
                 lexicals[i].Value.BindFields(ix, i, this,
                         lexicals[i].Key, binder);
         }
+
+        internal List<StaticSub> GetPhasers(int t1) {
+            int t2 = (t1 == Kernel.PHASER_KEEP) ? Kernel.PHASER_LEAVE : t1;
+            List<StaticSub> r = new List<StaticSub>();
+            foreach (int i in zyg) {
+                StaticSub z = unit.xref[i] as StaticSub;
+                if (z.is_phaser >= t1 && z.is_phaser <= t2) r.Add(z);
+            }
+            return r;
+        }
     }
 
     abstract class Lexical {
@@ -3500,6 +3510,7 @@ dynamic:
                 bool until = ((JScalar)z[1]).num != 0;
                 bool once  = ((JScalar)z[2]).num != 0;
                 return CpsOp.While(until, once, th.Scan(z[3]), th.Scan(z[4])); };
+            thandlers["_pushleave"] = Methody(null, Tokens.Frame.GetMethod("PushLeave"));
             handlers["_makesub"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_MakeSub,
                     CpsOp.GetSField(((StaticSub)z[1]).subinfo),
@@ -4174,6 +4185,8 @@ dynamic:
             sub.unit.EmitByte(sub.is_phaser >= 0 ? sub.is_phaser : 0xFF);
         }
 
+        JScalar j(string s) { return new JScalar(s); }
+        object[] a(params object[] ax) { return ax; }
         void EnterCode(List<object> frags) {
             List<object> latefrags = new List<object>();
 
@@ -4182,9 +4195,12 @@ dynamic:
                 FieldInfo fi = CLRBackend.Current.tb.DefineField(
                         "RTFRAME", typeof(Frame),
                         FieldAttributes.Public | FieldAttributes.Static);
-                frags.Add(new object[] { new JScalar("_cpsop"),
-                    CpsOp.SetSField(fi, CpsOp.CallFrame()) });
+                frags.Add(a(j("_cpsop"),
+                    CpsOp.SetSField(fi, CpsOp.CallFrame())));
             }
+
+            // Lexpad setup: XXX should be done *before* entry, indeed
+            // before the binder, so defaults work right
 
             foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
                 if ((sub.flags & StaticSub.RUN_ONCE) != 0)
@@ -4192,11 +4208,9 @@ dynamic:
 
                 if (kv.Value is LexSub) {
                     LexSub ls = (LexSub) kv.Value;
-                    frags.Add(new object[] { new JScalar("scopedlex"),
-                        new JScalar(kv.Key),
-                        new object[] { new JScalar("newscalar"),
-                            new object[] { new JScalar("_makesub"),
-                                ls.def.Resolve<StaticSub>() } } });
+                    frags.Add(a(j("scopedlex"), j(kv.Key),
+                        a(j("newscalar"), a(j("_makesub"),
+                                ls.def.Resolve<StaticSub>()))));
                 } else if (kv.Value is LexSimple) {
                     LexSimple ls = kv.Value as LexSimple;
                     int f = ls.flags;
@@ -4207,33 +4221,59 @@ dynamic:
                         CpsOp.Null(Tokens.STable) :
                         CpsOp.GetSField(ls.type.Resolve<Package>().metaObject);
                     if ((f & LexSimple.ROINIT) != 0) {
-                        bit = new object[] { new JScalar("class_ref"),
-                            new JScalar("typeVar"), new JScalar("Any") };
+                        bit = a(j("class_ref"), j("typeVar"), j("Any"));
                     } else if ((f & LexSimple.DEFOUTER) != 0) {
-                        bit = new object[] { new JScalar("outerlex"),
-                            new JScalar(kv.Key) };
+                        bit = a(j("outerlex"), j(kv.Key));
                     } else if ((f & (LexSimple.HASH | LexSimple.LIST)) != 0) {
-                        string s = ((f & LexSimple.HASH) != 0) ?
-                            "newhash" : "newarray";
-                        bit = new object[] { new JScalar(s) };
+                        bit = a(j( ((f & LexSimple.HASH) != 0) ?
+                            "newhash" : "newarray" ));
                     } else {
-                        bit = new object[] { new JScalar("_newoftype"), tc };
+                        bit = a(j("_newoftype"), tc);
                     }
-                    frags.Add(new object[] { new JScalar("scopedlex"),
-                        new JScalar(kv.Key), bit });
+                    frags.Add(a(j("scopedlex"), j(kv.Key), bit));
                 } else if (kv.Value is LexLabel) {
-                    frags.Add(new object[] { new JScalar("scopedlex"),
-                        new JScalar(kv.Key),
-                        new object[] { new JScalar("_newlabel"),
-                            new JScalar(kv.Key) } });
+                    frags.Add(a(j("scopedlex"), j(kv.Key),
+                        a(j("_newlabel"), j(kv.Key))));
                 } else if (kv.Value is LexDispatch) {
-                    latefrags.Add(new object[] { new JScalar("scopedlex"),
-                        new JScalar(kv.Key),
-                        new object[] { new JScalar("_newdispatch"),
-                            new JScalar(kv.Key) } });
+                    latefrags.Add(a(j("scopedlex"), j(kv.Key),
+                        a(j("_newdispatch"), j(kv.Key))));
                 }
             }
             foreach (object lf in latefrags) frags.Add(lf);
+
+            // PRE
+            foreach (StaticSub z in sub.GetPhasers(Kernel.PHASER_PRE)) {
+                frags.Add(a(j("ternary"),
+                    a(j("obj_getbool"), a(j("subcall"), j(""),
+                            a(j("_makesub"), z))),
+                    a(j("prog")),
+                    a(j("sink"),a("die",
+                            "Precondition failed in " + sub.name))));
+            }
+
+            foreach (StaticSub z in sub.GetPhasers(Kernel.PHASER_POST)) {
+                frags.Add(a(j("_pushleave"),
+                    (sub.is_phaser == Kernel.PHASER_PRE ?
+                        a(j("frame_outer"), a(j("callframe"))) :
+                        a(j("callframe"))),
+                    a(j("int"), j(LeaveHook.POST.ToString())),
+                    a(j("_makesub"), z)));
+            }
+
+            // includes UNDO and LEAVE
+            foreach (StaticSub z in sub.GetPhasers(Kernel.PHASER_KEEP)) {
+                int type = z.is_phaser == Kernel.PHASER_KEEP ? LeaveHook.KEEP :
+                    z.is_phaser == Kernel.PHASER_UNDO ? LeaveHook.UNDO :
+                    LeaveHook.UNDO + LeaveHook.KEEP;
+                frags.Add(a(j("_pushleave"), a(j("callframe")),
+                    a(j("int"), j(type.ToString())),
+                    a(j("_makesub"), z)));
+            }
+
+            foreach (StaticSub z in sub.GetPhasers(Kernel.PHASER_ENTER)) {
+                frags.Add(a(j("sink"), a(j("subcall"), j(""),
+                                a(j("_makesub"), z))));
+            }
         }
 
         CpsOp FillParamRole() {

@@ -623,8 +623,9 @@ namespace Niecza {
                 si.cur_pkg = ((STable)ReadXref(ref from));
                 ReadSignature(si, ref from);
                 if (TraceLoad) Console.WriteLine("Sig loaded");
-                int ph = heap[from++];
-                if (ph != 0xFF) Kernel.AddPhaser(ph, si.protosub);
+                si.phaser = heap[from++];
+                if (si.phaser != 0xFF && si.protosub != null)
+                    Kernel.AddPhaser(si.phaser, si.protosub);
             }
         }
 
@@ -713,6 +714,17 @@ namespace Niecza {
         }
     }
 
+    public class LeaveHook {
+        public LeaveHook next;
+        public P6any     thunk;
+        public int       type;
+
+        public const int KEEP = 1;
+        public const int UNDO = 2;
+        public const int DIE  = 4;
+        public const int POST = 7;
+    }
+
     public abstract class LexInfo {
         public abstract object Get(Frame f);
         public virtual void Set(Frame f, object to) {
@@ -799,6 +811,7 @@ namespace Niecza {
         public LAD ltm;
 
         public int special;
+        public int phaser;
         public STable cur_pkg;
         public int outer_topic_rank;
         public int outer_topic_key;
@@ -1269,6 +1282,7 @@ noparams:
         public DispatchEnt curDisp;
         public RxFrame rx;
         public P6any sub;
+        public LeaveHook on_leave;
 
         public Variable[] pos;
         public VarHash named;
@@ -1490,6 +1504,12 @@ noparams:
             throw new NieczaException("cannot bind " + name + " in " + info.name);
         }
 
+        public void PushLeave(int type, P6any thunk) {
+            LeaveHook l = new LeaveHook();
+            l.next = on_leave; on_leave = l;
+            l.thunk = thunk; l.type = type;
+        }
+
         public Frame DynamicCaller() {
             if (lex == null || !lex.ContainsKey("!return"))
                 return caller;
@@ -1506,6 +1526,19 @@ noparams:
         }
 
         public Frame Return() {
+            if (on_leave != null) {
+                Variable ret = (Variable) caller.resultSlot;
+                bool ok = ret.Fetch().IsDefined();
+                for (LeaveHook c = on_leave; c != null; c = c.next) {
+                    if (0 == ((ok ? LeaveHook.KEEP : LeaveHook.UNDO) & c.type))
+                        continue;
+                    Variable r = Kernel.RunInferior(c.thunk.Invoke(
+                        Kernel.GetInferiorRoot(), new Variable[] {ret}, null));
+                    if ((c.type & LeaveHook.DIE) != 0 &&
+                            !r.Fetch().mo.mro_raw_Bool.Get(r))
+                        throw new NieczaException("Post-constraint failed for " + info.name);
+                }
+            }
             return caller;
         }
     }
