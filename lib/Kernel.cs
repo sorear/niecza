@@ -1529,7 +1529,10 @@ noparams:
             if (on_leave != null) {
                 Variable ret = (Variable) caller.resultSlot;
                 bool ok = ret.Fetch().IsDefined();
-                for (LeaveHook c = on_leave; c != null; c = c.next) {
+                LeaveHook c = on_leave;
+                // if exception is thrown, do not rerun LEAVEs
+                on_leave = null;
+                for (; c != null; c = c.next) {
                     if (0 == ((ok ? LeaveHook.KEEP : LeaveHook.UNDO) & c.type))
                         continue;
                     Variable r = Kernel.RunInferior(c.thunk.Invoke(
@@ -4543,7 +4546,15 @@ def:        return at.Get(self, index);
 
         public static Frame Unwind(Frame th, int type, Frame tf, int tip,
                 object td) {
-            // LEAVE handlers aren't implemented yet.
+            while (th != tf) {
+                if (th.DynamicCaller() != th.caller) {
+                    th = th.DynamicCaller();
+                } else {
+                    // TODO: catch generated exceptions and add to @!
+                    th.caller.resultSlot = Kernel.NilP.mo.typeVar;
+                    th = th.Return();
+                }
+            }
             if (type == SubInfo.ON_NEXTDISPATCH) {
                 // These are a bit special because there isn't actually a
                 // catching frame.

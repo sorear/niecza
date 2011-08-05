@@ -162,6 +162,7 @@ enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
 augment class NieczaActions {
 sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     my $sub = $<blast>.ast;
+    $sub.outer.noninlinable;
     $sub.is_phaser = +::Metamodel::Phaser.($ph);
 
     $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
