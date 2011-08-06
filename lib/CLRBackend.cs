@@ -4941,8 +4941,13 @@ dynamic:
                 }
                 string[] argv = new string[args.Length - 3];
                 Array.Copy(args, 3, argv, 0, argv.Length);
-                CLRBackend.RunMain(args[1], args[2],
-                        args[0] == "evalnam" ? null : argv);
+                try {
+                    CLRBackend.RunMain(args[1], args[2],
+                            args[0] == "evalnam" ? null : argv);
+                }
+                catch (Exception ex) {
+                    return new string[] { ex.ToString() };
+                }
                 return new string[0];
             } else if (args[0] == "setnames") {
                 Builtins.execName = args[1];

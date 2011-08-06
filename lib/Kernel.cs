@@ -1554,6 +1554,24 @@ noparams:
         public NieczaException() : base() {}
     }
 
+    public class ResumeUnwindException: Exception {
+        public readonly int type, to_ip;
+        public readonly Frame to_frame;
+        public readonly object to_data;
+        public readonly string p6backtrace;
+
+        public override string ToString() { return p6backtrace; }
+
+        public ResumeUnwindException(int type, Frame tf, int tip, object td,
+                string bt) : base(bt) {
+            p6backtrace = bt;
+            to_data = td;
+            to_ip = tip;
+            to_frame = tf;
+            this.type = type;
+        }
+    }
+
     class InvokeSub : InvokeHandler {
         public override Frame Invoke(P6any th, Frame caller,
                 Variable[] pos, VarHash named) {
@@ -4108,13 +4126,13 @@ def:        return at.Get(self, index);
         }
 
         class ExitRunloopException : Exception {
-            public string payload;
-            public ExitRunloopException(string p) { payload = p; }
+            public ResumeUnwindException payload;
+            public ExitRunloopException(ResumeUnwindException p) { payload = p; }
         }
         public static SubInfo ExitRunloopSI =
             new SubInfo("ExitRunloop", ExitRunloopC);
         private static Frame ExitRunloopC(Frame th) {
-            throw new ExitRunloopException(th.lex0 as string);
+            throw new ExitRunloopException(th.lex0 as ResumeUnwindException);
         }
 
         public const int TRACE_CUR = 1;
@@ -4148,10 +4166,12 @@ def:        return at.Get(self, index);
                             cur = cur.code(cur);
                     }
                 } catch (ExitRunloopException ere) {
-                    // XXX Stringifying all exceptions isn't very nice.
                     if (ere.payload != null)
-                        throw new NieczaException(ere.payload);
+                        throw ere.payload;
                     return;
+                } catch (ResumeUnwindException rue) {
+                    cur = Kernel.Unwind(cur, rue.type, rue.to_frame, rue.to_ip,
+                            rue.to_data, null, null, rue.p6backtrace);
                 } catch (Exception ex) {
                     cur = Kernel.Die(cur, ex.ToString());
                 }
@@ -4498,14 +4518,7 @@ def:        return at.Get(self, index);
 
             for (csr = th; ; csr = csr.DynamicCaller()) {
                 if (csr == null)
-                    throw new Exception("Corrupt call chain");
-                if (csr.info == ExitRunloopSI) {
-                    // when this exception reaches the outer runloop,
-                    // more frames will be added
-                    csr.lex0 = DescribeException(type, tgt, name, payload) +
-                            DescribeBacktrace(th, csr.caller);
-                    return csr;
-                }
+                    break; // unhandled exception, Unwind handles
                 if (type == SubInfo.ON_NEXTDISPATCH) {
                     if (csr.curDisp != null) {
                         unf = csr;
@@ -4523,7 +4536,7 @@ def:        return at.Get(self, index);
                 }
             }
 
-            return Unwind(th, type, unf, unip, payload);
+            return Unwind(th, type, unf, unip, payload, tgt, name, null);
         }
 
         public static string DescribeBacktrace(Frame from, Frame upto) {
@@ -4546,14 +4559,24 @@ def:        return at.Get(self, index);
         }
 
         public static Frame Unwind(Frame th, int type, Frame tf, int tip,
-                object td) {
-            while (th != tf) {
-                if (th.DynamicCaller() != th.caller) {
-                    th = th.DynamicCaller();
+                object td, Frame tgt, string name, string bt) {
+            Frame csr = th;
+            while (csr != tf) {
+                if (csr.info == ExitRunloopSI) {
+                    // when this exception reaches the outer runloop,
+                    // more frames will be added
+                    if (bt == null)
+                        bt = DescribeException(type, tgt, name, td);
+                    csr.lex0 = new ResumeUnwindException(type, tf, tip,
+                            td, bt + DescribeBacktrace(th, csr.caller));
+                    return csr;
+                }
+                if (csr.DynamicCaller() != csr.caller) {
+                    csr = csr.DynamicCaller();
                 } else {
                     // TODO: catch generated exceptions and add to @!
-                    th.caller.resultSlot = Kernel.NilP.mo.typeVar;
-                    th = th.Return();
+                    csr.caller.resultSlot = Kernel.NilP.mo.typeVar;
+                    csr = csr.Return();
                 }
             }
             if (type == SubInfo.ON_NEXTDISPATCH) {

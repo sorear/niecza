@@ -33,7 +33,8 @@ method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {
             $*orig_file // '(eval)') unless $repl;
         my $nam = NAMOutput.run($ast);
         $ast.clear_optrees;
-        downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam, @$.run_args);
+        my ($exn) = downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam, @$.run_args);
+        die $exn if $exn;
         if $repl {
             my ($exn) = downcall("replrun");
             die $exn if $exn;
