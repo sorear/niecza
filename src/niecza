@@ -200,6 +200,11 @@ method prefix:let ($/) { make ::Operator::Let.new }
 
 sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     my $sub = ($<blast> // $<block>).ast;
+
+    $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
+        if $unique && any($sub.outer.children).is_phaser ==
+            ::Metamodel::Phaser.($ph);
+
     $sub.outer.noninlinable;
     $sub.is_phaser = +::Metamodel::Phaser.($ph);
 
