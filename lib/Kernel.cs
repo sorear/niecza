@@ -4153,8 +4153,24 @@ def:        return at.Get(self, index);
         }
 
         public static void RunCore(ref Frame cur) {
+            // TimToady says that any exception thrown (but not internally
+            // caught) during CATCH or LEAVE processing becomes the new
+            // exception
+            Exception handle = null;
             for(;;) {
                 try {
+                    if (handle is ResumeUnwindException) {
+                        ResumeUnwindException rue =
+                            (ResumeUnwindException) handle;
+                        cur = Kernel.Unwind(cur, rue.type, rue.to_frame,
+                                rue.to_ip, rue.to_data, null, null,
+                                rue.p6backtrace);
+                    }
+                    else if (handle != null) {
+                        cur = Kernel.Die(cur, handle.ToString());
+                    }
+                    handle = null;
+
                     if (TraceCount != 0) {
                         for(;;) {
                             if (--TraceCount == 0)
@@ -4169,11 +4185,8 @@ def:        return at.Get(self, index);
                     if (ere.payload != null)
                         throw ere.payload;
                     return;
-                } catch (ResumeUnwindException rue) {
-                    cur = Kernel.Unwind(cur, rue.type, rue.to_frame, rue.to_ip,
-                            rue.to_data, null, null, rue.p6backtrace);
                 } catch (Exception ex) {
-                    cur = Kernel.Die(cur, ex.ToString());
+                    handle = ex;
                 }
             }
         }
@@ -4576,6 +4589,7 @@ def:        return at.Get(self, index);
                 } else {
                     // TODO: catch generated exceptions and add to @!
                     csr.caller.resultSlot = Kernel.NilP.mo.typeVar;
+                    Kernel.SetTopFrame(csr);
                     csr = csr.Return();
                 }
             }

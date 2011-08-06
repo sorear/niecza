@@ -64,6 +64,7 @@ S04-blocks-and-statements/temp.t
 S04-declarations/multiple.t
 S04-declarations/my.t
 S04-declarations/state.t
+S04-exceptions/control_across_runloop.t
 S04-phasers/enter-leave.t
 S04-phasers/keep-undo.t
 S04-phasers/pre-post.t
