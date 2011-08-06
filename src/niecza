@@ -199,12 +199,9 @@ method statement_control:TEMP ($/) {
 method prefix:let ($/) { make ::Operator::Let.new }
 
 sub phaser($/, $ph, :$unique, :$topic, :$csp) {
-    my $sub = $<blast>.ast;
+    my $sub = ($<blast> // $<block>).ast;
     $sub.outer.noninlinable;
     $sub.is_phaser = +::Metamodel::Phaser.($ph);
-
-    $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
-        if $unique && any($sub.outer.children).is_phaser == $sub.is_phaser;
 
     if $topic {
         $sub.lexicals.<$_> // $sub.add_my_name('$_');
@@ -215,8 +212,8 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     $*CURLEX<!sub>.create_static_pad if $csp;
     make ::Op::StatementList.new;
 }
-method statement_prefix:CATCH ($/) { phaser($/, 'CATCH', :unique, :topic) }
-method statement_prefix:CONTROL ($/) { phaser($/, 'CONTROL', :unique, :topic) }
+method statement_control:CATCH ($/) { phaser($/, 'CATCH', :unique, :topic) }
+method statement_control:CONTROL ($/) { phaser($/, 'CONTROL', :unique, :topic) }
 method statement_prefix:PRE ($/) { phaser($/, 'PRE') }
 method statement_prefix:POST ($/) { phaser($/, 'POST', :topic) }
 method statement_prefix:KEEP ($/) { phaser($/, 'KEEP', :topic) }
