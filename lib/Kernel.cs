@@ -1507,6 +1507,7 @@ noparams:
                     return;
                 csr = csr.outer;
             }
+            if (name == "$!") return;
             throw new NieczaException("cannot bind " + name + " in " + info.name);
         }
 
@@ -4534,6 +4535,13 @@ def:        return at.Get(self, index);
             Frame unf = null;
             int unip = 0;
 
+            // make sure we have a list for RunCATCH
+            // TODO: possibly should make X::AdHoc?
+            if (type == SubInfo.ON_DIE) {
+                payload = Kernel.NewRWListVar(Builtins.array_constructor(
+                    (Variable)payload).Fetch());
+            }
+
             for (csr = th; ; csr = csr.DynamicCaller()) {
                 if (csr == null)
                     break; // unhandled exception, Unwind handles
@@ -4549,8 +4557,51 @@ def:        return at.Get(self, index);
                     continue;
                 unip = csr.info.FindControlEnt(csr.ip, type, name);
                 if (unip >= 0) {
+                    if (csr.info == Builtins.RunCATCH_I && type == SubInfo.ON_DIE) {
+                        // Fudgy implementation of SIMPLECATCH
+                        // A non-control exception has been thrown from handler
+                        // Unwind will DTRT with control flow, but we need
+                        // to save the exception(s)
+                        Variable unh = (Variable)csr.lex2;
+                        Variable cur = (Variable)csr.lex3;
+                        unh.Fetch().mo.mro_push.Invoke(unh, new Variable[] {
+                                cur, (Variable) payload });
+                    }
                     unf = csr;
                     break;
+                }
+
+                if (type == SubInfo.ON_DIE && csr.info.catch_ != null) {
+                    Frame nfr = Builtins.RunCATCH_I.Binder(
+                        Kernel.GetInferiorRoot(), null, null, null, null,
+                        false, null);
+                    nfr.lex0 = Kernel.MakeSub(csr.info.catch_, csr);
+                    nfr.lex1 = payload;
+                    Variable np = Kernel.RunInferior(nfr);
+                    if (np.Fetch().mo.mro_raw_Bool.Get(np)) {
+                        payload = np;
+                    } else {
+                        // leave old payload so Unwind can install it
+                        unf = csr;
+                        break;
+                    }
+                }
+
+                if (type != SubInfo.ON_DIE && csr.info.control != null) {
+                    P6any sub = Kernel.MakeSub(csr.info.control, csr);
+                    Frame nfr = csr.info.control.Binder(
+                        Kernel.GetInferiorRoot(), csr, sub,
+                        new Variable[] {
+                            Builtins.MakeParcel(Builtins.MakeInt(type),
+                                Kernel.BoxAnyMO(name, Kernel.StrMO),
+                                tgt == null ? Kernel.AnyMO.typeVar :
+                                    Kernel.NewROScalar(tgt))
+                        }, null, false, null);
+                    Variable np = Kernel.RunInferior(nfr);
+                    if (np.Fetch().mo.mro_raw_Bool.Get(np)) {
+                        unf = csr;
+                        break;
+                    }
                 }
             }
 
@@ -4617,7 +4668,10 @@ def:        return at.Get(self, index);
                     return tf.caller;
                 }
             } else if (type == SubInfo.ON_DIE) {
-                tf.LexicalBind("$!", (Variable)td);
+                Variable exn = (Variable)td; // will be an Array
+                if (exn.Fetch().mo.mro_raw_Numeric.Get(exn) == 1)
+                    exn = exn.Fetch().mo.mro_at_pos.Get(exn, Builtins.MakeInt(0));
+                tf.LexicalBind("$!", (Variable)exn);
                 td = AnyMO.typeVar;
             }
             tf.ip = tip;
