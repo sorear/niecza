@@ -83,22 +83,22 @@ ok !(Cool === Any), "unidentical objects are unidentical";
 ok 12 eq "12", "eq stringifies";
 ok ("a" ~ "b") eq "ab", "a + b = ab";
 ok ("a" ~ "b" ~ "c") eq "abc", "a + b + c = abc";
-ok (?1) eq "Bool::True", "True strings to Bool::True";
-ok (?0) eq "Bool::False", "False strings to Bool::False";
+ok (?1) eq "True", "True strings to True";
+ok (?0) eq "False", "False strings to False";
 
 ok False ~~ Bool && !False, "False is the right constant";
 ok True ~~ Bool && True, "True is the right constant";
 ok Bool::False ~~ Bool && !Bool::False, "Bool::False is the right constant";
 ok Bool::True ~~ Bool && Bool::True, "Bool::True is the right constant";
 
-ok ~Any eq "Any()", "~Any is Any()";
+ok Any.gist eq "Any()", "Any.gist is Any()";
 
 ok (2.WHAT === 3.WHAT), "different objects get the same WHAT";
 ok !(2.WHAT.defined), "WHATs are undefined type objects";
-ok (sub foo() {}).WHAT eq 'Sub()', 'WHAT of a Sub is Sub()';
+ok (sub foo() {}).WHAT.gist eq 'Sub()', 'WHAT of a Sub is Sub()';
 ok "Foo".WHAT === Str, 'WHAT of a Str *is* Str';
 
-ok "Foo".HOW.WHAT eq 'ClassHOW()', 'anything.HOW is a ClassHOW';
+ok "Foo".HOW.WHAT.gist eq 'ClassHOW()', 'anything.HOW is a ClassHOW';
 ok "Foo".HOW === "Cow".HOW, 'objects of the same class have the same HOW';
 ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
 
@@ -285,7 +285,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
         }
         $buf;
     }
-    ok cat(1, (2, 3), ((4, 5), (Nil, 7))) eq "123457", "parcels flatten";
+    ok cat(1, (2, 3), ((4, 5), ((), 7))) eq "123457", "parcels flatten";
 }
 
 {
@@ -361,12 +361,12 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 
 {
     my $whatever = *;
-    ok $whatever.WHAT eq 'Whatever()', "can call methods on a specific Whatever";
+    ok $whatever.WHAT.gist eq 'Whatever()', "can call methods on a specific Whatever";
     my $wwhat = *.WHAT;
     ok !($wwhat.^isa(Whatever)), "method calls against * curry, though";
 
     ok (* + 5)(2) == 7, "can curry simple binops";
-    ok ((*) eq "foo") eq "Bool::False", "parens defeat Whatever directly";
+    is ((*) eq "foo"), Bool::False, "parens defeat Whatever directly";
     ok (1 + 2 * *)(5) == 11, "nested Whatever works";
     ok (2 * (1 + *))(5) == 12, "parens for grouping do not kill WhateverCode";
     ok (* + *)(5,12) == 17, "multiple *, multiple args";
@@ -624,8 +624,8 @@ EOC
 }
 
 {
-    is :foo.value, 'Bool::True', ":foo is true";
-    is :!foo.value, 'Bool::False', ":!foo is false";
+    is :foo.value, Bool::True, ":foo is true";
+    is :!foo.value, Bool::False, ":!foo is false";
     is :foo<12>.value, '12', ":foo<12> is 12";
     is :foo.key, 'foo', ":foo is foo";
 
@@ -819,7 +819,7 @@ end
 }
 
 rxtest /x.y/, "x.y", ("xay", "x y"), ("xy", "xaay");
-rxtest /<!>/, '<!>', Nil, ("", "x");
+rxtest /<!>/, '<!>', (), ("", "x");
 rxtest /\s/, '\s', (" ", ("\n" => '\n'), ("\r" => '\r'), "\x3000"),
     ("x", "1", "+");
 rxtest /\S/, '\S', ("x", "1", "+"),
@@ -963,44 +963,44 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
 
 {
     rxtest / . << . /, ".<<.", (" x",), ("x ","  ","xx");
-    rxtest / . << /, ".<<", Nil, ("x", " ");
+    rxtest / . << /, ".<<", (), ("x", " ");
     rxtest / << . /, "<<.", ("x",), (" ",);
-    rxtest / << /, "<<", Nil, ("",);
+    rxtest / << /, "<<", (), ("",);
 
     rxtest / . >> . /, ".>>.", ("x ",), (" x","  ","xx");
     rxtest / . >> /, ".>>", ("x",), (" ",);
-    rxtest / >> . /, ">>.", Nil, ("x"," ");
-    rxtest / >> /, ">>", Nil, ("",);
+    rxtest / >> . /, ">>.", (), ("x"," ");
+    rxtest / >> /, ">>", (), ("",);
 
     rxtest / . « . /, ".«.", (" x",), ("x ","  ","xx");
-    rxtest / . « /, ".«", Nil, ("x", " ");
+    rxtest / . « /, ".«", (), ("x", " ");
     rxtest / « . /, "«.", ("x",), (" ",);
-    rxtest / « /, "«", Nil, ("",);
+    rxtest / « /, "«", (), ("",);
 
     rxtest / . » . /, ".».", ("x ",), (" x","  ","xx");
     rxtest / . » /, ".»", ("x",), (" ",);
-    rxtest / » . /, "».", Nil, ("x"," ");
-    rxtest / » /, "»", Nil, ("",);
+    rxtest / » . /, "».", (), ("x"," ");
+    rxtest / » /, "»", (), ("",);
 
-    rxtest / . ^ . /, ".^.", Nil, ("x",);
-    rxtest / . ^ /, ".^", Nil, ("x",);
-    rxtest / ^ . /, "^.", ("x",), Nil;
-    rxtest / ^ /, "^", ("",), Nil;
+    rxtest / . ^ . /, ".^.", (), ("x",);
+    rxtest / . ^ /, ".^", (), ("x",);
+    rxtest / ^ . /, "^.", ("x",), ();
+    rxtest / ^ /, "^", ("",), ();
 
-    rxtest / . $ . /, '.$.', Nil, ("x",);
-    rxtest / . $ /, '.$', ("x",), Nil;
-    rxtest / $ . /, '$.', Nil, ("x",);
-    rxtest / $ /, '$', ("",), Nil;
+    rxtest / . $ . /, '.$.', (), ("x",);
+    rxtest / . $ /, '.$', ("x",), ();
+    rxtest / $ . /, '$.', (), ("x",);
+    rxtest / $ /, '$', ("",), ();
 
     rxtest / . ^^ . /, '.^^.', ("\nx","\n\n"), ("x\n","xx");
-    rxtest / . ^^ /, '.^^', Nil, ("x","\n");
-    rxtest / ^^ . /, '^^.', ("x","\n"), Nil;
-    rxtest / ^^ /, '^^', ("",), Nil;
+    rxtest / . ^^ /, '.^^', (), ("x","\n");
+    rxtest / ^^ . /, '^^.', ("x","\n"), ();
+    rxtest / ^^ /, '^^', ("",), ();
 
     rxtest / . $$ . /, '.$$.', ("x\n", "\n\n"), ("\nx","xx");
     rxtest / . $$ /, '.$$', ("x",), ("\n",);
     rxtest / $$ . /, '$$.', ("\n",), ("x",);
-    rxtest / $$ /, '$$', ("",), Nil;
+    rxtest / $$ /, '$$', ("",), ();
 }
 
 {
@@ -1064,9 +1064,9 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
         ok Foo::Bar.bar == 51, "within Foo, Bar is longname accessible";
         ok GLOBAL::Foo::Bar.bar == 51, "within Foo, Bar is GLOBAL accessible";
     }
-    ok Foo eq 'Foo()', "lexical lookup of our-class works";
-    ok OUR::Foo eq 'Foo()', "also visible in ourpad";
-    ok GLOBAL::Foo eq 'Foo()', "also visible globally";
+    ok Foo.gist eq 'Foo()', "lexical lookup of our-class works";
+    ok OUR::Foo.gist eq 'Foo()', "also visible in ourpad";
+    ok GLOBAL::Foo.gist eq 'Foo()', "also visible globally";
     ok Foo::Bar.bar == 51, "can call through nested methods";
     ok GLOBAL::Foo::Bar.bar == 51, "can call through GLOBAL nested";
 }
@@ -1114,8 +1114,8 @@ ok "abc" ~~ / :dba("foo") abc /, ":dba doesn't affect parsing";
     my @foo = 4,5,6;
     is join("|",item @foo), '4 5 6', '&item works';
     is join("|",@foo.item), '4 5 6', 'Mu.item works';
-    is (not False), 'Bool::True', '&not works';
-    is (defined 5), 'Bool::True', '&defined works';
+    is (not False), True, '&not works';
+    is (defined 5), True, '&defined works';
     push @foo, 7, 8;
     is join("|",@foo), '4|5|6|7|8', '&push works';
     unshift @foo, 2, 3;
@@ -1449,7 +1449,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     my $c = 3; $c ||= 4; is $c, 3, '||= works (T)';
     my $d = 0; $d ||= 4; is $d, 4, '||= works (F)';
     my $e = 0; $e andthen= 4; is $e, 4, 'andthen= works (D)';
-    my $f = Any; $f andthen= 4; is $f, Any, 'andthen= works (U)';
+    my $f = Any; $f andthen= 4; is $f.gist, Any.gist, 'andthen= works (U)';
     my $g = 0; $g //= 4; is $g, 0, '//= works (D)';
     my $h = Any; $h //= 4; is $h, 4, '//= works (U)';
 
@@ -1827,8 +1827,8 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    my $log;
-    my $ret;
+    my $log = '';
+    my $ret = '';
     my $var := _newtiedscalar(Any, Any, { $log ~= "F"; $ret }, { $log ~= $_ });
 
     $ret = 5; $log = "";
@@ -1950,7 +1950,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
     rxtest /z .* y [ a ::> x || . ]/, "z.*y[a::>x||.]",
         ("zyax", "zyb", "zyaxya"), ("zya",);
-    rxtest /z [ [ a ::> x || . ] | . y ]/, "z[[a::>x||.]|.y]", ("zay",), Nil;
+    rxtest /z [ [ a ::> x || . ] | . y ]/, "z[[a::>x||.]|.y]", ("zay",), ();
 }
 
 {
@@ -2154,19 +2154,19 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
     $st = ''; $k = False;
     until $k -> $z { $st ~= $z; $k = True }
-    is $st, 'Bool::False', 'until loops can take ->';
+    is $st, False, 'until loops can take ->';
 
     $st = '';
     unless False -> $z { $st ~= $z }
-    is $st, 'Bool::False', 'unless can take ->';
+    is $st, False, 'unless can take ->';
 
     $st = ''; $k = True;
     repeat until $k -> $z { $st ~= ($z // 5); $k = !$k; }
-    is $st, '5Bool::False', 'repeat until (prefix) can take ->';
+    is $st, 5~False, 'repeat until (prefix) can take ->';
 
     $st = ''; $k = True;
     repeat -> $z { $st ~= ($z // 5); $k = !$k; } until $k;
-    is $st, '5Bool::False', 'repeat until (postfix) can take ->';
+    is $st, 5~False, 'repeat until (postfix) can take ->';
 }
 
 {
@@ -2233,16 +2233,16 @@ ok (10 + 5i).im == 5, "(10 + 5i).im == 5";
 
 ok (10/3).numerator == 10, "(10/3).numerator == 10";
 ok (10/3).denominator == 3, "(10/3).denominator == 3";
-is FatRat.new(10,3).WHAT, FatRat, "FatRat.new returns FatRat";
+is FatRat.new(10,3).WHAT.gist, FatRat.gist, "FatRat.new returns FatRat";
 ok FatRat.new(10,3).numerator == 10, "FatRat.new(10,3).numerator == 10";
 ok FatRat.new(10,3).denominator == 3, "FatRat.new(10,3).denominator == 3";
 
 class {
-    is (sub () {}).WHAT, Sub, "sub gets correct class";
-    is ({ $_ * $_ }).WHAT, Block, "bare block gets correct class";
-    is /a+/.WHAT, Regex, "regex gets correct class";
-    is (method a () {}).WHAT, Method, "method gets correct class";
-    is (submethod b () {}).WHAT, Submethod, "submethod gets correct class";
+    is (sub () {}).WHAT.gist, Sub.gist, "sub gets correct class";
+    is ({ $_ * $_ }).WHAT.gist, Block.gist, "bare block gets correct class";
+    is /a+/.WHAT.gist, Regex.gist, "regex gets correct class";
+    is (method a () {}).WHAT.gist, Method.gist, "method gets correct class";
+    is (submethod b () {}).WHAT.gist, Submethod.gist, "submethod gets correct class";
 };
 
 is one(1,2).perl, 'one(1, 2)', '.perl roundtrips one()';
