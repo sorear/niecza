@@ -624,6 +624,10 @@ namespace Niecza {
                 ReadSignature(si, ref from);
                 if (TraceLoad) Console.WriteLine("Sig loaded");
                 si.phaser = heap[from++];
+                if (si.phaser == Kernel.PHASER_CATCH)
+                    si.outer.catch_ = si;
+                if (si.phaser == Kernel.PHASER_CONTROL)
+                    si.outer.control = si;
                 if (si.phaser != 0xFF && si.protosub != null)
                     Kernel.AddPhaser(si.phaser, si.protosub);
             }
@@ -816,6 +820,7 @@ namespace Niecza {
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;
+        public SubInfo catch_, control;
 
         // Used for closing runtime-generated SubInfo over values used
         // For vtable wrappers: 0 = unboxed, 1 = boxed

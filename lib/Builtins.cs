@@ -2043,4 +2043,73 @@ again:
 
         return v;
     }
+
+    internal static SubInfo RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
+            RunCATCH_C, null, null, new int[] {
+                0, 5, SubInfo.ON_NEXT, 1, 0,
+                0, 5, SubInfo.ON_REDO, 2, 0,
+                0, 5, SubInfo.ON_LAST, 4, 0,
+                0, 5, SubInfo.ON_DIE,  1, 0,
+            }, new string[] { "" }, 0);
+
+    private static Frame RunCATCH_C(Frame th) {
+        // ENTRY  lex0 : CATCH lambda (decontainerized)
+        //        lex1 : exception payload (@! Array)
+        // EXIT   ret  : new @!; will catch if false
+        // LEX    lex2 : @*unhandled
+        //        lex3 : $current
+        //        lex4 : @! iterator
+        // note, compiler munges catch/control lambdas to return True
+        //    if exitted via succeed
+        // note2, any exception thrown from under RunCATCH_I will be caught
+        //    and pushed onto @*unhandled along with $current, and next;
+
+        // -> $handler, @! { #0
+        //    my @*unhandled;
+        //    for @! -> $current { #N=1 R=2
+        //        $handler.($current) || push @*unhandled, $current
+        //    } #L=4
+        //    @*unhandled;
+        // }
+
+        // $! will be set to munged @! if we return nothing
+
+        Variable t1, t2;
+        VarDeque u1;
+        P6any v1;
+        switch (th.ip) {
+            case 0:
+                th.lex2 = Kernel.CreateArray();
+                t1 = (Variable)th.lex1;
+                th.lex4 = t1.Fetch().mo.mro_raw_iterator.Get(t1);
+                goto case 1;
+
+            case 1:
+                u1 = (VarDeque)th.lex4;
+                if (!Kernel.IterHasFlat(u1, true)) goto case 4;
+                th.lex3 = u1.Shift();
+                goto case 2;
+
+            case 2:
+                t1 = (Variable)th.lex3;
+                v1 = (P6any)th.lex0;
+                th.ip = 3;
+                return v1.Invoke(th, new Variable[] { t1 }, null);
+
+            case 3:
+                t1 = (Variable)th.resultSlot;
+                if (!t1.Fetch().mo.mro_raw_Bool.Get(t1))
+                    goto case 1; // yay handled
+                t2 = (Variable)th.lex2;
+                t2.Fetch().mo.mro_push.Invoke(t2, new Variable[] { t1 });
+                goto case 1;
+
+            case 4:
+                th.caller.resultSlot = th.lex2;
+                return th.Return();
+
+            default:
+                return Kernel.Die(th, "Invalid IP");
+        }
+    }
 }

@@ -190,6 +190,22 @@ augment class Operator::Temp {
     }
 }
 
+class Op::CatchyWrapper is Op {
+    has $.inner;
+    method zyg() { $!inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
+                CgOp.sink($!inner.cgop($body)),
+                CgOp.return(CgOp.scopedlex('False')),
+                CgOp.label("caught$id"),
+                CgOp.scopedlex('True')),
+            6, '', "caught$id");
+    }
+}
+
 augment class NieczaActions {
 method statement_control:TEMP ($/) {
     $*CURLEX<!sub>.noninlinable;
@@ -201,9 +217,11 @@ method prefix:let ($/) { make ::Operator::Let.new }
 sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     my $sub = ($<blast> // $<block>).ast;
 
-    $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
-        if $unique && any($sub.outer.children).is_phaser ==
-            ::Metamodel::Phaser.($ph);
+    if $unique {
+        $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
+            if any($sub.outer.children).is_phaser == ::Metamodel::Phaser.($ph);
+        $sub.code = ::Op::CatchyWrapper.new(inner => $sub.code);
+    }
 
     $sub.outer.noninlinable;
     $sub.is_phaser = +::Metamodel::Phaser.($ph);
