@@ -2098,8 +2098,9 @@ again:
 
             case 3:
                 t1 = (Variable)th.resultSlot;
-                if (!t1.Fetch().mo.mro_raw_Bool.Get(t1))
+                if (t1.Fetch().mo.mro_raw_Bool.Get(t1))
                     goto case 1; // yay handled
+                t1 = (Variable)th.lex3;
                 t2 = (Variable)th.lex2;
                 t2.Fetch().mo.mro_push.Invoke(t2, new Variable[] { t1 });
                 goto case 1;
@@ -2111,5 +2112,17 @@ again:
             default:
                 return Kernel.Die(th, "Invalid IP");
         }
+    }
+
+    internal static string DumpVar(Variable v) {
+        string ret;
+        try {
+            Variable p = Kernel.RunInferior(v.Fetch().InvokeMethod(
+                Kernel.GetInferiorRoot(), "perl", new Variable[] { v }, null));
+            ret = p.Fetch().mo.mro_raw_Str.Get(p);
+        } catch (Exception ex) {
+            ret = "(stringification failed: " + ex.ToString() +  ")";
+        }
+        return ret;
     }
 }

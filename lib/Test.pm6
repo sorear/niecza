@@ -95,34 +95,26 @@ sub is(\$got, \$expected, $tag?) is export {
     }
 }
 sub isnt(Mu $got, Mu $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
+sub no-control($code) {
+    my $ok = True;
+    {
+        CATCH   { default { $ok = False } }
+        CONTROL { default { $ok = False } }
+        $code.();
+    }
+    $ok
+}
 sub lives_ok($code,$why?) is export {
-    my $lived = False;
-    try { $code.(); $lived = True; }
-    $*TEST-BUILDER.ok($lived, $why);
+    $*TEST-BUILDER.ok(no-control($code), $why);
 }
 sub dies_ok($code,$why?) is export {
-    my $lived = False;
-    try { $code.(); $lived = True; }
-    $*TEST-BUILDER.ok(!$lived, $why);
+    $*TEST-BUILDER.ok(!no-control($code), $why);
 }
-# bit of a hack: forces an inferior runloop to make CONTROL catchable
-my class NoControlEval {
-    method Bool() {
-        my $rn = False;
-        (sub () { eval $*code; $rn++ })();
-        die "illegal return" unless $rn;
-        True;
-    }
+sub eval_dies_ok($code, $why?) is export {
+    $*TEST-BUILDER.ok(!no-control({ eval $code }), $why);
 }
-sub eval_dies_ok($*code, $why?) is export {
-    my $lived = False;
-    try { ?NoControlEval; $lived = True; }
-    $*TEST-BUILDER.ok(!$lived, $why);
-}
-sub eval_lives_ok($*code, $why?) is export {
-    my $lived = False;
-    try { ?NoControlEval; $lived = True; }
-    $*TEST-BUILDER.ok($lived, $why);
+sub eval_lives_ok($code, $why?) is export {
+    $*TEST-BUILDER.ok(no-control({ eval $code }), $why);
 }
 sub diag($str) is export { $*TEST-BUILDER.note($str) }
 sub is_approx(Mu $got, Mu $expected, $desc = '') is export {

@@ -4562,6 +4562,7 @@ def:        return at.Get(self, index);
                         // A non-control exception has been thrown from handler
                         // Unwind will DTRT with control flow, but we need
                         // to save the exception(s)
+                        // avoids "trytles all the way down"
                         Variable unh = (Variable)csr.lex2;
                         Variable cur = (Variable)csr.lex3;
                         unh.Fetch().mo.mro_push.Invoke(unh, new Variable[] {
@@ -4583,6 +4584,7 @@ def:        return at.Get(self, index);
                     } else {
                         // leave old payload so Unwind can install it
                         unf = csr;
+                        unip = -1;
                         break;
                     }
                 }
@@ -4600,6 +4602,7 @@ def:        return at.Get(self, index);
                     Variable np = Kernel.RunInferior(nfr);
                     if (np.Fetch().mo.mro_raw_Bool.Get(np)) {
                         unf = csr;
+                        unip = -1;
                         break;
                     }
                 }
@@ -4676,7 +4679,14 @@ def:        return at.Get(self, index);
             }
             tf.ip = tip;
             tf.resultSlot = td;
-            return tf;
+            if (tip < 0) {
+                // catch IP of -1 means to force an immediate return, as
+                // when a CATCH phaser is triggered.
+                tf.caller.resultSlot = Kernel.NilP.mo.typeVar;
+                return tf.Return();
+            } else {
+                return tf;
+            }
         }
     }
 }
