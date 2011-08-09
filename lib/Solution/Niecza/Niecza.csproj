@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="3.5" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.21022</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{07760CA6-1010-43E9-A46E-8E9712218E8E}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Niecza</RootNamespace>
+    <AssemblyName>Niecza</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="Mono.Posix" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="..\..\BigInteger.cs">
+      <Link>BigInteger.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Builtins.cs">
+      <Link>Builtins.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CLRBackend.cs">
+      <Link>CLRBackend.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CrossDomainReceiver.cs">
+      <Link>CrossDomainReceiver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Cursor.cs">
+      <Link>Cursor.cs</Link>
+    </Compile>
+    <Compile Include="..\..\JSYNC.cs">
+      <Link>JSYNC.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Kernel.cs">
+      <Link>Kernel.cs</Link>
+    </Compile>
+    <Compile Include="..\..\NieczaCLR.cs">
+      <Link>NieczaCLR.cs</Link>
+    </Compile>
+    <Compile Include="..\..\ObjModel.cs">
+      <Link>ObjModel.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Utils.cs">
+      <Link>Utils.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ProjectExtensions>
+    <MonoDevelop>
+      <Properties>
+        <Policies>
+          <TextStylePolicy FileWidth="120" EolMarker="Unix" inheritsSet="VisualStudio" inheritsScope="text/plain" scope="text/x-csharp" />
+          <CSharpFormattingPolicy inheritsSet="Mono" inheritsScope="text/x-csharp" scope="text/x-csharp" />
+          <TextStylePolicy FileWidth="120" TabWidth="4" EolMarker="Unix" inheritsSet="Mono" inheritsScope="text/plain" scope="text/plain" />
+        </Policies>
+      </Properties>
+    </MonoDevelop>
+  </ProjectExtensions>
+</Project>

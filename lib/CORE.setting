@@ -1885,6 +1885,14 @@ my class IO {
     method f() is unsafe { Q:CgOp { (box Bool (path_file_exists (obj_getstr {$!path}))) } }
     method d() is unsafe { Q:CgOp { (box Bool (path_dir_exists (obj_getstr {$!path}))) } }
     method e() is unsafe { Q:CgOp { (box Bool (path_any_exists (obj_getstr {$!path}))) } }
+    method r() is unsafe { Q:CgOp { (box Bool (path_eaccess_readable (obj_getstr {$!path}))) } }
+#    method R() is unsafe { Q:CgOp { (box Bool (path_access_readable (obj_getstr {$!path}))) } }
+    method w() is unsafe { Q:CgOp { (box Bool (path_eaccess_writable (obj_getstr {$!path}))) } }
+#    method W() is unsafe { Q:CgOp { (box Bool (path_access_writable (obj_getstr {$!path}))) } }
+    method x() is unsafe { Q:CgOp { (box Bool (path_eaccess_executable (obj_getstr {$!path}))) } }
+#    method X() is unsafe { Q:CgOp { (box Bool (path_access_executable (obj_getstr {$!path}))) } }
+    method o() is unsafe { Q:CgOp { (box Bool (path_eaccess_owned (obj_getstr {$!path}))) } }
+#    method O() is unsafe { Q:CgOp { (box Bool (path_access_owned (obj_getstr {$!path}))) } }
     method relative($base) { $base.IO.append(self) }
     method append($sub) { Q:CgOp { (box Str (path_combine (obj_getstr {self}) (obj_getstr {$sub}))) }.IO }
     method but-extension($ext) { Q:CgOp { (box Str (path_change_ext (obj_getstr {self}) (obj_getstr {$ext}))) }.IO }

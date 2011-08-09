@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Mono.Unix.Native;
+using Mono.Unix;
 
 namespace Niecza {
     public class UpCallee: CrossDomainReceiver {
@@ -1417,6 +1419,29 @@ flat_enough:;
 
     public static bool path_any_exists(string path) {
         return File.Exists(path) || Directory.Exists(path);
+    }
+
+    public static bool path_eaccess_readable(string path) {
+        return (File.Exists(path) || Directory.Exists(path))
+            && Syscall.access(path, AccessModes.R_OK);
+    }
+
+    public static bool path_eaccess_writable(string path) {
+        return (File.Exists(path) || Directory.Exists(path))
+            && Syscall.access(path, AccessModes.W_OK);
+    }
+
+    public static bool path_eaccess_executable(string path) {
+        return (File.Exists(path) || Directory.Exists(path))
+            && Syscall.access(path, AccessModes.X_OK);
+    }
+
+    public static bool path_eaccess_owner(string path) {
+        if (!File.Exists(path) && !Directory.Exists(path))
+            return false;
+        Stat buf;
+        Syscall.stat(path, out buf);
+        return UnixEnvironment.EffectiveUserId == buf.st_uid;
     }
 
     public static Variable BoxLoS(string[] los) {
