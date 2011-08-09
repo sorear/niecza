@@ -1421,6 +1421,20 @@ flat_enough:;
         return File.Exists(path) || Directory.Exists(path);
     }
 
+    public static bool emulate_eaccess(string path, AccessModes mode) {
+        uint ruid = (uint)UnixEnvironment.RealUserId;
+        uint rgid = (uint)UnixEnvironment.RealGroupId;
+        uint euid = (uint)UnixEnvironment.EffectiveUserId;
+        uint egid = (uint)UnixEnvironment.EffectiveGroupId;
+        // this is not threadsafe, but it's how Perl 5 does it sometimes
+        Syscall.setreuid(euid, euid);
+        Syscall.setregid(egid, egid);
+        int res = Syscall.access(path, mode);
+        Syscall.setreuid(ruid, euid);
+        Syscall.setregid(rgid, egid);
+        return res == 0;
+    }
+
     public static bool path_access_readable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
             && Syscall.access(path, AccessModes.R_OK) == 0;
@@ -1438,17 +1452,17 @@ flat_enough:;
     
     public static bool path_eaccess_readable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && true;
+            && emulate_eaccess(path, AccessModes.R_OK);
     }
 
     public static bool path_eaccess_writable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && true;
+            && emulate_eaccess(path, AccessModes.W_OK);
     }
 
     public static bool path_eaccess_executable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && true;
+            && emulate_eaccess(path, AccessModes.X_OK);
     }
 
     public static bool path_eaccess_owner(string path) {
