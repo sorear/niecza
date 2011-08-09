@@ -1087,6 +1087,11 @@ my class Enum is Cool {
 }
 
 my class Pair is Enum {
+    method ACCEPTS(\$other) {
+        self // nextsame;
+        $other.^does(Hash) ?? ($.value.ACCEPTS($other{$.key})) !!
+            (?$.value) == (?$other.?"$.key"())
+    }
     method Str() {
         $.key ~ "\t" ~ $.value
     }
