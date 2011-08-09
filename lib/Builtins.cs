@@ -1465,7 +1465,7 @@ flat_enough:;
             && emulate_eaccess(path, AccessModes.X_OK);
     }
 
-    public static bool path_eaccess_owner(string path) {
+    public static bool path_eaccess_owned(string path) {
         if (!File.Exists(path) && !Directory.Exists(path))
             return false;
         Stat buf;
@@ -1473,7 +1473,7 @@ flat_enough:;
         return UnixEnvironment.EffectiveUserId == buf.st_uid;
     }
 
-    public static bool path_access_owner(string path) {
+    public static bool path_access_owned(string path) {
         if (!File.Exists(path) && !Directory.Exists(path))
             return false;
         Stat buf;
