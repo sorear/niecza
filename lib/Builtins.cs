@@ -1421,19 +1421,34 @@ flat_enough:;
         return File.Exists(path) || Directory.Exists(path);
     }
 
-    public static bool path_eaccess_readable(string path) {
+    public static bool path_access_readable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
             && Syscall.access(path, AccessModes.R_OK);
     }
 
-    public static bool path_eaccess_writable(string path) {
+    public static bool path_access_writable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
             && Syscall.access(path, AccessModes.W_OK);
     }
 
-    public static bool path_eaccess_executable(string path) {
+    public static bool path_access_executable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
             && Syscall.access(path, AccessModes.X_OK);
+    }
+    
+    public static bool path_eaccess_readable(string path) {
+        return (File.Exists(path) || Directory.Exists(path))
+            && true;
+    }
+
+    public static bool path_eaccess_writable(string path) {
+        return (File.Exists(path) || Directory.Exists(path))
+            && true;
+    }
+
+    public static bool path_eaccess_executable(string path) {
+        return (File.Exists(path) || Directory.Exists(path))
+            && true;
     }
 
     public static bool path_eaccess_owner(string path) {
@@ -1442,6 +1457,14 @@ flat_enough:;
         Stat buf;
         Syscall.stat(path, out buf);
         return UnixEnvironment.EffectiveUserId == buf.st_uid;
+    }
+
+    public static bool path_access_owner(string path) {
+        if (!File.Exists(path) && !Directory.Exists(path))
+            return false;
+        Stat buf;
+        Syscall.stat(path, out buf);
+        return UnixEnvironment.RealUserId == buf.st_uid;
     }
 
     public static Variable BoxLoS(string[] los) {
