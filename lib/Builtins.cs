@@ -1423,17 +1423,17 @@ flat_enough:;
 
     public static bool path_access_readable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && Syscall.access(path, AccessModes.R_OK);
+            && Syscall.access(path, AccessModes.R_OK) == 0;
     }
 
     public static bool path_access_writable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && Syscall.access(path, AccessModes.W_OK);
+            && Syscall.access(path, AccessModes.W_OK) == 0;
     }
 
     public static bool path_access_executable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && Syscall.access(path, AccessModes.X_OK);
+            && Syscall.access(path, AccessModes.X_OK) == 0;
     }
     
     public static bool path_eaccess_readable(string path) {
