@@ -4,5 +4,5 @@ use warnings;
 
 my @OPTS = ('--keep-exit-code', 'niecza');
 
-my $nt = `../roast/fudge @OPTS @ARGV`;
+my $nt = `t/spec/fudge @OPTS @ARGV`;
 system("mono", "./run/Niecza.exe", split ' ', $nt);
