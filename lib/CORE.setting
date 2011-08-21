@@ -1908,6 +1908,10 @@ sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) 
 
 sub spew($path,$text) is unsafe { Q:CgOp { (rnull (spew (unbox str (@ {$path.Str})) (unbox str (@ {$text.Str})))) } }
 
+sub dir($directory = '.', Mu :$test = none('.','..')) is unsafe {
+    grep $test, Q:CgOp { (dir (obj_getstr {$directory})) };
+}
+
 my class Instant {
     has $.val;
     method to-posix() { ($!val, False) }

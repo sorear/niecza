@@ -2187,4 +2187,15 @@ again:
         }
         return ret;
     }
+
+    public static Variable dir(string s) {
+        string[] raw = Directory.GetFileSystemEntries(s);
+        string[] forperl = new string[raw.Length + 2];
+        forperl[0] = "."; forperl[1] = "..";
+        for (int i = 0; i < raw.Length; i++) {
+            int ix = raw[i].LastIndexOf(Path.DirectorySeparatorChar);
+            forperl[i+2] = (ix >= 0) ? raw[i].Substring(ix+1) : raw[i];
+        }
+        return BoxLoS(forperl);
+    }
 }
