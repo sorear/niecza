@@ -207,6 +207,48 @@ class Op::CatchyWrapper is Op {
 }
 
 augment class NieczaActions {
+method quote:m  ($/) {
+    make ::Op::CallMethod.new(|node($/), name => 'match',
+            receiver => mklex($/, '$_'),
+            args => [
+                self.op_for_regex($/, $<quibble>.ast),
+                self.extract_rx_adverbs(True, False, $<quibble>) ]);
+}
+method extract_rx_adverbs($ismatch, $issubst, $match) {
+    my $qps = ($match ~~ List) ?? $match !! $match<babble><quotepair>;
+    return () if !$qps;
+
+    my @ok;
+    my @nyi;
+    my @args;
+    my @internal = < sigspace s ratchet r ignorecase i >;
+
+    push @nyi, < ignoreaccent a bytes codes graphs chars Perl5 P5 >;
+
+    if $issubst {
+        push @nyi, < sameaccent aa samecase ii >;
+        push @ok,  < g global p pos c continue x nth st nd rd th >;
+    }
+
+    if $ismatch {
+        push @nyi, < overlap ov exhaustive ex global g rw >;
+        push @ok, < continue c pos p >;
+    }
+
+    for @$qps -> $qp {
+        if @internal.grep($qp<k>) {
+            # handled by rx compiler
+        } elsif @ok.grep($qp<k>) {
+            push @args, self.quotepair_term($qp);
+        } elsif @nyi.grep($qp<k>) {
+            $qp.CURSOR.sorry("Regex modifier $qp<k> not yet implemented");
+        } else {
+            $qp.CURSOR.sorry("Regex modifier $qp<k> not valid on { $issubst ?? "substitution" !! $ismatch ?? "match" !! "regex literal" }");
+        }
+    }
+
+    @args
+}
 method statement_control:TEMP ($/) {
     $*CURLEX<!sub>.noninlinable;
     make ::Op::Temporize.new(|node($/), mode => 2,

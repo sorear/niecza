@@ -141,6 +141,8 @@ my class Regex  { ... }
 my class Num    { ... }
 my class Str    { ... }
 my class Code   { ... }
+my class Match  { ... }
+
 my class Cool {
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
     method Int() { Q:CgOp { (coerce_to_int {self}) } }
@@ -180,27 +182,76 @@ my class Cool {
         push @out, substr($str, $last, (chars($str) - $last));
         @out;
     }
-    method subst(\$: $matcher_, $replacement, :g(:$global), :$inplace) {
+    method match($pat, :c(:$continue), :p(:$pos)) {
+        my $ix = $continue // $pos // 0;
+        my $str = ~self;
+        if $ix && ($ix === ?1) {
+            $ix = CALLER::CALLER::<$/> ?? CALLER::CALLER::<$/>.to !! 0;
+        }
+        Q:CgOp {
+            (letn ix   (cast int (obj_getnum {$ix}))
+                  str  (obj_getstr {$str})
+                  max  (str_length (l str))
+                  incr (cursor_start (@ {Cursor}) (l str) (@ {Any}))
+                  csr  (null cursor)
+                  iter (null vvarlist)
+                  posy (obj_is_defined (@ {$pos}))
+              (whileloop 0 0 (<= (l ix) (l max)) (prog
+                (l csr (cursor_butpos (l incr) (l ix)))
+                (l ix (+ (l ix) (i 1)))
+                (l iter (vvarlist_new_singleton
+                    (subcall (@ {$pat}) (ns (l csr)))))
+                (ternary (iter_hasflat (l iter))
+                  (letn val (vvarlist_shift (l iter))
+                    (set_status (s $/) (l val))
+                    (return (newrwlistvar (@ (l val))) (l val)))
+                  (ternary (l posy)
+                    (l ix (+ (l max) (i 1)))
+                    (prog)))))
+              (set_status (s $/) {Match})
+              {Match})
+        };
+    }
+    method subst(\$: $matcher_, $replacement, :g(:$global), :$x,
+            :c(:$continue), :st(:nd(:rd(:$nth))), :p(:$pos), :$inplace) {
+        die ":pos may not be used with :nth, :continue, or :x" if
+            defined($pos) && defined($nth // $continue // $x);
+        die ":x may not be used with :global" if defined($x) && $global;
+
         my $str = ~self;
         my $C = Cursor.new($str);
         my $matcher = $matcher_ ~~ Regex ?? $matcher_ !! /$matcher_/;
-        my $i = 0;
+        my $i = $pos // $continue // 0;
+        if ($i === ?1) {
+            my $o := CALLER::CALLER::<$/>;
+            $i = $o ?? $o.to !! 0;
+        }
         my $to = 0;
         my $changes = 0;
-        my $limctr = $global ?? Inf !! 1;
+        my $limctr = $global ?? Inf !! defined($x) ??
+            $x.niecza_quantifier_max !! 1;
         my @out;
+        my $index = 0;
         while $i < chars($str) && $limctr {
             my $M = head($matcher($C.cursor($i++)));
             if $M && $M.chars {
                 Q:CgOp { (rnull (set_status (s '$/') {$M})) };
-                $changes++;
-                push @out, substr($str,$to,$M.from-$to);
-                push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
-                $to = $i = $M.to;
-                $limctr = $limctr - 1;
+                unless defined($nth) && $index !~~ $nth {
+                    $changes++;
+                    push @out, substr($str,$to,$M.from-$to);
+                    push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
+                    $to = $i = $M.to;
+                    $limctr = $limctr - 1;
+                }
+                ++$index;
+            } else {
+                last if defined($pos);
             }
         }
         my $res = join "", @out, substr($str,$to,chars($str)-$to);
+        if defined($x) && $changes !~~ $x {
+            $res = $str;
+        }
         if $inplace {
             self = $res;
             ?$changes;
@@ -1458,9 +1509,8 @@ my class Regex is Method {
               (asbool (l res)))
         };
     }
-
     method ACCEPTS($st) {
-        return $st.^does(self) unless defined self;
+        self // nextsame;
         Q:CgOp {
             (letn ix   (i 0)
                   str  (obj_getstr {$st})

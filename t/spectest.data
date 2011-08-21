@@ -106,6 +106,7 @@ S05-metasyntax/changed.t
 S05-metasyntax/null.t
 S05-metasyntax/repeat.t
 S05-metasyntax/single-quotes.t
+S05-modifier/pos.t
 S06-multi/lexical-multis.t
 S06-advanced_subroutine_features/caller.t
 S06-signature/arity.t
