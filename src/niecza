@@ -232,7 +232,7 @@ method extract_rx_adverbs($ismatch, $issubst, $match) {
 
     if $ismatch {
         push @nyi, < overlap ov exhaustive ex global g rw >;
-        push @ok, < continue c pos p >;
+        push @ok, < continue c pos p nth st nd rd th >;
     }
 
     for @$qps -> $qp {

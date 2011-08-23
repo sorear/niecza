@@ -182,40 +182,36 @@ my class Cool {
         push @out, substr($str, $last, (chars($str) - $last));
         @out;
     }
-    method match($pat, :c(:$continue), :p(:$pos)) {
-        my $ix = $continue // $pos // 0;
-        my $str = ~self;
+    sub _match_nth($ix, @nth) {
+        shift @nth while @nth && @nth[0] < $ix;
+        @nth && @nth[0] == $ix;
+    }
+    method match($pat, :st(:rd(:nd(:th(:$nth)))), :c(:$continue), :p(:$pos)) {
+        my $ix   = $continue // $pos // 0;
+        my $str  = ~self;
         if $ix && ($ix === ?1) {
-            $ix = CALLER::CALLER::<$/> ?? CALLER::CALLER::<$/>.to !! 0;
+            $ix  = CALLER::CALLER::<$/> ?? CALLER::CALLER::<$/>.to !! 0;
         }
-        Q:CgOp {
-            (letn ix   (cast int (obj_getnum {$ix}))
-                  str  (obj_getstr {$str})
-                  max  (str_length (l str))
-                  incr (cursor_start (@ {Cursor}) (l str) (@ {Any}))
-                  csr  (null cursor)
-                  iter (null vvarlist)
-                  posy (obj_is_defined (@ {$pos}))
-              (whileloop 0 0 (<= (l ix) (l max)) (prog
-                (l csr (cursor_butpos (l incr) (l ix)))
-                (l ix (+ (l ix) (i 1)))
-                (l iter (vvarlist_new_singleton
-                    (subcall (@ {$pat}) (ns (l csr)))))
-                (ternary (iter_hasflat (l iter))
-                  (letn val (vvarlist_shift (l iter))
-                    (set_status (s $/) (l val))
-                    (return (newrwlistvar (@ (l val))) (l val)))
-                  (ternary (l posy)
-                    (l ix (+ (l max) (i 1)))
-                    (prog)))))
-              (set_status (s $/) {Match})
-              {Match})
-        };
+        my $max  = chars $str;
+        my $incr = Cursor.new($str);
+        my $indx = 0;
+        $nth := [ @$nth ] if defined($nth);
+
+        while $ix <= $max {
+            my $mat = head($pat.($incr.cursor($ix++)));
+            if $mat && (!defined($nth) || _match_nth(++$indx, $nth)) {
+                Q:CgOp { (rnull (set_status (s $/) {$mat})) };
+                return unitem($mat);
+            }
+            $ix = $max + 1 if defined($pos);
+        }
+        Q:CgOp { (rnull (set_status (s $/) {Match})) };
+        Match;
     }
     method subst(\$: $matcher_, $replacement, :g(:$global), :$x,
-            :c(:$continue), :st(:nd(:rd(:$nth))), :p(:$pos), :$inplace) {
-        die ":pos may not be used with :nth, :continue, or :x" if
-            defined($pos) && defined($nth // $continue // $x);
+            :c(:$continue), :th(:st(:nd(:rd(:$nth)))), :p(:$pos), :$inplace) {
+        die ":pos may not be used with :continue" if
+            defined($pos) && defined($continue);
         die ":x may not be used with :global" if defined($x) && $global;
 
         my $str = ~self;
@@ -226,6 +222,7 @@ my class Cool {
             my $o := CALLER::CALLER::<$/>;
             $i = $o ?? $o.to !! 0;
         }
+        $nth := [ @$nth ] if defined $nth;
         my $to = 0;
         my $changes = 0;
         my $limctr = $global ?? Inf !! defined($x) ??
@@ -236,14 +233,13 @@ my class Cool {
             my $M = head($matcher($C.cursor($i++)));
             if $M && $M.chars {
                 Q:CgOp { (rnull (set_status (s '$/') {$M})) };
-                unless defined($nth) && $index !~~ $nth {
+                unless defined($nth) && !_match_nth(++$index, $nth) {
                     $changes++;
                     push @out, substr($str,$to,$M.from-$to);
                     push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
                     $to = $i = $M.to;
                     $limctr = $limctr - 1;
                 }
-                ++$index;
             } else {
                 last if defined($pos);
             }
@@ -1448,6 +1444,7 @@ my class Cursor {
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method CURSOR() { self }
     token alpha { <+INTERNAL::alpha> } #OK
+    token ident { <+INTERNAL::alpha> \w* } #OK
 }
 
 my class Match is Cool {
