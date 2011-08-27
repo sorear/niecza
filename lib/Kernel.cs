@@ -1215,6 +1215,7 @@ noparams:
         }
 
         public bool GetLocalHint(string name, out BValue val) {
+            val = null;
             return (hints != null && hints.TryGetValue(name, out val));
         }
 

@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Niecza", "Niecza\Niecza.csproj", "{07760CA6-1010-43E9-A46E-8E9712218E8E}"
 EndProject
 Global
@@ -13,6 +13,9 @@ Global
 		{07760CA6-1010-43E9-A46E-8E9712218E8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07760CA6-1010-43E9-A46E-8E9712218E8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07760CA6-1010-43E9-A46E-8E9712218E8E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		StartupItem = Niecza\Niecza.csproj

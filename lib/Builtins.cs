@@ -18,7 +18,7 @@ namespace Niecza {
     }
 }
 
-public class Builtins {
+public partial class Builtins {
     public static P6any NominalCheck(string name, STable mo, Variable v) {
         P6any r = v.Fetch();
         if (!r.mo.HasMRO(mo))
@@ -1526,7 +1526,7 @@ flat_enough:;
 
     private static AppDomain subDomain;
     private static string backend;
-    // Better, but still fudgy.  Relies too mcuh on path structure.
+    // Better, but still fudgy.  Relies too much on path structure.
     private static AppDomain GetSubDomain() {
         if (subDomain != null) return subDomain;
 

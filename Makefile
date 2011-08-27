@@ -7,7 +7,7 @@ RM=rm -f
 CP=cp
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
-	 ObjModel.cs BigInteger.cs
+	 ObjModel.cs BigInteger.cs Printf.cs
 csbackend=CLRBackend.cs
 csxdr=CrossDomainReceiver.cs
 
