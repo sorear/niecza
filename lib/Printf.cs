@@ -165,8 +165,7 @@ public partial class Builtins {
                             continue_parsing_specifier = false;
                             break;
                         default:
-                            // die "invalid format specifier"
-                            break;
+                            throw new NieczaException("invalid format specifier");
                     }
                 }
             }
@@ -218,7 +217,6 @@ public partial class Builtins {
                     break;
                 case PrintfDirective.IntDecimal:
                     i = format.index>0 ? format.index : ++argi;
-//                  System.Console.Out.WriteLine("## Render IntDecimal {0} ", format.rightJustifyZeroes);
                     if (i < args.Length) {
                         n = (int) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
                         if (format.rightJustifyZeroes) {
@@ -233,18 +231,17 @@ public partial class Builtins {
                         }
                     }
                     else {
-                        // die "index out of range"
+                        throw new NieczaException("index out of range");
                     }
                     break;
                 case PrintfDirective.String:
                     i = format.index>0 ? format.index : ++argi;
                     if (i < args.Length) {
-//                      System.Console.Out.Write("## Render String {0} ", i);
                         s = args[i].Fetch().mo.mro_raw_Str.Get(args[i]);
                         result += s;
                     }
                     else {
-                        // die "index out of range"
+                        throw new NieczaException("index out of range");
                     }
                     break;
                 case PrintfDirective.UintDecimal:
