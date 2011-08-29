@@ -3206,6 +3206,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         my $/;
         $*CURLEX<!name> = $name;
         $*CURLEX<!cleanname !sym> =
+            !defined($name) ?? (Str, Str) !!
             ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
             ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
             ($name, Str);

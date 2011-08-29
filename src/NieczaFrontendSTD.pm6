@@ -107,9 +107,14 @@ method add_categorical($name) {
         $role = OUR::sym_categorical["{$cat}:sym<$sym>", $cat, $sym];
     }
 
-    Q:CgOp { (rnull (_addmethod (obj_llhow (@ {$role})) 8
-        (obj_getstr {$*name}) (@ {$*rxm}))) };
-    Q:CgOp { (rnull (_invalidate (obj_llhow (@ {$role})))) };
+    # $*name will be set if the role blocks are run.  If $*name is not set,
+    # then a cached role was reused and there is no need to fix up method names.
+    if defined $*name {
+        Q:CgOp { (rnull (_addmethod (obj_llhow (@ {$role})) 8
+            (obj_getstr {$*name}) (@ {$*rxm}))) };
+        Q:CgOp { (rnull (_invalidate (obj_llhow (@ {$role})))) };
+    }
+
     %*LANG<MAIN> = self.WHAT but $role;
     self.cursor_fresh(%*LANG<MAIN>);
 }

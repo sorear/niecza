@@ -2378,7 +2378,7 @@ grammar P6 is STD {
             ]
         ]
 
-        { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
+        { my $t = $<twigil>; $twigil = ($t.[0] // '').Str if @$t; }
         [ <?{ $twigil eq '.' }>
             [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix>
         ]?
@@ -2682,6 +2682,7 @@ grammar P6 is STD {
         {
             $*LEFTSIGIL = '@';
             if $lexsig {
+                $*CURLEX.<$?SIGNATURE> //= ''; # NIECZA
                 $*CURLEX.<$?SIGNATURE> ~= '|' if $lexsig > 1;
                 $*CURLEX.<$?SIGNATURE> ~= '(' ~ substr(self.orig, $startpos, $¢.pos - $startpos) ~ ')';
                 $*CURLEX.<!NEEDSIG>:delete;
@@ -4393,8 +4394,8 @@ method EXPR ($preclvl?) {
                 my @delims = $op;
                 push @list, pop(@termstack);
                 while @opstack {
-                    self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
-                    last if $sym ne @opstack[*-1]<sym>;
+                    self.deb($sym ~ " vs " ~ (@opstack[*-1]<sym> // '')) if $*DEBUG +& DEBUG::EXPR;
+                    last if $sym ne (@opstack[*-1]<sym> // '');
                     if @termstack and defined @termstack[0] {
                         push @list, pop(@termstack);
                     }
@@ -5391,7 +5392,8 @@ method lookup_compiler_var($name) {
 
 method check_categorical ($name) {
     self.deb("check_categorical $name") if $*DEBUG +& DEBUG::symtab;
-    self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
+    self.add_categorical(substr($name,1))
+        if defined($name) && $name ~~ /^\&\w+\:/;
 }
 
 method trymop($f) {

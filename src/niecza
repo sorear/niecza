@@ -576,8 +576,8 @@ method variable_declarator($/) {
 
     my $v = $<variable>.ast;
     my $t = $v<twigil>;
-    my $list = $v<sigil> eq '@';
-    my $hash = $v<sigil> eq '%';
+    my $list = $v<sigil> && $v<sigil> eq '@';
+    my $hash = $v<sigil> && $v<sigil> eq '%';
     if ($t && defined "?=~^:".index($t)) {
         $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
             "using $scope; they are created " ~
@@ -599,7 +599,7 @@ method variable_declarator($/) {
         $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
     }
 
-    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    my $name = defined($v<name>) ?? $v<sigil> ~ $v<twigil> ~ $v<name> !! "";
     # otherwise identical to my
     my $slot = ($scope eq 'anon' || !defined($v<name>))
         ?? self.gensym !! $name;

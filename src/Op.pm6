@@ -158,7 +158,7 @@ class CallMethod is CallLike {
     method adverb($adv) {
         Op::CallMethod.new(receiver => $.receiver, name => $.name,
             private => $.private, pclass => $.pclass,
-            ismeta => $.ismeta, args => [ self.getargs, $adv ])
+            ismeta => $!ismeta, args => [ self.getargs, $adv ])
     }
 
     method zyg() { $.receiver, (($.name ~~ Op) ?? $.name !! Nil),
@@ -167,15 +167,16 @@ class CallMethod is CallLike {
     method code($body) {
         my $name = ($.name ~~ Op) ?? CgOp.obj_getstr($.name.cgop($body))
             !! CgOp.str($.name);
+        my $meta = $!ismeta // '';
         if $.private {
             CgOp.subcall(CgOp.stab_privatemethod(
                     CgOp.class_ref('mo', @( $.pclass )), $name),
                 $.receiver.cgop($body), self.argblock($body));
-        } elsif $.ismeta eq '^' {
+        } elsif $meta eq '^' {
             CgOp.let($.receiver.cgop($body), -> $r {
                 CgOp.methodcall(CgOp.newscalar(CgOp.how(CgOp.fetch($r))),
                     $name, $r, self.argblock($body))});
-        } elsif $.ismeta eq '?' {
+        } elsif $meta eq '?' {
             # TODO maybe use a lower-level check
             CgOp.let($.receiver.cgop($body), -> $r { CgOp.let($name, -> $n {
                 CgOp.ternary(
