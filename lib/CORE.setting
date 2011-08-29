@@ -585,11 +585,7 @@ sub infix:<< >= >>($l,$r) is Niecza::builtin('numge',2,2)
 sub infix:<max>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a < $b ?? $b !! $a }
 sub infix:<min>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a > $b ?? $b !! $a }
 
-sub warn($str) { $PROCESS::OUTPUT_USED := True; Q:CgOp {
-    (prog [note (obj_getstr {$str})]
-          [box Bool (bool 1)]
-    )
-} }
+sub warn($str) { Q:CgOp { (control 11 (null frame) (int -1) (obj_getstr {$str}) (null obj)) } }
 
 sub gist(\|@items) { @items.gist }
 our sub Niecza::gistcat(\|@items) {

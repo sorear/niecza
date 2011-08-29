@@ -873,6 +873,7 @@ namespace Niecza {
         public const int ON_GOTO = 8;
         public const int ON_NEXTDISPATCH = 9;
         public const int ON_VARLOOKUP = 10;
+        public const int ON_WARNING = 11;
         // ON_VARLOOKUP is kinda special, it's not used for exceptions
         // but rather for $*FOO and the like; goto = the variable index
         public int[] edata;
@@ -880,7 +881,7 @@ namespace Niecza {
 
         private static string[] controls = new string[] { "unknown", "next",
             "last", "redo", "return", "die", "succeed", "proceed", "goto",
-            "nextsame/nextwith" };
+            "nextsame/nextwith", "varlookup", "warning" };
         public static string DescribeControl(int type, Frame tgt,
                 string name) {
             string ty = (type < controls.Length) ? controls[type] : "unknown";
@@ -4607,6 +4608,11 @@ def:        return at.Get(self, index);
                         break;
                     }
                 }
+            }
+
+            if (unf == null && type == SubInfo.ON_WARNING) {
+                Console.Error.WriteLine(name + DescribeBacktrace(th, null));
+                return th;
             }
 
             return Unwind(th, type, unf, unip, payload, tgt, name, null);
