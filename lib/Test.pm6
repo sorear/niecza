@@ -99,7 +99,7 @@ sub no-control($code) {
     my $ok = True;
     {
         CATCH   { default { $ok = False } }
-        CONTROL { default { $ok = False } }
+        CONTROL { when .[0] != 11 { $ok = False } } # pass warnings
         $code.();
     }
     $ok
