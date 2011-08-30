@@ -4,22 +4,54 @@ C<compiler.pod> - overview of Niecza compiler pipeline
 
 =head1 Description
 
-The main entry points are in F<src/NieczaCompiler.pm6>.  The C<!compile>
-method calls the parser (front end), a pipeline of conversion stages
-(middle end) and code emitter (back end).
+The Perl 6 script F<src/niecza> is the command line wrapper that controls
+the startup of Niecza.  After reading command line options it constructs
+a compiler object, tweaks its properties and calls one of its compile
+methods.
 
-The parser is in F<src/NieczaFrontendSTD.pm6>, it uses F<NieczaGrammar.pm6>
-and F<NieczaActions.pm6>.  The grammar uses F<src/STD.pm6>, a snapshot
+The compiler object is defined in F<src/NieczaCompiler.pm6>.  Each
+compile method creates a certain environment and then calls the internal
+C<!compile> method.  This runs a parser (front end), a pipeline of
+transformation stages (middle end) and a code emitter (back end).
+
+The binary representation of the program being passed between the
+components is an abstract syntax tree (AST).  The tree nodes are objects
+in subclasses of the base class C<Op> from F<src/Op.pm6>.
+
+The parser is F<src/NieczaFrontendSTD.pm6>, it uses F<src/NieczaGrammar.pm6>
+and F<src/NieczaActions.pm6>.  The grammar uses F<src/STD.pm6>, a snapshot
 of Larry Wall's standard Perl 6 grammar that continues to evolve at
 L<https://github.com/perl6/std>.  The actions module uses a series of
-other modules (Op, RxOp, Sig, CClass, OpHelpers, Operator) to create an
-abstract syntax tree (AST) from Perl 6 source code.  The parser triggers
-each action when it matches the corresponding token in the grammar.
+other modules (Op, RxOp, Sig, CClass, OpHelpers, Operator) to create the
+AST from Perl 6 source code.  The parser triggers each action when it
+matches the corresponding token in the grammar.
+
+The middle end currently consists of F<src/NieczaPassSimplifier.pm6> but
+more stages can be plugged in using the F<src/niecza> script.  The
+C<!compile> method calls the C<invoke> method of each stage, passing an
+AST in and getting a new AST out.  The PassSimplifier stage converts
+keywords such as C<next>, C<any> and C<return> into calls to runtime
+functions that implement them.  The stages are where code optimizers do
+their work.
+
+There are several back ends selectable from the F<src/niecza> script,
+the default one is 'dotnet' which begins in F<src/NieczaBackendDotnet.pm6>.
+Back ends transform the AST code into a Niecza Abstract Machine (NAM)
+structure, do platform specific optimization, and produce a NAM output
+format (see L<nam.pod>).  The NAM code is in F<src/NieczaBackendNAM.pm6>
+which uses F<src/NAMOutput.pm6>.
+
+The dotnet back end uses a subroutine called C<downcall> that calls
+C<rawscall> (defined in F<lib/CLRBackend.cs>) to make a "raw system call"
+to a handler, which in dotnet is a C<delegate>.  The downcall handler
+for dotnet is called C<DownCall> which resides in F<lib/Builtins.cs>,
+and it delegates to the C<NamProcessor> handler, also defined in
+F<lib/CLRBackend.cs>, passing it the NAM output.
 
 =begin obsolete_docs
 
 Content from here to the end of file is ignored by pod formatters.  We
-agreed on 2011-08-30 that is is obsolete.  Delete each part as soon as
+agreed on 2011-08-30 that it is obsolete.  Delete each part as soon as
 you replace it above.
 
 The Niecza compiler is currently completely static.  It is a Perl 5
