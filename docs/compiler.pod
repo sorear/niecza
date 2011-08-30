@@ -4,6 +4,24 @@ C<compiler.pod> - overview of Niecza compiler pipeline
 
 =head1 Description
 
+The main entry points are in F<src/NieczaCompiler.pm6>.  The C<!compile>
+method calls the parser (front end), a pipeline of conversion stages
+(middle end) and code emitter (back end).
+
+The parser is in F<src/NieczaFrontendSTD.pm6>, it uses F<NieczaGrammar.pm6>
+and F<NieczaActions.pm6>.  The grammar uses F<src/STD.pm6>, a snapshot
+of Larry Wall's standard Perl 6 grammar that continues to evolve at
+L<https://github.com/perl6/std>.  The actions module uses a series of
+other modules (Op, RxOp, Sig, CClass, OpHelpers, Operator) to create an
+abstract syntax tree (AST) from Perl 6 source code.  The parser triggers
+each action when it matches the corresponding token in the grammar.
+
+=begin obsolete_docs
+
+Content from here to the end of file is ignored by pod formatters.  We
+agreed on 2011-08-30 that is is obsolete.  Delete each part as soon as
+you replace it above.
+
 The Niecza compiler is currently completely static.  It is a Perl 5
 pipeline which converts Perl 6 code into C# code, then shells out
 to C<gmcs> to generate a .exe file.
@@ -46,3 +64,5 @@ methods on C<Op> and C<RxOp> objects and consumed by C<src/CgOpToCLROp.pm>,
 both during the "csharp" pass.  This part of the design is still
 very much in flux; see C<nam.pod> for a more forward-looking take
 on it.
+
+=end obsolete_docs
