@@ -998,3 +998,43 @@ class Op::FlipFlop is Op {
             CgOp.letvar('!ret'));
     }
 }
+
+class Op::Temporize is Op {
+    has Op $.var;
+    has Int $.mode;
+    method zyg() { $!var }
+    method code($body) { CgOp.temporize($!var.code($body), CgOp.callframe,
+        CgOp.int($!mode)) }
+}
+
+class Op::IndirectVar is Op {
+    has Op $.name;
+    has Bool $.bind_ro;
+    has Op $.bind;
+    method zyg() { $!name }
+
+    method code($body) {
+        CgOp.sc_indir(CgOp.sc_root(), CgOp.obj_getstr($!name.cgop($body)),
+            CgOp.bool($!bind_ro ?? 1 !! 0),
+            $!bind ?? $!bind.cgop($body) !! CgOp.null('var'))
+    }
+
+    method to_bind($/, $ro, $rhs) { self.new(name => $!name, bind_ro => $ro,
+        bind => $rhs) }
+}
+
+class Op::CatchyWrapper is Op {
+    has $.inner;
+    method zyg() { $!inner }
+
+    method code($body) {
+        my $id = ::GLOBAL::NieczaActions.genid;
+
+        CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
+                CgOp.sink($!inner.cgop($body)),
+                CgOp.return(CgOp.scopedlex('False')),
+                CgOp.label("caught$id"),
+                CgOp.scopedlex('True')),
+            6, '', "caught$id");
+    }
+}

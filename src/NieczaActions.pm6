@@ -238,7 +238,10 @@ method process_name($/, :$declaring, :$defer, :$clean) {
             my $pkg;
             my @tail = @ns;
             my $head = pop(@tail) ~ $ext;
-            return { name => $head } unless @tail;
+            unless @tail {
+                goto "dyn" if $head eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT >;
+                return { name => $head } unless @tail;
+            }
             try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
             goto "dyn" unless $pkg;
 
@@ -344,9 +347,10 @@ method quote:rx ($/) {
     make self.op_for_regex($/, $<quibble>.ast);
 }
 method quote:m  ($/) {
-    make ::Op::CallMethod.new(|node($/), name => 'ACCEPTS',
-            receiver => self.op_for_regex($/, $<quibble>.ast),
-            args => [ mklex($/, '$_'),
+    make ::Op::CallMethod.new(|node($/), name => 'match',
+            receiver => mklex($/, '$_'),
+            args => [
+                self.op_for_regex($/, $<quibble>.ast),
                 self.extract_rx_adverbs(True, False, $<quibble>) ]);
 }
 
@@ -1065,6 +1069,10 @@ method circumfix:sym<( )> ($/) {
         # XXX in cases like * > (2 + *), we *don't* want the parens to disable
         # syntactic specialization, since they're required for grouping
         make @kids[0];
+    } elsif !@kids {
+        # an empty StatementList returns Nil, but () needs to be defined...
+        make ::Op::Paren.new(|node($/), inside =>
+            ::Op::SimpleParcel.new(items => []));
     } else {
         make ::Op::StatementList.new(|node($/), children => @kids);
     }
@@ -1197,6 +1205,13 @@ method infix:sym<?? !!>($/) { make ::Operator::Ternary.new(middle => $<EXPR>.ast
 method infix:sym<.=> ($/) { make ::Operator::DotEq.new }
 
 method prefix:temp ($/) { make ::Operator::Temp.new }
+method prefix:let ($/) { make ::Operator::Let.new }
+
+method statement_control:TEMP ($/) {
+    $*CURLEX<!sub>.noninlinable;
+    make ::Op::Temporize.new(|node($/), mode => 2,
+        var => self.inliney_call($/, $<block>.ast));
+}
 
 method INFIX($/) {
     my $fn = $<infix>.ast;
@@ -1543,9 +1558,10 @@ method term:name ($/) {
         make mklex($/, $name<name>);
     }
 
-    if $<postcircumfix> {
-        make mkcall($/, '&_param_role_inst', $/.ast,
-            @( $<postcircumfix>[0].ast.args ));
+    my @pc = @( $<postcircumfix> );
+    if @pc && @pc[0].substr(0,1) eq '[' {
+        make mkcall($/, '&_param_role_inst', $/.ast, @( @pc[0].ast.args ));
+        shift @pc;
     } elsif $<args> {
         my $sal = $<args>.ast // [];
         # TODO: support zero-D slicels
@@ -1557,6 +1573,10 @@ method term:name ($/) {
 
         make ::Op::CallSub.new(|node($/), invocant => $/.ast,
             args => $sal[0] // []);
+    }
+
+    if @pc {
+        make @pc[0].ast.with_args($/, $/.ast);
     }
 }
 
@@ -1571,6 +1591,11 @@ method term:identifier ($/) {
         return;
     }
 
+    if $id eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT > {
+        make Op::IndirectVar.new(|node($/),
+            name => Op::StringLiteral.new(text => $id));
+        return;
+    }
     my $is_name = $/.CURSOR.is_name(~$<identifier>);
 
     if $is_name && $<args>.chars == 0 {
@@ -1719,6 +1744,7 @@ method variable($/) {
     my ($name, $pkg);
     my ($dsosl) = $<desigilname> ?? $<desigilname>.ast !!
         $<sublongname> ?? $<sublongname>.ast !!
+        $<longname> ?? self.process_name($<longname>, :defer) !!
         Any;
     if defined($dsosl<ind>) {
         make { term => self.docontext($/, $sigil, $dsosl<ind>) };
@@ -1741,10 +1767,6 @@ method variable($/) {
                 ::Op::Num.new(value => $<index>.ast))
         };
         return Nil;
-    } elsif $<longname> {
-        $/.CURSOR.sorry('::<> syntax NYI');
-        make { term => ::Op::StatementList.new };
-        return;
     } elsif $<postcircumfix> {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
@@ -2064,12 +2086,13 @@ method extract_rx_adverbs($ismatch, $issubst, $match) {
     push @nyi, < ignoreaccent a bytes codes graphs chars Perl5 P5 >;
 
     if $issubst {
-        push @nyi, < sameaccent aa samecase ii th st nd rd nth x >;
-        push @ok,  < g global >;
+        push @nyi, < sameaccent aa samecase ii >;
+        push @ok,  < g global p pos c continue x nth st nd rd th >;
     }
 
     if $ismatch {
-        push @nyi, < overlap ov exhaustive ex continue c pos p global g rw >;
+        push @nyi, < overlap ov exhaustive ex global g rw >;
+        push @ok, < continue c pos p nth st nd rd th >;
     }
 
     for @$qps -> $qp {
@@ -2285,6 +2308,7 @@ method variable_declarator($/) {
     my $start;
     for @$<trait> -> $t {
         if $t.ast<rw> {
+        } elsif $t.ast<dynamic> {
         } elsif $t.ast<start> && $*SCOPE eq 'state' {
             $start = $t.ast<start>;
         } else {
@@ -2308,8 +2332,8 @@ method variable_declarator($/) {
 
     my $v = $<variable>.ast;
     my $t = $v<twigil>;
-    my $list = $v<sigil> eq '@';
-    my $hash = $v<sigil> eq '%';
+    my $list = $v<sigil> && $v<sigil> eq '@';
+    my $hash = $v<sigil> && $v<sigil> eq '%';
     if ($t && defined "?=~^:".index($t)) {
         $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
             "using $scope; they are created " ~
@@ -2331,7 +2355,7 @@ method variable_declarator($/) {
         $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
     }
 
-    my $name = $v<sigil> ~ $v<twigil> ~ $v<name>;
+    my $name = defined($v<name>) ?? $v<sigil> ~ $v<twigil> ~ $v<name> !! "";
     # otherwise identical to my
     my $slot = ($scope eq 'anon' || !defined($v<name>))
         ?? self.gensym !! $name;
@@ -2454,7 +2478,7 @@ method make_constant_into($/, $pkg, $name, $rhs) {
 
 method init_constant($con, $rhs) {
     my $body = self.thunk_sub($rhs, name => "$con.name() init");
-    $body.is_phaser = 2;
+    $body.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
     $body.hint_hack = [ $*CURLEX<!sub>.xref, $con.name ];
     $body.outer.create_static_pad;
     $con.init = True;
@@ -3071,7 +3095,7 @@ method package_def ($/) {
             outer_direct => $*CURLEX<!sub>,
             cur_pkg    => $sub.cur_pkg,
             name       => 'ANON',
-            is_phaser  => 0,
+            is_phaser  => +::Metamodel::Phaser::INIT,
             augment_hack => $ah,
             class      => 'Code',
             code       => ::Op::StatementList.new(children => []),
@@ -3429,15 +3453,43 @@ method statement_prefix:START ($/) {
         self.inliney_call($/, $<blast>.ast));
 }
 
-# TODO: retain and return a value
-method statement_prefix:INIT ($/) {
-    $<blast>.ast.is_phaser = 0;
-    $*CURLEX<!sub>.create_static_pad;
+sub phaser($/, $ph, :$unique, :$topic, :$csp) {
+    my $sub = ($<blast> // $<block>).ast;
+
+    if $unique {
+        $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
+            if any($sub.outer.children).is_phaser == ::Metamodel::Phaser.($ph);
+        $sub.code = ::Op::CatchyWrapper.new(inner => $sub.code);
+    }
+
+    $sub.outer.noninlinable;
+    $sub.is_phaser = +::Metamodel::Phaser.($ph);
+
+    if $topic {
+        $sub.lexicals.<$_> // $sub.add_my_name('$_');
+        $sub.lexicals.<$_>.noinit   = True;
+        $sub.lexicals.<$_>.defouter = False;
+        $sub.signature = Sig.simple('$_');
+    }
+    $*CURLEX<!sub>.create_static_pad if $csp;
     make ::Op::StatementList.new;
 }
+method statement_control:CATCH ($/) { phaser($/, 'CATCH', :unique, :topic) }
+method statement_control:CONTROL ($/) { phaser($/, 'CONTROL', :unique, :topic) }
+method statement_prefix:PRE ($/) { phaser($/, 'PRE') }
+method statement_prefix:POST ($/) { phaser($/, 'POST', :topic) }
+method statement_prefix:KEEP ($/) { phaser($/, 'KEEP', :topic) }
+method statement_prefix:UNDO ($/) { phaser($/, 'UNDO', :topic) }
+method statement_prefix:ENTER ($/) { phaser($/, 'ENTER') }
+method statement_prefix:LEAVE ($/) { phaser($/, 'LEAVE', :topic) }
+
+method statement_prefix:CHECK ($/) { phaser($/, 'CHECK', :csp) }
+method statement_prefix:END ($/) { phaser($/, 'END', :csp) }
+method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
+
 # XXX 'As soon as possible' isn't quite soon enough here
 method statement_prefix:BEGIN ($/) {
-    $<blast>.ast.is_phaser = 2;
+    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
     $*CURLEX<!sub>.create_static_pad;
     make ::Op::StatementList.new;
 
@@ -3457,17 +3509,6 @@ method statement_prefix:BEGIN ($/) {
         last unless defined my $str = self.trivial_eval($/, $d.getargs.[0]);
         @*INC."$d.name()"($str);
     }
-}
-method statement_prefix:CHECK ($/) {
-    $<blast>.ast.is_phaser = 2;
-    $*CURLEX<!sub>.create_static_pad;
-    make ::Op::StatementList.new;
-}
-
-method statement_prefix:END ($/) {
-    $<blast>.ast.is_phaser = 1;
-    $*CURLEX<!sub>.create_static_pad;
-    make ::Op::StatementList.new;
 }
 
 method comp_unit($/) {

@@ -5163,42 +5163,71 @@ method is_name($longname, $curlex = $*CURLEX) {
     @parts[*-1] = $/ ~ @parts[*-1] if @parts && @parts[0] ~~ s/^(\W\W?)//;
 
     self.deb("reparsed: @parts.perl()") if $deb;
-    return False if !@parts;
+    return True if !@parts;
 
-    my $pkg;
+    my ($pkg, $sub);
 
-    if @parts[0] eq 'OUR' {
-        $pkg = $*unit.deref($curlex<!sub>.cur_pkg);
-        shift @parts;
-    } elsif @parts[0] eq 'PROCESS' or @parts[0] eq 'GLOBAL' {
-        $pkg = $*unit.abs_pkg(shift @parts);
-    } elsif @parts[0] eq 'MY' {
-        return False if @parts == 1;
-        my $lexical = self.lookup_lex(@parts[1], $curlex);
-        unless defined $lexical {
-            self.deb("Lexical @parts[1] not found") if $deb;
-            return False;
-        }
-        if $lexical ~~ ::Metamodel::Lexical::Stash {
-            shift @parts; shift @parts;
-            $pkg = $*unit.deref($lexical.pkg);
-        }
-        else {
-            return @parts == 2;
-        }
-    } else {
-        my $lexical = self.lookup_lex(@parts[0], $curlex);
-        if !defined $lexical {
-            return False if @parts == 1; # $x doesn't mean GLOBAL
-            $pkg = $*unit.abs_pkg('GLOBAL');
-        } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
-            $pkg = $*unit.deref($lexical.pkg);
+    given @parts[0] {
+        when 'OUR' {
+            $pkg = $*unit.deref($curlex<!sub>.cur_pkg);
             shift @parts;
-        } else {
-            return @parts == 1;
+            goto "packagey";
+        }
+        when 'PROCESS' | 'GLOBAL' {
+            $pkg = $*unit.abs_pkg(shift @parts);
+            goto "packagey";
+        }
+        when 'MY'      { $sub = $curlex<!sub>;                 goto "lexy"; }
+        when 'OUTER'   { $sub = $curlex<!sub>.?outer;          goto "lexy"; }
+        when 'UNIT'    { $sub = $curlex<!sub>.?to_unit;        goto "lexy"; }
+        when 'CORE'    { $sub = $curlex<!sub>.?true_setting;   goto "lexy"; }
+        when 'SETTING' { $sub = $curlex<!sub>.?to_unit.?outer; goto "lexy"; }
+
+        when 'COMPILING' | 'DYNAMIC' | 'CALLER' { return True }
+
+        default {
+            my $lexical = self.lookup_lex(@parts[0], $curlex);
+            if !defined($lexical) || @parts[0] eq 'PARENT' {
+                return False if @parts == 1; # $x doesn't mean GLOBAL
+                $pkg = (@parts[0] ~~ /^\W/) ??
+                    $*unit.deref($curlex<!sub>.cur_pkg) !!
+                    $*unit.abs_pkg('GLOBAL');
+            } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
+                $pkg = $*unit.deref($lexical.pkg);
+                shift @parts;
+            } else {
+                return @parts == 1;
+            }
+            goto "packagey";
         }
     }
 
+lexy:
+    shift @parts;
+    return False unless $sub;
+    return True unless @parts;
+    given @parts[0] {
+        when 'OUTER'   { $sub = $sub.?outer;          goto "lexy"; }
+        when 'UNIT'    { $sub = $sub.?to_unit;        goto "lexy"; }
+        when 'SETTING' { $sub = $sub.?to_unit.?outer; goto "lexy"; }
+        when 'CALLER'  { return True; }
+    }
+
+    my $lexical = self.lookup_lex(@parts[0], $sub);
+    unless defined $lexical {
+        self.deb("Lexical @parts[0] not found") if $deb;
+        return False;
+    }
+    if $lexical ~~ ::Metamodel::Lexical::Stash {
+        shift @parts;
+        $pkg = $*unit.deref($lexical.pkg);
+        goto "packagey";
+    }
+    else {
+        return @parts == 1;
+    }
+
+packagey:
     for @parts {
         return False if !$pkg || !$*unit.ns.exists($pkg.who, $_);
         $pkg = $*unit.ns.get($pkg.who, $_);
@@ -5410,7 +5439,7 @@ method trymop($f) {
 method lookup_lex($name, $lex is copy = $*CURLEX) {
     my $deb = $*DEBUG +& DEBUG::symtab;
     self.deb("Lookup $name") if $deb;
-    my $sub = $lex<!sub>;
+    my $sub = $lex.^isa(Hash) ?? $lex<!sub> !! $lex;
     my $sub2 = $sub;
     loop {
         if $sub.lexicals{$name}:exists {

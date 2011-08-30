@@ -226,8 +226,8 @@ class Temp is Operator {
     method with_args($/, *@args) {
         my $rarg = @args[0];
         if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
-            $/.CURSOR.sorry('Non-contextual case of temp NYI');
-            return ::Op::StatementList.new;
+            $*CURLEX<!sub>.noninlinable;
+            return ::Op::Temporize.new(|node($/), mode => 0, var => $rarg);
         }
         my $hash = substr($rarg.name,0,1) eq '%';
         my $list = substr($rarg.name,0,1) eq '@';
@@ -235,6 +235,13 @@ class Temp is Operator {
         mkcall($/, '&infix:<=>',
             ::Op::Lexical.new(name => $rarg.name, :$hash, :$list),
             ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+    }
+}
+
+class Operator::Let is Operator {
+    method with_args($/, *@args) {
+        $*CURLEX<!sub>.noninlinable;
+        return ::Op::Temporize.new(|node($/), mode => 1, var => @args[0]);
     }
 }
 

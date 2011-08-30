@@ -9,6 +9,9 @@ method locstr($fo, $lo, $fn, $ln) {
     $fn eq $fo ?? " (see line $lo)" !! " (see $fo line $lo)";
 }
 
+# keep synchronized with the list of Kernel.PHASER_XXX values
+enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
+
 ### NIECZA COMPILER METAMODEL
 # The metamodel exists to create a timeline inside the compiler.  Previously,
 # the compiler operated as a pure tree transformer with no conception of how
