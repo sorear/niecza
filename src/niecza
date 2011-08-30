@@ -24,6 +24,7 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+method backslash:qq ($/) { make $<quote>.ast }
 }
 
 CgOp._register_ops: < who sc_root sc_indir temporize
