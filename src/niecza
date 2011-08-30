@@ -24,6 +24,59 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+method process_nibble($/, @bits, $prefix?) {
+    my @acc;
+    for @bits -> $n {
+        my $ast = $n.ast;
+
+        if $ast ~~ CClass {
+            $n.CURSOR.sorry("Cannot use a character class in a string");
+            $ast = "";
+        }
+
+        if $ast !~~ Op && defined($prefix) && $prefix ne "" {
+            my $start_nl = !$n.from || "\r\n".index(
+                substr($n.orig, $n.from-1, 1)).defined;
+            $ast = $ast.split(/ ^^ [ <?{ $start_nl }> || <?after <[\r\n]> > ]
+                <before \h>[ $prefix || \h+ ]/).join("");
+        }
+
+        push @acc, $ast;
+    }
+
+    my $post = $/.CURSOR.postprocessor;
+    make mkstringycat($/, @acc);
+
+    if $post eq 'null' {
+        # already OK
+    }
+    # actually quotewords is a bit trickier than this...
+    elsif $post eq 'words' || $post eq 'quotewords' {
+        my $sl = $/.ast;
+        if !$sl.^isa(::Op::StringLiteral) {
+            make ::Op::CallMethod.new(|node($/), :name<words>, receiver => $sl);
+        }
+        else {
+            my @tok = $sl.text.words;
+            @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
+
+            make ((@tok == 1) ?? @tok[0] !! ::Op::Paren.new(|node($/),
+                inside => ::Op::SimpleParcel.new(|node($/), items => @tok)));
+        }
+    }
+    elsif $post eq 'path' {
+        # TODO could stand to be a lot fancier.
+        make ::Op::CallMethod.new(|node($/), receiver => $/.ast, :name<IO>);
+    }
+    elsif $post eq 'run' {
+        make mkcall($/, 'rungather', $/.ast);
+    }
+    else {
+        $/.CURSOR.sorry("Unhandled postprocessor $post");
+    }
+
+    $/.ast;
+}
 method backslash:qq ($/) { make $<quote>.ast }
 }
 
