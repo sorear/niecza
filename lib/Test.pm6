@@ -95,26 +95,45 @@ sub is(\$got, \$expected, $tag?) is export {
     }
 }
 sub isnt(Mu $got, Mu $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
+# Runs $code, trapping various failure modes and returning applicable.
 sub no-control($code) {
-    my $ok = True;
+    my ($died, $warned);
     {
-        CATCH   { default { $ok = False } }
-        CONTROL { when .[0] != 11 { $ok = False } } # pass warnings
+        CATCH   { default { $died = True } }
+        CONTROL {
+            if .[0] == 11 {
+                $warned = True;
+                return; # NIECZA - causes &warn to return
+            }
+            when .[0] != 11 { $died = True } # exits block
+        }
         $code.();
     }
-    $ok
+    $died ?? "die" !! $warned ?? "warn" !! "";
 }
 sub lives_ok($code,$why?) is export {
-    $*TEST-BUILDER.ok(no-control($code), $why);
+    $*TEST-BUILDER.ok(no-control($code) ne "die", $why);
 }
 sub dies_ok($code,$why?) is export {
-    $*TEST-BUILDER.ok(!no-control($code), $why);
+    $*TEST-BUILDER.ok(no-control($code) eq "die", $why);
 }
-sub eval_dies_ok($code, $why?) is export {
-    $*TEST-BUILDER.ok(!no-control({ eval $code }), $why);
+sub succeeds_ok($code,$why?,:$ignore = ()) is export {
+    $*TEST-BUILDER.ok(?(no-control($code) eq any("", @$ignore)), $why);
 }
-sub eval_lives_ok($code, $why?) is export {
-    $*TEST-BUILDER.ok(no-control({ eval $code }), $why);
+sub fails_ok($code,$why?,:$expect = <die warn fail>) is export {
+    $*TEST-BUILDER.ok(?(no-control($code) eq any(@$expect)), $why);
+}
+sub eval_lives_ok($code,$why?) is export {
+    $*TEST-BUILDER.ok(no-control({ eval $code }) ne "die", $why);
+}
+sub eval_dies_ok($code,$why?) is export {
+    $*TEST-BUILDER.ok(no-control({ eval $code }) eq "die", $why);
+}
+sub eval_succeeds_ok($code,$why?,:$ignore = ()) is export {
+    $*TEST-BUILDER.ok(?(no-control({ eval $code }) eq any("", @$ignore)), $why);
+}
+sub eval_fails_ok($code,$why?,:$expect = <die warn fail>) is export {
+    $*TEST-BUILDER.ok(?(no-control({ eval $code }) eq any(@$expect)), $why);
 }
 sub diag($str) is export { $*TEST-BUILDER.note($str) }
 sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
