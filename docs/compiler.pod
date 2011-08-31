@@ -48,53 +48,52 @@ for dotnet is called C<DownCall> which resides in F<lib/Builtins.cs>,
 and it delegates to the C<NamProcessor> handler, also defined in
 F<lib/CLRBackend.cs>, passing it the NAM output.
 
-=begin obsolete_docs
+Think carefully about what happens when C<rawscall> executes.  It looks
+like a language interoperability interface between Perl 6 and C#, as if
+the two languages are peers sending data to each other.  The details are
+a bit weirder.  Perl 6 code itself never executes directly, the code
+generated for it by a compiler executes.  Imagine C<rawscall> as a kind
+of wormhole made by the compiler to connect events in the Perl 6 world
+to events in the executable world.  Niecza is such a Perl 6 compiler
+that runs as an Intermediate Language (IL) program executed by a Common
+Language Runtime (CLR) (either Mono or .NET).  When a Perl 6 C<rawscall>
+executes it is the IL compiled for C<rawscall> that executes.  So how
+was the IL for the Perl 6 source code parts of Niecza (the callers of
+C<rawscall>) made?  How is the Niecza compiler babby formed?
 
-Content from here to the end of file is ignored by pod formatters.  We
-agreed on 2011-08-30 that it is obsolete.  Delete each part as soon as
-you replace it above.
+Consider what a compiler is - a program that writes a program.  Give it
+input in one language and it translates to output in another.  And a
+compiled compiler is also a program, written in one language and run in
+another.  There are then four potentially different languages, sometimes
+fewer, depending on whether it is a native compiler, a cross compiler, a
+self hosting compiler such as Niecza etc.
 
-The Niecza compiler is currently completely static.  It is a Perl 5
-pipeline which converts Perl 6 code into C# code, then shells out
-to C<gmcs> to generate a .exe file.
+Bootstrapping self-hosting compilers is a chicken-or-egg conundrum that
+software gurus call a "circular dependency" or "circularity".  In the
+case of Niecza today's solution is "here's one we made earlier", in a
+F<niecza.zip> that F<Makefile> downloads and expands into F<boot/> when
+you first build.  How was the earliest Niecza formed?  Once upon a time,
+Niecza was not self hosting, and the initial Nieczas were cross compiled
+using code written in Perl 5 and C#.  That obsolete code no longer works
+and has therefore been removed.  Phew.  Let's return to CLRBackend.
 
-The compiler is structured as a series of phases, which do not match
-precisely with the source files.
+=cut
 
-=head1 Intermediate representations
-
-=head2 Parse trees
-
-These are created by the viv-generated parser and are very ephemeral;
-with one exception they are always deconstructed immediately by the
-action methods.  Code to process them is entirely in C<Niecza::Actions>
-except for some heredoc code.
-
-=head2 Op trees
-
-This is the most worthy of the name "AST".  Op trees are built mostly
-from subclasses of C<Op>, with some C<Body> and C<RxOp> objects mixed
-in.  They contain unresolved symbol references, and are the most
-appropriate objects to return from macros once we have them.  These
-trees are primarily constructed in C<Niecza::Actions> during the "parse"
-phase, and are converted in-place into metamodel trees during "begin".
-
-=head2 Metamodel trees
-
-The metamodel trees are resolved to a specific data organization.  They
-make all typological relationships and scoping explicit.  They are
-constructed of many classes defined in C<src/Metamodel.pm>; function
-bodies are represented using C<Op> nodes, but it is important to keep
-in mind that at this stage C<Op> nodes represent pure code and have no
-declarative or scoping functions.  Most optimization passes work at this
-level.
-
-=head2 CgOp trees
-
-CgOp trees represent very concrete code.  They are constructed by
-methods on C<Op> and C<RxOp> objects and consumed by C<src/CgOpToCLROp.pm>,
-both during the "csharp" pass.  This part of the design is still
-very much in flux; see C<nam.pod> for a more forward-looking take
-on it.
-
-=end obsolete_docs
+<sorear> mberends: rawscall is raw static (method) call; it allows calls
+    into C# libraries from Perl 6, like earlier versions of Niecza
+    (before I started taking backend portability more seriously) defined
+    say using
+     (rawscall System.Console.WriteLine (obj_getstr {@args.join('')}))
+<sorear> mberends: the downcall mechanism is very hairy
+<mberends> sorear: interesting. I thought last night about writing
+    something about the bootstrapping implications of downcall
+<sorear> mberends: run/Niecza.exe is linked against run/Kernel.dll (from
+    the bootstrap zipball), but code you compile with Niecza.exe should
+    link against obj/Kernel.dll (compiled from lib/*.cs)
+<sorear> the CLR allows you to load two incompatible assemblies with the
+    same name, as long as you load them in different "application domains"
+<mberends> sorear: thanks! I'll also delete the old content and continue
+    writing up CLRBackend.cs
+<sorear> the C# DownCall method performs the necessary voodoo to create
+    a second appdomain for running code, then invoke the back back end :)
+    in CLRBackend.cs in the child appdomain
