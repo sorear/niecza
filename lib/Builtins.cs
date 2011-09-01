@@ -1164,7 +1164,6 @@ public partial class Builtins {
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             double angle = Math.Atan2(v1.im, v1.re) / 2;
-            if (angle < 0) angle += Math.PI;
             double mag = Math.Sqrt(Math.Sqrt(v1.im*v1.im + v1.re*v1.re));
             return MakeComplex(mag * Math.Cos(angle), mag * Math.Sin(angle));
         } else {
