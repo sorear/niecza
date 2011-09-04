@@ -526,7 +526,6 @@ next_method: ;
             = new CtxCallMethodUnbox<VarDeque>("iterator");
         public static readonly ContextHandler<Variable[]> RawCallReify
             = new CtxCallMethodUnbox<Variable[]>("reify");
-        public static readonly ContextHandler<object> CallToCLR = new MuToCLR();
         public static readonly IndexHandler CallAtPos
             = new IxCallMethod("postcircumfix:<[ ]>", null);
         public static readonly IndexHandler CallAtKey
