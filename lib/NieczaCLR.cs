@@ -165,6 +165,125 @@ class CandidateSet {
     }
 }
 
+class OverloadCandidate : MultiCandidate {
+    Type[] args;
+    Type param_array;
+
+    public override bool Admissable(Variable[] pos, VarHash named) {
+        if (named != null && named.IsNonEmpty)
+            return false;
+        if (!AdmissableArity(pos.Length))
+            return false;
+
+        object dummy;
+        for (int i = 0; i < args.Length; i++)
+            if (!CoerceArgument(out dummy, args[i], pos[i]))
+                return false;
+        // XXX: maybe param arrays should be treated as slurpies?
+        for (int i = args.Length; i < pos.Length; i++)
+            if (!CoerceArgument(out dummy, param_array, pos[i]))
+                return false;
+
+        return true;
+    }
+
+    bool CoerceArgument(out object clr, Type ty, Variable var) {
+        P6any obj = var.Fetch();
+        clr = null;
+
+        // type objects are typed nulls
+        if (!obj.IsDefined()) {
+            if (obj is BoxObject<object>) {
+                Type t = (Type)Kernel.UnboxAny<object>(obj.mo.how);
+                // is this enough?
+                return (ty.IsAssignableFrom(t) && !ty.IsValueType &&
+                        ty != typeof(void));
+            } else if (obj.mo == Kernel.MuMO || obj.mo == Kernel.AnyMO) {
+                // untyped-ish null
+                return !ty.IsValueType && ty != typeof(void);
+            } else {
+                // we'll pass this by value anyway
+                clr = obj;
+                return ty.IsAssignableFrom(obj.GetType());
+            }
+        }
+        // in all other cases we're definitely passing a non-null value
+
+        // Boolean values marshal to bool
+        if (obj.Does(Kernel.BoolMO)) {
+            clr = Kernel.UnboxAny<bool>(obj);
+        }
+        // note, Bool ~~ Int ~~ Integral
+        else if (obj.Does(Kernel.IntegralMO)) {
+            // important type directed case!
+            int small;
+            BigInteger big;
+            bool use_big = Builtins.GetAsInteger(var, out small, out big);
+
+            if (ty == typeof(sbyte))
+                clr = (!use_big && small >= sbyte.MinValue && small <= sbyte.MaxValue) ? (object)(sbyte)small : null;
+            else if (ty == typeof(byte))
+                clr = (!use_big && small >= byte.MinValue && small <= byte.MaxValue) ? (object)(byte)small : null;
+            else if (ty == typeof(short))
+                clr = (!use_big && small >= short.MinValue && small <= short.MaxValue) ? (object)(short)small : null;
+            else if (ty == typeof(ushort))
+                clr = (!use_big && small >= ushort.MinValue && small <= ushort.MaxValue) ? (object)(ushort)small : null;
+            else {
+                big = use_big ? big : (BigInteger) small;
+
+                if (ty == typeof(int))
+                    clr = (big >= int.MinValue && big <= int.MaxValue) ? (object)(int)big : null;
+                else if (ty == typeof(uint))
+                    clr = (big >= uint.MinValue && big <= uint.MaxValue) ? (object)(uint)big : null;
+                else if (ty == typeof(long))
+                    clr = (big >= long.MinValue && big <= long.MaxValue) ? (object)(long)big : null;
+                else if (ty == typeof(ulong))
+                    clr = (big >= ulong.MinValue && big <= ulong.MaxValue) ? (object)(ulong)big : null;
+
+                else if (ty == typeof(float))
+                    clr = (object)(float)big;
+                else if (ty == typeof(double))
+                    clr = (object)(double)big;
+                else if (ty == typeof(decimal))
+                    clr = big.GetWords().Length <= 3 ? (object)(decimal)big : null;
+                else
+                    clr = obj;
+            }
+        }
+        else if (obj.Does(Kernel.StrMO)) {
+            string s = Kernel.UnboxAny<string>(obj);
+            if (ty == typeof(char) && s.Length == 1)
+                clr = s[0];
+            else if (ty == typeof(string))
+                clr = s;
+            else
+                clr = obj;
+        }
+        // TODO: Code to delegates, Array to IList(maybe)
+        else {
+            clr = obj;
+        }
+
+        return clr != null && ty.IsAssignableFrom(clr.GetType());
+    }
+
+    public override int  Compare(int arity, MultiCandidate other) {
+        throw new NotImplementedException();
+    }
+
+    public override bool AdmissableArity(int arity) {
+        return param_array == null ? arity == args.Length :
+            arity >= args.Length;
+    }
+
+    public override int  MinDispatchArity() {
+        return args.Length + 1;
+    }
+}
+
+class OverloadDispatcher {
+}
+
 // public class NieczaCLR {
 //     static Dictionary<Type, STable> wrapper_cache
 //         = new Dictionary<Type, STable>();

@@ -3085,6 +3085,8 @@ have_v:
         public static P6any EMPTYP;
         public static P6any HashP;
         public static P6any IteratorP;
+        public static STable RealMO;
+        public static STable IntegralMO;
         public static readonly STable JunctionMO;
         public static readonly STable LabelMO;
         public static readonly STable AnyMO;

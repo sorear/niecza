@@ -393,6 +393,7 @@ my class Capture {
 # Scalar types {{{
 my class Numeric is Cool { }
 my class Real is Numeric { }
+my class Integral is Real { }
 my class Num is Real {
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
@@ -404,7 +405,7 @@ my class Num is Real {
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
 our constant i  = sqrt(-1);
-my class Int is Real {
+my class Int is Integral {
     method niecza_quantifier_max() { self }
     method niecza_quantifier_min() { self }
     method Int() { self }
