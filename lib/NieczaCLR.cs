@@ -267,8 +267,61 @@ class OverloadCandidate : MultiCandidate {
         return clr != null && ty.IsAssignableFrom(clr.GetType());
     }
 
-    public override int  Compare(int arity, MultiCandidate other) {
-        throw new NotImplementedException();
+    public override int  Compare(int arity, MultiCandidate other_) {
+        bool any_better = false, any_worse = false;
+        OverloadCandidate other = (OverloadCandidate) other_;
+
+        for (int ix = 0; ix < arity; ix++) {
+            int res = CompareType(ix >= args.Length ? param_array : args[ix],
+                ix >= other.args.Length ? other.param_array : other.args[ix]);
+            if (res > 0) any_better = true;
+            if (res < 0) any_worse  = true;
+        }
+
+        if (any_better && !any_worse)  return 1;
+        if (any_worse  && !any_better) return -1;
+        return 0;
+    }
+
+    const int NUM_NUMTYPES = 12;
+    static Type[] num_types = new Type[] {
+        typeof(sbyte), typeof(byte), typeof(short), typeof(ushort),
+        typeof(int), typeof(uint), typeof(long), typeof(ulong),
+        typeof(char), typeof(float), typeof(double), typeof(decimal),
+    };
+
+    // +1 if Y is a signed type shorter-or-equal to unsigned X, or
+    // Y is implicitly convertable to X
+    static sbyte[,] num_preced = new sbyte[,] {
+        //sb  ub  ss  us  si  ui  sl  ul  ch  sf  df  dc
+        {  0,  1,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1 }, //sbyte
+        {  0,  0,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1 }, //byte
+        {  0,  0,  0,  1,  1,  1,  1,  1,  0,  1,  1,  1 }, //short
+        {  0,  0,  0,  0,  1,  1,  1,  1,  0,  1,  1,  1 }, //ushort
+        {  0,  0,  0,  0,  0,  1,  1,  1,  0,  1,  1,  1 }, //int
+        {  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,  1,  1 }, //uint
+        {  0,  0,  0,  0,  0,  0,  0,  1,  0,  1,  1,  1 }, //long
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1 }, //ulong
+        {  0,  0,  0,  1,  1,  1,  1,  1,  0,  1,  1,  1 }, //char
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0 }, //float
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }, //double
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }, //decimal
+    };
+
+    int CompareType(Type t1, Type t2) {
+        int i1, i2;
+        if (t1 == t2) return 0;
+        for (i1 = 0; i1 < NUM_NUMTYPES && t1 != num_types[i1]; i1++) ;
+        for (i2 = 0; i2 < NUM_NUMTYPES && t2 != num_types[i2]; i2++) ;
+
+        if (i1 != NUM_NUMTYPES && i2 != NUM_NUMTYPES)
+            return num_preced[i1,i2] - num_preced[i2,i1];
+
+        if (t1.IsAssignableFrom(t2))
+            return 1;
+        if (t2.IsAssignableFrom(t1))
+            return -1;
+        return 0;
     }
 
     public override bool AdmissableArity(int arity) {
