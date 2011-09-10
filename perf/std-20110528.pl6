@@ -16,5 +16,5 @@ sub bench($name, $nr, $f) {
     say "$name = {($time - $avg)*1e6}µs [{$time*$nr}s / $nr]";
 }
 
-my $f = sub () { };
-bench 'sub call', 1000000, sub () { $f() };
+my $obj = CLR::System::Random.new;
+bench 'clr op', 100000, sub () { $obj.Next(100, 200); };

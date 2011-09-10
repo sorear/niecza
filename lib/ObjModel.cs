@@ -581,6 +581,7 @@ next_method: ;
 
         public int num_rank = -1;
         public bool is_any = false;
+        public Type box_type;
 
         public STable(string name) {
             this.name = name;

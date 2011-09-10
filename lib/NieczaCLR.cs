@@ -430,6 +430,8 @@ namespace Niecza {
                 if (named_wrapper_cache.TryGetValue(nm, out r))
                     return r;
                 Type ty = Type.GetType(nm.Substring(1));
+                if (CLROpts.Debug)
+                    Console.WriteLine("Loading type {0} ... {1}", nm.Substring(1), ty == null ? "failed" : "succeeded");
                 if (ty != null) {
                     wrapper_cache[ty] = r = NewWrapper(ty);
                     named_wrapper_cache[nm] = r;
@@ -462,6 +464,31 @@ namespace Niecza {
                     th.pos[0].Fetch()), rpos, th.named);
                 return th.caller;
             };
+        }
+
+        static Frame default_handler(Frame th) {
+            // XXX there HAS to be a better way to do this.
+            STable mo = ((Variable)th.lex0).Fetch().mo;
+            object obj = Array.CreateInstance(mo.box_type, 1).GetValue(0);
+            th.caller.resultSlot = obj == null ? mo.typeVar :
+                Kernel.BoxAnyMO<object>(obj, mo);
+            return th.caller;
+        }
+
+        static Frame marshal_handler(Frame th) {
+            STable mo = ((Variable)th.lex0).Fetch().mo;
+            object clr;
+            if (!CoerceArgument(out clr, mo.box_type, (Variable)th.lex1))
+                return Kernel.Die(th, "Cannot coerce value of type " + ((Variable)th.lex1).Fetch().mo.name + " to " + mo.box_type.FullName);
+            th.caller.resultSlot = clr == null ? mo.typeVar :
+                Kernel.BoxAnyMO<object>(clr, mo);
+            return th.caller;
+        }
+
+        static Frame unmarshal_handler(Frame th) {
+            object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
+            th.caller.resultSlot = BoxResult(o == null ? typeof(void) : o.GetType(), o);
+            return th.caller;
         }
 
         static STable NewWrapper(Type t) {
@@ -517,6 +544,32 @@ namespace Niecza {
                 MultiAdd(allMembers, fi.Name, fi, new ParameterInfo[0]);
             }
 
+            if (t == typeof(object)) {
+                SubInfo si;
+
+                si = new SubInfo("KERNEL default", default_handler);
+                si.sig_i = new int[] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                };
+                si.sig_r = new object[] { "self" };
+                m.AddMethod(0, "default", Kernel.MakeSub(si, null));
+
+                si = new SubInfo("KERNEL marshal", marshal_handler);
+                si.sig_i = new int[] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
+                };
+                si.sig_r = new object[] { "self", "$obj" };
+                m.AddMethod(0, "marshal", Kernel.MakeSub(si, null));
+
+                si = new SubInfo("KERNEL unmarshal", unmarshal_handler);
+                si.sig_i = new int[] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                };
+                si.sig_r = new object[] { "self" };
+                m.AddMethod(0, "unmarshal", Kernel.MakeSub(si, null));
+            }
+
             foreach (string n in needNewWrapper) {
                 string siname = string.Format("{0}.{1}", m.name, n);
 
@@ -527,6 +580,7 @@ namespace Niecza {
             }
 
             m.Invalidate();
+            m.box_type = t;
             m.typeObject = m.initObject = new BoxObject<object>(null, m);
             m.typeVar = m.initVar = Kernel.NewROScalar(m.typeObject);
             return m;
@@ -628,6 +682,8 @@ namespace Niecza {
                         clr = (object)(double)big;
                     else if (ty == typeof(decimal))
                         clr = big.GetWords().Length <= 3 ? (object)(decimal)big : null;
+                    else if (ty == typeof(object))
+                        clr = use_big ? null : (object)small;
                     else
                         clr = obj;
                 }
@@ -638,10 +694,15 @@ namespace Niecza {
                     clr = s[0];
                 else if (ty == typeof(string))
                     clr = s;
+                else if (ty == typeof(object))
+                    clr = s;
                 else
                     clr = obj;
             }
             // TODO: Code to delegates, Array to IList(maybe)
+            else if (obj is BoxObject<object>) {
+                clr = Kernel.UnboxAny<object>(obj);
+            }
             else {
                 clr = obj;
             }
