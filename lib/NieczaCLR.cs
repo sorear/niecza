@@ -123,6 +123,9 @@ namespace Niecza {
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < i; j++) {
                     int comp = afilt[i].Compare(arity, afilt[j]);
+                    if (CLROpts.MMDDebug && comp != 0)
+                        Console.WriteLine("{0} {1} {2}", afilt[i],
+                                (comp > 0 ? '>' : '<'), afilt[j]);
                     if (comp > 0) { // $C_i > C_j$
                         gt[i*n+j] = true;
                         blocks[i]++;
@@ -365,18 +368,28 @@ namespace Niecza {
         }
 
         public override int  Compare(int arity, MultiCandidate other_) {
-            bool any_better = false, any_worse = false;
+            bool any_better = false, any_worse = false, any_diff = false;
             OverloadCandidate other = (OverloadCandidate) other_;
 
             for (int ix = 0; ix < arity; ix++) {
-                int res = CompareType(ix >= args.Length ? param_array : args[ix],
-                    ix >= other.args.Length ? other.param_array : other.args[ix]);
+                Type t1 = ix >= args.Length ? param_array : args[ix];
+                Type t2 = ix >= other.args.Length ? other.param_array : other.args[ix];
+                int res = CompareType(t1, t2);
+                if (t1 != t2) any_diff = true;
                 if (res > 0) any_better = true;
                 if (res < 0) any_worse  = true;
             }
 
             if (any_better && !any_worse)  return 1;
             if (any_worse  && !any_better) return -1;
+
+            if (!any_diff) {
+                if (param_array == null && other.param_array != null)
+                    return 1;
+                if (param_array != null && other.param_array == null)
+                    return -11;
+            }
+
             return 0;
         }
 
@@ -415,9 +428,9 @@ namespace Niecza {
                 return num_preced[i1,i2] - num_preced[i2,i1];
 
             if (t1.IsAssignableFrom(t2))
-                return 1;
-            if (t2.IsAssignableFrom(t1))
                 return -1;
+            if (t2.IsAssignableFrom(t1))
+                return 1;
             return 0;
         }
 
