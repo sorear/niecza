@@ -4966,7 +4966,7 @@ dynamic:
                     if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
                         Variable pl = Kernel.RunInferior(
                             r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
-                                "perl", new Variable[] { r }, null));
+                                "gist", new Variable[] { r }, null));
                         Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
                     }
                 } catch (Exception ex) {

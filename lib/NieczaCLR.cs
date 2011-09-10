@@ -491,6 +491,13 @@ namespace Niecza {
             return th.caller;
         }
 
+        static Frame Str_handler(Frame th) {
+            P6any ro = ((Variable)th.lex0).Fetch();
+            object o = Kernel.UnboxAny<object>(ro);
+            th.caller.resultSlot = Kernel.BoxAnyMO(o == null ? ro.mo.name : o.ToString(), Kernel.StrMO);
+            return th.caller;
+        }
+
         static STable NewWrapper(Type t) {
             if (CLROpts.Debug)
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
@@ -513,7 +520,9 @@ namespace Niecza {
                         BindingFlags.Static | BindingFlags.Instance)) {
                 if (CLROpts.Debug)
                     Console.WriteLine("Checking method : {0}", mi);
-                if (mi.GetBaseDefinition().DeclaringType == t && !mi.IsSpecialName)
+                if (mi.IsSpecialName && (Utils.StartsWithInvariant(mi.Name, "set_") || Utils.StartsWithInvariant(mi.Name, "get_")))
+                    continue; // ignore property accessors
+                if (mi.GetBaseDefinition().DeclaringType == t)
                     needNewWrapper.Add(mi.Name);
                 MultiAdd(allMembers, mi.Name, mi, mi.GetParameters());
             }
@@ -568,6 +577,14 @@ namespace Niecza {
                 };
                 si.sig_r = new object[] { "self" };
                 m.AddMethod(0, "unmarshal", Kernel.MakeSub(si, null));
+
+                si = new SubInfo("KERNEL Str", Str_handler);
+                si.sig_i = new int[] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                };
+                si.sig_r = new object[] { "self" };
+                m.AddMethod(0, "Str",  Kernel.MakeSub(si, null));
+                m.AddMethod(0, "gist", Kernel.MakeSub(si, null));
             }
 
             foreach (string n in needNewWrapper) {
@@ -576,7 +593,10 @@ namespace Niecza {
                 DynBlockDelegate method = BindGroup(siname, allMembers[n]);
                 if (CLROpts.Debug)
                     Console.WriteLine("Installing {0}", siname);
-                m.AddMethod(0, n, Kernel.MakeSub(new SubInfo(siname, method), null));
+                P6any sub = Kernel.MakeSub(new SubInfo(siname, method), null);
+                m.AddMethod(0, n, sub);
+                if (n == "Invoke" && typeof(Delegate).IsAssignableFrom(t))
+                    m.AddMethod(0, "postcircumfix:<( )>", sub);
             }
 
             m.Invalidate();
