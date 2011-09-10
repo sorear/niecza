@@ -172,21 +172,91 @@ namespace Niecza {
         }
     }
 
+    sealed class PropertyProxy : Variable {
+        PropertyInfo prop;
+        object       obj;
+        object[]     argv;
+
+        public PropertyProxy(PropertyInfo prop, object obj, object[] argv) {
+            this.type   = Kernel.AnyMO; // XXX because of coercion
+            this.rw     = true; // make sure Fetch is called repeatedly
+            this.islist = false;
+            this.prop   = prop;
+            this.obj    = obj;
+            this.argv   = argv;
+        }
+
+        public override P6any Fetch() {
+            if (!prop.CanRead)
+                throw new NieczaException("Property " + prop.Name + " is write-only");
+            MethodInfo mi = prop.GetGetMethod();
+            object ret = mi.Invoke(obj, argv);
+            return CLRWrapperProvider.BoxResult(mi.ReturnType, ret).Fetch();
+        }
+
+        public override void Store(P6any v) {
+            if (!prop.CanWrite)
+                throw new NieczaException("Property " + prop.Name + " is read-only");
+            MethodInfo mi = prop.GetSetMethod();
+            object[] argv_ = argv;
+            Array.Resize(ref argv_, argv.Length + 1);
+            if (!CLRWrapperProvider.CoerceArgument(out argv_[argv.Length],
+                        prop.PropertyType, Kernel.NewROScalar(v)))
+                throw new NieczaException("Unable to coerce value of type " + v.mo.name + " for " + prop.Name); // could also be a range problem
+            mi.Invoke(obj, argv_);
+        }
+
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+    }
+
+    sealed class FieldProxy : Variable {
+        FieldInfo field;
+        object    obj;
+
+        public FieldProxy(FieldInfo field, object obj) {
+            this.type   = Kernel.AnyMO; // XXX because of coercion
+            this.rw     = true; // make sure Fetch is called repeatedly
+            this.islist = false;
+            this.field  = field;
+            this.obj    = obj;
+        }
+
+        public override P6any Fetch() {
+            object ret = field.GetValue(obj);
+            return CLRWrapperProvider.BoxResult(field.FieldType, ret).Fetch();
+        }
+
+        public override void Store(P6any v) {
+            if (field.IsInitOnly || field.IsLiteral)
+                throw new NieczaException("Field " + field.Name + " is read-only");
+            object clr;
+            if (!CLRWrapperProvider.CoerceArgument(out clr, field.FieldType,
+                        Kernel.NewROScalar(v)))
+                throw new NieczaException("Unable to coerce value of type " + v.mo.name + " for " + field.Name); // could also be a range problem
+            field.SetValue(obj, clr);
+        }
+
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+    }
+
     class OverloadCandidate : MultiCandidate {
-        MethodBase what_call;
+        MemberInfo what_call;
         Type[] args;
         Type param_array;
 
-        private OverloadCandidate(MethodBase what_call, Type[] args,
+        private OverloadCandidate(MemberInfo what_call, Type[] args,
                 Type param_array) {
             this.what_call = what_call;
             this.args = args;
             this.param_array = param_array;
         }
 
-        public static void GenerateCandidates(MethodBase what,
+        public static void MakeCandidates(MemberInfo what, ParameterInfo[] pi,
                 List<MultiCandidate> into) {
-            ParameterInfo[] pi = what.GetParameters();
             Type[] args1 = new Type[pi.Length];
             for (int i = 0; i < pi.Length; i++)
                 args1[i] = pi[i].ParameterType;
@@ -225,12 +295,20 @@ namespace Niecza {
                 }
                 argv[args.Length] = pa;
             }
-            object ret = what_call.Invoke((what_call.IsStatic ? null : obj),
-                argv);
             if (what_call is MethodInfo) {
-                return CLRWrapperProvider.BoxResult(((MethodInfo)what_call).ReturnType, ret);
+                MethodInfo mi = (MethodInfo) what_call;
+                object ret = mi.Invoke((mi.IsStatic ? null : obj), argv);
+                return CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
+            } else if (what_call is ConstructorInfo) {
+                ConstructorInfo ci = (ConstructorInfo) what_call;
+                object ret = ci.Invoke(null, argv);
+                return CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
+            } else if (what_call is FieldInfo) {
+                return new FieldProxy((FieldInfo) what_call, obj);
+            } else if (what_call is PropertyInfo) {
+                return new PropertyProxy((PropertyInfo) what_call, obj, argv);
             } else {
-                return CLRWrapperProvider.BoxResult(what_call.DeclaringType, ret);
+                throw new NieczaException("Unhandled member type " + what_call.GetType());
             }
         }
 
@@ -329,9 +407,6 @@ namespace Niecza {
         }
     }
 
-    class OverloadDispatcher {
-    }
-
     public class CLRWrapperProvider {
         // wrapper_cache serves as the lock-bearer for both
         static Dictionary<Type, STable> wrapper_cache
@@ -367,24 +442,15 @@ namespace Niecza {
             }
         }
 
-        static void MultiAdd<T>(Dictionary<string,List<T>> d, string n, T v) {
-            List<T> l;
+        static void MultiAdd(Dictionary<string,List<MultiCandidate>> d,
+                string n, MemberInfo mi, ParameterInfo[] pi) {
+            List<MultiCandidate> l;
             if (!d.TryGetValue(n, out l))
-                d[n] = l = new List<T>();
-            l.Add(v);
+                d[n] = l = new List<MultiCandidate>();
+            OverloadCandidate.MakeCandidates(mi, pi, l);
         }
 
-        static DynBlockDelegate BindAmbiguous() {
-            return delegate(Frame th) {
-                return Kernel.Die(th, "Cannot resolve " + th.info.name +
-                        " to a specific kind of member");
-            };
-        }
-
-        static DynBlockDelegate BindMethodGroup(string n, List<MethodBase> mis) {
-            List<MultiCandidate> mc = new List<MultiCandidate>();
-            foreach (MethodBase mb in mis)
-                OverloadCandidate.GenerateCandidates(mb, mc);
+        static DynBlockDelegate BindGroup(string n, List<MultiCandidate> mc) {
             CandidateSet cs = new CandidateSet(n, mc.ToArray());
 
             return delegate(Frame th) {
@@ -396,10 +462,6 @@ namespace Niecza {
                     th.pos[0].Fetch()), rpos, th.named);
                 return th.caller;
             };
-        }
-
-        static DynBlockDelegate BindPropertyGroup(List<PropertyInfo> mis) {
-            return BindAmbiguous();
         }
 
         static STable NewWrapper(Type t) {
@@ -416,10 +478,9 @@ namespace Niecza {
 
             HashSet<string> needNewWrapper = new HashSet<string>();
             needNewWrapper.Add("new"); // don't inherit constructors
-            Dictionary<string,List<MethodBase>> allMethods
-                = new Dictionary<string,List<MethodBase>>();
-            Dictionary<string,List<PropertyInfo>> allProperties
-                = new Dictionary<string,List<PropertyInfo>>();
+            Dictionary<string,List<MultiCandidate>> allMembers
+                = new Dictionary<string,List<MultiCandidate>>();
+            allMembers["new"] = new List<MultiCandidate>();
 
             foreach (MethodInfo mi in t.GetMethods(BindingFlags.Public |
                         BindingFlags.Static | BindingFlags.Instance)) {
@@ -427,7 +488,7 @@ namespace Niecza {
                     Console.WriteLine("Checking method : {0}", mi);
                 if (mi.GetBaseDefinition().DeclaringType == t && !mi.IsSpecialName)
                     needNewWrapper.Add(mi.Name);
-                MultiAdd(allMethods, mi.Name, mi);
+                MultiAdd(allMembers, mi.Name, mi, mi.GetParameters());
             }
 
             foreach (ConstructorInfo mi in t.GetConstructors(BindingFlags.Public |
@@ -435,7 +496,7 @@ namespace Niecza {
                 if (CLROpts.Debug)
                     Console.WriteLine("Checking constructor : {0}", mi);
                 needNewWrapper.Add("new");
-                MultiAdd(allMethods, "new", mi);
+                MultiAdd(allMembers, "new", mi, mi.GetParameters());
             }
 
             foreach (PropertyInfo pi in t.GetProperties(BindingFlags.Public |
@@ -444,39 +505,25 @@ namespace Niecza {
                     Console.WriteLine("Checking property : {0}", pi);
                 if (pi.DeclaringType == t)
                     needNewWrapper.Add(pi.Name);
-                MultiAdd(allProperties, pi.Name, pi);
+                MultiAdd(allMembers, pi.Name, pi, pi.GetIndexParameters());
             }
 
-            List<int> handlers = new List<int>();
+            foreach (FieldInfo fi in t.GetFields(BindingFlags.Public |
+                        BindingFlags.Static | BindingFlags.Instance)) {
+                if (CLROpts.Debug)
+                    Console.WriteLine("Checking fields : {0}", fi);
+                if (fi.DeclaringType == t)
+                    needNewWrapper.Add(fi.Name);
+                MultiAdd(allMembers, fi.Name, fi, new ParameterInfo[0]);
+            }
+
             foreach (string n in needNewWrapper) {
-                handlers.Clear();
+                string siname = string.Format("{0}.{1}", m.name, n);
 
-                string siname = string.Format("wrapper {0}:{1}", t.FullName, n);
-
-                if (allMethods.ContainsKey(n))
-                    handlers.Add(1);
-                if (allProperties.ContainsKey(n))
-                    handlers.Add(2);
-
-                DynBlockDelegate method = null;
-
-                switch (handlers.Count == 1 ? handlers[0] : 0) {
-                    case 0:
-                        method = BindAmbiguous();
-                        break;
-
-                    case 1:
-                        method = BindMethodGroup(m.name + "." + n, allMethods[n]);
-                        break;
-
-                    case 2:
-                        method = BindPropertyGroup(allProperties[n]);
-                        break;
-                }
-
+                DynBlockDelegate method = BindGroup(siname, allMembers[n]);
                 if (CLROpts.Debug)
                     Console.WriteLine("Installing {0}", siname);
-                m.AddMethod(0,n, Kernel.MakeSub(new SubInfo(siname, method), null));
+                m.AddMethod(0, n, Kernel.MakeSub(new SubInfo(siname, method), null));
             }
 
             m.Invalidate();
