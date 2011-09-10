@@ -415,6 +415,7 @@ namespace Niecza {
             m.FillClass(new string[] { }, new STable[] { pm }, mro);
 
             HashSet<string> needNewWrapper = new HashSet<string>();
+            needNewWrapper.Add("new"); // don't inherit constructors
             Dictionary<string,List<MethodBase>> allMethods
                 = new Dictionary<string,List<MethodBase>>();
             Dictionary<string,List<PropertyInfo>> allProperties
@@ -516,7 +517,9 @@ namespace Niecza {
             if (cty == typeof(P6any))
                 return Kernel.NewROScalar((P6any)ret);
 
-            return Kernel.BoxAnyMO<object>(ret, null); // XXX
+            if (ret == null)
+                return Kernel.AnyMO.typeVar;
+            return Kernel.BoxAnyMO<object>(ret, GetWrapper(ret.GetType()));
         }
 
         public static bool CoerceArgument(out object clr, Type ty, Variable var) {
@@ -601,13 +604,3 @@ namespace Niecza {
 
     }
 }
-
-public partial class Builtins {
-    public static Variable clr_test() {
-        Variable tv = CLRWrapperProvider.GetWrapper(typeof(System.Console)).typeVar;
-        return Kernel.RunInferior(tv.Fetch().InvokeMethod(
-                Kernel.GetInferiorRoot(), "WriteLine", new Variable[] {
-                    tv, Kernel.BoxAnyMO("Hello, world", Kernel.StrMO) }, null));
-    }
-}
-
