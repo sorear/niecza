@@ -5,8 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Mono.Unix.Native;
-using Mono.Unix;
 
 namespace Niecza {
     public class UpCallee: CrossDomainReceiver {
@@ -14,6 +12,89 @@ namespace Niecza {
             return Builtins.UnboxLoS(Kernel.RunInferior(Builtins.upcall_cb.Fetch().Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] { Builtins.BoxLoS(args) },
                 null)));
+        }
+    }
+
+    class PosixWrapper {
+        static Assembly Mono_Posix;
+        static Type Syscall, AccessModes, Stat;
+
+        // constant values are part of the ABI so these can't change
+        public const int R_OK = 1;
+        public const int W_OK = 2;
+        public const int X_OK = 4;
+        public const int F_OK = 8;
+
+        public static Func<uint> getuid, geteuid, getgid, getegid;
+        public static Func<uint,uint,int> setreuid, setregid;
+
+        static MethodInfo m_stat, m_access;
+        static FieldInfo  f_dev, f_ino, f_mode, f_nlink, f_uid, f_gid,
+            f_rdev, f_size, f_blksize, f_blocks, f_atime, f_mtime, f_ctime;
+
+        public static int access(string pathname, int mode) {
+            return (int) m_access.Invoke(null, new object[] {
+                pathname, Enum.ToObject(AccessModes, mode) });
+        }
+
+        public static long[] stat(string pathname) {
+            object[] args = new object[] { pathname, null };
+            long[] res = new long[14];
+            res[0] = (int) m_stat.Invoke(null, args);
+
+            res[1] =  (long)(ulong)f_dev.GetValue(args[1]);
+            res[2] =  (long)(ulong)f_ino.GetValue(args[1]);
+            res[3] =  ((IConvertible)f_mode.GetValue(args[1])).ToInt64(null);
+            res[4] =  (long)(ulong)f_nlink.GetValue(args[1]);
+            res[5] =  (uint)f_uid.GetValue(args[1]);
+            res[6] =  (uint)f_gid.GetValue(args[1]);
+            res[7] =  (long)(ulong)f_rdev.GetValue(args[1]);
+            res[8] =  (long)f_size.GetValue(args[1]);
+            res[9] =  (long)f_blksize.GetValue(args[1]);
+            res[10] = (long)f_blocks.GetValue(args[1]);
+            res[11] = (long)f_atime.GetValue(args[1]);
+            res[12] = (long)f_mtime.GetValue(args[1]);
+            res[13] = (long)f_ctime.GetValue(args[1]);
+
+            return res;
+        }
+
+        static PosixWrapper() {
+            Mono_Posix = Assembly.Load("Mono.Posix, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756");
+            Syscall = Mono_Posix.GetType("Mono.Unix.Native.Syscall", true);
+            AccessModes = Mono_Posix.GetType("Mono.Unix.Native.AccessModes", true);
+            Stat = Mono_Posix.GetType("Mono.Unix.Native.Stat", true);
+
+            getuid = (Func<uint>)Delegate.CreateDelegate(typeof(Func<uint>),
+                    Syscall.GetMethod("getuid"));
+            geteuid = (Func<uint>)Delegate.CreateDelegate(typeof(Func<uint>),
+                    Syscall.GetMethod("geteuid"));
+            getgid = (Func<uint>)Delegate.CreateDelegate(typeof(Func<uint>),
+                    Syscall.GetMethod("getgid"));
+            getegid = (Func<uint>)Delegate.CreateDelegate(typeof(Func<uint>),
+                    Syscall.GetMethod("getegid"));
+
+            setreuid = (Func<uint,uint,int>)Delegate.CreateDelegate(
+                typeof(Func<uint,uint,int>), Syscall.GetMethod("setreuid"));
+            setregid = (Func<uint,uint,int>)Delegate.CreateDelegate(
+                typeof(Func<uint,uint,int>), Syscall.GetMethod("setregid"));
+
+            m_stat = Syscall.GetMethod("stat");
+            m_access = Syscall.GetMethod("access");
+
+            f_dev = Stat.GetField("st_dev");
+            f_ino = Stat.GetField("st_ino");
+            f_mode = Stat.GetField("st_mode");
+            f_nlink = Stat.GetField("st_nlink");
+            f_uid = Stat.GetField("st_uid");
+            f_gid = Stat.GetField("st_gid");
+            f_rdev = Stat.GetField("st_rdev");
+            f_size = Stat.GetField("st_size");
+            f_blksize = Stat.GetField("st_blksize");
+            f_blocks = Stat.GetField("st_blocks");
+            f_atime = Stat.GetField("st_atime");
+            f_mtime = Stat.GetField("st_mtime");
+            f_ctime = Stat.GetField("st_ctime");
         }
     }
 }
@@ -1420,64 +1501,62 @@ flat_enough:;
         return File.Exists(path) || Directory.Exists(path);
     }
 
-    public static bool emulate_eaccess(string path, AccessModes mode) {
-        uint ruid = (uint)UnixEnvironment.RealUserId;
-        uint rgid = (uint)UnixEnvironment.RealGroupId;
-        uint euid = (uint)UnixEnvironment.EffectiveUserId;
-        uint egid = (uint)UnixEnvironment.EffectiveGroupId;
+    public static bool emulate_eaccess(string path, int mode) {
+        uint ruid = PosixWrapper.getuid();
+        uint rgid = PosixWrapper.getgid();
+        uint euid = PosixWrapper.geteuid();
+        uint egid = PosixWrapper.getegid();
         // this is not threadsafe, but it's how Perl 5 does it sometimes
-        Syscall.setreuid(euid, euid);
-        Syscall.setregid(egid, egid);
-        int res = Syscall.access(path, mode);
-        Syscall.setreuid(ruid, euid);
-        Syscall.setregid(rgid, egid);
+        PosixWrapper.setreuid(euid, euid);
+        PosixWrapper.setregid(egid, egid);
+        int res = PosixWrapper.access(path, mode);
+        PosixWrapper.setreuid(ruid, euid);
+        PosixWrapper.setregid(rgid, egid);
         return res == 0;
     }
 
     public static bool path_access_readable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && Syscall.access(path, AccessModes.R_OK) == 0;
+            && PosixWrapper.access(path, PosixWrapper.R_OK) == 0;
     }
 
     public static bool path_access_writable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && Syscall.access(path, AccessModes.W_OK) == 0;
+            && PosixWrapper.access(path, PosixWrapper.W_OK) == 0;
     }
 
     public static bool path_access_executable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && Syscall.access(path, AccessModes.X_OK) == 0;
+            && PosixWrapper.access(path, PosixWrapper.X_OK) == 0;
     }
     
     public static bool path_eaccess_readable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && emulate_eaccess(path, AccessModes.R_OK);
+            && emulate_eaccess(path, PosixWrapper.R_OK);
     }
 
     public static bool path_eaccess_writable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && emulate_eaccess(path, AccessModes.W_OK);
+            && emulate_eaccess(path, PosixWrapper.W_OK);
     }
 
     public static bool path_eaccess_executable(string path) {
         return (File.Exists(path) || Directory.Exists(path))
-            && emulate_eaccess(path, AccessModes.X_OK);
+            && emulate_eaccess(path, PosixWrapper.X_OK);
     }
 
     public static bool path_eaccess_owned(string path) {
         if (!File.Exists(path) && !Directory.Exists(path))
             return false;
-        Stat buf;
-        Syscall.stat(path, out buf);
-        return UnixEnvironment.EffectiveUserId == buf.st_uid;
+        long[] stat = PosixWrapper.stat(path);
+        return PosixWrapper.geteuid() == (uint)stat[5];
     }
 
     public static bool path_access_owned(string path) {
         if (!File.Exists(path) && !Directory.Exists(path))
             return false;
-        Stat buf;
-        Syscall.stat(path, out buf);
-        return UnixEnvironment.RealUserId == buf.st_uid;
+        long[] stat = PosixWrapper.stat(path);
+        return PosixWrapper.getuid() == (uint)stat[5];
     }
 
     public static Variable BoxLoS(string[] los) {

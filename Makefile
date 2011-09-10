@@ -52,7 +52,7 @@ obj/CrossDomainReceiver.dll: $(patsubst %,lib/%,$(csxdr))
 	    $(patsubst %,lib/%,$(csxdr))
 obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) obj/CrossDomainReceiver.dll
 	$(CSC) /target:library /out:obj/Kernel.dll /r:CrossDomainReceiver.dll \
-	    /r:Mono.Posix.dll /lib:obj /unsafe+ $(patsubst %,lib/%,$(cskernel))
+	    /lib:obj /unsafe+ $(patsubst %,lib/%,$(cskernel))
 obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll obj/CrossDomainReceiver.dll
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
 	    /r:CrossDomainReceiver.dll $(patsubst %,lib/%,$(csbackend))
