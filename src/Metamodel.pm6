@@ -593,7 +593,7 @@ class StaticSub is RefTarget {
             return $*unit.get_pkg($*unit.deref($!cur_pkg), @names, :$auto);
         } elsif $n0 eq 'PROCESS' or $n0 eq 'GLOBAL' {
             return $*unit.abs_pkg($n0, @names, :$auto);
-        } elsif $n0 eq 'COMPILING' or $n0 eq 'DYNAMIC' or $n0 eq 'CALLER' {
+        } elsif $n0 eq any < COMPILING DYNAMIC CLR CALLER > {
             # Yes, COMPILING is right here.  Because COMPILING is only valid
             # when recursively running code within the compiler, but this
             # function is only called directly from the compiler.  The closest

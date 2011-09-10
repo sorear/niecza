@@ -2583,6 +2583,7 @@ tryagain:
         public const int LEX  = 1; // p1(Frame) p2(int, depth)
         public const int ROOT = 2; // p1(Frame) p2(int)
         public const int DYNA = 3; // p1&p2
+        public const int CLR  = 4; // p1(string)
 
         int type;
         object p1;
@@ -2706,6 +2707,15 @@ tryagain:
             return true;
         }
 
+        public static P6any MakeCLR_WHO(string name) {
+            StashCursor sc = default(StashCursor);
+            sc.type = CLR;
+            sc.p1 = name;
+            P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
+            who.SetSlot("name", Kernel.BoxAnyMO(name, Kernel.StrMO));
+            return who;
+        }
+
         void Core(string key, bool final, out StashCursor sc, out Variable v,
                 Variable bind_to) {
             v = null;
@@ -2720,6 +2730,14 @@ tryagain:
                 if (bind_to != null)
                     throw new NieczaException("No slot to bind");
                 v = Kernel.AnyMO.typeVar;
+                goto have_v;
+            }
+            else if (type == CLR) {
+                if (Kernel.SaferMode)
+                    throw new NieczaException("CLR objects may not be used directly in safe mode");
+                if (bind_to != null)
+                    throw new NieczaException("Cannot bind interop namespaces");
+                v = CLRWrapperProvider.GetNamedWrapper((string)p1 + "." + key).typeVar;
                 goto have_v;
             }
             else if (type == WHO) {
@@ -2785,6 +2803,10 @@ tryagain:
                     throw new NieczaException("Cannot use COMPILING outside BEGIN scope");
                 } else if (key == "DYNAMIC") {
                     sc.type = DYNA;
+                    goto have_sc;
+                } else if (key == "CLR") {
+                    sc.type = CLR;
+                    sc.p1 = "";
                     goto have_sc;
                 } else {
                     v = bind_to;

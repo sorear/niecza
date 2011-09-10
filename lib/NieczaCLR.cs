@@ -333,15 +333,37 @@ namespace Niecza {
     }
 
     public class CLRWrapperProvider {
+        // wrapper_cache serves as the lock-bearer for both
         static Dictionary<Type, STable> wrapper_cache
             = new Dictionary<Type, STable>();
+        static Dictionary<string, STable> named_wrapper_cache
+            = new Dictionary<string, STable>();
 
         public static STable GetWrapper(Type t) {
             lock (wrapper_cache) {
                 STable r;
                 if (wrapper_cache.TryGetValue(t, out r))
                     return r;
-                return wrapper_cache[t] = NewWrapper(t);
+                wrapper_cache[t] = r = NewWrapper(t);
+                return r;
+            }
+        }
+
+        public static STable GetNamedWrapper(string nm) {
+            lock (wrapper_cache) {
+                STable r;
+                if (named_wrapper_cache.TryGetValue(nm, out r))
+                    return r;
+                Type ty = Type.GetType(nm.Substring(1));
+                if (ty != null) {
+                    wrapper_cache[ty] = r = NewWrapper(ty);
+                    named_wrapper_cache[nm] = r;
+                } else {
+                    named_wrapper_cache[nm] = r = StashCursor.MakePackage(
+                        "CLR" + nm.Replace(".","::"),
+                        StashCursor.MakeCLR_WHO(nm)).Fetch().mo;
+                }
+                return r;
             }
         }
 
@@ -384,6 +406,7 @@ namespace Niecza {
             if (CLROpts.Debug)
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
             STable m = new STable("CLR::" + t.FullName.Replace(".","::"));
+            m.who = StashCursor.MakeCLR_WHO("." + t.FullName);
             STable pm = t.BaseType == null ? Kernel.AnyMO :
                 GetWrapper(t.BaseType);
             STable[] mro = new STable[pm.mo.mro.Length + 1];

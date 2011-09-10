@@ -24,6 +24,117 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+
+method process_name($/, :$declaring, :$defer, :$clean) {
+    return () unless defined $/;
+
+    my @ns = @( $<name>.ast<names> );
+    my $ext = '';
+    my $trail = @ns && !defined @ns[*-1];
+    pop @ns if $trail;
+
+    if !$clean {
+        for @( $<colonpair> ) {
+            $ext ~= $_.ast<ext> // (
+                $_.CURSOR.sorry("Invalid colonpair for name extension");
+                "";
+            )
+        }
+    }
+
+    for $defer ?? () !! @ns.grep(Op) {
+        $_ = ~self.trivial_eval($/, $_);
+        # XXX should this always stringify?
+        if $_ ~~ Cool {
+            $_ = ~$_;
+        } else {
+            $_ = "XXX";
+            $/.CURSOR.sorry("Name components must evaluate to strings");
+        }
+    }
+
+    if $declaring {
+        # class :: is ... { } is a placeholder for a lack of name
+        return () if $trail && !@ns;
+        $/.CURSOR.sorry("Illegal explicit declaration of a symbol table")
+            if $trail;
+        die "Unimplemented" if $defer;
+        return () unless @ns;
+        my $head = pop(@ns) ~ $ext;
+        return Any, $head unless @ns;
+
+        # the remainder is assumed to name an existing or new package
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, :auto);
+        });
+        return $pkg, $head;
+    }
+    else {
+        if $defer {
+            # The stuff returned here is processed by the variable rule,
+            # and also by method call generation
+
+            goto "dyn" if $trail;
+            goto "dyn" if $_.^isa(Op) for @ns;
+            my $pkg;
+            my @tail = @ns;
+            my $head = pop(@tail) ~ $ext;
+            unless @tail {
+                goto "dyn" if $head eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT CLR >;
+                return { name => $head } unless @tail;
+            }
+            try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
+            goto "dyn" unless $pkg;
+
+            return { name => $head, pkg => $pkg };
+dyn:
+            my @bits = map { $_, '::' }, @ns;
+            pop @bits if @bits;
+            push @bits, '::' if $trail;
+            return { iname => mkstringycat($/, @bits) };
+        }
+
+        $/.CURSOR.sorry("Class required, but symbol table name used instead")
+            if $trail;
+        return () unless @ns;
+        my $head = pop(@ns) ~ $ext;
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, $head);
+        });
+        return $pkg;
+    }
+}
+method term:identifier ($/) {
+    my $id  = $<identifier>.ast;
+    my $sal = $<args> ?? ($<args>.ast // []) !! [];
+    # TODO: support zero-D slicels
+
+    if $sal > 1 {
+        $/.CURSOR.sorry("Slicel lists are NYI");
+        make ::Op::StatementList.new;
+        return;
+    }
+
+    if $id eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT CLR > {
+        make Op::IndirectVar.new(|node($/),
+            name => Op::StringLiteral.new(text => $id));
+        return;
+    }
+    my $is_name = $/.CURSOR.is_name(~$<identifier>);
+
+    if $is_name && $<args>.chars == 0 {
+        make mklex($/, $id);
+        return;
+    }
+
+    my $args = $sal[0] // [];
+
+    make ::Op::CallSub.new(|node($/),
+        invocant => mklex($/, $is_name ?? $id !! '&' ~ $id),
+        args => $args);
+}
 method process_nibble($/, @bits, $prefix?) {
     my @acc;
     for @bits -> $n {

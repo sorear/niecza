@@ -5183,7 +5183,7 @@ method is_name($longname, $curlex = $*CURLEX) {
         when 'CORE'    { $sub = $curlex<!sub>.?true_setting;   goto "lexy"; }
         when 'SETTING' { $sub = $curlex<!sub>.?to_unit.?outer; goto "lexy"; }
 
-        when 'COMPILING' | 'DYNAMIC' | 'CALLER' { return True }
+        when 'COMPILING' | 'DYNAMIC' | 'CALLER' | 'CLR' { return True }
 
         default {
             my $lexical = self.lookup_lex(@parts[0], $curlex);
