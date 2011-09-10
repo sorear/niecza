@@ -466,6 +466,64 @@ namespace Niecza {
             };
         }
 
+        /*
+for $args (0..9) {
+    my ($c1,$c2,$c3,$c4) = ("","","","");
+    for $i (0..$args-1) {
+        $c1 .= ", T$i a$i";
+        $c2 .= "a$i,";
+        $c3 .= "typeof(T$i),";
+        $c4 .= ",T$i";
+    }
+    print " " x 8, "public static TR dnv${args}<TR$c4>(P6any f$c1) { return (TR)Callback(f, typeof(TR), new object[] { $c2 }, new Type[] { $c3 }); }\n";
+    print " " x 8, "public static void dv${args}",($c4?"<".substr($c4,1).">":""),"(P6any f$c1) { Callback(f, typeof(void), new object[] { $c2 }, new Type[] { $c3 }); }\n";
+}
+        */
+        public static TR dnv0<TR>(P6any f) { return (TR)Callback(f, typeof(TR), new object[] {  }, new Type[] {  }); }
+        public static void dv0(P6any f) { Callback(f, typeof(void), new object[] {  }, new Type[] {  }); }
+        public static TR dnv1<TR,T0>(P6any f, T0 a0) { return (TR)Callback(f, typeof(TR), new object[] { a0, }, new Type[] { typeof(T0), }); }
+        public static void dv1<T0>(P6any f, T0 a0) { Callback(f, typeof(void), new object[] { a0, }, new Type[] { typeof(T0), }); }
+        public static TR dnv2<TR,T0,T1>(P6any f, T0 a0, T1 a1) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1, }, new Type[] { typeof(T0),typeof(T1), }); }
+        public static void dv2<T0,T1>(P6any f, T0 a0, T1 a1) { Callback(f, typeof(void), new object[] { a0,a1, }, new Type[] { typeof(T0),typeof(T1), }); }
+        public static TR dnv3<TR,T0,T1,T2>(P6any f, T0 a0, T1 a1, T2 a2) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2, }, new Type[] { typeof(T0),typeof(T1),typeof(T2), }); }
+        public static void dv3<T0,T1,T2>(P6any f, T0 a0, T1 a1, T2 a2) { Callback(f, typeof(void), new object[] { a0,a1,a2, }, new Type[] { typeof(T0),typeof(T1),typeof(T2), }); }
+        public static TR dnv4<TR,T0,T1,T2,T3>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3), }); }
+        public static void dv4<T0,T1,T2,T3>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3), }); }
+        public static TR dnv5<TR,T0,T1,T2,T3,T4>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3,a4, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4), }); }
+        public static void dv5<T0,T1,T2,T3,T4>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4), }); }
+        public static TR dnv6<TR,T0,T1,T2,T3,T4,T5>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3,a4,a5, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5), }); }
+        public static void dv6<T0,T1,T2,T3,T4,T5>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4,a5, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5), }); }
+        public static TR dnv7<TR,T0,T1,T2,T3,T4,T5,T6>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3,a4,a5,a6, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6), }); }
+        public static void dv7<T0,T1,T2,T3,T4,T5,T6>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4,a5,a6, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6), }); }
+        public static TR dnv8<TR,T0,T1,T2,T3,T4,T5,T6,T7>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3,a4,a5,a6,a7, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7), }); }
+        public static void dv8<T0,T1,T2,T3,T4,T5,T6,T7>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4,a5,a6,a7, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7), }); }
+        public static TR dnv9<TR,T0,T1,T2,T3,T4,T5,T6,T7,T8>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3,a4,a5,a6,a7,a8, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7),typeof(T8), }); }
+        public static void dv9<T0,T1,T2,T3,T4,T5,T6,T7,T8>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4,a5,a6,a7,a8, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7),typeof(T8), }); }
+        static MethodInfo[] delegate_methods;
+        static CLRWrapperProvider() {
+            delegate_methods = new MethodInfo[20];
+            foreach (MethodInfo mi in typeof(CLRWrapperProvider).GetMethods()) {
+                string nm = mi.Name;
+                if (nm[0] == 'd' && nm[1] == 'v')
+                    delegate_methods[2 * (nm[2] - '0')] = mi;
+                if (nm[0] == 'd' && nm[1] == 'n' && nm[2] == 'v')
+                    delegate_methods[2 * (nm[3] - '0') + 1] = mi;
+            }
+        }
+
+        static object Callback(P6any fun, Type ret, object[] args, Type[] aty) {
+            Variable[] pos = new Variable[args.Length];
+            for (int i = 0; i < args.Length; i++)
+                pos[i] = BoxResult(aty[i], args[i]);
+            Variable retv = Kernel.RunInferior(fun.Invoke(
+                Kernel.GetInferiorRoot(), pos, null));
+            if (ret == typeof(void)) return null;
+            object reto;
+            if (!CoerceArgument(out reto, ret, retv))
+                throw new Exception("Return value coercion failed, " + retv.Fetch().mo.name + " to " + ret.FullName);
+            return reto;
+        }
+
         static Frame default_handler(Frame th) {
             // XXX there HAS to be a better way to do this.
             STable mo = ((Variable)th.lex0).Fetch().mo;
@@ -667,7 +725,7 @@ namespace Niecza {
 
             // Boolean values marshal to bool
             if (obj.Does(Kernel.BoolMO)) {
-                clr = Kernel.UnboxAny<bool>(obj);
+                clr = Kernel.UnboxAny<int>(obj) != 0;
             }
             // note, Bool ~~ Int ~~ Integral
             else if (obj.Does(Kernel.IntegralMO)) {
@@ -719,7 +777,31 @@ namespace Niecza {
                 else
                     clr = obj;
             }
-            // TODO: Code to delegates, Array to IList(maybe)
+            // "Callable"
+            else if (typeof(Delegate).IsAssignableFrom(ty)) {
+                MethodInfo needed = ty.GetMethod("Invoke");
+                ParameterInfo[] pi = needed.GetParameters();
+
+                if (pi.Length >= 10) {
+                    clr = null;
+                } else if (needed.ReturnType != typeof(void)) {
+                    Type[] args = new Type[pi.Length + 1];
+                    args[0] = needed.ReturnType;
+                    for (int i = 0; i < pi.Length; i++)
+                        args[i+1] = pi[i].ParameterType;
+                    MethodInfo compat = delegate_methods[pi.Length * 2 + 1].
+                        MakeGenericMethod(args);
+                    clr = Delegate.CreateDelegate(ty, obj, compat);
+                } else {
+                    Type[] args = new Type[pi.Length];
+                    for (int i = 0; i < pi.Length; i++)
+                        args[i] = pi[i].ParameterType;
+                    MethodInfo compat = delegate_methods[pi.Length * 2];
+                    if (args.Length != 0)
+                        compat = compat.MakeGenericMethod(args);
+                    clr = Delegate.CreateDelegate(ty, obj, compat);
+                }
+            }
             else if (obj is BoxObject<object>) {
                 clr = Kernel.UnboxAny<object>(obj);
             }
