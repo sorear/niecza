@@ -1215,8 +1215,8 @@ my class Junction is Mu {
 
     my @kinds = <all none one any>;
     method perl() {
-        defined(self) ?? (@kinds[self!kind] ~ "(" ~
-            join(", ", map -> \$x { $x.perl }, @$!eigenstates) ~ ")") !! "Junction"
+        defined(self) ?? (@kinds[self!kind] ~ (anon @ := self!eigenstates).perl)
+            !! "Junction"
     }
 
     method Str() { defined(self) ?? self.perl !! "Junction()" }
