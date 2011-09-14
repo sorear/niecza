@@ -9,7 +9,6 @@ CP=cp
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
 	 ObjModel.cs BigInteger.cs Printf.cs
 csbackend=CLRBackend.cs
-csxdr=CrossDomainReceiver.cs
 
 # Tell make to regard the following targets as not being filenames
 .PHONY: all aot test spectest clean realclean
@@ -35,7 +34,7 @@ obj/CORE.nam: run/Niecza.exe obj/CLRBackend.exe lib/CORE.setting
 run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -c -Bnam niecza
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
-	$(CP) $(patsubst %,boot/obj/%.dll,Kernel CrossDomainReceiver $(libunits) $(srcunits)) run/
+	$(CP) $(patsubst %,boot/obj/%.dll,Kernel CompilerBlob $(libunits) $(srcunits)) run/
 	$(CP) boot/obj/MAIN.exe run/Niecza.exe
 
 .fetch-stamp: FETCH_URL
@@ -47,15 +46,15 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
 	$(RUN_CLR) boot/run/Niecza.exe -C JSYNC
 	touch .fetch-stamp
 
-obj/CrossDomainReceiver.dll: $(patsubst %,lib/%,$(csxdr))
-	$(CSC) /target:library /out:obj/CrossDomainReceiver.dll \
-	    $(patsubst %,lib/%,$(csxdr))
-obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) obj/CrossDomainReceiver.dll
-	$(CSC) /target:library /out:obj/Kernel.dll /r:CrossDomainReceiver.dll \
-	    /lib:obj /unsafe+ $(patsubst %,lib/%,$(cskernel))
-obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll obj/CrossDomainReceiver.dll
+boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
+	$(CSC) /target:library /out:boot/obj/CompilerBlob.dll /r:Kernel \
+	    /lib:obj src/CompilerBlob.cs
+obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
+	$(CSC) /target:library /out:obj/Kernel.dll /lib:obj /unsafe+ \
+	    $(patsubst %,lib/%,$(cskernel))
+obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
-	    /r:CrossDomainReceiver.dll $(patsubst %,lib/%,$(csbackend))
+	    $(patsubst %,lib/%,$(csbackend))
 
 aot: all
 	mono --aot run/*.dll run/Niecza.exe
@@ -87,8 +86,7 @@ half_reboot: all
 	cp -a src/ lib/ Makefile stage2/
 	cp -a src/ lib/ Makefile stage3/
 	# build a current Niecza with current Niecza
-	cp obj/Kernel.dll obj/CrossDomainReceiver.dll obj/CLRBackend.exe \
-	    stage2/boot/obj
+	cp obj/Kernel.dll obj/CLRBackend.exe stage2/boot/obj
 	cp -a lib run stage2/boot
 	cd stage2 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
 	cp test.pl stage2/
@@ -96,8 +94,7 @@ half_reboot: all
 
 reboot: half_reboot
 	# verify that the new Niecza can build itself correctly
-	cp stage2/obj/Kernel.dll stage2/obj/CrossDomainReceiver.dll \
-	    stage2/obj/CLRBackend.exe stage3/boot/obj
+	cp stage2/obj/Kernel.dll stage2/obj/CLRBackend.exe stage3/boot/obj
 	cp -a lib stage2/run stage3/boot
 	cd stage3 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
 	cp test.pl stage3/
@@ -106,8 +103,7 @@ reboot: half_reboot
 	# clean up the stuff that should NOT go into the boot
 	cd stage2 && rm -rf lib/*.cs obj/* src boot VERSION FETCH_URL \
 	    Makefile test.pl
-	cp obj/CrossDomainReceiver.dll obj/Kernel.dll obj/CLRBackend.exe \
-	    stage2/obj
+	cp obj/Kernel.dll obj/CLRBackend.exe stage2/obj
 	cp -a LICENSE README.pod docs/ stage2/
 	cd stage2 && zip -9r ../NewNieczaBootstrap.zip *
 
@@ -126,6 +122,8 @@ help:
 	@echo 'realclean  clean and also require new download of bootstrap files'
 	@echo 'help       this list of targets'
 	@echo ''
+
+boot/obj/NieczaBackendDotnet.nam: boot/obj/CompilerBlob.dll
 
 # grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/\1.nam: boot/obj/\2.nam|' | grep -v MONKEY_TYPING
 boot/obj/NAMOutput.nam: boot/obj/JSYNC.nam

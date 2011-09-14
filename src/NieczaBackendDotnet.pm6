@@ -23,7 +23,7 @@ sub upcalled(@strings) {
 }
 
 sub downcall(*@args) {
-    Q:CgOp { (rawscall Builtins,Kernel.DownCall {&upcalled} {@args}) }
+    Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.DownCall {&upcalled} {@args}) }
 }
 
 method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {

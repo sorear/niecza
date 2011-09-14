@@ -7,6 +7,7 @@ using System;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Collections.Generic;
+using System.Collections;
 using System.Text;
 using System.IO;
 
@@ -4923,8 +4924,38 @@ dynamic:
     }
 
     // instantiatable for the sake of reflecty loading
-    public class DownCallAcceptor: CrossDomainReceiver {
-        public override string[] Call(AppDomain up, string[] args) {
+    public abstract class CallReceiver : MarshalByRefObject, IDictionary {
+        public bool IsFixedSize { get { return false; } }
+        public bool IsReadOnly { get { return false; } }
+        public bool IsSynchronized { get { return false; } }
+        public int Count { get { return 0; } }
+        public object SyncRoot { get { return null; } }
+        public ICollection Keys { get { return null; } }
+        public ICollection Values { get { return null; } }
+        public void Add(object a, object b) { }
+        public void Clear() { }
+        public IDictionaryEnumerator GetEnumerator() { return null; }
+        IEnumerator IEnumerable.GetEnumerator() { return null; }
+        public bool Contains(object a) { return false; }
+        public void CopyTo(Array a, int offs) { }
+        public void Remove(object a) { }
+        public abstract object this[object i] { get; set; }
+    }
+
+    public class DowncallReceiver : CallReceiver {
+        public override object this[object i] {
+            set { }
+            get {
+                object[] ia = (object[]) i;
+                string[] sa = new string[ia.Length-1];
+                Array.Copy(ia, 1, sa, 0, ia.Length-1);
+                string[] sar = Call((AppDomain)ia[0], sa);
+                object[] iar = new object[sar.Length];
+                Array.Copy(sar, iar, sar.Length);
+                return iar;
+            }
+        }
+        string[] Call(AppDomain up, string[] args) {
             if (Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null) {
                 Console.WriteLine(args.Length);
                 foreach(string a in args)

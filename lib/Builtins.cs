@@ -7,14 +7,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Niecza {
-    public class UpCallee: CrossDomainReceiver {
-        public override string[] Call(AppDomain from, string[] args) {
-            return Builtins.UnboxLoS(Kernel.RunInferior(Builtins.upcall_cb.Fetch().Invoke(
-                Kernel.GetInferiorRoot(), new Variable[] { Builtins.BoxLoS(args) },
-                null)));
-        }
-    }
-
     class PosixWrapper {
         static Assembly Mono_Posix;
         static Type Syscall, AccessModes, Stat;
@@ -1590,54 +1582,25 @@ flat_enough:;
         return to_call.Invoke(th, Variable.None, null);
     }
 
-    // temporary until compiler is converted to use only downcalls
-    public static Variable RunCLRSubtask(Variable filename, Variable args) {
-        string sfn = filename.Fetch().mo.mro_raw_Str.Get(filename);
-        //Console.WriteLine("App name {0}", sfn);
-        int ret = GetSubDomain().ExecuteAssembly(sfn, null, UnboxLoS(args));
-        return MakeInt(ret);
-    }
-
     public static void RunSubtask(string file, string args) {
         System.Diagnostics.Process.Start(file, args).WaitForExit();
     }
 
-    private static AppDomain subDomain;
-    private static string backend;
-    // Better, but still fudgy.  Relies too much on path structure.
-    private static AppDomain GetSubDomain() {
-        if (subDomain != null) return subDomain;
-
-        AppDomainSetup ads = new AppDomainSetup();
-        string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
-        ads.ApplicationBase = obj;
-        backend = Path.Combine(obj, "CLRBackend.exe");
-        subDomain = AppDomain.CreateDomain("zyg", null, ads);
-        return subDomain;
-    }
     public static AppDomain up_domain;
-    public static Variable upcall_cb;
     public static DynBlockDelegate eval_result;
-    public static Variable DownCall(Variable cb, Variable list) {
-        GetSubDomain();
-        upcall_cb = cb;
-        CrossDomainReceiver r = (CrossDomainReceiver)
-            subDomain.CreateInstanceFromAndUnwrap(backend,
-                    "Niecza.CLRBackend.DownCallAcceptor");
-        return BoxLoS(r.Call(AppDomain.CurrentDomain, UnboxLoS(list)));
-    }
-
     public static Frame simple_eval(Frame th, Variable str) {
         if (up_domain == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
-        CrossDomainReceiver r = (CrossDomainReceiver)
-            up_domain.CreateInstanceAndUnwrap("Kernel", "Niecza.UpCallee");
+        System.Collections.IDictionary r = (System.Collections.IDictionary)
+            up_domain.CreateInstanceAndUnwrap("CompilerBlob", "Niecza.UpcallReceiver");
         SubInfo outer = th.caller.info;
-        string[] msg = r.Call(AppDomain.CurrentDomain, new string[] { "eval",
+        object ret = r[new object[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str),
                 (outer.unit == null ? "" : outer.unit.name),
                 outer.xref_no.ToString()
-                });
+                }];
+        string[] msg = new string[((object[])ret).Length];
+        Array.Copy((Array)ret, msg, msg.Length);
         if (msg[0] != "")
             return Kernel.Die(th, msg[0]);
         return th.MakeChild(null, new SubInfo("boot-" +
