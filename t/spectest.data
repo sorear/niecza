@@ -112,6 +112,7 @@ S05-modifier/counted.t
 S06-multi/lexical-multis.t
 S06-advanced_subroutine_features/caller.t
 S06-signature/arity.t
+S06-signature/optional.t
 S06-signature/passing-arrays.t
 S06-signature/positional-placeholders.t
 S06-signature/positional.t

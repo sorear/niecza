@@ -1054,7 +1054,13 @@ get_default:
                     goto gotit;
                 }
                 if ((flags & SIG_F_OPTIONAL) != 0) {
-                    src = type.initVar;
+                    // Array is the "default" Positional -masak
+                    if ((flags & SIG_F_IS_LIST) != 0)
+                        src = Kernel.CreateArray();
+                    else if ((flags & SIG_F_IS_HASH) != 0)
+                        src = Kernel.CreateHash();
+                    else
+                        src = type.initVar;
                     goto gotit;
                 }
                 if (quiet) return null;
