@@ -569,7 +569,7 @@ class StaticSub is RefTarget {
     # helper for compile_get_pkg; handles stuff like SETTING::OUTER::Foo,
     # recursively.
     method _lexy_ref(*@names, :$auto) {
-        @names || die "Cannot use a lexical psuedopackage as a compile time package reference";
+        @names || die "Cannot use a lexical pseudopackage as a compile time package reference";
         self // die "Passed top of lexical tree";
         given shift @names {
             when 'OUTER'   { return self.outer._lexy_ref(@names, :$auto) }

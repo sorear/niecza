@@ -2871,7 +2871,7 @@ tryagain:
 have_sc:
             if (!final) return;
             if (bind_to != null)
-                throw new NieczaException("cannot bind a psuedo package");
+                throw new NieczaException("cannot bind a pseudo package");
             {
                 P6any who = Kernel.BoxRaw(this, Kernel.PseudoStashMO);
                 who.SetSlot("name", Kernel.BoxAnyMO(key, Kernel.StrMO));
