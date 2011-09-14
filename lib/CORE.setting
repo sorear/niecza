@@ -856,6 +856,7 @@ my class Nil is Cool {
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
     method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method at_pos($key) { @(self).[$key] }
     method Capture () { ().Capture }
     method elems  () { 0 }
     method Numeric() { 0 }
@@ -867,6 +868,7 @@ my class Parcel is Cool {
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
     method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method at_pos($key) { @(self).[$key] }
 
     # LoLly usage
     method raw_elems() { Q:CgOp {
@@ -1028,6 +1030,8 @@ my class List is Cool {
     }
 
     method kv() { my $i = 0; self.map({ $i++, $_ }) }
+
+    method at_pos($p) { self[$p] }
 }
 
 my class Array is List {
@@ -1097,6 +1101,10 @@ my class Hash {
     # Rakudo extensions compatibility - DO NOT USE
     method delete($key) { self.{$key}:delete }
     method exists($key) { self.{$key}:exists }
+
+    method at_key($key) { self.{$key} }
+    method exists_key($key) { self.{$key}:exists }
+    method delete_key($key) { self.{$key}:exists }
 
     method perl(\$self:) {
         $self // return $self.typename;
@@ -1188,6 +1196,8 @@ my class EnumMap {
     method kv() { @!keys Z @!values }
     method pairs() { self.list }
     method postcircumfix:<{ }>(\$k) { @!values[%!by-key.{$k}] }
+    method at_key($k) { self{$k} }
+    method exists_key($k) { self{$k}:exists }
 }
 
 my class Junction is Mu {
@@ -1402,6 +1412,8 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
 # }}}
 # Regular expression support {{{
 my class Cursor {
+    method at_key($k) { self.{$k} }
+    method at_pos($k) { self.[$k] }
     method suppose($rx) {
         my $*IN_SUPPOSE = True;
         my $*FATALS = 0;
@@ -1447,6 +1459,8 @@ my class Cursor {
 }
 
 my class Match is Cool {
+    method at_key($k) { self.{$k} }
+    method at_pos($k) { self.[$k] }
     method ACCEPTS($) { self // nextsame }
     method list () { @( self.Capture ) }
     method hash () { %( self.Capture ) }
