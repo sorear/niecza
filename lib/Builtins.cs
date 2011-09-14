@@ -1249,7 +1249,7 @@ public partial class Builtins {
             return MakeComplex(mag * Math.Cos(angle), mag * Math.Sin(angle));
         } else {
             double val = PromoteToFloat(r1, n1);
-            return (val > 0) ? MakeFloat(Math.Sqrt(val)) : MakeComplex(0, Math.Sqrt(-val));
+            return (val >= 0) ? MakeFloat(Math.Sqrt(val)) : MakeComplex(0, Math.Sqrt(-val));
         }
     }
 
