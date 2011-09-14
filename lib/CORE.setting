@@ -739,7 +739,7 @@ my class CallFrame {
 sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
 sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 
-sub die($msg) { Q:CgOp { (die (@ {$msg})) } }
+sub die($msg = "Died") { Q:CgOp { (die (@ {$msg})) } }
 
 my class Label {
     has $!target;
