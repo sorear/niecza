@@ -17,8 +17,7 @@ csbackend=CLRBackend.cs
 libunits=CORE JSYNC
 srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
 	 OptRxSimple NAMOutput Operator NieczaActions NieczaFrontendSTD \
-	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendNAM \
-	 NieczaBackendDotnet NieczaBackendClisp NieczaBackendHoopl \
+	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendDotnet \
 	 NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
@@ -135,11 +134,7 @@ boot/obj/NieczaActions.nam: boot/obj/Sig.nam
 boot/obj/NieczaActions.nam: boot/obj/CClass.nam
 boot/obj/NieczaActions.nam: boot/obj/OpHelpers.nam
 boot/obj/NieczaActions.nam: boot/obj/Operator.nam
-boot/obj/NieczaBackendClisp.nam: boot/obj/NieczaBackendNAM.nam
-boot/obj/NieczaBackendDotnet.nam: boot/obj/NieczaBackendNAM.nam
 boot/obj/NieczaBackendDotnet.nam: boot/obj/NAMOutput.nam
-boot/obj/NieczaBackendHoopl.nam: boot/obj/NieczaBackendNAM.nam
-boot/obj/NieczaBackendNAM.nam: boot/obj/NAMOutput.nam
 boot/obj/NieczaCompiler.nam: boot/obj/JSYNC.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/STD.nam
 boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaGrammar.nam

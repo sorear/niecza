@@ -6,10 +6,7 @@ use JSYNC;
 use Metamodel;
 use NAMOutput;
 use NieczaActions;
-use NieczaBackendClisp;
 use NieczaBackendDotnet;
-use NieczaBackendHoopl;
-use NieczaBackendNAM;
 use NieczaCompiler;
 use NieczaFrontendSTD;
 use NieczaPassSimplifier;
@@ -251,17 +248,8 @@ GetOptions(:!permute,
 
 my @*INC;
 my $backend;
-if $bcnd eq 'nam' {
-    $backend = NieczaBackendNAM.new(obj_dir => $odir);
-}
-elsif $bcnd eq 'dotnet' || $bcnd eq 'mono' {
+if $bcnd eq 'dotnet' || $bcnd eq 'mono' {
     $backend = NieczaBackendDotnet.new(obj_dir => $odir, safemode => $safe);
-}
-elsif $bcnd eq 'clisp' {
-    $backend = NieczaBackendClisp.new(obj_dir => $odir);
-}
-elsif $bcnd eq 'hoopl' {
-    $backend = NieczaBackendHoopl.new(obj_dir => $odir);
 }
 else {
     note "Backend '$bcnd' not supported";
