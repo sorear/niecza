@@ -4942,13 +4942,20 @@ dynamic:
         public abstract object this[object i] { get; set; }
     }
 
+    class Handle: MarshalByRefObject {
+        object to;
+
+        public Handle(object to) { this.to = to; }
+        public static object Unbox(object h) { return ((Handle)h).to; }
+    }
+
     public class DowncallReceiver : CallReceiver {
         public override object this[object i] {
             set { }
             get { return Call((object[]) i); }
         }
         static bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
-        object[] Call(object[] args) {
+        object Call(object[] args) {
             if (TraceDown) {
                 Console.WriteLine(args.Length);
                 foreach(object a in args)
@@ -4957,11 +4964,16 @@ dynamic:
             string cmd = (string) args[0];
             if (cmd == "set_parent") {
                 Builtins.up_domain = (AppDomain)args[1];
-                return new object[0];
+                return null;
+            } else if (cmd == "new_unit") {
+                return new Handle(new RuntimeUnit((string)args[1],
+                        (string)args[2], (string)args[3]));
+            } else if (cmd == "sub_new") {
+                return null;
             } else if (cmd == "post_save") {
                 CLRBackend.Main(new string[] { (string)args[1],
                         (string)args[2], (string)args[3], (string)args[4] });
-                return new object[0];
+                return null;
             } else if (cmd == "runnam" || cmd == "evalnam") {
                 if (CLRBackend.Verbose > 0) {
                     Console.WriteLine("Eval code::");
@@ -4974,13 +4986,13 @@ dynamic:
                             cmd == "evalnam" ? null : argv);
                 }
                 catch (Exception ex) {
-                    return new object[] { ex.ToString() };
+                    return ex.ToString();
                 }
-                return new object[0];
+                return null;
             } else if (cmd == "setnames") {
                 Builtins.execName = (string)args[1];
                 Builtins.programName = (string)args[2];
-                return new object[0];
+                return null;
             } else if (cmd == "replrun") {
                 string ret = "";
                 try {
@@ -5000,12 +5012,12 @@ dynamic:
                 } catch (Exception ex) {
                     ret = ex.Message;
                 }
-                return new object[] { ret };
+                return ret;
             } else if (cmd == "safemode") {
                 Kernel.SaferMode = true;
-                return new object[0];
+                return null;
             } else {
-                return new object[] { "ERROR" };
+                return "ERROR";
             }
         }
     }

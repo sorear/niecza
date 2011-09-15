@@ -1594,15 +1594,13 @@ flat_enough:;
         System.Collections.IDictionary r = (System.Collections.IDictionary)
             up_domain.CreateInstanceAndUnwrap("CompilerBlob", "Niecza.UpcallReceiver");
         SubInfo outer = th.caller.info;
-        object ret = r[new object[] { "eval",
+        string msg = (string) r[new object[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str),
                 (outer.unit == null ? "" : outer.unit.name),
                 outer.xref_no.ToString()
                 }];
-        string[] msg = new string[((object[])ret).Length];
-        Array.Copy((Array)ret, msg, msg.Length);
-        if (msg[0] != "")
-            return Kernel.Die(th, msg[0]);
+        if (msg != null && msg != "")
+            return Kernel.Die(th, msg);
         return th.MakeChild(null, new SubInfo("boot-" +
                     eval_result.Method.DeclaringType, eval_result), Kernel.AnyP);
     }

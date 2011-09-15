@@ -243,8 +243,7 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     my $*UNIT;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
-    my $*unit = ::Metamodel::Unit.new(name => $unitname,
-        ns => ::Metamodel::Namespace.new, :$filename, :$modtime);
+    my $*unit = $*backend.create-unit($unitname, $filename, $modtime);
 
     if $*niecza_outer_ref {
         $*unit.setting_ref = $*niecza_outer_ref;

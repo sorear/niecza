@@ -45,8 +45,12 @@ sub upcalled(@strings) {
     }
 }
 
-sub downcall(*@args) {
+method new(*%_) {
     Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled})) };
+    nextsame;
+}
+
+sub downcall(*@args) {
     Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.DownCall {@args}) }
 }
 
@@ -79,4 +83,20 @@ method post_save($name, :$main) {
     downcall("post_save",
         $.obj_dir, $fname ~ ".nam", $fname ~ ($main ?? ".exe" !! ".dll"),
         $main ?? "1" !! "0");
+}
+
+class StaticSub {
+    has $.peer;
+}
+
+class Type {
+    has $.peer;
+}
+
+class Unit {
+    has $.peer;
+}
+
+method create-unit($name, $filename, $modtime) {
+    Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime));
 }

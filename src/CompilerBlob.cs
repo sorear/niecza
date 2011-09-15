@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Niecza {
@@ -58,17 +59,25 @@ namespace Niecza {
                         "Niecza.CLRBackend.DowncallReceiver");
             RawDowncall("set_parent", AppDomain.CurrentDomain);
         }
-        public static object[] RawDowncall(params object[] args) {
-            return (object[]) responder[args];
+        public static object RawDowncall(params object[] args) {
+            return responder[args];
         }
         public static Variable DownCall(Variable list) {
-            string[] ps = Builtins.UnboxLoS(list);
-            object[] po = new object[ps.Length];
-            Array.Copy(ps, po, ps.Length);
-            object[] ro = RawDowncall(po);
-            string[] rs = new string[ro.Length];
-            Array.Copy(ro, rs, ro.Length);
-            return Builtins.BoxLoS(rs);
+            List<object> lo = new List<object>();
+            VarDeque it = Builtins.start_iter(list);
+            while (Kernel.IterHasFlat(it, true)) {
+                Variable v = it.Shift();
+                P6any o = v.Fetch();
+                if (o is BoxObject<object>)
+                    lo.Add(Kernel.UnboxAny<object>(o));
+                else
+                    lo.Add((string) o.mo.mro_raw_Str.Get(v));
+            }
+
+            object r = RawDowncall(lo.ToArray());
+            if (r == null) return Kernel.AnyMO.typeVar;
+            else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
+            else return Kernel.BoxAnyMO(r, Kernel.AnyMO);
         }
     }
 }

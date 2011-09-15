@@ -193,7 +193,7 @@ namespace Niecza {
     public sealed class RuntimeUnit {
         static Dictionary<string, byte[]> heapreg;
 
-        public string name;
+        public string name, filename, modtime;
         public Type type;
         public byte[] heap;
         public RuntimeUnit[] depends;
@@ -230,6 +230,12 @@ namespace Niecza {
             if (heapreg == null)
                 heapreg = new Dictionary<string, byte[]>();
             heapreg[name] = heap;
+        }
+
+        public RuntimeUnit(string name, string filename, string modtime) {
+            this.name = name;
+            this.filename = filename;
+            this.modtime  = modtime;
         }
 
         public RuntimeUnit(string name, Type type, byte[] heap,
