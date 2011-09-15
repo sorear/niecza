@@ -41,30 +41,31 @@ namespace Niecza {
 
     public class Downcaller {
         private static AppDomain subDomain;
-        private static string backend;
+        internal static Variable upcall_cb;
+        private static IDictionary responder;
         // Better, but still fudgy.  Relies too much on path structure.
-        private static AppDomain GetSubDomain() {
-            if (subDomain != null) return subDomain;
+        public static void InitSlave(Variable cb) {
+            if (subDomain != null) return;
 
             AppDomainSetup ads = new AppDomainSetup();
             string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
             ads.ApplicationBase = obj;
-            backend = Path.Combine(obj, "CLRBackend.exe");
+            string backend = Path.Combine(obj, "CLRBackend.exe");
             subDomain = AppDomain.CreateDomain("zyg", null, ads);
-            return subDomain;
-        }
-        public static Variable upcall_cb;
-        public static Variable DownCall(Variable cb, Variable list) {
-            GetSubDomain();
             upcall_cb = cb;
-            IDictionary r = (IDictionary)
+            responder = (IDictionary)
                 subDomain.CreateInstanceFromAndUnwrap(backend,
                         "Niecza.CLRBackend.DowncallReceiver");
+            RawDowncall("set_parent", AppDomain.CurrentDomain);
+        }
+        public static object[] RawDowncall(params object[] args) {
+            return (object[]) responder[args];
+        }
+        public static Variable DownCall(Variable list) {
             string[] ps = Builtins.UnboxLoS(list);
-            object[] po = new object[ps.Length+1];
-            Array.Copy(ps, 0, po, 1, ps.Length);
-            po[0] = AppDomain.CurrentDomain;
-            object[] ro = (object[]) r[po];
+            object[] po = new object[ps.Length];
+            Array.Copy(ps, po, ps.Length);
+            object[] ro = RawDowncall(po);
             string[] rs = new string[ro.Length];
             Array.Copy(ro, rs, ro.Length);
             return Builtins.BoxLoS(rs);

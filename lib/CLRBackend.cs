@@ -4945,27 +4945,24 @@ dynamic:
     public class DowncallReceiver : CallReceiver {
         public override object this[object i] {
             set { }
-            get {
-                object[] ia = (object[]) i;
-                string[] sa = new string[ia.Length-1];
-                Array.Copy(ia, 1, sa, 0, ia.Length-1);
-                string[] sar = Call((AppDomain)ia[0], sa);
-                object[] iar = new object[sar.Length];
-                Array.Copy(sar, iar, sar.Length);
-                return iar;
-            }
+            get { return Call((object[]) i); }
         }
-        string[] Call(AppDomain up, string[] args) {
-            if (Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null) {
+        static bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
+        object[] Call(object[] args) {
+            if (TraceDown) {
                 Console.WriteLine(args.Length);
-                foreach(string a in args)
+                foreach(object a in args)
                     Console.WriteLine(a);
             }
-            Builtins.up_domain = up;
-            if (args[0] == "post_save") {
-                CLRBackend.Main(new string[] { args[1], args[2], args[3], args[4] });
-                return new string[0];
-            } else if (args[0] == "runnam" || args[0] == "evalnam") {
+            string cmd = (string) args[0];
+            if (cmd == "set_parent") {
+                Builtins.up_domain = (AppDomain)args[1];
+                return new object[0];
+            } else if (cmd == "post_save") {
+                CLRBackend.Main(new string[] { (string)args[1],
+                        (string)args[2], (string)args[3], (string)args[4] });
+                return new object[0];
+            } else if (cmd == "runnam" || cmd == "evalnam") {
                 if (CLRBackend.Verbose > 0) {
                     Console.WriteLine("Eval code::");
                     Console.WriteLine(args[2]);
@@ -4973,18 +4970,18 @@ dynamic:
                 string[] argv = new string[args.Length - 3];
                 Array.Copy(args, 3, argv, 0, argv.Length);
                 try {
-                    CLRBackend.RunMain(args[1], args[2],
-                            args[0] == "evalnam" ? null : argv);
+                    CLRBackend.RunMain((string)args[1], (string)args[2],
+                            cmd == "evalnam" ? null : argv);
                 }
                 catch (Exception ex) {
-                    return new string[] { ex.ToString() };
+                    return new object[] { ex.ToString() };
                 }
-                return new string[0];
-            } else if (args[0] == "setnames") {
-                Builtins.execName = args[1];
-                Builtins.programName = args[2];
-                return new string[0];
-            } else if (args[0] == "replrun") {
+                return new object[0];
+            } else if (cmd == "setnames") {
+                Builtins.execName = (string)args[1];
+                Builtins.programName = (string)args[2];
+                return new object[0];
+            } else if (cmd == "replrun") {
                 string ret = "";
                 try {
                     BValue b = Kernel.PackageLookup(Kernel.ProcessO, "$OUTPUT_USED");
@@ -5003,14 +5000,12 @@ dynamic:
                 } catch (Exception ex) {
                     ret = ex.Message;
                 }
-                return new string[] { ret };
-            } else if (args[0] == "safemode") {
+                return new object[] { ret };
+            } else if (cmd == "safemode") {
                 Kernel.SaferMode = true;
-                return new string[0];
-            } else if (args[0] == "hello") {
-                return new string[] { Assembly.GetExecutingAssembly().Location };
+                return new object[0];
             } else {
-                return new string[] { "ERROR" };
+                return new object[] { "ERROR" };
             }
         }
     }
