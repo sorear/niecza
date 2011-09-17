@@ -631,17 +631,15 @@ public class JsyncReader {
         if (h_tag != null) {
             if (!Utils.StartsWithInvariant("!perl6/", h_tag))
                 Err("Unsupported hash tag " + h_tag);
-            int s_cursor = 7;
-            P6any p_cursor = Kernel.GlobalO;
-            while(s_cursor < h_tag.Length) {
-                int s_next = h_tag.IndexOf("::", s_cursor);
-                if (s_next < 0) s_next = h_tag.Length;
-                else s_next = s_next + 2;
-                string frag = h_tag.Substring(s_cursor, s_next - s_cursor);
-                s_cursor = s_next;
+            string s2 = "::" + h_tag.Substring(7);
+            int cut = s2.LastIndexOf("::");
 
-                p_cursor = Kernel.PackageLookup(p_cursor, frag).v.Fetch();
-            }
+            Variable v_cursor = Kernel.GetVar(s2.Substring(0, cut),
+                    s2.Substring(cut+2)).v;
+
+            if (v_cursor.rw)
+                Err(s2.Substring(2) + " does not name a loaded global class");
+            P6any p_cursor = v_cursor.Fetch();
 
             if (p_cursor.Isa(Kernel.HashMO)) {
                 if (p_cursor.mo.nslots != 0)

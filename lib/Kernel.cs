@@ -190,10 +190,18 @@ namespace Niecza {
         public BValue(Variable v) { this.v = v; }
     }
 
+    public class StashEnt {
+        public Variable v;
+        public string   file;
+        public int      line;
+    }
+
     public sealed class RuntimeUnit {
         static Dictionary<string, byte[]> heapreg;
 
         public string name, filename, modtime;
+        public Dictionary<string, StashEnt> globals;
+
         public Type type;
         public byte[] heap;
         public RuntimeUnit[] depends;
@@ -235,7 +243,10 @@ namespace Niecza {
         public RuntimeUnit(string name, string filename, string modtime) {
             this.name = name;
             this.filename = filename;
-            this.modtime  = modtime;
+            this.modtime = modtime;
+            this.globals = new Dictionary<string,StashEnt>();
+            if (name == "CORE")
+                Kernel.CreateBasicTypes();
         }
 
         public RuntimeUnit(string name, Type type, byte[] heap,
@@ -465,7 +476,7 @@ namespace Niecza {
                 if (TraceLoad)
                     Console.WriteLine("Creating stash slot {0} {1}", who, name);
 
-                BValue slot = Kernel.GetVar(who, name);
+                StashEnt slot = Kernel.GetVar(who, name);
                 if (what == null) continue;
 
                 Variable item = (what is SubInfo) ?
@@ -650,7 +661,7 @@ namespace Niecza {
                 new STable(name);
             xref[ix] = mo;
 
-            mo.who = Kernel.GetStash(who);
+            //mo.who = Kernel.GetStash(who);
             mo.typeObject = new P6opaque(mo, 0);
             ((P6opaque)mo.typeObject).slots = null;
             mo.typeVar = Kernel.NewROScalar(mo.typeObject);
@@ -2686,13 +2697,10 @@ tryagain:
             }
             if (key.Length >= 2 && key[1] == '*') {
                 key = key.Remove(1,1);
-                BValue bv;
+                StashEnt bv;
 
-                if (Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.GlobalO).
-                        TryGetValue(key, out bv) ||
-                    Kernel.UnboxAny<Dictionary<string,BValue>>(Kernel.ProcessO).
-                        TryGetValue(key, out bv)) {
-
+                if (Kernel.currentGlobals.TryGetValue("\x8::GLOBAL" + key, out bv) ||
+                        Kernel.currentGlobals.TryGetValue("\x9::PROCESS" + key, out bv)) {
                     if (rbar_w) { bv.v = o; } else { o = bv.v; }
                     return true;
                 }
@@ -2770,7 +2778,7 @@ tryagain:
                         Kernel.GetInferiorRoot(), "name",
                         new Variable[] { whov }, null));
                     string name = vname.Fetch().mo.mro_raw_Str.Get(vname);
-                    P6any new_who = Kernel.GetStash(name + "::" + key);
+                    P6any new_who = Kernel.BoxRaw(name + "::" + key, Kernel.StashMO);
                     who.mo.mro_bind_key.Bind(whov, keyv,
                         MakePackage(key, new_who));
                     sc.p1 = new_who;
@@ -2790,11 +2798,11 @@ tryagain:
                     v = ToInfo().cur_pkg.typeVar;
                     goto have_v;
                 } else if (key == "GLOBAL") {
-                    sc.p1 = Kernel.GlobalO;
+                    sc.p1 = Kernel.GetVar("", "GLOBAL").v.Fetch();
                     sc.type = WHO;
                     goto have_sc;
                 } else if (key == "PROCESS") {
-                    sc.p1 = Kernel.ProcessO;
+                    sc.p1 = Kernel.GetVar("", "PROCESS").v.Fetch();
                     sc.type = WHO;
                     goto have_sc;
                 } else if (key == "UNIT" || key == "OUTER" ||
@@ -2831,7 +2839,7 @@ tryagain:
                     n.p1 = (key == "PARENT" || key.Length > 0 &&
                             "$&@%".IndexOf(key[0]) >= 0)
                         ? ToInfo().cur_pkg.who
-                        : Kernel.GlobalO;
+                        : Kernel.GetVar("", "GLOBAL").v.Fetch();
                     n.Core(key, final, out sc, out v, bind_to);
                     return;
                 }
@@ -3121,32 +3129,32 @@ have_v:
         public static P6any IteratorP;
         public static STable RealMO;
         public static STable IntegralMO;
-        public static readonly STable JunctionMO;
-        public static readonly STable LabelMO;
-        public static readonly STable AnyMO;
-        public static readonly STable IteratorMO;
-        public static readonly STable ScalarMO;
-        public static readonly STable StashMO;
+        public static STable JunctionMO;
+        public static STable LabelMO;
+        public static STable AnyMO;
+        public static STable IteratorMO;
+        public static STable ScalarMO;
+        public static STable StashMO;
         public static STable PseudoStashMO;
-        public static readonly STable CodeMO;
-        public static readonly STable StrMO;
-        public static readonly STable NumMO;
-        public static readonly STable IntMO;
-        public static readonly STable RatMO;
-        public static readonly STable FatRatMO;
-        public static readonly STable ComplexMO;
-        public static readonly STable ArrayMO;
-        public static readonly STable CursorMO;
-        public static readonly STable MatchMO;
-        public static readonly STable ParcelMO;
-        public static readonly STable ListMO;
-        public static readonly STable HashMO;
-        public static readonly STable BoolMO;
-        public static readonly STable MuMO;
-        public static readonly P6any StashP;
+        public static STable CodeMO;
+        public static STable StrMO;
+        public static STable NumMO;
+        public static STable IntMO;
+        public static STable RatMO;
+        public static STable FatRatMO;
+        public static STable ComplexMO;
+        public static STable ArrayMO;
+        public static STable CursorMO;
+        public static STable MatchMO;
+        public static STable ParcelMO;
+        public static STable ListMO;
+        public static STable HashMO;
+        public static STable BoolMO;
+        public static STable MuMO;
+        public static P6any StashP;
 
-        public static readonly Variable TrueV;
-        public static readonly Variable FalseV;
+        public static Variable TrueV;
+        public static Variable FalseV;
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
             P6opaque n = new P6opaque(info.mo ?? CodeMO, 2);
@@ -3610,13 +3618,11 @@ ltm:
                 up--;
             }
             name = name.Remove(1,1);
-            BValue v;
+            StashEnt v;
 
-            if (UnboxAny<Dictionary<string,BValue>>(GlobalO)
-                    .TryGetValue(name, out v)) {
+            if (currentGlobals.TryGetValue("\x8::GLOBAL" + name, out v)) {
                 return v.v;
-            } else if (UnboxAny<Dictionary<string,BValue>>(ProcessO)
-                    .TryGetValue(name, out v)) {
+            } else if (currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
                 return v.v;
             } else {
                 return AnyMO.typeVar;
@@ -3877,24 +3883,25 @@ slow:
                     " (" + oo.mo.name + ", " + nn.mo.name + ")");
         }
 
-        public static BValue GetVar(string who, string name) {
-            return PackageLookup(GetStash(who), name);
-        }
+        public static StashEnt GetVar(string who, string name) {
+            StashEnt v;
+            string key = (char)who.Length + who + name;
 
-        public static BValue PackageLookup(P6any parent, string name) {
-            Dictionary<string,BValue> stash =
-                UnboxAny<Dictionary<string,BValue>>(parent);
-            BValue v;
-
-            if (stash.TryGetValue(name, out v)) {
+            if (currentGlobals.TryGetValue(key, out v))
                 return v;
-            } else if (name.StartsWith("@")) {
-                return (stash[name] = new BValue(CreateArray()));
+            else
+                v = currentGlobals[key] = new StashEnt();
+
+
+            if (name.StartsWith("@")) {
+                v.v = CreateArray();
             } else if (name.StartsWith("%")) {
-                return (stash[name] = new BValue(CreateHash()));
+                v.v = CreateHash();
             } else {
-                return (stash[name] = new BValue(NewTypedScalar(null)));
+                v.v = NewTypedScalar(null);
             }
+
+            return v;
         }
 
         private static void Handler_Vonly(STable kl, string name,
@@ -4299,17 +4306,10 @@ def:        return at.Get(self, index);
             }
         }
 
-        static Dictionary<string, P6any> stashes;
-        public static P6any RootO;
-        // used as the fallbacks for $*FOO
-        public static P6any GlobalO;
-        public static P6any ProcessO;
+        [ThreadStatic]
+        public static Dictionary<string, StashEnt> currentGlobals;
 
-        static Kernel() {
-            PhaserBanks = new VarDeque[PHASER_TYPES];
-            for (int i = 0; i < PHASER_TYPES; i++)
-                PhaserBanks[i] = new VarDeque();
-
+        internal static void CreateBasicTypes() {
             CodeMO = new STable("Code");
             CodeMO.FillProtoClass(new string[] { "outer", "info" });
             SubInvokeSubSI.param1 = new InvokeSub();
@@ -4484,32 +4484,6 @@ def:        return at.Get(self, index);
 
             ScalarMO = new STable("Scalar");
             ScalarMO.FillProtoClass(new string[] { });
-
-            stashes  = new Dictionary<string,P6any>();
-            RootO    = GetStash("");
-            GlobalO  = GetStash("::GLOBAL");
-            ProcessO = GetStash("::PROCESS");
-        }
-
-        public static P6any GetStash(string name) {
-            P6any o;
-            if (stashes.TryGetValue(name, out o))
-                return o;
-            o = BoxRaw(new Dictionary<string,BValue>(), StashMO);
-            o.SetSlot("name", BoxAnyMO(name, StrMO));
-            return stashes[name] = o;
-        }
-
-        public static Dictionary<string, int> usedNames = new Dictionary<string, int>();
-        public static void LogNameLookup(string name) {
-            int k;
-            usedNames.TryGetValue(name, out k);
-            usedNames[name] = k + 1;
-        }
-
-        public static void DumpNameLog() {
-            foreach (KeyValuePair<string, int> kv in usedNames)
-                Console.WriteLine("{0} {1}", kv.Value, kv.Key);
         }
 
         // This is a library function in .NET 4

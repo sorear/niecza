@@ -95,8 +95,14 @@ class Type {
 
 class Unit {
     has $.peer;
+    method set_current() { downcall("set_current_unit", $!peer) }
+    method abs_pkg(*@names, :$auto) { downcall("abs_pkg",
+        $auto ?? "1" !! "", @names) }
+    method rel_pkg($pkg, *@names, :$auto) { downcall("rel_pkg",
+        $auto ?? "1" !! "", $pkg, @names) }
+    method get($pkg, $name) { downcall("get_name", $pkg, $name) }
 }
 
-method create-unit($name, $filename, $modtime) {
+method create_unit($name, $filename, $modtime) {
     Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime));
 }

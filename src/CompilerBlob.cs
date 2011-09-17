@@ -77,6 +77,7 @@ namespace Niecza {
             object r = RawDowncall(lo.ToArray());
             if (r == null) return Kernel.AnyMO.typeVar;
             else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
+            else if (r is Exception) throw new NieczaException(((Exception)r).Message);
             else return Kernel.BoxAnyMO(r, Kernel.AnyMO);
         }
     }

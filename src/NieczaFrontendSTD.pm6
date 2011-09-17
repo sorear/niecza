@@ -243,7 +243,9 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     my $*UNIT;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
-    my $*unit = $*backend.create-unit($unitname, $filename, $modtime);
+    my $*unit = $*backend.create_unit($unitname, $filename, $modtime);
+    %*units{$unitname} = $*unit;
+    $*unit.set_current;
 
     if $*niecza_outer_ref {
         $*unit.setting_ref = $*niecza_outer_ref;
@@ -252,20 +254,14 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
         $*unit.need_unit($lang);
         $*unit.setting_ref = $*unit.get_unit($lang).bottom_ref;
     }
-    %*units{$unitname} = $*unit;
-    $*unit.tdeps{$unitname} = [$filename, $modtime];
 
-    if $*unit.setting_ref {
-        $*unit.ns.root = $*unit.deref($*unit.setting_ref).unit.ns.root;
-    } else {
-        $*unit.ns.root = ::Metamodel::Package.new(name => 'ROOT', who => '').xref;
-        $*unit.abs_pkg('GLOBAL', :auto);
-        $*unit.abs_pkg('PROCESS', :auto);
-    }
+    $*unit.abs_pkg('GLOBAL', :auto);
+    $*unit.abs_pkg('PROCESS', :auto);
 
     my $ast = NieczaGrammar.parse($source, actions => NieczaActions).ast;
 
     @STD::herestub_queue = @save_herestub;
 
+    CALLER::<$*unit> && CALLER::<$*unit>.set_current;
     $ast;
 }

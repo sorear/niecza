@@ -4968,6 +4968,10 @@ dynamic:
             } else if (cmd == "new_unit") {
                 return new Handle(new RuntimeUnit((string)args[1],
                         (string)args[2], (string)args[3]));
+            } else if (cmd == "set_current_unit") {
+                Kernel.currentGlobals =
+                    ((RuntimeUnit)Handle.Unbox(args[1])).globals;
+                return null;
             } else if (cmd == "sub_new") {
                 return null;
             } else if (cmd == "post_save") {
@@ -4996,7 +5000,7 @@ dynamic:
             } else if (cmd == "replrun") {
                 string ret = "";
                 try {
-                    BValue b = Kernel.PackageLookup(Kernel.ProcessO, "$OUTPUT_USED");
+                    StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
                     b.v = Kernel.FalseV;
                     // hack to simulate a settingish environment
                     Variable r = Kernel.RunInferior(
@@ -5017,7 +5021,7 @@ dynamic:
                 Kernel.SaferMode = true;
                 return null;
             } else {
-                return "ERROR";
+                return new Exception("ERROR");
             }
         }
     }
