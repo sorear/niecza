@@ -4947,9 +4947,14 @@ dynamic:
 
         public Handle(object to) { this.to = to; }
         public static object Unbox(object h) { return ((Handle)h).to; }
+
+        public override string ToString() {
+            return string.Format("{0}[{1:X}]", to.ToString(), to.GetHashCode());
+        }
     }
 
     public class DowncallReceiver : CallReceiver {
+        [ThreadStatic] static RuntimeUnit currentUnit;
         public override object this[object i] {
             set { }
             get { return Call((object[]) i); }
@@ -4969,9 +4974,54 @@ dynamic:
                 return new Handle(new RuntimeUnit((string)args[1],
                         (string)args[2], (string)args[3]));
             } else if (cmd == "set_current_unit") {
-                Kernel.currentGlobals =
-                    ((RuntimeUnit)Handle.Unbox(args[1])).globals;
+                currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
+                Kernel.currentGlobals = currentUnit.globals;
                 return null;
+            } else if (cmd == "rel_pkg") {
+                bool auto = ((string)args[1]) != "";
+                STable pkg = args[2] == null ? null : (STable)Handle.Unbox(args[2]);
+                RuntimeUnit c = currentUnit;
+                for (int i = 3; i < args.Length; i++) {
+                    string key = (string) args[i];
+                    string who = "";
+                    if (pkg != null) {
+                        if (!pkg.who.Isa(Kernel.StashMO))
+                            return new Exception(pkg.name + " fails to name a standard package");
+                        who = Kernel.UnboxAny<string>(pkg.who);
+                    }
+                    StashEnt v;
+                    string hkey = (char)who.Length + who + key;
+                    if (c.globals.TryGetValue(hkey, out v)) {
+                        if (v.v.rw || v.v.Fetch().IsDefined())
+                            return new Exception((who + "::" + key).Substring(2) + " names a non-package");
+                        pkg = v.v.Fetch().mo;
+                    } else if (!auto) {
+                        return new Exception((who + "::" + key).Substring(2) + " does not name any package");
+                    } else {
+                        c.globals[hkey] = v = new StashEnt();
+                        v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Kernel.StashMO));
+                        pkg = v.v.Fetch().mo;
+                    }
+                }
+                return new Handle(pkg);
+            } else if (cmd == "get_name") {
+                string who  = (string)args[1];
+                string key  = (string)args[2];
+                string hkey = (char)who.Length + who + key;
+                StashEnt b;
+                if (Kernel.currentGlobals.TryGetValue(hkey, out b)) {
+                    if (!b.v.rw && !b.v.Fetch().IsDefined()) {
+                        return new object[] {
+                            new Handle(b.v.Fetch().mo), "1"
+                        };
+                    } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
+                        return new object[] {
+                            new Handle(b.v.Fetch().GetSlot("info")), ""
+                        };
+                    } else return null;
+                } else {
+                    return null;
+                }
             } else if (cmd == "sub_new") {
                 return null;
             } else if (cmd == "post_save") {

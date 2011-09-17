@@ -96,11 +96,16 @@ class Type {
 class Unit {
     has $.peer;
     method set_current() { downcall("set_current_unit", $!peer) }
-    method abs_pkg(*@names, :$auto) { downcall("abs_pkg",
-        $auto ?? "1" !! "", @names) }
-    method rel_pkg($pkg, *@names, :$auto) { downcall("rel_pkg",
-        $auto ?? "1" !! "", $pkg, @names) }
-    method get($pkg, $name) { downcall("get_name", $pkg, $name) }
+    method abs_pkg(*@names, :$auto) {
+        Type.new(peer => downcall("rel_pkg", $auto ?? "1" !! "", Any, @names))
+    }
+    method rel_pkg($pkg, *@names, :$auto) {
+        Type.new(peer => downcall("rel_pkg", $auto ?? "1" !! "", $pkg.peer, @names))
+    }
+    method get($pkg, $name) {
+        my ($p,$k) = downcall("get_name", $pkg, $name);
+        $k ?? Type.new(peer => $p) !! StaticSub.new(peer => $p)
+    }
 }
 
 method create_unit($name, $filename, $modtime) {

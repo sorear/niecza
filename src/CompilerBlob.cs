@@ -70,14 +70,25 @@ namespace Niecza {
                 P6any o = v.Fetch();
                 if (o is BoxObject<object>)
                     lo.Add(Kernel.UnboxAny<object>(o));
-                else
+                else if (o.IsDefined())
                     lo.Add((string) o.mo.mro_raw_Str.Get(v));
+                else
+                    lo.Add(null);
             }
 
-            object r = RawDowncall(lo.ToArray());
+            return DCResult(RawDowncall(lo.ToArray()));
+        }
+
+        static Variable DCResult(object r) {
             if (r == null) return Kernel.AnyMO.typeVar;
             else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
             else if (r is Exception) throw new NieczaException(((Exception)r).Message);
+            else if (r is object[]) {
+                object[] ra = (object[])r;
+                Variable[] ba = new Variable[ra.Length];
+                for (int i = 0; i < ba.Length; i++) ba[i] = DCResult(ra[i]);
+                return Builtins.MakeParcel(ba);
+            }
             else return Kernel.BoxAnyMO(r, Kernel.AnyMO);
         }
     }

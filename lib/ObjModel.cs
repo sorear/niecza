@@ -426,8 +426,15 @@ next_method: ;
             local_attr.Add(ai);
         }
 
-        public void FillProtoClass(string[] slots) {
-            FillClass(slots, new STable[] {}, new STable[] { stable });
+        public void FillProtoClass(STable parent, string[] slots) {
+            if (parent == null) {
+                FillClass(slots, new STable[] {}, new STable[] { stable });
+            } else {
+                STable[] mro = new STable[parent.mo.mro.Length + 1];
+                Array.Copy(parent.mo.mro, 0, mro, 1, mro.Length-1);
+                mro[0] = stable;
+                FillClass(slots, new STable[] { parent }, mro);
+            }
         }
 
         public void FillSubset(STable super) {
@@ -696,8 +703,8 @@ next_method: ;
             mo.AddAttribute(name, flags, init, type);
         }
 
-        public void FillProtoClass(string[] slots) {
-            mo.FillProtoClass(slots);
+        public void FillProtoClass(STable parent, string[] slots) {
+            mo.FillProtoClass(parent, slots);
         }
 
         public void FillClass(string[] all_slot, STable[] superclasses,

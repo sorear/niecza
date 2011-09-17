@@ -12,10 +12,11 @@ has $!discount-time = 0;
 
 has %.units;
 
-sub gettimeofday() { now.to-posix.[0] }
-
 method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode, $outer, $repl) {
     my %*units := %.units;
+
+    # FIXME this is a bit of a fudge
+    $unitname := 'CORE' if $!frontend.lang eq 'NULL';
 
     my $*module_loader = sub ($m) { self!load_dependent($m) };
     my $*niecza_outer_ref = $outer;

@@ -2626,7 +2626,7 @@ tryagain:
             st.typeVar = st.initVar = Kernel.NewROScalar(st.typeObject);
             st.mo.isPackage = true;
             // XXX should be PackageHOW
-            st.how = new BoxObject<STable>(st, Kernel.AnyMO.how.mo, 0);
+            st.how = new BoxObject<STable>(st, Kernel.ClassHOWMO, 0);
             st.mo.Revalidate();
             return st.typeVar;
         }
@@ -3135,6 +3135,7 @@ have_v:
         public static STable IteratorMO;
         public static STable ScalarMO;
         public static STable StashMO;
+        public static STable ClassHOWMO;
         public static STable PseudoStashMO;
         public static STable CodeMO;
         public static STable StrMO;
@@ -4310,41 +4311,75 @@ def:        return at.Get(self, index);
         public static Dictionary<string, StashEnt> currentGlobals;
 
         internal static void CreateBasicTypes() {
-            CodeMO = new STable("Code");
-            CodeMO.FillProtoClass(new string[] { "outer", "info" });
+            CodeMO = new STable("Code"); // forward decl
+            MuMO = new STable("Mu");
+            Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
+                    new CtxRawNativeDefined());
+            Handler_Vonly(MuMO, "Bool", new CtxBoolNativeDefined(),
+                    new CtxRawNativeDefined());
+            Handler_Vonly(MuMO, "item", new CtxReturnSelfItem(), null);
+
+            MuMO.FillProtoClass(null, new string[] { });
+            MuMO.Invalidate();
+
+            AnyMO = new STable("Any");
+            Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
+            WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
+                    null, null, new IxAnyBindPos());
+            WrapIndexy(AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
+                    new IxAnyExistsKey(), new IxAnyDeleteKey(),
+                    new IxAnyBindKey());
+            AnyMO.FillProtoClass(MuMO, new string[] { });
+            AnyMO.Invalidate();
+
+            CodeMO.FillProtoClass(AnyMO, new string[] { "outer", "info" });
             SubInvokeSubSI.param1 = new InvokeSub();
             CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
             CodeMO.Invalidate();
 
             LabelMO = new STable("Label");
-            LabelMO.FillProtoClass(new string[] { "target", "name" });
+            LabelMO.FillProtoClass(AnyMO, new string[] { "target", "name" });
             LabelMO.Invalidate();
 
+            // forward reference
+            StrMO = new STable("Str");
             BoolMO = new STable("Bool");
+
+            IntMO = new STable("Int");
+            Handler_Vonly(IntMO, "Numeric", new CtxReturnSelf(),
+                    new CtxCallMethodUnboxNumeric(null));
+            Handler_PandBox(IntMO, "Bool", new CtxIntBool(), BoolMO);
+            Handler_PandBox(IntMO, "Str", new CtxIntStr(), StrMO);
+            Handler_PandCont(IntMO, "succ", new CtxIntSuccish(+1));
+            Handler_PandCont(IntMO, "pred", new CtxIntSuccish(-1));
+            IntMO.FillProtoClass(AnyMO, new string[] { });
+            IntMO.Invalidate();
+
             Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
                     new CtxBoolUnbox());
-            BoolMO.FillProtoClass(new string[] { "index" });
+            BoolMO.FillProtoClass(IntMO, new string[] { "index" });
             BoolMO.Invalidate();
             TrueV  = NewROScalar(BoxRaw<int>(1, BoolMO));
             FalseV = NewROScalar(BoxRaw<int>(0, BoolMO));
+            FalseV.Fetch().SetSlot("index", BoxAnyMO(0, IntMO));
+            TrueV.Fetch().SetSlot("index", BoxAnyMO(1, IntMO));
 
-            StrMO = new STable("Str");
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));
             Handler_PandBox(StrMO, "Bool", new CtxStrBool(), BoolMO);
             Handler_PandCont(StrMO, "succ", new CtxStrSuccish(true));
             Handler_PandCont(StrMO, "pred", new CtxStrSuccish(false));
-            StrMO.FillProtoClass(new string[] { });
+            StrMO.FillProtoClass(AnyMO, new string[] { });
             StrMO.Invalidate();
 
             JunctionMO = new STable("Junction");
             Handler_PandBox(JunctionMO, "Bool", new CtxJunctionBool(), BoolMO);
             JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
-            JunctionMO.FillProtoClass(new string[] { "kind_", "eigenstates_" });
+            JunctionMO.FillProtoClass(MuMO, new string[] { "kind_", "eigenstates_" });
             JunctionMO.Invalidate();
 
             IteratorMO = new STable("Iterator");
-            IteratorMO.FillProtoClass(new string[] { });
+            IteratorMO.FillProtoClass(AnyMO, new string[] { });
 
             NumMO = new STable("Num");
             Handler_Vonly(NumMO, "Numeric", new CtxReturnSelf(),
@@ -4354,20 +4389,8 @@ def:        return at.Get(self, index);
             Handler_PandBox(NumMO, "Bool", new CtxNum2Bool(), BoolMO);
             Handler_PandCont(NumMO, "succ", new CtxNumSuccish(+1));
             Handler_PandCont(NumMO, "pred", new CtxNumSuccish(-1));
-            NumMO.FillProtoClass(new string[] { });
+            NumMO.FillProtoClass(AnyMO, new string[] { });
             NumMO.Invalidate();
-
-            IntMO = new STable("Int");
-            Handler_Vonly(IntMO, "Numeric", new CtxReturnSelf(),
-                    new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(IntMO, "Bool", new CtxIntBool(), BoolMO);
-            Handler_PandBox(IntMO, "Str", new CtxIntStr(), StrMO);
-            Handler_PandCont(IntMO, "succ", new CtxIntSuccish(+1));
-            Handler_PandCont(IntMO, "pred", new CtxIntSuccish(-1));
-            IntMO.FillProtoClass(new string[] { });
-            IntMO.Invalidate();
-            FalseV.Fetch().SetSlot("index", BoxAnyMO(0, IntMO));
-            TrueV.Fetch().SetSlot("index", BoxAnyMO(1, IntMO));
 
             RatMO = new STable("Rat");
             Handler_Vonly(RatMO, "Numeric", new CtxReturnSelf(),
@@ -4376,7 +4399,7 @@ def:        return at.Get(self, index);
             Handler_PandBox(RatMO, "Str", new CtxRatStr(), StrMO);
             Handler_PandCont(RatMO, "succ", new CtxRatSuccish(true));
             Handler_PandCont(RatMO, "pred", new CtxRatSuccish(false));
-            RatMO.FillProtoClass(new string[] { });
+            RatMO.FillProtoClass(AnyMO, new string[] { });
             RatMO.Invalidate();
 
             FatRatMO = new STable("FatRat");
@@ -4386,7 +4409,7 @@ def:        return at.Get(self, index);
             Handler_PandBox(FatRatMO, "Str", new CtxFatRatStr(), StrMO);
             Handler_PandCont(FatRatMO, "succ", new CtxFatRatSuccish(true));
             Handler_PandCont(FatRatMO, "pred", new CtxFatRatSuccish(false));
-            FatRatMO.FillProtoClass(new string[] { });
+            FatRatMO.FillProtoClass(AnyMO, new string[] { });
             FatRatMO.Invalidate();
 
             ComplexMO = new STable("Complex");
@@ -4396,36 +4419,23 @@ def:        return at.Get(self, index);
             Handler_PandBox(ComplexMO, "Str", new CtxComplexStr(), StrMO);
             Handler_PandCont(ComplexMO, "succ", new CtxComplexSuccish(+1));
             Handler_PandCont(ComplexMO, "pred", new CtxComplexSuccish(-1));
-            ComplexMO.FillProtoClass(new string[] { });
+            ComplexMO.FillProtoClass(AnyMO, new string[] { });
             ComplexMO.Invalidate();
 
-            MuMO = new STable("Mu");
-            Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
-                    new CtxRawNativeDefined());
-            Handler_Vonly(MuMO, "Bool", new CtxBoolNativeDefined(),
-                    new CtxRawNativeDefined());
-            Handler_Vonly(MuMO, "item", new CtxReturnSelfItem(), null);
-            MuMO.FillProtoClass(new string[] { });
-            MuMO.Invalidate();
-
             StashMO = new STable("Stash");
-            StashMO.FillProtoClass(new string[] { "name" });
+            StashMO.FillProtoClass(AnyMO, new string[] { });
             StashP = new P6opaque(StashMO);
+
+            ClassHOWMO = new STable("ClassHOW");
+            ClassHOWMO.FillProtoClass(AnyMO, new string[] { });
 
             ParcelMO = new STable("Parcel");
             Handler_PandBox(ParcelMO, "iterator", new CtxParcelIterator(),
                     IteratorMO);
             WrapHandler1(ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
             Handler_Vonly(ParcelMO, "list", new CtxParcelList(), null);
-            ParcelMO.FillProtoClass(new string[] { });
+            ParcelMO.FillProtoClass(AnyMO, new string[] { });
             ParcelMO.Invalidate();
-
-            ArrayMO = new STable("Array");
-            WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
-            ArrayMO.FillProtoClass(new string[] { "items", "rest" });
-            WrapIndexy(ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
-                    null, null, new IxListBindPos());
-            ArrayMO.Invalidate();
 
             ListMO = new STable("List");
             WrapIndexy(ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
@@ -4439,8 +4449,15 @@ def:        return at.Get(self, index);
             Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
             Handler_PandBoxInty(ListMO, "Numeric", new CtxListNum());
             Handler_Vonly(ListMO, "list", new CtxReturnSelfList(), null);
-            ListMO.FillProtoClass(new string[] { "items", "rest" });
+            ListMO.FillProtoClass(AnyMO, new string[] { "items", "rest" });
             ListMO.Invalidate();
+
+            ArrayMO = new STable("Array");
+            WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
+            ArrayMO.FillProtoClass(ListMO, new string[] { "items", "rest" });
+            WrapIndexy(ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
+                    null, null, new IxListBindPos());
+            ArrayMO.Invalidate();
 
             HashMO = new STable("Hash");
             WrapHandler1(HashMO, "LISTSTORE", new IxHashLISTSTORE());
@@ -4450,18 +4467,8 @@ def:        return at.Get(self, index);
             Handler_PandBox(HashMO, "iterator", new CtxHashIterator(), IteratorMO);
             Handler_PandBox(HashMO, "Bool", new CtxHashBool(), BoolMO);
             Handler_Vonly(HashMO, "hash", new CtxReturnSelfList(), null);
-            HashMO.FillProtoClass(new string[] { });
+            HashMO.FillProtoClass(AnyMO, new string[] { });
             HashMO.Invalidate();
-
-            AnyMO = new STable("Any");
-            Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
-            WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
-                    null, null, new IxAnyBindPos());
-            WrapIndexy(AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
-                    new IxAnyExistsKey(), new IxAnyDeleteKey(),
-                    new IxAnyBindKey());
-            AnyMO.FillProtoClass(new string[] { });
-            AnyMO.Invalidate();
 
             CursorMO = new STable("Cursor");
             WrapIndexy(CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
@@ -4469,7 +4476,7 @@ def:        return at.Get(self, index);
                     AnyMO.mro_bind_key);
             WrapIndexy(CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
                     null, null, AnyMO.mro_bind_pos);
-            CursorMO.FillProtoClass(new string[] { });
+            CursorMO.FillProtoClass(AnyMO, new string[] { });
             CursorMO.Invalidate();
 
             MatchMO = new STable("Match");
@@ -4479,11 +4486,11 @@ def:        return at.Get(self, index);
             WrapIndexy(MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
                     null, null, AnyMO.mro_bind_pos);
             Handler_PandBox(MatchMO, "Str", new CtxMatchStr(), StrMO);
-            MatchMO.FillProtoClass(new string[] { });
+            MatchMO.FillProtoClass(AnyMO, new string[] { });
             MatchMO.Invalidate();
 
             ScalarMO = new STable("Scalar");
-            ScalarMO.FillProtoClass(new string[] { });
+            ScalarMO.FillProtoClass(AnyMO, new string[] { });
         }
 
         // This is a library function in .NET 4
