@@ -47,7 +47,7 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
 
 boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 	$(CSC) /target:library /out:boot/obj/CompilerBlob.dll /r:Kernel \
-	    /lib:obj src/CompilerBlob.cs
+	    /lib:boot/obj src/CompilerBlob.cs
 obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 	$(CSC) /target:library /out:obj/Kernel.dll /lib:obj /unsafe+ \
 	    $(patsubst %,lib/%,$(cskernel))
