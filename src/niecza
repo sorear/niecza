@@ -20,6 +20,233 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD::P6 {
+    rule package_def {
+        :my $longname;
+        :my $*IN_DECL = 'package';
+        :my $*HAS_SELF = '';
+        :temp $*CURLEX;
+        :temp $*SCOPE;
+        :my $outer = $*CURLEX;
+        { $*SCOPE ||= 'our'; }
+        [
+            [ <longname> { $longname = $<longname>[0]; } ]?
+            <.newlex(0, ($*PKGDECL//'') ne 'role')>
+            [ :dba('generic role')
+                <?{ ($*PKGDECL//'') eq 'role' }>
+                '[' ~ ']' <signature(1)>
+                { $*IN_DECL = ''; }
+            ]?
+            <trait>*
+            <.open_package_def($/)>
+            [
+            || <?before '{'>
+                [
+                { $*begin_compunit = 0; $*IN_DECL = ''; }
+                <blockoid>
+                $<stub>={$¢.checkyada}
+                ]
+            || <?before ';'>
+                [
+                || <?{ $*begin_compunit }>
+                    {
+                        $longname orelse $¢.panic("Compilation unit cannot be anonymous");
+                        $outer === $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
+                        $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
+                        $*begin_compunit = 0;
+                        $*IN_DECL = '';
+                    }
+                    <.finishlex>
+                    <statementlist>     # whole rest of file, presumably
+                || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
+                ]
+            || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
+            ]
+            <.getsig>
+        ] || <.panic: "Malformed $*PKGDECL">
+    }
+}
+
+augment grammar STD {
+method finishlex() {
+    my $sub = $*CURLEX<!sub>;
+    if $sub.is_routine {
+        $sub.add_my_name('$/', :roinit) unless $sub.has_lexical('$/');
+        $sub.add_my_name('$!', :roinit) unless $sub.has_lexical('$!');
+    }
+    $sub.add_my_name('$_', :defouter(!$sub.is_routine ||
+        $sub.is($sub.to_unit))) unless $sub.has_lexical('$_');
+    $*SIGNUM = 0;
+
+    self;
+}
+method getsig {
+    my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
+    state %method = (:Method, :Submethod, :Regex);
+    if $*CURLEX.<!NEEDSIG>:delete {
+        my @parms;
+        if %method{$*CURLEX<!sub>.class} {
+            my $cl = $*CURLEX<!sub>.methodof &&
+                $*unit.deref($*CURLEX<!sub>.methodof);
+            # XXX type checking against roles NYI
+            if $cl && $cl !~~ ::Metamodel::Role &&
+                    $cl !~~ ::Metamodel::ParametricRole {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
+                    tclass => $cl.xref);
+            } else {
+                push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
+            }
+            $*CURLEX<!sub>.add_my_name('self', :noinit);
+        }
+
+        if $pv {
+            my $h_ = $pv.<%_>:delete;
+            my $a_ = $pv.<@_>:delete;
+            for (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) }) -> $pn is copy {
+                my $positional = True;
+                if substr($pn,0,1) eq ':' {
+                    $pn = substr($pn,1);
+                    $positional = False;
+                }
+                my $list = substr($pn,0,1) eq '@';
+                my $hash = substr($pn,0,1) eq '%';
+                push @parms, ::Sig::Parameter.new(slot => $pn, :$list, :$hash,
+                    name => $pn, :$positional, names => [ substr($pn,1) ]);
+            }
+            if $a_ {
+                push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
+                    :slurpy, :list);
+            }
+            if $h_ {
+                push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
+                    :slurpy, :hash);
+            }
+        }
+        else {
+            push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
+                :defouter, :rwtrans);
+            self.trymop({
+                $*CURLEX<!sub>.lexicals<$_>.noinit = True;
+                $*CURLEX<!sub>.lexicals<$_>.defouter = False;
+            });
+        }
+        $*CURLEX<!sub>.set_signature(::GLOBAL::Sig.new(params => @parms));
+    }
+
+    my regex interesting () {
+        <!before anon_ >
+        <!before <[ \$ \@ \% ]> _ >
+        <?before <[ \$ \@ \% \& ]> \w >
+    }
+
+    if ($*CURLEX<!multi>//'') ne 'proto' {
+        for $*CURLEX<!sub>.unused_lexicals -> $k, $pos {
+            next unless interesting(Cursor.new($k));
+            # next if $[_/!] declared automatically "dynamic" TODO
+            next unless $pos >= 0;
+            self.cursor($pos).worry("$k is declared but not used");
+        }
+    }
+    self;
+}
+method explain_mystery() {
+    my %post_types;
+    my %unk_types;
+    my %unk_routines;
+    my $m = '';
+    for keys(%*MYSTERY) {
+        my $p = %*MYSTERY{$_}.<lex>;
+        if self.is_name($_, $p) {
+            # types may not be post-declared
+            %post_types{$_} = %*MYSTERY{$_};
+            next;
+        }
+
+        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
+
+        # just a guess, but good enough to improve error reporting
+        if $_ lt 'a' {
+            %unk_types{$_} = %*MYSTERY{$_};
+        }
+        else {
+            %unk_routines{$_} = %*MYSTERY{$_};
+        }
+    }
+    if %post_types {
+        my @tmp = sort keys(%post_types);
+        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t'$_' used at line " ~ %post_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_types {
+        my @tmp = sort keys(%unk_types);
+        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t'$_' used at line " ~ %unk_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_routines {
+        my @tmp = sort keys(%unk_routines);
+        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t'$_' used at line " ~ %unk_routines{$_}.<line> ~ "\n";
+        }
+    }
+    self.sorry($m) if $m;
+
+    for $*unit.stubbed_stashes -> $pos, $type {
+        next if $type.closed || $type.is_package;
+        self.cursor($pos).sorry("Package was stubbed but not defined");
+    }
+
+    self;
+}
+method add_placeholder($name) {
+    my $decl = $*CURLEX.<!IN_DECL> // '';
+    my $sub = $*CURLEX<!sub>;
+    $decl = ' ' ~ $decl if $decl;
+    my $*IN_DECL = 'variable';
+
+    if $*SIGNUM {
+        return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
+    }
+    elsif my $siggy = $*CURLEX.<$?SIGNATURE> {
+        return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
+    }
+    if not $*CURLEX.<!NEEDSIG> {
+        if $*CURLEX === $*UNIT {
+            return self.sorry("Placeholder variable $name may not be used outside of a block");
+        }
+        return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
+    }
+    if $name ~~ /\:\:/ {
+        return self.sorry("Placeholder variable $name may not be package qualified");
+    }
+
+    my $varname = $name;
+    my $twigil = '';
+    my $signame = $varname;
+    if $varname ~~ s/<[ ^ : ]>// {
+        $twigil = $/.Str;
+        $signame = ($twigil eq ':' ?? ':' !! '') ~ $varname;
+    }
+    return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
+
+    if $sub.lexicals-used.{$varname} || $sub.lexicals.{$varname} {
+        return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
+    }
+    self.trymop({
+        self.check_categorical($varname);
+        $*CURLEX<!sub>.add_my_name($varname, :noinit, |mnode(self),
+            list => substr($varname,0,1) eq '@',
+            hash => substr($varname,0,1) eq '%');
+    });
+    $*CURLEX<!sub>.lexicals-used{$varname} = True;
+    self;
+}
+}
+
 augment class NieczaActions {
 
 method process_name($/, :$declaring, :$defer, :$clean) {

@@ -206,6 +206,7 @@ namespace Niecza {
 
         // used during construction only
         public TypeBuilder newType;
+        public List<KeyValuePair<int,STable>> stubbed_stashes;
 
         public Type type;
         public byte[] heap;
@@ -250,6 +251,7 @@ namespace Niecza {
             this.filename = filename;
             this.modtime = modtime;
             this.globals = new Dictionary<string,StashEnt>();
+            this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             if (name == "CORE")
                 Kernel.CreateBasicTypes();
         }

@@ -93,7 +93,12 @@ class Type { ... }
 class StaticSub {
     has $.peer;
     method lex_names() { downcall("lex_names", $!peer) }
+    method unused_lexicals() { downcall("unused_lexicals", $!peer) }
     method unit() { Unit.new(peer => downcall("sub_get_unit", $!peer)) }
+    method to_unit() { StaticSub.new(peer => downcall("sub_to_unit", $!peer)) }
+    method is($o) { downcall("equal_handles", $!peer, $o.peer) }
+    method is_routine() { downcall("sub_is_routine", $!peer) }
+    method has_lexical($name) { downcall("sub_has_lexical", $!peer, $name) }
     method set_signature($sig) {
         my @args;
         if !$sig {
@@ -154,31 +159,31 @@ class StaticSub {
     method add_my_name($name, :$file, :$line, :$pos, :$noinit, :$defouter,
             :$roinit, :$list, :$hash, :$typeconstraint) {
         self._addlex_result(downcall("add_my_name", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0),
+            ~($file//''), +($line//0), +($pos// -1),
             $typeconstraint && $typeconstraint.peer,
             ($noinit ?? 1 !! 0) + ($roinit ?? 2 !! 0) + ($defouter ?? 4 !! 0) +
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0)));
     }
     method add_hint($name, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_hint", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0)));
+            ~($file//''), +($line//0), +($pos// -1)));
     }
     method add_label($name, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_label", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0)));
+            ~($file//''), +($line//0), +($pos// -1)));
     }
     method add_dispatcher($name, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_dispatcher", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0)));
+            ~($file//''), +($line//0), +($pos// -1)));
     }
     method add_common_name($name, $pkg, $pname, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_common_name", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0), $pkg.peer, ~$pname));
+            ~($file//''), +($line//0), +($pos// -1), $pkg.peer, ~$pname));
     }
     method add_state_name($name, $backing, :$file, :$line, :$pos, :$noinit,
             :$defouter, :$roinit, :$list, :$hash, :$typeconstraint) {
         self._addlex_result(downcall("add_state_name", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0),
+            ~($file//''), +($line//0), +($pos// -1),
             $typeconstraint && $typeconstraint.peer,
             ($noinit ?? 1 !! 0) + ($roinit ?? 2 !! 0) + ($defouter ?? 4 !! 0) +
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0),
@@ -186,21 +191,27 @@ class StaticSub {
     }
     method add_my_stash($name, $pkg, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0), $pkg.peer));
+            ~($file//''), +($line//0), +($pos// -1), $pkg.peer));
     }
     method add_my_sub($name, $body, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos//0), $body.peer));
+            ~($file//''), +($line//0), +($pos// -1), $body.peer));
     }
 }
 
 class Type {
     has $.peer;
+    method is_package() { downcall("type_is_package", $!peer) }
+    method closed() { downcall("type_closed", $!peer) }
 }
 
 class Unit {
     has $.peer;
     method name() { downcall("unit_get_name", $!peer) }
+    method stubbed_stashes() {
+        downcall("unit_stubbed_stashes", $!peer).map({ $_ ~~ Int ?? $_ !! Type.new(peer => $_)})
+    }
+    method stub_stash($pos, $type) { downcall("unit_stub_stash", $pos, $type.peer) }
     method set_current() { downcall("set_current_unit", $!peer) }
     method set_mainline($sub) { downcall("set_mainline", $sub.peer) }
     method abs_pkg(*@names, :$auto) {

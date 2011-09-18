@@ -5016,8 +5016,45 @@ dynamic:
                 foreach (string k in ((SubInfo)Handle.Unbox(args[1])).dylex.Keys)
                     ret.Add(k);
                 return ret.ToArray();
+            } else if (cmd == "unused_lexicals") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                List<object> ret = new List<object>();
+                foreach (KeyValuePair<string,LexInfo> kv in s.dylex) {
+                    if (s.used_in_scope.ContainsKey(kv.Key))
+                        continue;
+                    ret.Add(kv.Key);
+                    ret.Add(kv.Value.pos);
+                }
+                return ret.ToArray();
+            } else if (cmd == "unit_stubbed_stashes") {
+                RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);
+                List<object> ret = new List<object>();
+                foreach (KeyValuePair<int,STable> kv in u.stubbed_stashes) {
+                    ret.Add(kv.Key);
+                    ret.Add(new Handle(kv.Value));
+                }
+                return ret.ToArray();
+            } else if (cmd == "unit_stub_stash") {
+                RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);
+                int    pos = (int)args[2];
+                STable type = (STable)Handle.Unbox(args[3]);
+                u.stubbed_stashes.Add(new KeyValuePair<int,STable>(pos,type));
+                return null;
             } else if (cmd == "unit_get_name") {
                 return ((RuntimeUnit)Handle.Unbox(args[1])).name;
+            } else if (cmd == "sub_to_unit") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                while ((s.special & RuntimeUnit.SUB_MAINLINE) == 0)
+                    s = s.outer;
+                return new Handle(s);
+            } else if (cmd == "equal_handles") {
+                return Handle.Unbox(args[1]) == Handle.Unbox(args[2]);
+            } else if (cmd == "sub_is_routine") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                return s.mo.HasMRO(Kernel.RoutineMO);
+            } else if (cmd == "sub_has_lexical") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                return s.dylex.ContainsKey((string)args[2]);
             } else if (cmd == "rel_pkg") {
                 bool auto = (bool)args[1];
                 STable pkg = args[2] == null ? null : (STable)Handle.Unbox(args[2]);
