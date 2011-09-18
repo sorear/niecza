@@ -257,6 +257,58 @@ namespace Niecza {
             return null; // TODO implement this
         }
 
+        public static string NsMerge(string who, string name,
+                ref StashEnt nse, StashEnt ose) {
+            P6any nseo = nse.v.Fetch();
+            P6any oseo = ose.v.Fetch();
+            bool  nseod = nseo.IsDefined();
+            bool  oseod = oseo.IsDefined();
+            // lowest priority are empty common symbols
+            if (nse.v.rw && !nseod) {
+                nse = ose;
+                return null;
+            }
+            if (ose.v.rw && !oseod) {
+                return null;
+            }
+
+            // no conflict if items are identical
+            if (!ose.v.rw && !nse.v.rw && oseo == nseo) {
+                nse = ose;
+                return null;
+            }
+
+            // no conflict if items are simple packages with the same who
+            if (!ose.v.rw && !oseod && oseo.mo.mo.isPackage &&
+                    !nse.v.rw && !nseod && nseo.mo.mo.isPackage &&
+                    oseo.mo.who.Isa(Kernel.StashMO) &&
+                    nseo.mo.who.Isa(Kernel.StashMO) &&
+                    Kernel.UnboxAny<string>(oseo.mo.who) ==
+                        Kernel.UnboxAny<string>(nseo.mo.who)) {
+                nse = ose;
+                return null;
+            }
+
+            return "Two definitions found for symbol "+who+"::"+name+"\n\n" +
+                    "  first at "+ose.file+" line "+ose.line+"\n" +
+                    "  second at "+nse.file+" line "+nse.line;
+        }
+
+        public string NsBind(string who, string name, Variable var,
+                string file, int line) {
+            string key = (char)who.Length + who + name;
+            StashEnt nse = new StashEnt();
+            nse.v = var;
+            nse.file = file;
+            nse.line = line;
+            StashEnt ose;
+            globals.TryGetValue(key, out ose);
+            string err = NsMerge(who, name, ref nse, ose);
+            if (err != null) return err;
+            globals[key] = nse;
+            return null;
+        }
+
         public RuntimeUnit(string name, Type type, byte[] heap,
                 RuntimeUnit[] depends, int nx) {
             this.name = name;
@@ -808,8 +860,19 @@ namespace Niecza {
         }
     }
 
-    public class LICommon : LIVarish {
-        public LICommon() : base(true) { }
+    // TODO: Provide some way to cache a StashEnt once the currentGlobals
+    // stops changing
+    public class LICommon : LexInfo {
+        public readonly string hkey;
+        public LICommon(string hkey) { this.hkey = hkey; }
+
+        public override object Get(Frame f) {
+            return Kernel.currentGlobals[hkey].v;
+        }
+
+        public override void Set(Frame f, object to) {
+            Kernel.currentGlobals[hkey].v = (Variable)to;
+        }
     }
 
     public class LIHint : LIVarish {

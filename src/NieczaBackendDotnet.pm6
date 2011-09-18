@@ -156,7 +156,37 @@ class StaticSub {
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0)));
     }
     method add_hint($name, :$file, :$line, :$pos) {
-        downcall("add_hint", $!peer, ~$name, ~($file//''), ~($line//0), ~($pos//0));
+        self._addlex_result(downcall("add_hint", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0)));
+    }
+    method add_label($name, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_label", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0)));
+    }
+    method add_dispatcher($name, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_dispatcher", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0)));
+    }
+    method add_common_name($name, $pkg, $pname, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_common_name", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0), $pkg.peer, ~$pname));
+    }
+    method add_state_name($name, $backing, :$file, :$line, :$pos, :$noinit,
+            :$defouter, :$roinit, :$list, :$hash, :$typeconstraint) {
+        self._addlex_result(downcall("add_state_name", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0),
+            $typeconstraint && $typeconstraint.peer,
+            ($noinit ?? 1 !! 0) + ($roinit ?? 2 !! 0) + ($defouter ?? 4 !! 0) +
+            ($list ?? 8 !! 0) + ($hash ?? 16 !! 0),
+            $backing));
+    }
+    method add_my_stash($name, $pkg, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0), $pkg.peer));
+    }
+    method add_my_sub($name, $body, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0), $body.peer));
     }
 }
 

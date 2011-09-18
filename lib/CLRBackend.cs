@@ -5077,6 +5077,46 @@ dynamic:
                 int     flags = (int)   args[7];
 
                 return AddLexical(args, new LISimple(flags, type));
+            } else if (cmd == "add_hint") {
+                return AddLexical(args, new LIHint());
+            } else if (cmd == "add_label") {
+                return AddLexical(args, new LILabel());
+            } else if (cmd == "add_dispatcher") {
+                return AddLexical(args, new LIDispatch());
+            } else if (cmd == "add_common_name") {
+                STable  pkg   = (STable)Handle.Unbox(args[6]);
+                string  pname = (string)args[7];
+                if (!pkg.who.Isa(Kernel.StashMO))
+                    return new Exception("NYI usage of a nonstandard package");
+                string  who   = Kernel.UnboxAny<string>(pkg.who);
+
+                string err = currentUnit.NsBind(who, pname, null,
+                        (string)args[3], (int)args[4]);
+                if (err != null) return new Exception(err);
+                return AddLexical(args, new LICommon((char)who.Length + who + pname));
+            } else if (cmd == "add_state_name") {
+                SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
+                SubInfo outer = (sub.special & RuntimeUnit.SUB_MAINLINE) != 0 ?
+                    sub : sub.outer;
+                STable  type  = (STable)Handle.Unbox(args[6]);
+                int     flags = (int)   args[7];
+                string  back  = (string)args[8];
+                string  name  = (string)args[2];
+
+                args[1] = outer;
+                args[2] = back;
+                AddLexical(args, new LISimple(flags, type));
+                args[1] = sub;
+                args[2] = name;
+                return AddLexical(args, new LIAlias(back));
+            } else if (cmd == "add_my_stash") {
+                STable  type  = (STable)Handle.Unbox(args[6]);
+
+                return AddLexical(args, new LIPackage(type));
+            } else if (cmd == "add_my_sub") {
+                SubInfo body  = (SubInfo)Handle.Unbox(args[6]);
+
+                return AddLexical(args, new LISub(body));
             } else if (cmd == "post_save") {
                 CLRBackend.Main(new string[] { (string)args[1],
                         (string)args[2], (string)args[3], (string)args[4] });
