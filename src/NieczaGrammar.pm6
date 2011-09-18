@@ -30,26 +30,23 @@ grammar Q is STD::Q { #} {
 
 grammar P6 is STD::P6 {
     method unitstart() {
-        my $top = $*unit.setting_ref;
-        my $rtop = $top && $*unit.deref($top);
-        $*CURLEX{'!sub'} = ::Metamodel::StaticSub.new(
-            unit => $*unit,
-            outerx => $top,
+        $*CURLEX{'!sub'} = $*unit.create_sub(
+            outer => $*settingref,
             class => 'Routine',
-            cur_pkg => $*unit.abs_pkg('GLOBAL').xref,
+            cur_pkg => $*unit.abs_pkg('GLOBAL'),
             name => "mainline",
-            run_once => (?$*niecza_outer_ref) || !$rtop || $rtop.run_once);
-        $*CURLEX{'!sub'}.add_my_name('$_') if !$top;
+            run_once => !$*settingref || $*settingref.run_once);
+        $*CURLEX{'!sub'}.add_my_name('$_') if !$*settingref;
         $*CURLEX{'!sub'}.add_hint('$?FILE');
-        $*CURLEX{'!sub'}.signature = ::GLOBAL::Sig.simple();
-        $*unit.mainline = $*CURLEX<!sub>;
+        $*CURLEX{'!sub'}.set_signature(::GLOBAL::Sig.simple());
+        $*unit.set_mainline($*CURLEX<!sub>);
 
         %*LANG<Q> = ::NieczaGrammar::Q ;
         %*LANG<MAIN> = ::NieczaGrammar::P6 ;
 
         my $h = self;
         loop (my $C = $*CURLEX<!sub>; $C && $C.unit.name ne 'CORE'; $C.=outer) {
-            for $C.lexicals.keys -> $lex {
+            for $C.lex_names -> $lex {
                 $h.check_categorical($lex);
                 $h = $h.cursor_fresh(%*LANG<MAIN>);
             }

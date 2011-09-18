@@ -5116,7 +5116,7 @@ method getsig {
                 $*CURLEX<!sub>.lexicals<$_>.defouter = False;
             });
         }
-        $*CURLEX<!sub>.signature = ::GLOBAL::Sig.new(params => @parms);
+        $*CURLEX<!sub>.set_signature(::GLOBAL::Sig.new(params => @parms));
     }
 
     my regex interesting () {

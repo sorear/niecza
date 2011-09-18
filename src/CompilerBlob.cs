@@ -70,9 +70,14 @@ namespace Niecza {
                 P6any o = v.Fetch();
                 if (o is BoxObject<object>)
                     lo.Add(Kernel.UnboxAny<object>(o));
-                else if (o.IsDefined())
-                    lo.Add((string) o.mo.mro_raw_Str.Get(v));
-                else
+                else if (o.IsDefined()) {
+                    if (o.Isa(Kernel.StrMO))
+                        lo.Add((string) o.mo.mro_raw_Str.Get(v));
+                    else if (o.Isa(Kernel.BoolMO))
+                        lo.Add((bool) o.mo.mro_raw_Bool.Get(v));
+                    else
+                        lo.Add((int) o.mo.mro_raw_Numeric.Get(v));
+                } else
                     lo.Add(null);
             }
 
@@ -82,6 +87,8 @@ namespace Niecza {
         static Variable DCResult(object r) {
             if (r == null) return Kernel.AnyMO.typeVar;
             else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
+            else if (r is int) return Builtins.MakeInt((int)r);
+            else if (r is bool) return ((bool)r) ? Kernel.TrueV : Kernel.FalseV;
             else if (r is Exception) throw new NieczaException(((Exception)r).Message);
             else if (r is object[]) {
                 object[] ra = (object[])r;

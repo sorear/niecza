@@ -246,14 +246,8 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer) {
     my $*unit = $*backend.create_unit($unitname, $filename, $modtime);
     %*units{$unitname} = $*unit;
     $*unit.set_current;
-
-    if $*niecza_outer_ref {
-        $*unit.setting_ref = $*niecza_outer_ref;
-        $*unit.need_unit($*unit.setting_ref.[0]);
-    } elsif $lang ne 'NULL' {
-        $*unit.need_unit($lang);
-        $*unit.setting_ref = $*unit.get_unit($lang).bottom_ref;
-    }
+    my $*settingref = $*niecza_outer_ref ||
+        $lang ne 'NULL' ?? $*unit.need_unit($lang).bottom !! Any;
 
     $*unit.abs_pkg('GLOBAL', :auto);
     $*unit.abs_pkg('PROCESS', :auto);

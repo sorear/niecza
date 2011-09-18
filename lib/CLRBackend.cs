@@ -4946,7 +4946,9 @@ dynamic:
         object to;
 
         public Handle(object to) { this.to = to; }
-        public static object Unbox(object h) { return ((Handle)h).to; }
+        public static object Unbox(object h) {
+            return h == null ? null : ((Handle)h).to;
+        }
 
         public override string ToString() {
             return string.Format("{0}[{1:X}]", to.ToString(), to.GetHashCode());
@@ -4977,8 +4979,10 @@ dynamic:
                 currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = currentUnit.globals;
                 return null;
+            } else if (cmd == "unit_get_name") {
+                return ((RuntimeUnit)Handle.Unbox(args[1])).name;
             } else if (cmd == "rel_pkg") {
-                bool auto = ((string)args[1]) != "";
+                bool auto = (bool)args[1];
                 STable pkg = args[2] == null ? null : (STable)Handle.Unbox(args[2]);
                 RuntimeUnit c = currentUnit;
                 for (int i = 3; i < args.Length; i++) {
@@ -5012,18 +5016,38 @@ dynamic:
                 if (Kernel.currentGlobals.TryGetValue(hkey, out b)) {
                     if (!b.v.rw && !b.v.Fetch().IsDefined()) {
                         return new object[] {
-                            new Handle(b.v.Fetch().mo), "1"
+                            new Handle(b.v.Fetch().mo), true
                         };
                     } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
                         return new object[] {
-                            new Handle(b.v.Fetch().GetSlot("info")), ""
+                            new Handle(b.v.Fetch().GetSlot("info")), false
                         };
                     } else return null;
                 } else {
                     return null;
                 }
-            } else if (cmd == "sub_new") {
-                return null;
+            } else if (cmd == "create_sub") {
+                string name = (string)args[1];
+                SubInfo outer = (SubInfo)Handle.Unbox(args[2]);
+                string cls = (string)args[3];
+                STable pkg = (STable)Handle.Unbox(args[4]);
+                bool once = (bool)args[5];
+
+                // this happens before lexicals are created, so we can't
+                // use lexicals.
+                STable rcls = (cls == "Sub") ? Kernel.SubMO :
+                    (cls == "Routine") ? Kernel.RoutineMO :
+                    (cls == "Method") ? Kernel.MethodMO :
+                    (cls == "Submethod") ? Kernel.SubmethodMO :
+                    (cls == "WhateverCode") ? Kernel.WhateverCodeMO :
+                    (cls == "Block") ? Kernel.BlockMO :
+                    (cls == "Code") ? Kernel.CodeMO : null;
+
+                if (rcls == null)
+                    return new Exception("sub-class lookup fail for " + cls);
+
+                return new Handle(new SubInfo(currentUnit, name, outer,
+                            rcls, pkg, once));
             } else if (cmd == "post_save") {
                 CLRBackend.Main(new string[] { (string)args[1],
                         (string)args[2], (string)args[3], (string)args[4] });

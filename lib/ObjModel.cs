@@ -435,6 +435,7 @@ next_method: ;
                 mro[0] = stable;
                 FillClass(slots, new STable[] { parent }, mro);
             }
+            Invalidate();
         }
 
         public void FillSubset(STable super) {
@@ -703,7 +704,7 @@ next_method: ;
             mo.AddAttribute(name, flags, init, type);
         }
 
-        public void FillProtoClass(STable parent, string[] slots) {
+        public void FillProtoClass(STable parent, params string[] slots) {
             mo.FillProtoClass(parent, slots);
         }
 

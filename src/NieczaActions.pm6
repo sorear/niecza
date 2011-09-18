@@ -569,7 +569,7 @@ method metachar:unsp ($/) { make ::RxOp::Sequence.new }
 
 method metachar:sym<{ }> ($/) {
     $/.CURSOR.trymop({
-        $<embeddedblock>.ast.signature = Sig.simple('$¢');
+        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
         $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
     });
 
@@ -806,7 +806,7 @@ method assertion:sym<!> ($/) {
 
 method assertion:sym<{ }> ($/) {
     $/.CURSOR.trymop({
-        $<embeddedblock>.ast.signature = Sig.simple('$¢');
+        $<embeddedblock>.set_signature(Sig.simple('$¢'));
         $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
     });
 
@@ -1514,8 +1514,8 @@ method whatever_postcheck($/, $st, $term) {
             in_class => $*CURLEX<!sub>.in_class,
             cur_pkg => $*CURLEX<!sub>.cur_pkg);
 
-        $body.signature = ::GLOBAL::Sig.new(params => [
-            map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]);
+        $body.set_signature(::GLOBAL::Sig.new(params => [
+            map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]));
         $body.add_my_name($_, :noinit) for @$st;
 
         $*CURLEX<!sub>.add_child($body);
@@ -1927,7 +1927,7 @@ method signature($/) {
         my $sig = Sig.new(params => [ ::Sig::Parameter.new(
                 name => ~$<param_var>, |$<param_var>.ast,
                 full_parcel => True) ]);
-        $*CURLEX<!sub>.signature = $sig if $*SIGNUM;
+        $*CURLEX<!sub>.set_signature($sig) if $*SIGNUM;
         make $sig;
         return;
     }
@@ -1971,7 +1971,7 @@ method signature($/) {
     }
 
     my $sig = Sig.new(params => @p);
-    $*CURLEX<!sub>.signature = $sig if $*SIGNUM;
+    $*CURLEX<!sub>.set_signature($sig) if $*SIGNUM;
     make $sig;
 }
 
@@ -2151,7 +2151,7 @@ method blockoid($/) {
 method lambda($/) {}
 method embeddedblock($/) {
     $*CURLEX<!sub>.code = $<statementlist>.ast;
-    $*CURLEX<!sub>.signature = Sig.simple();
+    $*CURLEX<!sub>.set_signature(Sig.simple());
     make $*CURLEX<!sub>;
 }
 
@@ -2272,10 +2272,10 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         name       => $name,
         cur_pkg    => $*CURLEX<!sub>.cur_pkg,
         class      => 'Method',
-        signature  => Sig.simple('self'),
         code       => ::Op::GetSlot.new(name => $name,
             object => ::Op::Lexical.new(name => 'self')));
     $nb.add_my_name('self', noinit => True);
+    $nb.set_signature(Sig.simple('self'));
     $*CURLEX<!sub>.create_static_pad; # for protosub instance
     $nb.strong_used = True;
     $*CURLEX<!sub>.add_child($nb);
@@ -2549,7 +2549,6 @@ method type_declarator:enum ($/) {
                 name       => $obj.name ~ '.enums',
                 cur_pkg    => $*CURLEX<!sub>.cur_pkg,
                 class      => 'Method',
-                signature  => Sig.simple('self'),
                 code       => self.init_constant(
                     self.make_constant($/, 'anon', Any),
                     ::Op::CallMethod.new(name => 'new',
@@ -2557,6 +2556,7 @@ method type_declarator:enum ($/) {
 
             my $nbvar = self.gensym;
             $nb.add_my_name('self', noinit => True);
+            $nb.set_signature(Sig.simple('self'));
             $*CURLEX<!sub>.create_static_pad;
             $nb.strong_used = True;
             $*CURLEX<!sub>.add_child($nb);
@@ -2639,7 +2639,7 @@ method process_block_traits($/, @tr) {
             $sub.outer.lexicals-used{$sub.outervar} = True
                 if defined $sub.outervar;
         } elsif !$pack && $tr<nobinder> {
-            $sub.signature = Any;
+            $sub.set_signature(Any);
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
             my $rel = $tr.keys.[0];
             my $to  = $tr.values.[0];
@@ -2725,7 +2725,7 @@ method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
         ltm => $ltm,
         in_class => $*CURLEX<!sub>.in_class,
         cur_pkg => $*CURLEX<!sub>.cur_pkg);
-    $n.signature = Sig.simple(@$params);
+    $n.set_signature(Sig.simple(@$params));
     $n.add_my_name($_, :noinit) for @$params;
     $*CURLEX<!sub>.add_child($n);
     $n;
@@ -3061,7 +3061,7 @@ method open_package_def($, $/ = $*cursor) {
     } else {
         my $type = %_decl2mclass{$*PKGDECL};
         if ($*PKGDECL//'role') eq 'role' && $<signature> {
-            $sub.signature = $<signature>.ast;
+            $sub.set_signature($<signature>.ast);
             $type = ::Metamodel::ParametricRole;
         }
 
@@ -3374,7 +3374,7 @@ method routine_def_2 ($, $/ = $*cursor) {
     if $<multisig> > 1 {
         $/.CURSOR.sorry("You may only use *one* signature");
     }
-    $*CURLEX<!sub>.signature = $<multisig> ?? $<multisig>[0].ast !! Any;
+    $*CURLEX<!sub>.set_signature($<multisig> ?? $<multisig>[0].ast !! Any);
     self.process_block_traits($/, $<trait>);
 }
 
@@ -3401,7 +3401,7 @@ method method_def_2 ($, $/ = $*cursor) {
     if $<multisig> > 1 {
         $/.CURSOR.sorry("You may only use *one* signature");
     }
-    $*CURLEX<!sub>.signature = $<multisig> ?? $<multisig>[0].ast !! Any;
+    $*CURLEX<!sub>.set_signature(<multisig> ?? $<multisig>[0].ast !! Any);
     self.process_block_traits($/, $<trait>);
 }
 
@@ -3469,7 +3469,7 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
         $sub.lexicals.<$_> // $sub.add_my_name('$_');
         $sub.lexicals.<$_>.noinit   = True;
         $sub.lexicals.<$_>.defouter = False;
-        $sub.signature = Sig.simple('$_');
+        $sub.set_signature(Sig.simple('$_'));
     }
     $*CURLEX<!sub>.create_static_pad if $csp;
     make ::Op::StatementList.new;
