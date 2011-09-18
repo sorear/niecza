@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
@@ -202,6 +203,9 @@ namespace Niecza {
         public string name, filename, modtime;
         public Dictionary<string, StashEnt> globals;
 
+        // used during construction only
+        public TypeBuilder newType;
+
         public Type type;
         public byte[] heap;
         public RuntimeUnit[] depends;
@@ -247,6 +251,10 @@ namespace Niecza {
             this.globals = new Dictionary<string,StashEnt>();
             if (name == "CORE")
                 Kernel.CreateBasicTypes();
+        }
+
+        public FieldInfo NewField(string name, Type ty) {
+            return null; // TODO implement this
         }
 
         public RuntimeUnit(string name, Type type, byte[] heap,
@@ -510,23 +518,23 @@ namespace Niecza {
             if (TraceLoad)
                 Console.WriteLine("Installing sub {0} \"{1}\" from {2:X}", ix, ns.name, _ifrom);
 
-            int dylexc = ReadInt(ref from);
-            ns.dylex = new Dictionary<string,LexInfo>();
+            //int dylexc = ReadInt(ref from);
+            //ns.dylex = new Dictionary<string,LexInfo>();
 
             LexInfo li = null;
-            for (int i = 0; i < dylexc; i++) {
-                string name = ReadStr(ref from);
-                ns.dylex_filter |= SubInfo.FilterForName(name);
-                switch (heap[from++]) {
-                    case 0: li = new LISlot(ReadInt(ref from)); break;
-                    case 1: li = new LIField(lex_fields[ReadStr(ref from)]); break;
-                    case 2: li = new LIBField(lex_fields[ReadStr(ref from)]); break;
-                    case 3: li = new LIAlias(ReadStr(ref from)); break;
-                    case 4: li = new LIPackage((STable)ReadXref(ref from)); break;
-                    default: throw new ArgumentException("dylex typecode");
-                }
-                ns.dylex[name] = li;
-            }
+            //for (int i = 0; i < dylexc; i++) {
+            //    string name = ReadStr(ref from);
+            //    ns.dylex_filter |= SubInfo.FilterForName(name);
+            //    switch (heap[from++]) {
+            //        //case 0: li = new LISlot(ReadInt(ref from)); break;
+            //        //case 1: li = new LIField(lex_fields[ReadStr(ref from)]); break;
+            //        //case 2: li = new LIBField(lex_fields[ReadStr(ref from)]); break;
+            //        //case 3: li = new LIAlias(ReadStr(ref from)); break;
+            //        //case 4: li = new LIPackage((STable)ReadXref(ref from)); break;
+            //        default: throw new ArgumentException("dylex typecode");
+            //    }
+            //    //ns.dylex[name] = li;
+            //}
 
             SubInfo sc = ns.outer;
             for (ns.outer_topic_rank = 1; sc != null; sc = sc.outer) {
@@ -534,11 +542,11 @@ namespace Niecza {
                     break;
                 ns.outer_topic_rank++;
             }
-            ns.outer_topic_key = (li is LISlot) ? (li as LISlot).slot : -1;
-            ns.self_key = -1;
-            if (ns.dylex != null && ns.dylex.TryGetValue("self", out li) &&
-                    li is LISlot)
-                ns.self_key = (li as LISlot).slot;
+            //ns.outer_topic_key = (li is LISlot) ? (li as LISlot).slot : -1;
+            //ns.self_key = -1;
+            //if (ns.dylex != null && ns.dylex.TryGetValue("self", out li) &&
+            //        li is LISlot)
+            //    ns.self_key = (li as LISlot).slot;
             //Console.WriteLine("{0} {1} {2}", name, outer_topic_rank, outer_topic_key);
             xref[ix] = ns;
             ns.xref_no = ix;
@@ -747,45 +755,98 @@ namespace Niecza {
     }
 
     public abstract class LexInfo {
+        public SubInfo owner;
+        public string name;
+        public string file;
+        public int line;
+        public int pos;
+
         public abstract object Get(Frame f);
         public virtual void Set(Frame f, object to) {
             throw new NieczaException("Variable cannot be bound");
         }
+        // names that are forced to dynamism for quick access
+        public static bool IsDynamicName(string name) {
+            if (name == "$_" || name == "$/" || name == "$!") return true;
+            if (name.Length < 2) return false;
+            if (name[0] == '*' || name[0] == '?') return true;
+            if (name[1] == '*' || name[1] == '?') return true;
+            return false;
+        }
+        public virtual void BindFields() {}
     }
 
-    public class LISlot : LexInfo {
-        public readonly int slot;
-        public LISlot(int slot) { this.slot = slot; }
-        public override object Get(Frame f) { return f.GetDynamic(slot); }
-        public override void Set(Frame f, object to) { f.SetDynamic(slot,to); }
-    }
+    public abstract class LIVarish : LexInfo {
+        public int index;
+        public FieldInfo stg;
+        bool once;
 
-    public class LIField : LexInfo {
-        FieldInfo fi;
-        public LIField(FieldInfo fi) { this.fi = fi; }
-        public override object Get(Frame f) { return fi.GetValue(null); }
-        public override void Set(Frame f, object to) { fi.SetValue(null, to); }
-    }
+        public LIVarish(bool once) { this.once = once; }
+        public LIVarish() { }
 
-    public class LIBField : LexInfo {
-        FieldInfo fi;
-        public LIBField(FieldInfo fi) { this.fi = fi; }
+        public override void BindFields() {
+            if (!once && (IsDynamicName(name) ||
+                        (owner.special & RuntimeUnit.SUB_RUN_ONCE) == 0)) {
+                index = owner.num_lex_slots++;
+            } else {
+                index = -1;
+                stg = owner.unit.NewField('L' + owner.name + '_' + name,
+                        typeof(StashEnt));
+            }
+        }
+
         public override object Get(Frame f) {
-            return ((BValue)fi.GetValue(null)).v;
+            return index >= 0 ? f.GetDynamic(index) :
+                ((StashEnt)stg.GetValue(null)).v;
         }
+
         public override void Set(Frame f, object to) {
-            ((BValue)fi.GetValue(null)).v = (Variable)to;
+            if (index >= 0)
+                f.SetDynamic(index, to);
+            else
+                ((StashEnt)stg.GetValue(null)).v = (Variable)to;
         }
     }
+
+    public class LICommon : LIVarish {
+        public LICommon() : base(true) { }
+    }
+
+    public class LIHint : LIVarish {
+        public LIHint() : base(true) { }
+    }
+
+    public class LISub : LIVarish {
+        SubInfo def;
+        public LISub(SubInfo def) { this.def = def; }
+    }
+
+    public class LISimple : LIVarish {
+        public const int NOINIT = 1;
+        public const int ROINIT = 2;
+        public const int DEFOUTER = 4;
+        public const int LIST = 8;
+        public const int HASH = 16;
+
+        int flags;
+        STable type;
+        public LISimple(int flags, STable type) {
+            this.flags = flags;
+            this.type  = type;
+        }
+    }
+
+    public class LILabel : LIVarish { }
+    public class LIDispatch : LIVarish { }
 
     public class LIAlias : LexInfo {
-        string name;
-        public LIAlias(string name) { this.name = name; }
+        string toName;
+        public LIAlias(string toName) { this.toName = toName; }
         object Common(Frame f, bool set, object to) {
             Frame cr = f;
             LexInfo li = null;
             while (cr.info.dylex == null ||
-                    !cr.info.dylex.TryGetValue(name, out li))
+                    !cr.info.dylex.TryGetValue(toName, out li))
                 cr = cr.outer;
             if (!set) return li.Get(cr);
             else { li.Set(cr, to); return null; }
@@ -838,6 +899,15 @@ namespace Niecza {
         public int outer_topic_key;
         public int self_key;
         public SubInfo catch_, control;
+        public class UsedInScopeInfo {
+            public string file;
+            public int line;
+            public int levels;
+            public string orig_file;
+            public int orig_line;
+        }
+        public Dictionary<string,UsedInScopeInfo> used_in_scope;
+        public int num_lex_slots;
 
         // Used for closing runtime-generated SubInfo over values used
         // For vtable wrappers: 0 = unboxed, 1 = boxed
@@ -1290,7 +1360,10 @@ noparams:
                     break;
                 outer_topic_rank++;
             }
-            outer_topic_key = (li is LISlot) ? (li as LISlot).slot : -1;
+            outer_topic_key = (li is LIVarish) ? (li as LIVarish).index : -1;
+
+            used_in_scope = new Dictionary<string,UsedInScopeInfo>();
+            dylex = new Dictionary<string,LexInfo>();
 
             if (once) special |= RuntimeUnit.SUB_RUN_ONCE;
         }

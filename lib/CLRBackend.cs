@@ -4962,6 +4962,30 @@ dynamic:
             get { return Call((object[]) i); }
         }
         static bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
+
+        object AddLexical(object[] args, LexInfo li) {
+            li.owner = (SubInfo)Handle.Unbox(args[1]);
+            li.name  = (string)args[2];
+            li.file  = (string)args[3];
+            li.line  = (int)   args[4];
+            li.pos   = (int)   args[5];
+
+            LexInfo other;
+
+            if (li.owner.dylex.TryGetValue(li.name, out other))
+                return new object[] { "collision", li.name, li.file, li.line,
+                    other.file, other.line };
+            SubInfo.UsedInScopeInfo uisi;
+            if (li.name != "$_" && li.owner.used_in_scope.TryGetValue(li.name, out uisi)) // $_ HACK
+                return new object[] { "already-bound", li.name, uisi.levels,
+                    uisi.line, li.file, li.line, uisi.orig_file, uisi.orig_line };
+            li.owner.dylex[li.name] = li;
+            li.owner.dylex_filter |= SubInfo.FilterForName(li.name);
+            li.BindFields();
+
+            return new object[] { "" };
+        }
+
         object Call(object[] args) {
             if (TraceDown) {
                 Console.WriteLine(args.Length);
@@ -5048,6 +5072,11 @@ dynamic:
 
                 return new Handle(new SubInfo(currentUnit, name, outer,
                             rcls, pkg, once));
+            } else if (cmd == "add_my_name") {
+                STable  type  = (STable)Handle.Unbox(args[6]);
+                int     flags = (int)   args[7];
+
+                return AddLexical(args, new LISimple(flags, type));
             } else if (cmd == "post_save") {
                 CLRBackend.Main(new string[] { (string)args[1],
                         (string)args[2], (string)args[3], (string)args[4] });

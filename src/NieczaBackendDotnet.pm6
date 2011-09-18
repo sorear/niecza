@@ -1,6 +1,7 @@
 class NieczaBackendDotnet;
 
 use NAMOutput;
+use Metamodel;
 
 has $.safemode = False;
 has $.obj_dir;
@@ -122,12 +123,37 @@ class StaticSub {
         downcall("set_signature", $!peer, @args);
     }
 
+    # TODO: prevent foo; sub foo { } from warning undefined
+    # needs a %*MYSTERY check when evaluating unused variables
+    method _addlex_result(*@args) {
+        given @args[0] {
+            when 'collision' {
+                my ($ , $slot, $nf,$nl,$of,$ol) = @args;
+                my $l = Metamodel.locstr($of, $ol, $nf, $nl);
+                if $slot ~~ /^\w/ {
+                    die "Illegal redeclaration of symbol '$slot'$l";
+                } elsif $slot ~~ /^\&/ {
+                    die "Illegal redeclaration of routine '$slot.substr(1)'$l";
+                } else {
+                    $*worry.("Useless redeclaration of variable $slot$l");
+                }
+            }
+            when 'already-bound' {
+                my ($ , $slot, $count, $line, $nf,$nl,$of,$ol) = @args;
+                my $truename = $slot;
+                $truename ~~ s/<?before \w>/OUTER::/ for ^$count;
+                die "Lexical symbol '$slot' is already bound to an outer symbol{Metamodel.locstr($of, $ol, $nf, $nl)};\n  the implicit outer binding at line $line must be rewritten as $truename\n  before you can unambiguously declare a new '$slot' in this scope";
+            }
+        }
+    }
+
     method add_my_name($name, :$file, :$line, :$pos, :$noinit, :$defouter,
             :$roinit, :$list, :$hash, :$typeconstraint) {
-        downcall("add_my_name", $!peer, ~$name, ~($file//''), ~($line//0), ~($pos//0),
+        self._addlex_result(downcall("add_my_name", $!peer, ~$name,
+            ~($file//''), +($line//0), +($pos//0),
             $typeconstraint && $typeconstraint.peer,
             ($noinit ?? 1 !! 0) + ($roinit ?? 2 !! 0) + ($defouter ?? 4 !! 0) +
-            ($list ?? 8 !! 0) + ($hash ?? 16 !! 0));
+            ($list ?? 8 !! 0) + ($hash ?? 16 !! 0)));
     }
     method add_hint($name, :$file, :$line, :$pos) {
         downcall("add_hint", $!peer, ~$name, ~($file//''), ~($line//0), ~($pos//0));
