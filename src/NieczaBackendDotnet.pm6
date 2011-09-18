@@ -1,6 +1,8 @@
 class NieczaBackendDotnet;
 
 use NAMOutput;
+use JSYNC;
+use NieczaPassSimplifier;
 use Metamodel;
 
 has $.safemode = False;
@@ -55,28 +57,20 @@ sub downcall(*@args) {
     Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.DownCall {@args}) }
 }
 
-method accept($unitname, $ast is rw, :$main, :$run, :$evalmode, :$repl) {
+method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not used
     downcall("safemode") if $.safemode;
     if $run {
         downcall("setnames", $*PROGRAM_NAME // '???',
             $*orig_file // '(eval)') unless $repl;
-        my $nam = NAMOutput.run($ast);
-        $ast.clear_optrees;
-        my ($exn) = downcall(($evalmode ?? "evalnam" !! "runnam"), $.obj_dir, $nam, @$.run_args);
-        die $exn if $exn;
+        downcall("run_unit", $unit.peer, ?$evalmode, @$!run_args);
         if $repl {
-            my ($exn) = downcall("replrun");
-            die $exn if $exn;
+            downcall("replrun");
         }
-        $*repl_outer = $ast.mainline.xref if $repl;
-        $ast = Any;
+        $*repl_outer = $unit.get_mainline if $repl;
         return;
     }
-    self.save_unit($unitname, $ast);
-    $ast.clear_optrees;
-    self.post_save($unitname, :$main);
-    $*repl_outer = $ast.mainline.xref if $repl;
-    $ast = Any;
+    downcall("save_unit", $unit.peer, ?$main);
+    $*repl_outer = $unit.get_mainline if $repl;
 }
 
 method post_save($name, :$main) {
@@ -197,6 +191,11 @@ class StaticSub {
         self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
             ~($file//''), +($line//0), +($pos// -1), $body.peer));
     }
+
+    method finish($ops) { 
+        $ops := NieczaPassSimplifier.invoke_incr(self, $ops);
+        downcall("sub_finish", $!peer, to-json($ops.cgop(self)));
+    }
 }
 
 class Type {
@@ -231,6 +230,6 @@ class Unit {
     }
 }
 
-method create_unit($name, $filename, $modtime) {
-    Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime));
+method create_unit($name, $filename, $modtime, $run) {
+    Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime, ?$run));
 }

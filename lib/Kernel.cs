@@ -246,7 +246,8 @@ namespace Niecza {
             heapreg[name] = heap;
         }
 
-        public RuntimeUnit(string name, string filename, string modtime) {
+        public RuntimeUnit(string name, string filename, string modtime,
+                bool nosave) {
             this.name = name;
             this.filename = filename;
             this.modtime = modtime;

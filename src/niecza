@@ -248,6 +248,11 @@ method add_placeholder($name) {
 }
 
 augment class NieczaActions {
+method comp_unit($/) {
+    $*CURLEX{'!sub'}.finish($<statementlist>.ast);
+
+    make $*unit;
+}
 
 method process_name($/, :$declaring, :$defer, :$clean) {
     return () unless defined $/;

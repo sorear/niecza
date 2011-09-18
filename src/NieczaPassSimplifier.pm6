@@ -10,6 +10,10 @@ method invoke($*unit) {
     $*unit
 }
 
+method invoke_incr($sub, $ops) {
+    run_optree($sub, $ops, 1);
+}
+
 sub no_named_params($op) {
     if defined $op.args {
         for @( $op.args ) -> $a {

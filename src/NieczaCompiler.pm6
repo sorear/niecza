@@ -26,32 +26,23 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
     my $*in_repl = $repl;
     my @*INC;
 
-    my $ast;
-    my @steps = (
-        $.frontend.typename => { $ast = $.frontend.parse(:$unitname,
-            :$filename, :$modtime, :$source, :$outer); },
-        (map -> $st { $st.typename => { $ast = $st.invoke($ast) } }, @$.stages),
-        $.backend.typename => { %.units{$unitname} = $ast; $.backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl) },
-    );
+    my $start = times[0] - $!discount-time;
 
-    my $allstart = times[0] - $!discount-time;
-    for @steps -> $step {
-        my $start = times[0] - $!discount-time;
-        $step.value.();
-        my $time = times[0] - $!discount-time - $start;
+    my $ast = $!frontend.parse(:$run, :$unitname, :$filename, :$modtime,
+        :$source, :$outer);
 
-        if $.verbose {
-            say "$unitname: $step.key() took $time";
-        }
+    %!units{$unitname} = $ast;
 
-        if $end eq $step.key {
-            say to-jsync($ast);
-            last;
-        }
+    $!backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl);
+
+    my $time = times[0] - $!discount-time - $start;
+
+    if $.verbose {
+        say "$unitname: took $time";
     }
-    my $alltime = times[0] - $!discount-time - $allstart;
+
     # don't count this time towards any other timing in progress
-    $!discount-time += $alltime;
+    $!discount-time += $time;
 }
 
 method compile_module($module, $stop = "") {

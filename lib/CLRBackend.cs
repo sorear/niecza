@@ -5000,7 +5000,7 @@ dynamic:
                 return null;
             } else if (cmd == "new_unit") {
                 return new Handle(new RuntimeUnit((string)args[1],
-                        (string)args[2], (string)args[3]));
+                        (string)args[2], (string)args[3], (bool)args[4]));
             } else if (cmd == "set_current_unit") {
                 currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = currentUnit.globals;
@@ -5199,6 +5199,11 @@ dynamic:
                 }
                 tgt.sig_i = sig_i.ToArray();
                 tgt.sig_r = sig_r.ToArray();
+                return null;
+            } else if (cmd == "sub_finish") {
+                // TODO: do something here
+                return null;
+            } else if (cmd == "run_unit") {
                 return null;
             } else if (cmd == "post_save") {
                 CLRBackend.Main(new string[] { (string)args[1],
