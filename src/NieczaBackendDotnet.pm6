@@ -86,17 +86,21 @@ method post_save($name, :$main) {
         $main ?? "1" !! "0");
 }
 
+class Unit { ... }
+class StaticSub { ... }
+class Type { ... }
+
 class StaticSub {
     has $.peer;
     method lex_names() { downcall("lex_names", $!peer) }
-    method unit() { downcall("sub_get_unit", $!peer) }
+    method unit() { Unit.new(peer => downcall("sub_get_unit", $!peer)) }
     method set_signature($sig) {
         my @args;
         if !$sig {
             downcall("sub_no_signature", $!peer);
             return;
         }
-        for $sig.params {
+        for @( $sig.params ) {
             my $flags = 0;
             # keep synced with SIG_F_ constants
             if .rwtrans       { $flags +|= 8 }

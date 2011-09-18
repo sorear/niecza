@@ -4981,6 +4981,8 @@ dynamic:
                     uisi.line, li.file, li.line, uisi.orig_file, uisi.orig_line };
             li.owner.dylex[li.name] = li;
             li.owner.dylex_filter |= SubInfo.FilterForName(li.name);
+            if (li.name == "self")
+                li.owner.self_key = li.SigIndex();
             li.BindFields();
 
             return new object[] { "" };
@@ -5003,6 +5005,17 @@ dynamic:
                 currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = currentUnit.globals;
                 return null;
+            } else if (cmd == "set_mainline") {
+                currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
+                currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
+                return null;
+            } else if (cmd == "sub_get_unit") {
+                return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
+            } else if (cmd == "lex_names") {
+                List<object> ret = new List<object>();
+                foreach (string k in ((SubInfo)Handle.Unbox(args[1])).dylex.Keys)
+                    ret.Add(k);
+                return ret.ToArray();
             } else if (cmd == "unit_get_name") {
                 return ((RuntimeUnit)Handle.Unbox(args[1])).name;
             } else if (cmd == "rel_pkg") {
@@ -5117,6 +5130,39 @@ dynamic:
                 SubInfo body  = (SubInfo)Handle.Unbox(args[6]);
 
                 return AddLexical(args, new LISub(body));
+            } else if (cmd == "sub_no_signature") {
+                SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
+                tgt.sig_i = null;
+                tgt.sig_r = null;
+                return null;
+            } else if (cmd == "set_signature") {
+                SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
+                int ix = 2;
+                List<int> sig_i = new List<int>();
+                List<object> sig_r = new List<object>();
+                while (ix != args.Length) {
+                    int    flags = (int)   args[ix++];
+                    string name  = (string)args[ix++];
+                    string slot  = (string)args[ix++];
+                    sig_r.Add(name);
+                    int nnames = 0;
+                    while(true) {
+                        string a_name = (string)args[ix++];
+                        if (a_name == null) break;
+                        nnames++;
+                        sig_r.Add(a_name);
+                    }
+                    SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
+                    STable  type  = (STable)Handle.Unbox(args[ix++]);
+                    if (deflt != null) sig_r.Add(deflt);
+                    if (type != null) sig_r.Add(type);
+                    sig_i.Add(flags);
+                    sig_i.Add(slot == null ? -1 : tgt.dylex[slot].SigIndex());
+                    sig_i.Add(nnames);
+                }
+                tgt.sig_i = sig_i.ToArray();
+                tgt.sig_r = sig_r.ToArray();
+                return null;
             } else if (cmd == "post_save") {
                 CLRBackend.Main(new string[] { (string)args[1],
                         (string)args[2], (string)args[3], (string)args[4] });

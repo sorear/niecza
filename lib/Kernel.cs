@@ -202,6 +202,7 @@ namespace Niecza {
 
         public string name, filename, modtime;
         public Dictionary<string, StashEnt> globals;
+        public SubInfo mainline, bottom;
 
         // used during construction only
         public TypeBuilder newType;
@@ -826,6 +827,7 @@ namespace Niecza {
             return false;
         }
         public virtual void BindFields() {}
+        public virtual int SigIndex() { return -1; }
     }
 
     public abstract class LIVarish : LexInfo {
@@ -836,6 +838,7 @@ namespace Niecza {
         public LIVarish(bool once) { this.once = once; }
         public LIVarish() { }
 
+        public override int SigIndex() { return index; }
         public override void BindFields() {
             if (!once && (IsDynamicName(name) ||
                         (owner.special & RuntimeUnit.SUB_RUN_ONCE) == 0)) {
