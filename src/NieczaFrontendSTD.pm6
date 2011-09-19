@@ -200,7 +200,7 @@ augment class Cursor {
 has $.lang;
 has $.safemode;
 
-method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run) {
+method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main) {
 
     my $*SAFEMODE    = $.safemode;
     my $*UNITNAME    = $unitname;
@@ -243,7 +243,7 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run) {
     my $*UNIT;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
-    my $*unit = $*backend.create_unit($unitname, $filename, $modtime, $run);
+    my $*unit = $*backend.create_unit($unitname, $filename, $modtime, $main, $run);
     %*units{$unitname} = $*unit;
     $*unit.set_current;
     my $*settingref = $*niecza_outer_ref ||

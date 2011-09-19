@@ -230,6 +230,7 @@ class Unit {
     }
 }
 
-method create_unit($name, $filename, $modtime, $run) {
-    Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime, ?$run));
+method create_unit($name, $filename, $modtime, $main, $run) {
+    Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime,
+            ~$!obj_dir, ?$main, ?$run));
 }

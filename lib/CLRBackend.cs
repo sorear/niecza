@@ -252,8 +252,8 @@ namespace Niecza.CLRBackend {
             if (ismain) return;
             string dname = name.Replace("::",".");
 
-            clrAssembly = Assembly.LoadFile(Path.Combine(
-                        CLRBackend.Current.dir, dname + ".dll"));
+            //clrAssembly = Assembly.LoadFile(Path.Combine(
+            //            CLRBackend.Current.dir, dname + ".dll"));
             clrType = clrAssembly.GetType(dname);
             Dictionary<string,FieldInfo> df =
                 new Dictionary<string,FieldInfo>();
@@ -995,7 +995,7 @@ namespace Niecza.CLRBackend {
         ClrOp GetProtoFrame() {
             if (owner.protopad != null)
                 return new ClrGetSField(owner.protopad);
-            StaticSub rs = CLRBackend.Current.unit.mainline_ref.Resolve<StaticSub>();
+            StaticSub rs = null;//CLRBackend.Current.unit.mainline_ref.Resolve<StaticSub>();
             ClrOp r = new ClrGetSField(rs.protopad);
             while (rs != owner) {
                 rs = rs.outer.Resolve<StaticSub>();
@@ -1175,13 +1175,11 @@ namespace Niecza.CLRBackend {
 
         public void EmitDataArray(Type ty, int ct, byte[] vec) {
             EmitInt(ct);
-            if (CLRBackend.Current.dynamic)
-                throw new Exception("cannot EmitDataArray with dynamic assembly");
             // the mono JIT checks for this exact sequence
             il.Emit(OpCodes.Newarr, ty);
             if (vec.Length != 0) {
                 FieldBuilder fb = tb.DefineInitializedData(
-                        "A" + (CLRBackend.Current.nextarray++), vec, 0);
+                        "A" + (DowncallReceiver.currentUnit.nextid++), vec, 0);
                 il.Emit(OpCodes.Dup);
                 il.Emit(OpCodes.Ldtoken, fb);
                 il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
@@ -2711,7 +2709,7 @@ namespace Niecza.CLRBackend {
                 if (!effects_before_use || zyg[i].stmts.Length == 0) {
                     args.Add(zyg[i].head);
                 } else {
-                    string ln = "!spill" + (CLRBackend.Current.nextspill++);
+                    string ln = "!spill" + DowncallReceiver.currentUnit.nextid++;
                     args.Add(new ClrPeekLet(ln, zyg[i].head.Returns));
                     stmts.Add(new ClrPushLet(ln, zyg[i].head));
                     pop.Add(ln);
@@ -2795,9 +2793,9 @@ namespace Niecza.CLRBackend {
             Resultify(ref iftrue_s, ref iftrue_h);
             Resultify(ref iffalse_s, ref iffalse_h);
 
-            CLRBackend cb = CLRBackend.Current;
-            string l1 = "!else"  + (cb.nextlabel++);
-            string l2 = "!endif" + (cb.nextlabel++);
+            RuntimeUnit ru = DowncallReceiver.currentUnit;
+            string l1 = "!else"  + (ru.nextid++);
+            string l2 = "!endif" + (ru.nextid++);
 
             List<ClrOp> stmts = new List<ClrOp>();
             foreach (ClrOp c in cond.stmts)
@@ -2821,9 +2819,9 @@ namespace Niecza.CLRBackend {
 
         // this is simplified a bit since body is always void
         public static CpsOp While(bool until, bool once, CpsOp cond, CpsOp body) {
-            CLRBackend cb = CLRBackend.Current;
-            string l1 = "!again" + (cb.nextlabel++);
-            string l2 = "!check" + (cb.nextlabel++);
+            RuntimeUnit ru = DowncallReceiver.currentUnit;
+            string l1 = "!again" + (ru.nextid++);
+            string l2 = "!check" + (ru.nextid++);
 
             List<ClrOp> stmts = new List<ClrOp>();
 
@@ -3093,15 +3091,6 @@ namespace Niecza.CLRBackend {
             return new CpsOp(new ClrNewDataArray(ty, vec.Length, buf));
         }
 
-        public static CpsOp StringArray(bool omit, string[] vec) {
-            if (vec.Length == 0 && omit) {
-                return Null(typeof(string[]));
-            } else {
-                Unit u = CLRBackend.Current.unit;
-                return u.StringListConst(vec);
-            }
-        }
-
         public static CpsOp Widen(Type to, CpsOp z) {
             return new CpsOp(z.stmts, new ClrWiden(to, z.head));
         }
@@ -3111,11 +3100,11 @@ namespace Niecza.CLRBackend {
         public readonly TypeBuilder tb;
         public readonly MethodBuilder mb;
         public readonly CgContext cx;
-        public readonly CLRBackend module;
+        public readonly RuntimeUnit ru;
 
-        public CpsBuilder(CLRBackend module, string clrname, bool pub) {
-            this.module = module;
-            this.tb = module.tb;
+        public CpsBuilder(RuntimeUnit ru, string clrname, bool pub) {
+            this.ru = ru;
+            this.tb = ru.type_builder;
             mb = tb.DefineMethod(clrname, MethodAttributes.Static |
                     (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
@@ -3168,13 +3157,13 @@ namespace Niecza.CLRBackend {
     }
 
     class NamProcessor {
-        StaticSub sub;
+        SubInfo sub;
         public readonly CpsBuilder cpb;
         Dictionary<string, Type> let_types = new Dictionary<string, Type>();
         List<List<ClrEhSpan>> eh_stack = new List<List<ClrEhSpan>>();
         List<object[]> scope_stack = new List<object[]>();
 
-        public NamProcessor(CpsBuilder cpb, StaticSub sub) {
+        public NamProcessor(CpsBuilder cpb, SubInfo sub) {
             this.sub = sub;
             this.cpb = cpb;
         }
@@ -3221,27 +3210,27 @@ namespace Niecza.CLRBackend {
             if (!core && !proto && (r = CheckScopes(name, ref outer, set_to)) != null)
                 return r;
 
-            Lexical lex = ResolveLex(name, outer>0, out uplevel, core);
+            LexInfo lex = ResolveLex(name, outer>0, out uplevel, core);
 
             return CpsOp.LexAccess(lex, uplevel, proto,
                 set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
         }
 
-        Lexical ResolveLex(string name, bool upf, out int uplevel, bool core) {
+        LexInfo ResolveLex(string name, bool upf, out int uplevel, bool core) {
             uplevel = 0;
-            StaticSub csr = sub;
+            SubInfo csr = sub;
 
             if (upf) {
-                csr = csr.outer.Resolve<StaticSub>();
+                csr = csr.outer;
                 uplevel++;
             }
 
             while (true) {
-                Lexical r;
-                if ((!core || csr.IsCore()) &&
-                        csr.l_lexicals.TryGetValue(name, out r)) {
-                    if (r is LexAlias) {
-                        name = (r as LexAlias).to;
+                LexInfo r;
+                if ((!core || csr.unit.name == "CORE") &&
+                        csr.dylex.TryGetValue(name, out r)) {
+                    if (r is LIAlias) {
+                        name = (r as LIAlias).to;
                         continue;
                     } else {
                         return r;
@@ -3249,7 +3238,7 @@ namespace Niecza.CLRBackend {
                 }
                 if (csr.outer == null)
                     throw new Exception("Unable to find lexical " + name + " in " + sub.name);
-                csr = csr.outer.Resolve<StaticSub>();
+                csr = csr.outer;
                 uplevel++;
             }
         }
@@ -3260,9 +3249,9 @@ namespace Niecza.CLRBackend {
             string filter = prefix + ":";
             string pn = prefix + ":(!proto)";
 
-            for (StaticSub csr = sub; ; csr = csr.outer.Resolve<StaticSub>()) {
+            for (SubInfo csr = sub; ; csr = csr.outer) {
                 bool brk = false;
-                foreach (KeyValuePair<string,Lexical> kp in csr.lexicals) {
+                foreach (KeyValuePair<string,LexInfo> kp in csr.dylex) {
                     if (Utils.StartsWithInvariant(filter, kp.Key) &&
                             kp.Key != pn &&
                             !names.Contains(kp.Key)) {
@@ -3273,7 +3262,7 @@ namespace Niecza.CLRBackend {
                 }
                 if (csr.outer == null) break;
                 // don't go above nearest proto
-                if (csr.l_lexicals.ContainsKey(pn)) break;
+                if (csr.dylex.ContainsKey(pn)) break;
                 if (brk) cands.Add(CpsOp.Null(Tokens.P6any));
             }
 
@@ -4078,70 +4067,6 @@ dynamic:
             cpb.Build(Scan(WrapBody()));
         }
 
-        void EncodeSignature(StaticSub obj) {
-            if (obj.sig == null) {
-                obj.unit.EmitInt(-1);
-                return;
-            }
-
-            List<int> sig_i   = new List<int>();
-            List<object> sig_r = new List<object>();
-            object[] rsig = (object[]) obj.sig;
-            foreach (object p in rsig) {
-                object[] param = (object[]) p;
-                string   name  = JScalar.S(param[0]);
-                int      flags = JScalar.I(param[1]);
-                string   slot  = JScalar.S(param[2]);
-                string[] names = JScalar.SA(0, param[3]);
-                Xref     deflt = Xref.from(param[4]);
-                Xref     type  = Xref.from(param[5]);
-
-                sig_r.Add(name);
-                foreach (string n in names)
-                    sig_r.Add(n);
-                int ufl = 0;
-                if ((flags & 4) != 0) ufl |= SubInfo.SIG_F_RWTRANS;
-                else if ((flags & 64) != 0) ufl |= SubInfo.SIG_F_READWRITE;
-
-                if ((flags & 384) != 0) ufl |= SubInfo.SIG_F_BINDLIST;
-                if ((flags & 512) != 0) ufl |= SubInfo.SIG_F_DEFOUTER;
-                if ((flags & 1024) != 0) ufl |= SubInfo.SIG_F_INVOCANT;
-                if ((flags & 2048) != 0) ufl |= SubInfo.SIG_F_MULTI_IGNORED;
-                if ((flags & 4096) != 0) ufl |= SubInfo.SIG_F_IS_COPY;
-                if (deflt != null) {
-                    ufl |= SubInfo.SIG_F_HASDEFAULT;
-                    sig_r.Add(deflt);
-                }
-                if (type != null) {
-                    ufl |= SubInfo.SIG_F_HASTYPE;
-                    sig_r.Add(type);
-                }
-                if ((flags & 128) != 0) ufl |= SubInfo.SIG_F_IS_LIST;
-                if ((flags & 256) != 0) ufl |= SubInfo.SIG_F_IS_HASH;
-                if ((flags & 16) != 0) ufl |= SubInfo.SIG_F_OPTIONAL;
-                if ((flags & 32) != 0) ufl |= SubInfo.SIG_F_POSITIONAL;
-                if ((flags & 1) != 0 && (flags & 256) != 0)
-                    ufl |= SubInfo.SIG_F_SLURPY_NAM;
-                if ((flags & 1) != 0 && (flags & 256) == 0)
-                    ufl |= SubInfo.SIG_F_SLURPY_POS;
-                if ((flags & 2) != 0) ufl |= SubInfo.SIG_F_SLURPY_CAP;
-                if ((flags & 8) != 0) ufl |= SubInfo.SIG_F_SLURPY_PCL;
-                sig_i.Add(ufl);
-                sig_i.Add(slot == null ? -1 : ((LexVarish)obj.l_lexicals[slot]).index);
-                sig_i.Add(names.Length);
-            }
-            obj.unit.EmitIntArray(sig_i.ToArray());
-            obj.unit.EmitInt(sig_r.Count);
-            foreach (object o in sig_r) {
-                if (o is string) {
-                    obj.unit.EmitStr((string)o);
-                } else {
-                    obj.unit.EmitStr(null);
-                    obj.unit.EmitXref((Xref)o);
-                }
-            }
-        }
-
         public void SubInfoCtor(int ix, List<int> thaw) {
             thaw.Add(sub.unit.thaw_heap.Count);
             int spec = 0;
@@ -4191,9 +4116,9 @@ dynamic:
         void EnterCode(List<object> frags) {
             List<object> latefrags = new List<object>();
 
-            if (sub == sub.unit.mainline_ref.Resolve<StaticSub>() &&
+            if ((sub.special & RuntimeUnit.SUB_MAINLINE) != 0 &&
                     sub.unit.is_mainish) {
-                FieldInfo fi = CLRBackend.Current.tb.DefineField(
+                FieldInfo fi = cpb.tb.DefineField(
                         "RTFRAME", typeof(Frame),
                         FieldAttributes.Public | FieldAttributes.Static);
                 frags.Add(a(j("_cpsop"),
@@ -4203,19 +4128,18 @@ dynamic:
             // Lexpad setup: XXX should be done *before* entry, indeed
             // before the binder, so defaults work right
 
-            foreach (KeyValuePair<string,Lexical> kv in sub.lexicals) {
-                if ((sub.flags & StaticSub.RUN_ONCE) != 0)
+            foreach (KeyValuePair<string,Lexical> kv in sub.dylex) {
+                if ((sub.special & RuntimeUnit.SUB_RUN_ONCE) != 0)
                     continue; // we'll just use the static pad
 
-                if (kv.Value is LexSub) {
-                    LexSub ls = (LexSub) kv.Value;
+                if (kv.Value is LISub) {
+                    LISub ls = (LISub) kv.Value;
                     frags.Add(a(j("scopedlex"), j(kv.Key),
-                        a(j("newscalar"), a(j("_makesub"),
-                                ls.def.Resolve<StaticSub>()))));
-                } else if (kv.Value is LexSimple) {
-                    LexSimple ls = kv.Value as LexSimple;
+                        a(j("newscalar"), a(j("_makesub"), ls.body))));
+                } else if (kv.Value is LISimple) {
+                    LISimple ls = kv.Value as LISimple;
                     int f = ls.flags;
-                    if ((f & LexSimple.NOINIT) != 0) continue;
+                    if ((f & LISimple.NO_INIT) != 0) continue;
 
                     object bit;
                     CpsOp tc = ls.type == null ?
@@ -4277,123 +4201,13 @@ dynamic:
             }
         }
 
-        CpsOp FillParamRole() {
-            ParametricRole pr =
-                sub.parametric_role_hack.Resolve<ParametricRole>();
-            CpsOp mo = CpsOp.PeekLet("!mo", Tokens.STable);
-            CpsOp to = CpsOp.PeekLet("!to", Tokens.P6opaque);
-            CpsOp pa = CpsOp.PeekLet("!pa", Tokens.VarHash);
-
-            List<CpsOp> build = new List<CpsOp>();
-
-            CpsOp[] supers = new CpsOp[pr.superclasses.Length];
-            for (int i = 0; i < supers.Length; i++)
-                supers[i] = CpsOp.GetSField(pr.superclasses[i].Resolve<Package>().metaObject);
-            build.Add( CpsOp.MethodCall(Tokens.DMO_FillRole,
-                mo, CpsOp.NewArray(Tokens.STable, supers),
-                CpsOp.NewArray(Tokens.STable)) );
-
-            foreach (Method m in pr.methods) {
-                CpsOp name = (m.name != null) ? CpsOp.StringLiteral(m.name) :
-                    Scan(new object[] { new JScalar("obj_getstr"), m.cname });
-                CpsOp var  = RawAccessLex("scopedlex", m.var, null, false);
-
-                build.Add(CpsOp.MethodCall(Tokens.DMO_AddMethod,
-                    mo, CpsOp.IntLiteral(m.kind), name,
-                    CpsOp.MethodCall(Tokens.Variable_Fetch, var)));
-            }
-
-            foreach (Attribute a in pr.attributes) {
-                int flags = a.publ ? 1 : 0;
-                if (a.sigil == '@') flags += 2;
-                if (a.sigil == '%') flags += 4;
-                CpsOp name = CpsOp.StringLiteral(a.name);
-                CpsOp publ = CpsOp.IntLiteral(flags);
-                CpsOp init = a.ivar == null ? CpsOp.Null(Tokens.P6any) :
-                    RawAccessLex("scopedlex", a.ivar, null, false);
-                CpsOp type = a.type == null ?
-                    CpsOp.GetSField(Tokens.Kernel_AnyMO) :
-                    CpsOp.GetSField(a.type.Resolve<Package>().metaObject);
-                build.Add(CpsOp.MethodCall(Tokens.DMO_AddAttribute,
-                    mo, name, publ, init, type));
-            }
-
-            build.Add(CpsOp.MethodCall(Tokens.DMO_Invalidate, mo));
-            if (sub.sig != null) {
-                object[] rsig = (object[]) sub.sig;
-                foreach (object se in rsig) {
-                    string slot = JScalar.S( ((object[])se)[2] );
-                    if (slot != null)
-                        build.Add(CpsOp.MethodCall(Tokens.VarHash_set_Item, pa, CpsOp.StringLiteral(slot), RawAccessLex("scopedlex", slot, null, false)));
-                }
-            }
-
-            build.Add(RawAccessLex("scopedlex", "*params", pa, false));
-            build.Add(CpsOp.SetField(Tokens.P6opaque_slots, to,
-                        CpsOp.Null(typeof(object[]))));
-            build.Add(CpsOp.SetField(Tokens.DMO_typeObject, mo, to));
-            build.Add(CpsOp.SetField(Tokens.DMO_initObject, mo, to));
-            build.Add(CpsOp.SetField(Tokens.DMO_typeVar, mo, CpsOp.MethodCall(Tokens.Kernel_NewROScalar, to)));
-            build.Add(CpsOp.SetField(Tokens.DMO_initVar, mo, CpsOp.GetField(Tokens.DMO_typeVar, mo)));
-            build.Add(CpsOp.CpsReturn(CpsOp.GetField(Tokens.DMO_typeVar, mo)));
-
-            return CpsOp.Let("!mo", CpsOp.ConstructorCall(Tokens.DMO_ctor,
-                        CpsOp.StringLiteral(pr.name)),
-                    CpsOp.Let("!to", CpsOp.ConstructorCall(Tokens.P6opaque_ctor, mo),
-                        CpsOp.Let("!pa", CpsOp.ConstructorCall(Tokens.VarHash.GetConstructor(new Type[0])),
-                            CpsOp.Sequence(build.ToArray()))));
-        }
-
         object WrapBody() {
             object b = sub.body;
             List<object> enter = new List<object>();
             EnterCode(enter);
 
             // TODO: bind a ro container around return values
-            if ((sub.flags & StaticSub.GATHER_HACK) != 0) {
-                enter.Insert(0, new JScalar("prog"));
-                enter.Add(new object[] { new JScalar("sink"), b });
-                enter.Add(new object[] { new JScalar("sink"),
-                        new object[] { new JScalar("take"),
-                    new object[] { new JScalar("corelex"), new JScalar("EMPTY") } } });
-                enter.Add(new object[] { new JScalar("return") });
-                b = enter.ToArray();
-            } else if (sub.hint_hack != null) {
-                enter.Insert(0, new JScalar("prog"));
-                enter.Add(new object[] { new JScalar("_hintset"),
-                    sub.hint_hack[1], b });
-                enter.Add(new object[] { new JScalar("return") });
-                b = enter.ToArray();
-            } else if (sub.augment_hack != null) {
-                enter = new List<object>();
-                object[] tuples = (object[]) sub.augment_hack;
-                for (int i = 1; i < tuples.Length; i++) {
-                    object[] t = (object[]) tuples[i];
-                    string k1 = JScalar.S(t[0]);
-                    string k2 = JScalar.S(t[1]);
-                    int ik = (k2 == "normal") ? 0 : (k2 == "private") ? 1 : 2;
-                    ik += ((k1 == "only") ? 0 : (k1 == "proto") ? 4 : 8);
-                    enter.Add(new object[] {
-                        new JScalar( "_addmethod" ),
-                        new object[] { new JScalar("letvar"), new JScalar("!mo") },
-                        new JScalar(ik.ToString()),
-                        new object[] { new JScalar("str"), t[2] },
-                        new object[] { new JScalar("fetch"), new object[] { new JScalar("scopedlex"), t[3] } } });
-                }
-                enter.Add(new object[] { new JScalar("_invalidate"), new object[] { new JScalar("letvar"), new JScalar("!mo") } });
-                enter.Add(new object[] { new JScalar("return") });
-                enter.Insert(0, new JScalar("prog"));
-                object[] t0 = (object[]) tuples[0];
-                b = new object[] { new JScalar("letn"), new JScalar("!mo"),
-                    new object[] { new JScalar("class_ref"), new JScalar("mo"),
-                        t0[0], t0[1], t0[2] },
-                    enter.ToArray() };
-            } else if (sub.parametric_role_hack != null) {
-                enter.Insert(0, new JScalar("prog"));
-                enter.Add(new object[] { new JScalar("sink"), b });
-                enter.Add(new object[] { new JScalar("_parametricrole") });
-                b = enter.ToArray();
-            } else if ((sub.flags & StaticSub.RETURNABLE) != 0) {
+            if (sub.mo.HasMRO(Kernel.RoutineMO)) {
                 enter.Add(new object[] { new JScalar("return"),
                     new object[] { new JScalar("xspan"),
                         new JScalar("rstart"), new JScalar("rend"),
@@ -4956,7 +4770,7 @@ dynamic:
     }
 
     public class DowncallReceiver : CallReceiver {
-        [ThreadStatic] static RuntimeUnit currentUnit;
+        [ThreadStatic] internal static RuntimeUnit currentUnit;
         public override object this[object i] {
             set { }
             get { return Call((object[]) i); }
@@ -5000,7 +4814,8 @@ dynamic:
                 return null;
             } else if (cmd == "new_unit") {
                 return new Handle(new RuntimeUnit((string)args[1],
-                        (string)args[2], (string)args[3], (bool)args[4]));
+                        (string)args[2], (string)args[3], (string)args[4],
+                        (bool)args[5], (bool)args[6]));
             } else if (cmd == "set_current_unit") {
                 currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = currentUnit.globals;

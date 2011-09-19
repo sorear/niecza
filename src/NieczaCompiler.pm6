@@ -28,8 +28,8 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
 
     my $start = times[0] - $!discount-time;
 
-    my $ast = $!frontend.parse(:$run, :$unitname, :$filename, :$modtime,
-        :$source, :$outer);
+    my $ast = $!frontend.parse(:$unitname, :$filename, :$modtime,
+        :$source, :$outer, :$main, :$run);
 
     %!units{$unitname} = $ast;
 

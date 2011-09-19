@@ -200,12 +200,14 @@ namespace Niecza {
     public sealed class RuntimeUnit {
         static Dictionary<string, byte[]> heapreg;
 
-        public string name, filename, modtime;
+        public string name, filename, modtime, asm_name;
         public Dictionary<string, StashEnt> globals;
         public SubInfo mainline, bottom;
 
         // used during construction only
-        public TypeBuilder newType;
+        public AssemblyBuilder asm_builder;
+        public ModuleBuilder mod_builder;
+        public TypeBuilder type_builder;
         public List<KeyValuePair<int,STable>> stubbed_stashes;
 
         public Type type;
@@ -247,7 +249,7 @@ namespace Niecza {
         }
 
         public RuntimeUnit(string name, string filename, string modtime,
-                bool nosave) {
+                string obj_dir, bool main, bool runnow) {
             this.name = name;
             this.filename = filename;
             this.modtime = modtime;
@@ -255,10 +257,29 @@ namespace Niecza {
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             if (name == "CORE")
                 Kernel.CreateBasicTypes();
+
+            this.asm_name = name.Replace("::", ".");
+            this.file_name = asm_name + (main ? ".exe" : ".dll");
+            this.asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
+                    new AssemblyName(asm_name),
+                    (runnow ? AssemblyBuilderAccess.RunAndSave :
+                        AssemblyBuilderAccess.Save), obj_dir);
+            mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
+                asm_builder.DefineDynamicModule(asm_name, filename);
+
+            type_builder = mob_buider.DefineType(asm_name,
+                    TypeAttributes.Public | TypeAttributes.Sealed |
+                    TypeAttributes.Abstract | TypeAttributes.Class |
+                    TypeAttributes.BeforeFieldInit);
         }
 
         public FieldInfo NewField(string name, Type ty) {
-            return null; // TODO implement this
+            string fname = name;
+            int i = 1;
+            while (type_builder.GetField(fname) != null)
+                fname = name + (i++);
+            return type_builder.DefineField(fname, ty, FieldAttributes.Public |
+                    FieldAttributes.Static);
         }
 
         public static string NsMerge(string who, string name,
