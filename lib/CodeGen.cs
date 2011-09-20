@@ -4043,49 +4043,17 @@ dynamic:
             cpb.Build(Scan(WrapBody(b)));
         }
 
-        //public void SubInfoCtor(int ix, List<int> thaw) {
-        //    thaw.Add(sub.unit.thaw_heap.Count);
-        //    int spec = 0;
+        public void FillSubInfo(Type ty) {
+            MethodInfo m = ty.GetMethod(cpb.mb.Name);
 
-        //    if ((sub.flags & StaticSub.UNSAFE) != 0)
-        //        spec |= RuntimeUnit.SUB_IS_UNSAFE;
-        //    if (sub == sub.unit.mainline_ref.Resolve<StaticSub>())
-        //        spec |= RuntimeUnit.SUB_MAINLINE;
-        //    if ((sub.flags & StaticSub.RUN_ONCE) != 0)
-        //        spec |= RuntimeUnit.SUB_RUN_ONCE;
-        //    spec |= RuntimeUnit.SUB_HAS_TYPE;
-        //    if (sub.protopad != null)
-        //        spec |= RuntimeUnit.MAKE_PROTOPAD;
-        //    if (sub.parametric_role_hack != null)
-        //        spec |= RuntimeUnit.SUB_IS_PARAM_ROLE;
+            sub.lines = cpb.cx.lineBuffer.ToArray();
+            sub.edata = cpb.cx.ehspanBuffer.ToArray();
+            sub.label_names = cpb.cx.ehlabelBuffer.ToArray();
+            sub.nspill = cpb.Spills();
 
-        //    sub.unit.EmitInt(ix);
-        //    sub.unit.EmitByte(spec);
-        //    sub.unit.EmitStr(sub.unit.name + " " +
-        //            (sub.name == "ANON" ? cpb.mb.Name : sub.name));
-        //    sub.unit.EmitIntArray(cpb.cx.lineBuffer.ToArray());
-        //    sub.unit.EmitXref(sub.outer);
-        //    sub.unit.EmitLAD(sub.ltm);
-        //    sub.unit.EmitIntArray(cpb.cx.ehspanBuffer.ToArray());
-        //    sub.unit.EmitStrArray(cpb.cx.ehlabelBuffer.ToArray());
-        //    sub.unit.EmitInt(cpb.Spills());
-
-        //    sub.unit.EmitInt(sub.l_lexicals.Count);
-        //    foreach (KeyValuePair<string, Lexical> kv in sub.l_lexicals) {
-        //        sub.unit.EmitStr(kv.Key);
-        //        kv.Value.EmitInfo(sub.unit);
-        //    }
-
-        //    sub.unit.EmitXref(sub.unit.GetCorePackage(sub.sclass).own_xref);
-
-        //    if (sub.parametric_role_hack != null)
-        //        sub.unit.EmitXref(sub.parametric_role_hack);
-
-        //    /*not used until sub3 time*/
-        //    sub.unit.EmitXref(sub.cur_pkg);
-        //    EncodeSignature(sub);
-        //    sub.unit.EmitByte(sub.is_phaser >= 0 ? sub.is_phaser : 0xFF);
-        //}
+            sub.code = (DynBlockDelegate) Delegate.CreateDelegate(
+                    Tokens.DynBlockDelegate, m);
+        }
 
         JScalar j(string s) { return new JScalar(s); }
         object[] a(params object[] ax) { return ax; }

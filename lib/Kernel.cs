@@ -290,10 +290,25 @@ namespace Niecza {
 
             constants = new Dictionary<object,FieldBuilder>(new IdentityComparer());
             val_constants = new Dictionary<string,CpsOp>();
+            our_subs = new List<SubInfo>();
         }
 
         public void PrepareEval() {
-            // TODO do something
+            NamProcessor[] ths = new NamProcessor[our_subs.Count];
+            for (int i = 0; i < ths.Length; i++) {
+                SubInfo z = our_subs[i];
+                ths[i] = new NamProcessor(
+                    new CpsBuilder(this, "C" + i + z.name, true), z);
+                ths[i].MakeBody(Reader.Read(z.nam_str));
+            }
+
+            type = type_builder.CreateType();
+
+            foreach (KeyValuePair<object, FieldBuilder> kv in constants)
+                type.GetField(kv.Value.Name).SetValue(null, kv.Key);
+
+            for (int i = 0; i < ths.Length; i++)
+                ths[i].FillSubInfo(type);
         }
 
         internal CpsOp TypeConstant(STable s) {
@@ -1737,6 +1752,8 @@ noparams:
             Environment.GetEnvironmentVariable("NIECZA_TRACE_CALLS") != null;
         public static readonly bool VerboseExceptions =
             Environment.GetEnvironmentVariable("NIECZA_VERBOSE_EXCEPTIONS") != null;
+        public static readonly bool AllExceptions =
+            Environment.GetEnvironmentVariable("NIECZA_ALL_EXCEPTIONS") != null;
 
         public Frame MakeChild(Frame outer, SubInfo info, P6any sub) {
             if (reusable_child == null) {
@@ -4620,6 +4637,8 @@ def:        return at.Get(self, index);
                                 rue.p6backtrace);
                     }
                     else if (handle != null) {
+                        if (Frame.AllExceptions)
+                            Console.Error.WriteLine(handle.ToString());
                         cur = Kernel.Die(cur, handle.ToString());
                     }
                     handle = null;
