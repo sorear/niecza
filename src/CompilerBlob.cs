@@ -51,7 +51,7 @@ namespace Niecza {
             AppDomainSetup ads = new AppDomainSetup();
             string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
             ads.ApplicationBase = obj;
-            string backend = Path.Combine(obj, "CLRBackend.exe");
+            string backend = Path.Combine(obj, "Kernel.dll");
             subDomain = AppDomain.CreateDomain("zyg", null, ads);
             upcall_cb = cb;
             responder = (IDictionary)

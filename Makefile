@@ -7,8 +7,7 @@ RM=rm -f
 CP=cp
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
-	 ObjModel.cs BigInteger.cs Printf.cs
-csbackend=CLRBackend.cs
+	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs
 
 # Tell make to regard the following targets as not being filenames
 .PHONY: all aot test spectest clean realclean
@@ -20,7 +19,7 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
 	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendDotnet \
 	 NieczaCompiler GetOptLong
 
-all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam obj/CLRBackend.exe
+all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam
 	@git describe --tags > VERSION
 
 $(patsubst %,boot/obj/%.nam,$(srcunits)): boot/obj/%.nam: .fetch-stamp src/%.pm6 boot/obj/CORE.nam
@@ -51,9 +50,6 @@ boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 	$(CSC) /target:library /out:obj/Kernel.dll /lib:obj /unsafe+ \
 	    $(patsubst %,lib/%,$(cskernel))
-obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll
-	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
-	    $(patsubst %,lib/%,$(csbackend))
 
 aot: all
 	mono --aot run/*.dll run/Niecza.exe

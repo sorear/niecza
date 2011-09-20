@@ -486,6 +486,10 @@ public partial class Builtins {
         return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Kernel.ComplexMO);
     }
 
+    public static Variable MakeStr(string str) {
+        return Kernel.BoxAnyMO(str, Kernel.StrMO);
+    }
+
     public static Variable MakeParcel(params Variable[] bits) {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }

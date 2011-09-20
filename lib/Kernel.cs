@@ -6,6 +6,7 @@ using System.Reflection.Emit;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using Niecza.CLRBackend;
 
 namespace Niecza {
     // We like to reuse continuation objects for speed - every function only
@@ -203,12 +204,26 @@ namespace Niecza {
         public string name, filename, modtime, asm_name;
         public Dictionary<string, StashEnt> globals;
         public SubInfo mainline, bottom;
+        public bool is_mainish;
 
         // used during construction only
+        public List<SubInfo> our_subs;
         public AssemblyBuilder asm_builder;
         public ModuleBuilder mod_builder;
         public TypeBuilder type_builder;
         public List<KeyValuePair<int,STable>> stubbed_stashes;
+        public Dictionary<object, FieldBuilder> constants;
+        internal Dictionary<string, CpsOp> val_constants;
+        public int nextid;
+
+        class IdentityComparer : IEqualityComparer<object> {
+            public int GetHashCode(object o) {
+                return RuntimeHelpers.GetHashCode(o);
+            }
+            public new bool Equals(object a, object b) {
+                return a == b;
+            }
+        }
 
         public Type type;
         public byte[] heap;
@@ -255,11 +270,12 @@ namespace Niecza {
             this.modtime = modtime;
             this.globals = new Dictionary<string,StashEnt>();
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
+            this.is_mainish = main;
             if (name == "CORE")
                 Kernel.CreateBasicTypes();
 
             this.asm_name = name.Replace("::", ".");
-            this.file_name = asm_name + (main ? ".exe" : ".dll");
+            this.filename = asm_name + (main ? ".exe" : ".dll");
             this.asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
                     new AssemblyName(asm_name),
                     (runnow ? AssemblyBuilderAccess.RunAndSave :
@@ -267,13 +283,149 @@ namespace Niecza {
             mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
                 asm_builder.DefineDynamicModule(asm_name, filename);
 
-            type_builder = mob_buider.DefineType(asm_name,
+            type_builder = mod_builder.DefineType(asm_name,
                     TypeAttributes.Public | TypeAttributes.Sealed |
                     TypeAttributes.Abstract | TypeAttributes.Class |
                     TypeAttributes.BeforeFieldInit);
+
+            constants = new Dictionary<object,FieldBuilder>(new IdentityComparer());
+            val_constants = new Dictionary<string,CpsOp>();
         }
 
-        public FieldInfo NewField(string name, Type ty) {
+        public void PrepareEval() {
+            // TODO do something
+        }
+
+        internal CpsOp TypeConstant(STable s) {
+            return RefConstant(s.name, s, Tokens.STable);
+        }
+
+        internal CpsOp RefConstant(string name, object val, Type nty) {
+            if (val == null)
+                return CpsOp.Null(nty);
+            FieldBuilder fi;
+            if (!constants.TryGetValue(val, out fi))
+                constants[val] = fi = NewField(name, val.GetType());
+            return CpsOp.IsConst(CpsOp.GetSField(fi));
+        }
+
+        internal CpsOp ValConstant(string desc, object val) {
+            CpsOp r;
+            if (!val_constants.TryGetValue(desc, out r))
+                val_constants[desc] = r =
+                    RefConstant(desc.Substring(0, desc.Length > 20 ? 20 : desc.Length), val, null);
+            return r;
+        }
+
+        internal CpsOp VarConstStr(string s) {
+            return ValConstant('S' + s, Builtins.MakeStr(s));
+        }
+
+        internal CpsOp VarConstNum(double n) {
+            char[] c = new char[5];
+            c[0] = 'N';
+            long b = BitConverter.DoubleToInt64Bits(n);
+            c[1] = (char)(b);
+            c[2] = (char)(b >> 16);
+            c[3] = (char)(b >> 32);
+            c[4] = (char)(b >> 48);
+            return ValConstant(new string(c), Builtins.MakeFloat(n));
+        }
+
+        public Variable ExactNum(int numbase, string digits) {
+            BigInteger num = BigInteger.Zero;
+            BigInteger den = BigInteger.Zero;
+
+            bool neg = false;
+
+            foreach (char d in digits) {
+                if (d == '-') neg = true;
+                if (d == '_') continue;
+                if (d == '.') {
+                    if (den != BigInteger.Zero)
+                        throw new Exception("two dots in " + digits);
+                    den = BigInteger.One;
+                    continue;
+                }
+                int digval;
+                if (d >= '0' && d <= '9') { digval = d - '0'; }
+                else if (d >= 'a' && d <= 'z') { digval = d + 10 - 'a'; }
+                else if (d >= 'A' && d <= 'Z') { digval = d + 10 - 'A'; }
+                else { throw new Exception("invalid digit in " + digits); }
+
+                if (digval >= numbase) { throw new Exception("out of range digit in " + digits); }
+
+                num *= numbase;
+                den *= numbase;
+                num += digval;
+            }
+
+            if (neg) num = -num;
+
+            if (num == BigInteger.Zero && den.Sign > 0)
+                den = BigInteger.One;
+            if (den > BigInteger.One) {
+                BigInteger g = BigInteger.GreatestCommonDivisor(num, den);
+                if (g != BigInteger.One) {
+                    num /= g;
+                    den /= g;
+                }
+            }
+
+            ulong sden;
+            if (!den.AsUInt64(out sden)) {
+                return Builtins.MakeFloat((double)num / (double)den);
+            }
+
+            if (sden == 0)
+                return Builtins.MakeInt(num);
+
+            return Builtins.MakeFixRat(num, sden);
+        }
+
+        internal CpsOp VarConstExact(int bas, string digs) {
+            return ValConstant("X" + bas + ',' + digs, ExactNum(bas, digs));
+        }
+
+        internal CpsOp CCConst(int[] cc) {
+            StringBuilder code = new StringBuilder();
+            foreach (int x in cc) {
+                code.Append((char)x);
+                code.Append((char)(x>>16));
+            }
+            return ValConstant(code.ToString(), new CC(cc));
+        }
+
+        internal CpsOp StringListConst(string[] sl) {
+            StringBuilder code = new StringBuilder();
+            foreach (string s in sl) {
+                code.Append((char)(s.Length >> 16));
+                code.Append((char)(s.Length));
+                code.Append(s);
+            }
+            return ValConstant(code.ToString(), sl);
+        }
+
+        internal CpsOp CCListConst(int[][] ccl) {
+            StringBuilder code = new StringBuilder();
+            foreach (int[] cc in ccl) {
+                code.Append((char)(cc.Length >> 16));
+                code.Append((char)(cc.Length));
+                foreach (int x in cc) {
+                    code.Append((char)x);
+                    code.Append((char)(x>>16));
+                }
+            }
+            CC[] buf = new CC[ccl.Length];
+            for (int i = 0; i < buf.Length; i++) buf[i] = new CC(ccl[i]);
+            return ValConstant(code.ToString(), buf);
+        }
+
+        internal CpsOp AltInfoConst(CgContext cx, object lads, string dba, string[] labels) {
+            return null; // TODO: redesign needed
+        }
+
+        internal FieldBuilder NewField(string name, Type ty) {
             string fname = name;
             int i = 1;
             while (type_builder.GetField(fname) != null)
@@ -842,6 +994,12 @@ namespace Niecza {
         public virtual void Set(Frame f, object to) {
             throw new NieczaException("Variable cannot be bound");
         }
+
+        internal virtual ClrOp SetCode(int up, ClrOp head) {
+            throw new Exception("Lexicals of type " + this + " cannot be bound");
+        }
+        internal abstract ClrOp GetCode(int up);
+
         // names that are forced to dynamism for quick access
         public static bool IsDynamicName(string name) {
             if (name == "$_" || name == "$/" || name == "$!") return true;
@@ -870,20 +1028,30 @@ namespace Niecza {
             } else {
                 index = -1;
                 stg = owner.unit.NewField('L' + owner.name + '_' + name,
-                        typeof(StashEnt));
+                        typeof(Variable));
             }
         }
 
         public override object Get(Frame f) {
             return index >= 0 ? f.GetDynamic(index) :
-                ((StashEnt)stg.GetValue(null)).v;
+                ((Variable)stg.GetValue(null));
         }
 
         public override void Set(Frame f, object to) {
             if (index >= 0)
                 f.SetDynamic(index, to);
             else
-                ((StashEnt)stg.GetValue(null)).v = (Variable)to;
+                stg.SetValue(null, to);;
+        }
+
+        internal override ClrOp GetCode(int up) {
+            return (index < 0) ? (ClrOp) new ClrGetSField(stg) :
+                new ClrPadGet(up, index);
+        }
+
+        internal override ClrOp SetCode(int up, ClrOp to) {
+            return (index < 0) ? (ClrOp)new ClrSetSField(stg, to) :
+                (ClrOp)new ClrPadSet(up, index, to);
         }
     }
 
@@ -900,6 +1068,16 @@ namespace Niecza {
         public override void Set(Frame f, object to) {
             Kernel.currentGlobals[hkey].v = (Variable)to;
         }
+
+        internal override ClrOp GetCode(int up) {
+            return new ClrMethodCall(false, Tokens.Kernel_GetGlobal,
+                    new ClrStringLiteral(hkey));
+        }
+
+        internal override ClrOp SetCode(int up, ClrOp to) {
+            return new ClrMethodCall(false, Tokens.Kernel_BindGlobal,
+                    new ClrStringLiteral(hkey), to);
+        }
     }
 
     public class LIHint : LIVarish {
@@ -907,7 +1085,7 @@ namespace Niecza {
     }
 
     public class LISub : LIVarish {
-        SubInfo def;
+        public SubInfo def;
         public LISub(SubInfo def) { this.def = def; }
     }
 
@@ -918,8 +1096,8 @@ namespace Niecza {
         public const int LIST = 8;
         public const int HASH = 16;
 
-        int flags;
-        STable type;
+        public int flags;
+        public STable type;
         public LISimple(int flags, STable type) {
             this.flags = flags;
             this.type  = type;
@@ -930,25 +1108,48 @@ namespace Niecza {
     public class LIDispatch : LIVarish { }
 
     public class LIAlias : LexInfo {
-        string toName;
-        public LIAlias(string toName) { this.toName = toName; }
-        object Common(Frame f, bool set, object to) {
+        public string to;
+        public LIAlias(string to) { this.to = to; }
+        object Common(Frame f, bool set, object bind) {
             Frame cr = f;
             LexInfo li = null;
             while (cr.info.dylex == null ||
-                    !cr.info.dylex.TryGetValue(toName, out li))
+                    !cr.info.dylex.TryGetValue(to, out li))
                 cr = cr.outer;
             if (!set) return li.Get(cr);
-            else { li.Set(cr, to); return null; }
+            else { li.Set(cr, bind); return null; }
         }
         public override object Get(Frame f) { return Common(f,false,null); }
-        public override void Set(Frame f, object to) { Common(f,true,to); }
+        public override void Set(Frame f, object bind) { Common(f,true,bind); }
+
+        internal override ClrOp GetCode(int up) {
+            LexInfo real;
+            SubInfo sc = owner;
+            while (!sc.dylex.TryGetValue(to, out real)) {
+                sc = sc.outer;
+                up++;
+            }
+            return real.GetCode(up);
+        }
+
+        internal override ClrOp SetCode(int up, ClrOp bind) {
+            LexInfo real;
+            SubInfo sc = owner;
+            while (!sc.dylex.TryGetValue(to, out real)) {
+                sc = sc.outer;
+                up++;
+            }
+            return real.SetCode(up, bind);
+        }
     }
 
     public class LIPackage : LexInfo {
-        STable pkg;
+        public STable pkg;
         public LIPackage(STable pkg) { this.pkg = pkg; }
         public override object Get(Frame f) { return pkg.typeVar; }
+        internal override ClrOp GetCode(int up) {
+            return CLRBackend.CLRBackend.currentUnit.TypeConstant(pkg).head;
+        }
     }
 
     // This stores all the invariant stuff about a Sub, i.e. everything
@@ -999,10 +1200,15 @@ namespace Niecza {
         public Dictionary<string,UsedInScopeInfo> used_in_scope;
         public int num_lex_slots;
 
+        // if this is non-null, compilation is being delayed
+        public string nam_str;
+        public object[] nam_refs;
+
         // Used for closing runtime-generated SubInfo over values used
         // For vtable wrappers: 0 = unboxed, 1 = boxed
         // For dispatch routines, 0 = parameter list
         public object param0, param1;
+        public List<SubInfo> children = new List<SubInfo>();
 
         // No instance fields past this point
         public const int SIG_I_RECORD  = 3;
@@ -1105,6 +1311,15 @@ namespace Niecza {
                 return edata[i+3];
             }
             return -1;
+        }
+
+        internal List<SubInfo> GetPhasers(int t1) {
+            int t2 = (t1 == Kernel.PHASER_KEEP) ? Kernel.PHASER_LEAVE : t1;
+            List<SubInfo> r = new List<SubInfo>();
+            foreach (SubInfo z in children) {
+                if (z.phaser >= t1 && z.phaser <= t2) r.Add(z);
+            }
+            return r;
         }
 
         private string PName(int rbase) {
@@ -4337,12 +4552,7 @@ def:        return at.Get(self, index);
             return th;
         }
 
-        public static Variable RunLoop(string main_unit,
-                string[] args, DynBlockDelegate boot) {
-            if (args == null) {
-                return BootModule(main_unit, boot);
-            }
-            commandArgs = args;
+        public static void RunMain(RuntimeUnit main_unit) {
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
                 if (trace == "all") {
@@ -4358,14 +4568,14 @@ def:        return at.Get(self, index);
                 }
                 TraceCount = TraceFreq;
             }
-            Variable r = null;
             try {
-                r = BootModule(main_unit, boot);
+                // TODO: settings
+                Kernel.RunInferior(Kernel.GetInferiorRoot().
+                        MakeChild(null, main_unit.mainline, AnyP));
             } catch (NieczaException n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
                 Environment.Exit(1);
             }
-            return r;
         }
 
         class ExitRunloopException : Exception {
@@ -4500,6 +4710,14 @@ def:        return at.Get(self, index);
 
         [ThreadStatic]
         public static Dictionary<string, StashEnt> currentGlobals;
+
+        public static Variable GetGlobal(string key) {
+            return currentGlobals[key].v;
+        }
+
+        public static void BindGlobal(string key, Variable to) {
+            currentGlobals[key].v = to;
+        }
 
         internal static void CreateBasicTypes() {
             CodeMO = new STable("Code"); // forward decl
