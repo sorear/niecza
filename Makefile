@@ -55,9 +55,13 @@ obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
 	    $(patsubst %,lib/%,$(csbackend))
-perl5: obj/Perl5Interpreter.dll
+
+perl5: obj/Perl5Interpreter.dll obj/p5embed.so
 obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
 	gmcs /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
+
+obj/p5embed.so: lib/p5embed.c
+	cc -shared -Wl,-soname,p5embed.so -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`
 
 aot: all
 	mono --aot run/*.dll run/Niecza.exe

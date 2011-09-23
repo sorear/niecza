@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 
 namespace Niecza {
     public interface IForeignInterpreter {
-        void eval(string code);
+        void Eval(string code);
     }
     class PosixWrapper {
         static Assembly Mono_Posix;
@@ -954,7 +954,7 @@ public partial class Builtins {
             System.Reflection.Assembly a = System.Reflection.Assembly.Load("Perl5Interpreter");
             p5_interpreter = (IForeignInterpreter) a.CreateInstance("Perl5Interpreter");
         }
-        p5_interpreter.eval(r);
+        p5_interpreter.Eval(r);
 
         return MakeInt(666);
     }
