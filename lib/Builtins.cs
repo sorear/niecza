@@ -951,7 +951,7 @@ public partial class Builtins {
         string r = o1.mo.mro_raw_Str.Get(v);
 
         if (p5_interpreter == null) {
-            System.Reflection.Assembly a = System.Reflection.Assembly.LoadFrom("obj/Perl5Interpreter.dll");
+            System.Reflection.Assembly a = System.Reflection.Assembly.Load("Perl5Interpreter");
             p5_interpreter = (IForeignInterpreter) a.CreateInstance("Perl5Interpreter");
         }
         p5_interpreter.eval(r);
