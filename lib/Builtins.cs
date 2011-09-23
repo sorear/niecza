@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Niecza {
-    public interface ForeignInterpreter {
+    public interface IForeignInterpreter {
         void eval(string code);
     }
     class PosixWrapper {
@@ -940,7 +940,7 @@ public partial class Builtins {
     }
 
     static Func<Variable,Variable> eval_perl5_d = eval_perl5;
-    static ForeignInterpreter p5_interpreter;
+    static IForeignInterpreter p5_interpreter;
     public static Variable eval_perl5(Variable v) {
 
         // Cargo culted to get the string from the argument
@@ -952,7 +952,7 @@ public partial class Builtins {
 
         if (p5_interpreter == null) {
             System.Reflection.Assembly a = System.Reflection.Assembly.LoadFrom("obj/Perl5Interpreter.dll");
-            p5_interpreter = (ForeignInterpreter) a.CreateInstance("Perl5Interpreter");
+            p5_interpreter = (IForeignInterpreter) a.CreateInstance("Perl5Interpreter");
         }
         p5_interpreter.eval(r);
 

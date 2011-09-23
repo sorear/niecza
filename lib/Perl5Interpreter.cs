@@ -1,5 +1,5 @@
 using Niecza;
-public class Perl5Interpreter : ForeignInterpreter {
+public class Perl5Interpreter : IForeignInterpreter {
     public Perl5Interpreter() {
         System.Console.WriteLine("creating perl5 interpreter");
     }
