@@ -55,6 +55,9 @@ obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 obj/CLRBackend.exe: $(patsubst %,lib/%,$(csbackend)) obj/Kernel.dll
 	$(CSC) /target:exe /lib:obj /out:obj/CLRBackend.exe /r:Kernel.dll \
 	    $(patsubst %,lib/%,$(csbackend))
+perl5: obj/Perl5Interpreter.dll
+obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
+	gmcs /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
 
 aot: all
 	mono --aot run/*.dll run/Niecza.exe
