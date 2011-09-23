@@ -246,27 +246,35 @@ namespace Niecza {
     class OverloadCandidate : MultiCandidate {
         MemberInfo what_call;
         Type[] args;
+        bool[] refs;
         Type param_array;
 
         private OverloadCandidate(MemberInfo what_call, Type[] args,
-                Type param_array) {
+                bool[] refs, Type param_array) {
             this.what_call = what_call;
             this.args = args;
+            this.refs = refs;
             this.param_array = param_array;
         }
 
         public static void MakeCandidates(MemberInfo what, ParameterInfo[] pi,
                 List<MultiCandidate> into) {
             Type[] args1 = new Type[pi.Length];
-            for (int i = 0; i < pi.Length; i++)
+            bool[] refs = new bool[pi.Length];
+            for (int i = 0; i < pi.Length; i++) {
                 args1[i] = pi[i].ParameterType;
-            into.Add(new OverloadCandidate(what, args1, null));
+                if (args1[i].IsByRef) {
+                    args1[i] = args1[i].GetElementType();
+                    refs[i] = true;
+                }
+            }
+            into.Add(new OverloadCandidate(what, args1, refs, null));
 
             if (pi.Length != 0 && pi[pi.Length-1].GetCustomAttributes(
                         typeof(ParamArrayAttribute), false).Length != 0) {
                 Type[] args2 = new Type[args1.Length - 1];
                 Array.Copy(args1, 0, args2, 0, args2.Length);
-                into.Add(new OverloadCandidate(what, args2,
+                into.Add(new OverloadCandidate(what, args2, refs,
                             args1[args1.Length - 1].GetElementType()));
             }
         }
@@ -278,6 +286,13 @@ namespace Niecza {
             } else {
                 return s1;
             }
+        }
+
+        void WritebackRefs(Variable[] pos, object[] argv) {
+            for (int i = 0; i < args.Length; i++)
+                if (refs[i])
+                    pos[i].Store(CLRWrapperProvider.BoxResult(args[i],
+                                argv[i]).Fetch());
         }
 
         public Variable Invoke(object obj, Variable[] pos, VarHash named) {
@@ -298,10 +313,12 @@ namespace Niecza {
             if (what_call is MethodInfo) {
                 MethodInfo mi = (MethodInfo) what_call;
                 object ret = mi.Invoke((mi.IsStatic ? null : obj), argv);
+                WritebackRefs(pos, argv);
                 return CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
             } else if (what_call is ConstructorInfo) {
                 ConstructorInfo ci = (ConstructorInfo) what_call;
                 object ret = ci.Invoke(null, argv);
+                WritebackRefs(pos, argv);
                 return CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
             } else if (what_call is FieldInfo) {
                 return new FieldProxy((FieldInfo) what_call, obj);
@@ -320,7 +337,8 @@ namespace Niecza {
 
             object dummy;
             for (int i = 0; i < args.Length; i++)
-                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i]))
+                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i])
+                        || (refs[i] && !pos[i].rw))
                     return false;
             // XXX: maybe param arrays should be treated as slurpies?
             for (int i = args.Length; i < pos.Length; i++)
