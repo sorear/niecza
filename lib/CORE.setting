@@ -1908,7 +1908,13 @@ sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 
-sub eval($str) is return-pass { Q:CgOp { (simple_eval {$str}) } }
+sub eval($str,:$lang="perl6") is return-pass {
+    if $lang eq "perl6" {
+        Q:CgOp { (simple_eval {$str}) }
+    } else {
+        Q:CgOp { (eval_perl5 {$str}) }
+    }
+}
 
 sub rungather($ ) { die "Run NYI" }
 # }}}

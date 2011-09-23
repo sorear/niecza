@@ -936,6 +936,21 @@ public partial class Builtins {
         return Kernel.NewROScalar(n1);
     }
 
+    static Func<Variable,Variable> eval_perl5_d = eval_perl5;
+    public static Variable eval_perl5(Variable v) {
+
+        // Cargo culted to get the string from the argument
+        P6any o1 = v.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v,o1, eval_perl5_d);
+        string r = o1.mo.mro_raw_Str.Get(v);
+
+        System.Console.WriteLine("evaling perl5 code (NYI):"+r);
+
+        return MakeInt(666);
+    }
+
     // we don't need to do nominal checking stuff here because this
     // is in a method, never inlined, and as such the binder had to
     // already have been called.
