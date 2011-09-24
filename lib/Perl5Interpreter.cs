@@ -14,6 +14,9 @@ public class Perl5Interpreter : IForeignInterpreter {
     public Perl5Interpreter() {
         Initialize();
     }
+    ~Perl5Interpreter() {
+        Dispose();
+    }
     public void Eval(string code) {
         EvalPerl5(code);
     }
