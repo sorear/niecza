@@ -29,8 +29,8 @@ void p5embed_initialize()
   eval_pv("use lib 'perl5';use Niecza::Interoperability",TRUE);
 }
 
-void p5embed_eval(char* code) { 
-  eval_pv(code,TRUE);
+SV* p5embed_eval(char* code) { 
+  return eval_pv(code,TRUE);
 }
 
 void p5embed_dispose()
@@ -38,4 +38,22 @@ void p5embed_dispose()
   perl_destruct(my_perl);
   perl_free(my_perl);
   PERL_SYS_TERM();
+}
+
+void p5method_call(char* name,SV* invocant) {
+  dSP;
+
+  SvREFCNT_inc(invocant);
+
+  /*ENTER;
+  SAVETMPS;*/
+
+  PUSHMARK(SP);
+  XPUSHs(invocant);
+  PUTBACK;
+
+  call_method(name,G_DISCARD);
+
+  /*FREETMPS;
+  LEAVE;*/
 }
