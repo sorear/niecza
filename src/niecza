@@ -125,10 +125,7 @@ method getsig {
         else {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
                 :defouter, :rwtrans);
-            self.trymop({
-                $*CURLEX<!sub>.lexicals<$_>.noinit = True;
-                $*CURLEX<!sub>.lexicals<$_>.defouter = False;
-            });
+            $*CURLEX<!sub>.parameterize_topic;
         }
         $*CURLEX<!sub>.set_signature(::GLOBAL::Sig.new(params => @parms));
     }
@@ -149,6 +146,7 @@ method getsig {
     }
     self;
 }
+
 method explain_mystery() {
     my %post_types;
     my %unk_types;
@@ -202,6 +200,16 @@ method explain_mystery() {
 
     self;
 }
+
+method lookup_lex($name, $lex) {
+    ($lex // $*CURLEX)<!sub>.lookup_lex($name, $*FILE<name>, self.lineof(self.pos));
+}
+
+method mark_used($name) {
+    $*CURLEX<!sub>.lookup_lex($name, $*FILE<name>, self.lineof(self.pos));
+    Nil;
+}
+
 method add_placeholder($name) {
     my $decl = $*CURLEX.<!IN_DECL> // '';
     my $sub = $*CURLEX<!sub>;
@@ -233,7 +241,7 @@ method add_placeholder($name) {
     }
     return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
 
-    if $sub.lexicals-used.{$varname} || $sub.lexicals.{$varname} {
+    if $sub.lexical_used($varname) || $sub.has_lexical($varname) {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
     self.trymop({
@@ -242,12 +250,413 @@ method add_placeholder($name) {
             list => substr($varname,0,1) eq '@',
             hash => substr($varname,0,1) eq '%');
     });
-    $*CURLEX<!sub>.lexicals-used{$varname} = True;
+    self.mark_used($varname);
     self;
 }
 }
 
+augment class Op::ForLoop {
+    method statement_level() {
+        my $body = $*CURLEX<!sub>.lookup_lex($!sink)[4];
+        my $var = [ map { ::GLOBAL::NieczaActions.gensym },
+            0 ..^ +$body.signature.params ];
+        ::Op::ImmedForLoop.new(source => $!source, var => $var,
+            sink => ::GLOBAL::OptBeta.make_call($!sink,
+                map { ::Op::LetVar.new(name => $_) }, @$var));
+    }
+}
+
+augment class Op::Lexical {
+    method to_bind($/, $ro, $rhs) {
+        my @lex = $*CURLEX<!sub>.lookup_lex($!name) or
+            ($/.CURSOR.sorry("Cannot find definition for binding???"),
+                return ::Op::StatementList.new);
+        my $list = False;
+        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
+        given @lex[0] {
+            when 'simple' {
+                $list = ?(@lex[4] +& 24); # LIST | HASH from LISimple
+                $type = @lex[5] // $type;
+            }
+            when 'common' {
+                $list = substr(@lex[5],0,1) eq '%' || substr(@lex[5],0,1) eq '@';
+            }
+            default {
+                nextsame;
+            }
+        }
+        ::Op::LexicalBind.new(name => $!name, :$ro, :$rhs, :$list, :$type);
+    }
+}
+
 augment class NieczaActions {
+method package_var($/, $slot, $name, $path) {
+    $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
+        my $ref = $path.^can('xref') ?? $path.xref !!
+            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref;
+        $*CURLEX<!sub>.add_common_name($slot, $ref, $name, |mnode($/));
+        $/.CURSOR.mark_used($slot);
+    });
+    ::Op::Lexical.new(|node($/), name => $slot);
+}
+
+method blockoid($/) {
+    # XXX horrible cheat, but my data structures aren't up to the task of
+    # $::UNIT being a class body &c.
+    if $/ eq '{YOU_ARE_HERE}' {
+        $*unit.bottom_ref = $*CURLEX<!sub>.xref;
+        $*CURLEX<!sub>.strong_used = True;
+        $*CURLEX<!sub>.create_static_pad;
+
+        loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
+            # this isn't *quite* right, as it will cause declaring
+            # anything more in the same scope to fail.
+            $/.CURSOR.mark_used($_) for $l.lex_names;
+        }
+
+        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
+    } else {
+        make $<statementlist>.ast;
+    }
+}
+
+sub phaser($/, $ph, :$unique, :$topic, :$csp) {
+    my $sub = ($<blast> // $<block>).ast;
+
+    if $unique {
+        $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
+            if any($sub.outer.children).is_phaser == ::Metamodel::Phaser.($ph);
+        $sub.code = ::Op::CatchyWrapper.new(inner => $sub.code);
+    }
+
+    $sub.outer.noninlinable;
+    $sub.is_phaser = +::Metamodel::Phaser.($ph);
+
+    if $topic {
+        $sub.has_lexical('$_') || $sub.add_my_name('$_');
+        $sub.parameterize_topic;
+        $sub.set_signature(Sig.simple('$_'));
+    }
+    $*CURLEX<!sub>.create_static_pad if $csp;
+    make ::Op::StatementList.new;
+}
+
+
+method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
+        :$longname, :$method_type is copy, :$contextual is copy) {
+
+    $multiness ||= 'only';
+    my ($pkg, $name) = self.process_name($longname, :declaring);
+
+    if !$scope {
+        if !defined($name) {
+            $scope = 'anon';
+        } elsif defined($pkg) {
+            $scope = 'our';
+        } elsif defined($method_type) {
+            $scope = 'has';
+        } else {
+            $scope = 'my';
+        }
+    }
+
+    if $class eq 'Regex' {
+        my $/;
+        $*CURLEX<!name> = $name;
+        $*CURLEX<!cleanname !sym> =
+            !defined($name) ?? (Str, Str) !!
+            ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
+            ($name, Str);
+        $multiness = 'multi' if defined $*CURLEX<!sym>;
+        $*CURLEX<!multi> = $multiness;
+    }
+
+    if $scope ne 'my' && $scope ne 'our' && $scope ne 'anon' && $scope ne 'has' {
+        $/.CURSOR.sorry("Illegal scope $scope for subroutine");
+        $scope = 'anon';
+    }
+
+    if $scope eq 'has' && !defined($method_type) {
+        $/.CURSOR.sorry('has scope-type is only valid for methods');
+        $scope = 'anon';
+    }
+
+    if $scope ne 'anon' && !defined($name) {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+        $scope = 'anon';
+    }
+
+    if $scope ne 'our' && defined($pkg) {
+        $/.CURSOR.sorry("Double-colon-qualified subs must be our");
+        $scope = 'our';
+    }
+
+    if $scope eq 'anon' && $multiness ne 'only' {
+        $/.CURSOR.sorry("Multi routines must have a name");
+        $multiness = 'only';
+    }
+
+    if $contextual && (defined($method_type) || $scope ne 'my') {
+        $/.CURSOR.sorry("Context-named routines must by purely my-scoped");
+        $contextual = False;
+    }
+
+    $method_type = Str if $scope eq 'anon';
+
+    my $method_targ = $method_type && $sub.outer.body_of;
+    if $method_targ {
+        $method_targ = $*unit.deref($method_targ);
+    } elsif defined($method_type) {
+        $/.CURSOR.sorry("Methods must be used in some kind of package");
+        $method_type = Str;
+    }
+
+    if $method_targ && !$method_targ.^can('add_method') {
+        $/.CURSOR.sorry("A {$method_targ.WHAT} cannot have methods added");
+        $method_type = Str;
+        $method_targ = Any;
+    }
+
+    if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
+            $method_targ !~~ ::Metamodel::ParametricRole) {
+        $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
+        $name = "placeholder";
+    }
+
+    my $bindlex = $scope eq 'my' || ($scope eq 'our' && !$pkg);
+
+    $sub.set_name(defined($method_type) ?? $method_targ.name ~ "." ~ $name !!
+        ($name // 'ANON'));
+    $sub.class = $class;
+    $sub.returnable = True;
+
+    my $std = $/.CURSOR;
+    {
+        my $/;
+        if $sub.name ~~ /^(\w+)\:\<(.*)\>$/ {
+            my %new = %( $std.default_O(~$0, ~$1) );
+            $sub.extend.<prec> = %new;
+        }
+    }
+
+    my Str $symbol;
+    $/.CURSOR.trymop({
+        if $bindlex && $class eq 'Regex' {
+            $symbol = '&' ~ $name;
+            my $proto = $symbol;
+            $proto ~~ s/\:.*//;
+            $sub.outer.add_dispatcher($proto, |mnode($/))
+                if $multiness ne 'only' && !$sub.outer.has_lexical($proto);
+            $symbol ~= ":(!proto)" if $multiness eq 'proto';
+        } elsif $bindlex {
+            $symbol = '&' ~ $name;
+            $/.CURSOR.check_categorical($symbol);
+            if $multiness ne 'only' && !$sub.outer.has_lexical($symbol) {
+                $sub.outer.add_dispatcher($symbol, |mnode($/))
+            }
+
+            given $multiness {
+                when 'multi' { $symbol ~= ":({ self.gensym })"; }
+                when 'proto' { $symbol ~= ":(!proto)"; }
+                default {
+                    $/.CURSOR.check_categorical($symbol);
+                }
+            }
+        } else {
+            $symbol = self.gensym;
+        }
+
+        $sub.outervar = $symbol;
+        $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
+        $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
+
+        if $multiness ne 'only' || $scope eq 'our' || $method_type {
+            $/.CURSOR.mark_used($symbol);
+        }
+
+        if defined($method_type) || $scope eq 'our' {
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
+        }
+
+        if defined($method_type) {
+            if $sub.outer.augment_hack {
+                push $sub.outer.augment_hack,
+                    [ $multiness, $method_type, $name, $symbol, $sub.xref ];
+            } else {
+                $method_targ.add_method($multiness, $method_type, $name,
+                    $symbol, $sub.xref, |mnode($/));
+            }
+        }
+
+        if $scope eq 'our' {
+            $*unit.bind($pkg // $*unit.deref($sub.outer.cur_pkg),
+                "&$name", $sub.xref);
+        }
+    });
+}
+
+
+method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
+        :$exports) {
+
+    $scope := $scope || 'our';
+    if $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid packageoid scope $scope");
+        $scope := 'anon';
+    }
+
+    my ($pkg, $head) = self.process_name($name, :declaring, :clean);
+
+    if defined($pkg) && $scope ne 'our' {
+        $/.CURSOR.sorry("Pathed definitions require our scope");
+        $scope := 'our';
+    }
+
+    if !$head {
+        $scope := 'anon';
+        $head  := 'ANON';
+    }
+
+    my $npkg;
+    my $lexname;
+    $/.CURSOR.trymop({
+        my $old;
+        if $scope ne 'anon' && !$pkg && $sub.has_lexical($head) {
+            my @linfo = $sub.lookup_lex(head);
+            die "Cannot resume definition - $head not a packageoid"
+                unless @linfo[0] eq 'package';
+            $old = @linfo[4];
+        } elsif defined $pkg {
+            $old = $*unit.get($pkg, $head);
+            $old = $old && $*unit.deref($old);
+        }
+
+        my $lexed_already;
+
+        if $old && $old.WHAT === $class && !$old.closed {
+            $npkg = $old;
+            $lexed_already = True;
+        } elsif $scope eq 'our' {
+            my $opkg = $pkg // $*unit.deref($sub.cur_pkg);
+            $npkg = $class.new(name => $head, who => $opkg.who ~ '::' ~ $head);
+            $*unit.bind($opkg, $head, $npkg.xref, |mnode($/));
+        } else {
+            my $id = $*unit.anon_stash;
+            $npkg = $class.new(name => $head, who => "::$id");
+            $*unit.bind($*unit.abs_pkg(), $id, $npkg.xref, |mnode($/));
+        }
+
+        $lexname = (!$lexed_already && $scope ne 'anon' && !defined($pkg))
+            ?? $head !! self.gensym;
+
+        $sub.add_my_stash($lexname, $npkg.xref, |mnode($/));
+        $sub.add_exports($head, $npkg.xref, $exports) if $exports;
+    });
+
+    $lexname, $npkg
+}
+
+
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for @tr -> $T {
+        my $tr = $T.ast;
+        if $pack && $tr<name> {
+            my $super = $tr<name>;
+
+            $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
+                next unless $sub.body_of;
+            $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
+                next if $sub.augmenting;
+            $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
+                next if !$*unit.deref($pack).^can('add_super');
+
+            $T.CURSOR.trymop({
+                $*unit.deref($pack).add_super($super.xref);
+            });
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($*unit.deref($pack).name, $pack, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports('&'~$sub.name, $sub.xref, @exports);
+            $sub.strong_used = True;
+            $sub.outer.create_static_pad;
+            $/.CURSOR.mark_used($sub.outervar)
+                if defined $sub.outervar;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.set_signature(Any);
+        } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
+            my $rel = $tr.keys.[0];
+            my $to  = $tr.values.[0];
+            $to = $to.inside if $to ~~ ::Op::Paren;
+            $to = $to.children[0] if $to ~~ ::Op::StatementList && $to.children == 1;
+
+            my $oprec;
+            if $to ~~ ::Op::Lexical {
+                $oprec = $T.CURSOR.function_O($to.name);
+            } elsif $to ~~ ::Op::StringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            } else {
+                $T.CURSOR.sorry("Cannot interpret operator reference");
+                next;
+            }
+            unless $sub.extend<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $oprec {
+                $T.CURSOR.sorry("No precedence available for reference target");
+                next;
+            }
+            if $rel eq 'equiv' {
+                my %copy = %$oprec;
+                $sub.extend.<prec> = %copy;
+            } else {
+                $sub.extend.<prec><prec> = $oprec.<prec>;
+            }
+            $sub.extend.<prec><prec> ~~ s/\=/<=/ if $rel eq 'looser';
+            $sub.extend.<prec><prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+        } elsif !$pack && $tr<assoc> {
+            my $arg = ~self.trivial_eval($T, $tr<assoc>);
+            unless $sub.extend<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            my @valid = < left right non list unary chain >;
+            unless grep $arg, @valid {
+                $T.CURSOR.sorry("Invalid associativity $arg");
+                next;
+            }
+            $sub.extend.<prec><assoc> = $arg;
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
+            unless $sub.extend.<prec> {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            $sub.extend.<prec><prec> = $arg;
+            $sub.extend.<prec><dba> = "like $sub.name()";
+        } elsif !$pack && $tr<Niecza::builtin> {
+            $sub.extend.<builtin> = [
+                self.trivial_eval($T, $tr<Niecza::builtin>) ];
+        } elsif !$pack && $tr<return_pass> {
+            $sub.returnable = False;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.unsafe = True;
+        } else {
+            $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+        }
+    }
+}
+
+
 method comp_unit($/) {
     $*CURLEX{'!sub'}.finish($<statementlist>.ast);
 

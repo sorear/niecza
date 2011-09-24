@@ -87,12 +87,21 @@ class Type { ... }
 class StaticSub {
     has $.peer;
     method lex_names() { downcall("lex_names", $!peer) }
+    method lookup_lex($name, $file?, $line?) {
+        my @ret = downcall("sub_lookup_lex", $!peer, $name, $file, $line//0);
+        @ret[4] = Type.new(peer => @ret[4]) if @ret[0] eq 'package';
+        @ret[5] = Type.new(peer => @ret[5]) if @ret[0] eq 'simple' && @ret[5];
+        @ret[4] = StaticSub.new(peer => @ret[4]) if @ret[0] eq 'sub';
+        @ret;
+    }
     method unused_lexicals() { downcall("unused_lexicals", $!peer) }
+    method parameterize_topic() { downcall("sub_parameterize_topic", $!peer) }
     method unit() { Unit.new(peer => downcall("sub_get_unit", $!peer)) }
     method to_unit() { StaticSub.new(peer => downcall("sub_to_unit", $!peer)) }
     method is($o) { downcall("equal_handles", $!peer, $o.peer) }
     method is_routine() { downcall("sub_is_routine", $!peer) }
     method has_lexical($name) { downcall("sub_has_lexical", $!peer, $name) }
+    method lexical_used($name) { downcall("sub_lexical_used", $!peer, $name) }
     method set_signature($sig) {
         my @args;
         if !$sig {

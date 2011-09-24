@@ -4705,6 +4705,9 @@ dynamic:
         public static object Unbox(object h) {
             return h == null ? null : ((Handle)h).to;
         }
+        public static Handle Wrap(object h) {
+            return h == null ? null : new Handle(h);
+        }
 
         public override string ToString() {
             return string.Format("{0}[{1:X}]", to.ToString(), to.GetHashCode());
@@ -4767,6 +4770,69 @@ dynamic:
                 return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
+            } else if (cmd == "sub_lookup_lex") {
+                SubInfo from = (SubInfo)Handle.Unbox(args[1]);
+                string  lkey = (string)args[2];
+                string  file = (string)args[3];
+                int     line = (int)args[4];
+
+                SubInfo csr;
+                int levels = 0;
+                for (csr = from; csr != null; csr = csr.outer, levels++)
+                    if (csr.dylex.ContainsKey(lkey))
+                        break;
+
+                if (csr == null)
+                    return new object[0];
+                LexInfo li = csr.dylex[lkey];
+
+                if (file != null) {
+                    for (SubInfo csr2 = from; csr2 != csr &&
+                            !csr2.used_in_scope.ContainsKey(lkey);
+                            csr2 = csr2.outer, levels--) {
+
+                        var uisi = new SubInfo.UsedInScopeInfo();
+                        uisi.orig_file = li.file;
+                        uisi.orig_line = li.line;
+                        uisi.file = file;
+                        uisi.line = line;
+                        uisi.levels = levels;
+                        csr2.used_in_scope[lkey] = uisi;
+                    }
+                }
+
+
+                object[] r = null;
+                var lalias = li as LIAlias;
+                if (lalias != null)
+                    r = new object[] { "alias",null,null,null, lalias.to };
+                var lsub   = li as LISub;
+                if (lsub != null)
+                    r = new object[] { "sub",null,null,null, new Handle(lsub.def) };
+                var lpkg   = li as LIPackage;
+                if (lpkg != null)
+                    r = new object[] { "package",null,null,null, new Handle(lpkg.pkg) };
+                var lsimp  = li as LISimple;
+                if (lsimp != null)
+                    r = new object[] { "simple",null,null,null, lsimp.flags, Handle.Wrap(lsimp.type) };
+                var ldisp  = li as LIDispatch;
+                if (ldisp != null)
+                    r = new object[] { "dispatch",null,null,null };
+                var llab   = li as LILabel;
+                if (llab != null)
+                    r = new object[] { "label",null,null,null };
+                var lhint  = li as LIHint;
+                if (lhint != null)
+                    r = new object[] { "hint",null,null,null };
+                var lcomm  = li as LICommon;
+                if (lcomm != null)
+                    r = new object[] { "common",null,null,null, lcomm.hkey };
+
+                r[1] = li.file;
+                r[2] = li.line;
+                r[3] = li.pos;
+
+                return r;
             } else if (cmd == "lex_names") {
                 List<object> ret = new List<object>();
                 foreach (string k in ((SubInfo)Handle.Unbox(args[1])).dylex.Keys)
@@ -4811,6 +4877,14 @@ dynamic:
             } else if (cmd == "sub_has_lexical") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 return s.dylex.ContainsKey((string)args[2]);
+            } else if (cmd == "sub_lexical_used") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                return s.used_in_scope.ContainsKey((string)args[2]);
+            } else if (cmd == "sub_parameterize_topic") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                LISimple li = (LISimple)s.dylex["$_"];
+                li.flags = LISimple.NOINIT;
+                return null;
             } else if (cmd == "rel_pkg") {
                 bool auto = (bool)args[1];
                 STable pkg = args[2] == null ? null : (STable)Handle.Unbox(args[2]);

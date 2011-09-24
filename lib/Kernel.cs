@@ -5061,7 +5061,12 @@ def:        return at.Get(self, index);
                 return th;
             }
 
-            return Unwind(th, type, unf, unip, payload, tgt, name, null);
+            try {
+                return Unwind(th, type, unf, unip, payload, tgt, name, null);
+            } catch (Exception e) {
+                Panic(e.ToString());
+                return null;
+            }
         }
 
         public static string DescribeBacktrace(Frame from, Frame upto) {
@@ -5083,10 +5088,21 @@ def:        return at.Get(self, index);
             return sb.ToString();
         }
 
+        // let's try to avoid looping failure
+        static void Panic(string str) {
+            Console.Error.WriteLine("Internal error in exception dispatch: " + str);
+            Environment.Exit(1);
+        }
+
         public static Frame Unwind(Frame th, int type, Frame tf, int tip,
                 object td, Frame tgt, string name, string bt) {
             Frame csr = th;
+            if (th.info == null)
+                Panic("Catching frame has no info?");
+            if (th.caller == null)
+                Panic("Catching frame has no caller?" + th.info.name);
             while (csr != tf) {
+                if (csr.info == null) Panic("Null SubInfo?");
                 if (csr.info == ExitRunloopSI) {
                     // when this exception reaches the outer runloop,
                     // more frames will be added
@@ -5099,6 +5115,7 @@ def:        return at.Get(self, index);
                 if (csr.DynamicCaller() != csr.caller) {
                     csr = csr.DynamicCaller();
                 } else {
+                    if (csr.caller == null) Panic(csr.info.name + " has no caller?");
                     // TODO: catch generated exceptions and add to @!
                     csr.caller.resultSlot = Kernel.NilP.mo.typeVar;
                     Kernel.SetTopFrame(csr);
@@ -5106,6 +5123,8 @@ def:        return at.Get(self, index);
                 }
             }
             if (type == SubInfo.ON_NEXTDISPATCH) {
+                if (tf.curDisp == null)
+                    Panic("ON_NEXTDISPATCH caught by nondispatch frame?? " + csr.info.name);
                 // These are a bit special because there isn't actually a
                 // catching frame.
                 DispatchEnt de = tf.curDisp.next;
