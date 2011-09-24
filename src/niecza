@@ -201,6 +201,21 @@ method explain_mystery() {
     self;
 }
 
+method newlex ($needsig = 0, $once = False) {
+    my $osub = $*CURLEX<!sub>;
+    $*CURLEX = { };
+    $*CURLEX<!NEEDSIG> = 1 if $needsig;
+    $*CURLEX<!IN_DECL> = $*IN_DECL if $*IN_DECL;
+    $*CURLEX<!sub> = $*unit.create_sub(
+        outer => $osub,
+        class => 'Block',
+        cur_pkg => $osub.cur_pkg,
+        in_class => $osub.in_class,
+        run_once => $once && $osub.run_once,
+        name => "ANON");
+    self;
+}
+
 method lookup_lex($name, $lex) {
     ($lex // $*CURLEX)<!sub>.lookup_lex($name, $*FILE<name>, self.lineof(self.pos));
 }
@@ -406,21 +421,19 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     $method_type = Str if $scope eq 'anon';
 
     my $method_targ = $method_type && $sub.outer.body_of;
-    if $method_targ {
-        $method_targ = $*unit.deref($method_targ);
-    } elsif defined($method_type) {
+    if !$method_targ && defined($method_type) {
         $/.CURSOR.sorry("Methods must be used in some kind of package");
         $method_type = Str;
     }
 
-    if $method_targ && !$method_targ.^can('add_method') {
+    if $method_targ && !$method_targ.can_add_method {
         $/.CURSOR.sorry("A {$method_targ.WHAT} cannot have methods added");
         $method_type = Str;
         $method_targ = Any;
     }
 
     if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
-            $method_targ !~~ ::Metamodel::ParametricRole) {
+            !$method_targ.is_param_role) {
         $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
         $name = "placeholder";
     }
@@ -429,8 +442,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 
     $sub.set_name(defined($method_type) ?? $method_targ.name ~ "." ~ $name !!
         ($name // 'ANON'));
-    $sub.class = $class;
-    $sub.returnable = True;
+    $sub.set_class($class);
 
     my $std = $/.CURSOR;
     {
@@ -468,8 +480,8 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             $symbol = self.gensym;
         }
 
-        $sub.outervar = $symbol;
-        $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
+        $sub.set_outervar($symbol);
+        $sub.set_methodof(defined($method_type) ?? $method_targ !! Any);
         $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
 
         if $multiness ne 'only' || $scope eq 'our' || $method_type {
@@ -477,7 +489,6 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         }
 
         if defined($method_type) || $scope eq 'our' {
-            $sub.strong_used = True;
             $sub.outer.create_static_pad;
         }
 
@@ -498,6 +509,10 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     });
 }
 
+method routine_def ($/) {
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
+    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
+}
 
 method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
         :$exports) {

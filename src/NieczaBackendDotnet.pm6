@@ -86,14 +86,33 @@ class Type { ... }
 
 class StaticSub {
     has $.peer;
+    method WRAP($p) { $p && self.new(peer => $p) }
     method lex_names() { downcall("lex_names", $!peer) }
     method lookup_lex($name, $file?, $line?) {
         my @ret = downcall("sub_lookup_lex", $!peer, $name, $file, $line//0);
+        return unless @ret;
         @ret[4] = Type.new(peer => @ret[4]) if @ret[0] eq 'package';
         @ret[5] = Type.new(peer => @ret[5]) if @ret[0] eq 'simple' && @ret[5];
         @ret[4] = StaticSub.new(peer => @ret[4]) if @ret[0] eq 'sub';
         @ret;
     }
+    method set_outervar($v) { downcall("sub_set_outervar", $!peer, ~$v) }
+    method set_class($n)    { downcall("sub_set_class", $!peer, ~$n) }
+    method set_name($v)     { downcall("sub_set_name", $!peer, ~$v) }
+    method set_methodof($m) { downcall("sub_set_methodof", $!peer, $m && $m.peer) }
+    method set_in_class($m) { downcall("sub_set_in_class", $!peer, $m && $m.peer) }
+    method set_body_of($m)  { downcall("sub_set_body_of", $!peer, $m && $m.peer) }
+
+    method name()     { downcall("sub_name", $!peer) }
+    method outer()    { StaticSub.WRAP(downcall("sub_outer", $!peer)) }
+    method class()    { downcall("sub_class", $!peer) }
+    method run_once() { downcall("sub_run_once", $!peer) }
+    method cur_pkg()  { Type.WRAP(downcall("sub_cur_pkg", $!peer)) }
+    method in_class() { Type.WRAP(downcall("sub_in_class", $!peer)) }
+    method body_of()  { Type.WRAP(downcall("sub_body_of", $!peer)) }
+    method outervar() { downcall("sub_outervar", $!peer) }
+    method methodof() { Type.WRAP(downcall("sub_methodof", $!peer)) }
+
     method unused_lexicals() { downcall("unused_lexicals", $!peer) }
     method parameterize_topic() { downcall("sub_parameterize_topic", $!peer) }
     method unit() { Unit.new(peer => downcall("sub_get_unit", $!peer)) }
@@ -197,7 +216,7 @@ class StaticSub {
             ~($file//''), +($line//0), +($pos// -1), $pkg.peer));
     }
     method add_my_sub($name, $body, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
+        self._addlex_result(downcall("add_my_sub", $!peer, ~$name,
             ~($file//''), +($line//0), +($pos// -1), $body.peer));
     }
 
@@ -209,12 +228,14 @@ class StaticSub {
 
 class Type {
     has $.peer;
+    method WRAP($p) { $p && self.new(peer => $p) }
     method is_package() { downcall("type_is_package", $!peer) }
     method closed() { downcall("type_closed", $!peer) }
 }
 
 class Unit {
     has $.peer;
+    method WRAP($p) { $p && self.new(peer => $p) }
     method name() { downcall("unit_get_name", $!peer) }
     method stubbed_stashes() {
         downcall("unit_stubbed_stashes", $!peer).map({ $_ ~~ Int ?? $_ !! Type.new(peer => $_)})
@@ -232,10 +253,12 @@ class Unit {
         my ($p,$k) = downcall("get_name", $pkg, $name);
         $k ?? Type.new(peer => $p) !! StaticSub.new(peer => $p)
     }
-    method create_sub(:$name, :$class, :$outer, :$cur_pkg, :$run_once) {
+
+    method create_sub(:$name, :$class, :$outer, :$cur_pkg, :$in_class,
+            :$run_once) {
         StaticSub.new(peer => downcall("create_sub", ~($name // 'ANON'),
             $outer && $outer.peer, ~($class // 'Sub'), $cur_pkg.peer,
-            ?$run_once))
+            $in_class && $in_class.peer, ?$run_once))
     }
 }
 

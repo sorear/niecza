@@ -312,7 +312,7 @@ namespace Niecza {
         }
 
         internal CpsOp TypeConstant(STable s) {
-            return RefConstant(s.name, s, Tokens.STable);
+            return RefConstant(s == null ? "" : s.name, s, Tokens.STable);
         }
 
         internal CpsOp RefConstant(string name, object val, Type nty) {
@@ -1247,7 +1247,8 @@ namespace Niecza {
 
         public int special;
         public int phaser;
-        public STable cur_pkg;
+        public STable cur_pkg, methodof, body_of, in_class;
+        public string outervar;
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;

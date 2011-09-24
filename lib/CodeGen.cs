@@ -4088,7 +4088,7 @@ dynamic:
                     object bit;
                     CpsOp tc = Backend.currentUnit.TypeConstant(ls.type);
                     if ((f & LISimple.ROINIT) != 0) {
-                        bit = a(j("class_ref"), j("typeVar"), j("Any"));
+                        bit = a(j("class_ref"), j("typeVar"), Kernel.AnyMO);
                     } else if ((f & LISimple.DEFOUTER) != 0) {
                         bit = a(j("outerlex"), j(kv.Key));
                     } else if ((f & (LISimple.HASH | LISimple.LIST)) != 0) {
@@ -4742,6 +4742,20 @@ dynamic:
             return new object[] { "" };
         }
 
+        STable ResolveSubClass(string cls) {
+            // this happens before lexicals are created, so we can't
+            // use lexicals.
+            STable rcls = (cls == "Sub") ? Kernel.SubMO :
+                (cls == "Routine") ? Kernel.RoutineMO :
+                (cls == "Method") ? Kernel.MethodMO :
+                (cls == "Submethod") ? Kernel.SubmethodMO :
+                (cls == "WhateverCode") ? Kernel.WhateverCodeMO :
+                (cls == "Block") ? Kernel.BlockMO :
+                (cls == "Code") ? Kernel.CodeMO : null;
+
+            return rcls;
+        }
+
         object Call(object[] args) {
             if (TraceDown) {
                 Console.WriteLine(args.Length);
@@ -4766,6 +4780,46 @@ dynamic:
                 return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
+            } else if (cmd == "sub_run_once") {
+                return (((SubInfo)Handle.Unbox(args[1])).special &
+                        RuntimeUnit.SUB_RUN_ONCE) != 0;
+            } else if (cmd == "sub_outervar") {
+                return ((SubInfo)Handle.Unbox(args[1])).outervar;
+            } else if (cmd == "sub_name") {
+                return ((SubInfo)Handle.Unbox(args[1])).name;
+            } else if (cmd == "sub_methodof") {
+                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).methodof);
+            } else if (cmd == "sub_outer") {
+                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).outer);
+            } else if (cmd == "sub_class") {
+                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).mo.name);
+            } else if (cmd == "sub_body_of") {
+                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).body_of);
+            } else if (cmd == "sub_in_class") {
+                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).in_class);
+            } else if (cmd == "sub_cur_pkg") {
+                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).cur_pkg);
+            } else if (cmd == "sub_set_methodof") {
+                ((SubInfo)Handle.Unbox(args[1])).methodof =
+                    (STable)Handle.Unbox(args[2]);
+                return null;
+            } else if (cmd == "sub_set_body_of") {
+                ((SubInfo)Handle.Unbox(args[1])).body_of =
+                    (STable)Handle.Unbox(args[2]);
+                return null;
+            } else if (cmd == "sub_set_in_class") {
+                ((SubInfo)Handle.Unbox(args[1])).in_class =
+                    (STable)Handle.Unbox(args[2]);
+                return null;
+            } else if (cmd == "sub_set_outervar") {
+                ((SubInfo)Handle.Unbox(args[1])).outervar = (string)args[2];
+                return null;
+            } else if (cmd == "sub_set_name") {
+                ((SubInfo)Handle.Unbox(args[1])).name = (string)args[2];
+                return null;
+            } else if (cmd == "sub_set_class") {
+                ((SubInfo)Handle.Unbox(args[1])).mo = ResolveSubClass((string)args[2]);
+                return null;
             } else if (cmd == "sub_lookup_lex") {
                 SubInfo from = (SubInfo)Handle.Unbox(args[1]);
                 string  lkey = (string)args[2];
@@ -4931,23 +4985,16 @@ dynamic:
                 SubInfo outer = (SubInfo)Handle.Unbox(args[2]);
                 string cls = (string)args[3];
                 STable pkg = (STable)Handle.Unbox(args[4]);
-                bool once = (bool)args[5];
+                STable icl = (STable)Handle.Unbox(args[5]);
+                bool once = (bool)args[6];
 
-                // this happens before lexicals are created, so we can't
-                // use lexicals.
-                STable rcls = (cls == "Sub") ? Kernel.SubMO :
-                    (cls == "Routine") ? Kernel.RoutineMO :
-                    (cls == "Method") ? Kernel.MethodMO :
-                    (cls == "Submethod") ? Kernel.SubmethodMO :
-                    (cls == "WhateverCode") ? Kernel.WhateverCodeMO :
-                    (cls == "Block") ? Kernel.BlockMO :
-                    (cls == "Code") ? Kernel.CodeMO : null;
-
+                STable rcls = ResolveSubClass(cls);
                 if (rcls == null)
                     return new Exception("sub-class lookup fail for " + cls);
 
                 SubInfo n = new SubInfo(Backend.currentUnit, name, outer,
                         rcls, pkg, once);
+                n.in_class = icl;
                 if (n.outer != null && n.outer.unit == Backend.currentUnit)
                     n.outer.children.Add(n);
                 Backend.currentUnit.our_subs.Add(n);
