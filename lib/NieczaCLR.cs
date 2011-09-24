@@ -567,6 +567,13 @@ for $args (0..9) {
             return th.caller;
         }
 
+        static Frame dispose_handler(Frame th) {
+            object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
+            ((IDisposable)o).Dispose();
+            th.caller.resultSlot = Kernel.NilP.mo.typeVar;
+            return th.caller;
+        }
+
         static Frame Str_handler(Frame th) {
             P6any ro = ((Variable)th.lex0).Fetch();
             object o = Kernel.UnboxAny<object>(ro);
@@ -627,6 +634,17 @@ for $args (0..9) {
                 if (fi.DeclaringType == t)
                     needNewWrapper.Add(fi.Name);
                 MultiAdd(allMembers, fi.Name, fi, new ParameterInfo[0]);
+            }
+
+            if (typeof(IDisposable).IsAssignableFrom(t)) {
+                SubInfo si;
+
+                si = new SubInfo("KERNEL dispose-hack", dispose_handler);
+                si.sig_i = new int[] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                };
+                si.sig_r = new object[] { "self" };
+                m.AddMethod(0, "dispose-hack", Kernel.MakeSub(si, null));
             }
 
             if (t == typeof(object)) {
