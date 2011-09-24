@@ -802,6 +802,68 @@ for $args (0..9) {
                         clr = obj;
                 }
             }
+            else if (obj.Does(Kernel.RealMO)) {
+                // fractional value
+
+                if (ty == typeof(decimal)) {
+                    // decimal is for people who care about exactness
+                    int rk;
+                    P6any n = Builtins.GetNumber(var, obj, out rk);
+                    BigInteger num, den;
+                    if (rk == Builtins.NR_FATRAT) {
+                        FatRat r = Kernel.UnboxAny<FatRat>(n);
+                        num = r.num; den = r.den;
+                    }
+                    else if (rk == Builtins.NR_FIXRAT) {
+                        Rat r = Kernel.UnboxAny<Rat>(n);
+                        num = r.num; den = r.den;
+                    }
+                    else if (rk == Builtins.NR_BIGINT) {
+                        num = Kernel.UnboxAny<BigInteger>(n); den = BigInteger.One;
+                    }
+                    else if (rk == Builtins.NR_FIXINT) {
+                        num = Kernel.UnboxAny<int>(n); den = BigInteger.One;
+                    }
+                    else {
+                        return false;
+                    }
+                    BigInteger div, rem;
+                    int scale = 0;
+                    while (true) {
+                        div = BigInteger.DivRem(den, 10, out rem);
+                        if (rem.Sign != 0) break;
+                        den = div;
+                        scale++;
+                    }
+                    while (true) {
+                        div = BigInteger.DivRem(den, 5, out rem);
+                        if (rem.Sign != 0) break;
+                        den = div;
+                        num *= 2;
+                        scale++;
+                    }
+                    while (true) {
+                        div = BigInteger.DivRem(den, 2, out rem);
+                        if (rem.Sign != 0) break;
+                        den = div;
+                        num *= 5;
+                        scale++;
+                    }
+                    if (den != BigInteger.One)
+                        return false;
+                    if (scale > 28)
+                        return false;
+                    int[] bits = decimal.GetBits((decimal)num);
+                    bits[3] = scale << 16;
+                    clr = new decimal(bits);
+                } else {
+                    double val = obj.mo.mro_raw_Numeric.Get(var);
+                    if (ty == typeof(float))
+                        clr = (object)(float)val;
+                    else if (ty == typeof(double) || ty == typeof(object))
+                        clr = (object)val;
+                }
+            }
             else if (obj.Does(Kernel.StrMO)) {
                 string s = Kernel.UnboxAny<string>(obj);
                 if (ty == typeof(char) && s.Length == 1)
