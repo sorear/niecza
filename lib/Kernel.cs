@@ -1005,6 +1005,7 @@ namespace Niecza {
         public int line;
         public int pos;
 
+        public abstract void Init(Frame f);
         public abstract object Get(Frame f);
         public virtual void Set(Frame f, object to) {
             throw new NieczaException("Variable cannot be bound");
@@ -1029,44 +1030,38 @@ namespace Niecza {
 
     public abstract class LIVarish : LexInfo {
         public int index;
-        public FieldInfo stg;
-        bool once;
 
-        public LIVarish(bool once) { this.once = once; }
         public LIVarish() { }
 
         public override int SigIndex() { return index; }
         public override void BindFields() {
-            if (!once && (IsDynamicName(name) ||
-                        (owner.special & RuntimeUnit.SUB_RUN_ONCE) == 0)) {
-                index = owner.num_lex_slots++;
-            } else {
-                index = -1;
-                stg = owner.unit.NewField('L' + owner.name + '_' + name,
-                        typeof(Variable));
-            }
+            index = owner.num_lex_slots++;
         }
 
         public override object Get(Frame f) {
-            return index >= 0 ? f.GetDynamic(index) :
-                ((Variable)stg.GetValue(null));
+            return f.GetDynamic(index);
         }
 
         public override void Set(Frame f, object to) {
-            if (index >= 0)
-                f.SetDynamic(index, to);
-            else
-                stg.SetValue(null, to);;
+            Console.WriteLine("S {0} {1:X}", name, f.GetHashCode());
+            f.SetDynamic(index, to);
         }
 
         internal override ClrOp GetCode(int up) {
-            return (index < 0) ? (ClrOp) new ClrGetSField(stg) :
-                new ClrPadGet(up, index);
+            Console.WriteLine("GC {0} {1:X}", name, owner.protopad.GetHashCode());
+            if ((owner.special & RuntimeUnit.SUB_RUN_ONCE) != 0)
+                return new ClrProtoGet(index,
+                    Backend.currentUnit.RefConstant(
+                        owner.name, owner.protopad, typeof(Frame)).head);
+            return new ClrPadGet(up, index);
         }
 
         internal override ClrOp SetCode(int up, ClrOp to) {
-            return (index < 0) ? (ClrOp)new ClrSetSField(stg, to) :
-                (ClrOp)new ClrPadSet(up, index, to);
+            if ((owner.special & RuntimeUnit.SUB_RUN_ONCE) != 0)
+                return new ClrProtoSet(index,
+                    Backend.currentUnit.RefConstant(
+                        owner.name, owner.protopad, typeof(Frame)).head, to);
+            return new ClrPadSet(up, index, to);
         }
     }
 
@@ -1075,6 +1070,8 @@ namespace Niecza {
     public class LICommon : LexInfo {
         public readonly string hkey;
         public LICommon(string hkey) { this.hkey = hkey; }
+
+        public override void Init(Frame f) { }
 
         public override object Get(Frame f) {
             return Kernel.currentGlobals[hkey].v;
@@ -1095,13 +1092,34 @@ namespace Niecza {
         }
     }
 
-    public class LIHint : LIVarish {
-        public LIHint() : base(true) { }
+    public class LIHint : LexInfo {
+        public BValue var;
+        public LIHint() { }
+        public override void Init(Frame f) { }
+        public override void BindFields() {
+            var = owner.AddHint(name);
+        }
+
+        public override object Get(Frame f) { return var.v; }
+        public override void Set(Frame f, object to) { var.v = (Variable)to; }
+
+        internal override ClrOp GetCode(int up) {
+            return new ClrGetField(Tokens.BValue_v,
+                Backend.currentUnit.RefConstant(name, var, null).head);
+        }
+
+        internal override ClrOp SetCode(int up, ClrOp to) {
+            return new ClrSetField(Tokens.BValue_v,
+                Backend.currentUnit.RefConstant(name, var, null).head, to);
+        }
     }
 
     public class LISub : LIVarish {
         public SubInfo def;
         public LISub(SubInfo def) { this.def = def; }
+        public override void Init(Frame f) {
+            Set(f, Kernel.NewROScalar(def.protosub));
+        }
     }
 
     public class LISimple : LIVarish {
@@ -1117,14 +1135,38 @@ namespace Niecza {
             this.flags = flags;
             this.type  = type;
         }
+        public override void Init(Frame f) {
+            if ((flags & NOINIT) != 0)
+                return;
+            if ((flags & ROINIT) != 0)
+                Set(f, Kernel.AnyMO.typeVar);
+            else if ((flags & DEFOUTER) != 0)
+                Set(f, f.info.GetOuterTopic(f));
+            else if ((flags & LIST) != 0)
+                Set(f, Kernel.CreateArray());
+            else if ((flags & HASH) != 0)
+                Set(f, Kernel.CreateHash());
+            else
+                Set(f, Kernel.NewTypedScalar(type));
+        }
     }
 
-    public class LILabel : LIVarish { }
-    public class LIDispatch : LIVarish { }
+    public class LILabel : LIVarish {
+        public override void Init(Frame f) {
+            Set(f, Kernel.NewLabelVar(f, name));
+        }
+    }
+
+    public class LIDispatch : LIVarish {
+        public override void Init(Frame f) {
+            throw new Exception("MMD NYI");
+        }
+    }
 
     public class LIAlias : LexInfo {
         public string to;
         public LIAlias(string to) { this.to = to; }
+        public override void Init(Frame f) { }
         object Common(Frame f, bool set, object bind) {
             Frame cr = f;
             LexInfo li = null;
@@ -1162,8 +1204,9 @@ namespace Niecza {
         public STable pkg;
         public LIPackage(STable pkg) { this.pkg = pkg; }
         public override object Get(Frame f) { return pkg.typeVar; }
+        public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
-            return CLRBackend.CLRBackend.currentUnit.TypeConstant(pkg).head;
+            return Backend.currentUnit.TypeConstant(pkg).head;
         }
     }
 
@@ -1587,6 +1630,11 @@ noparams:
             return th;
         }
 
+        internal Variable GetOuterTopic(Frame f) {
+            for (int i = 0; i < outer_topic_rank; i++) f = f.outer;
+            return (Variable)f.GetDynamic(outer_topic_key);
+        }
+
         static SubInfo AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub", AutoThreadSubC);
         static Frame AutoThreadSubC(Frame th) {
             Variable[] src = (Variable[]) th.lex4;
@@ -1641,6 +1689,34 @@ noparams:
             return false;
         }
 
+        internal void AddLexical(string name, LexInfo li) {
+            li.owner = this;
+            li.name  = name;
+            dylex[name] = li;
+            dylex_filter |= FilterForName(name);
+            if (name == "self")
+                self_key = li.SigIndex();
+            if (protopad != null)
+                li.Init(protopad);
+        }
+
+        internal void CreateProtopad() {
+            if (protopad != null)
+                return;
+            if (outer != null)
+                outer.CreateProtopad();
+
+            // protopad is set when the parent's protopad is created,
+            // or when we are
+            protopad = new Frame(null, outer != null ? outer.protopad : null,
+                this, protosub);
+
+            foreach (SubInfo z in children)
+                z.protosub = Kernel.MakeSub(z, protopad);
+            foreach (LexInfo li in dylex.Values)
+                li.Init(protopad);
+        }
+
         public static uint FilterForName(string name) {
             if (name.Length < 2 || name[1] != '*') return 0;
             uint hash = (uint)(name.GetHashCode() * FILTER_SALT);
@@ -1685,7 +1761,13 @@ noparams:
             used_in_scope = new Dictionary<string,UsedInScopeInfo>();
             dylex = new Dictionary<string,LexInfo>();
 
-            if (once) special |= RuntimeUnit.SUB_RUN_ONCE;
+            if (outer == null || outer.protopad != null)
+                protosub = Kernel.MakeSub(this, outer == null ?
+                        null : outer.protopad);
+            if (once) {
+                special |= RuntimeUnit.SUB_RUN_ONCE;
+                CreateProtopad();
+            }
         }
 
         public SubInfo(string name, DynBlockDelegate code) :

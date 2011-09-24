@@ -219,7 +219,7 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
-                if (CLRBackend.Verbose > 0)
+                if (Backend.Verbose > 0)
                     Console.WriteLine("Loading {0} {1}...", JScalar.S(xr[0]),i);
                 if (JScalar.S(xr[0]) == "sub") {
                     xref[i] = new StaticSub(this, xr, (code != null &&
@@ -244,7 +244,7 @@ namespace Niecza.CLRBackend {
                     id_to_tdep.Add(this);
                     continue;
                 }
-                //Unit o = CLRBackend.GetUnit(n);
+                //Unit o = Backend.GetUnit(n);
                 //id_to_tdep.Add(o);
                 //o.BindDepends(false);
             }
@@ -253,7 +253,7 @@ namespace Niecza.CLRBackend {
             string dname = name.Replace("::",".");
 
             //clrAssembly = Assembly.LoadFile(Path.Combine(
-            //            CLRBackend.Current.dir, dname + ".dll"));
+            //            Backend.Current.dir, dname + ".dll"));
             clrType = clrAssembly.GetType(dname);
             Dictionary<string,FieldInfo> df =
                 new Dictionary<string,FieldInfo>();
@@ -694,7 +694,7 @@ namespace Niecza.CLRBackend {
             index = (int)((JScalar)from[ofs+1]).num;
             name  = (from.Length - ofs > 2) ? ((JScalar)from[ofs+2]).str : null;
         }
-        public T Resolve<T>() { return default(T); } // CLRBackend.Resolve(this); }
+        public T Resolve<T>() { return default(T); } // Backend.Resolve(this); }
     }
 
     class Package {
@@ -975,7 +975,7 @@ namespace Niecza.CLRBackend {
         ClrOp GetProtoFrame() {
             if (owner.protopad != null)
                 return new ClrGetSField(owner.protopad);
-            StaticSub rs = null;//CLRBackend.Current.unit.mainline_ref.Resolve<StaticSub>();
+            StaticSub rs = null;//Backend.Current.unit.mainline_ref.Resolve<StaticSub>();
             ClrOp r = new ClrGetSField(rs.protopad);
             while (rs != owner) {
                 rs = rs.outer.Resolve<StaticSub>();
@@ -1159,7 +1159,7 @@ namespace Niecza.CLRBackend {
             il.Emit(OpCodes.Newarr, ty);
             if (vec.Length != 0) {
                 FieldBuilder fb = tb.DefineInitializedData(
-                        "A" + (CLRBackend.currentUnit.nextid++), vec, 0);
+                        "A" + (Backend.currentUnit.nextid++), vec, 0);
                 il.Emit(OpCodes.Dup);
                 il.Emit(OpCodes.Ldtoken, fb);
                 il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
@@ -1236,7 +1236,7 @@ namespace Niecza.CLRBackend {
             }
 
             if (ix >= Tokens.NumInt32 &&
-                    (CLRBackend.Verifiable || t.IsValueType)) {
+                    (Backend.Verifiable || t.IsValueType)) {
                 il.Emit(OpCodes.Unbox_Any, t);
             }
         }
@@ -2316,7 +2316,7 @@ namespace Niecza.CLRBackend {
                 return;
             cx.il.Emit(OpCodes.Ldarg_0);
             cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_resultSlot);
-            if (CLRBackend.Verifiable || Returns.IsValueType)
+            if (Backend.Verifiable || Returns.IsValueType)
                 cx.il.Emit(OpCodes.Unbox_Any, Returns);
         }
     }
@@ -2691,7 +2691,7 @@ namespace Niecza.CLRBackend {
                 if (!effects_before_use || zyg[i].stmts.Length == 0) {
                     args.Add(zyg[i].head);
                 } else {
-                    string ln = "!spill" + CLRBackend.currentUnit.nextid++;
+                    string ln = "!spill" + Backend.currentUnit.nextid++;
                     args.Add(new ClrPeekLet(ln, zyg[i].head.Returns));
                     stmts.Add(new ClrPushLet(ln, zyg[i].head));
                     pop.Add(ln);
@@ -2775,7 +2775,7 @@ namespace Niecza.CLRBackend {
             Resultify(ref iftrue_s, ref iftrue_h);
             Resultify(ref iffalse_s, ref iffalse_h);
 
-            RuntimeUnit ru = CLRBackend.currentUnit;
+            RuntimeUnit ru = Backend.currentUnit;
             string l1 = "!else"  + (ru.nextid++);
             string l2 = "!endif" + (ru.nextid++);
 
@@ -2801,7 +2801,7 @@ namespace Niecza.CLRBackend {
 
         // this is simplified a bit since body is always void
         public static CpsOp While(bool until, bool once, CpsOp cond, CpsOp body) {
-            RuntimeUnit ru = CLRBackend.currentUnit;
+            RuntimeUnit ru = Backend.currentUnit;
             string l1 = "!again" + (ru.nextid++);
             string l2 = "!check" + (ru.nextid++);
 
@@ -3344,8 +3344,8 @@ namespace Niecza.CLRBackend {
             };
             handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
                 List<ClrEhSpan> xn = new List<ClrEhSpan>();
-                string s = "!start" + CLRBackend.currentUnit.nextid++;
-                string e = "!end" + CLRBackend.currentUnit.nextid++;
+                string s = "!start" + Backend.currentUnit.nextid++;
+                string e = "!end" + Backend.currentUnit.nextid++;
                 for (int i = 2; i < zyg.Length - 2; i += 2) {
                     string vn = JScalar.S(zyg[i]);
                     string ln = JScalar.S(zyg[i+1]);
@@ -4086,7 +4086,7 @@ dynamic:
                     if ((f & LISimple.NOINIT) != 0) continue;
 
                     object bit;
-                    CpsOp tc = CLRBackend.currentUnit.TypeConstant(ls.type);
+                    CpsOp tc = Backend.currentUnit.TypeConstant(ls.type);
                     if ((f & LISimple.ROINIT) != 0) {
                         bit = a(j("class_ref"), j("typeVar"), j("Any"));
                     } else if ((f & LISimple.DEFOUTER) != 0) {
@@ -4175,22 +4175,22 @@ dynamic:
                     throw new Exception("Unhandled nam operator " + tag);
                 handlers[tag] = handler = MakeTotalHandler(Methody(null, mi));
             }
-            if (CLRBackend.Verbose > 1)
+            if (Backend.Verbose > 1)
                 Console.WriteLine("enter " + tag);
             CpsOp r = handler(this, rnode);
-            if (CLRBackend.Verbose > 1)
+            if (Backend.Verbose > 1)
                 Console.WriteLine("exit " + tag);
             return r;
         }
     }
 
-    public class CLRBackend {
+    public class Backend {
     //    internal AssemblyBuilder ab;
     //    internal ModuleBuilder mob;
     //    internal TypeBuilder tb;
     //    internal bool dynamic;
 
-    //    [ThreadStatic] internal static CLRBackend Current;
+    //    [ThreadStatic] internal static Backend Current;
     //    [ThreadStatic] internal static Frame repl_frame;
 
     //    internal int nextarray;
@@ -4207,7 +4207,7 @@ dynamic:
         public static bool Verifiable =
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
 
-    //    CLRBackend(string dir, string mobname, string filename) {
+    //    Backend(string dir, string mobname, string filename) {
     //        dynamic = (filename == null);
     //        AssemblyName an = new AssemblyName(mobname);
     //        this.dir = dir;
@@ -4240,7 +4240,7 @@ dynamic:
     //            string dp = JScalar.S(((object[])o)[0]);
     //            if (dp == unit.name) continue;
     //            thaw.Add(CpsOp.Sink(CpsOp.MethodCall(Tokens.Kernel_BootModule,
-    //                CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(CLRBackend.GetUnit(dp).clrType.GetMethod("BOOT")))));
+    //                CpsOp.StringLiteral(dp), CpsOp.DBDLiteral(Backend.GetUnit(dp).clrType.GetMethod("BOOT")))));
     //        }
     //        int unit_slot = thaw.Count;
     //        thaw.Add(null);
@@ -4498,7 +4498,7 @@ dynamic:
     //                    CpsOp.GetField(lex, CpsOp.CallFrame()),
     //                    CpsOp.StringLiteral("*resume_" + s),
     //                    CpsOp.GetSField(m.subinfo)));
-    //                Unit su = CLRBackend.GetUnit(s);
+    //                Unit su = Backend.GetUnit(s);
     //                s = (su.setting_ref != null) ? su.setting_ref.unit : null;
     //                m = su.mainline_ref.Resolve<StaticSub>();
     //            }
@@ -4528,7 +4528,7 @@ dynamic:
 
     //        CpsOp mkheap;
     //        // https://bugzilla.novell.com/show_bug.cgi?id=696817
-    //        if (CLRBackend.Current.dynamic) {
+    //        if (Backend.Current.dynamic) {
     //            mkheap = CpsOp.Null(typeof(byte[]));
     //            RuntimeUnit.RegisterHeap(unit.name, unit.thaw_heap.ToArray());
     //        } else {
@@ -4608,10 +4608,10 @@ dynamic:
     //    //    avail_units[root.name] = root;
     //    //    root.is_eval = (argv == null);
     //    //    root.is_mainish = true;
-    //    //    CLRBackend old_Current = Current;
+    //    //    Backend old_Current = Current;
     //    //    Dictionary<string,Unit> old_used_units = used_units;
     //    //    string op = Environment.GetEnvironmentVariable("NIECZA_FORCE_SAVE") == null ? null : root.name + "-TEMP.dll";
-    //    //    CLRBackend c = new CLRBackend(dir, root.name, op);
+    //    //    Backend c = new Backend(dir, root.name, op);
     //    //    Current = c;
 
     //    //    used_units = new Dictionary<string, Unit>();
@@ -4646,7 +4646,7 @@ dynamic:
     //    //        return;
     //    //    }
     //    //    if (args.Length != 4) {
-    //    //        Console.Error.WriteLine("usage : CLRBackend DIR UNITFILE OUTFILE ISMAIN");
+    //    //        Console.Error.WriteLine("usage : Backend DIR UNITFILE OUTFILE ISMAIN");
     //    //        return;
     //    //    }
     //    //    string dir      = args[0];
@@ -4656,7 +4656,7 @@ dynamic:
     //    //    string tx = File.ReadAllText(Path.Combine(dir, unitfile));
     //    //    Unit root = new Unit((object[])Reader.Read(tx),
     //    //            (object[])Reader.Read(tx.Substring(tx.IndexOf("\n")+1)));
-    //    //    CLRBackend c = new CLRBackend(dir, root.name.Replace("::","."), outfile);
+    //    //    Backend c = new Backend(dir, root.name.Replace("::","."), outfile);
     //    //    avail_units[root.name] = root;
     //    //    Current = c;
 
@@ -4737,10 +4737,7 @@ dynamic:
             if (li.name != "$_" && li.owner.used_in_scope.TryGetValue(li.name, out uisi)) // $_ HACK
                 return new object[] { "already-bound", li.name, uisi.levels,
                     uisi.line, li.file, li.line, uisi.orig_file, uisi.orig_line };
-            li.owner.dylex[li.name] = li;
-            li.owner.dylex_filter |= SubInfo.FilterForName(li.name);
-            if (li.name == "self")
-                li.owner.self_key = li.SigIndex();
+            li.owner.AddLexical(li.name, li);
             li.BindFields();
 
             return new object[] { "" };
@@ -4761,12 +4758,12 @@ dynamic:
                         (string)args[2], (string)args[3], (string)args[4],
                         (bool)args[5], (bool)args[6]));
             } else if (cmd == "set_current_unit") {
-                CLRBackend.currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
-                Kernel.currentGlobals = CLRBackend.currentUnit.globals;
+                Backend.currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
+                Kernel.currentGlobals = Backend.currentUnit.globals;
                 return null;
             } else if (cmd == "set_mainline") {
-                CLRBackend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
-                CLRBackend.currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
+                Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
+                Backend.currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
                 return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
@@ -4888,7 +4885,7 @@ dynamic:
             } else if (cmd == "rel_pkg") {
                 bool auto = (bool)args[1];
                 STable pkg = args[2] == null ? null : (STable)Handle.Unbox(args[2]);
-                RuntimeUnit c = CLRBackend.currentUnit;
+                RuntimeUnit c = Backend.currentUnit;
                 for (int i = 3; i < args.Length; i++) {
                     string key = (string) args[i];
                     string who = "";
@@ -4950,11 +4947,11 @@ dynamic:
                 if (rcls == null)
                     return new Exception("sub-class lookup fail for " + cls);
 
-                SubInfo n = new SubInfo(CLRBackend.currentUnit, name, outer,
+                SubInfo n = new SubInfo(Backend.currentUnit, name, outer,
                         rcls, pkg, once);
-                if (n.outer != null && n.outer.unit == CLRBackend.currentUnit)
+                if (n.outer != null && n.outer.unit == Backend.currentUnit)
                     n.outer.children.Add(n);
-                CLRBackend.currentUnit.our_subs.Add(n);
+                Backend.currentUnit.our_subs.Add(n);
                 return new Handle(n);
             } else if (cmd == "add_my_name") {
                 STable  type  = (STable)Handle.Unbox(args[6]);
@@ -4974,7 +4971,7 @@ dynamic:
                     return new Exception("NYI usage of a nonstandard package");
                 string  who   = Kernel.UnboxAny<string>(pkg.who);
 
-                string err = CLRBackend.currentUnit.NsBind(who, pname, null,
+                string err = Backend.currentUnit.NsBind(who, pname, null,
                         (string)args[3], (int)args[4]);
                 if (err != null) return new Exception(err);
                 return AddLexical(args, new LICommon((char)who.Length + who + pname));
