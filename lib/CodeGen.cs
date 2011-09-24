@@ -4738,7 +4738,6 @@ dynamic:
                 return new object[] { "already-bound", li.name, uisi.levels,
                     uisi.line, li.file, li.line, uisi.orig_file, uisi.orig_line };
             li.owner.AddLexical(li.name, li);
-            li.BindFields();
 
             return new object[] { "" };
         }

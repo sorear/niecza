@@ -1043,16 +1043,20 @@ namespace Niecza {
         }
 
         public override void Set(Frame f, object to) {
-            Console.WriteLine("S {0} {1:X}", name, f.GetHashCode());
             f.SetDynamic(index, to);
         }
 
         internal override ClrOp GetCode(int up) {
-            Console.WriteLine("GC {0} {1:X}", name, owner.protopad.GetHashCode());
-            if ((owner.special & RuntimeUnit.SUB_RUN_ONCE) != 0)
-                return new ClrProtoGet(index,
+            if ((owner.special & RuntimeUnit.SUB_RUN_ONCE) != 0) {
+                return new ClrUnboxAny(Tokens.Variable,
+                        new ClrMethodCall(false, Tokens.Frame.GetMethod("GetDynamic"),
                     Backend.currentUnit.RefConstant(
-                        owner.name, owner.protopad, typeof(Frame)).head);
+                        owner.name, owner.protopad, typeof(Frame)).head,
+                    new ClrIntLiteral(typeof(int), index)));
+                //return new ClrProtoGet(index,
+                //    Backend.currentUnit.RefConstant(
+                //        owner.name, owner.protopad, typeof(Frame)).head);
+            }
             return new ClrPadGet(up, index);
         }
 
@@ -1694,6 +1698,7 @@ noparams:
             li.name  = name;
             dylex[name] = li;
             dylex_filter |= FilterForName(name);
+            li.BindFields();
             if (name == "self")
                 self_key = li.SigIndex();
             if (protopad != null)
