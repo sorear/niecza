@@ -11,11 +11,11 @@ use warnings;
 package Foo;
 sub baz {
     my ($self,$arg) = @_;
-    print "calling method\n";
+    print "Just another $arg\n";
 }
 sub new {
     bless {},"Foo";
 }
 PERL5
 my $foo = eval(:lang<perl5>,'Foo->new');
-$foo.baz(eval(:lang<perl5>,'"Hello World"'));
+$foo.baz(eval(:lang<perl5>,'"Perl hacker"'));

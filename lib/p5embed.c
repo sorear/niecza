@@ -40,16 +40,18 @@ void p5embed_dispose()
   PERL_SYS_TERM();
 }
 
-void p5method_call(char* name,SV* invocant) {
+void p5method_call(char* name,int* args,int n) {
   dSP;
 
-  SvREFCNT_inc(invocant);
 
   /*ENTER;
   SAVETMPS;*/
 
   PUSHMARK(SP);
-  XPUSHs(invocant);
+  int i;
+  for (i=0;i<n;i++) {
+    XPUSHs(args[i]);
+  }
   PUTBACK;
 
   call_method(name,G_DISCARD);

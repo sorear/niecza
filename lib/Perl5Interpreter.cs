@@ -42,14 +42,32 @@ public class SVVariable : Variable {
 }
 public class SVany : P6any {
         [DllImport("obj/p5embed.so", EntryPoint="p5method_call")]
-        public static extern IntPtr MethodCall(string code,IntPtr invocant);
+        public static extern IntPtr MethodCall(
+            string name,
+            IntPtr[] foo,
+            int n
+        );
+
+        public static IntPtr VariableToSV(Variable var) {
+            P6any obj = var.Fetch();
+            if (obj is SVany) {
+                return ((SVany)obj).sv;
+            } else {
+                throw new NieczaException("can't convert argument to p5 type");
+            }
+        }
 
         public IntPtr sv;
         public override Frame InvokeMethod(Frame caller, string name,
                 Variable[] pos, VarHash named) {
-                MethodCall(name,sv);
+                IntPtr[] args = new IntPtr[pos.Length];
+                for (int i=0;i<pos.Length;i++) {
+                    args[i] = VariableToSV(pos[i]);
+                }
+                MethodCall(name,args,args.Length);
                 return caller;
         }
+
         public SVany(IntPtr _sv) {
             mo = Kernel.AnyMO;
             sv = _sv;
