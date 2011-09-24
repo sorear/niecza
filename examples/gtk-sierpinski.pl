@@ -1,9 +1,9 @@
-# Main documentation: http://docs.go-mono.com, particularly Gnome
-# (for Gdk and Gtk) and Mono (for Cairo) libraries.
+# Main documentation: http://docs.go-mono.com, particularly
+# Gnome (for Gdk and Gtk) and Mono (for Cairo) libraries.
 # See also: The X-Windows Disaster at http://www.art.net/~hopkins/Don/unix-haters/handbook.html
 
-constant $GTK = "gtk-sharp,Version=2.12.0.0,Culture=neutral,PublicKeyToken=35e10195dab3c99f";
-constant $GDK = "gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f";
+constant $GTK  = "gtk-sharp,  Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f";
+constant $GDK  = "gdk-sharp,  Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f";
 constant $GLIB = "glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f";
 # use 'gacutil -l' to look up similar module details
 
@@ -21,13 +21,13 @@ my $drawingarea = GtkDrawingArea.new;
 $drawingarea.add_ExposeEvent: sub ($obj, $args) {
     $args;  # suppress 'declared but not used' warnings
     my $cc = GdkCairoHelper.Create($obj.GdkWindow);  # Cairo Context
-    my $windowX; my $windowY; my $windowWidth; my $windowHeight; my $windowDepth;
-    # TODO: the following line seems to pass parameters by value, it needs to pass by reference to integers
+    # TODO: the following two lines pass parameters by value, need to pass by references to integers
+    # my $windowX; my $windowY; my $windowWidth; my $windowHeight; my $windowDepth;
+    # $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
     # Tracked as https://github.com/sorear/niecza/issues/57
-    $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
-    # TODO: remove the following cheat that works around the above problem
-    $windowWidth = $windowSizeX; $windowHeight = $windowSizeY;
-    $cc.SetSourceRGB(0, 1, 0); $cc.Paint();  # Make a green background
+    # TODO: remove the following one line cheat that works around the above problem
+    my $windowWidth = $windowSizeX; my $windowHeight = $windowSizeY;
+    $cc.SetSourceRGB(0.6.Num, 1, 0.6.Num); $cc.Paint();  # light green background
     # Start the recursive drawing process
     my $x0=0; my $y0=0; my  $x1=$windowWidth-1; my $y1=$windowHeight/2;
     my $x2=0; my $y2=$windowHeight-1;
@@ -35,10 +35,7 @@ $drawingarea.add_ExposeEvent: sub ($obj, $args) {
     my $label = sprintf("%d x %d, %d levels", $windowWidth, $windowHeight, $depth);
     say $label;
     $cc.Target.Dispose;
-    # TODO: Currently the following error appears at exit:
-    # Cairo.Context: called from finalization thread, programmer is missing a call to Dispose
-    # The following line should fix the above, but gives this error: Unable to resolve method Dispose
-    # $cc.Dispose(); # Should do: ((IDisposable) cc).Dispose();
+    $cc.dispose-hack; # Should be $cc.Dispose but CLR interop cannot call that
     # Tracked as https://github.com/sorear/niecza/issues/56
 };
 $window.add_DeleteEvent: sub ($obj, $args) {
@@ -51,8 +48,9 @@ Application.Run;
 
 sub Sierpinski($cc, $x0, $y0, $x1, $y1, $x2, $y2, $colorflag, $depth is copy)
 {
-    if $colorflag { $cc.SetSourceRGB(0, 0, 1); }
-    else { $cc.SetSourceRGB(1, 1, 0); }
+    if $colorflag { $cc.SetSourceRGB(0.6.Num, 0, 0.8.Num); }  # indigo
+    else          { $cc.SetSourceRGB(1, 1, 0.8.Num); }  # light yellow
+    # First draw the entire main triangle in one color
     $cc.MoveTo($x0.Int, $y0.Int); $cc.LineTo($x1.Int, $y1.Int);
     $cc.LineTo($x2.Int, $y2.Int); $cc.LineTo($x0.Int, $y0.Int);
     $cc.Fill;
