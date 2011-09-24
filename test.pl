@@ -2259,7 +2259,7 @@ is (1, 2).one.perl, 'one(1, 2)', 'Any.one means one()';
 is (1, 2).all.perl, 'all(1, 2)', 'Any.all means all()';
 is (1, 2).none.perl, 'none(1, 2)', 'Any.none means none()';
 
-is { a => True }.any.perl, 'any("a")', 'Hash.any means any(keys)';
+is { a => True }.any.perl, any("a").perl, 'Hash.any means any(keys)';
 
 ok  ?(all( True,  True)), 'all(True, True)';
 nok ?(all( True, False)), '!all(True, False)';
