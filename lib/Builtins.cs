@@ -881,6 +881,22 @@ public partial class Builtins {
         }
     }
 
+    static Func<Variable,Variable,Variable> atan2_d = atan2;
+    public static Variable atan2(Variable a1, Variable a2) {
+        P6any o1 = a1.Fetch();
+        int r1;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any o2 = a2.Fetch();
+        int r2;
+        P6any n2 = GetNumber(a2, o2, out r2);
+
+        {
+            double v1 = PromoteToFloat(r1, n1);
+            double v2 = PromoteToFloat(r2, n2);
+            return MakeFloat(Math.Atan2(v1, v2));
+        }
+    }
+
     static Func<Variable,Variable> floor_d = floor;
     public static Variable floor(Variable a1) {
         P6any o1 = a1.Fetch();

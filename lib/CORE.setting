@@ -183,6 +183,7 @@ my class Cool {
     method acosech() { Q:CgOp { (acosech {self}) } }
     method cotanh() { Q:CgOp { (cotanh {self}) } }
     method acotanh() { Q:CgOp { (acotanh {self}) } }
+    method atan2($x = 1) { Q:CgOp { (atan2 {self} {$x}) } }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -2092,6 +2093,7 @@ sub cosech($x) { $x.cosech }
 sub acosech($x) { $x.acosech }
 sub cotanh($x) { $x.cotanh }
 sub acotanh($x) { $x.acotanh }
+sub atan2($y, $x = 1) { $y.atan2($x) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
