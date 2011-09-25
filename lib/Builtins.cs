@@ -489,6 +489,10 @@ public partial class Builtins {
         return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Kernel.ComplexMO);
     }
 
+     public static Variable MakeComplex(Complex z) {
+        return Kernel.BoxAnyMO<Complex>(z, Kernel.ComplexMO);
+    }
+
     public static Variable MakeParcel(params Variable[] bits) {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
@@ -874,25 +878,6 @@ public partial class Builtins {
         {
             double v1 = PromoteToFloat(r1, n1);
             return MakeFloat(Math.Exp(v1));
-        }
-    }
-
-    static Func<Variable,Variable> sin_d = sin;
-    public static Variable sin(Variable a1) {
-        P6any o1 = a1.Fetch();
-        int r1;
-        if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sin_d);
-        P6any n1 = GetNumber(a1, o1, out r1);
-
-        if (r1 == NR_COMPLEX) {
-            Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(Math.Sin(v1.re) * Math.Cosh(v1.im),
-                               Math.Cos(v1.re) * Math.Sinh(v1.im));
-        }
-        {
-            double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Sin(v1));
         }
     }
 
