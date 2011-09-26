@@ -1,0 +1,87 @@
+    Announce: Niecza Perl 6 v10
+
+This is the tenth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Breaking changes]
+
+
+
+[Major features]
+
+CLR interoperation is now fairly well supported!  You can create
+objects, call methods, get and set fields and properties, create
+delegates, etc from Perl 6 code.  See examples/ for usage ideas.
+(Examples by Martin Berends)
+
+The Mono.Posix dependency has been relaxed from load time to run
+time, meaning .NET support is back if you don't use file tests.
+
+
+
+[Minor new features]
+
+\qq[] syntax is now implemented.
+
+qp|| now returns a path object.
+
+New Test.pm6 methods succeeds_ok and fails_ok (and eval_ variants) to
+catch warnings.  (Design by flussence)
+
+@foo? and %foo? in signatures are now correctly supported.
+
+Many more trig functions now implemented. (Solomon Foster)
+
+Standard grammar has been updated, in particular bringing the new
+concept of regex separators; x ** y is now spelled x+ % y.  Do
+not expect other forms of % and %% to work just yet.
+
+
+
+[Selected bug fixes]
+
+sqrt now returns the correct value for arguments with a negative
+imaginary part.  Also sqrt(0) returns Num not Complex now.
+
+
+
+[Other]
+
+docs/compiler.pod is more current.  (Martin Berends)
+
+Prototyping has begun on Perl 5 interoperation.  (Paweł Murias)
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+I have an active branch (started this month) to unify compile-time and
+run-time metamodel representations, using serialization to bridge the
+gap.  It doesn't work yet, but when it does it will enable many
+improvements, most importantly real support for BEGIN and roles.
+
+[1] https://github.com/downloads/sorear/niecza/niecza-10.zip
+[2] https://github.com/sorear/niecza
