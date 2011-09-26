@@ -470,10 +470,16 @@ method quantified_atom($/) { # :: RxOp
 
     if defined $q<min> {
         my @z = $atom;
+        if $<separator> {
+            if $q<sep>:exists {
+                $/.CURSOR.sorry("Cannot use two separators in one quantified_atom");
+            }
+            for %( $<separator>.ast ) { $q{.key} = .value }
+        }
         push @z, $q<sep> if defined $q<sep>;
         # parsing quirk, x #`(1) ** #`(2) y, the 1* position is counted
         # as $<normspace> but the 2* is parsed by the quantifier
-        if $q<general> && %*RX<s> && ($q<space> || $<normspace>) {
+        if ($q<general> || @z[1]) && %*RX<s> && ($q<space> || $<normspace>) {
             if @z[1] {
                 @z[1] = ::RxOp::Sequence.new(zyg => [
                     ::RxOp::Sigspace.new, @z[1], ::RxOp::Sigspace.new]);
@@ -483,7 +489,8 @@ method quantified_atom($/) { # :: RxOp
         }
         $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
             nonlisty => $q<nonlisty>, closure => $q<closure>,
-            zyg => [@z], minimal => ($q<mod> && $q<mod> eq '?'));
+            opsep => $q<opsep>, zyg => [@z],
+            minimal => ($q<mod> && $q<mod> eq '?'));
     }
 
     if defined($q<mod>) && $q<mod> eq '' {
@@ -527,6 +534,12 @@ method quantifier:sym<**> ($/) {
     $h<general> = True;
     $h<space> = ?($<normspace>);
     make $h;
+}
+
+method separator($/) {
+    make { sep   => $<quantified_atom>.ast,
+           space => ?($<normspace>),
+           opsep => (substr($/.orig, $/.from+1, 1) // '') eq '%' };
 }
 
 method quantmod($/) {
