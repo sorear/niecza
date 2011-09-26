@@ -546,11 +546,7 @@ method quantmod($/) {
     my $t = ~$/;
     if $t eq '' { make Any; return Nil }
     if substr($t,0,1) eq ':' { $t = substr($t,1,chars($t)-1) }
-    if $t eq '+' {
-        $/.CURSOR.sorry('STD parses + as a quantmod but there is nothing at all in S05 to explain what it should _do_'); #XXX
-        make Any;
-        return Nil;
-    }
+    if $t eq '+' { $t = '' }
     make $t;
 }
 
