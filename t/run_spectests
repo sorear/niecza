@@ -1,2 +1,2 @@
 #!/bin/sh
-sed 's|^|t/spec/|' t/spectest.data | xargs prove -e 't/fudgeandrun' "$@"
+grep -v "^#" t/spectest.data | sed 's|^|t/spec/|' | xargs prove -e 't/fudgeandrun' "$@"
