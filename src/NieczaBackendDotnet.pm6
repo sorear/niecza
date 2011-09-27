@@ -231,6 +231,9 @@ class Type {
     method WRAP($p) { $p && self.new(peer => $p) }
     method is_package() { downcall("type_is_package", $!peer) }
     method closed() { downcall("type_closed", $!peer) }
+    method close() { downcall("type_close", $!peer) }
+    method type_kind() { downcall("type_kind", $!peer) }
+    method is_param_role() { downcall("type_is_param_role", $!peer) }
 }
 
 class Unit {
@@ -240,6 +243,7 @@ class Unit {
     method stubbed_stashes() {
         downcall("unit_stubbed_stashes", $!peer).map({ $_ ~~ Int ?? $_ !! Type.new(peer => $_)})
     }
+    method anon_stash() { downcall("unit_anon_stash", $!peer) }
     method stub_stash($pos, $type) { downcall("unit_stub_stash", $pos, $type.peer) }
     method set_current() { downcall("set_current_unit", $!peer) }
     method set_mainline($sub) { downcall("set_mainline", $sub.peer) }
@@ -254,6 +258,9 @@ class Unit {
         $k ?? Type.new(peer => $p) !! StaticSub.new(peer => $p)
     }
 
+    method create_type(:$name, :$class, :$who) {
+        Type.new(peer => downcall("type_create", $!peer, ~$name, ~$class, ~$who));
+    }
     method create_sub(:$name, :$class, :$outer, :$cur_pkg, :$in_class,
             :$run_once) {
         StaticSub.new(peer => downcall("create_sub", ~($name // 'ANON'),

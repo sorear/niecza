@@ -25,6 +25,9 @@ augment grammar STD::P6 {
         :my $longname;
         :my $*IN_DECL = 'package';
         :my $*HAS_SELF = '';
+        # augments in niecza are a bit weird because they always
+        # defer to INIT time
+        :my $*AUGMENT_BUFFER;
         :temp $*CURLEX;
         :temp $*SCOPE;
         :my $outer = $*CURLEX;
@@ -514,6 +517,108 @@ method routine_def ($/) {
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
+method open_package_def($, $/ = $*cursor) {
+    my $sub = $*CURLEX<!sub>;
+
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+
+    if $*SCOPE eq 'augment' {
+        my ($obj) = self.process_name($<longname>, :clean);
+        $*AUGMENT_BUFFER = [];
+
+        $/.CURSOR.trymop({
+            die "Augment requires a target" unless $obj;
+            die "Illegal augment of a role" if $obj.is_role;
+
+            $sub.set_body_of($obj);
+            $sub.set_in_class($obj);
+            $sub.set_cur_pkg($obj);
+            $sub.set_name("augment-$obj.name()");
+        });
+    } else {
+        my $class = $*PKGDECL;
+        if $class eq 'role' && $<signature> {
+            $sub.set_signature($<signature>.ast);
+            $class = 'prole';
+        }
+
+        $/.CURSOR.trymop({
+            my ($lexvar, $obj) = self.do_new_package($/, sub => $sub.outer,
+                :$class, name => $<longname>, scope => $*SCOPE);
+
+            $sub.set_outervar($lexvar);
+            $sub.set_body_of($obj);
+            $sub.set_in_class($obj);
+            $sub.set_cur_pkg($obj);
+
+            self.process_block_traits($/, $<trait>);
+            $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
+        });
+    }
+}
+
+method package_def ($/) {
+    my $sub = $*CURLEX<!sub>;
+    my $obj = $sub.body_of;
+
+    my $bodyvar = self.gensym;
+    $sub.outer.add_my_sub($bodyvar, $sub);
+    my $ast = ($<blockoid> // $<statementlist>).ast;
+
+    if defined $*AUGMENT_BUFFER {
+        # generate an INIT block to do the augment
+        my $ph = $*unit.create_sub(
+            outer      => $sub,
+            cur_pkg    => $sub.cur_pkg,
+            name       => "phaser-$sub.name()",
+            class      => 'Code',
+            run_once   => $sub.run_once);
+
+        my @ops;
+        for @( $*AUGMENT_BUFFER ) -> $mode, $name, $sym {
+            push @ops, CgOp._addmethod(CgOp.letvar('!mo'), $mode,
+                CgOp.str($name), CgOp.scopedlex($sym));
+        }
+        my $fin = CgOp.letn('!mo', CgOp.class_ref('mo', $obj),
+            @ops, CgOp._invalidate(CgOp.letvar('!mo')), CgOp.corelex('Nil'));
+
+        $ph.finish(::Op::CgOp.new(op => $fin));
+        $sub.create_static_pad;
+        $ph.set_phaser(+::Metamodel::Phaser::INIT);
+
+        make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
+    }
+    else {
+        if $<stub> {
+            $*unit.stub_stash($/.from, $obj);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
+        }
+        else {
+            $/.CURSOR.trymop({ $obj.close; });
+
+            if $obj.is_param_role {
+                # return the frame object so that role instantiation can
+                # find the cloned methods
+                $ast = ::Op::StatementList.new(|node($/), children => [
+                    $ast, mkcall($/, '&callframe') ]);
+                $sub.create_static_pad;
+                $obj.set_instantiation_block($sub);
+
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                    ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
+        }
+    }
+
+    $sub.finish($ast);
+}
+
 method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
         :$exports) {
 
@@ -546,22 +651,23 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
             $old = @linfo[4];
         } elsif defined $pkg {
             $old = $*unit.get($pkg, $head);
-            $old = $old && $*unit.deref($old);
         }
 
         my $lexed_already;
 
-        if $old && $old.WHAT === $class && !$old.closed {
+        if $old && ($old.?type_kind // '') eq $class && !$old.closed {
             $npkg = $old;
             $lexed_already = True;
         } elsif $scope eq 'our' {
-            my $opkg = $pkg // $*unit.deref($sub.cur_pkg);
-            $npkg = $class.new(name => $head, who => $opkg.who ~ '::' ~ $head);
-            $*unit.bind($opkg, $head, $npkg.xref, |mnode($/));
+            my $opkg = $pkg // $sub.cur_pkg;
+            $npkg = $*unit.create_type(name => $head, :$class,
+                who => $opkg.who ~ '::' ~ $head);
+            $*unit.bind($opkg, $head, $npkg, |mnode($/));
         } else {
             my $id = $*unit.anon_stash;
-            $npkg = $class.new(name => $head, who => "::$id");
-            $*unit.bind($*unit.abs_pkg(), $id, $npkg.xref, |mnode($/));
+            $npkg = $*unit.create_type(name => $head, :$class,
+                who => "::$id");
+            $*unit.bind($*unit.abs_pkg(), $id, $npkg, |mnode($/));
         }
 
         $lexname = (!$lexed_already && $scope ne 'anon' && !defined($pkg))

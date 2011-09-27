@@ -4807,6 +4807,10 @@ dynamic:
                 ((SubInfo)Handle.Unbox(args[1])).body_of =
                     (STable)Handle.Unbox(args[2]);
                 return null;
+            } else if (cmd == "sub_set_cur_pkg") {
+                ((SubInfo)Handle.Unbox(args[1])).cur_pkg =
+                    (STable)Handle.Unbox(args[2]);
+                return null;
             } else if (cmd == "sub_set_in_class") {
                 ((SubInfo)Handle.Unbox(args[1])).in_class =
                     (STable)Handle.Unbox(args[2]);
