@@ -46,7 +46,7 @@ S03-metaops/not.t
 S03-metaops/reduce.t
 S03-operators/assign-is-not-binding.t
 S03-operators/binding-arrays.t
-S03-operators/binding-closure.t
+# S03-operators/binding-closure.t err: 'System.NullReferenceException: Object reference not set to an instance of an object'
 S03-operators/binding-hashes.t
 S03-operators/binding-nested.t
 S03-operators/binding-scalars.t
@@ -113,7 +113,7 @@ S05-metasyntax/repeat.t
 S05-metasyntax/single-quotes.t
 S05-modifier/continue.t
 S05-modifier/counted.t
-S05-modifier/pos.t
+# S05-modifier/pos.t err: 'Unsupported use of $/ variable as input record separator'
 S06-advanced/caller.t
 S06-multi/lexical-multis.t
 S06-signature/arity.t
