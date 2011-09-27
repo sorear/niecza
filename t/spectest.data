@@ -9,8 +9,14 @@ S02-types/autovivification.t
 S02-types/bool.t
 S02-types/catch_type_cast_mismatch.t
 S02-types/flattening.t
+S02-types/lists.t
+S02-types/nested_arrays.t
 S02-types/nested_pairs.t
+S02-types/nan.t
 S02-types/nil.t
+S02-types/num.t
+S02-types/range.t
+S02-types/whatever.t
 S02-types/parsing-bool.t
 S02-types/subscripts_and_context.t
 S02-lexical-conventions/begin_end_pod.t
