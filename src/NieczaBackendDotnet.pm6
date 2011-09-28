@@ -101,6 +101,7 @@ class StaticSub {
     method set_name($v)     { downcall("sub_set_name", $!peer, ~$v) }
     method set_methodof($m) { downcall("sub_set_methodof", $!peer, $m && $m.peer) }
     method set_in_class($m) { downcall("sub_set_in_class", $!peer, $m && $m.peer) }
+    method set_cur_pkg($m)  { downcall("sub_set_cur_pkg", $!peer, $m && $m.peer) }
     method set_body_of($m)  { downcall("sub_set_body_of", $!peer, $m && $m.peer) }
 
     method name()     { downcall("sub_name", $!peer) }

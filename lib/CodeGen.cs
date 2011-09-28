@@ -4774,6 +4774,9 @@ dynamic:
                 Backend.currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = Backend.currentUnit.globals;
                 return null;
+            } else if (cmd == "unit_anon_stash") {
+                return Backend.currentUnit.name + ":" +
+                    (Backend.currentUnit.nextid++);
             } else if (cmd == "set_mainline") {
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
                 Backend.currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
@@ -4984,6 +4987,35 @@ dynamic:
                 } else {
                     return null;
                 }
+            } else if (cmd == "type_create") {
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                string name = (string)args[2];
+                string type = (string)args[3];
+                string who  = (string)args[4];
+
+                FieldInfo mof = ru.name == "CORE" ?
+                    typeof(Kernel).GetField(name + "MO") : null;
+                FieldInfo pf = ru.name == "CORE" ?
+                    typeof(Kernel).GetField(name + "P") : null;
+
+                STable nst = mof == null ? null : (STable)mof.GetValue(null);
+                if (nst == null) { // not all FooMO are initialized by kernel
+                    nst = new STable(name);
+                    if (mof != null) mof.SetValue(null, nst);
+                }
+                nst.typeObject = new P6opaque(nst, 0);
+                ((P6opaque)nst.typeObject).slots = null;
+                nst.typeVar = Kernel.NewROScalar(nst.typeObject);
+
+                if (ru.name == "CORE" && name == "Nil") {
+                    // this anomalous type object is iterable
+                    nst.typeVar = Kernel.NewRWListVar(nst.typeObject);
+                }
+
+                nst.initVar    = nst.typeVar;
+                nst.initObject = nst.typeObject;
+
+                return new Handle(nst);
             } else if (cmd == "create_sub") {
                 string name = (string)args[1];
                 SubInfo outer = (SubInfo)Handle.Unbox(args[2]);
