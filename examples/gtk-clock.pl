@@ -22,11 +22,8 @@ $drawingarea.add_ExposeEvent: sub ($obj, $args) {
     $args;  # suppress 'declared but not used' warnings
     my $cc = GdkCairoHelper.Create($obj.GdkWindow);  # Cairo Context
     # TODO: the following two lines pass parameters by value, need to pass by references to integers
-    # my $windowX; my $windowY; my $windowWidth; my $windowHeight; my $windowDepth;
-    # $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
-    # Tracked as https://github.com/sorear/niecza/issues/57
-    # TODO: remove the following one line cheat that works around the above problem
-    my $windowWidth = $windowSizeX; my $windowHeight = $windowSizeY;
+    my $windowX=0; my $windowY=0; my $windowWidth=0; my $windowHeight=0; my $windowDepth=0;
+    $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
     $cc.SetSourceRGB(0.95.Num, 0.90.Num, 0.85.Num); $cc.Paint;  # background color
     ClockFace($cc, $windowWidth, $windowHeight);
     # Calculate the parameters needed to draw the clock
