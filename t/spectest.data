@@ -153,6 +153,7 @@ S04-statements/unless.t
 S04-statements/until.t
 S04-statements/while.t
 S05-capture/subrule.t
+S05-grammar/action-stubs.t
 S05-grammar/methods.t
 S05-grammar/protoregex.t
 S05-grammar/signatures.t
