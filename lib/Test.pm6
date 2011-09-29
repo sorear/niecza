@@ -151,7 +151,7 @@ sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
     }
     ?$test;
 }
-sub todo($reason, $count = 1) is export { $*TEST-BUILDER.todo($reason, $count) }
+sub todo($reason="", $count = 1) is export { $*TEST-BUILDER.todo($reason, $count) }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done() is export { $*TEST-BUILDER.done }
 sub skip($reason,$number) is export {
