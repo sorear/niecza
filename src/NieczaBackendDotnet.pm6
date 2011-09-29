@@ -48,8 +48,12 @@ sub upcalled(@strings) {
     }
 }
 
+class Unit { ... }
+class StaticSub { ... }
+class Type { ... }
+
 method new(*%_) {
-    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled})) };
+    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type})) };
     nextsame;
 }
 
@@ -62,14 +66,14 @@ method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not use
     if $run {
         downcall("setnames", $*PROGRAM_NAME // '???',
             $*orig_file // '(eval)') unless $repl;
-        downcall("run_unit", $unit.peer, ?$evalmode, @$!run_args);
+        downcall("run_unit", $unit, ?$evalmode, @$!run_args);
         if $repl {
             downcall("replrun");
         }
         $*repl_outer = $unit.get_mainline if $repl;
         return;
     }
-    downcall("save_unit", $unit.peer, ?$main);
+    downcall("save_unit", $unit, ?$main);
     $*repl_outer = $unit.get_mainline if $repl;
 }
 
@@ -80,52 +84,42 @@ method post_save($name, :$main) {
         $main ?? "1" !! "0");
 }
 
-class Unit { ... }
-class StaticSub { ... }
-class Type { ... }
-
 class StaticSub {
-    has $.peer;
-    method WRAP($p) { $p && self.new(peer => $p) }
-    method lex_names() { downcall("lex_names", $!peer) }
+    method lex_names() { downcall("lex_names", self) }
     method lookup_lex($name, $file?, $line?) {
-        my @ret = downcall("sub_lookup_lex", $!peer, $name, $file, $line//0);
-        return unless @ret;
-        @ret[4] = Type.new(peer => @ret[4]) if @ret[0] eq 'package';
-        @ret[5] = Type.new(peer => @ret[5]) if @ret[0] eq 'simple' && @ret[5];
-        @ret[4] = StaticSub.new(peer => @ret[4]) if @ret[0] eq 'sub';
-        @ret;
+        downcall("sub_lookup_lex", self, $name, $file, $line//0);
     }
-    method set_outervar($v) { downcall("sub_set_outervar", $!peer, ~$v) }
-    method set_class($n)    { downcall("sub_set_class", $!peer, ~$n) }
-    method set_name($v)     { downcall("sub_set_name", $!peer, ~$v) }
-    method set_methodof($m) { downcall("sub_set_methodof", $!peer, $m && $m.peer) }
-    method set_in_class($m) { downcall("sub_set_in_class", $!peer, $m && $m.peer) }
-    method set_cur_pkg($m)  { downcall("sub_set_cur_pkg", $!peer, $m && $m.peer) }
-    method set_body_of($m)  { downcall("sub_set_body_of", $!peer, $m && $m.peer) }
+    method set_outervar($v) { downcall("sub_set_outervar", self, ~$v) }
+    method set_class($n)    { downcall("sub_set_class", self, ~$n) }
+    method set_name($v)     { downcall("sub_set_name", self, ~$v) }
+    method set_methodof($m) { downcall("sub_set_methodof", self, $m) }
+    method set_in_class($m) { downcall("sub_set_in_class", self, $m) }
+    method set_cur_pkg($m)  { downcall("sub_set_cur_pkg", self, $m) }
+    method set_body_of($m)  { downcall("sub_set_body_of", self, $m) }
 
-    method name()     { downcall("sub_name", $!peer) }
-    method outer()    { StaticSub.WRAP(downcall("sub_outer", $!peer)) }
-    method class()    { downcall("sub_class", $!peer) }
-    method run_once() { downcall("sub_run_once", $!peer) }
-    method cur_pkg()  { Type.WRAP(downcall("sub_cur_pkg", $!peer)) }
-    method in_class() { Type.WRAP(downcall("sub_in_class", $!peer)) }
-    method body_of()  { Type.WRAP(downcall("sub_body_of", $!peer)) }
-    method outervar() { downcall("sub_outervar", $!peer) }
-    method methodof() { Type.WRAP(downcall("sub_methodof", $!peer)) }
+    method name()     { downcall("sub_name", self) }
+    method outer()    { downcall("sub_outer", self) }
+    method class()    { downcall("sub_class", self) }
+    method run_once() { downcall("sub_run_once", self) }
+    method cur_pkg()  { downcall("sub_cur_pkg", self) }
+    method in_class() { downcall("sub_in_class", self) }
+    method body_of()  { downcall("sub_body_of", self) }
+    method outervar() { downcall("sub_outervar", self) }
+    method methodof() { downcall("sub_methodof", self) }
 
-    method unused_lexicals() { downcall("unused_lexicals", $!peer) }
-    method parameterize_topic() { downcall("sub_parameterize_topic", $!peer) }
-    method unit() { Unit.new(peer => downcall("sub_get_unit", $!peer)) }
-    method to_unit() { StaticSub.new(peer => downcall("sub_to_unit", $!peer)) }
-    method is($o) { downcall("equal_handles", $!peer, $o.peer) }
-    method is_routine() { downcall("sub_is_routine", $!peer) }
-    method has_lexical($name) { downcall("sub_has_lexical", $!peer, $name) }
-    method lexical_used($name) { downcall("sub_lexical_used", $!peer, $name) }
+    method unused_lexicals() { downcall("unused_lexicals", self) }
+    method parameterize_topic() { downcall("sub_parameterize_topic", self) }
+    method unit() { downcall("sub_get_unit", self) }
+    method to_unit() { downcall("sub_to_unit", self) }
+    method is($o) { downcall("equal_handles", self, $o) }
+    method is_routine() { downcall("sub_is_routine", self) }
+    method has_lexical($name) { downcall("sub_has_lexical", self, $name) }
+    method lexical_used($name) { downcall("sub_lexical_used", self, $name) }
+
     method set_signature($sig) {
         my @args;
         if !$sig {
-            downcall("sub_no_signature", $!peer);
+            downcall("sub_no_signature", self);
             return;
         }
         for @( $sig.params ) {
@@ -152,7 +146,7 @@ class StaticSub {
             push @args, $flags, .name, .slot, @( .names ), Str,
                 .mdefault, .tclass;
         }
-        downcall("set_signature", $!peer, @args);
+        downcall("set_signature", self, @args);
     }
 
     # TODO: prevent foo; sub foo { } from warning undefined
@@ -181,96 +175,84 @@ class StaticSub {
 
     method add_my_name($name, :$file, :$line, :$pos, :$noinit, :$defouter,
             :$roinit, :$list, :$hash, :$typeconstraint) {
-        self._addlex_result(downcall("add_my_name", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos// -1),
-            $typeconstraint && $typeconstraint.peer,
+        self._addlex_result(downcall("add_my_name", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $typeconstraint,
             ($noinit ?? 1 !! 0) + ($roinit ?? 2 !! 0) + ($defouter ?? 4 !! 0) +
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0)));
     }
     method add_hint($name, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_hint", $!peer, ~$name,
+        self._addlex_result(downcall("add_hint", self, ~$name,
             ~($file//''), +($line//0), +($pos// -1)));
     }
     method add_label($name, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_label", $!peer, ~$name,
+        self._addlex_result(downcall("add_label", self, ~$name,
             ~($file//''), +($line//0), +($pos// -1)));
     }
     method add_dispatcher($name, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_dispatcher", $!peer, ~$name,
+        self._addlex_result(downcall("add_dispatcher", self, ~$name,
             ~($file//''), +($line//0), +($pos// -1)));
     }
     method add_common_name($name, $pkg, $pname, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_common_name", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos// -1), $pkg.peer, ~$pname));
+        self._addlex_result(downcall("add_common_name", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $pkg, ~$pname));
     }
     method add_state_name($name, $backing, :$file, :$line, :$pos, :$noinit,
             :$defouter, :$roinit, :$list, :$hash, :$typeconstraint) {
-        self._addlex_result(downcall("add_state_name", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos// -1),
-            $typeconstraint && $typeconstraint.peer,
+        self._addlex_result(downcall("add_state_name", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $typeconstraint,
             ($noinit ?? 1 !! 0) + ($roinit ?? 2 !! 0) + ($defouter ?? 4 !! 0) +
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0),
             $backing));
     }
     method add_my_stash($name, $pkg, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_my_stash", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos// -1), $pkg.peer));
+        self._addlex_result(downcall("add_my_stash", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $pkg));
     }
     method add_my_sub($name, $body, :$file, :$line, :$pos) {
-        self._addlex_result(downcall("add_my_sub", $!peer, ~$name,
-            ~($file//''), +($line//0), +($pos// -1), $body.peer));
+        self._addlex_result(downcall("add_my_sub", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $body));
     }
 
     method finish($ops) { 
         $ops := NieczaPassSimplifier.invoke_incr(self, $ops);
-        downcall("sub_finish", $!peer, to-json($ops.cgop(self)));
+        downcall("sub_finish", self, to-json($ops.cgop(self)));
     }
 }
 
 class Type {
-    has $.peer;
-    method WRAP($p) { $p && self.new(peer => $p) }
-    method is_package() { downcall("type_is_package", $!peer) }
-    method closed() { downcall("type_closed", $!peer) }
-    method close() { downcall("type_close", $!peer) }
-    method type_kind() { downcall("type_kind", $!peer) }
-    method is_param_role() { downcall("type_is_param_role", $!peer) }
+    method is_package() { downcall("type_is_package", self) }
+    method closed() { downcall("type_closed", self) }
+    method close() { downcall("type_close", self) }
+    method type_kind() { downcall("type_kind", self) }
+    method is_param_role() { downcall("type_is_param_role", self) }
 }
 
 class Unit {
-    has $.peer;
-    method WRAP($p) { $p && self.new(peer => $p) }
-    method name() { downcall("unit_get_name", $!peer) }
-    method stubbed_stashes() {
-        downcall("unit_stubbed_stashes", $!peer).map({ $_ ~~ Int ?? $_ !! Type.new(peer => $_)})
-    }
-    method anon_stash() { downcall("unit_anon_stash", $!peer) }
-    method stub_stash($pos, $type) { downcall("unit_stub_stash", $pos, $type.peer) }
-    method set_current() { downcall("set_current_unit", $!peer) }
-    method set_mainline($sub) { downcall("set_mainline", $sub.peer) }
-    method abs_pkg(*@names, :$auto) {
-        Type.new(peer => downcall("rel_pkg", ?$auto, Any, @names))
-    }
+    method name() { downcall("unit_get_name", self) }
+    method stubbed_stashes() { downcall("unit_stubbed_stashes", self) }
+    method anon_stash() { downcall("unit_anon_stash", self) }
+    method stub_stash($pos, $type) { downcall("unit_stub_stash", $pos, $type) }
+    method set_current() { downcall("set_current_unit", self) }
+    method set_mainline($sub) { downcall("set_mainline", $sub) }
+    method abs_pkg(*@names, :$auto) { downcall("rel_pkg", ?$auto, Any, @names) }
     method rel_pkg($pkg, *@names, :$auto) {
-        Type.new(peer => downcall("rel_pkg", ?$auto, $pkg.peer, @names))
+        downcall("rel_pkg", ?$auto, $pkg, @names)
     }
     method get($pkg, $name) {
-        my ($p,$k) = downcall("get_name", $pkg, $name);
-        $k ?? Type.new(peer => $p) !! StaticSub.new(peer => $p)
+        downcall("unit_get", $pkg, $name);
     }
 
     method create_type(:$name, :$class, :$who) {
-        Type.new(peer => downcall("type_create", $!peer, ~$name, ~$class, ~$who));
+        downcall("type_create", self, ~$name, ~$class, ~$who);
     }
     method create_sub(:$name, :$class, :$outer, :$cur_pkg, :$in_class,
             :$run_once) {
-        StaticSub.new(peer => downcall("create_sub", ~($name // 'ANON'),
-            $outer && $outer.peer, ~($class // 'Sub'), $cur_pkg.peer,
-            $in_class && $in_class.peer, ?$run_once))
+        downcall("create_sub", ~($name // 'ANON'), $outer, ~($class // 'Sub'),
+            $cur_pkg, $in_class, ?$run_once)
     }
 }
 
 method create_unit($name, $filename, $modtime, $main, $run) {
-    Unit.new(peer => downcall("new_unit", ~$name, ~$filename, ~$modtime,
-            ~$!obj_dir, ?$main, ?$run));
+    downcall("new_unit", ~$name, ~$filename, ~$modtime,
+            ~$!obj_dir, ?$main, ?$run);
 }

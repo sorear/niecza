@@ -4763,7 +4763,11 @@ dynamic:
                     Console.WriteLine(a);
             }
             string cmd = (string) args[0];
-            if (cmd == "set_parent") {
+            if (cmd == "gettype") {
+                object o = Handle.Unbox(args[1]);
+                return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
+                    (o is STable) ? "type" : "unknown";
+            } else if (cmd == "set_parent") {
                 Builtins.up_domain = (AppDomain)args[1];
                 return null;
             } else if (cmd == "new_unit") {
@@ -4969,20 +4973,16 @@ dynamic:
                     }
                 }
                 return new Handle(pkg);
-            } else if (cmd == "get_name") {
+            } else if (cmd == "unit_get") {
                 string who  = (string)args[1];
                 string key  = (string)args[2];
                 string hkey = (char)who.Length + who + key;
                 StashEnt b;
                 if (Kernel.currentGlobals.TryGetValue(hkey, out b)) {
                     if (!b.v.rw && !b.v.Fetch().IsDefined()) {
-                        return new object[] {
-                            new Handle(b.v.Fetch().mo), true
-                        };
+                        return new Handle(b.v.Fetch().mo);
                     } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                        return new object[] {
-                            new Handle(b.v.Fetch().GetSlot("info")), false
-                        };
+                        return new Handle(b.v.Fetch().GetSlot("info"));
                     } else return null;
                 } else {
                     return null;

@@ -41,12 +41,18 @@ namespace Niecza {
     }
 
     public class Downcaller {
-        private static AppDomain subDomain;
+        static AppDomain subDomain;
         internal static Variable upcall_cb;
-        private static IDictionary responder;
+        static IDictionary responder;
+        static P6any UnitP, StaticSubP, TypeP;
         // Better, but still fudgy.  Relies too much on path structure.
-        public static void InitSlave(Variable cb) {
+        public static void InitSlave(Variable cb, Variable unit,
+                Variable staticSub, Variable type) {
             if (subDomain != null) return;
+
+            UnitP = unit.Fetch();
+            StaticSubP = staticSub.Fetch();
+            TypeP = type.Fetch();
 
             AppDomainSetup ads = new AppDomainSetup();
             string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
@@ -96,7 +102,13 @@ namespace Niecza {
                 for (int i = 0; i < ba.Length; i++) ba[i] = DCResult(ra[i]);
                 return Builtins.MakeParcel(ba);
             }
-            else return Kernel.BoxAnyMO(r, Kernel.AnyMO);
+            else {
+                string t = (string)RawDowncall("gettype", r);
+                P6any pr = (t == "type") ? TypeP :
+                    (t == "sub") ? StaticSubP :
+                    (t == "unit") ? UnitP : null;
+                return Kernel.BoxAnyMO(r, pr.mo);
+            }
         }
     }
 }
