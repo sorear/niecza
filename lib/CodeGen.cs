@@ -4987,6 +4987,39 @@ dynamic:
                 } else {
                     return null;
                 }
+            } else if (cmd == "unit_bind") {
+                string who  = (string)args[1];
+                string name = (string)args[2];
+                object item = Handle.Unbox(args[3]);
+                string file = (string)args[4];
+                int    line = (int)args[5];
+
+                Variable vitm = null;
+                if (item is STable)
+                    vitm = ((STable)item).typeVar;
+                else if (item is SubInfo)
+                    vitm = Kernel.NewROScalar(((SubInfo)item).protosub);
+                else if (item == null)
+                    vitm = null;
+                else
+                    return new Exception("weird thing to bind");
+
+                string err = Backend.currentUnit.NsBind(who, name, vitm, file, line);
+                return err == null ? null : new Exception(err);
+            } else if (cmd == "type_closed") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                // TODO
+                return false;
+            } else if (cmd == "type_close") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                // TODO
+                return null;
+            } else if (cmd == "type_kind") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                return st.mo.rtype;
+            } else if (cmd == "type_name") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                return st.name;
             } else if (cmd == "type_create") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string name = (string)args[2];
@@ -5014,6 +5047,7 @@ dynamic:
 
                 nst.initVar    = nst.typeVar;
                 nst.initObject = nst.typeObject;
+                nst.mo.rtype   = type;
 
                 return new Handle(nst);
             } else if (cmd == "create_sub") {

@@ -127,6 +127,7 @@ namespace Niecza {
         public STable stable;
 
         public bool isRole, isSubset, isPackage;
+        public string rtype = "class"; // XXX used for compiler's inspection
         public P6any roleFactory;
         public P6any subsetWhereThunk;
         public Variable subsetFilter;

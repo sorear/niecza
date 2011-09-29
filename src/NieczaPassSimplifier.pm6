@@ -141,17 +141,18 @@ sub run_optree($body, $op, $nv) {
     my $inv = $op.invocant;
     return $op unless $inv.^isa(::Op::Lexical);
     my $invname = $inv.name;
-    my $inv_lex = $body.find_lex($invname);
-    return $op unless $inv_lex && $inv_lex.^isa(::Metamodel::Lexical::SubDef);
+    my @inv_lex = $body.lookup_lex($invname);
+    return $op unless @inv_lex && @inv_lex[0] eq 'sub';
 
-    if $inv_lex.body.extend<builtin> -> $B {
-        return $op unless defined my $args = no_named_params($op);
-        return $op unless $args >= $B[1] &&
-            (!defined($B[2]) || $args <= $B[2]);
-        return ::Op::Builtin.new(name => $B[0], args => $args);
-    }
+# TODO: get extend working again
+#     if $inv_lex.body.extend<builtin> -> $B {
+#         return $op unless defined my $args = no_named_params($op);
+#         return $op unless $args >= $B[1] &&
+#             (!defined($B[2]) || $args <= $B[2]);
+#         return ::Op::Builtin.new(name => $B[0], args => $args);
+#     }
 
-    return $op unless $inv_lex.body.unit.is_true_setting;
+    return $op unless @inv_lex[4].unit.name eq 'CORE';
     return $op unless my $func = %funcs{$invname};
 
     $func($body, $nv, $invname, $op);

@@ -6,20 +6,16 @@ items are required for yapsi.
 EASY
 
    Add your favorite missing function to the setting, with tests.
-   In particular, I could use: sprintf, dir, write, close, split, ...
+   In particular, I could use: write, close, split, ...
 
    Implement Sub.leave and CallFrame.leave
 
    Character class expressions like [[a .. A] & [\W]]
 
-   Fudge and run your favorite spectest file.
-
    Stuff spectests are blocking on: "closure for", :16(),
    constants in signatures, ::T, ...
 
 MEDIUM
-
- + qx[]
 
    Finish the set of Num operators, includig number-theoretic and
    transcedental functions.
@@ -30,8 +26,6 @@ MEDIUM
 
    Design and implement a generic system for multiplexed and non-blocking I/O.
 
-  *CATCH and CONTROL blocks.
-
    Jump table optimization for when chains.
 
   *Find out what readonly subs are supposed to do with lists, etc and implement
@@ -40,8 +34,6 @@ MEDIUM
    Add :rotate - depends on sized numbers.
 
    Add Buf bitops.
-
-   Implement warning exceptions.
 
 HARD
 
@@ -81,7 +73,12 @@ NASTY
 
    Export Perl 6 code into a CLR .dll
 
-Other stuff to do after:
-  - cnperl6 prototyping...
-  - CLR: KISS and then play with async I/O, possibly including soric
+Other stuff to do:
+
   - pm's = hack
+  - Stash entries should be smarter, should know the difference between
+    types, constants, subs, and variables
+  - Swappable global contexts containing *all* state
+  - Bounded serialization using global contexts
+  - eval requires splitting RuntimeUnit from SerializationContext;
+    null SerializationContext is in effect at runtime

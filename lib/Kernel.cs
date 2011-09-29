@@ -449,8 +449,17 @@ namespace Niecza {
                     FieldAttributes.Static);
         }
 
+        public static Variable MakeAppropriateVar(string name) {
+            if (name.Length >= 1 && name[0] == '@')
+                return Kernel.CreateArray();
+            if (name.Length >= 1 && name[0] == '%')
+                return Kernel.CreateHash();
+            return Kernel.NewTypedScalar(null);
+        }
+
         public static string NsMerge(string who, string name,
                 ref StashEnt nse, StashEnt ose) {
+
             P6any nseo = nse.v.Fetch();
             P6any oseo = ose.v.Fetch();
             bool  nseod = nseo.IsDefined();
@@ -490,12 +499,15 @@ namespace Niecza {
                 string file, int line) {
             string key = (char)who.Length + who + name;
             StashEnt nse = new StashEnt();
+            if (var == null)
+                var = MakeAppropriateVar(name);
             nse.v = var;
             nse.file = file;
             nse.line = line;
             StashEnt ose;
-            globals.TryGetValue(key, out ose);
-            string err = NsMerge(who, name, ref nse, ose);
+            string err = null;
+            if (globals.TryGetValue(key, out ose))
+                err = NsMerge(who, name, ref nse, ose);
             if (err != null) return err;
             globals[key] = nse;
             return null;
@@ -3129,6 +3141,7 @@ tryagain:
             ((P6opaque)st.typeObject).slots = null;
             st.typeVar = st.initVar = Kernel.NewROScalar(st.typeObject);
             st.mo.isPackage = true;
+            st.mo.rtype = "package";
             // XXX should be PackageHOW
             st.how = new BoxObject<STable>(st, Kernel.ClassHOWMO, 0);
             st.mo.Revalidate();

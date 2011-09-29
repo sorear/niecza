@@ -89,7 +89,7 @@ class StaticSub {
     method lookup_lex($name, $file?, $line?) {
         downcall("sub_lookup_lex", self, $name, $file, $line//0);
     }
-    method set_outervar($v) { downcall("sub_set_outervar", self, ~$v) }
+    method set_outervar($v) { downcall("sub_set_outervar", self, $v) }
     method set_class($n)    { downcall("sub_set_class", self, ~$n) }
     method set_name($v)     { downcall("sub_set_name", self, ~$v) }
     method set_methodof($m) { downcall("sub_set_methodof", self, $m) }
@@ -223,8 +223,8 @@ class Type {
     method is_package() { downcall("type_is_package", self) }
     method closed() { downcall("type_closed", self) }
     method close() { downcall("type_close", self) }
-    method type_kind() { downcall("type_kind", self) }
-    method is_param_role() { downcall("type_is_param_role", self) }
+    method kind() { downcall("type_kind", self) }
+    method name() { downcall("type_name", self) }
 }
 
 class Unit {
@@ -240,6 +240,10 @@ class Unit {
     }
     method get($pkg, $name) {
         downcall("unit_get", $pkg, $name);
+    }
+    method bind($pkg, $name, $item, :$file, :$line, :$pos) { #OK
+        downcall("unit_bind", ~$pkg, ~$name, $item, ~($file // '???'),
+            $line // 0);
     }
 
     method create_type(:$name, :$class, :$who) {

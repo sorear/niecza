@@ -197,7 +197,7 @@ method explain_mystery() {
     self.sorry($m) if $m;
 
     for $*unit.stubbed_stashes -> $pos, $type {
-        next if $type.closed || $type.is_package;
+        next if $type.closed || $type.kind eq 'package';
         self.cursor($pos).sorry("Package was stubbed but not defined");
     }
 
@@ -436,7 +436,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     }
 
     if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
-            !$method_targ.is_param_role) {
+            $method_targ.kind ne 'prole') {
         $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
         $name = "placeholder";
     }
@@ -530,7 +530,7 @@ method open_package_def($, $/ = $*cursor) {
 
         $/.CURSOR.trymop({
             die "Augment requires a target" unless $obj;
-            die "Illegal augment of a role" if $obj.is_role;
+            die "Illegal augment of a role" if $obj.kind eq 'role' | 'prole';
 
             $sub.set_body_of($obj);
             $sub.set_in_class($obj);
@@ -599,7 +599,7 @@ method package_def ($/) {
         else {
             $/.CURSOR.trymop({ $obj.close; });
 
-            if $obj.is_param_role {
+            if $obj.kind eq 'prole' {
                 # return the frame object so that role instantiation can
                 # find the cloned methods
                 $ast = ::Op::StatementList.new(|node($/), children => [
@@ -650,31 +650,31 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
                 unless @linfo[0] eq 'package';
             $old = @linfo[4];
         } elsif defined $pkg {
-            $old = $*unit.get($pkg, $head);
+            $old = $*unit.get($pkg.who, $head);
         }
 
         my $lexed_already;
 
-        if $old && ($old.?type_kind // '') eq $class && !$old.closed {
+        if $old && ($old.?kind // '') eq $class && !$old.closed {
             $npkg = $old;
             $lexed_already = True;
         } elsif $scope eq 'our' {
             my $opkg = $pkg // $sub.cur_pkg;
             $npkg = $*unit.create_type(name => $head, :$class,
                 who => $opkg.who ~ '::' ~ $head);
-            $*unit.bind($opkg, $head, $npkg, |mnode($/));
+            $*unit.bind($opkg.who, $head, $npkg, |mnode($/));
         } else {
             my $id = $*unit.anon_stash;
             $npkg = $*unit.create_type(name => $head, :$class,
                 who => "::$id");
-            $*unit.bind($*unit.abs_pkg(), $id, $npkg, |mnode($/));
+            $*unit.bind("", $id, $npkg, |mnode($/));
         }
 
         $lexname = (!$lexed_already && $scope ne 'anon' && !defined($pkg))
             ?? $head !! self.gensym;
 
-        $sub.add_my_stash($lexname, $npkg.xref, |mnode($/));
-        $sub.add_exports($head, $npkg.xref, $exports) if $exports;
+        $sub.add_my_stash($lexname, $npkg, |mnode($/));
+        $sub.add_exports($head, $npkg, $exports) if $exports;
     });
 
     $lexname, $npkg
