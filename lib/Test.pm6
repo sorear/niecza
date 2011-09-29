@@ -37,7 +37,7 @@ class Builder {
         my $not = $bool ?? "" !! "not ";
         my $desc;
         if $tag {
-            $desc = " - " ~ $tag.split("\n").join("\n#");
+            $desc = " - " ~ $tag.subst('#', '\#').split("\n").join("\n#");
         } else {
             $desc = '';
         }
