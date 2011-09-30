@@ -64,8 +64,8 @@ public partial class Builtins {
         for (int pos=0; pos < fmtstring.Length; ++pos) {
             char c = fmtstring[pos];
             PrintfFormat format = new PrintfFormat();
-            // not necessary to initialize all these fields,
-            // but handy to have them all listed together in one place.
+            // We do not have to initialize all these fields, but it's
+            // handy to have them all listed together in one place.
             format.index = 0;
             format.nonNegativeSpacePrefix = false;
             format.nonNegativePlusPrefix = false;
@@ -238,7 +238,11 @@ public partial class Builtins {
                     i = format.index>0 ? format.index : ++argi;
                     if (i < args.Length) {
                         s = args[i].Fetch().mo.mro_raw_Str.Get(args[i]);
+                        if (format.minimumWidth > s.Length && !format.leftJustify)
+                            result += new string(' ', format.minimumWidth-s.Length);
                         result += s;
+                        if (format.minimumWidth > s.Length && format.leftJustify)
+                            result += new string(' ', format.minimumWidth-s.Length);
                     }
                     else {
                         throw new NieczaException("index out of range");

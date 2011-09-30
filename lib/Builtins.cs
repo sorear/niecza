@@ -7,6 +7,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Niecza {
+    public interface IForeignInterpreter {
+        Variable Eval(string code);
+    }
     class PosixWrapper {
         static Assembly Mono_Posix;
         static Type Syscall, AccessModes, Stat;
@@ -490,6 +493,10 @@ public partial class Builtins {
         return Kernel.BoxAnyMO(str, Kernel.StrMO);
     }
 
+    public static Variable MakeComplex(Complex z) {
+        return Kernel.BoxAnyMO<Complex>(z, Kernel.ComplexMO);
+    }
+
     public static Variable MakeParcel(params Variable[] bits) {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
@@ -878,22 +885,19 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> sin_d = sin;
-    public static Variable sin(Variable a1) {
+    static Func<Variable,Variable,Variable> atan2_d = atan2;
+    public static Variable atan2(Variable a1, Variable a2) {
         P6any o1 = a1.Fetch();
         int r1;
-        if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sin_d);
         P6any n1 = GetNumber(a1, o1, out r1);
+        P6any o2 = a2.Fetch();
+        int r2;
+        P6any n2 = GetNumber(a2, o2, out r2);
 
-        if (r1 == NR_COMPLEX) {
-            Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(Math.Sin(v1.re) * Math.Cosh(v1.im),
-                               Math.Cos(v1.re) * Math.Sinh(v1.im));
-        }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Sin(v1));
+            double v2 = PromoteToFloat(r2, n2);
+            return MakeFloat(Math.Atan2(v1, v2));
         }
     }
 
@@ -938,6 +942,24 @@ public partial class Builtins {
                 return MakeInt(red);
         }
         return Kernel.NewROScalar(n1);
+    }
+
+    static Func<Variable,Variable> eval_perl5_d = eval_perl5;
+    static IForeignInterpreter p5_interpreter;
+    public static Variable eval_perl5(Variable v) {
+
+        // Cargo culted to get the string from the argument
+        P6any o1 = v.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v,o1, eval_perl5_d);
+        string r = o1.mo.mro_raw_Str.Get(v);
+
+        if (p5_interpreter == null) {
+            System.Reflection.Assembly a = System.Reflection.Assembly.Load("Perl5Interpreter");
+            p5_interpreter = (IForeignInterpreter) a.CreateInstance("Perl5Interpreter");
+        }
+        return p5_interpreter.Eval(r);
     }
 
     // we don't need to do nominal checking stuff here because this

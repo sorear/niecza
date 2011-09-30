@@ -3,8 +3,10 @@ my module Test;
 constant $?TRANSPARENT = 1;
 
 class Builder {
-    has $.current-test;
+    has $!current-test;
     has $!set-plan;
+    has $!todo-up-to;
+    has $!todo-reason;
 
     method new() {
         $*TEST-BUILDER;
@@ -23,7 +25,7 @@ class Builder {
     }
 
     method reset() {
-        $.current-test = 1;
+        $!current-test = 1;
     }
 
     method note($m) {
@@ -35,20 +37,24 @@ class Builder {
         my $not = $bool ?? "" !! "not ";
         my $desc;
         if $tag {
-            $desc = " - " ~ $tag.split("\n").join("\n#");
+            $desc = " - " ~ $tag.subst('#', '\#').split("\n").join("\n#");
         } else {
             $desc = '';
         }
-        self!output($not ~ "ok " ~ $.current-test++ ~ $desc);
+        if $!todo-up-to >= $!current-test {
+            $desc ~= " # TODO $!todo-reason";
+        }
+        self!output($not ~ "ok " ~ $!current-test++ ~ $desc);
         if !$bool { self.note(self.blame); }
     }
 
-    # TODO: Generalize this.
-    method todo($tag, $reason) {
-        self!output("not ok {$.current-test++} - $tag # TODO $reason");
+    method todo($reason, $count) {
+        $!todo-reason = $reason;
+        $!todo-up-to = $!current-test + $count - 1; # todo(1) should stop after cur
     }
+
     method skip($reason) {
-        self!output("ok {$.current-test++} # skip $reason");
+        self!output("ok {$!current-test++} # SKIP $reason");
     }
 
     method expected-tests($num) {
@@ -66,7 +72,7 @@ class Builder {
 
     method done {
         if !($!set-plan) {
-            self!output("1.." ~ ($.current-test - 1));
+            self!output("1.." ~ ($!current-test - 1));
         }
     }
 }
@@ -145,6 +151,7 @@ sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
     }
     ?$test;
 }
+sub todo($reason="", $count = 1) is export { $*TEST-BUILDER.todo($reason, $count) }
 sub plan($num) is export { $*TEST-BUILDER.plan($num) }
 sub done() is export { $*TEST-BUILDER.done }
 sub skip($reason,$number) is export {

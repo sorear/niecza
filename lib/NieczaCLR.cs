@@ -246,27 +246,35 @@ namespace Niecza {
     class OverloadCandidate : MultiCandidate {
         MemberInfo what_call;
         Type[] args;
+        bool[] refs;
         Type param_array;
 
         private OverloadCandidate(MemberInfo what_call, Type[] args,
-                Type param_array) {
+                bool[] refs, Type param_array) {
             this.what_call = what_call;
             this.args = args;
+            this.refs = refs;
             this.param_array = param_array;
         }
 
         public static void MakeCandidates(MemberInfo what, ParameterInfo[] pi,
                 List<MultiCandidate> into) {
             Type[] args1 = new Type[pi.Length];
-            for (int i = 0; i < pi.Length; i++)
+            bool[] refs = new bool[pi.Length];
+            for (int i = 0; i < pi.Length; i++) {
                 args1[i] = pi[i].ParameterType;
-            into.Add(new OverloadCandidate(what, args1, null));
+                if (args1[i].IsByRef) {
+                    args1[i] = args1[i].GetElementType();
+                    refs[i] = true;
+                }
+            }
+            into.Add(new OverloadCandidate(what, args1, refs, null));
 
             if (pi.Length != 0 && pi[pi.Length-1].GetCustomAttributes(
                         typeof(ParamArrayAttribute), false).Length != 0) {
                 Type[] args2 = new Type[args1.Length - 1];
                 Array.Copy(args1, 0, args2, 0, args2.Length);
-                into.Add(new OverloadCandidate(what, args2,
+                into.Add(new OverloadCandidate(what, args2, refs,
                             args1[args1.Length - 1].GetElementType()));
             }
         }
@@ -278,6 +286,13 @@ namespace Niecza {
             } else {
                 return s1;
             }
+        }
+
+        void WritebackRefs(Variable[] pos, object[] argv) {
+            for (int i = 0; i < args.Length; i++)
+                if (refs[i])
+                    pos[i].Store(CLRWrapperProvider.BoxResult(args[i],
+                                argv[i]).Fetch());
         }
 
         public Variable Invoke(object obj, Variable[] pos, VarHash named) {
@@ -298,10 +313,12 @@ namespace Niecza {
             if (what_call is MethodInfo) {
                 MethodInfo mi = (MethodInfo) what_call;
                 object ret = mi.Invoke((mi.IsStatic ? null : obj), argv);
+                WritebackRefs(pos, argv);
                 return CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
             } else if (what_call is ConstructorInfo) {
                 ConstructorInfo ci = (ConstructorInfo) what_call;
                 object ret = ci.Invoke(null, argv);
+                WritebackRefs(pos, argv);
                 return CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
             } else if (what_call is FieldInfo) {
                 return new FieldProxy((FieldInfo) what_call, obj);
@@ -320,7 +337,8 @@ namespace Niecza {
 
             object dummy;
             for (int i = 0; i < args.Length; i++)
-                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i]))
+                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i])
+                        || (refs[i] && !pos[i].rw))
                     return false;
             // XXX: maybe param arrays should be treated as slurpies?
             for (int i = args.Length; i < pos.Length; i++)
@@ -549,6 +567,13 @@ for $args (0..9) {
             return th.caller;
         }
 
+        static Frame dispose_handler(Frame th) {
+            object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
+            ((IDisposable)o).Dispose();
+            th.caller.resultSlot = Kernel.NilP.mo.typeVar;
+            return th.caller;
+        }
+
         static Frame Str_handler(Frame th) {
             P6any ro = ((Variable)th.lex0).Fetch();
             object o = Kernel.UnboxAny<object>(ro);
@@ -609,6 +634,17 @@ for $args (0..9) {
                 if (fi.DeclaringType == t)
                     needNewWrapper.Add(fi.Name);
                 MultiAdd(allMembers, fi.Name, fi, new ParameterInfo[0]);
+            }
+
+            if (typeof(IDisposable).IsAssignableFrom(t)) {
+                SubInfo si;
+
+                si = new SubInfo("KERNEL dispose-hack", dispose_handler);
+                si.sig_i = new int[] {
+                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
+                };
+                si.sig_r = new object[] { "self" };
+                m.AddMethod(0, "dispose-hack", Kernel.MakeSub(si, null));
             }
 
             if (t == typeof(object)) {
@@ -764,6 +800,68 @@ for $args (0..9) {
                         clr = use_big ? null : (object)small;
                     else
                         clr = obj;
+                }
+            }
+            else if (obj.Does(Kernel.RealMO)) {
+                // fractional value
+
+                if (ty == typeof(decimal)) {
+                    // decimal is for people who care about exactness
+                    int rk;
+                    P6any n = Builtins.GetNumber(var, obj, out rk);
+                    BigInteger num, den;
+                    if (rk == Builtins.NR_FATRAT) {
+                        FatRat r = Kernel.UnboxAny<FatRat>(n);
+                        num = r.num; den = r.den;
+                    }
+                    else if (rk == Builtins.NR_FIXRAT) {
+                        Rat r = Kernel.UnboxAny<Rat>(n);
+                        num = r.num; den = r.den;
+                    }
+                    else if (rk == Builtins.NR_BIGINT) {
+                        num = Kernel.UnboxAny<BigInteger>(n); den = BigInteger.One;
+                    }
+                    else if (rk == Builtins.NR_FIXINT) {
+                        num = Kernel.UnboxAny<int>(n); den = BigInteger.One;
+                    }
+                    else {
+                        return false;
+                    }
+                    BigInteger div, rem;
+                    int scale = 0;
+                    while (true) {
+                        div = BigInteger.DivRem(den, 10, out rem);
+                        if (rem.Sign != 0) break;
+                        den = div;
+                        scale++;
+                    }
+                    while (true) {
+                        div = BigInteger.DivRem(den, 5, out rem);
+                        if (rem.Sign != 0) break;
+                        den = div;
+                        num *= 2;
+                        scale++;
+                    }
+                    while (true) {
+                        div = BigInteger.DivRem(den, 2, out rem);
+                        if (rem.Sign != 0) break;
+                        den = div;
+                        num *= 5;
+                        scale++;
+                    }
+                    if (den != BigInteger.One)
+                        return false;
+                    if (scale > 28)
+                        return false;
+                    int[] bits = decimal.GetBits((decimal)num);
+                    bits[3] = scale << 16;
+                    clr = new decimal(bits);
+                } else {
+                    double val = obj.mo.mro_raw_Numeric.Get(var);
+                    if (ty == typeof(float))
+                        clr = (object)(float)val;
+                    else if (ty == typeof(double) || ty == typeof(object))
+                        clr = (object)val;
                 }
             }
             else if (obj.Does(Kernel.StrMO)) {

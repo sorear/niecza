@@ -124,6 +124,7 @@ class Quantifier is RxOp {
     has $.max; # Int
     has $.closure;
     has $.nonlisty;
+    has $.opsep;
 
     method opzyg() { $!closure // () }
 

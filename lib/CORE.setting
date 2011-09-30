@@ -160,6 +160,30 @@ my class Cool {
     multi method log() { self.ln }
     multi method log($base) { self.ln / $base.ln }
     method sin() { Q:CgOp { (sin {self}) } }
+    method asin() { Q:CgOp { (asin {self}) } }
+    method cos() { Q:CgOp { (cos {self}) } }
+    method acos() { Q:CgOp { (acos {self}) } }
+    method tan() { Q:CgOp { (tan {self}) } }
+    method atan() { Q:CgOp { (atan {self}) } }
+    method sec() { Q:CgOp { (sec {self}) } }
+    method asec() { Q:CgOp { (asec {self}) } }
+    method cosec() { Q:CgOp { (cosec {self}) } }
+    method acosec() { Q:CgOp { (acosec {self}) } }
+    method cotan() { Q:CgOp { (cotan {self}) } }
+    method acotan() { Q:CgOp { (acotan {self}) } }
+    method sinh() { Q:CgOp { (sinh {self}) } }
+    method asinh() { Q:CgOp { (asinh {self}) } }
+    method cosh() { Q:CgOp { (cosh {self}) } }
+    method acosh() { Q:CgOp { (acosh {self}) } }
+    method tanh() { Q:CgOp { (tanh {self}) } }
+    method atanh() { Q:CgOp { (atanh {self}) } }
+    method sech() { Q:CgOp { (sech {self}) } }
+    method asech() { Q:CgOp { (asech {self}) } }
+    method cosech() { Q:CgOp { (cosech {self}) } }
+    method acosech() { Q:CgOp { (acosech {self}) } }
+    method cotanh() { Q:CgOp { (cotanh {self}) } }
+    method acotanh() { Q:CgOp { (acotanh {self}) } }
+    method atan2($x = 1) { Q:CgOp { (atan2 {self} {$x}) } }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -1873,6 +1897,7 @@ sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
 sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
+sub exp($x) { $x.exp }
 # XXX 'Order' type
 sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
@@ -1908,7 +1933,13 @@ sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 
-sub eval($str) is return-pass { Q:CgOp { (simple_eval {$str}) } }
+sub eval($str,:$lang="perl6") is return-pass {
+    if $lang eq "perl6" {
+        Q:CgOp { (simple_eval {$str}) }
+    } else {
+        Q:CgOp { (eval_perl5 {$str}) }
+    }
+}
 
 sub rungather($ ) { die "Run NYI" }
 # }}}
@@ -2039,6 +2070,30 @@ sub prompt($msg) { print $msg; $*IN.get }
 sub getc($handle) { $handle.getc }
 
 sub sin($x) { $x.sin }
+sub asin($x) { $x.asin }
+sub cos($x) { $x.cos }
+sub acos($x) { $x.acos }
+sub tan($x) { $x.tan }
+sub atan($x) { $x.atan }
+sub sec($x) { $x.sec }
+sub asec($x) { $x.asec }
+sub cosec($x) { $x.cosec }
+sub acosec($x) { $x.acosec }
+sub cotan($x) { $x.cotan }
+sub acotan($x) { $x.acotan }
+sub sinh($x) { $x.sinh }
+sub asinh($x) { $x.asinh }
+sub cosh($x) { $x.cosh }
+sub acosh($x) { $x.acosh }
+sub tanh($x) { $x.tanh }
+sub atanh($x) { $x.atanh }
+sub sech($x) { $x.sech }
+sub asech($x) { $x.asech }
+sub cosech($x) { $x.cosech }
+sub acosech($x) { $x.acosech }
+sub cotanh($x) { $x.cotanh }
+sub acotanh($x) { $x.acotanh }
+sub atan2($y, $x = 1) { $y.atan2($x) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };

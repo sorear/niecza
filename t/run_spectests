@@ -1,2 +1,12 @@
 #!/bin/sh
-sed 's|^|t/spec/|' t/spectest.data | xargs prove -e 't/fudgeandrun' "$@"
+
+jobs=1
+if [ -z "$TEST_JOBS" ] ; then
+    jobs=1
+else
+    jobs=$TEST_JOBS
+fi
+
+grep -v "^#" t/spectest.data |
+sed 's|^|t/spec/|' | 
+xargs prove -e 't/fudgeandrun' -j $jobs "$@"

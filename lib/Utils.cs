@@ -517,6 +517,168 @@ namespace Niecza {
         public Complex(double re, double im) {
             this.re = re; this.im = im;
         }
+
+        public static readonly Complex i = new Complex(0, 1);
+
+        public static Complex operator- (Complex left) {
+            return new Complex(-left.re, -left.im);
+        }
+
+        public static Complex operator+ (Double left, Complex right) {
+            return new Complex(left + right.re, right.im);
+        }
+
+        public static Complex operator+ (Complex left, Complex right) {
+            return new Complex(left.re + right.re, left.im + right.im);
+        }
+
+        public static Complex operator- (Double left, Complex right) {
+            return new Complex(left - right.re, -right.im);
+        }
+
+        public static Complex operator- (Complex left, Complex right) {
+            return new Complex(left.re - right.re, left.im - right.im);
+        }
+
+        public static Complex operator* (Complex left, Complex right) {
+            return new Complex(left.re*right.re - left.im*right.im,
+                               left.im*right.re + left.re*right.im);
+        }
+
+        public static Complex operator* (Double left, Complex right) {
+            return new Complex(left*right.re,
+                               left*right.im);
+        }
+
+        public static Complex operator/ (Complex left, Complex right) {
+            double sn2 = right.re*right.re + right.im*right.im;
+            return new Complex((left.re*right.re + left.im*right.im)/sn2,
+                               (right.re*left.im - right.im*left.re)/sn2);
+        }
+
+        public static Complex operator/ (Double left, Complex right) {
+            double sn2 = right.re * right.re + right.im * right.im;
+            return new Complex(left * right.re / sn2,
+                               -right.im * left / sn2);
+        }
+
+        public static Complex operator/ (Complex left, Double right) {
+            return new Complex(left.re / right,
+                               left.im / right);
+        }
+
+        public Complex log() {
+            return new Complex(Math.Log(Math.Sqrt(re * re + im * im)),
+                               Math.Atan2(im, re));
+        }
+
+        public Complex exp() {
+            return new Complex(Math.Exp(re) * Math.Cos(im),
+                               Math.Exp(re) * Math.Sin(im));
+        }
+
+        public Complex sqrt() {
+            return (this.log() / 2).exp();
+        }
+
+        public Complex Sin() {
+            return new Complex(Math.Sin(re) * Math.Cosh(im),
+                               Math.Cos(re) * Math.Sinh(im));
+        }
+
+        public Complex Asin() {
+            return -i * (this * i + (1 - this * this).sqrt()).log();
+        }
+
+        public Complex Cos() {
+            return new Complex(Math.Cos(re) * Math.Cosh(im),
+                               -Math.Sin(re) * Math.Sinh(im));
+        }
+
+        public Complex Acos() {
+            return Math.PI / 2 - this.Asin();
+        }
+
+        public Complex Tan() {
+            return this.Sin() / this.Cos();
+        }
+
+        public Complex Atan() {
+            return ((1 + this * i).log() - (1 - this * i).log()) / (2 * i);
+        }
+
+        public Complex Sec() {
+            return 1 / this.Cos();
+        }
+
+        public Complex Asec() {
+            return (1 / this).Acos();
+        }
+
+        public Complex Cosec() {
+            return 1 / this.Sin();
+        }
+
+        public Complex Acosec() {
+            return (1 / this).Asin();
+        }
+
+        public Complex Cotan() {
+            return this.Cos() / this.Sin();
+        }
+
+        public Complex Acotan() {
+            return (1 / this).Atan();
+        }
+
+        public Complex Sinh() {
+            return -((i * this).Sin()) * i;
+        }
+
+        public Complex Asinh() {
+            return (this + (1 + this * this).sqrt()).log();
+        }
+
+        public Complex Cosh() {
+            return (i * this).Cos();
+        }
+
+        public Complex Acosh() {
+            return 2 * (((1 + this) / 2).sqrt() + ((-1 + this) / 2).sqrt()).log();
+/*            return (this + (-1 + this * this).sqrt()).log();*/
+        }
+
+        public Complex Tanh() {
+            return -(i * this).Tan() * i;
+        }
+
+        public Complex Atanh() {
+            return ((1 + this).log() - (1 - this).log()) / 2;
+        }
+
+        public Complex Sech() {
+            return 1 / this.Cosh();
+        }
+
+        public Complex Asech() {
+            return (1 / this).Acosh();
+        }
+
+        public Complex Cosech() {
+            return 1 / this.Sinh();
+        }
+
+        public Complex Acosech() {
+            return (1 / this).Asinh();
+        }
+
+        public Complex Cotanh() {
+            return 1 / this.Tanh();
+        }
+
+        public Complex Acotanh() {
+            return (1 / this).Atanh();
+        }
     }
 
     public sealed class Rat {

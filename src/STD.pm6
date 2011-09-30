@@ -2423,6 +2423,7 @@ grammar P6 is STD {
         # parametric type?
         <.unsp>? [ <?before '['> <param=.postcircumfix> ]?
         <.unsp>? [ <?before '{'> <whence=.postcircumfix> ]?
+        <.unsp>? [ <?before '('> <accept=.postcircumfix> ]?
         [<.ws> 'of' <.ws> <typename> ]?
     }
 
@@ -3320,7 +3321,7 @@ grammar P6 is STD {
             [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
             <quote>
             [ <?before '(' | '.(' | '\\'> || <.obs('. to concatenate strings or to call a quoted method', '~ to concatenate, or if you meant to call a quoted method, please supply the required parentheses')> ]
-            { my $t = $<quote><nibble>.Str; $t ~~ /\W/ or $t ~~ /^(WHO|WHAT|WHERE|WHEN|WHY|HOW)$/ or $¢.worry("Useless use of quotes") }
+            { my $t = $<quote><nibble>.Str; $t ~~ /\W/ or $t eq '' or $t ~~ /^(WHO|WHAT|WHERE|WHEN|WHY|HOW)$/ or $¢.worry("Useless use of quotes") }
         ] <.unsp>? 
 
         :dba('method arguments')
@@ -4714,9 +4715,13 @@ grammar Regex is STD {
         <!stopper>
         <!regex_infix>
         <atom>
-        [ <normspace>? <quantifier> ]?
+        [ <normspace>? <quantifier> <normspace>? <separator>? ]?
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Cannot quantify zero-width atom">
+    }
+
+    token separator {
+        '%''%'? <normspace>? <quantified_atom>
     }
 
     token atom {
@@ -5002,7 +5007,7 @@ grammar Regex is STD {
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
         | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
         | <embeddedblock>
-        | <quantified_atom>
+        | <quantified_atom> <.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, "nowadays")>
         ]
     }
 

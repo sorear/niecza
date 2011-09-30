@@ -7,7 +7,8 @@ RM=rm -f
 CP=cp
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
-	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs
+	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs \
+	 GeneratedTrigFunctions.cs
 
 # Tell make to regard the following targets as not being filenames
 .PHONY: all aot test spectest clean realclean
@@ -50,6 +51,13 @@ boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 	$(CSC) /target:library /out:obj/Kernel.dll /lib:obj /unsafe+ \
 	    $(patsubst %,lib/%,$(cskernel))
+
+perl5: obj/Perl5Interpreter.dll obj/p5embed.so
+obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
+	gmcs /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
+
+obj/p5embed.so: lib/p5embed.c
+	cc -shared -Wl,-soname,p5embed.so -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`
 
 aot: all
 	mono --aot run/*.dll run/Niecza.exe
