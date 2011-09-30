@@ -3654,6 +3654,7 @@ have_v:
         public static STable StashMO;
         public static STable ClassHOWMO;
         public static STable PseudoStashMO;
+        public static STable GrammarMO;
         public static STable CodeMO;
         public static STable WhateverCodeMO;
         public static STable RoutineMO;
@@ -5261,5 +5262,10 @@ def:        return at.Get(self, index);
                 return tf;
             }
         }
+    }
+
+    public class Config {
+        public static readonly bool C3Trace =
+            Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
     }
 }

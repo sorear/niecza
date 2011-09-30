@@ -5009,20 +5009,18 @@ dynamic:
             } else if (cmd == "type_CAN") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 string meth = (string)args[2];
-                // TODO
-                return true;
+                return (st.mo.rtype != "package" && st.mo.rtype != "module");
             } else if (cmd == "type_add_super") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 STable su = (STable)Handle.Unbox(args[2]);
-                // TODO
+                st.mo.superclasses.Add(su);
                 return null;
             } else if (cmd == "type_closed") {
                 STable st = (STable)Handle.Unbox(args[1]);
-                // TODO
-                return false;
+                return st.mo.isComposed;
             } else if (cmd == "type_close") {
                 STable st = (STable)Handle.Unbox(args[1]);
-                // TODO
+                st.mo.Compose();
                 return null;
             } else if (cmd == "type_kind") {
                 STable st = (STable)Handle.Unbox(args[1]);
@@ -5046,6 +5044,10 @@ dynamic:
                     nst = new STable(name);
                     if (mof != null) mof.SetValue(null, nst);
                 }
+                // Hack - we don't clear the MRO here, because we might need
+                // to call methods on the type in the process of defining the
+                // type itself.
+                nst.mo.superclasses.Clear();
                 nst.typeObject = new P6opaque(nst, 0);
                 ((P6opaque)nst.typeObject).slots = null;
                 nst.typeVar = Kernel.NewROScalar(nst.typeObject);
@@ -5058,6 +5060,8 @@ dynamic:
                 nst.initVar    = nst.typeVar;
                 nst.initObject = nst.typeObject;
                 nst.mo.rtype   = type;
+                nst.mo.isPackage = (type == "package");
+                nst.mo.isRole    = (type == "role" || type == "prole");
 
                 return new Handle(nst);
             } else if (cmd == "create_sub") {

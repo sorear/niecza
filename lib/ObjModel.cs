@@ -126,7 +126,7 @@ namespace Niecza {
     public class P6how {
         public STable stable;
 
-        public bool isRole, isSubset, isPackage;
+        public bool isRole, isSubset, isPackage, isComposed, isComposing;
         public string rtype = "class"; // XXX used for compiler's inspection
         public P6any roleFactory;
         public P6any subsetWhereThunk;
@@ -486,6 +486,110 @@ next_method: ;
             roleFactory = factory;
             instCache = new Dictionary<string, P6any>();
             SetMRO(Kernel.AnyMO.mo.mro);
+        }
+
+        string C3State(int[] pointers, List<STable> into, STable[][] from) {
+            List<string> mergees = new List<string>();
+
+            for (int i = 0; i < pointers.Length; i++) {
+                List<string> elts = new List<string>();
+
+                for (int j = pointers[i]; j < from[i].Length; j++)
+                    elts.Add(from[i][j].name);
+
+                mergees.Add(Kernel.JoinS(" ", elts));
+            }
+
+            return Kernel.JoinS(" ", into, st => st.name) + " <- " +
+                Kernel.JoinS(" | ", mergees);
+        }
+
+        string C3Merge(List<STable> into, STable[][] from) {
+            int[] pointers = new int[from.Length]; // all 0s
+            Dictionary<STable, int> blocked = new Dictionary<STable, int>();
+
+            foreach (STable[] list in from) {
+                for (int i = 0; i < list.Length; i++) {
+                    int k;
+                    // set 1 block for each non-initial value used
+                    blocked.TryGetValue(list[i], out k);
+                    blocked[list[i]] = k + (i == 0 ? 0 : 1);
+                }
+            }
+
+            while (true) {
+                if (Config.C3Trace)
+                    Console.WriteLine("C3 state: " + C3State(pointers, into, from));
+                STable to_shift = null;
+                STable k = null;
+                for (int i = 0; i < from.Length; i++) {
+                    if (pointers[i] < from[i].Length &&
+                            blocked[k = from[i][pointers[i]]] == 0) {
+                        to_shift = k;
+                        break;
+                    }
+                }
+
+                if (to_shift != null) {
+                    for (int i = 0; i < from.Length; i++) {
+                        if (pointers[i] < from[i].Length &&
+                                from[i][pointers[i]] == to_shift) {
+                            pointers[i]++;
+                            if (pointers[i] < from[i].Length)
+                                blocked[from[i][pointers[i]]]--;
+                        }
+                    }
+                    into.Add(to_shift);
+                } else {
+                    bool bad = false;
+                    for (int i = 0; i < from.Length; i++)
+                        if (pointers[i] < from[i].Length)
+                            bad = true;
+                    if (bad)
+                        return C3State(pointers, into, from);
+                    else
+                        return null;
+                }
+            }
+        }
+
+        public string Compose() {
+            if (isComposed || rtype == "package" || rtype == "module")
+                return null;
+            if (isComposing)
+                return "Circularity detected while composing " + stable.name;
+            isComposing = true;
+            string err;
+            foreach (STable su in superclasses) {
+                err = su.mo.Compose();
+                if (err != null) return err;
+            }
+            isComposed = true;
+
+            if (rtype == "role" || rtype == "prole") {
+                isRole = true;
+                SetMRO(Kernel.AnyMO.mo.mro);
+                return null;
+            }
+
+            if (superclasses.Count == 0 && stable != Kernel.MuMO) {
+                superclasses.Add(rtype == "grammar" ? Kernel.GrammarMO :
+                        Kernel.AnyMO);
+            }
+
+            STable[][] lists = new STable[superclasses.Count + 1][];
+            lists[0] = new STable[superclasses.Count + 1];
+            lists[0][0] = stable;
+            superclasses.CopyTo(lists[0], 1);
+            for (int i = 0; i < superclasses.Count; i++)
+                lists[i+1] = superclasses[i].mo.mro;
+
+            List<STable> nmro = new List<STable>();
+            err = C3Merge(nmro, lists);
+            if (err != null)
+                return "C3 MRO generation failed for " + stable.name + ": " + err;
+            SetMRO(nmro.ToArray());
+            return null;
         }
     }
 
