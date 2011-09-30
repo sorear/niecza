@@ -21,6 +21,7 @@ S02-literals/string-interpolation.t
 S02-literals/types.t
 S02-literals/underscores.t
 S02-magicals/block.t
+S02-magicals/dollar-underscore.t
 S02-magicals/file_line.t
 S02-magicals/progname.t
 S02-magicals/sub.t
