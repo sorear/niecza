@@ -692,12 +692,12 @@ method process_block_traits($/, @tr) {
             $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
                 next unless $sub.body_of;
             $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
-                next if $sub.augmenting;
+                next if defined $*AUGMENT_BUFFER;
             $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
-                next if !$*unit.deref($pack).^can('add_super');
+                next if !$pack.CAN('add_super');
 
             $T.CURSOR.trymop({
-                $*unit.deref($pack).add_super($super.xref);
+                $pack.add_super($super);
             });
         } elsif $pack && $tr<export> {
             my @exports = @( $tr<export> );

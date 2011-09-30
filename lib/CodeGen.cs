@@ -5006,6 +5006,16 @@ dynamic:
 
                 string err = Backend.currentUnit.NsBind(who, name, vitm, file, line);
                 return err == null ? null : new Exception(err);
+            } else if (cmd == "type_CAN") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                string meth = (string)args[2];
+                // TODO
+                return true;
+            } else if (cmd == "type_add_super") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                STable su = (STable)Handle.Unbox(args[2]);
+                // TODO
+                return null;
             } else if (cmd == "type_closed") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 // TODO

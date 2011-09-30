@@ -217,14 +217,65 @@ class StaticSub {
         $ops := NieczaPassSimplifier.invoke_incr(self, $ops);
         downcall("sub_finish", self, to-json($ops.cgop(self)));
     }
+
+    # helper for compile_get_pkg; handles stuff like SETTING::OUTER::Foo,
+    # recursively.
+    method _lexy_ref(*@names, :$auto) {
+        @names || die "Cannot use a lexical psuedopackage as a compile time package reference";
+        self // die "Passed top of lexical tree";
+        given shift @names {
+            when 'OUTER'   { return self.outer._lexy_ref(@names, :$auto) }
+            when 'SETTING' { return self.to_unit.outer._lexy_ref(@names, :$auto) }
+            when 'UNIT'    { return self.to_unit._lexy_ref(@names, :$auto) }
+            when 'CALLER'  { die "Cannot use CALLER in a compile time name" }
+            default {
+                my @lex = self.lookup_lex($_);
+                @lex || die "No lexical found for $_";
+                @lex[0] eq 'package' || die "Lexical $_ is not a package";
+                return $*unit.rel_pkg(@lex[4], @names, :$auto);
+            }
+        }
+    }
+
+    method true_setting() {
+        my $c = self;
+        $c = $c.to_unit.outer while $c.unit.name ne 'CORE';
+        $c;
+    }
+
+    # returns direct reference to package, or dies
+    method compile_get_pkg(*@names, :$auto) {
+        @names || die "Cannot make a compile time reference to the semantic root package";
+        my $n0 = shift(@names);
+        if $n0 eq 'OUR' {
+            return $*unit.rel_pkg(self.cur_pkg, @names, :$auto);
+        } elsif $n0 eq 'PROCESS' or $n0 eq 'GLOBAL' {
+            return $*unit.abs_pkg($n0, @names, :$auto);
+        } elsif $n0 eq any < COMPILING DYNAMIC CLR CALLER > {
+            # Yes, COMPILING is right here.  Because COMPILING is only valid
+            # when recursively running code within the compiler, but this
+            # function is only called directly from the compiler.  The closest
+            # it comes to making sense is if you use eval in a macro.  Don't
+            # do that, okay?
+            die "Pseudo package $n0 may not be used in compile time reference";
+        } elsif $n0 eq 'MY' {
+            return self._lexy_ref(@names, :$auto);
+        } elsif $n0 eq 'CORE' {
+            return self.true_setting._lexy_ref(@names, :$auto);
+        } elsif $n0 eq 'OUTER' or $n0 eq 'SETTING' or $n0 eq 'UNIT' {
+            return self._lexy_ref($n0, @names, :$auto);
+        } elsif $n0 ne 'PARENT' && self.lookup_lex($n0) {
+            return self._lexy_ref($n0, @names, :$auto);
+        } elsif $n0 ~~ /^\W/ {
+            return $*unit.rel_pkg(self.cur_pkg, $n0, @names, :$auto);
+        } else {
+            return $*unit.abs_pkg('GLOBAL', $n0, @names, :$auto);
+        }
+    }
 }
 
 class Type {
-    method is_package() { downcall("type_is_package", self) }
-    method closed() { downcall("type_closed", self) }
-    method close() { downcall("type_close", self) }
-    method kind() { downcall("type_kind", self) }
-    method name() { downcall("type_name", self) }
+    method FALLBACK($name, *@args) { downcall("type_$name", self, @args) }
 }
 
 class Unit {
