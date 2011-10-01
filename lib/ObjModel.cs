@@ -188,6 +188,9 @@ namespace Niecza {
             public P6any impl;
 
             public int flags;
+
+            public string file;
+            public int line;
         }
 
         public class DispatchSet {
@@ -390,16 +393,18 @@ next_method: ;
         }
 
         public void AddMethod(int flags, string name, P6any code) {
-            MethodInfo mi;
+            AddMethodPos(flags, name, code, "???", 0);
+        }
+
+        public void AddMethodPos(int flags, string name, P6any code, string file, int line) {
+            MethodInfo mi = new MethodInfo();
             //SubInfo si = (SubInfo) code.GetSlot("info");
             mi.impl = code;
             mi.short_name = name;
             mi.long_name = name;
-            // XXX
-            if ((flags & M_MASK) == 0 && code.mo.name == "Regex" &&
-                    name.IndexOf(':') >= 0) {
-                flags |= M_MULTI;
-            }
+            mi.file = file;
+            mi.line = line;
+
             if ((flags & M_MASK) != 0) {
                 if ((flags & M_MASK) == M_PROTO) {
                     mi.long_name = mi.long_name + ":(proto)";

@@ -85,36 +85,16 @@ method post_save($name, :$main) {
 }
 
 class StaticSub {
+    method FALLBACK($name, *@args) { downcall("sub_$name", self, @args) }
+
     method lex_names() { downcall("lex_names", self) }
     method lookup_lex($name, $file?, $line?) {
         downcall("sub_lookup_lex", self, $name, $file, $line//0);
     }
-    method set_outervar($v) { downcall("sub_set_outervar", self, $v) }
-    method set_class($n)    { downcall("sub_set_class", self, ~$n) }
-    method set_name($v)     { downcall("sub_set_name", self, ~$v) }
-    method set_methodof($m) { downcall("sub_set_methodof", self, $m) }
-    method set_in_class($m) { downcall("sub_set_in_class", self, $m) }
-    method set_cur_pkg($m)  { downcall("sub_set_cur_pkg", self, $m) }
-    method set_body_of($m)  { downcall("sub_set_body_of", self, $m) }
-
-    method name()     { downcall("sub_name", self) }
-    method outer()    { downcall("sub_outer", self) }
-    method class()    { downcall("sub_class", self) }
-    method run_once() { downcall("sub_run_once", self) }
-    method cur_pkg()  { downcall("sub_cur_pkg", self) }
-    method in_class() { downcall("sub_in_class", self) }
-    method body_of()  { downcall("sub_body_of", self) }
-    method outervar() { downcall("sub_outervar", self) }
-    method methodof() { downcall("sub_methodof", self) }
 
     method unused_lexicals() { downcall("unused_lexicals", self) }
-    method parameterize_topic() { downcall("sub_parameterize_topic", self) }
     method unit() { downcall("sub_get_unit", self) }
-    method to_unit() { downcall("sub_to_unit", self) }
     method is($o) { downcall("equal_handles", self, $o) }
-    method is_routine() { downcall("sub_is_routine", self) }
-    method has_lexical($name) { downcall("sub_has_lexical", self, $name) }
-    method lexical_used($name) { downcall("sub_lexical_used", self, $name) }
 
     method set_signature($sig) {
         my @args;
@@ -276,6 +256,11 @@ class StaticSub {
 
 class Type {
     method FALLBACK($name, *@args) { downcall("type_$name", self, @args) }
+
+    method add_method($mode, $name, $sub, :$file, :$line, :$pos) {
+        downcall("type_add_method", self, $mode, $name, $sub,
+            $file, $line, $pos);
+    }
 }
 
 class Unit {

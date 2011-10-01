@@ -20,6 +20,20 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD {
+method trymop($f) {
+    my $*worry = sub ($m) { self.worry($m) };
+    state $fast = %*ENV<NIECZA_FAIL_FAST>;
+    if $fast {
+        $f();
+    } else {
+        unless try { $f(); True } {
+            self.sorry($!)
+        }
+    }
+}
+}
+
 augment grammar STD::P6 {
     rule package_def {
         :my $longname;
@@ -319,6 +333,11 @@ method package_var($/, $slot, $name, $path) {
     ::Op::Lexical.new(|node($/), name => $slot);
 }
 
+method method_def ($/) {
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
+    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
+}
+
 method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
@@ -360,6 +379,72 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     make ::Op::StatementList.new;
 }
 
+method signature($/) {
+    if $<type_constraint> {
+        # ignore for now
+    }
+
+    if $<param_var> {
+        my $sig = Sig.new(params => [ ::Sig::Parameter.new(
+                name => ~$<param_var>, |$<param_var>.ast,
+                full_parcel => True) ]);
+        $*CURLEX<!sub>.set_signature($sig) if $*SIGNUM;
+        make $sig;
+        return;
+    }
+
+    my @p = map *.ast, @( $<parameter> );
+    my @ps = @( $<param_sep> );
+    my $ign = False;
+    loop (my $i = 0; $i < @p; $i++) {
+        @p[$i].multi_ignored = $ign;
+        if $i >= @ps {
+        } elsif defined @ps[$i].index(':') {
+            $/.CURSOR.sorry('Only the first parameter may be invocant') if $i;
+            $*CURLEX<!sub>.add_my_name('self', :noinit, |mnode($/));
+            @p[$i].invocant = True;
+        } elsif defined @ps[$i].index(';;') {
+            $ign = True;
+        } elsif !defined @ps[$i].index(',') {
+            $/.CURSOR.sorry("Parameter separator @ps[$i] NYI");
+        }
+    }
+
+    state %mlike = (:Method, :Submethod, :Regex);
+    if $*SIGNUM && %mlike{$*CURLEX<!sub>.class} && (!@p || !@p[0].invocant) {
+        $*CURLEX<!sub>.add_my_name('self', :noinit, |mnode($/));
+        unshift @p, ::Sig::Parameter.new(name => 'self', :invocant);
+    }
+
+    for @p {
+        if !defined(.tclass) && $*SIGNUM {
+            if .invocant && $*CURLEX<!sub>.methodof {
+                my $cl = $*CURLEX<!sub>.methodof;
+                # XXX type checking against roles NYI
+                if $cl.kind eq none <role prole> {
+                    .tclass = $cl;
+                }
+            } elsif !$*CURLEX<!sub>.is_routine {
+                .tclass = $*CURLEX<!sub>.compile_get_pkg('Mu');
+            }
+        }
+    }
+
+    my $sig = Sig.new(params => @p);
+    $*CURLEX<!sub>.set_signature($sig) if $*SIGNUM;
+    make $sig;
+}
+
+method pblock($/) {
+    #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
+    make $*CURLEX<!sub>;
+}
+
+method block($/) {
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
+    make $*CURLEX<!sub>
+}
 
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$longname, :$method_type is copy, :$contextual is copy) {
@@ -429,8 +514,8 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         $method_type = Str;
     }
 
-    if $method_targ && !$method_targ.can_add_method {
-        $/.CURSOR.sorry("A {$method_targ.WHAT} cannot have methods added");
+    if $method_targ && !$method_targ.CAN('add_method') {
+        $/.CURSOR.sorry("A {$method_targ.kind} cannot have methods added");
         $method_type = Str;
         $method_targ = Any;
     }
@@ -496,18 +581,29 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         }
 
         if defined($method_type) {
-            if $sub.outer.augment_hack {
-                push $sub.outer.augment_hack,
-                    [ $multiness, $method_type, $name, $symbol, $sub.xref ];
+            my $mode = 0;
+            given $method_type {
+                when 'sub'      { $mode += 2 }
+                when 'normal'   { $mode += 0 }
+                when 'private'  { $mode += 1 }
+                default         { die "Unimplemented method type $_" }
+            }
+            given $multiness {
+                when 'only'     { $mode += 0 }
+                when 'proto'    { $mode += 4 }
+                when 'multi'    { $mode += 8 }
+                default         { die "Unimplemented multiness $_" }
+            }
+            if defined $*AUGMENT_BUFFER {
+                push $*AUGMENT_BUFFER, $mode, $name, $symbol;
             } else {
-                $method_targ.add_method($multiness, $method_type, $name,
-                    $symbol, $sub.xref, |mnode($/));
+                $method_targ.add_method($mode, $name, $sub, |mnode($/));
             }
         }
 
         if $scope eq 'our' {
-            $*unit.bind($pkg // $*unit.deref($sub.outer.cur_pkg),
-                "&$name", $sub.xref);
+            $*unit.bind(($pkg // $sub.outer.cur_pkg).who,
+                "&$name", $sub);
         }
     });
 }
@@ -645,7 +741,7 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
     $/.CURSOR.trymop({
         my $old;
         if $scope ne 'anon' && !$pkg && $sub.has_lexical($head) {
-            my @linfo = $sub.lookup_lex(head);
+            my @linfo = $sub.lookup_lex($head);
             die "Cannot resume definition - $head not a packageoid"
                 unless @linfo[0] eq 'package';
             $old = @linfo[4];
@@ -655,7 +751,7 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
 
         my $lexed_already;
 
-        if $old && ($old.?kind // '') eq $class && !$old.closed {
+        if $old && $old.kind eq $class && !$old.closed {
             $npkg = $old;
             $lexed_already = True;
         } elsif $scope eq 'our' {

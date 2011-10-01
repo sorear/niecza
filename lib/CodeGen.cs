@@ -4185,6 +4185,11 @@ dynamic:
     }
 
     public class Backend {
+        public static string LocStr(string fo, int lo, string fn, int ln) {
+            return fn == fo ? " (see line " + lo + ")" :
+                " (see " + fo + " line " + lo + ")";
+        }
+
     //    internal AssemblyBuilder ab;
     //    internal ModuleBuilder mob;
     //    internal TypeBuilder tb;
@@ -4759,8 +4764,12 @@ dynamic:
         object Call(object[] args) {
             if (TraceDown) {
                 Console.WriteLine(args.Length);
-                foreach(object a in args)
-                    Console.WriteLine(a);
+                foreach(object a in args) {
+                    char ch = (a is int) ? 'i' : (a is Handle) ? 'h' :
+                        (a is string) ? 's' : (a is bool) ? 'b' :
+                        (a == null) ? 'n' : 'X';
+                    Console.WriteLine("{0}:{1}", ch, a);
+                }
             }
             string cmd = (string) args[0];
             if (cmd == "gettype") {
@@ -4785,6 +4794,9 @@ dynamic:
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
                 Backend.currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
                 return null;
+            } else if (cmd == "sub_create_static_pad") {
+                ((SubInfo)Handle.Unbox(args[1])).CreateProtopad();
+                return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
             } else if (cmd == "sub_run_once") {
@@ -4799,7 +4811,7 @@ dynamic:
             } else if (cmd == "sub_outer") {
                 return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).outer);
             } else if (cmd == "sub_class") {
-                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).mo.name);
+                return ((SubInfo)Handle.Unbox(args[1])).mo.name;
             } else if (cmd == "sub_body_of") {
                 return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).body_of);
             } else if (cmd == "sub_in_class") {
@@ -4918,10 +4930,10 @@ dynamic:
                 }
                 return ret.ToArray();
             } else if (cmd == "unit_stub_stash") {
-                RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);
-                int    pos = (int)args[2];
-                STable type = (STable)Handle.Unbox(args[3]);
-                u.stubbed_stashes.Add(new KeyValuePair<int,STable>(pos,type));
+                int    pos = (int)args[1];
+                STable type = (STable)Handle.Unbox(args[2]);
+                Backend.currentUnit.stubbed_stashes.
+                    Add(new KeyValuePair<int,STable>(pos,type));
                 return null;
             } else if (cmd == "unit_get_name") {
                 return ((RuntimeUnit)Handle.Unbox(args[1])).name;
@@ -5014,6 +5026,27 @@ dynamic:
                 STable st = (STable)Handle.Unbox(args[1]);
                 STable su = (STable)Handle.Unbox(args[2]);
                 st.mo.superclasses.Add(su);
+                return null;
+            } else if (cmd == "type_add_method") {
+                STable  add_to = (STable)Handle.Unbox(args[1]);
+                int     mode   = (int)args[2];
+                string  name   = (string)args[3];
+                SubInfo sub    = (SubInfo)Handle.Unbox(args[4]);
+                string  file   = (string)args[5];
+                int     line   = (int)args[6];
+                //int   pos    = (int)args[7];
+
+                if ((mode & P6how.M_MASK) == P6how.M_ONLY) {
+                    foreach (P6how.MethodInfo mi in add_to.mo.lmethods) {
+                        if (mi.Name() == name &&
+                                ((mi.flags ^ mode) & P6how.V_MASK) == 0) {
+                            return new Exception("Two definitions of method " +
+                                    name + Backend.LocStr(mi.file, mi.line, file, line));
+                        }
+                    }
+                }
+
+                add_to.mo.AddMethodPos(mode, name, sub.protosub, file, line);
                 return null;
             } else if (cmd == "type_closed") {
                 STable st = (STable)Handle.Unbox(args[1]);
