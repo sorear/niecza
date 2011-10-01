@@ -19,3 +19,5 @@ sub new {
 PERL5
 my $foo = eval(:lang<perl5>,'Foo->new');
 $foo.baz(eval(:lang<perl5>,'"Perl hacker"'));
+say eval(:lang<perl5>,"125");
+

@@ -12,7 +12,25 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_eval")]
     public static extern IntPtr EvalPerl5(string code);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvIV")]
+    public static extern int SvIV(IntPtr sv);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvIOKp")]
+    public static extern int SvIOKp(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvNOKp")]
+    public static extern int SvNOKp(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPOKp")]
+    public static extern int SvPOKp(IntPtr sv);
+
+    public static Variable SVToVariable(IntPtr sv) {
+        if (SvIOKp(sv) != 0) {
+            return Builtins.MakeInt(SvIV(sv));
+        } else {
+            return new SVVariable(sv);
+        }
+    }
   
     public Perl5Interpreter() {
         Initialize();
@@ -21,7 +39,7 @@ public class Perl5Interpreter : IForeignInterpreter {
         Dispose();
     }
     public Variable Eval(string code) {
-        return new SVVariable(EvalPerl5(code));
+        return SVToVariable(EvalPerl5(code));
     }
 }
 

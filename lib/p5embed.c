@@ -59,3 +59,17 @@ void p5method_call(char* name,int* args,int n) {
   /*FREETMPS;
   LEAVE;*/
 }
+
+int p5embed_SvIOKp(SV* sv) {
+    return SvIOKp(sv);
+}
+int p5embed_SvNOKp(SV* sv) {
+    return SvNOKp(sv);
+}
+int p5embed_SvPOKp(SV* sv) {
+    return SvPOKp(sv);
+}
+
+int p5embed_SvIV(SV* sv) {
+    return SvIV(sv);
+}
