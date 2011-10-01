@@ -40,7 +40,7 @@ void p5embed_dispose()
   PERL_SYS_TERM();
 }
 
-void p5method_call(char* name,int* args,int n) {
+void p5method_call(char* name,SV** args,int n) {
   dSP;
 
 
@@ -72,4 +72,7 @@ int p5embed_SvPOKp(SV* sv) {
 
 int p5embed_SvIV(SV* sv) {
     return SvIV(sv);
+}
+double p5embed_SvNV(SV* sv) {
+    return SvNV(sv);
 }
