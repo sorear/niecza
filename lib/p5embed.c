@@ -22,17 +22,18 @@ void p5embed_initialize()
   printf("# initialising perl\n");
   PERL_SYS_INIT3(0,NULL,NULL);
   PerlInterpreter* my_perl = perl_alloc();
-  PERL_SET_CONTEXT(my_perl);
   perl_construct(my_perl);
   char *embedding[] = { "", "-e", "0" };
   perl_parse(my_perl, xs_init, 3, embedding, NULL);
   PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
-  eval_pv("use lib 'perl5';use Niecza::Interoperability",TRUE);
+//  eval_pv("use lib 'perl5';use Niecza::Interoperability",TRUE);
   printf("# initialised perl\n");
 }
 
 SV* p5embed_eval(char* code) { 
   printf("# evaling code <%s>...\n",code);
+  eval_pv("1",TRUE);
+  printf("# evaled 1\n");
   SV* ret = eval_pv(code,TRUE);
   printf("# survived evaling code...\n");
   return ret;
