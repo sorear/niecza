@@ -19,6 +19,7 @@ xs_init(pTHX)
 static PerlInterpreter *my_perl;
 void p5embed_initialize()
 {
+  printf("# initialising perl\n");
   PERL_SYS_INIT3(0,NULL,NULL);
   PerlInterpreter* my_perl = perl_alloc();
   PERL_SET_CONTEXT(my_perl);
@@ -27,10 +28,11 @@ void p5embed_initialize()
   perl_parse(my_perl, xs_init, 3, embedding, NULL);
   PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
   eval_pv("use lib 'perl5';use Niecza::Interoperability",TRUE);
+  printf("# initialised perl\n");
 }
 
 SV* p5embed_eval(char* code) { 
-  printf("# evaling code...\n");
+  printf("# evaling code <%s>...\n",code);
   SV* ret = eval_pv(code,TRUE);
   printf("# survived evaling code...\n");
   return ret;
@@ -38,6 +40,7 @@ SV* p5embed_eval(char* code) {
 
 void p5embed_dispose()
 {
+  printf("# disposing of perl\n");
   perl_destruct(my_perl);
   perl_free(my_perl);
   PERL_SYS_TERM();
