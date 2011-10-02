@@ -73,8 +73,8 @@ public class SVany : P6any {
         [DllImport("obj/p5embed.so", EntryPoint="p5method_call")]
         public static extern IntPtr MethodCall(
             string name,
-            IntPtr[] foo,
-            int n
+            IntPtr[] arguments,
+            int argument_n
         );
 
         public static IntPtr VariableToSV(Variable var) {
@@ -93,7 +93,8 @@ public class SVany : P6any {
                 for (int i=0;i<pos.Length;i++) {
                     args[i] = VariableToSV(pos[i]);
                 }
-                MethodCall(name,args,args.Length);
+                IntPtr ret = MethodCall(name,args,args.Length);
+                caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
                 return caller;
         }
 

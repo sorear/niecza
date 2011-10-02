@@ -40,21 +40,31 @@ void p5embed_dispose()
   PERL_SYS_TERM();
 }
 
-void p5method_call(char* name,SV** args,int n) {
+
+SV* p5method_call(char* name,SV** args,int args_count) {
   dSP;
 
 
-  /*ENTER;
-  SAVETMPS;*/
-
   PUSHMARK(SP);
   int i;
-  for (i=0;i<n;i++) {
+  for (i=0;i<args_count;i++) {
     XPUSHs(args[i]);
   }
   PUTBACK;
 
-  call_method(name,G_DISCARD);
+
+  int count = call_method(name,G_SCALAR);
+  SPAGAIN;
+  if (count != 1) croak("Big trouble\n");
+
+  SV* ret = POPs;
+
+  /* TODO should i do that? */
+  SvREFCNT_inc(ret);
+
+  PUTBACK;
+
+  return ret;
 
   /*FREETMPS;
   LEAVE;*/
