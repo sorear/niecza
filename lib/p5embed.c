@@ -89,3 +89,6 @@ double p5embed_SvNV(SV* sv) {
 char* p5embed_SvPV_nolen(SV* sv) {
     return SvPV_nolen(sv);
 }
+SV* p5embed_newSVpvn(char* str,int len) {
+    return newSVpvn(str,len);
+}

@@ -11,8 +11,7 @@ use warnings;
 package Foo;
 sub baz {
     my ($self,$arg) = @_;
-    my $who = $$arg;
-    print "Just another $who\n";
+    print "Just another $arg\n";
     return 44;
 }
 sub new {
@@ -20,7 +19,7 @@ sub new {
 }
 PERL5
 my $foo = eval(:lang<perl5>,'Foo->new');
-say $foo.baz(eval(:lang<perl5>,'\"Perl hacker"'));
+say $foo.baz("Perl hacker");
 say eval(:lang<perl5>,"125");
 say eval(:lang<perl5>,"13.5");
 say eval(:lang<perl5>,"'Hello there'");

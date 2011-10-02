@@ -30,6 +30,9 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPOKp")]
     public static extern int SvPOKp(IntPtr sv);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_newSVpvn")]
+    public static extern IntPtr newSVpvn(string s,int length);
+
     public static Variable SVToVariable(IntPtr sv) {
         if (SvIOKp(sv) != 0) {
             return Builtins.MakeInt(SvIV(sv));
@@ -81,6 +84,9 @@ public class SVany : P6any {
             P6any obj = var.Fetch();
             if (obj is SVany) {
                 return ((SVany)obj).sv;
+            } else if (obj.Does(Kernel.StrMO)) {
+                string s = Kernel.UnboxAny<string>(obj);
+                return Perl5Interpreter.newSVpvn(s,s.Length);
             } else {
                 throw new NieczaException("can't convert argument to p5 type");
             }
