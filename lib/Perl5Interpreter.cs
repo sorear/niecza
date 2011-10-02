@@ -59,7 +59,9 @@ public class Perl5Interpreter : IForeignInterpreter {
         Dispose();
     }
     public Variable Eval(string code) {
-        return SVToVariable(EvalPerl5(code));
+        IntPtr sv = EvalPerl5(code);
+        Console.WriteLine("# wrapping/converting SV");
+        return SVToVariable(sv);
     }
 }
 
