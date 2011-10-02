@@ -78,7 +78,7 @@ sub ExposeEvent($sender, $eventargs)  #OK not used
     $offsetX = (($windowWidth  - ($scale * matrixColumns))/2).Int;
     $offsetY = (($windowHeight - ($scale * matrixRows   ))/2).Int;
     $cc.SetSourceRGB(0, 0, 0.4.Num); $cc.Paint;  # Dark blue background
-    MoveDownOne();
+    TryMovePieceDown();  # also clears full rows and makes new pieces
     DrawMatrix($cc);
     DrawPiece($cc);
     $cc.dispose-hack; # Should be $cc.IDisposable.Dispose but currently
@@ -113,7 +113,7 @@ sub CanMovePiece($deltaX, $deltaY)
     $canMove;
 }
 
-sub MoveDownOne()
+sub TryMovePieceDown()
 {
     if CanMovePiece(0, 1) {
         ++$pieceY;
@@ -121,6 +121,23 @@ sub MoveDownOne()
     else {  # Copy this piece into the matrix and start with a new piece
         for @piece -> $x, $y {
             @matrix[$y+$pieceY][$x+$pieceX] = $colorindex;
+        }
+        # Look for full rows and remove them. TODO: keep score.
+        for ^matrixRows -> $row {
+            my $full = True;
+            for ^matrixColumns -> $column {
+                if @matrix[$row][$column] == 0 { $full = False; }
+            }
+            if $full {
+                loop (my $moveRow = $row; $moveRow > 0; --$moveRow) {
+                    for ^matrixColumns -> $column {
+                        @matrix[$moveRow][$column] = @matrix[$moveRow-1][$column];
+                    }
+                }
+                for ^matrixColumns -> $column {
+                    @matrix[0][$column] = 0;
+                }
+            }
         }
         CreatePiece();
     }
