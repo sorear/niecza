@@ -66,8 +66,33 @@ SV* p5method_call(char* name,SV** args,int args_count) {
 
   return ret;
 
-  /*FREETMPS;
-  LEAVE;*/
+}
+
+SV* p5embed_subcall(SV** args,int args_count) {
+  dSP;
+
+
+  PUSHMARK(SP);
+  int i;
+  for (i=1;i<args_count;i++) {
+    XPUSHs(args[i]);
+  }
+  PUTBACK;
+
+
+  int count = call_sv(args[0],G_SCALAR);
+  SPAGAIN;
+  if (count != 1) croak("Big trouble\n");
+
+  SV* ret = POPs;
+
+  /* TODO should i do that? */
+  SvREFCNT_inc(ret);
+
+  PUTBACK;
+
+  return ret;
+
 }
 
 int p5embed_SvIOKp(SV* sv) {

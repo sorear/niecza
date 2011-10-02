@@ -33,6 +33,12 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_newSVpvn")]
     public static extern IntPtr newSVpvn(string s,int length);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_subcall")]
+    public static extern IntPtr SubCall(
+        IntPtr[] arguments,
+        int argument_n
+    );
+
     public static Variable SVToVariable(IntPtr sv) {
         if (SvIOKp(sv) != 0) {
             return Builtins.MakeInt(SvIV(sv));
@@ -92,15 +98,29 @@ public class SVany : P6any {
             }
         }
 
-        public IntPtr sv;
-        public override Frame InvokeMethod(Frame caller, string name,
-                Variable[] pos, VarHash named) {
+        static IntPtr[] MarshalPositionals(Variable[] pos) {
                 IntPtr[] args = new IntPtr[pos.Length];
                 for (int i=0;i<pos.Length;i++) {
                     args[i] = VariableToSV(pos[i]);
                 }
-                IntPtr ret = MethodCall(name,args,args.Length);
-                caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
+                return args;
+        }
+
+        public IntPtr sv;
+        public override Frame InvokeMethod(Frame caller, string name,
+                Variable[] pos, VarHash named) {
+
+                if (name == "postcircumfix:<( )>") {
+                    IntPtr[] args = MarshalPositionals(pos);
+                    IntPtr ret = Perl5Interpreter.SubCall(args,args.Length);
+                    caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
+                    return caller;
+                } else {
+                    IntPtr[] args = MarshalPositionals(pos);
+                    IntPtr ret = MethodCall(name,args,args.Length);
+                    caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
+                }
+
                 return caller;
         }
 
