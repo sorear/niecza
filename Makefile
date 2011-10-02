@@ -77,7 +77,7 @@ p6eval: all
 	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
 
 clean:
-	@rm -f obj/*.dll obj/*.exe obj/*.nam
+	@rm -f obj/*.dll obj/*.exe obj/*.nam obj/*.so
 	@rm -f run/Niecza.exe
 	@rm -f run/*.dll
 	@rm -f run/*.dll.so
