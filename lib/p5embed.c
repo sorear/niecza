@@ -30,7 +30,10 @@ void p5embed_initialize()
 }
 
 SV* p5embed_eval(char* code) { 
-  return eval_pv(code,TRUE);
+  printf("# evaling code...\n");
+  SV* ret = eval_pv(code,TRUE);
+  printf("# survived evaling code...\n");
+  return ret;
 }
 
 void p5embed_dispose()
