@@ -309,8 +309,10 @@ namespace Niecza {
             foreach (KeyValuePair<object, FieldBuilder> kv in constants)
                 type.GetField(kv.Value.Name).SetValue(null, kv.Key);
 
-            for (int i = 0; i < ths.Length; i++)
+            for (int i = 0; i < ths.Length; i++) {
                 ths[i].FillSubInfo(type);
+                Console.WriteLine("{0} | {1}", our_subs[i].name, our_subs[i].code);
+            }
 
             if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
                 Kernel.TraceFlags = Kernel.TRACE_CUR;
@@ -1801,6 +1803,7 @@ noparams:
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
                 int nspill) {
+            Console.WriteLine("New SubInfo#1 {0}", name);
             this.lines = lines;
             this.code = code;
             this.outer = outer;
@@ -1817,6 +1820,7 @@ noparams:
 
         public SubInfo(RuntimeUnit unit, string name, SubInfo outer,
                 STable cls, STable pkg, bool once) {
+            Console.WriteLine("New SubInfo#2 {0} [{1:X}]", name, GetHashCode());
             edata = new int[0];
             this.name  = name;
             this.unit  = unit;
@@ -4774,8 +4778,8 @@ def:        return at.Get(self, index);
         private static void DoTrace(Frame cur) {
             TraceCount = TraceFreq;
             if ((TraceFlags & TRACE_CUR) != 0)
-                Console.WriteLine("{0}|{1} @ {2}",
-                        cur.DepthMark(), cur.info.name, cur.ip);
+                Console.WriteLine("{0}|{1} @ {2} [{3}/{4:X}]",
+                        cur.DepthMark(), cur.info.name, cur.ip, cur.info.code, cur.info.GetHashCode());
             if ((TraceFlags & TRACE_ALL) != 0) {
                 Console.WriteLine("Context:" + DescribeBacktrace(cur, null));
             }
