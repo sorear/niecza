@@ -201,7 +201,7 @@ namespace Niecza {
     public sealed class RuntimeUnit {
         static Dictionary<string, byte[]> heapreg;
 
-        public string name, filename, modtime, asm_name;
+        public string name, filename, modtime, asm_name, dll_name;
         public Dictionary<string, StashEnt> globals;
         public SubInfo mainline, bottom;
         public bool is_mainish;
@@ -275,13 +275,14 @@ namespace Niecza {
                 Kernel.CreateBasicTypes();
 
             this.asm_name = name.Replace("::", ".");
-            this.filename = asm_name + (main ? ".exe" : ".dll");
+            this.dll_name = asm_name + (main ? ".exe" : ".dll");
             this.asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
                     new AssemblyName(asm_name),
                     (runnow ? AssemblyBuilderAccess.RunAndSave :
                         AssemblyBuilderAccess.Save), obj_dir);
-            mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
-                asm_builder.DefineDynamicModule(asm_name, filename);
+            //mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
+            //    asm_builder.DefineDynamicModule(asm_name, filename);
+            mod_builder = asm_builder.DefineDynamicModule(asm_name, dll_name);
 
             type_builder = mod_builder.DefineType(asm_name,
                     TypeAttributes.Public | TypeAttributes.Sealed |
@@ -299,16 +300,22 @@ namespace Niecza {
                 SubInfo z = our_subs[i];
                 ths[i] = new NamProcessor(
                     new CpsBuilder(this, "C" + i + z.name, true), z);
-                ths[i].MakeBody(Reader.Read(z.nam_str));
+                ths[i].MakeBody(Reader.Read(z.nam_str, z.nam_refs));
             }
 
             type = type_builder.CreateType();
+            asm_builder.Save(dll_name);
 
             foreach (KeyValuePair<object, FieldBuilder> kv in constants)
                 type.GetField(kv.Value.Name).SetValue(null, kv.Key);
 
             for (int i = 0; i < ths.Length; i++)
                 ths[i].FillSubInfo(type);
+
+            if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
+                Kernel.TraceFlags = Kernel.TRACE_CUR;
+                Kernel.TraceCount = Kernel.TraceFreq = 1;
+            }
         }
 
         internal CpsOp TypeConstant(STable s) {
@@ -729,6 +736,9 @@ namespace Niecza {
         public const int SUB_IS_UNSAFE = 8;
         public const int SUB_IS_PARAM_ROLE = 16;
         public const int SUB_MAINLINE = 32;
+        public const int SUB_TRANSPARENT = 64;
+        public const int SUB_INLINED = 128;
+        public const int SUB_CANNOT_INLINE = 256;
 
         public void LoadStashes(int from) {
             int ct = ReadInt(ref from);
@@ -1703,6 +1713,53 @@ noparams:
                 if (s.GetLocalHint(name, out val))
                     return true;
             val = null;
+            return false;
+        }
+
+        internal bool IsInlinable() {
+            if (sig_i == null)
+                return false;
+            if ((special & RuntimeUnit.SUB_CANNOT_INLINE) != 0)
+                return false;
+            if (children.Count != 0)
+                return false;
+            foreach (KeyValuePair<string,LexInfo> kv in dylex) {
+                if (!(kv.Value is LISimple))
+                    return false;
+                if ((kv.Key.Length > 0 &&
+                            (kv.Key[0] == '?' || kv.Key[0] == '*')) ||
+                        (kv.Key.Length > 1 &&
+                          (kv.Key[1] == '?' || kv.Key[1] == '*')))
+                    return false;
+            }
+            for (int i = 0; i < sig_i.Length; i += SIG_I_RECORD) {
+                int fl = sig_i[i + SIG_I_FLAGS];
+                if ((fl & SIG_F_POSITIONAL) == 0)
+                    return false;
+                if ((fl & SIG_F_HASDEFAULT) != 0)
+                    return false;
+            }
+            return true;
+        }
+
+        internal void SetInlined() {
+            special |= RuntimeUnit.SUB_INLINED;
+            outer.children.Remove(this);
+            unit.our_subs.Remove(this);
+            if (outervar != null && outer.dylex[outervar] is LISub)
+                outer.dylex.Remove(outervar);
+        }
+
+        internal bool IsTopicalizer() {
+            if (sig_i == null)
+                return false;
+            LexInfo topic;
+            dylex.TryGetValue("$_", out topic);
+            for (int i = 0; i < sig_i.Length; i += SIG_I_RECORD) {
+                int slot = sig_i[i + SIG_I_SLOT];
+                if (slot > 0 && topic != null && topic.SigIndex() == slot)
+                    return true;
+            }
             return false;
         }
 
@@ -5204,6 +5261,7 @@ def:        return at.Get(self, index);
             if (th.caller == null)
                 Panic("Catching frame has no caller?" + th.info.name);
             while (csr != tf) {
+                if (csr == null) Panic("Unwinding into null frame");
                 if (csr.info == null) Panic("Null SubInfo?");
                 if (csr.info == ExitRunloopSI) {
                     // when this exception reaches the outer runloop,

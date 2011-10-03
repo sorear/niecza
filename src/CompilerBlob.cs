@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using System.IO;
 
 namespace Niecza {
@@ -109,6 +110,59 @@ namespace Niecza {
                     (t == "unit") ? UnitP : null;
                 return Kernel.BoxAnyMO(r, pr.mo);
             }
+        }
+
+        static void SerializeNam(Variable v, StringBuilder sb,
+                List<object> refs) {
+
+            P6any o = v.Fetch();
+            if (o is BoxObject<int>) { /* includes bool */
+                sb.Append(Kernel.UnboxAny<int>(o));
+            } else if (o is BoxObject<double>) {
+                sb.Append(Utils.N2S(Kernel.UnboxAny<double>(o)));
+            } else if (o is BoxObject<string>) {
+                string s = Kernel.UnboxAny<string>(o);
+                sb.Append('"');
+                foreach (char c in s) {
+                    if (c >= ' ' && c <= '~')
+                        sb.Append(c);
+                    else {
+                        sb.Append("\\u");
+                        sb.AppendFormat("{0:4X}", (int)c);
+                    }
+                }
+                sb.Append('"');
+            } else if (!o.IsDefined()) {
+                sb.Append("null");
+            } else if (o.Isa(Kernel.ListMO)) {
+                VarDeque d = o.mo.mro_raw_iterator.Get(v);
+                bool comma = false;
+                sb.Append('[');
+                while (Kernel.IterHasFlat(d, true)) {
+                    if (comma) sb.Append(',');
+                    SerializeNam(d.Shift(), sb, refs);
+                    comma = true;
+                }
+                sb.Append(']');
+            } else if (o is BoxObject<object>) {
+                sb.Append('!');
+                sb.Append(refs.Count);
+                refs.Add(Kernel.UnboxAny<object>(o));
+            } else {
+                throw new NieczaException("weird object in sub_finish " + o.mo.name);
+            }
+        }
+
+        public static Variable Finish(Variable si, Variable nam) {
+            StringBuilder sb = new StringBuilder();
+            List<object> refs = new List<object>();
+            SerializeNam(nam, sb, refs);
+            object[] args = new object[refs.Count + 3];
+            args[0] = "sub_finish";
+            args[1] = Kernel.UnboxAny<object>(si.Fetch());
+            args[2] = sb.ToString();
+            refs.CopyTo(args, 3);
+            return DCResult(RawDowncall(args));
         }
     }
 }

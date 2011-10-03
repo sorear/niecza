@@ -22,6 +22,7 @@ namespace Niecza.CLRBackend {
         bool has_val;
 
         public JScalar(string txt) { text = txt; }
+        public JScalar(int val) : this(val.ToString()) { }
         public string str { get { return text; } }
         public double num {
             get {
@@ -78,7 +79,7 @@ namespace Niecza.CLRBackend {
             return (char)acc;
         }
 
-        public static object Read(string inputx) {
+        public static object Read(string inputx, object[] refs) {
             char[] input = inputx.ToCharArray();
             int ilen = input.Length;
             int start, write;
@@ -151,7 +152,12 @@ namespace Niecza.CLRBackend {
                         break;
                     ix++;
                 }
-                containers[containers.Count - 1].Add(new JScalar(new string(input, start, ix - start)));
+                if (input[start] == '!') {
+                    string str = new string(input, start+1, ix - start - 1);
+                    containers[containers.Count - 1].Add(refs[int.Parse(str)]);
+                } else {
+                    containers[containers.Count - 1].Add(new JScalar(new string(input, start, ix - start)));
+                }
             }
         }
     }
@@ -1378,6 +1384,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewRWScalar");
         public static readonly MethodInfo Kernel_NewTypedScalar =
             typeof(Kernel).GetMethod("NewTypedScalar");
+        public static readonly MethodInfo Kernel_Assign =
+            typeof(Kernel).GetMethod("Assign");
         public static readonly MethodInfo Kernel_CreateArray =
             typeof(Kernel).GetMethod("CreateArray");
         public static readonly MethodInfo Kernel_CreateHash =
@@ -3254,6 +3262,100 @@ namespace Niecza.CLRBackend {
                     CpsOp.NewArray(Tokens.P6any, cands.ToArray())));
         }
 
+        object[] InlineCall(SubInfo tgt, object[] zyg) {
+            RuntimeUnit ru = Backend.currentUnit;
+            object tgzyg = Reader.Read(tgt.nam_str, tgt.nam_refs);
+
+            string[] lex_names = (new List<string>(tgt.dylex.Keys)).ToArray();
+            // locale-independant code generation
+            Array.Sort(lex_names, string.CompareOrdinal);
+
+            // letscope: gives visible names to lets
+            List<object> scope = new List<object>();
+            scope.Add(new JScalar("letscope"));
+            scope.Add(new JScalar(tgt.special & RuntimeUnit.SUB_TRANSPARENT));
+
+            // let: introduces symbols for !argN, !lexN
+            List<object> let = new List<object>();
+            let.Add(new JScalar("letn"));
+
+            int[] nsigi = (int[])tgt.sig_i.Clone();
+            List<object> bind = new List<object>();
+            bind.Add(new JScalar("_inlinebind"));
+            bind.Add(tgt.name);
+            bind.Add(nsigi);
+            bind.Add(tgt.sig_r);
+            bind.Add(null);
+
+            // give unique names to the arguments
+            foreach (object a in zyg) {
+                string alias = "!arg" + ru.nextid++;
+                bind.Add(new object[] { new JScalar("letvar"), new JScalar(alias) });
+                let.Add(new JScalar(alias));
+                let.Add(a);
+            }
+
+
+            string[] slot_to_lex = new string[tgt.dylex.Count];
+
+            for (int i = 0; i < lex_names.Length; i++) {
+                string   ln = lex_names[i];
+                LISimple li = (LISimple)tgt.dylex[ln]; // checked in inlinable()
+                string let_name = "!var" + ru.nextid++;
+
+                slot_to_lex[li.index] = ln;
+
+                let.Add(new JScalar(let_name));
+                if ((li.flags & LISimple.NOINIT) != 0)
+                    let.Add(new object[] { new JScalar("null"), new JScalar("var") });
+                else if ((li.flags & LISimple.ROINIT) != 0)
+                    let.Add(new object[] { new JScalar("scopedlex"), new JScalar("Any") });
+                else if ((li.flags & LISimple.DEFOUTER) != 0)
+                    let.Add(new object[] { new JScalar("scopedlex"), new JScalar(ln) });
+                else if ((li.flags & LISimple.HASH) != 0)
+                    let.Add(new object[] { new JScalar("newhash") });
+                else if ((li.flags & LISimple.LIST) != 0)
+                    let.Add(new object[] { new JScalar("newarray") });
+                else
+                    let.Add(new object[] { new JScalar("_newoftype"),
+                        ru.TypeConstant(li.type) });
+
+                scope.Add(new JScalar(ln));
+                scope.Add(new JScalar(let_name));
+            }
+
+            string[] lexicals_fixup =
+                new string[nsigi.Length / SubInfo.SIG_I_RECORD];
+            for (int i = 0; i < lexicals_fixup.Length; i ++) {
+                int slot = nsigi[i * SubInfo.SIG_I_RECORD + SubInfo.SIG_I_SLOT];
+                if (slot < 0)
+                    lexicals_fixup[i] = null;
+                else
+                    lexicals_fixup[i] = slot_to_lex[slot];
+            }
+            bind[4] = lexicals_fixup;
+
+            scope.Add(new object[] {
+                new JScalar("prog"),
+                bind.ToArray(),
+                tgzyg
+            });
+
+            let.Add(scope.ToArray());
+
+            if (tgt.IsTopicalizer()) {
+                int tid = ru.nextid++;
+                return new object[] {
+                    new JScalar("xspan"), new JScalar("!start"+tid),
+                    new JScalar("!end"+tid), new JScalar(0), let.ToArray(),
+                    new JScalar(SubInfo.ON_SUCCEED), new JScalar(""),
+                    new JScalar("!end"+tid)
+                };
+            } else {
+                return let.ToArray();
+            }
+        }
+
         CpsOp SubyCall(bool ismethod, object[] zyg) {
             int sh = ismethod ? 3 : 2;
             string sig = ((JScalar) zyg[sh-1]).str;
@@ -3341,6 +3443,82 @@ namespace Niecza.CLRBackend {
                 CpsOp ch = th.Scan(z[4]);
                 th.eh_stack.RemoveAt(th.eh_stack.Count - 1);
                 return CpsOp.Span(ls, le, FixBool(z[3]), xn, ch);
+            };
+            handlers["_inlinebind"] = delegate(NamProcessor th, object[] zyg) {
+                CpsOp[] args = JScalar.A<CpsOp>(5, zyg, th.Scan);
+                int[] sig_i = (int[])zyg[2];
+                string[] lexnames = (string[])zyg[4];
+                object[] sig_r = (object[])zyg[3];
+                string name = (string)zyg[1];
+                RuntimeUnit ru = Backend.currentUnit;
+                List<CpsOp> ops = new List<CpsOp>();
+                int rix = 0;
+                int aused = 0;
+                for (int i = 0; i < sig_i.Length; i+=SubInfo.SIG_I_RECORD) {
+                    int flags = sig_i[i + SubInfo.SIG_I_FLAGS];
+                    int nname = sig_i[i + SubInfo.SIG_I_NNAMES];
+                    int rbase = rix;
+                    string lex = lexnames[i / SubInfo.SIG_I_RECORD];
+                    rix += (nname+1);
+                    STable type = Kernel.AnyMO;
+                    //SubInfo def = null;
+
+                    if ((flags & SubInfo.SIG_F_HASDEFAULT) != 0)
+                        rix++; //def = (SubInfo) sig_r[rix++];
+                    if ((flags & SubInfo.SIG_F_HASTYPE) != 0)
+                        type = (STable) sig_r[rix++];
+
+                    CpsOp get = null;
+                    if (aused < args.Length) {
+                        get = args[aused++];
+                    } else if ((flags & SubInfo.SIG_F_DEFOUTER) != 0) {
+                        get = th.RawAccessLex("outerlex", lex, null);
+                    } else if ((flags & SubInfo.SIG_F_OPTIONAL) != 0) {
+                        get = ru.RefConstant(type.name + "MO", type.typeVar, null);
+                    } else {
+                        get = CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
+                            CpsOp.StringLiteral("No value in "+name+" available for parameter "+(string)sig_r[rbase]));
+                    }
+
+                    if (lex == null) {
+                        ops.Add(CpsOp.Sink(get));
+                    } else if ((flags & SubInfo.SIG_F_IS_COPY) != 0) {
+                        CpsOp init;
+                        if ((flags & SubInfo.SIG_F_IS_HASH) != 0) {
+                            init = CpsOp.MethodCall(Tokens.Kernel_CreateHash);
+                        } else if ((flags & SubInfo.SIG_F_IS_LIST) != 0) {
+                            init = CpsOp.MethodCall(Tokens.Kernel_CreateArray);
+                        } else {
+                            init = CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
+                                    ru.TypeConstant(type));
+                        }
+                        ops.Add(th.RawAccessLex("scopedlex", lex, init));
+                        ops.Add(CpsOp.Sink(CpsOp.MethodCall(
+                            Tokens.Kernel_Assign,
+                            th.RawAccessLex("scopedlex", lex, null),
+                            get)));
+                    } else if ((flags & SubInfo.SIG_F_RWTRANS) != 0) {
+                        ops.Add(th.RawAccessLex("scopedlex", lex, get));
+                    } else {
+                        int mode = 0;
+                        if ((flags & SubInfo.SIG_F_READWRITE) != 0)
+                            mode = Kernel.NBV_RW;
+                        else if ((flags & (SubInfo.SIG_F_IS_LIST |
+                                SubInfo.SIG_F_IS_HASH)) != 0)
+                            mode = Kernel.NBV_LIST;
+                        ops.Add(th.RawAccessLex("scopedlex", lex,
+                            CpsOp.MethodCall(Tokens.Kernel_NewBoundVar,
+                                CpsOp.IntLiteral(mode),
+                                ru.TypeConstant(type), get)));
+                    }
+                }
+
+                return CpsOp.Sequence(ops.ToArray());
+            };
+            handlers["_inline"] = delegate(NamProcessor th, object[] zyg) {
+                object[] rzyg = new object[zyg.Length - 2];
+                Array.Copy(zyg, 2, rzyg, 0, rzyg.Length);
+                return th.Scan(th.InlineCall((SubInfo)zyg[1], rzyg));
             };
             handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
                 List<ClrEhSpan> xn = new List<ClrEhSpan>();
@@ -3941,7 +4119,7 @@ dynamic:
                     CpsOp.Goto("!again", false),
                     CpsOp.Null(Tokens.Variable));
             };
-            thandlers["assign"] = Methody(null, Tokens.Kernel.GetMethod("Assign"));
+            thandlers["assign"] = Methody(null, Tokens.Kernel_Assign);
             thandlers["cotake"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("CoTake"));
             thandlers["take"] = Methody(Tokens.Variable, Tokens.Kernel.GetMethod("Take"));
             thandlers["startgather"] = Methody(Tokens.Frame, Tokens.Kernel.GetMethod("GatherHelper"));
@@ -4796,6 +4974,17 @@ dynamic:
                 return null;
             } else if (cmd == "sub_create_static_pad") {
                 ((SubInfo)Handle.Unbox(args[1])).CreateProtopad();
+                return null;
+            } else if (cmd == "sub_noninlinable") {
+                ((SubInfo)Handle.Unbox(args[1])).special |=
+                    RuntimeUnit.SUB_CANNOT_INLINE;
+                return null;
+            } else if (cmd == "sub_is_inlinable") {
+                return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
+            } else if (cmd == "sub_topicalizer") {
+                return ((SubInfo)Handle.Unbox(args[1])).IsTopicalizer();
+            } else if (cmd == "sub_set_inlined") {
+                ((SubInfo)Handle.Unbox(args[1])).SetInlined();
                 return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);

@@ -193,9 +193,9 @@ class StaticSub {
             ~($file//''), +($line//0), +($pos// -1), $body));
     }
 
-    method finish($ops) { 
+    method finish($ops) {
         $ops := NieczaPassSimplifier.invoke_incr(self, $ops);
-        downcall("sub_finish", self, to-json($ops.cgop(self)));
+        Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.Finish {self} {$ops.cgop(self)}) }
     }
 
     # helper for compile_get_pkg; handles stuff like SETTING::OUTER::Foo,
