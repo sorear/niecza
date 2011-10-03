@@ -12,7 +12,45 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_eval")]
     public static extern IntPtr EvalPerl5(string code);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvIV")]
+    public static extern int SvIV(IntPtr sv);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPV_nolen")]
+    public static extern string SvPV_nolen(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvNV")]
+    public static extern double SvNV(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvIOKp")]
+    public static extern int SvIOKp(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvNOKp")]
+    public static extern int SvNOKp(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPOKp")]
+    public static extern int SvPOKp(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_newSVpvn")]
+    public static extern IntPtr newSVpvn(string s,int length);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_subcall")]
+    public static extern IntPtr SubCall(
+        IntPtr[] arguments,
+        int argument_n
+    );
+
+    public static Variable SVToVariable(IntPtr sv) {
+        if (SvIOKp(sv) != 0) {
+            return Builtins.MakeInt(SvIV(sv));
+        } else if (SvNOKp(sv) != 0) {
+            return Builtins.MakeFloat(SvNV(sv));
+        } else if (SvPOKp(sv) != 0) {
+            string s = SvPV_nolen(sv);
+            return Kernel.BoxAnyMO(s, Kernel.StrMO);
+        } else {
+            return new SVVariable(sv);
+        }
+    }
   
     public Perl5Interpreter() {
         Initialize();
@@ -21,7 +59,9 @@ public class Perl5Interpreter : IForeignInterpreter {
         Dispose();
     }
     public Variable Eval(string code) {
-        return new SVVariable(EvalPerl5(code));
+        IntPtr sv = EvalPerl5(code);
+        Console.WriteLine("# wrapping/converting SV");
+        return SVToVariable(sv);
     }
 }
 
@@ -44,27 +84,45 @@ public class SVany : P6any {
         [DllImport("obj/p5embed.so", EntryPoint="p5method_call")]
         public static extern IntPtr MethodCall(
             string name,
-            IntPtr[] foo,
-            int n
+            IntPtr[] arguments,
+            int argument_n
         );
 
         public static IntPtr VariableToSV(Variable var) {
             P6any obj = var.Fetch();
             if (obj is SVany) {
                 return ((SVany)obj).sv;
+            } else if (obj.Does(Kernel.StrMO)) {
+                string s = Kernel.UnboxAny<string>(obj);
+                return Perl5Interpreter.newSVpvn(s,s.Length);
             } else {
                 throw new NieczaException("can't convert argument to p5 type");
             }
         }
 
-        public IntPtr sv;
-        public override Frame InvokeMethod(Frame caller, string name,
-                Variable[] pos, VarHash named) {
+        static IntPtr[] MarshalPositionals(Variable[] pos) {
                 IntPtr[] args = new IntPtr[pos.Length];
                 for (int i=0;i<pos.Length;i++) {
                     args[i] = VariableToSV(pos[i]);
                 }
-                MethodCall(name,args,args.Length);
+                return args;
+        }
+
+        public IntPtr sv;
+        public override Frame InvokeMethod(Frame caller, string name,
+                Variable[] pos, VarHash named) {
+
+                if (name == "postcircumfix:<( )>") {
+                    IntPtr[] args = MarshalPositionals(pos);
+                    IntPtr ret = Perl5Interpreter.SubCall(args,args.Length);
+                    caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
+                    return caller;
+                } else {
+                    IntPtr[] args = MarshalPositionals(pos);
+                    IntPtr ret = MethodCall(name,args,args.Length);
+                    caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
+                }
+
                 return caller;
         }
 

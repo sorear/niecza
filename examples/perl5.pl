@@ -12,10 +12,15 @@ package Foo;
 sub baz {
     my ($self,$arg) = @_;
     print "Just another $arg\n";
+    return 44;
 }
 sub new {
     bless {},"Foo";
 }
 PERL5
 my $foo = eval(:lang<perl5>,'Foo->new');
-$foo.baz(eval(:lang<perl5>,'"Perl hacker"'));
+say $foo.baz("Perl hacker");
+say eval(:lang<perl5>,"125");
+say eval(:lang<perl5>,"13.5");
+say eval(:lang<perl5>,"'Hello there'");
+
