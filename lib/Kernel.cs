@@ -329,7 +329,7 @@ namespace Niecza {
                 return CpsOp.Null(nty);
             FieldBuilder fi;
             if (!constants.TryGetValue(val, out fi))
-                constants[val] = fi = NewField(name, val.GetType());
+                constants[val] = fi = NewField(name, val is Variable ? typeof(Variable) : val.GetType());
             return CpsOp.IsConst(CpsOp.GetSField(fi));
         }
 
@@ -1234,7 +1234,8 @@ namespace Niecza {
         public override object Get(Frame f) { return pkg.typeVar; }
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
-            return Backend.currentUnit.TypeConstant(pkg).head;
+            return Backend.currentUnit.RefConstant(pkg.name + "V",
+                    pkg.typeVar, typeof(Variable)).head;
         }
     }
 
