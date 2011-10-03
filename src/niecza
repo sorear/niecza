@@ -85,6 +85,7 @@ augment grammar STD::P6 {
 }
 
 augment grammar STD {
+my package DEBUG { our constant symtab = 0 }
 method finishlex() {
     my $sub = $*CURLEX<!sub>;
     if $sub.is_routine {
@@ -97,19 +98,105 @@ method finishlex() {
 
     self;
 }
+
+method is_name($longname, $curlex = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("is_name $longname") if $deb;
+    if defined($longname.index("::(")) {
+        self.deb("computed name gets a free pass") if $deb;
+        return True;
+    }
+    my @parts = $longname.split('::');
+    shift @parts if @parts[0] eq '';
+    pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
+
+    @parts[*-1] = $/ ~ @parts[*-1] if @parts && @parts[0] ~~ s/^(\W\W?)//;
+
+    self.deb("reparsed: @parts.perl()") if $deb;
+    return True if !@parts;
+
+    my ($pkg, $sub);
+
+    given @parts[0] {
+        when 'OUR' {
+            $pkg = $curlex<!sub>.cur_pkg;
+            shift @parts;
+            goto "packagey";
+        }
+        when 'PROCESS' | 'GLOBAL' {
+            $pkg = $*unit.abs_pkg(shift @parts);
+            goto "packagey";
+        }
+        when 'MY'      { $sub = $curlex<!sub>;                 goto "lexy"; }
+        when 'OUTER'   { $sub = $curlex<!sub>.?outer;          goto "lexy"; }
+        when 'UNIT'    { $sub = $curlex<!sub>.?to_unit;        goto "lexy"; }
+        when 'CORE'    { $sub = $curlex<!sub>.?true_setting;   goto "lexy"; }
+        when 'SETTING' { $sub = $curlex<!sub>.?to_unit.?outer; goto "lexy"; }
+
+        when 'COMPILING' | 'DYNAMIC' | 'CALLER' | 'CLR' { return True }
+
+        default {
+            my @lexical = self.lookup_lex(@parts[0], $curlex);
+            if !@lexical || @parts[0] eq 'PARENT' {
+                return False if @parts == 1; # $x doesn't mean GLOBAL
+                $pkg = (@parts[0] ~~ /^\W/) ??
+                    $curlex<!sub>.cur_pkg !!
+                    $*unit.abs_pkg('GLOBAL');
+            } elsif @lexical[0] eq 'package' {
+                $pkg = @lexical[4];
+                shift @parts;
+            } else {
+                return @parts == 1;
+            }
+            goto "packagey";
+        }
+    }
+
+lexy:
+    shift @parts;
+    return False unless $sub;
+    return True unless @parts;
+    given @parts[0] {
+        when 'OUTER'   { $sub = $sub.?outer;          goto "lexy"; }
+        when 'UNIT'    { $sub = $sub.?to_unit;        goto "lexy"; }
+        when 'SETTING' { $sub = $sub.?to_unit.?outer; goto "lexy"; }
+        when 'CALLER'  { return True; }
+    }
+
+    my @lex = self.lookup_lex(@parts[0], $sub);
+    unless @lex {
+        self.deb("Lexical @parts[0] not found") if $deb;
+        return False;
+    }
+    if @lex[0] eq 'package' {
+        shift @parts;
+        $pkg = @lex[4];
+        goto "packagey";
+    }
+    else {
+        return @parts == 1;
+    }
+
+packagey:
+    for @parts {
+        return False if !$pkg || !$*unit.exists($pkg.who, $_);
+        $pkg = $*unit.get($pkg.who, $_);
+    }
+
+    return True;
+}
+
 method getsig {
     my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
     state %method = (:Method, :Submethod, :Regex);
     if $*CURLEX.<!NEEDSIG>:delete {
         my @parms;
         if %method{$*CURLEX<!sub>.class} {
-            my $cl = $*CURLEX<!sub>.methodof &&
-                $*unit.deref($*CURLEX<!sub>.methodof);
+            my $cl = $*CURLEX<!sub>.methodof;
             # XXX type checking against roles NYI
-            if $cl && $cl !~~ ::Metamodel::Role &&
-                    $cl !~~ ::Metamodel::ParametricRole {
+            if $cl && $cl.kind eq none <role prole> {
                 push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
-                    tclass => $cl.xref);
+                    tclass => $cl);
             } else {
                 push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
             }
@@ -304,7 +391,7 @@ augment class Op::Lexical {
             ($/.CURSOR.sorry("Cannot find definition for binding???"),
                 return ::Op::StatementList.new);
         my $list = False;
-        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
+        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu');
         given @lex[0] {
             when 'simple' {
                 $list = ?(@lex[4] +& 24); # LIST | HASH from LISimple
@@ -325,8 +412,8 @@ augment class NieczaActions {
 method package_var($/, $slot, $name, $path) {
     $/.CURSOR.trymop({
         $/.CURSOR.check_categorical($slot);
-        my $ref = $path.^can('xref') ?? $path.xref !!
-            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref;
+        my $ref = $path.^can('kind') ?? $path !!
+            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto);
         $*CURLEX<!sub>.add_common_name($slot, $ref, $name, |mnode($/));
         $/.CURSOR.mark_used($slot);
     });
@@ -797,10 +884,10 @@ method process_block_traits($/, @tr) {
             });
         } elsif $pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports($*unit.deref($pack).name, $pack, @exports);
+            $sub.outer.add_exports($pack.name, $pack, @exports);
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports('&'~$sub.name, $sub.xref, @exports);
+            $sub.outer.add_exports('&'~$sub.name, $sub, @exports);
             $sub.strong_used = True;
             $sub.outer.create_static_pad;
             $/.CURSOR.mark_used($sub.outervar)

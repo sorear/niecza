@@ -5190,6 +5190,11 @@ dynamic:
                 } else {
                     return null;
                 }
+            } else if (cmd == "unit_exists") {
+                string who  = (string)args[2];
+                string key  = (string)args[3];
+                string hkey = (char)who.Length + who + key;
+                return Kernel.currentGlobals.ContainsKey(hkey);
             } else if (cmd == "unit_bind") {
                 string who  = (string)args[1];
                 string name = (string)args[2];
@@ -5252,6 +5257,9 @@ dynamic:
             } else if (cmd == "type_name") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 return st.name;
+            } else if (cmd == "type_name") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                return Kernel.UnboxAny<string>(st.who);
             } else if (cmd == "type_create") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string name = (string)args[2];

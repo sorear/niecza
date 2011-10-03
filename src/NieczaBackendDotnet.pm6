@@ -264,6 +264,7 @@ class Type {
 }
 
 class Unit {
+    method FALLBACK($name, *@args) { downcall("unit_$name", self, @args) }
     method name() { downcall("unit_get_name", self) }
     method stubbed_stashes() { downcall("unit_stubbed_stashes", self) }
     method anon_stash() { downcall("unit_anon_stash", self) }
