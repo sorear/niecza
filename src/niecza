@@ -425,6 +425,12 @@ method method_def ($/) {
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
+method embeddedblock($/) {
+    $*CURLEX<!sub>.finish($<statementlist>.ast);
+    $*CURLEX<!sub>.set_signature(Sig.simple());
+    make $*CURLEX<!sub>;
+}
+
 method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.

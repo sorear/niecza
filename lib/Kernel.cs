@@ -1060,6 +1060,11 @@ namespace Niecza {
         public override int SigIndex() { return index; }
         public override void BindFields() {
             index = owner.num_lex_slots++;
+            if (owner.protopad != null) {
+                int osz = owner.protopad.lexn == null ? 0 : owner.protopad.lexn.Length;
+                if (owner.num_lex_slots > 10 + osz)
+                    Array.Resize(ref owner.protopad.lexn, owner.num_lex_slots * 2 - 10);
+            }
         }
 
         public override object Get(Frame f) {
