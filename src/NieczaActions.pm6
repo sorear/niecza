@@ -1,5 +1,6 @@
 class NieczaActions;
 
+use CgOp;
 use Op;
 use RxOp;
 use Sig;
@@ -239,7 +240,7 @@ method process_name($/, :$declaring, :$defer, :$clean) {
             my @tail = @ns;
             my $head = pop(@tail) ~ $ext;
             unless @tail {
-                goto "dyn" if $head eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT >;
+                goto "dyn" if $head eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT CLR >;
                 return { name => $head } unless @tail;
             }
             try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
@@ -891,6 +892,7 @@ sub post_backslash($/) {
         make $/.ast.negate;
     }
 }
+method backslash:qq ($/) { make $<quote>.ast }
 method backslash:x ($/) {
     if $<hexint> {
         make chr($<hexint>.ast);
@@ -980,10 +982,10 @@ method process_nibble($/, @bits, $prefix?) {
     }
     elsif $post eq 'path' {
         # TODO could stand to be a lot fancier.
-        make ::Op::CallMethod(|node($/), receiver => $/.ast, :name<IO>);
+        make ::Op::CallMethod.new(|node($/), receiver => $/.ast, :name<IO>);
     }
     elsif $post eq 'run' {
-        make mkcall($/, 'rungather', $/.ast);
+        make mkcall($/, '&rungather', $/.ast);
     }
     else {
         $/.CURSOR.sorry("Unhandled postprocessor $post");
@@ -1542,10 +1544,10 @@ method term:value ($/) { make $<value>.ast }
 method package_var($/, $slot, $name, $path) {
     $/.CURSOR.trymop({
         $/.CURSOR.check_categorical($slot);
-        my $ref = $path.^can('xref') ?? $path.xref !!
-            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto).xref;
+        my $ref = $path.^can('kind') ?? $path !!
+            $*CURLEX<!sub>.compile_get_pkg(@$path, :auto);
         $*CURLEX<!sub>.add_common_name($slot, $ref, $name, |mnode($/));
-        $*CURLEX<!sub>.lexicals-used{$slot} = True;
+        $/.CURSOR.mark_used($slot);
     });
     ::Op::Lexical.new(|node($/), name => $slot);
 }
@@ -1600,7 +1602,7 @@ method term:identifier ($/) {
         return;
     }
 
-    if $id eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT > {
+    if $id eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT CLR > {
         make Op::IndirectVar.new(|node($/),
             name => Op::StringLiteral.new(text => $id));
         return;
@@ -1967,14 +1969,13 @@ method signature($/) {
     for @p {
         if !defined(.tclass) && $*SIGNUM {
             if .invocant && $*CURLEX<!sub>.methodof {
-                my $cl = $*unit.deref($*CURLEX<!sub>.methodof);
+                my $cl = $*CURLEX<!sub>.methodof;
                 # XXX type checking against roles NYI
-                if $cl !~~ ::Metamodel::Role &&
-                        $cl !~~ ::Metamodel::ParametricRole {
-                    .tclass = $cl.xref;
+                if $cl.kind eq none <role prole> {
+                    .tclass = $cl;
                 }
-            } elsif !$*CURLEX<!sub>.returnable {
-                .tclass = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
+            } elsif !$*CURLEX<!sub>.is_routine {
+                .tclass = $*CURLEX<!sub>.compile_get_pkg('Mu');
             }
         }
     }
@@ -2149,7 +2150,7 @@ method blockoid($/) {
         loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
             # this isn't *quite* right, as it will cause declaring
             # anything more in the same scope to fail.
-            $/.CURSOR.mark_used($_) for $l.lexicals.keys;
+            $/.CURSOR.mark_used($_) for $l.lex_names;
         }
 
         make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
@@ -2159,7 +2160,7 @@ method blockoid($/) {
 }
 method lambda($/) {}
 method embeddedblock($/) {
-    $*CURLEX<!sub>.code = $<statementlist>.ast;
+    $*CURLEX<!sub>.finish($<statementlist>.ast);
     $*CURLEX<!sub>.set_signature(Sig.simple());
     make $*CURLEX<!sub>;
 }
@@ -2630,22 +2631,22 @@ method process_block_traits($/, @tr) {
             $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
                 next unless $sub.body_of;
             $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
-                next if $sub.augmenting;
+                next if defined $*AUGMENT_BUFFER;
             $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
-                next if !$*unit.deref($pack).^can('add_super');
+                next if !$pack.CAN('add_super');
 
             $T.CURSOR.trymop({
-                $*unit.deref($pack).add_super($super.xref);
+                $pack.add_super($super);
             });
         } elsif $pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports($*unit.deref($pack).name, $pack, @exports);
+            $sub.outer.add_exports($pack.name, $pack, @exports);
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports('&'~$sub.name, $sub.xref, @exports);
+            $sub.outer.add_exports('&'~$sub.name, $sub, @exports);
             $sub.strong_used = True;
             $sub.outer.create_static_pad;
-            $sub.outer.lexicals-used{$sub.outervar} = True
+            $/.CURSOR.mark_used($sub.outervar)
                 if defined $sub.outervar;
         } elsif !$pack && $tr<nobinder> {
             $sub.set_signature(Any);
@@ -3007,48 +3008,43 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
     my $lexname;
     $/.CURSOR.trymop({
         my $old;
-        if $scope ne 'anon' && !$pkg && $sub.lexicals.{$head} -> $l {
+        if $scope ne 'anon' && !$pkg && $sub.has_lexical($head) {
+            my @linfo = $sub.lookup_lex($head);
             die "Cannot resume definition - $head not a packageoid"
-                unless $l ~~ ::Metamodel::Lexical::Stash;
-            $old = $*unit.deref($l.pkg);
+                unless @linfo[0] eq 'package';
+            $old = @linfo[4];
         } elsif defined $pkg {
-            $old = $*unit.get($pkg, $head);
-            $old = $old && $*unit.deref($old);
+            $old = $*unit.get($pkg.who, $head);
         }
 
         my $lexed_already;
 
-        if $old && $old.WHAT === $class && !$old.closed {
+        if $old && $old.kind eq $class && !$old.closed {
             $npkg = $old;
             $lexed_already = True;
         } elsif $scope eq 'our' {
-            my $opkg = $pkg // $*unit.deref($sub.cur_pkg);
-            $npkg = $class.new(name => $head, who => $opkg.who ~ '::' ~ $head);
-            $*unit.bind($opkg, $head, $npkg.xref, |mnode($/));
+            my $opkg = $pkg // $sub.cur_pkg;
+            $npkg = $*unit.create_type(name => $head, :$class,
+                who => $opkg.who ~ '::' ~ $head);
+            $*unit.bind($opkg.who, $head, $npkg, |mnode($/));
         } else {
             my $id = $*unit.anon_stash;
-            $npkg = $class.new(name => $head, who => "::$id");
-            $*unit.bind($*unit.abs_pkg(), $id, $npkg.xref, |mnode($/));
+            $npkg = $*unit.create_type(name => $head, :$class,
+                who => "::$id");
+            $*unit.bind("", $id, $npkg, |mnode($/));
         }
 
         $lexname = (!$lexed_already && $scope ne 'anon' && !defined($pkg))
             ?? $head !! self.gensym;
 
-        $sub.add_my_stash($lexname, $npkg.xref, |mnode($/));
-        $sub.add_exports($head, $npkg.xref, $exports) if $exports;
+        $sub.add_my_stash($lexname, $npkg, |mnode($/));
+        $sub.add_exports($head, $npkg, $exports) if $exports;
     });
 
     $lexname, $npkg
 }
 
 method open_package_def($, $/ = $*cursor) {
-    state %_decl2mclass = (
-        package => ::Metamodel::Package,
-        class   => ::Metamodel::Class,
-        module  => ::Metamodel::Module,
-        grammar => ::Metamodel::Grammar,
-        role    => ::Metamodel::Role,
-    );
     my $sub = $*CURLEX<!sub>;
 
     if $*MULTINESS {
@@ -3057,29 +3053,32 @@ method open_package_def($, $/ = $*cursor) {
 
     if $*SCOPE eq 'augment' {
         my ($obj) = self.process_name($<longname>, :clean);
+        $*AUGMENT_BUFFER = [];
 
         $/.CURSOR.trymop({
             die "Augment requires a target" unless $obj;
-            die "Illegal augment of a role" if $obj ~~ ::Metamodel::Role;
+            die "Illegal augment of a role" if $obj.kind eq 'role' | 'prole';
 
-            $sub.augment_hack = [ $obj.xref ];
-            $sub.body_of = $sub.in_class = $sub.cur_pkg = $obj.xref;
-            $sub.augmenting = True;
+            $sub.set_body_of($obj);
+            $sub.set_in_class($obj);
+            $sub.set_cur_pkg($obj);
             $sub.set_name("augment-$obj.name()");
         });
     } else {
-        my $type = %_decl2mclass{$*PKGDECL};
-        if ($*PKGDECL//'role') eq 'role' && $<signature> {
+        my $class = $*PKGDECL;
+        if $class eq 'role' && $<signature> {
             $sub.set_signature($<signature>.ast);
-            $type = ::Metamodel::ParametricRole;
+            $class = 'prole';
         }
 
         $/.CURSOR.trymop({
             my ($lexvar, $obj) = self.do_new_package($/, sub => $sub.outer,
-                class => $type, name => $<longname>, scope => $*SCOPE);
+                :$class, name => $<longname>, scope => $*SCOPE);
 
-            $sub.outervar = $lexvar;
-            $sub.body_of = $sub.in_class = $sub.cur_pkg = $obj.xref;
+            $sub.set_outervar($lexvar);
+            $sub.set_body_of($obj);
+            $sub.set_in_class($obj);
+            $sub.set_cur_pkg($obj);
 
             self.process_block_traits($/, $<trait>);
             $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
@@ -3089,46 +3088,51 @@ method open_package_def($, $/ = $*cursor) {
 
 method package_def ($/) {
     my $sub = $*CURLEX<!sub>;
+    my $obj = $sub.body_of;
 
     my $bodyvar = self.gensym;
     $sub.outer.add_my_sub($bodyvar, $sub);
-    $sub.code = ($<blockoid> // $<statementlist>).ast;
+    my $ast = ($<blockoid> // $<statementlist>).ast;
 
-    if $sub.augmenting {
-        my $ah = $sub.augment_hack;
-        $sub.augment_hack = Any;
-
-        my $ph = ::Metamodel::StaticSub.new(
-            unit       => $*unit,
-            outerx     => $sub.xref,
-            outer_direct => $*CURLEX<!sub>,
+    if defined $*AUGMENT_BUFFER {
+        # generate an INIT block to do the augment
+        my $ph = $*unit.create_sub(
+            outer      => $sub,
             cur_pkg    => $sub.cur_pkg,
-            name       => 'ANON',
-            is_phaser  => +::Metamodel::Phaser::INIT,
-            augment_hack => $ah,
+            name       => "phaser-$sub.name()",
             class      => 'Code',
-            code       => ::Op::StatementList.new(children => []),
             run_once   => $sub.run_once);
+
+        my @ops;
+        for @( $*AUGMENT_BUFFER ) -> $mode, $name, $sym {
+            push @ops, CgOp._addmethod(CgOp.letvar('!mo'), $mode,
+                CgOp.str($name), CgOp.scopedlex($sym));
+        }
+        my $fin = CgOp.letn('!mo', CgOp.class_ref('mo', $obj),
+            @ops, CgOp._invalidate(CgOp.letvar('!mo')), CgOp.corelex('Nil'));
+
+        $ph.finish(::Op::CgOp.new(op => $fin));
         $sub.create_static_pad;
-        $sub.add_child($ph);
+        $ph.set_phaser(+::Metamodel::Phaser::INIT);
 
         make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
     }
     else {
-        my $obj = $*unit.deref($sub.body_of);
-
         if $<stub> {
-            push $*unit.stubbed_stashes, ($obj => $/.CURSOR);
+            $*unit.stub_stash($/.from, $obj);
 
             make mklex($/, $*CURLEX<!sub>.outervar);
         }
         else {
             $/.CURSOR.trymop({ $obj.close; });
 
-            if $obj ~~ ::Metamodel::ParametricRole {
-                $sub.parametric_role_hack = $obj.xref;
-                $sub.add_my_name('*params', :noinit);
+            if $obj.kind eq 'prole' {
+                # return the frame object so that role instantiation can
+                # find the cloned methods
+                $ast = ::Op::StatementList.new(|node($/), children => [
+                    $ast, mkcall($/, '&callframe') ]);
                 $sub.create_static_pad;
+                $obj.set_instantiation_block($sub);
 
                 make mklex($/, $*CURLEX<!sub>.outervar);
             } else {
@@ -3138,6 +3142,8 @@ method package_def ($/) {
             }
         }
     }
+
+    $sub.finish($ast);
 }
 
 method trait_mod:will ($/) {
@@ -3280,21 +3286,19 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
     $method_type = Str if $scope eq 'anon';
 
     my $method_targ = $method_type && $sub.outer.body_of;
-    if $method_targ {
-        $method_targ = $*unit.deref($method_targ);
-    } elsif defined($method_type) {
+    if !$method_targ && defined($method_type) {
         $/.CURSOR.sorry("Methods must be used in some kind of package");
         $method_type = Str;
     }
 
-    if $method_targ && !$method_targ.^can('add_method') {
-        $/.CURSOR.sorry("A {$method_targ.WHAT} cannot have methods added");
+    if $method_targ && !$method_targ.CAN('add_method') {
+        $/.CURSOR.sorry("A {$method_targ.kind} cannot have methods added");
         $method_type = Str;
         $method_targ = Any;
     }
 
     if $name ~~ Op && (!defined($method_type) || $scope ne 'has' ||
-            $method_targ !~~ ::Metamodel::ParametricRole) {
+            $method_targ.kind ne 'prole') {
         $/.CURSOR.sorry("Computed names are only implemented for parametric roles");
         $name = "placeholder";
     }
@@ -3303,8 +3307,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 
     $sub.set_name(defined($method_type) ?? $method_targ.name ~ "." ~ $name !!
         ($name // 'ANON'));
-    $sub.class = $class;
-    $sub.returnable = True;
+    $sub.set_class($class);
 
     my $std = $/.CURSOR;
     {
@@ -3322,12 +3325,12 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             my $proto = $symbol;
             $proto ~~ s/\:.*//;
             $sub.outer.add_dispatcher($proto, |mnode($/))
-                if $multiness ne 'only' && !$sub.outer.lexicals.{$proto};
+                if $multiness ne 'only' && !$sub.outer.has_lexical($proto);
             $symbol ~= ":(!proto)" if $multiness eq 'proto';
         } elsif $bindlex {
             $symbol = '&' ~ $name;
             $/.CURSOR.check_categorical($symbol);
-            if $multiness ne 'only' && !$sub.outer.lexicals.{$symbol} {
+            if $multiness ne 'only' && !$sub.outer.has_lexical($symbol) {
                 $sub.outer.add_dispatcher($symbol, |mnode($/))
             }
 
@@ -3342,32 +3345,42 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             $symbol = self.gensym;
         }
 
-        $sub.outervar = $symbol;
-        $sub.methodof = defined($method_type) ?? $method_targ.xref !! Any;
+        $sub.set_outervar($symbol);
+        $sub.set_methodof(defined($method_type) ?? $method_targ !! Any);
         $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
 
         if $multiness ne 'only' || $scope eq 'our' || $method_type {
-            $sub.outer.lexicals-used{$symbol} = True;
+            $/.CURSOR.mark_used($symbol);
         }
 
         if defined($method_type) || $scope eq 'our' {
-            $sub.strong_used = True;
             $sub.outer.create_static_pad;
         }
 
         if defined($method_type) {
-            if $sub.outer.augment_hack {
-                push $sub.outer.augment_hack,
-                    [ $multiness, $method_type, $name, $symbol, $sub.xref ];
+            my $mode = 0;
+            given $method_type {
+                when 'sub'      { $mode += 2 }
+                when 'normal'   { $mode += 0 }
+                when 'private'  { $mode += 1 }
+                default         { die "Unimplemented method type $_" }
+            }
+            given $multiness {
+                when 'only'     { $mode += 0 }
+                when 'proto'    { $mode += 4 }
+                when 'multi'    { $mode += 8 }
+                default         { die "Unimplemented multiness $_" }
+            }
+            if defined $*AUGMENT_BUFFER {
+                push $*AUGMENT_BUFFER, $mode, $name, $symbol;
             } else {
-                $method_targ.add_method($multiness, $method_type, $name,
-                    $symbol, $sub.xref, |mnode($/));
+                $method_targ.add_method($mode, $name, $sub, |mnode($/));
             }
         }
 
         if $scope eq 'our' {
-            $*unit.bind($pkg // $*unit.deref($sub.outer.cur_pkg),
-                "&$name", $sub.xref);
+            $*unit.bind(($pkg // $sub.outer.cur_pkg).who,
+                "&$name", $sub);
         }
     });
 }
@@ -3388,7 +3401,7 @@ method routine_def_2 ($, $/ = $*cursor) {
 }
 
 method routine_def ($/) {
-    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
@@ -3415,19 +3428,19 @@ method method_def_2 ($, $/ = $*cursor) {
 }
 
 method method_def ($/) {
-    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
 method block($/) {
-    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
     make $*CURLEX<!sub>
 }
 
 # :: Body
 method pblock($/) {
     #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
-    $*CURLEX<!sub>.code = $<blockoid>.ast;
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
     make $*CURLEX<!sub>;
 }
 
@@ -3475,9 +3488,8 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     $sub.is_phaser = +::Metamodel::Phaser.($ph);
 
     if $topic {
-        $sub.lexicals.<$_> // $sub.add_my_name('$_');
-        $sub.lexicals.<$_>.noinit   = True;
-        $sub.lexicals.<$_>.defouter = False;
+        $sub.has_lexical('$_') || $sub.add_my_name('$_');
+        $sub.parameterize_topic;
         $sub.set_signature(Sig.simple('$_'));
     }
     $*CURLEX<!sub>.create_static_pad if $csp;
@@ -3521,8 +3533,7 @@ method statement_prefix:BEGIN ($/) {
 }
 
 method comp_unit($/) {
-    $*CURLEX{'!sub'}.code = $<statementlist>.ast;
-    $*CURLEX{'!sub'}.close;
+    $*CURLEX{'!sub'}.finish($<statementlist>.ast);
 
     make $*unit;
 }

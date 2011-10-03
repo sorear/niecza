@@ -1694,6 +1694,9 @@ grammar P6 is STD {
         :my $longname;
         :my $*IN_DECL = 'package';
         :my $*HAS_SELF = '';
+        # augments in niecza are a bit weird because they always
+        # defer to INIT time
+        :my $*AUGMENT_BUFFER;
         :temp $*CURLEX;
         :temp $*SCOPE;
         :my $outer = $*CURLEX;
@@ -5045,27 +5048,24 @@ method newlex ($needsig = 0, $once = False) {
     $*CURLEX = { };
     $*CURLEX<!NEEDSIG> = 1 if $needsig;
     $*CURLEX<!IN_DECL> = $*IN_DECL if $*IN_DECL;
-    $*CURLEX<!sub> = ::Metamodel::StaticSub.new(
-        unit => $*unit,
+    $*CURLEX<!sub> = $*unit.create_sub(
+        outer => $osub,
         class => 'Block',
-        outerx => $osub.xref,
-        outer_direct => $osub,
-        in_class => $osub.in_class,
         cur_pkg => $osub.cur_pkg,
-        run_once => $once && $osub.run_once
-    );
-    $osub.add_child($*CURLEX<!sub>);
+        in_class => $osub.in_class,
+        run_once => $once && $osub.run_once,
+        name => "ANON");
     self;
 }
 
 method finishlex() {
     my $sub = $*CURLEX<!sub>;
     if $sub.is_routine {
-        $sub.add_my_name('$/', :roinit) unless $sub.lexicals<$/>:exists;
-        $sub.add_my_name('$!', :roinit) unless $sub.lexicals<$!>:exists;
+        $sub.add_my_name('$/', :roinit) unless $sub.has_lexical('$/');
+        $sub.add_my_name('$!', :roinit) unless $sub.has_lexical('$!');
     }
     $sub.add_my_name('$_', :defouter(!$sub.is_routine ||
-        $sub === $sub.to_unit)) unless $sub.lexicals<$_>:exists;
+        $sub.is($sub.to_unit))) unless $sub.has_lexical('$_');
     $*SIGNUM = 0;
 
     self;
@@ -5077,13 +5077,11 @@ method getsig {
     if $*CURLEX.<!NEEDSIG>:delete {
         my @parms;
         if %method{$*CURLEX<!sub>.class} {
-            my $cl = $*CURLEX<!sub>.methodof &&
-                $*unit.deref($*CURLEX<!sub>.methodof);
+            my $cl = $*CURLEX<!sub>.methodof;
             # XXX type checking against roles NYI
-            if $cl && $cl !~~ ::Metamodel::Role &&
-                    $cl !~~ ::Metamodel::ParametricRole {
+            if $cl && $cl.kind eq none <role prole> {
                 push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
-                    tclass => $cl.xref);
+                    tclass => $cl);
             } else {
                 push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
             }
@@ -5116,10 +5114,7 @@ method getsig {
         else {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
                 :defouter, :rwtrans);
-            self.trymop({
-                $*CURLEX<!sub>.lexicals<$_>.noinit = True;
-                $*CURLEX<!sub>.lexicals<$_>.defouter = False;
-            });
+            $*CURLEX<!sub>.parameterize_topic;
         }
         $*CURLEX<!sub>.set_signature(::GLOBAL::Sig.new(params => @parms));
     }
@@ -5131,13 +5126,11 @@ method getsig {
     }
 
     if ($*CURLEX<!multi>//'') ne 'proto' {
-        my $lu = $*CURLEX<!sub>.lexicals-used;
-        for $*CURLEX<!sub>.lexicals.kv -> $k, $desc {
+        for $*CURLEX<!sub>.unused_lexicals -> $k, $pos {
             next unless interesting(Cursor.new($k));
-            next if $lu{$k};
             # next if $[_/!] declared automatically "dynamic" TODO
-            next unless defined $desc.pos;
-            self.cursor($desc.pos).worry("$k is declared but not used");
+            next unless $pos >= 0;
+            self.cursor($pos).worry("$k is declared but not used");
         }
     }
     self;
@@ -5174,7 +5167,7 @@ method is_name($longname, $curlex = $*CURLEX) {
 
     given @parts[0] {
         when 'OUR' {
-            $pkg = $*unit.deref($curlex<!sub>.cur_pkg);
+            $pkg = $curlex<!sub>.cur_pkg;
             shift @parts;
             goto "packagey";
         }
@@ -5191,14 +5184,14 @@ method is_name($longname, $curlex = $*CURLEX) {
         when 'COMPILING' | 'DYNAMIC' | 'CALLER' | 'CLR' { return True }
 
         default {
-            my $lexical = self.lookup_lex(@parts[0], $curlex);
-            if !defined($lexical) || @parts[0] eq 'PARENT' {
+            my @lexical = self.lookup_lex(@parts[0], $curlex);
+            if !@lexical || @parts[0] eq 'PARENT' {
                 return False if @parts == 1; # $x doesn't mean GLOBAL
                 $pkg = (@parts[0] ~~ /^\W/) ??
-                    $*unit.deref($curlex<!sub>.cur_pkg) !!
+                    $curlex<!sub>.cur_pkg !!
                     $*unit.abs_pkg('GLOBAL');
-            } elsif $lexical ~~ ::Metamodel::Lexical::Stash {
-                $pkg = $*unit.deref($lexical.pkg);
+            } elsif @lexical[0] eq 'package' {
+                $pkg = @lexical[4];
                 shift @parts;
             } else {
                 return @parts == 1;
@@ -5218,14 +5211,14 @@ lexy:
         when 'CALLER'  { return True; }
     }
 
-    my $lexical = self.lookup_lex(@parts[0], $sub);
-    unless defined $lexical {
+    my @lex = self.lookup_lex(@parts[0], $sub);
+    unless @lex {
         self.deb("Lexical @parts[0] not found") if $deb;
         return False;
     }
-    if $lexical ~~ ::Metamodel::Lexical::Stash {
+    if @lex[0] eq 'package' {
         shift @parts;
-        $pkg = $*unit.deref($lexical.pkg);
+        $pkg = @lex[4];
         goto "packagey";
     }
     else {
@@ -5234,9 +5227,8 @@ lexy:
 
 packagey:
     for @parts {
-        return False if !$pkg || !$*unit.ns.exists($pkg.who, $_);
-        $pkg = $*unit.ns.get($pkg.who, $_);
-        $pkg = $pkg && $*unit.deref($pkg);
+        return False if !$pkg || !$*unit.exists($pkg.who, $_);
+        $pkg = $*unit.get($pkg.who, $_);
     }
 
     return True;
@@ -5306,9 +5298,9 @@ method explain_mystery() {
     }
     self.sorry($m) if $m;
 
-    for $*unit.stubbed_stashes {
-        next if .key.closed || .key.WHAT === ::GLOBAL::Metamodel::Package;
-        .value.sorry("Package was stubbed but not defined");
+    for $*unit.stubbed_stashes -> $pos, $type {
+        next if $type.closed || $type.kind eq 'package';
+        self.cursor($pos).sorry("Package was stubbed but not defined");
     }
 
     self;
@@ -5432,8 +5424,13 @@ method check_categorical ($name) {
 
 method trymop($f) {
     my $*worry = sub ($m) { self.worry($m) };
-    unless try { $f(); True } {
-        self.sorry($!)
+    state $fast = %*ENV<NIECZA_FAIL_FAST>;
+    if $fast {
+        $f();
+    } else {
+        unless try { $f(); True } {
+            self.sorry($!)
+        }
     }
 }
 
@@ -5441,49 +5438,13 @@ method trymop($f) {
 # makes OUTER:: aliases...
 # note: does NOT follow ::Alias lexicals, since the ::Alias is the real
 # user visible lex in most cases
-method lookup_lex($name, $lex is copy = $*CURLEX) {
-    my $deb = $*DEBUG +& DEBUG::symtab;
-    self.deb("Lookup $name") if $deb;
-    my $sub = $lex.^isa(Hash) ?? $lex<!sub> !! $lex;
-    my $sub2 = $sub;
-    loop {
-        if $sub.lexicals{$name}:exists {
-            until $sub2 === $sub || $sub2.lexicals-used{$name} {
-                $sub2.lexicals-used{$name} //=
-                    ($*FILE<name> => self.lineof(self.pos));
-                $sub2 = $sub2.outer;
-            }
-            $sub2.lexicals-used{$name} //=
-                ($*FILE<name> => self.lineof(self.pos)) if $sub2 === $sub;
-
-            self.deb("Found in $sub.name()") if $deb;
-            return $sub.lexicals{$name};
-        }
-        $sub = $sub.outer || last;
-    }
-    self.deb("Not found") if $deb;
-    return Any;
+method lookup_lex($name, $lex) {
+    ($lex // $*CURLEX)<!sub>.lookup_lex($name, $*FILE<name>, self.lineof(self.pos));
 }
 
 method mark_used($name) {
-    (my $sub) = (my $sub2) = $*CURLEX<!sub>;
-
-    while $sub {
-        if $sub.lexicals{$name} || $sub.lexicals-used{$name} {
-            $sub.lexicals-used{$name} //=
-                ($*FILE<name> => self.lineof(self.pos));
-
-            while $sub2 !=== $sub {
-                $sub2.lexicals-used{$name} =
-                    ($*FILE<name> => self.lineof(self.pos));
-                $sub2 .= outer;
-            }
-
-            return;
-        }
-
-        $sub .= outer;
-    }
+    $*CURLEX<!sub>.lookup_lex($name, $*FILE<name>, self.lineof(self.pos));
+    Nil;
 }
 
 method add_placeholder($name) {
@@ -5517,7 +5478,7 @@ method add_placeholder($name) {
     }
     return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
 
-    if $sub.lexicals-used.{$varname} || $sub.lexicals.{$varname} {
+    if $sub.lexical_used($varname) || $sub.has_lexical($varname) {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
     self.trymop({
@@ -5526,7 +5487,7 @@ method add_placeholder($name) {
             list => substr($varname,0,1) eq '@',
             hash => substr($varname,0,1) eq '%');
     });
-    $*CURLEX<!sub>.lexicals-used{$varname} = True;
+    self.mark_used($varname);
     self;
 }
 

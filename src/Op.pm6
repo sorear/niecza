@@ -437,7 +437,7 @@ class ForLoop is Op {
     }
 
     method statement_level() {
-        my $body = $*CURLEX<!sub>.find_lex($!sink).body;
+        my $body = $*CURLEX<!sub>.lookup_lex($!sink)[4];
         my $var = [ map { ::GLOBAL::NieczaActions.gensym },
             0 ..^ +$body.signature.params ];
         ::Op::ImmedForLoop.new(source => $!source, var => $var,
@@ -635,18 +635,18 @@ class Lexical is Op {
     method code($) { CgOp.scopedlex($.name) }
 
     method to_bind($/, $ro, $rhs) {
-        my $lex = $*CURLEX<!sub>.find_lex($!name) or
+        my @lex = $*CURLEX<!sub>.lookup_lex($!name) or
             ($/.CURSOR.sorry("Cannot find definition for binding???"),
                 return ::Op::StatementList.new);
         my $list = False;
-        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu').xref;
-        given $lex {
-            when ::Metamodel::Lexical::Simple {
-                $list = .list || .hash;
-                $type = .typeconstraint // $type;
+        my $type = $*CURLEX<!sub>.compile_get_pkg('Mu');
+        given @lex[0] {
+            when 'simple' {
+                $list = ?(@lex[4] +& 24); # LIST | HASH from LISimple
+                $type = @lex[5] // $type;
             }
-            when ::Metamodel::Lexical::Common {
-                $list = substr(.name,0,1) eq '%' || substr(.name,0,1) eq '@';
+            when 'common' {
+                $list = substr(@lex[5],0,1) eq '%' || substr(@lex[5],0,1) eq '@';
             }
             default {
                 nextsame;
