@@ -91,8 +91,7 @@ sub CreatePiece()
 {
     my $piece = (rand * 7).Int % 7; # TODO: ^7.pick;
     $colorindex = $piece + 1;
-    # TODO: @piece = @tetrominoes[$piece] instead of the following loop:
-    @piece = (); for ^8 -> $i { @piece[$i] = @tetrominoes[$piece][$i]; }
+    @piece = @( @tetrominoes[$piece] );
     $pieceX = 4;
     $pieceY = 0;
 }
@@ -123,22 +122,8 @@ sub TryMovePieceDown()
             @matrix[$y+$pieceY][$x+$pieceX] = $colorindex;
         }
         # Look for full rows and remove them. TODO: keep score.
-        for ^matrixRows -> $row {
-            my $full = True;
-            for ^matrixColumns -> $column {
-                if @matrix[$row][$column] == 0 { $full = False; }
-            }
-            if $full {
-                loop (my $moveRow = $row; $moveRow > 0; --$moveRow) {
-                    for ^matrixColumns -> $column {
-                        @matrix[$moveRow][$column] = @matrix[$moveRow-1][$column];
-                    }
-                }
-                for ^matrixColumns -> $column {
-                    @matrix[0][$column] = 0;
-                }
-            }
-        }
+        @matrix = grep { !all(@$_) }, @matrix;
+        unshift @matrix, [ 0 xx matrixColumns ] while @matrix < matrixRows;
         CreatePiece();
     }
 }
@@ -146,7 +131,7 @@ sub TryMovePieceDown()
 sub TryRotatePiece()
 {
     my @p = @piece;
-    @piece = @p[1], -@p[0], @p[3], -@p[2], @p[5], -@p[4], @p[7], -@p[6];
+    @piece .= map({ $^b, -$^a });
     if ! CanMovePiece(0, 0) {
         @piece = @p;
     }
