@@ -5298,7 +5298,7 @@ dynamic:
             } else if (cmd == "type_name") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 return st.name;
-            } else if (cmd == "type_name") {
+            } else if (cmd == "type_who") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 return Kernel.UnboxAny<string>(st.who);
             } else if (cmd == "type_create") {
@@ -5332,6 +5332,7 @@ dynamic:
 
                 nst.initVar    = nst.typeVar;
                 nst.initObject = nst.typeObject;
+                nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
                 nst.mo.rtype   = type;
                 nst.mo.isPackage = (type == "package");
                 nst.mo.isRole    = (type == "role" || type == "prole");
@@ -5433,6 +5434,17 @@ dynamic:
                 }
                 tgt.sig_i = sig_i.ToArray();
                 tgt.sig_r = sig_r.ToArray();
+                return null;
+            } else if (cmd == "sub_set_phaser") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                int     p = (int)args[2];
+                s.phaser = p;
+                if (s.protosub != null)
+                    Kernel.AddPhaser(p, s.protosub);
+                if (p == Kernel.PHASER_CATCH)
+                    s.outer.catch_ = s;
+                if (p == Kernel.PHASER_CONTROL)
+                    s.outer.control = s;
                 return null;
             } else if (cmd == "sub_finish") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);

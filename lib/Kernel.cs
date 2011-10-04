@@ -318,6 +318,9 @@ namespace Niecza {
                 Kernel.TraceFlags = Kernel.TRACE_CUR;
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
+
+            Kernel.FirePhasers(Kernel.PHASER_UNIT_INIT, false);
+            Kernel.FirePhasers(Kernel.PHASER_INIT, false);
         }
 
         internal CpsOp TypeConstant(STable s) {
@@ -4916,6 +4919,10 @@ def:        return at.Get(self, index);
         }
 
         internal static void CreateBasicTypes() {
+            // XXX maybe wrong place
+            PhaserBanks = new VarDeque[PHASER_TYPES];
+            for (int i = 0; i < PHASER_TYPES; i++)
+                PhaserBanks[i] = new VarDeque();
             CodeMO = new STable("Code"); // forward decl
             MuMO = new STable("Mu");
             Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
