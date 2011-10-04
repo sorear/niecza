@@ -160,6 +160,8 @@ namespace Niecza {
             public P6any init;
             public int flags;
             public STable type;
+            public string file;
+            public int line;
         }
 
         public const int A_PUBLIC = 1;
@@ -424,11 +426,17 @@ next_method: ;
 
         public void AddAttribute(string name, int flags, P6any init,
                 STable type) {
+            AddAttributePos(name,flags,init,type, "???", 0);
+        }
+        public void AddAttributePos(string name, int flags, P6any init,
+                STable type, string file, int line) {
             AttrInfo ai;
             ai.name = name;
             ai.flags = flags;
             ai.init = init;
             ai.type = type;
+            ai.file = file;
+            ai.line = line;
             local_attr.Add(ai);
         }
 

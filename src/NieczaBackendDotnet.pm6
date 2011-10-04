@@ -254,11 +254,18 @@ class StaticSub {
     }
 }
 
+enum Metamodel::MultiMode ( only => 0, proto => 4, multi => 8 );
+enum Metamodel::SubVisibility ( normal => 0, private => 1, sub => 2 );
+
 class Type {
     method FALLBACK($name, *@args) { downcall("type_$name", self, @args) }
 
     method add_method($mode, $name, $sub, :$file, :$line, :$pos) {
         downcall("type_add_method", self, $mode, $name, $sub,
+            $file, $line, $pos);
+    }
+    method add_attribute($name, $sigil, $access, $type, :$file, :$line, :$pos) {
+        downcall("type_add_attribute", self, $name, $sigil, ?$access, $type,
             $file, $line, $pos);
     }
 }

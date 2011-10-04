@@ -4932,6 +4932,7 @@ dynamic:
             // use lexicals.
             STable rcls = (cls == "Sub") ? Kernel.SubMO :
                 (cls == "Routine") ? Kernel.RoutineMO :
+                (cls == "Regex") ? Kernel.RegexMO :
                 (cls == "Method") ? Kernel.MethodMO :
                 (cls == "Submethod") ? Kernel.SubmethodMO :
                 (cls == "WhateverCode") ? Kernel.WhateverCodeMO :
@@ -5230,6 +5231,38 @@ dynamic:
                 STable su = (STable)Handle.Unbox(args[2]);
                 st.mo.superclasses.Add(su);
                 return null;
+            } else if (cmd == "type_add_attribute") {
+                STable  add_to = (STable)Handle.Unbox(args[1]);
+                string  name   = (string)args[2];
+                string  sigil  = (string)args[3];
+                bool    access = (bool)args[4];
+                STable  type   = (STable)Handle.Unbox(args[5]);
+                string  file   = (string)args[6];
+                int     line   = (int)args[7];
+
+                foreach (P6how.AttrInfo ai in add_to.mo.local_attr)
+                    if (ai.name == name)
+                        return new Exception("Two definitions of attribute " + name + Backend.LocStr(ai.file, ai.line, file, line));
+
+                int flags = (sigil == "@") ? P6how.A_ARRAY :
+                    (sigil == "%") ? P6how.A_HASH : 0;
+                if (access) flags |= P6how.A_PUBLIC;
+
+                add_to.mo.AddAttributePos(name, flags, null, type, file, line);
+                return null;
+            } else if (cmd == "type_add_initializer") {
+                STable  add_to = (STable)Handle.Unbox(args[1]);
+                string  name   = (string)args[2];
+                SubInfo init   = (SubInfo)Handle.Unbox(args[3]);
+                for (int i = 0; i < add_to.mo.local_attr.Count; i++) {
+                    var ai = add_to.mo.local_attr[i];
+                    if (ai.name == name) {
+                        ai.init = init.protosub;
+                        add_to.mo.local_attr[i] = ai;
+                        break;
+                    }
+                }
+                return null;
             } else if (cmd == "type_add_method") {
                 STable  add_to = (STable)Handle.Unbox(args[1]);
                 int     mode   = (int)args[2];
@@ -5257,6 +5290,7 @@ dynamic:
             } else if (cmd == "type_close") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 st.mo.Compose();
+                st.Invalidate();
                 return null;
             } else if (cmd == "type_kind") {
                 STable st = (STable)Handle.Unbox(args[1]);
