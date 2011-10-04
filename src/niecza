@@ -20,7 +20,95 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class Op::ForLoop {
+    method statement_level() {
+        my $body = $*CURLEX<!sub>.lookup_lex($!sink)[4];
+        my $var = [ map { ::GLOBAL::NieczaActions.gensym },
+            0 ..^ $body.count ];
+        ::Op::ImmedForLoop.new(source => $!source, var => $var,
+            sink => ::GLOBAL::OptBeta.make_call($!sink,
+                map { ::Op::LetVar.new(name => $_) }, @$var));
+    }
+}
+
 augment class NieczaActions {
+method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
+    my $n = $*unit.create_sub(
+        name => $name // 'ANON',
+        class => $class // 'Block',
+        outer => $*CURLEX<!sub>,
+        cur_pkg => $*CURLEX<!sub>.cur_pkg,
+        in_class => $*CURLEX<!sub>.in_class);
+    $n.set_transparent;
+    $n.set_ltm($ltm) if $ltm;
+    $n.set_signature(Sig.simple(@$params));
+    $n.add_my_name($_, :noinit) for @$params;
+    $n.finish($code);
+    $n;
+}
+method statement_prefix:gather ($/) {
+    make ::Op::Gather.new(|node($/),
+        var => self.block_expr($/, $<blast>.ast).name);
+}
+method default_value($/) { make self.thunk_sub($<EXPR>.ast) }
+method parameter($/) {
+    my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
+    my $copy = False;
+    my $sorry;
+    my $slurpy = False;
+    my $slurpycap = False;
+    my $optional = False;
+    my $rwt = False;
+    my $type;
+
+    if $<type_constraint> {
+        ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
+    }
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $rw = True }
+        elsif $trait.ast<copy> { $copy = True }
+        elsif $trait.ast<parcel> { $rwt = True }
+        elsif $trait.ast<readonly> { $rw = False }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+    $default.set_name("$/ init") if $default;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '|:*'  { $slurpycap = True }
+    elsif $tag eq '\\:!' { $rwt = True }
+    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $optional = True }
+    elsif $tag eq ':?'   { $optional = True }
+    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+    my $p = $<param_var> // $<named_param>;
+
+    if defined $p.ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
+        :$optional, :$slurpy, :$rw, tclass => $type,
+        :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
+}
 
 }
 

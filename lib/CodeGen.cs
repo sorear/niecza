@@ -4943,13 +4943,14 @@ dynamic:
 
         object Call(object[] args) {
             if (TraceDown) {
-                Console.WriteLine(args.Length);
+                StringBuilder sb = new StringBuilder();
                 foreach(object a in args) {
                     char ch = (a is int) ? 'i' : (a is Handle) ? 'h' :
                         (a is string) ? 's' : (a is bool) ? 'b' :
                         (a == null) ? 'n' : 'X';
-                    Console.WriteLine("{0}:{1}", ch, a);
+                    sb.AppendFormat("{0}:{1}; ", ch, a);
                 }
+                Console.WriteLine(sb.ToString());
             }
             string cmd = (string) args[0];
             if (cmd == "gettype") {
@@ -4981,10 +4982,16 @@ dynamic:
                 ((SubInfo)Handle.Unbox(args[1])).special |=
                     RuntimeUnit.SUB_CANNOT_INLINE;
                 return null;
+            } else if (cmd == "sub_set_transparent") {
+                ((SubInfo)Handle.Unbox(args[1])).special |=
+                    RuntimeUnit.SUB_TRANSPARENT;
+                return null;
             } else if (cmd == "sub_is_inlinable") {
                 return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
             } else if (cmd == "sub_topicalizer") {
                 return ((SubInfo)Handle.Unbox(args[1])).IsTopicalizer();
+            } else if (cmd == "sub_count") {
+                return Builtins.get_count((SubInfo)Handle.Unbox(args[1]));
             } else if (cmd == "sub_set_inlined") {
                 ((SubInfo)Handle.Unbox(args[1])).SetInlined();
                 return null;

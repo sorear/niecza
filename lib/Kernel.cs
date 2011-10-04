@@ -3631,11 +3631,19 @@ have_v:
             return from;
         }
 
+        static SubInfo dogather_SI = new SubInfo("KERNEL dogather", dogather);
+        static Frame dogather(Frame th) {
+            if (th.ip == 0) {
+                th.ip = 1;
+                return ((P6any)th.lex0).Invoke(th, Variable.None, null);
+            } else {
+                return Take(th, Kernel.EMPTYP.mo.typeVar);
+            }
+        }
+
         public static Frame GatherHelper(Frame th, P6any sub) {
-            P6opaque dyo = (P6opaque) sub;
-            Frame n = (dyo.slots[1] as SubInfo).Binder(th,
-                    (dyo.slots[0] as Frame), dyo, Variable.None, null, false,
-                    null);
+            Frame n = th.MakeChild(null, dogather_SI, AnyP);
+            n.lex0 = sub;
             n.MarkSharedChain();
             n.lex = new Dictionary<string,object>();
             n.lex["!return"] = null;

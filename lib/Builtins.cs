@@ -1668,7 +1668,9 @@ flat_enough:;
     public static int get_count(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return 1; // can't introspect fake subs (?)
-        SubInfo si = (SubInfo) fcni.GetSlot("info");
+        return get_count((SubInfo) fcni.GetSlot("info"));
+    }
+    public static int get_count(SubInfo si) {
         int[] sig = si.sig_i;
         if (sig == null)
             return 1;
