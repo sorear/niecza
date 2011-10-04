@@ -3329,6 +3329,7 @@ namespace Niecza.CLRBackend {
             namtypes["cursor"] = Tokens.Cursor;
             namtypes["strbuf"] = typeof(StringBuilder);
             namtypes["treader"] = typeof(TextReader);
+            namtypes["twriter"] = typeof(TextWriter);
 
             handlers = new Dictionary<string, Func<NamProcessor,object[],CpsOp>>();
             thandlers = new Dictionary<string, Func<CpsOp[], CpsOp>>();
@@ -4007,6 +4008,13 @@ dynamic:
             thandlers["treader_open"] = delegate(CpsOp[] z) {
                 return CpsOp.Widen(typeof(TextReader),
                     CpsOp.ConstructorCall(treader_open, z)); };
+
+            ConstructorInfo twriter_open = typeof(StreamWriter).GetConstructor(new Type[1] { Tokens.String });
+            thandlers["twriter_open"] = delegate(CpsOp[] z) {
+                return CpsOp.Widen(typeof(TextWriter),
+                    CpsOp.ConstructorCall(twriter_open, z)); };
+            thandlers["twriter_puts"] = Methody(null, typeof(TextWriter).GetMethod("Write", new Type[] { Tokens.String }));
+            thandlers["twriter_close"] = Methody(null, typeof(TextWriter).GetMethod("Close"));
 
             foreach (KeyValuePair<string, Func<CpsOp[], CpsOp>> kv
                     in thandlers) {

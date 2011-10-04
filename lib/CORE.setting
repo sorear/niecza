@@ -2004,11 +2004,6 @@ augment class Str {
     method IO() { IO.new(path => self) }
 }
 
-my class TextWriter {
-    method say(*@bits) { say @bits }
-    method print(*@bits) { print @bits }
-}
-
 my class TextReader {
     method get() {
         Q:CgOp {
@@ -2032,6 +2027,24 @@ my class TextReader {
 
     method lines() {
         gather take my $l while ($l = self.get).defined;
+    }
+}
+
+my class TextWriter {
+    method say(*@c) {
+        # $PROCESS::OUTPUT_USED := True;
+        Q:CgOp { (rnull (twriter_puts (unbox twriter (@ {self})) (obj_getstr {Niecza::gistcat(|@c) ~ "\n"}))) };
+        True;
+    }
+
+    method print(*@c) {
+        # $PROCESS::OUTPUT_USED := True;
+        Q:CgOp { (rnull (twriter_puts (unbox twriter (@ {self})) (obj_getstr {Niecza::gistcat(|@c)}))) };
+        True;
+    }
+
+    method close() {
+        Q:CgOp { (rnull (twriter_close (unbox twriter (@ {self})))) }; True
     }
 }
 
@@ -2059,8 +2072,13 @@ class IO::ArgFiles {
         }
     }
 }
-sub open($filename) is unsafe {
+
+multi sub open($filename) is unsafe {
     Q:CgOp { (box TextReader (treader_open (obj_getstr {$filename}))) }
+}
+
+multi sub open($filename, :$w) is unsafe {
+    Q:CgOp { (box TextWriter (twriter_open (obj_getstr {$filename}))) }
 }
 
 # TODO $*ARGFILES, multi
