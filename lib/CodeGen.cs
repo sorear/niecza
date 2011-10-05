@@ -4328,7 +4328,8 @@ dynamic:
             EnterCode(enter);
 
             // TODO: bind a ro container around return values
-            if (sub.mo.HasMRO(Kernel.RoutineMO)) {
+            if (sub.mo.HasMRO(Kernel.RoutineMO) &&
+                    (sub.special & RuntimeUnit.SUB_RETURN_PASS) == 0) {
                 enter.Add(new object[] { new JScalar("return"),
                     new object[] { new JScalar("xspan"),
                         new JScalar("rstart"), new JScalar("rend"),
@@ -4983,6 +4984,10 @@ dynamic:
                 ((SubInfo)Handle.Unbox(args[1])).special |=
                     RuntimeUnit.SUB_CANNOT_INLINE;
                 return null;
+            } else if (cmd == "sub_set_return_pass") {
+                ((SubInfo)Handle.Unbox(args[1])).special |=
+                    RuntimeUnit.SUB_RETURN_PASS;
+                return null;
             } else if (cmd == "sub_set_transparent") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
                     RuntimeUnit.SUB_TRANSPARENT;
@@ -5041,6 +5046,13 @@ dynamic:
                 return null;
             } else if (cmd == "sub_set_class") {
                 ((SubInfo)Handle.Unbox(args[1])).mo = ResolveSubClass((string)args[2]);
+                return null;
+            } else if (cmd == "sub_delete_lex") {
+                // XXX This leaves a gap in the lexical/number mapping.
+                // Don't use it too much.
+                SubInfo from = (SubInfo)Handle.Unbox(args[1]);
+                string  lkey = (string)args[2];
+                from.dylex.Remove(lkey);
                 return null;
             } else if (cmd == "sub_lookup_lex") {
                 SubInfo from = (SubInfo)Handle.Unbox(args[1]);

@@ -371,7 +371,7 @@ method process_block_traits($/, @tr) {
             $sub.set_extend('builtin',
                 self.trivial_eval($T, $tr<Niecza::builtin>));
         } elsif !$pack && $tr<return_pass> {
-            $sub.returnable = False;
+            $sub.set_return_pass;
         } elsif !$pack && $tr<of> {
         } elsif !$pack && $tr<rw> {
         } elsif !$pack && $tr<unsafe> {
@@ -379,6 +379,30 @@ method process_block_traits($/, @tr) {
         } else {
             $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
         }
+    }
+}
+
+method whatever_postcheck($/, $st, $term) {
+    if @$st {
+        my $slot = self.gensym;
+
+        my $body = $*unit.create_sub(
+            outer => $*CURLEX<!sub>,
+            class => 'WhateverCode',
+            in_class => $*CURLEX<!sub>.in_class,
+            cur_pkg => $*CURLEX<!sub>.cur_pkg);
+
+        $body.add_my_name($_, :noinit) for @$st;
+        $body.set_signature(::GLOBAL::Sig.new(params => [
+            map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]));
+        $body.set_transparent;
+        $body.finish($term);
+
+        $*CURLEX<!sub>.add_my_sub($slot, $body);
+
+        ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, |node($/));
+    } else {
+        $term;
     }
 }
 

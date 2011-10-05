@@ -744,6 +744,7 @@ namespace Niecza {
         public const int SUB_TRANSPARENT = 64;
         public const int SUB_INLINED = 128;
         public const int SUB_CANNOT_INLINE = 256;
+        public const int SUB_RETURN_PASS = 512;
 
         public void LoadStashes(int from) {
             int ct = ReadInt(ref from);

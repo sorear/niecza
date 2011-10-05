@@ -890,7 +890,6 @@ my class Nil is Cool {
 my class Parcel is Cool {
     method ACCEPTS(\$what) { defined(self) ?? self.flat.ACCEPTS($what) !! nextsame }
     method flat() { self.iterator.flat }
-    method list() { self.iterator.list }
     method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
     method at_pos($key) { @(self).[$key] }
 
