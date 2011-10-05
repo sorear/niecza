@@ -144,13 +144,12 @@ sub run_optree($body, $op, $nv) {
     my @inv_lex = $body.lookup_lex($invname);
     return $op unless @inv_lex && @inv_lex[0] eq 'sub';
 
-# TODO: get extend working again
-#     if $inv_lex.body.extend<builtin> -> $B {
-#         return $op unless defined my $args = no_named_params($op);
-#         return $op unless $args >= $B[1] &&
-#             (!defined($B[2]) || $args <= $B[2]);
-#         return ::Op::Builtin.new(name => $B[0], args => $args);
-#     }
+    if @inv_lex[4].get_extend('builtin') -> $B {
+        return $op unless defined my $args = no_named_params($op);
+        return $op unless $args >= $B[1] &&
+            (!defined($B[2]) || $args <= $B[2]);
+        return ::Op::Builtin.new(name => $B[0], args => $args);
+    }
 
     return $op unless @inv_lex[4].unit.name eq 'CORE';
     return $op unless my $func = %funcs{$invname};

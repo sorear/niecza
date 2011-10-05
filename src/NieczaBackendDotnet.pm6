@@ -85,6 +85,7 @@ method post_save($name, :$main) {
 }
 
 class StaticSub {
+    method kind { "sub" }
     method FALLBACK($name, *@args) { downcall("sub_$name", self, @args) }
 
     method lex_names() { downcall("lex_names", self) }

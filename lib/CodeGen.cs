@@ -5098,7 +5098,7 @@ dynamic:
                     r = new object[] { "hint",null,null,null };
                 var lcomm  = li as LICommon;
                 if (lcomm != null)
-                    r = new object[] { "common",null,null,null, lcomm.hkey };
+                    r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName() };
 
                 r[1] = li.file;
                 r[2] = li.line;
@@ -5446,6 +5446,20 @@ dynamic:
                 if (p == Kernel.PHASER_CONTROL)
                     s.outer.control = s;
                 return null;
+            } else if (cmd == "sub_set_extend") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                object[] val = new object[args.Length - 3];
+                Array.Copy(args, 3, val, 0, val.Length);
+                if (s.extend == null)
+                    s.extend = new Dictionary<string,object[]>();
+                s.extend[(string)args[2]] = val;
+                return null;
+            } else if (cmd == "sub_get_extend") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                object[] ret = null;
+                if (s.extend != null)
+                    s.extend.TryGetValue((string)args[2], out ret);
+                return ret ?? new object[0];
             } else if (cmd == "sub_finish") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 s.nam_str = (string)args[2];

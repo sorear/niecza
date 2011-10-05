@@ -27,22 +27,23 @@ method cat_O($cat, $sym) {
 }
 
 method function_O($name) {
-    my $lex = self.lookup_lex($name);
+    my @lex = self.lookup_lex($name);
 
-    if $lex ~~ ::Metamodel::Lexical::Dispatch {
-        $lex = self.lookup_lex($name ~ ":(!proto)");
+    if @lex[0] eq 'dispatch' {
+        @lex = self.lookup_lex($name ~ ":(!proto)");
     }
 
     my $sub;
 
-    if $lex ~~ ::Metamodel::Lexical::Common {
-        $sub = $*unit.deref($*unit.get($*unit.deref($lex.pkg), $lex.name));
-    } elsif $lex ~~ ::Metamodel::Lexical::SubDef {
-        $sub = $lex.body;
+    if @lex[0] eq 'common' {
+        $sub = $*unit.get(@lex[4], @lex[5]);
+    } elsif @lex[0] eq 'sub' {
+        $sub = @lex[4];
     }
 
-    if $sub ~~ ::Metamodel::StaticSub {
-        return $sub.extend<prec>;
+    if $sub && $sub.kind eq 'sub' {
+        my %ext = $sub.get_extend('prec');
+        return %ext || Any;
     } else {
         return Any;
     }

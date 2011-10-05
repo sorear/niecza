@@ -1108,6 +1108,8 @@ namespace Niecza {
         public LICommon(string hkey) { this.hkey = hkey; }
 
         public override void Init(Frame f) { }
+        internal string Stash() { return hkey.Substring(1, (int)hkey[0]); }
+        internal string VarName() { return hkey.Substring(1 + (int)hkey[0]); }
 
         public override object Get(Frame f) {
             return Kernel.currentGlobals[hkey].v;
@@ -1305,6 +1307,7 @@ namespace Niecza {
         // For dispatch routines, 0 = parameter list
         public object param0, param1;
         public List<SubInfo> children = new List<SubInfo>();
+        public Dictionary<string,object[]> extend;
 
         // No instance fields past this point
         public const int SIG_I_RECORD  = 3;
