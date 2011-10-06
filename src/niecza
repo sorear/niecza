@@ -824,6 +824,65 @@ method parameter($/) {
         :$optional, :$slurpy, :$rw, tclass => $type,
         :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
 }
+method package_def ($/) {
+    my $sub = $*CURLEX<!sub>;
+    my $obj = $sub.body_of;
+
+    my $bodyvar = self.gensym;
+    $sub.outer.add_my_sub($bodyvar, $sub);
+    my $ast = ($<blockoid> // $<statementlist>).ast;
+
+    if defined $*AUGMENT_BUFFER {
+        # generate an INIT block to do the augment
+        my $ph = $*unit.create_sub(
+            outer      => $sub,
+            cur_pkg    => $sub.cur_pkg,
+            name       => "phaser-$sub.name()",
+            class      => 'Code',
+            run_once   => $sub.run_once);
+
+        my @ops;
+        for @( $*AUGMENT_BUFFER ) -> $mode, $name, $sym {
+            push @ops, CgOp._addmethod(CgOp.letvar('!mo'), $mode,
+                CgOp.str($name), CgOp.fetch(CgOp.scopedlex($sym)));
+        }
+        my $fin = CgOp.letn('!mo', CgOp.class_ref('mo', $obj),
+            @ops, CgOp._invalidate(CgOp.letvar('!mo')), CgOp.corelex('Nil'));
+
+        $ph.finish(::Op::CgOp.new(op => $fin));
+        $sub.create_static_pad;
+        $ph.set_phaser(+::Metamodel::Phaser::INIT);
+
+        make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
+    }
+    else {
+        if $<stub> {
+            $*unit.stub_stash($/.from, $obj);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
+        }
+        else {
+            $/.CURSOR.trymop({ $obj.close; });
+
+            if $obj.kind eq 'prole' {
+                # return the frame object so that role instantiation can
+                # find the cloned methods
+                $ast = ::Op::StatementList.new(|node($/), children => [
+                    $ast, mkcall($/, '&callframe') ]);
+                $sub.create_static_pad;
+                $obj.set_instantiation_block($sub);
+
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make ::Op::StatementList.new(|node($/), children => [
+                    ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
+                    ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
+        }
+    }
+
+    $sub.finish($ast);
+}
 
 }
 

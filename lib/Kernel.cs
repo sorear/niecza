@@ -298,6 +298,8 @@ namespace Niecza {
             NamProcessor[] ths = new NamProcessor[our_subs.Count];
             for (int i = 0; i < ths.Length; i++) {
                 SubInfo z = our_subs[i];
+                if (Config.CGVerbose > 0)
+                    Console.WriteLine("generating code for: {0}", z.name);
                 ths[i] = new NamProcessor(
                     new CpsBuilder(this, "C" + i + z.name, true), z);
                 ths[i].MakeBody(Reader.Read(z.nam_str, z.nam_refs));
@@ -327,6 +329,9 @@ namespace Niecza {
 
         internal CpsOp TypeConstant(STable s) {
             return RefConstant(s == null ? "" : s.name, s, Tokens.STable);
+        }
+        internal CpsOp SubConstant(SubInfo s) {
+            return RefConstant(s == null ? "" : s.name, s, Tokens.SubInfo);
         }
 
         internal CpsOp RefConstant(string name, object val, Type nty) {
@@ -417,7 +422,7 @@ namespace Niecza {
         }
 
         internal CpsOp CCConst(int[] cc) {
-            StringBuilder code = new StringBuilder();
+            StringBuilder code = new StringBuilder("CC");
             foreach (int x in cc) {
                 code.Append((char)x);
                 code.Append((char)(x>>16));
@@ -426,7 +431,7 @@ namespace Niecza {
         }
 
         internal CpsOp StringListConst(string[] sl) {
-            StringBuilder code = new StringBuilder();
+            StringBuilder code = new StringBuilder("SL");
             foreach (string s in sl) {
                 code.Append((char)(s.Length >> 16));
                 code.Append((char)(s.Length));
@@ -436,7 +441,7 @@ namespace Niecza {
         }
 
         internal CpsOp CCListConst(int[][] ccl) {
-            StringBuilder code = new StringBuilder();
+            StringBuilder code = new StringBuilder("CL");
             foreach (int[] cc in ccl) {
                 code.Append((char)(cc.Length >> 16));
                 code.Append((char)(cc.Length));
@@ -5354,6 +5359,10 @@ def:        return at.Get(self, index);
     }
 
     public class Config {
+        public static int CGVerbose =
+            int.Parse(Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") ?? "0");
+        public static bool CGVerifiable =
+            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
         public static readonly bool C3Trace =
             Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
     }

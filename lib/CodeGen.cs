@@ -225,7 +225,7 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < xref.Length; i++) {
                 if (xref[i] == null) continue;
                 object[] xr = (object[]) xref[i];
-                if (Backend.Verbose > 0)
+                if (Config.CGVerbose > 0)
                     Console.WriteLine("Loading {0} {1}...", JScalar.S(xr[0]),i);
                 if (JScalar.S(xr[0]) == "sub") {
                     xref[i] = new StaticSub(this, xr, (code != null &&
@@ -1242,7 +1242,7 @@ namespace Niecza.CLRBackend {
             }
 
             if (ix >= Tokens.NumInt32 &&
-                    (Backend.Verifiable || t.IsValueType)) {
+                    (Config.CGVerifiable || t.IsValueType)) {
                 il.Emit(OpCodes.Unbox_Any, t);
             }
         }
@@ -2324,7 +2324,7 @@ namespace Niecza.CLRBackend {
                 return;
             cx.il.Emit(OpCodes.Ldarg_0);
             cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_resultSlot);
-            if (Backend.Verifiable || Returns.IsValueType)
+            if (Config.CGVerifiable || Returns.IsValueType)
                 cx.il.Emit(OpCodes.Unbox_Any, Returns);
         }
     }
@@ -3664,7 +3664,7 @@ dynamic:
             thandlers["_pushleave"] = Methody(null, Tokens.Frame.GetMethod("PushLeave"));
             handlers["_makesub"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_MakeSub,
-                    CpsOp.GetSField(((StaticSub)z[1]).subinfo),
+                    Backend.currentUnit.SubConstant((SubInfo)z[1]),
                     CpsOp.CallFrame()); };
             handlers["_newlabel"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewLabelVar,
@@ -4356,10 +4356,10 @@ dynamic:
                     throw new Exception("Unhandled nam operator " + tag);
                 handlers[tag] = handler = MakeTotalHandler(Methody(null, mi));
             }
-            if (Backend.Verbose > 1)
+            if (Config.CGVerbose > 1)
                 Console.WriteLine("enter " + tag);
             CpsOp r = handler(this, rnode);
-            if (Backend.Verbose > 1)
+            if (Config.CGVerbose > 1)
                 Console.WriteLine("exit " + tag);
             return r;
         }
@@ -4388,10 +4388,6 @@ dynamic:
     //    internal List<CpsOp> thaw = new List<CpsOp>();
 
         [ThreadStatic] internal static RuntimeUnit currentUnit;
-        public static int Verbose =
-            int.Parse(Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") ?? "0");
-        public static bool Verifiable =
-            Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
 
     //    Backend(string dir, string mobname, string filename) {
     //        dynamic = (filename == null);
@@ -4903,7 +4899,13 @@ dynamic:
     public class DowncallReceiver : CallReceiver {
         public override object this[object i] {
             set { }
-            get { return Call((object[]) i); }
+            get {
+                try {
+                    return Call((object[]) i);
+                } catch (Exception ex) {
+                    return new Exception(ex.ToString());
+                }
+            }
         }
         static bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
 

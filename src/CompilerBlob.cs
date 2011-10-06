@@ -133,11 +133,11 @@ namespace Niecza {
                 string s = Kernel.UnboxAny<string>(o);
                 sb.Append('"');
                 foreach (char c in s) {
-                    if (c >= ' ' && c <= '~')
+                    if (c >= ' ' && c <= '~' && c != '\\' && c != '"')
                         sb.Append(c);
                     else {
                         sb.Append("\\u");
-                        sb.AppendFormat("{0:4X}", (int)c);
+                        sb.AppendFormat("{0:X4}", (int)c);
                     }
                 }
                 sb.Append('"');
