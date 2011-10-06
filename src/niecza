@@ -116,9 +116,10 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         if $accessor {
             $ns.add_method(0, $name, $nb, |mnode($/));
         }
+        $at = True;
     });
 
-    $at ?? ::Op::Attribute.new(name => $name, initializer => $type) !!
+    $at ?? ::Op::Attribute.new(name => $name, initializer => $ns) !!
         ::Op::StatementList.new;
 }
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
@@ -565,13 +566,13 @@ method INFIX($/) {
                         $fn.with_args($/, $ll, $rhs)),
                     $ll]) });
         }
-        elsif $lhs.^isa(::Op::Attribute) && !defined($lhs.initializer.ivar) {
+        elsif $lhs.^isa(::Op::Attribute) {
             my $init = self.thunk_sub($rhs,
                 :name($lhs.initializer.name ~ " init"));
             $init.set_outervar(my $ov = self.gensym);
             $*CURLEX<!sub>.add_my_sub($ov, $init);
             $lhs.initializer.add_initializer($lhs.name, $init);
-            make $lhs;
+            make ::Op::StatementList.new;
         }
         elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
             my $sig = substr($lhs.name, 0, 1);

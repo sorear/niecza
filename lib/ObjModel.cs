@@ -602,6 +602,19 @@ next_method: ;
             if (err != null)
                 return "C3 MRO generation failed for " + stable.name + ": " + err;
             SetMRO(nmro.ToArray());
+
+            List<string> all_slot_l = new List<string>();
+            foreach (STable m in mro)
+                foreach (AttrInfo ai in m.mo.local_attr)
+                    all_slot_l.Add(ai.name);
+            butCache = new Dictionary<STable, STable>();
+            stable.all_slot = all_slot_l.ToArray();
+            local_does = new STable[0];
+
+            stable.nslots = 0;
+            foreach (string an in stable.all_slot) {
+                stable.slotMap[an] = stable.nslots++;
+            }
             return null;
         }
     }

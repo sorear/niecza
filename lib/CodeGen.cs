@@ -5394,9 +5394,13 @@ dynamic:
                     nst.typeVar = Kernel.NewRWListVar(nst.typeObject);
                 }
 
+                if (pf != null)
+                    pf.SetValue(null, nst.typeObject);
+
                 nst.initVar    = nst.typeVar;
                 nst.initObject = nst.typeObject;
                 nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
+                nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
                 nst.mo.rtype   = type;
                 nst.mo.isPackage = (type == "package");
                 nst.mo.isRole    = (type == "role" || type == "prole");

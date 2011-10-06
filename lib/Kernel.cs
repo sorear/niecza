@@ -315,7 +315,6 @@ namespace Niecza {
                 ths[i].FillSubInfo(type);
                 if ((our_subs[i].special & SUB_IS_UNSAFE) != 0)
                     Kernel.CheckUnsafe(our_subs[i]);
-                Console.WriteLine("{0} | {1}", our_subs[i].name, our_subs[i].code);
             }
 
             if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
@@ -2029,8 +2028,12 @@ noparams:
         public string ExecutingFile() {
             BValue l;
             SubInfo i = info;
-            if (i.GetHint("$?FILE", out l))
-                return l.v.Fetch().mo.mro_raw_Str.Get(l.v);
+            try {
+                if (i.GetHint("$?FILE", out l))
+                    return l.v.Fetch().mo.mro_raw_Str.Get(l.v);
+            } catch (Exception e) {
+                return "<exception>";
+            }
             return "";
         }
 
@@ -2129,7 +2132,7 @@ noparams:
                     return;
                 csr = csr.outer;
             }
-            if (name == "$!") return;
+            if (name == "$!" || name == "$/") return;
             throw new NieczaException("cannot bind " + name + " in " + info.name);
         }
 
@@ -4806,8 +4809,8 @@ def:        return at.Get(self, index);
         private static void DoTrace(Frame cur) {
             TraceCount = TraceFreq;
             if ((TraceFlags & TRACE_CUR) != 0)
-                Console.WriteLine("{0}|{1} @ {2} [{3}/{4:X}]",
-                        cur.DepthMark(), cur.info.name, cur.ip, cur.info.code, cur.info.GetHashCode());
+                Console.WriteLine("{0}|{1} @ {2}",
+                        cur.DepthMark(), cur.info.name, cur.ip);
             if ((TraceFlags & TRACE_ALL) != 0) {
                 Console.WriteLine("Context:" + DescribeBacktrace(cur, null));
             }
@@ -5313,7 +5316,8 @@ def:        return at.Get(self, index);
                 } else {
                     if (csr.caller == null) Panic(csr.info.name + " has no caller?");
                     // TODO: catch generated exceptions and add to @!
-                    csr.caller.resultSlot = Kernel.NilP.mo.typeVar;
+                    csr.caller.resultSlot = Kernel.NilP == null ? null :
+                        Kernel.NilP.mo.typeVar;
                     Kernel.SetTopFrame(csr);
                     csr = csr.Return();
                 }
