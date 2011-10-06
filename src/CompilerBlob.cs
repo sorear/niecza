@@ -69,24 +69,33 @@ namespace Niecza {
         public static object RawDowncall(params object[] args) {
             return responder[args];
         }
+
+        static object DCArg(Variable v) {
+            P6any o = v.Fetch();
+            if (o is BoxObject<object>)
+                return Kernel.UnboxAny<object>(o);
+            else if (o.IsDefined()) {
+                if (o.Isa(Kernel.StrMO))
+                    return (string) o.mo.mro_raw_Str.Get(v);
+                else if (o.Isa(Kernel.BoolMO))
+                    return (bool) o.mo.mro_raw_Bool.Get(v);
+                else if (o.Isa(Kernel.ListMO)) {
+                    VarDeque it = o.mo.mro_raw_iterator.Get(v);
+                    var lo = new List<object>();
+                    while (Kernel.IterHasFlat(it, true))
+                        lo.Add(DCArg(it.Shift()));
+                    return lo.ToArray();
+                } else
+                    return (int) o.mo.mro_raw_Numeric.Get(v);
+            } else
+                return null;
+        }
+
         public static Variable DownCall(Variable list) {
             List<object> lo = new List<object>();
             VarDeque it = Builtins.start_iter(list);
-            while (Kernel.IterHasFlat(it, true)) {
-                Variable v = it.Shift();
-                P6any o = v.Fetch();
-                if (o is BoxObject<object>)
-                    lo.Add(Kernel.UnboxAny<object>(o));
-                else if (o.IsDefined()) {
-                    if (o.Isa(Kernel.StrMO))
-                        lo.Add((string) o.mo.mro_raw_Str.Get(v));
-                    else if (o.Isa(Kernel.BoolMO))
-                        lo.Add((bool) o.mo.mro_raw_Bool.Get(v));
-                    else
-                        lo.Add((int) o.mo.mro_raw_Numeric.Get(v));
-                } else
-                    lo.Add(null);
-            }
+            while (Kernel.IterHasFlat(it, true))
+                lo.Add(DCArg(it.Shift()));
 
             return DCResult(RawDowncall(lo.ToArray()));
         }

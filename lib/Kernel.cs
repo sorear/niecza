@@ -311,6 +311,8 @@ namespace Niecza {
 
             for (int i = 0; i < ths.Length; i++) {
                 ths[i].FillSubInfo(type);
+                if ((our_subs[i].special & SUB_IS_UNSAFE) != 0)
+                    Kernel.CheckUnsafe(our_subs[i]);
                 Console.WriteLine("{0} | {1}", our_subs[i].name, our_subs[i].code);
             }
 

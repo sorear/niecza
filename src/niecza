@@ -46,6 +46,7 @@ method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
         cur_pkg => $*CURLEX<!sub>.cur_pkg,
         in_class => $*CURLEX<!sub>.in_class);
     $n.set_transparent;
+    say $ltm.perl if $ltm;
     $n.set_ltm($ltm) if $ltm;
     $n.add_my_name($_, :noinit) for @$params;
     $n.set_signature(Sig.simple(@$params));
@@ -375,11 +376,58 @@ method process_block_traits($/, @tr) {
         } elsif !$pack && $tr<of> {
         } elsif !$pack && $tr<rw> {
         } elsif !$pack && $tr<unsafe> {
-            $sub.unsafe = True;
+            $sub.set_unsafe;
         } else {
             $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
         }
     }
+}
+method regex_def($/) {
+    my $endsym;
+    for map *.ast, @$<trait> -> $t {
+        if $t<unary> || $t<binary> || $t<defequiv> || $t<of> {
+            # Ignored for now
+        }
+        elsif defined $t<endsym> {
+            $endsym = $t<endsym>;
+        }
+        else {
+            $/.CURSOR.sorry("Unhandled regex trait $t.keys.[0]");
+        }
+    }
+
+    if $*CURLEX<!multi> eq 'proto' {
+        if ($<signature> && $<signature>[0].ast.params != 1) ||
+                !$<regex_block><onlystar> {
+            $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
+        }
+        @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} = $endsym
+            if defined $*CURLEX<!cleanname>;
+    } else {
+        $endsym //= @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} if
+            defined $*CURLEX<!cleanname>;
+    }
+
+    my $ast = $<regex_block>.ast;
+    if $*CURLEX<!multi> eq 'proto' {
+        $ast = ::RxOp::ProtoRedis.new(name => $*CURLEX<!name>);
+    }
+
+    {
+        my $*paren = 0;
+        my $*symtext = $*CURLEX<!sym>;
+        my $*endsym = $endsym;
+        my $*dba = $*CURLEX<!name> // 'anonymous regex';
+        $ast.check;
+    }
+    my @lift = $ast.oplift;
+    my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
+    say $ltm.perl;
+    $*CURLEX<!sub>.set_ltm($ltm);
+    ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
+    $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
+        name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
+    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
 method whatever_postcheck($/, $st, $term) {

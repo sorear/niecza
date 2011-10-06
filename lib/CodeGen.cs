@@ -4943,6 +4943,48 @@ dynamic:
             return rcls;
         }
 
+        LAD BuildLad(object[] tree) {
+            string key = (string) tree[0];
+
+            if (key == "CC") {
+                int[] nar = new int[tree.Length-1];
+                Array.Copy(tree, 1, nar, 0, nar.Length);
+                return new LADCC(new CC(nar));
+            } else if (key == "Imp") {
+                return new LADImp();
+            } else if (key == "Dot") {
+                return new LADDot();
+            } else if (key == "None") {
+                return new LADNone();
+            } else if (key == "Null") {
+                return new LADNull();
+            } else if (key == "Dispatcher") {
+                return new LADDispatcher();
+            } else if (key == "Str") {
+                return new LADStr((string)tree[1]);
+            } else if (key == "StrNoCase") {
+                return new LADStrNoCase((string)tree[1]);
+            } else if (key == "Param") {
+                return new LADParam((string)tree[1]);
+            } else if (key == "Method") {
+                return new LADMethod((string)tree[1]);
+            } else if (key == "Opt") {
+                return new LADOpt(BuildLad((object[])tree[1]));
+            } else if (key == "Star") {
+                return new LADStar(BuildLad((object[])tree[1]));
+            } else if (key == "Plus") {
+                return new LADPlus(BuildLad((object[])tree[1]));
+            } else if (key == "Sequence" || key == "Any") {
+                object[] za = (object[])tree[1];
+                LAD[] z = new LAD[za.Length];
+                for (int i = 0; i < za.Length; i++)
+                    z[i] = BuildLad((object[])za[i]);
+                return (key == "Any") ? (LAD)new LADAny(z) : new LADSequence(z);
+            } else {
+                throw new Exception("odd lad key " + key);
+            }
+        }
+
         object Call(object[] args) {
             if (TraceDown) {
                 StringBuilder sb = new StringBuilder();
@@ -4977,6 +5019,10 @@ dynamic:
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
                 Backend.currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
                 return null;
+            } else if (cmd == "sub_set_ltm") {
+                ((SubInfo)Handle.Unbox(args[1])).ltm =
+                    BuildLad((object[])args[2]);
+                return null;
             } else if (cmd == "sub_create_static_pad") {
                 ((SubInfo)Handle.Unbox(args[1])).CreateProtopad();
                 return null;
@@ -4991,6 +5037,10 @@ dynamic:
             } else if (cmd == "sub_set_transparent") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
                     RuntimeUnit.SUB_TRANSPARENT;
+                return null;
+            } else if (cmd == "sub_set_unsafe") {
+                ((SubInfo)Handle.Unbox(args[1])).special |=
+                    RuntimeUnit.SUB_IS_UNSAFE;
                 return null;
             } else if (cmd == "sub_is_inlinable") {
                 return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
