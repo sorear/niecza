@@ -1515,7 +1515,7 @@ noparams:
                     return;
                 csr = csr.outer;
             }
-            if (name == "$!") return;
+            if (name == "$!" || name == "$/") return;
             throw new NieczaException("cannot bind " + name + " in " + info.name);
         }
 
