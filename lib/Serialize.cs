@@ -1,5 +1,27 @@
 using System;
 
+// Here in Niecza we have four different kinds of unit scopes:
+//
+// * COMPILING::UNIT, aka RuntimeUnit: one of these exists for every
+//   call into the compiler, whether eval or module.  The REPL will
+//   be considered as if it were eval.
+//
+// * Serialization scopes, which are created when compiling modules
+//   or when pre-compiling a main program.  During execution there is
+//   no current serialization scope; evals inherit the serialization
+//   scope or lack thereof that was in effect.
+//
+// * Assembly scopes, which are an artifact of the CLR and almost align
+//   with precompilation scopes, except that they have to exist always
+//   because methods cannot be created free-floating in CLR 2.x.
+//
+//   An assembly scope is created for all serialization scopes, and
+//   non-saved anonymous assemblies are created for eval-and-run of
+//   a file and non-BEGIN-time evals.
+//
+// * GLOBAL scope is very much like serialization scope except that there
+//   is a "true globals" scope that is used when not serializing.
+
 // This implements "bounded serialization" for Niecza.  Unfortunately
 // the CLR's builtin serialization can't efficiently be made bounded,
 // and anyway it would be nice if the serialization format could be
