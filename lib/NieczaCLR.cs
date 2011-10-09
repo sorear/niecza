@@ -209,6 +209,8 @@ namespace Niecza {
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
+
+        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
     }
 
     sealed class FieldProxy : Variable {
@@ -241,6 +243,7 @@ namespace Niecza {
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
+        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
     }
 
     class OverloadCandidate : MultiCandidate {

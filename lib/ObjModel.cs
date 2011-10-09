@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using Niecza.Serialization;
 
 namespace Niecza {
-    public abstract class P6any {
+    public abstract class P6any: IFreeze {
         public STable mo;
+
+        public abstract void Freeze(FreezeBuffer fb);
 
         public virtual object GetSlot(string name) {
             throw new InvalidOperationException("no slots in this repr");
@@ -628,7 +631,7 @@ next_method: ;
     // generally a single class is limited to a single representation.
     // (Although due to quirks of the C# implementation, Cursor and
     // BoxObject can share the P6opaque STable)
-    public class STable {
+    public class STable: IFreeze {
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -851,6 +854,10 @@ next_method: ;
         public void FillParametricRole(P6any factory) {
             mo.FillParametricRole(factory);
         }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            throw new NotImplementedException();
+        }
     }
 
     // This is quite similar to DynFrame and I wonder if I can unify them.
@@ -888,6 +895,8 @@ next_method: ;
         public override bool IsDefined() {
             return this != mo.typeObject;
         }
+
+        public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
     }
 
     public class BoxObject<T> : P6opaque {

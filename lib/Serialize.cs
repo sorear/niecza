@@ -170,7 +170,7 @@ namespace Niecza.Serialization {
     }
 
     // One of these codes is written at the beginning of every object ref
-    enum SerializationCode {
+    enum SerializationCode : byte {
         // special
         Null,
 
@@ -178,10 +178,33 @@ namespace Niecza.Serialization {
         ForeignRef,
         SelfRef,
         NewUnitRef,
+
+        // types of new object
+        RuntimeUnit,
+        SubInfo,
+        STable,
+        StashEnt,
+
+        // types of P6any-reified object
+        P6opaque,
+        BoxObject,
+        Frame,
+        Cursor,
+
+        // variables - allow 4 codes each for flag compaction
+        SimpleVariable,
+        SubstrLValue = SimpleVariable + 4,
+
+        // vivification hooks
+        SubViviHook = SubstrLValue + 4,
+        ArrayViviHook,
+        NewArrayViviHook,
+        HashViviHook,
+        NewHashViviHook,
     }
 
     // An instance of this class is used to serialize serialization units
-    class FreezeBuffer {
+    public class FreezeBuffer {
         byte[] data;
         int wpointer;
 
@@ -287,7 +310,7 @@ namespace Niecza.Serialization {
 
     // Note that this interface only handles freezing - thaw is done using
     // a switch statement.
-    interface IFreeze {
+    public interface IFreeze {
         void Freeze(FreezeBuffer fb);
     }
 

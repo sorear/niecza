@@ -533,6 +533,7 @@ public class Cursor : P6any {
     public CapInfo captures;
     public STable save_klass;
 
+    public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
     public string GetBacking() { return global.orig_s; }
 
     public Cursor(P6any proto, string text, P6any actions)

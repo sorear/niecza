@@ -7,6 +7,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using Niecza.CLRBackend;
+using Niecza.Serialization;
 
 namespace Niecza {
     // We like to reuse continuation objects for speed - every function only
@@ -38,7 +39,7 @@ namespace Niecza {
     // except the targets of := and ::=.
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public abstract class Variable {
+    public abstract class Variable : IFreeze {
         public ViviHook whence;
 
         // these should be treated as ro for the life of the variable
@@ -51,10 +52,47 @@ namespace Niecza {
 
         public abstract Variable GetVar();
 
+        const int S_RO   = 0;
+        const int S_LIST = 1;
+        const int S_RW   = 2;
+        const int S_VIV  = 3;
+
+        public abstract void Freeze(FreezeBuffer fb);
+
+        internal void BaseFreeze(FreezeBuffer fb, SerializationCode code) {
+            fb.Byte((byte)((int)code + (islist ? S_LIST :
+                !rw ? S_RO : whence == null ? S_RW : S_VIV)));
+
+            if (whence != null) fb.ObjRef(whence);
+            if (rw) fb.ObjRef(type);
+        }
+
+        // note: callers need to make sure type is set up properly if null
+        public Variable() { }
+        internal Variable(ThawBuffer tb, int subcode) {
+            switch (subcode) {
+                default: break;
+                case S_RO:
+                    // rw = false islist = false whence = null type = null
+                    break;
+                case S_LIST:
+                    islist = true;
+                    break;
+                case S_VIV:
+                    whence = (ViviHook) tb.ObjRef();
+                    goto case S_RW;
+                case S_RW:
+                    rw = true;
+                    type = (STable) tb.ObjRef();
+                    break;
+            }
+        }
+
         public static readonly Variable[] None = new Variable[0];
     }
 
-    public abstract class ViviHook {
+    public abstract class ViviHook : IFreeze {
+        public abstract void Freeze(FreezeBuffer fb);
         public abstract void Do(Variable toviv);
     }
 
@@ -65,6 +103,13 @@ namespace Niecza {
             Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
                         new Variable[] { toviv }, null));
         }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.SubViviHook);
+            fb.ObjRef(sub);
+        }
+        internal static SubViviHook Thaw(ThawBuffer tb) {
+            return new SubViviHook((P6any)tb.ObjRef());
+        }
     }
 
     public class HashViviHook : ViviHook {
@@ -74,6 +119,14 @@ namespace Niecza {
         public override void Do(Variable toviv) {
             VarHash rh = Kernel.UnboxAny<VarHash>(hash);
             rh[key] = toviv;
+        }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.HashViviHook);
+            fb.ObjRef(hash);
+            fb.String(key);
+        }
+        internal static IFreeze Thaw(ThawBuffer tb) {
+            return new HashViviHook((P6any)tb.ObjRef(), tb.String());
         }
     }
 
@@ -86,6 +139,14 @@ namespace Niecza {
             rh[key] = toviv;
             hashv.Store(Kernel.BoxRaw(rh, Kernel.HashMO));
         }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.NewHashViviHook);
+            fb.ObjRef(hashv);
+            fb.String(key);
+        }
+        internal static IFreeze Thaw(ThawBuffer tb) {
+            return new NewHashViviHook((Variable)tb.ObjRef(), tb.String());
+        }
     }
 
     public class ArrayViviHook : ViviHook {
@@ -97,6 +158,14 @@ namespace Niecza {
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
+        }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.ArrayViviHook);
+            fb.ObjRef(ary);
+            fb.Int(key);
+        }
+        internal static IFreeze Thaw(ThawBuffer tb) {
+            return new ArrayViviHook((P6any)tb.ObjRef(), tb.Int());
         }
     }
 
@@ -113,6 +182,14 @@ namespace Niecza {
             d.slots[0] = vd;
             d.slots[1] = new VarDeque();
             ary.Store(d);
+        }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.NewArrayViviHook);
+            fb.ObjRef(ary);
+            fb.Int(key);
+        }
+        internal static IFreeze Thaw(ThawBuffer tb) {
+            return new NewArrayViviHook((Variable)tb.ObjRef(), tb.Int());
         }
     }
 
@@ -145,6 +222,11 @@ namespace Niecza {
 
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+
+        public override void Freeze(FreezeBuffer fb) {
+            BaseFreeze(fb, SerializationCode.SimpleVariable);
+            fb.ObjRef(val);
         }
     }
 
@@ -183,7 +265,8 @@ namespace Niecza {
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
-    }
+        public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
+}
 
     // Used to make Variable sharing explicit in some cases; will eventually be
     // the only way to share a bvalue
@@ -192,13 +275,28 @@ namespace Niecza {
         public BValue(Variable v) { this.v = v; }
     }
 
-    public class StashEnt {
+    public class StashEnt : IFreeze {
         public Variable v;
         public string   file;
         public int      line;
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.StashEnt);
+            fb.ObjRef(v);
+            fb.String(file);
+            fb.Int(line);
+        }
+
+        internal static StashEnt Thaw(ThawBuffer tb) {
+            StashEnt r = new StashEnt();
+            r.v = (Variable)tb.ObjRef();
+            r.file = tb.String();
+            r.line = tb.Int();
+            return r;
+        }
     }
 
-    public sealed class RuntimeUnit {
+    public sealed class RuntimeUnit : IFreeze {
         static Dictionary<string, byte[]> heapreg;
 
         public string name, filename, modtime, asm_name, dll_name;
@@ -455,7 +553,7 @@ namespace Niecza {
         }
 
         internal CpsOp AltInfoConst(CgContext cx, object lads, string dba, string[] labels) {
-            return null; // TODO: redesign needed
+            throw new NotImplementedException(); // TODO: redesign needed
         }
 
         internal FieldBuilder NewField(string name, Type ty) {
@@ -1019,6 +1117,26 @@ namespace Niecza {
                         type);
             }
         }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.RuntimeUnit);
+
+            fb.String(name);
+            fb.String(filename);
+            fb.String(modtime);
+            fb.String(asm_name);
+            fb.String(dll_name);
+
+            fb.Int(globals.Count);
+            foreach (KeyValuePair<string, StashEnt> kv in globals) {
+                fb.String(kv.Key);
+                fb.ObjRef(kv.Value);
+            }
+
+            fb.ObjRef(mainline);
+            fb.ObjRef(bottom);
+            fb.Byte((byte)(is_mainish ? 1 : 0));
+        }
     }
 
     public class LeaveHook {
@@ -1263,23 +1381,27 @@ namespace Niecza {
     // changed, but it's rare by construction.  We don't want to be
     // like Rakudo/Parrot where simple sub cloning requires copying
     // 100s of bytes.
-    public class SubInfo {
+    public class SubInfo : IFreeze {
         // Essential call functions
         public DynBlockDelegate code;
         public int nspill;
         public int[] sig_i;
         public object[] sig_r;
 
-        // Standard metadata
+        // Basic metadata
+        public int[] lines;
         public Dictionary<string, LexInfo> dylex;
         public uint dylex_filter; // (32,1) Bloom on hash code
-        public int[] lines;
-        public STable mo;
-        // for inheriting hints
+
+        // References to related objects
         public SubInfo outer;
         public P6any protosub;
         public Frame protopad;
         public RuntimeUnit unit;
+
+        public STable mo;
+
+        // Standard metadata
         public int xref_no;
         public int fixups_from;
         public string name;
@@ -1870,6 +1992,11 @@ noparams:
 
         public SubInfo(string name, DynBlockDelegate code) :
             this(name, null, code, null, null, new int[0], null, 0) { }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.SubInfo);
+            throw new NotImplementedException();
+        }
     }
 
     // We need hashy frames available to properly handle BEGIN; for the time
@@ -2176,6 +2303,7 @@ noparams:
             }
             return caller;
         }
+        public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
     }
 
     public class NieczaException: Exception {
