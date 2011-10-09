@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 
 // Here in Niecza we have four different kinds of unit scopes:
 //
@@ -28,47 +31,148 @@ using System;
 // transported across backends.
 
 // TODO: implement a more Storable-like interface.
+
+// Note, the serialization subsystem is *NOT* thread safe !
 namespace Niecza.Serialization {
+    // Information kept on a serialization unit after loading or storing,
+    // but not before storing.
+    class SerUnit {
+        internal string name; // eg "File.Copy"
+        internal byte[] hash; // hash of entire file, filled at write time
+        internal object[] bynum; // objects in unit
+        internal object root; // the RuntimeUnit object
+        internal int nobj;
+    }
 
     // The central feature of *bounded* serialization is that object
     // registries are kept distinct from the (de)serializer, and can
     // be shared between serialization runs.
     class ObjectRegistry {
-        // TODO: investigate a more specialized representation
-        // In each entry here, the top 32 bits select a unit to reference
-        // and the bottom 32 select an object within the unit.
-        Dictionary<object,long> byref = new Dictionary<object,long>();
-        object[][] bynum = new object[8][];
-        int[] occupancies = new int[8];
-        int nextid;
-        int nextunit;
-
-        public int NewUnit() {
-            if (nextunit == bynum.Length) {
-                Array.Resize(ref bynum, nextunit * 2);
-                Array.Resize(ref occupancies, nextunit * 2);
-            }
-            bynum[nextunit] = new object[8];
-            return nextunit++;
+        // TODO: investigate a more specialized representation,
+        // ideally not having to hash as many objects
+        struct ObjRef {
+            SerUnit unit;
+            int id;
         }
+        Dictionary<object,ObjRef> byref = new Dictionary<object,ObjRef>();
 
-        public bool CheckWriteObject(int unit, object o, out long id) {
-            if (byref.TryGetValue(o, out id))
+        Dictionary<string,SerUnit> units =
+            new Dictionary<string,SerUnit>();
+
+        static readonly HashAlgorithm hash = SHA256.Create();
+        static readonly string signature = "Niecza-Serialized-Module";
+        static readonly int version = 1;
+
+        // Routines for use by serialization code
+        public bool CheckWriteObject(SerUnit into, object o,
+                out SerUnit lui, out int id) {
+            ObjRef or;
+            if (byref.TryGetValue(o, out or)) {
+                lui = or.unit;
+                id  = or.id;
                 return true;
+            }
 
-            if (occupancies[unit] == byref[unit].Length)
-                Array.Resize(ref byref[unit], occupancies[unit] * 2);
+            if (into.nobj == into.bynum.Length)
+                Array.Resize(ref into.bynum, into.nobj * 2);
 
-            int oid = occupancies[unit]++;
-            byref[o] = id = (unit << 32) | oid;
-            bynum[unit][oid] = o;
+            or.unit = into;
+            id = or.id = into.nobj++;
+            into.bynum[id] = o;
+
+            byref[o] = or;
 
             return false;
+        }
+
+        // Routines for use by compilation manager
+
+        // Loads a single unit from the compiled-data directory.
+        // Will throw a ThawException if a stale reference is encountered
+        // or other data format error.
+        public SerUnit LoadUnit(string name) {
+            SerUnit su;
+
+            // is the unit already loaded?
+            if (units.TryGetValue(name, out su))
+                return su;
+
+            string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    name + ".ser");
+            byte[] bytes = File.ReadAllBytes(file);
+
+            su = new SerUnit();
+            su.name = name;
+            su.hash = hash.ComputeHash(bytes);
+
+            ThawBuffer tb = new ThawBuffer(this, unit, bytes, bytes.Length);
+
+            bool success = false;
+            try {
+                string rsig = tb.String();
+                if (rsig != signature)
+                    throw new ThawException("signature mismatch loading " + file);
+                int rver = tb.Int();
+                if (rver != version)
+                    throw new ThawException("version mismatch loading " + file);
+
+                tb.root = tb.ObjRef();
+                success = true;
+            } finally {
+                // don't leave half-read units in the map
+                if (!success)
+                    UnloadUnit(name);
+            }
+
+            return su;
+        }
+
+        // removes a stale unit so a new version can be saved over it.
+        public void UnloadUnit(string name) {
+            SerUnit su = units[name];
+            units.Remove(name);
+
+            for (int i = 0; i < su.nobj; i++)
+                byref.Remove(su.bynum[i]);
+        }
+
+        public SerUnit SaveUnit(string name, IFreeze root) {
+            SerUnit su = new SerUnit();
+            su.name = name;
+            su.root = root;
+
+            if (units.ContainsKey(name))
+                throw new IllegalOperationException();
+
+            bool success = false;
+            string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    name + ".ser");
+
+            FreezeBuffer fb = new FreezeBuffer(this, su);
+
+            try {
+                fb.String(signature);
+                fb.Int(version);
+                fb.ObjRef(root);
+
+                byte[] data = fb.GetData();
+                su.hash = hash.ComputeHash(data);
+                File.WriteAllBytes(file, data);
+                success = true;
+            } finally {
+                if (!success)
+                    UnloadUnit(name);
+            }
+
+            return su;
         }
     }
 
     // One of these codes is written at the beginning of every object ref
     enum SerializationCode {
+        // special
+        Null,
+
         // existing objects
         ForeignRef,
         SelfRef,
@@ -80,15 +184,16 @@ namespace Niecza.Serialization {
         byte[] data;
         int wpointer;
 
-        int[] unit_to_offset;
+        Dictionary<SerUnit,int> unit_to_offset;
+        int usedunits;
 
         ObjectRegistry reg;
-        int unit;
+        SerUnit unit;
 
-        public FreezeBuffer(ObjectRegistry reg) {
+        internal FreezeBuffer(ObjectRegistry reg, SerUnit unit) {
             this.reg = reg;
-            unit = reg.NewUnit();
-            unit_to_offset = new int[8];
+            this.unit = unit;
+            unit_to_offset = new Dictionary<SerUnit,int>();
             data = new byte[256];
         }
 
@@ -138,26 +243,37 @@ namespace Niecza.Serialization {
             }
         }
 
+        // This is the main routine you should call from your Freeze
+        // callbacks to freeze an object
         public void ObjRef(IFreeze o) {
-            long id;
-            if (reg.CheckWriteObject(unit, o, out id)) {
-                int altunit = (int)(id >> 32);
+            int id;
+            SerUnit altunit;
+            if (o == null) { // null pointers are special
+                Byte((byte)SerializationCode.Null);
+                return;
+            }
+
+            if (reg.CheckWriteObject(unit, o, out altunit, out id)) {
                 if (altunit == unit) {
                     Byte((byte)SerializationCode.SelfRef);
                 } else {
-                    if (altunit >= unit_to_offset.Length)
-                        Array.Resize(ref unit_to_offset, altunit * 3 / 2);
-                    if (unit_to_offset[altunit] == 0) {
+                    int altcode;
+                    if (!unit_to_offset.TryGetValue(altunit, out altcode)) {
                         Byte((byte)SerializationCode.NewUnitRef);
                         String(reg.UnitName(altunit));
+                        // save the hash too so stale refs can be caught
+                        Int(altunit.hash.Length);
+                        foreach (byte b in altunit.hash) Byte(b);
+
                         unit_to_offset[altunit] = usedunits++;
                     } else {
                         Byte((byte)SerializationCode.ForeignRef);
-                        Int(unit_to_offset[altunit]);
+                        Int(altcode);
                     }
                 }
                 Int((int)id);
             } else {
+                // must take responsibility for saving the tag
                 o.Freeze(this);
             }
         }
@@ -175,41 +291,78 @@ namespace Niecza.Serialization {
         int rpointer;
         ObjectRegistry reg;
 
-        int[] unit_map = new int[8];
+        SerUnit[] unit_map = new SerUnit[8];
         int refed_units;
-        int unit;
+        SerUnit unit;
 
-        public ThawBuffer(ObjectRegistry reg, string name, byte[] data,
-                int dlen) {
+        internal ThawBuffer(ObjectRegistry reg, SerUnit unit,
+                byte[] data, int dlen) {
             this.data = data;
             this.dlen = dlen;
             this.reg  = reg;
-
-            unit = reg.NewUnit(name);
+            this.unit = unit;
         }
 
         object ObjRef() {
             var tag = (SerializationCode)Byte();
             int i, j;
-            string s;
             switch(tag) {
+                case SerializationCode.Null:
+                    return null;
                 case SerializationCode.SelfRef:
                     i = Int();
-                    return reg.GetObject(unit, i);
+                    return unit.bynum[i];
                 case SerializationCode.ForeignRef:
                     i = Int();
                     j = Int();
-                    return reg.GetObject(unit_map[i], j);
+                    return unit_map[i].bynum[j];
                 case SerializationCode.NewUnitRef:
-                    s = String();
-                    if (refed_units == unit_map.Length)
-                        Array.Resize(ref unit_map, refed_units * 2);
-                    unit_map[refed_units++] = reg.LoadUnit(s);
-                    i = Int();
-                    return reg.GetObject(unit_map[refed_units-1], i);
+                    return LoadNewUnit();
                 default:
                     throw new ThawException("unexpected object tag" + (byte)tag);
             }
         }
+
+        object LoadNewUnit() {
+            string name = String();
+            if (refed_units == unit_map.Length)
+                Array.Resize(ref unit_map, refed_units * 2);
+
+            SerUnit su = reg.LoadUnit(name);
+            unit_map[refed_units++] = su;
+
+            byte[] hash = Bytes(su.hash.Length);
+
+            for (int i = 0; i < hash.Length; i++)
+                if (hash[i] != su.hash[i])
+                    goto badhash;
+
+            int ix = Int();
+            return su.bynum[ix];
+
+badhash:
+            StringBuilder sb = new StringBuilder();
+            sb.AppendFormat("Hash mismatch for unit {0} referenced from {1}",
+                    su.name, unit.name);
+
+            sb.Append(", wanted ");
+            foreach (byte b in hash)
+                sb.AppendFormat("{0:X2}", b);
+
+            sb.Append(", got ");
+            foreach (byte b in su.hash)
+                sb.AppendFormat("{0:X2}", b);
+
+            throw new ThawException(sb.ToString());
+        }
+    }
+
+    // Thrown to indicate data format problems in the serialized stream
+    // Not necessarily bugs; could also indicate stale files, including
+    // cases where the data format is changed and cases where a depended
+    // file was recreated
+    class ThawException : Exception {
+        public ThawException(string s) : base(s) { }
+        public ThawException() : base() { }
     }
 }
