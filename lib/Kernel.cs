@@ -743,7 +743,7 @@ namespace Niecza {
         public LIHint() { }
         public override void Init(Frame f) { }
         public override void BindFields() {
-            var = owner.AddHint(name);
+            var = new BValue(null);
         }
 
         public override object Get(Frame f) { return var.v; }
@@ -885,10 +885,7 @@ namespace Niecza {
         public STable mo;
 
         // Standard metadata
-        public int xref_no;
-        public int fixups_from;
         public string name;
-        public Dictionary<string, BValue> hints;
         // maybe should be a hint
         public LAD ltm;
 
@@ -1317,31 +1314,6 @@ noparams:
                 th.pos, th.named, false, (DispatchEnt)th.lex7);
         }
 
-        public BValue AddHint(string name) {
-            if (hints == null)
-                hints = new Dictionary<string,BValue>();
-            if (hints.ContainsKey(name))
-                return hints[name];
-            return hints[name] = new BValue(Kernel.AnyMO.typeVar);
-        }
-
-        public void SetStringHint(string name, string value) {
-            AddHint(name).v = Kernel.BoxAnyMO<string>(value, Kernel.StrMO);
-        }
-
-        public bool GetLocalHint(string name, out BValue val) {
-            val = null;
-            return (hints != null && hints.TryGetValue(name, out val));
-        }
-
-        public bool GetHint(string name, out BValue val) {
-            for (SubInfo s = this; s != null; s = s.outer)
-                if (s.GetLocalHint(name, out val))
-                    return true;
-            val = null;
-            return false;
-        }
-
         internal bool IsInlinable() {
             if (sig_i == null)
                 return false;
@@ -1636,15 +1608,10 @@ noparams:
         }
 
         public string ExecutingFile() {
-            BValue l;
-            SubInfo i = info;
-            try {
-                if (i.GetHint("$?FILE", out l))
-                    return l.v.Fetch().mo.mro_raw_Str.Get(l.v);
-            } catch (Exception) {
-                return "<exception>";
-            }
-            return "";
+            if (info != null && info.unit != null && info.unit.filename != null)
+                return info.unit.filename;
+            else
+                return "<unknown>";
         }
 
         public void SetDynamic(int ix, object v) {
@@ -1716,13 +1683,6 @@ noparams:
 
         public Variable LexicalFind(string name) {
             Frame csr = this;
-            if (name.Length >= 2 && name[1] == '?') {
-                BValue b;
-                if (info.GetHint(name, out b))
-                    return b.v;
-                else
-                    return Kernel.AnyMO.typeVar;
-            }
             uint m = SubInfo.FilterForName(name);
             while (csr != null) {
                 object o;
