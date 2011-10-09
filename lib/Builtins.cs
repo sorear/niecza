@@ -1621,8 +1621,7 @@ flat_enough:;
         SubInfo outer = th.caller.info;
         string msg = (string) r[new object[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str),
-                (outer.unit == null ? "" : outer.unit.name),
-                outer.xref_no.ToString()
+                new Niecza.CLRBackend.Handle(outer)
                 }];
         if (msg != null && msg != "")
             return Kernel.Die(th, msg);

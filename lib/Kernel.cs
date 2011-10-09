@@ -372,7 +372,7 @@ namespace Niecza {
 
             for (int i = 0; i < ths.Length; i++) {
                 ths[i].FillSubInfo(type);
-                if ((our_subs[i].special & SUB_IS_UNSAFE) != 0)
+                if ((our_subs[i].special & SubInfo.UNSAFE) != 0)
                     Kernel.CheckUnsafe(our_subs[i]);
             }
 
@@ -590,17 +590,6 @@ namespace Niecza {
             return null;
         }
 
-        public const int SUB_RUN_ONCE = 1;
-        public const int MAKE_PROTOPAD = 2;
-        public const int SUB_HAS_TYPE = 4;
-        public const int SUB_IS_UNSAFE = 8;
-        public const int SUB_IS_PARAM_ROLE = 16;
-        public const int SUB_MAINLINE = 32;
-        public const int SUB_TRANSPARENT = 64;
-        public const int SUB_INLINED = 128;
-        public const int SUB_CANNOT_INLINE = 256;
-        public const int SUB_RETURN_PASS = 512;
-
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.RuntimeUnit);
 
@@ -687,7 +676,7 @@ namespace Niecza {
         }
 
         internal override ClrOp GetCode(int up) {
-            if ((owner.special & RuntimeUnit.SUB_RUN_ONCE) != 0) {
+            if ((owner.special & SubInfo.RUN_ONCE) != 0) {
                 return new ClrUnboxAny(Tokens.Variable,
                         new ClrMethodCall(false, Tokens.Frame.GetMethod("GetDynamic"),
                     Backend.currentUnit.RefConstant(
@@ -701,7 +690,7 @@ namespace Niecza {
         }
 
         internal override ClrOp SetCode(int up, ClrOp to) {
-            if ((owner.special & RuntimeUnit.SUB_RUN_ONCE) != 0)
+            if ((owner.special & SubInfo.RUN_ONCE) != 0)
                 return new ClrProtoSet(index,
                     Backend.currentUnit.RefConstant(
                         owner.name, owner.protopad, typeof(Frame)).head, to);
@@ -919,6 +908,18 @@ namespace Niecza {
         public Dictionary<string,object[]> extend;
 
         // No instance fields past this point
+
+        public const int RUN_ONCE = 1;
+        public const int MAKE_PROTOPAD = 2;
+        public const int HAS_TYPE = 4;
+        public const int UNSAFE = 8;
+        public const int PARAM_ROLE = 16;
+        public const int MAINLINE = 32;
+        public const int TRANSPARENT = 64;
+        public const int INLINED = 128;
+        public const int CANNOT_INLINE = 256;
+        public const int RETURN_PASS = 512;
+
         public const int SIG_I_RECORD  = 3;
         public const int SIG_I_FLAGS   = 0;
         public const int SIG_I_SLOT    = 1;
@@ -1036,7 +1037,7 @@ namespace Niecza {
         public unsafe Frame Binder(Frame caller, Frame outer, P6any sub,
                 Variable[] pos, VarHash named, bool quiet, DispatchEnt de) {
             Frame th;
-            if ((special & RuntimeUnit.SUB_RUN_ONCE) != 0) {
+            if ((special & RUN_ONCE) != 0) {
                 th = protopad;
                 th.caller = caller;
                 th.ip = 0;
@@ -1317,7 +1318,7 @@ noparams:
         internal bool IsInlinable() {
             if (sig_i == null)
                 return false;
-            if ((special & RuntimeUnit.SUB_CANNOT_INLINE) != 0)
+            if ((special & CANNOT_INLINE) != 0)
                 return false;
             if (children.Count != 0)
                 return false;
@@ -1341,7 +1342,7 @@ noparams:
         }
 
         internal void SetInlined() {
-            special |= RuntimeUnit.SUB_INLINED;
+            special |= INLINED;
             outer.children.Remove(this);
             unit.our_subs.Remove(this);
             if (outervar != null && outer.dylex[outervar] is LISub)
@@ -1440,7 +1441,7 @@ noparams:
                 protosub = Kernel.MakeSub(this, outer == null ?
                         null : outer.protopad);
             if (once) {
-                special |= RuntimeUnit.SUB_RUN_ONCE;
+                special |= RUN_ONCE;
                 CreateProtopad();
             }
         }
@@ -3023,7 +3024,7 @@ tryagain:
                 }
                 else if (key == "UNIT") {
                     while (sc.p2 > 0 || (sc.ToInfo().special &
-                                RuntimeUnit.SUB_MAINLINE) == 0)
+                                SubInfo.MAINLINE) == 0)
                         sc = sc.ToOuter();
                     goto have_sc;
                 }
@@ -3033,7 +3034,7 @@ tryagain:
                 }
                 else if (key == "SETTING") {
                     while (sc.p2 > 0 || (sc.ToInfo().special &
-                                RuntimeUnit.SUB_MAINLINE) == 0)
+                                SubInfo.MAINLINE) == 0)
                         sc = sc.ToOuter();
                     sc = sc.ToOuter();
                     goto have_sc;

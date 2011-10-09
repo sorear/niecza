@@ -2311,7 +2311,7 @@ namespace Niecza.CLRBackend {
             // letscope: gives visible names to lets
             List<object> scope = new List<object>();
             scope.Add(new JScalar("letscope"));
-            scope.Add(new JScalar(tgt.special & RuntimeUnit.SUB_TRANSPARENT));
+            scope.Add(new JScalar(tgt.special & SubInfo.TRANSPARENT));
 
             // let: introduces symbols for !argN, !lexN
             List<object> let = new List<object>();
@@ -3278,7 +3278,7 @@ dynamic:
         void EnterCode(List<object> frags) {
             List<object> latefrags = new List<object>();
 
-            if ((sub.special & RuntimeUnit.SUB_MAINLINE) != 0 &&
+            if ((sub.special & SubInfo.MAINLINE) != 0 &&
                     sub.unit.is_mainish) {
                 FieldInfo fi = cpb.tb.DefineField(
                         "RTFRAME", typeof(Frame),
@@ -3291,7 +3291,7 @@ dynamic:
             // before the binder, so defaults work right
 
             foreach (KeyValuePair<string,LexInfo> kv in sub.dylex) {
-                if ((sub.special & RuntimeUnit.SUB_RUN_ONCE) != 0)
+                if ((sub.special & SubInfo.RUN_ONCE) != 0)
                     continue; // we'll just use the static pad
 
                 if (kv.Value is LISub) {
@@ -3367,7 +3367,7 @@ dynamic:
 
             // TODO: bind a ro container around return values
             if (sub.mo.HasMRO(Kernel.RoutineMO) &&
-                    (sub.special & RuntimeUnit.SUB_RETURN_PASS) == 0) {
+                    (sub.special & SubInfo.RETURN_PASS) == 0) {
                 enter.Add(new object[] { new JScalar("return"),
                     new object[] { new JScalar("xspan"),
                         new JScalar("rstart"), new JScalar("rend"),
@@ -3570,7 +3570,7 @@ dynamic:
                     (Backend.currentUnit.nextid++);
             } else if (cmd == "set_mainline") {
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
-                Backend.currentUnit.mainline.special |= RuntimeUnit.SUB_MAINLINE;
+                Backend.currentUnit.mainline.special |= SubInfo.MAINLINE;
                 return null;
             } else if (cmd == "sub_set_ltm") {
                 ((SubInfo)Handle.Unbox(args[1])).ltm =
@@ -3581,19 +3581,19 @@ dynamic:
                 return null;
             } else if (cmd == "sub_noninlinable") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
-                    RuntimeUnit.SUB_CANNOT_INLINE;
+                    SubInfo.CANNOT_INLINE;
                 return null;
             } else if (cmd == "sub_set_return_pass") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
-                    RuntimeUnit.SUB_RETURN_PASS;
+                    SubInfo.RETURN_PASS;
                 return null;
             } else if (cmd == "sub_set_transparent") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
-                    RuntimeUnit.SUB_TRANSPARENT;
+                    SubInfo.TRANSPARENT;
                 return null;
             } else if (cmd == "sub_set_unsafe") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
-                    RuntimeUnit.SUB_IS_UNSAFE;
+                    SubInfo.UNSAFE;
                 return null;
             } else if (cmd == "sub_is_inlinable") {
                 return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
@@ -3608,7 +3608,7 @@ dynamic:
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
             } else if (cmd == "sub_run_once") {
                 return (((SubInfo)Handle.Unbox(args[1])).special &
-                        RuntimeUnit.SUB_RUN_ONCE) != 0;
+                        SubInfo.RUN_ONCE) != 0;
             } else if (cmd == "sub_outervar") {
                 return ((SubInfo)Handle.Unbox(args[1])).outervar;
             } else if (cmd == "sub_name") {
@@ -3753,7 +3753,7 @@ dynamic:
                 return ((RuntimeUnit)Handle.Unbox(args[1])).name;
             } else if (cmd == "sub_to_unit") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                while ((s.special & RuntimeUnit.SUB_MAINLINE) == 0)
+                while ((s.special & SubInfo.MAINLINE) == 0)
                     s = s.outer;
                 return new Handle(s);
             } else if (cmd == "equal_handles") {
@@ -4000,7 +4000,7 @@ dynamic:
                 return AddLexical(args, new LICommon((char)who.Length + who + pname));
             } else if (cmd == "add_state_name") {
                 SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
-                SubInfo outer = (sub.special & RuntimeUnit.SUB_MAINLINE) != 0 ?
+                SubInfo outer = (sub.special & SubInfo.MAINLINE) != 0 ?
                     sub : sub.outer;
                 STable  type  = (STable)Handle.Unbox(args[6]);
                 int     flags = (int)   args[7];
