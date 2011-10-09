@@ -476,6 +476,28 @@ namespace Niecza {
     }
 
     public class Utils {
+        public static void HexDump(byte[] heap) {
+            for (int offs = 0; offs < heap.Length; offs += 16) {
+                Console.Write("{0:X6}   ", offs);
+                int len = heap.Length - offs;
+                if (len > 16) len = 16;
+                for (int col = 0; col < 16; col++) {
+                    if (col >= len)
+                        Console.Write("   ");
+                    else
+                        Console.Write("{0:X2} ", heap[offs+col]);
+                    if (col == 7)
+                        Console.Write(" ");
+                }
+                Console.Write("   |");
+                for (int col = 0; col < len; col++)
+                    Console.Write(
+                        (heap[offs+col] < 32 || heap[offs+col] > 126)
+                            ? '.' : (char)heap[offs+col]);
+                Console.WriteLine("|");
+            }
+        }
+
         // s1 must not have embedded nuls
         public static unsafe bool StartsWithInvariant(string s1, string s2) {
             fixed (char* st1 = s1) {

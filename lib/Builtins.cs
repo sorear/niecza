@@ -889,9 +889,11 @@ public partial class Builtins {
     static Func<Variable,Variable,Variable> atan2_d = atan2;
     public static Variable atan2(Variable a1, Variable a2) {
         P6any o1 = a1.Fetch();
+        P6any o2 = a2.Fetch();
+        if (!o1.mo.is_any || !o2.mo.is_any)
+            return HandleSpecial2(a1,a2,o1,o2, atan2_d);
         int r1;
         P6any n1 = GetNumber(a1, o1, out r1);
-        P6any o2 = a2.Fetch();
         int r2;
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -945,15 +947,11 @@ public partial class Builtins {
         return Kernel.NewROScalar(n1);
     }
 
-    static Func<Variable,Variable> eval_perl5_d = eval_perl5;
     static IForeignInterpreter p5_interpreter;
     public static Variable eval_perl5(Variable v) {
 
         // Cargo culted to get the string from the argument
         P6any o1 = v.Fetch();
-        int r1;
-        if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, eval_perl5_d);
         string r = o1.mo.mro_raw_Str.Get(v);
 
         if (p5_interpreter == null) {
