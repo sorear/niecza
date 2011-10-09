@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Collections.Generic;
 using System.Text;
 
 // Here in Niecza we have four different kinds of unit scopes:
@@ -51,8 +52,8 @@ namespace Niecza.Serialization {
         // TODO: investigate a more specialized representation,
         // ideally not having to hash as many objects
         struct ObjRef {
-            SerUnit unit;
-            int id;
+            public SerUnit unit;
+            public int id;
         }
         Dictionary<object,ObjRef> byref = new Dictionary<object,ObjRef>();
 
@@ -76,7 +77,7 @@ namespace Niecza.Serialization {
             if (into.nobj == into.bynum.Length)
                 Array.Resize(ref into.bynum, into.nobj * 2);
 
-            or.unit = into;
+            or.unit = lui = into;
             id = or.id = into.nobj++;
             into.bynum[id] = o;
 
@@ -105,7 +106,7 @@ namespace Niecza.Serialization {
             su.name = name;
             su.hash = hash.ComputeHash(bytes);
 
-            ThawBuffer tb = new ThawBuffer(this, unit, bytes, bytes.Length);
+            ThawBuffer tb = new ThawBuffer(this, su, bytes);
 
             bool success = false;
             try {
@@ -116,7 +117,7 @@ namespace Niecza.Serialization {
                 if (rver != version)
                     throw new ThawException("version mismatch loading " + file);
 
-                tb.root = tb.ObjRef();
+                su.root = tb.ObjRef();
                 success = true;
             } finally {
                 // don't leave half-read units in the map
@@ -142,7 +143,7 @@ namespace Niecza.Serialization {
             su.root = root;
 
             if (units.ContainsKey(name))
-                throw new IllegalOperationException();
+                throw new InvalidOperationException("unit " +name+ " exists");
 
             bool success = false;
             string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
@@ -195,6 +196,12 @@ namespace Niecza.Serialization {
             this.unit = unit;
             unit_to_offset = new Dictionary<SerUnit,int>();
             data = new byte[256];
+        }
+
+        internal byte[] GetData() {
+            byte[] ret = new byte[wpointer];
+            Array.Copy(data, ret, ret.Length);
+            return ret;
         }
 
         void Ensure(int ct) {
@@ -260,9 +267,8 @@ namespace Niecza.Serialization {
                     int altcode;
                     if (!unit_to_offset.TryGetValue(altunit, out altcode)) {
                         Byte((byte)SerializationCode.NewUnitRef);
-                        String(reg.UnitName(altunit));
+                        String(altunit.name);
                         // save the hash too so stale refs can be caught
-                        Int(altunit.hash.Length);
                         foreach (byte b in altunit.hash) Byte(b);
 
                         unit_to_offset[altunit] = usedunits++;
@@ -287,7 +293,6 @@ namespace Niecza.Serialization {
 
     class ThawBuffer {
         byte[] data;
-        int dlen;
         int rpointer;
         ObjectRegistry reg;
 
@@ -295,15 +300,51 @@ namespace Niecza.Serialization {
         int refed_units;
         SerUnit unit;
 
-        internal ThawBuffer(ObjectRegistry reg, SerUnit unit,
-                byte[] data, int dlen) {
+        internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data = data;
-            this.dlen = dlen;
             this.reg  = reg;
             this.unit = unit;
         }
 
-        object ObjRef() {
+        public byte Byte() { return data[rpointer++]; }
+
+        public short Short() {
+            return (short)((((int)Byte()) << 8) | Byte());
+        }
+
+        public int Int() {
+            return (((int)Byte()) << 24) | (((int)Byte()) << 16) |
+                (((int)Byte()) << 8) | ((int)Byte());
+        }
+
+        public long Long() {
+            // try to do as much as possible in 32-bit precision,
+            // but suppress sign extension
+            return (((long)Int()) << 32) | (long)(uint)Int();
+        }
+
+        public string String() {
+            int l = Int();
+
+            if (l < 0) return null;
+            char[] cb = new char[l];
+
+            for (int i = 0; i < l; i++)
+                cb[i] = (char)Short();
+
+            return new string(cb);
+        }
+
+        public byte[] Bytes(int k) {
+            byte[] buf = new byte[k];
+
+            for (int i = 0; i < k; i++)
+                buf[i] = Byte();
+
+            return buf;
+        }
+
+        public object ObjRef() {
             var tag = (SerializationCode)Byte();
             int i, j;
             switch(tag) {

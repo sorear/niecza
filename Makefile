@@ -8,7 +8,7 @@ CP=cp
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
 	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs \
-	 GeneratedTrigFunctions.cs
+	 GeneratedTrigFunctions.cs Serialize.cs
 
 # Tell make to regard the following targets as not being filenames
 .PHONY: all aot test spectest clean realclean
