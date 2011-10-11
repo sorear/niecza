@@ -1,4 +1,5 @@
 using Niecza;
+using Niecza.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -533,7 +534,7 @@ public class Cursor : P6any {
     public CapInfo captures;
     public STable save_klass;
 
-    public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
+    public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
     public string GetBacking() { return global.orig_s; }
 
     public Cursor(P6any proto, string text, P6any actions)
@@ -935,9 +936,10 @@ public sealed class NFA {
 }
 
 // ltm automaton descriptors
-public abstract class LAD {
+public abstract class LAD : IFreeze {
     public abstract void ToNFA(NFA pad, int from, int to);
     public abstract void Dump(int indent);
+    public abstract void Freeze(FreezeBuffer fb);
     public virtual void QueryLiteral(NFA pad, out int len, out bool cont) {
         len = 0; cont = false;
     }
@@ -970,6 +972,10 @@ public class LADStr : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "str: " + text);
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADStr);
+        fb.String(text);
+    }
 }
 
 public class LADStrNoCase : LAD {
@@ -997,6 +1003,10 @@ public class LADStrNoCase : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "strnocase: " + text);
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADStrNoCase);
+        fb.String(text);
+    }
 }
 
 public class LADCC : LAD {
@@ -1011,6 +1021,10 @@ public class LADCC : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "cc: " + cc.ToString());
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADCC);
+        fb.Ints(cc.vec);
+    }
 }
 
 public class LADImp : LAD {
@@ -1023,6 +1037,9 @@ public class LADImp : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "imp");
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADImp);
     }
 }
 
@@ -1039,6 +1056,9 @@ public class LADNull : LAD {
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
         len = 0; cont = true;
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADNull);
+    }
 }
 
 public class LADNone : LAD {
@@ -1048,6 +1068,9 @@ public class LADNone : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "none");
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADNone);
     }
 }
 
@@ -1059,6 +1082,9 @@ public class LADDot : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "dot");
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADDot);
     }
 }
 
@@ -1078,6 +1104,10 @@ public class LADStar : LAD {
         Console.WriteLine(new string(' ', indent) + "star:");
         child.Dump(indent + 4);
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADStar);
+        fb.ObjRef(child);
+    }
 }
 
 public class LADOpt : LAD {
@@ -1093,6 +1123,10 @@ public class LADOpt : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "opt:");
         child.Dump(indent + 4);
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADOpt);
+        fb.ObjRef(child);
     }
 }
 
@@ -1117,6 +1151,10 @@ public class LADPlus : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "plus:");
         child.Dump(indent + 4);
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADPlus);
+        fb.ObjRef(child);
     }
 }
 
@@ -1155,6 +1193,12 @@ public class LADSequence : LAD {
         foreach (LAD l in args)
             l.Dump(indent + 4);
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADSequence);
+        fb.Int(args.Length);
+        foreach (LAD l in args)
+            fb.ObjRef(l);
+    }
 }
 
 public class LADAny : LAD {
@@ -1176,6 +1220,12 @@ public class LADAny : LAD {
         Console.WriteLine(new string(' ', indent) + "any:");
         foreach (LAD k in zyg)
             k.Dump(indent + 4);
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADAny);
+        fb.Int(zyg.Length);
+        foreach (LAD l in zyg)
+            fb.ObjRef(l);
     }
 }
 
@@ -1240,6 +1290,10 @@ imp:
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "param: " + name);
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADParam);
+        fb.String(name);
+    }
 }
 
 public class LADMethod : LAD {
@@ -1291,6 +1345,10 @@ public class LADMethod : LAD {
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "methodcall " + name);
     }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADMethod);
+        fb.String(name);
+    }
 }
 
 // Only really makes sense if used in the static scope of a proto
@@ -1331,6 +1389,9 @@ public class LADDispatcher : LAD {
 
     public override void Dump(int indent) {
         Console.WriteLine(new string(' ', indent) + "dispatcher");
+    }
+    public override void Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.LADDispatcher);
     }
 }
 

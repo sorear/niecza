@@ -650,6 +650,11 @@ namespace Niecza {
         }
         public virtual void BindFields() {}
         public virtual int SigIndex() { return -1; }
+
+        internal abstract void DoFreeze(FreezeBuffer fb);
+        internal enum LexSerCode {
+            Simple, Sub, Label, Dispatch, Common, Hint, Package, Alias
+        }
     }
 
     public abstract class LIVarish : LexInfo {
@@ -725,6 +730,11 @@ namespace Niecza {
             return new ClrMethodCall(false, Tokens.Kernel_BindGlobal,
                     new ClrStringLiteral(hkey), to);
         }
+
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Common);
+            fb.String(hkey);
+        }
     }
 
     public class LIHint : LexInfo {
@@ -747,6 +757,10 @@ namespace Niecza {
             return new ClrSetField(Tokens.BValue_v,
                 Backend.currentUnit.RefConstant(name, var, null).head, to);
         }
+
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Hint);
+        }
     }
 
     public class LISub : LIVarish {
@@ -754,6 +768,11 @@ namespace Niecza {
         public LISub(SubInfo def) { this.def = def; }
         public override void Init(Frame f) {
             Set(f, Kernel.NewROScalar(def.protosub));
+        }
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Sub);
+            fb.Int(index);
+            fb.ObjRef(def);
         }
     }
 
@@ -769,6 +788,12 @@ namespace Niecza {
         public LISimple(int flags, STable type) {
             this.flags = flags;
             this.type  = type;
+        }
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Simple);
+            fb.Int(index);
+            fb.Byte((byte)flags);
+            fb.ObjRef(type);
         }
         public override void Init(Frame f) {
             if ((flags & NOINIT) != 0)
@@ -790,11 +815,19 @@ namespace Niecza {
         public override void Init(Frame f) {
             Set(f, Kernel.NewLabelVar(f, name));
         }
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Label);
+            fb.Int(index);
+        }
     }
 
     public class LIDispatch : LIVarish {
         public override void Init(Frame f) {
             throw new Exception("MMD NYI");
+        }
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Dispatch);
+            fb.Int(index);
         }
     }
 
@@ -833,6 +866,10 @@ namespace Niecza {
             }
             return real.SetCode(up, bind);
         }
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Alias);
+            fb.String(to);
+        }
     }
 
     public class LIPackage : LexInfo {
@@ -843,6 +880,10 @@ namespace Niecza {
         internal override ClrOp GetCode(int up) {
             return Backend.currentUnit.RefConstant(pkg.name + "V",
                     pkg.typeVar, typeof(Variable)).head;
+        }
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.Package);
+            fb.ObjRef(pkg);
         }
     }
 
@@ -860,39 +901,32 @@ namespace Niecza {
         public int[] sig_i;
         public object[] sig_r;
 
-        // Basic metadata
+        // Local metadata
         public int[] lines;
         public Dictionary<string, LexInfo> dylex;
         public uint dylex_filter; // (32,1) Bloom on hash code
+        public string name;
+        // maybe should be in extend or a hint?
+        public LAD ltm;
+        public int special;
+        public int phaser;
+        public string outervar;
 
         // References to related objects
+        public RuntimeUnit unit;
         public SubInfo outer;
         public P6any protosub;
         public Frame protopad;
-        public RuntimeUnit unit;
-
+        public STable cur_pkg, methodof, body_of, in_class;
         public STable mo;
 
-        // Standard metadata
-        public string name;
-        // maybe should be a hint
-        public LAD ltm;
-
-        public int special;
-        public int phaser;
-        public STable cur_pkg, methodof, body_of, in_class;
-        public string outervar;
+        // caches for fast $OUTER::_, invocants, exn handling
         public int outer_topic_rank;
         public int outer_topic_key;
         public int self_key;
         public SubInfo catch_, control;
-        public class UsedInScopeInfo {
-            public string file;
-            public int line;
-            public int levels;
-            public string orig_file;
-            public int orig_line;
-        }
+
+        // this is used only at compile time
         public Dictionary<string,UsedInScopeInfo> used_in_scope;
         public int num_lex_slots;
 
@@ -908,6 +942,13 @@ namespace Niecza {
         public Dictionary<string,object[]> extend;
 
         // No instance fields past this point
+        public class UsedInScopeInfo {
+            public string file;
+            public int line;
+            public int levels;
+            public string orig_file;
+            public int orig_line;
+        }
 
         public const int RUN_ONCE = 1;
         public const int MAKE_PROTOPAD = 2;
@@ -1451,7 +1492,73 @@ noparams:
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.SubInfo);
-            throw new NotImplementedException();
+            // TODO: make serialization work with the code
+            fb.Int(nspill);
+            fb.Ints(sig_i);
+            if (sig_i != null) {
+                fb.Int(sig_r.Length);
+                foreach (object o in sig_r) {
+                    if (o is string) {
+                        fb.ObjRef(null);
+                        fb.String((string)o);
+                    } else {
+                        fb.ObjRef((IFreeze)o);
+                    }
+                }
+            }
+
+            fb.Ints(lines);
+            fb.Int(dylex.Count);
+            foreach (KeyValuePair<string, LexInfo> kv in dylex) {
+                fb.String(kv.Key);
+                kv.Value.DoFreeze(fb);
+            }
+            // not saving dylex_filter as it is a cache
+            fb.String(name);
+            fb.ObjRef(ltm);
+            fb.Int(special);
+            fb.Int(phaser);
+            fb.String(outervar);
+            fb.ObjRef(unit);
+            fb.ObjRef(outer);
+            fb.ObjRef(protosub);
+            fb.ObjRef(protopad);
+            fb.ObjRef(cur_pkg);
+            fb.ObjRef(methodof);
+            fb.ObjRef(body_of);
+            fb.ObjRef(in_class);
+            fb.ObjRef(mo);
+            // not storing caches here
+            // also not storing used_in_scope, it's compiler only data
+            // TODO: we want to store the compiled code not this
+            fb.String(nam_str);
+            if (nam_str != null) {
+                fb.Int(nam_refs.Length);
+                foreach(object o in nam_refs)
+                    fb.ObjRef((IFreeze)o);
+            }
+            // can't save param0/param1.  Or can we?
+            fb.Int(children.Count);
+            foreach(SubInfo si in children)
+                fb.ObjRef(si);
+            if (extend == null)
+                fb.Int(-1);
+            else {
+                fb.Int(extend.Count);
+                foreach(KeyValuePair<string,object[]> kv in extend) {
+                    fb.String(kv.Key);
+                    fb.Int(kv.Value.Length);
+                    foreach (object o in kv.Value) {
+                        if (o is int) {
+                            fb.Byte(0);
+                            fb.Int((int)o);
+                        } else {
+                            fb.Byte(1);
+                            fb.String((string)o);
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -201,6 +201,23 @@ namespace Niecza.Serialization {
         NewArrayViviHook,
         HashViviHook,
         NewHashViviHook,
+
+        // Longest-token automaton descriptors
+        LADNone, // no-args
+        LADNull,
+        LADDot,
+        LADDispatcher,
+        LADImp,
+        LADStr, // string
+        LADStrNoCase,
+        LADMethod,
+        LADParam,
+        LADOpt, // LAD
+        LADPlus,
+        LADStar,
+        LADSequence, // LAD[]
+        LADAny,
+        LADCC, // CC
     }
 
     // An instance of this class is used to serialize serialization units
@@ -270,6 +287,16 @@ namespace Niecza.Serialization {
                 Int(s.Length);
                 foreach (char ch in s)
                     Short((short)ch);
+            }
+        }
+
+        public void Ints(int[] s) {
+            if (s == null) {
+                Int(-1);
+            } else {
+                Int(s.Length);
+                foreach (int ch in s)
+                    Int(ch);
             }
         }
 
