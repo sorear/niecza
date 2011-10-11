@@ -223,7 +223,12 @@ public partial class Builtins {
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
-        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
+        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
+            fb.Byte((byte)Niecza.Serialization.SerializationCode.SubstrLValue);
+            fb.ObjRef(backing);
+            fb.Int(from);
+            fb.Int(length);
+        }
     }
 
     public static string LaxSubstring(string str, int from) {

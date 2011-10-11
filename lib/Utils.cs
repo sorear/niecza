@@ -4,9 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using Niecza.Serialization;
 
 namespace Niecza {
-    public sealed class VarDeque {
+    public sealed class VarDeque : IFreeze {
         private Variable[] data;
         private int head;
         private int count;
@@ -129,6 +130,17 @@ namespace Niecza {
                 head = 0;
             }
         }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.VarDeque);
+            fb.Int(count);
+            int index = head;
+            for (int i = 0; i < count; i++) {
+                fb.ObjRef(data[index]);
+                index++;
+                if (index == data.Length) index = 0;
+            }
+        }
     }
 
     struct VarHashLink {
@@ -137,7 +149,8 @@ namespace Niecza {
         internal int next;
     }
 
-    public sealed class VarHash : IEnumerable<KeyValuePair<string,Variable>> {
+    public sealed class VarHash : IEnumerable<KeyValuePair<string,Variable>>,
+            IFreeze {
         int hfree;
         int count;
         VarHashLink[] heap;
@@ -343,6 +356,8 @@ namespace Niecza {
             get { return count != 0; }
         }
 
+        public int Count { get { return count; } }
+
         public bool TryGetValue(string key, out Variable value) {
             if (htab == null) {
                 for (int i = 0; i < count; i++) {
@@ -433,6 +448,15 @@ namespace Niecza {
         }
 
         public VarHashKeys Keys { get { return new VarHashKeys(this); } }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.VarHash);
+            fb.Int(count);
+            foreach (KeyValuePair<string,Variable> kv in this) {
+                fb.String(kv.Key);
+                fb.ObjRef(kv.Value);
+            }
+        }
     }
 
     public class SubscriberSet {
@@ -532,7 +556,7 @@ namespace Niecza {
         }
     }
 
-    public sealed class Complex {
+    public sealed class Complex : IFreeze {
         public readonly double re;
         public readonly double im;
 
@@ -701,23 +725,41 @@ namespace Niecza {
         public Complex Acotanh() {
             return (1 / this).Atanh();
         }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.Complex);
+            fb.Long(BitConverter.DoubleToInt64Bits(re));
+            fb.Long(BitConverter.DoubleToInt64Bits(im));
+        }
     }
 
-    public sealed class Rat {
+    public sealed class Rat : IFreeze {
         public readonly BigInteger num;
         public readonly ulong den;
 
         public Rat(BigInteger num, ulong den) {
             this.num = num; this.den = den;
         }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.Rat);
+            fb.ObjRef(num);
+            fb.Long((long)den);
+        }
     }
 
-    public sealed class FatRat {
+    public sealed class FatRat : IFreeze {
         public readonly BigInteger num;
         public readonly BigInteger den;
 
         public FatRat(BigInteger num, BigInteger den) {
             this.num = num; this.den = den;
+        }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.FatRat);
+            fb.ObjRef(num);
+            fb.ObjRef(den);
         }
     }
 

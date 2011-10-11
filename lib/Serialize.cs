@@ -184,15 +184,23 @@ namespace Niecza.Serialization {
         SubInfo,
         STable,
         StashEnt,
+        Rat,
+        FatRat,
+        Complex,
+        BigInteger,
+        VarDeque,
+        VarHash,
 
         // types of P6any-reified object
-        P6opaque,
-        BoxObject,
+        P6opaque, // eventually let's specialize this
         Frame,
         Cursor,
 
+        // miscellany
+        Variant, // allow 5, see FallbackFreeze
+
         // variables - allow 4 codes each for flag compaction
-        SimpleVariable,
+        SimpleVariable = Variant + 5,
         SubstrLValue = SimpleVariable + 4,
 
         // vivification hooks
@@ -300,9 +308,19 @@ namespace Niecza.Serialization {
             }
         }
 
+        public void Refs<T> (T[] x) where T: IFreeze {
+            if (x == null) {
+                Int(-1);
+            } else {
+                Int(x.Length);
+                foreach (T y in x)
+                    ObjRef(y);
+            }
+        }
+
         // This is the main routine you should call from your Freeze
         // callbacks to freeze an object
-        public void ObjRef(IFreeze o) {
+        public void ObjRef(object o) {
             int id;
             SerUnit altunit;
             if (o == null) { // null pointers are special
@@ -330,7 +348,45 @@ namespace Niecza.Serialization {
                 Int((int)id);
             } else {
                 // must take responsibility for saving the tag
-                o.Freeze(this);
+                IFreeze f = o as IFreeze;
+                if (f != null) {
+                    f.Freeze(this);
+                } else {
+                    FallbackFreeze(o);
+                }
+            }
+        }
+
+        // Call this to freeze a variant-typed value.  (Avoid)
+        static Type[] anyTypes = new Type[] {
+            typeof(string), typeof(P6any[]), typeof(Variable[]),
+            typeof(int), typeof(double),
+        };
+
+        void FallbackFreeze(object o) {
+            int ix = 0;
+            Type t = o.GetType();
+            while (ix != 11 && anyTypes[ix] != t) ix++;
+            Byte((byte)(((int)SerializationCode.Variant) + ix));
+
+            switch(ix) {
+                case 0:
+                    String((string)o);
+                    break;
+                case 1:
+                    Refs((P6any[])o);
+                    break;
+                case 2:
+                    Refs((Variable[])o);
+                    break;
+                case 3:
+                    Int((int)o);
+                    break;
+                case 4:
+                    Long(BitConverter.DoubleToInt64Bits((double)o));
+                    break;
+                default:
+                    throw new NotImplementedException(t.FullName);
             }
         }
     }

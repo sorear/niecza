@@ -896,12 +896,27 @@ next_method: ;
             return this != mo.typeObject;
         }
 
-        public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
+        public override void Freeze(FreezeBuffer fb) {
+            FreezeSelf(fb);
+            fb.ObjRef(null);
+        }
+        protected void FreezeSelf(FreezeBuffer fb) {
+            fb.Byte((byte) SerializationCode.P6opaque);
+            fb.ObjRef(mo);
+            int l = slots == null ? 0 : slots.Length;
+            fb.Int(l);
+            for (int i = 0; i < l; i++)
+                fb.ObjRef(slots[i]);
+        }
     }
 
     public class BoxObject<T> : P6opaque {
         public T value;
         public BoxObject(T x, STable klass) : base(klass) { value = x; }
         public BoxObject(T x, STable klass, int na) : base(klass,na) { value = x; }
+        public override void Freeze(FreezeBuffer fb) {
+            FreezeSelf(fb);
+            fb.ObjRef(value);
+        }
     }
 }

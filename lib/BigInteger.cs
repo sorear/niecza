@@ -3,6 +3,9 @@
 //
 // Rodrigo Kumpera (rkumpera@novell.com)
 
+// MODIFIED 2011 BY SOREAR
+//  - Added GetData function, IFreeze instance for serialization
+
 //
 // Copyright (C) 2010 Novell, Inc (http://www.novell.com)
 //
@@ -62,7 +65,7 @@ Optimization
 	Schoolbook multiply is O(n^2), use Karatsuba /Toom-3 for large numbers
 */
 namespace Niecza {
-	public struct BigInteger : IComparable, IFormattable, IComparable<BigInteger>, IEquatable<BigInteger>
+	public struct BigInteger : IComparable, IFormattable, IComparable<BigInteger>, IEquatable<BigInteger>, Niecza.Serialization.IFreeze
 	{
 		//LSB on [0]
 		readonly uint[] data;
@@ -2334,6 +2337,14 @@ namespace Niecza {
 				q = new uint [] { 0 };
 				r = u;
 			}
+		}
+
+		void Niecza.Serialization.IFreeze.Freeze(
+				Niecza.Serialization.FreezeBuffer fb) {
+			fb.Byte((byte) Niecza.Serialization.SerializationCode.BigInteger);
+			fb.Int(sign * data.Length);
+			foreach (uint x in data)
+				fb.Int((int)x);
 		}
 	}
 }
