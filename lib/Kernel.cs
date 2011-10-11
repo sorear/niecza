@@ -265,8 +265,14 @@ namespace Niecza {
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
-        public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
-}
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.TiedVariable);
+            fb.ObjRef(type);
+            fb.ObjRef(fetch);
+            fb.ObjRef(store);
+            fb.ObjRef(whence);
+        }
+    }
 
     // Used to make Variable sharing explicit in some cases; will eventually be
     // the only way to share a bvalue

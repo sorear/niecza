@@ -632,6 +632,7 @@ next_method: ;
     // (Although due to quirks of the C# implementation, Cursor and
     // BoxObject can share the P6opaque STable)
     public class STable: IFreeze {
+        /// well-known context handlers {{{
         public static readonly ContextHandler<Variable> CallStr
             = new CtxCallMethod("Str");
         public static readonly ContextHandler<Variable> CallBool
@@ -684,18 +685,35 @@ next_method: ;
             = new PushyCallMethod("push");
         public static readonly PushyHandler CallUnshift
             = new PushyCallMethod("unshift");
+        /// }}}
 
+        /// "true" state {{{
         public P6how mo;
 
         public P6any how, who;
         public P6any typeObject, initObject;
         public Variable typeVar, initVar;
-        public int fixups_from;
         public string name;
         public bool isSubset;
 
+        public Type box_type;
+        /// }}}
+
+        /// compositon-created cache {{{
         public LexerCache lexcache;
 
+        public Dictionary<string, int> slotMap = new Dictionary<string, int>();
+        public int nslots = 0;
+        public string[] all_slot;
+        /// }}}
+
+        /// caches set up by Revalidate {{{
+        public Dictionary<string, DispatchEnt> mro_methods;
+        public Dictionary<string, P6any> private_mro;
+        public P6how.AttrInfo[] init_program;
+        /// }}}
+
+        /// caches set up in SetupVTables {{{
         public ContextHandler<Variable> mro_Str, mro_Numeric, mro_Bool,
                 mro_defined, mro_iterator, mro_item, mro_list, mro_hash,
                 mro_shift, mro_pop;
@@ -713,17 +731,9 @@ next_method: ;
         public InvokeHandler mro_INVOKE;
         public PushyHandler mro_push, mro_unshift;
 
-        public Dictionary<string, DispatchEnt> mro_methods;
-        public Dictionary<string, P6any> private_mro;
-
-        public Dictionary<string, int> slotMap = new Dictionary<string, int>();
-        public int nslots = 0;
-        public string[] all_slot;
-        public P6how.AttrInfo[] init_program;
-
         public int num_rank = -1;
         public bool is_any = false;
-        public Type box_type;
+        /// }}}
 
         public STable(string name) {
             this.name = name;

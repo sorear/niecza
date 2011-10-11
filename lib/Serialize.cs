@@ -199,12 +199,13 @@ namespace Niecza.Serialization {
         // miscellany
         Variant, // allow 5, see FallbackFreeze
 
-        // variables - allow 4 codes each for flag compaction
-        SimpleVariable = Variant + 5,
+        // variables
+        SimpleVariable = Variant + 5, // allow 4 for flags
         SubstrLValue = SimpleVariable + 4,
+        TiedVariable,
 
         // vivification hooks
-        SubViviHook = SubstrLValue + 4,
+        SubViviHook,
         ArrayViviHook,
         NewArrayViviHook,
         HashViviHook,
