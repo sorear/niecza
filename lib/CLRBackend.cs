@@ -4013,6 +4013,12 @@ dynamic:
             thandlers["twriter_open"] = delegate(CpsOp[] z) {
                 return CpsOp.Widen(typeof(TextWriter),
                     CpsOp.ConstructorCall(twriter_open, z)); };
+
+            ConstructorInfo twriter_append = typeof(StreamWriter).GetConstructor(new Type[2] { Tokens.String, Tokens.Boolean });
+            thandlers["twriter_append"] = delegate(CpsOp[] z) {
+                return CpsOp.Widen(typeof(TextWriter),
+                    CpsOp.ConstructorCall(twriter_append, z)); };
+
             thandlers["twriter_puts"] = Methody(null, typeof(TextWriter).GetMethod("Write", new Type[] { Tokens.String }));
             thandlers["twriter_close"] = Methody(null, typeof(TextWriter).GetMethod("Close"));
 

@@ -2073,12 +2073,14 @@ class IO::ArgFiles {
     }
 }
 
-multi sub open($filename) is unsafe {
-    Q:CgOp { (box TextReader (treader_open (obj_getstr {$filename}))) }
-}
-
-multi sub open($filename, :$w) is unsafe {
-    Q:CgOp { (box TextWriter (twriter_open (obj_getstr {$filename}))) }
+multi sub open($filename, :$w?, :$a?) is unsafe {
+    if $a {
+        Q:CgOp { (box TextWriter (twriter_append (obj_getstr {$filename}) (obj_getbool {True}))) } # wrong!
+    } elsif $w {
+        Q:CgOp { (box TextWriter (twriter_open (obj_getstr {$filename}))) }
+    } else {
+        Q:CgOp { (box TextReader (treader_open (obj_getstr {$filename}))) }
+    }
 }
 
 # TODO $*ARGFILES, multi
