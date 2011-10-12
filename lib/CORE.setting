@@ -2075,7 +2075,7 @@ class IO::ArgFiles {
 
 multi sub open($filename, :$w?, :$a?) is unsafe {
     if $a {
-        Q:CgOp { (box TextWriter (twriter_append (obj_getstr {$filename}) (obj_getbool {True}))) } # wrong!
+        Q:CgOp { (box TextWriter (twriter_append (obj_getstr {$filename}) (obj_getbool {True}))) }
     } elsif $w {
         Q:CgOp { (box TextWriter (twriter_open (obj_getstr {$filename}))) }
     } else {
