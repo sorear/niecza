@@ -2028,6 +2028,10 @@ my class TextReader {
     method lines() {
         gather take my $l while ($l = self.get).defined;
     }
+
+    method close() {
+        Q:CgOp { (rnull (treader_close (unbox treader (@ {self})))) }; True
+    }
 }
 
 my class TextWriter {
