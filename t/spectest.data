@@ -241,6 +241,7 @@ S29-context/exit-in-if.t
 S32-array/bool.t
 S32-array/push.t
 S32-array/unshift.t
+S32-list/pick.t
 S32-num/pi.t
 S32-num/power.t
 S32-str/append.t
