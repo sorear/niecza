@@ -134,6 +134,24 @@ my class Any is Mu {
     }
 
     method hash() { anon %hash = @(self) }
+
+    multi method pick($num is copy = 1) {
+        my @l = @(self);
+
+        if ($num == 1) {
+            return @l[floor(@l.elems.rand)];
+        }
+
+        my $number-elements = @l.elems;
+        gather {
+            while ($num > 0 and $number-elements > 0) {
+                my $idx = floor($number-elements.rand());
+                take @l[$idx];
+                @l[$idx] = @l[--$number-elements];
+                --$num;
+            }
+        }
+    }
 }
 
 my class Cursor { ... }
@@ -184,6 +202,7 @@ my class Cool {
     method cotanh() { Q:CgOp { (cotanh {self}) } }
     method acotanh() { Q:CgOp { (acotanh {self}) } }
     method atan2($x = 1) { Q:CgOp { (atan2 {self} {$x}) } }
+    method rand() { self * rand; }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -2118,6 +2137,8 @@ sub acosech($x) { $x.acosech }
 sub cotanh($x) { $x.cotanh }
 sub acotanh($x) { $x.acotanh }
 sub atan2($y, $x = 1) { $y.atan2($x) }
+
+sub pick($num, *@values) { @values.pick($num) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
