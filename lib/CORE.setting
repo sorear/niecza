@@ -135,6 +135,11 @@ my class Any is Mu {
 
     method hash() { anon %hash = @(self) }
 
+    multi method roll($num = 1) {
+        return self[floor(self.elems.rand)] if $num == 1;
+        return map { self[floor(self.elems.rand)] }, ^$num;
+    }
+
     multi method pick($num is copy = 1) {
         my @l = @(self);
 
