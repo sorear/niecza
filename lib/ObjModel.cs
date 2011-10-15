@@ -72,22 +72,22 @@ namespace Niecza {
         }
     }
 
-    public abstract class ContextHandler<T> {
+    public abstract class ContextHandler<T> : ReflectObj {
         public abstract T Get(Variable obj);
     }
 
-    public abstract class InvokeHandler {
+    public abstract class InvokeHandler : ReflectObj {
         public abstract Frame Invoke(P6any obj, Frame th, Variable[] pos, VarHash named);
     }
-    public abstract class PushyHandler {
+    public abstract class PushyHandler : ReflectObj {
         public abstract Variable Invoke(Variable obj, Variable[] args);
     }
 
-    public abstract class BindHandler {
+    public abstract class BindHandler : ReflectObj {
         public abstract Variable Bind(Variable obj, Variable key, Variable to);
     }
 
-    public abstract class IndexHandler {
+    public abstract class IndexHandler : ReflectObj {
         public abstract Variable Get(Variable obj, Variable key);
 
         public virtual P6any GetWHO(P6any obj, string key) {

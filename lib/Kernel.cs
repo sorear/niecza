@@ -2041,6 +2041,9 @@ noparams:
     class PushyCallMethod : PushyHandler {
         string method;
         public PushyCallMethod(string method) { this.method = method; }
+        public PushyCallMethod() { }
+        protected override object[] GetData() { return new object[]{method};}
+        protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override Variable Invoke(Variable obj, Variable[] args) {
             Variable[] rargs = new Variable[args.Length + 1];
@@ -2053,6 +2056,9 @@ noparams:
     class CtxCallMethodUnbox<T> : ContextHandler<T> {
         string method;
         public CtxCallMethodUnbox(string method) { this.method = method; }
+        public CtxCallMethodUnbox() { }
+        protected override object[] GetData() { return new object[]{method};}
+        protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override T Get(Variable obj) {
             Variable v = Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
@@ -2062,6 +2068,9 @@ noparams:
     class CtxCallMethodUnboxBool : ContextHandler<bool> {
         string method;
         public CtxCallMethodUnboxBool(string method) { this.method = method; }
+        public CtxCallMethodUnboxBool() { }
+        protected override object[] GetData() { return new object[]{method};}
+        protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override bool Get(Variable obj) {
             Variable v = Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
@@ -2072,6 +2081,9 @@ noparams:
     class CtxCallMethodUnboxNumeric : ContextHandler<double> {
         string method;
         public CtxCallMethodUnboxNumeric(string method) { this.method = method; }
+        public CtxCallMethodUnboxNumeric() { }
+        protected override object[] GetData() { return new object[]{method};}
+        protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override double Get(Variable obj) {
             Variable v = method == null ? obj : Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
@@ -2104,6 +2116,9 @@ noparams:
     class CtxCallMethod : ContextHandler<Variable> {
         string method;
         public CtxCallMethod(string method) { this.method = method; }
+        public CtxCallMethod() { }
+        protected override object[] GetData() { return new object[]{method};}
+        protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override Variable Get(Variable obj) {
             return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
@@ -2113,6 +2128,9 @@ noparams:
     class CtxCallMethodFetch : ContextHandler<P6any> {
         string method;
         public CtxCallMethodFetch(string method) { this.method = method; }
+        public CtxCallMethodFetch() { }
+        protected override object[] GetData() { return new object[]{method};}
+        protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override P6any Get(Variable obj) {
             return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null)).Fetch();
@@ -2122,6 +2140,9 @@ noparams:
     class CtxJustUnbox<T> : ContextHandler<T> {
         T dflt;
         public CtxJustUnbox(T dflt) { this.dflt = dflt; }
+        public CtxJustUnbox() { }
+        protected override object[] GetData() { return new object[]{dflt};}
+        protected override void SetData(object[]o) { dflt = (T)o[0]; }
         public override T Get(Variable obj) {
             P6any o = obj.Fetch();
             if (!o.IsDefined()) return dflt;
@@ -2215,6 +2236,14 @@ noparams:
     class CtxBoxify<T> : ContextHandler<Variable> {
         ContextHandler<T> inner;
         STable box;
+        public CtxBoxify() { }
+        protected override object[] GetData() {
+            return new object[] { inner, box };
+        }
+        protected override void SetData(object[] o) {
+            inner = (ContextHandler<T>)o[0];
+            box = (STable)o[1];
+        }
         public CtxBoxify(ContextHandler<T> inner, STable box) {
             this.inner = inner;
             this.box = box;
@@ -2226,6 +2255,13 @@ noparams:
 
     class CtxBoxifyInty : ContextHandler<Variable> {
         ContextHandler<double> inner;
+        public CtxBoxifyInty() { }
+        protected override object[] GetData() {
+            return new object[] { inner };
+        }
+        protected override void SetData(object[] o) {
+            inner = (ContextHandler<double>)o[0];
+        }
         public CtxBoxifyInty(ContextHandler<double> inner) {
             this.inner = inner;
         }
@@ -2236,6 +2272,13 @@ noparams:
 
     class CtxContainerize : ContextHandler<Variable> {
         ContextHandler<P6any> inner;
+        public CtxContainerize() { }
+        protected override object[] GetData() {
+            return new object[] { inner };
+        }
+        protected override void SetData(object[] o) {
+            inner = (ContextHandler<P6any>)o[0];
+        }
         public CtxContainerize(ContextHandler<P6any> inner) {
             this.inner = inner;
         }
@@ -2385,6 +2428,9 @@ noparams:
 
     class CtxNumSuccish : ContextHandler<P6any> {
         double amt;
+        public CtxNumSuccish() { }
+        protected override object[] GetData() { return new object[] { amt }; }
+        protected override void SetData(object[] o) { amt = (double) o[0]; }
         public CtxNumSuccish(double amt) { this.amt = amt; }
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -2407,6 +2453,9 @@ noparams:
 
     class CtxIntSuccish : ContextHandler<P6any> {
         int amt;
+        public CtxIntSuccish() { }
+        protected override object[] GetData() { return new object[] { amt }; }
+        protected override void SetData(object[] o) { amt = (int) o[0]; }
         public CtxIntSuccish(int amt) { this.amt = amt; }
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -2443,6 +2492,9 @@ noparams:
 
     class CtxRatSuccish : ContextHandler<P6any> {
         bool up;
+        public CtxRatSuccish() { }
+        protected override object[] GetData() { return new object[] { up }; }
+        protected override void SetData(object[] o) { up = (bool) o[0]; }
         public CtxRatSuccish(bool up) { this.up = up; }
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
@@ -2476,6 +2528,9 @@ noparams:
     class CtxFatRatSuccish : ContextHandler<P6any> {
         bool up;
         public CtxFatRatSuccish(bool up) { this.up = up; }
+        public CtxFatRatSuccish() { }
+        protected override object[] GetData() { return new object[] { up }; }
+        protected override void SetData(object[] o) { up = (bool) o[0]; }
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
             FatRat rr;
@@ -2508,6 +2563,9 @@ noparams:
     class CtxComplexSuccish : ContextHandler<P6any> {
         double amt;
         public CtxComplexSuccish(double amt) { this.amt = amt; }
+        public CtxComplexSuccish() { }
+        protected override object[] GetData() { return new object[] { amt }; }
+        protected override void SetData(object[] o) { amt = (double) o[0]; }
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
             Complex c = o.IsDefined() ? Kernel.UnboxAny<Complex>(o) : null;
@@ -2543,6 +2601,9 @@ noparams:
     class CtxStrSuccish : ContextHandler<P6any> {
         bool succ;
         public CtxStrSuccish(bool succ) { this.succ = succ; }
+        public CtxStrSuccish() { }
+        protected override object[] GetData() { return new object[] { succ }; }
+        protected override void SetData(object[] o) { succ = (bool) o[0]; }
         // note that most of this table is katakana.  Perhaps there
         // is a better way.
         static ushort[] table = {
@@ -2737,6 +2798,14 @@ tryagain:
     class IxCallMethod : IndexHandler {
         string name;
         VarHash named;
+        public IxCallMethod() { }
+        protected override object[] GetData() {
+            return new object[] { name, named };
+        }
+        protected override void SetData(object[] o) {
+            name = (string) o[0];
+            named = (VarHash) o[1];
+        }
         public IxCallMethod(string name, string adv) {
             this.name = name;
             if (adv != null) {
@@ -2753,6 +2822,14 @@ tryagain:
 
     class KeySlicer : IndexHandler {
         int mode; IndexHandler bas;
+        public KeySlicer() { }
+        protected override object[] GetData() {
+            return new object[] { mode, bas };
+        }
+        protected override void SetData(object[] o) {
+            mode = (int) o[0];
+            bas  = (IndexHandler) o[1];
+        }
         public KeySlicer(int mode, IndexHandler bas) {
             this.mode = mode; this.bas = bas;
         }
@@ -2944,6 +3021,9 @@ tryagain:
     class IxListAtPos : IndexHandler {
         bool extend;
         public IxListAtPos(bool extend) { this.extend = extend; }
+        public IxListAtPos() { }
+        protected override object[] GetData() { return new object[] { extend};}
+        protected override void SetData(object[] o) { extend = (bool)o[0]; }
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();

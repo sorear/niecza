@@ -211,6 +211,7 @@ namespace Niecza.Serialization {
         DispatchEnt,
         RxFrame,
         P6how,
+        ReflectObj,
 
         // types of P6any-reified object
         P6opaque, // eventually let's specialize this
@@ -224,6 +225,7 @@ namespace Niecza.Serialization {
         Boolean,
         Int,
         Double,
+        Type,
 
         // variables
         SimpleVariable, // allow 4 for flags
@@ -409,7 +411,7 @@ namespace Niecza.Serialization {
 
         static Type[] anyTypes = new Type[] {
             typeof(string), typeof(P6any[]), typeof(Variable[]),
-            typeof(bool), typeof(int), typeof(double),
+            typeof(bool), typeof(int), typeof(double), typeof(Type),
         };
 
         void FallbackFreeze(object o) {
@@ -436,6 +438,9 @@ namespace Niecza.Serialization {
                     break;
                 case 5:
                     Long(BitConverter.DoubleToInt64Bits((double)o));
+                    break;
+                case 6:
+                    String(((Type)o).AssemblyQualifiedName);
                     break;
                 default:
                     throw new NotImplementedException(t.FullName);
@@ -555,6 +560,8 @@ namespace Niecza.Serialization {
                     return RuntimeUnit.Thaw(this);
                 case SerializationCode.StashEnt:
                     return StashEnt.Thaw(this);
+                case SerializationCode.ReflectObj:
+                    return ReflectObj.Thaw(this);
                 case SerializationCode.SimpleVariable:
                 case SerializationCode.SimpleVariable_1:
                 case SerializationCode.SimpleVariable_2:
@@ -612,5 +619,24 @@ badhash:
     class ThawException : Exception {
         public ThawException(string s) : base(s) { }
         public ThawException() : base() { }
+    }
+
+    public class ReflectObj : IFreeze {
+        protected virtual object[] GetData() { return new object[0]; }
+        protected virtual void SetData(object[] a) { }
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.ReflectObj);
+            fb.String(GetType().AssemblyQualifiedName);
+            fb.Refs(GetData());
+        }
+
+        internal static ReflectObj Thaw(ThawBuffer tb) {
+            Type nt = Type.GetType(tb.String());
+            ReflectObj n = (ReflectObj)
+                nt.GetConstructor(new Type[0]).Invoke(null, new object[0]);
+            tb.Register(n);
+            n.SetData(tb.RefsA<object>());
+            return n;
+        }
     }
 }

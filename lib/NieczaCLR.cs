@@ -170,6 +170,16 @@ namespace Niecza {
 
             return ret;
         }
+
+        internal Frame Binder(Frame th) {
+            Variable[] rpos = new Variable[th.pos.Length - 1];
+            Array.Copy(th.pos, 1, rpos, 0, rpos.Length);
+            OverloadCandidate oc = (OverloadCandidate)
+                DoDispatch(rpos, th.named);
+            th.caller.resultSlot = oc.Invoke(Kernel.UnboxAny<object>(
+                th.pos[0].Fetch()), rpos, th.named);
+            return th.caller;
+        }
     }
 
     sealed class PropertyProxy : Variable {
@@ -476,15 +486,7 @@ namespace Niecza {
         static DynBlockDelegate BindGroup(string n, List<MultiCandidate> mc) {
             CandidateSet cs = new CandidateSet(n, mc.ToArray());
 
-            return delegate(Frame th) {
-                Variable[] rpos = new Variable[th.pos.Length - 1];
-                Array.Copy(th.pos, 1, rpos, 0, rpos.Length);
-                OverloadCandidate oc = (OverloadCandidate)
-                    cs.DoDispatch(rpos, th.named);
-                th.caller.resultSlot = oc.Invoke(Kernel.UnboxAny<object>(
-                    th.pos[0].Fetch()), rpos, th.named);
-                return th.caller;
-            };
+            return cs.Binder;
         }
 
         /*
