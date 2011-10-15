@@ -328,6 +328,11 @@ namespace Niecza {
         }
     }
 
+    // set this on mutable global fields to indicate that they should be saved
+    // along with CORE.  Not really needed for immutable fields
+    [AttributeUsage(AttributeTargets.Field)]
+    class CORESavedAttribute : Attribute { }
+
     public sealed class RuntimeUnit : IFreeze {
         public string name, filename, modtime, asm_name, dll_name;
         public Dictionary<string, StashEnt> globals;
@@ -657,6 +662,17 @@ namespace Niecza {
             fb.ObjRef(bottom);
             fb.Refs(our_subs);
             fb.Byte((byte)(is_mainish ? 1 : 0));
+
+            if (name == "CORE") {
+                FieldInfo[] kf = typeof(Kernel).GetFields();
+                Array.Sort<FieldInfo>(kf,
+                        (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
+                foreach (FieldInfo f in kf) {
+                    if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
+                        fb.ObjRef(f.GetValue(null));
+                    }
+                }
+            }
         }
 
         internal static RuntimeUnit Thaw(ThawBuffer tb) {
@@ -679,6 +695,17 @@ namespace Niecza {
             n.bottom     = (SubInfo)tb.ObjRef();
             n.our_subs   = tb.RefsL<SubInfo>();
             n.is_mainish = tb.Byte() != 0;
+
+            if (n.name == "CORE") {
+                FieldInfo[] kf = typeof(Kernel).GetFields();
+                Array.Sort<FieldInfo>(kf,
+                        (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
+                foreach (FieldInfo f in kf) {
+                    if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
+                        f.SetValue(null, tb.ObjRef());
+                    }
+                }
+            }
             return n;
         }
     }
@@ -1010,7 +1037,7 @@ namespace Niecza {
         // Used for closing runtime-generated SubInfo over values used
         // For vtable wrappers: 0 = unboxed, 1 = boxed
         // For dispatch routines, 0 = parameter list
-        public object param0, param1;
+        public object[] param;
         public List<SubInfo> children = new List<SubInfo>();
         public Dictionary<string,object[]> extend;
 
@@ -1608,7 +1635,7 @@ noparams:
                 foreach(object o in nam_refs)
                     fb.ObjRef(o);
             }
-            // can't save param0/param1.  Or can we?
+            fb.Refs(param);
             fb.Refs(children);
             if (extend == null)
                 fb.Int(0);
@@ -3508,55 +3535,55 @@ have_v:
             return nw;
         }
 
-        public static STable PairMO;
-        public static STable EnumMapMO;
-        public static STable CallFrameMO;
-        public static STable CaptureMO;
-        public static STable GatherIteratorMO;
-        public static STable IterCursorMO;
-        public static P6any NilP;
-        public static P6any AnyP;
-        public static P6any ArrayP;
-        public static P6any EMPTYP;
-        public static P6any HashP;
-        public static P6any IteratorP;
-        public static STable RealMO;
-        public static STable IntegralMO;
-        public static STable JunctionMO;
-        public static STable LabelMO;
-        public static STable AnyMO;
-        public static STable IteratorMO;
-        public static STable ScalarMO;
-        public static STable StashMO;
-        public static STable ClassHOWMO;
-        public static STable PseudoStashMO;
-        public static STable GrammarMO;
-        public static STable CodeMO;
-        public static STable WhateverCodeMO;
-        public static STable RoutineMO;
-        public static STable SubMO;
-        public static STable SubmethodMO;
-        public static STable MethodMO;
-        public static STable BlockMO;
-        public static STable RegexMO;
-        public static STable StrMO;
-        public static STable NumMO;
-        public static STable IntMO;
-        public static STable RatMO;
-        public static STable FatRatMO;
-        public static STable ComplexMO;
-        public static STable ArrayMO;
-        public static STable CursorMO;
-        public static STable MatchMO;
-        public static STable ParcelMO;
-        public static STable ListMO;
-        public static STable HashMO;
-        public static STable BoolMO;
-        public static STable MuMO;
-        public static P6any StashP;
+        [CORESaved] public static STable PairMO;
+        [CORESaved] public static STable EnumMapMO;
+        [CORESaved] public static STable CallFrameMO;
+        [CORESaved] public static STable CaptureMO;
+        [CORESaved] public static STable GatherIteratorMO;
+        [CORESaved] public static STable IterCursorMO;
+        [CORESaved] public static P6any NilP;
+        [CORESaved] public static P6any AnyP;
+        [CORESaved] public static P6any ArrayP;
+        [CORESaved] public static P6any EMPTYP;
+        [CORESaved] public static P6any HashP;
+        [CORESaved] public static P6any IteratorP;
+        [CORESaved] public static STable RealMO;
+        [CORESaved] public static STable IntegralMO;
+        [CORESaved] public static STable JunctionMO;
+        [CORESaved] public static STable LabelMO;
+        [CORESaved] public static STable AnyMO;
+        [CORESaved] public static STable IteratorMO;
+        [CORESaved] public static STable ScalarMO;
+        [CORESaved] public static STable StashMO;
+        [CORESaved] public static STable ClassHOWMO;
+        [CORESaved] public static STable PseudoStashMO;
+        [CORESaved] public static STable GrammarMO;
+        [CORESaved] public static STable CodeMO;
+        [CORESaved] public static STable WhateverCodeMO;
+        [CORESaved] public static STable RoutineMO;
+        [CORESaved] public static STable SubMO;
+        [CORESaved] public static STable SubmethodMO;
+        [CORESaved] public static STable MethodMO;
+        [CORESaved] public static STable BlockMO;
+        [CORESaved] public static STable RegexMO;
+        [CORESaved] public static STable StrMO;
+        [CORESaved] public static STable NumMO;
+        [CORESaved] public static STable IntMO;
+        [CORESaved] public static STable RatMO;
+        [CORESaved] public static STable FatRatMO;
+        [CORESaved] public static STable ComplexMO;
+        [CORESaved] public static STable ArrayMO;
+        [CORESaved] public static STable CursorMO;
+        [CORESaved] public static STable MatchMO;
+        [CORESaved] public static STable ParcelMO;
+        [CORESaved] public static STable ListMO;
+        [CORESaved] public static STable HashMO;
+        [CORESaved] public static STable BoolMO;
+        [CORESaved] public static STable MuMO;
+        [CORESaved] public static P6any StashP;
 
-        public static Variable TrueV;
-        public static Variable FalseV;
+        [CORESaved] public static Variable TrueV;
+        [CORESaved] public static Variable FalseV;
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
             P6opaque n = new P6opaque(info.mo ?? CodeMO, 2);
@@ -3796,13 +3823,14 @@ have_v:
 
         public static Frame TypeDispatcher(Frame th, bool tailcall) {
             Frame dth = th;
-            while ((dth.info.param0 as P6any[]) == null) dth = dth.outer;
+            while (dth.info.param == null ||
+                    (dth.info.param[0] as P6any[]) == null) dth = dth.outer;
 
             //Console.WriteLine("---");
             DispatchEnt root = new DispatchEnt();
             DispatchEnt ptr  = root;
 
-            List<P6any> sp = SortCandidates(dth.info.param0 as P6any[]);
+            List<P6any> sp = SortCandidates(dth.info.param[0] as P6any[]);
 
             // XXX I think this is a harmless race
             //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
@@ -3859,7 +3887,7 @@ have_v:
             }
 
             SubInfo si = new SubInfo(name, StandardTypeProtoC);
-            si.param0 = cands;
+            si.param = new object[] { cands, null };
             return Kernel.MakeSub(si, null);
 ltm:
             List<P6any> lp = new List<P6any>();
@@ -4339,8 +4367,7 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL,
                 0, 0 };
             si.sig_r = new object[1] { "self" };
-            si.param1 = cvb;
-            si.param0 = cvu;
+            si.param = new object[] { cvu, cvb };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -4357,7 +4384,7 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0
             };
             si.sig_r = new object[2] { "self", "$key" };
-            si.param1 = cv;
+            si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -4377,7 +4404,7 @@ slow:
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_SLURPY_PCL, 1, 0
             };
             si.sig_r = new object[2] { "self", "$args" };
-            si.param1 = cv;
+            si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -4436,7 +4463,7 @@ def:        return at.Get(self, index);
                 };
                 si.sig_r = new object[10] { "self", "$index", "k", "k", "kv", "kv", "p", "p", "BIND_VALUE", "BIND_VALUE" };
             }
-            si.param1 = new object[] { at, exist, del, bind };
+            si.param = new object[] { at, exist, del, bind };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
@@ -4742,7 +4769,7 @@ def:        return at.Get(self, index);
             AnyMO.Invalidate();
 
             CodeMO.FillProtoClass(AnyMO, "outer", "info");
-            SubInvokeSubSI.param1 = new InvokeSub();
+            SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
             CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
             CodeMO.Invalidate();
 

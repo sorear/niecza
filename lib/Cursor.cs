@@ -1365,15 +1365,15 @@ public class LADDispatcher : LAD {
         Frame   of = pad.outer_stack[pad.outer_stack.Count - 1];
         SubInfo si = pad.info_stack[pad.info_stack.Count - 1];
 
-        while ((si == null || si.param0 == null) && of != null) {
+        while ((si == null || si.param == null) && of != null) {
             si = of.info;
             of = of.outer;
         }
 
-        if (si == null || si.param0 == null || !(si.param0 is P6any[]))
+        if (si == null || si.param == null || !(si.param[0] is P6any[]))
             throw new NieczaException("Cannot resolve dispatch operator");
 
-        P6any[] cands = si.param0 as P6any[];
+        P6any[] cands = si.param[0] as P6any[];
         LAD[] opts = new LAD[cands.Length];
 
         for (int i = 0; i < opts.Length; i++) {
@@ -1588,7 +1588,7 @@ anew:
         }
         NFA pad = new NFA();
         pad.cursor_class = kl;
-        P6any[] cands = (P6any[])disp.param0;
+        P6any[] cands = (P6any[])disp.param[0];
         LAD[] lads_p = new LAD[cands.Length];
 
         for (int i = 0; i < lads_p.Length; i++) {
@@ -1718,10 +1718,11 @@ anew:
 
     public static P6any[] RunDispatch(Frame fromf, P6any cursor) {
         STable kl = cursor.mo;
-        while (fromf.info.param0 == null) fromf = fromf.outer;
+        while (fromf.info.param == null ||
+                fromf.info.param[0] == null) fromf = fromf.outer;
 
         Lexer l = GetDispatchLexer(fromf, kl, fromf.info);
-        P6any[] candidates = (P6any[]) fromf.info.param0;
+        P6any[] candidates = (P6any[]) fromf.info.param[0];
 
         Cursor c = (Cursor)cursor;
         int[] brnum = l.Run(c.global.orig_s, c.pos);
@@ -1765,7 +1766,7 @@ anew:
 
     public static P6any MakeDispatcher(string name, P6any[] cands) {
         SubInfo si = new SubInfo(name, StandardProtoC);
-        si.param0 = cands;
+        si.param = new object[] { cands, null };
         si.sig_i = new int[3] { SubInfo.SIG_F_POSITIONAL, 0, 0 };
         si.sig_r = new object[1] { "self" };
         si.ltm = new LADDispatcher();

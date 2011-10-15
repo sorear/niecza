@@ -837,23 +837,13 @@ next_method: ;
             is_any = Kernel.AnyMO != null && HasMRO(Kernel.AnyMO);
         }
 
-        private object _GetVT(string name) {
-            DispatchEnt de;
-            mro_methods.TryGetValue(name, out de);
-            return de == null ? null : de.info.param1;
-        }
-
+        private object _GetVT(string name) { return _GetVTi(name, 1); }
+        private object _GetVTU(string name) { return _GetVTi(name, 0); }
         private object _GetVTi(string name, int ix) {
             DispatchEnt de;
             mro_methods.TryGetValue(name, out de);
-            object[] ri = de == null ? null : de.info.param1 as object[];
+            object[] ri = de == null ? null : de.info.param as object[];
             return ri == null ? null : ri[ix];
-        }
-
-        private object _GetVTU(string name) {
-            DispatchEnt de;
-            mro_methods.TryGetValue(name, out de);
-            return de == null ? null : de.info.param0;
         }
 
         public void Invalidate() { mo.Invalidate(); }
