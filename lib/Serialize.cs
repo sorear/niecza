@@ -299,6 +299,14 @@ namespace Niecza.Serialization {
             }
         }
 
+        public void Strings(string[] s) {
+            if (s == null) Int(-1);
+            else {
+                Int(s.Length);
+                foreach (string ch in s) String(ch);
+            }
+        }
+
         public void Ints(int[] s) {
             if (s == null) {
                 Int(-1);
@@ -314,6 +322,16 @@ namespace Niecza.Serialization {
                 Int(-1);
             } else {
                 Int(x.Length);
+                foreach (T y in x)
+                    ObjRef(y);
+            }
+        }
+
+        public void Refs<T> (IList<T> x) where T: IFreeze {
+            if (x == null) {
+                Int(-1);
+            } else {
+                Int(x.Count);
                 foreach (T y in x)
                     ObjRef(y);
             }

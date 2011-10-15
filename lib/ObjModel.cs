@@ -126,7 +126,8 @@ namespace Niecza {
 
     // NOT P6any; these things should only be exposed through a ClassHOW-like
     // façade
-    public class P6how {
+    public class P6how: IFreeze {
+        // true primitive data {{{
         public STable stable;
 
         public bool isRole, isSubset, isPackage, isComposed, isComposing;
@@ -134,17 +135,6 @@ namespace Niecza {
         public P6any roleFactory;
         public P6any subsetWhereThunk;
         public Variable subsetFilter;
-        public Dictionary<string, P6any> instCache;
-        // role type objects have an empty MRO cache so no methods can be
-        // called against them; the fallback (NYI) is to pun.
-
-        public Dictionary<STable, STable> butCache;
-
-        public Dictionary<string, DispatchEnt> inherit_methods;
-
-        public Dictionary<string, P6how.DispatchSet> up_protos;
-        public List<DispatchSet> here_protos;
-        public Dictionary<DispatchSet, List<MethodInfo>> multimethods;
 
         public STable[] local_does;
 
@@ -152,12 +142,27 @@ namespace Niecza {
         public List<AttrInfo> local_attr = new List<AttrInfo>();
 
         public List<STable> superclasses = new List<STable>();
+        // }}}
+        // calculated at compose time {{{
+        public STable[] mro = new STable[0];
+        // }}}
+        // strictly caches (mostly set when MRO changed) {{{
+        public Dictionary<string, DispatchEnt> inherit_methods;
+
+        public Dictionary<string, P6how.DispatchSet> up_protos;
+        public List<DispatchSet> here_protos;
+        public Dictionary<DispatchSet, List<MethodInfo>> multimethods;
+
+        public HashSet<STable> isa = new HashSet<STable>();
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
+        public Dictionary<string, P6any> instCache;
+        public Dictionary<STable, STable> butCache;
+        // role type objects have an empty MRO cache so no methods can be
+        // called against them; the fallback (NYI) is to pun.
+        // }}}
 
-        public STable[] mro = new STable[0];
-        public HashSet<STable> isa = new HashSet<STable>();
-
+        // types and constants {{{
         public struct AttrInfo {
             public string name;
             public P6any init;
@@ -203,6 +208,7 @@ namespace Niecza {
             public string name;
             public P6any proto;
         }
+        // }}}
 
         void CollectMMDs() {
             // Superclass data already collected
@@ -620,6 +626,37 @@ next_method: ;
             }
             return null;
         }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.ObjRef(stable);
+            fb.Byte((byte)(isComposed ? 2 : isComposing ? 1 : 0));
+            fb.String(rtype);
+            fb.ObjRef(roleFactory);
+            fb.ObjRef(subsetWhereThunk);
+            fb.ObjRef(subsetFilter);
+
+            // local_does not yet used
+            fb.Int(lmethods.Count);
+            // we do NOT save source position info here, it's only used
+            // intra-unit
+            foreach (MethodInfo mi in lmethods) {
+                fb.String(mi.short_name);
+                fb.String(mi.long_name);
+                fb.ObjRef(mi.impl);
+                fb.Byte(checked((byte) mi.flags));
+            }
+
+            fb.Int(local_attr.Count);
+            foreach (AttrInfo ai in local_attr) {
+                fb.String(ai.name);
+                fb.ObjRef(ai.init);
+                fb.Byte(checked((byte) ai.flags));
+                fb.ObjRef(ai.type);
+            }
+
+            fb.Refs<STable>(superclasses);
+            fb.Refs<STable>(mro);
+        }
     }
 
     // The role of STable is to hold stuff that needs to exist per
@@ -866,7 +903,17 @@ next_method: ;
         }
 
         void IFreeze.Freeze(FreezeBuffer fb) {
-            throw new NotImplementedException();
+            fb.ObjRef(mo);
+            fb.ObjRef(how);
+            fb.ObjRef(who);
+            fb.ObjRef(typeObject);
+            fb.ObjRef(initObject);
+            fb.ObjRef(typeVar);
+            fb.ObjRef(initVar);
+            fb.String(name);
+            fb.Byte((byte)(isSubset ? 1 : 0));
+            fb.String(box_type == null ? null : box_type.AssemblyQualifiedName);
+            fb.Strings(all_slot);
         }
     }
 
