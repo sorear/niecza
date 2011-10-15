@@ -351,11 +351,11 @@ namespace Niecza {
             this.dll_name = asm_name + (main ? ".exe" : ".dll");
             this.asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
                     new AssemblyName(asm_name),
-                    (runnow ? AssemblyBuilderAccess.RunAndSave :
+                    (runnow ? AssemblyBuilderAccess.Run :
                         AssemblyBuilderAccess.Save), obj_dir);
-            //mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
-            //    asm_builder.DefineDynamicModule(asm_name, filename);
-            mod_builder = asm_builder.DefineDynamicModule(asm_name, dll_name);
+            mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
+                asm_builder.DefineDynamicModule(asm_name, dll_name);
+            //mod_builder = asm_builder.DefineDynamicModule(asm_name, dll_name);
 
             type_builder = mod_builder.DefineType(asm_name,
                     TypeAttributes.Public | TypeAttributes.Sealed |
@@ -367,7 +367,7 @@ namespace Niecza {
             our_subs = new List<SubInfo>();
         }
 
-        public void PrepareEval() {
+        void GenerateCode() {
             NamProcessor[] ths = new NamProcessor[our_subs.Count];
             for (int i = 0; i < ths.Length; i++) {
                 SubInfo z = our_subs[i];
@@ -379,16 +379,29 @@ namespace Niecza {
             }
 
             type = type_builder.CreateType();
-            asm_builder.Save(dll_name);
-
-            foreach (KeyValuePair<object, FieldBuilder> kv in constants)
-                type.GetField(kv.Value.Name).SetValue(null, kv.Key);
 
             for (int i = 0; i < ths.Length; i++) {
                 ths[i].FillSubInfo(type);
-                if ((our_subs[i].special & SubInfo.UNSAFE) != 0)
-                    Kernel.CheckUnsafe(our_subs[i]);
             }
+        }
+
+        static ObjectRegistry reg = new ObjectRegistry();
+
+        public void Save() {
+            GenerateCode();
+            asm_builder.Save(dll_name);
+            reg.SaveUnit(asm_name, this);
+        }
+
+        public void PrepareEval() {
+            GenerateCode();
+
+            foreach (SubInfo z in our_subs)
+                if ((z.special & SubInfo.UNSAFE) != 0)
+                    Kernel.CheckUnsafe(z);
+
+            foreach (KeyValuePair<object, FieldBuilder> kv in constants)
+                type.GetField(kv.Value.Name).SetValue(null, kv.Key);
 
             if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
                 Kernel.TraceFlags = Kernel.TRACE_CUR;

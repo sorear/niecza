@@ -73,7 +73,7 @@ method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not use
         $*repl_outer = $unit.get_mainline if $repl;
         return;
     }
-    downcall("save_unit", $unit, ?$main);
+    downcall("save_unit", $unit);
     $*repl_outer = $unit.get_mainline if $repl;
 }
 

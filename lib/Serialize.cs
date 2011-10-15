@@ -40,9 +40,9 @@ namespace Niecza.Serialization {
     class SerUnit {
         internal string name; // eg "File.Copy"
         internal byte[] hash; // hash of entire file, filled at write time
-        internal object[] bynum; // objects in unit
+        internal object[] bynum = new object[8]; // objects in unit
         internal object root; // the RuntimeUnit object
-        internal int nobj;
+        internal int nobj; // = 0
     }
 
     // The central feature of *bounded* serialization is that object
@@ -108,6 +108,7 @@ namespace Niecza.Serialization {
 
             ThawBuffer tb = new ThawBuffer(this, su, bytes);
 
+            units[name] = su;
             bool success = false;
             try {
                 string rsig = tb.String();
@@ -130,6 +131,8 @@ namespace Niecza.Serialization {
 
         // removes a stale unit so a new version can be saved over it.
         public void UnloadUnit(string name) {
+            if (!units.ContainsKey(name))
+                return;
             SerUnit su = units[name];
             units.Remove(name);
 
@@ -150,6 +153,8 @@ namespace Niecza.Serialization {
                     name + ".ser");
 
             FreezeBuffer fb = new FreezeBuffer(this, su);
+
+            units[name] = su;
 
             try {
                 fb.String(signature);
@@ -244,6 +249,8 @@ namespace Niecza.Serialization {
         SerUnit unit;
 
         internal FreezeBuffer(ObjectRegistry reg, SerUnit unit) {
+            if (reg == null || unit == null)
+                throw new ArgumentNullException();
             this.reg = reg;
             this.unit = unit;
             unit_to_offset = new Dictionary<SerUnit,int>();

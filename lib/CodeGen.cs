@@ -4086,6 +4086,10 @@ dynamic:
                 for (int i = 0; i < s.nam_refs.Length; i++)
                     s.nam_refs[i] = Handle.Unbox(args[i+3]);
                 return null;
+            } else if (cmd == "save_unit") {
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                ru.Save();
+                return null;
             } else if (cmd == "run_unit") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 bool evalmode = (bool)args[2];
