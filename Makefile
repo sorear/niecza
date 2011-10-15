@@ -49,12 +49,12 @@ boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 	$(CSC) /target:library /out:boot/obj/CompilerBlob.dll /r:Kernel \
 	    /lib:boot/obj src/CompilerBlob.cs
 obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
-	$(CSC) /target:library /out:obj/Kernel.dll /lib:obj /unsafe+ \
+	$(CSC) /target:exe /out:obj/Kernel.dll /lib:obj /unsafe+ \
 	    $(patsubst %,lib/%,$(cskernel))
 
 perl5: obj/Perl5Interpreter.dll obj/p5embed.so
 obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
-	gmcs /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
+	$(CSC) /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
 
 obj/p5embed.so: lib/p5embed.c
 	cc -shared -Wl,-soname,p5embed.so -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`

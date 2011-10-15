@@ -316,9 +316,9 @@ namespace Niecza {
         public SubInfo mainline, bottom;
         public bool is_mainish;
         public Type type;
+        public List<SubInfo> our_subs;
 
         // used during construction only
-        public List<SubInfo> our_subs;
         public AssemblyBuilder asm_builder;
         public ModuleBuilder mod_builder;
         public TypeBuilder type_builder;
@@ -336,6 +336,8 @@ namespace Niecza {
             }
         }
 
+        private RuntimeUnit() { }
+
         public RuntimeUnit(string name, string filename, string modtime,
                 string obj_dir, bool main, bool runnow) {
             this.name = name;
@@ -349,10 +351,15 @@ namespace Niecza {
 
             this.asm_name = name.Replace("::", ".");
             this.dll_name = asm_name + (main ? ".exe" : ".dll");
+            our_subs = new List<SubInfo>();
+        }
+
+        void GenerateCode(bool runnow) {
             this.asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
                     new AssemblyName(asm_name),
                     (runnow ? AssemblyBuilderAccess.Run :
-                        AssemblyBuilderAccess.Save), obj_dir);
+                        AssemblyBuilderAccess.Save),
+                    AppDomain.CurrentDomain.BaseDirectory);
             mod_builder = runnow ? asm_builder.DefineDynamicModule(asm_name) :
                 asm_builder.DefineDynamicModule(asm_name, dll_name);
             //mod_builder = asm_builder.DefineDynamicModule(asm_name, dll_name);
@@ -364,10 +371,6 @@ namespace Niecza {
 
             constants = new Dictionary<object,FieldBuilder>(new IdentityComparer());
             val_constants = new Dictionary<string,CpsOp>();
-            our_subs = new List<SubInfo>();
-        }
-
-        void GenerateCode() {
             NamProcessor[] ths = new NamProcessor[our_subs.Count];
             for (int i = 0; i < ths.Length; i++) {
                 SubInfo z = our_subs[i];
@@ -385,16 +388,16 @@ namespace Niecza {
             }
         }
 
-        static ObjectRegistry reg = new ObjectRegistry();
+        internal static ObjectRegistry reg = new ObjectRegistry();
 
         public void Save() {
-            GenerateCode();
+            GenerateCode(false);
             asm_builder.Save(dll_name);
             reg.SaveUnit(asm_name, this);
         }
 
         public void PrepareEval() {
-            GenerateCode();
+            GenerateCode(true);
 
             foreach (SubInfo z in our_subs)
                 if ((z.special & SubInfo.UNSAFE) != 0)
@@ -634,7 +637,31 @@ namespace Niecza {
 
             fb.ObjRef(mainline);
             fb.ObjRef(bottom);
+            fb.Refs(our_subs);
             fb.Byte((byte)(is_mainish ? 1 : 0));
+        }
+
+        internal static RuntimeUnit Thaw(ThawBuffer tb) {
+            RuntimeUnit n = new RuntimeUnit();
+            tb.Register(n);
+
+            n.name     = tb.String();
+            n.filename = tb.String();
+            n.modtime  = tb.String();
+            n.asm_name = tb.String();
+            n.dll_name = tb.String();
+
+            int ct = tb.Int();
+            n.globals = new Dictionary<string, StashEnt>();
+            for (int i = 0; i < ct; i++) {
+                n.globals[tb.String()] = (StashEnt)tb.ObjRef();
+            }
+
+            n.mainline   = (SubInfo)tb.ObjRef();
+            n.bottom     = (SubInfo)tb.ObjRef();
+            n.our_subs   = tb.RefsL<SubInfo>();
+            n.is_mainish = tb.Byte() != 0;
+            return n;
         }
     }
 
@@ -5111,6 +5138,20 @@ def:        return at.Get(self, index);
                 return tf.Return();
             } else {
                 return tf;
+            }
+        }
+
+        public static void Main(string[] args) {
+            string cmd = args.Length > 0 ? args[0] : "-help";
+
+            if (cmd == "-run" && args.Length == 2) {
+                RuntimeUnit ru = (RuntimeUnit)
+                    RuntimeUnit.reg.LoadUnit(args[1]).root;
+
+                ru.PrepareEval();
+                RunMain(ru);
+            } else {
+                Console.WriteLine("usage: Kernel.dll -run Unit.Name");
             }
         }
     }

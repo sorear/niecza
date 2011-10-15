@@ -86,6 +86,18 @@ namespace Niecza.Serialization {
             return false;
         }
 
+        public void RegisterThawed(SerUnit into, object o) {
+            ObjRef or;
+            if (into.nobj == into.bynum.Length)
+                Array.Resize(ref into.bynum, into.nobj * 2);
+
+            or.unit = into;
+            or.id   = into.nobj++;
+            into.bynum[or.id] = o;
+
+            byref[o] = or;
+        }
+
         // Routines for use by compilation manager
 
         // Loads a single unit from the compiled-data directory.
@@ -204,11 +216,15 @@ namespace Niecza.Serialization {
         Frame,
         Cursor,
 
-        // miscellany
-        Variant, // allow 5, see FallbackFreeze
+        // miscellany - keep these in same order as FallbackFreeze
+        String,
+        ArrP6any,
+        ArrVariable,
+        Int,
+        Double,
 
         // variables
-        SimpleVariable = Variant + 5, // allow 4 for flags
+        SimpleVariable, // allow 4 for flags
         SubstrLValue = SimpleVariable + 4,
         TiedVariable,
 
@@ -386,7 +402,6 @@ namespace Niecza.Serialization {
             }
         }
 
-        // Call this to freeze a variant-typed value.  (Avoid)
         static Type[] anyTypes = new Type[] {
             typeof(string), typeof(P6any[]), typeof(Variable[]),
             typeof(int), typeof(double),
@@ -396,7 +411,7 @@ namespace Niecza.Serialization {
             int ix = 0;
             Type t = o.GetType();
             while (ix != 11 && anyTypes[ix] != t) ix++;
-            Byte((byte)(((int)SerializationCode.Variant) + ix));
+            Byte((byte)(((int)SerializationCode.String) + ix));
 
             switch(ix) {
                 case 0:
@@ -479,6 +494,24 @@ namespace Niecza.Serialization {
             return buf;
         }
 
+        public List<T> RefsL<T>() where T : class {
+            int ct = Int();
+            if (ct < 0) return null;
+            List<T> ret = new List<T>();
+            for (int i = 0; i < ct; i++)
+                ret.Add((T) ObjRef());
+            return ret;
+        }
+
+        public T[] RefsA<T>() where T : class {
+            int ct = Int();
+            if (ct < 0) return null;
+            T[] ret = new T[ct];
+            for (int i = 0; i < ct; i++)
+                ret[i] = (T) ObjRef();
+            return ret;
+        }
+
         public object ObjRef() {
             var tag = (SerializationCode)Byte();
             int i, j;
@@ -494,9 +527,16 @@ namespace Niecza.Serialization {
                     return unit_map[i].bynum[j];
                 case SerializationCode.NewUnitRef:
                     return LoadNewUnit();
+                case SerializationCode.RuntimeUnit:
+                    return RuntimeUnit.Thaw(this);
                 default:
-                    throw new ThawException("unexpected object tag" + (byte)tag);
+                    throw new ThawException("unexpected object tag " + tag);
             }
+        }
+
+        // call this when thawing any new object
+        internal void Register(object o) {
+            reg.RegisterThawed(unit, o);
         }
 
         object LoadNewUnit() {
