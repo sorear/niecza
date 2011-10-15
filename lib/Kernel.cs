@@ -1469,7 +1469,6 @@ noparams:
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
                 int nspill) {
-            Console.WriteLine("New SubInfo#1 {0}", name);
             this.lines = lines;
             this.code = code;
             this.outer = outer;
@@ -1486,7 +1485,6 @@ noparams:
 
         public SubInfo(RuntimeUnit unit, string name, SubInfo outer,
                 STable cls, STable pkg, bool once) {
-            Console.WriteLine("New SubInfo#2 {0} [{1:X}]", name, GetHashCode());
             edata = new int[0];
             this.name  = name;
             this.unit  = unit;
@@ -1530,7 +1528,7 @@ noparams:
                         fb.ObjRef(null);
                         fb.String((string)o);
                     } else {
-                        fb.ObjRef((IFreeze)o);
+                        fb.ObjRef(o);
                     }
                 }
             }
@@ -1563,7 +1561,7 @@ noparams:
             if (nam_str != null) {
                 fb.Int(nam_refs.Length);
                 foreach(object o in nam_refs)
-                    fb.ObjRef((IFreeze)o);
+                    fb.ObjRef(o);
             }
             // can't save param0/param1.  Or can we?
             fb.Int(children.Count);
@@ -1580,9 +1578,13 @@ noparams:
                         if (o is int) {
                             fb.Byte(0);
                             fb.Int((int)o);
-                        } else {
+                        } else if (o is string) {
                             fb.Byte(1);
                             fb.String((string)o);
+                        } else if (o is bool) {
+                            fb.Byte((byte)(((bool)o)? 3 : 2));
+                        } else {
+                            throw new NotImplementedException(o.GetType().Name);
                         }
                     }
                 }
