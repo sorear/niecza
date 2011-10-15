@@ -130,6 +130,7 @@ namespace Niecza.Serialization {
                 if (rver != version)
                     throw new ThawException("version mismatch loading " + file);
 
+                tb.RunFixups();
                 su.root = tb.ObjRef();
                 success = true;
             } finally {
@@ -220,12 +221,16 @@ namespace Niecza.Serialization {
         String,
         ArrP6any,
         ArrVariable,
+        Boolean,
         Int,
         Double,
 
         // variables
         SimpleVariable, // allow 4 for flags
-        SubstrLValue = SimpleVariable + 4,
+        SimpleVariable_1,
+        SimpleVariable_2,
+        SimpleVariable_3,
+        SubstrLValue,
         TiedVariable,
 
         // vivification hooks
@@ -404,13 +409,13 @@ namespace Niecza.Serialization {
 
         static Type[] anyTypes = new Type[] {
             typeof(string), typeof(P6any[]), typeof(Variable[]),
-            typeof(int), typeof(double),
+            typeof(bool), typeof(int), typeof(double),
         };
 
         void FallbackFreeze(object o) {
             int ix = 0;
             Type t = o.GetType();
-            while (ix != 11 && anyTypes[ix] != t) ix++;
+            while (ix != anyTypes.Length && anyTypes[ix] != t) ix++;
             Byte((byte)(((int)SerializationCode.String) + ix));
 
             switch(ix) {
@@ -424,9 +429,12 @@ namespace Niecza.Serialization {
                     Refs((Variable[])o);
                     break;
                 case 3:
-                    Int((int)o);
+                    Byte((byte)((bool)o ? 1 : 0));
                     break;
                 case 4:
+                    Int((int)o);
+                    break;
+                case 5:
                     Long(BitConverter.DoubleToInt64Bits((double)o));
                     break;
                 default:
@@ -440,6 +448,10 @@ namespace Niecza.Serialization {
     public interface IFreeze {
         void Freeze(FreezeBuffer fb);
     }
+    // implement this if you need to copy in data from other objects, &c
+    interface IFixup {
+        void Fixup();
+    }
 
     class ThawBuffer {
         byte[] data;
@@ -450,10 +462,22 @@ namespace Niecza.Serialization {
         int refed_units;
         SerUnit unit;
 
+        List<IFixup> fixups_needed = new List<IFixup>();
+
         internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data = data;
             this.reg  = reg;
             this.unit = unit;
+        }
+
+        internal void RunFixups() {
+            foreach (IFixup f in fixups_needed)
+                f.Fixup();
+            fixups_needed.Clear();
+        }
+
+        internal void PushFixup(IFixup f) {
+            fixups_needed.Add(f);
         }
 
         public byte Byte() { return data[rpointer++]; }
@@ -529,6 +553,14 @@ namespace Niecza.Serialization {
                     return LoadNewUnit();
                 case SerializationCode.RuntimeUnit:
                     return RuntimeUnit.Thaw(this);
+                case SerializationCode.StashEnt:
+                    return StashEnt.Thaw(this);
+                case SerializationCode.SimpleVariable:
+                case SerializationCode.SimpleVariable_1:
+                case SerializationCode.SimpleVariable_2:
+                case SerializationCode.SimpleVariable_3:
+                    return SimpleVariable.Thaw(this,
+                            (int)tag - (int)SerializationCode.SimpleVariable);
                 default:
                     throw new ThawException("unexpected object tag " + tag);
             }

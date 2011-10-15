@@ -60,41 +60,10 @@ namespace Niecza {
 
         public abstract Variable GetVar();
 
-        const int S_RO   = 0;
-        const int S_LIST = 1;
-        const int S_RW   = 2;
-        const int S_VIV  = 3;
-
         public abstract void Freeze(FreezeBuffer fb);
-
-        internal void BaseFreeze(FreezeBuffer fb, SerializationCode code) {
-            fb.Byte((byte)((int)code + (islist ? S_LIST :
-                !rw ? S_RO : whence == null ? S_RW : S_VIV)));
-
-            if (whence != null) fb.ObjRef(whence);
-            if (rw) fb.ObjRef(type);
-        }
 
         // note: callers need to make sure type is set up properly if null
         public Variable() { }
-        internal Variable(ThawBuffer tb, int subcode) {
-            switch (subcode) {
-                default: break;
-                case S_RO:
-                    // rw = false islist = false whence = null type = null
-                    break;
-                case S_LIST:
-                    islist = true;
-                    break;
-                case S_VIV:
-                    whence = (ViviHook) tb.ObjRef();
-                    goto case S_RW;
-                case S_RW:
-                    rw = true;
-                    type = (STable) tb.ObjRef();
-                    break;
-            }
-        }
 
         public static readonly Variable[] None = new Variable[0];
     }
@@ -201,9 +170,10 @@ namespace Niecza {
         }
     }
 
-    public sealed class SimpleVariable: Variable {
+    public sealed class SimpleVariable: Variable, IFixup {
         P6any val;
 
+        private SimpleVariable() { }
         public SimpleVariable(bool rw, bool islist, STable type, ViviHook whence, P6any val) {
             this.val = val; this.whence = whence; this.rw = rw;
             this.islist = islist; this.type = type;
@@ -232,9 +202,46 @@ namespace Niecza {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
 
+        const int S_RO   = 0;
+        const int S_LIST = 1;
+        const int S_RW   = 2;
+        const int S_VIV  = 3;
+
         public override void Freeze(FreezeBuffer fb) {
-            BaseFreeze(fb, SerializationCode.SimpleVariable);
+            int code = ((int)SerializationCode.SimpleVariable) +
+                (islist ? S_LIST : !rw ? S_RO : whence == null ? S_RW : S_VIV);
+            fb.Byte((byte)code);
+
+            if (whence != null) fb.ObjRef(whence);
+            if (rw) fb.ObjRef(type);
             fb.ObjRef(val);
+        }
+        void IFixup.Fixup() {
+            type = val.mo;
+        }
+        internal static SimpleVariable Thaw(ThawBuffer tb, int subcode) {
+            SimpleVariable n = new SimpleVariable();
+            tb.Register(n);
+            switch (subcode) {
+                default: throw new ArgumentException(subcode.ToString());
+                case S_RO:
+                    // rw = false islist = false whence = null type = null
+                    tb.PushFixup(n);
+                    break;
+                case S_LIST:
+                    tb.PushFixup(n);
+                    n.islist = true;
+                    break;
+                case S_VIV:
+                    n.whence = (ViviHook) tb.ObjRef();
+                    goto case S_RW;
+                case S_RW:
+                    n.rw = true;
+                    n.type = (STable) tb.ObjRef();
+                    break;
+            }
+            n.val = (P6any) tb.ObjRef();
+            return n;
         }
     }
 
@@ -242,6 +249,7 @@ namespace Niecza {
         P6any fetch;
         P6any store;
 
+        private TiedVariable() { }
         public TiedVariable(STable type, P6any whsub, P6any fetch, P6any store) {
             this.fetch = fetch;
             this.store = store;
@@ -280,6 +288,15 @@ namespace Niecza {
             fb.ObjRef(store);
             fb.ObjRef(whence);
         }
+        internal static TiedVariable Thaw(ThawBuffer tb) {
+            TiedVariable n = new TiedVariable();
+            tb.Register(n);
+            n.type   = (STable)   tb.ObjRef();
+            n.fetch  = (P6any)    tb.ObjRef();
+            n.store  = (P6any)    tb.ObjRef();
+            n.whence = (ViviHook) tb.ObjRef();
+            return n;
+        }
     }
 
     // Used to make Variable sharing explicit in some cases; will eventually be
@@ -303,6 +320,7 @@ namespace Niecza {
 
         internal static StashEnt Thaw(ThawBuffer tb) {
             StashEnt r = new StashEnt();
+            tb.Register(r);
             r.v = (Variable)tb.ObjRef();
             r.file = tb.String();
             r.line = tb.Int();
@@ -1591,29 +1609,14 @@ noparams:
                     fb.ObjRef(o);
             }
             // can't save param0/param1.  Or can we?
-            fb.Int(children.Count);
-            foreach(SubInfo si in children)
-                fb.ObjRef(si);
+            fb.Refs(children);
             if (extend == null)
-                fb.Int(-1);
+                fb.Int(0);
             else {
                 fb.Int(extend.Count);
                 foreach(KeyValuePair<string,object[]> kv in extend) {
                     fb.String(kv.Key);
-                    fb.Int(kv.Value.Length);
-                    foreach (object o in kv.Value) {
-                        if (o is int) {
-                            fb.Byte(0);
-                            fb.Int((int)o);
-                        } else if (o is string) {
-                            fb.Byte(1);
-                            fb.String((string)o);
-                        } else if (o is bool) {
-                            fb.Byte((byte)(((bool)o)? 3 : 2));
-                        } else {
-                            throw new NotImplementedException(o.GetType().Name);
-                        }
-                    }
+                    fb.Refs(kv.Value);
                 }
             }
         }
