@@ -133,7 +133,7 @@ public class AltInfo {
 // extends Frame for a time/space tradeoff
 // we keep the cursor in exploded form to avoid creating lots and lots of
 // cursor objects
-public sealed class RxFrame {
+public sealed class RxFrame: IFreeze {
     public Choice bt;
     public State st;
 
@@ -493,8 +493,7 @@ public sealed class RxFrame {
             return_one = true;
             VarDeque ks = new VarDeque();
             ks.Push(Kernel.NewROScalar(m));
-            th.lex = new Dictionary<string,object>();
-            th.lex["!return"] = null;
+            th.coro_return = th;
             P6opaque it  = new P6opaque(Kernel.GatherIteratorMO);
             it.slots[0 /*frame*/] = Kernel.NewMuScalar(th);
             it.slots[1 /*reify*/] = Kernel.NewMuScalar(Kernel.AnyP);
@@ -507,6 +506,7 @@ public sealed class RxFrame {
         }
         return th.Return();
     }
+    void IFreeze.Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
 }
 
 // This is used to carry match states in and out of subrules.  Within subrules,

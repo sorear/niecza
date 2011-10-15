@@ -628,6 +628,7 @@ next_method: ;
         }
 
         void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.P6how);
             fb.ObjRef(stable);
             fb.Byte((byte)(isComposed ? 2 : isComposing ? 1 : 0));
             fb.String(rtype);
@@ -903,6 +904,7 @@ next_method: ;
         }
 
         void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.STable);
             fb.ObjRef(mo);
             fb.ObjRef(how);
             fb.ObjRef(who);

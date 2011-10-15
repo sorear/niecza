@@ -19,7 +19,7 @@ namespace Niecza {
     // Used by DynFrame to plug in code
     public delegate Frame DynBlockDelegate(Frame frame);
 
-    public sealed class DispatchEnt {
+    public sealed class DispatchEnt : IFreeze {
         public DispatchEnt next;
         public SubInfo info;
         public Frame outer;
@@ -32,6 +32,14 @@ namespace Niecza {
             P6opaque d = (P6opaque)ip6;
             this.outer = (Frame) d.slots[0];
             this.info = (SubInfo) d.slots[1];
+        }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.DispatchEnt);
+            fb.ObjRef(next);
+            fb.ObjRef(info);
+            fb.ObjRef(outer);
+            fb.ObjRef(ip6);
         }
     }
 
@@ -617,7 +625,7 @@ namespace Niecza {
         }
     }
 
-    public class LeaveHook {
+    public sealed class LeaveHook {
         public LeaveHook next;
         public P6any     thunk;
         public int       type;
@@ -626,6 +634,7 @@ namespace Niecza {
         public const int UNDO = 2;
         public const int DIE  = 4;
         public const int POST = 7;
+        public const int SENTINEL = 15;
     }
 
     public abstract class LexInfo {
@@ -1568,20 +1577,14 @@ noparams:
         }
     }
 
-    // We need hashy frames available to properly handle BEGIN; for the time
-    // being, all frames will be hashy for simplicity
+    // This object fills the combined roles of Parrot LexPad and CallContext
+    // objects.
     public class Frame: P6any {
-        public Frame caller;
-        public Frame outer;
-        public SubInfo info;
-        // a doubly-linked list of frames being used by a given coroutine
-        public Frame reusable_child;
-        public Frame reuser;
-        public object resultSlot = null;
+        // Used by trampoline to find destination
         public int ip = 0;
         public DynBlockDelegate code;
-        public Dictionary<string, object> lex;
-        // statistically, most subs have few lexicals; since Frame objects
+        // Storage for lexicals: most subs have a smallish number of lexicals,
+        // and inlining them into the frame helps a lot.  Since Frame objects
         // are reused, bloating them doesn't hurt much
         public object lex0;
         public object lex1;
@@ -1594,16 +1597,36 @@ noparams:
         public object lex8;
         public object lex9;
 
+        // special slot that is filled by the callee before returning
+        // used in some cases as a scratch slot by the codegen
+        public object resultSlot = null;
+
         public int lexi0;
         public int lexi1;
 
-        public object[] lexn;
+        public object[] lexn; // Overflow for large subs
 
+        // Link fields for other related frames, objects
+        public Frame caller;
+        public Frame outer;
+        public SubInfo info; // the executing sub
+        // a doubly-linked list of frames being used by a given coroutine
+        public Frame reusable_child;
+        public Frame reuser;
+        // by being non-null marks the root frame of a coroutine, also
+        // stores the Frame to return to when take is called if != this
+        public Frame coro_return;
+
+        // used by nextsame to find where to go
         public DispatchEnt curDisp;
+        // stores extra data needed in regex frames
         public RxFrame rx;
+        // for CALLER::<&?BLOCK>
         public P6any sub;
+        // linked list of LEAVE phasers to call at return time
         public LeaveHook on_leave;
 
+        // stores original capture for callframe.args
         public Variable[] pos;
         public VarHash named;
 
@@ -1642,7 +1665,7 @@ noparams:
             reusable_child.resultSlot = null;
             reusable_child.lexn = (info.nspill != 0) ? new object[info.nspill] : null;
             reusable_child.on_leave = null;
-            reusable_child.lex = null;
+            reusable_child.coro_return = null;
             reusable_child.lex0 = null;
             reusable_child.lex1 = null;
             reusable_child.lex2 = null;
@@ -1761,8 +1784,6 @@ noparams:
 
         public bool TryGetDynamic(string name, uint mask, out object v) {
             v = null;
-            if (lex != null && lex.TryGetValue(name, out v))
-                return true;
             if ((info.dylex_filter & mask) != mask)
                 return false;
 
@@ -1827,9 +1848,9 @@ noparams:
         }
 
         public Frame DynamicCaller() {
-            if (lex == null || !lex.ContainsKey("!return"))
+            if (coro_return == null)
                 return caller;
-            return (Frame) lex["!return"];
+            return (Frame) coro_return;
         }
 
         private static List<string> spacey = new List<string>();
@@ -1860,7 +1881,41 @@ noparams:
             }
             return caller;
         }
-        public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte) SerializationCode.Frame);
+            fb.Int(ip);
+            // code will be reloaded from info.code
+            fb.ObjRef(lex0);
+            fb.ObjRef(lex1);
+            fb.ObjRef(lex2);
+            fb.ObjRef(lex3);
+            fb.ObjRef(lex4);
+            fb.ObjRef(lex5);
+            fb.ObjRef(lex6);
+            fb.ObjRef(lex7);
+            fb.ObjRef(lex8);
+            fb.ObjRef(lex9);
+            fb.ObjRef(resultSlot); // probably not necessary
+            fb.Int(lexi0);
+            fb.Int(lexi1);
+            fb.Refs(lexn);
+            fb.ObjRef(caller); // XXX this might serialize too much
+            fb.ObjRef(outer);
+            fb.ObjRef(info);
+            // we won't store reuse info :)
+            fb.ObjRef(coro_return);
+            fb.ObjRef(curDisp);
+            fb.ObjRef(rx);
+            fb.ObjRef(sub);
+            for (LeaveHook l = on_leave; l != null; l = l.next) {
+                fb.Byte(checked((byte)l.type));
+                fb.ObjRef(l.thunk);
+            }
+            fb.Byte(LeaveHook.SENTINEL);
+            fb.Refs(pos);
+            fb.ObjRef(named);
+            fb.Byte(checked((byte)flags));
+        }
     }
 
     public class NieczaException: Exception {
@@ -3309,13 +3364,13 @@ have_v:
 
         public static Frame Take(Frame th, Variable payload) {
             Frame c = th;
-            while (c != null && (c.lex == null || !c.lex.ContainsKey("!return")))
+            while (c != null && c.coro_return == null)
                 c = c.caller;
             if (c == null)
                 return Kernel.Die(th, "used take outside of a coroutine");
 
-            Frame r = (Frame) c.lex["!return"];
-            c.lex["!return"] = null;
+            Frame r = c.coro_return;
+            c.coro_return = c;
             r.LexicalBind("$*nextframe", NewROScalar(th));
             r.resultSlot = payload;
             th.resultSlot = payload;
@@ -3324,11 +3379,11 @@ have_v:
 
         public static Frame CoTake(Frame th, Frame from) {
             Frame c = from;
-            while (c != null && (c.lex == null || !c.lex.ContainsKey("!return")))
+            while (c != null && c.coro_return == null)
                 c = c.caller;
-            if (c.lex["!return"] != null)
+            if (c.coro_return != c)
                 return Kernel.Die(th, "Attempted to re-enter abnormally exitted or running coroutine");
-            c.lex["!return"] = th;
+            c.coro_return = th;
 
             return from;
         }
@@ -3347,8 +3402,7 @@ have_v:
             Frame n = th.MakeChild(null, dogather_SI, AnyP);
             n.lex0 = sub;
             n.MarkSharedChain();
-            n.lex = new Dictionary<string,object>();
-            n.lex["!return"] = null;
+            n.coro_return = n;
             th.resultSlot = n;
             return th;
         }
@@ -4091,8 +4145,7 @@ again:
                 Frame th = new Frame(null, null, IF_SI, Kernel.AnyP);
                 th.lex0 = inq;
                 P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
-                th.lex = new Dictionary<string,object>();
-                th.lex["!return"] = null;
+                th.coro_return = th;
                 thunk.slots[0] = NewMuScalar(th);
                 thunk.slots[1] = NewMuScalar(AnyP);
                 outq.Push(NewROScalar(thunk));

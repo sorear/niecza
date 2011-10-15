@@ -1869,8 +1869,7 @@ again:
                 Variable[] pen;
                 if (!src.TryGet(out pen, tailmode != 0)) {
                     P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
-                    th.lex = new Dictionary<string,object>();
-                    th.lex["!return"] = null;
+                    th.coro_return = th;
                     th.MarkSharedChain();
                     thunk.slots[0] = Kernel.NewMuScalar(th);
                     thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
@@ -2000,8 +1999,7 @@ again:
                         if (src.Count() == 0) break;
                         if (src[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
                             P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
-                            th.lex = new Dictionary<string,object>();
-                            th.lex["!return"] = null;
+                            th.coro_return = th;
                             th.MarkSharedChain();
                             thunk.slots[0] = Kernel.NewMuScalar(th);
                             thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);

@@ -190,6 +190,9 @@ namespace Niecza.Serialization {
         BigInteger,
         VarDeque,
         VarHash,
+        DispatchEnt,
+        RxFrame,
+        P6how,
 
         // types of P6any-reified object
         P6opaque, // eventually let's specialize this
@@ -317,7 +320,7 @@ namespace Niecza.Serialization {
             }
         }
 
-        public void Refs<T> (T[] x) where T: IFreeze {
+        public void Refs<T> (T[] x) {
             if (x == null) {
                 Int(-1);
             } else {
@@ -327,7 +330,7 @@ namespace Niecza.Serialization {
             }
         }
 
-        public void Refs<T> (IList<T> x) where T: IFreeze {
+        public void Refs<T> (IList<T> x) {
             if (x == null) {
                 Int(-1);
             } else {
