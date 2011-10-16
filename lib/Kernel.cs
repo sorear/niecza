@@ -875,6 +875,7 @@ namespace Niecza {
     public class LISub : LIVarish {
         public SubInfo def;
         public LISub(SubInfo def) { this.def = def; }
+        internal LISub(int index, SubInfo def) { this.index = index; this.def = def; }
         public override void Init(Frame f) {
             Set(f, Kernel.NewROScalar(def.protosub));
         }
@@ -895,6 +896,11 @@ namespace Niecza {
         public int flags;
         public STable type;
         public LISimple(int flags, STable type) {
+            this.flags = flags;
+            this.type  = type;
+        }
+        internal LISimple(int index, int flags, STable type) {
+            this.index = index;
             this.flags = flags;
             this.type  = type;
         }
@@ -921,6 +927,8 @@ namespace Niecza {
     }
 
     public class LILabel : LIVarish {
+        public LILabel() { }
+        internal LILabel(int index) { this.index = index; }
         public override void Init(Frame f) {
             Set(f, Kernel.NewLabelVar(f, name));
         }
@@ -931,6 +939,8 @@ namespace Niecza {
     }
 
     public class LIDispatch : LIVarish {
+        public LIDispatch() { }
+        internal LIDispatch(int index) { this.index = index; }
         public override void Init(Frame f) {
             throw new Exception("MMD NYI");
         }
@@ -1003,7 +1013,7 @@ namespace Niecza {
     // changed, but it's rare by construction.  We don't want to be
     // like Rakudo/Parrot where simple sub cloning requires copying
     // 100s of bytes.
-    public class SubInfo : IFreeze {
+    public class SubInfo : IFreeze, IFixup {
         // Essential call functions
         public DynBlockDelegate code;
         public int nspill;
@@ -1547,6 +1557,7 @@ noparams:
             return 1u << (int)(hash >> 27);
         }
 
+        private SubInfo() { }
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
                 int nspill) {
@@ -1613,17 +1624,8 @@ noparams:
             fb.String(tn);
             fb.Int(nspill);
             fb.Ints(sig_i);
-            if (sig_i != null) {
-                fb.Int(sig_r.Length);
-                foreach (object o in sig_r) {
-                    if (o is string) {
-                        fb.ObjRef(null);
-                        fb.String((string)o);
-                    } else {
-                        fb.ObjRef(o);
-                    }
-                }
-            }
+            if (sig_i != null)
+                fb.Refs(sig_r);
 
             fb.Ints(lines);
             fb.Int(dylex.Count);
@@ -1650,11 +1652,8 @@ noparams:
             // also not storing used_in_scope, it's compiler only data
             // TODO: we want to store the compiled code not this
             fb.String(nam_str);
-            if (nam_str != null) {
-                fb.Int(nam_refs.Length);
-                foreach(object o in nam_refs)
-                    fb.ObjRef(o);
-            }
+            if (nam_str != null)
+                fb.Refs(nam_refs);
             fb.Refs(param);
             fb.Refs(children);
             if (extend == null)
@@ -1665,6 +1664,120 @@ noparams:
                     fb.String(kv.Key);
                     fb.Refs(kv.Value);
                 }
+            }
+        }
+
+        internal static SubInfo Thaw(ThawBuffer tb) {
+            SubInfo n = new SubInfo();
+            tb.Register(n);
+            // TODO - saving constant pools NYI
+            string mn = tb.String();
+            string tn = tb.String();
+            if (tn != null) {
+                n.code = (DynBlockDelegate) Delegate.CreateDelegate(
+                    typeof(DynBlockDelegate),
+                    typeof(Kernel).Assembly.GetType(tn, true).GetMethod(mn,
+                        BindingFlags.Public | BindingFlags.NonPublic |
+                        BindingFlags.Static));
+            }
+
+            n.nspill = tb.Int();
+            n.sig_i = tb.Ints();
+            if (n.sig_i != null)
+                n.sig_r = tb.RefsA<object>();
+
+            n.lines = tb.Ints();
+            int dyct = tb.Int();
+            n.dylex = new Dictionary<string, LexInfo>();
+            for (int i = 0; i < dyct; i++) {
+                string key = tb.String();
+                int type = tb.Byte();
+                LexInfo li = null;
+                switch (type) {
+                    case (int) LexInfo.LexSerCode.Simple:
+                        li = new LISimple(tb.Int(), tb.Byte(), (STable)tb.ObjRef());
+                        break;
+                    case (int) LexInfo.LexSerCode.Sub:
+                        li = new LISub(tb.Int(), (SubInfo)tb.ObjRef());
+                        break;
+                    case (int) LexInfo.LexSerCode.Label:
+                        li = new LILabel(tb.Int());
+                        break;
+                    case (int) LexInfo.LexSerCode.Dispatch:
+                        li = new LIDispatch(tb.Int());
+                        break;
+                    case (int) LexInfo.LexSerCode.Common:
+                        li = new LICommon(tb.String());
+                        break;
+                    case (int) LexInfo.LexSerCode.Hint:
+                        li = new LIHint();
+                        break;
+                    case (int) LexInfo.LexSerCode.Package:
+                        li = new LIPackage((STable) tb.ObjRef());
+                        break;
+                    case (int) LexInfo.LexSerCode.Alias:
+                        li = new LIAlias(tb.String());
+                        break;
+                    default:
+                        throw new ArgumentException(type.ToString());
+                }
+                n.dylex[key] = li;
+                li.owner = n;
+                li.name = key;
+                n.dylex_filter |= FilterForName(key);
+            }
+            // not saving dylex_filter as it is a cache
+            n.name = tb.String();
+            n.ltm = (LAD) tb.ObjRef();
+            n.special = tb.Int();
+            n.phaser = tb.Int();
+            n.outervar = tb.String();
+            n.unit = (RuntimeUnit)tb.ObjRef();
+            n.outer = (SubInfo)tb.ObjRef();
+            n.protosub = (P6any)tb.ObjRef();
+            n.protopad = (Frame)tb.ObjRef();
+            n.cur_pkg = (STable)tb.ObjRef();
+            n.methodof = (STable)tb.ObjRef();
+            n.body_of = (STable)tb.ObjRef();
+            n.in_class = (STable)tb.ObjRef();
+            n.mo = (STable)tb.ObjRef();
+            // not storing caches here
+            // also not storing used_in_scope, it's compiler only data
+            // TODO: we want to store the compiled code not this
+            n.nam_str = tb.String();
+            if (n.nam_str != null)
+                n.nam_refs = tb.RefsA<object>();
+            n.param = tb.RefsA<object>();
+            n.children = tb.RefsL<SubInfo>();
+            int nex = tb.Int();
+            if (nex != 0) n.extend = new Dictionary<string,object[]>();
+            for (int i = 0; i < nex; i++)
+                n.extend[tb.String()] = tb.RefsA<object>();
+            tb.PushFixup(n);
+            return n;
+        }
+
+        void IFixup.Fixup() {
+            SubInfo sc = outer;
+            LexInfo li = null;
+            for (outer_topic_rank = 1; sc != null; sc = sc.outer) {
+                if (sc.dylex != null && sc.dylex.TryGetValue("$_", out li))
+                    break;
+                outer_topic_rank++;
+            }
+            outer_topic_key = (li is LIVarish) ? (li as LIVarish).index : -1;
+
+            if (dylex.TryGetValue("self", out li)) {
+                self_key = li.SigIndex();
+            } else {
+                self_key = -1;
+            }
+
+            foreach (SubInfo z in children) {
+                if (z.phaser == Kernel.PHASER_CATCH)
+                    catch_ = z;
+                if (z.phaser == Kernel.PHASER_CONTROL)
+                    control = z;
             }
         }
     }
@@ -2850,8 +2963,8 @@ tryagain:
             mode = (int) o[0];
             bas  = (IndexHandler) o[1];
         }
-        public KeySlicer(int mode, IndexHandler bas) {
-            this.mode = mode; this.bas = bas;
+        public KeySlicer(int mode, object bas) {
+            this.mode = mode; this.bas = (IndexHandler)bas;
         }
 
         public override Variable Get(Variable obj, Variable key) {
@@ -4434,32 +4547,33 @@ slow:
         }
 
         private static void Handler_Vonly(STable kl, string name,
-                ContextHandler<Variable> cv, object cu) {
-            WrapHandler0(kl, name, cv, cv, cu);
+                ContextHandler<Variable> cv, object cvu) {
+            WrapHandler0(kl, name, cv, cvu);
         }
 
         private static void Handler_PandBox<T>(STable kl, string name,
                 ContextHandler<T> cvu, STable box) {
             ContextHandler<Variable> cv = new CtxBoxify<T>(cvu, box);
-            WrapHandler0(kl, name, cv, cv, cvu);
+            WrapHandler0(kl, name, cv, cvu);
         }
 
         private static void Handler_PandBoxInty(STable kl, string name,
                 ContextHandler<double> cvu) {
             ContextHandler<Variable> cv = new CtxBoxifyInty(cvu);
-            WrapHandler0(kl, name, cv, cv, cvu);
+            WrapHandler0(kl, name, cv, cvu);
         }
 
         private static void Handler_PandCont(STable kl, string name,
                 ContextHandler<P6any> cvu) {
             ContextHandler<Variable> cv = new CtxContainerize(cvu);
-            WrapHandler0(kl, name, cv, cv, cvu);
+            WrapHandler0(kl, name, cv, cvu);
         }
 
         private static void WrapHandler0(STable kl, string name,
-                ContextHandler<Variable> cv, object cvb, object cvu) {
+                ContextHandler<Variable> cvb, object cvu) {
             DynBlockDelegate dbd = delegate (Frame th) {
-                th.caller.resultSlot = cv.Get((Variable)th.lex0);
+                th.caller.resultSlot = ((ContextHandler<Variable>)
+                        th.info.param[1]).Get((Variable)th.lex0);
                 return th.Return();
             };
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
@@ -4474,7 +4588,8 @@ slow:
         private static void WrapHandler1(STable kl, string name,
                 IndexHandler cv) {
             DynBlockDelegate dbd = delegate (Frame th) {
-                th.caller.resultSlot = cv.Get((Variable)th.lex0,
+                IndexHandler fcv = (IndexHandler) th.info.param[1];
+                th.caller.resultSlot = fcv.Get((Variable)th.lex0,
                         (Variable)th.lex1);
                 return th.Return();
             };
@@ -4491,11 +4606,12 @@ slow:
         private static void WrapPushy(STable kl, string name,
                 PushyHandler cv) {
             DynBlockDelegate dbd = delegate (Frame th) {
+                PushyHandler fcv = (PushyHandler) th.info.param[1];
                 Variable[] fullpc = UnboxAny<Variable[]>(
                         ((Variable)th.lex1).Fetch());
                 Variable[] chop = new Variable[fullpc.Length - 1];
                 Array.Copy(fullpc, 1, chop, 0, chop.Length);
-                th.caller.resultSlot = cv.Invoke((Variable)th.lex0, chop);
+                th.caller.resultSlot = fcv.Invoke((Variable)th.lex0, chop);
                 return th.Return();
             };
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
@@ -4508,33 +4624,32 @@ slow:
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
-        private static Variable DispIndexy(IndexHandler at, IndexHandler exist,
-                IndexHandler del, BindHandler bind, VarHash n,
+        private static Variable DispIndexy(object[] p, VarHash n,
                 Variable self, Variable index) {
 
             if (n == null) goto def;
-            if (del != null && n.ContainsKey("exists"))
-                return exist.Get(self, index);
-            if (del != null && n.ContainsKey("delete"))
-                return del.Get(self, index);
+            if (p[1] != null && n.ContainsKey("exists"))
+                return ((IndexHandler)p[1]).Get(self, index);
+            if (p[2] != null && n.ContainsKey("delete"))
+                return ((IndexHandler)p[2]).Get(self, index);
 
             if (n.ContainsKey("k"))
-                return new KeySlicer(0, at).Get(self, index);
+                return new KeySlicer(0, p[0]).Get(self, index);
             if (n.ContainsKey("kv"))
-                return new KeySlicer(1, at).Get(self, index);
+                return new KeySlicer(1, p[0]).Get(self, index);
             if (n.ContainsKey("p"))
-                return new KeySlicer(2, at).Get(self, index);
+                return new KeySlicer(2, p[0]).Get(self, index);
             if (n.ContainsKey("BIND_VALUE"))
-                return bind.Bind(self, index, n["BIND_VALUE"]);
+                return ((BindHandler)p[3]).Bind(self, index, n["BIND_VALUE"]);
 
-def:        return at.Get(self, index);
+def:        return ((IndexHandler)p[0]).Get(self, index);
         }
 
         private static void WrapIndexy(STable kl, string name,
                 IndexHandler at, IndexHandler exist, IndexHandler del,
                 BindHandler bind) {
             DynBlockDelegate dbd = delegate (Frame th) {
-                th.caller.resultSlot = DispIndexy(at, exist, del, bind,
+                th.caller.resultSlot = DispIndexy(th.info.param,
                     th.named, (Variable)th.lex0, (Variable)th.lex1);
                 return th.Return();
             };

@@ -971,8 +971,9 @@ next_method: ;
             n.box_type = box_type == null ? null : Type.GetType(box_type,true);
             n.all_slot = tb.Strings();
 
-            foreach (string s in n.all_slot)
-                n.slotMap[s] = n.nslots++;
+            if (n.all_slot != null)
+                foreach (string s in n.all_slot)
+                    n.slotMap[s] = n.nslots++;
 
             tb.PushRevalidate(n);
             return n;

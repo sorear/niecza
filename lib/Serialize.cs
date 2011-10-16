@@ -603,7 +603,8 @@ namespace Niecza.Serialization {
 
                 case SerializationCode.RuntimeUnit:
                     return RuntimeUnit.Thaw(this);
-                //SubInfo,
+                case SerializationCode.SubInfo:
+                    return SubInfo.Thaw(this);
                 case SerializationCode.STable:
                     return STable.Thaw(this);
                 case SerializationCode.StashEnt:
