@@ -170,16 +170,6 @@ namespace Niecza {
 
             return ret;
         }
-
-        internal Frame Binder(Frame th) {
-            Variable[] rpos = new Variable[th.pos.Length - 1];
-            Array.Copy(th.pos, 1, rpos, 0, rpos.Length);
-            OverloadCandidate oc = (OverloadCandidate)
-                DoDispatch(rpos, th.named);
-            th.caller.resultSlot = oc.Invoke(Kernel.UnboxAny<object>(
-                th.pos[0].Fetch()), rpos, th.named);
-            return th.caller;
-        }
     }
 
     sealed class PropertyProxy : Variable {
@@ -483,10 +473,14 @@ namespace Niecza {
             OverloadCandidate.MakeCandidates(mi, pi, l);
         }
 
-        static DynBlockDelegate BindGroup(string n, List<MultiCandidate> mc) {
-            CandidateSet cs = new CandidateSet(n, mc.ToArray());
-
-            return cs.Binder;
+        static Frame Binder(Frame th) {
+            Variable[] rpos = new Variable[th.pos.Length - 1];
+            Array.Copy(th.pos, 1, rpos, 0, rpos.Length);
+            OverloadCandidate oc = (OverloadCandidate)
+                (th.info.param[0] as CandidateSet).DoDispatch(rpos, th.named);
+            th.caller.resultSlot = oc.Invoke(Kernel.UnboxAny<object>(
+                th.pos[0].Fetch()), rpos, th.named);
+            return th.caller;
         }
 
         /*
@@ -689,10 +683,12 @@ for $args (0..9) {
             foreach (string n in needNewWrapper) {
                 string siname = string.Format("{0}.{1}", m.name, n);
 
-                DynBlockDelegate method = BindGroup(siname, allMembers[n]);
+                SubInfo si = new SubInfo(siname, Binder);
+                si.param = new object[] {
+                    new CandidateSet(siname, allMembers[n].ToArray()) };
                 if (CLROpts.Debug)
                     Console.WriteLine("Installing {0}", siname);
-                P6any sub = Kernel.MakeSub(new SubInfo(siname, method), null);
+                P6any sub = Kernel.MakeSub(si, null);
                 m.AddMethod(0, n, sub);
                 if (n == "Invoke" && typeof(Delegate).IsAssignableFrom(t))
                     m.AddMethod(0, "postcircumfix:<( )>", sub);

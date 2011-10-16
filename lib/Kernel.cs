@@ -1590,7 +1590,18 @@ noparams:
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.SubInfo);
-            // TODO: make serialization work with the code
+            // TODO - saving constant pools NYI
+            string mn = null;
+            string tn = null;
+            if (code != null) {
+                Type t = code.Method.DeclaringType;
+                if (t.Assembly == typeof(Kernel).Assembly) {
+                    tn = t.FullName;
+                    mn = code.Method.Name;
+                }
+            }
+            fb.String(mn);
+            fb.String(tn);
             fb.Int(nspill);
             fb.Ints(sig_i);
             if (sig_i != null) {
