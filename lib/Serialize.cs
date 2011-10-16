@@ -413,6 +413,19 @@ namespace Niecza.Serialization {
             }
         }
 
+        internal static Type[] boxTypes = new Type[] {
+            null, typeof(Rat), typeof(FatRat), typeof(Complex),
+            typeof(double), typeof(int), typeof(string),
+            typeof(Variable[]), typeof(VarDeque), typeof(STable),
+        };
+        internal static Func<P6opaque>[] boxCreate = new Func<P6opaque>[] {
+            P6opaque.Create, BoxObject<Rat>.Create, BoxObject<FatRat>.Create,
+            BoxObject<Complex>.Create, BoxObject<double>.Create,
+            BoxObject<int>.Create, BoxObject<string>.Create,
+            BoxObject<Variable[]>.Create, BoxObject<VarDeque>.Create,
+            BoxObject<STable>.Create,
+        };
+
         static Type[] anyTypes = new Type[] {
             typeof(string), typeof(P6any[]), typeof(Variable[]),
             typeof(bool), typeof(int), typeof(double), typeof(Type),
@@ -584,8 +597,8 @@ namespace Niecza.Serialization {
                     return VarDeque.Thaw(this);
                 case SerializationCode.VarHash:
                     return VarHash.Thaw(this);
-                //case SerializationCode.DispatchEnt:
-                //    return DispatchEnt.Thaw(this);
+                case SerializationCode.DispatchEnt:
+                    return DispatchEnt.Thaw(this);
                 //case SerializationCode.RxFrame:
                 //    return RxFrame.Thaw(this);
                 //case SerializationCode.P6how:
@@ -593,17 +606,25 @@ namespace Niecza.Serialization {
 
                 case SerializationCode.ReflectObj:
                     return ReflectObj.Thaw(this);
-                //P6opaque,
+                case SerializationCode.P6opaque:
+                    return P6opaque.Thaw(this);
                 //Frame,
                 //Cursor,
 
-                //String,
-                //ArrP6any,
-                //ArrVariable,
-                //Boolean,
-                //Int,
-                //Double,
-                //Type,
+                case SerializationCode.String:
+                    return Register(String());
+                case SerializationCode.ArrP6any:
+                    return Register(RefsA<P6any>());
+                case SerializationCode.ArrVariable:
+                    return Register(RefsA<Variable>());
+                case SerializationCode.Boolean:
+                    return Register(Byte() != 0);
+                case SerializationCode.Int:
+                    return Register(Int());
+                case SerializationCode.Double:
+                    return Register(Double());
+                case SerializationCode.Type:
+                    return Register(Type.GetType(String(), true));
 
                 case SerializationCode.SimpleVariable:
                 case SerializationCode.SimpleVariable_1:
@@ -639,8 +660,9 @@ namespace Niecza.Serialization {
         }
 
         // call this when thawing any new object
-        internal void Register(object o) {
+        internal object Register(object o) {
             reg.RegisterThawed(unit, o);
+            return o;
         }
 
         object LoadNewUnit() {

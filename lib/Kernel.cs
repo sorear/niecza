@@ -41,6 +41,15 @@ namespace Niecza {
             fb.ObjRef(outer);
             fb.ObjRef(ip6);
         }
+        internal static DispatchEnt Thaw(ThawBuffer tb) {
+            DispatchEnt de = new DispatchEnt();
+            tb.Register(de);
+            de.next = (DispatchEnt) tb.ObjRef();
+            de.info = (SubInfo) tb.ObjRef();
+            de.outer = (Frame) tb.ObjRef();
+            de.ip6 = (P6any) tb.ObjRef();
+            return de;
+        }
     }
 
     // A Variable is the meaning of function arguments, of any subexpression

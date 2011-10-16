@@ -916,6 +916,7 @@ next_method: ;
         // containers are objects now
         public object[] slots;
 
+        internal P6opaque() { }
         public P6opaque(STable klass) {
             this.mo = klass;
             this.slots = (klass.nslots != 0) ? new object[klass.nslots] : null;
@@ -946,25 +947,49 @@ next_method: ;
         }
 
         public override void Freeze(FreezeBuffer fb) {
-            FreezeSelf(fb);
-            fb.ObjRef(null);
+            FreezeSelf(fb, null);
         }
-        protected void FreezeSelf(FreezeBuffer fb) {
+        protected void FreezeSelf(FreezeBuffer fb, Type t) {
             fb.Byte((byte) SerializationCode.P6opaque);
+            int i;
+            for (i = 0; i < FreezeBuffer.boxTypes.Length &&
+                FreezeBuffer.boxTypes[i] != t; i++) { }
+            if (i == FreezeBuffer.boxTypes.Length)
+                throw new NotImplementedException(t.FullName);
+            fb.Byte((byte)i);
             fb.ObjRef(mo);
             int l = slots == null ? 0 : slots.Length;
             fb.Int(l);
-            for (int i = 0; i < l; i++)
+            for (i = 0; i < l; i++)
                 fb.ObjRef(slots[i]);
+        }
+        protected virtual void SetData(object o) { }
+        internal static P6opaque Create() { return new P6opaque(); }
+        internal static P6opaque Thaw(ThawBuffer tb) {
+            int k = tb.Byte();
+            P6opaque o = FreezeBuffer.boxCreate[k]();
+            tb.Register(o);
+            o.mo = (STable) tb.ObjRef();
+            int l = tb.Int();
+            if (l > 0) {
+                o.slots = new object[l];
+                for (int i = 0; i < l; i++)
+                    o.slots[i] = tb.ObjRef();
+            }
+            if (k != 0)
+                o.SetData(tb.ObjRef());
+            return o;
         }
     }
 
     public class BoxObject<T> : P6opaque {
         public T value;
+        private BoxObject() { }
         public BoxObject(T x, STable klass) : base(klass) { value = x; }
         public BoxObject(T x, STable klass, int na) : base(klass,na) { value = x; }
+        internal static new P6opaque Create() { return new BoxObject<T>(); }
         public override void Freeze(FreezeBuffer fb) {
-            FreezeSelf(fb);
+            FreezeSelf(fb, typeof(T));
             fb.ObjRef(value);
         }
     }
