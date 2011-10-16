@@ -1028,7 +1028,7 @@ namespace Niecza {
         // maybe should be in extend or a hint?
         public LAD ltm;
         public int special;
-        public int phaser;
+        public int phaser = -1;
         public string outervar;
 
         // References to related objects
