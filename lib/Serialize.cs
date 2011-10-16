@@ -130,8 +130,8 @@ namespace Niecza.Serialization {
                 if (rver != version)
                     throw new ThawException("version mismatch loading " + file);
 
-                tb.RunFixups();
                 su.root = tb.ObjRef();
+                tb.RunFixups();
                 success = true;
             } finally {
                 // don't leave half-read units in the map

@@ -4058,8 +4058,6 @@ dynamic:
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 int     p = (int)args[2];
                 s.phaser = p;
-                if (s.protosub != null)
-                    Kernel.AddPhaser(p, s.protosub);
                 if (p == Kernel.PHASER_CATCH)
                     s.outer.catch_ = s;
                 if (p == Kernel.PHASER_CONTROL)

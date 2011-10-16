@@ -443,8 +443,8 @@ namespace Niecza {
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
 
-            Kernel.FirePhasers(Kernel.PHASER_UNIT_INIT, false);
-            Kernel.FirePhasers(Kernel.PHASER_INIT, false);
+            Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
+            Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
         }
 
         internal CpsOp TypeConstant(STable s) {
@@ -3636,12 +3636,6 @@ have_v:
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
-        private static VarDeque[] PhaserBanks;
-
-        public static void AddPhaser(int i, P6any v) {
-            PhaserBanks[i].Push(NewROScalar(v));
-        }
-
         // not listed: BEGIN, CHECK (cannot be implemented in this model),
         // START (desugared using state), FIRST, NEXT, LAST (use masak code)
         public const int PHASER_INIT = 0;
@@ -3657,11 +3651,14 @@ have_v:
         public const int PHASER_CONTROL = 10;
         public const int PHASER_TYPES = 11;
 
-        public static void FirePhasers(int i, bool lifo) {
-            while (PhaserBanks[i].Count() != 0)
-                RunInferior((lifo ? PhaserBanks[i].Pop() :
-                            PhaserBanks[i].Shift()).Fetch().Invoke(
-                            GetInferiorRoot(), Variable.None, null));
+        // XXX do lifo
+        public static void FirePhasers(RuntimeUnit ru, int i, bool lifo) {
+            foreach (SubInfo z in ru.our_subs) {
+                if (z.phaser == i && z.protosub != null) {
+                    RunInferior(z.protosub.Invoke(GetInferiorRoot(),
+                        Variable.None, null));
+                }
+            }
         }
 
         internal static HashSet<string> ModulesStarted = new HashSet<string>();
@@ -5009,10 +5006,6 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         }
 
         internal static void CreateBasicTypes() {
-            // XXX maybe wrong place
-            PhaserBanks = new VarDeque[PHASER_TYPES];
-            for (int i = 0; i < PHASER_TYPES; i++)
-                PhaserBanks[i] = new VarDeque();
             CodeMO = new STable("Code"); // forward decl
             MuMO = new STable("Mu");
             Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
