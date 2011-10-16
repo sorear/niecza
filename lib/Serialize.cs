@@ -632,7 +632,8 @@ namespace Niecza.Serialization {
                     return ReflectObj.Thaw(this);
                 case SerializationCode.P6opaque:
                     return P6opaque.Thaw(this);
-                //Frame,
+                case SerializationCode.Frame:
+                    return Frame.Thaw(this);
                 //Cursor,
 
                 case SerializationCode.String:

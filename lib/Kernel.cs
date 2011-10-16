@@ -1784,7 +1784,7 @@ noparams:
 
     // This object fills the combined roles of Parrot LexPad and CallContext
     // objects.
-    public class Frame: P6any {
+    public class Frame: P6any, IFixup {
         // Used by trampoline to find destination
         public int ip = 0;
         public DynBlockDelegate code;
@@ -2120,6 +2120,57 @@ noparams:
             fb.Refs(pos);
             fb.ObjRef(named);
             fb.Byte(checked((byte)flags));
+        }
+        internal static Frame Thaw(ThawBuffer tb) {
+            Frame n = new Frame();
+            tb.Register(n);
+            n.ip = tb.Int();
+            // code will be reloaded from info.code
+            n.lex0 = tb.ObjRef();
+            n.lex1 = tb.ObjRef();
+            n.lex2 = tb.ObjRef();
+            n.lex3 = tb.ObjRef();
+            n.lex4 = tb.ObjRef();
+            n.lex5 = tb.ObjRef();
+            n.lex6 = tb.ObjRef();
+            n.lex7 = tb.ObjRef();
+            n.lex8 = tb.ObjRef();
+            n.lex9 = tb.ObjRef();
+            n.resultSlot = tb.ObjRef(); // probably not necessary
+            n.lexi0 = tb.Int();
+            n.lexi1 = tb.Int();
+            n.lexn = tb.RefsA<object>();
+            n.caller = (Frame)tb.ObjRef(); // XXX this might serialize too much
+            n.outer = (Frame)tb.ObjRef();
+            n.info = (SubInfo)tb.ObjRef();
+            // we won't store reuse info :)
+            n.coro_return = (Frame)tb.ObjRef();
+            n.curDisp = (DispatchEnt)tb.ObjRef();
+            n.rx = (RxFrame)tb.ObjRef();
+            n.sub = (P6any)tb.ObjRef();
+
+            LeaveHook fin = null;
+            int type = tb.Byte();
+            while (type != LeaveHook.SENTINEL) {
+                if (fin == null) {
+                    fin = n.on_leave = new LeaveHook();
+                } else {
+                    fin.next = new LeaveHook();
+                    fin = fin.next;
+                }
+                fin.type = type;
+                fin.thunk = (P6any) tb.ObjRef();
+                type = tb.Byte();
+            }
+
+            n.pos = tb.RefsA<Variable>();
+            n.named = (VarHash)tb.ObjRef();
+            n.flags = tb.Byte();
+            tb.PushFixup(n);
+            return n;
+        }
+        void IFixup.Fixup() {
+            code = info.code;
         }
     }
 
