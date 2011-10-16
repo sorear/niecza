@@ -19,7 +19,10 @@ xs_init(pTHX)
 static PerlInterpreter *my_perl;
 void p5embed_initialize()
 {
-  PERL_SYS_INIT3(0,NULL,NULL);
+  int argc = 1;
+  char *argv0[] = { "perl", NULL, 0 };
+  char **argv = argv0;
+  PERL_SYS_INIT(&argc,&argv);
   my_perl = perl_alloc();
   perl_construct(my_perl);
   char *embedding[] = { "", "-e", "0" };
