@@ -485,6 +485,7 @@ namespace Niecza.Serialization {
         SerUnit unit;
 
         List<IFixup> fixups_needed = new List<IFixup>();
+        List<object> revalidate = new List<object>();
 
         internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data = data;
@@ -493,6 +494,7 @@ namespace Niecza.Serialization {
         }
 
         internal void RunFixups() {
+            P6how.BulkRevalidate(revalidate);
             foreach (IFixup f in fixups_needed)
                 f.Fixup();
             fixups_needed.Clear();
@@ -500,6 +502,10 @@ namespace Niecza.Serialization {
 
         internal void PushFixup(IFixup f) {
             fixups_needed.Add(f);
+        }
+
+        internal void PushRevalidate(STable f) {
+            revalidate.Add(f);
         }
 
         public byte Byte() { return data[rpointer++]; }
@@ -553,6 +559,22 @@ namespace Niecza.Serialization {
             return ret;
         }
 
+        public int[] Ints() {
+            int ct = Int();
+            if (ct < 0) return null;
+            int[] ret = new int[ct];
+            for (int i = 0; i < ct; i++) ret[i] = Int();
+            return ret;
+        }
+
+        public string[] Strings() {
+            int ct = Int();
+            if (ct < 0) return null;
+            string[] ret = new string[ct];
+            for (int i = 0; i < ct; i++) ret[i] = String();
+            return ret;
+        }
+
         public T[] RefsA<T>() where T : class {
             int ct = Int();
             if (ct < 0) return null;
@@ -582,7 +604,8 @@ namespace Niecza.Serialization {
                 case SerializationCode.RuntimeUnit:
                     return RuntimeUnit.Thaw(this);
                 //SubInfo,
-                //STable,
+                case SerializationCode.STable:
+                    return STable.Thaw(this);
                 case SerializationCode.StashEnt:
                     return StashEnt.Thaw(this);
                 case SerializationCode.Rat:
@@ -601,8 +624,8 @@ namespace Niecza.Serialization {
                     return DispatchEnt.Thaw(this);
                 //case SerializationCode.RxFrame:
                 //    return RxFrame.Thaw(this);
-                //case SerializationCode.P6how:
-                //    return P6how.Thaw(this);
+                case SerializationCode.P6how:
+                    return P6how.Thaw(this);
 
                 case SerializationCode.ReflectObj:
                     return ReflectObj.Thaw(this);

@@ -126,7 +126,7 @@ namespace Niecza {
 
     // NOT P6any; these things should only be exposed through a ClassHOW-like
     // façade
-    public class P6how: IFreeze {
+    public class P6how: IFreeze, IFixup {
         // true primitive data {{{
         public STable stable;
 
@@ -658,6 +658,52 @@ next_method: ;
             fb.Refs<STable>(superclasses);
             fb.Refs<STable>(mro);
         }
+
+        internal static P6how Thaw(ThawBuffer tb) {
+            P6how n = new P6how();
+            tb.Register(n);
+            n.stable = (STable)tb.ObjRef();
+            int state = tb.Byte();
+            n.isComposing = state >= 1;
+            n.isComposed  = state >= 2;
+            n.rtype = tb.String();
+            n.isRole = n.rtype == "role" || n.rtype == "prole";
+            n.isSubset = n.rtype == "subset";
+            n.isPackage = n.rtype == "package";
+            n.roleFactory = (P6any)tb.ObjRef();
+            n.subsetWhereThunk = (P6any)tb.ObjRef();
+            n.subsetFilter = (Variable)tb.ObjRef();
+
+            // local_does not yet used
+            int mcount = tb.Int();
+            while (mcount-- > 0) {
+                MethodInfo mi = default(MethodInfo);
+                mi.short_name = tb.String();
+                mi.long_name = tb.String();
+                mi.impl = (P6any)tb.ObjRef();
+                mi.flags = tb.Byte();
+                n.lmethods.Add(mi);
+            }
+
+            int acount = tb.Int();
+            while (acount-- > 0) {
+                AttrInfo ai = default(AttrInfo);
+                ai.name = tb.String();
+                ai.init = (P6any)tb.ObjRef();
+                ai.flags = tb.Byte();
+                ai.type = (STable)tb.ObjRef();
+                n.local_attr.Add(ai);
+            }
+
+            n.superclasses = tb.RefsL<STable>();
+            n.mro = tb.RefsA<STable>();
+            tb.PushFixup(n);
+            return n;
+        }
+
+        void IFixup.Fixup() {
+            SetMRO(mro);
+        }
     }
 
     // The role of STable is to hold stuff that needs to exist per
@@ -773,6 +819,7 @@ next_method: ;
         public bool is_any = false;
         /// }}}
 
+        private STable() {}
         public STable(string name) {
             this.name = name;
             mo = new P6how();
@@ -906,6 +953,29 @@ next_method: ;
             fb.Byte((byte)(isSubset ? 1 : 0));
             fb.String(box_type == null ? null : box_type.AssemblyQualifiedName);
             fb.Strings(all_slot);
+        }
+
+        internal static STable Thaw(ThawBuffer tb) {
+            STable n = new STable();
+            tb.Register(n);
+            n.mo = (P6how)tb.ObjRef();
+            n.how = (P6any)tb.ObjRef();
+            n.who = (P6any)tb.ObjRef();
+            n.typeObject = (P6any)tb.ObjRef();
+            n.initObject = (P6any)tb.ObjRef();
+            n.typeVar = (Variable)tb.ObjRef();
+            n.initVar = (Variable)tb.ObjRef();
+            n.name = tb.String();
+            n.isSubset = tb.Byte() != 0;
+            string box_type = tb.String();
+            n.box_type = box_type == null ? null : Type.GetType(box_type,true);
+            n.all_slot = tb.Strings();
+
+            foreach (string s in n.all_slot)
+                n.slotMap[s] = n.nslots++;
+
+            tb.PushRevalidate(n);
+            return n;
         }
     }
 
