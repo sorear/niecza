@@ -35,11 +35,16 @@ public class Perl5Interpreter : IForeignInterpreter {
 
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_subcall")]
     public static extern IntPtr SubCall(
+        int context,
         IntPtr[] arguments,
         int argument_n
     );
 
     public static Variable SVToVariable(IntPtr sv) {
+        if (sv == IntPtr.Zero) {
+            //TODO: check - cargo culted
+            return Kernel.NilP.mo.typeVar;
+        }
         if (SvIOKp(sv) != 0) {
             return Builtins.MakeInt(SvIV(sv));
         } else if (SvNOKp(sv) != 0) {
@@ -99,6 +104,20 @@ public class SVany : P6any {
             }
         }
 
+        static int Context(Variable var) {
+            P6any obj = var.Fetch();
+            string s = Kernel.UnboxAny<string>(obj);
+            if (s == "list") {
+                return 0;
+            } else if (s == "scalar") {
+                return 1;
+            } else if (s == "void") {
+                return 2;
+            } else {
+                throw new NieczaException("unknown p5 context type: "+s);
+            }
+        }
+
         static IntPtr[] MarshalPositionals(Variable[] pos) {
                 IntPtr[] args = new IntPtr[pos.Length];
                 for (int i=0;i<pos.Length;i++) {
@@ -112,8 +131,14 @@ public class SVany : P6any {
                 Variable[] pos, VarHash named) {
 
                 if (name == "postcircumfix:<( )>") {
+                    int context = 1;
+                    if (named["context"] != null) {
+                        context = Context(named["context"]);
+                    }
                     IntPtr[] args = MarshalPositionals(pos);
-                    IntPtr ret = Perl5Interpreter.SubCall(args,args.Length);
+                    IntPtr ret = Perl5Interpreter.SubCall(context,args,args.Length);
+
+            
                     caller.resultSlot = Perl5Interpreter.SVToVariable(ret);
                     return caller;
                 } else {

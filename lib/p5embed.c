@@ -72,7 +72,7 @@ SV* p5method_call(char* name,SV** args,int args_count) {
 
 }
 
-SV* p5embed_subcall(SV** args,int args_count) {
+SV* p5embed_subcall(int context,SV** args,int args_count) {
   dSP;
 
 
@@ -84,18 +84,22 @@ SV* p5embed_subcall(SV** args,int args_count) {
   PUTBACK;
 
 
-  int count = call_sv(args[0],G_SCALAR);
-  SPAGAIN;
-  if (count != 1) croak("Big trouble\n");
+  /* HACK - list context is NYI */
+  if (context == 1 || context == 0) {
+    int count = call_sv(args[0],G_SCALAR);
+    SPAGAIN;
+    if (count != 1) croak("Big trouble\n");
 
-  SV* ret = POPs;
+    SV* ret = POPs;
 
-  /* TODO should i do that? */
-  SvREFCNT_inc(ret);
+    /* TODO should i do that? */
+    SvREFCNT_inc(ret);
 
-  PUTBACK;
-
-  return ret;
+    PUTBACK;
+    return ret;
+  } else if (context == 2) {
+    call_sv(args[0],G_VOID);
+  }
 
 }
 
