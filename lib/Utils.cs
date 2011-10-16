@@ -141,6 +141,13 @@ namespace Niecza {
                 if (index == data.Length) index = 0;
             }
         }
+        internal static VarDeque Thaw(ThawBuffer tb) {
+            VarDeque r = new VarDeque();
+            tb.Register(r);
+            int c = tb.Int();
+            for (int i = 0; i < c; i++) r.Push((Variable) tb.ObjRef());
+            return r;
+        }
     }
 
     struct VarHashLink {
@@ -457,6 +464,14 @@ namespace Niecza {
                 fb.ObjRef(kv.Value);
             }
         }
+        internal static VarHash Thaw(ThawBuffer tb) {
+            VarHash r = new VarHash();
+            tb.Register(r);
+            int c = tb.Int();
+            for (int i = 0; i < c; i++)
+                r[tb.String()] = (Variable) tb.ObjRef();
+            return r;
+        }
     }
 
     public class SubscriberSet {
@@ -728,14 +743,20 @@ namespace Niecza {
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.Complex);
-            fb.Long(BitConverter.DoubleToInt64Bits(re));
-            fb.Long(BitConverter.DoubleToInt64Bits(im));
+            fb.Double(re);
+            fb.Double(im);
+        }
+        internal static Complex Thaw(ThawBuffer tb) {
+            // NOTE this deferral only works because we don't call ObjRef
+            Complex r = new Complex(tb.Double(), tb.Double());
+            tb.Register(r);
+            return r;
         }
     }
 
     public sealed class Rat : IFreeze {
-        public readonly BigInteger num;
-        public readonly ulong den;
+        public BigInteger num;
+        public ulong den;
 
         public Rat(BigInteger num, ulong den) {
             this.num = num; this.den = den;
@@ -746,11 +767,19 @@ namespace Niecza {
             fb.ObjRef(num);
             fb.Long((long)den);
         }
+        private Rat() {}
+        internal static Rat Thaw(ThawBuffer tb) {
+            Rat r = new Rat();
+            tb.Register(r);
+            r.num = (BigInteger)tb.ObjRef();
+            r.den = (ulong)tb.Long();
+            return r;
+        }
     }
 
     public sealed class FatRat : IFreeze {
-        public readonly BigInteger num;
-        public readonly BigInteger den;
+        public BigInteger num;
+        public BigInteger den;
 
         public FatRat(BigInteger num, BigInteger den) {
             this.num = num; this.den = den;
@@ -760,6 +789,14 @@ namespace Niecza {
             fb.Byte((byte)SerializationCode.FatRat);
             fb.ObjRef(num);
             fb.ObjRef(den);
+        }
+        private FatRat() {}
+        internal static FatRat Thaw(ThawBuffer tb) {
+            FatRat r = new FatRat();
+            tb.Register(r);
+            r.num = (BigInteger)tb.ObjRef();
+            r.den = (BigInteger)tb.ObjRef();
+            return r;
         }
     }
 

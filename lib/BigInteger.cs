@@ -2343,8 +2343,25 @@ namespace Niecza {
 				Niecza.Serialization.FreezeBuffer fb) {
 			fb.Byte((byte) Niecza.Serialization.SerializationCode.BigInteger);
 			fb.Int(sign * data.Length);
-			foreach (uint x in data)
-				fb.Int((int)x);
+			if (sign != 0)
+				foreach (uint x in data)
+					fb.Int((int)x);
+		}
+
+		internal static BigInteger Thaw(
+				Niecza.Serialization.ThawBuffer tb) {
+			int s_l = tb.Int();
+			short sign;
+			int ct;
+			if (s_l > 0) { sign = 1; ct = s_l; }
+			else if (s_l == 0) { sign = 0; ct = 0; }
+			else { sign = -1; ct = -s_l; }
+			uint[] d = new uint[ct];
+			for (int i = 0; i < ct; i++)
+			    d[i] = (uint)tb.Int();
+			BigInteger r = new BigInteger(sign, sign == 0 ? ZERO : d);
+			tb.Register(r);
+			return r;
 		}
 	}
 }

@@ -322,6 +322,10 @@ namespace Niecza.Serialization {
             data[wpointer++] = (byte)(x      );
         }
 
+        public void Double(double x) {
+            Long(BitConverter.DoubleToInt64Bits(x));
+        }
+
         public void String(string s) {
             if (s == null) {
                 Int(-1);
@@ -437,7 +441,7 @@ namespace Niecza.Serialization {
                     Int((int)o);
                     break;
                 case 5:
-                    Long(BitConverter.DoubleToInt64Bits((double)o));
+                    Double((double)o);
                     break;
                 case 6:
                     String(((Type)o).AssemblyQualifiedName);
@@ -502,6 +506,10 @@ namespace Niecza.Serialization {
             return (((long)Int()) << 32) | (long)(uint)Int();
         }
 
+        public double Double() {
+            return BitConverter.Int64BitsToDouble(Long());
+        }
+
         public string String() {
             int l = Int();
 
@@ -547,27 +555,84 @@ namespace Niecza.Serialization {
             switch(tag) {
                 case SerializationCode.Null:
                     return null;
-                case SerializationCode.SelfRef:
-                    i = Int();
-                    return unit.bynum[i];
+
                 case SerializationCode.ForeignRef:
                     i = Int();
                     j = Int();
                     return unit_map[i].bynum[j];
+                case SerializationCode.SelfRef:
+                    i = Int();
+                    return unit.bynum[i];
                 case SerializationCode.NewUnitRef:
                     return LoadNewUnit();
+
                 case SerializationCode.RuntimeUnit:
                     return RuntimeUnit.Thaw(this);
+                //SubInfo,
+                //STable,
                 case SerializationCode.StashEnt:
                     return StashEnt.Thaw(this);
+                case SerializationCode.Rat:
+                    return Rat.Thaw(this);
+                case SerializationCode.FatRat:
+                    return FatRat.Thaw(this);
+                case SerializationCode.Complex:
+                    return Complex.Thaw(this);
+                case SerializationCode.BigInteger:
+                    return BigInteger.Thaw(this);
+                case SerializationCode.VarDeque:
+                    return VarDeque.Thaw(this);
+                case SerializationCode.VarHash:
+                    return VarHash.Thaw(this);
+                //case SerializationCode.DispatchEnt:
+                //    return DispatchEnt.Thaw(this);
+                //case SerializationCode.RxFrame:
+                //    return RxFrame.Thaw(this);
+                //case SerializationCode.P6how:
+                //    return P6how.Thaw(this);
+
                 case SerializationCode.ReflectObj:
                     return ReflectObj.Thaw(this);
+                //P6opaque,
+                //Frame,
+                //Cursor,
+
+                //String,
+                //ArrP6any,
+                //ArrVariable,
+                //Boolean,
+                //Int,
+                //Double,
+                //Type,
+
                 case SerializationCode.SimpleVariable:
                 case SerializationCode.SimpleVariable_1:
                 case SerializationCode.SimpleVariable_2:
                 case SerializationCode.SimpleVariable_3:
                     return SimpleVariable.Thaw(this,
                             (int)tag - (int)SerializationCode.SimpleVariable);
+                //SubstrLValue,
+                //TiedVariable,
+                //SubViviHook,
+                //ArrayViviHook,
+                //NewArrayViviHook,
+                //HashViviHook,
+                //NewHashViviHook,
+                //LADNone, // no-args
+                //LADNull,
+                //LADDot,
+                //LADDispatcher,
+                //LADImp,
+                //LADStr, // string
+                //LADStrNoCase,
+                //LADMethod,
+                //LADParam,
+                //LADOpt, // LAD
+                //LADPlus,
+                //LADStar,
+                //LADSequence, // LAD[]
+                //LADAny,
+                //LADCC, // CC
                 default:
                     throw new ThawException("unexpected object tag " + tag);
             }
