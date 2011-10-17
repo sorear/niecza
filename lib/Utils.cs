@@ -515,6 +515,15 @@ namespace Niecza {
     }
 
     public class Utils {
+        public static string HashToStr(byte[] hash) {
+            char[] buf = new char[hash.Length * 2];
+            for (int i = 0; i < hash.Length; i++) {
+                buf[i*2]   = "0123456789abcdef"[hash[i] >> 4];
+                buf[i*2+1] = "0123456789abcdef"[hash[i] & 15];
+            }
+            return new string(buf);
+        }
+
         public static void HexDump(byte[] heap) {
             for (int offs = 0; offs < heap.Length; offs += 16) {
                 Console.Write("{0:X6}   ", offs);

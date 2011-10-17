@@ -301,7 +301,6 @@ class Unit {
     }
 }
 
-method create_unit($name, $filename, $modtime, $main, $run) {
-    downcall("new_unit", ~$name, ~$filename, ~$modtime,
-            ~$!obj_dir, ?$main, ?$run);
+method create_unit($name, $filename, $source, $main, $run) {
+    downcall("new_unit", ~$name, ~$filename, ~$source, ?$main, ?$run);
 }

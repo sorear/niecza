@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using System.Security.Cryptography;
 using System.IO;
 
 namespace Niecza {
@@ -172,6 +173,18 @@ namespace Niecza {
             args[2] = sb.ToString();
             refs.CopyTo(args, 3);
             return DCResult(RawDowncall(args));
+        }
+
+        public static string DoHash(string input) {
+            HashAlgorithm sha = SHA256.Create();
+            byte[] ibytes = new UTF8Encoding().GetBytes(input);
+            byte[] hash = sha.ComputeHash(ibytes);
+            char[] buf = new char[hash.Length * 2];
+            for (int i = 0; i < hash.Length; i++) {
+                buf[i*2]   = "0123456789abcdef"[hash[i] >> 4];
+                buf[i*2+1] = "0123456789abcdef"[hash[i] & 15];
+            }
+            return new string(buf);
         }
     }
 }

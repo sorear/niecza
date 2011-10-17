@@ -1618,16 +1618,21 @@ flat_enough:;
 
     public static AppDomain up_domain;
     public static DynBlockDelegate eval_result;
+    static System.Collections.IDictionary upcall_receiver;
+    internal static object UpCall(object[] args) {
+        if (upcall_receiver == null)
+            upcall_receiver = (System.Collections.IDictionary)
+                up_domain.CreateInstanceAndUnwrap("CompilerBlob", "Niecza.UpcallReceiver");
+        return upcall_receiver[args];
+    }
     public static Frame simple_eval(Frame th, Variable str) {
         if (up_domain == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
-        System.Collections.IDictionary r = (System.Collections.IDictionary)
-            up_domain.CreateInstanceAndUnwrap("CompilerBlob", "Niecza.UpcallReceiver");
         SubInfo outer = th.caller.info;
-        string msg = (string) r[new object[] { "eval",
+        string msg = (string) UpCall(new object[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str),
                 new Niecza.CLRBackend.Handle(outer)
-                }];
+                });
         if (msg != null && msg != "")
             return Kernel.Die(th, msg);
         return th.MakeChild(null, new SubInfo("boot-" +

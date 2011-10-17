@@ -343,7 +343,8 @@ namespace Niecza {
     class CORESavedAttribute : Attribute { }
 
     public sealed class RuntimeUnit : IFreeze {
-        public string name, filename, modtime, asm_name, dll_name;
+        public string name, filename, source, asm_name, dll_name;
+        public HashSet<RuntimeUnit> depended_units;
         public Dictionary<string, StashEnt> globals;
         public SubInfo mainline, bottom;
         public bool is_mainish;
@@ -370,11 +371,13 @@ namespace Niecza {
 
         private RuntimeUnit() { }
 
-        public RuntimeUnit(string name, string filename, string modtime,
-                string obj_dir, bool main, bool runnow) {
+        public RuntimeUnit(string name, string filename, string source,
+                bool main, bool runnow) {
             this.name = name;
             this.filename = filename;
-            this.modtime = modtime;
+            this.source = source;
+            this.depended_units = new HashSet<RuntimeUnit>();
+            this.depended_units.Add(this);
             this.globals = new Dictionary<string,StashEnt>();
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             this.is_mainish = main;
@@ -655,9 +658,22 @@ namespace Niecza {
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.RuntimeUnit);
 
+            // put this FIRST so that we can bail out in Thaw if need be
             fb.String(name);
+            RuntimeUnit[] dep = new List<RuntimeUnit>(depended_units).ToArray();
+            Array.Sort<RuntimeUnit>(dep, (a, b) =>
+                    string.CompareOrdinal(a.name, b.name));
+            string[] srcinfo = new string[dep.Length * 2];
+            for (int i = 0; i < dep.Length; i++) {
+                srcinfo[i*2]   = dep[i].name;
+                srcinfo[i*2+1] = Utils.HashToStr(
+                    ObjectRegistry.hash.ComputeHash(
+                        new UTF8Encoding().GetBytes(dep[i].source)));
+            }
+            fb.Strings(srcinfo);
+
             fb.String(filename);
-            fb.String(modtime);
+            fb.String(source);
             fb.String(asm_name);
             fb.String(dll_name);
 
@@ -689,8 +705,19 @@ namespace Niecza {
             tb.Register(n);
 
             n.name     = tb.String();
+            string[] srcinfo = tb.Strings();
+            if (Builtins.up_domain != null) {
+                object[] args = new object[srcinfo.Length + 1];
+                Array.Copy(srcinfo, 0, args, 1, srcinfo.Length);
+                args[0] = "check_dated";
+                string result = (string) Builtins.UpCall(args);
+                if (result != "ok")
+                    throw new ThawException("dated sources");
+            }
+            // load assembly here
+
             n.filename = tb.String();
-            n.modtime  = tb.String();
+            n.source   = tb.String();
             n.asm_name = tb.String();
             n.dll_name = tb.String();
 

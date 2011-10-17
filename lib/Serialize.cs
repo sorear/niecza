@@ -60,7 +60,7 @@ namespace Niecza.Serialization {
         Dictionary<string,SerUnit> units =
             new Dictionary<string,SerUnit>();
 
-        static readonly HashAlgorithm hash = SHA256.Create();
+        internal static readonly HashAlgorithm hash = SHA256.Create();
         static readonly string signature = "Niecza-Serialized-Module";
         static readonly int version = 1;
 
@@ -708,19 +708,10 @@ namespace Niecza.Serialization {
             return su.bynum[ix];
 
 badhash:
-            StringBuilder sb = new StringBuilder();
-            sb.AppendFormat("Hash mismatch for unit {0} referenced from {1}",
-                    su.name, unit.name);
-
-            sb.Append(", wanted ");
-            foreach (byte b in hash)
-                sb.AppendFormat("{0:X2}", b);
-
-            sb.Append(", got ");
-            foreach (byte b in su.hash)
-                sb.AppendFormat("{0:X2}", b);
-
-            throw new ThawException(sb.ToString());
+            throw new ThawException(string.Format("Hash mismatch for " +
+                "unit {0} referenced from {1}, wanted {2}, got {3}",
+                su.name, unit.name, Utils.HashToStr(unit.hash),
+                Utils.HashToStr(su.hash)));
         }
     }
 

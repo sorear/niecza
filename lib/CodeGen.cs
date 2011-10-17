@@ -3559,8 +3559,8 @@ dynamic:
                 return null;
             } else if (cmd == "new_unit") {
                 return new Handle(new RuntimeUnit((string)args[1],
-                        (string)args[2], (string)args[3], (string)args[4],
-                        (bool)args[5], (bool)args[6]));
+                        (string)args[2], (string)args[3],
+                        (bool)args[4], (bool)args[5]));
             } else if (cmd == "set_current_unit") {
                 Backend.currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = Backend.currentUnit.globals;
