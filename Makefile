@@ -57,7 +57,7 @@ obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
 	$(CSC) /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
 
 obj/p5embed.so: lib/p5embed.c
-	cc -shared -Wl,-soname,p5embed.so -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`
+	cc -shared -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`
 
 aot: all
 	mono --aot run/*.dll run/Niecza.exe

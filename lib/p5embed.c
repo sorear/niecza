@@ -19,29 +19,26 @@ xs_init(pTHX)
 static PerlInterpreter *my_perl;
 void p5embed_initialize()
 {
-  printf("# initialising perl\n");
-  PERL_SYS_INIT3(0,NULL,NULL);
-  PerlInterpreter* my_perl = perl_alloc();
+  int argc = 1;
+  char *argv0[] = { "perl", NULL, 0 };
+  char **argv = argv0;
+  PERL_SYS_INIT(&argc,&argv);
+  my_perl = perl_alloc();
   perl_construct(my_perl);
   char *embedding[] = { "", "-e", "0" };
   perl_parse(my_perl, xs_init, 3, embedding, NULL);
   PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
 //  eval_pv("use lib 'perl5';use Niecza::Interoperability",TRUE);
-  printf("# initialised perl\n");
 }
 
 SV* p5embed_eval(char* code) { 
-  printf("# evaling code <%s>...\n",code);
   eval_pv("1",TRUE);
-  printf("# evaled 1\n");
   SV* ret = eval_pv(code,TRUE);
-  printf("# survived evaling code...\n");
   return ret;
 }
 
 void p5embed_dispose()
 {
-  printf("# disposing of perl\n");
   perl_destruct(my_perl);
   perl_free(my_perl);
   PERL_SYS_TERM();
@@ -75,7 +72,7 @@ SV* p5method_call(char* name,SV** args,int args_count) {
 
 }
 
-SV* p5embed_subcall(SV** args,int args_count) {
+SV* p5embed_subcall(int context,SV** args,int args_count) {
   dSP;
 
 
@@ -87,18 +84,22 @@ SV* p5embed_subcall(SV** args,int args_count) {
   PUTBACK;
 
 
-  int count = call_sv(args[0],G_SCALAR);
-  SPAGAIN;
-  if (count != 1) croak("Big trouble\n");
+  /* HACK - list context is NYI */
+  if (context == 1 || context == 0) {
+    int count = call_sv(args[0],G_SCALAR);
+    SPAGAIN;
+    if (count != 1) croak("Big trouble\n");
 
-  SV* ret = POPs;
+    SV* ret = POPs;
 
-  /* TODO should i do that? */
-  SvREFCNT_inc(ret);
+    /* TODO should i do that? */
+    SvREFCNT_inc(ret);
 
-  PUTBACK;
-
-  return ret;
+    PUTBACK;
+    return ret;
+  } else if (context == 2) {
+    call_sv(args[0],G_VOID);
+  }
 
 }
 

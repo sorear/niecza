@@ -22,8 +22,7 @@ $window.Add($drawingarea);
 $window.ShowAll;
 Application.Run;  # end of main program, it's all over when this returns
 
-sub DeleteEvent($obj, $args) {
-    $obj; $args; # suppress "declared but not used" "Potential difficulties"
+sub DeleteEvent($obj, $args) {  #OK not used
     Application.Quit;
 };
 
@@ -31,12 +30,8 @@ sub ExposeEvent($obj, $args)
 {
     $args;  # suppress "declared but not used" "Potential difficulties"
     my $cc = GdkCairoHelper.Create($obj.GdkWindow);  # Cairo Context
-    # TODO: the following two lines pass parameters by value, need to pass by references to integers
-    # my $windowX; my $windowY; my $windowWidth; my $windowHeight; my $windowDepth;
-    # $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
-    # Tracked as https://github.com/sorear/niecza/issues/57
-    # TODO: remove the following one line cheat that works around the above problem
-    my $windowWidth = $windowSizeX; my $windowHeight = $windowSizeY;
+    my $windowX=0; my $windowY=0; my $windowWidth=0; my $windowHeight=0; my $windowDepth=0;
+    $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
     $cc.SetSourceRGB(0.6, 1, 0.6); $cc.Paint;  # pale green background
     # Start the recursive drawing process
     my $x0=0; my $y0=0; my  $x1=$windowWidth-1; my $y1=$windowHeight/2;
