@@ -1059,6 +1059,7 @@ next_method: ;
         public BoxObject(T x, STable klass) : base(klass) { value = x; }
         public BoxObject(T x, STable klass, int na) : base(klass,na) { value = x; }
         internal static new P6opaque Create() { return new BoxObject<T>(); }
+        protected override void SetData(object o) { value = (T)o; }
         public override void Freeze(FreezeBuffer fb) {
             FreezeSelf(fb, typeof(T));
             fb.ObjRef(value);

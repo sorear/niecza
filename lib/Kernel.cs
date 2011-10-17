@@ -349,6 +349,7 @@ namespace Niecza {
         public SubInfo mainline, bottom;
         public bool is_mainish;
         public Type type;
+        public Assembly assembly;
         public List<SubInfo> our_subs;
 
         // used during construction only
@@ -420,6 +421,8 @@ namespace Niecza {
 
             for (int i = 0; i < ths.Length; i++) {
                 ths[i].FillSubInfo(type);
+                our_subs[i].nam_str = null;
+                our_subs[i].nam_refs = null;
             }
         }
 
@@ -432,14 +435,16 @@ namespace Niecza {
         }
 
         public void PrepareEval() {
-            GenerateCode(true);
+            if (type == null) {
+                GenerateCode(true);
+
+                foreach (KeyValuePair<object, FieldBuilder> kv in constants)
+                    type.GetField(kv.Value.Name).SetValue(null, kv.Key);
+            }
 
             foreach (SubInfo z in our_subs)
                 if ((z.special & SubInfo.UNSAFE) != 0)
                     Kernel.CheckUnsafe(z);
-
-            foreach (KeyValuePair<object, FieldBuilder> kv in constants)
-                type.GetField(kv.Value.Name).SetValue(null, kv.Key);
 
             if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
                 Kernel.TraceFlags = Kernel.TRACE_CUR;
@@ -677,6 +682,12 @@ namespace Niecza {
             fb.String(asm_name);
             fb.String(dll_name);
 
+            fb.Int(constants.Count);
+            foreach (KeyValuePair<object,FieldBuilder> kv in constants) {
+                fb.String(kv.Value.Name);
+                fb.ObjRef(kv.Key);
+            }
+
             fb.Int(globals.Count);
             foreach (KeyValuePair<string, StashEnt> kv in globals) {
                 fb.String(kv.Key);
@@ -714,12 +725,20 @@ namespace Niecza {
                 if (result != "ok")
                     throw new ThawException("dated sources");
             }
-            // load assembly here
 
             n.filename = tb.String();
             n.source   = tb.String();
             n.asm_name = tb.String();
             n.dll_name = tb.String();
+
+            n.assembly = Assembly.LoadFrom(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, n.dll_name));
+            n.type = tb.type = n.assembly.GetType(n.name, true);
+
+            int ncon = tb.Int();
+            while (ncon-- > 0) {
+                FieldInfo fi = n.type.GetField(tb.String());
+                fi.SetValue(null, tb.ObjRef());
+            }
 
             int ct = tb.Int();
             n.globals = new Dictionary<string, StashEnt>();
@@ -1637,15 +1656,14 @@ noparams:
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.SubInfo);
-            // TODO - saving constant pools NYI
             string mn = null;
             string tn = null;
             if (code != null) {
                 Type t = code.Method.DeclaringType;
                 if (t.Assembly == typeof(Kernel).Assembly) {
                     tn = t.FullName;
-                    mn = code.Method.Name;
                 }
+                mn = code.Method.Name;
             }
             fb.String(mn);
             fb.String(tn);
@@ -1697,15 +1715,16 @@ noparams:
         internal static SubInfo Thaw(ThawBuffer tb) {
             SubInfo n = new SubInfo();
             tb.Register(n);
-            // TODO - saving constant pools NYI
             string mn = tb.String();
             string tn = tb.String();
-            if (tn != null) {
+            if (mn != null) {
+                Type t = tn == null ? tb.type :
+                    typeof(Kernel).Assembly.GetType(tn, true);
+
                 n.code = (DynBlockDelegate) Delegate.CreateDelegate(
                     typeof(DynBlockDelegate),
-                    typeof(Kernel).Assembly.GetType(tn, true).GetMethod(mn,
-                        BindingFlags.Public | BindingFlags.NonPublic |
-                        BindingFlags.Static));
+                    t.GetMethod(mn, BindingFlags.Public |
+                        BindingFlags.NonPublic | BindingFlags.Static));
             }
 
             n.nspill = tb.Int();

@@ -487,6 +487,8 @@ namespace Niecza.Serialization {
         List<IFixup> fixups_needed = new List<IFixup>();
         List<object> revalidate = new List<object>();
 
+        public Type type;
+
         internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data = data;
             this.reg  = reg;
