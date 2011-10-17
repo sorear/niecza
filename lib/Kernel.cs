@@ -417,6 +417,20 @@ namespace Niecza {
                 ths[i].MakeBody(Reader.Read(z.nam_str, z.nam_refs));
             }
 
+            if (is_mainish) {
+                var mainb = type_builder.DefineMethod("Main",
+                        MethodAttributes.Static | MethodAttributes.Public,
+                        typeof(void), new Type[] { typeof(string[]) });
+                var il = mainb.GetILGenerator();
+
+                il.Emit(OpCodes.Ldstr, asm_name);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Call, typeof(Kernel).GetMethod("MainHandler"));
+                il.Emit(OpCodes.Ret);
+
+                asm_builder.SetEntryPoint(mainb);
+            }
+
             type = type_builder.CreateType();
 
             for (int i = 0; i < ths.Length; i++) {
@@ -5474,6 +5488,16 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             } else {
                 return tf;
             }
+        }
+
+        public static void MainHandler(string uname, string[] args) {
+            commandArgs = args;
+
+            RuntimeUnit ru = (RuntimeUnit)
+                RuntimeUnit.reg.LoadUnit(uname).root;
+
+            ru.PrepareEval();
+            RunMain(ru);
         }
 
         public static void Main(string[] args) {
