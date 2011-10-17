@@ -435,10 +435,12 @@ method regex_def($/) {
         $ast.check;
     }
     my @lift = $ast.oplift;
-    $*CURLEX<!sub>.ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
+    my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
+    say $ltm.perl;
+    $*CURLEX<!sub>.set_ltm($ltm);
     ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
-    $*CURLEX<!sub>.code = ::Op::RegexBody.new(|node($/), pre => @lift,
-        name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb);
+    $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
+        name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
@@ -1098,7 +1100,7 @@ method circumfix:sym<[ ]> ($/) {
 # XXX This fails to catch {; ... } because it runs after empty statement
 # elimination.
 method check_hash($/) {
-    my $do = $<pblock>.ast.code;
+    my $do = $<pblock><blockoid>.ast;
 
     return False unless $do.^isa(::Op::StatementList);
     return True if $do.children == 0;
@@ -1242,13 +1244,13 @@ method INFIX($/) {
                         $fn.with_args($/, $ll, $rhs)),
                     $ll]) });
         }
-        elsif $lhs.^isa(::Op::Attribute) && !defined($lhs.initializer.ivar) {
+        elsif $lhs.^isa(::Op::Attribute) {
             my $init = self.thunk_sub($rhs,
                 :name($lhs.initializer.name ~ " init"));
-            $lhs.initializer.ivar = self.gensym;
-            $*CURLEX<!sub>.add_my_sub($lhs.initializer.ivar, $init);
-            $lhs.initializer.ibody = $init.xref;
-            make $lhs;
+            $init.set_outervar(my $ov = self.gensym);
+            $*CURLEX<!sub>.add_my_sub($ov, $init);
+            $lhs.initializer.add_initializer($lhs.name, $init);
+            make ::Op::StatementList.new;
         }
         elsif $lhs.^isa(::Op::ConstantDecl) && !$lhs.init {
             my $sig = substr($lhs.name, 0, 1);
@@ -1515,21 +1517,18 @@ method whatever_postcheck($/, $st, $term) {
     if @$st {
         my $slot = self.gensym;
 
-        my $body = ::Metamodel::StaticSub.new(
-            outerx => $*CURLEX<!sub>.xref,
-            outer_direct => $*CURLEX<!sub>,
+        my $body = $*unit.create_sub(
+            outer => $*CURLEX<!sub>,
             class => 'WhateverCode',
-            unit => $*unit,
-            transparent => True,
-            code => $term,
             in_class => $*CURLEX<!sub>.in_class,
             cur_pkg => $*CURLEX<!sub>.cur_pkg);
 
+        $body.add_my_name($_, :noinit) for @$st;
         $body.set_signature(::GLOBAL::Sig.new(params => [
             map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]));
-        $body.add_my_name($_, :noinit) for @$st;
+        $body.set_transparent;
+        $body.finish($term);
 
-        $*CURLEX<!sub>.add_child($body);
         $*CURLEX<!sub>.add_my_sub($slot, $body);
 
         ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, |node($/));
@@ -1544,7 +1543,7 @@ method term:value ($/) { make $<value>.ast }
 method package_var($/, $slot, $name, $path) {
     $/.CURSOR.trymop({
         $/.CURSOR.check_categorical($slot);
-        my $ref = $path.^can('kind') ?? $path !!
+        my $ref = $path.^can('FALLBACK') ?? $path !!
             $*CURLEX<!sub>.compile_get_pkg(@$path, :auto);
         $*CURLEX<!sub>.add_common_name($slot, $ref, $name, |mnode($/));
         $/.CURSOR.mark_used($slot);
@@ -1880,7 +1879,6 @@ method parameter($/) {
 
     if $<type_constraint> {
         ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
-        $type &&= $type.xref;
     }
 
     for @( $<trait> ) -> $trait {
@@ -1900,7 +1898,7 @@ method parameter($/) {
     }
 
     my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
-    $*unit.deref($default).set_name("$/ init") if $default;
+    $default.set_name("$/ init") if $default;
 
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
@@ -2265,46 +2263,40 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
     $/.CURSOR.sorry("Attribute $name declared outside of any class"),
         return ::Op::StatementList.new unless $ns;
     $/.CURSOR.sorry("Attribute $name declared in an augment"),
-        return ::Op::StatementList.new if $*CURLEX<!sub>.augmenting;
+        return ::Op::StatementList.new if defined $*AUGMENT_BUFFER;
 
-    $ns = $*unit.deref($ns);
-
-    if !$ns.^can('add_attribute') {
+    if !$ns.CAN('add_attribute') {
         $/.CURSOR.sorry("A $ns.WHAT() cannot have attributes");
         return ::Op::StatementList.new
     }
 
-    my $nb = ::Metamodel::StaticSub.new(
-        transparent=> True,
-        unit       => $*unit,
-        outerx     => $*CURLEX<!sub>.xref,
-        outer_direct => $*CURLEX<!sub>,
+    my $nb = $*unit.create_sub(
+        outer      => $*CURLEX<!sub>,
         name       => $name,
         cur_pkg    => $*CURLEX<!sub>.cur_pkg,
-        class      => 'Method',
-        code       => ::Op::GetSlot.new(name => $name,
-            object => ::Op::Lexical.new(name => 'self')));
+        class      => 'Method');
+    $nb.set_transparent;
     $nb.add_my_name('self', noinit => True);
     $nb.set_signature(Sig.simple('self'));
+    $nb.finish(::Op::GetSlot.new(name => $name,
+        object => ::Op::Lexical.new(name => 'self')));
     $*CURLEX<!sub>.create_static_pad; # for protosub instance
-    $nb.strong_used = True;
-    $*CURLEX<!sub>.add_child($nb);
     my $at;
 
     $/.CURSOR.trymop({
         my $ac = self.gensym;
+        $nb.set_outervar($ac);
         $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
-        $at = $ns.add_attribute($name, $sigil, +$accessor, Any, Any, $type,
-            |mnode($/));
-        $ns.add_method('only', 'private', $name, $ac, $nb.xref,
+        $ns.add_attribute($name, $sigil, +$accessor, $type, |mnode($/));
+        $ns.add_method(::Metamodel::SubVisibility::private, $name, $nb,
             |mnode($/));
         if $accessor {
-            $ns.add_method('only', 'normal', $name, $ac, $nb.xref,
-                |mnode($/));
+            $ns.add_method(0, $name, $nb, |mnode($/));
         }
+        $at = True;
     });
 
-    $at ?? ::Op::Attribute.new(name => $name, initializer => $at) !!
+    $at ?? ::Op::Attribute.new(name => $name, initializer => $ns) !!
         ::Op::StatementList.new;
 }
 
@@ -2336,7 +2328,6 @@ method variable_declarator($/) {
     my $typeconstraint;
     if $*OFTYPE {
         ($typeconstraint) = self.process_name($*OFTYPE<longname>);
-        $typeconstraint &&= $typeconstraint.xref;
         $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
     }
 
@@ -2480,18 +2471,19 @@ method make_constant($/, $scope, $name) {
 method make_constant_into($/, $pkg, $name, $rhs) {
     my $slot = self.gensym;
     $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_common_name($slot, $pkg.xref, $name, |mnode($/));
+        $*CURLEX<!sub>.add_common_name($slot, $pkg, $name, |mnode($/));
     });
     self.init_constant(::Op::ConstantDecl.new(|node($/), name => $slot,
         init => False), $rhs);
 }
 
 method init_constant($con, $rhs) {
-    my $body = self.thunk_sub($rhs, name => "$con.name() init");
-    $body.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
-    $body.hint_hack = [ $*CURLEX<!sub>.xref, $con.name ];
+    my $body = self.thunk_sub(
+        ::Op::LexicalBind.new(name => $con.name, :$rhs),
+        name => "$con.name() init");
     $body.outer.create_static_pad;
     $con.init = True;
+    $body.set_phaser(+::Metamodel::Phaser::UNIT_INIT);
     $con;
 }
 
@@ -2546,33 +2538,29 @@ method type_declarator:enum ($/) {
         my ($lexvar, $obj);
         $/.CURSOR.trymop({
             ($lexvar, $obj) = self.do_new_package($/, :$scope,
-                class => ::Metamodel::Class, name => $<longname>, :@exports);
+                class => 'class', name => $<longname>, :@exports);
 
-            $obj.add_super($*CURLEX<!sub>.compile_get_pkg($kindtype).xref);
-            $obj.add_super($basetype.xref);
+            $obj.add_super($*CURLEX<!sub>.compile_get_pkg($kindtype));
+            $obj.add_super($basetype);
 
-            my $nb = ::Metamodel::StaticSub.new(
-                transparent=> True,
-                unit       => $*unit,
-                outerx     => $*CURLEX<!sub>.xref,
-                outer_direct => $*CURLEX<!sub>,
+            my $nb = $*unit.create_sub(
+                outer      => $*CURLEX<!sub>,
                 name       => $obj.name ~ '.enums',
                 cur_pkg    => $*CURLEX<!sub>.cur_pkg,
-                class      => 'Method',
-                code       => self.init_constant(
-                    self.make_constant($/, 'anon', Any),
-                    ::Op::CallMethod.new(name => 'new',
-                        receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+                class      => 'Method');
+
+            $nb.set_transparent;
 
             my $nbvar = self.gensym;
             $nb.add_my_name('self', noinit => True);
             $nb.set_signature(Sig.simple('self'));
+            $nb.finish(self.init_constant(
+                self.make_constant($/, 'anon', Any),
+                ::Op::CallMethod.new(name => 'new',
+                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
             $*CURLEX<!sub>.create_static_pad;
-            $nb.strong_used = True;
-            $*CURLEX<!sub>.add_child($nb);
             $*CURLEX<!sub>.add_my_sub($nbvar, $nb, |mnode($/));
-            $obj.add_method('only', 'normal', 'enums', $nbvar,
-                $nb.xref, |mnode($/));
+            $obj.add_method(0, 'enums', $nb, |mnode($/));
             $obj.close;
 
             for @pairs {
@@ -2665,7 +2653,7 @@ method process_block_traits($/, @tr) {
                 $T.CURSOR.sorry("Cannot interpret operator reference");
                 next;
             }
-            unless $sub.extend<prec> {
+            unless $sub.get_extend('prec') {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
                 next;
             }
@@ -2674,42 +2662,46 @@ method process_block_traits($/, @tr) {
                 next;
             }
             if $rel eq 'equiv' {
-                my %copy = %$oprec;
-                $sub.extend.<prec> = %copy;
+                $sub.set_extend('prec', $oprec.kv);
             } else {
-                $sub.extend.<prec><prec> = $oprec.<prec>;
+                my %prec = $sub.get_extend('prec');
+                %prec<prec> = $oprec.<prec>;
+                %prec<prec> ~~ s/\=/<=/ if $rel eq 'looser';
+                %prec<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+                $sub.set_extend('prec', %prec.kv);
             }
-            $sub.extend.<prec><prec> ~~ s/\=/<=/ if $rel eq 'looser';
-            $sub.extend.<prec><prec> ~~ s/\=/>=/ if $rel eq 'tighter';
         } elsif !$pack && $tr<assoc> {
             my $arg = ~self.trivial_eval($T, $tr<assoc>);
-            unless $sub.extend<prec> {
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
                 next;
             }
-            my @valid = < left right non list unary chain >;
-            unless grep $arg, @valid {
+            unless $arg eq any < left right non list unary chain > {
                 $T.CURSOR.sorry("Invalid associativity $arg");
                 next;
             }
-            $sub.extend.<prec><assoc> = $arg;
+            %prec<assoc> = $arg;
+            $sub.set_extend('prec', %prec.kv);
         } elsif !$pack && $tr<Niecza::absprec> {
             my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
-            unless $sub.extend.<prec> {
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
                 next;
             }
-            $sub.extend.<prec><prec> = $arg;
-            $sub.extend.<prec><dba> = "like $sub.name()";
+            %prec<prec> = $arg;
+            %prec<dba> = "like $sub.name()";
+            $sub.set_extend('prec', %prec.kv);
         } elsif !$pack && $tr<Niecza::builtin> {
-            $sub.extend.<builtin> = [
-                self.trivial_eval($T, $tr<Niecza::builtin>) ];
+            $sub.set_extend('builtin',
+                self.trivial_eval($T, $tr<Niecza::builtin>));
         } elsif !$pack && $tr<return_pass> {
-            $sub.returnable = False;
+            $sub.set_return_pass;
         } elsif !$pack && $tr<of> {
         } elsif !$pack && $tr<rw> {
         } elsif !$pack && $tr<unsafe> {
-            $sub.unsafe = True;
+            $sub.set_unsafe;
         } else {
             $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
         }
@@ -2722,22 +2714,20 @@ method termish($/) { make $<term>.ast }
 method nulltermish($/) {}
 method EXPR($/) { make $<root>.ast }
 method modifier_expr($/) { make $<EXPR>.ast }
-method default_value($/) { make self.thunk_sub($<EXPR>.ast).xref }
+method default_value($/) { make self.thunk_sub($<EXPR>.ast) }
 method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
-    my $n = ::Metamodel::StaticSub.new(
-        outerx => $*CURLEX<!sub>.xref,
-        outer_direct => $*CURLEX<!sub>,
-        class => $class // 'Block',
-        unit => $*unit,
+    my $n = $*unit.create_sub(
         name => $name // 'ANON',
-        transparent => True,
-        code => $code,
-        ltm => $ltm,
-        in_class => $*CURLEX<!sub>.in_class,
-        cur_pkg => $*CURLEX<!sub>.cur_pkg);
-    $n.set_signature(Sig.simple(@$params));
+        class => $class // 'Block',
+        outer => $*CURLEX<!sub>,
+        cur_pkg => $*CURLEX<!sub>.cur_pkg,
+        in_class => $*CURLEX<!sub>.in_class);
+    $n.set_transparent;
+    say $ltm.perl if $ltm;
+    $n.set_ltm($ltm) if $ltm;
     $n.add_my_name($_, :noinit) for @$params;
-    $*CURLEX<!sub>.add_child($n);
+    $n.set_signature(Sig.simple(@$params));
+    $n.finish($code);
     $n;
 }
 
@@ -3106,7 +3096,7 @@ method package_def ($/) {
         my @ops;
         for @( $*AUGMENT_BUFFER ) -> $mode, $name, $sym {
             push @ops, CgOp._addmethod(CgOp.letvar('!mo'), $mode,
-                CgOp.str($name), CgOp.scopedlex($sym));
+                CgOp.str($name), CgOp.fetch(CgOp.scopedlex($sym)));
         }
         my $fin = CgOp.letn('!mo', CgOp.class_ref('mo', $obj),
             @ops, CgOp._invalidate(CgOp.letvar('!mo')), CgOp.corelex('Nil'));
@@ -3314,7 +3304,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         my $/;
         if $sub.name ~~ /^(\w+)\:\<(.*)\>$/ {
             my %new = %( $std.default_O(~$0, ~$1) );
-            $sub.extend.<prec> = %new;
+            $sub.set_extend('prec', %new.kv);
         }
     }
 
@@ -3460,7 +3450,6 @@ method statement_prefix:do ($/) {
         body => self.inliney_call($/, $<blast>.ast));
 }
 method statement_prefix:gather ($/) {
-    $<blast>.ast.gather_hack = True;
     make ::Op::Gather.new(|node($/),
         var => self.block_expr($/, $<blast>.ast).name);
 }
@@ -3480,12 +3469,13 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
 
     if $unique {
         $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
-            if any($sub.outer.children).is_phaser == ::Metamodel::Phaser.($ph);
-        $sub.code = ::Op::CatchyWrapper.new(inner => $sub.code);
+            if $sub.outer.contains_phaser(+::Metamodel::Phaser.($ph));
+        my $code = ($<blast><statement> // $<blast><block><blockoid> // $<block><blockoid>).ast;
+        # TODO avoid double finishing
+        $sub.finish(::Op::CatchyWrapper.new(inner => $code));
     }
 
     $sub.outer.noninlinable;
-    $sub.is_phaser = +::Metamodel::Phaser.($ph);
 
     if $topic {
         $sub.has_lexical('$_') || $sub.add_my_name('$_');
@@ -3493,8 +3483,10 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
         $sub.set_signature(Sig.simple('$_'));
     }
     $*CURLEX<!sub>.create_static_pad if $csp;
+    $sub.set_phaser(+::Metamodel::Phaser.($ph));
     make ::Op::StatementList.new;
 }
+
 method statement_control:CATCH ($/) { phaser($/, 'CATCH', :unique, :topic) }
 method statement_control:CONTROL ($/) { phaser($/, 'CONTROL', :unique, :topic) }
 method statement_prefix:PRE ($/) { phaser($/, 'PRE') }
@@ -3510,13 +3502,13 @@ method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 
 # XXX 'As soon as possible' isn't quite soon enough here
 method statement_prefix:BEGIN ($/) {
-    $<blast>.ast.is_phaser = +::Metamodel::Phaser::UNIT_INIT;
     $*CURLEX<!sub>.create_static_pad;
+    $<blast>.ast.set_phaser(+::Metamodel::Phaser::UNIT_INIT);
     make ::Op::StatementList.new;
 
     # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
     repeat while False {
-        my $c = $<blast>.ast.code;
+        my $c = ($<blast><statement> || $<blast><block><blockoid>).ast;
 
         last unless $c ~~ Op::StatementList;
         last unless $c.children == 1;

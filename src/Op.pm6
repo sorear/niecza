@@ -439,7 +439,7 @@ class ForLoop is Op {
     method statement_level() {
         my $body = $*CURLEX<!sub>.lookup_lex($!sink)[4];
         my $var = [ map { ::GLOBAL::NieczaActions.gensym },
-            0 ..^ +$body.signature.params ];
+            0 ..^ $body.count ];
         ::Op::ImmedForLoop.new(source => $!source, var => $var,
             sink => ::GLOBAL::OptBeta.make_call($!sink,
                 map { ::Op::LetVar.new(name => $_) }, @$var));

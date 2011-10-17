@@ -5438,7 +5438,7 @@ method trymop($f) {
 # makes OUTER:: aliases...
 # note: does NOT follow ::Alias lexicals, since the ::Alias is the real
 # user visible lex in most cases
-method lookup_lex($name, $lex) {
+method lookup_lex($name, $lex?) {
     ($lex // $*CURLEX)<!sub>.lookup_lex($name, $*FILE<name>, self.lineof(self.pos));
 }
 
