@@ -1515,6 +1515,10 @@ flat_enough:;
         return File.Exists(path) || Directory.Exists(path);
     }
 
+    public static void path_unlink(string path) {
+        File.Delete(path);
+    }
+
     public static bool emulate_eaccess(string path, int mode) {
         uint ruid = PosixWrapper.getuid();
         uint rgid = PosixWrapper.getgid();

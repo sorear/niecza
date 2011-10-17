@@ -2101,6 +2101,13 @@ class IO::ArgFiles {
     }
 }
 
+sub unlink(*@filenames) is unsafe {
+    for @filenames -> $filename {
+        Q:CgOp { (rnull (path_unlink (obj_getstr {$filename}))) };
+    }
+    True; # is there a way to actually detect problems with File.Delete?
+}
+
 multi sub open($filename, :$w?, :$a?) is unsafe {
     if $a {
         Q:CgOp { (box TextWriter (twriter_append (obj_getstr {$filename}) (obj_getbool {True}))) }
