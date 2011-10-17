@@ -311,7 +311,7 @@ S32-str/substr.t
 S32-str/uc.t
 S32-str/ucfirst.t
 S32-str/words.t
-# S32-trig/atan2.t # TODO: fudging
+S32-trig/atan2.t
 S32-trig/cos.t
 S32-trig/cosec.t
 S32-trig/cosech.t
