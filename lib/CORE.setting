@@ -2118,6 +2118,10 @@ multi sub open($filename, :$w?, :$a?) is unsafe {
     }
 }
 
+sub close($file) {
+    $file.close;
+}
+
 # TODO $*ARGFILES, multi
 sub get($handle = $*IN) { $handle.get }
 sub lines($filehandle = $*IN) { $filehandle.lines }
