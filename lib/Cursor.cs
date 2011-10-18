@@ -957,7 +957,7 @@ public abstract class LAD : IFreeze {
 }
 
 public class LADStr : LAD {
-    public readonly string text;
+    public string text;
     public LADStr(string text) { this.text = text; }
 
     public override LAD Reify(NFA pad) { return this; }
@@ -985,11 +985,18 @@ public class LADStr : LAD {
         fb.Byte((byte) SerializationCode.LADStr);
         fb.String(text);
     }
+    internal static LADStr Thaw(ThawBuffer tb) {
+        LADStr n = new LADStr(null);
+        tb.Register(n);
+        n.text = tb.String();
+        return n;
+    }
 }
 
 public class LADStrNoCase : LAD {
-    public readonly string text;
+    public string text;
     public LADStrNoCase(string text) { this.text = text; }
+    private LADStrNoCase() { }
 
     public override LAD Reify(NFA pad) { return this; }
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
@@ -1016,10 +1023,17 @@ public class LADStrNoCase : LAD {
         fb.Byte((byte) SerializationCode.LADStrNoCase);
         fb.String(text);
     }
+    internal static LADStrNoCase Thaw(ThawBuffer tb) {
+        LADStrNoCase n = new LADStrNoCase();
+        tb.Register(n);
+        n.text = tb.String();
+        return n;
+    }
 }
 
 public class LADCC : LAD {
-    public readonly CC cc;
+    public CC cc;
+    private LADCC() { }
     public LADCC(CC cc) { this.cc = cc; }
 
     public override LAD Reify(NFA pad) { return this; }
@@ -1032,7 +1046,13 @@ public class LADCC : LAD {
     }
     public override void Freeze(FreezeBuffer fb) {
         fb.Byte((byte) SerializationCode.LADCC);
-        fb.Ints(cc.vec);
+        fb.ObjRef(cc);
+    }
+    internal static LADCC Thaw(ThawBuffer tb) {
+        LADCC n = new LADCC();
+        tb.Register(n);
+        n.cc = (CC) tb.ObjRef();
+        return n;
     }
 }
 
@@ -1098,8 +1118,9 @@ public class LADDot : LAD {
 }
 
 public class LADStar : LAD {
-    public readonly LAD child;
+    public LAD child;
     public LADStar(LAD child) { this.child = child; }
+    private LADStar() {}
 
     public override LAD Reify(NFA pad) { return new LADStar(child.Reify(pad)); }
     public override void ToNFA(NFA pad, int from, int to) {
@@ -1117,12 +1138,19 @@ public class LADStar : LAD {
         fb.Byte((byte) SerializationCode.LADStar);
         fb.ObjRef(child);
     }
+    internal static object Thaw(ThawBuffer tb) {
+        var n = new LADStar();
+        tb.Register(n);
+        n.child = (LAD) tb.ObjRef();
+        return n;
+    }
 }
 
 public class LADOpt : LAD {
-    public readonly LAD child;
+    public LAD child;
     public override LAD Reify(NFA pad) { return new LADOpt(child.Reify(pad)); }
     public LADOpt(LAD child) { this.child = child; }
+    private LADOpt() {}
 
     public override void ToNFA(NFA pad, int from, int to) {
         pad.AddEdge(from, to, null);
@@ -1137,12 +1165,19 @@ public class LADOpt : LAD {
         fb.Byte((byte) SerializationCode.LADOpt);
         fb.ObjRef(child);
     }
+    internal static object Thaw(ThawBuffer tb) {
+        var n = new LADOpt();
+        tb.Register(n);
+        n.child = (LAD) tb.ObjRef();
+        return n;
+    }
 }
 
 public class LADPlus : LAD {
-    public readonly LAD child;
+    public LAD child;
     public override LAD Reify(NFA pad) { return new LADPlus(child.Reify(pad)); }
     public LADPlus(LAD child) { this.child = child; }
+    private LADPlus() { }
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
         child.QueryLiteral(pad, out len, out cont);
@@ -1165,11 +1200,18 @@ public class LADPlus : LAD {
         fb.Byte((byte) SerializationCode.LADPlus);
         fb.ObjRef(child);
     }
+    internal static object Thaw(ThawBuffer tb) {
+        var n = new LADPlus();
+        tb.Register(n);
+        n.child = (LAD) tb.ObjRef();
+        return n;
+    }
 }
 
 public class LADSequence : LAD {
-    public readonly LAD[] args;
+    public LAD[] args;
     public LADSequence(LAD[] args) { this.args = args; }
+    private LADSequence() { }
     public override LAD Reify(NFA pad) {
         LAD[] nc = new LAD[args.Length];
         for (int i = 0; i < args.Length; i++)
@@ -1204,15 +1246,20 @@ public class LADSequence : LAD {
     }
     public override void Freeze(FreezeBuffer fb) {
         fb.Byte((byte) SerializationCode.LADSequence);
-        fb.Int(args.Length);
-        foreach (LAD l in args)
-            fb.ObjRef(l);
+        fb.Refs(args);
+    }
+    internal static object Thaw(ThawBuffer tb) {
+        var n = new LADSequence();
+        tb.Register(n);
+        n.args = tb.RefsA<LAD>();
+        return n;
     }
 }
 
 public class LADAny : LAD {
-    public readonly LAD[] zyg;
+    public LAD[] zyg;
     public LADAny(LAD[] zyg) { this.zyg = zyg; }
+    private LADAny() { }
     public override LAD Reify(NFA pad) {
         LAD[] nc = new LAD[zyg.Length];
         for (int i = 0; i < zyg.Length; i++)
@@ -1232,14 +1279,19 @@ public class LADAny : LAD {
     }
     public override void Freeze(FreezeBuffer fb) {
         fb.Byte((byte) SerializationCode.LADAny);
-        fb.Int(zyg.Length);
-        foreach (LAD l in zyg)
-            fb.ObjRef(l);
+        fb.Refs(zyg);
+    }
+    internal static object Thaw(ThawBuffer tb) {
+        var n = new LADAny();
+        tb.Register(n);
+        n.zyg = tb.RefsA<LAD>();
+        return n;
     }
 }
 
 public class LADParam : LAD {
-    public readonly string name;
+    public string name;
+    private LADParam() {}
     public LADParam(string name) { this.name = name; }
 
     public override LAD Reify(NFA pad) {
@@ -1303,12 +1355,19 @@ imp:
         fb.Byte((byte) SerializationCode.LADParam);
         fb.String(name);
     }
+    internal static LADParam Thaw(ThawBuffer tb) {
+        LADParam n = new LADParam();
+        tb.Register(n);
+        n.name = tb.String();
+        return n;
+    }
 }
 
 public class LADMethod : LAD {
-    public readonly string name;
+    public string name;
 
     public LADMethod(string name) { this.name = name; }
+    private LADMethod() {}
 
     public override void ToNFA(NFA pad, int from, int to) {
         throw new InvalidOperationException();
@@ -1357,6 +1416,12 @@ public class LADMethod : LAD {
     public override void Freeze(FreezeBuffer fb) {
         fb.Byte((byte) SerializationCode.LADMethod);
         fb.String(name);
+    }
+    internal static LADMethod Thaw(ThawBuffer tb) {
+        LADMethod n = new LADMethod();
+        tb.Register(n);
+        n.name = tb.String();
+        return n;
     }
 }
 

@@ -93,8 +93,11 @@ namespace Niecza {
             fb.Byte((byte)SerializationCode.SubViviHook);
             fb.ObjRef(sub);
         }
-        internal static SubViviHook Thaw(ThawBuffer tb) {
-            return new SubViviHook((P6any)tb.ObjRef());
+        internal static object Thaw(ThawBuffer tb) {
+            var n = new SubViviHook(null);
+            tb.Register(n);
+            n.sub = (P6any) tb.ObjRef();
+            return n;
         }
     }
 
@@ -112,7 +115,11 @@ namespace Niecza {
             fb.String(key);
         }
         internal static IFreeze Thaw(ThawBuffer tb) {
-            return new HashViviHook((P6any)tb.ObjRef(), tb.String());
+            var n = new HashViviHook(null, null);
+            tb.Register(n);
+            n.hash = (P6any) tb.ObjRef();
+            n.key = tb.String();
+            return n;
         }
     }
 
@@ -131,7 +138,11 @@ namespace Niecza {
             fb.String(key);
         }
         internal static IFreeze Thaw(ThawBuffer tb) {
-            return new NewHashViviHook((Variable)tb.ObjRef(), tb.String());
+            var n = new NewHashViviHook(null, null);
+            tb.Register(n);
+            n.hashv = (Variable) tb.ObjRef();
+            n.key = tb.String();
+            return n;
         }
     }
 
@@ -151,7 +162,11 @@ namespace Niecza {
             fb.Int(key);
         }
         internal static IFreeze Thaw(ThawBuffer tb) {
-            return new ArrayViviHook((P6any)tb.ObjRef(), tb.Int());
+            var n = new ArrayViviHook(null, 0);
+            tb.Register(n);
+            n.ary = (P6any) tb.ObjRef();
+            n.key = tb.Int();
+            return n;
         }
     }
 
@@ -175,7 +190,11 @@ namespace Niecza {
             fb.Int(key);
         }
         internal static IFreeze Thaw(ThawBuffer tb) {
-            return new NewArrayViviHook((Variable)tb.ObjRef(), tb.Int());
+            var n = new NewArrayViviHook(null, 0);
+            tb.Register(n);
+            n.ary = (Variable) tb.ObjRef();
+            n.key = tb.Int();
+            return n;
         }
     }
 

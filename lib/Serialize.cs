@@ -711,28 +711,52 @@ namespace Niecza.Serialization {
                 case SerializationCode.SimpleVariable_3:
                     return SimpleVariable.Thaw(this,
                             (int)tag - (int)SerializationCode.SimpleVariable);
-                //SubstrLValue,
-                //TiedVariable,
-                //SubViviHook,
-                //ArrayViviHook,
-                //NewArrayViviHook,
-                //HashViviHook,
-                //NewHashViviHook,
-                //LADNone, // no-args
-                //LADNull,
-                //LADDot,
-                //LADDispatcher,
-                //LADImp,
-                //LADStr, // string
-                //LADStrNoCase,
-                //LADMethod,
-                //LADParam,
-                //LADOpt, // LAD
-                //LADPlus,
-                //LADStar,
-                //LADSequence, // LAD[]
-                //LADAny,
-                //LADCC, // CC
+                case SerializationCode.SubstrLValue:
+                    return SubstrLValue.Thaw(this);
+                case SerializationCode.TiedVariable:
+                    return TiedVariable.Thaw(this);
+
+                case SerializationCode.SubViviHook:
+                    return SubViviHook.Thaw(this);
+                case SerializationCode.ArrayViviHook:
+                    return ArrayViviHook.Thaw(this);
+                case SerializationCode.NewArrayViviHook:
+                    return NewArrayViviHook.Thaw(this);
+                case SerializationCode.HashViviHook:
+                    return HashViviHook.Thaw(this);
+                case SerializationCode.NewHashViviHook:
+                    return NewHashViviHook.Thaw(this);
+
+                case SerializationCode.LADNone:
+                    return Register(new LADNone());
+                case SerializationCode.LADNull:
+                    return Register(new LADNull());
+                case SerializationCode.LADDot:
+                    return Register(new LADDot());
+                case SerializationCode.LADDispatcher:
+                    return Register(new LADDispatcher());
+                case SerializationCode.LADImp:
+                    return Register(new LADImp());
+                case SerializationCode.LADStr:
+                    return LADStr.Thaw(this);
+                case SerializationCode.LADStrNoCase:
+                    return LADStrNoCase.Thaw(this);
+                case SerializationCode.LADMethod:
+                    return LADMethod.Thaw(this);
+                case SerializationCode.LADParam:
+                    return LADParam.Thaw(this);
+                case SerializationCode.LADOpt:
+                    return LADOpt.Thaw(this);
+                case SerializationCode.LADPlus:
+                    return LADPlus.Thaw(this);
+                case SerializationCode.LADStar:
+                    return LADStar.Thaw(this);
+                case SerializationCode.LADSequence:
+                    return LADSequence.Thaw(this);
+                case SerializationCode.LADAny:
+                    return LADAny.Thaw(this);
+                case SerializationCode.LADCC:
+                    return LADCC.Thaw(this);
                 default:
                     throw new ThawException("unexpected object tag " + tag);
             }

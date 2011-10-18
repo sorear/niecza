@@ -92,6 +92,59 @@ namespace Niecza {
             f_ctime = Stat.GetField("st_ctime");
         }
     }
+
+    class SubstrLValue: Variable {
+        Variable backing;
+        int from;
+        int length;
+
+        private SubstrLValue() {}
+        public SubstrLValue(Variable backing, int from, int length) {
+            this.backing = backing;
+            this.from = from;
+            this.length = length;
+            // XXX Should binding a substr lvalue count as binding the original?
+            this.whence = null;
+            this.rw = backing.rw;
+            this.type = Kernel.StrMO;
+        }
+
+        public override P6any Fetch() {
+            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
+            string sub = Builtins.LaxSubstring2(str, from, length);
+            return sub == null ? Kernel.StrMO.typeObject :
+                Kernel.BoxRaw(sub,Kernel.StrMO);
+        }
+
+        public override void Store(P6any v) {
+            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
+            int left = (from < 0) ? 0 : (from > str.Length) ? str.Length : from;
+            int right = ((length > (str.Length - left)) ? (str.Length - left) :
+                (length < 0) ? 0 : length) + left;
+            string lfr = str.Substring(0, left);
+            string mfr = v.mo.mro_raw_Str.Get(Kernel.NewROScalar(v));
+            string rfr = str.Substring(right);
+            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Kernel.StrMO));
+        }
+
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
+            fb.Byte((byte)Niecza.Serialization.SerializationCode.SubstrLValue);
+            fb.ObjRef(backing);
+            fb.Int(from);
+            fb.Int(length);
+        }
+        internal static object Thaw(Niecza.Serialization.ThawBuffer tb) {
+            var n = new SubstrLValue();
+            tb.Register(n);
+            n.backing = (Variable) tb.ObjRef();
+            n.from = tb.Int();
+            n.length = tb.Int();
+            return n;
+        }
+    }
 }
 
 public partial class Builtins {
@@ -184,50 +237,6 @@ public partial class Builtins {
             lhs.Store(rhs);
         } else {
             lhs.Fetch().mo.mro_LISTSTORE.Get(lhs, Kernel.NewROScalar(rhs));
-        }
-    }
-
-    class SubstrLValue: Variable {
-        Variable backing;
-        int from;
-        int length;
-
-        public SubstrLValue(Variable backing, int from, int length) {
-            this.backing = backing;
-            this.from = from;
-            this.length = length;
-            // XXX Should binding a substr lvalue count as binding the original?
-            this.whence = null;
-            this.rw = backing.rw;
-            this.type = Kernel.StrMO;
-        }
-
-        public override P6any Fetch() {
-            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
-            string sub = Builtins.LaxSubstring2(str, from, length);
-            return sub == null ? Kernel.StrMO.typeObject :
-                Kernel.BoxRaw(sub,Kernel.StrMO);
-        }
-
-        public override void Store(P6any v) {
-            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
-            int left = (from < 0) ? 0 : (from > str.Length) ? str.Length : from;
-            int right = ((length > (str.Length - left)) ? (str.Length - left) :
-                (length < 0) ? 0 : length) + left;
-            string lfr = str.Substring(0, left);
-            string mfr = v.mo.mro_raw_Str.Get(Kernel.NewROScalar(v));
-            string rfr = str.Substring(right);
-            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Kernel.StrMO));
-        }
-
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-        }
-        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
-            fb.Byte((byte)Niecza.Serialization.SerializationCode.SubstrLValue);
-            fb.ObjRef(backing);
-            fb.Int(from);
-            fb.Int(length);
         }
     }
 
