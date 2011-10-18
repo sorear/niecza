@@ -484,6 +484,7 @@ namespace Niecza {
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
 
+            Kernel.currentGlobals = globals;
             Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
             Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
         }
@@ -4925,6 +4926,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         }
 
         public static void RunMain(RuntimeUnit main_unit) {
+            currentGlobals = main_unit.globals;
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
                 if (trace == "all") {
