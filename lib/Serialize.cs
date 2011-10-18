@@ -300,31 +300,36 @@ namespace Niecza.Serialization {
             data[wpointer++] = x;
         }
 
-        public void Short(short x) {
-            Ensure(2);
-            data[wpointer++] = (byte)(x >>  8);
-            data[wpointer++] = (byte)(x      );
-        }
-
-        public void Int(int x) {
-            Ensure(4);
-            data[wpointer++] = (byte)(x >> 24);
-            data[wpointer++] = (byte)(x >> 16);
-            data[wpointer++] = (byte)(x >>  8);
-            data[wpointer++] = (byte)(x      );
-        }
-
         public void Long(long x) {
-            Ensure(8);
-            data[wpointer++] = (byte)(x >> 56);
-            data[wpointer++] = (byte)(x >> 48);
-            data[wpointer++] = (byte)(x >> 40);
-            data[wpointer++] = (byte)(x >> 32);
-            data[wpointer++] = (byte)(x >> 24);
-            data[wpointer++] = (byte)(x >> 16);
-            data[wpointer++] = (byte)(x >>  8);
-            data[wpointer++] = (byte)(x      );
+            //Console.WriteLine("Saving {0} at {1}", x, wpointer);
+            Ensure(10);
+            while (true) {
+                if (x >= -64 && x <= 63) {
+                    data[wpointer++] = (byte) (127 & (byte)x);
+                    break;
+                } else {
+                    data[wpointer++] = (byte) (128 | (byte)x);
+                    x >>= 7;
+                }
+            }
         }
+
+        public void ULong(ulong x) {
+            //Console.WriteLine("Saving {0} at {1}", x, wpointer);
+            Ensure(10);
+            while (true) {
+                if (x <= 127) {
+                    data[wpointer++] = (byte) (127 & (byte)x);
+                    break;
+                } else {
+                    data[wpointer++] = (byte) (128 | (byte)x);
+                    x >>= 7;
+                }
+            }
+        }
+
+        public void Short(short x) { Long(x); }
+        public void Int(int x) { Long(x); }
 
         public void Double(double x) {
             Long(BitConverter.DoubleToInt64Bits(x));
@@ -336,7 +341,7 @@ namespace Niecza.Serialization {
             } else {
                 Int(s.Length);
                 foreach (char ch in s)
-                    Short((short)ch);
+                    ULong((ulong)ch);
             }
         }
 
@@ -383,6 +388,8 @@ namespace Niecza.Serialization {
         public void ObjRef(object o) {
             int id;
             SerUnit altunit;
+            if (Config.SerTrace)
+                Console.WriteLine("Saving {0} at {1}...", o, wpointer);
             if (o == null) { // null pointers are special
                 Byte((byte)SerializationCode.Null);
                 return;
@@ -426,8 +433,8 @@ namespace Niecza.Serialization {
             P6opaque.Create, BoxObject<Rat>.Create, BoxObject<FatRat>.Create,
             BoxObject<Complex>.Create, BoxObject<double>.Create,
             BoxObject<int>.Create, BoxObject<string>.Create,
-            BoxObject<Variable[]>.Create, BoxObject<VarDeque>.Create,
-            BoxObject<STable>.Create,
+            BoxObject<VarHash>.Create, BoxObject<Variable[]>.Create,
+            BoxObject<VarDeque>.Create, BoxObject<STable>.Create,
         };
 
         static Type[] anyTypes = new Type[] {
@@ -523,19 +530,43 @@ namespace Niecza.Serialization {
 
         public byte Byte() { return data[rpointer++]; }
 
+        public long Long() {
+            int shift = 0;
+            long accum = 0;
+            while (true) {
+                byte b = Byte();
+                accum |= (((long)(b & 127)) << shift);
+                shift += 7;
+                if ((b & 128) == 0) {
+                    if ((b & 64) != 0) {
+                        accum |= ((-1L) << shift);
+                    }
+                    //Console.WriteLine("Read {0} end {1}", accum, rpointer);
+                    return accum;
+                }
+            }
+        }
+
+        public ulong ULong() {
+            int shift = 0;
+            ulong accum = 0;
+            while (true) {
+                byte b = Byte();
+                accum |= (((ulong)(b & 127)) << shift);
+                shift += 7;
+                if ((b & 128) == 0) {
+                    //Console.WriteLine("Read {0} end {1}", accum, rpointer);
+                    return accum;
+                }
+            }
+        }
+
         public short Short() {
-            return (short)((((int)Byte()) << 8) | Byte());
+            return checked((short)Long());
         }
 
         public int Int() {
-            return (((int)Byte()) << 24) | (((int)Byte()) << 16) |
-                (((int)Byte()) << 8) | ((int)Byte());
-        }
-
-        public long Long() {
-            // try to do as much as possible in 32-bit precision,
-            // but suppress sign extension
-            return (((long)Int()) << 32) | (long)(uint)Int();
+            return checked((int)Long());
         }
 
         public double Double() {
@@ -549,7 +580,7 @@ namespace Niecza.Serialization {
             char[] cb = new char[l];
 
             for (int i = 0; i < l; i++)
-                cb[i] = (char)Short();
+                cb[i] = (char)ULong();
 
             return new string(cb);
         }
@@ -599,6 +630,8 @@ namespace Niecza.Serialization {
 
         public object ObjRef() {
             var tag = (SerializationCode)Byte();
+            if (Config.SerTrace)
+                Console.WriteLine("Reading {0} from {1}...", tag, rpointer-1);
             int i, j;
             switch(tag) {
                 case SerializationCode.Null:

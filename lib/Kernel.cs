@@ -5524,5 +5524,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
         public static readonly bool C3Trace =
             Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
+        public static readonly bool SerTrace =
+            Environment.GetEnvironmentVariable("NIECZA_SER_TRACE") != null;
     }
 }
