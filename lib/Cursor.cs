@@ -726,7 +726,7 @@ public class Cursor : P6any {
     }
 }
 
-public sealed class CC {
+public sealed class CC : IFreeze {
     public readonly int[] vec;
 
     public CC(int[] vec) {
@@ -844,6 +844,15 @@ public sealed class CC {
                 clauses.Add(head);
         }
         return Kernel.JoinS(",", clauses);
+    }
+
+    void IFreeze.Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.CC);
+        fb.Ints(vec);
+    }
+
+    internal static object Thaw(ThawBuffer tb) {
+        return tb.Register(new CC(tb.Ints()));
     }
 }
 

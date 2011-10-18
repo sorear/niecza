@@ -513,6 +513,8 @@ namespace Niecza.CLRBackend {
             P6any.GetField("mo");
         public static readonly FieldInfo BValue_v =
             BValue.GetField("v");
+        public static readonly FieldInfo StashEnt_v =
+            typeof(StashEnt).GetField("v");
         public static readonly FieldInfo SubInfo_protosub =
             SubInfo.GetField("protosub");
         public static readonly FieldInfo SubInfo_protopad =

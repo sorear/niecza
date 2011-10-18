@@ -212,6 +212,8 @@ namespace Niecza.Serialization {
         RxFrame,
         P6how,
         ReflectObj,
+        CC,
+        AltInfo,
 
         // types of P6any-reified object
         P6opaque, // eventually let's specialize this
@@ -222,6 +224,8 @@ namespace Niecza.Serialization {
         String,
         ArrP6any,
         ArrVariable,
+        ArrString,
+        ArrCC,
         Boolean,
         Int,
         Double,
@@ -415,7 +419,7 @@ namespace Niecza.Serialization {
 
         internal static Type[] boxTypes = new Type[] {
             null, typeof(Rat), typeof(FatRat), typeof(Complex),
-            typeof(double), typeof(int), typeof(string),
+            typeof(double), typeof(int), typeof(string), typeof(VarHash),
             typeof(Variable[]), typeof(VarDeque), typeof(STable),
         };
         internal static Func<P6opaque>[] boxCreate = new Func<P6opaque>[] {
@@ -428,6 +432,7 @@ namespace Niecza.Serialization {
 
         static Type[] anyTypes = new Type[] {
             typeof(string), typeof(P6any[]), typeof(Variable[]),
+            typeof(string[]), typeof(CC[]),
             typeof(bool), typeof(int), typeof(double), typeof(Type),
         };
 
@@ -448,15 +453,21 @@ namespace Niecza.Serialization {
                     Refs((Variable[])o);
                     break;
                 case 3:
-                    Byte((byte)((bool)o ? 1 : 0));
+                    Refs((string[])o);
                     break;
                 case 4:
-                    Int((int)o);
+                    Refs((CC[])o);
                     break;
                 case 5:
-                    Double((double)o);
+                    Byte((byte)((bool)o ? 1 : 0));
                     break;
                 case 6:
+                    Int((int)o);
+                    break;
+                case 7:
+                    Double((double)o);
+                    break;
+                case 8:
                     String(((Type)o).AssemblyQualifiedName);
                     break;
                 default:
@@ -629,6 +640,10 @@ namespace Niecza.Serialization {
                 //    return RxFrame.Thaw(this);
                 case SerializationCode.P6how:
                     return P6how.Thaw(this);
+                case SerializationCode.CC:
+                    return CC.Thaw(this);
+                //case SerializationCode.AltInfo:
+                //    return AltInfo.Thaw(this);
 
                 case SerializationCode.ReflectObj:
                     return ReflectObj.Thaw(this);
@@ -644,6 +659,10 @@ namespace Niecza.Serialization {
                     return Register(RefsA<P6any>());
                 case SerializationCode.ArrVariable:
                     return Register(RefsA<Variable>());
+                case SerializationCode.ArrString:
+                    return Register(RefsA<string>());
+                case SerializationCode.ArrCC:
+                    return Register(RefsA<CC>());
                 case SerializationCode.Boolean:
                     return Register(Byte() != 0);
                 case SerializationCode.Int:

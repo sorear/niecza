@@ -436,7 +436,6 @@ method regex_def($/) {
     }
     my @lift = $ast.oplift;
     my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
-    say $ltm.perl;
     $*CURLEX<!sub>.set_ltm($ltm);
     ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
     $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
@@ -2723,7 +2722,6 @@ method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
         cur_pkg => $*CURLEX<!sub>.cur_pkg,
         in_class => $*CURLEX<!sub>.in_class);
     $n.set_transparent;
-    say $ltm.perl if $ltm;
     $n.set_ltm($ltm) if $ltm;
     $n.add_my_name($_, :noinit) for @$params;
     $n.set_signature(Sig.simple(@$params));

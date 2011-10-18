@@ -907,28 +907,30 @@ namespace Niecza {
     }
 
     public class LIHint : LexInfo {
-        public BValue var;
+        public StashEnt var;
         public LIHint() { }
+        public LIHint(StashEnt var) { this.var = var; }
         public override void Init(Frame f) { }
         public override void BindFields() {
-            var = new BValue(null);
+            var = new StashEnt();
         }
 
         public override object Get(Frame f) { return var.v; }
         public override void Set(Frame f, object to) { var.v = (Variable)to; }
 
         internal override ClrOp GetCode(int up) {
-            return new ClrGetField(Tokens.BValue_v,
+            return new ClrGetField(Tokens.StashEnt_v,
                 Backend.currentUnit.RefConstant(name, var, null).head);
         }
 
         internal override ClrOp SetCode(int up, ClrOp to) {
-            return new ClrSetField(Tokens.BValue_v,
+            return new ClrSetField(Tokens.StashEnt_v,
                 Backend.currentUnit.RefConstant(name, var, null).head, to);
         }
 
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Hint);
+            fb.ObjRef(var);
         }
     }
 
@@ -1770,7 +1772,7 @@ noparams:
                         li = new LICommon(tb.String());
                         break;
                     case (int) LexInfo.LexSerCode.Hint:
-                        li = new LIHint();
+                        li = new LIHint((StashEnt) tb.ObjRef());
                         break;
                     case (int) LexInfo.LexSerCode.Package:
                         li = new LIPackage((STable) tb.ObjRef());
