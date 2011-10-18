@@ -1708,6 +1708,8 @@ noparams:
                 fb.Refs(sig_r);
 
             fb.Ints(lines);
+            fb.Ints(edata);
+            fb.Strings(label_names);
             fb.Int(dylex.Count);
             foreach (KeyValuePair<string, LexInfo> kv in dylex) {
                 fb.String(kv.Key);
@@ -1768,6 +1770,11 @@ noparams:
                 n.sig_r = tb.RefsA<object>();
 
             n.lines = tb.Ints();
+            n.edata = tb.Ints();
+            n.label_names = tb.Strings();
+            for (int i = 0; i < n.edata.Length; i += 5)
+                if (n.edata[i+2] == ON_VARLOOKUP && n.edata[i+4] >= 0)
+                    n.dylex_filter |=FilterForName(n.label_names[n.edata[i+4]]);
             int dyct = tb.Int();
             n.dylex = new Dictionary<string, LexInfo>();
             for (int i = 0; i < dyct; i++) {
