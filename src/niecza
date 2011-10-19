@@ -21,7 +21,31 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+method blockoid($/) {
+    # XXX horrible cheat, but my data structures aren't up to the task of
+    # $::UNIT being a class body &c.
+    if $/ eq '{YOU_ARE_HERE}' {
+        $*unit.set_bottom($*CURLEX<!sub>);
+        $*CURLEX<!sub>.create_static_pad;
 
+        loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
+            # this isn't *quite* right, as it will cause declaring
+            # anything more in the same scope to fail.
+            $/.CURSOR.mark_used($_) for $l.lex_names;
+        }
+
+        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
+    } else {
+        make $<statementlist>.ast;
+    }
+}
+}
+
+augment class Op::BareBlock {
+    method statement_level() {
+        $*CURLEX<!sub>.lookup_lex($!var).[4].set_run_once;
+        ::GLOBAL::OptBeta.make_call($!var);
+    }
 }
 
 CgOp._register_ops: < who sc_root sc_indir temporize _addmethod _invalidate

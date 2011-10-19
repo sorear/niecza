@@ -20,14 +20,14 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
 	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendDotnet \
 	 NieczaCompiler GetOptLong
 
-all: run/Niecza.exe obj/Kernel.dll obj/CORE.nam
+all: run/Niecza.exe obj/Kernel.dll obj/CORE.dll
 	@git describe --tags > VERSION
 
 $(patsubst %,boot/obj/%.nam,$(srcunits)): boot/obj/%.nam: .fetch-stamp src/%.pm6 boot/obj/CORE.nam
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -Bnam -C $*
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $*.nam $*.dll 0
 
-obj/CORE.nam: run/Niecza.exe obj/CLRBackend.exe lib/CORE.setting
+obj/CORE.dll: run/Niecza.exe obj/Kernel.dll lib/CORE.setting
 	$(RUN_CLR) run/Niecza.exe -C CORE
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza

@@ -3608,6 +3608,13 @@ dynamic:
                 ((SubInfo)Handle.Unbox(args[1])).special |=
                     SubInfo.TRANSPARENT;
                 return null;
+            } else if (cmd == "sub_set_run_once") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                if ((s.outer.special & SubInfo.RUN_ONCE) != 0) {
+                    s.CreateProtopad();
+                    s.special |= SubInfo.RUN_ONCE;
+                }
+                return null;
             } else if (cmd == "sub_set_unsafe") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
                     SubInfo.UNSAFE;
