@@ -3585,6 +3585,10 @@ dynamic:
             } else if (cmd == "unit_anon_stash") {
                 return Backend.currentUnit.name + ":" +
                     (Backend.currentUnit.nextid++);
+            } else if (cmd == "unit_set_bottom") {
+                ((RuntimeUnit)Handle.Unbox(args[1])).bottom =
+                    (SubInfo)Handle.Unbox(args[2]);
+                return null;
             } else if (cmd == "set_mainline") {
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
                 Backend.currentUnit.mainline.special |= SubInfo.MAINLINE;
