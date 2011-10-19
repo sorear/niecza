@@ -1024,11 +1024,40 @@ namespace Niecza {
         public LIDispatch() { }
         internal LIDispatch(int index) { this.index = index; }
         public override void Init(Frame f) {
-            throw new Exception("MMD NYI");
+            MakeDispatch(f);
         }
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Dispatch);
             fb.Int(index);
+        }
+
+        internal void MakeDispatch(Frame into) {
+            HashSet<string> names = new HashSet<string>();
+            List<P6any> cands = new List<P6any>();
+            string filter = name + ":";
+            string pn = name + ":(!proto)";
+
+            Frame f = into;
+            for (SubInfo csr = into.info; ; csr = csr.outer) {
+                bool brk = false;
+                foreach (KeyValuePair<string,LexInfo> kp in csr.dylex) {
+                    if (Utils.StartsWithInvariant(filter, kp.Key) &&
+                            kp.Key != pn &&
+                            !names.Contains(kp.Key)) {
+                        names.Add(kp.Key);
+                        brk = true;
+                        cands.Add(((Variable)kp.Value.Get(f)).Fetch());
+                    }
+                }
+                if (csr.outer == null) break;
+                // don't go above nearest proto
+                if (csr.dylex.ContainsKey(pn)) break;
+                if (brk) cands.Add(null);
+                f = f.outer;
+            }
+
+            Set(into, Kernel.NewROScalar(Kernel.MakeDispatcher(name, null,
+                    cands.ToArray())));
         }
     }
 
@@ -1612,8 +1641,16 @@ noparams:
             li.BindFields();
             if (name == "self")
                 self_key = li.SigIndex();
-            if (protopad != null)
+            if (protopad != null) {
                 li.Init(protopad);
+
+                int ix = name.IndexOf(':');
+                LexInfo disp;
+                if (ix >= 0 && dylex.TryGetValue(name.Substring(0, ix),
+                            out disp) && disp is LIDispatch) {
+                    ((LIDispatch)disp).MakeDispatch(protopad);
+                }
+            }
         }
 
         internal void CreateProtopad() {
