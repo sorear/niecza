@@ -117,16 +117,33 @@ public sealed class Choice {
     }
 }
 
-public class AltInfo {
-    public readonly int[] labels;
-    public readonly LAD[] prefixes;
-    public readonly string dba;
+public class AltInfo : IFreeze {
+    public int[] labels;
+    public LAD[] prefixes;
+    public string dba;
     //public readonly STable in_class;
 
     public AltInfo(LAD[] prefixes, string dba, int[] labels) {
         this.labels = labels;
         this.prefixes = prefixes;
         this.dba = dba;
+    }
+
+    private AltInfo() { }
+    void IFreeze.Freeze(FreezeBuffer fb) {
+        fb.Byte((byte) SerializationCode.AltInfo);
+        fb.Ints(labels);
+        fb.Refs(prefixes);
+        fb.String(dba);
+    }
+
+    internal static AltInfo Thaw(ThawBuffer tb) {
+        var n = new AltInfo();
+        tb.Register(n);
+        n.labels = tb.Ints();
+        n.prefixes = tb.RefsA<LAD>();
+        n.dba = tb.String();
+        return n;
     }
 }
 

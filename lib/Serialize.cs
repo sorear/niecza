@@ -685,8 +685,8 @@ namespace Niecza.Serialization {
                     return P6how.Thaw(this);
                 case SerializationCode.CC:
                     return CC.Thaw(this);
-                //case SerializationCode.AltInfo:
-                //    return AltInfo.Thaw(this);
+                case SerializationCode.AltInfo:
+                    return AltInfo.Thaw(this);
 
                 case SerializationCode.ReflectObj:
                     return ReflectObj.Thaw(this);

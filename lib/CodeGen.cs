@@ -2193,6 +2193,9 @@ namespace Niecza.CLRBackend {
         List<List<ClrEhSpan>> eh_stack = new List<List<ClrEhSpan>>();
         List<object[]> scope_stack = new List<object[]>();
 
+        internal List<KeyValuePair<AltInfo, string[]>> altinfo_fixups =
+            new List<KeyValuePair<AltInfo, string[]>>();
+
         public NamProcessor(CpsBuilder cpb, SubInfo sub) {
             this.sub = sub;
             this.cpb = cpb;
@@ -2732,7 +2735,7 @@ dynamic:
                     return th.sub.unit.RefConstant(m.name + "TV", m.typeVar, null);
                 if (kind == "typeObj")
                     return th.sub.unit.RefConstant(m.name + "TO", m.typeObject, null);
-                throw new NotImplementedException();
+                throw new NotImplementedException("class_ref " + kind);
             };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
                 return th.SubyCall(true, zyg); };
@@ -2993,10 +2996,14 @@ dynamic:
                     CpsOp.RxFrame(),
                     CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2]))); };
             handlers["ltm_push_alts"] = delegate(NamProcessor th, object[] z) {
-                CpsOp ai = th.sub.unit.AltInfoConst(th.cpb.cx, z[1],
-                    JScalar.S(z[2]), JScalar.SA(0,z[3]));
+                LAD[] prefixes = JScalar.A<LAD>(0, z[1],
+                        DowncallReceiver.BuildLadJ);
+                AltInfo ai = new AltInfo(prefixes, JScalar.S(z[2]), null);
+                th.altinfo_fixups.Add(new KeyValuePair<AltInfo,string[]>(
+                        ai, JScalar.SA(0, z[3])));
+                CpsOp aic = th.sub.unit.RefConstant(ai.dba, ai, null);
                 return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
-                    CpsOp.RxFrame(), CpsOp.CallFrame(), ai); };
+                    CpsOp.RxFrame(), CpsOp.CallFrame(), aic); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
             thandlers["rxend"] = delegate(CpsOp[] zyg) {
                 return CpsOp.Sequence(
@@ -3284,6 +3291,14 @@ dynamic:
             sub.label_names = cpb.cx.ehlabelBuffer.ToArray();
             sub.nspill = cpb.Spills();
 
+            foreach (var kv in altinfo_fixups) {
+                kv.Key.labels = new int[kv.Value.Length];
+                for (int i = 0; i < kv.Value.Length; i++) {
+                    kv.Key.labels[i] =
+                        cpb.cx.named_cases[kv.Value[i]];
+                }
+            }
+
             sub.code = (DynBlockDelegate) Delegate.CreateDelegate(
                     Tokens.DynBlockDelegate, m);
             if (sub.protopad != null)
@@ -3513,7 +3528,50 @@ dynamic:
             return rcls;
         }
 
-        LAD BuildLad(object[] tree) {
+        // XXX delete me after killing JScalar
+        internal static LAD BuildLadJ(object treex) {
+            object[] tree = (object[]) treex;
+            string key = JScalar.S(tree[0]);
+
+            if (key == "CC") {
+                int[] nar = JScalar.IA(1, tree);
+                return new LADCC(new CC(nar));
+            } else if (key == "Imp") {
+                return new LADImp();
+            } else if (key == "Dot") {
+                return new LADDot();
+            } else if (key == "None") {
+                return new LADNone();
+            } else if (key == "Null") {
+                return new LADNull();
+            } else if (key == "Dispatcher") {
+                return new LADDispatcher();
+            } else if (key == "Str") {
+                return new LADStr(JScalar.S(tree[1]));
+            } else if (key == "StrNoCase") {
+                return new LADStrNoCase(JScalar.S(tree[1]));
+            } else if (key == "Param") {
+                return new LADParam(JScalar.S(tree[1]));
+            } else if (key == "Method") {
+                return new LADMethod(JScalar.S(tree[1]));
+            } else if (key == "Opt") {
+                return new LADOpt(BuildLadJ(tree[1]));
+            } else if (key == "Star") {
+                return new LADStar(BuildLadJ(tree[1]));
+            } else if (key == "Plus") {
+                return new LADPlus(BuildLadJ(tree[1]));
+            } else if (key == "Sequence" || key == "Any") {
+                object[] za = (object[])tree[1];
+                LAD[] z = new LAD[za.Length];
+                for (int i = 0; i < za.Length; i++)
+                    z[i] = BuildLadJ(za[i]);
+                return (key == "Any") ? (LAD)new LADAny(z) : new LADSequence(z);
+            } else {
+                throw new Exception("odd lad key " + key);
+            }
+        }
+
+        static LAD BuildLad(object[] tree) {
             string key = (string) tree[0];
 
             if (key == "CC") {
