@@ -1698,6 +1698,11 @@ noparams:
             // or when we are
             protopad = new Frame(null, outer != null ? outer.protopad : null,
                 this, protosub);
+            if (num_lex_slots > 10 && protopad.lexn == null) {
+                // nspill is zero at this point so protopad allocation is
+                // incomplete
+                protopad.lexn = new object[num_lex_slots - 10];
+            }
 
             foreach (SubInfo z in children)
                 z.protosub = Kernel.MakeSub(z, protopad);
