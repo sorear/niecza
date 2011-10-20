@@ -31,13 +31,11 @@ namespace Niecza {
                 object[] ia = (object[]) i;
                 string[] sa = new string[ia.Length];
                 Array.Copy(ia, sa, ia.Length);
-                string[] sar = Builtins.UnboxLoS(Kernel.RunInferior(
-                            Downcaller.upcall_cb.Fetch().Invoke(
-                                Kernel.GetInferiorRoot(),
-                                new Variable[] { Builtins.BoxLoS(sa) }, null)));
-                object[] iar = new object[sar.Length];
-                Array.Copy(sar, iar, sar.Length);
-                return iar;
+                Variable vr = Kernel.RunInferior(
+                        Downcaller.upcall_cb.Fetch().Invoke(
+                            Kernel.GetInferiorRoot(),
+                            new Variable[] { Builtins.BoxLoS(sa) }, null));
+                return vr.Fetch().mo.mro_raw_Str.Get(vr);
             }
         }
     }

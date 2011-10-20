@@ -630,6 +630,25 @@ namespace Niecza {
                     FieldAttributes.Static);
         }
 
+        internal string LinkUnit(RuntimeUnit other) {
+            foreach (RuntimeUnit third in other.depended_units)
+                depended_units.Add(third);
+
+            foreach (KeyValuePair<string, StashEnt> gm in other.globals) {
+                StashEnt ose;
+                StashEnt nse = gm.Value;
+                string who = gm.Key.Substring(1, (int)gm.Key[0]);
+                string name = gm.Key.Substring(1 + (int)gm.Key[0]);
+                string err = null;
+                if (globals.TryGetValue(gm.Key, out ose))
+                    err = NsMerge(who, name, ref nse, ose);
+                if (err != null) return err;
+                globals[gm.Key] = nse;
+            }
+
+            return null;
+        }
+
         public static Variable MakeAppropriateVar(string name) {
             if (name.Length >= 1 && name[0] == '@')
                 return Kernel.CreateArray();
@@ -716,6 +735,8 @@ namespace Niecza {
             fb.String(asm_name);
             fb.String(dll_name);
 
+            fb.Refs(dep);
+
             fb.Int(constants.Count);
             foreach (KeyValuePair<object,FieldBuilder> kv in constants) {
                 fb.String(kv.Value.Name);
@@ -756,6 +777,7 @@ namespace Niecza {
                 Array.Copy(srcinfo, 0, args, 1, srcinfo.Length);
                 args[0] = "check_dated";
                 string result = (string) Builtins.UpCall(args);
+                Console.WriteLine(result);
                 if (result != "ok")
                     throw new ThawException("dated sources");
             }
@@ -764,6 +786,8 @@ namespace Niecza {
             n.source   = tb.String();
             n.asm_name = tb.String();
             n.dll_name = tb.String();
+
+            n.depended_units = new HashSet<RuntimeUnit>(tb.RefsA<RuntimeUnit>());
 
             n.assembly = Assembly.LoadFrom(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, n.dll_name));
             n.type = tb.type = n.assembly.GetType(n.name, true);

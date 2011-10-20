@@ -43,6 +43,9 @@ sub upcalled(@strings) {
             }
             return $!;
         }
+        when "check_dated" {
+            return "ok";  #TODO
+        }
         say "upcall: @strings.join('|')";
         "ERROR";
     }

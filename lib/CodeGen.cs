@@ -3582,6 +3582,14 @@ dynamic:
                 Backend.currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
                 Kernel.currentGlobals = Backend.currentUnit.globals;
                 return null;
+            } else if (cmd == "unit_need_unit") {
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                string oname   = (string)args[2];
+
+                RuntimeUnit tg = (RuntimeUnit)
+                    RuntimeUnit.reg.LoadUnit(oname).root;
+                string err = ru.LinkUnit(tg);
+                return err == null ? (object)new Handle(tg) : new Exception(err);
             } else if (cmd == "unit_anon_stash") {
                 return Backend.currentUnit.name + ":" +
                     (Backend.currentUnit.nextid++);
@@ -3589,6 +3597,8 @@ dynamic:
                 ((RuntimeUnit)Handle.Unbox(args[1])).bottom =
                     (SubInfo)Handle.Unbox(args[2]);
                 return null;
+            } else if (cmd == "unit_bottom") {
+                return new Handle(((RuntimeUnit)Handle.Unbox(args[1])).bottom);
             } else if (cmd == "set_mainline") {
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
                 Backend.currentUnit.mainline.special |= SubInfo.MAINLINE;
@@ -3703,6 +3713,7 @@ dynamic:
 
                 if (file != null) {
                     for (SubInfo csr2 = from; csr2 != csr &&
+                            csr2.unit == from.unit && // modify this unit only
                             !csr2.used_in_scope.ContainsKey(lkey);
                             csr2 = csr2.outer, levels--) {
 
@@ -4153,7 +4164,7 @@ dynamic:
                 Kernel.SaferMode = true;
                 return null;
             } else {
-                return new Exception("ERROR");
+                return new Exception("No handler for downcall " + cmd);
             }
         }
     }
