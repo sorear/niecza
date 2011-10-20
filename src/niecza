@@ -21,6 +21,223 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+method method_def_2 ($, $/ = $*cursor) {
+    if $<multisig> > 1 {
+        $/.CURSOR.sorry("You may only use *one* signature");
+    }
+    $*CURLEX<!sub>.set_signature($<multisig> ?? $<multisig>[0].ast !! Any);
+    self.process_block_traits($/, $<trait>);
+}
+
+method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
+        :$exports) {
+
+    $scope := $scope || 'our';
+    if $scope ne 'our' && $scope ne 'my' && $scope ne 'anon' {
+        $/.CURSOR.sorry("Invalid packageoid scope $scope");
+        $scope := 'anon';
+    }
+
+    my ($pkg, $head) = self.process_name($name, :declaring, :clean);
+
+    if defined($pkg) && $scope ne 'our' {
+        $/.CURSOR.sorry("Pathed definitions require our scope");
+        $scope := 'our';
+    }
+
+    if !$head {
+        $scope := 'anon';
+        $head  := 'ANON';
+    }
+
+    my $npkg;
+    my $lexname;
+    $/.CURSOR.trymop({
+        my $old;
+        if $scope ne 'anon' && !$pkg && $sub.has_lexical($head) {
+            my @linfo = $sub.lookup_lex($head);
+            die "Cannot resume definition - $head not a packageoid"
+                unless @linfo[0] eq 'package';
+            $old = @linfo[4];
+        } elsif defined $pkg {
+            $old = $*unit.get($pkg.who, $head);
+        }
+
+        my $lexed_already;
+
+        if $old && $old.kind eq $class && !$old.closed {
+            $npkg = $old;
+            $lexed_already = True;
+        } elsif $scope eq 'our' {
+            my $opkg = $pkg // $sub.cur_pkg;
+            $npkg = $*unit.create_type(name => $head, :$class,
+                who => $opkg.who ~ '::' ~ $head);
+            $*unit.bind($opkg.who, $head, $npkg, |mnode($/));
+        } else {
+            my $id = $*unit.anon_stash;
+            $npkg = $*unit.create_type(name => $head, :$class,
+                who => "::$id");
+            $*unit.bind("", $id, $npkg, |mnode($/));
+        }
+
+        $lexname = (!$lexed_already && $scope ne 'anon' && !defined($pkg))
+            ?? $head !! self.gensym;
+
+        $sub.add_my_stash($lexname, $npkg, |mnode($/));
+        $sub.add_exports($head, $npkg, @$exports) if $exports;
+    });
+
+    $lexname, $npkg
+}
+
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for @tr -> $T {
+        my $tr = $T.ast;
+        if $pack && $tr<name> {
+            my $super = $tr<name>;
+
+            $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
+                next unless $sub.body_of;
+            $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
+                next if defined $*AUGMENT_BUFFER;
+            $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
+                next if !$pack.CAN('add_super');
+
+            $T.CURSOR.trymop({
+                $pack.add_super($super);
+            });
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($pack.name, $pack, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports('&'~$sub.name, $sub, @exports);
+            $sub.outer.create_static_pad;
+            $/.CURSOR.mark_used($sub.outervar)
+                if defined $sub.outervar;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.set_signature(Any);
+        } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
+            my $rel = $tr.keys.[0];
+            my $to  = $tr.values.[0];
+            $to = $to.inside if $to ~~ ::Op::Paren;
+            $to = $to.children[0] if $to ~~ ::Op::StatementList && $to.children == 1;
+
+            my $oprec;
+            if $to ~~ ::Op::Lexical {
+                $oprec = $T.CURSOR.function_O($to.name);
+            } elsif $to ~~ ::Op::StringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            } else {
+                $T.CURSOR.sorry("Cannot interpret operator reference");
+                next;
+            }
+            unless $sub.get_extend('prec') {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $oprec {
+                $T.CURSOR.sorry("No precedence available for reference target");
+                next;
+            }
+            if $rel eq 'equiv' {
+                $sub.set_extend('prec', $oprec.kv);
+            } else {
+                my %prec = $sub.get_extend('prec');
+                %prec<prec> = $oprec.<prec>;
+                %prec<prec> ~~ s/\=/<=/ if $rel eq 'looser';
+                %prec<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+                $sub.set_extend('prec', %prec.kv);
+            }
+        } elsif !$pack && $tr<assoc> {
+            my $arg = ~self.trivial_eval($T, $tr<assoc>);
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $arg eq any < left right non list unary chain > {
+                $T.CURSOR.sorry("Invalid associativity $arg");
+                next;
+            }
+            %prec<assoc> = $arg;
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            %prec<prec> = $arg;
+            %prec<dba> = "like $sub.name()";
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::builtin> {
+            $sub.set_extend('builtin',
+                self.trivial_eval($T, $tr<Niecza::builtin>));
+        } elsif !$pack && $tr<return_pass> {
+            $sub.set_return_pass;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.set_unsafe;
+        } else {
+            $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+        }
+    }
+}
+
+method statement_control:use ($/) {
+    make ::Op::StatementList.new;
+    return if $<version>; # just ignore these
+
+    my $name = $<module_name>.ast<name>;
+    my $args = $<arglist> ?? $<arglist>.ast !! [];
+
+    if defined $<module_name>.ast.<args> {
+        $/.CURSOR.sorry("'use' of an instantiated role not yet understood");
+        return;
+    }
+
+    if $args {
+        $/.CURSOR.sorry("'use' with arguments NYI");
+        return;
+    }
+
+    if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
+        return;
+    }
+
+    my $u2 = $*unit.need_unit($name);
+
+    my $module = $u2.mainline.compile_get_pkg($name.split('::'));
+    my $exp;
+    try $exp = $*unit.get_pkg($module, 'EXPORT', 'DEFAULT');
+
+    # in the :: case, $module will usually be visible via GLOBAL
+    if !defined($name.index('::')) {
+        $*CURLEX<!sub>.add_my_stash($name, $module.xref);
+    }
+
+    return unless $exp;
+
+    my $h = $/.CURSOR;
+    for $*unit.list_stash($exp) -> $tup {
+        my $uname = $tup.key;
+        my $obj   = $tup.value && $*unit.deref($tup.value);
+
+        if !$obj || $obj ~~ ::Metamodel::StaticSub {
+            $*CURLEX<!sub>.add_common_name($uname, $exp.xref, $uname);
+        } else {
+            $*CURLEX<!sub>.add_my_stash($uname, $obj.xref);
+        }
+        $h.check_categorical($uname);
+        $h = $h.cursor_fresh(%*LANG<MAIN>);
+    }
+}
+
 method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.

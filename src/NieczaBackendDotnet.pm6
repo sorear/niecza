@@ -133,6 +133,15 @@ class StaticSub {
         downcall("set_signature", self, @args);
     }
 
+    method add_exports($name, $obj, $tags) {
+        my $u = self.unit;
+        for @$tags -> $tag {
+            $u.bind($u.rel_pkg(self.cur_pkg, 'EXPORT', $tag, :auto),
+                $name, $obj);
+        }
+        +$tags;
+    }
+
     # TODO: prevent foo; sub foo { } from warning undefined
     # needs a %*MYSTERY check when evaluating unused variables
     method _addlex_result(*@args) {
