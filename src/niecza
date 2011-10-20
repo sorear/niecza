@@ -214,24 +214,21 @@ method statement_control:use ($/) {
 
     my $module = $u2.mainline.compile_get_pkg($name.split('::'));
     my $exp;
-    try $exp = $*unit.get_pkg($module, 'EXPORT', 'DEFAULT');
+    try $exp = $*unit.rel_pkg($module, 'EXPORT', 'DEFAULT');
 
     # in the :: case, $module will usually be visible via GLOBAL
     if !defined($name.index('::')) {
-        $*CURLEX<!sub>.add_my_stash($name, $module.xref);
+        $*CURLEX<!sub>.add_my_stash($name, $module);
     }
 
     return unless $exp;
 
     my $h = $/.CURSOR;
-    for $*unit.list_stash($exp) -> $tup {
-        my $uname = $tup.key;
-        my $obj   = $tup.value && $*unit.deref($tup.value);
-
-        if !$obj || $obj ~~ ::Metamodel::StaticSub {
-            $*CURLEX<!sub>.add_common_name($uname, $exp.xref, $uname);
+    for $*unit.list_stash($exp.who) -> $uname, $obj {
+        if !$obj || $obj.kind eq 'sub' {
+            $*CURLEX<!sub>.add_common_name($uname, $exp, $uname);
         } else {
-            $*CURLEX<!sub>.add_my_stash($uname, $obj.xref);
+            $*CURLEX<!sub>.add_my_stash($uname, $obj);
         }
         $h.check_categorical($uname);
         $h = $h.cursor_fresh(%*LANG<MAIN>);

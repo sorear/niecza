@@ -3600,7 +3600,9 @@ dynamic:
                     (SubInfo)Handle.Unbox(args[2]);
                 return null;
             } else if (cmd == "unit_bottom") {
-                return new Handle(((RuntimeUnit)Handle.Unbox(args[1])).bottom);
+                return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).bottom);
+            } else if (cmd == "unit_mainline") {
+                return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).mainline);
             } else if (cmd == "set_mainline") {
                 Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
                 Backend.currentUnit.mainline.special |= SubInfo.MAINLINE;
@@ -3719,7 +3721,6 @@ dynamic:
                             !csr2.used_in_scope.ContainsKey(lkey);
                             csr2 = csr2.outer, levels--) {
 
-                        Console.WriteLine("Marking {0} used in {1}", lkey, csr2.name);
                         var uisi = new SubInfo.UsedInScopeInfo();
                         uisi.orig_file = li.file;
                         uisi.orig_line = li.line;
@@ -3775,7 +3776,6 @@ dynamic:
                 foreach (KeyValuePair<string,LexInfo> kv in s.dylex) {
                     if (s.used_in_scope.ContainsKey(kv.Key))
                         continue;
-                    Console.WriteLine("{0} not used in {1}", kv.Key, s.name);
                     ret.Add(kv.Key);
                     ret.Add(kv.Value.pos);
                 }
@@ -3844,6 +3844,27 @@ dynamic:
                     }
                 }
                 return new Handle(pkg);
+            } else if (cmd == "unit_list_stash") {
+                RuntimeUnit c = (RuntimeUnit) Handle.Unbox(args[1]);
+                string who = (string)args[2];
+                var r = new List<object>();
+                string filter = ((char)who.Length) + who;
+
+                foreach (KeyValuePair<string,StashEnt> kv in c.globals) {
+                    if (!Utils.StartsWithInvariant(filter, kv.Key))
+                        continue;
+                    r.Add(kv.Key.Substring(filter.Length));
+                    StashEnt b = kv.Value;
+
+                    if (!b.v.rw && !b.v.Fetch().IsDefined()) {
+                        r.Add(new Handle(b.v.Fetch().mo));
+                    } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
+                        r.Add(new Handle(b.v.Fetch().GetSlot("info")));
+                    } else {
+                        r.Add(null);
+                    }
+                }
+                return r.ToArray();
             } else if (cmd == "unit_get") {
                 string who  = (string)args[1];
                 string key  = (string)args[2];
