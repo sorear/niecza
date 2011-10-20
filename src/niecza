@@ -49,6 +49,15 @@ augment class Op::CallMethod {
 }
 
 augment class NieczaActions {
+method metachar:sym<{ }> ($/) {
+    $/.CURSOR.trymop({
+        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
+        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
+    });
+
+    make ::RxOp::VoidBlock.new(block => self.inliney_call($/,
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
+}
 method method_def_2 ($, $/ = $*cursor) {
     if $<multisig> > 1 {
         $/.CURSOR.sorry("You may only use *one* signature");
