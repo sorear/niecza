@@ -4073,12 +4073,16 @@ dynamic:
                 string  back  = (string)args[8];
                 string  name  = (string)args[2];
 
-                args[1] = outer;
+                args[1] = Handle.Wrap(outer);
                 args[2] = back;
                 AddLexical(args, new LISimple(flags, type));
-                args[1] = sub;
-                args[2] = name;
-                return AddLexical(args, new LIAlias(back));
+                if (name != null) {
+                    args[1] = Handle.Wrap(sub);
+                    args[2] = name;
+                    return AddLexical(args, new LIAlias(back));
+                } else {
+                    return null;
+                }
             } else if (cmd == "add_my_stash") {
                 STable  type  = (STable)Handle.Unbox(args[6]);
 
