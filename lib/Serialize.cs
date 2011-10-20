@@ -628,6 +628,16 @@ namespace Niecza.Serialization {
             return ret;
         }
 
+        // used from ObjRef only so guaranteed non-null
+        T[] RefsARegister<T>() where T : class {
+            int ct = Int();
+            T[] ret = new T[ct];
+            Register(ret);
+            for (int i = 0; i < ct; i++)
+                ret[i] = (T) ObjRef();
+            return ret;
+        }
+
         public object ObjRef() {
             var tag = (SerializationCode)Byte();
             if (Config.SerTrace)
@@ -689,13 +699,13 @@ namespace Niecza.Serialization {
                 case SerializationCode.String:
                     return Register(String());
                 case SerializationCode.ArrP6any:
-                    return Register(RefsA<P6any>());
+                    return RefsARegister<P6any>();
                 case SerializationCode.ArrVariable:
-                    return Register(RefsA<Variable>());
+                    return RefsARegister<Variable>();
                 case SerializationCode.ArrString:
-                    return Register(RefsA<string>());
+                    return RefsARegister<string>();
                 case SerializationCode.ArrCC:
-                    return Register(RefsA<CC>());
+                    return RefsARegister<CC>();
                 case SerializationCode.Boolean:
                     return Register(Byte() != 0);
                 case SerializationCode.Int:
