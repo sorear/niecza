@@ -3965,6 +3965,11 @@ dynamic:
 
                 add_to.mo.AddMethodPos(mode, name, sub.protosub, file, line);
                 return null;
+            } else if (cmd == "type_set_instantiation_block") {
+                STable  add_to = (STable)Handle.Unbox(args[1]);
+                SubInfo block  = (SubInfo)Handle.Unbox(args[2]);
+                add_to.mo.roleFactory = block.protosub;
+                return null;
             } else if (cmd == "type_closed") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 return st.mo.isComposed;
