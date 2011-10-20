@@ -497,7 +497,7 @@ namespace Niecza {
 
             if (!is_mainish && bottom == null) {
                 Kernel.RunInferior(Kernel.GetInferiorRoot().
-                        MakeChild(null, mainline, AnyP));
+                        MakeChild(null, mainline, Kernel.AnyP));
             }
         }
 

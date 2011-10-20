@@ -3555,17 +3555,19 @@ dynamic:
             }
         }
 
-        object Call(object[] args) {
-            if (TraceDown) {
-                StringBuilder sb = new StringBuilder();
-                foreach(object a in args) {
-                    char ch = (a is int) ? 'i' : (a is Handle) ? 'h' :
-                        (a is string) ? 's' : (a is bool) ? 'b' :
-                        (a == null) ? 'n' : 'X';
-                    sb.AppendFormat("{0}:{1}; ", ch, a);
-                }
-                Console.WriteLine(sb.ToString());
+        void ShowCall(object[] args) {
+            StringBuilder sb = new StringBuilder();
+            foreach(object a in args) {
+                char ch = (a is int) ? 'i' : (a is Handle) ? 'h' :
+                    (a is string) ? 's' : (a is bool) ? 'b' :
+                    (a == null) ? 'n' : 'X';
+                sb.AppendFormat("{0}:{1}; ", ch, a);
             }
+            Console.WriteLine(sb.ToString());
+        }
+
+        object Call(object[] args) {
+            if (TraceDown) ShowCall(args);
             string cmd = (string) args[0];
             if (cmd == "gettype") {
                 object o = Handle.Unbox(args[1]);
@@ -4093,6 +4095,13 @@ dynamic:
                 tgt.sig_i = sig_i.ToArray();
                 tgt.sig_r = sig_r.ToArray();
                 return null;
+            } else if (cmd == "sub_contains_phaser") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                int     p = (int)args[2];
+                foreach (SubInfo z in s.children)
+                    if (z.phaser == p)
+                        return true;
+                return false;
             } else if (cmd == "sub_set_phaser") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 int     p = (int)args[2];
@@ -4165,6 +4174,7 @@ dynamic:
                 Kernel.SaferMode = true;
                 return null;
             } else {
+                ShowCall(args);
                 return new Exception("No handler for downcall " + cmd);
             }
         }
