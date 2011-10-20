@@ -136,7 +136,7 @@ class StaticSub {
     method add_exports($name, $obj, $tags) {
         my $u = self.unit;
         for @$tags -> $tag {
-            $u.bind($u.rel_pkg(self.cur_pkg, 'EXPORT', $tag, :auto),
+            $u.bind($u.rel_pkg(self.cur_pkg, 'EXPORT', $tag, :auto).who,
                 $name, $obj);
         }
         +$tags;

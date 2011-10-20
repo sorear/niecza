@@ -3714,11 +3714,12 @@ dynamic:
                 LexInfo li = csr.dylex[lkey];
 
                 if (file != null) {
-                    for (SubInfo csr2 = from; csr2 != csr &&
+                    for (SubInfo csr2 = from;
                             csr2.unit == from.unit && // modify this unit only
                             !csr2.used_in_scope.ContainsKey(lkey);
                             csr2 = csr2.outer, levels--) {
 
+                        Console.WriteLine("Marking {0} used in {1}", lkey, csr2.name);
                         var uisi = new SubInfo.UsedInScopeInfo();
                         uisi.orig_file = li.file;
                         uisi.orig_line = li.line;
@@ -3726,6 +3727,8 @@ dynamic:
                         uisi.line = line;
                         uisi.levels = levels;
                         csr2.used_in_scope[lkey] = uisi;
+                        if (csr == csr2)
+                            break; // stop *after* reaching defined scope
                     }
                 }
 
@@ -3772,6 +3775,7 @@ dynamic:
                 foreach (KeyValuePair<string,LexInfo> kv in s.dylex) {
                     if (s.used_in_scope.ContainsKey(kv.Key))
                         continue;
+                    Console.WriteLine("{0} not used in {1}", kv.Key, s.name);
                     ret.Add(kv.Key);
                     ret.Add(kv.Value.pos);
                 }
