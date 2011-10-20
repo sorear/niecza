@@ -4081,7 +4081,7 @@ dynamic:
                     args[2] = name;
                     return AddLexical(args, new LIAlias(back));
                 } else {
-                    return null;
+                    return new object[] { "" };
                 }
             } else if (cmd == "add_my_stash") {
                 STable  type  = (STable)Handle.Unbox(args[6]);

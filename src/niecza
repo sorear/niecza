@@ -20,6 +20,34 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class Op::CallMethod {
+    method code($body) {
+        my $name = ($.name ~~ Op) ?? CgOp.obj_getstr($.name.cgop($body))
+            !! CgOp.str($.name);
+        my $meta = $!ismeta // '';
+        if $.private {
+            CgOp.subcall(CgOp.stab_privatemethod(
+                    CgOp.class_ref('mo', $!pclass), $name),
+                $.receiver.cgop($body), self.argblock($body));
+        } elsif $meta eq '^' {
+            CgOp.let($.receiver.cgop($body), -> $r {
+                CgOp.methodcall(CgOp.newscalar(CgOp.how(CgOp.fetch($r))),
+                    $name, $r, self.argblock($body))});
+        } elsif $meta eq '?' {
+            # TODO maybe use a lower-level check
+            CgOp.let($.receiver.cgop($body), -> $r { CgOp.let($name, -> $n {
+                CgOp.ternary(
+                    CgOp.obj_getbool(CgOp.methodcall(CgOp.newscalar(CgOp.how(
+                        CgOp.fetch($r))), "can", $r, CgOp.box('Str',$n))),
+                    CgOp.methodcall($r, $n, self.argblock($body)),
+                    CgOp.scopedlex('Nil'))})});
+        } else {
+            CgOp.methodcall($.receiver.cgop($body),
+                $name, self.argblock($body));
+        }
+    }
+}
+
 augment class NieczaActions {
 method method_def_2 ($, $/ = $*cursor) {
     if $<multisig> > 1 {
@@ -233,6 +261,29 @@ method statement_control:use ($/) {
         $h.check_categorical($uname);
         $h = $h.cursor_fresh(%*LANG<MAIN>);
     }
+}
+method methodop($/) {
+    if $<longname> {
+        my ($c) = self.process_name($<longname>, :defer);
+        make ::Operator::Method.new(name => 'die');
+        unless $c {
+            $/.CURSOR.sorry("Method call requires a name");
+            return;
+        }
+        if $c<iname> {
+            $/.CURSOR.sorry("Indirectly named method calls NYI");
+            return;
+        }
+        make ::Operator::Method.new(name => $c<name>, package => $c<pkg>);
+    } elsif $<quote> {
+        make ::Operator::Method.new(name => $<quote>.ast);
+    } elsif $<variable> {
+        make ::Operator::Function.new(function =>
+            self.do_variable_reference($/, $<variable>.ast));
+    }
+
+    $/.ast.args = $<args>[0].ast[0] if $<args>[0];
+    $/.ast.args = $<arglist>[0].ast if $<arglist>[0];
 }
 
 method blockoid($/) {
