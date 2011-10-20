@@ -371,6 +371,8 @@ namespace Niecza {
         public Assembly assembly;
         public List<SubInfo> our_subs;
 
+        bool prepared = false;
+
         // used during construction only
         public AssemblyBuilder asm_builder;
         public ModuleBuilder mod_builder;
@@ -468,6 +470,12 @@ namespace Niecza {
         }
 
         public void PrepareEval() {
+            if (prepared) return;
+            prepared = true;
+
+            foreach (RuntimeUnit d in depended_units)
+                d.PrepareEval(); // would loop without above assignment
+
             if (type == null) {
                 GenerateCode(true);
 
@@ -484,7 +492,6 @@ namespace Niecza {
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
 
-            Kernel.currentGlobals = globals;
             Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
             Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
         }
@@ -4987,7 +4994,6 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         }
 
         public static void RunMain(RuntimeUnit main_unit) {
-            currentGlobals = main_unit.globals;
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
                 if (trace == "all") {
@@ -5587,6 +5593,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             RuntimeUnit ru = (RuntimeUnit)
                 RuntimeUnit.reg.LoadUnit(uname).root;
 
+            Kernel.currentGlobals = ru.globals;
             ru.PrepareEval();
             RunMain(ru);
         }
@@ -5598,6 +5605,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 RuntimeUnit ru = (RuntimeUnit)
                     RuntimeUnit.reg.LoadUnit(args[1]).root;
 
+                Kernel.currentGlobals = ru.globals;
                 ru.PrepareEval();
                 RunMain(ru);
             } else {

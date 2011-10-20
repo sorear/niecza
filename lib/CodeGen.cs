@@ -4132,6 +4132,7 @@ dynamic:
                 bool evalmode = (bool)args[2];
                 Kernel.commandArgs = new string[args.Length - 3];
                 Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
+                Kernel.currentGlobals = ru.globals;
                 ru.PrepareEval();
                 if (!evalmode)
                     Kernel.RunMain(ru);
