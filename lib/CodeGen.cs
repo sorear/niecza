@@ -3750,7 +3750,11 @@ dynamic:
                 ((SubInfo)Handle.Unbox(args[1])).name = (string)args[2];
                 return null;
             } else if (cmd == "sub_set_class") {
-                ((SubInfo)Handle.Unbox(args[1])).mo = ResolveSubClass((string)args[2]);
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                STable  c = ResolveSubClass((string)args[2]);
+                s.mo = c;
+                if (s.protosub != null)
+                    s.protosub.mo = c;
                 return null;
             } else if (cmd == "sub_delete_lex") {
                 // XXX This leaves a gap in the lexical/number mapping.
