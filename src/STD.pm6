@@ -4656,10 +4656,16 @@ grammar Regex is STD {
 
     token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($¢.orig,$¢.pos,1) ~ "') or use a backslashed form like \\xXX"> }  # no unspace in regexen  NIECZA: removed ord, sprintf
 
-    rule nibbler {
+    rule nibbler(:$reset?) {
         :temp %*RX;
+        :my $stub = do { #OK
+            %*RX<paren> //= 0;
+            %*RX<paren> = 0 if $reset;
+            %*RX<altparen> = %*RX<maxparen> = %*RX<paren>;
+        };
         [ <.normspace>? < || | && & > ]?
         <EXPR>
+        { CALLER::CALLER::<%*RX>.<paren> = %*RX<maxparen> max %*RX<paren>; }
         [
         || <?infixstopper>
         || $$ <.panic: "Regex not terminated">
@@ -4709,9 +4715,14 @@ grammar Regex is STD {
         ]
     }
 
-    token regex_infix:sym<||> { <sym> <O(|%tight_or)>  }
+    method reset_paren() {
+        %*RX<maxparen> max= %*RX<paren>;
+        %*RX<paren> = %*RX<altparen>;
+        self;
+    }
+    token regex_infix:sym<||> { <sym> <O(|%tight_or)> <.reset_paren> }
     token regex_infix:sym<&&> { <sym> <O(|%tight_and)>  }
-    token regex_infix:sym<|> { <sym> <O(|%junctive_or)>  }
+    token regex_infix:sym<|> { <sym> <O(|%junctive_or)> <.reset_paren> }
     token regex_infix:sym<&> { <sym> <O(|%junctive_and)>  }
 
     token quantified_atom {
@@ -4804,7 +4815,7 @@ grammar Regex is STD {
 
     token metachar:sym<( )> {
         :dba("capture parens")
-        '(' ~ ')' <nibbler>
+        '(' ~ ')' <nibbler(:reset)>
         $<sym> = {<( )>}
     }
 

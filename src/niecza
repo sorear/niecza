@@ -48,7 +48,73 @@ augment class Op::CallMethod {
     }
 }
 
+augment grammar STD::Regex {
+    rule nibbler(:$reset?) {
+        :temp %*RX;
+        :my $stub = do { #OK
+            %*RX<paren> //= 0;
+            %*RX<paren> = 0 if $reset;
+            %*RX<altparen> = %*RX<maxparen> = %*RX<paren>;
+        };
+        [ <.normspace>? < || | && & > ]?
+        <EXPR>
+        { CALLER::CALLER::<%*RX>.<paren> = %*RX<maxparen> max %*RX<paren> unless $reset }
+        [
+        || <?infixstopper>
+        || $$ <.panic: "Regex not terminated">
+        || (\W)<.sorry("Unrecognized regex metacharacter " ~ $0.Str ~ " (must be quoted to match literally)")>
+        || <.panic: "Regex not terminated">
+        ]
+    }
+}
+
 augment class NieczaActions {
+method metachar:sym<( )> ($/) {
+    make self.rxcapturize($/, %*RX<paren>++,
+        self.encapsulate_regex($/, $<nibbler>.ast, passcut => True));
+}
+method rxcapturize($M, $name, $rxop is copy) {
+    if !$rxop.^isa(::RxOp::Capturing) {
+        # $<foo>=[...]
+        $rxop = self.encapsulate_regex($M, $rxop, passcut => True,
+            passcap => True);
+    }
+
+    # $<foo>=(...)
+    # XXX might not quite be right
+    if +$rxop.captures == 1 && $rxop.captures.[0] ~~ /^\d+$/ {
+        return $rxop.clone(captures => [$name]);
+    }
+
+    return $rxop.clone(captures => [ $name, @( $rxop.captures ) ]);
+}
+method metachar:var ($/) {
+    sub _isnum { $_ ~~ /^\d+$/ }
+    if $<binding> {
+        my $a = $<binding><quantified_atom>.ast.uncut;
+        my $cid = $<variable>.ast.<capid>;
+
+        if !defined $cid {
+            $/.CURSOR.sorry("Non-Match bindings NYI");
+            make ::RxOp::Sequence.new;
+            return Nil;
+        }
+
+        if $a.^isa(::RxOp::VoidBlock) {
+            make ::RxOp::SaveValue.new(capid => $cid, block => $a.block);
+            return Nil;
+        }
+
+        if _isnum($cid) {
+            %*RX<paren> = $cid + 1;
+        }
+
+        make self.rxcapturize($/, $cid, $a);
+        return Nil;
+    }
+    make ::RxOp::VarString.new(param => ~$<variable>,
+        ops => self.rxembed($/, self.do_variable_reference($/, $<variable>.ast), True));
+}
 method metachar:sym<{ }> ($/) {
     $/.CURSOR.trymop({
         $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
