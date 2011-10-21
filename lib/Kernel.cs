@@ -634,10 +634,19 @@ namespace Niecza {
         }
 
         internal FieldBuilder NewField(string name, Type ty) {
-            string fname = name;
+            StringBuilder fnb = new StringBuilder();
+            // sanitize string - it must be convertable to a nonempty
+            // null-terminated UTF8 string
+            foreach (char ch in name) {
+                if (ch >= ' ' && ch <= '~') // yes this is overkill
+                    fnb.Append(ch);
+            }
+            if (fnb.Length == 0)
+                fnb.Append('_');
+            string fname = fnb.ToString();
             int i = 1;
             while (type_builder.GetField(fname) != null)
-                fname = name + (i++);
+                fname = fnb.ToString() + (i++);
             return type_builder.DefineField(fname, ty, FieldAttributes.Public |
                     FieldAttributes.Static);
         }
