@@ -1078,10 +1078,11 @@ namespace Niecza {
                 foreach (KeyValuePair<string,LexInfo> kp in csr.dylex) {
                     if (Utils.StartsWithInvariant(filter, kp.Key) &&
                             kp.Key != pn &&
+                            kp.Value is LISub &&
                             !names.Contains(kp.Key)) {
                         names.Add(kp.Key);
                         brk = true;
-                        cands.Add(((Variable)kp.Value.Get(f)).Fetch());
+                        cands.Add(((LISub)kp.Value).def.protosub);
                     }
                 }
                 if (csr.outer == null) break;
