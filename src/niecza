@@ -337,6 +337,15 @@ method statement_control:use ($/) {
         $h = $h.cursor_fresh(%*LANG<MAIN>);
     }
 }
+method assertion:sym<{ }> ($/) {
+    $/.CURSOR.trymop({
+        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
+        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
+    });
+
+    make ::RxOp::CheckBlock.new(block => self.inliney_call($/,
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
+}
 method methodop($/) {
     if $<longname> {
         my ($c) = self.process_name($<longname>, :defer);
