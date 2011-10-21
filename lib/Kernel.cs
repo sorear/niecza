@@ -1714,11 +1714,10 @@ noparams:
             // or when we are
             protopad = new Frame(null, outer != null ? outer.protopad : null,
                 this, protosub);
-            if (num_lex_slots > 10 && protopad.lexn == null) {
-                // nspill is zero at this point so protopad allocation is
-                // incomplete
-                protopad.lexn = new object[num_lex_slots - 10];
-            }
+            // make sure there's room for installing the current lexicals
+            // may be grown later for more lexicals, or when compiling
+            // spill-slots
+            protopad.EnsureSpills(num_lex_slots - 10);
 
             foreach (SubInfo z in children) {
                 z.protosub = Kernel.MakeSub(z, protopad);
@@ -2086,6 +2085,11 @@ noparams:
             } else {
                 return null;
             }
+        }
+
+        internal void EnsureSpills(int nr) {
+            if (nr > 0 && (lexn == null || lexn.Length < nr))
+                Array.Resize(ref lexn, nr);
         }
 
         public void MarkShared() {

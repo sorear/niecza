@@ -3301,8 +3301,10 @@ dynamic:
 
             sub.code = (DynBlockDelegate) Delegate.CreateDelegate(
                     Tokens.DynBlockDelegate, m);
-            if (sub.protopad != null)
+            if (sub.protopad != null) {
                 sub.protopad.code = sub.code;
+                sub.protopad.EnsureSpills(sub.nspill);
+            }
         }
 
         JScalar j(string s) { return new JScalar(s); }
