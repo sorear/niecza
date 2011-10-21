@@ -2339,7 +2339,7 @@ namespace Niecza.CLRBackend {
             }
 
 
-            string[] slot_to_lex = new string[tgt.dylex.Count];
+            string[] slot_to_lex = new string[tgt.num_lex_slots];
 
             for (int i = 0; i < lex_names.Length; i++) {
                 string   ln = lex_names[i];
