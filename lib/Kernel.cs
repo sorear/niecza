@@ -4949,9 +4949,13 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                         th.lex1 = s;
                         bool ok;
                         P6any r;
-                        lock (th.lex0)
-                            ok = ((STable) th.lex0).mo.instCache.
+                        STable st = (STable) th.lex0;
+                        lock (st) {
+                            if (st.mo.instCache == null)
+                                st.mo.instCache = new Dictionary<string,P6any>();
+                            ok = st.mo.instCache.
                                 TryGetValue((string) th.lex1, out r);
+                        }
                         if (ok) {
                             th.caller.resultSlot = NewROScalar(r);
                             return th.Return();
@@ -5004,6 +5008,8 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 STable role) {
             lock (b) {
                 STable rs;
+                if (b.mo.butCache == null)
+                    b.mo.butCache = new Dictionary<STable,STable>();
                 if (b.mo.butCache.TryGetValue(role, out rs))
                     return rs;
                 return b.mo.butCache[role] = DoRoleApply(b, role);
