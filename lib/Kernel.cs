@@ -1651,8 +1651,11 @@ noparams:
             special |= INLINED;
             outer.children.Remove(this);
             unit.our_subs.Remove(this);
-            if (outervar != null && outer.dylex[outervar] is LISub)
-                outer.dylex.Remove(outervar);
+            foreach (KeyValuePair<string, LexInfo> kv in outer.dylex)
+                if (kv.Value is LISub && ((LISub)kv.Value).def == this) {
+                    outer.dylex.Remove(kv.Key);
+                    break;
+                }
         }
 
         internal bool IsTopicalizer() {
@@ -1686,6 +1689,9 @@ noparams:
                     ((LIDispatch)disp).MakeDispatch(protopad);
                 }
             }
+
+            if (li is LISub && ((LISub)li).def.outer != this)
+                Console.WriteLine("Eeep!  Adding a LISub to the wrong place");
         }
 
         internal void CreateProtopad() {
@@ -1704,8 +1710,9 @@ noparams:
                 protopad.lexn = new object[num_lex_slots - 10];
             }
 
-            foreach (SubInfo z in children)
+            foreach (SubInfo z in children) {
                 z.protosub = Kernel.MakeSub(z, protopad);
+            }
             foreach (LexInfo li in dylex.Values)
                 li.Init(protopad);
         }
