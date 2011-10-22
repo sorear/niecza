@@ -68,6 +68,13 @@ augment grammar STD::Regex {
     }
 }
 
+augment grammar STD {
+method nibble ($lang) {
+    temp %*RX; # prevent up-vars from leaking
+    self.cursor_fresh($lang).nibbler;
+}
+}
+
 augment class NieczaActions {
 method metachar:sym<( )> ($/) {
     make self.rxcapturize($/, %*RX<paren>++,
