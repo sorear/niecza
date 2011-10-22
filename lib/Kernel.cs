@@ -1686,7 +1686,7 @@ noparams:
             dylex.TryGetValue("$_", out topic);
             for (int i = 0; i < sig_i.Length; i += SIG_I_RECORD) {
                 int slot = sig_i[i + SIG_I_SLOT];
-                if (slot > 0 && topic != null && topic.SigIndex() == slot)
+                if (slot >= 0 && topic != null && topic.SigIndex() == slot)
                     return true;
             }
             return false;

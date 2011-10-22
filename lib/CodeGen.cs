@@ -3400,20 +3400,22 @@ dynamic:
             EnterCode(enter);
 
             // TODO: bind a ro container around return values
+            if (sub.IsTopicalizer()) {
+                b = new object[] { new JScalar("xspan"),
+                    new JScalar("tstart"), new JScalar("tend"),
+                    new JScalar("0"), b,
+                    new JScalar("6"), new JScalar(""), new JScalar("tend")};
+            }
             if (sub.mo.HasMRO(Kernel.RoutineMO) &&
                     (sub.special & SubInfo.RETURN_PASS) == 0) {
-                enter.Add(new object[] { new JScalar("return"),
-                    new object[] { new JScalar("xspan"),
-                        new JScalar("rstart"), new JScalar("rend"),
-                        new JScalar("0"), b,
-                        new JScalar("4"), new JScalar(""), new JScalar("rend") } });
-                enter.Insert(0, new JScalar("prog"));
-                b = enter.ToArray();
-            } else {
-                enter.Insert(0, new JScalar("prog"));
-                enter.Add(new object[] { new JScalar("return"), b });
-                b = enter.ToArray();
+                b = new object[] { new JScalar("xspan"),
+                    new JScalar("rstart"), new JScalar("rend"),
+                    new JScalar("0"), b,
+                    new JScalar("4"), new JScalar(""), new JScalar("rend")};
             }
+            enter.Insert(0, new JScalar("prog"));
+            enter.Add(new object[] { new JScalar("return"), b });
+            b = enter.ToArray();
 
             return b;
         }
