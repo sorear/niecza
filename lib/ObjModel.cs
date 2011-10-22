@@ -156,7 +156,7 @@ namespace Niecza {
         public HashSet<STable> isa = new HashSet<STable>();
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
-        public Dictionary<string, P6any> instCache;
+        public Dictionary<string, STable> instCache;
         public Dictionary<STable, STable> butCache;
         // role type objects have an empty MRO cache so no methods can be
         // called against them; the fallback (NYI) is to pun.
@@ -486,7 +486,6 @@ next_method: ;
                 STable[] mro) {
             this.superclasses = new List<STable>(superclasses);
             SetMRO(mro);
-            butCache = new Dictionary<STable, STable>();
             stable.all_slot = all_slot;
             local_does = new STable[0];
 
@@ -506,7 +505,6 @@ next_method: ;
         public void FillParametricRole(P6any factory) {
             isRole = true;
             roleFactory = factory;
-            instCache = new Dictionary<string, P6any>();
             SetMRO(Kernel.AnyMO.mo.mro);
         }
 
@@ -616,7 +614,6 @@ next_method: ;
             foreach (STable m in mro)
                 foreach (AttrInfo ai in m.mo.local_attr)
                     all_slot_l.Add(ai.name);
-            butCache = new Dictionary<STable, STable>();
             stable.all_slot = all_slot_l.ToArray();
             local_does = new STable[0];
 

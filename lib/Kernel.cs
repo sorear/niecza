@@ -4917,66 +4917,72 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
-        private static SubInfo IRSI = new SubInfo("InstantiateRole", IRC);
-        private static Frame IRC(Frame th) {
-            switch (th.ip) {
-                case 0:
-                    {
-                        string s = "";
-                        th.lex0 = th.pos[0].Fetch().mo;
-                        bool cache_ok = true;
-                        Variable[] args;
-                        P6any argv = th.pos[1].Fetch();
-                        if (argv.mo == Kernel.ParcelMO) {
-                            args = UnboxAny<Variable[]>(argv);
-                        } else {
-                            args = new Variable[] { th.pos[1] };
-                        }
-                        Variable[] to_pass = new Variable[args.Length];
-                        for (int i = 0; i < args.Length; i++) {
-                            P6any obj = args[i].Fetch();
-                            to_pass[i] = NewROScalar(obj);
-                            if (obj.mo == StrMO) {
-                                string p = UnboxAny<string>(obj);
-                                s += new string((char)p.Length, 1);
-                                s += p;
-                            } else { cache_ok = false; }
-                        }
-                        if (!cache_ok) {
-                            return ((STable) th.lex0).mo.roleFactory.
-                                Invoke(th.Return(), to_pass, null);
-                        }
-                        th.lex1 = s;
-                        bool ok;
-                        P6any r;
-                        STable st = (STable) th.lex0;
-                        lock (st) {
-                            if (st.mo.instCache == null)
-                                st.mo.instCache = new Dictionary<string,P6any>();
-                            ok = st.mo.instCache.
-                                TryGetValue((string) th.lex1, out r);
-                        }
-                        if (ok) {
-                            th.caller.resultSlot = NewROScalar(r);
-                            return th.Return();
-                        }
-                        th.ip = 1;
-                        return ((STable) th.lex0).mo.roleFactory.
-                            Invoke(th, to_pass, null);
-                    }
-                case 1:
-                    lock (th.lex0) {
-                        ((STable) th.lex0).mo.instCache[(string) th.lex1]
-                            = ((Variable) th.resultSlot).Fetch();
-                    }
-                    th.caller.resultSlot = th.resultSlot;
-                    return th.Return();
-                default:
-                    return Die(th, "Invalid IP");
-            }
-        }
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
-            return IRSI.Binder(th, null, null, pcl, null, false, null);
+            STable prole = pcl[0].Fetch().mo;
+
+            string cache_key = "";
+            bool cache_ok = true;
+
+            // get argument list - TODO make this saner
+            P6any argv = pcl[1].Fetch();
+            Variable[] args = argv.mo == Kernel.ParcelMO ?
+                UnboxAny<Variable[]>(argv) : new Variable[] { pcl[1] };
+
+            Variable[] to_pass = new Variable[args.Length];
+            // calculate cache key; we only cache all-Str instantiations for
+            // now
+            for (int i = 0; i < args.Length; i++) {
+                P6any obj = args[i].Fetch();
+                to_pass[i] = NewROScalar(obj);
+                if (obj.mo == StrMO) {
+                    string p = UnboxAny<string>(obj);
+                    cache_key += new string((char)p.Length, 1);
+                    cache_key += p;
+                } else {
+                    cache_ok = false;
+                }
+            }
+
+            lock (prole) {
+                if (prole.mo.instCache == null)
+                    prole.mo.instCache = new Dictionary<string,STable>();
+                STable r;
+                if (cache_ok &&
+                        prole.mo.instCache.TryGetValue(cache_key, out r)) {
+                }
+                else {
+                    Frame ifr = (Frame)RunInferior(prole.mo.roleFactory.
+                        Invoke(GetInferiorRoot(), to_pass, null)).Fetch();
+
+                    r = new STable(prole.name + "[...]");
+                    r.mo.rtype = "role";
+                    r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
+                    r.typeObject = r.initObject = new P6opaque(r);
+                    r.typeVar = r.initVar = NewROScalar(r.typeObject);
+                    // Hack - reseat role to this closure-clone of methods
+                    foreach (var mi in prole.mo.lmethods) {
+                        var nmi = mi;
+                        SubInfo orig = (SubInfo) nmi.impl.GetSlot("info");
+                        nmi.impl = ((Variable)ifr.info.dylex[orig.outervar].
+                                Get(ifr)).Fetch();
+                        r.mo.lmethods.Add(nmi);
+                    }
+                    foreach (var ai in prole.mo.local_attr) {
+                        var nai = ai;
+                        if (nai.init != null) {
+                            SubInfo orig = (SubInfo) nai.init.GetSlot("info");
+                            nai.init = ((Variable)ifr.info.
+                                dylex[orig.outervar].Get(ifr)).Fetch();
+                        }
+                        r.mo.local_attr.Add(nai);
+                    }
+                    r.mo.Invalidate();
+                    if (cache_ok)
+                        prole.mo.instCache[cache_key] = r;
+                }
+                th.resultSlot = r.typeVar;
+                return th;
+            }
         }
 
         private static STable DoRoleApply(STable b,
