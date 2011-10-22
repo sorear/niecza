@@ -1614,14 +1614,9 @@ flat_enough:;
         return la.ToArray();
     }
 
+    internal static Dictionary<string,SubInfo> setting_path;
     public static Frame you_are_here(Frame th, string sname) {
-        string key = "*resume_" + sname;
-        uint khash = SubInfo.FilterForName(key);
-        object r = null;
-        for (Frame c = th; c != null; c = c.caller)
-            if (c.TryGetDynamic(key, khash, out r))
-                break;
-        P6any to_call = Kernel.MakeSub((SubInfo)r, th);
+        P6any to_call = Kernel.MakeSub(setting_path[sname], th);
         return to_call.Invoke(th, Variable.None, null);
     }
 

@@ -495,10 +495,21 @@ namespace Niecza {
             Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
             Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
 
-            if (!is_mainish && bottom == null) {
-                Kernel.RunInferior(Kernel.GetInferiorRoot().
-                        MakeChild(null, mainline, Kernel.AnyP));
+            if (!is_mainish && bottom == null)
+                RunMainline();
+        }
+
+        internal void RunMainline() {
+            RuntimeUnit csr = this;
+            Builtins.setting_path = new Dictionary<string,SubInfo>();
+            while (csr.mainline.outer != null) {
+                RuntimeUnit o = csr.mainline.outer.unit;
+                Builtins.setting_path[o.name] = csr.mainline;
+                csr = o;
             }
+
+            Kernel.RunInferior(Kernel.GetInferiorRoot().
+                    MakeChild(null, csr.mainline, Kernel.AnyP));
         }
 
         internal CpsOp TypeConstant(STable s) {
@@ -5052,9 +5063,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 TraceCount = TraceFreq;
             }
             try {
-                // TODO: settings
-                Kernel.RunInferior(Kernel.GetInferiorRoot().
-                        MakeChild(null, main_unit.mainline, AnyP));
+                main_unit.RunMainline();
             } catch (NieczaException n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
                 Environment.Exit(1);
