@@ -76,6 +76,77 @@ method nibble ($lang) {
 }
 
 augment class NieczaActions {
+method do_variable_reference($M, $v) {
+    if $v<term> {
+        return $v<term>;
+    }
+
+    my $tw = $v<twigil>;
+    my $sl = $v<sigil> ~ $tw ~ $v<name>;
+    my $list = $v<sigil> eq '@';
+    my $hash = $v<sigil> eq '%';
+
+    if defined($v<pkg>) && $tw ~~ /<[*=~?^:]>/ {
+        $M.CURSOR.sorry("Twigil $tw cannot be used with qualified names");
+        return ::Op::StatementList.new;
+    }
+
+    if $tw eq '!' {
+        my $pclass;
+        if $v<pkg> {
+            $pclass = $v<pkg>.xref;
+        } elsif $*CURLEX<!sub>.in_class -> $c {
+            $pclass = $c;
+        } else {
+            $M.CURSOR.sorry("Cannot resolve class for private method");
+        }
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, private => True, receiver => mklex($M, 'self'),
+            :$pclass));
+    }
+    elsif $tw eq '.' {
+        if defined $v<pkg> {
+            $M.CURSOR.sorry('$.Foo::bar syntax NYI');
+            return ::Op::StatementList.new;
+        }
+
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+            name => $v<name>, receiver => mklex($M, 'self')));
+    }
+    # no twigil in lex name for these
+    elsif $tw eq '^' || $tw eq ':' {
+        mklex($M, $v<sigil> ~ $v<name>, :$hash, :$list);
+    }
+    elsif $tw eq '*' {
+        ::Op::ContextVar.new(|node($M), name => $sl);
+    }
+    elsif $tw eq '' || $tw eq '?' {
+        if defined($v<pkg>) {
+            self.package_var($M, self.gensym, $sl, $v<pkg>);
+        } elsif $tw eq '?' && $sl eq '$?POSITION' {
+            mkcall($M, '&infix:<..^>',
+                ::Op::Num.new(|node($M), value => [10, ~$M.from]),
+                ::Op::Num.new(|node($M), value => [10, ~$M.to]));
+        } elsif $tw eq '?' && $sl eq '$?LINE' {
+            ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
+        } elsif $tw eq '?' && $sl eq '$?FILE' {
+            ::Op::StringLiteral.new(|node($M), text => $*FILE<name>);
+        } elsif $tw eq '?' && $sl eq '$?ORIG' {
+            ::Op::StringLiteral.new(|node($M), text => $M.orig);
+        } elsif $tw eq '?' && $sl eq '&?BLOCK' {
+            $*CURLEX<!sub>.noninlinable;
+            ::Op::GetBlock.new(|node($M))
+        } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
+            $*CURLEX<!sub>.noninlinable;
+            ::Op::GetBlock.new(|node($M), :routine)
+        } else {
+            mklex($M, $sl, :$hash, :$list);
+        }
+    }
+    else {
+        $M.CURSOR.sorry("Unhandled reference twigil $tw");
+    }
+}
 method metachar:sym<( )> ($/) {
     make self.rxcapturize($/, %*RX<paren>++,
         self.encapsulate_regex($/, $<nibbler>.ast, passcut => True));
