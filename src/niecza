@@ -337,6 +337,28 @@ method statement_control:use ($/) {
         $h = $h.cursor_fresh(%*LANG<MAIN>);
     }
 }
+method check_hash($/) {
+    my $do = $<pblock><blockoid>.ast;
+
+    return False unless $do.^isa(::Op::StatementList);
+    return True if $do.children == 0;
+    return False if $do.children > 1;
+
+    $do = $do.children[0];
+    my @bits = $do.^isa(::Op::SimpleParcel) ?? @( $do.items ) !! $do;
+
+    return True if @bits[0].^isa(::Op::SimplePair);
+
+    if @bits[0].^isa(::Op::Builtin) && @bits[0].name eq 'pair' {
+        return True;
+    }
+
+    if @bits[0].^isa(::Op::Lexical) && substr(@bits[0].name,0,1) eq '%' {
+        return True;
+    }
+
+    return False;
+}
 method assertion:sym<{ }> ($/) {
     $/.CURSOR.trymop({
         $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
