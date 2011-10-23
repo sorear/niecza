@@ -597,10 +597,9 @@ next_method: ;
                         Kernel.AnyMO);
             }
 
-            STable[][] lists = new STable[superclasses.Count + 1][];
-            lists[0] = new STable[superclasses.Count + 1];
-            lists[0][0] = stable;
-            superclasses.CopyTo(lists[0], 1);
+            STable[][] lists = new STable[superclasses.Count + 2][];
+            lists[0] = new STable[] { stable };
+            lists[superclasses.Count + 1] = superclasses.ToArray();
             for (int i = 0; i < superclasses.Count; i++)
                 lists[i+1] = superclasses[i].mo.mro;
 
