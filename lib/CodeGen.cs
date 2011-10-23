@@ -353,28 +353,6 @@ namespace Niecza.CLRBackend {
             CC.GetConstructor(new Type[] { typeof(int[]) });
         public static readonly ConstructorInfo SC_ctor =
             StashCursor.GetConstructor(new Type[] { typeof(Frame), typeof(int) });
-        public static readonly Dictionary<string,int> LADcodes
-            = _LADcodes();
-        private static Dictionary<string,int> _LADcodes() {
-            Dictionary<string,int> n =
-                new Dictionary<string,int>();
-            n["CC"]  = 1;
-            n["Str"] = 2;
-            n["Param"] = 3;
-            n["Method"] = 4;
-            n["Dispatcher"] = 5;
-            n["StrNoCase"] = 6;
-            n["Imp"] = 7;
-            n["Dot"] = 8;
-            n["None"] = 9;
-            n["Null"] = 10;
-            n["Plus"] = 11;
-            n["Star"] = 12;
-            n["Opt"] = 13;
-            n["Sequence"] = 14;
-            n["Any"] = 15;
-            return n;
-        }
 
         public static readonly MethodInfo P6any_InvokeMethod =
             P6any.GetMethod("InvokeMethod");
@@ -563,10 +541,12 @@ namespace Niecza.CLRBackend {
             typeof(Frame).GetField("resultSlot");
         public static readonly FieldInfo Frame_lexn =
             typeof(Frame).GetField("lexn");
+        [Immutable]
         public static readonly FieldInfo[] Frame_lexi32 = new FieldInfo[] {
             typeof(Frame).GetField("lexi0"),
             typeof(Frame).GetField("lexi1")
         };
+        [Immutable]
         public static readonly FieldInfo[] Frame_lexobj = new FieldInfo[] {
             typeof(Frame).GetField("lex0"),
             typeof(Frame).GetField("lex1"),
@@ -1034,7 +1014,7 @@ namespace Niecza.CLRBackend {
             HasCases = false;
         }
         public override void CodeGen(CgContext cx) { }
-        public static ClrNoop Instance = new ClrNoop();
+        [Immutable] public static ClrNoop Instance = new ClrNoop();
     }
 
     class ClrEhSpan : ClrOp {
@@ -1121,7 +1101,7 @@ namespace Niecza.CLRBackend {
             cx.il.MarkLabel(cx.cases[cx.next_case++]);
             cx.save_line();
         }
-        public static ClrSync Instance = new ClrSync();
+        [Immutable] public static ClrSync Instance = new ClrSync();
     }
 
     // only used in ClrOperator.Sink, and assumes it in the HasCases=false
@@ -1489,7 +1469,7 @@ namespace Niecza.CLRBackend {
         public override void CodeGen(CgContext cx) {
             cx.il.Emit(OpCodes.Ldarg_0);
         }
-        public static ClrCpsFrame Instance = new ClrCpsFrame();
+        [Immutable] public static ClrCpsFrame Instance = new ClrCpsFrame();
     }
 
     class ClrNullLiteral : ClrOp {
@@ -2420,9 +2400,9 @@ namespace Niecza.CLRBackend {
                 : Scan(z);
         }
 
-        static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
-        static Dictionary<string, Func<CpsOp[], CpsOp>> thandlers;
-        static Dictionary<string, Type> namtypes;
+        [Immutable] static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
+        [Immutable] static Dictionary<string, Func<CpsOp[], CpsOp>> thandlers;
+        [Immutable] static Dictionary<string, Type> namtypes;
 
         static Type namtype(object z) {
             string name = JScalar.S(z);
@@ -3494,7 +3474,7 @@ dynamic:
                 }
             }
         }
-        static bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
+        static readonly bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
 
         object AddLexical(object[] args, LexInfo li) {
             li.owner = (SubInfo)Handle.Unbox(args[1]);

@@ -378,7 +378,7 @@ namespace Niecza {
         }
 
         const int NUM_NUMTYPES = 12;
-        static Type[] num_types = new Type[] {
+        [Immutable] static Type[] num_types = new Type[] {
             typeof(sbyte), typeof(byte), typeof(short), typeof(ushort),
             typeof(int), typeof(uint), typeof(long), typeof(ulong),
             typeof(char), typeof(float), typeof(double), typeof(decimal),
@@ -386,7 +386,7 @@ namespace Niecza {
 
         // +1 if Y is a signed type shorter-or-equal to unsigned X, or
         // Y is implicitly convertable to X
-        static sbyte[,] num_preced = new sbyte[,] {
+        [Immutable] static sbyte[,] num_preced = new sbyte[,] {
             //sb  ub  ss  us  si  ui  sl  ul  ch  sf  df  dc
             {  0,  1,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1 }, //sbyte
             {  0,  0,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1 }, //byte
@@ -430,8 +430,10 @@ namespace Niecza {
 
     public class CLRWrapperProvider {
         // wrapper_cache serves as the lock-bearer for both
+        [ContainerGlobal]
         static Dictionary<Type, STable> wrapper_cache
             = new Dictionary<Type, STable>();
+        [ContainerGlobal]
         static Dictionary<string, STable> named_wrapper_cache
             = new Dictionary<string, STable>();
 
@@ -516,6 +518,7 @@ for $args (0..9) {
         public static void dv8<T0,T1,T2,T3,T4,T5,T6,T7>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4,a5,a6,a7, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7), }); }
         public static TR dnv9<TR,T0,T1,T2,T3,T4,T5,T6,T7,T8>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) { return (TR)Callback(f, typeof(TR), new object[] { a0,a1,a2,a3,a4,a5,a6,a7,a8, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7),typeof(T8), }); }
         public static void dv9<T0,T1,T2,T3,T4,T5,T6,T7,T8>(P6any f, T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) { Callback(f, typeof(void), new object[] { a0,a1,a2,a3,a4,a5,a6,a7,a8, }, new Type[] { typeof(T0),typeof(T1),typeof(T2),typeof(T3),typeof(T4),typeof(T5),typeof(T6),typeof(T7),typeof(T8), }); }
+        [Immutable]
         static MethodInfo[] delegate_methods;
         static CLRWrapperProvider() {
             delegate_methods = new MethodInfo[20];

@@ -166,6 +166,7 @@ namespace Niecza {
         const int INITIAL = 5;
         const int THRESHOLD = 11;
 
+        [Immutable]
         static int[] grow = new int[] {
             5, 11, 17, 37, 67, 131, 257, 521, 1031, 2053, 4099, 8209, 16411,
             32771, 65537, 131101, 262147, 524309, 1048583, 2097169, 4194319,
@@ -588,6 +589,7 @@ namespace Niecza {
             this.re = re; this.im = im;
         }
 
+        [Immutable]
         public static readonly Complex i = new Complex(0, 1);
 
         public static Complex operator- (Complex left) {

@@ -74,6 +74,7 @@ namespace Niecza {
         // note: callers need to make sure type is set up properly if null
         public Variable() { }
 
+        [Immutable]
         public static readonly Variable[] None = new Variable[0];
     }
 
@@ -767,7 +768,7 @@ namespace Niecza {
             for (int i = 0; i < dep.Length; i++) {
                 srcinfo[i*2]   = dep[i].name;
                 srcinfo[i*2+1] = Utils.HashToStr(
-                    ObjectRegistry.hash.ComputeHash(
+                    ObjectRegistry.NewHash().ComputeHash(
                         new UTF8Encoding().GetBytes(dep[i].source)));
             }
             fb.Strings(srcinfo);
@@ -1308,6 +1309,7 @@ namespace Niecza {
         public int[] edata;
         public string[] label_names;
 
+        [Immutable]
         private static string[] controls = new string[] { "unknown", "next",
             "last", "redo", "return", "die", "succeed", "proceed", "goto",
             "nextsame/nextwith", "varlookup", "warning" };
@@ -2266,6 +2268,7 @@ noparams:
             return (Frame) coro_return;
         }
 
+        [TrueGlobal]
         private static List<string> spacey = new List<string>();
         public string DepthMark() {
             Frame f = this;
@@ -2998,6 +3001,7 @@ noparams:
         protected override void SetData(object[] o) { succ = (bool) o[0]; }
         // note that most of this table is katakana.  Perhaps there
         // is a better way.
+        [Immutable]
         static ushort[] table = {
             48, 57, 57, 48, 65, 90, 90, 65, 97, 122, 122, 97, 913, 929,
             937, 931, 931, 937, 929, 913, 945, 961, 969, 963, 963, 969,
@@ -3869,34 +3873,8 @@ have_v:
             }
         }
 
-        internal static HashSet<string> ModulesStarted = new HashSet<string>();
-        internal static Dictionary<string,RuntimeUnit> ModulesFinished =
-            new Dictionary<string,RuntimeUnit>();
-
-        public static Variable BootModule(string name, DynBlockDelegate dgt) {
-            if (ModulesFinished.ContainsKey(name))
-                return AnyMO.typeVar;
-            if (ModulesStarted.Contains(name))
-                throw new NieczaException("Recursive module graph detected at " + name + ": " + JoinS(" ", ModulesStarted));
-            ModulesStarted.Add(name);
-            Variable r = Kernel.RunInferior(Kernel.GetInferiorRoot().
-                    MakeChild(null, new SubInfo("boot-" + name, dgt), AnyP));
-            if (!ModulesFinished.ContainsKey(name))
-                ModulesFinished[name] = null;
-            return r;
-        }
-
         public static void DoRequire(string name) {
-            if (ModulesFinished.ContainsKey(name))
-                return;
-            Assembly a = Assembly.Load(name);
-            Type t = a.GetType(name);
-            if (t == null) throw new NieczaException("Load module must have a type of the same name");
-            MethodInfo mi = t.GetMethod("BOOT");
-            if (mi == null) throw new NieczaException("Load module must have a BOOT method");
-            BootModule(name, delegate (Frame fr) {
-                return (Frame) mi.Invoke(null, new object[] { fr });
-            });
+            throw new NotImplementedException(); // TODO reimplement
         }
 
         public static T UnboxAny<T>(P6any o) {
@@ -4067,8 +4045,8 @@ have_v:
             public bool constrained;
             public bool required;
 
-            public static MMDParameter TOP = new MMDParameter();
-            public static MMDParameter BOTTOM = new MMDParameter();
+            [Immutable] public static MMDParameter TOP = new MMDParameter();
+            [Immutable] public static MMDParameter BOTTOM = new MMDParameter();
 
             // XXX Should requiredness be factored in?
             // 2: narrower 0: tied 1: less narrow 3: incomparable
@@ -4365,6 +4343,7 @@ ltm:
             return Lexer.MakeDispatcher(name, lp.ToArray());
         }
 
+        [TrueGlobal]
         public static bool SaferMode;
 
         private static Frame SaferTrap(Frame th) {
@@ -4494,6 +4473,7 @@ ltm:
             return nv;
         }
 
+        [TrueGlobal]
         public static string[] commandArgs;
 
         public static VarDeque SortHelper(Frame th, P6any cb, VarDeque from) {
@@ -5093,9 +5073,9 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         public const int TRACE_CUR = 1;
         public const int TRACE_ALL = 2;
 
-        public static int TraceFreq;
-        public static int TraceCount;
-        public static int TraceFlags;
+        [TrueGlobal] public static int TraceFreq;
+        [TrueGlobal] public static int TraceCount;
+        [TrueGlobal] public static int TraceFlags;
 
         private static void DoTrace(Frame cur) {
             TraceCount = TraceFreq;
@@ -5212,7 +5192,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             }
         }
 
-        [ThreadStatic]
+        [ContainerGlobal]
         public static Dictionary<string, StashEnt> currentGlobals;
 
         public static Variable GetGlobal(string key) {
@@ -5671,6 +5651,15 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                             BindingFlags.Public | BindingFlags.NonPublic)) {
                         if (fi.GetCustomAttributes(typeof(CompilerGeneratedAttribute), true).Length != 0)
                             continue;
+                        // already classified
+                        if (fi.GetCustomAttributes(typeof(ImmutableAttribute), true).Length != 0)
+                            continue;
+                        if (fi.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0)
+                            continue;
+                        if (fi.GetCustomAttributes(typeof(ContainerGlobalAttribute), true).Length != 0)
+                            continue;
+                        if (fi.GetCustomAttributes(typeof(TrueGlobalAttribute), true).Length != 0)
+                            continue;
                         // ignore effectively constant fields
                         if (fi.IsLiteral)
                             continue;
@@ -5681,14 +5670,15 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                         if (fi.IsInitOnly && (ft.IsPrimitive ||
                                 ft == typeof(BigInteger) ||
                                 ft == typeof(Type) ||
+                                ft == typeof(Assembly) ||
                                 ft == typeof(FieldInfo) ||
                                 ft == typeof(ConstructorInfo) ||
                                 ft == typeof(MethodInfo) ||
                                 typeof(Delegate).IsAssignableFrom(ft) ||
-                                ft.IsSealed && ft.GetFields(
-                                    BindingFlags.Instance |
-                                    BindingFlags.Public |
-                                    BindingFlags.NonPublic).Length == 0 ||
+                                //ft.IsSealed && ft.GetFields(
+                                //    BindingFlags.Instance |
+                                //    BindingFlags.Public |
+                                //    BindingFlags.NonPublic).Length == 0 ||
                                 typeof(ReflectObj).IsAssignableFrom(ft) ||
                                 ft == typeof(string)))
                             continue;
@@ -5711,9 +5701,9 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
     }
 
     public class Config {
-        public static int CGVerbose =
+        public static readonly int CGVerbose =
             int.Parse(Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") ?? "0");
-        public static bool CGVerifiable =
+        public static readonly bool CGVerifiable =
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
         public static readonly bool C3Trace =
             Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;

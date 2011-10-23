@@ -961,10 +961,8 @@ public partial class Builtins {
         return Kernel.NewROScalar(n1);
     }
 
-    static IForeignInterpreter p5_interpreter;
+    [TrueGlobal] static IForeignInterpreter p5_interpreter;
     public static Variable eval_perl5(Variable v) {
-
-        // Cargo culted to get the string from the argument
         P6any o1 = v.Fetch();
         string r = o1.mo.mro_raw_Str.Get(v);
 
@@ -1520,6 +1518,7 @@ flat_enough:;
         return MakeParcel(ret);
     }
 
+    [TrueGlobal]
     private static Random rng = new Random();
 
     public static Variable rand() {
@@ -1614,6 +1613,7 @@ flat_enough:;
         return la.ToArray();
     }
 
+    [ContainerGlobal]
     internal static Dictionary<string,SubInfo> setting_path;
     public static Frame you_are_here(Frame th, string sname) {
         P6any to_call = Kernel.MakeSub(setting_path[sname], th);
@@ -1624,9 +1624,9 @@ flat_enough:;
         System.Diagnostics.Process.Start(file, args).WaitForExit();
     }
 
-    internal static AppDomain up_domain;
-    internal static RuntimeUnit eval_result;
-    static System.Collections.IDictionary upcall_receiver;
+    [TrueGlobal] internal static AppDomain up_domain;
+    [TrueGlobal] internal static RuntimeUnit eval_result;
+    [TrueGlobal] static System.Collections.IDictionary upcall_receiver;
     internal static object UpCall(object[] args) {
         if (upcall_receiver == null)
             upcall_receiver = (System.Collections.IDictionary)
@@ -1725,6 +1725,7 @@ flat_enough:;
 
     class ItemSource {
         protected ItemSource() {}
+        [Immutable]
         public static ItemSource Empty = new ItemSource();
         public virtual bool TryGet(out Variable[] r, bool block) {
             r = null;
@@ -2102,8 +2103,8 @@ again:
     }
 
     // Used mostly to initialize $*PID et al
-    public static string programName;
-    public static string execName;
+    [TrueGlobal] public static string programName;
+    [TrueGlobal] public static string execName;
 
     public static Variable getenv(string str) {
         return Kernel.BoxAnyMO(Environment.GetEnvironmentVariable(str), Kernel.StrMO);

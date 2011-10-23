@@ -42,9 +42,9 @@ public sealed class GState {
         highwater = (orig_a.Length < 100 || !Cursor.HwTrace) ?
             int.MaxValue : 0;
     }
-    public static string BailAt =
+    public static readonly string BailAt =
         Environment.GetEnvironmentVariable("NIECZA_DIE_AT_PCT");
-    public static int BailAtI;
+    public static readonly int BailAtI;
     static GState() {
         if (!int.TryParse(BailAt, out BailAtI))
             BailAtI = 101;
@@ -488,6 +488,7 @@ public sealed class RxFrame: IFreeze {
         return global.CallAction(th, name, _matchObj);
     }
 
+    [ContainerGlobal]
     public static Variable EmptyList;
 
     public Frame FinalEnd(Frame th) {
@@ -532,9 +533,9 @@ public sealed class RxFrame: IFreeze {
 // this does double duty backing Match; note that Cursor and Match need to be
 // treated polymorphically in a couple places
 public class Cursor : P6any {
-    public static bool Trace =
+    public static readonly bool Trace =
         Environment.GetEnvironmentVariable("NIECZA_RX_TRACE") != null;
-    public static bool HwTrace =
+    public static readonly bool HwTrace =
         Environment.GetEnvironmentVariable("NIECZA_HIGHWATER_TRACE") != null;
 
     // common fields
@@ -799,13 +800,14 @@ public sealed class CC : IFreeze {
 
     public const int MAlNum   = MAlpha | MNum;
 
-    public static readonly CC Word  = new CC(new int[] { 0, MAlNum,
+    [Immutable] public static readonly CC Word  = new CC(new int[] { 0, MAlNum,
             '_', MAll, '_'+1, MAlNum });
 
-    public static readonly CC All   = new CC(MAll);
-    public static readonly CC None  = new CC(0);
-    public static readonly CC AlNum = new CC(MAlNum);
+    [Immutable] public static readonly CC All   = new CC(MAll);
+    [Immutable] public static readonly CC None  = new CC(0);
+    [Immutable] public static readonly CC AlNum = new CC(MAlNum);
 
+    [Immutable]
     private static readonly int[] masks = new int[] {
         MAll, (MAll & ~MOther), 0x71F,
         0x1F, 0xE0, 0x700, 0x3800, 0x3C000, 0x1FC0000, 0x1E000000,
@@ -815,6 +817,7 @@ public sealed class CC : IFreeze {
         (1<<16), (1<<17), (1<<18), (1<<19),  (1<<20), (1<<21), (1<<22), (1<<23),
         (1<<24), (1<<25), (1<<26), (1<<27),  (1<<28), (1<<29),
     };
+    [Immutable]
     private static readonly string[] masknames = new string[] {
         "ALL", "Assigned", "Alnum",
         "Alpha", "Mark", "Num", "Space", "Control", "Punct", "Symbol",
@@ -1604,7 +1607,7 @@ public class Lexer {
     int[] fatebuffer;
     int usedfates;
 
-    public static bool LtmTrace =
+    public static readonly bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
 
     public static Lexer GetLexer(Frame fromf, STable kl, LAD[] lads, string title) {

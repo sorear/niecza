@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 
 public class JsyncWriter {
-    internal static bool FailSoft =
+    internal static readonly bool FailSoft =
         Environment.GetEnvironmentVariable("NIECZA_JSYNC_WRITER_FAILSOFT") != null;
     StringBuilder o = new StringBuilder();
     Dictionary<object,int> anchors = new Dictionary<object,int>();

@@ -71,8 +71,8 @@ namespace Niecza {
 		readonly uint[] data;
 		readonly short sign;
 
-		static readonly uint[] ZERO = new uint [1];
-		static readonly uint[] ONE = new uint [1] { 1 };
+		[Immutable] static readonly uint[] ZERO = new uint [1];
+		[Immutable] static readonly uint[] ONE = new uint [1] { 1 };
 
 		public BigInteger (short sign, uint[] data)
 		{

@@ -60,7 +60,8 @@ namespace Niecza.Serialization {
         Dictionary<string,SerUnit> units =
             new Dictionary<string,SerUnit>();
 
-        internal static readonly HashAlgorithm hash = SHA256.Create();
+        internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
+
         static readonly string signature = "Niecza-Serialized-Module";
         static readonly int version = 1;
 
@@ -116,7 +117,7 @@ namespace Niecza.Serialization {
 
             su = new SerUnit();
             su.name = name;
-            su.hash = hash.ComputeHash(bytes);
+            su.hash = NewHash().ComputeHash(bytes);
 
             ThawBuffer tb = new ThawBuffer(this, su, bytes);
 
@@ -175,7 +176,7 @@ namespace Niecza.Serialization {
                 fb.ObjRef(root);
 
                 byte[] data = fb.GetData();
-                su.hash = hash.ComputeHash(data);
+                su.hash = NewHash().ComputeHash(data);
                 File.WriteAllBytes(file, data);
                 success = true;
             } finally {
@@ -424,11 +425,13 @@ namespace Niecza.Serialization {
             }
         }
 
+        [Immutable]
         internal static Type[] boxTypes = new Type[] {
             null, typeof(Rat), typeof(FatRat), typeof(Complex),
             typeof(double), typeof(int), typeof(string), typeof(VarHash),
             typeof(Variable[]), typeof(VarDeque), typeof(STable),
         };
+        [Immutable]
         internal static Func<P6opaque>[] boxCreate = new Func<P6opaque>[] {
             P6opaque.Create, BoxObject<Rat>.Create, BoxObject<FatRat>.Create,
             BoxObject<Complex>.Create, BoxObject<double>.Create,
@@ -436,7 +439,7 @@ namespace Niecza.Serialization {
             BoxObject<VarHash>.Create, BoxObject<Variable[]>.Create,
             BoxObject<VarDeque>.Create, BoxObject<STable>.Create,
         };
-
+        [Immutable]
         static Type[] anyTypes = new Type[] {
             typeof(string), typeof(P6any[]), typeof(Variable[]),
             typeof(string[]), typeof(CC[]),
