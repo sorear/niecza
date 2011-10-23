@@ -1321,40 +1321,25 @@ public class LADParam : LAD {
     }
 
     public string GetText(NFA pad) {
+        // XXX we might want to restrict this to "true constants"
+        // alternatively, we could generalize to any variable, and add rechecks
         Frame outer = pad.outer_stack[pad.outer_stack.Count - 1];
-        string reason;
 
-        if (outer == null) {
-            reason = "no outer frame";
-            goto imp;
+        Variable vr = outer == null ? Kernel.AnyMO.typeVar :
+            outer.LexicalFind(name);
+
+        P6any ob = vr.Fetch();
+
+        if (!vr.rw && ob.IsDefined() && ob.mo == Kernel.StrMO) {
+            if (Lexer.LtmTrace)
+                Console.WriteLine("Resolved {0} to \"{1}\"", name,
+                        Kernel.UnboxAny<string>(ob));
+            return Kernel.UnboxAny<string>(ob);
+        } else {
+            if (Lexer.LtmTrace)
+                Console.WriteLine("No LTM for {0}", name);
+            return null;
         }
-
-        object o;
-
-        if (!outer.TryGetDynamic("*params", 0, out o)) {
-            reason = "no parameter block";
-            goto imp;
-        }
-
-        Variable p;
-        if (!((VarHash) o).TryGetValue(name, out p)) {
-            reason = "parameter not found";
-            goto imp;
-        }
-        P6any i = p.Fetch();
-        if (i.mo != Kernel.StrMO) {
-            reason = "parameter is not a string";
-            goto imp;
-        }
-
-        string text = Kernel.UnboxAny<string>(i);
-        if (Lexer.LtmTrace)
-            Console.WriteLine("Resolved {0} to \"{1}\"", name, text);
-        return text;
-imp:
-        if (Lexer.LtmTrace)
-            Console.WriteLine("No LTM for {0} because {1}", name, reason);
-        return null;
     }
 
     public override void ToNFA(NFA pad, int from, int to) {
