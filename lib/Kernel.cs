@@ -360,6 +360,16 @@ namespace Niecza {
     // along with CORE.  Not really needed for immutable fields
     [AttributeUsage(AttributeTargets.Field)]
     class CORESavedAttribute : Attribute { }
+    // Marks fields that are really immutable
+    [AttributeUsage(AttributeTargets.Field)]
+    class ImmutableAttribute : Attribute { }
+    // Marks fields that should be treated as container-global
+    // CORESaved implies ContainerGlobal
+    [AttributeUsage(AttributeTargets.Field)]
+    class ContainerGlobalAttribute : Attribute { }
+    // Marks fields that should be treated as true-global
+    [AttributeUsage(AttributeTargets.Field)]
+    class TrueGlobalAttribute : Attribute { }
 
     public sealed class RuntimeUnit : IFreeze {
         public string name, filename, source, asm_name, dll_name;
@@ -5652,7 +5662,42 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         public static void Main(string[] args) {
             string cmd = args.Length > 0 ? args[0] : "-help";
 
-            if (cmd == "-run" && args.Length == 2) {
+            if (cmd == "-field-inventory") {
+                foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {
+                    if (ty.GetCustomAttributes(typeof(CompilerGeneratedAttribute), true).Length != 0)
+                        continue;
+
+                    foreach (FieldInfo fi in ty.GetFields(BindingFlags.Static |
+                            BindingFlags.Public | BindingFlags.NonPublic)) {
+                        if (fi.GetCustomAttributes(typeof(CompilerGeneratedAttribute), true).Length != 0)
+                            continue;
+                        // ignore effectively constant fields
+                        if (fi.IsLiteral)
+                            continue;
+                        Type ft = fi.FieldType;
+                        // delegates can be stateful, but niecza
+                        // doesn't assign stateful delegates to initonly fields
+                        // niecza also does not use any stateful callhandlers
+                        if (fi.IsInitOnly && (ft.IsPrimitive ||
+                                ft == typeof(BigInteger) ||
+                                ft == typeof(Type) ||
+                                ft == typeof(FieldInfo) ||
+                                ft == typeof(ConstructorInfo) ||
+                                ft == typeof(MethodInfo) ||
+                                typeof(Delegate).IsAssignableFrom(ft) ||
+                                ft.IsSealed && ft.GetFields(
+                                    BindingFlags.Instance |
+                                    BindingFlags.Public |
+                                    BindingFlags.NonPublic).Length == 0 ||
+                                typeof(ReflectObj).IsAssignableFrom(ft) ||
+                                ft == typeof(string)))
+                            continue;
+
+                        Console.WriteLine(ty.FullName + "." + fi.Name);
+                    }
+                }
+            }
+            else if (cmd == "-run" && args.Length == 2) {
                 RuntimeUnit ru = (RuntimeUnit)
                     RuntimeUnit.reg.LoadUnit(args[1]).root;
 

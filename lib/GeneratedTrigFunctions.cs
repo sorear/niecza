@@ -4,7 +4,7 @@ using System;
 
 public partial class Builtins {
 
-    static Func<Variable,Variable> sin_d = sin;
+    static readonly Func<Variable,Variable> sin_d = sin;
     public static Variable sin(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -22,7 +22,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> asin_d = asin;
+    static readonly Func<Variable,Variable> asin_d = asin;
     public static Variable asin(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -40,7 +40,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> cos_d = cos;
+    static readonly Func<Variable,Variable> cos_d = cos;
     public static Variable cos(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -58,7 +58,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> acos_d = acos;
+    static readonly Func<Variable,Variable> acos_d = acos;
     public static Variable acos(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -76,7 +76,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> tan_d = tan;
+    static readonly Func<Variable,Variable> tan_d = tan;
     public static Variable tan(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -94,7 +94,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> atan_d = atan;
+    static readonly Func<Variable,Variable> atan_d = atan;
     public static Variable atan(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -112,7 +112,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> sinh_d = sinh;
+    static readonly Func<Variable,Variable> sinh_d = sinh;
     public static Variable sinh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -135,7 +135,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> asinh_d = asinh;
+    static readonly Func<Variable,Variable> asinh_d = asinh;
     public static Variable asinh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -158,7 +158,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> cosh_d = cosh;
+    static readonly Func<Variable,Variable> cosh_d = cosh;
     public static Variable cosh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -181,7 +181,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> acosh_d = acosh;
+    static readonly Func<Variable,Variable> acosh_d = acosh;
     public static Variable acosh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -204,7 +204,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> tanh_d = tanh;
+    static readonly Func<Variable,Variable> tanh_d = tanh;
     public static Variable tanh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -227,7 +227,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> atanh_d = atanh;
+    static readonly Func<Variable,Variable> atanh_d = atanh;
     public static Variable atanh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -250,7 +250,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> acotanh_d = acotanh;
+    static readonly Func<Variable,Variable> acotanh_d = acotanh;
     public static Variable acotanh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -273,7 +273,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> asec_d = asec;
+    static readonly Func<Variable,Variable> asec_d = asec;
     public static Variable asec(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -291,7 +291,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> cosech_d = cosech;
+    static readonly Func<Variable,Variable> cosech_d = cosech;
     public static Variable cosech(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -314,7 +314,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> acosech_d = acosech;
+    static readonly Func<Variable,Variable> acosech_d = acosech;
     public static Variable acosech(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -337,7 +337,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> sec_d = sec;
+    static readonly Func<Variable,Variable> sec_d = sec;
     public static Variable sec(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -355,7 +355,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> acosec_d = acosec;
+    static readonly Func<Variable,Variable> acosec_d = acosec;
     public static Variable acosec(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -373,7 +373,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> cotanh_d = cotanh;
+    static readonly Func<Variable,Variable> cotanh_d = cotanh;
     public static Variable cotanh(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -396,7 +396,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> sech_d = sech;
+    static readonly Func<Variable,Variable> sech_d = sech;
     public static Variable sech(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -419,7 +419,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> cotan_d = cotan;
+    static readonly Func<Variable,Variable> cotan_d = cotan;
     public static Variable cotan(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -437,7 +437,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> acotan_d = acotan;
+    static readonly Func<Variable,Variable> acotan_d = acotan;
     public static Variable acotan(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -455,7 +455,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> cosec_d = cosec;
+    static readonly Func<Variable,Variable> cosec_d = cosec;
     public static Variable cosec(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -473,7 +473,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> asech_d = asech;
+    static readonly Func<Variable,Variable> asech_d = asech;
     public static Variable asech(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;

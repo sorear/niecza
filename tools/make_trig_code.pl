@@ -28,7 +28,7 @@ foreach my $function (@normal_functions) {
 
         print <<"Function";
 
-    static Func<Variable,Variable> ${function}_d = ${function};
+    static readonly Func<Variable,Variable> ${function}_d = ${function};
     public static Variable ${function}(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -56,7 +56,7 @@ Function
 
         print <<"Function";
 
-    static Func<Variable,Variable> ${function}_d = ${function};
+    static readonly Func<Variable,Variable> ${function}_d = ${function};
     public static Variable ${function}(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -90,7 +90,7 @@ foreach my $function (keys %inverted_functions) {
 
         print <<"Function";
 
-    static Func<Variable,Variable> ${function}_d = ${function};
+    static readonly Func<Variable,Variable> ${function}_d = ${function};
     public static Variable ${function}(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -118,7 +118,7 @@ Function
 
         print <<"Function";
 
-    static Func<Variable,Variable> ${function}_d = ${function};
+    static readonly Func<Variable,Variable> ${function}_d = ${function};
     public static Variable ${function}(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;

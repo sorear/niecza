@@ -11,8 +11,8 @@ namespace Niecza {
         Variable Eval(string code);
     }
     class PosixWrapper {
-        static Assembly Mono_Posix;
-        static Type Syscall, AccessModes, Stat;
+        static readonly Assembly Mono_Posix;
+        static readonly Type Syscall, AccessModes, Stat;
 
         // constant values are part of the ABI so these can't change
         public const int R_OK = 1;
@@ -20,11 +20,11 @@ namespace Niecza {
         public const int X_OK = 4;
         public const int F_OK = 8;
 
-        public static Func<uint> getuid, geteuid, getgid, getegid;
-        public static Func<uint,uint,int> setreuid, setregid;
+        public readonly static Func<uint> getuid, geteuid, getgid, getegid;
+        public readonly static Func<uint,uint,int> setreuid, setregid;
 
-        static MethodInfo m_stat, m_access;
-        static FieldInfo  f_dev, f_ino, f_mode, f_nlink, f_uid, f_gid,
+        static readonly MethodInfo m_stat, m_access;
+        static readonly FieldInfo  f_dev, f_ino, f_mode, f_nlink, f_uid, f_gid,
             f_rdev, f_size, f_blksize, f_blocks, f_atime, f_mtime, f_ctime;
 
         public static int access(string pathname, int mode) {
@@ -516,7 +516,7 @@ public partial class Builtins {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
 
-    static Func<Variable,Variable,Variable> numeq_d = numeq;
+    static readonly Func<Variable,Variable,Variable> numeq_d = numeq;
     public static Variable numeq(Variable v1, Variable v2) {
         return numcompare(v1, v2, O_IS_EQUAL, numeq_d);
     }
@@ -527,22 +527,22 @@ public partial class Builtins {
                 numeq_d);
     }
 
-    static Func<Variable,Variable,Variable> numlt_d = numlt;
+    static readonly Func<Variable,Variable,Variable> numlt_d = numlt;
     public static Variable numlt(Variable v1, Variable v2) {
         return numcompare(v1, v2, O_IS_LESS, numlt_d);
     }
 
-    static Func<Variable,Variable,Variable> numle_d = numle;
+    static readonly Func<Variable,Variable,Variable> numle_d = numle;
     public static Variable numle(Variable v1, Variable v2) {
         return numcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, numle_d);
     }
 
-    static Func<Variable,Variable,Variable> numgt_d = numgt;
+    static readonly Func<Variable,Variable,Variable> numgt_d = numgt;
     public static Variable numgt(Variable v1, Variable v2) {
         return numcompare(v1, v2, O_IS_GREATER, numgt_d);
     }
 
-    static Func<Variable,Variable,Variable> numge_d = numge;
+    static readonly Func<Variable,Variable,Variable> numge_d = numge;
     public static Variable numge(Variable v1, Variable v2) {
         return numcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, numge_d);
     }
@@ -565,7 +565,7 @@ public partial class Builtins {
         return ((mask & mcom) != 0) ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    static Func<Variable,Variable,Variable> streq_d = streq;
+    static readonly Func<Variable,Variable,Variable> streq_d = streq;
     public static Variable streq(Variable v1, Variable v2) {
         return strcompare(v1, v2, O_IS_EQUAL, streq_d);
     }
@@ -574,27 +574,27 @@ public partial class Builtins {
         return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD, streq_d);
     }
 
-    static Func<Variable,Variable,Variable> strlt_d = strlt;
+    static readonly Func<Variable,Variable,Variable> strlt_d = strlt;
     public static Variable strlt(Variable v1, Variable v2) {
         return strcompare(v1, v2, O_IS_LESS, strlt_d);
     }
 
-    static Func<Variable,Variable,Variable> strle_d = strle;
+    static readonly Func<Variable,Variable,Variable> strle_d = strle;
     public static Variable strle(Variable v1, Variable v2) {
         return strcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, strle_d);
     }
 
-    static Func<Variable,Variable,Variable> strgt_d = strgt;
+    static readonly Func<Variable,Variable,Variable> strgt_d = strgt;
     public static Variable strgt(Variable v1, Variable v2) {
         return strcompare(v1, v2, O_IS_GREATER, strgt_d);
     }
 
-    static Func<Variable,Variable,Variable> strge_d = strge;
+    static readonly Func<Variable,Variable,Variable> strge_d = strge;
     public static Variable strge(Variable v1, Variable v2) {
         return strcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, strge_d);
     }
 
-    static Func<Variable,Variable,Variable,Variable> substr3_d = substr3;
+    static readonly Func<Variable,Variable,Variable,Variable> substr3_d = substr3;
     public static Variable substr3(Variable v1, Variable v2, Variable v3) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
@@ -623,7 +623,7 @@ public partial class Builtins {
         return new SubstrLValue(v1, r2, r3);
     }
 
-    static Func<Variable,Variable,Variable> plus_d = plus;
+    static readonly Func<Variable,Variable,Variable> plus_d = plus;
     public static Variable plus(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
@@ -659,7 +659,7 @@ public partial class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable,Variable> minus_d = minus;
+    static readonly Func<Variable,Variable,Variable> minus_d = minus;
     public static Variable minus(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
@@ -711,7 +711,7 @@ public partial class Builtins {
         return result;
     }
 
-    static Func<Variable,Variable,Variable> pow_d = pow;
+    static readonly Func<Variable,Variable,Variable> pow_d = pow;
     public static Variable pow(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
@@ -798,7 +798,7 @@ public partial class Builtins {
         return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
     }
 
-    static Func<Variable,Variable> negate_d = negate;
+    static readonly Func<Variable,Variable> negate_d = negate;
     public static Variable negate(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -827,7 +827,7 @@ public partial class Builtins {
         return MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
-    static Func<Variable,Variable> abs_d = abs;
+    static readonly Func<Variable,Variable> abs_d = abs;
     public static Variable abs(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -861,7 +861,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> ln_d = ln;
+    static readonly Func<Variable,Variable> ln_d = ln;
     public static Variable ln(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -881,7 +881,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> exp_d = exp;
+    static readonly Func<Variable,Variable> exp_d = exp;
     public static Variable exp(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -900,7 +900,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable,Variable> atan2_d = atan2;
+    static readonly Func<Variable,Variable,Variable> atan2_d = atan2;
     public static Variable atan2(Variable a1, Variable a2) {
         P6any o1 = a1.Fetch();
         P6any o2 = a2.Fetch();
@@ -918,7 +918,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> floor_d = floor;
+    static readonly Func<Variable,Variable> floor_d = floor;
     public static Variable floor(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -1058,7 +1058,7 @@ public partial class Builtins {
         return ((mask & res) != 0) ? Kernel.TrueV : Kernel.FalseV;
     }
 
-    static Func<Variable,Variable,Variable> mul_d = mul;
+    static readonly Func<Variable,Variable,Variable> mul_d = mul;
     public static Variable mul(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
@@ -1094,7 +1094,7 @@ public partial class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable,Variable> divide_d = divide;
+    static readonly Func<Variable,Variable,Variable> divide_d = divide;
     public static Variable divide(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
@@ -1131,7 +1131,7 @@ public partial class Builtins {
         return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
-    static Func<Variable,Variable,Variable> mod_d = mod;
+    static readonly Func<Variable,Variable,Variable> mod_d = mod;
     public static Variable mod(Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
@@ -1265,7 +1265,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable> sqrt_d = sqrt;
+    static readonly Func<Variable,Variable> sqrt_d = sqrt;
     public static Variable sqrt(Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
@@ -1284,7 +1284,7 @@ public partial class Builtins {
         }
     }
 
-    static Func<Variable,Variable,Variable> numand_d = numand;
+    static readonly Func<Variable,Variable,Variable> numand_d = numand;
     public static Variable numand(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
@@ -1295,7 +1295,7 @@ public partial class Builtins {
         return MakeInt(r1 & r2);
     }
 
-    static Func<Variable,Variable,Variable> numor_d = numor;
+    static readonly Func<Variable,Variable,Variable> numor_d = numor;
     public static Variable numor(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
@@ -1306,7 +1306,7 @@ public partial class Builtins {
         return MakeInt(r1 | r2);
     }
 
-    static Func<Variable,Variable,Variable> numxor_d = numxor;
+    static readonly Func<Variable,Variable,Variable> numxor_d = numxor;
     public static Variable numxor(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
@@ -1317,7 +1317,7 @@ public partial class Builtins {
         return MakeInt(r1 ^ r2);
     }
 
-    static Func<Variable,Variable,Variable> numlshift_d = numlshift;
+    static readonly Func<Variable,Variable,Variable> numlshift_d = numlshift;
     public static Variable numlshift(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
@@ -1328,7 +1328,7 @@ public partial class Builtins {
         return MakeInt(r1 << r2);
     }
 
-    static Func<Variable,Variable,Variable> numrshift_d = numrshift;
+    static readonly Func<Variable,Variable,Variable> numrshift_d = numrshift;
     public static Variable numrshift(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
@@ -1339,7 +1339,7 @@ public partial class Builtins {
         return MakeInt(r1 >> r2);
     }
 
-    static Func<Variable,Variable> numcompl_d = numcompl;
+    static readonly Func<Variable,Variable> numcompl_d = numcompl;
     public static Variable numcompl(Variable v1) {
         P6any o1 = v1.Fetch();
         if (!o1.mo.is_any)
@@ -1399,7 +1399,7 @@ public partial class Builtins {
         return r ? Kernel.FalseV : Kernel.TrueV;
     }
 
-    static Func<Variable,Variable> chars_d = chars;
+    static readonly Func<Variable,Variable> chars_d = chars;
     public static Variable chars(Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
@@ -1409,7 +1409,7 @@ public partial class Builtins {
         return MakeInt(r.Length);
     }
 
-    static Func<Variable,Variable> ord_d = ord;
+    static readonly Func<Variable,Variable> ord_d = ord;
     public static Variable ord(Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
@@ -1421,7 +1421,7 @@ public partial class Builtins {
         return MakeInt((int)r[0]);
     }
 
-    static Func<Variable,Variable> chr_d = chr;
+    static readonly Func<Variable,Variable> chr_d = chr;
     public static Variable chr(Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
