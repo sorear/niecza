@@ -4243,6 +4243,7 @@ dynamic:
                 Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
                 Kernel.currentGlobals = ru.globals;
                 ru.PrepareEval();
+                Builtins.eval_result = ru;
                 if (!evalmode)
                     Kernel.RunMain(ru);
                 return null;
@@ -4258,7 +4259,7 @@ dynamic:
                     // hack to simulate a settingish environment
                     Variable r = Kernel.RunInferior(
                         Kernel.GetInferiorRoot().MakeChild(null,
-                            new SubInfo("<repl>", Builtins.eval_result),
+                            new SubInfo("<repl>", null),//Builtins.eval_result),
                             Kernel.AnyP));
                     if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
                         Variable pl = Kernel.RunInferior(

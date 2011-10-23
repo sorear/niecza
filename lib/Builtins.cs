@@ -1624,8 +1624,8 @@ flat_enough:;
         System.Diagnostics.Process.Start(file, args).WaitForExit();
     }
 
-    public static AppDomain up_domain;
-    public static DynBlockDelegate eval_result;
+    internal static AppDomain up_domain;
+    internal static RuntimeUnit eval_result;
     static System.Collections.IDictionary upcall_receiver;
     internal static object UpCall(object[] args) {
         if (upcall_receiver == null)
@@ -1643,8 +1643,8 @@ flat_enough:;
                 });
         if (msg != null && msg != "")
             return Kernel.Die(th, msg);
-        return th.MakeChild(null, new SubInfo("boot-" +
-                    eval_result.Method.DeclaringType, eval_result), Kernel.AnyP);
+        P6any sub = Kernel.MakeSub(eval_result.mainline, th.caller);
+        return sub.Invoke(th, Variable.None, null);
     }
 
     public static Variable pair(Variable key, Variable value) {

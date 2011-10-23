@@ -245,10 +245,9 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
     my $*unit = $*backend.create_unit($unitname, $filename, $source, $main, $run);
-    %*units{$unitname} = $*unit;
     $*unit.set_current;
     my $*settingref = $*niecza_outer_ref ||
-        $lang ne 'NULL' ?? $*unit.need_unit($lang).bottom !! Any;
+        ($lang ne 'NULL' ?? $*unit.need_unit($lang).bottom !! Any);
 
     $*unit.abs_pkg('GLOBAL', :auto);
     $*unit.abs_pkg('PROCESS', :auto);

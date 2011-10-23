@@ -13,8 +13,6 @@ has $!discount-time = 0;
 has %.units;
 
 method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $evalmode, $outer, $repl) {
-    my %*units := %.units;
-
     # FIXME this is a bit of a fudge
     $unitname := 'CORE' if $!frontend.lang eq 'NULL';
 
@@ -30,8 +28,6 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
 
     my $ast = $!frontend.parse(:$unitname, :$filename, :$modtime,
         :$source, :$outer, :$main, :$run);
-
-    %!units{$unitname} = $ast;
 
     $!backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl);
 

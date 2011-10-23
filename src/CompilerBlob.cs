@@ -29,12 +29,12 @@ namespace Niecza {
             set { }
             get {
                 object[] ia = (object[]) i;
-                string[] sa = new string[ia.Length];
-                Array.Copy(ia, sa, ia.Length);
+                Variable[] va = new Variable[ia.Length];
+                for (int ix = 0; ix < ia.Length; ix++)
+                    va[ix] = Downcaller.DCResult(ia[ix]);
                 Variable vr = Kernel.RunInferior(
                         Downcaller.upcall_cb.Fetch().Invoke(
-                            Kernel.GetInferiorRoot(),
-                            new Variable[] { Builtins.BoxLoS(sa) }, null));
+                            Kernel.GetInferiorRoot(), va, null));
                 return vr.Fetch().mo.mro_raw_Str.Get(vr);
             }
         }
@@ -99,7 +99,7 @@ namespace Niecza {
             return DCResult(RawDowncall(lo.ToArray()));
         }
 
-        static Variable DCResult(object r) {
+        internal static Variable DCResult(object r) {
             if (r == null) return Kernel.AnyMO.typeVar;
             else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
             else if (r is int) return Builtins.MakeInt((int)r);

@@ -31,14 +31,14 @@ method save_unit($name, $unit) {
     $file.spew(NAMOutput.run($unit));
 }
 
-sub upcalled(@strings) {
+sub upcalled(*@strings) {
     given @strings[0] {
         when "eval" {
             my $*IN_EVAL = True;
             # XXX NieczaException is eaten by boundary
             try {
                 $*compiler.compile_string(@strings[1], True, :evalmode,
-                    :outer([@strings[2], +@strings[3]]));
+                    :outer(@strings[2]));
                 return "";
             }
             return $!;
