@@ -1519,6 +1519,10 @@ flat_enough:;
         File.Delete(path);
     }
 
+    public static void path_mkdir(string path) {
+        Directory.CreateDirectory(path);
+    }
+
     public static bool emulate_eaccess(string path, int mode) {
         uint ruid = PosixWrapper.getuid();
         uint rgid = PosixWrapper.getgid();
