@@ -3637,12 +3637,13 @@ dynamic:
                 }
                 return new Handle(ru);
             } else if (cmd == "unit_need_unit") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                // LinkUnit state is owned by the root
+                //RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string oname   = (string)args[2];
 
                 RuntimeUnit tg = (RuntimeUnit)
                     RuntimeUnit.reg.LoadUnit(oname).root;
-                string err = ru.LinkUnit(tg);
+                string err = Kernel.containerRootUnit.LinkUnit(tg);
                 return err == null ? (object)new Handle(tg) : new Exception(err);
             } else if (cmd == "unit_anon_stash") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
