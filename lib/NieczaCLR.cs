@@ -429,16 +429,14 @@ namespace Niecza {
     }
 
     public class CLRWrapperProvider {
-        // wrapper_cache serves as the lock-bearer for both
-        [ContainerGlobal]
-        static Dictionary<Type, STable> wrapper_cache
-            = new Dictionary<Type, STable>();
-        [ContainerGlobal]
-        static Dictionary<string, STable> named_wrapper_cache
-            = new Dictionary<string, STable>();
+        [TrueGlobal] static object wrapper_cache_lock = new object();
+        [ContainerGlobal] static Dictionary<Type, STable> wrapper_cache;
+        [ContainerGlobal] static Dictionary<string, STable> named_wrapper_cache;
 
         public static STable GetWrapper(Type t) {
-            lock (wrapper_cache) {
+            lock (wrapper_cache_lock) {
+                if (wrapper_cache == null)
+                    wrapper_cache = new Dictionary<Type, STable>();
                 STable r;
                 if (wrapper_cache.TryGetValue(t, out r))
                     return r;
@@ -448,7 +446,11 @@ namespace Niecza {
         }
 
         public static STable GetNamedWrapper(string nm) {
-            lock (wrapper_cache) {
+            lock (wrapper_cache_lock) {
+                if (wrapper_cache == null)
+                    wrapper_cache = new Dictionary<Type, STable>();
+                if (named_wrapper_cache == null)
+                    named_wrapper_cache = new Dictionary<string, STable>();
                 STable r;
                 if (named_wrapper_cache.TryGetValue(nm, out r))
                     return r;
