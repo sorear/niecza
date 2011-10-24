@@ -3612,7 +3612,7 @@ dynamic:
             if (cmd == "gettype") {
                 object o = Handle.Unbox(args[1]);
                 return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
-                    (o is STable) ? "type" : "unknown";
+                    (o is STable) ? "type" : (o is Frame) ? "frame" : "unknown";
             } else if (cmd == "set_parent") {
                 Builtins.up_domain = (AppDomain)args[1];
                 return null;
@@ -3665,7 +3665,7 @@ dynamic:
                     BuildLad((object[])args[2]);
                 return null;
             } else if (cmd == "sub_create_static_pad") {
-                ((SubInfo)Handle.Unbox(args[1])).CreateProtopad();
+                ((SubInfo)Handle.Unbox(args[1])).CreateProtopad(null);
                 return null;
             } else if (cmd == "sub_noninlinable") {
                 ((SubInfo)Handle.Unbox(args[1])).special |=
@@ -3682,7 +3682,7 @@ dynamic:
             } else if (cmd == "sub_set_run_once") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 if ((s.outer.special & SubInfo.RUN_ONCE) != 0) {
-                    s.CreateProtopad();
+                    s.CreateProtopad(null);
                     s.special |= SubInfo.RUN_ONCE;
                 }
                 return null;
@@ -4098,12 +4098,19 @@ dynamic:
                 STable pkg = (STable)Handle.Unbox(args[5]);
                 STable icl = (STable)Handle.Unbox(args[6]);
                 bool once = (bool)args[7];
+                Frame outer_frame = (Frame)Handle.Unbox(args[8]);
+
+                if (outer_frame != null && outer_frame.info != outer) {
+                    Console.WriteLine("MISMATCHED OUTER FRAME!!!");
+                    outer_frame = null;
+                }
 
                 STable rcls = ResolveSubClass(cls);
                 if (rcls == null)
                     return new Exception("sub-class lookup fail for " + cls);
 
-                SubInfo n = new SubInfo(ru, name, outer, rcls, pkg, once);
+                SubInfo n = new SubInfo(ru, name, outer, rcls, pkg, once,
+                        outer_frame);
                 n.in_class = icl;
                 if (n.outer != null && n.outer.unit == ru)
                     n.outer.children.Add(n);
@@ -4240,7 +4247,6 @@ dynamic:
                 Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
                 Kernel.currentGlobals = ru.globals;
                 ru.PrepareEval();
-                Builtins.eval_result = ru;
                 if (!evalmode)
                     Kernel.RunMain(ru);
                 return null;

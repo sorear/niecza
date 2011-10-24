@@ -9,45 +9,18 @@ has $.safemode = False;
 has $.obj_dir;
 has $.run_args = [];
 
-# The purpose of the backend is twofold.  It must be able to accept
-# and process units; and it must be able to retrieve processed units
-# at a later time.
-
-# Return Metamodel::Unit, undefined if unit not available.  The caller
-# will check tdeps, load them if needed, and maybe even discard the
-# returned unit.
-method get_unit($name) {
-    my $file = ($name.split('::').join('.') ~ ".nam").IO\
-        .relative($.obj_dir);
-    $file.e ?? NAMOutput.load($file.slurp) !! ::Metamodel::Unit;
-}
-
-# Save a unit.  If $main is true, it is being considered as a main
-# module; if $run, it should be auto-run.  Main modules do not need
-# to be retrievable.
-method save_unit($name, $unit) {
-    my $file = ($name.split('::').join('.') ~ ".nam").IO\
-        .relative($.obj_dir);
-    $file.spew(NAMOutput.run($unit));
-}
-
-sub upcalled(*@strings) {
-    given @strings[0] {
+sub upcalled(*@args) {
+    given @args[0] {
         when "eval" {
             my $*IN_EVAL = True;
-            # XXX NieczaException is eaten by boundary
-            try {
-                $*compiler.compile_string(@strings[1], True, :evalmode,
-                    :outer(@strings[2]));
-                return "";
-            }
-            return $!;
+            return $*compiler.compile_string(@args[1], True, :evalmode,
+                :outer(@args[2]), :outer_frame(@args[3]));
         }
         when "check_dated" {
             return "ok";  #TODO
         }
-        say "upcall: @strings.join('|')";
-        "ERROR";
+        say "upcall: @args.join('|')";
+        die "ERROR";
     }
 }
 
@@ -78,13 +51,6 @@ method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not use
     }
     downcall("save_unit", $unit);
     $*repl_outer = $unit.get_mainline if $repl;
-}
-
-method post_save($name, :$main) {
-    my $fname = $name.split('::').join('.');
-    downcall("post_save",
-        $.obj_dir, $fname ~ ".nam", $fname ~ ($main ?? ".exe" !! ".dll"),
-        $main ?? "1" !! "0");
 }
 
 class StaticSub {
@@ -300,9 +266,9 @@ class Unit {
         downcall("type_create", self, ~$name, ~$class, ~$who);
     }
     method create_sub(:$name, :$class, :$outer, :$cur_pkg, :$in_class,
-            :$run_once) {
+            :$run_once, :$outer_frame) {
         downcall("create_sub", self, ~($name // 'ANON'), $outer,
-            ~($class // 'Sub'), $cur_pkg, $in_class, ?$run_once)
+            ~($class // 'Sub'), $cur_pkg, $in_class, ?$run_once, $outer_frame)
     }
 }
 

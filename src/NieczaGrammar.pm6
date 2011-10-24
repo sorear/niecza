@@ -32,10 +32,12 @@ grammar P6 is STD::P6 {
     method unitstart() {
         $*CURLEX{'!sub'} = $*unit.create_sub(
             outer => $*settingref,
+            outer_frame => $*niecza_outer_frame,
             class => 'Routine',
             cur_pkg => $*unit.abs_pkg('GLOBAL'),
             name => "mainline",
-            run_once => !$*settingref || $*settingref.run_once);
+            run_once => !$*settingref || ?$*niecza_outer_frame ||
+                $*settingref.run_once);
         $*CURLEX{'!sub'}.add_my_name('$_') if !$*settingref;
         $*CURLEX{'!sub'}.set_signature(::GLOBAL::Sig.simple());
         $*unit.set_mainline($*CURLEX<!sub>);

@@ -1742,16 +1742,18 @@ noparams:
                 Console.WriteLine("Eeep!  Adding a LISub to the wrong place");
         }
 
-        internal void CreateProtopad() {
+        // ofr != null is used ONLY with evals to set up a protopad pointing
+        // to a specific runtime pad.  I'm not 100% sure this design is right...
+        internal void CreateProtopad(Frame ofr) {
             if (protopad != null)
                 return;
             if (outer != null)
-                outer.CreateProtopad();
+                outer.CreateProtopad(null);
 
-            // protopad is set when the parent's protopad is created,
+            // protosub is set when the parent's protopad is created,
             // or when we are
-            protopad = new Frame(null, outer != null ? outer.protopad : null,
-                this, protosub);
+            protopad = new Frame(null, ofr != null ? ofr : outer != null ?
+                    outer.protopad : null, this, protosub);
             // make sure there's room for installing the current lexicals
             // may be grown later for more lexicals, or when compiling
             // spill-slots
@@ -1789,7 +1791,7 @@ noparams:
         }
 
         public SubInfo(RuntimeUnit unit, string name, SubInfo outer,
-                STable cls, STable pkg, bool once) {
+                STable cls, STable pkg, bool once, Frame ofr) {
             edata = new int[0];
             this.name  = name;
             this.unit  = unit;
@@ -1814,7 +1816,7 @@ noparams:
                         null : outer.protopad);
             if (once) {
                 special |= RUN_ONCE;
-                CreateProtopad();
+                CreateProtopad(ofr);
             }
         }
 

@@ -1625,7 +1625,6 @@ flat_enough:;
     }
 
     [TrueGlobal] internal static AppDomain up_domain;
-    [TrueGlobal] internal static RuntimeUnit eval_result;
     [TrueGlobal] static System.Collections.IDictionary upcall_receiver;
     internal static object UpCall(object[] args) {
         if (upcall_receiver == null)
@@ -1637,13 +1636,14 @@ flat_enough:;
         if (up_domain == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
         SubInfo outer = th.caller.info;
-        string msg = (string) UpCall(new object[] { "eval",
+        object r = UpCall(new object[] { "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str),
-                new Niecza.CLRBackend.Handle(outer)
+                new Niecza.CLRBackend.Handle(outer),
+                new Niecza.CLRBackend.Handle(th.caller)
                 });
-        if (msg != null && msg != "")
-            return Kernel.Die(th, msg);
-        P6any sub = Kernel.MakeSub(eval_result.mainline, th.caller);
+        if (r is Exception)
+            return Kernel.Die(th, ((Exception)r).Message);
+        P6any sub = Kernel.MakeSub(((RuntimeUnit)Niecza.CLRBackend.Handle.Unbox(r)).mainline, th.caller);
         return sub.Invoke(th, Variable.None, null);
     }
 

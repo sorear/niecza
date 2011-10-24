@@ -32,10 +32,14 @@ namespace Niecza {
                 Variable[] va = new Variable[ia.Length];
                 for (int ix = 0; ix < ia.Length; ix++)
                     va[ix] = Downcaller.DCResult(ia[ix]);
-                Variable vr = Kernel.RunInferior(
-                        Downcaller.upcall_cb.Fetch().Invoke(
-                            Kernel.GetInferiorRoot(), va, null));
-                return vr.Fetch().mo.mro_raw_Str.Get(vr);
+                try {
+                    Variable vr = Kernel.RunInferior(
+                            Downcaller.upcall_cb.Fetch().Invoke(
+                                Kernel.GetInferiorRoot(), va, null));
+                    return Downcaller.DCArg(vr);
+                } catch (Exception ex) {
+                    return new Exception(ex.ToString());
+                }
             }
         }
     }
@@ -69,7 +73,7 @@ namespace Niecza {
             return responder[args];
         }
 
-        static object DCArg(Variable v) {
+        internal static object DCArg(Variable v) {
             P6any o = v.Fetch();
             if (o is BoxObject<object>)
                 return Kernel.UnboxAny<object>(o);
@@ -115,7 +119,7 @@ namespace Niecza {
                 string t = (string)RawDowncall("gettype", r);
                 P6any pr = (t == "type") ? TypeP :
                     (t == "sub") ? StaticSubP :
-                    (t == "unit") ? UnitP : null;
+                    (t == "unit") ? UnitP : Kernel.AnyP;
                 return Kernel.BoxAnyMO(r, pr.mo);
             }
         }
