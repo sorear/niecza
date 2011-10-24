@@ -203,7 +203,7 @@ namespace Niecza.CLRBackend {
             il.Emit(OpCodes.Newarr, ty);
             if (vec.Length != 0) {
                 FieldBuilder fb = tb.DefineInitializedData(
-                        "A" + (Backend.currentUnit.nextid++), vec, 0);
+                        "A" + (EmitUnit.Current.nextid++), vec, 0);
                 il.Emit(OpCodes.Dup);
                 il.Emit(OpCodes.Ldtoken, fb);
                 il.Emit(OpCodes.Call, typeof(System.Runtime.CompilerServices.RuntimeHelpers).GetMethod("InitializeArray"));
@@ -1719,7 +1719,7 @@ namespace Niecza.CLRBackend {
                 if (!effects_before_use || zyg[i].stmts.Length == 0) {
                     args.Add(zyg[i].head);
                 } else {
-                    string ln = "!spill" + Backend.currentUnit.nextid++;
+                    string ln = "!spill" + EmitUnit.Current.nextid++;
                     args.Add(new ClrPeekLet(ln, zyg[i].head.Returns));
                     stmts.Add(new ClrPushLet(ln, zyg[i].head));
                     pop.Add(ln);
@@ -1803,9 +1803,9 @@ namespace Niecza.CLRBackend {
             Resultify(ref iftrue_s, ref iftrue_h);
             Resultify(ref iffalse_s, ref iffalse_h);
 
-            RuntimeUnit ru = Backend.currentUnit;
-            string l1 = "!else"  + (ru.nextid++);
-            string l2 = "!endif" + (ru.nextid++);
+            EmitUnit eu = EmitUnit.Current;
+            string l1 = "!else"  + (eu.nextid++);
+            string l2 = "!endif" + (eu.nextid++);
 
             List<ClrOp> stmts = new List<ClrOp>();
             foreach (ClrOp c in cond.stmts)
@@ -1829,9 +1829,9 @@ namespace Niecza.CLRBackend {
 
         // this is simplified a bit since body is always void
         public static CpsOp While(bool until, bool once, CpsOp cond, CpsOp body) {
-            RuntimeUnit ru = Backend.currentUnit;
-            string l1 = "!again" + (ru.nextid++);
-            string l2 = "!check" + (ru.nextid++);
+            EmitUnit eu = EmitUnit.Current;
+            string l1 = "!again" + (eu.nextid++);
+            string l2 = "!check" + (eu.nextid++);
 
             List<ClrOp> stmts = new List<ClrOp>();
 
@@ -2110,11 +2110,11 @@ namespace Niecza.CLRBackend {
         public readonly TypeBuilder tb;
         public readonly MethodBuilder mb;
         public readonly CgContext cx;
-        public readonly RuntimeUnit ru;
+        public readonly EmitUnit eu;
 
-        public CpsBuilder(RuntimeUnit ru, string clrname, bool pub) {
-            this.ru = ru;
-            this.tb = ru.type_builder;
+        public CpsBuilder(EmitUnit eu, string clrname, bool pub) {
+            this.eu = eu;
+            this.tb = eu.type_builder;
             mb = tb.DefineMethod(clrname, MethodAttributes.Static |
                     (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
@@ -2286,7 +2286,7 @@ namespace Niecza.CLRBackend {
         }
 
         object[] InlineCall(SubInfo tgt, object[] zyg) {
-            RuntimeUnit ru = Backend.currentUnit;
+            EmitUnit eu = EmitUnit.Current;
             object tgzyg = Reader.Read(tgt.nam_str, tgt.nam_refs);
 
             string[] lex_names = (new List<string>(tgt.dylex.Keys)).ToArray();
@@ -2312,7 +2312,7 @@ namespace Niecza.CLRBackend {
 
             // give unique names to the arguments
             foreach (object a in zyg) {
-                string alias = "!arg" + ru.nextid++;
+                string alias = "!arg" + eu.nextid++;
                 bind.Add(new object[] { new JScalar("letvar"), new JScalar(alias) });
                 let.Add(new JScalar(alias));
                 let.Add(a);
@@ -2324,7 +2324,7 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < lex_names.Length; i++) {
                 string   ln = lex_names[i];
                 LISimple li = (LISimple)tgt.dylex[ln]; // checked in inlinable()
-                string let_name = "!var" + ru.nextid++;
+                string let_name = "!var" + eu.nextid++;
 
                 slot_to_lex[li.index] = ln;
 
@@ -2341,7 +2341,7 @@ namespace Niecza.CLRBackend {
                     let.Add(new object[] { new JScalar("newarray") });
                 else
                     let.Add(new object[] { new JScalar("_newoftype"),
-                        ru.TypeConstant(li.type) });
+                        eu.TypeConstant(li.type) });
 
                 scope.Add(new JScalar(ln));
                 scope.Add(new JScalar(let_name));
@@ -2367,7 +2367,7 @@ namespace Niecza.CLRBackend {
             let.Add(scope.ToArray());
 
             if (tgt.IsTopicalizer()) {
-                int tid = ru.nextid++;
+                int tid = eu.nextid++;
                 return new object[] {
                     new JScalar("xspan"), new JScalar("!start"+tid),
                     new JScalar("!end"+tid), new JScalar(0), let.ToArray(),
@@ -2474,7 +2474,7 @@ namespace Niecza.CLRBackend {
                 string[] lexnames = (string[])zyg[4];
                 object[] sig_r = (object[])zyg[3];
                 string name = (string)zyg[1];
-                RuntimeUnit ru = Backend.currentUnit;
+                EmitUnit eu = EmitUnit.Current;
                 List<CpsOp> ops = new List<CpsOp>();
                 int rix = 0;
                 int aused = 0;
@@ -2498,7 +2498,7 @@ namespace Niecza.CLRBackend {
                     } else if ((flags & SubInfo.SIG_F_DEFOUTER) != 0) {
                         get = th.RawAccessLex("outerlex", lex, null);
                     } else if ((flags & SubInfo.SIG_F_OPTIONAL) != 0) {
-                        get = ru.RefConstant(type.name + "MO", type.typeVar, null);
+                        get = eu.RefConstant(type.name + "MO", type.typeVar, null);
                     } else {
                         get = CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
                             CpsOp.StringLiteral("No value in "+name+" available for parameter "+(string)sig_r[rbase]));
@@ -2514,7 +2514,7 @@ namespace Niecza.CLRBackend {
                             init = CpsOp.MethodCall(Tokens.Kernel_CreateArray);
                         } else {
                             init = CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
-                                    ru.TypeConstant(type));
+                                    eu.TypeConstant(type));
                         }
                         ops.Add(th.RawAccessLex("scopedlex", lex, init));
                         ops.Add(CpsOp.Sink(CpsOp.MethodCall(
@@ -2533,7 +2533,7 @@ namespace Niecza.CLRBackend {
                         ops.Add(th.RawAccessLex("scopedlex", lex,
                             CpsOp.MethodCall(Tokens.Kernel_NewBoundVar,
                                 CpsOp.IntLiteral(mode),
-                                ru.TypeConstant(type), get)));
+                                eu.TypeConstant(type), get)));
                     }
                 }
 
@@ -2546,8 +2546,8 @@ namespace Niecza.CLRBackend {
             };
             handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
                 List<ClrEhSpan> xn = new List<ClrEhSpan>();
-                string s = "!start" + Backend.currentUnit.nextid++;
-                string e = "!end" + Backend.currentUnit.nextid++;
+                string s = "!start" + EmitUnit.Current.nextid++;
+                string e = "!end" + EmitUnit.Current.nextid++;
                 for (int i = 2; i < zyg.Length - 2; i += 2) {
                     string vn = JScalar.S(zyg[i]);
                     string ln = JScalar.S(zyg[i+1]);
@@ -2660,7 +2660,7 @@ dynamic:
                     } else {
                         int dummy;
                         LexInfo li = th.ResolveLex(name,false,out dummy,true);
-                        mo = th.sub.unit.TypeConstant((li as LIPackage).pkg);
+                        mo = th.cpb.eu.TypeConstant((li as LIPackage).pkg);
                     }
                 } else {
                     mo = CpsOp.GetField(Tokens.P6any_mo, th.Scan(zyg[1]));
@@ -2688,7 +2688,7 @@ dynamic:
             thandlers["_pushleave"] = Methody(null, Tokens.Frame.GetMethod("PushLeave"));
             handlers["_makesub"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_MakeSub,
-                    Backend.currentUnit.SubConstant((SubInfo)z[1]),
+                    EmitUnit.Current.SubConstant((SubInfo)z[1]),
                     CpsOp.CallFrame()); };
             handlers["_newlabel"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewLabelVar,
@@ -2710,11 +2710,11 @@ dynamic:
                     m = ((LIPackage)li).pkg;
                 }
                 if (kind == "mo")
-                    return th.sub.unit.TypeConstant(m);
+                    return th.cpb.eu.TypeConstant(m);
                 if (kind == "typeVar")
-                    return th.sub.unit.RefConstant(m.name + "TV", m.typeVar, null);
+                    return th.cpb.eu.RefConstant(m.name + "TV", m.typeVar, null);
                 if (kind == "typeObj")
-                    return th.sub.unit.RefConstant(m.name + "TO", m.typeObject, null);
+                    return th.cpb.eu.RefConstant(m.name + "TO", m.typeObject, null);
                 throw new NotImplementedException("class_ref " + kind);
             };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
@@ -2751,12 +2751,12 @@ dynamic:
                     CpsOp.NewIntArray(Tokens.Int32, vec));
             };
             handlers["rxpushcapture"] = delegate(NamProcessor th, object[] z) {
-                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(2,z));
+                CpsOp strs = th.cpb.eu.StringListConst(JScalar.SA(2,z));
                 return CpsOp.MethodCall(Tokens.RxFrame_PushCapture,
                     CpsOp.RxFrame(), strs, th.Scan(z[1]));
             };
             handlers["rxincorpshift"] = delegate(NamProcessor th, object[] z) {
-                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(0,z[1]));
+                CpsOp strs = th.cpb.eu.StringListConst(JScalar.SA(0,z[1]));
 
                 return CpsOp.Goto("backtrack", true,
                     CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpShift"),
@@ -2765,7 +2765,7 @@ dynamic:
                         CpsOp.LabelId(th.cpb.cx, JScalar.S(z[3]))));
             };
             handlers["rxincorpcut"] = delegate(NamProcessor th, object[] z) {
-                CpsOp strs = th.sub.unit.StringListConst(JScalar.SA(0,z[1]));
+                CpsOp strs = th.cpb.eu.StringListConst(JScalar.SA(0,z[1]));
 
                 return CpsOp.Goto("backtrack", true,
                     CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpCut"),
@@ -2788,26 +2788,26 @@ dynamic:
                 object[] ch = z[1] as object[];
                 string chh = JScalar.S(ch[0]);
                 if (chh == "exactnum") {
-                    return th.sub.unit.VarConstExact(JScalar.I(ch[1]),
+                    return th.cpb.eu.VarConstExact(JScalar.I(ch[1]),
                         JScalar.S(ch[2]));
                 } else if (chh == "box" && ch[1] is JScalar) {
                     string typ = JScalar.S(ch[1]);
                     object[] chch = ch[2] as object[];
                     string chchh = JScalar.S(chch[0]);
                     if (typ == "Str" && chchh == "str") {
-                        return th.sub.unit.VarConstStr(JScalar.S(chch[1]));
+                        return th.cpb.eu.VarConstStr(JScalar.S(chch[1]));
                     } else if (typ == "Num" && chchh == "double") {
-                        return th.sub.unit.VarConstNum(JScalar.N(chch[1]));
+                        return th.cpb.eu.VarConstNum(JScalar.N(chch[1]));
                     } else {
                         Console.WriteLine("odd constant box {0}/{1}", typ, chchh);
                     }
                 } else if (chh == "newcc") {
-                    return th.sub.unit.CCConst(JScalar.IA(1, ch));
+                    return th.cpb.eu.CCConst(JScalar.IA(1, ch));
                 } else if (chh == "fcclist_new") {
                     int[][] ccl = new int[ch.Length - 1][];
                     for (int i = 1; i < ch.Length; i++)
                         ccl[i-1] = JScalar.IA(1, ch[i]);
-                    return th.sub.unit.CCListConst(ccl);
+                    return th.cpb.eu.CCListConst(ccl);
                 } else {
                     Console.WriteLine("odd constant {0}", chh);
                 }
@@ -2981,7 +2981,7 @@ dynamic:
                 AltInfo ai = new AltInfo(prefixes, JScalar.S(z[2]), null);
                 th.altinfo_fixups.Add(new KeyValuePair<AltInfo,string[]>(
                         ai, JScalar.SA(0, z[3])));
-                CpsOp aic = th.sub.unit.RefConstant(ai.dba, ai, null);
+                CpsOp aic = th.cpb.eu.RefConstant(ai.dba, ai, null);
                 return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
                     CpsOp.RxFrame(), CpsOp.CallFrame(), aic); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");
@@ -3318,7 +3318,7 @@ dynamic:
                     if ((f & LISimple.NOINIT) != 0) continue;
 
                     object bit;
-                    CpsOp tc = Backend.currentUnit.TypeConstant(ls.type);
+                    CpsOp tc = EmitUnit.Current.TypeConstant(ls.type);
                     if ((f & LISimple.ROINIT) != 0) {
                         bit = a(j("class_ref"), j("typeVar"), Kernel.AnyMO);
                     } else if ((f & LISimple.DEFOUTER) != 0) {
