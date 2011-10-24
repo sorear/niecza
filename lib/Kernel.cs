@@ -374,10 +374,10 @@ namespace Niecza {
     // information such as random number seeds.  They may NOT point at Perl 6
     // level objects.
     //
-    // [ContainerGlobal] fields are unrestricted in usage, but are always
+    // [CompartmentGlobal] fields are unrestricted in usage, but are always
     // automatically saved and restored when manipulating the container stack.
     //
-    // [CORESaved] fields are the same as ContainerGlobal but are additionally
+    // [CORESaved] fields are the same as CompartmentGlobal but are additionally
     // saved in CORE.ser.
 
     [AttributeUsage(AttributeTargets.Field)]
@@ -385,7 +385,7 @@ namespace Niecza {
     [AttributeUsage(AttributeTargets.Field)]
     class ImmutableAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Field)]
-    class ContainerGlobalAttribute : Attribute { }
+    class CompartmentGlobalAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Field)]
     class TrueGlobalAttribute : Attribute { }
 
@@ -657,7 +657,7 @@ namespace Niecza {
             return eu;
         }
 
-        [ContainerGlobal]
+        [CompartmentGlobal]
         internal static ObjectRegistry reg;
 
         public void Save() {
@@ -4015,18 +4015,18 @@ have_v:
 
         // SubInfo objects can be mutated at runtime by .wrap so they
         // must be containerized
-        [ContainerGlobal] internal static SubInfo dogather_SI;
-        [ContainerGlobal] internal static SubInfo AutoThreadSubSI;
-        [ContainerGlobal] internal static SubInfo IF_SI;
-        [ContainerGlobal] internal static SubInfo ExitRunloopSI;
-        [ContainerGlobal] internal static SubInfo JunctionFallbackSI;
-        [ContainerGlobal] internal static SubInfo SubInvokeSubSI;
-        [ContainerGlobal] internal static SubInfo RunCATCH_I;
-        [ContainerGlobal] internal static SubInfo CommonMEMap_I;
-        [ContainerGlobal] internal static SubInfo CommonGrep_I;
-        [ContainerGlobal] internal static SubInfo TEMP_SI;
+        [CompartmentGlobal] internal static SubInfo dogather_SI;
+        [CompartmentGlobal] internal static SubInfo AutoThreadSubSI;
+        [CompartmentGlobal] internal static SubInfo IF_SI;
+        [CompartmentGlobal] internal static SubInfo ExitRunloopSI;
+        [CompartmentGlobal] internal static SubInfo JunctionFallbackSI;
+        [CompartmentGlobal] internal static SubInfo SubInvokeSubSI;
+        [CompartmentGlobal] internal static SubInfo RunCATCH_I;
+        [CompartmentGlobal] internal static SubInfo CommonMEMap_I;
+        [CompartmentGlobal] internal static SubInfo CommonGrep_I;
+        [CompartmentGlobal] internal static SubInfo TEMP_SI;
 
-        internal static void InitContainer() {
+        internal static void InitCompartment() {
             RuntimeUnit.reg = new ObjectRegistry();
 
             AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub",
@@ -5271,11 +5271,11 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             }
         }
 
-        [ContainerGlobal]
+        [CompartmentGlobal]
         public static Dictionary<string, StashEnt> currentGlobals;
         // The root unit of this isolation container; will not point to
         // an eval or such.
-        [ContainerGlobal]
+        [CompartmentGlobal]
         internal static RuntimeUnit containerRootUnit;
 
         public static Variable GetGlobal(string key) {
@@ -5715,7 +5715,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         }
 
         public static void MainHandler(string uname, string[] args) {
-            InitContainer();
+            InitCompartment();
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
@@ -5731,7 +5731,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         public static void Main(string[] args) {
             string cmd = args.Length > 0 ? args[0] : "-help";
 
-            InitContainer();
+            InitCompartment();
 
             if (cmd == "-field-inventory") {
                 foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {
@@ -5747,7 +5747,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                             continue;
                         if (fi.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0)
                             continue;
-                        if (fi.GetCustomAttributes(typeof(ContainerGlobalAttribute), true).Length != 0)
+                        if (fi.GetCustomAttributes(typeof(CompartmentGlobalAttribute), true).Length != 0)
                             continue;
                         if (fi.GetCustomAttributes(typeof(TrueGlobalAttribute), true).Length != 0)
                             continue;

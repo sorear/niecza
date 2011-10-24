@@ -430,8 +430,8 @@ namespace Niecza {
 
     public class CLRWrapperProvider {
         [TrueGlobal] static object wrapper_cache_lock = new object();
-        [ContainerGlobal] static Dictionary<Type, STable> wrapper_cache;
-        [ContainerGlobal] static Dictionary<string, STable> named_wrapper_cache;
+        [CompartmentGlobal] static Dictionary<Type, STable> wrapper_cache;
+        [CompartmentGlobal] static Dictionary<string, STable> named_wrapper_cache;
 
         public static STable GetWrapper(Type t) {
             lock (wrapper_cache_lock) {

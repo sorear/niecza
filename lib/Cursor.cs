@@ -488,7 +488,7 @@ public sealed class RxFrame: IFreeze {
         return global.CallAction(th, name, _matchObj);
     }
 
-    [ContainerGlobal]
+    [CompartmentGlobal]
     public static Variable EmptyList;
 
     public Frame FinalEnd(Frame th) {
