@@ -44,13 +44,13 @@ method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not use
             $*orig_file // '(eval)') unless $repl;
         downcall("run_unit", $unit, ?$evalmode, @$!run_args);
         if $repl {
-            downcall("replrun");
+            $*repl_outer_frame = $unit.replrun;
+            $*repl_outer = $unit.mainline;
         }
-        $*repl_outer = $unit.get_mainline if $repl;
         return;
     }
     downcall("save_unit", $unit);
-    $*repl_outer = $unit.get_mainline if $repl;
+    $*repl_outer = $unit.mainline if $repl;
 }
 
 class StaticSub {

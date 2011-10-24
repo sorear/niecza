@@ -5237,6 +5237,9 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             MuMO.Invalidate();
 
             AnyMO = new STable("Any");
+            // AnyMO.typeObject is needed very early, while setting up the
+            // root $_
+            AnyMO.typeObject = new P6opaque(AnyMO, 0);
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
             WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
                     null, null, new IxAnyBindPos());

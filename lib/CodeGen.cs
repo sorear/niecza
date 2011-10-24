@@ -4069,7 +4069,8 @@ dynamic:
                 // to call methods on the type in the process of defining the
                 // type itself.
                 nst.mo.superclasses.Clear();
-                nst.typeObject = new P6opaque(nst, 0);
+                if (nst.typeObject == null) // AnyMO.typeObject is set up early
+                    nst.typeObject = new P6opaque(nst, 0);
                 ((P6opaque)nst.typeObject).slots = null;
                 nst.typeVar = Kernel.NewROScalar(nst.typeObject);
 
@@ -4254,26 +4255,22 @@ dynamic:
                 Builtins.execName = (string)args[1];
                 Builtins.programName = (string)args[2];
                 return null;
-            } else if (cmd == "replrun") {
-                string ret = "";
-                try {
-                    StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
-                    b.v = Kernel.FalseV;
-                    // hack to simulate a settingish environment
-                    Variable r = Kernel.RunInferior(
-                        Kernel.GetInferiorRoot().MakeChild(null,
-                            new SubInfo("<repl>", null),//Builtins.eval_result),
-                            Kernel.AnyP));
-                    if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
-                        Variable pl = Kernel.RunInferior(
-                            r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
-                                "gist", new Variable[] { r }, null));
-                        Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
-                    }
-                } catch (Exception ex) {
-                    ret = ex.Message;
+            } else if (cmd == "unit_replrun") {
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                Frame fret = null;
+                StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
+                b.v = Kernel.FalseV;
+                Frame ir = Kernel.GetInferiorRoot();
+                fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
+                fret.MarkShared();
+                Variable r = Kernel.RunInferior(fret);
+                if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
+                    Variable pl = Kernel.RunInferior(
+                        r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
+                            "gist", new Variable[] { r }, null));
+                    Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
                 }
-                return ret;
+                return new Handle(fret);
             } else if (cmd == "safemode") {
                 Kernel.SaferMode = true;
                 return null;

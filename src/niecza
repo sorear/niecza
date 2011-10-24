@@ -604,6 +604,7 @@ elsif @*ARGS {
 }
 else {
     my $*repl_outer;
+    my $*repl_outer_frame;
     $c.compile_string('', !$comp, $stop);
     while True {
         print "niecza> ";
@@ -611,7 +612,7 @@ else {
         my $ok;
         try {
             $c.compile_string($l, !$comp, $stop, :repl, :evalmode,
-                :outer($*repl_outer));
+                :outer($*repl_outer), :outer_frame($*repl_outer_frame));
             $ok = True;
         }
         say $! unless $ok;
