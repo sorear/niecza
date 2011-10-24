@@ -357,18 +357,35 @@ namespace Niecza {
         }
     }
 
-    // set this on mutable global fields to indicate that they should be saved
-    // along with CORE.  Not really needed for immutable fields
+    // We need to isolate the compilations of different modules from
+    // each other, which is accomplished by a stack of isolation containers.
+    // Each global variable in niecza must be assured to be incapable of
+    // compromising the isolation.  To simplify this, four restricted
+    // contracts are offered:
+    //
+    // [Immutable] fields are never changed, so they cannot act as a side
+    // channel.  This is assumed for initonly fields of primitive type or
+    // some well-known immutable types.  For other cases, such as arrays,
+    // that are not manifestly immutable, this attribute can be used to mark
+    // them.
+    //
+    // [TrueGlobal] fields can be changed during execution, but are not
+    // changed under the direct control of Perl 6 code.  They may leak some
+    // information such as random number seeds.  They may NOT point at Perl 6
+    // level objects.
+    //
+    // [ContainerGlobal] fields are unrestricted in usage, but are always
+    // automatically saved and restored when manipulating the container stack.
+    //
+    // [CORESaved] fields are the same as ContainerGlobal but are additionally
+    // saved in CORE.ser.
+
     [AttributeUsage(AttributeTargets.Field)]
     class CORESavedAttribute : Attribute { }
-    // Marks fields that are really immutable
     [AttributeUsage(AttributeTargets.Field)]
     class ImmutableAttribute : Attribute { }
-    // Marks fields that should be treated as container-global
-    // CORESaved implies ContainerGlobal
     [AttributeUsage(AttributeTargets.Field)]
     class ContainerGlobalAttribute : Attribute { }
-    // Marks fields that should be treated as true-global
     [AttributeUsage(AttributeTargets.Field)]
     class TrueGlobalAttribute : Attribute { }
 
@@ -377,7 +394,7 @@ namespace Niecza {
         // This is only used during GenerateCode calls, which cannot
         // call back into Perl 6 code, so it doesn't need to be
         // containerized, or even saved
-        [TrueGlobal] [ThreadStatic]
+        [ThreadStatic]
         internal static EmitUnit Current;
 
         public AssemblyBuilder asm_builder;
