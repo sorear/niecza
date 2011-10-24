@@ -285,21 +285,15 @@ class Type {
 
 class Unit {
     method FALLBACK($name, *@args) { downcall("unit_$name", self, @args) }
-    method name() { downcall("unit_get_name", self) }
-    method stubbed_stashes() { downcall("unit_stubbed_stashes", self) }
-    method anon_stash() { downcall("unit_anon_stash", self) }
-    method stub_stash($pos, $type) { downcall("unit_stub_stash", $pos, $type) }
     method set_current() { downcall("set_current_unit", self) }
-    method set_mainline($sub) { downcall("set_mainline", $sub) }
-    method abs_pkg(*@names, :$auto) { downcall("rel_pkg", ?$auto, Any, @names) }
-    method rel_pkg($pkg, *@names, :$auto) {
-        downcall("rel_pkg", ?$auto, $pkg, @names)
+    method abs_pkg(*@names, :$auto) {
+        downcall("unit_rel_pkg", self, ?$auto, Any, @names)
     }
-    method get($pkg, $name) {
-        downcall("unit_get", $pkg, $name);
+    method rel_pkg($pkg, *@names, :$auto) {
+        downcall("unit_rel_pkg", self, ?$auto, $pkg, @names)
     }
     method bind($pkg, $name, $item, :$file, :$line, :$pos) { #OK
-        downcall("unit_bind", ~$pkg, ~$name, $item, ~($file // '???'),
+        downcall("unit_bind", self, ~$pkg, ~$name, $item, ~($file // '???'),
             $line // 0);
     }
 
@@ -308,8 +302,8 @@ class Unit {
     }
     method create_sub(:$name, :$class, :$outer, :$cur_pkg, :$in_class,
             :$run_once) {
-        downcall("create_sub", ~($name // 'ANON'), $outer, ~($class // 'Sub'),
-            $cur_pkg, $in_class, ?$run_once)
+        downcall("create_sub", self, ~($name // 'ANON'), $outer,
+            ~($class // 'Sub'), $cur_pkg, $in_class, ?$run_once)
     }
 }
 

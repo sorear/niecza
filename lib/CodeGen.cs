@@ -3635,8 +3635,8 @@ dynamic:
                 string err = ru.LinkUnit(tg);
                 return err == null ? (object)new Handle(tg) : new Exception(err);
             } else if (cmd == "unit_anon_stash") {
-                return Backend.currentUnit.name + ":" +
-                    (Backend.currentUnit.nextid++);
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                return ru.name + ":" + (ru.nextid++);
             } else if (cmd == "unit_set_bottom") {
                 ((RuntimeUnit)Handle.Unbox(args[1])).bottom =
                     (SubInfo)Handle.Unbox(args[2]);
@@ -3645,9 +3645,10 @@ dynamic:
                 return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).bottom);
             } else if (cmd == "unit_mainline") {
                 return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).mainline);
-            } else if (cmd == "set_mainline") {
-                Backend.currentUnit.mainline = (SubInfo)Handle.Unbox(args[1]);
-                Backend.currentUnit.mainline.special |= SubInfo.MAINLINE;
+            } else if (cmd == "unit_set_mainline") {
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                ru.mainline = (SubInfo)Handle.Unbox(args[2]);
+                ru.mainline.special |= SubInfo.MAINLINE;
                 return null;
             } else if (cmd == "sub_set_ltm") {
                 ((SubInfo)Handle.Unbox(args[1])).ltm =
@@ -3835,12 +3836,12 @@ dynamic:
                 }
                 return ret.ToArray();
             } else if (cmd == "unit_stub_stash") {
-                int    pos = (int)args[1];
-                STable type = (STable)Handle.Unbox(args[2]);
-                Backend.currentUnit.stubbed_stashes.
-                    Add(new KeyValuePair<int,STable>(pos,type));
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                int    pos = (int)args[2];
+                STable type = (STable)Handle.Unbox(args[3]);
+                ru.stubbed_stashes.Add(new KeyValuePair<int,STable>(pos,type));
                 return null;
-            } else if (cmd == "unit_get_name") {
+            } else if (cmd == "unit_name") {
                 return ((RuntimeUnit)Handle.Unbox(args[1])).name;
             } else if (cmd == "sub_to_unit") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
@@ -3863,11 +3864,13 @@ dynamic:
                 LISimple li = (LISimple)s.dylex["$_"];
                 li.flags = LISimple.NOINIT;
                 return null;
-            } else if (cmd == "rel_pkg") {
-                bool auto = (bool)args[1];
-                STable pkg = args[2] == null ? null : (STable)Handle.Unbox(args[2]);
-                RuntimeUnit c = Backend.currentUnit;
-                for (int i = 3; i < args.Length; i++) {
+            } else if (cmd == "unit_rel_pkg") {
+                RuntimeUnit c = (RuntimeUnit)Handle.Unbox(args[1]);
+                bool auto     = (bool)args[2];
+                STable pkg    = args[3] == null ? null :
+                    (STable)Handle.Unbox(args[3]);
+
+                for (int i = 4; i < args.Length; i++) {
                     string key = (string) args[i];
                     string who = "";
                     if (pkg != null) {
@@ -3912,11 +3915,12 @@ dynamic:
                 }
                 return r.ToArray();
             } else if (cmd == "unit_get") {
-                string who  = (string)args[1];
-                string key  = (string)args[2];
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                string who  = (string)args[2];
+                string key  = (string)args[3];
                 string hkey = (char)who.Length + who + key;
                 StashEnt b;
-                if (Kernel.currentGlobals.TryGetValue(hkey, out b)) {
+                if (ru.globals.TryGetValue(hkey, out b)) {
                     if (!b.v.rw && !b.v.Fetch().IsDefined()) {
                         return new Handle(b.v.Fetch().mo);
                     } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
@@ -3926,16 +3930,18 @@ dynamic:
                     return null;
                 }
             } else if (cmd == "unit_exists") {
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string who  = (string)args[2];
                 string key  = (string)args[3];
                 string hkey = (char)who.Length + who + key;
-                return Kernel.currentGlobals.ContainsKey(hkey);
+                return ru.globals.ContainsKey(hkey);
             } else if (cmd == "unit_bind") {
-                string who  = (string)args[1];
-                string name = (string)args[2];
-                object item = Handle.Unbox(args[3]);
-                string file = (string)args[4];
-                int    line = (int)args[5];
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                string who  = (string)args[2];
+                string name = (string)args[3];
+                object item = Handle.Unbox(args[4]);
+                string file = (string)args[5];
+                int    line = (int)args[6];
 
                 Variable vitm = null;
                 if (item is STable)
@@ -3947,7 +3953,7 @@ dynamic:
                 else
                     return new Exception("weird thing to bind");
 
-                string err = Backend.currentUnit.NsBind(who, name, vitm, file, line);
+                string err = ru.NsBind(who, name, vitm, file, line);
                 return err == null ? null : new Exception(err);
             } else if (cmd == "type_CAN") {
                 STable st = (STable)Handle.Unbox(args[1]);
@@ -4075,23 +4081,23 @@ dynamic:
 
                 return new Handle(nst);
             } else if (cmd == "create_sub") {
-                string name = (string)args[1];
-                SubInfo outer = (SubInfo)Handle.Unbox(args[2]);
-                string cls = (string)args[3];
-                STable pkg = (STable)Handle.Unbox(args[4]);
-                STable icl = (STable)Handle.Unbox(args[5]);
-                bool once = (bool)args[6];
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                string name = (string)args[2];
+                SubInfo outer = (SubInfo)Handle.Unbox(args[3]);
+                string cls = (string)args[4];
+                STable pkg = (STable)Handle.Unbox(args[5]);
+                STable icl = (STable)Handle.Unbox(args[6]);
+                bool once = (bool)args[7];
 
                 STable rcls = ResolveSubClass(cls);
                 if (rcls == null)
                     return new Exception("sub-class lookup fail for " + cls);
 
-                SubInfo n = new SubInfo(Backend.currentUnit, name, outer,
-                        rcls, pkg, once);
+                SubInfo n = new SubInfo(ru, name, outer, rcls, pkg, once);
                 n.in_class = icl;
-                if (n.outer != null && n.outer.unit == Backend.currentUnit)
+                if (n.outer != null && n.outer.unit == ru)
                     n.outer.children.Add(n);
-                Backend.currentUnit.our_subs.Add(n);
+                ru.our_subs.Add(n);
                 return new Handle(n);
             } else if (cmd == "add_my_name") {
                 STable  type  = (STable)Handle.Unbox(args[6]);
@@ -4105,13 +4111,14 @@ dynamic:
             } else if (cmd == "add_dispatcher") {
                 return AddLexical(args, new LIDispatch());
             } else if (cmd == "add_common_name") {
+                SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
                 STable  pkg   = (STable)Handle.Unbox(args[6]);
                 string  pname = (string)args[7];
                 if (!pkg.who.Isa(Kernel.StashMO))
                     return new Exception("NYI usage of a nonstandard package");
                 string  who   = Kernel.UnboxAny<string>(pkg.who);
 
-                string err = Backend.currentUnit.NsBind(who, pname, null,
+                string err = sub.unit.NsBind(who, pname, null,
                         (string)args[3], (int)args[4]);
                 if (err != null) return new Exception(err);
                 return AddLexical(args, new LICommon((char)who.Length + who + pname));
