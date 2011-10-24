@@ -3424,8 +3424,6 @@ dynamic:
             return fn == fo ? " (see line " + lo + ")" :
                 " (see " + fo + " line " + lo + ")";
         }
-
-        [ThreadStatic] internal static RuntimeUnit currentUnit;
     }
 
     // instantiatable for the sake of reflecty loading
@@ -3619,13 +3617,25 @@ dynamic:
                 Builtins.up_domain = (AppDomain)args[1];
                 return null;
             } else if (cmd == "new_unit") {
-                return new Handle(new RuntimeUnit((string)args[1],
+                RuntimeUnit ru = new RuntimeUnit((string)args[1],
                         (string)args[2], (string)args[3],
-                        (bool)args[4], (bool)args[5]));
-            } else if (cmd == "set_current_unit") {
-                Backend.currentUnit = (RuntimeUnit)Handle.Unbox(args[1]);
-                Kernel.currentGlobals = Backend.currentUnit.globals;
-                return null;
+                        (bool)args[4], (bool)args[5]);
+
+                if (Kernel.containerRootUnit == null) {
+                    // this is a module unit
+                    Kernel.containerRootUnit = ru;
+                    ru.globals = Kernel.currentGlobals =
+                        new Dictionary<string,StashEnt>();
+                } else {
+                    // needs to use the same globals as the other units in
+                    // this serialization unit
+                    ru.globals = Kernel.currentGlobals;
+
+                    // evals during compilation add to the same .dll
+                    if (Kernel.containerRootUnit.type == null)
+                        Kernel.containerRootUnit.cosaved_evals.Add(ru);
+                }
+                return new Handle(ru);
             } else if (cmd == "unit_need_unit") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string oname   = (string)args[2];

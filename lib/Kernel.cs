@@ -559,6 +559,7 @@ namespace Niecza {
         // used during construction only
         public List<KeyValuePair<int,STable>> stubbed_stashes;
         public Dictionary<object, FieldBuilder> constants;
+        internal List<RuntimeUnit> cosaved_evals = new List<RuntimeUnit>();
         public int nextid;
 
         private RuntimeUnit() { }
@@ -570,7 +571,6 @@ namespace Niecza {
             this.source = source;
             this.depended_units = new HashSet<RuntimeUnit>();
             this.depended_units.Add(this);
-            this.globals = new Dictionary<string,StashEnt>();
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             this.is_mainish = main;
             if (name == "CORE")
@@ -5209,6 +5209,10 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
 
         [ContainerGlobal]
         public static Dictionary<string, StashEnt> currentGlobals;
+        // The root unit of this isolation container; will not point to
+        // an eval or such.
+        [ContainerGlobal]
+        internal static RuntimeUnit containerRootUnit;
 
         public static Variable GetGlobal(string key) {
             return currentGlobals[key].v;
@@ -5649,7 +5653,9 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             RuntimeUnit ru = (RuntimeUnit)
                 RuntimeUnit.reg.LoadUnit(uname).root;
 
+            Kernel.containerRootUnit = ru;
             Kernel.currentGlobals = ru.globals;
+
             ru.PrepareEval();
             RunMain(ru);
         }
@@ -5706,7 +5712,9 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 RuntimeUnit ru = (RuntimeUnit)
                     RuntimeUnit.reg.LoadUnit(args[1]).root;
 
+                Kernel.containerRootUnit = ru;
                 Kernel.currentGlobals = ru.globals;
+
                 ru.PrepareEval();
                 RunMain(ru);
             } else {

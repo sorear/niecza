@@ -285,7 +285,6 @@ class Type {
 
 class Unit {
     method FALLBACK($name, *@args) { downcall("unit_$name", self, @args) }
-    method set_current() { downcall("set_current_unit", self) }
     method abs_pkg(*@names, :$auto) {
         downcall("unit_rel_pkg", self, ?$auto, Any, @names)
     }

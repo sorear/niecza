@@ -245,7 +245,6 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
     my $*unit = $*backend.create_unit($unitname, $filename, $source, $main, $run);
-    $*unit.set_current;
     my $*settingref = $*niecza_outer_ref ||
         ($lang ne 'NULL' ?? $*unit.need_unit($lang).bottom !! Any);
 
@@ -256,6 +255,5 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main
 
     @STD::herestub_queue = @save_herestub;
 
-    CALLER::<$*unit> && CALLER::<$*unit>.set_current;
     $ast;
 }
