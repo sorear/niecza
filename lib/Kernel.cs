@@ -657,7 +657,8 @@ namespace Niecza {
             return eu;
         }
 
-        internal static ObjectRegistry reg = new ObjectRegistry();
+        [ContainerGlobal]
+        internal static ObjectRegistry reg;
 
         public void Save() {
             EmitUnit eu = GenerateCode(false);
@@ -1627,7 +1628,7 @@ noparams:
             if (jun_pivot != -1 && !quiet) {
                 Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
                         pos[jun_pivot]);
-                th = caller.MakeChild(null, AutoThreadSubSI, Kernel.AnyP);
+                th = caller.MakeChild(null, Kernel.AutoThreadSubSI, Kernel.AnyP);
 
                 P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -1657,8 +1658,7 @@ noparams:
             return (Variable)f.GetDynamic(outer_topic_key);
         }
 
-        static SubInfo AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub", AutoThreadSubC);
-        static Frame AutoThreadSubC(Frame th) {
+        internal static Frame AutoThreadSubC(Frame th) {
             Variable[] src = (Variable[]) th.lex4;
             Variable[] dst = (Variable[]) th.lex8;
             if (th.lexi1 > 0)
@@ -3941,7 +3941,6 @@ have_v:
             return from;
         }
 
-        static SubInfo dogather_SI = new SubInfo("KERNEL dogather", dogather);
         static Frame dogather(Frame th) {
             if (th.ip == 0) {
                 th.ip = 1;
@@ -3960,7 +3959,6 @@ have_v:
             return th;
         }
 
-        private static SubInfo SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>", SubInvokeSubC);
         private static Frame SubInvokeSubC(Frame th) {
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
@@ -3969,7 +3967,6 @@ have_v:
                     th.Return(), post, th.named);
         }
 
-        private static SubInfo JunctionFallbackSI = new SubInfo("Junction.FALLBACK", JunctionFallbackC);
         private static Frame JunctionFallbackC(Frame th) {
             if (th.ip == 0) {
                 if (!th.pos[0].Fetch().IsDefined())
@@ -4014,6 +4011,56 @@ have_v:
             nw.SetSlot("named", caller.named);
             caller.named = null;
             return nw;
+        }
+
+        // SubInfo objects can be mutated at runtime by .wrap so they
+        // must be containerized
+        [ContainerGlobal] internal static SubInfo dogather_SI;
+        [ContainerGlobal] internal static SubInfo AutoThreadSubSI;
+        [ContainerGlobal] internal static SubInfo IF_SI;
+        [ContainerGlobal] internal static SubInfo ExitRunloopSI;
+        [ContainerGlobal] internal static SubInfo JunctionFallbackSI;
+        [ContainerGlobal] internal static SubInfo SubInvokeSubSI;
+        [ContainerGlobal] internal static SubInfo RunCATCH_I;
+        [ContainerGlobal] internal static SubInfo CommonMEMap_I;
+        [ContainerGlobal] internal static SubInfo CommonGrep_I;
+        [ContainerGlobal] internal static SubInfo TEMP_SI;
+
+        internal static void InitContainer() {
+            RuntimeUnit.reg = new ObjectRegistry();
+
+            AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub",
+                    SubInfo.AutoThreadSubC);
+            dogather_SI   = new SubInfo("KERNEL dogather", dogather);
+            ExitRunloopSI = new SubInfo("ExitRunloop", ExitRunloopC);
+            IF_SI         = new SubInfo("iter_flatten", IF_C);
+            JunctionFallbackSI = new SubInfo("Junction.FALLBACK",
+                    JunctionFallbackC);
+            SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>",
+                    SubInvokeSubC);
+            TEMP_SI       = new SubInfo("KERNEL Scalar.TEMP", Builtins.TEMP_C);
+
+            RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
+                Builtins.RunCATCH_C, null, null, new int[] {
+                    0, 5, SubInfo.ON_NEXT, 1, 0,
+                    0, 5, SubInfo.ON_REDO, 2, 0,
+                    0, 5, SubInfo.ON_LAST, 4, 0,
+                    0, 5, SubInfo.ON_DIE,  1, 0,
+                }, new string[] { "" }, 0);
+
+            CommonMEMap_I = new SubInfo("KERNEL map", null,
+                Builtins.CommonMEMap_C, null, null, new int[] {
+                    2, 3, SubInfo.ON_NEXT, 0, 0,
+                    2, 3, SubInfo.ON_REDO, 1, 0,
+                    2, 3, SubInfo.ON_LAST, 3, 0,
+                }, new string[] { "" }, 0);
+
+            CommonGrep_I = new SubInfo("KERNEL grep", null,
+                Builtins.CommonGrep_C, null, null, new int[] {
+                    2, 3, SubInfo.ON_NEXT, 0, 0,
+                    2, 3, SubInfo.ON_REDO, 1, 0,
+                    2, 3, SubInfo.ON_LAST, 3, 0,
+                }, new string[] { "" }, 0);
         }
 
         [CORESaved] public static STable PairMO;
@@ -4197,6 +4244,7 @@ have_v:
                 }
             }
 
+            [TrueGlobal]
             private static long unique;
             public static long get_unique() {
                 return Interlocked.Increment(ref unique);
@@ -4712,7 +4760,6 @@ again:
             goto again;
         }
 
-        private static SubInfo IF_SI = new SubInfo("iter_flatten", IF_C);
         private static Frame IF_C(Frame th) {
             VarDeque inq = (VarDeque) th.lex0;
             if (IterHasFlat(inq, true)) {
@@ -5098,8 +5145,6 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             public ResumeUnwindException payload;
             public ExitRunloopException(ResumeUnwindException p) { payload = p; }
         }
-        public static SubInfo ExitRunloopSI =
-            new SubInfo("ExitRunloop", ExitRunloopC);
         private static Frame ExitRunloopC(Frame th) {
             throw new ExitRunloopException(th.lex0 as ResumeUnwindException);
         }
@@ -5511,7 +5556,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                     continue;
                 unip = csr.info.FindControlEnt(csr.ip, type, name);
                 if (unip >= 0) {
-                    if (csr.info == Builtins.RunCATCH_I && type == SubInfo.ON_DIE) {
+                    if (csr.info == Kernel.RunCATCH_I && type == SubInfo.ON_DIE) {
                         // Fudgy implementation of SIMPLECATCH
                         // A non-control exception has been thrown from handler
                         // Unwind will DTRT with control flow, but we need
@@ -5527,7 +5572,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 }
 
                 if (type == SubInfo.ON_DIE && csr.info.catch_ != null) {
-                    Frame nfr = Builtins.RunCATCH_I.Binder(
+                    Frame nfr = Kernel.RunCATCH_I.Binder(
                         Kernel.GetInferiorRoot(), null, null, null, null,
                         false, null);
                     nfr.lex0 = Kernel.MakeSub(csr.info.catch_, csr);
@@ -5670,6 +5715,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         }
 
         public static void MainHandler(string uname, string[] args) {
+            InitContainer();
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
@@ -5684,6 +5730,8 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
 
         public static void Main(string[] args) {
             string cmd = args.Length > 0 ? args[0] : "-help";
+
+            InitContainer();
 
             if (cmd == "-field-inventory") {
                 foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {

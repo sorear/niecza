@@ -1870,13 +1870,7 @@ again:
         }
     }
 
-    private static SubInfo CommonMEMap_I = new SubInfo("KERNEL map", null,
-            CommonMEMap_C, null, null, new int[] {
-                2, 3, SubInfo.ON_NEXT, 0, 0,
-                2, 3, SubInfo.ON_REDO, 1, 0,
-                2, 3, SubInfo.ON_LAST, 3, 0,
-            }, new string[] { "" }, 0);
-    private static Frame CommonMEMap_C(Frame th) {
+    internal static Frame CommonMEMap_C(Frame th) {
         ItemSource src = (ItemSource) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;
         object fnc = th.lex2;
@@ -1946,7 +1940,7 @@ again:
         P6any fcni = fcn.Fetch();
         int arity = get_count(fcni);
 
-        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
@@ -1958,7 +1952,7 @@ again:
             Func<Variable,Variable> fcn) {
         VarDeque iter = new VarDeque(Kernel.NewRWListVar(lst));
 
-        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(1, iter);
         fr.lex1 = new VarDeque();
@@ -1976,7 +1970,7 @@ again:
     }
 
     public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -1986,7 +1980,7 @@ again:
     }
 
     public static Frame MECross(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -1995,13 +1989,7 @@ again:
         return fr;
     }
 
-    private static SubInfo CommonGrep_I = new SubInfo("KERNEL grep", null,
-            CommonGrep_C, null, null, new int[] {
-                2, 3, SubInfo.ON_NEXT, 0, 0,
-                2, 3, SubInfo.ON_REDO, 1, 0,
-                2, 3, SubInfo.ON_LAST, 3, 0,
-            }, new string[] { "" }, 0);
-    private static Frame CommonGrep_C(Frame th) {
+    internal static Frame CommonGrep_C(Frame th) {
         VarDeque src = (VarDeque) th.lex0;
         VarDeque outq = (VarDeque) th.lex1;
         Variable flt = (Variable) th.lex2;
@@ -2074,7 +2062,7 @@ again:
         Variable fcn = iter.Shift();
         iter = Kernel.IterFlatten(iter);
 
-        Frame fr = th.MakeChild(null, CommonGrep_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonGrep_I, Kernel.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = iter;
         fr.lex1 = new VarDeque();
@@ -2169,8 +2157,7 @@ again:
         return Kernel.UnboxAny<StashCursor>(st).Raw(key, to);
     }
 
-    static SubInfo TEMP_SI = new SubInfo("KERNEL Scalar.TEMP", TEMP_C);
-    static Frame TEMP_C(Frame th) {
+    internal static Frame TEMP_C(Frame th) {
         ((Variable)th.outer.lex0).Store((P6any)th.outer.lex1);
         return th.Return();
     }
@@ -2189,21 +2176,13 @@ again:
             Frame o = new Frame();
             o.lex0 = v;
             o.lex1 = v.Fetch();
-            fr.PushLeave(type, Kernel.MakeSub(TEMP_SI, o));
+            fr.PushLeave(type, Kernel.MakeSub(Kernel.TEMP_SI, o));
         }
 
         return v;
     }
 
-    internal static SubInfo RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
-            RunCATCH_C, null, null, new int[] {
-                0, 5, SubInfo.ON_NEXT, 1, 0,
-                0, 5, SubInfo.ON_REDO, 2, 0,
-                0, 5, SubInfo.ON_LAST, 4, 0,
-                0, 5, SubInfo.ON_DIE,  1, 0,
-            }, new string[] { "" }, 0);
-
-    private static Frame RunCATCH_C(Frame th) {
+    internal static Frame RunCATCH_C(Frame th) {
         // ENTRY  lex0 : CATCH lambda (decontainerized)
         //        lex1 : exception payload (@! Array)
         // EXIT   ret  : new @!; will catch if false

@@ -3623,6 +3623,7 @@ dynamic:
 
                 if (Kernel.containerRootUnit == null) {
                     // this is a module unit
+                    Kernel.InitContainer();
                     Kernel.containerRootUnit = ru;
                     ru.globals = Kernel.currentGlobals =
                         new Dictionary<string,StashEnt>();
