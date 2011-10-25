@@ -677,7 +677,7 @@ namespace Niecza {
             if (prepared) return;
             prepared = true;
 
-            foreach (RuntimeUnit d in depended_units)
+            foreach (RuntimeUnit d in Kernel.containerRootUnit.depended_units)
                 d.PrepareEval(); // would loop without above assignment
 
             if (type == null) {
@@ -697,7 +697,7 @@ namespace Niecza {
             Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
             Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
 
-            if (!is_mainish && bottom == null)
+            if (!is_mainish && bottom == null && filename != "(eval)")
                 RunMainline();
         }
 
