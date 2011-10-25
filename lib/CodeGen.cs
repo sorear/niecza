@@ -3648,8 +3648,17 @@ dynamic:
                 //RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string oname   = (string)args[2];
 
-                RuntimeUnit tg = (RuntimeUnit)
-                    RuntimeUnit.reg.LoadUnit(oname).root;
+                RuntimeUnit tg;
+                try {
+                    tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+                } catch (Exception) {
+                    // assume stale at first
+                    object r1 = Builtins.UpCall(new object[] {
+                        "compile_unit", oname });
+                    if (r1 != null)
+                        return r1;
+                    tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+                }
                 string err = Kernel.containerRootUnit.LinkUnit(tg);
                 return err == null ? (object)new Handle(tg) : new Exception(err);
             } else if (cmd == "unit_anon_stash") {

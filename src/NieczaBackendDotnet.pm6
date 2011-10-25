@@ -9,15 +9,34 @@ has $.safemode = False;
 has $.obj_dir;
 has $.run_args = [];
 
+
 sub upcalled(*@args) {
+    my $v = $*compiler.verbose;
     given @args[0] {
         when "eval" {
             my $*IN_EVAL = True;
+            say "eval: @args[1] from @args[2].name()" if $v;
             return $*compiler.compile_string(@args[1], True, :evalmode,
                 :outer(@args[2]), :outer_frame(@args[3]));
         }
         when "check_dated" {
-            return "ok";  #TODO
+            shift @args;
+            for @args -> $module, $hash {
+                my ($file, $modt, $src) = #OK
+                    $*compiler.module_finder.load_module($module);
+                my $trueh = gethash($src);
+                say "check-dated $module: was $hash now $trueh" if $v;
+                return "no" unless $hash eq $trueh;
+            }
+            return "ok";
+        }
+        when "compile_unit" {
+            say "autocompiling @args[1]..." if $v;
+            say "[auto-compiling setting]" if @args[1] eq 'CORE' && !$v;
+            $*compiler.compile_module(@args[1]);
+            say "[done]" if @args[1] eq 'CORE' && !$v;
+            say "done compiling @args[1]." if $v;
+            return;
         }
         say "upcall: @args.join('|')";
         die "ERROR";
@@ -35,6 +54,10 @@ method new(*%_) {
 
 sub downcall(*@args) {
     Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.DownCall {@args}) }
+}
+
+sub gethash($str) {
+    Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.DoHash (obj_getstr {$str}))) }
 }
 
 method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not used
