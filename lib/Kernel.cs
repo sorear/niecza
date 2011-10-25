@@ -401,7 +401,7 @@ namespace Niecza {
         public ModuleBuilder mod_builder;
         public TypeBuilder type_builder;
         public int nextid;
-        public Dictionary<object, FieldBuilder> constants;
+        public Dictionary<object, FieldInfo> constants;
         internal Dictionary<string, CpsOp> val_constants;
 
         internal CpsOp TypeConstant(STable s) {
@@ -414,7 +414,7 @@ namespace Niecza {
         internal CpsOp RefConstant(string name, object val, Type nty) {
             if (val == null)
                 return CpsOp.Null(nty);
-            FieldBuilder fi;
+            FieldInfo fi;
             if (!constants.TryGetValue(val, out fi))
                 constants[val] = fi = NewField(name, val is Variable ? typeof(Variable) : val.GetType());
             return CpsOp.IsConst(CpsOp.GetSField(fi));
@@ -570,12 +570,12 @@ namespace Niecza {
         public Type type;
         public Assembly assembly;
         public List<SubInfo> our_subs;
+        public Dictionary<object, FieldInfo> constants;
 
         bool prepared = false;
 
         // used during construction only
         public List<KeyValuePair<int,STable>> stubbed_stashes;
-        public Dictionary<object, FieldBuilder> constants;
         internal List<RuntimeUnit> cosaved_evals = new List<RuntimeUnit>();
         public int nextid;
 
@@ -618,7 +618,7 @@ namespace Niecza {
                     TypeAttributes.Abstract | TypeAttributes.Class |
                     TypeAttributes.BeforeFieldInit);
 
-            eu.constants = new Dictionary<object,FieldBuilder>(new IdentityComparer());
+            eu.constants = new Dictionary<object,FieldInfo>(new IdentityComparer());
             eu.val_constants = new Dictionary<string,CpsOp>();
             NamProcessor[] ths = new NamProcessor[our_subs.Count];
             for (int i = 0; i < ths.Length; i++) {
@@ -666,6 +666,13 @@ namespace Niecza {
             reg.SaveUnit(asm_name, this);
         }
 
+        internal void SetConstants() {
+            if (type != null) {
+                foreach (KeyValuePair<object, FieldInfo> kv in constants)
+                    type.GetField(kv.Value.Name).SetValue(null, kv.Key);
+            }
+        }
+
         public void PrepareEval() {
             if (prepared) return;
             prepared = true;
@@ -675,9 +682,7 @@ namespace Niecza {
 
             if (type == null) {
                 GenerateCode(true);
-
-                foreach (KeyValuePair<object, FieldBuilder> kv in constants)
-                    type.GetField(kv.Value.Name).SetValue(null, kv.Key);
+                SetConstants();
             }
 
             foreach (SubInfo z in our_subs)
@@ -817,7 +822,7 @@ namespace Niecza {
             fb.Refs(dep);
 
             fb.Int(constants.Count);
-            foreach (KeyValuePair<object,FieldBuilder> kv in constants) {
+            foreach (KeyValuePair<object,FieldInfo> kv in constants) {
                 fb.String(kv.Value.Name);
                 fb.ObjRef(kv.Key);
             }
@@ -871,9 +876,12 @@ namespace Niecza {
             n.type = tb.type = n.assembly.GetType(n.name, true);
 
             int ncon = tb.Int();
+            n.constants = new Dictionary<object,FieldInfo>();
             while (ncon-- > 0) {
                 FieldInfo fi = n.type.GetField(tb.String());
-                fi.SetValue(null, tb.ObjRef());
+                object val = tb.ObjRef();
+                n.constants[val] = fi;
+                fi.SetValue(null, val);
             }
 
             int ct = tb.Int();
@@ -3879,6 +3887,66 @@ have_v:
         }
     }
 
+    class Compartment {
+        [Immutable] static readonly FieldInfo[] fieldsToSave;
+
+        static Compartment() {
+            var typesToCheck = new Type[] {
+                typeof(Kernel), typeof(RuntimeUnit), typeof(CLRWrapperProvider),
+                typeof(RxFrame), typeof(Builtins)
+            };
+
+            List<FieldInfo> fields = new List<FieldInfo>();
+            foreach (Type ty in typesToCheck) {
+                foreach (FieldInfo fi in ty.GetFields(BindingFlags.NonPublic |
+                            BindingFlags.Public | BindingFlags.Static)) {
+                    foreach (object o in fi.GetCustomAttributes(true)) {
+                        if (o is CORESavedAttribute) goto saveme;
+                        if (o is CompartmentGlobalAttribute) goto saveme;
+                    }
+                    continue;
+saveme:
+                    fields.Add(fi);
+                }
+            }
+
+            fieldsToSave = fields.ToArray();
+        }
+
+        Compartment prev;
+        object[] saved_values;
+        private Compartment() { }
+
+        [TrueGlobal]
+        public static Compartment Top = new Compartment();
+
+        internal static void Push() {
+            Compartment n = new Compartment();
+            n.prev = Top;
+            n.saved_values = new object[fieldsToSave.Length];
+
+            for (int i = 0; i < fieldsToSave.Length; i++) {
+                n.saved_values[i] = fieldsToSave[i].GetValue(null);
+                fieldsToSave[i].SetValue(null, null);
+            }
+
+            Kernel.InitCompartment();
+            Top = n;
+        }
+
+        internal static void Pop() {
+            for (int i = 0; i < fieldsToSave.Length; i++) {
+                fieldsToSave[i].SetValue(null, Top.saved_values[i]);
+            }
+
+            if (Kernel.containerRootUnit != null) {
+                foreach (RuntimeUnit ru in Kernel.containerRootUnit.depended_units)
+                    ru.SetConstants();
+            }
+            Top = Top.prev;
+        }
+    }
+
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
@@ -5211,6 +5279,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
         class LastFrameNode {
             public LastFrameNode next, prev;
             public Frame cur, root;
+            public Compartment compartment = Compartment.Top;
         }
         [ThreadStatic] static LastFrameNode rlstack;
         public static void SetTopFrame(Frame f) {
@@ -5228,6 +5297,8 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 lfn.next.prev = lfn;
             }
             Frame l = lfn.cur;
+            if (lfn.compartment != Compartment.Top)
+                l = null; // hide other objects
             rlstack = lfn.next;
             return lfn.next.cur = lfn.next.root = ((l == null ?
                         new Frame(null, null, ExitRunloopSI, Kernel.AnyP) :

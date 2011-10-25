@@ -201,7 +201,7 @@ augment class Cursor {
 has $.lang;
 has $.safemode;
 
-method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main) {
+method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main, :$evalmode, :$repl) {
 
     my $*SAFEMODE    = $.safemode;
     my $*UNITNAME    = $unitname;
@@ -244,6 +244,8 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main
     my $*UNIT;
     my $*CCSTATE; my $*BORG; my %*RX; my $*XACT; my $*VAR; my $*IN_REDUCE;
 
+    $*backend.push_compartment unless $evalmode;
+    LEAVE { $*backend.pop_compartment unless $evalmode };
     my $*unit = $*backend.create_unit($unitname, $filename, $source, $main, $run);
     my $*settingref = $*niecza_outer_ref ||
         ($lang ne 'NULL' ?? $*unit.need_unit($lang).bottom !! Any);
@@ -255,5 +257,7 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main
 
     @STD::herestub_queue = @save_herestub;
 
-    $ast;
+    $*backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl);
+
+    $evalmode ?? $ast !! Nil;
 }

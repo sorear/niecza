@@ -3616,6 +3616,12 @@ dynamic:
             } else if (cmd == "set_parent") {
                 Builtins.up_domain = (AppDomain)args[1];
                 return null;
+            } else if (cmd == "push_compartment") {
+                Compartment.Push();
+                return null;
+            } else if (cmd == "pop_compartment") {
+                Compartment.Pop();
+                return null;
             } else if (cmd == "new_unit") {
                 RuntimeUnit ru = new RuntimeUnit((string)args[1],
                         (string)args[2], (string)args[3],

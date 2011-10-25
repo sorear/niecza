@@ -27,9 +27,7 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end, $eva
     my $start = times[0] - $!discount-time;
 
     my $ast = $!frontend.parse(:$unitname, :$filename, :$modtime,
-        :$source, :$outer, :$main, :$run);
-
-    $!backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl);
+        :$source, :$outer, :$main, :$run, :$evalmode, :$repl);
 
     my $time = times[0] - $!discount-time - $start;
 
