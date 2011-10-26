@@ -479,6 +479,7 @@ my class Complex is Numeric {
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
     method conjugate() { self.re - (self.im)i }
+    method polar() { self.abs, atan2(self.im, self.re); }
 }
 my class FatRat is Real {
     method new($n,$d) { FatRat.succ * $n / $d }
