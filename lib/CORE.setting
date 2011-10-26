@@ -2,6 +2,142 @@
 my module CORE;
 use MONKEY_TYPING;
 
+# Predeclarations of types {{{
+my class Mu       { ... }
+my class Cursor   { ... }
+my class Regex    { ... }
+my class Num      { ... }
+my class Str      { ... }
+my class Code     { ... }
+my class Match    { ... }
+my class List     { ... }
+my class Array    { ... }
+my class Junction { ... }
+# }}}
+# Important inlinable definitions {{{
+sub infix:<+>($l,$r) is Niecza::builtin('plus',2,2) { $l + $r }
+sub infix:<->($l,$r) is Niecza::builtin('minus',2,2) { $l - $r }
+sub infix:<*> is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> ($l,$r) { $l * $r }
+sub infix:</> is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
+sub infix:<%> is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
+sub infix:<**> is Niecza::builtin('pow',2,2)  is Niecza::absprec<w=> is assoc<right> ($l,$r) { $l ** $r }
+
+sub next ($x?) { _lexotic(1, $x, ()) }
+sub last ($x?) { _lexotic(2, $x, ()) }
+sub redo ($x?) { _lexotic(3, $x, ()) }
+sub return(\|@pcl) is return-pass { Q:CgOp {
+    (control 4 (null frame) (int -1) (null str) {@pcl.unwrap-single})
+} }
+sub succeed(\|@pcl) {
+    Q:CgOp { (control 6 (null frame) (int -1) (null str) {@pcl.unwrap-single}) }
+}
+sub proceed() { proceed }
+sub term:<proceed>() {
+    Q:CgOp { (control 7 (null frame) (int -1) (null str) {()}) }
+}
+
+sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
+
+sub infix:<&> is Niecza::absprec<q=> is assoc<list>
+    (\|$p) { Junction.from-parcel(0, $p) }
+sub infix:<^> is Niecza::absprec<p=> is assoc<list>
+    (\|$p) { Junction.from-parcel(2, $p) }
+sub infix:<|> is Niecza::absprec<p=> is assoc<list>
+    (\|$p) { Junction.from-parcel(3, $p) }
+sub all  (*@p) { all @p }
+sub none (*@p) { none @p }
+sub one  (*@p) { one @p }
+sub any  (*@p) { any @p }
+
+sub infix:<< == >>($l,$r) is Niecza::builtin('numeq',2,2)
+    is Niecza::absprec<m=> is assoc<chain> { $l == $r }
+sub infix:<< != >>($l,$r) is Niecza::builtin('numne',2,2)
+    is equiv<==> { $l != $r }
+sub infix:<< < >>($l,$r)  is Niecza::builtin('numlt',2,2)
+    is equiv<==> { $l <  $r }
+sub infix:<< > >>($l,$r)  is Niecza::builtin('numgt',2,2)
+    is equiv<==> { $l >  $r }
+sub infix:<< <= >>($l,$r) is Niecza::builtin('numle',2,2)
+    is equiv<==> { $l <= $r }
+sub infix:<< >= >>($l,$r) is Niecza::builtin('numge',2,2)
+    is equiv<==> { $l >= $r }
+
+sub infix:<ge>($s1, $s2) is Niecza::builtin('strge',2,2)
+    is equiv<==> { $s1 ge $s2 }
+sub infix:<gt>($s1, $s2) is Niecza::builtin('strgt',2,2)
+    is equiv<==> { $s1 gt $s2 }
+sub infix:<le>($s1, $s2) is Niecza::builtin('strle',2,2)
+    is equiv<==> { $s1 le $s2 }
+sub infix:<lt>($s1, $s2) is Niecza::builtin('strlt',2,2)
+    is equiv<==> { $s1 lt $s2 }
+sub infix:<eq>($s1, $s2) is Niecza::builtin('streq',2,2)
+    is equiv<==> { $s1 eq $s2 }
+sub infix:<ne>($s1, $s2) is Niecza::builtin('strne',2,2)
+    is equiv<==> { $s1 ne $s2 }
+
+sub infix:<,> is Niecza::builtin('comma',0) is Niecza::absprec<g=> is assoc<list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
+sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builtin('assign',2,2) { $a = $b }
+
+sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
+
+sub defined(\$x) is Niecza::builtin('defined',1,1) { defined($x) }
+
+sub prefix:<~>(\$v) is Niecza::builtin('asstr', 1, 1) { ~$v }
+sub prefix:<?>(\$v) is Niecza::builtin('asbool', 1, 1) { ?$v }
+sub prefix:<->(\$v) is Niecza::builtin('negate', 1, 1) { -$v }
+sub prefix:<+>(\$v) is Niecza::builtin('num', 1, 1) { +$v }
+sub prefix:<!>(\$v) is Niecza::builtin('not', 1, 1) { !$v }
+
+sub not(\$v) is Niecza::builtin('not', 1, 1)    { not($v) }
+sub so(\$v)  is Niecza::builtin('asbool', 1, 1) { so $v }
+
+sub infix:<+&> is Niecza::builtin('numand',2,2) is Niecza::absprec<u=> ($x, $y) { $x +& $y }
+sub infix:<+|>($x, $y) is Niecza::builtin('numor',2,2) { $x +| $y }
+sub infix:<+^>($x, $y) is Niecza::builtin('numxor',2,2) { $x +^ $y }
+sub infix:<< +< >>($x, $y) is Niecza::absprec<u=>
+    is Niecza::builtin('numlshift',2,2) { $x +< $y }
+sub infix:<< +> >>($x, $y) is Niecza::absprec<u=>
+    is Niecza::builtin('numrshift',2,2) { $x +> $y }
+sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) { +^$x }
+
+sub infix:<< => >>($k, Mu $v) is equiv<=>
+    is Niecza::builtin('pair', 2, 2) { $k => $v }
+
+sub postcircumfix:<[ ]>(\$container, \$index, *%adverbs) {
+    $container.postcircumfix:<[ ]>($index, |%adverbs)
+}
+
+sub postcircumfix:<{ }>(\$container, \$index, *%adverbs) {
+    $container.postcircumfix:<{ }>($index, |%adverbs)
+}
+
+sub push(@array, *@stuff) is Niecza::builtin('push', 1) { @array.push(@stuff) }
+sub unshift(@array, *@stuff) is Niecza::builtin('unshift', 1) { @array.unshift(@stuff) }
+sub pop(@array) is Niecza::builtin('pop', 1, 1) { @array.pop }
+sub shift(@array) is Niecza::builtin('shift', 1, 1) { @array.shift }
+
+sub grep(Mu $filter, *@items) is Niecza::builtin('grep',1) { grep($filter, @items) }
+sub map($callback, *@items) is Niecza::builtin('map',1) { map($callback, @items) }
+
+sub _array_constructor(\$parcel) is Niecza::builtin('array_constructor', 1,
+    1) { _array_constructor($parcel) }
+
+sub make($x) is Niecza::builtin('make', 1, 1) { make $x }
+
+# these are defined in terms of other operators so they go at the end
+sub prefix:<-->  is Niecza::absprec<x=> is Niecza::builtin('predec',1,1) ($v is rw) { $v = $v.pred; $v }
+sub prefix:<++>  is Niecza::absprec<x=> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
+sub postfix:<--> is Niecza::absprec<x=> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
+sub postfix:<++> is Niecza::absprec<x=> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
+sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
+    $start := $start(chars $str) if $start.^does(Code);
+    $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
+        $len // (chars($str) - $start);
+    defined($repl) ??
+        substr($str, $start, $len) = $repl !!
+        substr($str, $start, $len)
+}
+# }}}
 # Fundamental types {{{
 my class Mu {
     method head() { @(self).head }
@@ -158,13 +294,6 @@ my class Any is Mu {
         }
     }
 }
-
-my class Cursor { ... }
-my class Regex  { ... }
-my class Num    { ... }
-my class Str    { ... }
-my class Code   { ... }
-my class Match  { ... }
 
 my class Cool {
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
@@ -611,26 +740,6 @@ sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
       [box Str (strbuf_seal (l buf))])
 } }
 
-sub infix:<+>($l,$r) is Niecza::builtin('plus',2,2) { $l + $r }
-sub infix:<->($l,$r) is Niecza::builtin('minus',2,2) { $l - $r }
-sub infix:<*> is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> ($l,$r) { $l * $r }
-sub infix:</> is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
-sub infix:<%> is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
-sub infix:<**> is Niecza::builtin('pow',2,2)  is Niecza::absprec<w=> is assoc<right> ($l,$r) { $l ** $r }
-
-sub infix:<< == >>($l,$r) is Niecza::builtin('numeq',2,2)
-    is Niecza::absprec<m=> is assoc<chain> { $l == $r }
-sub infix:<< != >>($l,$r) is Niecza::builtin('numne',2,2)
-    is equiv<==> { $l != $r }
-sub infix:<< < >>($l,$r)  is Niecza::builtin('numlt',2,2)
-    is equiv<==> { $l <  $r }
-sub infix:<< > >>($l,$r)  is Niecza::builtin('numgt',2,2)
-    is equiv<==> { $l >  $r }
-sub infix:<< <= >>($l,$r) is Niecza::builtin('numle',2,2)
-    is equiv<==> { $l <= $r }
-sub infix:<< >= >>($l,$r) is Niecza::builtin('numge',2,2)
-    is equiv<==> { $l >= $r }
-
 sub infix:<max>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a < $b ?? $b !! $a }
 sub infix:<min>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a > $b ?? $b !! $a }
 
@@ -654,17 +763,6 @@ sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])
 } }
 
-sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builtin('assign',2,2) { $a = $b }
-
-sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
-sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
-    $start := $start(chars $str) if $start.^does(Code);
-    $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
-        $len // (chars($str) - $start);
-    defined($repl) ??
-        substr($str, $start, $len) = $repl !!
-        substr($str, $start, $len)
-}
 sub index($haystack,$needle,$pos?) { $haystack.index($needle,$pos) }
 sub rindex($haystack,$needle,$pos?) { $haystack.rindex($needle,$pos) }
 sub comb($matcher,$str,$limit?,:$match) { (~$str).comb($matcher,$limit,:$match) }
@@ -673,21 +771,6 @@ sub split($matcher,$str,$limit?,:$all) { (~$str).split($matcher,$limit,:$all) }
 sub item(Mu $x) { $x }
 
 sub prefix:<not> is Niecza::absprec<h=> (\$x) { not($x) }
-sub defined(\$x) is Niecza::builtin('defined',1,1) { defined($x) }
-
-sub prefix:<-->  is Niecza::absprec<x=> is Niecza::builtin('predec',1,1) ($v is rw) { $v = $v.pred; $v }
-sub prefix:<++>  is Niecza::absprec<x=> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
-sub postfix:<--> is Niecza::absprec<x=> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
-sub postfix:<++> is Niecza::absprec<x=> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
-
-sub prefix:<~>(\$v) is Niecza::builtin('asstr', 1, 1) { ~$v }
-sub prefix:<?>(\$v) is Niecza::builtin('asbool', 1, 1) { ?$v }
-sub prefix:<->(\$v) is Niecza::builtin('negate', 1, 1) { -$v }
-sub prefix:<+>(\$v) is Niecza::builtin('num', 1, 1) { +$v }
-sub prefix:<!>(\$v) is Niecza::builtin('not', 1, 1) { !$v }
-
-sub not(\$v) is Niecza::builtin('not', 1, 1)    { not($v) }
-sub so(\$v)  is Niecza::builtin('asbool', 1, 1) { so $v }
 
 sub infix:<x> is Niecza::absprec<s=> ($str, $ct) {
     my $i = +$ct;
@@ -703,18 +786,6 @@ sub infix:<leg> is Niecza::absprec<n=> is assoc<non> ($s1, $s2) {
     Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }
 }
 
-sub infix:<ge>($s1, $s2) is Niecza::builtin('strge',2,2)
-    is equiv<==> { $s1 ge $s2 }
-sub infix:<gt>($s1, $s2) is Niecza::builtin('strgt',2,2)
-    is equiv<==> { $s1 gt $s2 }
-sub infix:<le>($s1, $s2) is Niecza::builtin('strle',2,2)
-    is equiv<==> { $s1 le $s2 }
-sub infix:<lt>($s1, $s2) is Niecza::builtin('strlt',2,2)
-    is equiv<==> { $s1 lt $s2 }
-sub infix:<eq>($s1, $s2) is Niecza::builtin('streq',2,2)
-    is equiv<==> { $s1 eq $s2 }
-sub infix:<ne>($s1, $s2) is Niecza::builtin('strne',2,2)
-    is equiv<==> { $s1 ne $s2 }
 sub lc($string)    { (~$string).lc }
 sub uc($string)    { (~$string).uc }
 sub chop($string)  { (~$string).chop }
@@ -745,14 +816,6 @@ sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
 
 sub ord($x) { Q:CgOp { (ord {$x}) } }
 sub chr($x) { Q:CgOp { (chr {$x}) } }
-sub infix:<+&> is Niecza::builtin('numand',2,2) is Niecza::absprec<u=> ($x, $y) { $x +& $y }
-sub infix:<+|>($x, $y) is Niecza::builtin('numor',2,2) { $x +| $y }
-sub infix:<+^>($x, $y) is Niecza::builtin('numxor',2,2) { $x +^ $y }
-sub infix:<< +< >>($x, $y) is Niecza::absprec<u=>
-    is Niecza::builtin('numlshift',2,2) { $x +< $y }
-sub infix:<< +> >>($x, $y) is Niecza::absprec<u=>
-    is Niecza::builtin('numrshift',2,2) { $x +> $y }
-sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) { +^$x }
 
 # }}}
 # Flow inspection and control {{{
@@ -814,21 +877,8 @@ sub _lexotic ($id, $x, \$val) {
           (control (cast int (obj_getnum {$id})) (l fr) (int -1) (l nm) {$val}))
     }
 }
-sub next ($x?) { _lexotic(1, $x, ()) }
-sub last ($x?) { _lexotic(2, $x, ()) }
-sub redo ($x?) { _lexotic(3, $x, ()) }
 sub goto ($x)  { _lexotic(8, $x, ()) }
 
-sub return(\|@pcl) is return-pass { Q:CgOp {
-    (control 4 (null frame) (int -1) (null str) {@pcl.unwrap-single})
-} }
-sub succeed(\|@pcl) {
-    Q:CgOp { (control 6 (null frame) (int -1) (null str) {@pcl.unwrap-single}) }
-}
-sub proceed() { proceed }
-sub term:<proceed>() {
-    Q:CgOp { (control 7 (null frame) (int -1) (null str) {()}) }
-}
 sub nextsame() {
     Q:CgOp { (control 9 (null frame) (int -1) (null str) (null obj)) }
 }
@@ -892,9 +942,6 @@ my class Whatever {
 }
 
 my class EMPTY { }
-
-my class List { ... }
-my class Array { ... }
 
 my class Nil is Cool {
     method new() { Nil }
@@ -1278,28 +1325,10 @@ my class Junction is Mu {
             $other.^isa(self)
     }
 }
-sub infix:<&> is Niecza::absprec<q=> is assoc<list>
-    (\|$p) { Junction.from-parcel(0, $p) }
-sub infix:<^> is Niecza::absprec<p=> is assoc<list>
-    (\|$p) { Junction.from-parcel(2, $p) }
-sub infix:<|> is Niecza::absprec<p=> is assoc<list>
-    (\|$p) { Junction.from-parcel(3, $p) }
-sub all  (*@p) { all @p }
-sub none (*@p) { none @p }
-sub one  (*@p) { one @p }
-sub any  (*@p) { any @p }
 # }}}
 # List utilities {{{
 sub _vivify_array_at_pos(\$self, $ix) {
     Q:CgOp { (newvnewarrayvar (class_ref mo Any) {$self} (cast int (obj_getnum {$ix})) (@ {Any})) };
-}
-
-sub postcircumfix:<[ ]>(\$container, $index, *%adverbs) {
-    $container.postcircumfix:<[ ]>($index, |%adverbs)
-}
-
-sub postcircumfix:<{ }>(\$container, $index, *%adverbs) {
-    $container.postcircumfix:<{ }>($index, |%adverbs)
 }
 
 my class GatherIterator is IterCursor {
@@ -1324,36 +1353,23 @@ sub _gather($fr) {
     &infix:<,>(GatherIterator.new(frame => $fr)).list
 }
 
-sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
-
-sub infix:<< => >>($k, Mu $v) is equiv<=>
-    is Niecza::builtin('pair', 2, 2) { $k => $v }
-
 sub reverse(*@array) {
     my @acc;
     push @acc, pop(@array) while @array;
     @acc;
 }
 
-sub push(@array, *@stuff) is Niecza::builtin('push', 1) { @array.push(@stuff) }
-sub unshift(@array, *@stuff) is Niecza::builtin('unshift', 1) { @array.unshift(@stuff) }
-sub pop(@array) is Niecza::builtin('pop', 1, 1) { @array.pop }
-sub shift(@array) is Niecza::builtin('shift', 1, 1) { @array.shift }
 sub join($tween, *@stuff) { @stuff.join($tween) }
 
 sub invert(%h) { %h.invert }
 sub keys(%h) { %h.keys }
 sub values(%h) { %h.values }
 
-sub grep(Mu $filter, *@items) is Niecza::builtin('grep',1) { grep($filter, @items) }
-sub map($callback, *@items) is Niecza::builtin('map',1) { map($callback, @items) }
 
 sub sort(*@bits) { @bits.sort }
 
 sub first(Mu $test, *@bits) { @bits.first($test) }
 
-sub _array_constructor(\$parcel) is Niecza::builtin('array_constructor', 1,
-    1) { _array_constructor($parcel) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
 sub _make_capture(|$c) { $c }
 
@@ -1591,7 +1607,6 @@ my class Regex is Method {
     }
 }
 
-sub make($x) is Niecza::builtin('make', 1, 1) { make $x }
 
 my class Grammar is Cursor {
     method parse($text, :$rule = "TOP", :$actions) {
@@ -1966,7 +1981,6 @@ sub eval($str,:$lang="perl6") is return-pass {
 
 sub rungather($ ) { die "Run NYI" }
 # }}}
-
 # I/O stuff {{{
 sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
 
@@ -2172,9 +2186,5 @@ INIT {
     @GLOBAL::INC = ();
 }
 # }}}
-
-# This needs to be at the end because it screws up the parsing of everything
-# after it.
-sub infix:<,> is Niecza::builtin('comma',0) is Niecza::absprec<g=> is assoc<list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 
 {YOU_ARE_HERE}
