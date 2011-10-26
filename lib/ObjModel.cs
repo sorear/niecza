@@ -574,8 +574,10 @@ next_method: ;
         }
 
         public string Compose() {
-            if (isComposed || rtype == "package" || rtype == "module")
+            if (isComposed || rtype == "package" || rtype == "module") {
+                isComposed = true;
                 return null;
+            }
             if (isComposing)
                 return "Circularity detected while composing " + stable.name;
             isComposing = true;
