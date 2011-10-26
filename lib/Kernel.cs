@@ -3729,11 +3729,11 @@ tryagain:
                     v = ToInfo().cur_pkg.typeVar;
                     goto have_v;
                 } else if (key == "GLOBAL") {
-                    sc.p1 = Kernel.GetVar("", "GLOBAL").v.Fetch();
+                    sc.p1 = Kernel.GetVar("", "GLOBAL").v.Fetch().mo.who;
                     sc.type = WHO;
                     goto have_sc;
                 } else if (key == "PROCESS") {
-                    sc.p1 = Kernel.GetVar("", "PROCESS").v.Fetch();
+                    sc.p1 = Kernel.GetVar("", "PROCESS").v.Fetch().mo.who;
                     sc.type = WHO;
                     goto have_sc;
                 } else if (key == "UNIT" || key == "OUTER" ||
