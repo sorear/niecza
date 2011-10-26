@@ -3800,7 +3800,7 @@ dynamic:
 
                 if (file != null) {
                     for (SubInfo csr2 = from;
-                            csr2.unit == from.unit && // modify this unit only
+                            csr2.used_in_scope != null && // modify only open units
                             !csr2.used_in_scope.ContainsKey(lkey);
                             csr2 = csr2.outer, levels--) {
 
@@ -3862,6 +3862,7 @@ dynamic:
                     ret.Add(kv.Key);
                     ret.Add(kv.Value.pos);
                 }
+                s.used_in_scope = null;
                 return ret.ToArray();
             } else if (cmd == "unit_stubbed_stashes") {
                 RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);
