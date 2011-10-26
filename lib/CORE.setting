@@ -208,6 +208,8 @@ my class Cool {
     method cotanh() { Q:CgOp { (cotanh {self}) } }
     method acotanh() { Q:CgOp { (acotanh {self}) } }
     method atan2($x = 1) { Q:CgOp { (atan2 {self} {$x}) } }
+    method unpolar($angle) { unpolar(self, $angle); }
+    method cis() { cis(self); }
     method rand() { self * rand; }
 
     method split($matcher, $limit?, :$all?) {
@@ -2137,6 +2139,9 @@ sub getc($handle) { $handle.getc }
 multi sub log($x) { $x.log }
 multi sub log($x, $base) { $x.log($base) }
 sub log10($x) { $x.log(10) }
+
+sub unpolar($mag, $angle) { Complex.new($mag * $angle.cos, $mag * $angle.sin); }
+sub cis($angle) { Complex.new($angle.cos, $angle.sin); }
 
 sub sin($x) { $x.sin }
 sub asin($x) { $x.asin }
