@@ -3,6 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Text;
+using Niecza.CLRBackend;
 
 // Here in Niecza we have four different kinds of unit scopes:
 //
@@ -111,8 +112,8 @@ namespace Niecza.Serialization {
             if (units.TryGetValue(name, out su))
                 return su;
 
-            string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                    name + ".ser");
+            string file = Path.Combine(Backend.obj_dir, Backend.prefix +
+                    name.Replace("::",".") + ".ser");
             byte[] bytes = File.ReadAllBytes(file);
 
             su = new SerUnit();
@@ -163,8 +164,8 @@ namespace Niecza.Serialization {
                 throw new InvalidOperationException("unit " +name+ " exists");
 
             bool success = false;
-            string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                    name + ".ser");
+            string file = Path.Combine(Backend.obj_dir, Backend.prefix +
+                    name.Replace("::",".") + ".ser");
 
             FreezeBuffer fb = new FreezeBuffer(this, su);
 

@@ -20,14 +20,14 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
 	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendDotnet \
 	 NieczaCompiler GetOptLong
 
-all: run/Niecza.exe obj/Kernel.dll obj/CORE.dll
+all: run/Niecza.exe obj/Run.Kernel.dll obj/Run.CORE.dll
 	@git describe --tags > VERSION
 
 $(patsubst %,boot/obj/%.nam,$(srcunits)): boot/obj/%.nam: .fetch-stamp src/%.pm6 boot/obj/CORE.nam
 	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -Bnam -C $*
 	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $*.nam $*.dll 0
 
-obj/CORE.dll: run/Niecza.exe obj/Kernel.dll lib/CORE.setting
+obj/Run.CORE.dll: run/Niecza.exe obj/Run.Kernel.dll lib/CORE.setting
 	$(RUN_CLR) run/Niecza.exe -C CORE
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
@@ -48,8 +48,8 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
 boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 	$(CSC) /target:library /out:boot/obj/CompilerBlob.dll /r:Kernel \
 	    /lib:boot/obj src/CompilerBlob.cs
-obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
-	$(CSC) /target:exe /out:obj/Kernel.dll /lib:obj /unsafe+ \
+obj/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel))
+	$(CSC) /target:exe /out:obj/Run.Kernel.dll /lib:obj /unsafe+ \
 	    $(patsubst %,lib/%,$(cskernel))
 
 perl5: obj/Perl5Interpreter.dll obj/p5embed.so

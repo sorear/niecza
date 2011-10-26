@@ -1628,16 +1628,12 @@ flat_enough:;
         System.Diagnostics.Process.Start(file, args).WaitForExit();
     }
 
-    [TrueGlobal] internal static AppDomain up_domain;
-    [TrueGlobal] static System.Collections.IDictionary upcall_receiver;
+    [TrueGlobal] internal static System.Collections.IDictionary upcall_receiver;
     internal static object UpCall(object[] args) {
-        if (upcall_receiver == null)
-            upcall_receiver = (System.Collections.IDictionary)
-                up_domain.CreateInstanceAndUnwrap("CompilerBlob", "Niecza.UpcallReceiver");
         return upcall_receiver[args];
     }
     public static Frame simple_eval(Frame th, Variable str) {
-        if (up_domain == null)
+        if (upcall_receiver == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
         SubInfo outer = th.caller.info;
         object r = UpCall(new object[] { "eval",

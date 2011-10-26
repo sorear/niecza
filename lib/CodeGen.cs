@@ -3420,6 +3420,11 @@ dynamic:
     }
 
     public class Backend {
+        [TrueGlobal]
+        public static string obj_dir = AppDomain.CurrentDomain.BaseDirectory;
+        [TrueGlobal]
+        public static string prefix = (typeof(Backend).Assembly.GetName().Name == "Kernel") ? "" : "Run.";
+
         public static string LocStr(string fo, int lo, string fn, int ln) {
             return fn == fo ? " (see line " + lo + ")" :
                 " (see " + fo + " line " + lo + ")";
@@ -3613,8 +3618,9 @@ dynamic:
                 object o = Handle.Unbox(args[1]);
                 return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
                     (o is STable) ? "type" : (o is Frame) ? "frame" : "unknown";
-            } else if (cmd == "set_parent") {
-                Builtins.up_domain = (AppDomain)args[1];
+            } else if (cmd == "set_binding") {
+                Backend.obj_dir = (string)args[1];
+                Builtins.upcall_receiver = (System.Collections.IDictionary)args[2];
                 return null;
             } else if (cmd == "push_compartment") {
                 Compartment.Push();

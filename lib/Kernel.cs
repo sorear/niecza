@@ -593,7 +593,7 @@ namespace Niecza {
             if (name == "CORE")
                 Kernel.CreateBasicTypes();
 
-            this.asm_name = name.Replace("::", ".");
+            this.asm_name = Backend.prefix + name.Replace("::", ".");
             this.dll_name = asm_name + (main ? ".exe" : ".dll");
             our_subs = new List<SubInfo>();
         }
@@ -608,7 +608,7 @@ namespace Niecza {
                     new AssemblyName(asm_name),
                     (runnow ? AssemblyBuilderAccess.Run :
                         AssemblyBuilderAccess.Save),
-                    AppDomain.CurrentDomain.BaseDirectory);
+                    Backend.obj_dir);
             eu.mod_builder = runnow ?
                 eu.asm_builder.DefineDynamicModule(asm_name) :
                 eu.asm_builder.DefineDynamicModule(asm_name, dll_name);
@@ -636,7 +636,7 @@ namespace Niecza {
                         typeof(void), new Type[] { typeof(string[]) });
                 var il = mainb.GetILGenerator();
 
-                il.Emit(OpCodes.Ldstr, asm_name);
+                il.Emit(OpCodes.Ldstr, name);
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Call, typeof(Kernel).GetMethod("MainHandler"));
                 il.Emit(OpCodes.Ret);
@@ -663,7 +663,7 @@ namespace Niecza {
         public void Save() {
             EmitUnit eu = GenerateCode(false);
             eu.asm_builder.Save(dll_name);
-            reg.SaveUnit(asm_name, this);
+            reg.SaveUnit(name, this);
         }
 
         internal void SetConstants() {
@@ -856,7 +856,7 @@ namespace Niecza {
 
             n.name     = tb.String();
             string[] srcinfo = tb.Strings();
-            if (Builtins.up_domain != null) {
+            if (Builtins.upcall_receiver != null) {
                 object[] args = new object[srcinfo.Length + 1];
                 Array.Copy(srcinfo, 0, args, 1, srcinfo.Length);
                 args[0] = "check_dated";
@@ -872,8 +872,8 @@ namespace Niecza {
 
             n.depended_units = new HashSet<RuntimeUnit>(tb.RefsA<RuntimeUnit>());
 
-            n.assembly = Assembly.LoadFrom(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, n.dll_name));
-            n.type = tb.type = n.assembly.GetType(n.name, true);
+            n.assembly = Assembly.Load(n.asm_name);
+            n.type = tb.type = n.assembly.GetType(n.asm_name, true);
 
             int ncon = tb.Int();
             n.constants = new Dictionary<object,FieldInfo>();

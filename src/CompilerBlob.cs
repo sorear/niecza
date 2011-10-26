@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -45,29 +46,40 @@ namespace Niecza {
     }
 
     public class Downcaller {
-        static AppDomain subDomain;
         internal static Variable upcall_cb;
         static IDictionary responder;
         static P6any UnitP, StaticSubP, TypeP;
+        static string obj_dir;
+
+        // let the CLR load assemblies from obj/ too
+        static Assembly ObjLoader(object source, ResolveEventArgs e) {
+            string name = e.Name;
+            if (name.IndexOf(',') >= 0)
+                name = name.Substring(0, name.IndexOf(','));
+            string file = Path.Combine(obj_dir, name + ".dll");
+            if (File.Exists(file))
+                return Assembly.LoadFrom(file);
+            else
+                return null;
+        }
         // Better, but still fudgy.  Relies too much on path structure.
         public static void InitSlave(Variable cb, Variable unit,
                 Variable staticSub, Variable type) {
-            if (subDomain != null) return;
+            if (responder != null) return;
 
             UnitP = unit.Fetch();
             StaticSubP = staticSub.Fetch();
             TypeP = type.Fetch();
 
-            AppDomainSetup ads = new AppDomainSetup();
-            string obj = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj")));
-            ads.ApplicationBase = obj;
-            string backend = Path.Combine(obj, "Kernel.dll");
-            subDomain = AppDomain.CreateDomain("zyg", null, ads);
+            obj_dir = Path.GetFullPath(Path.Combine(
+                        AppDomain.CurrentDomain.BaseDirectory,
+                        Path.Combine("..", "obj")));
+            AppDomain.CurrentDomain.AssemblyResolve += ObjLoader;
+
             upcall_cb = cb;
-            responder = (IDictionary)
-                subDomain.CreateInstanceFromAndUnwrap(backend,
-                        "Niecza.CLRBackend.DowncallReceiver");
-            RawDowncall("set_parent", AppDomain.CurrentDomain);
+            responder = (IDictionary) Activator.CreateInstance(Type.GetType(
+                    "Niecza.CLRBackend.DowncallReceiver,Run.Kernel", true));
+            RawDowncall("set_binding", obj_dir, new UpcallReceiver());
         }
         public static object RawDowncall(params object[] args) {
             return responder[args];
