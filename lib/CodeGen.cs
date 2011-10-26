@@ -3727,6 +3727,9 @@ dynamic:
             } else if (cmd == "sub_run_once") {
                 return (((SubInfo)Handle.Unbox(args[1])).special &
                         SubInfo.RUN_ONCE) != 0;
+            } else if (cmd == "sub_transparent") {
+                return (((SubInfo)Handle.Unbox(args[1])).special &
+                        SubInfo.TRANSPARENT) != 0;
             } else if (cmd == "sub_outervar") {
                 return ((SubInfo)Handle.Unbox(args[1])).outervar;
             } else if (cmd == "sub_name") {
