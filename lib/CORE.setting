@@ -182,6 +182,7 @@ my class Cool {
     method ln() { Q:CgOp { (ln {self}) } }
     multi method log() { self.ln }
     multi method log($base) { self.ln / $base.ln }
+    method log10() { self.ln / 10.ln }
     method sin() { Q:CgOp { (sin {self}) } }
     method asin() { Q:CgOp { (asin {self}) } }
     method cos() { Q:CgOp { (cos {self}) } }
@@ -2132,6 +2133,10 @@ sub get($handle = $*IN) { $handle.get }
 sub lines($filehandle = $*IN) { $filehandle.lines }
 sub prompt($msg) { print $msg; $*IN.get }
 sub getc($handle) { $handle.getc }
+
+multi sub log($x) { $x.log }
+multi sub log($x, $base) { $x.log($base) }
+sub log10($x) { $x.log(10) }
 
 sub sin($x) { $x.sin }
 sub asin($x) { $x.asin }
