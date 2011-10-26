@@ -1924,7 +1924,8 @@ sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
 sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
-sub exp($x) { $x.exp }
+multi sub exp($x) { $x.exp }
+multi sub exp($x, $base) { $base ** $x }
 # XXX 'Order' type
 sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
