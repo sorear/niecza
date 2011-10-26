@@ -38,6 +38,7 @@ grammar P6 is STD::P6 {
             name => "mainline",
             run_once => !$*settingref || ?$*niecza_outer_frame ||
                 $*settingref.run_once);
+        $*CURLEX<!sub>.set_return_pass;
         $*CURLEX{'!sub'}.add_my_name('$_') if !$*settingref;
         $*CURLEX{'!sub'}.set_signature(::GLOBAL::Sig.simple());
         $*unit.set_mainline($*CURLEX<!sub>);
