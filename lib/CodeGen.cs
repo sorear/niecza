@@ -4063,7 +4063,9 @@ dynamic:
                 return st.mo.isComposed;
             } else if (cmd == "type_close") {
                 STable st = (STable)Handle.Unbox(args[1]);
-                st.mo.Compose();
+                string err = st.mo.Compose();
+                if (err != null)
+                    return new Exception(err);
                 st.Invalidate();
                 return null;
             } else if (cmd == "type_kind") {
