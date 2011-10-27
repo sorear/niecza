@@ -10,7 +10,6 @@ method ctxopzyg() { map *.ctxopzyg, @$!zyg }
 method oplift()   { map *.oplift, @$!zyg }
 method uncut()    { self }
 
-method check()    { for @$!zyg { $_.check } }
 method tocclist() { CClass }
 
 # all that matters is 0-1-infty; $*in_quant valid here
@@ -31,17 +30,6 @@ method label() { "b" ~ ($nlabel++) }
 class Capturing is RxOp {
     has $.captures = []; # Array of Str
 
-    method check() {
-        for @$.captures -> $c is rw {
-            if !defined($c) {
-                $c = $*paren++;
-            } elsif $c ~~ /^<[ 0..9 ]>+$/ {
-                $*paren = $c + 1;
-            }
-        }
-        for @$.zyg { $_.check }
-    }
-
     method used_caps() {
         my %h = map { ($_ => $*in_quant ?? 2 !! 1) }, @$.captures;
         %h
@@ -58,8 +46,6 @@ class Sym is Capturing {
         self.WHAT.new(text => $.text, igcase => $.igcase, igmark => $.igmark,
             :$captures);
     }
-
-    method check() { $.text = $*symtext; $.endsym = $*endsym; nextsame }
 
     method code($body) { #OK not used
         my $t = $.text;
@@ -278,19 +264,6 @@ class Sequence is RxOp {
 class AltBase is RxOp {
     has $.dba; # Str
 
-    method check() {
-        my $maxparen = $*paren;
-        $!dba //= ($*dba // die "wtf no dba");
-
-        for @$.zyg {
-            temp $*paren;
-            $_.check;
-            if ($*paren > $maxparen) { $maxparen = $*paren }
-        }
-
-        $*paren = $maxparen;
-    }
-
     method used_caps() {
         my %used;
         for @$.zyg -> $x {
@@ -304,7 +277,6 @@ class AltBase is RxOp {
 }
 
 class SeqAlt is AltBase {
-    has $.dba; # is rw, Str
     # zyg * N
 
     method code($body) {
@@ -425,11 +397,6 @@ class Tilde is RxOp {
     has $.closer = die "Tilde.closer required"; # Str
     has $.dba;
 
-    method check() {
-        $!dba //= $*dba;
-        nextsame;
-    }
-
     method code($body) {
         my @code;
         my $fail = self.label;
@@ -483,18 +450,6 @@ class Subrule is Capturing {
             for keys $h2 { %h{$_} = (%h{$_} // 0) + $h2{$_} }
         }
         %h
-    }
-
-    method check() {
-        if $!_passcapzyg {
-            if $!passcap {
-                $!_passcapzyg.check;
-            } else {
-                my $*paren = 0;
-                $!_passcapzyg.check;
-            }
-        }
-        nextsame;
     }
 
     method code($body) {
@@ -568,8 +523,6 @@ class Alt is AltBase {
         my @ls = map { self.label }, @$.zyg;
         my @lads = @( $.optimized_lads // (map { $_.lad }, @$.zyg) );
         my $end = self.label;
-
-        die "check screwed up" unless defined $.dba;
 
         my @code;
         push @code, CgOp.ltm_push_alts([@lads], $.dba, [@ls]);

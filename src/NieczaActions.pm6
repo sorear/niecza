@@ -327,13 +327,6 @@ method rxembed($/, $op, $) {
 
 method op_for_regex($/, $rxop) {
     my @lift = $rxop.oplift;
-    {
-        my $*paren = 0;
-        my $*dba = 'anonymous rule';
-        my $*symtext;
-        my $*endsym;
-        $rxop.check
-    }
     my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
     my $sub = self.thunk_sub(::Op::RegexBody.new(|node($/),
             canback => $mb, pre => @lift, rxop => $orxop),
@@ -394,16 +387,13 @@ method regex_def_2 ($, $/ = $*cursor) {
     if $<signature> > 1 {
         $/.CURSOR.sorry("Too many signatures on regex");
     }
-}
 
-method regex_def($/) {
-    my $endsym;
     for map *.ast, @$<trait> -> $t {
         if $t<unary> || $t<binary> || $t<defequiv> || $t<of> {
             # Ignored for now
         }
         elsif defined $t<endsym> {
-            $endsym = $t<endsym>;
+            %*RX<endsym> = $t<endsym>;
         }
         else {
             $/.CURSOR.sorry("Unhandled regex trait $t.keys.[0]");
@@ -411,29 +401,28 @@ method regex_def($/) {
     }
 
     if $*CURLEX<!multi> eq 'proto' {
+        @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} = %*RX<endsym>
+            if defined $*CURLEX<!cleanname>;
+    } else {
+        %*RX<endsym> //= @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} if
+            defined $*CURLEX<!cleanname>;
+    }
+
+    %*RX<dba> = $*CURLEX<!name> // 'anonymous regex';
+}
+
+method regex_def($/) {
+    my $ast = $<regex_block>.ast;
+
+    if $*CURLEX<!multi> eq 'proto' {
         if ($<signature> && $<signature>[0].ast.params != 1) ||
                 !$<regex_block><onlystar> {
             $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
         }
-        @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} = $endsym
-            if defined $*CURLEX<!cleanname>;
-    } else {
-        $endsym //= @*MEMOS[0]<proto_endsym>{$*CURLEX<!cleanname>} if
-            defined $*CURLEX<!cleanname>;
-    }
 
-    my $ast = $<regex_block>.ast;
-    if $*CURLEX<!multi> eq 'proto' {
         $ast = ::RxOp::ProtoRedis.new(name => $*CURLEX<!name>);
     }
 
-    {
-        my $*paren = 0;
-        my $*symtext = $*CURLEX<!sym>;
-        my $*endsym = $endsym;
-        my $*dba = $*CURLEX<!name> // 'anonymous regex';
-        $ast.check;
-    }
     my @lift = $ast.oplift;
     my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
     $*CURLEX<!sub>.set_ltm($ltm);
@@ -720,7 +709,7 @@ method do_cclass($/) {
                 $rxop = ::RxOp::CClassElem.new(cc => ($rxop ?? $rxop.cc !! $CClass::Full).minus($exp.cc));
             }
         } elsif $sign {
-            $rxop = $rxop ?? ::RxOp::SeqAlt.new(zyg => [ $exp, $rxop ]) !! $exp;
+            $rxop = $rxop ?? ::RxOp::SeqAlt.new(zyg => [ $exp, $rxop ], dba => %*RX<dba>) !! $exp;
         } else {
             $rxop = ::RxOp::Sequence.new(zyg => [
                 ::RxOp::NotBefore.new(zyg => [ $exp ]),
@@ -752,7 +741,10 @@ method assertion:name ($/) {
     if $<assertion> {
         make $<assertion>.ast;
     } elsif $name eq 'sym' {
-        make ::RxOp::Sym.new(igcase => %*RX<i>, igmark => %*RX<a>);
+        $/.CURSOR.sorry("<sym> is only valid in multiregexes")
+            unless defined %*RX<sym>;
+        make ::RxOp::Sym.new(igcase => %*RX<i>, igmark => %*RX<a>,
+            text => %*RX<sym> // '', endsym => %*RX<endsym>);
     } elsif $name eq 'before' {
         make ::RxOp::Before.new(zyg => [$<nibbler>[0].ast]);
         return Nil;
@@ -3238,6 +3230,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             ($name ~~ /\:sym\<(.*)\>/) ?? ($name.substr(0, $/.from), ~$0) !!
             ($name ~~ /\:(\w+)/) ?? ($name.substr(0, $/.from), ~$0) !!
             ($name, Str);
+        %*RX<sym> = $*CURLEX<!sym>;
         $multiness = 'multi' if defined $*CURLEX<!sym>;
         $*CURLEX<!multi> = $multiness;
     }
