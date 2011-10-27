@@ -344,7 +344,7 @@ my class Cool {
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
         my $str = ~self;
-        my $C = Cursor.new($str);
+        my $C = Cursor.cursor_start($str);
         my @out;
         my $i = 0;
         my $last = 0;
@@ -373,7 +373,7 @@ my class Cool {
             $ix  = CALLER::CALLER::<$/> ?? CALLER::CALLER::<$/>.to !! 0;
         }
         my $max  = chars $str;
-        my $incr = Cursor.new($str);
+        my $incr = Cursor.cursor_start($str);
         my $indx = 0;
         $nth := [ @$nth ] if defined($nth);
 
@@ -395,7 +395,7 @@ my class Cool {
         die ":x may not be used with :global" if defined($x) && $global;
 
         my $str = ~self;
-        my $C = Cursor.new($str);
+        my $C = Cursor.cursor_start($str);
         my $matcher = $matcher_ ~~ Regex ?? $matcher_ !! /$matcher_/;
         my $i = $pos // $continue // 0;
         if ($i === ?1) {
@@ -467,7 +467,7 @@ my class Cool {
     my $_char = /./;
     method comb($matcher?, $limit?, :$match) {
         my $str = ~self;
-        my $C = Cursor.new($str);
+        my $C = Cursor.cursor_start($str);
         my $i = 0;
         $matcher := $matcher // $_char;
         my $limctr = $limit // Inf;
@@ -1506,7 +1506,7 @@ my class Cursor {
           (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
           (newscalar (l cap)))
     } }
-    method new($str, $act?) { Q:CgOp { (ns (cursor_start
+    method cursor_start($str, $act?) { Q:CgOp { (ns (cursor_start
         (@ {self}) (obj_getstr {$str}) (@ {$act}))) } }
     method pos() { Q:CgOp { (box Num (cast num (cursor_pos
         (cast cursor (@ {self}))))) } }
@@ -1613,7 +1613,7 @@ my class Regex is Method {
 my class Grammar is Cursor {
     method parse($text, :$rule = "TOP", :$actions) {
         my $match = (head grep { $_.to == chars $text },
-            self.new($text, $actions)."$rule"()) // self;
+            self.cursor_start($text, $actions)."$rule"()) // self;
         Q:CgOp { (rnull (set_status (s '$/') {$match})) };
         $match;
     }

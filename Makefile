@@ -60,7 +60,7 @@ obj/p5embed.so: lib/p5embed.c
 	cc -shared -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`
 
 aot: all
-	mono --aot run/*.dll run/Niecza.exe
+	mono --aot run/*.dll obj/Run.CORE.dll run/Niecza.exe
 
 test: all
 	$(RUN_CLR) run/Niecza.exe -c test.pl
