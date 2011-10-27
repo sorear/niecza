@@ -426,6 +426,7 @@ token escape:none { <!> }
 
 # and this is what makes nibbler polymorphic...
 method nibble ($lang) {
+    temp %*RX; # prevent up-vars from leaking
     self.cursor_fresh($lang).nibbler;
 }
 
@@ -4665,7 +4666,7 @@ grammar Regex is STD {
         };
         [ <.normspace>? < || | && & > ]?
         <EXPR>
-        { CALLER::CALLER::<%*RX>.<paren> = %*RX<maxparen> max %*RX<paren>; }
+        { CALLER::CALLER::<%*RX>.<paren> = %*RX<maxparen> max %*RX<paren> unless $reset }
         [
         || <?infixstopper>
         || $$ <.panic: "Regex not terminated">
@@ -5186,11 +5187,11 @@ method is_name($longname, $curlex = $*CURLEX) {
             $pkg = $*unit.abs_pkg(shift @parts);
             goto "packagey";
         }
-        when 'MY'      { $sub = $curlex<!sub>;                 goto "lexy"; }
-        when 'OUTER'   { $sub = $curlex<!sub>.?outer;          goto "lexy"; }
-        when 'UNIT'    { $sub = $curlex<!sub>.?to_unit;        goto "lexy"; }
-        when 'CORE'    { $sub = $curlex<!sub>.?true_setting;   goto "lexy"; }
-        when 'SETTING' { $sub = $curlex<!sub>.?to_unit.?outer; goto "lexy"; }
+        when 'MY'      { $sub = $curlex<!sub>;               goto "lexy"; }
+        when 'OUTER'   { $sub = $curlex<!sub>.outer;         goto "lexy"; }
+        when 'UNIT'    { $sub = $curlex<!sub>.to_unit;       goto "lexy"; }
+        when 'CORE'    { $sub = $curlex<!sub>.true_setting;  goto "lexy"; }
+        when 'SETTING' { $sub = $curlex<!sub>.to_unit.outer; goto "lexy"; }
 
         when 'COMPILING' | 'DYNAMIC' | 'CALLER' | 'CLR' { return True }
 
@@ -5216,13 +5217,13 @@ lexy:
     return False unless $sub;
     return True unless @parts;
     given @parts[0] {
-        when 'OUTER'   { $sub = $sub.?outer;          goto "lexy"; }
-        when 'UNIT'    { $sub = $sub.?to_unit;        goto "lexy"; }
-        when 'SETTING' { $sub = $sub.?to_unit.?outer; goto "lexy"; }
+        when 'OUTER'   { $sub = $sub.outer;         goto "lexy"; }
+        when 'UNIT'    { $sub = $sub.to_unit;       goto "lexy"; }
+        when 'SETTING' { $sub = $sub.to_unit.outer; goto "lexy"; }
         when 'CALLER'  { return True; }
     }
 
-    my @lex = self.lookup_lex(@parts[0], $sub);
+    my @lex = $sub.lookup_lex(@parts[0], $*FILE<name>, self.lineof(self.pos));
     unless @lex {
         self.deb("Lexical @parts[0] not found") if $deb;
         return False;

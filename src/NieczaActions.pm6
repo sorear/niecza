@@ -580,8 +580,8 @@ method metachar:unsp ($/) { make ::RxOp::Sequence.new }
 
 method metachar:sym<{ }> ($/) {
     $/.CURSOR.trymop({
-        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
         $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
+        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
     });
 
     make ::RxOp::VoidBlock.new(block => self.inliney_call($/,
@@ -602,8 +602,8 @@ method metachar:sym<[ ]> ($/) {
 }
 
 method metachar:sym<( )> ($/) {
-    make self.rxcapturize($/, Any, self.encapsulate_regex($/, $<nibbler>.ast,
-            passcut => True));
+    make self.rxcapturize($/, %*RX<paren>++,
+        self.encapsulate_regex($/, $<nibbler>.ast, passcut => True));
 }
 
 method metachar:sym« <( » ($/) { make ::RxOp::MarkFrom.new }
@@ -657,6 +657,7 @@ method metachar:sym<" "> ($/) {
 }
 
 method metachar:var ($/) {
+    sub _isnum { $_ ~~ /^\d+$/ }
     if $<binding> {
         my $a = $<binding><quantified_atom>.ast.uncut;
         my $cid = $<variable>.ast.<capid>;
@@ -672,6 +673,10 @@ method metachar:var ($/) {
             return Nil;
         }
 
+        if _isnum($cid) {
+            %*RX<paren> = $cid + 1;
+        }
+
         make self.rxcapturize($/, $cid, $a);
         return Nil;
     }
@@ -679,16 +684,16 @@ method metachar:var ($/) {
         ops => self.rxembed($/, self.do_variable_reference($/, $<variable>.ast), True));
 }
 
-method rxcapturize($/, $name, $_rxop) {
-    my $rxop = $_rxop;
+method rxcapturize($M, $name, $rxop is copy) {
     if !$rxop.^isa(::RxOp::Capturing) {
         # $<foo>=[...]
-        $rxop = self.encapsulate_regex($/, $rxop, passcut => True,
+        $rxop = self.encapsulate_regex($M, $rxop, passcut => True,
             passcap => True);
     }
 
     # $<foo>=(...)
-    if +$rxop.captures == 1 && !defined($rxop.captures.[0]) {
+    # XXX might not quite be right
+    if +$rxop.captures == 1 && $rxop.captures.[0] ~~ /^\d+$/ {
         return $rxop.clone(captures => [$name]);
     }
 
@@ -817,8 +822,8 @@ method assertion:sym<!> ($/) {
 
 method assertion:sym<{ }> ($/) {
     $/.CURSOR.trymop({
-        $<embeddedblock>.set_signature(Sig.simple('$¢'));
         $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
+        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
     });
 
     make ::RxOp::CheckBlock.new(block => self.inliney_call($/,
@@ -1110,9 +1115,7 @@ method check_hash($/) {
 
     return True if @bits[0].^isa(::Op::SimplePair);
 
-    if @bits[0].^isa(::Op::CallSub) &&
-            @bits[0].invocant.^isa(::Op::Lexical) &&
-            @bits[0].invocant.name eq '&infix:<=>>' {
+    if @bits[0].^isa(::Op::Builtin) && @bits[0].name eq 'pair' {
         return True;
     }
 
@@ -1394,8 +1397,7 @@ method methodop($/) {
             $/.CURSOR.sorry("Indirectly named method calls NYI");
             return;
         }
-        make ::Operator::Method.new(name => $c<name>,
-            package => $c<pkg> && $c<pkg>.xref);
+        make ::Operator::Method.new(name => $c<name>, package => $c<pkg>);
     } elsif $<quote> {
         make ::Operator::Method.new(name => $<quote>.ast);
     } elsif $<variable> {
@@ -1720,6 +1722,10 @@ method do_variable_reference($M, $v) {
                 ::Op::Num.new(|node($M), value => [10, ~$M.to]));
         } elsif $tw eq '?' && $sl eq '$?LINE' {
             ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
+        } elsif $tw eq '?' && $sl eq '$?FILE' {
+            ::Op::StringLiteral.new(|node($M), text => $*FILE<name>);
+        } elsif $tw eq '?' && $sl eq '$?ORIG' {
+            ::Op::StringLiteral.new(|node($M), text => $M.orig);
         } elsif $tw eq '?' && $sl eq '&?BLOCK' {
             $*CURLEX<!sub>.noninlinable;
             ::Op::GetBlock.new(|node($M))
@@ -2140,8 +2146,7 @@ method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
     if $/ eq '{YOU_ARE_HERE}' {
-        $*unit.bottom_ref = $*CURLEX<!sub>.xref;
-        $*CURLEX<!sub>.strong_used = True;
+        $*unit.set_bottom($*CURLEX<!sub>);
         $*CURLEX<!sub>.create_static_pad;
 
         loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
@@ -2631,7 +2636,6 @@ method process_block_traits($/, @tr) {
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
             $sub.outer.add_exports('&'~$sub.name, $sub, @exports);
-            $sub.strong_used = True;
             $sub.outer.create_static_pad;
             $/.CURSOR.mark_used($sub.outervar)
                 if defined $sub.outervar;
@@ -2947,24 +2951,21 @@ method statement_control:use ($/) {
 
     my $module = $u2.mainline.compile_get_pkg($name.split('::'));
     my $exp;
-    try $exp = $*unit.get_pkg($module, 'EXPORT', 'DEFAULT');
+    try $exp = $*unit.rel_pkg($module, 'EXPORT', 'DEFAULT');
 
     # in the :: case, $module will usually be visible via GLOBAL
     if !defined($name.index('::')) {
-        $*CURLEX<!sub>.add_my_stash($name, $module.xref);
+        $*CURLEX<!sub>.add_my_stash($name, $module);
     }
 
     return unless $exp;
 
     my $h = $/.CURSOR;
-    for $*unit.list_stash($exp) -> $tup {
-        my $uname = $tup.key;
-        my $obj   = $tup.value && $*unit.deref($tup.value);
-
-        if !$obj || $obj ~~ ::Metamodel::StaticSub {
-            $*CURLEX<!sub>.add_common_name($uname, $exp.xref, $uname);
+    for $*unit.list_stash($exp.who) -> $uname, $obj {
+        if !$obj || $obj.kind eq 'sub' {
+            $*CURLEX<!sub>.add_common_name($uname, $exp, $uname);
         } else {
-            $*CURLEX<!sub>.add_my_stash($uname, $obj.xref);
+            $*CURLEX<!sub>.add_my_stash($uname, $obj);
         }
         $h.check_categorical($uname);
         $h = $h.cursor_fresh(%*LANG<MAIN>);
@@ -3026,7 +3027,7 @@ method do_new_package($/, :$sub = $*CURLEX<!sub>, :$scope!, :$name!, :$class!,
             ?? $head !! self.gensym;
 
         $sub.add_my_stash($lexname, $npkg, |mnode($/));
-        $sub.add_exports($head, $npkg, $exports) if $exports;
+        $sub.add_exports($head, $npkg, @$exports) if $exports;
     });
 
     $lexname, $npkg
@@ -3411,7 +3412,7 @@ method method_def_2 ($, $/ = $*cursor) {
     if $<multisig> > 1 {
         $/.CURSOR.sorry("You may only use *one* signature");
     }
-    $*CURLEX<!sub>.set_signature(<multisig> ?? $<multisig>[0].ast !! Any);
+    $*CURLEX<!sub>.set_signature($<multisig> ?? $<multisig>[0].ast !! Any);
     self.process_block_traits($/, $<trait>);
 }
 

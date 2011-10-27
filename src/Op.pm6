@@ -170,7 +170,7 @@ class CallMethod is CallLike {
         my $meta = $!ismeta // '';
         if $.private {
             CgOp.subcall(CgOp.stab_privatemethod(
-                    CgOp.class_ref('mo', @( $.pclass )), $name),
+                    CgOp.class_ref('mo', $!pclass), $name),
                 $.receiver.cgop($body), self.argblock($body));
         } elsif $meta eq '^' {
             CgOp.let($.receiver.cgop($body), -> $r {
@@ -605,14 +605,7 @@ class BareBlock is Op {
     method code($) { CgOp.scopedlex($!var) }
 
     method statement_level() {
-        # This cheat relies on the fact that we can't have any lexicals put
-        # into this block until after the compile is done, so the usual
-        # issues with changing lexical representation don't apply :)
-        my $body = $*CURLEX<!sub>.find_lex($!var).body;
-        if $body.code ~~ ::Op::YouAreHere {
-            $body.run_once = $body.outer.run_once;
-        }
-
+        $*CURLEX<!sub>.lookup_lex($!var).[4].set_run_once;
         ::GLOBAL::OptBeta.make_call($!var);
     }
 }
