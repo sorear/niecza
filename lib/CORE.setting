@@ -1371,8 +1371,8 @@ sub first(Mu $test, *@bits) { @bits.first($test) }
 sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
 sub _make_capture(|$c) { $c }
 
-sub _newtiedscalar(Mu $type, $bind, $fetch, $store) {
-    Q:CgOp { (var_new_tied (obj_llhow (@ {$type})) (@ {$bind}) (@ {$fetch}) (@ {$store})) }
+sub _newtiedscalar($bind, $fetch, $store) {
+    Q:CgOp { (var_new_tied (@ {$bind}) (@ {$fetch}) (@ {$store})) }
 }
 
 sub infix:<X>(\|$pcl) is Niecza::absprec<f=> is assoc<list> {

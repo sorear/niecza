@@ -60,7 +60,6 @@ namespace Niecza {
         public ViviHook whence;
 
         // these should be treated as ro for the life of the variable
-        public STable type;
         public bool rw;
         public bool islist;
 
@@ -199,13 +198,18 @@ namespace Niecza {
         }
     }
 
-    public sealed class SimpleVariable: Variable, IFixup {
+    public sealed class SimpleVariable: Variable {
+        STable type; // null for Any/Mu variables, and roish
         P6any val;
 
         private SimpleVariable() { }
         public SimpleVariable(bool rw, bool islist, STable type, ViviHook whence, P6any val) {
             this.val = val; this.whence = whence; this.rw = rw;
             this.islist = islist; this.type = type;
+        }
+        public SimpleVariable(P6any val) { this.val = val; }
+        public SimpleVariable(bool islist, P6any val) {
+            this.islist = islist; this.val = val;
         }
 
         public override P6any  Fetch()       { return val; }
@@ -214,9 +218,9 @@ namespace Niecza {
                 throw new NieczaException("Writing to readonly scalar");
             }
             if (v == Kernel.NilP) {
-                v = type.initObject;
+                v = type == null ? Kernel.AnyP : type.initObject;
             }
-            if (!v.Does(type)) {
+            if (type != null && !v.Does(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
             }
             if (whence != null) {
@@ -245,9 +249,6 @@ namespace Niecza {
             if (rw) fb.ObjRef(type);
             fb.ObjRef(val);
         }
-        void IFixup.Fixup() {
-            type = val.mo;
-        }
         internal static SimpleVariable Thaw(ThawBuffer tb, int subcode) {
             SimpleVariable n = new SimpleVariable();
             tb.Register(n);
@@ -255,10 +256,8 @@ namespace Niecza {
                 default: throw new ArgumentException(subcode.ToString());
                 case S_RO:
                     // rw = false islist = false whence = null type = null
-                    tb.PushFixup(n);
                     break;
                 case S_LIST:
-                    tb.PushFixup(n);
                     n.islist = true;
                     break;
                 case S_VIV:
@@ -279,22 +278,17 @@ namespace Niecza {
         P6any store;
 
         private TiedVariable() { }
-        public TiedVariable(STable type, P6any whsub, P6any fetch, P6any store) {
+        public TiedVariable(P6any whsub, P6any fetch, P6any store) {
             this.fetch = fetch;
             this.store = store;
             this.whence = whsub.IsDefined() ? new SubViviHook(whsub) : null;
             this.rw = true;
-            this.type = type;
         }
 
         public override P6any Fetch() {
             Variable vr = Kernel.RunInferior(fetch.Invoke(
                 Kernel.GetInferiorRoot(), None, null));
-            P6any vl = vr.Fetch();
-            if (!vl.Does(type))
-                throw new NieczaException("Tied variable of type " + type +
-                        " returned value of type " + vl.mo.name + " instead");
-            return vl;
+            return vr.Fetch();
         }
 
         public override void Store(P6any v) {
@@ -312,7 +306,6 @@ namespace Niecza {
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.TiedVariable);
-            fb.ObjRef(type);
             fb.ObjRef(fetch);
             fb.ObjRef(store);
             fb.ObjRef(whence);
@@ -320,7 +313,6 @@ namespace Niecza {
         internal static TiedVariable Thaw(ThawBuffer tb) {
             TiedVariable n = new TiedVariable();
             tb.Register(n);
-            n.type   = (STable)   tb.ObjRef();
             n.fetch  = (P6any)    tb.ObjRef();
             n.store  = (P6any)    tb.ObjRef();
             n.whence = (ViviHook) tb.ObjRef();
@@ -1598,8 +1590,7 @@ gotit:
                     else {
                         if (!src.rw && islist == src.islist)
                             goto bound;
-                        src = new SimpleVariable(false, islist, srco.mo,
-                                null, srco);
+                        src = new SimpleVariable(islist, srco);
                     }
 bound: ;
                 }
@@ -3422,7 +3413,7 @@ tryagain:
             Variable r;
             if (h.TryGetValue(kss, out r))
                 return r;
-            return new SimpleVariable(true, false, Kernel.MuMO,
+            return new SimpleVariable(true, false, null,
                     new HashViviHook(os, kss), Kernel.AnyP);
         }
     }
@@ -3492,7 +3483,7 @@ tryagain:
                 return Kernel.AnyMO.typeVar;
             if (items.Count() <= ix) {
                 if (extend) {
-                    return new SimpleVariable(true, false, Kernel.MuMO,
+                    return new SimpleVariable(true, false, null,
                             new ArrayViviHook(os, ix), Kernel.AnyP);
                 } else {
                     return Kernel.AnyMO.typeVar;
@@ -4541,8 +4532,7 @@ ltm:
 
         public static Variable Decontainerize(Variable rhs) {
             if (!rhs.rw) return rhs;
-            P6any v = rhs.Fetch();
-            return new SimpleVariable(false, rhs.islist, v.mo, null, v);
+            return new SimpleVariable(rhs.islist, rhs.Fetch());
         }
 
         public const int NBV_RO = 0;
@@ -4567,7 +4557,7 @@ ltm:
             if (!rhs.rw && islist == rhs.islist)
                 return rhs;
 
-            return new SimpleVariable(false, islist, rhso.mo, null, rhso);
+            return new SimpleVariable(islist, rhso);
         }
 
         public static Variable Assign(Variable lhs, Variable rhs) {
@@ -4584,7 +4574,7 @@ ltm:
 
         // ro, not rebindable
         public static Variable NewROScalar(P6any obj) {
-            return new SimpleVariable(false, false, obj.mo, null, obj);
+            return new SimpleVariable(obj);
         }
 
         public static Variable NewRWScalar(STable t, P6any obj) {
@@ -4592,20 +4582,19 @@ ltm:
         }
 
         public static Variable NewMuScalar(P6any obj) {
-            return new SimpleVariable(true, false, MuMO, null, obj);
+            return new SimpleVariable(true, false, null, null, obj);
         }
 
         public static Variable NewTypedScalar(STable t) {
             if (t == null)
-                return new SimpleVariable(true, false, MuMO, null,
+                return new SimpleVariable(true, false, null, null,
                         AnyMO.typeObject);
 
             return new SimpleVariable(true, false, t, null, t.initObject);
         }
 
         public static Variable NewRWListVar(P6any container) {
-            return new SimpleVariable(false, true, container.mo, null,
-                    container);
+            return new SimpleVariable(true, container);
         }
 
         public static VarDeque SlurpyHelper(Frame th, int from) {

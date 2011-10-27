@@ -1829,7 +1829,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 {
     my $log = '';
     my $ret = '';
-    my $var := _newtiedscalar(Any, Any, { $log ~= "F"; $ret }, { $log ~= $_ });
+    my $var := _newtiedscalar(Any, { $log ~= "F"; $ret }, { $log ~= $_ });
 
     $ret = 5; $log = "";
     my $a = $var;
@@ -1841,19 +1841,19 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     is $log, "9", "stores work";
 
     $log = "";
-    $a = _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any });
+    $a = _newtiedscalar({ $log ~= "B" }, { Any }, { Any });
     is $log, "", "bind not called spuriously (1)";
 
     $log = "";
-    $a ::= _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any });
+    $a ::= _newtiedscalar({ $log ~= "B" }, { Any }, { Any });
     is $log, "", "bind not called spuriously (2)";
 
     $log = "";
-    my $b := _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any }); #OK
+    my $b := _newtiedscalar({ $log ~= "B" }, { Any }, { Any }); #OK
     is $log, "B", "bind called when needed (bind)";
 
     $log = "";
-    _newtiedscalar(Any, { $log ~= "B" }, { Any }, { Any }) = 5;
+    _newtiedscalar({ $log ~= "B" }, { Any }, { Any }) = 5;
     is $log, "B", "bind called when needed (write)";
 }
 

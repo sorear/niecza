@@ -3136,7 +3136,7 @@ dynamic:
             thandlers["cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
             thandlers["zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
             thandlers["var_get_var"] = Methody(null, Tokens.Variable.GetMethod("GetVar"));
-            thandlers["var_new_tied"] = Constructy(typeof(TiedVariable).GetConstructor(new Type[] { Tokens.STable, Tokens.P6any, Tokens.P6any, Tokens.P6any }));
+            thandlers["var_new_tied"] = Constructy(typeof(TiedVariable).GetConstructor(new Type[] { Tokens.P6any, Tokens.P6any, Tokens.P6any }));
             thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
             thandlers["bget"] = FieldGet(Tokens.BValue, "v");
@@ -3862,7 +3862,6 @@ dynamic:
                     ret.Add(kv.Key);
                     ret.Add(kv.Value.pos);
                 }
-                s.used_in_scope = null;
                 return ret.ToArray();
             } else if (cmd == "unit_stubbed_stashes") {
                 RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);

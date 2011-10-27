@@ -106,7 +106,6 @@ namespace Niecza {
             // XXX Should binding a substr lvalue count as binding the original?
             this.whence = null;
             this.rw = backing.rw;
-            this.type = Kernel.StrMO;
         }
 
         public override P6any Fetch() {

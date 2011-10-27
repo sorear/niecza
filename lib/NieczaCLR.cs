@@ -178,7 +178,6 @@ namespace Niecza {
         object[]     argv;
 
         public PropertyProxy(PropertyInfo prop, object obj, object[] argv) {
-            this.type   = Kernel.AnyMO; // XXX because of coercion
             this.rw     = true; // make sure Fetch is called repeatedly
             this.islist = false;
             this.prop   = prop;
@@ -218,7 +217,6 @@ namespace Niecza {
         object    obj;
 
         public FieldProxy(FieldInfo field, object obj) {
-            this.type   = Kernel.AnyMO; // XXX because of coercion
             this.rw     = true; // make sure Fetch is called repeatedly
             this.islist = false;
             this.field  = field;

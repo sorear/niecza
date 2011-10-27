@@ -64,7 +64,7 @@ aot: all
 
 test: all
 	$(RUN_CLR) run/Niecza.exe -c test.pl
-	prove -e "$(RUN_CLR)" obj/MAIN.exe
+	prove -e "$(RUN_CLR)" obj/Run.MAIN.exe
 
 spectest: all
 	@t/run_spectests
