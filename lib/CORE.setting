@@ -311,6 +311,7 @@ my class Cool {
     method ln() { Q:CgOp { (ln {self}) } }
     multi method log() { self.ln }
     multi method log($base) { self.ln / $base.ln }
+    method log10() { self.ln / 10.ln }
     method sin() { Q:CgOp { (sin {self}) } }
     method asin() { Q:CgOp { (asin {self}) } }
     method cos() { Q:CgOp { (cos {self}) } }
@@ -336,6 +337,8 @@ my class Cool {
     method cotanh() { Q:CgOp { (cotanh {self}) } }
     method acotanh() { Q:CgOp { (acotanh {self}) } }
     method atan2($x = 1) { Q:CgOp { (atan2 {self} {$x}) } }
+    method unpolar($angle) { unpolar(self, $angle); }
+    method cis() { cis(self); }
     method rand() { self * rand; }
 
     method split($matcher, $limit?, :$all?) {
@@ -605,6 +608,7 @@ my class Complex is Numeric {
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
     method conjugate() { self.re - (self.im)i }
+    method polar() { self.abs, atan2(self.im, self.re); }
 }
 my class FatRat is Real {
     method new($n,$d) { FatRat.succ * $n / $d }
@@ -1933,7 +1937,8 @@ sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
 sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
-sub exp($x) { $x.exp }
+multi sub exp($x) { $x.exp }
+multi sub exp($x, $base) { $base ** $x }
 # XXX 'Order' type
 sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
@@ -2143,6 +2148,13 @@ sub get($handle = $*IN) { $handle.get }
 sub lines($filehandle = $*IN) { $filehandle.lines }
 sub prompt($msg) { print $msg; $*IN.get }
 sub getc($handle) { $handle.getc }
+
+multi sub log($x) { $x.log }
+multi sub log($x, $base) { $x.log($base) }
+sub log10($x) { $x.log(10) }
+
+sub unpolar($mag, $angle) { Complex.new($mag * $angle.cos, $mag * $angle.sin); }
+sub cis($angle) { Complex.new($angle.cos, $angle.sin); }
 
 sub sin($x) { $x.sin }
 sub asin($x) { $x.asin }
