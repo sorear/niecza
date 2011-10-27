@@ -21,6 +21,37 @@ use Sig;
 use STD;
 
 augment class NieczaActions {
+method type_declarator:subset ($/) {
+    my ($basetype) = self.process_name($*OFTYPE<longname>);
+    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', 'Any');
+    my @exports;
+
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } elsif $t<of> {
+            $basetype = $t<of>;
+        } else {
+            $/.CURSOR.sorry("Unsupported subset trait $t.keys()");
+        }
+    }
+
+    my $body = self.thunk_sub($<EXPR> ?? $<EXPR>.ast !! mklex($/, 'True'));
+
+    my ($lexvar, $obj) = "Any";
+
+    $/.CURSOR.trymop({
+        ($lexvar, $obj) = self.do_new_package($/, scope => $*SCOPE,
+            name => $<longname>, class => 'subset', :@exports);
+
+        $*CURLEX<!sub>.create_static_pad;
+
+        $obj.set_basetype($basetype);
+        $obj.set_where($body);
+    });
+
+    make mklex($/, $lexvar);
+}
 }
 
 CgOp._register_ops: < who sc_root sc_indir temporize _addmethod _invalidate

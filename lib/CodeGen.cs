@@ -4118,8 +4118,22 @@ dynamic:
                 nst.mo.rtype   = type;
                 nst.mo.isPackage = (type == "package");
                 nst.mo.isRole    = (type == "role" || type == "prole");
+                nst.mo.isSubset  = (type == "subset");
 
                 return new Handle(nst);
+            } else if (cmd == "type_set_basetype") {
+                STable subset = (STable)Handle.Unbox(args[1]);
+                STable basety = (STable)Handle.Unbox(args[2]);
+
+                subset.mo.FillSubset(basety);
+                subset.initObject = basety.initObject;
+                subset.initVar = basety.initVar;
+                return null;
+            } else if (cmd == "type_set_where") {
+                STable  subset = (STable)Handle.Unbox(args[1]);
+                SubInfo where  = (SubInfo)Handle.Unbox(args[2]);
+                subset.mo.subsetWhereThunk = where.protosub;
+                return null;
             } else if (cmd == "create_sub") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string name = (string)args[2];
