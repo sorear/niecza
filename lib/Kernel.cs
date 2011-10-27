@@ -764,13 +764,14 @@ namespace Niecza {
             }
 
             // no conflict if items are simple packages with the same who
-            if (!ose.v.rw && !oseod && oseo.mo.mo.isPackage &&
-                    !nse.v.rw && !nseod && nseo.mo.mo.isPackage &&
+            if (!ose.v.rw && !oseod && !nse.v.rw && !nseod &&
+                    (oseo.mo.mo.isPackage || nseo.mo.mo.isPackage) &&
                     oseo.mo.who.Isa(Kernel.StashMO) &&
                     nseo.mo.who.Isa(Kernel.StashMO) &&
                     Kernel.UnboxAny<string>(oseo.mo.who) ==
                         Kernel.UnboxAny<string>(nseo.mo.who)) {
-                nse = ose;
+                if (nseo.mo.mo.isPackage)
+                    nse = ose;
                 return null;
             }
 
