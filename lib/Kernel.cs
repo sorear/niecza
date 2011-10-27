@@ -3705,10 +3705,9 @@ tryagain:
                 if (final) return;
 
                 if (v.rw && !v.Fetch().IsDefined()) {
-                    Variable vname = Kernel.RunInferior(who.InvokeMethod(
-                        Kernel.GetInferiorRoot(), "name",
-                        new Variable[] { whov }, null));
-                    string name = vname.Fetch().mo.mro_raw_Str.Get(vname);
+                    if (!who.Isa(Kernel.StashMO))
+                        throw new NieczaException("Autovivification only implemented for normal-type stashes");
+                    string name = Kernel.UnboxAny<string>(who);
                     P6any new_who = Kernel.BoxRaw(name + "::" + key, Kernel.StashMO);
                     who.mo.mro_bind_key.Bind(whov, keyv,
                         MakePackage(key, new_who));
@@ -3770,7 +3769,7 @@ tryagain:
                     n.p1 = (key == "PARENT" || key.Length > 0 &&
                             "$&@%".IndexOf(key[0]) >= 0)
                         ? ToInfo().cur_pkg.who
-                        : Kernel.GetVar("", "GLOBAL").v.Fetch();
+                        : Kernel.GetVar("", "GLOBAL").v.Fetch().mo.who;
                     n.Core(key, final, out sc, out v, bind_to);
                     return;
                 }
