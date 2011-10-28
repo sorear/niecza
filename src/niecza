@@ -20,6 +20,59 @@ use RxOp;
 use Sig;
 use STD;
 
+augment grammar STD {
+method nibbler() {
+    my @nibbles;
+    my $from = self.pos;
+    my $len = self.orig.chars;
+    my $to = $from;
+
+    loop {
+        my $here = self.cursor($to);
+        last if head($here.stopper);
+
+        if head($here.starter) -> $starter {
+            push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+                :method<Str>, :captures()) if $from != $to;
+
+            my $nibbler = head(self.cursor($starter.to).nibbler) or return;
+            my $stopper = head(self.cursor($nibbler.to).stopper) or return;
+
+            $from = $to = $stopper.to;
+            push @nibbles, $starter;
+            push @nibbles, @( $nibbler<nibbles> );
+            push @nibbles, $stopper;
+        }
+        elsif head($here.escape) -> $escape {
+            push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+                :method<Str>, :captures()) if $from != $to;
+
+            $from = $to = $escape.to;
+            push @nibbles, $escape;
+        }
+        elsif $to < $len {
+            $to++;
+        }
+        else { # at end, and not stopper
+            return;
+        }
+    }
+
+    push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
+        :method<Str>, :captures()) if $from != $to || !@nibbles;
+
+    $*LAST_NIBBLE = $to;
+    $*LAST_NIBBLE_START = self.pos;
+    if defined substr(self.orig, self.pos, $to - self.pos).index("\n") {
+        $*LAST_NIBBLE_MULTILINE = $to;
+        $*LAST_NIBBLE_MULTILINE_START = self.pos;
+    }
+
+    Match.synthetic(:cursor(self), from => self.pos, :$to, :method<nibbler>,
+        :captures(nibbles => @nibbles))
+}
+}
+
 augment class NieczaActions {
 method type_declarator:subset ($/) {
     my ($basetype) = self.process_name($*OFTYPE<longname>);
