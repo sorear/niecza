@@ -640,8 +640,11 @@ namespace Niecza {
 
             for (int i = 0; i < ths.Length; i++) {
                 ths[i].FillSubInfo(type);
-                our_subs[i].nam_str = null;
-                our_subs[i].nam_refs = null;
+
+                if (!Config.KeepIL) {
+                    our_subs[i].nam_str = null;
+                    our_subs[i].nam_refs = null;
+                }
             }
 
             EmitUnit.Current = null;
@@ -5862,5 +5865,7 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
         public static readonly bool SerTrace =
             Environment.GetEnvironmentVariable("NIECZA_SER_TRACE") != null;
+        public static readonly bool KeepIL =
+            Environment.GetEnvironmentVariable("NIECZA_KEEP_IL") != null;
     }
 }
