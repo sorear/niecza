@@ -22,6 +22,14 @@ sub infix:</> is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
 sub infix:<%> is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
 sub infix:<**> is Niecza::builtin('pow',2,2)  is Niecza::absprec<w=> is assoc<right> ($l,$r) { $l ** $r }
 
+# sub infix:<gcd>($l,$r) is Niecza::builtin('gcd',2,2) { $l gcd $r }
+sub infix:<gcd>($l,$r)  { Q:CgOp { (gcd {$l.Int} {$r.Int}) } }
+sub infix:<lcm>($l,$r) {
+    my $l-int = $l.Int.abs;
+    my $r-int = $r.Int.abs;
+    $l-int div ($l-int gcd $r-int) * $r-int;
+}
+
 sub next ($x?) { _lexotic(1, $x, ()) }
 sub last ($x?) { _lexotic(2, $x, ()) }
 sub redo ($x?) { _lexotic(3, $x, ()) }

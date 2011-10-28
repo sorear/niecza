@@ -960,6 +960,19 @@ public partial class Builtins {
         return Kernel.NewROScalar(n1);
     }
 
+    static readonly Func<Variable,Variable,Variable> gcd_d = gcd;
+    public static Variable gcd(Variable a1, Variable a2) {
+        int r1, r2;
+        P6any o1 = a1.Fetch(), o2 = a2.Fetch();
+        if (!(o1.mo.is_any && o2.mo.is_any))
+            return HandleSpecial2(a1,a2, o1,o2, minus_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
+
+        // SHOULD: optimize for the case of two small sized Ints
+        return MakeInt(BigInteger.GreatestCommonDivisor(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2)));
+    }
+
     [TrueGlobal] static IForeignInterpreter p5_interpreter;
     public static Variable eval_perl5(Variable v) {
         P6any o1 = v.Fetch();
