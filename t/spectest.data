@@ -99,8 +99,10 @@ S03-operators/comparison-simple.t
 S03-operators/equality.t
 S03-operators/eqv.t
 S03-operators/flip-flop.t
+S03-operators/gcd.t
 S03-operators/inplace.t
 S03-operators/is-divisible-by.t
+S03-operators/lcm.t
 S03-operators/list-quote-junction.t
 S03-operators/minmax.t
 S03-operators/misc.t
