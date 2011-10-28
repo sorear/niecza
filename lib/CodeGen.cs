@@ -3424,6 +3424,8 @@ dynamic:
         public static string obj_dir = AppDomain.CurrentDomain.BaseDirectory;
         [TrueGlobal]
         public static string prefix = (typeof(Backend).Assembly.GetName().Name == "Kernel") ? "" : "Run.";
+        [TrueGlobal]
+        public static bool cross_level_load;
 
         public static string LocStr(string fo, int lo, string fn, int ln) {
             return fn == fo ? " (see line " + lo + ")" :

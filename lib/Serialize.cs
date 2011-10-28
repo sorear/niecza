@@ -64,7 +64,7 @@ namespace Niecza.Serialization {
         internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 1;
+        static readonly int version = 2;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -826,7 +826,10 @@ badhash:
         }
 
         internal static ReflectObj Thaw(ThawBuffer tb) {
-            Type nt = Type.GetType(tb.String());
+            string nm = tb.String();
+            if (Backend.cross_level_load)
+                nm = nm.Replace("Run.", "");
+            Type nt = Type.GetType(nm, true);
             ReflectObj n = (ReflectObj)
                 nt.GetConstructor(new Type[0]).Invoke(null, new object[0]);
             tb.Register(n);

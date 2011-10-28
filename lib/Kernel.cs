@@ -6,6 +6,7 @@ using System.Reflection.Emit;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.IO;
 using Niecza.CLRBackend;
 using Niecza.Serialization;
 
@@ -868,16 +869,25 @@ namespace Niecza {
 
             n.depended_units = new HashSet<RuntimeUnit>(tb.RefsA<RuntimeUnit>());
 
-            n.assembly = Assembly.Load(n.asm_name);
-            n.type = tb.type = n.assembly.GetType(n.asm_name, true);
-
             int ncon = tb.Int();
-            n.constants = new Dictionary<object,FieldInfo>();
-            while (ncon-- > 0) {
-                FieldInfo fi = n.type.GetField(tb.String());
-                object val = tb.ObjRef();
-                n.constants[val] = fi;
-                fi.SetValue(null, val);
+            if (Backend.cross_level_load) {
+                // we'll be regenerating the assembly anyway
+                while (ncon-- > 0) {
+                    tb.String();
+                    tb.ObjRef();
+                }
+            }
+            else {
+                n.assembly = Assembly.Load(n.asm_name);
+                n.type = tb.type = n.assembly.GetType(n.asm_name, true);
+
+                n.constants = new Dictionary<object,FieldInfo>();
+                while (ncon-- > 0) {
+                    FieldInfo fi = n.type.GetField(tb.String());
+                    object val = tb.ObjRef();
+                    n.constants[val] = fi;
+                    fi.SetValue(null, val);
+                }
             }
 
             int ct = tb.Int();
@@ -1912,7 +1922,8 @@ noparams:
                 Type t = tn == null ? tb.type :
                     typeof(Kernel).Assembly.GetType(tn, true);
 
-                n.code = (DynBlockDelegate) Delegate.CreateDelegate(
+                n.code = t == null ? null :
+                    (DynBlockDelegate) Delegate.CreateDelegate(
                     typeof(DynBlockDelegate),
                     t.GetMethod(mn, BindingFlags.Public |
                         BindingFlags.NonPublic | BindingFlags.Static));
@@ -4946,14 +4957,16 @@ slow:
             WrapHandler0(kl, name, cv, cvu);
         }
 
+        static Frame WrapHandler0cb(Frame th) {
+            th.caller.resultSlot = ((ContextHandler<Variable>)
+                    th.info.param[1]).Get((Variable)th.lex0);
+            return th.Return();
+        }
+
         private static void WrapHandler0(STable kl, string name,
                 ContextHandler<Variable> cvb, object cvu) {
-            DynBlockDelegate dbd = delegate (Frame th) {
-                th.caller.resultSlot = ((ContextHandler<Variable>)
-                        th.info.param[1]).Get((Variable)th.lex0);
-                return th.Return();
-            };
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+                    WrapHandler0cb);
             si.sig_i = new int[3] {
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL,
                 0, 0 };
@@ -4962,15 +4975,16 @@ slow:
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
+        static Frame WrapHandler1cb(Frame th) {
+            IndexHandler fcv = (IndexHandler) th.info.param[1];
+            th.caller.resultSlot = fcv.Get((Variable)th.lex0,
+                    (Variable)th.lex1);
+            return th.Return();
+        }
         private static void WrapHandler1(STable kl, string name,
                 IndexHandler cv) {
-            DynBlockDelegate dbd = delegate (Frame th) {
-                IndexHandler fcv = (IndexHandler) th.info.param[1];
-                th.caller.resultSlot = fcv.Get((Variable)th.lex0,
-                        (Variable)th.lex1);
-                return th.Return();
-            };
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+                WrapHandler1cb);
             si.sig_i = new int[6] {
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0
@@ -4980,18 +4994,19 @@ slow:
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
+        static Frame WrapPushycb(Frame th) {
+            PushyHandler fcv = (PushyHandler) th.info.param[1];
+            Variable[] fullpc = UnboxAny<Variable[]>(
+                    ((Variable)th.lex1).Fetch());
+            Variable[] chop = new Variable[fullpc.Length - 1];
+            Array.Copy(fullpc, 1, chop, 0, chop.Length);
+            th.caller.resultSlot = fcv.Invoke((Variable)th.lex0, chop);
+            return th.Return();
+        }
         private static void WrapPushy(STable kl, string name,
                 PushyHandler cv) {
-            DynBlockDelegate dbd = delegate (Frame th) {
-                PushyHandler fcv = (PushyHandler) th.info.param[1];
-                Variable[] fullpc = UnboxAny<Variable[]>(
-                        ((Variable)th.lex1).Fetch());
-                Variable[] chop = new Variable[fullpc.Length - 1];
-                Array.Copy(fullpc, 1, chop, 0, chop.Length);
-                th.caller.resultSlot = fcv.Invoke((Variable)th.lex0, chop);
-                return th.Return();
-            };
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+                    WrapPushycb);
             si.sig_i = new int[6] {
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
                 SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_SLURPY_PCL, 1, 0
@@ -5001,37 +5016,41 @@ slow:
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 
-        private static Variable DispIndexy(object[] p, VarHash n,
-                Variable self, Variable index) {
+        private static Frame DispIndexy(Frame th) {
+            object[] p     = th.info.param;
+            VarHash  n     = th.named;
+            Variable self  = (Variable)th.lex0;
+            Variable index = (Variable)th.lex1;
 
-            if (n == null) goto def;
-            if (p[1] != null && n.ContainsKey("exists"))
-                return ((IndexHandler)p[1]).Get(self, index);
-            if (p[2] != null && n.ContainsKey("delete"))
-                return ((IndexHandler)p[2]).Get(self, index);
+            Variable res = null;
 
-            if (n.ContainsKey("k"))
-                return new KeySlicer(0, p[0]).Get(self, index);
-            if (n.ContainsKey("kv"))
-                return new KeySlicer(1, p[0]).Get(self, index);
-            if (n.ContainsKey("p"))
-                return new KeySlicer(2, p[0]).Get(self, index);
-            if (n.ContainsKey("BIND_VALUE"))
-                return ((BindHandler)p[3]).Bind(self, index, n["BIND_VALUE"]);
+            if (n == null) {
+                res = ((IndexHandler)p[0]).Get(self, index);
+            } else if (p[1] != null && n.ContainsKey("exists")) {
+                res = ((IndexHandler)p[1]).Get(self, index);
+            } else if (p[2] != null && n.ContainsKey("delete")) {
+                res = ((IndexHandler)p[2]).Get(self, index);
+            } else if (n.ContainsKey("k")) {
+                res =  new KeySlicer(0, p[0]).Get(self, index);
+            } else if (n.ContainsKey("kv")) {
+                res = new KeySlicer(1, p[0]).Get(self, index);
+            } else if (n.ContainsKey("p")) {
+                res = new KeySlicer(2, p[0]).Get(self, index);
+            } else if (n.ContainsKey("BIND_VALUE")) {
+                res = ((BindHandler)p[3]).Bind(self, index, n["BIND_VALUE"]);
+            } else {
+                res = ((IndexHandler)p[0]).Get(self, index);
+            }
 
-def:        return ((IndexHandler)p[0]).Get(self, index);
+            th.caller.resultSlot = res;
+            return th.Return();
         }
 
         private static void WrapIndexy(STable kl, string name,
                 IndexHandler at, IndexHandler exist, IndexHandler del,
                 BindHandler bind) {
-            DynBlockDelegate dbd = delegate (Frame th) {
-                th.caller.resultSlot = DispIndexy(th.info.param,
-                    th.named, (Variable)th.lex0, (Variable)th.lex1);
-                return th.Return();
-            };
-
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name, dbd);
+            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+                    DispIndexy);
             if (del != null) {
                 si.sig_i = new int[24] {
                     SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
@@ -5791,6 +5810,28 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
             RunMain(ru);
         }
 
+        static void RewriteUnits(RuntimeUnit from, string exe_name,
+                string from_dir, HashSet<string> done) {
+            if (done.Contains(from.name))
+                return;
+            done.Add(from.name);
+
+            foreach (RuntimeUnit z in from.depended_units)
+                RewriteUnits(z, exe_name, from_dir, done);
+
+            Console.WriteLine("Looking at {0} ...", from.name);
+
+            string osername = Path.Combine(from_dir, "Run."+from.name+".ser");
+            string nsername = Path.Combine(Backend.obj_dir, from.name+".ser");
+
+            if (File.Exists(nsername) && File.GetLastWriteTime(osername) <
+                    File.GetLastWriteTime(nsername)) {
+                Console.WriteLine("... up to date.");
+                return;
+            }
+            Console.WriteLine("... needs to be rewritten.");
+        }
+
         public static void Main(string[] args) {
             string cmd = args.Length > 0 ? args[0] : "-help";
 
@@ -5841,6 +5882,34 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                     }
                 }
             }
+            else if (cmd == "-gen-app" && args.Length == 3) {
+                // Code regeneration: this is required for the bootstrap
+                // procedure, because initial code generation makes Run.CORE
+                // and we need to turn it into CORE for the compiler proper.
+
+                if (Backend.prefix != "") {
+                    Console.Error.WriteLine("-gen-app may only be used with Kernel.dll");
+                    Environment.Exit(1);
+                }
+
+                string exename = args[1];
+                string fromdir = args[2];
+
+                // allow loading of Run. files, but don't try to load the
+                // assemblies, since we're not Run.Kernel
+                Backend.obj_dir = fromdir;
+                Backend.prefix  = "Run.";
+                Backend.cross_level_load = true;
+
+                RuntimeUnit root = (RuntimeUnit)
+                    RuntimeUnit.reg.LoadUnit("MAIN").root;
+
+                // reset for writing
+                Backend.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
+                Backend.prefix  = "";
+
+                RewriteUnits(root, exename, fromdir, new HashSet<string>());
+            }
             else if (cmd == "-run" && args.Length == 2) {
                 RuntimeUnit ru = (RuntimeUnit)
                     RuntimeUnit.reg.LoadUnit(args[1]).root;
@@ -5851,6 +5920,8 @@ def:        return ((IndexHandler)p[0]).Get(self, index);
                 ru.PrepareEval();
                 RunMain(ru);
             } else {
+                Console.WriteLine("usage: Kernel.dll -run Unit.Name");
+                Console.WriteLine("usage: Kernel.dll -gen-app App.exe build/dir");
                 Console.WriteLine("usage: Kernel.dll -run Unit.Name");
             }
         }
