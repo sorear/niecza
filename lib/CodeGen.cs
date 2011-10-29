@@ -587,7 +587,7 @@ namespace Niecza.CLRBackend {
         }
         protected static void TypeCheck(Type sub, Type super, object c) {
             if (!super.IsAssignableFrom(sub))
-                throw new Exception(sub + " not subtype of " + super + ":" + c);
+                throw new Exception(sub + " not subtype of " + super + ": " + c);
         }
     }
 
@@ -732,7 +732,7 @@ namespace Niecza.CLRBackend {
                 throw new Exception("argument list length mismatch");
 
             for (int i = 0; i < ts.Count; i++) {
-                TypeCheck(zyg[i].Returns, ts[i]);
+                TypeCheck(zyg[i].Returns, ts[i], mi);
             }
         }
     }
@@ -1223,13 +1223,13 @@ namespace Niecza.CLRBackend {
 
         public ClrSubyCall(bool ismethod, string sig, ClrOp[] zyg) {
             int i = 0;
-            if (ismethod) TypeCheck(zyg[i++].Returns, Tokens.String);
-            TypeCheck(zyg[i++].Returns, ismethod ? Tokens.Variable : Tokens.P6any);
+            if (ismethod) TypeCheck(zyg[i++].Returns, Tokens.String, "methodname");
+            TypeCheck(zyg[i++].Returns, ismethod ? Tokens.Variable : Tokens.P6any, "sub");
             int j = 0;
             while (j < sig.Length) {
                 string s = sig.Substring(j+1, sig[j]);
                 j += (1 + s.Length);
-                TypeCheck(zyg[i++].Returns, (s == "flatcap") ? Tokens.P6any : Tokens.Variable);
+                TypeCheck(zyg[i++].Returns, (s == "flatcap") ? Tokens.P6any : Tokens.Variable, j);
             }
             this.ismethod = ismethod;
             this.sig = sig;
@@ -1613,7 +1613,7 @@ namespace Niecza.CLRBackend {
             if (r.IsValueType)
                 throw new ArgumentException();
             foreach(ClrOp c in zyg)
-                TypeCheck(c.Returns, r);
+                TypeCheck(c.Returns, r, "new-array");
             HasCases = false;
             this.zyg = zyg;
         }
@@ -3414,7 +3414,7 @@ dynamic:
                 Console.WriteLine("enter " + tag);
             CpsOp r = handler(this, rnode);
             if (Config.CGVerbose > 1)
-                Console.WriteLine("exit " + tag);
+                Console.WriteLine("exit " + tag + " " + r.head.Returns);
             return r;
         }
     }

@@ -568,7 +568,7 @@ namespace Niecza {
         }
 
         internal CpsOp StringListConst(string[] sl) {
-            StringBuilder code = new StringBuilder("SL");
+            StringBuilder code = new StringBuilder("LS");
             foreach (string s in sl) {
                 code.Append((char)(s.Length >> 16));
                 code.Append((char)(s.Length));
@@ -578,7 +578,7 @@ namespace Niecza {
         }
 
         internal CpsOp CCListConst(int[][] ccl) {
-            StringBuilder code = new StringBuilder("CL");
+            StringBuilder code = new StringBuilder("LC");
             foreach (int[] cc in ccl) {
                 code.Append((char)(cc.Length >> 16));
                 code.Append((char)(cc.Length));
