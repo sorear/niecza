@@ -397,6 +397,73 @@ namespace Niecza {
         public Dictionary<object, FieldInfo> constants;
         internal Dictionary<string, CpsOp> val_constants;
 
+        List<NamProcessor> fill = new List<NamProcessor>();
+        string dll_name;
+
+        public EmitUnit(string uname, string asm_name, string dll_name, bool is_mainish) {
+
+            this.dll_name = dll_name;
+            asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
+                    new AssemblyName(asm_name),
+                    (dll_name == null ? AssemblyBuilderAccess.Run :
+                        AssemblyBuilderAccess.Save),
+                    Backend.obj_dir);
+
+            mod_builder = dll_name == null ?
+                asm_builder.DefineDynamicModule(asm_name) :
+                asm_builder.DefineDynamicModule(asm_name, dll_name);
+
+            type_builder = mod_builder.DefineType(asm_name,
+                    TypeAttributes.Public | TypeAttributes.Sealed |
+                    TypeAttributes.Abstract | TypeAttributes.Class |
+                    TypeAttributes.BeforeFieldInit);
+
+            if (is_mainish) {
+                var mainb = type_builder.DefineMethod("Main",
+                        MethodAttributes.Static | MethodAttributes.Public,
+                        typeof(void), new Type[] { typeof(string[]) });
+                var il = mainb.GetILGenerator();
+
+                il.Emit(OpCodes.Ldstr, uname);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Call, typeof(Kernel).GetMethod("MainHandler"));
+                il.Emit(OpCodes.Ret);
+
+                asm_builder.SetEntryPoint(mainb);
+            }
+
+            constants = new Dictionary<object,FieldInfo>(new IdentityComparer());
+            val_constants = new Dictionary<string,CpsOp>();
+        }
+
+        public void CgSub(SubInfo sub, bool erase) {
+            EmitUnit oc = Current;
+            if (Config.CGVerbose > 0)
+                Console.WriteLine("generating code for: {0}", sub.name);
+            Current = this;
+            try {
+                var n = new NamProcessor(new CpsBuilder(this,
+                            "C" + fill.Count + sub.name, true), sub);
+                n.MakeBody(Reader.Read(sub.nam_str, sub.nam_refs));
+                fill.Add(n);
+            } finally {
+                Current = oc;
+            }
+            if (erase) {
+                sub.nam_str = null;
+                sub.nam_refs = null;
+            }
+        }
+
+        public Type Finish() {
+            var type = type_builder.CreateType();
+            if (dll_name != null)
+                asm_builder.Save(dll_name);
+            foreach (NamProcessor th in fill)
+                th.FillSubInfo(type);
+            return type;
+        }
+
         internal CpsOp TypeConstant(STable s) {
             return RefConstant(s == null ? "" : s.name, s, Tokens.STable);
         }
@@ -554,22 +621,33 @@ namespace Niecza {
         }
     }
 
+    // There are two kinds of units.  Primary units have their own hash of
+    // globals, assembly (if saved), and save file; subordinate units share
+    // those of the master.
     public sealed class RuntimeUnit : IFreeze {
         public string name, filename, source, asm_name, dll_name;
+
         public HashSet<RuntimeUnit> depended_units;
+        public List<RuntimeUnit> subordinates = new List<RuntimeUnit>();
+        public RuntimeUnit owner;
+
         public Dictionary<string, StashEnt> globals;
         public SubInfo mainline, bottom;
-        public bool is_mainish;
-        public Type type;
-        public Assembly assembly;
         public List<SubInfo> our_subs;
+        public bool is_mainish;
+
+        // note: type is only set to a non-null value if the type is a
+        // member of a saved assembly; thus type being non-null implies
+        // a significance to freezing and thawing the type, and also
+        // implies that the type is potentially shared between compartments
+        // and globals must be reset in Compartment.Pop.
+        public Type type;
         public Dictionary<object, FieldInfo> constants;
 
-        bool prepared = false;
+        public bool inited = false;
 
         // used during construction only
         public List<KeyValuePair<int,STable>> stubbed_stashes;
-        internal List<RuntimeUnit> cosaved_evals = new List<RuntimeUnit>();
         public int nextid;
 
         private RuntimeUnit() { }
@@ -591,103 +669,70 @@ namespace Niecza {
             our_subs = new List<SubInfo>();
         }
 
-        EmitUnit GenerateCode(bool runnow) {
-            if (EmitUnit.Current != null)
-                throw new InvalidOperationException("reentrant GenerateCode");
-
-            EmitUnit eu = EmitUnit.Current = new EmitUnit();
-
-            eu.asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
-                    new AssemblyName(asm_name),
-                    (runnow ? AssemblyBuilderAccess.Run :
-                        AssemblyBuilderAccess.Save),
-                    Backend.obj_dir);
-            eu.mod_builder = runnow ?
-                eu.asm_builder.DefineDynamicModule(asm_name) :
-                eu.asm_builder.DefineDynamicModule(asm_name, dll_name);
-
-            eu.type_builder = eu.mod_builder.DefineType(asm_name,
-                    TypeAttributes.Public | TypeAttributes.Sealed |
-                    TypeAttributes.Abstract | TypeAttributes.Class |
-                    TypeAttributes.BeforeFieldInit);
-
-            eu.constants = new Dictionary<object,FieldInfo>(new IdentityComparer());
-            eu.val_constants = new Dictionary<string,CpsOp>();
-            NamProcessor[] ths = new NamProcessor[our_subs.Count];
-            for (int i = 0; i < ths.Length; i++) {
-                SubInfo z = our_subs[i];
-                if (Config.CGVerbose > 0)
-                    Console.WriteLine("generating code for: {0}", z.name);
-                ths[i] = new NamProcessor(
-                    new CpsBuilder(eu, "C" + i + z.name, true), z);
-                ths[i].MakeBody(Reader.Read(z.nam_str, z.nam_refs));
-            }
-
-            if (is_mainish) {
-                var mainb = eu.type_builder.DefineMethod("Main",
-                        MethodAttributes.Static | MethodAttributes.Public,
-                        typeof(void), new Type[] { typeof(string[]) });
-                var il = mainb.GetILGenerator();
-
-                il.Emit(OpCodes.Ldstr, name);
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, typeof(Kernel).GetMethod("MainHandler"));
-                il.Emit(OpCodes.Ret);
-
-                eu.asm_builder.SetEntryPoint(mainb);
-            }
-
-            type = eu.type_builder.CreateType();
-
-            for (int i = 0; i < ths.Length; i++) {
-                ths[i].FillSubInfo(type);
-
-                if (!Config.KeepIL) {
-                    our_subs[i].nam_str = null;
-                    our_subs[i].nam_refs = null;
-                }
-            }
-
-            EmitUnit.Current = null;
-            constants = eu.constants;
-            return eu;
+        internal void SaveSubs(EmitUnit eu, bool erase) {
+            foreach (SubInfo z in our_subs)
+                eu.CgSub(z, erase);
+            foreach (RuntimeUnit zu in subordinates)
+                foreach (SubInfo z in zu.our_subs)
+                    eu.CgSub(z, erase);
         }
 
         [CompartmentGlobal]
         internal static ObjectRegistry reg;
 
+        // note that after Save the unit is _not_ run; the compartment
+        // is immediately discarded!
         public void Save() {
-            EmitUnit eu = GenerateCode(false);
-            eu.asm_builder.Save(dll_name);
+            EmitUnit eu = new EmitUnit(name, asm_name, dll_name, is_mainish);
+
+            SaveSubs(eu, !Config.KeepIL);
+
+            type = eu.Finish();
+            constants = eu.constants;
+            // all co-saved units must remember that their code is here
+            foreach (RuntimeUnit zu in subordinates)
+                zu.type = type;
+
             reg.SaveUnit(name, this);
         }
 
-        internal void SetConstants() {
-            if (type != null) {
-                foreach (KeyValuePair<object, FieldInfo> kv in constants)
-                    type.GetField(kv.Value.Name).SetValue(null, kv.Key);
+        internal void SetConstants() { SetConstants(type, constants); }
+        void SetConstants(Type ty, Dictionary<object,FieldInfo> consts) {
+            if (ty != null) {
+                foreach (KeyValuePair<object, FieldInfo> kv in consts)
+                    ty.GetField(kv.Value.Name).SetValue(null, kv.Key);
             }
         }
 
+        [TrueGlobal] static int anon_id;
+
+        // This is called when compiling a unit which will be run without
+        // saving _only_
         public void PrepareEval() {
-            if (prepared) return;
-            prepared = true;
+            EmitUnit eu = new EmitUnit(name, "Anon." + Interlocked.Increment(
+                        ref anon_id) + "." + asm_name, null, false);
+            SaveSubs(eu, false);
 
-            foreach (RuntimeUnit d in Kernel.containerRootUnit.depended_units)
-                d.PrepareEval(); // would loop without above assignment
+            SetConstants(eu.Finish(), eu.constants);
+        }
 
-            if (type == null) {
-                GenerateCode(true);
-                SetConstants();
-            }
+        // InitTime is called:
+        //  * on MAIN when running a program
+        //  * on evals if global INIT time has already passed
+        //  * when linking units in an INITed container
+        public void InitTime() {
+            if (inited) return;
+            inited = true;
 
-            foreach (SubInfo z in our_subs)
+            foreach (RuntimeUnit zu in subordinates)
+                zu.InitTime();
+            foreach (RuntimeUnit zu in depended_units)
+                zu.InitTime();
+
+            // XXX this is WRONG and will need to be changed with BEGIN
+            foreach (SubInfo z in our_subs) {
                 if ((z.special & SubInfo.UNSAFE) != 0)
                     Kernel.CheckUnsafe(z);
-
-            if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
-                Kernel.TraceFlags = Kernel.TRACE_CUR;
-                Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
 
             Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
@@ -817,19 +862,23 @@ namespace Niecza {
             fb.String(dll_name);
 
             fb.Refs(dep);
+            fb.ObjRef(owner);
 
-            fb.Int(constants.Count);
-            foreach (KeyValuePair<object,FieldInfo> kv in constants) {
-                fb.String(kv.Value.Name);
-                fb.ObjRef(kv.Key);
+            if (owner == this) {
+                // master unit requires saving type and constant info
+                fb.Int(constants.Count);
+                foreach (KeyValuePair<object,FieldInfo> kv in constants) {
+                    fb.String(kv.Value.Name);
+                    fb.ObjRef(kv.Key);
+                }
+                fb.Int(globals.Count);
+                foreach (KeyValuePair<string, StashEnt> kv in globals) {
+                    fb.String(kv.Key);
+                    fb.ObjRef(kv.Value);
+                }
             }
 
-            fb.Int(globals.Count);
-            foreach (KeyValuePair<string, StashEnt> kv in globals) {
-                fb.String(kv.Key);
-                fb.ObjRef(kv.Value);
-            }
-
+            fb.Refs(subordinates);
             fb.ObjRef(mainline);
             fb.ObjRef(bottom);
             fb.Refs(our_subs);
@@ -868,34 +917,43 @@ namespace Niecza {
             n.dll_name = tb.String();
 
             n.depended_units = new HashSet<RuntimeUnit>(tb.RefsA<RuntimeUnit>());
+            n.owner = (RuntimeUnit)tb.ObjRef();
 
-            int ncon = tb.Int();
-            if (Backend.cross_level_load) {
-                // we'll be regenerating the assembly anyway
-                while (ncon-- > 0) {
-                    tb.String();
-                    tb.ObjRef();
+            if (n.owner == n) {
+                // is a master unit
+                int ncon = tb.Int();
+                if (Backend.cross_level_load) {
+                    // don't load a type, throw away constants
+                    while (ncon-- > 0) {
+                        tb.String();
+                        tb.ObjRef();
+                    }
+                } else {
+                    Assembly assembly = Assembly.Load(n.asm_name);
+                    n.type = tb.type = assembly.GetType(n.asm_name, true);
+                    n.constants = new Dictionary<object,FieldInfo>();
+                    while (ncon-- > 0) {
+                        FieldInfo fi = n.type.GetField(tb.String());
+                        object val = tb.ObjRef();
+                        n.constants[val] = fi;
+                        fi.SetValue(null, val);
+                    }
+                }
+
+                int ct = tb.Int();
+                n.globals = new Dictionary<string, StashEnt>();
+                for (int i = 0; i < ct; i++) {
+                    n.globals[tb.String()] = (StashEnt)tb.ObjRef();
                 }
             }
             else {
-                n.assembly = Assembly.Load(n.asm_name);
-                n.type = tb.type = n.assembly.GetType(n.asm_name, true);
-
-                n.constants = new Dictionary<object,FieldInfo>();
-                while (ncon-- > 0) {
-                    FieldInfo fi = n.type.GetField(tb.String());
-                    object val = tb.ObjRef();
-                    n.constants[val] = fi;
-                    fi.SetValue(null, val);
-                }
+                if (n.owner.globals == null)
+                    throw new Exception("load order goof");
+                n.globals = n.owner.globals;
+                n.type = n.owner.type;
             }
 
-            int ct = tb.Int();
-            n.globals = new Dictionary<string, StashEnt>();
-            for (int i = 0; i < ct; i++) {
-                n.globals[tb.String()] = (StashEnt)tb.ObjRef();
-            }
-
+            n.subordinates = tb.RefsL<RuntimeUnit>();
             n.mainline   = (SubInfo)tb.ObjRef();
             n.bottom     = (SubInfo)tb.ObjRef();
             n.our_subs   = tb.RefsL<SubInfo>();
@@ -5196,7 +5254,7 @@ slow:
             return th;
         }
 
-        public static void RunMain(RuntimeUnit main_unit) {
+        internal static void SetTrace() {
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
                 if (trace == "all") {
@@ -5212,7 +5270,11 @@ slow:
                 }
                 TraceCount = TraceFreq;
             }
+        }
+
+        public static void RunMain(RuntimeUnit main_unit) {
             try {
+                main_unit.InitTime();
                 main_unit.RunMainline();
             } catch (NieczaException n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
@@ -5798,6 +5860,7 @@ slow:
 
         public static void MainHandler(string uname, string[] args) {
             InitCompartment();
+            SetTrace();
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
@@ -5806,7 +5869,7 @@ slow:
             Kernel.containerRootUnit = ru;
             Kernel.currentGlobals = ru.globals;
 
-            ru.PrepareEval();
+            ru.InitTime();
             RunMain(ru);
         }
 
@@ -5836,6 +5899,7 @@ slow:
             string cmd = args.Length > 0 ? args[0] : "-help";
 
             InitCompartment();
+            SetTrace();
 
             if (cmd == "-field-inventory") {
                 foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {
@@ -5911,14 +5975,7 @@ slow:
                 RewriteUnits(root, exename, fromdir, new HashSet<string>());
             }
             else if (cmd == "-run" && args.Length == 2) {
-                RuntimeUnit ru = (RuntimeUnit)
-                    RuntimeUnit.reg.LoadUnit(args[1]).root;
-
-                Kernel.containerRootUnit = ru;
-                Kernel.currentGlobals = ru.globals;
-
-                ru.PrepareEval();
-                RunMain(ru);
+                MainHandler(args[1], new string[0]);
             } else {
                 Console.WriteLine("usage: Kernel.dll -run Unit.Name");
                 Console.WriteLine("usage: Kernel.dll -gen-app App.exe build/dir");

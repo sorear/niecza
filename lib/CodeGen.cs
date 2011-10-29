@@ -3621,6 +3621,11 @@ dynamic:
                 return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
                     (o is STable) ? "type" : (o is Frame) ? "frame" : "unknown";
             } else if (cmd == "set_binding") {
+                if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
+                    Kernel.TraceFlags = Kernel.TRACE_CUR;
+                    Kernel.TraceCount = Kernel.TraceFreq = 1;
+                }
+                Kernel.SetTrace();
                 Backend.obj_dir = (string)args[1];
                 Builtins.upcall_receiver = (System.Collections.IDictionary)args[2];
                 return null;
@@ -3639,21 +3644,20 @@ dynamic:
                     // this is a module unit
                     Kernel.InitCompartment();
                     Kernel.containerRootUnit = ru;
+                    ru.owner = ru;
                     ru.globals = Kernel.currentGlobals =
                         new Dictionary<string,StashEnt>();
                 } else {
                     // needs to use the same globals as the other units in
                     // this serialization unit
                     ru.globals = Kernel.currentGlobals;
-
-                    // evals during compilation add to the same .dll
-                    if (Kernel.containerRootUnit.type == null)
-                        Kernel.containerRootUnit.cosaved_evals.Add(ru);
+                    ru.owner = Kernel.containerRootUnit;
+                    ru.owner.subordinates.Add(ru);
                 }
                 return new Handle(ru);
             } else if (cmd == "unit_need_unit") {
                 // LinkUnit state is owned by the root
-                //RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 string oname   = (string)args[2];
 
                 RuntimeUnit tg;
@@ -3667,7 +3671,7 @@ dynamic:
                         return r1;
                     tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
                 }
-                string err = Kernel.containerRootUnit.LinkUnit(tg);
+                string err = ru.owner.LinkUnit(tg);
                 return err == null ? (object)new Handle(tg) : new Exception(err);
             } else if (cmd == "unit_anon_stash") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
@@ -4292,6 +4296,10 @@ dynamic:
                 Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
                 Kernel.currentGlobals = ru.globals;
                 ru.PrepareEval();
+                // If we're done with an eval but it's too late to be caught
+                // by the normal INIT process, run that now.
+                if (ru != ru.owner && ru.owner.inited)
+                    ru.InitTime();
                 if (!evalmode)
                     Kernel.RunMain(ru);
                 return null;
@@ -4301,6 +4309,7 @@ dynamic:
                 return null;
             } else if (cmd == "unit_replrun") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+                ru.InitTime();
                 Frame fret = null;
                 StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
                 b.v = Kernel.FalseV;
