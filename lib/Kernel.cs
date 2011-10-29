@@ -782,6 +782,21 @@ namespace Niecza {
             return Kernel.NewTypedScalar(null);
         }
 
+        static bool IsEmptyAggr(Variable v) {
+            if (!v.islist) return false;
+            P6any p = v.Fetch();
+            if (p.mo == Kernel.ArrayMO) {
+                return ((VarDeque)p.GetSlot("items")).Count() == 0 &&
+                    ((VarDeque)p.GetSlot("rest")).Count() == 0;
+            }
+            else if (p.mo == Kernel.HashMO) {
+                return Kernel.UnboxAny<VarHash>(p).Count == 0;
+            }
+            else {
+                return false;
+            }
+        }
+
         public static string NsMerge(string who, string name,
                 ref StashEnt nse, StashEnt ose) {
 
@@ -790,11 +805,11 @@ namespace Niecza {
             bool  nseod = nseo.IsDefined();
             bool  oseod = oseo.IsDefined();
             // lowest priority are empty common symbols
-            if (nse.v.rw && !nseod) {
+            if (nse.v.rw && !nseod || IsEmptyAggr(nse.v)) {
                 nse = ose;
                 return null;
             }
-            if (ose.v.rw && !oseod) {
+            if (ose.v.rw && !oseod || IsEmptyAggr(ose.v)) {
                 return null;
             }
 
