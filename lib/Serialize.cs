@@ -510,6 +510,7 @@ namespace Niecza.Serialization {
         List<object> revalidate = new List<object>();
 
         public Type type;
+        public Dictionary<string,System.Reflection.MethodInfo> methods;
 
         internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data = data;

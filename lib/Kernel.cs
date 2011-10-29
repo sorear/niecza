@@ -396,6 +396,7 @@ namespace Niecza {
         public int nextid;
         public Dictionary<object, FieldInfo> constants;
         internal Dictionary<string, CpsOp> val_constants;
+        HashSet<string> used_fields = new HashSet<string>();
 
         List<NamProcessor> fill = new List<NamProcessor>();
         string dll_name;
@@ -461,6 +462,13 @@ namespace Niecza {
                 asm_builder.Save(dll_name);
             foreach (NamProcessor th in fill)
                 th.FillSubInfo(type);
+
+            var fields = new Dictionary<string,FieldInfo>();
+            foreach (FieldInfo fi in type.GetFields())
+                fields[fi.Name] = fi;
+            foreach (object k in constants.Keys)
+                constants[k] = fields[constants[k].Name];
+
             return type;
         }
 
@@ -604,8 +612,9 @@ namespace Niecza {
                 fnb.Append('_');
             string fname = fnb.ToString();
             int i = 1;
-            while (type_builder.GetField(fname) != null)
+            while (used_fields.Contains(fname))
                 fname = fnb.ToString() + (i++);
+            used_fields.Add(fname);
             return type_builder.DefineField(fname, ty, FieldAttributes.Public |
                     FieldAttributes.Static);
         }
@@ -700,7 +709,7 @@ namespace Niecza {
         void SetConstants(Type ty, Dictionary<object,FieldInfo> consts) {
             if (ty != null) {
                 foreach (KeyValuePair<object, FieldInfo> kv in consts)
-                    ty.GetField(kv.Value.Name).SetValue(null, kv.Key);
+                    kv.Value.SetValue(null, kv.Key);
             }
         }
 
@@ -948,8 +957,14 @@ namespace Niecza {
                     Assembly assembly = Assembly.Load(n.asm_name);
                     n.type = tb.type = assembly.GetType(n.asm_name, true);
                     n.constants = new Dictionary<object,FieldInfo>();
+                    var fields = new Dictionary<string,FieldInfo>();
+                    foreach (FieldInfo fi in n.type.GetFields())
+                        fields[fi.Name] = fi;
+                    tb.methods = new Dictionary<string,MethodInfo>();
+                    foreach (MethodInfo mi in n.type.GetMethods())
+                        tb.methods[mi.Name] = mi;
                     while (ncon-- > 0) {
-                        FieldInfo fi = n.type.GetField(tb.String());
+                        FieldInfo fi = fields[tb.String()];
                         object val = tb.ObjRef();
                         n.constants[val] = fi;
                         fi.SetValue(null, val);
@@ -1999,8 +2014,9 @@ noparams:
                 n.code = t == null ? null :
                     (DynBlockDelegate) Delegate.CreateDelegate(
                     typeof(DynBlockDelegate),
-                    t.GetMethod(mn, BindingFlags.Public |
-                        BindingFlags.NonPublic | BindingFlags.Static));
+                    t == tb.type ? tb.methods[mn] :
+                        t.GetMethod(mn, BindingFlags.Public |
+                            BindingFlags.NonPublic | BindingFlags.Static));
             }
 
             n.nspill = tb.Int();
