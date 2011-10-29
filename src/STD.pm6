@@ -5139,9 +5139,10 @@ method getsig {
         <?before <[ \$ \@ \% \& ]> \w >
     }
 
+    my $new = Cursor.^can('cursor_start');
     if ($*CURLEX<!multi>//'') ne 'proto' {
         for $*CURLEX<!sub>.unused_lexicals -> $k, $pos {
-            next unless interesting(Cursor.new($k));
+            next unless interesting($new ?? Cursor.cursor_start($k) !! Cursor.new($k));
             # next if $[_/!] declared automatically "dynamic" TODO
             next unless $pos >= 0;
             self.cursor($pos).worry("$k is declared but not used");
