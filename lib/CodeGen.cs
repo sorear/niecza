@@ -3663,7 +3663,9 @@ dynamic:
                 RuntimeUnit tg;
                 try {
                     tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
-                } catch (Exception) {
+                } catch (Exception ex) {
+                    if (Config.SerFailInfo)
+                        Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
                     // assume stale at first
                     object r1 = Builtins.UpCall(new object[] {
                         "compile_unit", oname });

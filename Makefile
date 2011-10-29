@@ -2,7 +2,7 @@
 
 # How to run CLR programs; can be blank for Win32
 RUN_CLR=mono
-CSC=gmcs
+CSC=gmcs /debug+
 RM=rm -f
 CP=cp
 

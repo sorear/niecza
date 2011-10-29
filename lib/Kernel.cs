@@ -861,9 +861,7 @@ namespace Niecza {
             fb.String(asm_name);
             fb.String(dll_name);
 
-            fb.Refs(dep);
             fb.ObjRef(owner);
-
             if (owner == this) {
                 // master unit requires saving type and constant info
                 fb.Int(constants.Count);
@@ -877,6 +875,7 @@ namespace Niecza {
                     fb.ObjRef(kv.Value);
                 }
             }
+            fb.Refs(dep);
 
             fb.Refs(subordinates);
             fb.ObjRef(mainline);
@@ -916,11 +915,13 @@ namespace Niecza {
             n.asm_name = tb.String();
             n.dll_name = tb.String();
 
-            n.depended_units = new HashSet<RuntimeUnit>(tb.RefsA<RuntimeUnit>());
             n.owner = (RuntimeUnit)tb.ObjRef();
-
+            // master-case initialization has to happen before potentially
+            // loading any *other* unit
             if (n.owner == n) {
                 // is a master unit
+                // set this before any potential of aliasing
+                n.globals = new Dictionary<string,StashEnt>();
                 int ncon = tb.Int();
                 if (Backend.cross_level_load) {
                     // don't load a type, throw away constants
@@ -941,18 +942,17 @@ namespace Niecza {
                 }
 
                 int ct = tb.Int();
-                n.globals = new Dictionary<string, StashEnt>();
                 for (int i = 0; i < ct; i++) {
                     n.globals[tb.String()] = (StashEnt)tb.ObjRef();
                 }
             }
             else {
-                if (n.owner.globals == null)
-                    throw new Exception("load order goof");
                 n.globals = n.owner.globals;
+                if (n.globals == null) throw new Exception("load goofed");
                 n.type = n.owner.type;
             }
 
+            n.depended_units = new HashSet<RuntimeUnit>(tb.RefsA<RuntimeUnit>());
             n.subordinates = tb.RefsL<RuntimeUnit>();
             n.mainline   = (SubInfo)tb.ObjRef();
             n.bottom     = (SubInfo)tb.ObjRef();
@@ -1308,6 +1308,7 @@ namespace Niecza {
         public Dictionary<string, LexInfo> dylex;
         public uint dylex_filter; // (32,1) Bloom on hash code
         public string name;
+        public int num_lex_slots; // for code generation
         // maybe should be in extend or a hint?
         public LAD ltm;
         public int special;
@@ -1330,7 +1331,6 @@ namespace Niecza {
 
         // this is used only at compile time
         public Dictionary<string,UsedInScopeInfo> used_in_scope;
-        public int num_lex_slots;
 
         // if this is non-null, compilation is being delayed
         public string nam_str;
@@ -1932,6 +1932,7 @@ noparams:
             fb.Ints(lines);
             fb.Ints(edata);
             fb.Strings(label_names);
+            fb.Int(num_lex_slots);
             fb.Int(dylex.Count);
             foreach (KeyValuePair<string, LexInfo> kv in dylex) {
                 fb.String(kv.Key);
@@ -1998,6 +1999,7 @@ noparams:
             for (int i = 0; i < n.edata.Length; i += 5)
                 if (n.edata[i+2] == ON_VARLOOKUP && n.edata[i+4] >= 0)
                     n.dylex_filter |=FilterForName(n.label_names[n.edata[i+4]]);
+            n.num_lex_slots = tb.Int();
             int dyct = tb.Int();
             n.dylex = new Dictionary<string, LexInfo>();
             for (int i = 0; i < dyct; i++) {
@@ -5873,26 +5875,25 @@ slow:
             RunMain(ru);
         }
 
-        static void RewriteUnits(RuntimeUnit from, string exe_name,
-                string from_dir, HashSet<string> done) {
-            if (done.Contains(from.name))
+        // Turns all the units of the app into subordinates of the
+        // main unit
+        static void RewriteUnits(RuntimeUnit from, RuntimeUnit root,
+                HashSet<RuntimeUnit> done) {
+            if (done.Contains(from))
                 return;
-            done.Add(from.name);
+            done.Add(from);
 
             foreach (RuntimeUnit z in from.depended_units)
-                RewriteUnits(z, exe_name, from_dir, done);
+                RewriteUnits(z, root, done);
+            foreach (RuntimeUnit z in from.subordinates)
+                RewriteUnits(z, root, done);
 
-            Console.WriteLine("Looking at {0} ...", from.name);
-
-            string osername = Path.Combine(from_dir, "Run."+from.name+".ser");
-            string nsername = Path.Combine(Backend.obj_dir, from.name+".ser");
-
-            if (File.Exists(nsername) && File.GetLastWriteTime(osername) <
-                    File.GetLastWriteTime(nsername)) {
-                Console.WriteLine("... up to date.");
-                return;
+            from.owner = root;
+            from.asm_name = from.name.Replace("::", ".");
+            if (from != root) {
+                root.subordinates.Add(from);
+                from.subordinates.Clear();
             }
-            Console.WriteLine("... needs to be rewritten.");
         }
 
         public static void Main(string[] args) {
@@ -5972,7 +5973,15 @@ slow:
                 Backend.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
                 Backend.prefix  = "";
 
-                RewriteUnits(root, exename, fromdir, new HashSet<string>());
+                RewriteUnits(root, root, new HashSet<RuntimeUnit>());
+
+                // reset for writability
+                RuntimeUnit.reg = new ObjectRegistry();
+
+                root.dll_name = exename + ".exe";
+                root.asm_name = exename;
+                root.name = exename;
+                root.Save();
             }
             else if (cmd == "-run" && args.Length == 2) {
                 MainHandler(args[1], new string[0]);
@@ -5993,6 +6002,8 @@ slow:
             Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
         public static readonly bool SerTrace =
             Environment.GetEnvironmentVariable("NIECZA_SER_TRACE") != null;
+        public static readonly bool SerFailInfo =
+            Environment.GetEnvironmentVariable("NIECZA_SER_FAIL_INFO") != null;
         public static readonly bool KeepIL =
             Environment.GetEnvironmentVariable("NIECZA_KEEP_IL") != null;
     }
