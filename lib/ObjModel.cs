@@ -591,6 +591,8 @@ next_method: ;
             if (rtype == "role" || rtype == "prole") {
                 isRole = true;
                 SetMRO(Kernel.AnyMO.mo.mro);
+                Revalidate();
+                stable.SetupVTables();
                 return null;
             }
 
@@ -622,6 +624,8 @@ next_method: ;
             foreach (string an in stable.all_slot) {
                 stable.slotMap[an] = stable.nslots++;
             }
+            Revalidate();
+            stable.SetupVTables();
             return null;
         }
 

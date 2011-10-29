@@ -4074,7 +4074,6 @@ dynamic:
                 string err = st.mo.Compose();
                 if (err != null)
                     return new Exception(err);
-                st.Invalidate();
                 return null;
             } else if (cmd == "type_kind") {
                 STable st = (STable)Handle.Unbox(args[1]);
