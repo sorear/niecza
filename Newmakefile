@@ -45,8 +45,8 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/ni
 	$(RUN_CLR) boot/run/Niecza.exe -C JSYNC
 	touch .fetch-stamp
 
-boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
-	$(CSC) /target:library /out:boot/obj/CompilerBlob.dll /r:Run.Kernel \
+boot/obj/Run.CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
+	$(CSC) /target:library /out:boot/obj/Run.CompilerBlob.dll /r:Run.Kernel \
 	    /lib:boot/obj src/CompilerBlob.cs
 obj/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 	$(CSC) /target:exe /out:obj/Run.Kernel.dll /lib:obj /unsafe+ \
@@ -134,7 +134,7 @@ help:
 	@echo 'help       this list of targets'
 	@echo ''
 
-boot/obj/NieczaBackendDotnet.ser: boot/obj/CompilerBlob.dll
+boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.CompilerBlob.dll
 
 # grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/Run.\1.ser: boot/obj/Run.\2.ser|' | grep -v MONKEY_TYPING
 boot/obj/Run.NAMOutput.ser: boot/obj/Run.JSYNC.ser
