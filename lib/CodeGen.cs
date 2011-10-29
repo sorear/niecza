@@ -3385,20 +3385,34 @@ dynamic:
             List<object> enter = new List<object>();
             EnterCode(enter);
 
+            List<object> handlers = new List<object>();
+            handlers.Add(new JScalar("xspan"));
+            handlers.Add(new JScalar("tstart"));
+            handlers.Add(new JScalar("tend"));
+            handlers.Add(new JScalar("0"));
+            handlers.Add(b);
+
             // TODO: bind a ro container around return values
             if (sub.IsTopicalizer()) {
-                b = new object[] { new JScalar("xspan"),
-                    new JScalar("tstart"), new JScalar("tend"),
-                    new JScalar("0"), b,
-                    new JScalar("6"), new JScalar(""), new JScalar("tend")};
+                handlers.Add(new JScalar("6"));
+                handlers.Add(new JScalar(""));
+                handlers.Add(new JScalar("tend"));
+            }
+            foreach (KeyValuePair<string,LexInfo> kv in sub.dylex) {
+                if (!(kv.Value is LILabel))
+                    continue;
+                handlers.Add(new JScalar("8"));
+                handlers.Add(new JScalar(kv.Key));
+                handlers.Add(new JScalar("goto_" + kv.Key));
             }
             if (sub.mo.HasMRO(Kernel.RoutineMO) &&
                     (sub.special & SubInfo.RETURN_PASS) == 0) {
-                b = new object[] { new JScalar("xspan"),
-                    new JScalar("rstart"), new JScalar("rend"),
-                    new JScalar("0"), b,
-                    new JScalar("4"), new JScalar(""), new JScalar("rend")};
+                handlers.Add(new JScalar("4"));
+                handlers.Add(new JScalar(""));
+                handlers.Add(new JScalar("tend"));
             }
+            if (handlers.Count != 5)
+                b = handlers.ToArray();
             enter.Insert(0, new JScalar("prog"));
             enter.Add(new object[] { new JScalar("return"), b });
             b = enter.ToArray();
