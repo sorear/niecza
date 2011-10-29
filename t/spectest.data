@@ -9,16 +9,17 @@ integration/advent2009-day01.t
 integration/advent2009-day03.t
 integration/advent2009-day04.t
 integration/advent2009-day06.t
-integration/advent2009-day06.t
 integration/advent2009-day07.t
 integration/advent2009-day13.t
 integration/advent2009-day14.t
+integration/advent2009-day15.t
 integration/advent2009-day16.t
 integration/advent2009-day23.t
 integration/advent2010-day04.t
 integration/code-blocks-as-sub-args.t
 integration/lexicals-and-attributes.t
 integration/man-or-boy.t
+integration/packages.t
 integration/pair-in-array.t
 S02-lexical-conventions/begin_end_pod.t
 S02-lexical-conventions/comments.t
@@ -30,11 +31,13 @@ S02-lexical-conventions/unicode.t
 S02-literals/array-interpolation.t
 S02-literals/autoref.t
 S02-literals/hash-interpolation.t
+S02-literals/listquote-whitespace.t
 S02-literals/numeric.t
 S02-literals/pair-boolean.t
 S02-literals/quoting.t
 S02-literals/string-interpolation.t
 S02-literals/subscript.t
+S02-literals/sub-calls.t
 S02-literals/types.t
 S02-literals/underscores.t
 S02-magicals/block.t
@@ -43,6 +46,7 @@ S02-magicals/file_line.t
 S02-magicals/progname.t
 S02-magicals/sub.t
 S02-names-vars/contextual.t
+S02-names-vars/list_array_perl.t
 S02-names-vars/varnames.t
 S02-names/caller.t
 S02-names/identifier.t
@@ -82,11 +86,12 @@ S03-metaops/hyper.t
 S03-metaops/not.t
 S03-metaops/reduce.t
 S03-metaops/reverse.t
+S03-metaops/zip.t
 S03-operators/also.t
 S03-operators/assign-is-not-binding.t
 S03-operators/autovivification.t
 S03-operators/binding-arrays.t
-# S03-operators/binding-closure.t err: 'System.NullReferenceException: Object reference not set to an instance of an object'
+S03-operators/binding-closure.t
 S03-operators/binding-hashes.t
 S03-operators/binding-nested.t
 S03-operators/binding-ro.t
@@ -100,6 +105,7 @@ S03-operators/equality.t
 S03-operators/eqv.t
 S03-operators/flip-flop.t
 S03-operators/gcd.t
+S03-operators/increment.t
 S03-operators/inplace.t
 S03-operators/is-divisible-by.t
 S03-operators/lcm.t
@@ -122,6 +128,7 @@ S03-operators/subscript-adverbs.t
 S03-operators/subscript-vs-lt.t
 S03-operators/ternary.t
 S03-operators/value_equivalence.t
+S03-sequence/arity0.t
 S03-smartmatch/any-any.t
 S03-smartmatch/any-array-slice.t
 S03-smartmatch/any-array.t
@@ -148,6 +155,7 @@ S04-declarations/multiple.t
 S04-declarations/my.t
 S04-declarations/state.t
 S04-exceptions/control_across_runloop.t
+S04-phasers/begin.t
 S04-phasers/end.t
 S04-phasers/enter-leave.t
 S04-phasers/keep-undo.t
@@ -219,6 +227,7 @@ S06-currying/named.t
 S06-multi/by-trait.t
 S06-multi/lexical-multis.t
 S06-other/anon-hashes-vs-blocks.t
+S06-other/main-eval.t
 S06-other/misc.t
 S06-routine-modifiers/scoped-named-subs.t
 S06-signature/arity.t
@@ -291,6 +300,8 @@ S32-hash/invert.t
 S32-hash/keys_values.t
 S32-hash/pairs.t
 S32-hash/slice.t
+S32-io/dir.t
+S32-io/file-tests.t
 S32-list/first.t
 S32-list/pick.t
 S32-num/abs.t
