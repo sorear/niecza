@@ -466,8 +466,10 @@ namespace Niecza {
             var fields = new Dictionary<string,FieldInfo>();
             foreach (FieldInfo fi in type.GetFields())
                 fields[fi.Name] = fi;
-            foreach (object k in constants.Keys)
-                constants[k] = fields[constants[k].Name];
+            var rconstants = new Dictionary<object,FieldInfo>();
+            foreach (var kv in constants)
+                rconstants[kv.Key] = fields[kv.Value.Name];
+            constants = rconstants;
 
             return type;
         }
