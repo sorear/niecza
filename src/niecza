@@ -73,6 +73,13 @@ method nibbler() {
 }
 }
 
+augment class RxOp::Sym {
+    method clone(:$captures) {
+        self.WHAT.new(text => $!text, igcase => $!igcase, igmark => $!igmark,
+            endsym => $!endsym, :$captures);
+    }
+}
+
 augment class NieczaActions {
 method type_declarator:subset ($/) {
     my ($basetype) = self.process_name($*OFTYPE<longname>);
