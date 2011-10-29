@@ -543,7 +543,7 @@ namespace Niecza.Serialization {
                 accum |= (((long)(b & 127)) << shift);
                 shift += 7;
                 if ((b & 128) == 0) {
-                    if ((b & 64) != 0) {
+                    if ((b & 64) != 0 && shift < 64) {
                         accum |= ((-1L) << shift);
                     }
                     //Console.WriteLine("Read {0} end {1}", accum, rpointer);
