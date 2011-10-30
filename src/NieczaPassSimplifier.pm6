@@ -50,13 +50,6 @@ sub capture_params($op) {
     $(@pos), @named;
 }
 
-sub is_simple_var($op) {
-    $op = $op.inner while $op.^isa(::Op::Paren);
-    return Any unless $op.^isa(::Op::Lexical);
-    return Any if $op.declaring || $op.state_backing;
-    return $op.name;
-}
-
 our %funcs = (
     '&postcircumfix:<{ }>' => &do_atkey,
     '&postcircumfix:<[ ]>' => &do_atpos,

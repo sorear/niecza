@@ -1035,7 +1035,7 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
     rxtest /^ x**2..4 $/, 'x**2..4', ('xx','xxx','xxxx'), ('x','xxxxx');
     rxtest /^ x**2..* $/, 'x**2..*', ('xx','xxx','xxxx'), ('x',);
     rxtest /^ [x**2] $/, 'x**2', ('xx',), ('x','xxx');
-    rxtest /^ [x**y] $/, 'x**y', ('x','xyx','xyxyx'), ('','xy','yx');
+    rxtest /^ [x+%y] $/, 'x**y', ('x','xyx','xyxyx'), ('','xy','yx');
 }
 
 {
@@ -1167,7 +1167,7 @@ is join("|", <a3 b2 c1 d0>.sort({ substr($^a,1) leg substr($^b,1) })),
     'd0|c1|b2|a3', '.sort with callback works';
 
 is ("yayay" ~~ /y\w*?y/), "yay", "minimal matching works";
-is ("yayay" ~~ /y**?a/), "y", "minimal matching works with **";
+is ("yayay" ~~ /y+?%a/), "y", "minimal matching works with **";
 
 is +[ 2 ], 1, "array construction w/ one argument";
 is +[ ], 0, "array construction w/ no arguments";

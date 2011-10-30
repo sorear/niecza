@@ -1183,11 +1183,6 @@ method infixish($/) {
     }
 }
 
-my %loose2tight = (
-    '&&' => '&&', '||' => '||', '//' => '//', 'andthen' => 'andthen',
-    'orelse' => '//', 'and' => '&&', 'or' => '||',
-);
-
 method infix:sym<...> ($/) {
     # STD parses ...^ in the ... rule
     make Operator.funop($/, '&infix:<' ~ $/ ~ '>', 2);
