@@ -152,6 +152,14 @@ class StaticSub {
                 $truename ~~ s/<?before \w>/OUTER::/ for ^$count;
                 die "Lexical symbol '$slot' is already bound to an outer symbol{Metamodel.locstr($of, $ol, $nf, $nl)};\n  the implicit outer binding at line $line must be rewritten as $truename\n  before you can unambiguously declare a new '$slot' in this scope";
             }
+            when 'sub' {
+                my ($ , $slot) = @args;
+                if %*MYSTERY{substr($slot,1)} -> $my {
+                    my $ix = $my<line>.index(',');
+                    self.lookup_lex($slot, $*FILE<name>,
+                        +(defined($ix) ?? substr($my<line>,0,$ix) !! $my<line>));
+                }
+            }
         }
     }
 

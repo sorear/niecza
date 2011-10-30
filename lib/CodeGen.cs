@@ -3507,6 +3507,9 @@ dynamic:
                     uisi.line, li.file, li.line, uisi.orig_file, uisi.orig_line };
             li.owner.AddLexical(li.name, li);
 
+            if (li.name.Length >= 1 && li.name[0] == '&')
+                return new object[] { "sub", li.name };
+
             return new object[] { "" };
         }
 
