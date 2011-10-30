@@ -408,7 +408,7 @@ token charname {
     ] || <.sorry: "Unrecognized character name"> .*?<?terminator>
 }
 
-token charnames { \s* [<charname><.ws>] ** [','\s*] }
+token charnames { \s* [<charname><.ws>]+ % [','\s*] }
 
 token charspec {
     [
@@ -747,25 +747,25 @@ token embeddedblock {
     [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
 }
 
-token binints { [<.ws><binint><.ws>] ** ',' }
+token binints { [<.ws><binint><.ws>]+ % ',' }
 
 token binint {
     <[ 0..1 ]>+ [ _ <[ 0..1 ]>+ ]*
 }
 
-token octints { [<.ws><octint><.ws>] ** ',' }
+token octints { [<.ws><octint><.ws>]+ % ',' }
 
 token octint {
     <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
 }
 
-token hexints { [<.ws><hexint><.ws>] ** ',' }
+token hexints { [<.ws><hexint><.ws>]+ % ',' }
 
 token hexint {
     <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
 }
 
-token decints { [<.ws><decint><.ws>] ** ',' }
+token decints { [<.ws><decint><.ws>]+ % ',' }
 
 token decint {
     \d+ [ _ \d+ ]*
@@ -1369,7 +1369,7 @@ grammar P6 is STD {
         [
         |<version>
         |<module_name>
-        ] ** ','
+        ]+ % ','
     }
 
     token statement_control:import {
@@ -1548,7 +1548,7 @@ grammar P6 is STD {
     }
 
     token version:sym<v> {
-        'v' <?before \d+> :: <vnum> ** '.' '+'?
+        'v' <?before \d+> :: <vnum>+ % '.' '+'?
     }
 
     ###############
@@ -1783,8 +1783,8 @@ grammar P6 is STD {
         :dba('signature')
         [
             ':'?'(' ~ ')' <signature(++$signum)>
-        ]
-        ** '|'
+        ]+
+        % '|'
     }
 
     method checkyada {
@@ -2674,7 +2674,7 @@ grammar P6 is STD {
         |   [
             | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
             | [ <parameter> || <.panic: "Malformed parameter"> ]
-            ] ** <param_sep>
+            ]+ % <param_sep>
         ]
         <.ws>
         { $*IN_DECL = ''; }
@@ -3339,7 +3339,7 @@ grammar P6 is STD {
     }
 
     token semiarglist {
-        <arglist> ** ';'
+        <arglist>+ % ';'
         <.ws>
     }
 
@@ -4657,7 +4657,7 @@ grammar Regex is STD {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
     }
 
-    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($¢.orig,$¢.pos,1) ~ "') or use a backslashed form like \\xXX"> }  # no unspace in regexen  NIECZA: removed ord, sprintf
+    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($¢.orig,$¢.pos,1) ~ "') or use a backslashed form like \\x{sprintf '%02x', ord(substr($¢.orig,$¢.pos,1))}"> }  # no unspace in regexen
 
     rule nibbler(:$reset?) {
         :temp %*RX;
