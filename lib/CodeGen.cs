@@ -2498,7 +2498,7 @@ namespace Niecza.CLRBackend {
                     } else if ((flags & SubInfo.SIG_F_DEFOUTER) != 0) {
                         get = th.RawAccessLex("outerlex", lex, null);
                     } else if ((flags & SubInfo.SIG_F_OPTIONAL) != 0) {
-                        get = eu.RefConstant(type.name + "MO", type.typeVar, null);
+                        get = eu.TypeConstantV(type);
                     } else {
                         get = CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
                             CpsOp.StringLiteral("No value in "+name+" available for parameter "+(string)sig_r[rbase]));
@@ -2712,9 +2712,9 @@ dynamic:
                 if (kind == "mo")
                     return th.cpb.eu.TypeConstant(m);
                 if (kind == "typeVar")
-                    return th.cpb.eu.RefConstant(m.name + "TV", m.typeVar, null);
+                    return th.cpb.eu.TypeConstantV(m);
                 if (kind == "typeObj")
-                    return th.cpb.eu.RefConstant(m.name + "TO", m.typeObject, null);
+                    return th.cpb.eu.TypeConstantP(m);
                 throw new NotImplementedException("class_ref " + kind);
             };
             handlers["methodcall"] = delegate (NamProcessor th, object[] zyg) {
@@ -2981,7 +2981,7 @@ dynamic:
                 AltInfo ai = new AltInfo(prefixes, JScalar.S(z[2]), null);
                 th.altinfo_fixups.Add(new KeyValuePair<AltInfo,string[]>(
                         ai, JScalar.SA(0, z[3])));
-                CpsOp aic = th.cpb.eu.RefConstant(ai.dba, ai, null);
+                CpsOp aic = th.cpb.eu.RefConstant(ai.dba, "", ai, null);
                 return CpsOp.MethodCall(Tokens.RxFrame.GetMethod("LTMPushAlts"),
                     CpsOp.RxFrame(), CpsOp.CallFrame(), aic); };
             thandlers["popcut"] = RxCall(null, "PopCutGroup");

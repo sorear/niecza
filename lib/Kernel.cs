@@ -395,11 +395,11 @@ namespace Niecza {
         public TypeBuilder type_builder;
         public int nextid;
         public Dictionary<object, FieldInfo> constants;
-        internal Dictionary<string, CpsOp> val_constants;
-        HashSet<string> used_fields = new HashSet<string>();
+        Dictionary<string, CpsOp> val_constants;
 
         List<NamProcessor> fill = new List<NamProcessor>();
         string dll_name;
+        int funique;
 
         public EmitUnit(string uname, string asm_name, string dll_name, bool is_mainish) {
 
@@ -475,26 +475,35 @@ namespace Niecza {
         }
 
         internal CpsOp TypeConstant(STable s) {
-            return RefConstant(s == null ? "" : s.name, s, Tokens.STable);
+            return RefConstant(s == null ? "" : s.name, "MO", s, Tokens.STable);
+        }
+        internal CpsOp TypeConstantP(STable s) {
+            return RefConstant(s.name, "P", s.typeObject, Tokens.P6any);
+        }
+        internal CpsOp TypeConstantV(STable s) {
+            return RefConstant(s.name, "V", s.typeVar, Tokens.Variable);
         }
         internal CpsOp SubConstant(SubInfo s) {
-            return RefConstant(s == null ? "" : s.name, s, Tokens.SubInfo);
+            return RefConstant(s == null ? "" : s.name, "S", s, Tokens.SubInfo);
+        }
+        internal CpsOp FrameConstant(Frame s) {
+            return RefConstant(s.info.name, "P", s, Tokens.Frame);
         }
 
-        internal CpsOp RefConstant(string name, object val, Type nty) {
+        internal CpsOp RefConstant(string n1, string n2, object val, Type nty) {
             if (val == null)
                 return CpsOp.Null(nty);
             FieldInfo fi;
             if (!constants.TryGetValue(val, out fi))
-                constants[val] = fi = NewField(name, val is Variable ? typeof(Variable) : val.GetType());
+                constants[val] = fi = NewField(n1, n2,
+                        val is Variable ? typeof(Variable) : val.GetType());
             return CpsOp.IsConst(CpsOp.GetSField(fi));
         }
 
-        internal CpsOp ValConstant(string desc, object val) {
+        internal CpsOp ValConstant(string key, object val) {
             CpsOp r;
-            if (!val_constants.TryGetValue(desc, out r))
-                val_constants[desc] = r =
-                    RefConstant(desc.Substring(0, desc.Length > 20 ? 20 : desc.Length), val, null);
+            if (!val_constants.TryGetValue(key, out r))
+                val_constants[key] = r = RefConstant(key, "", val, null);
             return r;
         }
 
@@ -602,23 +611,34 @@ namespace Niecza {
             return ValConstant(code.ToString(), buf);
         }
 
-        internal FieldBuilder NewField(string name, Type ty) {
-            StringBuilder fnb = new StringBuilder();
-            // sanitize string - it must be convertable to a nonempty
-            // null-terminated UTF8 string
-            foreach (char ch in name) {
-                if (ch >= ' ' && ch <= '~') // yes this is overkill
-                    fnb.Append(ch);
+        internal FieldBuilder NewField(string n1, string n2, Type ty) {
+            char[] buf = new char[20];
+            // add unique-id
+            int wp = 10;
+            int ac = funique++;
+            while (ac > 0) {
+                int d = ac % 36;
+                ac /= 36;
+                buf[--wp] = d >= 10 ? (char)(d + 87) : (char)(d + 48);
             }
-            if (fnb.Length == 0)
-                fnb.Append('_');
-            string fname = fnb.ToString();
-            int i = 1;
-            while (used_fields.Contains(fname))
-                fname = fnb.ToString() + (i++);
-            used_fields.Add(fname);
-            return type_builder.DefineField(fname, ty, FieldAttributes.Public |
-                    FieldAttributes.Static);
+            int rp = wp;
+            wp = 0;
+            while (rp != 10) { buf[wp++] = buf[rp++]; }
+            buf[wp++] = '_';
+            // and names; sanitized
+            foreach (char ch in n1) {
+                if (wp == 20) break;
+                if (ch >= ' ' && ch <= '~') // yes this is overkill
+                    buf[wp++] = ch;
+            }
+            foreach (char ch in n2) {
+                if (wp == 20) break;
+                if (ch >= ' ' && ch <= '~' && wp < 20)
+                    buf[wp++] = ch;
+            }
+
+            return type_builder.DefineField(new string(buf, 0, wp),
+                    ty, FieldAttributes.Public | FieldAttributes.Static);
         }
 
     }
@@ -1079,8 +1099,7 @@ namespace Niecza {
             if ((owner.special & SubInfo.RUN_ONCE) != 0) {
                 return new ClrUnboxAny(Tokens.Variable,
                         new ClrMethodCall(false, Tokens.Frame.GetMethod("GetDynamic"),
-                    EmitUnit.Current.RefConstant(
-                        owner.name, owner.protopad, typeof(Frame)).head,
+                    EmitUnit.Current.FrameConstant(owner.protopad).head,
                     new ClrIntLiteral(typeof(int), index)));
             }
             return new ClrPadGet(up, index);
@@ -1089,8 +1108,7 @@ namespace Niecza {
         internal override ClrOp SetCode(int up, ClrOp to) {
             if ((owner.special & SubInfo.RUN_ONCE) != 0)
                 return new ClrProtoSet(index,
-                    EmitUnit.Current.RefConstant(
-                        owner.name, owner.protopad, typeof(Frame)).head, to);
+                    EmitUnit.Current.FrameConstant(owner.protopad).head, to);
             return new ClrPadSet(up, index, to);
         }
     }
@@ -1143,12 +1161,12 @@ namespace Niecza {
 
         internal override ClrOp GetCode(int up) {
             return new ClrGetField(Tokens.StashEnt_v,
-                EmitUnit.Current.RefConstant(name, var, null).head);
+                EmitUnit.Current.RefConstant(name, "E", var, null).head);
         }
 
         internal override ClrOp SetCode(int up, ClrOp to) {
             return new ClrSetField(Tokens.StashEnt_v,
-                EmitUnit.Current.RefConstant(name, var, null).head, to);
+                EmitUnit.Current.RefConstant(name, "E", var, null).head, to);
         }
 
         internal override void DoFreeze(FreezeBuffer fb) {
@@ -1312,8 +1330,7 @@ namespace Niecza {
         public override object Get(Frame f) { return pkg.typeVar; }
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
-            return EmitUnit.Current.RefConstant(pkg.name + "V",
-                    pkg.typeVar, typeof(Variable)).head;
+            return EmitUnit.Current.TypeConstantV(pkg).head;
         }
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Package);
