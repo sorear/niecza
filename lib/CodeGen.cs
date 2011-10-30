@@ -547,6 +547,9 @@ namespace Niecza.CLRBackend {
 
         public const int NumInt32 = 2;
         public const int NumInline = 10;
+
+        // other random stuff
+        public static readonly ClrOp[] EmptyClrOp = new ClrOp[0];
     }
 
     // This are expressional CLR operators.  This is lower level than the
@@ -1662,7 +1665,7 @@ namespace Niecza.CLRBackend {
         // the head MUST NOT have cases
         public ClrOp head;
 
-        public CpsOp(ClrOp head) : this(new ClrOp[0], head) { }
+        public CpsOp(ClrOp head) : this(Tokens.EmptyClrOp, head) { }
         public CpsOp(ClrOp[] stmts, ClrOp head) {
             if (head.HasCases)
                 throw new Exception("head must not have cases");
@@ -1722,18 +1725,23 @@ namespace Niecza.CLRBackend {
         public static CpsOp Sequence(params CpsOp[] terms) {
             if (terms.Length == 0) return new CpsOp(ClrNoop.Instance);
 
-            List<ClrOp> stmts = new List<ClrOp>();
+            int k = -1;
+            foreach (CpsOp t in terms)
+                k += 1 + t.stmts.Length;
+            ClrOp[] stmts = new ClrOp[k];
+            k = 0;
+
             for (int i = 0; i < terms.Length - 1; i++) {
                 if (terms[i].head.Returns != Tokens.Void)
                     throw new Exception("Non-void expression used in nonfinal sequence position" + terms[i].head.Returns);
                 foreach (ClrOp s in terms[i].stmts)
-                    stmts.Add(s);
-                stmts.Add(terms[i].head);
+                    stmts[k++] = s;
+                stmts[k++] = terms[i].head;
             }
 
             foreach (ClrOp s in terms[terms.Length - 1].stmts)
-                stmts.Add(s);
-            return new CpsOp(stmts.ToArray(), terms[terms.Length - 1].head);
+                stmts[k++] = s;
+            return new CpsOp(stmts, terms[terms.Length - 1].head);
         }
 
         static ClrOp StripResult(ClrOp it) {
