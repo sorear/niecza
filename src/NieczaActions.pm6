@@ -174,6 +174,11 @@ method name($/) {
 method longname($ ) { } # look at the children yourself
 method deflongname($ ) { }
 
+method is_pseudo_pkg {
+    $_ eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING
+        PROCESS COMPILING PARENT CLR >;
+}
+
 # this is to be the one place where names are processed
 
 # MODES
@@ -240,7 +245,6 @@ method process_name($/, :$declaring, :$defer, :$clean) {
             my @tail = @ns;
             my $head = pop(@tail) ~ $ext;
             unless @tail {
-                goto "dyn" if $head eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT CLR >;
                 return { name => $head } unless @tail;
             }
             try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
@@ -1557,7 +1561,12 @@ method term:name ($/) {
     }
     elsif $name<pkg> {
         make self.package_var($/, self.gensym, $name<name>, $name<pkg>);
-    } else {
+    }
+    elsif self.is_pseudo_pkg($name<name>) {
+        make ::Op::IndirectVar.new(|node($/),
+            name => ::Op::StringLiteral.new(text => $name<name>));
+    }
+    else {
         make mklex($/, $name<name>);
     }
 
@@ -1594,7 +1603,7 @@ method term:identifier ($/) {
         return;
     }
 
-    if $id eq any < MY OUR CORE DYNAMIC GLOBAL CALLER OUTER UNIT SETTING PROCESS COMPILING PARENT CLR > {
+    if self.is_pseudo_pkg($id) {
         make Op::IndirectVar.new(|node($/),
             name => Op::StringLiteral.new(text => $id));
         return;
