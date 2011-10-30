@@ -81,6 +81,28 @@ augment class RxOp::Sym {
 }
 
 augment class NieczaActions {
+method blockoid($/) {
+    # XXX horrible cheat, but my data structures aren't up to the task of
+    # $::UNIT being a class body &c.
+    if $/ eq '{YOU_ARE_HERE}' {
+        $*unit.set_bottom($*CURLEX<!sub>);
+        $*CURLEX<!sub>.create_static_pad;
+        $*CURLEX<!sub>.noninlinable;
+
+        loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
+            # this isn't *quite* right, as it will cause declaring
+            # anything more in the same scope to fail.
+            # ... and we have to be careful not to mark anon_0 used
+            # or installing this very block will fail!
+            substr($_,0,4) ne 'anon' and $/.CURSOR.mark_used($_)
+                for $l.lex_names;
+        }
+
+        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
+    } else {
+        make $<statementlist>.ast;
+    }
+}
 method type_declarator:subset ($/) {
     my ($basetype) = self.process_name($*OFTYPE<longname>);
     $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', 'Any');

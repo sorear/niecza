@@ -87,7 +87,7 @@ mknext: run/Niecza.exe obj/Run.Kernel.dll obj/Kernel.dll
 	rm -rf next/
 	mkdir -p next next/boot next/obj next/run next/boot next/boot/obj/
 	touch next/FETCH_URL next/.fetch-stamp
-	cp -a src/ lib/ Newmakefile next/
+	cp -a src/ lib/ docs/ README.pod LICENSE Newmakefile next/
 	cp Newmakefile next/Makefile
 	cp -a run/ lib/ next/boot/
 	cp obj/Run.Kernel.dll obj/Kernel.dll next/boot/obj/

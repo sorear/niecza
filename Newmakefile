@@ -69,9 +69,6 @@ test: all
 spectest: all
 	@t/run_spectests
 
-p6eval: all
-	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
-
 clean:
 	@rm -f obj/*.dll obj/*.exe obj/*.nam obj/*.so
 	@rm -f run/Niecza.exe
@@ -86,6 +83,15 @@ mknext: run/Niecza.exe obj/Run.Kernel.dll
 	touch next/FETCH_URL next/.fetch-stamp
 	cp -a src/ lib/ Makefile next/
 	cp -a run/ lib/ next/boot/
+
+mkpackage:
+	rm -rf package/
+	mkdir package/ package/run/ package/lib/ package/obj/
+	cp -a docs/ README.pod LICENSE package/
+	cp -a run/Niecza.exe run/Niecza.ser run/Kernel.dll \
+	    run/CompilerBlob.dll package/run/
+	cp lib/*.pm6 lib/*.setting package/lib/
+	cp obj/Run.Kernel.dll package/obj/
 
 half_reboot: all
 	# setup a clean build area
