@@ -16,34 +16,19 @@ using Niecza;
 namespace Niecza.CLRBackend {
     // The portable format is a subset of JSON, and is currently read
     // into a matching internal form.
-    sealed class JScalar {
-        string text;
-        double val;
-        bool has_val;
-
-        public JScalar(string txt) { text = txt; }
-        public JScalar(int val) : this(val.ToString()) { }
-        public string str { get { return text; } }
-        public double num {
-            get {
-                if (has_val) return val;
-                val = Utils.S2N(text);
-                has_val = true;
-                return val;
-            }
-        }
+    static class JScalar {
         public static string[] SA(int cut, object x) {
             object[] arr = (object[]) x;
             string[] r = new string[ arr.Length - cut ];
             for (int i = 0; i < r.Length; i++)
-                r[i] = ((JScalar)arr[i+cut]).str;
+                r[i] = S(arr[i+cut]);
             return r;
         }
         public static int[] IA(int cut, object x) {
             object[] arr = (object[]) x;
             int[] r = new int[ arr.Length - cut ];
             for (int i = 0; i < r.Length; i++)
-                r[i] = (int)((JScalar)arr[i+cut]).num;
+                r[i] = I(arr[i+cut]);
             return r;
         }
         public static T[] A<T>(int cut, object x, Func<object, T> rdr) {
@@ -59,11 +44,10 @@ namespace Niecza.CLRBackend {
             if (s == "0" || s == "") return false;
             throw new ArgumentException(s);
         }
-        public static int I(object x) { return (int)((JScalar)x).num; }
-        public static double N(object x) { return ((JScalar)x).num; }
-        public static int IN(object x) { return x == null ? -1 : (int)((JScalar)x).num; }
-        public static string S(object x) { return x == null ? null : ((JScalar)x).str; }
-        public override string ToString() { return text; }
+        public static int I(object x) { return (int)N(x); }
+        public static double N(object x) { return Utils.S2N((string)x); }
+        public static int IN(object x) { return x == null ? -1 : (int)N(x); }
+        public static string S(object x) { return x == null ? null : ((string)x); }
     }
 
     class Reader {
@@ -141,7 +125,7 @@ namespace Niecza.CLRBackend {
                         }
                     }
                     ix++;
-                    containers[containers.Count - 1].Add(new JScalar(new string(input, start, write - start)));
+                    containers[containers.Count - 1].Add(new string(input, start, write - start));
                     continue;
                 }
                 start = ix;
@@ -156,7 +140,7 @@ namespace Niecza.CLRBackend {
                     string str = new string(input, start+1, ix - start - 1);
                     containers[containers.Count - 1].Add(refs[int.Parse(str)]);
                 } else {
-                    containers[containers.Count - 1].Add(new JScalar(new string(input, start, ix - start)));
+                    containers[containers.Count - 1].Add(new string(input, start, ix - start));
                 }
             }
         }
@@ -2295,16 +2279,16 @@ namespace Niecza.CLRBackend {
 
             // letscope: gives visible names to lets
             List<object> scope = new List<object>();
-            scope.Add(new JScalar("letscope"));
-            scope.Add(new JScalar(tgt.special & SubInfo.TRANSPARENT));
+            scope.Add("letscope");
+            scope.Add((tgt.special & SubInfo.TRANSPARENT) != 0 ? "1" : "0");
 
             // let: introduces symbols for !argN, !lexN
             List<object> let = new List<object>();
-            let.Add(new JScalar("letn"));
+            let.Add("letn");
 
             int[] nsigi = (int[])tgt.sig_i.Clone();
             List<object> bind = new List<object>();
-            bind.Add(new JScalar("_inlinebind"));
+            bind.Add("_inlinebind");
             bind.Add(tgt.name);
             bind.Add(nsigi);
             bind.Add(tgt.sig_r);
@@ -2313,8 +2297,8 @@ namespace Niecza.CLRBackend {
             // give unique names to the arguments
             foreach (object a in zyg) {
                 string alias = "!arg" + eu.nextid++;
-                bind.Add(new object[] { new JScalar("letvar"), new JScalar(alias) });
-                let.Add(new JScalar(alias));
+                bind.Add(new object[] { "letvar", alias });
+                let.Add(alias);
                 let.Add(a);
             }
 
@@ -2328,23 +2312,23 @@ namespace Niecza.CLRBackend {
 
                 slot_to_lex[li.index] = ln;
 
-                let.Add(new JScalar(let_name));
+                let.Add(let_name);
                 if ((li.flags & LISimple.NOINIT) != 0)
-                    let.Add(new object[] { new JScalar("null"), new JScalar("var") });
+                    let.Add(new object[] { "null", "var" });
                 else if ((li.flags & LISimple.ROINIT) != 0)
-                    let.Add(new object[] { new JScalar("scopedlex"), new JScalar("Any") });
+                    let.Add(new object[] { "scopedlex", "Any" });
                 else if ((li.flags & LISimple.DEFOUTER) != 0)
-                    let.Add(new object[] { new JScalar("scopedlex"), new JScalar(ln) });
+                    let.Add(new object[] { "scopedlex", ln });
                 else if ((li.flags & LISimple.HASH) != 0)
-                    let.Add(new object[] { new JScalar("newhash") });
+                    let.Add(new object[] { "newhash" });
                 else if ((li.flags & LISimple.LIST) != 0)
-                    let.Add(new object[] { new JScalar("newarray") });
+                    let.Add(new object[] { "newarray" });
                 else
-                    let.Add(new object[] { new JScalar("_newoftype"),
-                        eu.TypeConstant(li.type) });
+                    let.Add(new object[] { "_newoftype",
+                            eu.TypeConstant(li.type) });
 
-                scope.Add(new JScalar(ln));
-                scope.Add(new JScalar(let_name));
+                scope.Add(ln);
+                scope.Add(let_name);
             }
 
             string[] lexicals_fixup =
@@ -2359,7 +2343,7 @@ namespace Niecza.CLRBackend {
             bind[4] = lexicals_fixup;
 
             scope.Add(new object[] {
-                new JScalar("prog"),
+                "prog",
                 bind.ToArray(),
                 tgzyg
             });
@@ -2369,10 +2353,8 @@ namespace Niecza.CLRBackend {
             if (tgt.IsTopicalizer()) {
                 int tid = eu.nextid++;
                 return new object[] {
-                    new JScalar("xspan"), new JScalar("!start"+tid),
-                    new JScalar("!end"+tid), new JScalar(0), let.ToArray(),
-                    new JScalar(SubInfo.ON_SUCCEED), new JScalar(""),
-                    new JScalar("!end"+tid)
+                    "xspan", "!start"+tid, "!end"+tid, "0", let.ToArray(),
+                    SubInfo.ON_SUCCEED.ToString(), "", "!end"+tid
                 };
             } else {
                 return let.ToArray();
@@ -2381,7 +2363,7 @@ namespace Niecza.CLRBackend {
 
         CpsOp SubyCall(bool ismethod, object[] zyg) {
             int sh = ismethod ? 3 : 2;
-            string sig = ((JScalar) zyg[sh-1]).str;
+            string sig = JScalar.S(zyg[sh-1]);
             CpsOp[] args = new CpsOp[zyg.Length - 2];
             if (ismethod) {
                 args[0] = AnyStr(zyg[1]);
@@ -2391,13 +2373,12 @@ namespace Niecza.CLRBackend {
             return CpsOp.SubyCall(ismethod, sig, args);
         }
 
-        static string FixStr(object z) { return ((JScalar)z).str; }
-        static double FixNum(object z) { return ((JScalar)z).num; }
+        static string FixStr(object z) { return JScalar.S(z); }
+        static double FixNum(object z) { return JScalar.N(z); }
         static int FixInt(object z) { return (int)FixNum(z); }
         static bool FixBool(object z) { return FixNum(z) != 0; }
         CpsOp AnyStr(object z) {
-            return (z is JScalar) ? CpsOp.StringLiteral(FixStr(z))
-                : Scan(z);
+            return (z is object[]) ? Scan(z) : CpsOp.StringLiteral(FixStr(z));
         }
 
         [Immutable] static Dictionary<string, Func<NamProcessor, object[], CpsOp>> handlers;
@@ -2433,17 +2414,17 @@ namespace Niecza.CLRBackend {
             handlers["null"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Null(namtype(zyg[1])); };
             handlers["str"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.StringLiteral(((JScalar)zyg[1]).str); };
+                return CpsOp.StringLiteral(JScalar.S(zyg[1])); };
             handlers["int"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.IntLiteral((int) ((JScalar)zyg[1]).num); };
+                return CpsOp.IntLiteral(JScalar.I(zyg[1])); };
             handlers["char"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.CharLiteral(JScalar.S(zyg[1])[0]); };
             handlers["double"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.DoubleLiteral(((JScalar)zyg[1]).num); };
+                return CpsOp.DoubleLiteral(JScalar.N(zyg[1])); };
             handlers["bool"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.BoolLiteral(((JScalar)zyg[1]).num != 0); };
+                return CpsOp.BoolLiteral(FixBool(zyg[1])); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.Annotate((int) ((JScalar)zyg[2]).num, th.Scan(zyg[3])); };
+                return CpsOp.Annotate(FixInt(zyg[2]), th.Scan(zyg[3])); };
             handlers["label"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.Label(FixStr(z[1]), true);
             };
@@ -2595,7 +2576,7 @@ namespace Niecza.CLRBackend {
                 }
             };
             handlers["die"] = delegate(NamProcessor th, object[] zyg) {
-                if (zyg[1] is JScalar) {
+                if (!(zyg[1] is object[])) {
                     return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
                         CpsOp.StringLiteral(FixStr(zyg[1])));
                 } else {
@@ -2607,7 +2588,7 @@ namespace Niecza.CLRBackend {
                 }
             };
             handlers["control"] = delegate(NamProcessor th, object[] zyg) {
-                if (!(zyg[1] is JScalar)) goto dynamic;
+                if (zyg[1] is object[]) goto dynamic;
                 if (JScalar.S(((object[])zyg[2])[0]) != "null") goto dynamic;
                 if (JScalar.S(((object[])zyg[3])[0]) != "int") goto dynamic;
                 if (JScalar.S(((object[])zyg[4])[0]) != "null") goto dynamic;
@@ -2630,8 +2611,8 @@ dynamic:
                 CpsOp[] z = new CpsOp[5];
                 for (int i = 1; i < 5; i++)
                     z[i] = th.Scan(zyg[i+1]);
-                z[0] = zyg[1] is JScalar ? CpsOp.IntLiteral(FixInt(zyg[1])) :
-                    th.Scan(zyg[1]);
+                z[0] = zyg[1] is object[] ? th.Scan(zyg[1]) :
+                    CpsOp.IntLiteral(FixInt(zyg[1]));
 
                 return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_SFH, z);
             };
@@ -2649,8 +2630,8 @@ dynamic:
             };
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
-                if (zyg[1] is JScalar) {
-                    string name = ((JScalar)zyg[1]).str;
+                if (!(zyg[1] is object[])) {
+                    string name = FixStr(zyg[1]);
                     // these might need to happen *early*, before user classes
                     // are set up
                     if (name == "Str") {
@@ -2682,9 +2663,8 @@ dynamic:
                     CpsOp.IntLiteral(ro+list), typ, rhs);
             };
             handlers["whileloop"] = delegate(NamProcessor th, object[] z) {
-                bool until = ((JScalar)z[1]).num != 0;
-                bool once  = ((JScalar)z[2]).num != 0;
-                return CpsOp.While(until, once, th.Scan(z[3]), th.Scan(z[4])); };
+                return CpsOp.While(FixBool(z[1]), FixBool(z[2]),
+                        th.Scan(z[3]), th.Scan(z[4])); };
             thandlers["_pushleave"] = Methody(null, Tokens.Frame.GetMethod("PushLeave"));
             handlers["_makesub"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_MakeSub,
@@ -2727,8 +2707,8 @@ dynamic:
                     new Dictionary<string,Type>(th.let_types);
                 List<KeyValuePair<string,CpsOp>> lvec =
                     new List<KeyValuePair<string,CpsOp>>();
-                while (zyg.Length - i >= 3 && zyg[i] is JScalar) {
-                    string name = ((JScalar)zyg[i]).str;
+                while (zyg.Length - i >= 3 && !(zyg[i] is object[])) {
+                    string name = FixStr(zyg[i]);
                     CpsOp  init = th.Scan(zyg[i+1]);
                     th.let_types[name] = init.head.Returns;
                     lvec.Add(new KeyValuePair<string,CpsOp>(name, init));
@@ -2790,7 +2770,7 @@ dynamic:
                 if (chh == "exactnum") {
                     return th.cpb.eu.VarConstExact(JScalar.I(ch[1]),
                         JScalar.S(ch[2]));
-                } else if (chh == "box" && ch[1] is JScalar) {
+                } else if (chh == "box" && !(ch[1] is object[])) {
                     string typ = JScalar.S(ch[1]);
                     object[] chch = ch[2] as object[];
                     string chchh = JScalar.S(chch[0]);
@@ -3293,7 +3273,7 @@ dynamic:
             }
         }
 
-        JScalar j(string s) { return new JScalar(s); }
+        object j(string s) { return s; }
         object[] a(params object[] ax) { return ax; }
         void EnterCode(List<object> frags) {
             List<object> latefrags = new List<object>();
@@ -3386,35 +3366,35 @@ dynamic:
             EnterCode(enter);
 
             List<object> handlers = new List<object>();
-            handlers.Add(new JScalar("xspan"));
-            handlers.Add(new JScalar("tstart"));
-            handlers.Add(new JScalar("tend"));
-            handlers.Add(new JScalar("0"));
+            handlers.Add("xspan");
+            handlers.Add("tstart");
+            handlers.Add("tend");
+            handlers.Add("0");
             handlers.Add(b);
 
             // TODO: bind a ro container around return values
             if (sub.IsTopicalizer()) {
-                handlers.Add(new JScalar("6"));
-                handlers.Add(new JScalar(""));
-                handlers.Add(new JScalar("tend"));
+                handlers.Add("6");
+                handlers.Add("");
+                handlers.Add("tend");
             }
             foreach (KeyValuePair<string,LexInfo> kv in sub.dylex) {
                 if (!(kv.Value is LILabel))
                     continue;
-                handlers.Add(new JScalar("8"));
-                handlers.Add(new JScalar(kv.Key));
-                handlers.Add(new JScalar("goto_" + kv.Key));
+                handlers.Add("8");
+                handlers.Add(kv.Key);
+                handlers.Add("goto_" + kv.Key);
             }
             if (sub.mo.HasMRO(Kernel.RoutineMO) &&
                     (sub.special & SubInfo.RETURN_PASS) == 0) {
-                handlers.Add(new JScalar("4"));
-                handlers.Add(new JScalar(""));
-                handlers.Add(new JScalar("tend"));
+                handlers.Add("4");
+                handlers.Add("");
+                handlers.Add("tend");
             }
             if (handlers.Count != 5)
                 b = handlers.ToArray();
-            enter.Insert(0, new JScalar("prog"));
-            enter.Add(new object[] { new JScalar("return"), b });
+            enter.Insert(0, "prog");
+            enter.Add(new object[] { "return", b });
             b = enter.ToArray();
 
             return b;
@@ -3422,7 +3402,7 @@ dynamic:
 
         CpsOp Scan(object node) {
             object[] rnode = (object[]) node;
-            string tag = ((JScalar)rnode[0]).str;
+            string tag = JScalar.S(rnode[0]);
             Func<NamProcessor, object[], CpsOp> handler;
             if (!handlers.TryGetValue(tag, out handler)) {
                 MethodInfo mi = Tokens.Builtins.GetMethod(tag);
