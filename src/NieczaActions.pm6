@@ -2288,7 +2288,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         $nb.set_outervar($ac);
         $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
         $ns.add_attribute($name, $sigil, +$accessor, $type, |mnode($/));
-        $ns.add_method(::Metamodel::SubVisibility::private, $name, $nb,
+        $ns.add_method($*backend.sub_visibility("private"), $name, $nb,
             |mnode($/));
         if $accessor {
             $ns.add_method(0, $name, $nb, |mnode($/));
@@ -2437,13 +2437,12 @@ method type_declarator:subset ($/) {
 
     $/.CURSOR.trymop({
         ($lexvar, $obj) = self.do_new_package($/, scope => $*SCOPE,
-            name => $<longname>, class => ::Metamodel::Subset,
-            :@exports);
+            name => $<longname>, class => 'subset', :@exports);
 
         $*CURLEX<!sub>.create_static_pad;
 
-        $obj.basetype = $basetype.xref;
-        $obj.where = $body.xref;
+        $obj.set_basetype($basetype);
+        $obj.set_where($body);
     });
 
     make mklex($/, $lexvar);
@@ -2483,7 +2482,7 @@ method init_constant($con, $rhs) {
         name => "$con.name() init");
     $body.outer.create_static_pad;
     $con.init = True;
-    $body.set_phaser(+::Metamodel::Phaser::UNIT_INIT);
+    $body.set_phaser($*backend.phaser('UNIT_INIT'));
     $con;
 }
 
@@ -3098,7 +3097,7 @@ method package_def ($/) {
 
         $ph.finish(::Op::CgOp.new(op => $fin));
         $sub.create_static_pad;
-        $ph.set_phaser(+::Metamodel::Phaser::INIT);
+        $ph.set_phaser($*backend.phaser('INIT'));
 
         make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
     }
@@ -3465,7 +3464,7 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
 
     if $unique {
         $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
-            if $sub.outer.contains_phaser(+::Metamodel::Phaser.($ph));
+            if $sub.outer.contains_phaser($*backend.phaser($ph));
         my $code = ($<blast><statement> // $<blast><block><blockoid> // $<block><blockoid>).ast;
         # TODO avoid double finishing
         $sub.finish(::Op::CatchyWrapper.new(inner => $code));
@@ -3479,7 +3478,7 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
         $sub.set_signature(Sig.simple('$_'));
     }
     $*CURLEX<!sub>.create_static_pad if $csp;
-    $sub.set_phaser(+::Metamodel::Phaser.($ph));
+    $sub.set_phaser($*backend.phaser($ph));
     make ::Op::StatementList.new;
 }
 
@@ -3499,7 +3498,7 @@ method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 # XXX 'As soon as possible' isn't quite soon enough here
 method statement_prefix:BEGIN ($/) {
     $*CURLEX<!sub>.create_static_pad;
-    $<blast>.ast.set_phaser(+::Metamodel::Phaser::UNIT_INIT);
+    $<blast>.ast.set_phaser($*backend.phaser('UNIT_INIT'));
     make ::Op::StatementList.new;
 
     # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work

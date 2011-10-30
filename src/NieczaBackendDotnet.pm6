@@ -1,14 +1,28 @@
 class NieczaBackendDotnet;
 
-use NAMOutput;
 use JSYNC;
 use NieczaPassSimplifier;
-use Metamodel;
 
 has $.safemode = False;
 has $.obj_dir;
 has $.run_args = [];
 
+enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
+enum MultiMode ( only => 0, proto => 4, multi => 8 );
+enum SubVisibility ( normal => 0, private => 1, sub => 2 );
+
+method phaser($n) { +Phaser.($n) }
+method sub_visibility($n) { +SubVisibility.($n) }
+method multi_mode($n) { +MultiMode.($n) }
+
+sub locstr($fo, $lo, $fn, $ln) {
+    $fo := $fo // '???';
+    $lo := $lo // '???';
+    $fn := $fn // '???';
+    $ln := $ln // '???';
+
+    $fn eq $fo ?? " (see line $lo)" !! " (see $fo line $lo)";
+}
 
 sub upcalled(*@args) {
     my $v = $*compiler.verbose;
@@ -137,7 +151,7 @@ class StaticSub {
         given @args[0] {
             when 'collision' {
                 my ($ , $slot, $nf,$nl,$of,$ol) = @args;
-                my $l = Metamodel.locstr($of, $ol, $nf, $nl);
+                my $l = locstr($of, $ol, $nf, $nl);
                 if $slot ~~ /^\w/ {
                     die "Illegal redeclaration of symbol '$slot'$l";
                 } elsif $slot ~~ /^\&/ {
@@ -150,7 +164,7 @@ class StaticSub {
                 my ($ , $slot, $count, $line, $nf,$nl,$of,$ol) = @args;
                 my $truename = $slot;
                 $truename ~~ s/<?before \w>/OUTER::/ for ^$count;
-                die "Lexical symbol '$slot' is already bound to an outer symbol{Metamodel.locstr($of, $ol, $nf, $nl)};\n  the implicit outer binding at line $line must be rewritten as $truename\n  before you can unambiguously declare a new '$slot' in this scope";
+                die "Lexical symbol '$slot' is already bound to an outer symbol{locstr($of, $ol, $nf, $nl)};\n  the implicit outer binding at line $line must be rewritten as $truename\n  before you can unambiguously declare a new '$slot' in this scope";
             }
             when 'sub' {
                 my ($ , $slot) = @args;
@@ -264,8 +278,6 @@ class StaticSub {
     }
 }
 
-enum Metamodel::MultiMode ( only => 0, proto => 4, multi => 8 );
-enum Metamodel::SubVisibility ( normal => 0, private => 1, sub => 2 );
 
 class Type {
     method FALLBACK($name, *@args) { downcall("type_$name", self, @args) }

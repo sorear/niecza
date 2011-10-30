@@ -15,10 +15,9 @@ cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
 .PHONY: help
 
 libunits=CORE JSYNC
-srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
-	 OptRxSimple NAMOutput Operator NieczaActions NieczaFrontendSTD \
-	 NieczaPassSimplifier OptBeta NieczaPathSearch NieczaBackendDotnet \
-	 NieczaCompiler GetOptLong
+srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar OptRxSimple \
+	 Operator NieczaActions NieczaFrontendSTD NieczaPassSimplifier \
+	 OptBeta NieczaPathSearch NieczaBackendDotnet NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Run.Kernel.dll obj/Run.CORE.dll
 	@git describe --tags > VERSION
@@ -117,9 +116,6 @@ help:
 boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.CompilerBlob.dll
 
 # grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/Run.\1.ser: boot/obj/Run.\2.ser|' | grep -v MONKEY_TYPING
-boot/obj/Run.NAMOutput.ser: boot/obj/Run.JSYNC.ser
-boot/obj/Run.NAMOutput.ser: boot/obj/Run.Metamodel.ser
-boot/obj/Run.NAMOutput.ser: boot/obj/Run.Sig.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.CgOp.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.Op.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.RxOp.ser
@@ -127,10 +123,8 @@ boot/obj/Run.NieczaActions.ser: boot/obj/Run.Sig.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.CClass.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.OpHelpers.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.Operator.ser
-boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.NAMOutput.ser
 boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.JSYNC.ser
 boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.NieczaPassSimplifier.ser
-boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.Metamodel.ser
 boot/obj/Run.NieczaCompiler.ser: boot/obj/Run.JSYNC.ser
 boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.STD.ser
 boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.NieczaGrammar.ser
