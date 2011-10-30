@@ -1,7 +1,5 @@
 class NieczaCompiler;
 
-use JSYNC;
-
 has $.module_finder;
 has $.backend;
 has $.stages;
@@ -12,21 +10,26 @@ has $!discount-time = 0;
 
 has %.units;
 
-method !compile($unitname, $filename, $modtime, $source, $main, $run, $end , $evalmode, $outer, $outer_frame, $repl) { #OK
+method !compile(:$unitname, :$filename, :$source, :$main, :$run, :$evalmode, :$outer, :$outer_frame, :$repl) {
     # FIXME this is a bit of a fudge
     $unitname := 'CORE' if $!frontend.lang eq 'NULL';
 
+    # send information to NieczaGrammar for creating the root sub
     my $*niecza_outer_ref = $outer;
     my $*niecza_outer_frame = $outer_frame;
+
+    # useful references
     my $*compiler = self;
     my $*verbose = $.verbose;
     my $*backend = $.backend;
+
+    # tells parser not to exit when parse fails
     my $*in_repl = $repl;
     my @*INC;
 
     my $start = times[0] - $!discount-time;
 
-    my $ast = $!frontend.parse(:$unitname, :$filename, :$modtime,
+    my $ast = $!frontend.parse(:$unitname, :$filename,
         :$source, :$outer, :$main, :$run, :$evalmode, :$repl);
 
     my $time = times[0] - $!discount-time - $start;
@@ -41,9 +44,9 @@ method !compile($unitname, $filename, $modtime, $source, $main, $run, $end , $ev
     $ast;
 }
 
-method compile_module($module, $stop = "") {
-    my ($filename, $modtime, $source) = $.module_finder.load_module($module);
-    self!compile($module, $filename, $modtime, $source, False, False, $stop, False, Any, Any, False);
+method compile_module($unitname) {
+    my ($filename, $source) = $.module_finder.load_module($unitname);
+    self!compile(:$unitname, :$filename, :$source);
 }
 
 method !main_name() {
@@ -51,12 +54,12 @@ method !main_name() {
     $i ?? "MAIN_$i" !! "MAIN";
 }
 
-method compile_file($file, $run, $stop = "") {
-    my $*orig_file = $file; # XXX
-    my ($filename, $modtime, $source) = $.module_finder.load_file($file);
-    self!compile(self!main_name, $filename, $modtime, $source, True, $run, $stop, False, Any, Any, False);
+method compile_file($file, $run) {
+    my ($filename, $source) = $.module_finder.load_file($file);
+    self!compile(unitname => self!main_name, :$filename, :$source, :main, :$run);
 }
 
-method compile_string($source, $run, $stop = "", :$evalmode = False, :$outer, :$repl, :$outer_frame) {
-    self!compile(self!main_name, "(eval)", 0, $source, True, $run, $stop, $evalmode, $outer, $outer_frame, $repl);
+method compile_string($source, $run, :$evalmode = False, :$outer, :$repl, :$outer_frame) {
+    self!compile(unitname => self!main_name, filename => "(eval)", :$source,
+        :main, :$run, :$evalmode, :$outer, :$outer_frame, :$repl);
 }

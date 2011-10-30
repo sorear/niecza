@@ -116,11 +116,10 @@ usage: niecza -e 'code'      # run a one-liner
 general options:
    -n                        # short for -L CORN
    -p                        # short for -L CORP
-   -B --backend=NAME         # select backend (nam, dotnet, clisp, hoopl)
+   -B --backend=NAME         # select backend (dotnet)
    -L --language=NAME        # select your setting
    -v --verbose              # detailed timing info
    -c --compile              # don't run (implied with -C)
-      --stop-after=STAGE     # stop after STAGE and dump AST
       --safe                 # disable system interaction
       --help                 # display this message
 
@@ -140,8 +139,6 @@ my $verb = 0;
 my @eval;
 my $cmod = False;
 my $comp = False;
-my $stop = "";
-my $aotc = False;
 
 GetOptions(:!permute,
     "evaluate|e=s" => sub { push @eval, $_ },
@@ -153,8 +150,6 @@ GetOptions(:!permute,
     "verbose|v" => sub { $verb++ },
     "compile|c" => sub { $comp = True },
     "safe" => sub { $safe = True },
-    "stop=s" => sub { $stop = $_ },
-    "aot" => sub { $aotc = True },
     "include|I=s" => sub { unshift @lib, $_.IO.realpath },
     "obj-dir=s" => sub { $odir = $_ },
     "help|h" => sub { say $usage; exit 0 },
@@ -178,7 +173,6 @@ my $c = NieczaCompiler.new(
         lang => $lang,
         safemode => $safe,
     ),
-    stages => [ NieczaPassSimplifier.new ],
     backend => $backend,
     verbose => $verb,
 );
@@ -193,30 +187,31 @@ if $cmod {
         exit 0;
     }
     for @*ARGS {
-        $c.compile_module($_, $stop);
+        $c.compile_module($_);
     }
 }
 elsif @eval {
     $c.backend.run_args = @*ARGS;
     for @eval {
-        $c.compile_string($_, !$comp, $stop);
+        $c.compile_string($_, !$comp);
     }
 }
 elsif @*ARGS {
     my $file = shift @*ARGS;
     $c.backend.run_args = @*ARGS;
-    $c.compile_file($file, !$comp, $stop);
+    $c.compile_file($file, !$comp);
 }
 else {
     my $*repl_outer;
     my $*repl_outer_frame;
-    $c.compile_string('', !$comp, $stop);
+    $c.compile_string('$PROCESS::OUTPUT_USED ::= True', !$comp, :repl,
+        :evalmode);
     while True {
         print "niecza> ";
         my $l = $*IN.get // last;
         my $ok;
         try {
-            $c.compile_string($l, !$comp, $stop, :repl, :evalmode,
+            $c.compile_string($l, !$comp, :repl, :evalmode,
                 :outer($*repl_outer), :outer_frame($*repl_outer_frame));
             $ok = True;
         }

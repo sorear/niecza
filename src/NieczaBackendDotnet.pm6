@@ -36,7 +36,7 @@ sub upcalled(*@args) {
         when "check_dated" {
             shift @args;
             for @args -> $module, $hash {
-                my ($file, $modt, $src) = #OK
+                my ($file, $src) = #OK
                     $*compiler.module_finder.load_module($module);
                 my $trueh = gethash($src);
                 say "check-dated $module: was $hash now $trueh" if $v;
@@ -62,8 +62,10 @@ class StaticSub { ... }
 class Type { ... }
 
 method new(*%_) {
+    my $self = callsame;
     Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type})) };
-    nextsame;
+    downcall("safemode") if $self.safemode;
+    $self;
 }
 
 sub downcall(*@args) {
@@ -74,11 +76,9 @@ sub gethash($str) {
     Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.DoHash (obj_getstr {$str}))) }
 }
 
-method accept($unitname, $unit, :$main, :$run, :$evalmode, :$repl) { #OK not used
-    downcall("safemode") if $.safemode;
+method accept($unit, :$filename, :$run, :$evalmode, :$repl) {
     if $run {
-        downcall("setnames", $*PROGRAM_NAME // '???',
-            $*orig_file // '(eval)') unless $repl;
+        downcall("setnames", $*PROGRAM_NAME // '???', $filename) unless $repl;
         downcall("run_unit", $unit, ?$evalmode, @$!run_args);
         if $repl {
             $*repl_outer_frame = $unit.replrun;

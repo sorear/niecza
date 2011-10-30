@@ -3286,15 +3286,6 @@ dynamic:
         void EnterCode(List<object> frags) {
             List<object> latefrags = new List<object>();
 
-            if ((sub.special & SubInfo.MAINLINE) != 0 &&
-                    sub.unit.is_mainish) {
-                FieldInfo fi = cpb.tb.DefineField(
-                        "RTFRAME", typeof(Frame),
-                        FieldAttributes.Public | FieldAttributes.Static);
-                frags.Add(a(j("_cpsop"),
-                    CpsOp.SetSField(fi, CpsOp.CallFrame())));
-            }
-
             // Lexpad setup: XXX should be done *before* entry, indeed
             // before the binder, so defaults work right
 

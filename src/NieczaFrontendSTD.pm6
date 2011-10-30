@@ -201,11 +201,10 @@ augment class Cursor {
 has $.lang;
 has $.safemode;
 
-method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main, :$evalmode, :$repl) {
+method parse(:$unitname, :$filename, :$source, :$outer, :$run, :$main, :$evalmode, :$repl) {
 
     my $*SAFEMODE    = $.safemode;
     my $*UNITNAME    = $unitname;
-    my $*modtime     = $modtime;
 
     my $lang = $!lang;
     if $unitname eq 'CORE' {
@@ -253,11 +252,11 @@ method parse(:$unitname, :$filename, :$modtime, :$source, :$outer, :$run, :$main
     $*unit.abs_pkg('GLOBAL', :auto);
     $*unit.abs_pkg('PROCESS', :auto);
 
-    my $ast = NieczaGrammar.parse($source, actions => NieczaActions).ast;
+    NieczaGrammar.parse($source, actions => NieczaActions);
 
     @STD::herestub_queue = @save_herestub;
 
-    $*backend.accept($unitname, $ast, :$main, :$run, :$evalmode, :$repl);
+    $*backend.accept($*unit, :$filename, :$run, :$evalmode, :$repl);
 
-    $evalmode ?? $ast !! Nil;
+    $evalmode ?? $*unit !! Nil;
 }
