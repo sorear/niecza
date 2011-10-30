@@ -23,30 +23,30 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar Metamodel \
 all: run/Niecza.exe obj/Run.Kernel.dll obj/Run.CORE.dll
 	@git describe --tags > VERSION
 
-$(patsubst %,boot/obj/%.nam,$(srcunits)): boot/obj/%.nam: .fetch-stamp src/%.pm6 boot/obj/CORE.nam
-	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -Bnam -C $*
-	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj $*.nam $*.dll 0
+$(patsubst %,boot/obj/Run.%.ser,$(srcunits)): boot/obj/Run.%.ser: .fetch-stamp src/%.pm6 boot/obj/Run.CORE.ser
+	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe -C $*
 
 obj/Run.CORE.dll: run/Niecza.exe obj/Run.Kernel.dll lib/CORE.setting
 	$(RUN_CLR) run/Niecza.exe -C CORE
 
-run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/%.nam,$(srcunits)) src/niecza
-	cd src && $(RUN_CLR) ../boot/run/Niecza.exe -c -Bnam niecza
-	$(RUN_CLR) boot/obj/CLRBackend.exe boot/obj MAIN.nam MAIN.exe 1
-	$(CP) $(patsubst %,boot/obj/%.dll,Kernel CompilerBlob $(libunits) $(srcunits)) run/
-	$(CP) boot/obj/MAIN.exe run/Niecza.exe
+run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/niecza
+	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe -c niecza
+	$(CP) boot/obj/Kernel.dll run/
+	$(CSC) /target:library /out:run/CompilerBlob.dll /r:Kernel \
+	    /lib:run src/CompilerBlob.cs
+	$(RUN_CLR) run/Kernel.dll -gen-app Niecza boot/obj
 
 .fetch-stamp: FETCH_URL
 	-rm -rf boot/
 	mkdir boot
 	wget --no-check-certificate -Oboot/niecza.zip $$(cat FETCH_URL)
 	cd boot && unzip niecza.zip
-	$(RUN_CLR) boot/run/Niecza.exe -C CORE
-	$(RUN_CLR) boot/run/Niecza.exe -C JSYNC
+	NIECZA_KEEP_IL=1 $(RUN_CLR) boot/run/Niecza.exe -C $(libunits)
+	$(CP) boot/run/Kernel.dll boot/obj/
 	touch .fetch-stamp
 
-boot/obj/CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
-	$(CSC) /target:library /out:boot/obj/CompilerBlob.dll /r:Kernel \
+boot/obj/Run.CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
+	$(CSC) /target:library /out:boot/obj/Run.CompilerBlob.dll /r:Run.Kernel \
 	    /lib:boot/obj src/CompilerBlob.cs
 obj/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel))
 	$(CSC) /target:exe /out:obj/Run.Kernel.dll /lib:obj /unsafe+ \
@@ -72,9 +72,6 @@ test: all
 spectest: all
 	@t/run_spectests
 
-p6eval: all
-	$(RUN_CLR) run/Niecza.exe -C CORE Test JSYNC
-
 clean:
 	@rm -f obj/*.dll obj/*.exe obj/*.nam obj/*.so
 	@rm -f run/Niecza.exe
@@ -83,46 +80,23 @@ clean:
 	@rm -fr *~
 
 # uses the current niecza to set up a build area for the next stage
+mkpackage:
+	rm -rf package/
+	mkdir package/ package/run/ package/lib/ package/obj/
+	cp -a docs/ README.pod LICENSE package/
+	cp -a run/Niecza.exe run/Niecza.ser run/Kernel.dll \
+	    run/CompilerBlob.dll package/run/
+	cp lib/*.pm6 lib/*.setting package/lib/
+	cp obj/Run.Kernel.dll package/obj/
+
 mknext: run/Niecza.exe obj/Run.Kernel.dll obj/Kernel.dll
 	rm -rf next/
 	mkdir -p next next/boot next/obj next/run next/boot next/boot/obj/
 	touch next/FETCH_URL next/.fetch-stamp
-	cp -a src/ lib/ docs/ README.pod LICENSE Newmakefile next/
-	cp Newmakefile next/Makefile
+	cp -a src/ lib/ docs/ README.pod LICENSE Makefile test.pl next/
 	cp -a run/ lib/ next/boot/
 	cp obj/Run.Kernel.dll obj/Kernel.dll next/boot/obj/
 	NIECZA_KEEP_IL=1 $(RUN_CLR) next/boot/run/Niecza.exe -C $(libunits)
-
-half_reboot: all
-	# setup a clean build area
-	rm -rf stage2/ stage3/
-	mkdir -p stage2/obj stage2/run stage2/boot stage2/boot/obj \
-	    stage3/obj stage3/run stage3/boot stage3/boot/obj
-	touch stage2/FETCH_URL stage3/FETCH_URL stage2/.fetch-stamp \
-	    stage3/.fetch-stamp
-	cp -a src/ lib/ Makefile stage2/
-	cp -a src/ lib/ Makefile stage3/
-	# build a current Niecza with current Niecza
-	cp obj/Kernel.dll obj/CLRBackend.exe stage2/boot/obj
-	cp -a lib run stage2/boot
-	cd stage2 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
-	cp test.pl stage2/
-	cd stage2 && $(MAKE) test
-
-reboot: half_reboot
-	# verify that the new Niecza can build itself correctly
-	cp stage2/obj/Kernel.dll stage2/obj/CLRBackend.exe stage3/boot/obj
-	cp -a lib stage2/run stage3/boot
-	cd stage3 && $(RUN_CLR) boot/run/Niecza.exe -C CORE JSYNC
-	cp test.pl stage3/
-	cd stage3 && $(MAKE) test
-	# yay, stage2/ looks like a good new bootstrap version
-	# clean up the stuff that should NOT go into the boot
-	cd stage2 && rm -rf lib/*.cs obj/* src boot VERSION FETCH_URL \
-	    Makefile test.pl
-	cp obj/Kernel.dll obj/CLRBackend.exe stage2/obj
-	cp -a LICENSE README.pod docs/ stage2/
-	cd stage2 && zip -9r ../NewNieczaBootstrap.zip *
 
 realclean: clean
 	@rm .fetch-stamp
@@ -140,29 +114,33 @@ help:
 	@echo 'help       this list of targets'
 	@echo ''
 
-boot/obj/NieczaBackendDotnet.nam: boot/obj/CompilerBlob.dll
+boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.CompilerBlob.dll
 
-# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/\1.nam: boot/obj/\2.nam|' | grep -v MONKEY_TYPING
-boot/obj/NAMOutput.nam: boot/obj/JSYNC.nam
-boot/obj/NAMOutput.nam: boot/obj/Metamodel.nam
-boot/obj/NAMOutput.nam: boot/obj/Sig.nam
-boot/obj/NieczaActions.nam: boot/obj/Op.nam
-boot/obj/NieczaActions.nam: boot/obj/RxOp.nam
-boot/obj/NieczaActions.nam: boot/obj/Sig.nam
-boot/obj/NieczaActions.nam: boot/obj/CClass.nam
-boot/obj/NieczaActions.nam: boot/obj/OpHelpers.nam
-boot/obj/NieczaActions.nam: boot/obj/Operator.nam
-boot/obj/NieczaBackendDotnet.nam: boot/obj/NAMOutput.nam
-boot/obj/NieczaCompiler.nam: boot/obj/JSYNC.nam
-boot/obj/NieczaFrontendSTD.nam: boot/obj/STD.nam
-boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaGrammar.nam
-boot/obj/NieczaFrontendSTD.nam: boot/obj/NieczaActions.nam
-boot/obj/NieczaGrammar.nam: boot/obj/STD.nam
-boot/obj/Operator.nam: boot/obj/Sig.nam
-boot/obj/Operator.nam: boot/obj/OpHelpers.nam
-boot/obj/Op.nam: boot/obj/CgOp.nam
-boot/obj/OptBeta.nam: boot/obj/CgOp.nam
-boot/obj/OptRxSimple.nam: boot/obj/RxOp.nam
-boot/obj/RxOp.nam: boot/obj/CgOp.nam
-boot/obj/RxOp.nam: boot/obj/CClass.nam
-boot/obj/Sig.nam: boot/obj/CgOp.nam
+# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/Run.\1.ser: boot/obj/Run.\2.ser|' | grep -v MONKEY_TYPING
+boot/obj/Run.NAMOutput.ser: boot/obj/Run.JSYNC.ser
+boot/obj/Run.NAMOutput.ser: boot/obj/Run.Metamodel.ser
+boot/obj/Run.NAMOutput.ser: boot/obj/Run.Sig.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.CgOp.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.Op.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.RxOp.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.Sig.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.CClass.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.OpHelpers.ser
+boot/obj/Run.NieczaActions.ser: boot/obj/Run.Operator.ser
+boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.NAMOutput.ser
+boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.JSYNC.ser
+boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.NieczaPassSimplifier.ser
+boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.Metamodel.ser
+boot/obj/Run.NieczaCompiler.ser: boot/obj/Run.JSYNC.ser
+boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.STD.ser
+boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.NieczaGrammar.ser
+boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.NieczaActions.ser
+boot/obj/Run.NieczaGrammar.ser: boot/obj/Run.STD.ser
+boot/obj/Run.Operator.ser: boot/obj/Run.Sig.ser
+boot/obj/Run.Operator.ser: boot/obj/Run.OpHelpers.ser
+boot/obj/Run.Op.ser: boot/obj/Run.CgOp.ser
+boot/obj/Run.OptBeta.ser: boot/obj/Run.CgOp.ser
+boot/obj/Run.OptRxSimple.ser: boot/obj/Run.RxOp.ser
+boot/obj/Run.RxOp.ser: boot/obj/Run.CgOp.ser
+boot/obj/Run.RxOp.ser: boot/obj/Run.CClass.ser
+boot/obj/Run.Sig.ser: boot/obj/Run.CgOp.ser
