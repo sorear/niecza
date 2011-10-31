@@ -18,6 +18,61 @@ use Sig;
 use STD;
 
 augment grammar STD {
+method explain_mystery($nested?) {
+    my %post_types;
+    my %unk_types;
+    my %unk_routines;
+    my $m = '';
+    for keys(%*MYSTERY) {
+        my $p = %*MYSTERY{$_}.<lex>;
+        if self.is_name($_, $p) {
+            # types may not be post-declared
+            %post_types{$_} = %*MYSTERY{$_};
+            next;
+        }
+
+        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
+
+        # just a guess, but good enough to improve error reporting
+        if $_ lt 'a' {
+            %unk_types{$_} = %*MYSTERY{$_};
+        }
+        else {
+            %unk_routines{$_} = %*MYSTERY{$_};
+        }
+    }
+    if %post_types {
+        my @tmp = sort keys(%post_types);
+        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t'$_' used at line " ~ %post_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_types {
+        my @tmp = sort keys(%unk_types);
+        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t'$_' used at line " ~ %unk_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_routines {
+        my @tmp = sort keys(%unk_routines);
+        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t'$_' used at line " ~ %unk_routines{$_}.<line> ~ "\n";
+        }
+    }
+    self.sorry($m) if $m;
+
+    unless $nested {
+        for $*unit.stubbed_stashes -> $pos, $type {
+            next if $type.closed || $type.kind eq 'package';
+            self.cursor($pos).sorry("Package was stubbed but not defined");
+        }
+    }
+
+    self;
+}
 method nibbler() {
     my @nibbles;
     my $from = self.pos;
@@ -101,6 +156,15 @@ method statement_prefix:BEGIN ($/) {
     $*CURLEX<!sub>.create_static_pad;
     $<blast>.ast.run_BEGIN;
     make ::Op::StatementList.new;
+}
+method init_constant($con, $rhs) {
+    my $body = self.thunk_sub(
+        ::Op::LexicalBind.new(name => $con.name, :$rhs),
+        name => "$con.name() init");
+    $body.outer.create_static_pad;
+    $body.run_BEGIN;
+    $con.init = True;
+    $con;
 }
 method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of

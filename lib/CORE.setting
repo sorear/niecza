@@ -145,6 +145,9 @@ sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
         substr($str, $start, $len) = $repl !!
         substr($str, $start, $len)
 }
+
+# not actually inlined but needed for constant i
+sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
 # }}}
 # Fundamental types {{{
 my class Mu {
@@ -639,7 +642,7 @@ my class Str is Cool {
     method gist() { defined(self) ?? self !! nextsame }
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
     method perl() {
-        defined(self) // nextsame;
+        self // nextsame;
         my $str = self;
         $str ~~ s:g { <[ " \\ ]> } = '\\' ~ $/;
         "\"$str\""
@@ -739,10 +742,17 @@ my class StrBasedEnum is CommonEnum {
     } }
 }
 
-my enum Bool < False True >;
-augment class Bool {
+# Using the "enum" type declarator would require a compile time reference
+# to the EnumMap type, which depends on Bool; ick.
+my class Bool is IntBasedEnum is Int {
+    our $_enums;
+    method enums() { $_enums }
+    our constant True = Q:CgOp { (box Bool (bool 1)) };
+    our constant False = Q:CgOp { (box Bool (bool 0)) };
     method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
 }
+my constant True = Q:CgOp { (box Bool (bool 1)) };
+my constant False = Q:CgOp { (box Bool (bool 0)) };
 # }}}
 # Fundamental scalar operators {{{
 sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
@@ -1308,6 +1318,7 @@ my class EnumMap {
     method at_key($k) { self{$k} }
     method exists_key($k) { self{$k}:exists }
 }
+BEGIN { $Bool::_enums ::= EnumMap.new("False" => 0, "True" => 1) }
 
 my class Junction is Mu {
     has $!kind_;
@@ -1949,7 +1960,6 @@ sub conjugate($x) { $x.conjugate }
 sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
 sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
-sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
 multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
 # XXX 'Order' type

@@ -1401,7 +1401,7 @@ grammar P6 is STD {
             [ <.spacey> <arglist> ]?
         ]
         <.ws>
-        <.explain_mystery>
+        <.explain_mystery(True)>
     }
 
 
@@ -1410,7 +1410,7 @@ grammar P6 is STD {
         <sym> <.ws>
         <module_name>[<.spacey><arglist>]?
         <.ws>
-        <.explain_mystery>
+        <.explain_mystery(True)>
     }
 
 
@@ -1498,7 +1498,7 @@ grammar P6 is STD {
     }
     rule statement_control:default {<sym> <block> }
 
-    token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
+    token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery(True)> }
     token statement_prefix:CHECK   { <sym> <blast> }
     token statement_prefix:INIT    { <sym> <blast> }
     token statement_prefix:START   { <sym> <blast> }

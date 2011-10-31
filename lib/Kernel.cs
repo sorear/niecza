@@ -864,7 +864,7 @@ namespace Niecza {
             }
 
             // no conflict if items are identical
-            if (!ose.v.rw && !nse.v.rw && oseo == nseo) {
+            if (ose.v == nse.v || !ose.v.rw && !nse.v.rw && oseo == nseo) {
                 nse = ose;
                 return null;
             }
