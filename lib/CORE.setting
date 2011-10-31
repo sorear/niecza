@@ -295,8 +295,9 @@ my class Any is Mu {
         gather {
             while ($num > 0 and $number-elements > 0) {
                 my $idx = floor($number-elements.rand());
-                take @l[$idx];
+                my $old = @l[$idx];
                 @l[$idx] = @l[--$number-elements];
+                take $old;
                 --$num;
             }
         }
