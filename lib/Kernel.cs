@@ -403,10 +403,13 @@ namespace Niecza {
 
         public EmitUnit(string uname, string asm_name, string dll_name, bool is_mainish) {
 
+            if (Config.CGForceSave && dll_name == null)
+                dll_name = asm_name + ".exe";
             this.dll_name = dll_name;
             asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
                     new AssemblyName(asm_name),
                     (dll_name == null ? AssemblyBuilderAccess.Run :
+                        Config.CGForceSave ? AssemblyBuilderAccess.RunAndSave :
                         AssemblyBuilderAccess.Save),
                     Backend.obj_dir);
 
@@ -6068,6 +6071,8 @@ slow:
             int.Parse(Environment.GetEnvironmentVariable("NIECZA_CODEGEN_TRACE") ?? "0");
         public static readonly bool CGVerifiable =
             Environment.GetEnvironmentVariable("NIECZA_CODEGEN_UNVERIFIABLE") != null ? false : true;
+        public static readonly bool CGForceSave =
+            Environment.GetEnvironmentVariable("NIECZA_FORCE_SAVE") != null;
         public static readonly bool C3Trace =
             Environment.GetEnvironmentVariable("NIECZA_C3_TRACE") != null;
         public static readonly bool SerTrace =
