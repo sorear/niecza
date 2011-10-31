@@ -638,8 +638,12 @@ my class Str is Cool {
     } }
     method gist() { defined(self) ?? self !! nextsame }
     method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
-    # XXX .trans
-    method perl() { defined(self) ?? '"' ~ self ~ '"' !! self.typename }
+    method perl() {
+        defined(self) // nextsame;
+        my $str = self;
+        $str ~~ s:g { <[ " \\ ]> } = '\\' ~ $/;
+        "\"$str\""
+    }
 }
 
 my class Scalar {
