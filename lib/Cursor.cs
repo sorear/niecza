@@ -261,7 +261,13 @@ public sealed class RxFrame: IFreeze {
     }
 
     public void IncorporateChild(string[] names, bool passcap, P6any match) {
-        Cursor child = (Cursor) match;
+        Cursor child = match as Cursor;
+
+        if (child == null)
+            throw new NieczaException((names.Length == 0 ?
+                "Anonymous submatch" : "Submatch to be bound to " + names[0]) +
+                    " returned a " + match.mo.name + " instead of a Cursor, " +
+                    "violating the submatch protocol.");
 
         SetPos(child.pos);
         if (passcap)
