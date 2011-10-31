@@ -3732,6 +3732,9 @@ dynamic:
             } else if (cmd == "sub_set_inlined") {
                 ((SubInfo)Handle.Unbox(args[1])).SetInlined();
                 return null;
+            } else if (cmd == "sub_run_BEGIN") {
+                ((SubInfo)Handle.Unbox(args[1])).RunBEGIN();
+                return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
             } else if (cmd == "sub_run_once") {
@@ -4287,6 +4290,7 @@ dynamic:
                 s.nam_refs = new object[args.Length - 3];
                 for (int i = 0; i < s.nam_refs.Length; i++)
                     s.nam_refs[i] = Handle.Unbox(args[i+3]);
+                s.code = RuntimeUnit.JitCompileSub;
                 return null;
             } else if (cmd == "save_unit") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);

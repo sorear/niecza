@@ -708,6 +708,20 @@ namespace Niecza {
                     eu.CgSub(z, erase);
         }
 
+        internal static Frame JitCompileSub(Frame th) {
+            if (Config.CGVerbose > 0)
+                Console.WriteLine("Generating code for {0} now because it's about to be run", th.info.name);
+
+            EmitUnit eu = new EmitUnit(null, "Anon." + Interlocked.Increment(
+                        ref anon_id), null, false);
+            eu.CgSub(th.info, false);
+            SetConstants(eu.Finish(), eu.constants);
+
+            th.code = th.info.code;
+
+            return th;
+        }
+
         [CompartmentGlobal]
         internal static ObjectRegistry reg;
 
@@ -728,7 +742,7 @@ namespace Niecza {
         }
 
         internal void SetConstants() { SetConstants(type, constants); }
-        void SetConstants(Type ty, Dictionary<object,FieldInfo> consts) {
+        static void SetConstants(Type ty, Dictionary<object,FieldInfo> consts) {
             if (ty != null) {
                 foreach (KeyValuePair<object, FieldInfo> kv in consts)
                     kv.Value.SetValue(null, kv.Key);
@@ -1841,6 +1855,12 @@ noparams:
                     outer.dylex.Remove(kv.Key);
                     break;
                 }
+        }
+
+        internal void RunBEGIN() {
+            Kernel.RunInferior(protosub.Invoke(Kernel.GetInferiorRoot(),
+                Variable.None, null));
+            SetInlined();
         }
 
         internal bool IsTopicalizer() {

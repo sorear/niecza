@@ -78,6 +78,30 @@ augment class RxOp::Sym {
 }
 
 augment class NieczaActions {
+method statement_prefix:BEGIN ($/) {
+    # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
+    repeat while False {
+        my $c = ($<blast><statement> || $<blast><block><blockoid>).ast;
+
+        last unless $c ~~ Op::StatementList;
+        last unless $c.children == 1;
+        my $d = $c.children.[0];
+        last unless $d ~~ Op::CallMethod;
+        last unless $d.receiver ~~ Op::ContextVar;
+        last unless $d.receiver.name eq '@*INC';
+        last if $d.private || $d.ismeta;
+        last unless $d.name eq any <push unshift>;
+        last unless +$d.getargs == 1;
+        last unless defined my $str = self.trivial_eval($/, $d.getargs.[0]);
+        @*INC."$d.name()"($str);
+        make ::Op::StatementList.new;
+        return;
+    }
+
+    $*CURLEX<!sub>.create_static_pad;
+    $<blast>.ast.run_BEGIN;
+    make ::Op::StatementList.new;
+}
 method blockoid($/) {
     # XXX horrible cheat, but my data structures aren't up to the task of
     # $::UNIT being a class body &c.
