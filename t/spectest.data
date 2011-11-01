@@ -19,7 +19,7 @@ integration/advent2010-day04.t
 integration/code-blocks-as-sub-args.t
 integration/lexicals-and-attributes.t
 integration/man-or-boy.t
-integration/packages.t
+#integration/packages.t
 integration/pair-in-array.t
 S02-lexical-conventions/begin_end_pod.t
 S02-lexical-conventions/comments.t
@@ -155,7 +155,7 @@ S04-declarations/multiple.t
 S04-declarations/my.t
 S04-declarations/state.t
 S04-exceptions/control_across_runloop.t
-S04-phasers/begin.t
+#S04-phasers/begin.t
 S04-phasers/end.t
 S04-phasers/enter-leave.t
 S04-phasers/keep-undo.t
