@@ -786,9 +786,6 @@ namespace Niecza {
 
             Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
             Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
-
-            if (!is_mainish && bottom == null && filename != "(eval)")
-                RunMainline();
         }
 
         internal void RunMainline() {
