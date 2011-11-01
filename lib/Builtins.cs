@@ -965,7 +965,7 @@ public partial class Builtins {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, minus_d);
+            return HandleSpecial2(a1,a2, o1,o2, gcd_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
