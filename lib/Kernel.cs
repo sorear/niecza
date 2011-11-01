@@ -721,8 +721,7 @@ namespace Niecza {
             SetConstants(eu.Finish(), eu.constants);
 
             th.code = th.info.code;
-            if (th.info.nspill > 0)
-                th.lexn = new object[th.info.nspill];
+            th.EnsureSpills(th.info.nspill);
 
             return th;
         }
