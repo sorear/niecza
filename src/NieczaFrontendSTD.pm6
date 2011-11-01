@@ -190,12 +190,13 @@ method lookup_dynvar($) { Any } # NYI
 method check_old_cclass($) { } # NYI
 }
 
-augment class Cursor {
-    our $RED    = "\e[31m";
-    our $GREEN  = "\e[32m";
-    our $YELLOW = "\e[33m";
-    our $CLEAR  = "\e[0m";
-
+# these stash entries were created in STD so they are considered to belong
+# to STD, so we have to use an INIT to change them
+INIT {
+    $Cursor::RED    = "\e[31m";
+    $Cursor::GREEN  = "\e[32m";
+    $Cursor::YELLOW = "\e[33m";
+    $Cursor::CLEAR  = "\e[0m";
 }
 
 has $.lang;
