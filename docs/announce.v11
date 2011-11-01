@@ -1,0 +1,86 @@
+    Announce: Niecza Perl 6 v11
+
+This is the eleventh release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month, at least in the US west coast time zone.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+[Major features / Breaking changes]
+
+The compile time / runtime metamodel unification mentioned in the v10
+announce is done now.  Real Sub and ClassHOW objects are created at
+compile time and stored in a .ser (serialized data) file alongside the
+.dll.  When using modules the .ser file is loaded; .nam files are gone.
+Some operations are faster and others are slower.
+
+All non-dotnet backends no longer work and have been removed, since
+niecza now requires much closer integration between the front and back
+ends.  Restoring them would not be impossible.
+
+BEGIN time code execution is now supported!  In particular, a BEGIN in
+a module is run *once*; any objects it creates will be serialized, and
+the BEGIN is not re-run at runtime.  It is erroneous to modify objects
+owned by a different module at BEGIN time.
+
+
+[Minor new features]
+
+The x*+ syntax is now supported as a synonym of x**, doing possessive
+quantification like Perl 5.
+
+"make spectest" now respects TEST_JOBS.  (Will Coleda)
+
+todo is now supported in tests.
+
+Various improvemends to the p5 interop system. (Paweł Murias)
+
+CLR interop example improvements: make clock resizable, add notepad,
+tetris, webbrowser. (Martin Berends)
+
+Fleshed out TextWriter and open to some semblance of usability.
+Added close, unlink, mkdir. (Solomon Foster)
+
+Added .pick and .roll. (Solomon Foster)
+
+Added log, log10, exp, cis, polar, gcd, lcm. (Solomon Foster)
+
+Handling of variable types that are constrained to Mu but default to
+Any are more consistant.
+
+[Selected bug fixes]
+
+grep /regex/, @list no longer crashes.
+
+" (a source file with an unclosed string) no longer crashes the compiler.
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+In the wake of the /serialize branch merge there will be a lot of
+bugs to fix and documents to update.  I am also looking at designing
+a good practical realization of S11 and module packaging.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-11.zip
+[2] https://github.com/sorear/niecza
