@@ -6,7 +6,6 @@ items are required for yapsi.
 EASY
 
    Add your favorite missing function to the setting, with tests.
-   In particular, I could use: write, close, split, ...
 
    Implement Sub.leave and CallFrame.leave
 
@@ -16,9 +15,6 @@ EASY
    constants in signatures, ::T, ...
 
 MEDIUM
-
-   Finish the set of Num operators, includig number-theoretic and
-   transcedental functions.
 
    Implement buffer types and binary I/O.
 
@@ -65,8 +61,6 @@ NASTY
    TimToady on dependency extraction; there are some subtle points with
    modules that export slangs.
 
-  *Figure out how BEGIN can possibly work.  Do it.
-
    Native type support.
 
    SIMD hyperoperators.
@@ -78,7 +72,5 @@ Other stuff to do:
   - pm's = hack
   - Stash entries should be smarter, should know the difference between
     types, constants, subs, and variables
-  - Swappable global contexts containing *all* state
-  - Bounded serialization using global contexts
-  - eval requires splitting RuntimeUnit from SerializationContext;
-    null SerializationContext is in effect at runtime
+  - ideas after v11: prototype S11, native types, optimize stuff using
+    native types, eq any<> and other spot rewrites (RULES?)
