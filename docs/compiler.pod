@@ -2,98 +2,165 @@
 
 C<compiler.pod> - overview of Niecza compiler pipeline
 
-=head1 Description
+=head1 Setup
 
 The Perl 6 script F<src/niecza> is the command line wrapper that controls
 the startup of Niecza.  After reading command line options it constructs
 a compiler object, tweaks its properties and calls one of its compile
-methods.
+methods - C<compile_string>, C<compile_file>, or C<compile_module>.
 
 The compiler object is defined in F<src/NieczaCompiler.pm6>.  Each
-compile method creates a certain environment and then calls the internal
-C<!compile> method.  This runs a parser (front end), a pipeline of
-transformation stages (middle end) and a code emitter (back end).
+compile method translates its arguments into a common format and then
+delegates to C<!compile>.  This sets up some important contextuals like
+C<$*backend> and delegates to C<parse> in F<src/NieczaFrontendSTD.pm6>.
+These two methods may be worth combining.  Between them these two methods
+perform necessary setup and teardown and start the compilation process.
+
+The compilation process proper is best thought of as a succession of
+stages, although for BEGIN reasons the stages are actually interleaved -
+a sub must be completely ready to run soon after the closing brace
+because a BEGIN might need to call it.
+
+=head1 Data types
 
 The binary representation of the program being passed between the
-components is an abstract syntax tree (AST).  The tree nodes are objects
-in subclasses of the base class C<Op> from F<src/Op.pm6>.
+components is an abstract syntax tree (AST) of some type.  Four types of
+AST are used in Niecza.  "Op" tree nodes are objects in subclasses of
+the base class C<Op> from F<src/Op.pm6>.  "CgOp" tree nodes are actually
+C<Array> instances for some combination of flexibility and historical
+reasons; they are constructed by the methods in class C<CgOp> from
+F<src/CgOp.pm6>.  CgOp tree nodes can be flattened into a JSON-like form,
+which is used to move them from Perl 6 space to C# space, and also as
+part of the bootstrap procedure (see below).
 
-The parser is F<src/NieczaFrontendSTD.pm6>, it uses F<src/NieczaGrammar.pm6>
-and F<src/NieczaActions.pm6>.  The grammar uses F<src/STD.pm6>, a snapshot
-of Larry Wall's standard Perl 6 grammar that continues to evolve at
-L<https://github.com/perl6/std>.  The actions module uses a series of
+In C# space there are two more AST types we are concerned with, C<CpsOp>
+and C<ClrOp>, both defined in F<lib/CodeGen.cs>.  C<CpsOp> nodes exist
+in direct correspondence with sections of the C<CgOp> tree and can do
+any Perl 6 task.  C<ClrOp> nodes are created as the output of the
+ANF-converter, and are restricted to only the kinds of control flow that
+the CLR natively supports.  After C<ClrOp> data is handed off to Mono and
+is no longer of our concern.
+
+It should be noted that all of these data types are used only for
+executable statements and expressions.  Structural information from the
+source code is directly passed to the backend where it is used to create
+the ClassHOW, SubInfo, etc objects that will be used at runtime.
+
+=head1 The pipeline
+
+The first stage is the parser, which accepts source code (read in by
+F<src/NieczaPathSearch.pm6>) and converts it into a tree of C<Match>
+objects while calling action methods.  The parser exists mostly in
+F<src/STD.pm6> with some Niecza extensions coded in F<src/NieczaGrammar.pm6>
+and F<src/NieczaFrontendSTD.pm6>.  The grammar itself is a branch
+of Larry Wall's standard Perl 6 grammar, which continues to evolve at
+L<https://github.com/perl6/std>, but Niecza tries to track relevant changes.
+It is worth noting that there is a significant degree of feedback into the
+parser, especially for disambiguating types and function calls.
+
+The actions module in F<src/NieczaActions.pm6> accepts C<Match> objects
+and method calls from the grammar; it uses a collection of other modules
 other modules (Op, RxOp, Sig, CClass, OpHelpers, Operator) to create the
-AST from Perl 6 source code.  The parser triggers each action when it
-matches the corresponding token in the grammar.
+Op AST from Perl 6 source code.  The parser triggers each action when it
+matches the corresponding token in the grammar.  The actions system
+directly calls into the backend to create metaobjects for non-code
+grammatical constructs, and can even run code for BEGIN and constants.
 
-The middle end currently consists of F<src/NieczaPassSimplifier.pm6> but
-more stages can be plugged in using the F<src/niecza> script.  The
-C<!compile> method calls the C<invoke> method of each stage, passing an
-AST in and getting a new AST out.  The PassSimplifier stage converts
-keywords such as C<next>, C<any> and C<return> into calls to runtime
-functions that implement them.  The stages are where code optimizers do
-their work.
+While constructing subs, C<NieczaActions> uses two external tree
+walkers that are perhaps best regarded as stages in their own right.
+These perform specific optimizations; it should be noted that they
+are applied to one sub at a time, again for BEGIN reasons.
 
-There are several back ends selectable from the F<src/niecza> script,
-the default one is 'dotnet' which begins in F<src/NieczaBackendDotnet.pm6>.
-Back ends transform the AST code into a Niecza Abstract Machine (NAM)
-structure, do platform specific optimization, and produce a NAM output
-format (see L<nam.pod>).  The NAM code is in F<src/NieczaBackendNAM.pm6>
-which uses F<src/NAMOutput.pm6>.
+The two external walkers are in F<src/NieczaPassSimplifier.pm6> and
+F<src/OptRxSimple.pm6>.  They use a combination of top-down and
+bottom-up analysis to convert certain expressions or regex subterms,
+respectively, into simpler forms.  In particular C<NieczaPassSimplifier>
+handles inlining of some simple functions that just wrap a single runtime
+operator, like C<return> and C<< infix:<+> >>.
 
-The dotnet back end uses a subroutine called C<downcall> that calls
-C<rawscall> (defined in F<lib/CLRBackend.cs>) to make a "raw system call"
-to a handler, which in dotnet is a C<delegate>.  The downcall handler
-for dotnet is called C<DownCall> which resides in F<lib/Builtins.cs>,
-and it delegates to the C<NamProcessor> handler, also defined in
-F<lib/CLRBackend.cs>, passing it the NAM output.
+After simplification the C<Op> tree must be converted into a C<CgOp>
+tree.  This is done recursively by the C<code> and C<cgop> methods on
+C<Op> and C<RxOp> objects.  You should implement C<code> in your
+subclasses but call C<cgop>; C<cgop> should not be overridden because
+it is responsible for adding line number annotations, and possibly
+more stuff later.  (Think of it as the C<augment/inner> emulation pattern.)
 
-Think carefully about what happens when C<rawscall> executes.  It looks
-like a language interoperability interface between Perl 6 and C#, as if
-the two languages are peers sending data to each other.  The details are
-a bit weirder.  Perl 6 code itself never executes directly, the code
-generated for it by a compiler executes.  Imagine C<rawscall> as a kind
-of wormhole made by the compiler to connect events in the Perl 6 world
-to events in the executable world.  Niecza is such a Perl 6 compiler
-that runs as an Intermediate Language (IL) program executed by a Common
-Language Runtime (CLR) (either Mono or .NET).  When a Perl 6 C<rawscall>
-executes it is the IL compiled for C<rawscall> that executes.  So how
-was the IL for the Perl 6 source code parts of Niecza (the callers of
-C<rawscall>) made?  How is the Niecza compiler babby formed?
+Once the code is converted to C<CgOp> it is passed to the backend via
+the C<finish> method on static sub objects.  The code is then marshalled
+over to the C# side of the fence and saved.
 
-Consider what a compiler is - a program that writes a program.  Give it
-input in one language and it translates to output in another.  And a
-compiled compiler is also a program, written in one language and run in
-another.  There are then four potentially different languages, sometimes
-fewer, depending on whether it is a native compiler, a cross compiler, a
-self hosting compiler such as Niecza etc.
+The final code generation step is postponed to after UNITCHECK time in
+order that as much information as possible be available for optimizations.
+However, the code generator is integrated with the runloop, so if a function
+needs to be invoked early it can be code-generated early.  Due to
+limititations of the CLR (essentially, a class must be closed before it
+can be used), functions which are used early will need to be code-generated
+a total of twice if they are to be saved - one copy going into the saved
+class, which cannot be used yet, and one copy to be used immediately, which
+cannot be very usefully saved.
 
-Bootstrapping self-hosting compilers is a chicken-or-egg conundrum that
-software gurus call a "circular dependency" or "circularity".  In the
-case of Niecza today's solution is "here's one we made earlier", in a
-F<niecza.zip> that F<Makefile> downloads and expands into F<boot/> when
-you first build.  How was the earliest Niecza formed?  Once upon a time,
-Niecza was not self hosting, and the initial Nieczas were cross compiled
-using code written in Perl 5 and C#.  That obsolete code no longer works
-and has therefore been removed.  Phew.  Let's return to CLRBackend.
+The code generation process is controlled by C<NamProcessor.Scan> in
+F<lib/CodeGen.cs>, which walks over the C# version of the C<CgOp> tree
+bottom-up mapping it into C<CpsOp>.  Simultaneously, the C<CpsOp> tree
+is converted into a C<ClrOp> tree by the smart constructors in the
+C<CpsOp> class.  (The C<CpsOp> tree only exists in a notional sense, as
+the data flow graph of the constructor calls.)  What the smart
+constructors do is to rearrange the code so that it can be used in a
+context with language-defined control flow, such as resumable exceptions
+and gather/take.  The process is often inaccurately referred to as
+"Continuation Passing Style" (CPS) conversion; a better term would most
+likely be "Applicative Normal Form" (ANF), since the functions are not
+actually being split into separate continuation blocks.
 
-=cut
+At last the C<ClrOp> data is made executable by the C<CodeGen> methods
+on the various C<ClrOp> subclasses, which produce MSIL in the form of
+calls to methods on a C<System.Reflection.Emit.ILGenerator> object.
+Actually this is a two-step process.  Language-defined control flow
+requires the use of a master switch statement at the beginning of
+each CLR-level function.  C<ListCases> methods on the op nodes are
+called first to calculate the correct indexes into the switch.
 
-<sorear> mberends: rawscall is raw static (method) call; it allows calls
-    into C# libraries from Perl 6, like earlier versions of Niecza
-    (before I started taking backend portability more seriously) defined
-    say using
-     (rawscall System.Console.WriteLine (obj_getstr {@args.join('')}))
-<sorear> mberends: the downcall mechanism is very hairy
-<mberends> sorear: interesting. I thought last night about writing
-    something about the bootstrapping implications of downcall
-<sorear> mberends: run/Niecza.exe is linked against run/Kernel.dll (from
-    the bootstrap zipball), but code you compile with Niecza.exe should
-    link against obj/Kernel.dll (compiled from lib/*.cs)
-<sorear> the CLR allows you to load two incompatible assemblies with the
-    same name, as long as you load them in different "application domains"
-<mberends> sorear: thanks! I'll also delete the old content and continue
-    writing up CLRBackend.cs
-<sorear> the C# DownCall method performs the necessary voodoo to create
-    a second appdomain for running code, then invoke the back back end :)
-    in CLRBackend.cs in the child appdomain
+The IL generated is then dealt with appropriately by the underlying
+runtime.  If we are precompiling a module, it will be saved (by the
+call to C<AssemblyBuilder.Save> in F<lib/Kernel.cs>) into a C<.dll>
+or C<.exe> file.  Otherwise, it will be converted into native code
+by the JIT (involving several more intermediate stages, Mono method IR,
+SSA forms, possibly even LLVM IR).
+
+The corresponding metaobjects and constants are then saved alongside
+the module into a C<.ser> file.
+
+=head1 Metacircularity concerns and bootstrapping
+
+There is an important subtlety with regards to the Perl 6 / C# transition.
+The compiler is, itself, compiled using (an earlier version of) Niecza,
+and is running on top of a C# kernel with a copy of C<CodeGen>.  However,
+it cannot be used.  Why not?  In order to continue evolving Niecza we
+need the flexibility to make incompatible changes to the runtime library!
+So the compiler must access a kernel from the B<current> Niecza,
+simultaneously with running on the B<old> Niecza.
+
+This is accomplished by a renaming trick.  All files associated with the
+current Niecza are prefixed with C<Run.>.  The CLR will of course happily
+load two files, one named C<Kernel.dll> and one named C<Run.Kernel.dll>,
+and allow them to be independent; although just renaming the file isn't
+enough, it has to be compiled twice to get the "assembly name" correct.
+(Previous versions of Niecza used a more general feature called
+I<application domains> instead.  This was changed because it was too slow.)
+
+So the compiler, running on C<Kernel.dll>, can compile user code using
+C<Run.Kernel.dll> while referencing C<Run.CORE.dll>, etc.  Works fine but
+there is one remaining catch.  When the compiler is to compile a new version
+of itself, it needs to generate an assembly linked against a new version
+of C<Kernel.dll>, which it cannot load.  The workaround used here is to allow
+the compiler to only partially compile itself, generating C<.ser> files;
+then the newly-compiled C<Kernel.dll> can finish the job, creating
+C<Niecza.exe> and C<Niecza.ser> linked against itself,
+I<without loading the old compiler or old Kernel.dll>.
+It turned out to be more convenient to merge all modules into a single output
+file at the same time.
+
+It would also be worth pointing out F<src/CompilerBlob.cs>, which is a C#
+module that extends the compiling compiler's kernel, but can be updated along
+with the current compiler.  I try not to think about it too hard, but it's
+very useful.
