@@ -134,6 +134,13 @@ method dec_number ($/) {
     else { make [10, ~$/] }
 }
 
+method alnumint ($/) { }
+method radint ($/) { }
+method rad_number ($/) {
+    # MUST: need to handle base and exp fields as well
+    make [+$<radix>, ~$<coeff>]
+}
+
 method number($/) {
     my $child = $<integer> // $<dec_number> // $<rad_number>;
     make (defined($child) ?? $child.ast !!
