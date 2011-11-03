@@ -93,7 +93,7 @@ The final code generation step is postponed to after UNITCHECK time in
 order that as much information as possible be available for optimizations.
 However, the code generator is integrated with the runloop, so if a function
 needs to be invoked early it can be code-generated early.  Due to
-limititations of the CLR (essentially, a class must be closed before it
+limitations of the CLR (essentially, a class must be closed before it
 can be used), functions which are used early will need to be code-generated
 a total of twice if they are to be saved - one copy going into the saved
 class, which cannot be used yet, and one copy to be used immediately, which
