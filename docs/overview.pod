@@ -5,14 +5,16 @@ entirely inside the repository.
 
 =head1 Compiler
 
-Found mostly in C<src/>, this converts Perl 6 source to C#.  See
-C<compiler.pod> for more details.
+Found mostly in C<src/>, this parses Perl 6 and converts it to a
+representation that can be consumed by the backend.  See C<compiler.pod>
+for more details.
 
 =head1 Runtime system
 
-This comprises C<lib/Kernel.cs> and C<lib/Cursor.cs>; it is the body of C#
-primitives necessary for compiler output to function, or that underlie the
-lowest levels of library functionality.
+This comprises C<lib/*.cs>; it is the body of C# primitives necessary
+for compiler output to function, or that underlie the lowest levels
+of library functionality.  It also contains the back end of the compiler
+which integrates Perl 6 output with C<System.Reflection.Emit>.
 
 =head1 Core library
 
@@ -23,26 +25,38 @@ heavily, especially inline NAM code and references into the runtime.
 =head1 Other libraries
 
 C<lib/*.pm6> currently provides multithreading and a TAP stub.  I hope to see
-more here eventually.
+more here eventually.  Or maybe we'll integrate with "ecosystem".
+
+C<lib/COR*.setting> provides the settings used by C<-p> and C<-n>.
 
 =head1 Build system
 
-C<Niecza.proj> is in charge of getting the compiler and libraries into a
-usable state and running the tests.  It is supported by C<PerlTask.cs> and
-C<PerlStub.pl>, a Microsoft.Build plugin for running Perl 5 code; not having
-to load Niecza more than once saves quite a few seconds.
+C<Makefile> is in charge of the build process; it downloads a bootstrap
+compiler, builds the new compiler, and builds the libraries.  It can also
+be used to make a new bootstrap image and run tests.
+
+There has been some discussion of rewriting it in C# to support non-Cygwin
+Windows.
 
 =head1 Documentation
 
-Watch this space.
+Start in this file, and follow links as needed.  Also see the archived
+release announcements.
 
 =head1 Miscellany
 
-C<perf/> contains various scripts and tools used to microbenchmark changes in
-Niecza.  C<t/> contains a handful of unit tests (unmaintained).
+C<perf/> contains various scripts used to microbenchmark changes in
+Niecza.  C<tools/> contains a handful of tools that are useful while
+developing Niecza.  C<examples/> contains demos of Perl 6 code that works
+(especially well) on Niecza, often using Niecza extensions like CLR
+interoperability.
 
 =head1 Test suite
 
 C<test.pl> is the main test suite; all tests in it are expected to pass.
 C<test2.pl> and C<test3.pl> are much smaller and allowed to contain failing
 tests; I use them as a TDD staging area.
+
+Now that Niecza can run roast tests, most new tests should go into roast,
+not here.  Only add new tests here if they are essentially linked to
+Niecza extensions.
