@@ -1,0 +1,157 @@
+=head1 Synopsis
+
+Environment variables available in the Niecza (.NET) runtime
+
+=head1 General
+
+Niecza has a large number of debug modes which can be activated by
+adding an environment variable.  Most of these are boolean options
+which enable a specific form of debug output.  Boolean options only
+care about the presence or absence of the named environment variable.
+
+=head1 Non-debug options
+
+=head2 C<NIECZA_CODEGEN_UNVERIFIABLE>
+
+Removes redundant C<unbox.any> instructions from the generated IL stream,
+improving performance slightly at the expense of making the generated
+code unverifiable (and likely to segfault in critical failure scenarios).
+
+=head2 C<NIECZA_KEEP_IL>
+
+Instructs the module saver to save a copy of the CgOp-level code in the
+generated C<.ser> files.  Used as part of the bootstrap procedure
+(see L<compiler.pod>) and also for cross-compiling.
+
+=head1 Special mention
+
+=head2 C<NIECZA_FAIL_FAST>
+
+Processed by the compiler, not the runtime.  Disables the normal conversion
+of exceptions to SORRYs, allowing you to see the full backtrace.
+
+=head1 Debug options
+
+=head2 C<NIECZA_ALL_EXCEPTIONS>
+
+When set, all Perl 6 level exceptions (not internal ones like
+ExitRunloopException or ResumeUnwindException) will be printed as if they
+were unhandled, whether they are actually handled or not.  Prints at a
+very early stage so it's useful in cases where exception handling itself
+is seriously broken.
+
+=head2 C<NIECZA_C3_TRACE>
+
+Displays a running account of the state of the C3 superclass linearization
+algorithm.
+
+=head2 C<NIECZA_CLR_TRACE>
+
+Generates some debug info from the CLR object wrapper generator.
+
+=head2 C<NIECZA_CODEGEN_TRACE>
+
+This is an integer parameter.  If set to 1, an informative message will be
+printed before generating CLR methods for any Perl 6 block.  If set to 2,
+individual steps in the NamProcessor.Scan recursion will be logged.
+
+=head2 C<NIECZA_DEFER_TRACE>
+
+Setting this when running the compiler causes the equivalent of
+setting C<NIECZA_TRACE=all> in the context of the child only.  Useful
+for debugging problems that appear only in compile-and-run mode,
+since it avoids tracing the compiler itself (a procedure which generates
+much unneeded output, wasting time and space).
+
+=head2 C<NIECZA_DIE_AT_PCT>
+
+Throw an exception and generate a stack dump at a specific point in the
+parsing process.  Only meaningful in conjunction with
+C<NIECZA_HIGHWATER_TRACE>; for instance, setting this to C<53> will die
+immediately after the generation of the "53%" status report.
+
+=head2 C<NIECZA_FORCE_SAVE>
+
+Causes C<.dll> files to be generated for all MSIL emission, even MSIL
+emission that would not normally be saved such as for evals and BEGIN
+blocks.
+
+=head2 C<NIECZA_HIGHWATER_TRACE>
+
+Generates running status reports for all regex matches against long
+strings (greater than 100 characters).  The status measured is the
+high-water mark, the highest character position yet seen (for speed
+reasons, this is only sampled when backtracking, at the end of rules,
+and on entry to longest-term matching).
+
+=head2 C<NIECZA_JSYNC_WRITER_FAILSOFT>
+
+Encode unencodable objects as the string C<"UNSERIALIZABLE Type">, to
+make it easier to find them in the data structure.
+
+=head2 C<NIECZA_LTM_TRACE>
+
+Generates extensive reports on the construction and use of longest-term
+automata.
+
+=head2 C<NIECZA_MMD_TRACE>
+
+Dumps the status of the overloading resolution algorithm (currently only
+used for CLR overloaded methods).
+
+=head2 C<NIECZA_RX_TRACE>
+
+Traces entry and exit to all regex methods.  Each trace point includes
+the position of the attempt; exits include success/failure information
+and match range if applicable.  Also traces C<< <ws> >>.
+
+=head2 C<NIECZA_SER_FAIL_INFO>
+
+Normally exceptions generated during the thaw process are treated as
+indications of an incompatible format change too fundamental for the
+signature and version number to be correctly parsed, so they are not
+shown to the user.  This option causes such exceptions to be displayed.
+
+=head2 C<NIECZA_SER_TRACE>
+
+Dumps information on the saving and loading of objects from serialized
+store files, in particular types and file offsets.  Useful for inspecting
+store files and debugging synchronization failures between save and load.
+
+=head2 C<NIECZA_TRACE>
+
+This enables per-operation tracing by instrumenting the trampoline.
+It may be set to C<all> or C<stat>.  If it is set to C<all>, then the
+call tree will be printed in real time; each trampoline bounce displays
+a node and the current call depth.  If it is set to C<stat>, then the
+call stack will be printed every 1 million bounces (by default).
+
+The C<all> mode is useful for debugging the context of crashes,
+especially infinite loops in a single operation.  For Perl 6-level
+infinite loops, C<stat> is more useful; C<stat> can also be used as a
+primitive profiler, though its utility is limited by the fact that it
+does not count real time.
+
+=head2 C<NIECZA_TRACE_CALLS>
+
+This dumps all edges in the callgraph for profiling purposes.  The
+C<perf/call-log-analyze.pl> script transforms the output into a
+more readable form.
+
+=head2 C<NIECZA_TRACE_DOWNCALLS>
+
+Setting this causes all interaction between the Perl 6 compiler proper
+and the C# runtime stub to be logged; for instance creation of subs,
+creation of packages, installation of sub code, and variable lookups.
+
+=head2 C<NIECZA_TRACE_PERIOD>
+
+This sets the display interval for C<NIECZA_TRACE=stat>.  Defaults to
+C<1000000>.  Setting it lower is potentially useful in a profiling
+context.
+
+=head2 C<NIECZA_VERBOSE_EXCEPTIONS>
+
+Displays details of call arguments like C<callframe.args.perl> in
+backtraces in addition to the usual C<$?FILE> / C<$?LINE> / C<&?BLOCK.name>
+information.  Has an unfortunate tendency to cause infinite loops.
