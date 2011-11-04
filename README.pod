@@ -1,6 +1,6 @@
 =head1 ABOUT
 
-This is 'Niecza', which will is a Perl 6 implementation focusing on
+This is 'Niecza', which is a Perl 6 implementation focusing on
 optimization and efficient implementation research.  It targets the
 Common Language Runtime (ECMA-335; implementations are "Mono" and ".NET").
 
