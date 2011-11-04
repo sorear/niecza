@@ -1,46 +1,54 @@
 =head1 Synopsis
 
-This document describes NAM, aka CgOp, the Niecza Abstract Machine.  NAM is the
-language used to connect the portable parts of Niecza to the unportable.  It is
-the last Niecza IR which is shared between all cross-compiler backends.  It is
-used primarily to refer to three things: a computing model suitable for running
-Niecza output, a representation of abstract operations in the model, and a file
-format for storing modules in the model.
+This document describes NAM, aka CgOp, the Niecza Abstract Machine.
+NAM is the language used to connect the portable parts of Niecza to
+the unportable.  It is the last Niecza IR which is shared between all
+cross-compiler backends.  It is used primarily to refer to two things:
+a computing model suitable for running Niecza output and a
+representation of abstract operations in the model.
 
 =head1 General model
 
-A program for execution by NAM consists of one or more units, one of which is
-singled out as the main unit by a compiler option.  Each unit consists of some
-global data, a list of dependency units, and a set of meta-objects.
+NAM does B<not> define a file format, nor does it handle the details
+of representing classes or similar things.  Those are handled by a
+separate backend protocol (not yet documented).   NAM only handles the
+executable expressions and statements that make up sub bodies.
 
-The dependency lists organize the units into a directed acyclic graph.  A unit
-can only see objects from another unit if a dependency is declared.  This
-facilitates recompilation checking.
-
-Meta-objects have per-unit unique identifiers, and can be identified globally
-by a token known as an xref, which contains the originating unit's identity,
-the per-unit identifier, and a name to facilitate debugging.  Meta-objects
-come in two basic types; sub bodies and packages.  Packages are further
-subdivided into packages, modules, classes, grammars, roles, and parametric
-roles.
-
-Sub bodies contain a variety of metadata, including the runtime class, flags
-for various special types of sub, the signature, the set of lexical variable
-definitions, and a tree of operations.  This tree is structured much like a
-Lisp program and obeys similar evaluation rules.
+Each sub which is created by the frontend is associated with a string
+of NAM code, and a list of metaobjects referenced by the NAM code.
+The backend then needs to use this code to make the sub executable;
+the CLR backend delays this as long as possible because of quirks of
+the AssemblyBuilder/TypeBuilder interface, but this is not generally
+required.
 
 NAM code must be statically typable but this may not always be enforced.
 Different data objects have logical types, which can map many-to-one onto
 lower-level types, especially in type-poor environments such as Parrot and
 JavaScript.
 
-Packageoids contain information about the construction of the object, such
-as methods, attributes, superclasses, the C3 MRO, and the name.
+NAM is vaguely similar to Lisp, in the sense that NAM code is built
+out of expressions which have a value and possibly side effects.  An
+example might do well here:
 
-Each metaobject is logically divided into a persistant portion and a
-temporary portion.  The persistant portion is required by the compiler
-to parse and generate code for depending modules; the temporary
-portion is not.  This allows less data to be loaded.
+    ["say",["str","Hello, world"]]
+
+Here the "str" expression returns a C<str>, while the "say" expression
+does not return anything.  NAM, like many backends, does not treat
+C<void> as a runtime type, and in fact has no way to represent the
+name.
+
+=head1 Surface syntax
+
+NAM code is send to the backend in the form of a variant of JSON.
+Mappings and C<undefined> are not used; only sequences, strings,
+numbers, C<null>, C<true>, and C<false> will be generated.  One
+additional syntactic item is added, C<!123>, which uses a decimal
+index to represent a runtime object which the code needs to reference.
+
+Within string literals, the only escape sequence used is C<\uABCD>,
+with the requirement to use surrogate characters for codepoints
+outside the BMP.  Outside string literals, whitespace is generally not
+used.
 
 =head1 Runtime data objects, by static type
 
@@ -908,241 +916,5 @@ Obtains a reference to the Sub implementing a private method.
 =head3 rawcall
 
 =head3 rawscall
-
-=head1 File format
-
-NAM unit files are encoded in JSON, using only numbers, strings, and sequences;
-mappings and boolean values are excluded.  It is helpful to consider a number
-of "node types" for describing the format of the sequences.  Most node types
-reflect a sequence with a fixed number of children with fixed interpretations.
-No names are used; all access is by index.
-
-A file contains two JSON objects.  The first one is of the "File root"
-type; the second is an array of the temporary parts of meta-objects.
-Meta-objects with no temporary object will be null, or possibly
-omitted if at the end.  Currently only subs use the temporary segment.
-
-=head2 File root
-
-    Name            Type    Description
-    mainline_ref    Xref    Xref to mainline subroutine
-    name            string  Unit's unique name
-    log             ...     Mostly unused vestige of last stash system
-    setting         string  Name of setting unit or null
-    bottom_ref      Xref    Xref to sub containing {YOU_ARE_HERE}, or null
-    filename        string  Filename of source code or null
-    modtime         number  Seconds since 1970-01-01
-    xref            Xref[]  Resolves refs from other units
-    tdeps           TDep[]  Holds dependency data for recompilation
-    stash_root      StNode  Trie holding classes and global variables
-
-xref entries cannot be reordered as they are referenced by index.  Filename and
-modification time are used for checking recompilation necessity; tdeps
-("transitive dependency") are used to check for recursive recompilation with
-minimal file reading.  Filename is also used to provide C<$?FILE>.  Each xref
-entry is either null, a Subroutine, or a Packageoid.
-
-=head2 Cross-reference
-
-    Name            Type    Description
-    unit            string  Names unit of origin
-    index           number  Indexes into unit's xref array
-    name            string  Descriptive name for debugging
-
-Cross-reference (xref) nodes allow object references to cross unit boundaries
-without complicating serialization.
-
-=head2 Transitive dependency node
-
-    Name            Type    Descripton
-    unitname        string  Names unit that is depended on
-    filename        string  Absolute filename of source code
-    modtime         number  Modification time in POSIX seconds
-
-=head2 Stash node
-
-This is a sequence of tuples; each such tuple has one of the forms
-C<[ name, "var", Xref, ChildNode ]> or C<[ name, "graft", path ]>.
-
-=head2 Method node
-
-    Name            Type    Description
-    name            string  Method name without ! decorator
-    kind            string  [1]
-    var             string  Variable for implementing sub in param role
-    body            Xref    Reference to implementing sub
-
-[1] Allowable kinds are "normal", "private", and "sub".
-
-=head2 Attribute node
-
-    Name            Type    Description
-    name            string  Attribute name without sigil or twigil
-    public          number  Nonzero if attribute should be easy to inspect
-    ivar            string  Sub name of BUILD phaser for param roles
-    ibody           Xref    Reference to BUILD phaser
-
-=head2 Subroutine
-
-    Name            Type    Description
-    typecode        string  Always "sub"
-    name            string  Sub's name for backtraces
-    outer_xref      Xref    OUTER:: sub, may be in a setting unit
-    flags           number  [1]
-    children        num[]   Supports tree traversals
-    class           string  &?BLOCK.WHAT; "Sub" or "Regex"
-    ltm             LtmNode Only for regexes; stores declarative prefix
-    exports         str[][] List of global names
-    signature       Param[] May be null in exotic cases
-    lexicals        Lex[]   Come in multiple forms[6]
-
-Temporary portion:
-
-    Name            Type    Description
-    xref            Xref    For documentation only
-    param_role_hack ...     [2]
-    augment_hack    ...     [3]
-    hint_hack       ...     [4]
-    is_phaser       number  [5]
-    body_of         Xref    Only valid in immediate block of class {} et al
-    in_class        Xref    Innermost enclosing body_of
-    cur_pkg         str[]   OUR:: as a list of names
-    lexicals        Lex[]   Come in multiple forms[6]
-    nam             ...     See description of opcodes earlier
-
-[1] The following flags are used:
-
-    1   RUN_ONCE        Sub does not need pad cloning
-    2   SPAD_EXISTS     Sub needs a static pad
-    4   GATHER_HACK     Assume a "take EMPTY" at end
-    8   STRONG_USED     Not dead code even if unreferenced
-    16  RETURNABLE      Add a return exception handler
-    32  AUGMENTING      Is an augment{} block
-
-[2] Xref to role object if this is a role{} block with parameters
-
-[3] Sequence; first item is a ref to the target packageoid, subsequent items
-are Method descriptors.
-
-[4] Sequence of [Xref, string] identifying a specific "hint" lexical in a
-specific sub.  This lexical is bound to the return value of the current sub's
-code; will always be seen with a PREINIT phaser.
-
-[5] If non-null, registers the current sub for a phaser queue.
-
-    0   INIT    Before global mainline
-    1   END     Not implemented
-    2   PREINIT Before all mainlines
-
-[6] Either the temporary copy will be null, or the primary copy will
-have no items, depending on whether this sub needs to have its
-lexicals inspected by the compiler.
-
-=head2 Lexical definition
-
-These come in several flavors, but all share the same first two fields, which
-are used to find the correct lexical and identify its format.
-
-    Name            Type    Description
-    name            string  "$?FOO" or similar
-    typecode        string  Always 'hint'
-
-This type is used for lexically scoped constants.  They cannot be rebound by
-the scopedlex or corelex operations, but are automatically bound by the
-handling of hint_hack subs.
-
-    Name            Type    Description
-    name            string  "OUTER" or similar
-    typecode        string  Always 'label'
-
-This type marks labels.  Labels are cloned like subs on entry, and
-refer to objects which encapsulate a name and a frame reference.
-
-    Name            Type    Description
-    name            string  "&infix:<+>" or similar
-    typecode        string  Always 'dispatch'
-
-This type is used for dispatch subs.  Dispatch subs are created on
-clone and encapsulate some number of multi candidates, specifically
-all lexically-visible unshadowed subs with names like the dispatch
-followed by ":(" and any extra stuff.
-
-    Name            Type    Description
-    name            string  "$foo"
-    typecode        string  Always 'simple'
-    flags           number  4=NOINIT, 2=LIST, 1=HASH
-
-These are used for run of the mill my-variables.  NOINIT is required for
-variables that are initialized by signature binding.
-
-    Name            Type    Description
-    name            string  "$foo"
-    typecode        string  Always 'alias'
-    to              string  "anon_21934"
-
-These are used for state variables, which need storage in an outer sub, but
-should only be accessible under the declared name in an inner one.
-
-    Name            Type    Description
-    name            string  "Regex"
-    typecode        string  Always 'stash'
-    path...         string  "GLOBAL"
-    path...         string  "STD"
-    path...         string  "Regex"
-
-These are used to lexically name packageoids.  All packageoids have a stash
-name; my-scoped packageoids get gensym names.  The list of names is stored
-inline.
-
-    Name            Type    Description
-    name            string  "$ALL"
-    typecode        string  Always 'common'
-    path...         string  "GLOBAL"
-    path...         string  "STD"
-    path...         string  "$ALL"
-
-These are used for our-scoped variables.  As an optimization, direct references
-like C<$STD::ALL> generate a gensym-named common lexical.
-
-    Name            Type    Description
-    name            string  "&say"
-    typecode        string  Always 'sub'
-    [Xref stored inline here]
-
-These are used for subs, and must be in correspondence with the "zyg" list.
-
-=head2 Signature parameter
-
-    Name            Type    Description
-    name            string  For binding error messages
-    flags           number  [1]
-    slot            string  Name of lexical to accept value
-    names           str[]   All legal named-parameter names
-    default         Xref    Sub to call if HAS_DEFAULT; must be child of this
-
-[1] Flag values are as follows.
-
-    1   SLURPY      *@foo or *%foo (check HASH)
-    2   SLURPYCAP   |$foo
-    4   RWTRANS     \$foo
-    8   FULL_PARCEL \|$foo
-    16  OPTIONAL    $foo?
-    32  POSITIONAL  $foo, not :$foo
-    64  READONLY    $foo, not $foo is rw
-    128 LIST        @foo
-    256 HASH        %foo
-
-=head2 Packageoid
-
-    Name            Type    Description
-    typecode        string  A definition keyword or "parametricrole"
-    name            string  The object's debug name
-    exports         str[][] List of global names to which object is bound
-    (The following are only found in class, grammar, role, parametricrole)
-    attributes      attr[]  Attributes local to the class
-    methods         methd[] Methods local to the class
-    superclasses    Xref[]  Direct superclasses of the class
-    (The following is only found in class, grammar)
-    linear_mro      Xref[]  All superclasses in C3 order
 
 =for vim vim: tw=70
