@@ -748,7 +748,7 @@ for $args (0..9) {
             // type objects are typed nulls
             if (!obj.IsDefined()) {
                 if (obj is BoxObject<object>) {
-                    Type t = (Type)Kernel.UnboxAny<object>(obj.mo.how);
+                    Type t = obj.mo.box_type;
                     // is this enough?
                     return (ty.IsAssignableFrom(t) && !ty.IsValueType &&
                             ty != typeof(void));
