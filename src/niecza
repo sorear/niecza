@@ -206,6 +206,7 @@ general options:
    -p                        # short for -L CORP
    -B --backend=NAME         # select backend (dotnet)
    -L --language=NAME        # select your setting
+   -I --include=DIR          # add a directory to search for modules
    -v --verbose              # detailed timing info
    -c --compile              # don't run (implied with -C)
       --safe                 # disable system interaction
