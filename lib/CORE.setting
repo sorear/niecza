@@ -589,14 +589,14 @@ my class Integral is Real { }
 my class Num is Real {
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
-    our constant i  = sqrt(-1);
+    our constant i  = Q:CgOp { (complex_new {0} {1}) };
     method Num() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
-our constant i  = sqrt(-1);
+our constant i  = Num::i;
 my class Int is Integral {
     method niecza_quantifier_max() { self }
     method niecza_quantifier_min() { self }
@@ -613,7 +613,7 @@ my class Rat is Real {
     method nude() { [ self.numerator, self.denominator ] }
 }
 my class Complex is Numeric {
-    method new($re,$im) { $re + $im\i }
+    method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method Complex() { self }

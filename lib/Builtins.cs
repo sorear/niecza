@@ -988,6 +988,11 @@ public partial class Builtins {
     // we don't need to do nominal checking stuff here because this
     // is in a method, never inlined, and as such the binder had to
     // already have been called.
+    public static Variable complex_new(Variable a1, Variable a2) {
+        double d1 = a1.Fetch().mo.mro_raw_Numeric.Get(a1);
+        double d2 = a2.Fetch().mo.mro_raw_Numeric.Get(a2);
+        return MakeComplex(d1,d2);
+    }
     public static Variable complex_re(Variable a1) {
         return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).re);
     }
@@ -1290,7 +1295,7 @@ public partial class Builtins {
             return MakeComplex(mag * Math.Cos(angle), mag * Math.Sin(angle));
         } else {
             double val = PromoteToFloat(r1, n1);
-            return (val >= 0) ? MakeFloat(Math.Sqrt(val)) : MakeComplex(0, Math.Sqrt(-val));
+            return MakeFloat(Math.Sqrt(val));
         }
     }
 
