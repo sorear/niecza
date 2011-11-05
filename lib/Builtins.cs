@@ -2149,7 +2149,8 @@ again:
     }
 
     public static Variable stash_bind_key(P6any st, string key, Variable to) {
-        return Kernel.GetVar(Kernel.UnboxAny<string>(st), key).v = to;
+        Kernel.GetVar(Kernel.UnboxAny<string>(st), key).Bind(to);
+        return to;
     }
 
     public static Variable stash_delete_key(P6any st, string key) {

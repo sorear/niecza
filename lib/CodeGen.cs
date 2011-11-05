@@ -4319,7 +4319,7 @@ dynamic:
                 ru.InitTime();
                 Frame fret = null;
                 StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
-                b.v = Kernel.FalseV;
+                b.Bind(Kernel.FalseV);
                 Frame ir = Kernel.GetInferiorRoot();
                 fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
                 fret.MarkShared();

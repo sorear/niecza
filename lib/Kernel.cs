@@ -327,6 +327,10 @@ namespace Niecza {
         public string   file;
         public int      line;
 
+        public void Bind(Variable v) {
+            this.v = v;
+        }
+
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.StashEnt);
             fb.ObjRef(v);
@@ -1133,11 +1137,11 @@ namespace Niecza {
         internal string VarName() { return hkey.Substring(1 + (int)hkey[0]); }
 
         public override object Get(Frame f) {
-            return Kernel.currentGlobals[hkey].v;
+            return Kernel.GetGlobal(hkey);
         }
 
         public override void Set(Frame f, object to) {
-            Kernel.currentGlobals[hkey].v = (Variable)to;
+            Kernel.BindGlobal(hkey, (Variable)to);
         }
 
         internal override ClrOp GetCode(int up) {
@@ -1173,6 +1177,7 @@ namespace Niecza {
                 EmitUnit.Current.RefConstant(name, "E", var, null).head);
         }
 
+        // XXX should die() with constant improvements
         internal override ClrOp SetCode(int up, ClrOp to) {
             return new ClrSetField(Tokens.StashEnt_v,
                 EmitUnit.Current.RefConstant(name, "E", var, null).head, to);
@@ -3763,7 +3768,7 @@ tryagain:
 
                 if (Kernel.currentGlobals.TryGetValue("\x8::GLOBAL" + key, out bv) ||
                         Kernel.currentGlobals.TryGetValue("\x9::PROCESS" + key, out bv)) {
-                    if (rbar_w) { bv.v = o; } else { o = bv.v; }
+                    if (rbar_w) { bv.Bind(o); } else { o = bv.v; }
                     return true;
                 }
             }
@@ -5047,7 +5052,6 @@ slow:
             else
                 v = currentGlobals[key] = new StashEnt();
 
-
             if (name.StartsWith("@")) {
                 v.v = CreateArray();
             } else if (name.StartsWith("%")) {
@@ -5494,7 +5498,7 @@ slow:
         }
 
         public static void BindGlobal(string key, Variable to) {
-            currentGlobals[key].v = to;
+            currentGlobals[key].Bind(to);
         }
 
         internal static void CreateBasicTypes() {
