@@ -321,13 +321,7 @@ namespace Niecza {
         }
     }
 
-    // Used to make Variable sharing explicit in some cases; will eventually be
-    // the only way to share a bvalue
-    public sealed class BValue {
-        public Variable v;
-        public BValue(Variable v) { this.v = v; }
-    }
-
+    // Used to make Variable sharing explicit in some cases
     public class StashEnt : IFreeze {
         public Variable v;
         public string   file;

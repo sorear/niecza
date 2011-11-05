@@ -287,7 +287,6 @@ namespace Niecza.CLRBackend {
         public static readonly Type SubInfo = typeof(SubInfo);
         public static readonly Type P6any = typeof(P6any);
         public static readonly Type Variable = typeof(Variable);
-        public static readonly Type BValue = typeof(BValue);
         public static readonly Type P6opaque = typeof(P6opaque);
         public static readonly Type DynBlockDelegate = typeof(DynBlockDelegate);
         public static readonly Type STable = typeof(STable);
@@ -473,8 +472,6 @@ namespace Niecza.CLRBackend {
 
         public static readonly FieldInfo P6any_mo =
             P6any.GetField("mo");
-        public static readonly FieldInfo BValue_v =
-            BValue.GetField("v");
         public static readonly FieldInfo StashEnt_v =
             typeof(StashEnt).GetField("v");
         public static readonly FieldInfo SubInfo_protosub =
@@ -3133,7 +3130,6 @@ dynamic:
             thandlers["var_new_tied"] = Constructy(typeof(TiedVariable).GetConstructor(new Type[] { Tokens.P6any, Tokens.P6any, Tokens.P6any }));
             thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);
-            thandlers["bget"] = FieldGet(Tokens.BValue, "v");
             thandlers["default_new"] = delegate(CpsOp[] z) {
                 return CpsOp.Sequence(
                     CpsOp.Label("!again", false),
