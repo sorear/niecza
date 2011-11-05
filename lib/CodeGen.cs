@@ -3729,7 +3729,18 @@ dynamic:
                 ((SubInfo)Handle.Unbox(args[1])).SetInlined();
                 return null;
             } else if (cmd == "sub_run_BEGIN") {
-                ((SubInfo)Handle.Unbox(args[1])).RunBEGIN();
+                SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
+                Variable v  = si.RunBEGIN();
+                string   cn = (string)args[2];
+                while (si != null && !si.dylex.ContainsKey(cn)) si = si.outer;
+                LexInfo li = si == null ? null : si.dylex[cn];
+                if (li is LIHint) {
+                    ((LIHint)li).var.v = v;
+                } else if (li is LICommon) {
+                    li.Set(null, v);
+                } else {
+                    return new Exception("cannot bind constant value");
+                }
                 return null;
             } else if (cmd == "sub_get_unit") {
                 return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);

@@ -1857,10 +1857,9 @@ noparams:
                 }
         }
 
-        internal void RunBEGIN() {
-            Kernel.RunInferior(protosub.Invoke(Kernel.GetInferiorRoot(),
+        internal Variable RunBEGIN() {
+            return Kernel.RunInferior(protosub.Invoke(Kernel.GetInferiorRoot(),
                 Variable.None, null));
-            SetInlined();
         }
 
         internal bool IsTopicalizer() {

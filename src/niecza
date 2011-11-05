@@ -154,15 +154,15 @@ method statement_prefix:BEGIN ($/) {
     }
 
     $*CURLEX<!sub>.create_static_pad;
-    $<blast>.ast.run_BEGIN;
-    make ::Op::StatementList.new;
+    my $con = self.make_constant($/, 'anon', 'BEGIN');
+    $<blast>.ast.run_BEGIN($con.name);
+    $con.init = True;
+    make $con;
 }
 method init_constant($con, $rhs) {
-    my $body = self.thunk_sub(
-        ::Op::LexicalBind.new(name => $con.name, :$rhs),
-        name => "$con.name() init");
+    my $body = self.thunk_sub($rhs, name => "$con.name() init");
     $body.outer.create_static_pad;
-    $body.run_BEGIN;
+    $body.run_BEGIN($con.name);
     $con.init = True;
     $con;
 }
