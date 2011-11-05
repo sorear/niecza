@@ -3737,7 +3737,9 @@ dynamic:
                 if (li is LIHint) {
                     ((LIHint)li).var.v = v;
                 } else if (li is LICommon) {
-                    li.Set(null, v);
+                    StashEnt hkey = Kernel.currentGlobals[((LICommon)li).hkey];
+                    hkey.constant = true;
+                    hkey.v = v;
                 } else {
                     return new Exception("cannot bind constant value");
                 }

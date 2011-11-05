@@ -326,13 +326,17 @@ namespace Niecza {
         public Variable v;
         public string   file;
         public int      line;
+        public bool     constant;
 
         public void Bind(Variable v) {
+            if (constant)
+                throw new NieczaException("Binding of constant common variable");
             this.v = v;
         }
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.StashEnt);
+            fb.Byte((byte)(constant ? 1 : 0));
             fb.ObjRef(v);
             fb.String(file);
             fb.Int(line);
@@ -341,6 +345,7 @@ namespace Niecza {
         internal static StashEnt Thaw(ThawBuffer tb) {
             StashEnt r = new StashEnt();
             tb.Register(r);
+            r.constant = tb.Byte() != 0;
             r.v = (Variable)tb.ObjRef();
             r.file = tb.String();
             r.line = tb.Int();
@@ -849,22 +854,26 @@ namespace Niecza {
             bool  nseod = nseo.IsDefined();
             bool  oseod = oseo.IsDefined();
             // lowest priority are empty common symbols
-            if (nse.v.rw && !nseod || IsEmptyAggr(nse.v)) {
+            if (nse.v.rw && !nseod || !nse.constant && IsEmptyAggr(nse.v)) {
                 nse = ose;
                 return null;
             }
-            if (ose.v.rw && !oseod || IsEmptyAggr(ose.v)) {
+            if (ose.v.rw && !oseod || !ose.constant && IsEmptyAggr(ose.v)) {
                 return null;
             }
 
             // no conflict if items are identical
-            if (ose.v == nse.v || !ose.v.rw && !nse.v.rw && oseo == nseo) {
+            if (ose.v == nse.v || !ose.v.rw && !nse.v.rw &&
+                    ose.v.islist == nse.v.islist && oseo == nseo) {
                 nse = ose;
                 return null;
             }
 
             // no conflict if items are simple packages with the same who
-            if (!ose.v.rw && !oseod && !nse.v.rw && !nseod &&
+            // note that this will effectively change a constant, but these
+            // packages are observationally identical barring &infix:<does>
+            // (mis)use
+            if (ose.constant && !oseod && nse.constant && !nseod &&
                     (oseo.mo.mo.isPackage || nseo.mo.mo.isPackage) &&
                     oseo.mo.who.Isa(Kernel.StashMO) &&
                     nseo.mo.who.Isa(Kernel.StashMO) &&
@@ -884,6 +893,7 @@ namespace Niecza {
                 string file, int line) {
             string key = (char)who.Length + who + name;
             StashEnt nse = new StashEnt();
+            nse.constant = (var != null);
             if (var == null)
                 var = MakeAppropriateVar(name);
             nse.v = var;
