@@ -1091,7 +1091,7 @@ namespace Niecza {
 
         internal abstract void DoFreeze(FreezeBuffer fb);
         internal enum LexSerCode {
-            Simple, Sub, Label, Dispatch, Common, Hint, Package, Alias
+            Simple, Sub, Label, Dispatch, Common, Constant, Package, Alias
         }
     }
 
@@ -1170,32 +1170,33 @@ namespace Niecza {
         }
     }
 
-    public class LIHint : LexInfo {
-        public StashEnt var;
-        public LIHint() { }
-        public LIHint(StashEnt var) { this.var = var; }
+    public class LIConstant : LexInfo {
+        public Variable value;
+        public LIConstant() { this.value = Kernel.AnyMO.typeVar; }
+        internal LIConstant(Variable value) { this.value = value; }
         public override void Init(Frame f) { }
-        public override void BindFields() {
-            var = new StashEnt();
+        public override void BindFields() { }
+
+        public override object Get(Frame f) { return value; }
+        public override void Set(Frame f, object to) {
+            throw new NieczaException("Cannot bind to constant " + name);
         }
 
-        public override object Get(Frame f) { return var.v; }
-        public override void Set(Frame f, object to) { var.v = (Variable)to; }
-
         internal override ClrOp GetCode(int up) {
-            return new ClrGetField(Tokens.StashEnt_v,
-                EmitUnit.Current.RefConstant(name, "E", var, null).head);
+            return EmitUnit.Current.RefConstant(name, "", value, typeof(Variable)).head;
         }
 
         // XXX should die() with constant improvements
         internal override ClrOp SetCode(int up, ClrOp to) {
-            return new ClrSetField(Tokens.StashEnt_v,
-                EmitUnit.Current.RefConstant(name, "E", var, null).head, to);
+            return new ClrOperator(Tokens.Void, OpCodes.Throw, new [] {
+                new ClrConstructorCall(typeof(NieczaException).
+                    GetConstructor(new [] { typeof(string) }),
+                    new [] { new ClrStringLiteral("Cannot bind to constant " + name) }) });
         }
 
         internal override void DoFreeze(FreezeBuffer fb) {
-            fb.Byte((byte)LexSerCode.Hint);
-            fb.ObjRef(var);
+            fb.Byte((byte)LexSerCode.Constant);
+            fb.ObjRef(value);
         }
     }
 
@@ -2101,8 +2102,8 @@ noparams:
                     case (int) LexInfo.LexSerCode.Common:
                         li = new LICommon(tb.String());
                         break;
-                    case (int) LexInfo.LexSerCode.Hint:
-                        li = new LIHint((StashEnt) tb.ObjRef());
+                    case (int) LexInfo.LexSerCode.Constant:
+                        li = new LIConstant((Variable) tb.ObjRef());
                         break;
                     case (int) LexInfo.LexSerCode.Package:
                         li = new LIPackage((STable) tb.ObjRef());

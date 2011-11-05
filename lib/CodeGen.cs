@@ -3734,8 +3734,8 @@ dynamic:
                 string   cn = (string)args[2];
                 while (si != null && !si.dylex.ContainsKey(cn)) si = si.outer;
                 LexInfo li = si == null ? null : si.dylex[cn];
-                if (li is LIHint) {
-                    ((LIHint)li).var.v = v;
+                if (li is LIConstant) {
+                    ((LIConstant)li).value = v;
                 } else if (li is LICommon) {
                     StashEnt hkey = Kernel.currentGlobals[((LICommon)li).hkey];
                     hkey.constant = true;
@@ -3858,7 +3858,7 @@ dynamic:
                 var llab   = li as LILabel;
                 if (llab != null)
                     r = new object[] { "label",null,null,null };
-                var lhint  = li as LIHint;
+                var lhint  = li as LIConstant;
                 if (lhint != null)
                     r = new object[] { "hint",null,null,null };
                 var lcomm  = li as LICommon;
@@ -4186,7 +4186,7 @@ dynamic:
 
                 return AddLexical(args, new LISimple(flags, type));
             } else if (cmd == "add_hint") {
-                return AddLexical(args, new LIHint());
+                return AddLexical(args, new LIConstant());
             } else if (cmd == "add_label") {
                 return AddLexical(args, new LILabel());
             } else if (cmd == "add_dispatcher") {
