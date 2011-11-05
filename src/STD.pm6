@@ -2084,7 +2084,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$@> {
-        <sym> <?before \W> ::
+        <sym> <!before \w> ::
         <.obs('$@ variable as eval error', '$!')>
     }
 
@@ -2106,7 +2106,7 @@ grammar P6 is STD {
 
     # Note: this works because placeholders are restricted to lowercase
     token special_variable:sym<$^X> {
-        <sigil> '^' $<letter> = [<[A..Z]>] \W
+        <sigil> '^' $<letter> = [<[A..Z]>] <![\w]>
         <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>.Str, $<letter>.Str)>
     }
 
