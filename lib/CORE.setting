@@ -1952,6 +1952,7 @@ sub prefix:<|> (\$item) { $item.Capture }
 sub prefix:<^> ($limit) { 0 ..^ +$limit }
 sub prefix:<so> is Niecza::absprec<h=> (\$item) { ?$item }
 sub infix:<xx> is Niecza::absprec<s=> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
+sub _doreplicate($func, $ct) { map { $func() }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) { Q:CgOp { (abs {$x}) } }
 sub abs($x) { Q:CgOp { (abs {$x}) } }
 sub floor($x) { Q:CgOp { (floor {$x}) } }

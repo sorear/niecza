@@ -17,6 +17,14 @@ use RxOp;
 use Sig;
 use STD;
 
+class Operator::Replicate is Operator {
+    method as_function($/) { mklex($/, '&infix:<xx>') }
+    method with_args($/, *@args) {
+        mkcall($/, '&_doreplicate', ::GLOBAL::NieczaActions.block_expr($/,
+            ::GLOBAL::NieczaActions.thunk_sub(@args[0])), @args[1]);
+    }
+}
+
 augment grammar STD {
 method explain_mystery($nested?) {
     my %post_types;
@@ -133,6 +141,7 @@ augment class RxOp::Sym {
 }
 
 augment class NieczaActions {
+method infix:sym<xx> ($/) { make ::Operator::Replicate.new }
 method statement_prefix:BEGIN ($/) {
     # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
     repeat while False {
