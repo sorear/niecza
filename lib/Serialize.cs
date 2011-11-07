@@ -832,7 +832,7 @@ badhash:
                 nm = nm.Replace("Run.", "");
             Type nt = Type.GetType(nm, true);
             ReflectObj n = (ReflectObj)
-                nt.GetConstructor(new Type[0]).Invoke(null, new object[0]);
+                nt.GetConstructor(new Type[0]).Invoke(new object[0]);
             tb.Register(n);
             n.SetData(tb.RefsA<object>());
             return n;

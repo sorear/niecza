@@ -318,7 +318,7 @@ namespace Niecza {
                 return CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
             } else if (what_call is ConstructorInfo) {
                 ConstructorInfo ci = (ConstructorInfo) what_call;
-                object ret = ci.Invoke(null, argv);
+                object ret = ci.Invoke(argv);
                 WritebackRefs(pos, argv);
                 return CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
             } else if (what_call is FieldInfo) {

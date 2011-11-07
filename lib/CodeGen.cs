@@ -3946,6 +3946,7 @@ dynamic:
                         return new Exception((who + "::" + key).Substring(2) + " does not name any package");
                     } else {
                         c.globals[hkey] = v = new StashEnt();
+                        v.constant = true;
                         v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Kernel.StashMO));
                         pkg = v.v.Fetch().mo;
                     }

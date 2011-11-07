@@ -5357,7 +5357,7 @@ slow:
             try {
                 main_unit.InitTime();
                 main_unit.RunMainline();
-            } catch (NieczaException n) {
+            } catch (Exception n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
                 Environment.Exit(1);
             }
