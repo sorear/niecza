@@ -1,0 +1,35 @@
+we need to add:
+
+* Threads need to be better supported.  So realize each thread as a
+  ThreadContext object (with corresponding Thread instance, moved to
+  the setting) created when the LastFrameNode stack is.  ThreadContext
+  should probably own the LastFrameNode stack.
+
+* StatementList children need to use stmt NN rather than ann NN, to
+  produce the correct sequence points.
+
+* Add a debug event queue, which is an object pipe getting events
+
+* Breakpoint operator: makes a condvar, signals a debug event, waits
+  for clearance to continue.
+
+* More inspection and setting operators on Frame, SubInfo, etc.  We
+  especially want &wrap and a facility for on-stack replacement.
+
+* New debug runloop (can be enabled/disabled from code), features:
+
+  + Signal breakpoint after N trampoline bounces
+  + Run either normal code or code instrumented to turn stmt into a
+    return-to-runloop
+  + Per-thread breakpoint position list - break at (sub, seqpt)
+  + Asynchronous stopping
+
+* Watchpointing: Tie _any_ variable (Not sure if this can work
+  performantly in the C# impl; tying the "RO vars" will be
+  C#-specific in any case)
+
+* a Niecza/DebugInterface.pm6 module to expose all this.  Perhaps,
+  have Niecza::Thread in the setting and re-export it as Thread in
+  Threads.pm6.
+
+* Add a pretty GUI or curses debugger :)
