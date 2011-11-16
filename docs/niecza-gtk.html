@@ -1,0 +1,578 @@
+<html>
+  <head>
+    <title>niecza-gtk.html</title>
+    <style type="text/css">
+      html { font-family: sans-serif }
+      body { border-color: white; margin-color: white; }
+      table.slideshow { background-color: white; border: white; }
+      tr.prev, tr.next { height: 300px; vertical-align: top; }
+      td.top, td.bottom { width: 1024px; height: 50%;
+        background-color: white; }
+      h1 { text-align: center; font-size: 36pt; }
+      h2 { text-align: center; font-size: 30pt; }
+      h3 { font-size: 24pt; }
+      h1.titleslide { font-size: 48pt; }
+      pre {background-color: lightgray }
+      div.text { font-size: 18pt; text-align: center }
+    </style>
+  </head>
+  <body>
+    <table class="slideshow">
+
+      <a id="#slide1"/>
+      <tr class="titleslide" id="slide1">
+        <td class="slide">
+          <a href="#slide0">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/>
+                  <h1 class="titleslide">Niecza Perl 6 and Gtk</h1>
+                  <h1 class="titleslide">..er, Tetris</h1>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide2">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h2>by Martin Berends</h2>
+                  <h2>London Perl Workshop</h2>
+                  <h2>12 November 2011</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide2"/>
+      <tr class="slide" id="slide2">
+        <td class="slide">
+          <a href="#slide1">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Graphical User Interfaces</h1>
+                  <h2>(Event driven programming)</h1>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide3">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <br/>
+                  <h3>* Like in Soviet Russia:</h3>
+                  <h3>* You don't call the GUI libraries.</h3>
+                  <h3>* The GUI libraries call you.</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide3"/>
+      <tr class="slide" id="slide3">
+        <td class="slide">
+          <a href="#slide2">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Events == user actions</h2>
+                  <h2>and system signals</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide4">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <br/>
+                  <h3>Examples:</h3>
+                  <h3>* Mouse and keyboard input</h3>
+                  <h3>* Clock ticks and file I/O</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide4"/>
+      <tr class="slide" id="slide4">
+        <td class="slide">
+          <a href="#slide3">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Event handlers are a form</h2>
+                  <h2>of callback routine</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide5">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:20pt">
+my $window = Window.new("helloworld");
+$window.add_DeleteEvent: sub ($obj, $args) { #OK
+    # runs when the user deletes the window using the "close
+    # window" widget in the window frame.
+    Application.Quit;
+};                </pre>
+                  <pre style="font-size:20pt">
+Application.Run;  </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide5"/>
+      <tr class="slide" id="slide5">
+        <td class="slide">
+          <a href="#slide4">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>BTW, that was part of</h2>
+                  <h2>niecza/examples/gtk1.pl</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide6">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h3>About Niecza:</h3>
+                  <h3>* a recent Perl 6 implementation by Stefan O'Rear</h3>
+                  <h3>* uses Mono or .NET, on Linux, OS X and Windows</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide6"/>
+      <tr class="slide" id="slide6">
+        <td class="slide">
+          <a href="#slide5">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Niecza uses most CLR libraries (from GAC)</h2>
+                  <h2>and auto-marshals params & return values</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide7">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:13pt">
+# Translated from http://www.mono-project.com/GtkSharp:_Hello_World
+
+constant $GTK = "gtk-sharp,Version=2.12.0.0,Culture=neutral,PublicKeyToken=35e10195dab3c99f";
+
+constant Application = CLR::("Gtk.Application,$GTK");
+constant Window      = CLR::("Gtk.Window,$GTK");
+constant Button      = CLR::("Gtk.Button,$GTK");
+
+Application.Init; </pre>
+                  <pre style="font-size:13pt">
+my $window = Window.new("helloworld"); </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide7"/>
+      <tr class="slide" id="slide7">
+        <td class="slide">
+          <a href="#slide6">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Live demo 1</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide8">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h2>niecza/examples/gtk1.pl</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide8"/>
+      <tr class="slide" id="slide8">
+        <td class="slide">
+          <a href="#slide7">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Gtk (and Gdk)</h2>
+                  <h3>in 'Gnome Libraries' at http://docs.go-mono.com</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide9">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h3>Widgets including: AboutDialog Arrow Box Button 
+Calendar Clipboard ComboBox Curve Dialog Drag DrawingArea
+FileChooserDialog Menu Printer ProgressBar Scrollbar Statusbar Timeout 
+Toolbar TrayIcon VolumeButton Win32EmbedWidget WindowGroup
+and over 200 others</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide9"/>
+      <tr class="slide" id="slide9">
+        <td class="slide">
+          <a href="#slide8">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Drawing with Gdk and Cairo</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide10">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:13pt">
+constant GdkCairoHelper = CLR::("Gdk.CairoHelper,$GDK");
+constant GtkDrawingArea = CLR::("Gtk.DrawingArea,$GTK");
+my $drawingarea = GtkDrawingArea.new;
+$drawingarea.add_ExposeEvent: sub ($obj, $args) {
+    my $cc = GdkCairoHelper.Create($obj.GdkWindow);  # Cairo Context
+    my $windowX=0; my $windowY=0; my $windowWidth=0; my $windowHeight=0; my $windowDepth=0;
+    $obj.GdkWindow.GetGeometry($windowX, $windowY, $windowWidth, $windowHeight, $windowDepth);
+    $cc.SetSourceRGB(0.95.Num, 0.90.Num, 0.85.Num); $cc.Paint;  # background color
+    ...           </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide10"/>
+      <tr class="slide" id="slide10">
+        <td class="slide">
+          <a href="#slide9">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Time event handler</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide11">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:16pt">
+constant GLibTimeout    = CLR::("GLib.Timeout,$GLIB"); </pre>
+                  <pre style="font-size:16pt">
+GLibTimeout.Add: 60000, sub () {  # Update once per minute
+    $drawingarea.QueueDrawArea(0,0,$windowSizeX,$windowSizeY);
+    return True;  # meaning please continue calling this timeout handler
+};                </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide11"/>
+      <tr class="slide" id="slide11">
+        <td class="slide">
+          <a href="#slide10">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Live demo 2</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide12">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h2>niecza/examples/gtk-clock.pl</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide12"/>
+      <tr class="slide" id="slide12">
+        <td class="slide">
+          <a href="#slide11">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Introducing Tetris (Tetromino-tennis)</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide13">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:18pt">
+constant matrixRows = 20; constant matrixColumns = 10;
+my @tetrominoes =  # cell coordinates relative to the "middle" cell
+    [ -1,  0,  0, 0, 1, 0, 2, 0 ],  # I
+    [ -1,  0,  0, 0, 1, 0, 1, 1 ],  # J
+    [ -1,  1, -1, 0, 0, 0, 1, 0 ],  # L
+    [ -1,  1, -1, 0, 0, 0, 0, 1 ],  # O
+    [ -1,  1,  0, 1, 0, 0, 1, 0 ],  # S
+    [ -1,  0,  0, 0, 0, 1, 1, 0 ],  # T
+    [ -1,  0,  0, 0, 0, 1, 1, 1 ];  # Z   </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide13"/>
+      <tr class="slide" id="slide13">
+        <td class="slide">
+          <a href="#slide12">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Colours</h2>
+                  <h3>(must convert Rat -> Num to marshal to Float)</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide14">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:18pt">
+my @colors =  # Copied approximately from the PC version
+    [0,       0,       0      ], # 0: black background
+    [0.5.Num, 0,       0      ], # 1: I maroon
+    [1,       1,       1      ], # 2: J white
+    [0.9.Num, 0,       0.9.Num], # 3: L dark magenta
+    [0,       0,       0.6.Num], # 4: O dark blue
+    [0,       0.8.Num, 0      ], # 5: S green
+    [0.7.Num, 0.7.Num, 0      ], # 6: T brown
+    [0,       0.8.Num, 0.8.Num]; # 7: Z dark cyan </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide14"/>
+      <tr class="slide" id="slide14">
+        <td class="slide">
+          <a href="#slide13">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Physics (1)</h2>
+                  <h3>- pieces should obey laws of nature</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide15">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:16pt">
+sub CanMovePiece($deltaX, $deltaY) {
+    my $canMove = True;
+    for @piece -> $x, $y {
+        if $x+$pieceX+$deltaX < 0 || $x+$pieceX+$deltaX >= matrixColumns ||
+           $y+$pieceY+$deltaY < 0 || $y+$pieceY+$deltaY >= matrixRows ||
+           @matrix[$y+$pieceY+$deltaY][$x+$pieceX+$deltaX] != 0
+        { $canMove = False; }
+    }
+    $canMove;
+}                 </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide15"/>
+      <tr class="slide" id="slide15">
+        <td class="slide">
+          <a href="#slide14">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Physics (2)</h2>
+                  <h3>- pieces should obey laws of nature</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide16">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:18pt">
+sub TryRotatePiece() {
+    my @p = @piece;
+    @piece .= map({ $^b, -$^a });
+    if ! CanMovePiece(0, 0) {
+        @piece = @p;
+    }
+}                 </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide16"/>
+      <tr class="slide" id="slide16">
+        <td class="slide">
+          <a href="#slide15">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Keyboard input</h2>
+                  <h3>(give the user the illusion of control)</h3>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide17">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <pre style="font-size:18pt">
+sub KeyPressEvent($sender, $eventargs) { #OK not used
+    given $eventargs.Event.Key {
+        when 'Up'    { if $colorindex != 4 { TryRotatePiece() } }
+        when 'Down'  { while CanMovePiece(0,1) {++$pieceY;} }
+        when 'Left'  { if CanMovePiece(-1,0)   {--$pieceX;} }
+        when 'Right' { if CanMovePiece( 1,0)   {++$pieceX;} }
+    }
+    return True;  # means this keypress is now handled
+}                 </pre>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide17"/>
+      <tr class="slide" id="slide17">
+        <td class="slide">
+          <a href="#slide16">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Live demo 3</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide18">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h2>niecza/examples/gtk-tetris.pl</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+      <a id="#slide18"/>
+      <tr class="slide" id="slide18">
+        <td class="slide">
+          <a href="#slide17">
+            <table>
+              <tr class="prev">
+                <td class="top" bgcolor="#F0F0F0">
+                  <br/><br/><br/>
+                  <h2>Thanks!</h2>
+                  <h2>Questions?</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+          <a href="#slide19">
+            <table>
+              <tr class="next">
+                <td class="bottom" bgcolor="#E0E0E0">
+                  <h2>github.com/sorear/niecza</h2>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+
+    </table>
+  </body>
+</html>
