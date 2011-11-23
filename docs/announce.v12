@@ -4,7 +4,7 @@ This is the twelth release of Niecza Perl 6, as usual scheduled on
 the last Monday of the month.  I've not had very much time for Niecza
 this month.  This release marks one year since the first public release,
 and about a year and a half since the project began.  It's hard to
-beleive I've been at it this long.
+believe I've been at it this long.
 
 You can obtain a build of Niecza from [1].  This build contains a
 working compiler as a set of .exe and .dll files suitable for use with
