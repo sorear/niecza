@@ -1,0 +1,72 @@
+    Announce: Niecza Perl 6 v12
+
+This is the twelth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.  I've not had very much time for Niecza
+this month.  This release marks one year since the first public release,
+and about a year and a half since the project began.  It's hard to
+beleive I've been at it this long.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+[Minor features]
+
+:BASE<DIGITS> literals are now supported.  (Solomon Foster)
+
+
+
+[Bug fixes]
+
+sqrt(-1) is NaN, complex math is strictly opt-in (#64).
+
+Undefined values can be passed correctly to CLR interop (#66).
+
+-I is now mentioned by --help (#52).
+
+Constants, including 'our constant's, are now truly immutable (#46).
+
+$@ and $^X now properly handled as the last characters in the file (#63).
+
+Left side of xx is now autothunkified so [] xx 4 works correctly (#70).
+
+
+
+[Other]
+
+The internals documentation has been largely rewritten to match the
+refactor in v11.
+
+Added a copy of Martin Berends' London Perl Workshop slides.
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+My current priorities are:
+ 1. Make regexes much more feature-complete, including general Unicode
+    properties and grapheme mode
+ 2. Prototype the debugger
+ 3. 6model convergence work, including roles/native types
+ 4. Figure out how modules and S11 stuff should work in Niecza.  Do it.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-12.zip
+[2] https://github.com/sorear/niecza
