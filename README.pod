@@ -20,8 +20,6 @@ platforms.
 2.8.2 or later is recommended for best performance; you should use
 C<RUN_CLR=mono-sgen> in this case.  2.10 (latest stable) is also tested.
 
-(2.6.x is currently broken due to versioning issues.  Stay tuned.)
-
 Debian and derivatives have a modular mono packaging; you should install
 'mono-complete'.  (The other packages exist for the sake of Debian-packaged
 programs.)
@@ -33,6 +31,10 @@ mono installers from C<http://go-mono.org/>
 
 To run on Windows/Microsoft .NET 3.5 (2.0 runtime with 3.5 extensions)
 or .NET 4.0, install the .NET runtime from C<http://goo.gl/PMKvB>
+
+NOTE: Niecza does NOT currently support Windows line endings.  Source
+code (including the setting) must be encoded in Unix format, that is,
+linefeed only.
 
 =back
 
