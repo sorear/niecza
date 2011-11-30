@@ -1,0 +1,39 @@
+* Prepare the release announcement
+
+  - Copy docs/announce.vN to docs/announce.vN+1
+  - Change the text at the top to include a new number and comment
+  - Fill out the middle list of changes
+  - Fill out the end priority list
+  - Update the link at the end
+  - Commit it and wait for feedback
+
+* Check if the new compiler can compile itself
+
+  - make mknext
+  - cd next
+  - make test
+  - make mknext
+  - cd next
+  - make test
+  - make spectest
+
+* Make a new binary package
+
+  - make mkpackage # from inside next/
+  - cd package
+  - zip -9r ../../niecza-vN+1.zip *
+  - make sure there are no extraneous files in it
+
+* Tag and upload stuff
+
+  - git tag -s vN+1
+  - git push --tags
+  - upload niecza-vN+1.zip to github Downloads pane
+
+* Announce it
+
+  - send a copy of announce.vN+1 to p6c and p6a
+
+* Post-release
+
+  - update FETCH_URL (make sure you don't add a trailing newline)
