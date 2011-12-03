@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Niecza {
     public interface IForeignInterpreter {
@@ -2279,5 +2280,17 @@ again:
             forperl[i+2] = (ix >= 0) ? raw[i].Substring(ix+1) : raw[i];
         }
         return BoxLoS(forperl);
+    }
+
+    public static Thread start_p6_thread(P6any sub) {
+        Frame th = Kernel.GetTopFrame();
+        th.MarkSharedChain();
+        Thread thr = new Thread(delegate () {
+                Kernel.SetupThreadParent(th);
+                Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
+                        Variable.None, null));
+            });
+        thr.Start();
+        return thr;
     }
 }

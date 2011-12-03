@@ -26,7 +26,7 @@ class Monitor is export {
             (cast int (obj_getnum {$t * 1000}))))
     } }
     # TODO exception handling
-    method lock($f) { self.enter; $f(); self.exit }
+    method lock($f) { self.enter; LEAVE self.exit; $f() }
 }
 
 sub lock($m,$f) is export { $m.lock($f); }
@@ -54,8 +54,7 @@ class ObjectPipe {
 class Thread is export {
     has $!value;
     method new($func) {
-        Q:CgOp { (box (@ {Thread}) (rawscall
-            Niecza.Kernel,Kernel.StartP6Thread:System.Threading.Thread (@ {$func}))) }
+        Q:CgOp { (box (@ {Thread}) (start_p6_thread (@ {$func}))) }
     }
 
     method join() {

@@ -5322,19 +5322,6 @@ slow:
             }
         }
 
-        public static Frame StartP6Thread(Frame th, P6any sub) {
-            th.MarkSharedChain();
-            Thread thr = new Thread(delegate () {
-                    rlstack = new LastFrameNode();
-                    rlstack.cur = th;
-                    RunInferior(sub.Invoke(GetInferiorRoot(),
-                            Variable.None, null));
-                });
-            thr.Start();
-            th.resultSlot = thr;
-            return th;
-        }
-
         internal static void SetTrace() {
             string trace = Environment.GetEnvironmentVariable("NIECZA_TRACE");
             if (trace != null) {
@@ -5438,6 +5425,13 @@ slow:
         [ThreadStatic] static LastFrameNode rlstack;
         public static void SetTopFrame(Frame f) {
             rlstack.cur = f;
+        }
+        internal static void SetupThreadParent(Frame f) {
+            rlstack = new LastFrameNode();
+            rlstack.cur = f;
+        }
+        public static Frame GetTopFrame() {
+            return rlstack.cur;
         }
 
         // it is an error to throw an exception between GetInferiorRoot
