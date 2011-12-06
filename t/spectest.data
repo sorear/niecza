@@ -137,7 +137,6 @@ S03-smartmatch/any-bool.t
 S03-smartmatch/any-callable.t
 S03-smartmatch/any-complex.t
 S03-smartmatch/any-hash-pair.t
-S03-smartmatch/any-hash-slice.t
 S03-smartmatch/any-method.t
 S03-smartmatch/any-num.t
 S03-smartmatch/any-pair.t
@@ -194,7 +193,7 @@ S05-capture/match-object.t
 S05-capture/subrule.t
 S05-grammar/action-stubs.t
 S05-grammar/methods.t
-S05-grammar/protoregex.t
+#S05-grammar/protoregex.t # https://github.com/sorear/niecza/issues/83
 S05-grammar/signatures.t
 S05-interpolation/lexicals.t
 S05-mass/recursive.t
