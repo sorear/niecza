@@ -931,6 +931,9 @@ public partial class Builtins {
         }
         if (r1 == NR_FLOAT) {
             double v1 = PromoteToFloat(r1, n1);
+            if (Double.IsNaN(v1) || Double.IsNegativeInfinity(v1) || Double.IsPositiveInfinity(v1)) {
+                return MakeFloat(v1);
+            }
             ulong bits = (ulong)BitConverter.DoubleToInt64Bits(v1);
             BigInteger big = (bits & ((1UL << 52) - 1)) + (1UL << 52);
             int power = ((int)((bits >> 52) & 0x7FF)) - 0x433;
@@ -1216,6 +1219,17 @@ public partial class Builtins {
 
     // this is only called from .Int
     public static Variable coerce_to_int(Variable a1) {
+        int r1;
+        P6any o1 = a1.Fetch();
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+        if (r1 == NR_FLOAT) {
+            double v1 = PromoteToFloat(r1, n1);
+            if (Double.IsNaN(v1) || Double.IsNegativeInfinity(v1) || Double.IsPositiveInfinity(v1)) {
+                return MakeFloat(v1);
+            }
+        }
+
         int small; BigInteger big;
         return GetAsInteger(a1, out small, out big) ?
             MakeInt(big) : MakeInt(small);

@@ -315,6 +315,7 @@ my class Cool {
     method floor() { floor self }
     method ceiling() { ceiling self }
     method round($scale = 1) { round self, $scale }
+    method truncate() { truncate self }
     method sqrt() { sqrt self }
     method sign() { sign self }
     method conjugate() { self }
