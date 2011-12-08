@@ -276,6 +276,7 @@ S12-methods/how.t
 S12-methods/lvalue.t
 S12-methods/topic.t
 S12-methods/typed-attributes.t
+S12-methods/what.t
 S13-overloading/metaoperators.t
 S13-type-casting/methods.t
 # S16-filehandles/filetest.t # needs refudging
