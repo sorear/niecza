@@ -8,26 +8,37 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Niecza {
+    // IForeignInterpreter is used for runtime loading of the Perl 5
+    // interop module (the CLR likes us to use interfaces for inter-module
+    // communication like this).
     public interface IForeignInterpreter {
         Variable Eval(string code);
     }
+    // Since Mono.Posix is not available on Windows, we want to access it
+    // using late binding so that Niecza will at least load on Windows.
+    // Of course actually trying to use the POSIX stuff on Windows will die.
     class PosixWrapper {
         static readonly Assembly Mono_Posix;
         static readonly Type Syscall, AccessModes, Stat;
 
-        // constant values are part of the ABI so these can't change
+        // copied from Mono.Posix.dll; constant values are part of the
+        // stable ABI so these can't change
         public const int R_OK = 1;
         public const int W_OK = 2;
         public const int X_OK = 4;
         public const int F_OK = 8;
 
+        // references to methods that can be directly called
         public readonly static Func<uint> getuid, geteuid, getgid, getegid;
         public readonly static Func<uint,uint,int> setreuid, setregid;
 
+        // methods and fields that must be used through wrappers
         static readonly MethodInfo m_stat, m_access;
         static readonly FieldInfo  f_dev, f_ino, f_mode, f_nlink, f_uid, f_gid,
             f_rdev, f_size, f_blksize, f_blocks, f_atime, f_mtime, f_ctime;
 
+        // wrappers for methods that need to be wrapped, typically because
+        // they take or return a data type defined in Mono.Posix
         public static int access(string pathname, int mode) {
             return (int) m_access.Invoke(null, new object[] {
                 pathname, Enum.ToObject(AccessModes, mode) });
@@ -94,6 +105,7 @@ namespace Niecza {
         }
     }
 
+    // A special variable type used to implement lvalue returns from substr.
     class SubstrLValue: Variable {
         Variable backing;
         int from;
@@ -147,7 +159,16 @@ namespace Niecza {
     }
 }
 
+// The special feature of this class is that Q:CgOp operations which are not
+// recognized by the code generator are automatically turned into method calls
+// against this class.
+//
+// We use the convention that lowercase methods are intended to be called from
+// Perl 6 code while uppercase-starting methods are support routines.
 public partial class Builtins {
+    // When calling builtins, the binder is often bypassed, so we need to
+    // check arguement types ourselves.  This is the really simple version
+    // that doesn't handle junctions, not often used.
     public static P6any NominalCheck(string name, STable mo, Variable v) {
         P6any r = v.Fetch();
         if (!r.mo.HasMRO(mo))
@@ -156,6 +177,8 @@ public partial class Builtins {
         return r;
     }
 
+    // Type-check val against any, tracking state appropriately for
+    // junctions.
     static void CheckSpecialArg(int ix, ref int pivot, ref uint rank,
             P6any val) {
         if (val.mo.is_any) {
@@ -172,7 +195,7 @@ public partial class Builtins {
         }
     }
 
-    // NOTE: Destructive on avs!  Clone first if you need to.
+    // This function implements the actual looping part of autothreading
     public static Variable AutoThread(P6any j, Func<Variable,Variable> dgt) {
         P6opaque j_ = (P6opaque)j;
         P6any listObj = (P6any) j_.slots[1];
@@ -188,8 +211,11 @@ public partial class Builtins {
         return Kernel.NewROScalar(newJunc);
     }
 
-    // functions containing sub-functions get mangled by the compiler, so
-    // keep the critical path away.
+    // These three functions implement type checking and junctional
+    // autothreading for signatures like (Any, Any).
+    //
+    // You need to pass a reference to the function in so that these may
+    // call it for autothreading.
     public static Variable HandleSpecial1(Variable av0, P6any ao0,
             Func<Variable,Variable> dgt) {
         uint jrank = uint.MaxValue;
@@ -232,6 +258,7 @@ public partial class Builtins {
             avs[jpivot] = n; return dgt(avs[0], avs[1], avs[2]); });
     }
 
+    // Assign a value to a variable, while handling list variables sensibly
     public static void AssignV(Variable lhs, P6any rhs) {
         if (!lhs.islist) {
             lhs.Store(rhs);
@@ -240,6 +267,7 @@ public partial class Builtins {
         }
     }
 
+    // Truncating substrings useful in some places
     public static string LaxSubstring(string str, int from) {
         if (from < 0 || from > str.Length)
             return null;
@@ -253,6 +281,8 @@ public partial class Builtins {
         return str.Substring(from, l);
     }
 
+    // Here begins the Niecza numerics system.  Every CORE number is assigned
+    // to one of these six groups.
     public const int NR_FIXINT  = 0;
     public const int NR_BIGINT  = 1;
     public const int NR_FIXRAT  = 2;
@@ -260,6 +290,7 @@ public partial class Builtins {
     public const int NR_FLOAT   = 4;
     public const int NR_COMPLEX = 5;
 
+    // Coerce a value to numeric and return the group code
     public static P6any GetNumber(Variable v, P6any o, out int rank) {
         if (o.mo.num_rank >= 0) {
             rank = o.mo.num_rank;
@@ -275,6 +306,7 @@ public partial class Builtins {
         return o;
     }
 
+    // If a number is <= NR_COMPLEX, return it as if at NR_COMPLEX
     public static Complex PromoteToComplex(int rank, P6any vret) {
         Rat r; FatRat fr;
         if (!vret.IsDefined()) return new Complex(0,0);
@@ -298,6 +330,7 @@ public partial class Builtins {
         }
     }
 
+    // If a number is <= NR_FLOAT, return it as if at NR_FLOAT
     public static double PromoteToFloat(int rank, P6any vret) {
         Rat r; FatRat fr;
         if (!vret.IsDefined()) return 0;
@@ -319,6 +352,7 @@ public partial class Builtins {
         }
     }
 
+    // If a number is <= NR_FATRAT, return it as if at NR_FATRAT
     public static FatRat PromoteToFatRat(int rank, P6any vret) {
         Rat r;
         if (!vret.IsDefined()) return new FatRat(BigInteger.Zero,BigInteger.One);
@@ -337,6 +371,7 @@ public partial class Builtins {
         }
     }
 
+    // If a number is <= NR_FIXRAT, return it as if at NR_FIXRAT
     public static Rat PromoteToFixRat(int rank, P6any vret) {
         if (!vret.IsDefined()) return new Rat(BigInteger.Zero, 1);
 
@@ -351,6 +386,7 @@ public partial class Builtins {
         }
     }
 
+    // If a number is <= NR_BIGINT, return it as if at NR_BIGINT
     public static BigInteger PromoteToBigInt(int rank, P6any vret) {
         if (!vret.IsDefined()) return BigInteger.Zero;
 
@@ -363,11 +399,13 @@ public partial class Builtins {
         }
     }
 
+    // If a number is <= NR_FIXINT, return it as if at NR_FIXINT
     public static int PromoteToFixInt(int rank, P6any vret) {
         if (!vret.IsDefined()) return 0;
         return Kernel.UnboxAny<int>(vret);
     }
 
+    // Produce a number from an int
     public static Variable MakeInt(int v) {
         return Kernel.BoxAnyMO<int>(v, Kernel.IntMO);
     }
@@ -384,6 +422,8 @@ public partial class Builtins {
         else return Kernel.BoxAnyMO<BigInteger>(v, Kernel.IntMO);
     }
 
+    // Coerce a number to a real rational value - note that this loses
+    // the "inexact" annotation carried by Nums
     public static void GetAsRational(Variable v,
             out BigInteger num, out BigInteger den) {
         int rk;
@@ -424,6 +464,7 @@ public partial class Builtins {
         }
     }
 
+    // Coerce a real number to an integer, truncating towards 0
     public static bool GetAsInteger(Variable v, out int small,
             out BigInteger big) {
         int rk;
@@ -516,6 +557,8 @@ public partial class Builtins {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
 
+    // Most of the following functions get used for inline calls, so they
+    // must use HandleSpecialX
     static readonly Func<Variable,Variable,Variable> numeq_d = numeq;
     public static Variable numeq(Variable v1, Variable v2) {
         return numcompare(v1, v2, O_IS_EQUAL, numeq_d);
