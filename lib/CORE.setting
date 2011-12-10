@@ -87,6 +87,7 @@ sub infix:<,> is Niecza::builtin('comma',0) is Niecza::absprec<g=> is assoc<list
 sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builtin('assign',2,2) { $a = $b }
 
 sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
+sub codes($str) is Niecza::builtin('codes',1,1) { codes($str) }
 
 sub defined(\$x) is Niecza::builtin('defined',1,1) { defined($x) }
 
@@ -505,7 +506,7 @@ my class Cool {
     }
     method say() { (~self).say }
     method chars() { chars(self) }
-    method codes() { chars(self) }
+    method codes() { codes(self) }
     method bytes() { chars(self) * 2 }
     method chomp() {
         my $s = ~self;
@@ -1856,7 +1857,7 @@ our sub Niecza::generate-series(@lhs, $rhs, :$exclude-limit) {
         return { $_ } if @lhs.elems > 1 && @lhs[*-1] cmp @lhs[*-2] == 0 ;  # case: (a , a) ... *
 
         if  @lhs[*-1] ~~ Str || $limit ~~ Str {
-            if @lhs[*-1].chars == 1 && $limit.defined && $limit.chars == 1 {
+            if @lhs[*-1].codes == 1 && $limit.defined && $limit.codes == 1 {
                 return { .ord.succ.chr } if @lhs[*-1] lt  $limit;# case (... , non-number) ... limit
                 return { .ord.pred.chr } if @lhs[*-1] gt  $limit;# case (... , non-number) ... limit
             }

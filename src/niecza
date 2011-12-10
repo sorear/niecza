@@ -17,6 +17,95 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class NieczaActions {
+sub post_backslash($/) {
+    # XXX confine $/ resetting
+    sub _isupper { $_ ~~ /^<[ A .. Z ]>$/ }
+    sub _islower { $_ ~~ /^<[ a .. z ]>$/ }
+    if _isupper($/) && _islower($<sym>) {
+        if $/.ast.^isa(Str) && $/.ast.codes != 1 {
+            $/.CURSOR.sorry("Improper attempt to negate a string");
+            return Nil;
+        }
+        make CClass.enum($/.ast) if $/.ast.^isa(Str);
+        make $/.ast.negate;
+    }
+}
+method backslash:x ($/) {
+    if $<hexint> {
+        make chr($<hexint>.ast);
+    } else {
+        make (join "", map *.&chr, @( $<hexints>.ast ));
+    }
+    post_backslash($/);
+}
+method backslash:o ($/) {
+    if $<octint> {
+        make chr($<octint>.ast);
+    } else {
+        make (join "", map *.&chr, @( $<octints>.ast ));
+    }
+    post_backslash($/);
+}
+method backslash:sym<\\> ($/) { make ~$<text> }
+method backslash:stopper ($/) { make ~$<text> }
+method backslash:unspace ($/) { make "" }
+method backslash:misc ($/) { make ($<text> // ~$<litchar>) }
+# XXX h, v, s, needs spec clarification
+method backslash:sym<0> ($/) { make "\0" }
+method backslash:a ($/) { make "\a"; post_backslash($/) }
+method backslash:b ($/) { make "\b"; post_backslash($/) }
+method backslash:d ($/) { make $CClass::Digit; post_backslash($/) }
+method backslash:e ($/) { make "\e"; post_backslash($/) }
+method backslash:f ($/) { make "\f"; post_backslash($/) }
+method backslash:h ($/) { make $CClass::HSpace; post_backslash($/) }
+method backslash:n ($/) { make "\n"; post_backslash($/) }
+method backslash:r ($/) { make "\r"; post_backslash($/) }
+method backslash:s ($/) { make $CClass::Space; post_backslash($/) }
+method backslash:t ($/) { make "\t"; post_backslash($/) }
+method backslash:v ($/) { make $CClass::VSpace; post_backslash($/) }
+method backslash:w ($/) { make $CClass::Word; post_backslash($/) }
+my class RangeSymbol { };
+method escape:sym<..> ($/) { make RangeSymbol }
+method process_tribble(@bits) {
+    my @cstack;
+    my @mstack;
+    for @bits -> $b {
+        if $b.ast.^isa(Str) {
+            next if $b.ast eq "";
+            if $b.ast.codes > 1 {
+                $b.CURSOR.sorry("Cannot use >1 character strings as cclass elements");
+                return $CClass::Empty;
+            }
+        }
+        push @mstack, $b.CURSOR;
+        push @cstack, $b.ast;
+        if @cstack >= 2 && @cstack[*-2] ~~ RangeSymbol {
+            if @cstack == 2 {
+                @mstack[0].sorry(".. requires a left endpoint");
+                return $CClass::Empty;
+            }
+            for 1, 3 -> $i {
+                if @cstack[*-$i] !~~ Str {
+                    @mstack[*-$i].sorry(".. endpoint must be a single character");
+                    return $CClass::Empty;
+                }
+            }
+            my $new = CClass.range(@cstack[*-3], @cstack[*-1]);
+            pop(@cstack); pop(@cstack); pop(@cstack); push(@cstack, $new);
+            pop(@mstack); pop(@mstack);
+        }
+    }
+    if @cstack && @cstack[*-1] ~~ RangeSymbol {
+        @mstack[*-1].sorry(".. requires a right endpoint");
+        return $CClass::Empty;
+    }
+    my $ret = $CClass::Empty;
+    for @cstack { $ret = $ret.plus($_) }
+    $ret;
+}
+}
+
 class Operator::Replicate is Operator {
     method as_function($/) { mklex($/, '&infix:<xx>') }
     method with_args($/, *@args) {

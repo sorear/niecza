@@ -1482,6 +1482,22 @@ public partial class Builtins {
         return MakeInt(r.Length);
     }
 
+    static readonly Func<Variable,Variable> codes_d = codes;
+    public static Variable codes(Variable v) {
+        P6any o1 = v.Fetch();
+        if (!o1.mo.is_any)
+            return HandleSpecial1(v,o1, codes_d);
+
+        string r = o1.mo.mro_raw_Str.Get(v);
+
+        int i = 0;
+        foreach (char ch in r)
+            if (((uint)(ch - 0xDC00)) >= 0x400)
+                i++;
+
+        return MakeInt(i);
+    }
+
     static readonly Func<Variable,Variable> ord_d = ord;
     public static Variable ord(Variable v) {
         P6any o1 = v.Fetch();
