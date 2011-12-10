@@ -1491,6 +1491,11 @@ public partial class Builtins {
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
         if (r.Length == 0) return Kernel.AnyMO.typeVar;
+        else if (r.Length >= 2 &&
+                r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
+                r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
+            return MakeInt((0x10000 - 0xDC00) +
+                    ((int)r[0] - 0xD800) * 0x400 + (int)r[1]);
         return MakeInt((int)r[0]);
     }
 
@@ -1500,7 +1505,15 @@ public partial class Builtins {
         if (!o1.mo.is_any)
             return HandleSpecial1(v,o1, chr_d);
 
-        double r = o1.mo.mro_raw_Numeric.Get(v);
+        int r = (int)o1.mo.mro_raw_Numeric.Get(v);
+        if (r >= 0x110000)
+            return Kernel.AnyMO.typeVar; // XXX failure
+        if (r >= 0x10000) {
+            char[] rs = new char[2];
+            rs[0] = (char)(0xD800 + ((r - 0x10000) >> 10));
+            rs[1] = (char)(0xDC00 + (r & 0x3FF));
+            return Kernel.BoxAnyMO(new string(rs), Kernel.StrMO);
+        }
         return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
     }
 
