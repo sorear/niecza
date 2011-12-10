@@ -375,11 +375,22 @@ public sealed class RxFrame: IFreeze {
     }
 
     public bool AnyChar() {
-        return !(st.pos++ == end);
+        if (st.pos++ == end) return false;
+        if (((uint)(orig[st.pos-1] - 0xD800)) < 0x400u && st.pos != end)
+            st.pos++; // skip low surrogate; we assume well-formed input
+        return true;
     }
 
     public bool CClass(CC x) {
-        return !(st.pos == end || !x.Accepts(orig[st.pos++]));
+        if (st.pos++ == end) return false;
+        int ho = orig[st.pos-1];
+        int hs = ho - 0xD800;
+        if (((uint)hs) < 0x400u && st.pos != end) {
+            st.pos++;
+            return x.Accepts(0x10000 - 0xDC00 + orig[st.pos-1] + 0x400 * hs);
+        } else {
+            return x.Accepts(ho);
+        }
     }
 
     public bool ZeroWidth(int type) {
@@ -413,29 +424,57 @@ public sealed class RxFrame: IFreeze {
     }
 
     public bool AfterCCs(bool neg, CC[] vec) {
-        int offs = st.pos - vec.Length;
-        if (offs < 0) return neg;
-        for (int i = 0; i < vec.Length; i++)
-            if (!vec[i].Accepts(orig[offs + i]))
+        int offs = st.pos;
+        for (int i = vec.Length - 1; i >= 0; i--) {
+            if (offs == 0)
                 return neg;
+            int ch = orig[--offs];
+            if (((uint)(ch - 0xDC00)) < 0x400u && offs != 0) {
+                ch = orig[--offs] * 0x400 + ch +
+                   (0x10000 - (0xD800 * 0x400 + 0xDC00));
+            }
+            if (!vec[i].Accepts(ch))
+                return neg;
+        }
         return !neg;
     }
 
     public bool BeforeCCs(bool neg, CC[] vec) {
-        if (end - st.pos < vec.Length) return neg;
-        for (int i = 0; i < vec.Length; i++)
-            if (!vec[i].Accepts(orig[st.pos + i]))
+        int offs = st.pos;
+        int upto = end;
+        for (int i = 0; i < vec.Length; i++) {
+            if (offs == upto) return neg;
+            int ch = orig[offs++];
+            if (((uint)(ch - 0xD800)) < 0x400u && offs != upto) {
+                ch = orig[offs++] + ch * 0x400 +
+                   (0x10000 - (0xD800 * 0x400 + 0xDC00));
+            }
+            if (!vec[i].Accepts(ch))
                 return neg;
+        }
         return !neg;
     }
 
     public bool ScanCClass(int min, int max, CC x) {
-        int i;
-        int maxr = end - st.pos;
-        if (maxr < max) max = maxr;
+        int i = 0;
+        int at = st.pos;
+        int upto = end;
 
-        for (i = 0; i < max && x.Accepts(orig[st.pos + i]); i++);
-        st.pos += i;
+        while (i < max && at < upto) {
+            int oat = at;
+            int ch = orig[at++];
+            if (((uint)(ch - 0xD800)) < 0x400u && at != upto) {
+                ch = orig[at++] + ch * 0x400 +
+                   (0x10000 - (0xD800 * 0x400 + 0xDC00));
+            }
+            if (x.Accepts(ch)) {
+                i++;
+            } else {
+                at = oat;
+                break;
+            }
+        }
+
         return (i >= min);
     }
 
@@ -774,7 +813,7 @@ public sealed class CC : IFreeze {
         }
     }
 
-    public bool Accepts(char ch) {
+    public bool Accepts(int ch) {
         int l = 0;
         int h = vec.Length / 2;
 
@@ -790,7 +829,8 @@ public sealed class CC : IFreeze {
             }
         }
 
-        int mask = 1 << (int)char.GetUnicodeCategory(ch);
+        int mask = (ch < 0x10000) ?
+            (1 << (int)char.GetUnicodeCategory((char)ch)) : 1;
         return (vec[l * 2 + 1] & mask) != 0;
     }
 
