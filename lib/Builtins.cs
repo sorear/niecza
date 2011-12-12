@@ -767,6 +767,9 @@ public partial class Builtins {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
             double r = Math.Sqrt(v1.re * v1.re + v1.im * v1.im);
+            if (r == 0.0) {
+                return MakeComplex(0.0, 0.0);
+            }
             double theta = Math.Atan2(v1.im, v1.re);
             // Log z = ln r + iθ
             // ($a.log * $b).exp;
