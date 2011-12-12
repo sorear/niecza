@@ -1469,7 +1469,7 @@ grammar P6 is STD {
                 <e3=.EXPR>?
             ')'||<.panic: "Malformed loop spec">]
             [ <?before '{' > <.sorry: "Whitespace required before block"> ]?
-        )? <.ws>
+        )? :s
         <block>
     }
 
@@ -3094,8 +3094,8 @@ grammar P6 is STD {
             | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
             | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
-            | {} <?dotty> <.panic: "Method call found where infix expected (omit whitespace?)">
-            | {} <?postfix> <.panic: "Postfix found where infix expected (omit whitespace?)">
+            | {} <?dotty> <.panic: "Method call found where infix expected (change whitespace?)">
+            | {} <?postfix> <.panic: "Postfix found where infix expected (change whitespace?)">
             ]
             [ <?before '='> <assign_meta_operator($<infix>)>
                    {$O = $<assign_meta_operator>[0]<O>}
@@ -3171,7 +3171,8 @@ grammar P6 is STD {
     regex term:reduce {
         :my $*IN_REDUCE = 1;
         <?before '['\S+']'>
-        '[' $<triangle>=['\\'?] <op=.infixish('red')> ']' {}
+        '[' $<triangle>=['\\'?] <op=.infixish('red')> ']'
+        { @*MEMOS[$¢.pos]<listop> = 1; }
 
         <.can_meta($<op>, "reduce with")>
 
@@ -3900,6 +3901,7 @@ grammar P6 is STD {
             if %deftrap{$name} {
                 my $al = $<args><arglist>[0];
                 my $ok = 0;
+                $ok = 1 if $isname;
                 $ok = 1 if $al and $al.from != $al.to;
                 $ok = 1 if $<args><semiarglist>;
                 if not $ok {
@@ -3926,7 +3928,8 @@ grammar P6 is STD {
     #    | :dba('argument list') '.(' ~ ')' <semiarglist>
         | :dba('argument list') '(' ~ ')' <semiarglist>
         | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
-        |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
+        |  { $listopish = 1; @*MEMOS[$¢.pos]<listop> = 1; }
+            [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
         ]
         $<invocant> = {$*INVOCANT_IS}
 
@@ -5024,7 +5027,7 @@ grammar Regex is STD {
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
         | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
         | <embeddedblock>
-        | <quantified_atom> <.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, "nowadays")>
+        | {} <quantified_atom> <.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, " nowadays")>
         ]
     }
 
@@ -5562,6 +5565,9 @@ method panic (Str $s) {
     elsif @t {
         if self.lineof($startpos) != self.lineof($endpos) {
             $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+        }
+        elsif @*MEMOS[$startpos]<listop> {
+            $m ~~ s|Confused|Two terms in a row (listop with args requires whitespace or parens)|;
         }
         elsif @*MEMOS[$startpos]<baremeth> {
             $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
