@@ -489,6 +489,28 @@ public sealed class RxFrame: IFreeze {
         }
     }
 
+    public void PushConjStart() {
+        st.ns = new NState(bt, "CSTART", st.ns);
+        st.ns.quant = st.pos;
+    }
+
+    public void PushConjEnd() {
+        st.ns = new NState(bt, "CEND", st.ns);
+        st.ns.quant = st.pos;
+    }
+
+    public void GotoConjStart() {
+        st.pos = st.ns.next.quant;
+    }
+
+    public bool CheckConjEnd() {
+        return (st.pos == st.ns.quant);
+    }
+
+    public void EndConj() {
+        st.ns = st.ns.next.next;
+    }
+
     public void OpenQuant() {
         st.ns = new NState(bt, "QUANT", st.ns);
     }

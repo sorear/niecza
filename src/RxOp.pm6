@@ -261,6 +261,33 @@ class Sequence is RxOp {
     method tocclist() { map { $_.tocclist }, @$.zyg }
 }
 
+class Conj is RxOp {
+    # zyg * N
+
+    method code($body) {
+        my @z = @$.zyg;
+        my @code;
+        return () unless @z;
+
+        push @code, CgOp.rxcall('PushConjStart');
+        push @code, shift(@z).code($body);
+        push @code, CgOp.rxcall('PushConjEnd');
+
+        for @z -> $subseq {
+            push @code, CgOp.rxcall('GotoConjStart');
+            push @code, $subseq.code($body);
+            push @code, CgOp.rxbprim('CheckConjEnd');
+        }
+
+        push @code, CgOp.rxcall('EndConj');
+
+
+        CgOp.prog(map { $_.code($body) }, @$.zyg);
+    }
+
+    method lad() { [ 'Imp' ] }
+}
+
 class AltBase is RxOp {
     has $.dba; # Str
 

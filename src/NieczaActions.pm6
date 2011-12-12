@@ -559,7 +559,7 @@ method quant_atom_list($/) {
 my %LISTrx_types = (
     '&'  => ::RxOp::Conj,
     '|'  => ::RxOp::Alt,
-    '&&' => ::RxOp::SeqConj,
+    '&&' => ::RxOp::Conj, # these are treated as the same!
     '||' => ::RxOp::SeqAlt,
 );
 
