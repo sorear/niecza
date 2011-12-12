@@ -475,6 +475,8 @@ public sealed class RxFrame: IFreeze {
             }
         }
 
+        st.pos = at;
+
         return (i >= min);
     }
 
