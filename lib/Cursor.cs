@@ -1548,7 +1548,7 @@ public class LADDispatcher : LAD {
 // that happens
 public sealed class LexerState {
     public int[] nstates;
-    Dictionary<char,LexerState> dfc = new Dictionary<char,LexerState>();
+    Dictionary<int,LexerState> dfc = new Dictionary<int,LexerState>();
 
     public LexerState(NFA nf) {
         this.nstates = new int[(nf.nodes.Length + 31) >> 5];
@@ -1558,7 +1558,7 @@ public sealed class LexerState {
         nstates[n >> 5] |= 1 << (n & 31);
     }
 
-    public LexerState Next(NFA nf, char ch) {
+    public LexerState Next(NFA nf, int ch) {
         LexerState l;
         if (dfc.TryGetValue(ch, out l))
             return l;
@@ -1840,7 +1840,11 @@ anew:
             state.CollectFates(pad, this);
 
             if (pos == from.Length || state == nil) break;
-            char ch = from[pos++];
+            int ch = from[pos++];
+            if (((uint)(ch - 0xD800)) < 0x400u && pos != from.Length) {
+                ch = from[pos++] + ch * 0x400 +
+                   (0x10000 - (0xD800 * 0x400 + 0xDC00));
+            }
 
             if (LtmTrace)
                 Console.WriteLine("+ Adding character {0}", ch);
