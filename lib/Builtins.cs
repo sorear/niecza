@@ -1450,6 +1450,8 @@ public partial class Builtins {
     public static Variable postinc(Variable v) {
         P6any o1 = v.Fetch();
         AssignV(v, o1.mo.mro_succ.Get(v));
+        if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x++
+            o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
         return Kernel.NewROScalar(o1);
     }
 
@@ -1461,6 +1463,8 @@ public partial class Builtins {
     public static Variable postdec(Variable v) {
         P6any o1 = v.Fetch();
         AssignV(v, o1.mo.mro_pred.Get(v));
+        if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x--
+            o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
         return Kernel.NewROScalar(o1);
     }
 
