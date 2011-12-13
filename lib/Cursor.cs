@@ -393,9 +393,20 @@ public sealed class RxFrame: IFreeze {
         }
     }
 
+    public bool Newline() {
+        if (st.pos == end) return false;
+        char next = orig[st.pos++];
+        if (next == '\r' && st.pos != end && orig[st.pos] == '\n') {
+            st.pos++;
+            return true;
+        }
+        return CC.VSpace.Accepts(next);
+    }
+
     public bool ZeroWidth(int type) {
         int next = (st.pos == end) ? -1 : orig[st.pos];
         int prev = (st.pos == 0) ? -1 : orig[st.pos-1];
+        bool crlf = (prev == '\r' && next == '\n');
         switch(type) {
             case 0:
                 return (next >= 0) && CC.Word.Accepts((char)next) &&
@@ -408,9 +419,11 @@ public sealed class RxFrame: IFreeze {
             case 3:
                 return (next == -1);
             case 4:
-                return (prev == -1) || (prev == '\n' && next >= 0);
+                return (prev == -1 ||
+                        (!crlf && CC.VSpace.Accepts(prev) && next >= 0));
             case 5:
-                return (next == '\n') || (next == -1 && prev != '\n');
+                return (CC.VSpace.Accepts(next) && !crlf) ||
+                    (next == -1 && !CC.VSpace.Accepts(prev));
             default:
                 return false;
         }
@@ -869,6 +882,12 @@ public sealed class CC : IFreeze {
     public const int MAll     = 0x3FFFFFFF;
 
     public const int MAlNum   = MAlpha | MNum;
+
+    // our $VSpace = CClass.enum("\x000A", "\x000B", "\x000C", "\x000D",
+    //    "\x0085", "\x2028", "\x2029");
+    [Immutable] public static readonly CC VSpace = new CC(new int[] {
+            0x000A, MAll, 0x000E, 0, 0x0085, MAll, 0x0086, 0,
+            0x2028, MAll, 0x202A, 0 });
 
     [Immutable] public static readonly CC Word  = new CC(new int[] { 0, MAlNum,
             '_', MAll, '_'+1, MAlNum });

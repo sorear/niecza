@@ -25,6 +25,14 @@ use STD;
 # }
 # }
 
+class RxOp::Newline is RxOp {
+    method code($) { CgOp.rxbprim('Newline') }
+    method lad() {
+        ['Any', [ ['Str', "\x0D\x0A"],
+                  [ 'CC', @( $CClass::VSpace.terms ) ] ] ]
+    }
+}
+
 augment class NieczaActions {
 our $CCTrace = %*ENV<NIECZA_CC_TRACE> // False;
 
@@ -196,7 +204,15 @@ method backslash:d ($/) { make $CClass::Digit; self.post_backslash($/) }
 method backslash:e ($/) { make "\e"; self.post_backslash($/) }
 method backslash:f ($/) { make "\f"; self.post_backslash($/) }
 method backslash:h ($/) { make $CClass::HSpace; self.post_backslash($/) }
-method backslash:n ($/) { make "\n"; self.post_backslash($/) }
+method backslash:n ($/) {
+    if $/.CURSOR.can('backslash:d') {
+        # HACK - only use this form when we're looking for regexy stuff
+        make [False, ::RxOp::Newline.new];
+        self.post_backslash($/)
+    } else {
+        make "\n";
+    }
+}
 method backslash:r ($/) { make "\r"; self.post_backslash($/) }
 method backslash:s ($/) { make $CClass::Space; self.post_backslash($/) }
 method backslash:t ($/) { make "\t"; self.post_backslash($/) }
