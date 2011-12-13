@@ -182,6 +182,10 @@ my class Mu {
     method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
 }
 
+my class Whatever {
+    method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
+}
+
 my class Any is Mu {
     method isa(\$other) { self.^isa($other) }
     method does(\$other) { self.^does($other) }
@@ -291,7 +295,9 @@ my class Any is Mu {
     multi method pick($num is copy = 1) {
         my @l = @(self);
 
-        if ($num == 1) {
+        if ($num ~~ Whatever) {
+            $num = @l.elems;
+        } elsif ($num == 1) {
             return @l[floor(@l.elems.rand)];
         }
 
@@ -964,10 +970,6 @@ sub flat(*@x) { @x }
 sub hash(|$cap) {
     (%$cap || $cap.Parcel.raw_elems != 1) ??
         %( @$cap, %$cap ) !! %( $$cap )
-}
-
-my class Whatever {
-    method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
 }
 
 my class EMPTY { }
