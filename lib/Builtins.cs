@@ -561,13 +561,13 @@ public partial class Builtins {
     // must use HandleSpecialX
     static readonly Func<Variable,Variable,Variable> numeq_d = numeq;
     public static Variable numeq(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_EQUAL, numeq_d);
+        return numcompare(v1, v2, O_IS_EQUAL | O_COMPLEX_OK, numeq_d);
     }
 
     public static Variable numne(Variable v1, Variable v2) {
         // NOTE that junctionalization uses == !  See check in numcompare
-        return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD,
-                numeq_d);
+        return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD |
+                O_COMPLEX_OK, numeq_d);
     }
 
     static readonly Func<Variable,Variable,Variable> numlt_d = numlt;
@@ -1066,6 +1066,7 @@ public partial class Builtins {
     const int O_IS_LESS    = 2;
     const int O_IS_EQUAL   = 4;
     const int O_IS_UNORD   = 8;
+    const int O_COMPLEX_OK = 16;
     public static Variable numcompare(Variable a1, Variable a2, int mask,
             Func<Variable,Variable,Variable> dl) {
         int r1, r2, res=0;
@@ -1073,7 +1074,7 @@ public partial class Builtins {
         if (!(o1.mo.is_any && o2.mo.is_any)) {
             Variable jr = HandleSpecial2(a1, a2, o1, o2, dl);
             // treat $x != $y as !($x == $y)
-            if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
+            if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD | O_COMPLEX_OK))
                 return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
                     Kernel.TrueV;
             return jr;
@@ -1082,6 +1083,8 @@ public partial class Builtins {
         P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
+            if ((mask & O_COMPLEX_OK) == 0)
+                throw new NieczaException("Complex numbers are not arithmetically ordered; use cmp if you want an arbitrary order");
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
             if (double.IsNaN(v1.re) || double.IsNaN(v1.im) ||
