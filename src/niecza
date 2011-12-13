@@ -17,7 +17,123 @@ use RxOp;
 use Sig;
 use STD;
 
+#augment class RxOp {
+#method oplift() {
+#    say "oplift: {self.typename}";
+#    my $i = 0;
+#    map { say $i++; .oplift }, @$!zyg
+#}
+#}
+
 augment class NieczaActions {
+
+# UTS18 specifies a rule for "pulling up" negations in character classes,
+# so we have to delay the negation, it seems; [0] = neg [1] = RxOp
+
+method negate_cc($exp) { [ !$exp[0], $exp[1] ] }
+
+# TODO: implement this more directly
+method xor_cc($lhs, $rhs) {
+    self.or_cc(self.and_cc($lhs, self.negate_cc($rhs)),
+               self.and_cc(self.negate_cc($lhs), $rhs));
+}
+
+method and_cc($lhs, $rhs) {
+    self.negate_cc(self.or_cc(self.negate_cc($lhs), self.negate_cc($rhs)));
+}
+
+method or_cc($lhs, $rhs) {
+    #say "or($lhs[1].typename(), $rhs[1].typename())";
+    if $lhs[0] {
+        if $rhs[0] {
+            [ True, ::RxOp::Conj.new(zyg => [ $lhs[1], $rhs[1] ]) ];
+        } else { # !L | R = !(L & !R)
+            [ True, ::RxOp::Sequence.new(zyg => [
+                ::RxOp::NotBefore.new(zyg => [ $rhs[1] ]), $lhs[1] ]) ];
+        }
+    } else {
+        if $rhs[0] {
+            self.or_cc($rhs, $lhs);
+        } else {
+            [ False, ::RxOp::Alt.new(dba => 'character class', zyg => [$lhs[1], $rhs[1]]) ];
+        }
+    }
+}
+
+method assertion:sym<:> ($/) { make self.do_cclass($/) }
+method assertion:sym<[> ($/) { make self.do_cclass($/) }
+method assertion:sym<-> ($/) { make self.do_cclass($/) }
+method assertion:sym<+> ($/) { make self.do_cclass($/) }
+
+method do_cclass($/) {
+    my $z = $<cclass_expr>.ast;
+    #say "do_cc $z[1].typename()";
+    return $z[0] ?? ::RxOp::Sequence.new(zyg => [
+        ::RxOp::NotBefore.new(zyg => [$z[1]]), ::RxOp::Any.new]) !! $z[1];
+}
+
+method cclass_expr($/) {
+    my @ops = @$<op>;
+    my @zyg = map *.ast, @$<cclass_union>;
+    for @ops -> $op {
+        my $z1 = shift @zyg;
+        my $z2 = shift @zyg;
+        unshift @zyg, ($op eq '^') ?? self.xor_cc($z1,$z2) !! self.or_cc($z1,$z2);
+    }
+    #say "cclass_expr @zyg[0][1].typename()";
+    make @zyg[0];
+}
+
+method cclass_union($/) {
+    my ($a, @zyg) = map *.ast, @$<cclass_add>;
+    for @zyg { $a = self.and_cc($a, $_) }
+    #say "cclass_union $a[1].typename()";
+    make $a;
+}
+
+method cclass_add($/) {
+    my ($a, @zyg) = map *.ast, @$<cclass_elem>;
+    if $<sign> eq '-' { $a = self.negate_cc($a) }
+    for @$<op> {
+        $a = ($_ eq '+') ?? self.or_cc($a, shift(@zyg))
+                         !! self.and_cc($a, self.negate_cc(shift(@zyg)));
+    }
+    #say "cclass_add $a[1].typename()";
+    make $a;
+}
+
+method cclass_elem:name ($/) {
+    make [False, (substr($<name>,0,10) eq 'INTERNAL::') ??
+        ::RxOp::CClassElem.new(cc => CClass.internal(substr($<name>,10))) !!
+        ::RxOp::Subrule.new(captures => [], method => ~$<name>)];
+
+    #say ":name $<name> $/.ast[1].typename()";
+}
+
+method cclass_elem:sym<[ ]> ($/) {
+    make [False, ::RxOp::CClassElem.new(cc => $<nibble>.ast)];
+    # say ":[] $/.ast[1].typename()";
+}
+
+method cclass_elem:sym<( )> ($/) {
+    make $<cclass_expr>.ast;
+}
+
+method cclass_elem:property ($/) {
+    # $<colonpair>
+    $/.CURSOR.sorry("Character property database NYI");
+    make [False, ::RxOp::None.new];
+}
+
+method cclass_elem:quote ($/) {
+    if ! $<quote>.ast.^isa(::Op::StringLiteral) {
+        make ::RxOp::VarString.new(ops => self.rxembed($/, $<quote>.ast, True));
+        return;
+    }
+    make [False, ::RxOp::String.new(text => $<quote>.ast.text,
+        igcase => %*RX<i>, igmark => %*RX<a>)];
+}
+
 sub post_backslash($/) {
     # XXX confine $/ resetting
     sub _isupper { $_ ~~ /^<[ A .. Z ]>$/ }

@@ -189,8 +189,8 @@ proto token value {*}
 token category:term { <sym> }
 proto token term {*}
 
-token category:strtonum { <sym> }
-proto token strtonum {*}
+token category:numeric { <sym> }
+proto token numeric {*}
 
 token category:quote { <sym> }
 proto token quote () {*}
@@ -201,8 +201,8 @@ proto token prefix is unary is defequiv(%symbolic_unary) {*}
 token category:infix { <sym> }
 proto token infix is binary is defequiv(%additive) {*}
 
-token category:postfix is unary is defequiv(%autoincrement) { <sym> }
-proto token postfix {*}
+token category:postfix { <sym> }
+proto token postfix is unary is defequiv(%autoincrement) {*}
 
 token category:dotty { <sym> }
 proto token dotty is endsym<unspacey> {*}
@@ -589,7 +589,7 @@ token circumfix:sym<« »>   { :dba('shell-quote words') '«' ~ '»' <nibble($¢
 token circumfix:sym«<< >>» { :dba('shell-quote words') '<<' ~ '>>' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> }
 token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
     [
-        [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
+        [ <?before 'STDIN>' > <.obs('<STDIN>', '$*IN.lines (or add whitespace to suppress warning)')> ]?
         [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil")> ]?
         <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))>
     ]
@@ -1926,11 +1926,11 @@ grammar P6 is STD {
         <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
     }
     token trait_mod:hides {
-        <sym>:s <module_name>
+        <sym>:s <typename>
     }
     token trait_mod:does {
         :my $*PKGDECL ::= 'role';
-        <sym>:s <module_name>
+        <sym>:s <typename>
     }
     token trait_mod:will {
         <sym>:s <identifier> <pblock>
@@ -2445,11 +2445,10 @@ grammar P6 is STD {
         ]
     }
 
-    # <strtonum> is (we hope) used only by Str --> Num conversions
-    #  (such as those done dwimmily by quotewords)
-    token strtonum:rational { <[+\-]>?<nu=.integer>'/'<de=.integer> }
-    token strtonum:complex { [<[+\-]>?<re=.number>]? <[+\-]><im=.number>'\\'?'i' }
-    token strtonum:number { <[+\-]>?<number> }
+    # <numeric> is used by Str.Numeric conversions such as those done by val()
+    token numeric:rational { <[+\-]>?<nu=.integer>'/'<de=.integer> }
+    token numeric:complex { [<[+\-]>?<re=.number>]? <[+\-]><im=.number>'\\'?'i' }
+    token numeric:number { <[+\-]>?<number> }
 
     ##########
     # Quotes #
@@ -2463,6 +2462,7 @@ grammar P6 is STD {
         $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
         [ <?{ $start ne $stop }>
             <.ws>
+            [ <?[ \[ \{ \( \< ]> <.obs('brackets around replacement', 'assignment syntax')> ]?
             [ <infixish> || <panic: "Missing assignment operator"> ]
             [ <?{ $<infixish>.Str eq '=' || $<infixish>.<assign_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
             <.ws>
@@ -4648,6 +4648,9 @@ grammar Regex is STD {
     token category:quantifier { <sym> }
     proto token quantifier {*}
 
+    token category:cclass_elem { <sym> }
+    proto token cclass_elem {*}
+
     token category:mod_internal { <sym> }
     proto token mod_internal {*}
 
@@ -4925,6 +4928,8 @@ grammar Regex is STD {
     token assertion:sym<???> { <sym> }
     token assertion:sym<!!!> { <sym> }
 
+    # XXX NIECZA STD uses <assertion> here, which makes no sense.
+    token assertion:sym<|> { <sym> <identifier> }  # assertion-like syntax, anyway
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<*> { <sym> [ <?before '>'> | <.ws> <nibbler> ] }
@@ -4960,10 +4965,10 @@ grammar Regex is STD {
                                     ]?
     }
 
-    token assertion:sym<:> { <?before ':'<alpha>> <cclass_elem>+ }
-    token assertion:sym<[> { <?before '['> <cclass_elem>+ }
-    token assertion:sym<+> { <?before '+'> <cclass_elem>+ }
-    token assertion:sym<-> { <?before '-'> <cclass_elem>+ }
+    token assertion:sym<:> { <?before ':'<alpha>> <cclass_expr> }
+    token assertion:sym<[> { <?before '['> <cclass_expr> }
+    token assertion:sym<+> { <?before '+'> <cclass_expr> }
+    token assertion:sym<-> { <?before '-'> <cclass_expr> }
     token assertion:sym<.> { <sym> }
     token assertion:sym<,> { <sym> }
     token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] }
@@ -4971,16 +4976,52 @@ grammar Regex is STD {
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
     token sign { '+' | '-' | <?> }
-    token cclass_elem {
+    token cclass_expr {
+        ::
+        <.normspace>?
+        <cclass_union>+ % [$<op>=[ '|' | '^' ]]
+    }
+
+    token cclass_union {
+        <.normspace>?
+        <cclass_add>+ % [$<op>=[ '&' ]]
+    }
+
+    token cclass_add {
+        <.normspace>?
+        <sign>
+        <cclass_elem>+ % [$<op>=[ '+' | '-' ]<.normspace>?]
+    }
+
+    token cclass_elem:name {
+        :dba('character class element')
+        <name>
+        <.normspace>?
+    }
+
+    token cclass_elem:sym<[ ]> {
         :my $*CCSTATE = '';
         :dba('character class element')
-        <sign>
+        "[" ~ "]" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc).unbalanced("]"))>
         <.normspace>?
-        [
-        | <name>
-        | <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
-        | [:lang(%*LANG<MAIN>) <colonpair> ]
-        ]
+    }
+
+    token cclass_elem:sym<( )> {
+        :my $*CCSTATE = '';
+        :dba('character class element')
+        '(' ~ ')' <cclass_expr>
+        <.normspace>?
+    }
+
+    token cclass_elem:property {
+        :dba('character class element')
+        [:lang(%*LANG<MAIN>) <colonpair> ]
+        <.normspace>?
+    }
+
+    token cclass_elem:quote {
+        <?before '"' | "'">
+        [:lang(%*LANG<MAIN>) <quote> ]
         <.normspace>?
     }
 

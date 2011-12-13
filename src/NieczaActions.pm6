@@ -700,6 +700,11 @@ method rxcapturize($M, $name, $rxop is copy) {
     return $rxop.clone(captures => [ $name, @( $rxop.captures ) ]);
 }
 
+method cclass_expr($/) {
+    say $/<op>.elems;
+    say $/<cclass_union>.elems;
+}
+
 method do_cclass($/) {
     my @cce = @( $<cclass_elem> );
 
@@ -833,9 +838,10 @@ method assertion:sym<{ }> ($/) {
         $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
 }
 
-method assertion:sym<[> ($/) { self.do_cclass($/) }
-method assertion:sym<-> ($/) { self.do_cclass($/) }
-method assertion:sym<+> ($/) { self.do_cclass($/) }
+method assertion:sym<:> ($/) { make $<cclass_expr>.ast }
+method assertion:sym<[> ($/) { make $<cclass_expr>.ast }
+method assertion:sym<-> ($/) { make $<cclass_expr>.ast }
+method assertion:sym<+> ($/) { make $<cclass_expr>.ast }
 
 # These have effects only in the parser, so no ast is correct.
 method mod_value($ ) {}
