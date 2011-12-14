@@ -261,3 +261,11 @@ class DotEq is Operator {
         @args[1].meta_assign.with_args($/, @args[0]);
     }
 }
+
+class Operator::Replicate is Operator {
+    method as_function($/) { mklex($/, '&infix:<xx>') }
+    method with_args($/, *@args) {
+        mkcall($/, '&_doreplicate', ::GLOBAL::NieczaActions.block_expr($/,
+            ::GLOBAL::NieczaActions.thunk_sub(@args[0])), @args[1]);
+    }
+}

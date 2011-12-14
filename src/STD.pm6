@@ -436,6 +436,7 @@ method nibble ($lang) {
 method nibbler() {
     my @nibbles;
     my $from = self.pos;
+    my $len = self.orig.chars;
     my $to = $from;
 
     loop {
@@ -446,8 +447,8 @@ method nibbler() {
             push @nibbles, Match.synthetic(:cursor(self), :$from, :$to,
                 :method<Str>, :captures()) if $from != $to;
 
-            my $nibbler = head(self.cursor($starter.to).nibbler) or return ();
-            my $stopper = head(self.cursor($nibbler.to).stopper) or return ();
+            my $nibbler = head(self.cursor($starter.to).nibbler) or return;
+            my $stopper = head(self.cursor($nibbler.to).stopper) or return;
 
             $from = $to = $stopper.to;
             push @nibbles, $starter;
@@ -461,8 +462,11 @@ method nibbler() {
             $from = $to = $escape.to;
             push @nibbles, $escape;
         }
-        else {
+        elsif $to < $len {
             $to++;
+        }
+        else { # at end, and not stopper
+            return;
         }
     }
 
@@ -5311,7 +5315,7 @@ method add_mystery ($token,$pos,$ctx) {
     self;
 }
 
-method explain_mystery() {
+method explain_mystery($nested?) {
     my %post_types;
     my %unk_types;
     my %unk_routines;
@@ -5357,9 +5361,11 @@ method explain_mystery() {
     }
     self.sorry($m) if $m;
 
-    for $*unit.stubbed_stashes -> $pos, $type {
-        next if $type.closed || $type.kind eq 'package';
-        self.cursor($pos).sorry("Package was stubbed but not defined");
+    unless $nested {
+        for $*unit.stubbed_stashes -> $pos, $type {
+            next if $type.closed || $type.kind eq 'package';
+            self.cursor($pos).sorry("Package was stubbed but not defined");
+        }
     }
 
     self;

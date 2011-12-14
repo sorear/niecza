@@ -8,6 +8,8 @@ use CClass;
 use OpHelpers;
 use Operator;
 
+our $CCTrace = %*ENV<NIECZA_CC_TRACE> // False;
+
 # XXX Niecza  Needs improvement
 method sym_categorical($/) { self.FALLBACK($<name>, $/) }
 method bracket_categorical($/) { self.FALLBACK($<name>, $/) }
@@ -262,6 +264,7 @@ dyn:
             my @bits = map { $_, '::' }, @ns;
             pop @bits if @bits;
             push @bits, '::' if $trail;
+            push @bits, $ext;
             return { iname => mkstringycat($/, @bits) };
         }
 
@@ -625,11 +628,10 @@ method metachar:qw ($/) {
 method metachar:sym«< >» ($/) { make $<assertion>.ast }
 method metachar:sym<\\> ($/) {
     my $cc = $<backslash>.ast;
-    make ($cc.^isa(CClass) ??
-        ::RxOp::CClassElem.new(cc => $cc,
-            igcase => %*RX<i>, igmark => %*RX<a>) !!
+    make ($cc.^isa(Str) ??
         ::RxOp::String.new(text => $cc,
-            igcase => %*RX<i>, igmark => %*RX<a>));
+            igcase => %*RX<i>, igmark => %*RX<a>) !!
+        self.cc_to_rxop($cc));
 }
 
 method metachar:sym<.> ($/) { make ::RxOp::Any.new }
@@ -700,40 +702,125 @@ method rxcapturize($M, $name, $rxop is copy) {
     return $rxop.clone(captures => [ $name, @( $rxop.captures ) ]);
 }
 
-method cclass_expr($/) {
-    say $/<op>.elems;
-    say $/<cclass_union>.elems;
+# UTS18 specifies a rule for "pulling up" negations in character classes,
+# so we have to delay the negation, it seems; [0] = neg [1] = RxOp
+
+method negate_cc($exp) { [ !$exp[0], $exp[1] ] }
+method void_cc() { [False, ::RxOp::CClassElem.new(cc => $CClass::Empty)] }
+method cclass_cc($cc) { [False, ::RxOp::CClassElem.new(:$cc)] }
+method neg_cclass_cc($cc) { [True, ::RxOp::CClassElem.new(:$cc)] }
+method string_cc($str) {
+    $str.codes == 1 ?? self.cclass_cc(CClass.enum($str)) !!
+        [False, ::RxOp::String.new(text => $str)];
 }
 
-method do_cclass($/) {
-    my @cce = @( $<cclass_elem> );
+# TODO: implement this more directly
+method xor_cc($lhs, $rhs) {
+    self.or_cc(self.and_cc($lhs, self.negate_cc($rhs)),
+               self.and_cc(self.negate_cc($lhs), $rhs));
+}
 
-    my $rxop;
-    for @cce {
-        my $sign = $_.<sign> ne '-';
-        my $exp =
-            ($_.<name> && substr($_.<name>,0,10) eq 'INTERNAL::') ??
-                ::RxOp::CClassElem.new(cc => CClass.internal(substr($_.<name>,10))) !!
-            $_.<quibble> ??
-                ::RxOp::CClassElem.new(cc => $_.<quibble>.ast) !!
-            ::RxOp::Subrule.new(captures => [], method => ~$_.<name>);
+method and_cc($lhs, $rhs) {
+    self.negate_cc(self.or_cc(self.negate_cc($lhs), self.negate_cc($rhs)));
+}
 
-        if $exp.^isa(::RxOp::CClassElem) && (!$rxop || $rxop.^isa(::RxOp::CClassElem)) {
-            if $sign {
-                $rxop = $rxop ?? ::RxOp::CClassElem.new(cc => $exp.cc.plus($rxop.cc)) !! $exp;
-            } else {
-                $rxop = ::RxOp::CClassElem.new(cc => ($rxop ?? $rxop.cc !! $CClass::Full).minus($exp.cc));
-            }
-        } elsif $sign {
-            $rxop = $rxop ?? ::RxOp::SeqAlt.new(zyg => [ $exp, $rxop ], dba => %*RX<dba>) !! $exp;
+method or_cc($lhs, $rhs) {
+    say "or($lhs[1].typename(), $rhs[1].typename())" if $CCTrace;
+    my $ccl = $lhs[1] ~~ ::RxOp::CClassElem;
+    my $ccr = $rhs[1] ~~ ::RxOp::CClassElem;
+    if $lhs[0] {
+        if $rhs[0] {
+            $ccl && $ccr ??
+                self.neg_cclass_cc($lhs[1].cc.minus($rhs[1].cc.negate)) !!
+                [ True, ::RxOp::Conj.new(zyg => [ $lhs[1], $rhs[1] ]) ];
+        } else { # !L | R = !(L & !R)
+            $ccl && $ccr ??
+                self.neg_cclass_cc($lhs[1].cc.minus($rhs[1].cc)) !!
+                [ True, ::RxOp::Sequence.new(zyg => [
+                    ::RxOp::NotBefore.new(zyg => [ $rhs[1] ]), $lhs[1] ]) ];
+        }
+    } else {
+        if $rhs[0] {
+            self.or_cc($rhs, $lhs);
         } else {
-            $rxop = ::RxOp::Sequence.new(zyg => [
-                ::RxOp::NotBefore.new(zyg => [ $exp ]),
-                $rxop // ::RxOp::Any.new]);
+            $ccl && $ccr ??
+                self.cclass_cc($lhs[1].cc.plus($rhs[1].cc)) !!
+                [ False, ::RxOp::Alt.new(dba => 'character class',
+                    zyg => [$lhs[1], $rhs[1]]) ];
         }
     }
+}
 
-    make $rxop;
+method cc_to_rxop($z) {
+    say "do_cc $z[1].typename()" if $CCTrace;
+    return $z[0] ?? ::RxOp::Sequence.new(zyg => [
+        ::RxOp::NotBefore.new(zyg => [$z[1]]), ::RxOp::Any.new]) !! $z[1];
+}
+
+method cclass_expr($/) {
+    my @ops = @$<op>;
+    my @zyg = map *.ast, @$<cclass_union>;
+    for @ops -> $op {
+        my $z1 = shift @zyg;
+        my $z2 = shift @zyg;
+        unshift @zyg, ($op eq '^') ?? self.xor_cc($z1,$z2) !! self.or_cc($z1,$z2);
+    }
+    say "cclass_expr @zyg[0][1].typename()" if $CCTrace;
+    make @zyg[0];
+}
+
+method cclass_union($/) {
+    my ($a, @zyg) = map *.ast, @$<cclass_add>;
+    for @zyg { $a = self.and_cc($a, $_) }
+    say "cclass_union $a[1].typename()" if $CCTrace;
+    make $a;
+}
+
+method cclass_add($/) {
+    my ($a, @zyg) = map *.ast, @$<cclass_elem>;
+    if $<sign> eq '-' { $a = self.negate_cc($a) }
+    for @$<op> {
+        $a = ($_ eq '+') ?? self.or_cc($a, shift(@zyg))
+                         !! self.and_cc($a, self.negate_cc(shift(@zyg)));
+    }
+    say "cclass_add $a[1].typename()" if $CCTrace;
+    make $a;
+}
+
+method cclass_elem:name ($/) {
+    make (substr($<name>,0,10) eq 'INTERNAL::') ??
+        self.cclass_cc(CClass.internal(substr($<name>,10))) !!
+        [False, ::RxOp::Subrule.new(captures => [], method => ~$<name>)];
+
+    say ":name $<name> $/.ast[1].typename()" if $CCTrace;
+}
+
+method cclass_elem:sym<[ ]> ($/) {
+    make $<nibble>.ast;
+    say ":[] $/.ast[1].typename()" if $CCTrace;
+}
+
+method cclass_elem:sym<( )> ($/) {
+    make $<cclass_expr>.ast;
+}
+
+method cclass_elem:property ($/) {
+    # $<colonpair>
+    $/.CURSOR.sorry("Character property database NYI");
+    make self.void_cc;
+}
+
+method cclass_elem:quote ($/) {
+    if ! $<quote>.ast.^isa(::Op::StringLiteral) {
+        make ::RxOp::VarString.new(ops => self.rxembed($/, $<quote>.ast, True));
+        return;
+    }
+    if !%*RX<i> && !%*RX<a> {
+        make self.string_cc($<quote>.ast.text);
+        return;
+    }
+    make [False, ::RxOp::String.new(text => $<quote>.ast.text,
+        igcase => %*RX<i>, igmark => %*RX<a>)];
 }
 
 method decapturize($/) {
@@ -838,10 +925,10 @@ method assertion:sym<{ }> ($/) {
         $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
 }
 
-method assertion:sym<:> ($/) { make $<cclass_expr>.ast }
-method assertion:sym<[> ($/) { make $<cclass_expr>.ast }
-method assertion:sym<-> ($/) { make $<cclass_expr>.ast }
-method assertion:sym<+> ($/) { make $<cclass_expr>.ast }
+method assertion:sym<:> ($/) { make self.cc_to_rxop($<cclass_expr>.ast) }
+method assertion:sym<[> ($/) { make self.cc_to_rxop($<cclass_expr>.ast) }
+method assertion:sym<-> ($/) { make self.cc_to_rxop($<cclass_expr>.ast) }
+method assertion:sym<+> ($/) { make self.cc_to_rxop($<cclass_expr>.ast) }
 
 # These have effects only in the parser, so no ast is correct.
 method mod_value($ ) {}
@@ -894,27 +981,28 @@ method mod_internal:p6adv ($/) {
     }
 }
 
-sub post_backslash($/) {
+method backslash:qq ($/) { make $<quote>.ast }
+method post_backslash($/) {
     # XXX confine $/ resetting
     sub _isupper { $_ ~~ /^<[ A .. Z ]>$/ }
     sub _islower { $_ ~~ /^<[ a .. z ]>$/ }
+    if $/.ast.^isa(CClass) {
+        make self.cclass_cc($/.ast);
+    }
     if _isupper($/) && _islower($<sym>) {
-        if $/.ast.^isa(Str) && chars($/.ast) != 1 {
-            $/.CURSOR.sorry("Improper attempt to negate a string");
-            return Nil;
+        if $/.ast.^isa(Str) {
+            make self.string_cc($/.ast);
         }
-        make CClass.enum($/.ast) if $/.ast.^isa(Str);
-        make $/.ast.negate;
+        make self.negate_cc($/.ast);
     }
 }
-method backslash:qq ($/) { make $<quote>.ast }
 method backslash:x ($/) {
     if $<hexint> {
         make chr($<hexint>.ast);
     } else {
         make (join "", map *.&chr, @( $<hexints>.ast ));
     }
-    post_backslash($/);
+    self.post_backslash($/);
 }
 method backslash:o ($/) {
     if $<octint> {
@@ -922,26 +1010,33 @@ method backslash:o ($/) {
     } else {
         make (join "", map *.&chr, @( $<octints>.ast ));
     }
-    post_backslash($/);
+    self.post_backslash($/);
 }
 method backslash:sym<\\> ($/) { make ~$<text> }
 method backslash:stopper ($/) { make ~$<text> }
 method backslash:unspace ($/) { make "" }
 method backslash:misc ($/) { make ($<text> // ~$<litchar>) }
-# XXX h, v, s, needs spec clarification
 method backslash:sym<0> ($/) { make "\0" }
-method backslash:a ($/) { make "\a"; post_backslash($/) }
-method backslash:b ($/) { make "\b"; post_backslash($/) }
-method backslash:d ($/) { make $CClass::Digit; post_backslash($/) }
-method backslash:e ($/) { make "\e"; post_backslash($/) }
-method backslash:f ($/) { make "\f"; post_backslash($/) }
-method backslash:h ($/) { make $CClass::HSpace; post_backslash($/) }
-method backslash:n ($/) { make "\n"; post_backslash($/) }
-method backslash:r ($/) { make "\r"; post_backslash($/) }
-method backslash:s ($/) { make $CClass::Space; post_backslash($/) }
-method backslash:t ($/) { make "\t"; post_backslash($/) }
-method backslash:v ($/) { make $CClass::VSpace; post_backslash($/) }
-method backslash:w ($/) { make $CClass::Word; post_backslash($/) }
+method backslash:a ($/) { make "\a"; self.post_backslash($/) }
+method backslash:b ($/) { make "\b"; self.post_backslash($/) }
+method backslash:d ($/) { make $CClass::Digit; self.post_backslash($/) }
+method backslash:e ($/) { make "\e"; self.post_backslash($/) }
+method backslash:f ($/) { make "\f"; self.post_backslash($/) }
+method backslash:h ($/) { make $CClass::HSpace; self.post_backslash($/) }
+method backslash:n ($/) {
+    if $/.CURSOR.can('backslash:d') {
+        # HACK - only use this form when we're looking for regexy stuff
+        make [False, ::RxOp::Newline.new];
+        self.post_backslash($/)
+    } else {
+        make "\n";
+    }
+}
+method backslash:r ($/) { make "\r"; self.post_backslash($/) }
+method backslash:s ($/) { make $CClass::Space; self.post_backslash($/) }
+method backslash:t ($/) { make "\t"; self.post_backslash($/) }
+method backslash:v ($/) { make $CClass::VSpace; self.post_backslash($/) }
+method backslash:w ($/) { make $CClass::Word; self.post_backslash($/) }
 
 method escape:sym<\\> ($/) { make $<item>.ast }
 method escape:sym<{ }> ($/) { make self.inliney_call($/, $<embeddedblock>.ast) }
@@ -1015,36 +1110,35 @@ method process_tribble(@bits) {
     for @bits -> $b {
         if $b.ast.^isa(Str) {
             next if $b.ast eq "";
-            if chars($b.ast) > 1 {
-                $b.CURSOR.sorry("Cannot use >1 character strings as cclass elements");
-                return $CClass::Empty;
-            }
         }
         push @mstack, $b.CURSOR;
         push @cstack, $b.ast;
         if @cstack >= 2 && @cstack[*-2] ~~ RangeSymbol {
             if @cstack == 2 {
                 @mstack[0].sorry(".. requires a left endpoint");
-                return $CClass::Empty;
+                return self.void_cc;
             }
             for 1, 3 -> $i {
-                if @cstack[*-$i] !~~ Str {
+                if (@cstack[*-$i] !~~ Str) || (@cstack[*-$i].codes != 1) {
                     @mstack[*-$i].sorry(".. endpoint must be a single character");
-                    return $CClass::Empty;
+                    return self.void_cc;
                 }
             }
-            my $new = CClass.range(@cstack[*-3], @cstack[*-1]);
+            my $new = [False, ::RxOp::CClassElem.new(cc =>
+                CClass.range(@cstack[*-3], @cstack[*-1]))];
             pop(@cstack); pop(@cstack); pop(@cstack); push(@cstack, $new);
             pop(@mstack); pop(@mstack);
         }
     }
     if @cstack && @cstack[*-1] ~~ RangeSymbol {
         @mstack[*-1].sorry(".. requires a right endpoint");
-        return $CClass::Empty;
+        return self.void_cc;
     }
-    my $ret = $CClass::Empty;
-    for @cstack { $ret = $ret.plus($_) }
-    $ret;
+    my $retcc = self.void_cc;
+    for @cstack {
+        $retcc = self.or_cc($retcc, ($_ ~~ Str) ?? self.string_cc($_) !! $_);
+    }
+    $retcc;
 }
 
 method nibbler($/, $prefix?) {
@@ -1200,6 +1294,7 @@ method infix:sym<...> ($/) {
     # STD parses ...^ in the ... rule
     make Operator.funop($/, '&infix:<' ~ $/ ~ '>', 2);
 }
+method infix:sym<xx> ($/) { make ::Operator::Replicate.new }
 method infix:sym<ff>($/) { make Operator::FlipFlop.new() }
 method infix:sym<fff>($/) { make Operator::FlipFlop.new(:sedlike) }
 method infix:sym<ff^>($/) { make Operator::FlipFlop.new(:excl_rhs) }
@@ -2157,11 +2252,15 @@ method blockoid($/) {
     if $/ eq '{YOU_ARE_HERE}' {
         $*unit.set_bottom($*CURLEX<!sub>);
         $*CURLEX<!sub>.create_static_pad;
+        $*CURLEX<!sub>.noninlinable;
 
         loop (my $l = $*CURLEX<!sub>; $l; $l.=outer) {
             # this isn't *quite* right, as it will cause declaring
             # anything more in the same scope to fail.
-            $/.CURSOR.mark_used($_) for $l.lex_names;
+            # ... and we have to be careful not to mark anon_0 used
+            # or installing this very block will fail!
+            substr($_,0,4) ne 'anon' and $/.CURSOR.mark_used($_)
+                for $l.lex_names;
         }
 
         make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
@@ -2490,12 +2589,10 @@ method make_constant_into($/, $pkg, $name, $rhs) {
 }
 
 method init_constant($con, $rhs) {
-    my $body = self.thunk_sub(
-        ::Op::LexicalBind.new(name => $con.name, :$rhs),
-        name => "$con.name() init");
+    my $body = self.thunk_sub($rhs, name => "$con.name() init");
     $body.outer.create_static_pad;
+    $body.run_BEGIN($con.name);
     $con.init = True;
-    $body.set_phaser($*backend.phaser('UNIT_INIT'));
     $con;
 }
 
@@ -3508,12 +3605,7 @@ method statement_prefix:CHECK ($/) { phaser($/, 'CHECK', :csp) }
 method statement_prefix:END ($/) { phaser($/, 'END', :csp) }
 method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 
-# XXX 'As soon as possible' isn't quite soon enough here
 method statement_prefix:BEGIN ($/) {
-    $*CURLEX<!sub>.create_static_pad;
-    $<blast>.ast.set_phaser($*backend.phaser('UNIT_INIT'));
-    make ::Op::StatementList.new;
-
     # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
     repeat while False {
         my $c = ($<blast><statement> || $<blast><block><blockoid>).ast;
@@ -3529,7 +3621,15 @@ method statement_prefix:BEGIN ($/) {
         last unless +$d.getargs == 1;
         last unless defined my $str = self.trivial_eval($/, $d.getargs.[0]);
         @*INC."$d.name()"($str);
+        make ::Op::StatementList.new;
+        return;
     }
+
+    $*CURLEX<!sub>.create_static_pad;
+    my $con = self.make_constant($/, 'anon', 'BEGIN');
+    $<blast>.ast.run_BEGIN($con.name);
+    $con.init = True;
+    make $con;
 }
 
 method comp_unit($/) {

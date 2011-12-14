@@ -43,8 +43,8 @@ class Sym is Capturing {
     has $.igmark; # Bool
 
     method clone(:$captures) {
-        self.WHAT.new(text => $.text, igcase => $.igcase, igmark => $.igmark,
-            :$captures);
+        self.WHAT.new(text => $!text, igcase => $!igcase, igmark => $!igmark,
+            endsym => $!endsym, :$captures);
     }
 
     method code($body) { #OK not used
@@ -127,44 +127,59 @@ class Quantifier is RxOp {
         %r;
     }
 
-    method mincode($body, $min, $max) {
+    method code($body) {
+        my $rmin = $!closure ?? CgOp.letvar('!min') !! CgOp.int($!min);
+        my $rmax = $!closure ?? CgOp.letvar('!max') !! CgOp.int($!max//2**31-1);
+
+        my $exit   = self.label;
+        my $repeat = self.label;
+        my $sep    = self.label;
+
         my @code;
 
-        my $exit = self.label;
-        my $add  = self.label;
-
+        push @code, CgOp.cgoto('backtrack',
+            CgOp.compare('>', CgOp::int(0), $rmax)) if $!closure || $!max < 0;
         push @code, CgOp.rxopenquant;
-        push @code, CgOp.goto($exit);
-        push @code, CgOp.label($add);
-        push @code, CgOp.cgoto('backtrack', CgOp.compare('>=',
-                CgOp.rxgetquant, $max)) if $!closure || defined ($!max);
-        if $.zyg[1] && !$!closure && $!min {
-            push @code, $.zyg[1].code($body);
-            push @code, CgOp.label($exit);
-            push @code, $.zyg[0].code($body);
-            push @code, CgOp.rxincquant;
-        } else {
-            push @code, CgOp.ternary(CgOp.compare('!=', CgOp.rxgetquant,
-                CgOp.int(0)), $.zyg[1].code($body), CgOp.prog()) if $.zyg[1];
-            push @code, $.zyg[0].code($body);
-            push @code, CgOp.rxincquant;
-            push @code, CgOp.label($exit);
+
+        sub exit($label, $cond) {
+            if $!minimal {
+                push @code, CgOp.ternary($cond,
+                    CgOp.prog(CgOp.rxpushb('QUANT', $label),
+                        CgOp.goto($exit)), CgOp.prog());
+            } else {
+                push @code, CgOp.ternary($cond,
+                    CgOp.rxpushb('QUANT', $exit), CgOp.prog());
+            }
         }
-        push @code, CgOp.rxpushb('QUANT', $add);
-        push @code, CgOp.cgoto('backtrack', CgOp.compare('<',
-                CgOp.rxgetquant, $min)) if $!closure || $!min > 0;
+
+        # Allow 0-time exit matching null string
+        exit($repeat, CgOp.compare('<', $rmin, CgOp.int(1)));
+
+        # We have to match something now
+        push @code, CgOp.label($repeat);
+        push @code, CgOp.cgoto('backtrack',
+            CgOp.compare('>=', CgOp.rxgetquant, $rmax));
+        push @code, $.zyg[0].code($body);
+        push @code, CgOp.rxincquant;
+
+        if $.zyg[1] {
+            exit($sep, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+
+            push @code, CgOp.label($sep);
+            push @code, $.zyg[1].code($body);
+
+            # Allow exiting here if a trailing separator is allowed
+            if $!opsep {
+                exit($repeat, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+            }
+        } else {
+            exit($repeat, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+        }
+
+        push @code, CgOp.goto($repeat);
+
+        push @code, CgOp.label($exit);
         push @code, CgOp.sink(CgOp.rxclosequant);
-
-        @code;
-    }
-
-    method code($body) {
-        my $min = $!closure ?? CgOp.letvar('!min') !! CgOp.int($!min);
-        my $max = $!closure ?? CgOp.letvar('!max') !! CgOp.int($!max);
-
-        my @code = $!minimal
-            ?? self.mincode($body, $min, $max)
-            !! self.maxcode($body, $min, $max);
 
         return @code unless $!closure;
 
@@ -175,63 +190,6 @@ class Quantifier is RxOp {
             '!max', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
                         CgOp.letvar('!range'), 'niecza_quantifier_max'))),
             @code);
-    }
-
-    method maxcode($body, $min, $max) {
-        my @code;
-
-        my $exit   = self.label;
-        my $repeat = self.label;
-        my $middle = self.label;
-
-        # get the degenerate cases out the way
-        if defined $!max {
-            return CgOp.goto('backtrack') if $!max < $!min;
-            return CgOp.prog() if $!max == 0;
-            return $.zyg[0].code($body) if $!max == 1 && $!min == 1;
-        }
-
-        my $usequant = $!closure || (defined($!max) && $!max != 1) ||
-            ($!min > 1) || ($!min && $.zyg[1]);
-        my $userep   = $!closure || !(defined($!max) && $!max == 1);
-
-        push @code, CgOp.rxopenquant if $usequant;
-        push @code, CgOp.goto($middle) if !$!closure && $!min;
-        push @code, CgOp.label($repeat) if $userep;
-        # min == 0 or quant >= 1
-        if $!closure || $!min > 1 {
-            # only allow exiting if min met
-            push @code, CgOp.ternary(CgOp.compare('>=', CgOp.rxgetquant, $min),
-                CgOp.rxpushb('QUANT', $exit), CgOp.prog());
-        } else {
-            # min automatically met
-            push @code, CgOp.rxpushb('QUANT', $exit);
-        }
-
-        # if userep false, quant == 0
-        if $!closure || defined($!max) && $userep {
-            push @code, CgOp.cgoto('backtrack', CgOp.compare('>=',
-                    CgOp.rxgetquant, $max));
-        }
-
-        if $.zyg[1] && ($!closure || $!min == 0) {
-            push @code, CgOp.cgoto($middle,
-                CgOp.compare('==', CgOp.rxgetquant, CgOp.int(0)));
-        }
-        push @code, $.zyg[1].code($body) if $.zyg[1];
-        push @code, CgOp.label($middle) if $.zyg[1] || (!$!closure && $!min);
-        push @code, $.zyg[0].code($body);
-        push @code, CgOp.rxincquant if $usequant;
-        if $userep {
-            push @code, CgOp.goto($repeat);
-        } else {
-            # quant == 1
-            # userep implies max == 1, min == 0; fall through
-        }
-        push @code, CgOp.label($exit);
-        push @code, CgOp.sink(CgOp.rxclosequant) if $usequant;
-
-        @code;
     }
 
     method lad() {
@@ -674,4 +632,12 @@ class CClassElem is RxOp {
 class None is RxOp {
     method code($) { CgOp.goto('backtrack') }
     method lad() { ['None'] }
+}
+
+class RxOp::Newline is RxOp {
+    method code($) { CgOp.rxbprim('Newline') }
+    method lad() {
+        ['Any', [ ['Str', "\x0D\x0A"],
+                  [ 'CC', @( $CClass::VSpace.terms ) ] ] ]
+    }
 }
