@@ -1,0 +1,80 @@
+(This document summarizes features documented in S05 but not in Niecza.
+All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
+
+(  49) Tiebreaker #5: I still don't know what this means.  (2609 conflicts)
+( 113) Unicode defines a 'Word' to include all Pc as well.
+( 219) Loose matches are mostly not implemented.
+( 226) Also no :samecase, :sameaccent, :samespace.
+( 346) Need to audit whitespace removal algorithm.
+( 360) No :sigspace<rule>.
+( 396) No ms// or ss///; "mm" is parsed
+( 408) No Unicode levels
+( 427) No :Perl5
+( 497) No :ex/:ov
+( 535) No :rw
+( 768) No internal smartmatches
+( 924) $/ is a Cursor inside closures
+( 933) Don't know how fail is supposed to work there
+( 945) No handling of sigspace for general quantifier
+( 978) No negative quantifiers
+( 993) x* % y, etc do not seem to work
+(1039) No %% (ticket #80)
+(1057) No special handling of zero-width matches
+(1068) No % sigspace handling
+(1124) 'Regex' scalar values not called (ticket #77)
+(1172) No auto-declared temporary variables $x = <.ident>
+(1178) No bindings to existing variables
+(1186) No interpolation of arrays or || @array
+(1253) No handling of formal parameters in LTM
+(1258) No {*} and funky proto handling in general
+(1276) Declarativeness of constants is insufficiently general
+(1388) <foo> never uses a lexical regex
+(1436) No dottyop/indirect method assertions
+(1461) Arguments in <&foo(2)> not handled; STD parses EXPR but only this legal
+(1489) No correct <$foo> handling
+(1507) No support for indirect <::($name)> calls
+       Also, nice fossil.
+(1520) No <@foo>
+(1533) <{ }> has wrong semantics
+(1565) Code assertions not always considered declarative
+(1585) <[ z..a ]> not treated as compile error
+(1634) No Unicode properties
+(1679) No <.>
+(1718) No <?same>, <?at($pos)>
+(1733) <?after> is incomplete
+(1744) No <*...>
+(1804) No <~~>
+(1843) No <|g> etc
+(1857) No <( or )>
+(1893) Missing predefined rules include upper, lower, digit, xdigit, print,
+       graph, cntrl, punct, alnum, wb, ww, space, blank
+(2246) regex :ratchet syntax doesn't work
+(2342) ::> is defined in terms of brackets, not temporal alternation
+(2380) No <commit> or <cut>
+(2460) $foo ~~ rule { } does not automatically dual-anchor (what!?)
+(2501) No <prior> (probable fossil)
+(2638) ** 1..5 is not considered declarative
+(2738) No success value; failed matches return Match
+(2788) $/.ast doesn't correctly return undefined
+(2789) No special case for $(), @(), %()
+(2818) In list context, $match[0] will return $match if $match[0] does not
+       otherwise exist; useful for improving DWIM ness of lists
+(2851) @<foo> does not seem to work
+(2868) No .values or .kv, .keys ignores numeric captures
+(2895) Undefined: caps, chunks, prematch, postmatch
+(2910) No concept of cursor directionality
+(3144) Missing captures don't produce Nil
+(3549) Implementation of $<foo>=[] is horrible and wrong
+(3718) $0=<.alpha>+ is processed backwards; $0=[<.alpha>]+ is fine
+(3750) No array aliasing
+(3923) No hash aliasing
+(3972) No external aliasing
+(3996) No support for multiple Matches
+(4160) CORE does not contain STD, parsefile, unbalanced
+(4204) No 'augment slang' functionality
+(4218) No default-control pragmata
+(4237) No transliterations
+(4445) No matching against buffers and compact arrays
+(4466) No matching against non-stringy positionals
+(4496) This seems to contradict (1436)
+(4522) I don't know if this should be a special case or just use Str
