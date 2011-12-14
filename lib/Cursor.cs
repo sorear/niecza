@@ -1932,6 +1932,7 @@ anew:
             case 4:
                 if (!Kernel.IterHasFlat((VarDeque)th.lex2, true))
                     goto case 1;
+                th.ip = 4;
                 return th.rx.EndWith(th, (Cursor) ((VarDeque)th.lex2).Shift().Fetch());
         }
     }
