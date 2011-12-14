@@ -25,6 +25,73 @@ use STD;
 # }
 # }
 
+augment class RxOp::Quantifier {
+    method code($body) {
+        my $rmin = $!closure ?? CgOp.letvar('!min') !! CgOp.int($!min);
+        my $rmax = $!closure ?? CgOp.letvar('!max') !! CgOp.int($!max//2**31-1);
+
+        my $exit   = self.label;
+        my $repeat = self.label;
+        my $sep    = self.label;
+
+        my @code;
+
+        push @code, CgOp.cgoto('backtrack',
+            CgOp.compare('>', CgOp::int(0), $rmax)) if $!closure || $!max < 0;
+        push @code, CgOp.rxopenquant;
+
+        sub exit($label, $cond) {
+            if $!minimal {
+                push @code, CgOp.ternary($cond,
+                    CgOp.prog(CgOp.rxpushb('QUANT', $label),
+                        CgOp.goto($exit)), CgOp.prog());
+            } else {
+                push @code, CgOp.ternary($cond,
+                    CgOp.rxpushb('QUANT', $exit), CgOp.prog());
+            }
+        }
+
+        # Allow 0-time exit matching null string
+        exit($repeat, CgOp.compare('<', $rmin, CgOp.int(1)));
+
+        # We have to match something now
+        push @code, CgOp.label($repeat);
+        push @code, CgOp.cgoto('backtrack',
+            CgOp.compare('>=', CgOp.rxgetquant, $rmax));
+        push @code, $.zyg[0].code($body);
+        push @code, CgOp.rxincquant;
+
+        if $.zyg[1] {
+            exit($sep, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+
+            push @code, CgOp.label($sep);
+            push @code, $.zyg[1].code($body);
+
+            # Allow exiting here if a trailing separator is allowed
+            if $!opsep {
+                exit($repeat, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+            }
+        } else {
+            exit($repeat, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+        }
+
+        push @code, CgOp.goto($repeat);
+
+        push @code, CgOp.label($exit);
+        push @code, CgOp.sink(CgOp.rxclosequant);
+
+        return @code unless $!closure;
+
+        return CgOp.letn(
+            '!range', $!closure.code($body),
+            '!min', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
+                        CgOp.letvar('!range'), 'niecza_quantifier_min'))),
+            '!max', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
+                        CgOp.letvar('!range'), 'niecza_quantifier_max'))),
+            @code);
+    }
+}
+
 class RxOp::Newline is RxOp {
     method code($) { CgOp.rxbprim('Newline') }
     method lad() {
