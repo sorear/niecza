@@ -193,6 +193,7 @@ my class Any is Mu {
     method flat() { @(self) }
     method Numeric() {
         die "Cannot use value like $.typename as a number" if defined(self);
+        warn "Use of uninitialized value in numeric context";
         0;
     }
 
@@ -1559,7 +1560,7 @@ my class Match is Cool {
     method hash () { %( self.Capture ) }
     method flat () { @( self.Capture ) }
     method iterator () { self.flat.iterator }
-    method Numeric() { +(~self) }
+    method Numeric() { self // nextsame; +(~self) }
     method keys () { keys %(self) }
     method Capture () { Q:CgOp {
         (letn cap (obj_newblank (obj_llhow (@ {Capture})))
