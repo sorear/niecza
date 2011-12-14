@@ -2,6 +2,17 @@
 use Test;
 use MONKEY_TYPING;
 
+is (("ab" x 10) ~~ /[aba?] ** 10/).chars, 20, "**COUNT works with backtracking";
+
+is ("a, d" ~~ /:s <alpha>+ % ','/), 'a, d', 'sigspace respected on %';
+is ("a b c" ~~ /:s <alpha> ** 3/), 'a b c', 'sigspace respected on **';
+is ("a, d" ~~ /:s <alpha>+%','/), 'a', 'no-sigspace respected on %';
+is ("a b c def" ~~ /:s <alpha>**3/), ' def', 'no-sigspace respected on **';
+is ("a,b,c," ~~ / <alpha>+ %% ','/), 'a,b,c,', '%% works';
+is ("a,b,c" ~~ / <alpha>+ %% ','/), 'a,b,c', '%% works like %';
+is ("a,b,c" ~~ / <alpha>* %% ','/), 'a,b,c', '% works on *';
+is ("XX" ~~ / X <alpha>* %% ',' X/), 'XX', '% works on * (null string)';
+
 {
     my class Bt {
         has $!pie;

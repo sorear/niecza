@@ -75,6 +75,11 @@ public sealed class NState {
         next = proto; this.cut_to = cut_to; this.name = name;
         if (proto != null) klass = proto.klass;
     }
+
+    public NState(NState f) {
+        next = f.next; name = f.name; cut_to = f.cut_to;
+        quant = f.quant; klass = f.klass;
+    }
 }
 
 public sealed class CapInfo {
@@ -537,6 +542,7 @@ public sealed class RxFrame: IFreeze {
     }
 
     public void IncQuant() {
+        st.ns = new NState(st.ns);
         st.ns.quant++;
     }
 
