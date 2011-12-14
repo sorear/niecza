@@ -3,7 +3,7 @@ my module Test;
 constant $?TRANSPARENT = 1;
 
 class Builder {
-    has $!current-test = 1;
+    has $!current-test;
     has $!set-plan;
     has $!todo-up-to = 0;
     has $!todo-reason;
