@@ -3,9 +3,9 @@ my module Test;
 constant $?TRANSPARENT = 1;
 
 class Builder {
-    has $!current-test;
+    has $!current-test = 1;
     has $!set-plan;
-    has $!todo-up-to;
+    has $!todo-up-to = 0;
     has $!todo-reason;
 
     method new() {
