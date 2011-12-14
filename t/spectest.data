@@ -191,9 +191,9 @@ S04-statements/until.t
 S04-statements/while.t
 S05-capture/match-object.t
 S05-capture/subrule.t
-#S05-grammar/action-stubs.t # https://github.com/sorear/niecza/issues/86
+S05-grammar/action-stubs.t
 S05-grammar/methods.t
-#S05-grammar/protoregex.t # https://github.com/sorear/niecza/issues/83
+S05-grammar/protoregex.t
 S05-grammar/signatures.t
 S05-interpolation/lexicals.t
 S05-mass/recursive.t
