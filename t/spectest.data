@@ -119,6 +119,7 @@ S03-operators/not.t
 S03-operators/overflow.t
 S03-operators/precedence.t
 S03-operators/range-basic.t
+S03-operators/range-int.t
 S03-operators/range.t
 S03-operators/relational.t
 S03-operators/repeat.t
