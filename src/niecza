@@ -82,6 +82,27 @@ augment class Op::RegexBody {
     }
 }
 
+class RxOp::StringCap is RxOp::Capturing {
+    # zyg * 1
+
+    method clone(:$captures) {
+        self.WHAT.new(zyg => $.zyg, :$captures);
+    }
+
+    method code($body) { #OK not used
+        my @code;
+
+        push @code, CgOp.pushcut("CAP");
+        push @code, CgOp.rxsetquant(CgOp.rxgetpos);
+        push @code, $.zyg[0].code($body);
+        push @code, CgOp.rxpushcapture(CgOp.rxcall("StringCapture"), @$.captures);
+        push @code, CgOp.popcut;
+
+        @code;
+    }
+
+    method lad() { $.zyg[0].lad }
+}
 class RxOp::ListPrim is RxOp {
     has Str $.name; # used for LTM cheatery
     has Str $.type;
@@ -105,6 +126,20 @@ class RxOp::ListPrim is RxOp {
 }
 
 augment class NieczaActions {
+method rxcapturize($M, $name, $rxop is copy) {
+    if !$rxop.^isa(::RxOp::Capturing) {
+        # $<foo>=[...]
+        $rxop = ::RxOp::StringCap.new(zyg => [$rxop]);
+    }
+
+    # $<foo>=(...)
+    # XXX might not quite be right
+    if +$rxop.captures == 1 && $rxop.captures.[0] ~~ /^\d+$/ {
+        return $rxop.clone(captures => [$name]);
+    }
+
+    return $rxop.clone(captures => [ $name, @( $rxop.captures ) ]);
+}
 method quantified_atom($/) { # :: RxOp
     my $atom = $<atom>.ast;
     my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;

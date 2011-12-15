@@ -677,6 +677,12 @@ public sealed class RxFrame: IFreeze {
         st.ns.klass = dm;
     }
 
+    public Variable StringCapture() {
+        return Kernel.NewROScalar(
+            new Cursor(global, st.ns.klass, st.ns.quant, st.pos,
+                null, null, "ANON"));
+    }
+
     public Cursor MakeCursor() {
         return new Cursor(global, st.ns.klass, this, st.ns, bt, st.pos, st.captures);
     }
