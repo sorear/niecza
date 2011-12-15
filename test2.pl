@@ -20,8 +20,17 @@ is %().kv.join("|"), "alpha|o", '%() returns named captures';
 "bar" ~~ / { make 5 } /;
 is $(), 5, '$() gets AST';
 
-my $rx = /a+/;
-is ("ooofaaabkkk" ~~ /f $rx b/), "faaab", '$var can call regexes';
+{
+    my $rx = /a+/;
+    is ("ooofaaabkkk" ~~ /f $rx b/), "faaab", '$var can call regexes';
+
+    my @a1 = ( 'fo', 'fooo', 'bar' );
+    is ("barxy" ~~ / @a1 /), "bar", '@var works';
+    is ("fooooooo" ~~ / @a1 /), 'fooo', '@var has longest-token semantics';
+
+    my @a2 = ( /fooo/, /fo+/ );
+    is ("fooooooo" ~~ / @a2 /), "fooooooo", '@var has longest-token semantics with regex elements';
+}
 
 {
     my class Bt {

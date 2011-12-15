@@ -46,10 +46,20 @@ class RxOp::ListPrim is RxOp {
         @code;
     }
 
-    method lad() { $!type eq 'scalar_var' ?? ['Param', $!param] !! ['Imp'] }
+    method lad() { $!type eq 'scalar_var' ?? ['Param', $!name] !! ['Imp'] }
 }
 
 augment class NieczaActions {
+method op_for_regex($/, $rxop) {
+    my @lift = $rxop.oplift;
+    my $ltm = ::GLOBAL::OptRxSimple.run_lad($rxop.lad);
+    my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
+    my $sub = self.thunk_sub(::Op::RegexBody.new(|node($/),
+            canback => $mb, pre => @lift, rxop => $orxop),
+        class => 'Regex', params => ['self'], :$ltm);
+    $sub.add_my_name('$/');
+    self.block_expr($/, $sub);
+}
 method metachar:var ($/) {
     sub _isnum { $_ ~~ /^\d+$/ }
     if $<binding> {

@@ -523,6 +523,86 @@ public sealed class RxFrame: IFreeze {
         }
     }
 
+    public Frame list_var(Frame th, Variable var) {
+        VarDeque iter = Builtins.start_iter(var);
+        List<object> toks = new List<object>();
+        List<LAD> lads = new List<LAD>();
+
+        NFA pad = new NFA();
+        pad.cursor_class = st.ns.klass;
+
+        while (Kernel.IterHasFlat(iter, true)) {
+            Variable svar = iter.Shift();
+            P6any sobj = svar.Fetch();
+
+            if (sobj.Isa(Kernel.RegexMO)) {
+                toks.Add(sobj);
+
+                pad.outer_stack.Add((Frame)sobj.GetSlot("outer"));
+                pad.info_stack.Add((SubInfo)sobj.GetSlot("info"));
+                lads.Add(pad.info_stack[0].ltm.Reify(pad));
+                pad.outer_stack.Clear();;
+                pad.info_stack.Clear();
+            } else {
+                string str = sobj.mo.mro_raw_Str.Get(svar);
+                toks.Add(str);
+                lads.Add(new LADStr(str));
+            }
+        }
+
+        int[] cases = (new Lexer(pad, "array_var", lads.ToArray())).
+            Run(global.orig_s, st.pos);
+
+        Frame nth = th.MakeChild(null, ArrayHelperSI, Kernel.AnyP);
+        nth.lex0 = MakeCursor();
+        nth.lex1 = toks;
+        nth.lex2 = cases;
+
+        return nth;
+    }
+
+    private static SubInfo ArrayHelperSI = new SubInfo("KERNEL ArrayHelper", ArrayHelperC);
+    private static Frame ArrayHelperC(Frame th) {
+        int[] cases = (int[]) th.lex2;
+        List<object> toks = (List<object>) th.lex1;
+        object tok;
+        switch (th.ip) {
+            default:
+                return Kernel.Die(th, "Invalid IP");
+            case 1:
+                return th.rx.Backtrack(th);
+            case 0:
+                th.rx = new RxFrame("ArrayHelper", (Cursor) th.lex0, false, false);
+                th.lexi0 = 0;
+                goto case 2;
+            case 2:
+                if (th.lexi0 == cases.Length)
+                    goto case 1;
+                th.rx.PushBacktrack(2);
+                tok = toks[cases[th.lexi0++]];
+                if (tok is string) {
+                    if (!th.rx.Exact((string)tok))
+                        goto case 1;
+                    th.ip = 5;
+                    return th.rx.MakeMatch(th);
+                } else {
+                    th.ip = 3;
+                    return ((P6any)tok).Invoke(th, new Variable[] {
+                            th.rx.MakeCursorV() }, null);
+                }
+            case 3:
+                th.lex2 = Builtins.start_iter((Variable) th.resultSlot);
+                goto case 4;
+            case 4:
+                if (!Kernel.IterHasFlat((VarDeque)th.lex2, true))
+                    goto case 1;
+                th.ip = 4;
+                return th.rx.EndWith(th, (Cursor) ((VarDeque)th.lex2).Shift().Fetch());
+            case 5:
+                th.ip = 1;
+                return th.rx.End(th);
+        }
+    }
     public void PushConjStart() {
         st.ns = new NState(bt, "CSTART", st.ns);
         st.ns.quant = st.pos;

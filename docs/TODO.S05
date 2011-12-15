@@ -20,7 +20,7 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1057) No special handling of zero-width matches DISCUSS
 (1172) No auto-declared temporary variables $x = <.ident>
 (1178) No bindings to existing variables
-(1186) No interpolation of arrays or || @array DISCUSS PARSE
+(1186) No || @array temporal-alternation syntax DISCUSS PARSE
 (1253) No handling of formal parameters in LTM
 (1258) No {*} and funky proto handling in general
 (1276) Declarativeness of constants is insufficiently general
