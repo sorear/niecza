@@ -64,7 +64,7 @@ namespace Niecza.Serialization {
         internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 6;
+        static readonly int version = 7;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -258,9 +258,7 @@ namespace Niecza.Serialization {
         LADStrNoCase,
         LADMethod,
         LADParam,
-        LADOpt, // LAD
-        LADPlus,
-        LADStar,
+        LADQuant, // byte,LAD,LAD
         LADSequence, // LAD[]
         LADAny,
         LADCC, // CC
@@ -760,12 +758,8 @@ namespace Niecza.Serialization {
                     return LADMethod.Thaw(this);
                 case SerializationCode.LADParam:
                     return LADParam.Thaw(this);
-                case SerializationCode.LADOpt:
-                    return LADOpt.Thaw(this);
-                case SerializationCode.LADPlus:
-                    return LADPlus.Thaw(this);
-                case SerializationCode.LADStar:
-                    return LADStar.Thaw(this);
+                case SerializationCode.LADQuant:
+                    return LADQuant.Thaw(this);
                 case SerializationCode.LADSequence:
                     return LADSequence.Thaw(this);
                 case SerializationCode.LADAny:

@@ -28,6 +28,18 @@ use STD;
 augment class NieczaActions {
 }
 
+augment class RxOp::Quantifier {
+    method lad() {
+        return [ 'Imp' ] if $!minimal || $!closure;
+
+        my $mode = 0;
+        $mode += 1 if $!min <= 0;
+        $mode += 2 if ($!max // Inf) > 1;
+        $mode += 4 if $!opsep;
+
+        [ 'Quant', $mode, map *.lad, @.zyg ];
+    }
+}
 
 CgOp._register_ops: < who sc_root sc_indir temporize _addmethod _invalidate
 >;

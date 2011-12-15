@@ -3541,12 +3541,9 @@ dynamic:
                 return new LADParam(JScalar.S(tree[1]));
             } else if (key == "Method") {
                 return new LADMethod(JScalar.S(tree[1]));
-            } else if (key == "Opt") {
-                return new LADOpt(BuildLadJ(tree[1]));
-            } else if (key == "Star") {
-                return new LADStar(BuildLadJ(tree[1]));
-            } else if (key == "Plus") {
-                return new LADPlus(BuildLadJ(tree[1]));
+            } else if (key == "Quant") {
+                return new LADQuant(JScalar.I(tree[1]), BuildLadJ(tree[2]),
+                        tree.Length > 3 ? BuildLadJ(tree[3]) : null);
             } else if (key == "Sequence" || key == "Any") {
                 object[] za = (object[])tree[1];
                 LAD[] z = new LAD[za.Length];
@@ -3583,12 +3580,9 @@ dynamic:
                 return new LADParam((string)tree[1]);
             } else if (key == "Method") {
                 return new LADMethod((string)tree[1]);
-            } else if (key == "Opt") {
-                return new LADOpt(BuildLad((object[])tree[1]));
-            } else if (key == "Star") {
-                return new LADStar(BuildLad((object[])tree[1]));
-            } else if (key == "Plus") {
-                return new LADPlus(BuildLad((object[])tree[1]));
+            } else if (key == "Quant") {
+                return new LADQuant((int)tree[1], BuildLad((object[])tree[2]),
+                        tree.Length > 3 ? BuildLad((object[])tree[3]) : null);
             } else if (key == "Sequence" || key == "Any") {
                 object[] za = (object[])tree[1];
                 LAD[] z = new LAD[za.Length];

@@ -1232,93 +1232,66 @@ public class LADDot : LAD {
     }
 }
 
-public class LADStar : LAD {
-    public LAD child;
-    public LADStar(LAD child) { this.child = child; }
-    private LADStar() {}
-
-    public override LAD Reify(NFA pad) { return new LADStar(child.Reify(pad)); }
-    public override void ToNFA(NFA pad, int from, int to) {
-        int knot = pad.AddNode();
-        pad.AddEdge(from, knot, null);
-        pad.AddEdge(knot, to, null);
-        child.ToNFA(pad, knot, knot);
+public class LADQuant : LAD {
+    public int type; // 1=allow 0  2=allow multiple  4=z1 optional
+    public LAD z0, z1;
+    public LADQuant(int type, LAD z0, LAD z1) {
+        this.type = type; this.z0 = z0; this.z1 = z1;
     }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "star:");
-        child.Dump(indent + 4);
-    }
-    public override void Freeze(FreezeBuffer fb) {
-        fb.Byte((byte) SerializationCode.LADStar);
-        fb.ObjRef(child);
-    }
-    internal static object Thaw(ThawBuffer tb) {
-        var n = new LADStar();
-        tb.Register(n);
-        n.child = (LAD) tb.ObjRef();
-        return n;
-    }
-}
-
-public class LADOpt : LAD {
-    public LAD child;
-    public override LAD Reify(NFA pad) { return new LADOpt(child.Reify(pad)); }
-    public LADOpt(LAD child) { this.child = child; }
-    private LADOpt() {}
-
-    public override void ToNFA(NFA pad, int from, int to) {
-        pad.AddEdge(from, to, null);
-        child.ToNFA(pad, from, to);
-    }
-
-    public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "opt:");
-        child.Dump(indent + 4);
-    }
-    public override void Freeze(FreezeBuffer fb) {
-        fb.Byte((byte) SerializationCode.LADOpt);
-        fb.ObjRef(child);
-    }
-    internal static object Thaw(ThawBuffer tb) {
-        var n = new LADOpt();
-        tb.Register(n);
-        n.child = (LAD) tb.ObjRef();
-        return n;
-    }
-}
-
-public class LADPlus : LAD {
-    public LAD child;
-    public override LAD Reify(NFA pad) { return new LADPlus(child.Reify(pad)); }
-    public LADPlus(LAD child) { this.child = child; }
-    private LADPlus() { }
+    private LADQuant() {}
 
     public override void QueryLiteral(NFA pad, out int len, out bool cont) {
-        child.QueryLiteral(pad, out len, out cont);
+        if ((type & 1) == 0) {
+            z0.QueryLiteral(pad, out len, out cont);
+        } else {
+            len = 0;
+        }
+        cont = false;
     }
 
+    public override LAD Reify(NFA pad) {
+        return new LADQuant(type, z0.Reify(pad), z1 != null ? z1.Reify(pad) : null);
+    }
     public override void ToNFA(NFA pad, int from, int to) {
         int knot1 = pad.AddNode();
         int knot2 = pad.AddNode();
+        int knot3 = pad.AddNode();
         pad.AddEdge(from, knot1, null);
+
+        z0.ToNFA(pad, knot1, knot2);
+        if (z1 != null)
+            z1.ToNFA(pad, knot2, knot3);
+        else
+            pad.AddEdge(knot2, knot3, null);
+
         pad.AddEdge(knot2, to, null);
-        pad.AddEdge(knot2, knot1, null);
-        child.ToNFA(pad, knot1, knot2);
+
+        if ((type & 1) != 0)
+            pad.AddEdge(from, to, null);
+        if ((type & 4) != 0)
+            pad.AddEdge(knot3, to, null);
+        if ((type & 2) != 0)
+            pad.AddEdge(knot3, knot1, null);
     }
 
     public override void Dump(int indent) {
-        Console.WriteLine(new string(' ', indent) + "plus:");
-        child.Dump(indent + 4);
+        Console.WriteLine(new string(' ', indent) + "quant({0}):", type);
+        z0.Dump(indent + 4);
+        if (z1 != null)
+            z1.Dump(indent + 4);
     }
     public override void Freeze(FreezeBuffer fb) {
-        fb.Byte((byte) SerializationCode.LADPlus);
-        fb.ObjRef(child);
+        fb.Byte((byte) SerializationCode.LADQuant);
+        fb.Byte((byte) (type | (z1 != null ? 8 : 0)));
+        fb.ObjRef(z0);
+        if (z1 != null) fb.ObjRef(z1);
     }
     internal static object Thaw(ThawBuffer tb) {
-        var n = new LADPlus();
+        var n = new LADQuant();
         tb.Register(n);
-        n.child = (LAD) tb.ObjRef();
+        n.type = tb.Byte();
+        n.z0 = (LAD) tb.ObjRef();
+        if ((n.type & 8) != 0) n.z1 = (LAD) tb.ObjRef();
         return n;
     }
 }
