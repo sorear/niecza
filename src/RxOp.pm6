@@ -138,7 +138,7 @@ class Quantifier is RxOp {
         my @code;
 
         push @code, CgOp.cgoto('backtrack',
-            CgOp.compare('>', CgOp::int(0), $rmax)) if $!closure || $!max < 0;
+            CgOp.compare('>', CgOp.int(0), $rmax)) if $!closure || $!max < 0;
         push @code, CgOp.rxopenquant;
 
         sub exit($label, $cond) {
