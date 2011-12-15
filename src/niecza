@@ -27,6 +27,61 @@ use STD;
 
 # RxOp::VarString.param NO LONGER USED
 
+augment class RxOp::Tilde {
+    method code($body) {
+        my @code;
+        my $fail = self.label;
+        my $pass = self.label;
+
+        $body.add_my_name('$*GOAL') unless $body.has_lexical('$*GOAL');
+
+        push @code, CgOp.rxcall("PushGoal", CgOp.callframe, CgOp.str($!closer));
+        push @code, $.zyg[0].code($body);
+        push @code, CgOp.rxpushb("TILDE", $fail);
+        push @code, CgOp.rxbprim('Exact', CgOp.str($!closer));
+        push @code, CgOp.goto($pass);
+        push @code, CgOp.label($fail);
+        push @code, CgOp.sink(CgOp.methodcall(CgOp.newscalar(
+                CgOp.rxcall("MakeCursor")), 'FAILGOAL',
+            CgOp.string_var($!closer), CgOp.string_var($!dba),
+            CgOp.box('Num', CgOp.cast('num', CgOp.rxgetquant))));
+        push @code, CgOp.label($pass);
+        push @code, CgOp.rxcall("PopGoal", CgOp.callframe);
+
+        @code;
+    }
+}
+
+augment class Op::RegexBody {
+    method code($body) {
+        my @mcaps;
+        my $*in_quant = False;
+        if !$.passcap {
+            my $u = $.rxop.used_caps;
+            for keys $u {
+                push @mcaps, $_ if $u{$_} >= 2;
+            }
+        }
+        my @pre = map { CgOp.sink($_.cgop($body)) }, @$.pre;
+        my @core = $.rxop.code($body);
+        unshift @pre, CgOp.scopedlex('$*GOAL',
+            CgOp.context_get('$*GOAL', 1)) if $body.has_lexical('$*GOAL');
+
+        CgOp.prog(
+            @pre,
+            CgOp.rxinit(CgOp.str($.name),
+                    CgOp.cast('cursor', CgOp.fetch(CgOp.scopedlex('self'))),
+                    +$.passcap, +$.passcut),
+            ($.passcap ?? () !!
+                CgOp.rxpushcapture(CgOp.null('var'), @mcaps)),
+            @core,
+            ($.canback ?? CgOp.rxend !! CgOp.rxfinalend),
+            CgOp.label('backtrack'),
+            CgOp.rxbacktrack,
+            CgOp.null('var'));
+    }
+}
+
 class RxOp::ListPrim is RxOp {
     has Str $.name; # used for LTM cheatery
     has Str $.type;
@@ -50,6 +105,64 @@ class RxOp::ListPrim is RxOp {
 }
 
 augment class NieczaActions {
+method quantified_atom($/) { # :: RxOp
+    my $atom = $<atom>.ast;
+    my $q    = $<quantifier> ?? $<quantifier>.ast !! Any;
+
+    return Nil unless $atom;
+
+    if %*RX<r> {
+        # no quantifier at all?  treat it as :
+        $q //= { mod => '' };
+        # quantifier without explicit :? / :! gets :
+        $q<mod> //= '';
+    }
+
+    if defined $q<min> {
+        my @z = $atom;
+        if $<separator> {
+            if $q<sep>:exists {
+                $/.CURSOR.sorry("Cannot use two separators in one quantified_atom");
+            }
+            for %( $<separator>.ast ) { $q{.key} = .value }
+        }
+        push @z, $q<sep> if defined $q<sep>;
+        # parsing quirk, x #`(1) ** #`(2) y, the 1* position is counted
+        # as $<normspace> but the 2* is parsed by the quantifier
+        if ($q<general> || @z[1]) && %*RX<s> && ($q<space> || $<normspace>) {
+            if @z[1] {
+                @z[1] = ::RxOp::Sequence.new(zyg => [
+                    ::RxOp::Sigspace.new, @z[1], ::RxOp::Sigspace.new]);
+            } else {
+                push @z, ::RxOp::Sigspace.new;
+            }
+        }
+        $atom = ::RxOp::Quantifier.new(min => $q<min>, max => $q<max>,
+            nonlisty => $q<nonlisty>, closure => $q<closure>,
+            opsep => $q<opsep>, zyg => [@z],
+            minimal => ($q<mod> && $q<mod> eq '?'));
+    }
+
+    if defined($q<mod>) && $q<mod> eq '' {
+        $atom = ::RxOp::Cut.new(zyg => [$atom]);
+    }
+
+    if defined $q<tilde> {
+        my ($closer, $inner) = @( $q<tilde> );
+        $closer = $closer.zyg[0] if $closer.^isa(::RxOp::Cut) &&
+            $closer.zyg[0].^isa(::RxOp::String);
+        if !$closer.^isa(::RxOp::String) {
+            $/.CURSOR.sorry("Non-literal closers for ~ NYI");
+            make ::RxOp::None.new;
+            return;
+        }
+        $atom = ::RxOp::Sequence.new(zyg => [$atom,
+            ::RxOp::Tilde.new(closer => $closer.text, dba => %*RX<dba>,
+                zyg => [$inner])]);
+    }
+
+    make $atom;
+}
 method op_for_regex($/, $rxop) {
     my @lift = $rxop.oplift;
     my $ltm = ::GLOBAL::OptRxSimple.run_lad($rxop.lad);

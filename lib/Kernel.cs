@@ -446,7 +446,8 @@ namespace Niecza {
         public void CgSub(SubInfo sub, bool erase) {
             EmitUnit oc = Current;
             if (Config.CGVerbose > 0)
-                Console.WriteLine("generating code for: {0}", sub.name);
+                Console.WriteLine("generating code for: {0} ({1:X})",
+                        sub.name, sub.GetHashCode());
             Current = this;
             try {
                 var n = new NamProcessor(new CpsBuilder(this,

@@ -111,8 +111,10 @@ public sealed class Choice {
     public void Commit() {
         // we aren't going to backtrack here, so we can't use this.
         // help out the GC
-        st.subrule_iter = null;
-        ip = (ip < 0) ? ip : (-ip-1);
+        if (ip > 0 || ip < -10) {
+            st.subrule_iter = null;
+        }
+        ip = (ip < 0) ? ip : (-ip-10);
     }
 
     public Choice(Choice prev, int ip, State st) {
@@ -201,8 +203,13 @@ public sealed class RxFrame: IFreeze {
 
     public Frame Backtrack(Frame th) {
         // throw away cut or mark-only frames
-        while (bt != rootf && (bt.ip < 0))
+        while (bt != rootf && (bt.ip < 0)) {
+            if (bt.ip == -1) {
+                // Special frame that does $*GOAL cleanup ...
+                th.LexicalBind("$*GOAL", (Variable)bt.st.subrule_iter);
+            }
             bt = bt.prev;
+        }
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
         if (bt == rootf) {
@@ -345,6 +352,22 @@ public sealed class RxFrame: IFreeze {
             it.Commit();
             it = it.prev;
         }
+    }
+
+    public void PushGoal(Frame th, string newGoal) {
+        bt = new Choice(bt, -1, st);
+        bt.st.subrule_iter = th.LexicalFind("$*GOAL");
+        th.LexicalBind("$*GOAL", Builtins.MakeStr(newGoal));
+        st.ns = new NState(bt, "GOAL", st.ns);
+        st.ns.quant = st.pos;
+    }
+
+    public void PopGoal(Frame th) {
+        bt = new Choice(bt, -1, st);
+        bt.st.subrule_iter = th.LexicalFind("$*GOAL");
+
+        th.LexicalBind("$*GOAL", (Variable)st.ns.cut_to.st.subrule_iter);
+        st.ns = st.ns.next;
     }
 
     public bool Exact(string str) {
