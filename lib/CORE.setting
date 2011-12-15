@@ -1693,7 +1693,7 @@ my class Range is Cool {
                       :limit($!max), :exclusive($!excludes_max))).iterator
     }
 
-    method Str() { self.perl }
+    method Str() { self.list.Str }
     method perl() {
         ( $.min.perl,
           ('^' if $.excludes_min),
