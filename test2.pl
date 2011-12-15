@@ -12,6 +12,13 @@ is ("a,b,c," ~~ / <alpha>+ %% ','/), 'a,b,c,', '%% works';
 is ("a,b,c" ~~ / <alpha>+ %% ','/), 'a,b,c', '%% works like %';
 is ("a,b,c" ~~ / <alpha>* %% ','/), 'a,b,c', '% works on *';
 is ("XX" ~~ / X <alpha>* %% ',' X/), 'XX', '% works on * (null string)';
+"foo" ~~ / (<.alpha>) <alpha> /;
+is $(), "fo", '$() gets the string';
+ok !$/.ast.defined, '$/.ast not defined without make';
+is @().join("|"), "f", '@() returns positional captures';
+is %().kv.join("|"), "alpha|o", '%() returns named captures';
+"bar" ~~ / { make 5 } /;
+is $(), 5, '$() gets AST';
 
 {
     my class Bt {

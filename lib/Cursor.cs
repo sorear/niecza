@@ -726,10 +726,7 @@ public class Cursor : P6any {
     public string Reduced() { return reduced; }
     public P6any AST() {
         P6any a = (feedback != null) ? feedback.ast : ast;
-        if (a != null)
-            return a;
-        else
-            return Kernel.BoxRaw<string>(GetBacking().Substring(from, pos - from), Kernel.StrMO);
+        return a ?? Kernel.AnyMO.typeObject;
     }
 
     // TODO: cache generated lists

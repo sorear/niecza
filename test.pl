@@ -1532,7 +1532,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
 {
     "foo" ~~ /oo/;
-    is $/.ast, 'oo', '.ast defaults to .Str';
+    ok !$/.ast.defined, '.ast defaults to undefined';
     "foo" ~~ /oo { make 15 }/;
     is $/.ast, 15, 'make can change .ast';
     "foo" ~~ /{make 30} oo/;
