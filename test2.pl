@@ -20,6 +20,9 @@ is %().kv.join("|"), "alpha|o", '%() returns named captures';
 "bar" ~~ / { make 5 } /;
 is $(), 5, '$() gets AST';
 
+my $rx = /a+/;
+is ("ooofaaabkkk" ~~ /f $rx b/), "faaab", '$var can call regexes';
+
 {
     my class Bt {
         has $!pie;

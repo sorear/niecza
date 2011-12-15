@@ -509,6 +509,20 @@ public sealed class RxFrame: IFreeze {
         }
     }
 
+    public Frame scalar_var(Frame th, Variable var) {
+        P6any o = var.Fetch();
+        if (o.Isa(Kernel.RegexMO)) {
+            return o.Invoke(th, new Variable[] { MakeCursorV() }, null);
+        } else {
+            if (Exact(o.mo.mro_raw_Str.Get(var))) {
+                th.resultSlot = MakeCursorV();
+            } else {
+                th.resultSlot = Kernel.NilP.mo.typeVar;
+            }
+            return th;
+        }
+    }
+
     public void PushConjStart() {
         st.ns = new NState(bt, "CSTART", st.ns);
         st.ns.quant = st.pos;
@@ -808,24 +822,17 @@ public class Cursor : P6any {
         int l = backing_ca.Length;
         int p = pos;
 
-        VarDeque ks = new VarDeque();
-
-        P6opaque lst = new P6opaque(Kernel.ListMO);
-        lst.slots[0 /*items*/] = ks;
-        lst.slots[1 /*rest*/ ] = new VarDeque();
-
         if (p != 0 && p != l && CC.Word.Accepts(backing[p]) &&
                 CC.Word.Accepts(backing[p-1])) {
             if (Trace)
                 Console.WriteLine("! no match <ws> at {0}", pos);
+            return Kernel.NilP.mo.typeVar;
         } else {
             while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
             if (Trace)
                 Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
-            ks.Push(Kernel.NewROScalar(At(p)));
+            return Kernel.NewROScalar(At(p));
         }
-
-        return Kernel.NewRWListVar(lst);
     }
 }
 

@@ -2769,6 +2769,14 @@ dynamic:
                         Tokens.RxFrame.GetMethod(FixStr(z[1])), args);
                 return CpsOp.Goto("backtrack", true, call);
             };
+            handlers["rxlprim"] = delegate(NamProcessor th, object[] z) {
+                CpsOp[] args = new CpsOp[z.Length - 1];
+                for(int i = 0; i < z.Length - 2; i++)
+                    args[i+1] = th.Scan(z[i+2]);
+                args[0] = CpsOp.RxFrame();
+                return CpsOp.CpsCall(Tokens.Variable,
+                        Tokens.RxFrame.GetMethod(FixStr(z[1])), args);
+            };
             handlers["const"] = delegate(NamProcessor th, object[] z) {
                 object[] ch = z[1] as object[];
                 string chh = JScalar.S(ch[0]);

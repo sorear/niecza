@@ -18,7 +18,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 ( 933) Don't know how fail is supposed to work there
 ( 978) No negative quantifiers
 (1057) No special handling of zero-width matches DISCUSS
-(1124) 'Regex' scalar values not called (ticket #77)
 (1172) No auto-declared temporary variables $x = <.ident>
 (1178) No bindings to existing variables
 (1186) No interpolation of arrays or || @array DISCUSS PARSE

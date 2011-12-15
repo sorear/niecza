@@ -25,7 +25,68 @@ use STD;
 # }
 # }
 
+# RxOp::VarString.param NO LONGER USED
+
+class RxOp::ListPrim is RxOp {
+    has Str $.name; # used for LTM cheatery
+    has Str $.type;
+    has $.ops = die "RxOp::Variable.ops required"; # Op
+
+    method ctxopzyg() { $!ops, 1 }
+    method opzyg() { $!ops }
+
+    method code($body) {
+        my $bt = self.label;
+
+        my @code;
+        push @code, CgOp.rxcall("InitCursorList",
+            CgOp.rxlprim($!type, $!ops.cgop($body)));
+        push @code, CgOp.label($bt);
+        push @code, CgOp.rxincorpshift([], 0, $bt);
+        @code;
+    }
+
+    method lad() { $!type eq 'scalar_var' ?? ['Param', $!param] !! ['Imp'] }
+}
+
 augment class NieczaActions {
+method metachar:var ($/) {
+    sub _isnum { $_ ~~ /^\d+$/ }
+    if $<binding> {
+        my $a = $<binding><quantified_atom>.ast.uncut;
+        my $cid = $<variable>.ast.<capid>;
+
+        if !defined $cid {
+            $/.CURSOR.sorry("Non-Match bindings NYI");
+            make ::RxOp::Sequence.new;
+            return Nil;
+        }
+
+        if $a.^isa(::RxOp::VoidBlock) {
+            make ::RxOp::SaveValue.new(capid => $cid, block => $a.block);
+            return Nil;
+        }
+
+        if _isnum($cid) {
+            %*RX<paren> = $cid + 1;
+        }
+
+        make self.rxcapturize($/, $cid, $a);
+        return;
+    }
+
+    my $kind = 'scalar_var';
+    given substr($<variable>,0,1) {
+        when '$' { $kind = 'scalar_var'; }
+        when '@' { $kind = 'list_var'; }
+        default  {
+            $/.CURSOR.sorry('Only $ and @ variables may be used in regexes for now');
+        }
+    }
+    make ::RxOp::ListPrim.new(name => ~$<variable>, type => $kind,
+        ops => self.rxembed($/,
+            self.do_variable_reference($/, $<variable>.ast), True));
+}
 method circumfix:sigil ($/) {
     # XXX duplicates logic in variable
     if $<semilist>.ast.elems == 0 {
@@ -126,6 +187,7 @@ augment class RxOp::Quantifier {
 }
 
 CgOp._register_ops: < who sc_root sc_indir temporize _addmethod _invalidate
+    rxlprim
 >;
 
 my $usage = q:to/EOM/;
