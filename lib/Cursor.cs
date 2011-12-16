@@ -521,10 +521,17 @@ public sealed class RxFrame: IFreeze {
         }
     }
 
-    public Frame scalar_var(Frame th, Variable var) {
+    public Frame scalar_var(Frame th, Variable var) { return scalar_common(false, th, var); }
+    public Frame scalar_asn(Frame th, Variable var) { return scalar_common(true, th, var); }
+
+    Frame scalar_common(bool eval, Frame th, Variable var) {
         P6any o = var.Fetch();
         if (o.Isa(Kernel.RegexMO)) {
             return o.Invoke(th, new Variable[] { MakeCursorV() }, null);
+        } else if (eval) {
+            P6any rx = Builtins.compile_bind_regex(th,
+                    o.mo.mro_raw_Str.Get(var));
+            return rx.Invoke(th, new Variable[] { MakeCursorV() }, null);
         } else {
             if (Exact(o.mo.mro_raw_Str.Get(var))) {
                 th.resultSlot = MakeCursorV();
@@ -535,7 +542,9 @@ public sealed class RxFrame: IFreeze {
         }
     }
 
-    public Frame list_var(Frame th, Variable var) {
+    public Frame list_var(Frame th, Variable var) { return list_common(false, th, var); }
+    public Frame list_asn(Frame th, Variable var) { return list_common(true, th, var); }
+    public Frame list_common(bool eval, Frame th, Variable var) {
         VarDeque iter = Builtins.start_iter(var);
         List<object> toks = new List<object>();
         List<LAD> lads = new List<LAD>();
@@ -547,14 +556,20 @@ public sealed class RxFrame: IFreeze {
             Variable svar = iter.Shift();
             P6any sobj = svar.Fetch();
 
+retry:
             if (sobj.Isa(Kernel.RegexMO)) {
                 toks.Add(sobj);
 
                 pad.outer_stack.Add((Frame)sobj.GetSlot("outer"));
                 pad.info_stack.Add((SubInfo)sobj.GetSlot("info"));
                 lads.Add(pad.info_stack[0].ltm.Reify(pad));
-                pad.outer_stack.Clear();;
+                pad.outer_stack.Clear();
                 pad.info_stack.Clear();
+            } else if (eval) {
+                sobj = Builtins.compile_bind_regex(th,
+                        sobj.mo.mro_raw_Str.Get(svar));
+                svar = Kernel.NewROScalar(sobj);
+                goto retry;
             } else {
                 string str = sobj.mo.mro_raw_Str.Get(svar);
                 toks.Add(str);

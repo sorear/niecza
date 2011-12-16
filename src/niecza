@@ -123,6 +123,27 @@ class RxOp::ListPrim is RxOp {
 }
 
 augment class NieczaActions {
+method assertion:variable ($/) {
+    given substr($/,0,1) {
+        when '&' {
+            make ::RxOp::Subrule.new(|node($/), regex =>
+                ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
+                    positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+        }
+        when '$' {
+            make ::RxOp::ListPrim.new(type => 'scalar_asn',
+                ops => self.rxembed($/, $<variable>.ast, True));
+        }
+        when '@' {
+            make ::RxOp::ListPrim.new(type => 'list_asn',
+                ops => self.rxembed($/, $<variable>.ast, True));
+        }
+        default {
+            make ::RxOp::None.new;
+            $/.CURSOR.sorry("Sigil $_ is not allowed for regex assertions");
+        }
+    }
+}
 method rxcapturize($M, $name, $rxop is copy) { #OK not used
     if !$rxop.^isa(::RxOp::Capturing) {
         # $<foo>=[...]

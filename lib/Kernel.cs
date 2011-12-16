@@ -1418,6 +1418,9 @@ namespace Niecza {
         public List<SubInfo> children = new List<SubInfo>();
         public Dictionary<string,object[]> extend;
 
+        // not saved, rarely used
+        internal Dictionary<string,SubInfo> rx_compile_cache;
+
         // No instance fields past this point
         public class UsedInScopeInfo {
             public string file;

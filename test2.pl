@@ -30,6 +30,16 @@ is $(), 5, '$() gets AST';
 
     my @a2 = ( /fooo/, /fo+/ );
     is ("fooooooo" ~~ / @a2 /), "fooooooo", '@var has longest-token semantics with regex elements';
+
+    my $rxstr = 'a+';
+    is ("ooofaaabkkk" ~~ /f <$rx> b/), "faaab", '<$var> can call regexes';
+    is ("ooofaaabkkk" ~~ /f <$rxstr> b/), "faaab", '<$var> can compile regexes';
+
+    is ("fooooooo" ~~ / <@a2> /), "fooooooo", '<@var> has longest-token semantics with regex elements';
+
+    my @a3 = ( 'bar?', 'fooo', 'fo+' );
+    is ("barx" ~~ / <@a3> /), "bar", '<@var> works (compiling)';
+    is ("fooooooo" ~~ / <@a3> /), 'fooooooo', '<@var> has longest-token semantics (compiling)';
 }
 
 {

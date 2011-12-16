@@ -1761,6 +1761,29 @@ flat_enough:;
         return sub.Invoke(th, Variable.None, null);
     }
 
+    internal static P6any compile_bind_regex(Frame th, string code) {
+        if (th.info.rx_compile_cache == null)
+            th.info.rx_compile_cache = new Dictionary<string, SubInfo>();
+        SubInfo main;
+        // TODO: it would be better if the compiler could be modified to
+        // compile a regex directly as the mainline
+        if (!th.info.rx_compile_cache.TryGetValue(code, out main)) {
+            if (upcall_receiver == null)
+                throw new NieczaException("Cannot eval; no compiler available");
+            object r = UpCall(new object[] { "eval",
+                    "regex {" + code + "}",
+                    new Niecza.CLRBackend.Handle(th.info)
+                    });
+            if (r is Exception)
+                throw new NieczaException(((Exception)r).Message);
+            main = ((RuntimeUnit)Niecza.CLRBackend.Handle.Unbox(r)).mainline;
+            th.info.rx_compile_cache[code] = main;
+        }
+        P6any sub = Kernel.MakeSub(main, th);
+        return Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
+            Variable.None, null)).Fetch();
+    }
+
     public static Variable pair(Variable key, Variable value) {
         P6any l = new P6opaque(Kernel.PairMO);
         l.SetSlot("key", key);
