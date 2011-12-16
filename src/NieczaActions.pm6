@@ -362,23 +362,16 @@ method quote:m  ($/) {
                 self.extract_rx_adverbs(True, False, $<quibble>) ]);
 }
 
-method encapsulate_regex($/, $rxop, :$goal, :$passcut = False,
-        :$passcap = False) {
+method encapsulate_regex($/, $rxop, :$passcut = False) {
     my @lift = $rxop.oplift;
     my $lad = $rxop.lad;
     my ($nrxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
-    if defined $goal {
-        unshift @lift, ::Op::LexicalBind.new(|node($/), :name<$*GOAL>,
-            rhs => ::Op::StringLiteral.new(text => $goal));
-    }
     my $subop = self.thunk_sub(
-        ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut, :$passcap,
+        ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut,
             rxop => $nrxop), ltm => $lad, class => 'Regex', params => ['self']);
-    $/.CURSOR.trymop({ $subop.add_my_name('$*GOAL') if defined($goal); });
     $subop = ::Op::CallSub.new(|node($/), invocant => self.block_expr($/, $subop),
         positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
-    ::RxOp::Subrule.new(regex => $subop, :$passcap, _passcapzyg => $nrxop,
-        _passcapltm => $lad);
+    ::RxOp::Subrule.new(regex => $subop, ltm => $lad);
 }
 
 method regex_block($/) {

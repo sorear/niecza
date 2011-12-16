@@ -711,7 +711,6 @@ class LetVar is Op {
 class RegexBody is Op {
     has $.rxop = die "RegexBody.rxop required"; # RxOp
     has $.name = '';
-    has $.passcap = False;
     has $.passcut = False;
     has $.pre = []; # Array of Op
     has $.canback = True;
@@ -722,11 +721,9 @@ class RegexBody is Op {
     method code($body) {
         my @mcaps;
         my $*in_quant = False;
-        if !$.passcap {
-            my $u = $.rxop.used_caps;
-            for keys $u {
-                push @mcaps, $_ if $u{$_} >= 2;
-            }
+        my $u = $.rxop.used_caps;
+        for keys $u {
+            push @mcaps, $_ if $u{$_} >= 2;
         }
         my @pre = map { CgOp.sink($_.cgop($body)) }, @$.pre;
 
@@ -734,9 +731,8 @@ class RegexBody is Op {
             @pre,
             CgOp.rxinit(CgOp.str($.name),
                     CgOp.cast('cursor', CgOp.fetch(CgOp.scopedlex('self'))),
-                    +$.passcap, +$.passcut),
-            ($.passcap ?? () !!
-                CgOp.rxpushcapture(CgOp.null('var'), @mcaps)),
+                    +$.passcut),
+            CgOp.rxpushcapture(CgOp.null('var'), @mcaps),
             $.rxop.code($body),
             ($.canback ?? CgOp.rxend !! CgOp.rxfinalend),
             CgOp.label('backtrack'),

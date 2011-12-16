@@ -410,19 +410,15 @@ class Tilde is RxOp {
 class Subrule is Capturing {
     has $.method; # Str
     has $.regex; # Op
-    has $.passcap = False; # Bool
-    has $._passcapzyg; # RxOp, is rw
-    has $._passcapltm; # is rw
+    has $.ltm;
     has $.selfcut = False; # Bool
     has $.zerowidth; # Bool
     has $.negative; # Bool
 
     method clone(*%_) {
-        self.WHAT.new(method => $!method, regex => $!regex,
-            passcap => $!passcap, _passcapltm => $!_passcapltm,
-            _passcapzyg => $!_passcapzyg, selfcut => $!selfcut,
-            zerowidth => $!zerowidth, negative => $!negative,
-            captures => $.captures, |%_);
+        self.WHAT.new(method => $!method, regex => $!regex, ltm => $!ltm,
+            selfcut => $!selfcut, zerowidth => $!zerowidth,
+            negative => $!negative, captures => $.captures, |%_);
     }
 
     method ctxopzyg() { defined($!regex) ?? ($!regex, 1) !! () }
@@ -430,10 +426,6 @@ class Subrule is Capturing {
 
     method used_caps() {
         my %h = map { ($_ => $*in_quant ?? 2 !! 1) }, @$.captures;
-        if $!passcap {
-            my $h2 = $!_passcapzyg.used_caps;
-            for keys $h2 { %h{$_} = (%h{$_} // 0) + $h2{$_} }
-        }
         %h
     }
 
@@ -446,22 +438,20 @@ class Subrule is Capturing {
 
         if $!selfcut {
             push @code, CgOp.rxincorpcut($.captures, +?$!zerowidth,
-                +?$!negative, +?$!passcap, $callf);
+                +?$!negative, $callf);
         } else {
             my $bt = self.label;
 
             push @code, CgOp.rxcall("InitCursorList", $callf);
             push @code, CgOp.label($bt);
-            push @code, CgOp.rxincorpshift($.captures, +?$!passcap, $bt);
+            push @code, CgOp.rxincorpshift($.captures, $bt);
         }
 
         @code;
     }
 
     method lad() {
-        defined($!method) ?? [ 'Method', $!method ] !!
-            $!_passcapzyg ?? ($!_passcapltm // die "passcapltm missing") !!
-            [ 'Imp' ];
+        $!ltm // (defined($!method) ?? [ 'Method', $!method ] !! [ 'Imp' ]);
     }
 }
 

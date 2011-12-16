@@ -57,7 +57,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (2895) Undefined: caps, chunks, prematch, postmatch
 (2910) No concept of cursor directionality
 (3144) Missing captures don't produce Nil
-(3549) Implementation of $<foo>=[] is horrible and wrong
 (3718) $0=<.alpha>+ is processed backwards; $0=[<.alpha>]+ is fine
 (3750) No array aliasing
 (3923) No hash aliasing

@@ -182,7 +182,7 @@ public sealed class RxFrame: IFreeze {
     // don't remove this on backtracking, and quit if we would back into it
     public readonly Choice rootf;
 
-    public RxFrame(string name, Cursor csr, bool passcap, bool passcut) {
+    public RxFrame(string name, Cursor csr, bool passcut) {
         global = csr.global;
         orig = global.orig_a;
         end = orig.Length;
@@ -190,8 +190,6 @@ public sealed class RxFrame: IFreeze {
         this.name = name;
         st.ns = passcut ? csr.nstate :
             new NState(rootf, name, csr.nstate);
-        if (passcap)
-            st.captures = csr.captures;
         if (Cursor.Trace) {
             Console.WriteLine("Entering subrule {0} at {1}/{2}", name, csr.pos,
                     end);
@@ -264,15 +262,11 @@ public sealed class RxFrame: IFreeze {
         return (VarDeque)st.subrule_iter;
     }
 
-    public void SetCapturesFrom(Cursor inp) {
-        st.captures = inp.captures;
-    }
-
     public void SetPos(int pos) {
         st.pos = pos;
     }
 
-    public void IncorporateChild(string[] names, bool passcap, P6any match) {
+    public void IncorporateChild(string[] names, P6any match) {
         Cursor child = match as Cursor;
 
         if (child == null)
@@ -282,18 +276,13 @@ public sealed class RxFrame: IFreeze {
                     "violating the submatch protocol.");
 
         SetPos(child.pos);
-        if (passcap)
-            SetCapturesFrom(child);
 
-        if (names != null) {
-            if (passcap) child = child.StripCaps();
+        if (names != null)
             PushCapture(names, Kernel.NewROScalar(child));
-        }
     }
 
     public const int IC_ZERO_WIDTH = 1;
     public const int IC_NEGATIVE = 2;
-    public const int IC_PASS_CAP = 4;
 
     public bool IncorpCut(string[] names, int mode, Variable list) {
         Variable match_v = Kernel.GetFirst(list);
@@ -301,15 +290,15 @@ public sealed class RxFrame: IFreeze {
         if (match.IsDefined() == ((mode & IC_NEGATIVE) != 0))
             return false;
         if ((mode & IC_ZERO_WIDTH) == 0)
-            IncorporateChild(names, (mode & IC_PASS_CAP) != 0, match);
+            IncorporateChild(names, match);
         return true;
     }
 
-    public bool IncorpShift(string[] names, bool pass_cap, int label) {
+    public bool IncorpShift(string[] names, int label) {
         if (!Kernel.IterHasFlat(GetCursorIter(), true))
             return false;
         PushBacktrack(label);
-        IncorporateChild(names, pass_cap, GetCursorIter().Shift().Fetch());
+        IncorporateChild(names, GetCursorIter().Shift().Fetch());
         SetCursorList(null);
         return true;
     }
@@ -595,7 +584,7 @@ public sealed class RxFrame: IFreeze {
             case 1:
                 return th.rx.Backtrack(th);
             case 0:
-                th.rx = new RxFrame("ArrayHelper", (Cursor) th.lex0, false, false);
+                th.rx = new RxFrame("ArrayHelper", (Cursor) th.lex0, false);
                 th.lexi0 = 0;
                 goto case 2;
             case 2:
@@ -2006,7 +1995,7 @@ anew:
             case 1:
                 return th.rx.Backtrack(th);
             case 0:
-                th.rx = new RxFrame(th.info.name, (Cursor) ((Variable)th.lex0).Fetch(), false, false);
+                th.rx = new RxFrame(th.info.name, (Cursor) ((Variable)th.lex0).Fetch(), false);
                 th.rx.PushCutGroup("LTM");
                 th.lex1 = RunDispatch(th, ((Variable)th.lex0).Fetch());
                 th.lexi0 = 0;

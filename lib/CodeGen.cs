@@ -314,7 +314,7 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo DMO_ctor =
             STable.GetConstructor(new Type[] { String });
         public static readonly ConstructorInfo RxFrame_ctor =
-            RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean, Boolean });
+            RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean });
         public static readonly ConstructorInfo SV_ctor =
             typeof(SimpleVariable).GetConstructor(new Type[] {
                     Boolean, Boolean, STable, typeof(ViviHook), P6any });
@@ -2745,9 +2745,8 @@ dynamic:
 
                 return CpsOp.Goto("backtrack", true,
                     CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpShift"),
-                        CpsOp.RxFrame(),
-                        strs, CpsOp.BoolLiteral(JScalar.B(z[2])),
-                        CpsOp.LabelId(th.cpb.cx, JScalar.S(z[3]))));
+                        CpsOp.RxFrame(), strs,
+                        CpsOp.LabelId(th.cpb.cx, JScalar.S(z[2]))));
             };
             handlers["rxincorpcut"] = delegate(NamProcessor th, object[] z) {
                 CpsOp strs = th.cpb.eu.StringListConst(JScalar.SA(0,z[1]));
@@ -2756,9 +2755,8 @@ dynamic:
                     CpsOp.MethodCall(Tokens.RxFrame.GetMethod("IncorpCut"),
                         CpsOp.RxFrame(), strs, CpsOp.IntLiteral(
                             JScalar.I(z[2]) * RxFrame.IC_ZERO_WIDTH +
-                            JScalar.I(z[3]) * RxFrame.IC_NEGATIVE +
-                            JScalar.I(z[4]) * RxFrame.IC_PASS_CAP),
-                        th.Scan(z[5])));
+                            JScalar.I(z[3]) * RxFrame.IC_NEGATIVE),
+                        th.Scan(z[4])));
             };
             handlers["rxbprim"] = delegate(NamProcessor th, object[] z) {
                 CpsOp[] args = new CpsOp[z.Length - 1];
@@ -2962,8 +2960,7 @@ dynamic:
                 return CpsOp.SetField(Tokens.Frame_rx, CpsOp.CallFrame(),
                     CpsOp.ConstructorCall(Tokens.RxFrame_ctor,
                         th.Scan(z[1]), th.Scan(z[2]),
-                        CpsOp.BoolLiteral(FixBool(z[3])),
-                        CpsOp.BoolLiteral(FixBool(z[4])))); };
+                        CpsOp.BoolLiteral(FixBool(z[3])))); };
             handlers["rxpushb"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.RxFrame_PushBacktrack,
                     CpsOp.RxFrame(),
