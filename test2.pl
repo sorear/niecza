@@ -53,6 +53,10 @@ is $(), 5, '$() gets AST';
         my regex alpha { . }
         is ("4e" ~~ /<.alpha>/), "e", "leading dot forces method interpretation";
     }
+
+    my regex two($x) { $x $x }
+    is ("xfoofoox" ~~ /<two("foo")>/), "foofoo", "calling lexical regexes like <two> with args works";
+    is ("xfoofoox" ~~ /<&two("foo")>/), "foofoo", "calling lexical regexes like <&two> with args works";
 }
 
 {

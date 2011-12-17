@@ -227,9 +227,17 @@ method assertion:name ($/) {
 method assertion:variable ($/) {
     given substr($/,0,1) {
         when '&' {
-            make ::RxOp::Subrule.new(|node($/), regex =>
-                ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
-                    positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+            if $<variable>.ast ~~ ::Op::CallSub {
+                make ::RxOp::Subrule.new(|node($/), regex =>
+                    ::Op::CallSub.new(|node($/),
+                        invocant => $<variable>.ast.invocant,
+                        args => [ ::Op::MakeCursor.new(|node($/)),
+                            @( $<variable>.ast.args ) ]));
+            } else {
+                make ::RxOp::Subrule.new(|node($/), regex =>
+                    ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
+                        positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+            }
         }
         when '$' {
             make ::RxOp::ListPrim.new(type => 'scalar_asn',
