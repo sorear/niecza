@@ -15,16 +15,15 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 ( 535) No :rw
 ( 768) No internal smartmatches
 ( 924) $/ is a Cursor inside closures
-( 933) Don't know how fail is supposed to work there
-( 978) No negative quantifiers
+( 933) Don't know how fail is supposed to work there DISCUSS
+( 978) No negative quantifiers DUBIOUS
 (1057) No special handling of zero-width matches DISCUSS
 (1172) No auto-declared temporary variables $x = <.ident>
 (1178) No bindings to existing variables
-(1186) No || @array temporal-alternation syntax DISCUSS PARSE
+(1186) No || @array temporal-alternation syntax DISCUSS
 (1253) No handling of formal parameters in LTM
 (1258) No {*} and funky proto handling in general
 (1276) Declarativeness of constants is insufficiently general
-(1388) <foo> never uses a lexical regex
 (1461) Arguments in <&foo(2)> not handled; STD parses EXPR but only this legal
 (1507) No support for indirect <::($name)> calls
        Also, nice fossil.
@@ -43,15 +42,15 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (2342) ::> is defined in terms of brackets, not temporal alternation
 (2380) No <commit> or <cut>
 (2460) $foo ~~ rule { } does not automatically dual-anchor (DISCUSS)
-(2501) No <prior> (probable fossil) DISCUSS
+(2501) No <prior> (probable fossil) DUBIOUS
 (2738) No success value; failed matches return Match
 (2818) In list context, $match[0] will return $match if $match[0] does not
        otherwise exist; useful for improving DWIM ness of lists
 (2851) @<foo> does not seem to work
 (2868) No .values or .kv, .keys ignores numeric captures
 (2895) Undefined: caps, chunks, prematch, postmatch
-(2910) No concept of cursor directionality
-(3144) Missing captures don't produce Nil
+(2910) No concept of cursor directionality DUBIOUS
+(3144) Missing captures don't produce Nil DISCUSS
 (3718) $0=<.alpha>+ is processed backwards; $0=[<.alpha>]+ is fine
 (3750) No array aliasing
 (3923) No hash aliasing

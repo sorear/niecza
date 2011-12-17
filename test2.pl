@@ -42,6 +42,17 @@ is $(), 5, '$() gets AST';
     is ("fooooooo" ~~ / <@a3> /), 'fooooooo', '<@var> has longest-token semantics (compiling)';
 
     is ("foo" ~~ /<."alpha"()>/), "f", "dottyop assertions work";
+
+    my regex sam { \d+ }
+    is ("fo23op" ~~ /<sam>/), "23", "lexical regexes can be used without &";
+    {
+        sub alpha() { }
+        is ("xyz" ~~ /<alpha>/), "x", "non-regex subs do not confuse";
+    }
+    {
+        my regex alpha { . }
+        is ("4e" ~~ /<.alpha>/), "e", "leading dot forces method interpretation";
+    }
 }
 
 {

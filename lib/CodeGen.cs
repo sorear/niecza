@@ -3910,6 +3910,9 @@ dynamic:
             } else if (cmd == "sub_is_routine") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 return s.mo.HasMRO(Kernel.RoutineMO);
+            } else if (cmd == "sub_is_regex") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                return s.mo.HasMRO(Kernel.RegexMO);
             } else if (cmd == "sub_has_lexical") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 return s.dylex.ContainsKey((string)args[2]);
