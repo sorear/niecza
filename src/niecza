@@ -63,11 +63,6 @@ method metachar:sym<{*}> ($/) {
     make ::RxOp::ProtoRedis.new(name => '', :!cutltm);
     return;
 }
-method metachar:sym<[*]> ($/) {
-    $/.CURSOR.sorry("This syntax is not specced.");
-    make ::RxOp::None.new;
-    return;
-}
 
 method is_dispatcher($blockoid) {
     $blockoid.Str ~~ m/ '{' \s* '*' \s* '}' /;
@@ -246,6 +241,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 }
 }
 
+# remove run_dispatch
 CgOp._register_ops: < who sc_root sc_indir temporize _addmethod _invalidate
     rxlprim
 >;

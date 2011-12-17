@@ -4777,7 +4777,6 @@ grammar Regex is STD {
     }
 
     token metachar:sym<{*}> { <onlystar=.sym> <?{ $*MULTINESS eq 'proto' }> }
-    token metachar:sym<[*]> { <onlystar=.sym> <?{ $*MULTINESS eq 'proto' }> }
     token metachar:quant { <quantifier> <.sorry: "Quantifier quantifies nothing"> }
 
     # "normal" metachars
