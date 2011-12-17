@@ -29,7 +29,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1461) Arguments in <&foo(2)> not handled; STD parses EXPR but only this legal
 (1507) No support for indirect <::($name)> calls
        Also, nice fossil.
-(1533) <{ }> has wrong semantics
 (1565) Code assertions not always considered declarative
 (1585) <[ z..a ]> not treated as compile error DISCUSS
 (1634) No Unicode properties

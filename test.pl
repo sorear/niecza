@@ -1186,8 +1186,8 @@ is { :a(1) }.<a>, 1, "hash constructors work w/ colons";
 is { a => 1, b => 2 }.<b>, 2, "hash constructors work w/ lists";
 ok { } ~~ Hash, "hash constructors work w/ nothing";
 
-ok !('xy' ~~ /x <{ False }> y/), '<{False}> blocks a match';
-ok 'xy' ~~ /x <{ True }> y/, '<{True}> does not affect it';
+ok !('xy' ~~ /x <?{ False }> y/), '<{False}> blocks a match';
+ok 'xy' ~~ /x <?{ True }> y/, '<{True}> does not affect it';
 ok (1 < 3 > 2), "CHAIN works with dissimilar ops";
 
 {

@@ -519,14 +519,16 @@ class Alt is AltBase {
 
 class CheckBlock is RxOp {
     has $.block = die "CheckBlock.block required"; # Op
+    has Bool $.negate;
     method ctxopzyg() { $!block, 1 }
     method opzyg() { $!block }
 
     method code($body) {
-        CgOp.ncgoto('backtrack', CgOp.obj_getbool($!block.cgop($body)));
+        my $m = $!negate ?? "cgoto" !! "ncgoto";
+        CgOp."$m"('backtrack', CgOp.obj_getbool($!block.cgop($body)));
     }
 
-    method lad() { ['Imp'] }
+    method lad() { ['Null'] }
 }
 
 class SaveValue is RxOp {

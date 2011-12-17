@@ -123,6 +123,36 @@ class RxOp::ListPrim is RxOp {
 }
 
 augment class NieczaActions {
+method assertion:sym<{ }> ($/) {
+    $/.CURSOR.trymop({
+        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
+        $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
+    });
+
+    make ::RxOp::ListPrim.new(type => 'scalar_asn', ops => self.inliney_call($/,
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
+}
+
+method assertion:sym<?> ($/) {
+    if $<assertion> {
+        make $<assertion>.reduced eq 'assertion:sym<{ }>' ??
+            ::RxOp::CheckBlock.new(block => $<assertion>.ast.ops, :!negate) !!
+            ::RxOp::Before.new(zyg => [self.decapturize($/)]);
+    } else {
+        make ::RxOp::Sequence.new;
+    }
+}
+
+method assertion:sym<!> ($/) {
+    if $<assertion> {
+        make $<assertion>.reduced eq 'assertion:sym<{ }>' ??
+            ::RxOp::CheckBlock.new(block => $<assertion>.ast.ops, :negate) !!
+            ::RxOp::NotBefore.new(zyg => [self.decapturize($/)]);
+    } else {
+        make ::RxOp::None.new;
+    }
+}
+
 method assertion:variable ($/) {
     given substr($/,0,1) {
         when '&' {
