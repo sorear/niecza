@@ -34,7 +34,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1744) No <*...>
 (1804) No <~~> DISCUSS
 (1843) No <|g> etc
-(1857) No <( or )>
 (1893) Missing predefined rules include upper, lower, digit, xdigit, print,
        graph, cntrl, punct, alnum, wb, ww, space, blank
 (2246) regex :ratchet syntax doesn't work

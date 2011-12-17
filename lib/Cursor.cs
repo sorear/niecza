@@ -163,7 +163,11 @@ public sealed class RxFrame: IFreeze {
 
     // when this is set, one value has already been given, so we don't need
     // any more Lists
-    public bool return_one;
+    public const int RETURN_ONE = 1;
+    // <( and )> have been used; MakeMatch needs to search for the end
+    // tokens
+    public const int USED_ENDS = 2;
+    public byte flags;
 
     // .from in matches
     public int from;
@@ -211,7 +215,7 @@ public sealed class RxFrame: IFreeze {
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
         if (bt == rootf) {
-            if (return_one) {
+            if ((flags & RETURN_ONE) != 0) {
                 if (Cursor.Trace)
                     Console.WriteLine("Failing {0}@{1} after no matches",
                             name, from);
@@ -243,6 +247,7 @@ public sealed class RxFrame: IFreeze {
     }
 
     public void PushCapture(string[] cn, Variable cl) {
+        if (cn.Length == 0) return;
         st.captures = new CapInfo(st.captures, cn, cl);
     }
 
@@ -264,6 +269,13 @@ public sealed class RxFrame: IFreeze {
 
     public void SetPos(int pos) {
         st.pos = pos;
+    }
+
+    // This is not the most efficient way, but it avoids adding another
+    // field to the backtrack state.
+    public void SetEndpoint(string which) {
+        flags |= USED_ENDS;
+        PushCapture(new string[] { null, which }, Builtins.MakeInt(st.pos));
     }
 
     public void IncorporateChild(string[] names, P6any match) {
@@ -701,10 +713,20 @@ retry:
 
     Cursor _matchObj;
     public Frame MakeMatch(Frame th) {
+        int use_from = from;
+        int use_to = st.pos;
+        if ((flags & USED_ENDS) != 0) {
+            for (CapInfo c = st.captures; c != null; c = c.prev) {
+                if (c.names[0] == null && c.names[1] == "from")
+                    use_from = Kernel.UnboxAny<int>(c.cap.Fetch());
+                if (c.names[0] == null && c.names[1] == "to")
+                    use_to = Kernel.UnboxAny<int>(c.cap.Fetch());
+            }
+        }
         if (Cursor.Trace)
-            Console.WriteLine("Matching {0} from {1} to {2}",
-                    name, from, st.pos);
-        _matchObj = new Cursor(global, st.ns.klass, from, st.pos,
+            Console.WriteLine("Matching {0} from {1} to {2} (really {3}-{4})",
+                    name, use_from, use_to, from, st.pos);
+        _matchObj = new Cursor(global, st.ns.klass, use_from, use_to,
                 st.captures, ast, name);
         return global.CallAction(th, name, _matchObj);
     }
@@ -725,11 +747,11 @@ retry:
     public Frame EndWith(Frame th, Cursor m) {
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
-        if (return_one) {
+        if ((flags & RETURN_ONE) != 0) {
             return Kernel.Take(th, Kernel.NewROScalar(m));
         } else {
             th.MarkSharedChain();
-            return_one = true;
+            flags |= RETURN_ONE;
             VarDeque ks = new VarDeque();
             ks.Push(Kernel.NewROScalar(m));
             th.coro_return = th;
@@ -867,14 +889,15 @@ public class Cursor : P6any {
         CapInfo it = captures;
         VarDeque caps = new VarDeque();
 
-        while (it != null) {
+        for (; it != null; it = it.prev) {
+            if (it.names[0] == null)
+                continue; // special node
             foreach (string cn in it.names) {
                 if (cn == str) {
                     caps.Unshift(it.cap);
                     break;
                 }
             }
-            it = it.prev;
         }
 
         if (str == "0" && caps.Count() == 0)
@@ -889,7 +912,9 @@ public class Cursor : P6any {
         Dictionary<string,VarDeque> namr = new Dictionary<string,VarDeque>();
         CapInfo it = captures;
 
-        while (it != null) {
+        for (; it != null; it = it.prev) {
+            if (it.names[0] == null)
+                continue; // special node
             foreach (string name in it.names) {
                 int nami;
                 VarDeque t;
@@ -902,7 +927,6 @@ public class Cursor : P6any {
                 }
                 t.Unshift(it.cap);
             }
-            it = it.prev;
         }
 
         if (posr[0].Count() == 0)

@@ -77,6 +77,26 @@ is $(), 5, '$() gets AST';
 }
 
 {
+    is ("fffoxxx" ~~ / f <( . )> x /), "o", '<( )> works basically';
+    is $/.from, 3, '$/.from set correctly';
+    is $/.to, 4, '$/.to set correctly';
+
+    my $var = 'one $16 two $9 three';
+    $var ~~ s:g[\$ <( \d+ )>] *= 2;
+    is $var, 'one $32 two $18 three', 's:g <( example from S05';
+
+    # because of anchoring behavior, leading context behaves differently
+    is "abcdef".comb(/<(.)>../).join('|'), 'a|b|c|d',
+        '.comb with overlapping context regions';
+    $var = 'abcdef';
+    $var ~~ s:g[<(.)>....] = $/.uc;
+    is $var, 'ABcdef', 's:g with overlapping context';
+
+    is ("foo" ~~ / f <( .. /), "oo", '<( does not need to be paired';
+    is ("foo" ~~ / f )> .. /), "f",  ')> does not need to be paired';
+}
+
+{
     my class Bt {
         has $!pie;
         method get_pie() { $!pie }

@@ -39,7 +39,20 @@ augment class RxOp::ProtoRedis {
     }
 }
 
+class RxOp::Endpoint is RxOp {
+    has Str $.type = die "Endpoint.type required";
+
+    method code($) { CgOp.rxcall('SetEndpoint', CgOp.str($!type)); }
+    method lad() { [ 'Null' ] }
+}
+
 augment class NieczaActions {
+method metachar:sym« <( » ($/) {
+    make ::RxOp::Endpoint.new(|node($/), :type<from>)
+}
+method metachar:sym« )> » ($/) {
+    make ::RxOp::Endpoint.new(|node($/), :type<to>)
+}
 method regex_def($/) {
     my $ast = $<regex_block>.ast;
 
