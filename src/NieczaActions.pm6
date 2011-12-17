@@ -341,10 +341,11 @@ method rxembed($/, $op, $) {
 
 method op_for_regex($/, $rxop) {
     my @lift = $rxop.oplift;
+    my $ltm = ::GLOBAL::OptRxSimple.run_lad($rxop.lad);
     my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
     my $sub = self.thunk_sub(::Op::RegexBody.new(|node($/),
             canback => $mb, pre => @lift, rxop => $orxop),
-        class => 'Regex', params => ['self']);
+        class => 'Regex', params => ['self'], :$ltm);
     $sub.add_my_name('$/');
     self.block_expr($/, $sub);
 }
@@ -502,10 +503,8 @@ method quantified_atom($/) { # :: RxOp
         if !$closer.^isa(::RxOp::String) {
             $/.CURSOR.sorry("Non-literal closers for ~ NYI");
             make ::RxOp::None.new;
-            return Nil;
+            return;
         }
-        $inner = self.encapsulate_regex($/, $inner, passcut => True,
-            goal => $closer.text, passcap => True);
         $atom = ::RxOp::Sequence.new(zyg => [$atom,
             ::RxOp::Tilde.new(closer => $closer.text, dba => %*RX<dba>,
                 zyg => [$inner])]);
@@ -673,17 +672,26 @@ method metachar:var ($/) {
         }
 
         make self.rxcapturize($/, $cid, $a);
-        return Nil;
+        return;
     }
-    make ::RxOp::VarString.new(param => ~$<variable>,
-        ops => self.rxembed($/, self.do_variable_reference($/, $<variable>.ast), True));
+
+    my $kind = 'scalar_var';
+    given substr($<variable>,0,1) {
+        when '$' { $kind = 'scalar_var'; }
+        when '@' { $kind = 'list_var'; }
+        default  {
+            $/.CURSOR.sorry('Only $ and @ variables may be used in regexes for now');
+        }
+    }
+    make ::RxOp::ListPrim.new(name => ~$<variable>, type => $kind,
+        ops => self.rxembed($/,
+            self.do_variable_reference($/, $<variable>.ast), True));
 }
 
-method rxcapturize($M, $name, $rxop is copy) {
+method rxcapturize($M, $name, $rxop is copy) { #OK not used
     if !$rxop.^isa(::RxOp::Capturing) {
         # $<foo>=[...]
-        $rxop = self.encapsulate_regex($M, $rxop, passcut => True,
-            passcap => True);
+        $rxop = ::RxOp::StringCap.new(zyg => [$rxop]);
     }
 
     # $<foo>=(...)
@@ -834,6 +842,10 @@ method assertion:name ($/) {
         $/.CURSOR.sorry('Method call requires a method name');
     }
 
+    my @lex = $*CURLEX<!sub>.lookup_lex("&$name");
+    my $is_lexical = substr($/.orig, $/.from-1, 1) ne '.' &&
+        @lex && @lex[0] eq 'sub' && @lex[4].is_regex;
+
     if $<assertion> {
         make $<assertion>.ast;
     } elsif $name eq 'sym' {
@@ -852,8 +864,9 @@ method assertion:name ($/) {
             return Nil;
         }
         make ::RxOp::ZeroWidthCCs.new(neg => False, after => True, ccs => @l);
-        return Nil;
-    } elsif !$<nibbler> && !$<arglist> && !$pname<pkg> && !$pname<iname> {
+        return;
+    } elsif !$<nibbler> && !$<arglist> && !$pname<pkg> && !$pname<iname> &&
+            !$is_lexical {
         make ::RxOp::Subrule.new(method => $pname<name>);
     } else {
         my $args = $<nibbler> ??
@@ -865,9 +878,15 @@ method assertion:name ($/) {
             $pname = {name => 'alpha'};
         }
 
-        my $callop = ::Operator::Method.new(name => $pname<name>, :$args,
-            package => $pname<pkg> && $pname<pkg>.xref)\
-                .with_args($/, mklex($/, '$¢'));
+        my $callop;
+        if $is_lexical {
+            $callop = ::Op::CallSub.new(invocant => mklex($/, "&$name"),
+                positionals => [ mklex($/, '$¢'), @$args ]);
+        } else {
+            $callop = ::Operator::Method.new(name => $pname<name>, :$args,
+                package => $pname<pkg> && $pname<pkg>.xref)\
+                    .with_args($/, mklex($/, '$¢'));
+        }
 
         my $regex = self.rxembed($/, $callop, True);
 
@@ -876,25 +895,51 @@ method assertion:name ($/) {
     make self.rxcapturize($/, ~$<longname>, $/.ast);
 }
 
-# actually we need a few more special cases here.
 method assertion:variable ($/) {
-    make ::RxOp::Subrule.new(|node($/), regex =>
-        ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
-            positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+    given substr($/,0,1) {
+        when '&' {
+            if $<variable>.ast ~~ ::Op::CallSub {
+                make ::RxOp::Subrule.new(|node($/), regex =>
+                    ::Op::CallSub.new(|node($/),
+                        invocant => $<variable>.ast.invocant,
+                        args => [ ::Op::MakeCursor.new(|node($/)),
+                            @( $<variable>.ast.args ) ]));
+            } else {
+                make ::RxOp::Subrule.new(|node($/), regex =>
+                    ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
+                        positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+            }
+        }
+        when '$' {
+            make ::RxOp::ListPrim.new(type => 'scalar_asn',
+                ops => self.rxembed($/, $<variable>.ast, True));
+        }
+        when '@' {
+            make ::RxOp::ListPrim.new(type => 'list_asn',
+                ops => self.rxembed($/, $<variable>.ast, True));
+        }
+        default {
+            make ::RxOp::None.new;
+            $/.CURSOR.sorry("Sigil $_ is not allowed for regex assertions");
+        }
+    }
 }
 
 method assertion:method ($/) {
     if $<dottyop> {
-        $/.CURSOR.sorry("Dottyop assertions NYI");
-        make ::RxOp::None.new;
-        return Nil;
+        make ::RxOp::Subrule.new(|node($/), regex =>
+            self.rxembed($/, $<dottyop>.ast.with_args($/,
+                    ::Op::MakeCursor.new(|node($/))), True));
+    } else {
+        make self.decapturize($/);
     }
-    make self.decapturize($/);
 }
 
 method assertion:sym<?> ($/) {
     if $<assertion> {
-        make ::RxOp::Before.new(zyg => [self.decapturize($/)]);
+        make $<assertion>.reduced eq 'assertion:sym<{ }>' ??
+            ::RxOp::CheckBlock.new(block => $<assertion>.ast.ops, :!negate) !!
+            ::RxOp::Before.new(zyg => [self.decapturize($/)]);
     } else {
         make ::RxOp::Sequence.new;
     }
@@ -902,7 +947,9 @@ method assertion:sym<?> ($/) {
 
 method assertion:sym<!> ($/) {
     if $<assertion> {
-        make ::RxOp::NotBefore.new(zyg => [self.decapturize($/)]);
+        make $<assertion>.reduced eq 'assertion:sym<{ }>' ??
+            ::RxOp::CheckBlock.new(block => $<assertion>.ast.ops, :negate) !!
+            ::RxOp::NotBefore.new(zyg => [self.decapturize($/)]);
     } else {
         make ::RxOp::None.new;
     }
@@ -914,7 +961,7 @@ method assertion:sym<{ }> ($/) {
         $<embeddedblock>.ast.set_signature(Sig.simple('$¢'));
     });
 
-    make ::RxOp::CheckBlock.new(block => self.inliney_call($/,
+    make ::RxOp::ListPrim.new(type => 'scalar_asn', ops => self.inliney_call($/,
         $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
 }
 
@@ -1234,7 +1281,23 @@ method circumfix:sym<{ }> ($/) {
 }
 
 method circumfix:sigil ($/) {
-    self.circumfix:sym<( )>($/); # XXX
+    # XXX duplicates logic in variable
+    if $<semilist>.ast.elems == 0 {
+        if $<sigil> eq '$' {
+            make ::Op::ShortCircuit.new(|node($/), kind => '//',
+                args => [ ::Op::CallMethod.new(name => 'ast',
+                            receiver => mklex($/, '$/')),
+                          ::Op::CallMethod.new(name => 'Str',
+                            receiver => mklex($/, '$/')) ] );
+        } elsif $<sigil> eq any < @ % > {
+            make self.docontext($/, ~$<sigil>, mklex($/, '$/'));
+        } else {
+            make mklex($/, 'Mu');
+            $/.CURSOR.sorry("Missing argument for contextualizer");
+        }
+        return;
+    }
+    self.circumfix:sym<( )>($/);
     make self.docontext($/, ~$<sigil>, $/.ast);
 }
 
@@ -1849,6 +1912,9 @@ method docontext($M, $sigil, $term) {
     ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
 }
 
+method docontextif($/, $sigil, $op) {
+    $sigil eq '$' ?? $op !! self.docontext($/, $sigil, $op)
+}
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
@@ -1874,21 +1940,36 @@ method variable($/) {
         $name = substr(~$<special_variable>, 1);
     } elsif $<index> {
         make { capid => $<index>.ast, term =>
-            mkcall($/, '&postcircumfix:<[ ]>',
-                ::Op::Lexical.new(name => '$/'),
-                ::Op::Num.new(value => $<index>.ast))
+            self.docontextif($/, $sigil,
+                mkcall($/, '&postcircumfix:<[ ]>',
+                    ::Op::Lexical.new(name => '$/'),
+                    ::Op::Num.new(value => $<index>.ast)))
         };
         return Nil;
     } elsif $<postcircumfix> {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
-                mkcall($/, '&postcircumfix:<{ }>',
-                    ::Op::Lexical.new(name => '$/'),
-                    @( $<postcircumfix>[0].ast.args))
+                self.docontextif($/, $sigil,
+                    mkcall($/, '&postcircumfix:<{ }>',
+                        ::Op::Lexical.new(name => '$/'),
+                        @( $<postcircumfix>[0].ast.args)))
             };
             return;
         } else {
-            make { term => self.docontext($/, $sigil, $<postcircumfix>[0].ast.args[0]) };
+            if $<postcircumfix>[0].ast.args[0] -> $arg {
+                make { term => self.docontext($/, $sigil, $arg) };
+            } elsif $sigil eq '$' {
+                make { term => ::Op::ShortCircuit.new(|node($/), kind => '//',
+                    args => [ ::Op::CallMethod.new(name => 'ast',
+                                receiver => mklex($/, '$/')),
+                              ::Op::CallMethod.new(name => 'Str',
+                                receiver => mklex($/, '$/')) ] ) };
+            } elsif $sigil eq any < @ % > {
+                make { term => self.docontext($/, $sigil, mklex($/, '$/')) };
+            } else {
+                make { term => mklex($/, 'Mu') };
+                $/.CURSOR.sorry("Missing argument for contextualizer");
+            }
             return;
         }
     } else {

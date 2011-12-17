@@ -726,6 +726,9 @@ class RegexBody is Op {
             push @mcaps, $_ if $u{$_} >= 2;
         }
         my @pre = map { CgOp.sink($_.cgop($body)) }, @$.pre;
+        my @core = $.rxop.code($body);
+        unshift @pre, CgOp.scopedlex('$*GOAL',
+            CgOp.context_get('$*GOAL', 1)) if $body.has_lexical('$*GOAL');
 
         CgOp.prog(
             @pre,
@@ -733,7 +736,7 @@ class RegexBody is Op {
                     CgOp.cast('cursor', CgOp.fetch(CgOp.scopedlex('self'))),
                     +$.passcut),
             CgOp.rxpushcapture(CgOp.null('var'), @mcaps),
-            $.rxop.code($body),
+            @core,
             ($.canback ?? CgOp.rxend !! CgOp.rxfinalend),
             CgOp.label('backtrack'),
             CgOp.rxbacktrack,

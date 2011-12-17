@@ -92,7 +92,6 @@ class String is RxOp {
 }
 
 class VarString is RxOp {
-    has $.param; # Str
     has $.ops = die "RxOp::VarString.ops required"; # Op
     method ctxopzyg() { $!ops, 1 }
     method opzyg() { $!ops }
@@ -101,7 +100,7 @@ class VarString is RxOp {
         CgOp.rxbprim('Exact', CgOp.obj_getstr($!ops.cgop($body)));
     }
 
-    method lad() { defined($!param) ?? ['Param', $!param] !! ['Imp'] }
+    method lad() { ['Imp'] }
 }
 
 class Quantifier is RxOp {
@@ -194,18 +193,13 @@ class Quantifier is RxOp {
 
     method lad() {
         return [ 'Imp' ] if $!minimal || $!closure;
-        my $mi = $!min;
-        my $ma = $!max // -1;
-        my $str;
-        if $mi == 0 && $ma == -1 { $str = 'Star' }
-        if $mi == 1 && $ma == -1 { $str = 'Plus' }
-        if $mi == 0 && $ma ==  1 { $str = 'Opt' }
 
-        if $str {
-            [ $str, $.zyg[0].lad ];
-        } else {
-            [ 'Imp' ];
-        }
+        my $mode = 0;
+        $mode += 1 if $!min <= 0;
+        $mode += 2 if ($!max // Inf) > 1;
+        $mode += 4 if $!opsep;
+
+        [ 'Quant', $mode, map *.lad, @.zyg ];
     }
 }
 
@@ -387,8 +381,9 @@ class Tilde is RxOp {
         my $fail = self.label;
         my $pass = self.label;
 
-        push @code, CgOp.pushcut("TILDE $!closer");
-        push @code, CgOp.rxsetquant(CgOp.rxgetpos);
+        $body.add_my_name('$*GOAL') unless $body.has_lexical('$*GOAL');
+
+        push @code, CgOp.rxcall("PushGoal", CgOp.callframe, CgOp.str($!closer));
         push @code, $.zyg[0].code($body);
         push @code, CgOp.rxpushb("TILDE", $fail);
         push @code, CgOp.rxbprim('Exact', CgOp.str($!closer));
@@ -399,7 +394,7 @@ class Tilde is RxOp {
             CgOp.string_var($!closer), CgOp.string_var($!dba),
             CgOp.box('Num', CgOp.cast('num', CgOp.rxgetquant))));
         push @code, CgOp.label($pass);
-        push @code, CgOp.popcut;
+        push @code, CgOp.rxcall("PopGoal", CgOp.callframe);
 
         @code;
     }
@@ -632,4 +627,48 @@ class RxOp::Newline is RxOp {
         ['Any', [ ['Str', "\x0D\x0A"],
                   [ 'CC', @( $CClass::VSpace.terms ) ] ] ]
     }
+}
+
+class RxOp::StringCap is RxOp::Capturing {
+    # zyg * 1
+
+    method clone(:$captures) {
+        self.WHAT.new(zyg => $.zyg, :$captures);
+    }
+
+    method code($body) { #OK not used
+        my @code;
+
+        push @code, CgOp.pushcut("CAP");
+        push @code, CgOp.rxsetquant(CgOp.rxgetpos);
+        push @code, $.zyg[0].code($body);
+        push @code, CgOp.rxpushcapture(CgOp.rxcall("StringCapture"), @$.captures);
+        push @code, CgOp.popcut;
+
+        @code;
+    }
+
+    method lad() { $.zyg[0].lad }
+}
+
+class RxOp::ListPrim is RxOp {
+    has Str $.name; # used for LTM cheatery
+    has Str $.type;
+    has $.ops = die "RxOp::Variable.ops required"; # Op
+
+    method ctxopzyg() { $!ops, 1 }
+    method opzyg() { $!ops }
+
+    method code($body) {
+        my $bt = self.label;
+
+        my @code;
+        push @code, CgOp.rxcall("InitCursorList",
+            CgOp.rxlprim($!type, $!ops.cgop($body)));
+        push @code, CgOp.label($bt);
+        push @code, CgOp.rxincorpshift([], $bt);
+        @code;
+    }
+
+    method lad() { $!type eq 'scalar_var' ?? ['Param', $!name] !! ['Imp'] }
 }
