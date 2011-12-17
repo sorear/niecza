@@ -25,11 +25,9 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1258) No {*} and funky proto handling in general
 (1276) Declarativeness of constants is insufficiently general
 (1388) <foo> never uses a lexical regex
-(1436) No dottyop/indirect method assertions
 (1461) Arguments in <&foo(2)> not handled; STD parses EXPR but only this legal
 (1507) No support for indirect <::($name)> calls
        Also, nice fossil.
-(1565) Code assertions not always considered declarative
 (1585) <[ z..a ]> not treated as compile error DISCUSS
 (1634) No Unicode properties
 (1679) No <.>

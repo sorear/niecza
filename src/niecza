@@ -153,6 +153,16 @@ method assertion:sym<!> ($/) {
     }
 }
 
+method assertion:method ($/) {
+    if $<dottyop> {
+        make ::RxOp::Subrule.new(|node($/), regex =>
+            self.rxembed($/, $<dottyop>.ast.with_args($/,
+                    ::Op::MakeCursor.new(|node($/))), True));
+    } else {
+        make self.decapturize($/);
+    }
+}
+
 method assertion:variable ($/) {
     given substr($/,0,1) {
         when '&' {

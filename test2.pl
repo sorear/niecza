@@ -40,6 +40,8 @@ is $(), 5, '$() gets AST';
     my @a3 = ( 'bar?', 'fooo', 'fo+' );
     is ("barx" ~~ / <@a3> /), "bar", '<@var> works (compiling)';
     is ("fooooooo" ~~ / <@a3> /), 'fooooooo', '<@var> has longest-token semantics (compiling)';
+
+    is ("foo" ~~ /<."alpha"()>/), "f", "dottyop assertions work";
 }
 
 {
