@@ -444,7 +444,7 @@ namespace Niecza {
         }
 
         public void CgSub(SubInfo sub, bool erase) {
-            if (sub.code != null && sub.nam_str == null)
+            if (sub.code != RuntimeUnit.JitCompileSub && sub.nam_str == null)
                 return; // not defined by Perl 6?
             EmitUnit oc = Current;
             if (Config.CGVerbose > 0)
@@ -718,15 +718,33 @@ namespace Niecza {
         }
 
         internal static Frame JitCompileSub(Frame th) {
+            if (th.info.code != JitCompileSub) {
+                th.code = th.info.code;
+                th.EnsureSpills(th.info.nspill);
+                return th;
+            }
+            if (th.info.prototype != null &&
+                    th.info.prototype.code != JitCompileSub) {
+                th.info.code = th.info.prototype.code;
+                th.info.nspill = th.info.prototype.nspill;
+
+                th.code = th.info.code;
+                th.EnsureSpills(th.info.nspill);
+                return th;
+            }
+
+            SubInfo sub = th.info.prototype ?? th.info;
+
             if (Config.CGVerbose > 0)
-                Console.WriteLine("Generating code for {0} now because it's about to be run", th.info.name);
+                Console.WriteLine("Generating code for {0} now because it's about to be run", sub.name);
 
             EmitUnit eu = new EmitUnit(null, "Anon." + Interlocked.Increment(
                         ref anon_id), null, false);
-            eu.CgSub(th.info, false);
+            eu.CgSub(sub, false);
             SetConstants(eu.Finish(), eu.constants);
 
-            th.code = th.info.code;
+            th.code = th.info.code = sub.code;
+            th.info.nspill = sub.nspill;
             th.EnsureSpills(th.info.nspill);
 
             return th;
@@ -1380,7 +1398,7 @@ namespace Niecza {
     // 100s of bytes.
     public class SubInfo : IFreeze, IFixup {
         // Essential call functions
-        public DynBlockDelegate code;
+        public DynBlockDelegate code = RuntimeUnit.JitCompileSub;
         public int nspill;
         public int[] sig_i;
         public object[] sig_r;
@@ -1402,6 +1420,7 @@ namespace Niecza {
         public SubInfo outer;
         public P6any protosub;
         public Frame protopad;
+        public SubInfo prototype; // when cloning, don't jit twice
         public STable cur_pkg, methodof, body_of, in_class;
         public STable mo;
 
@@ -1951,6 +1970,48 @@ noparams:
         }
 
         private SubInfo() { }
+
+        // This is a _shallow_ clone.  The children wind up shared, as do
+        // a lot of immutable-ish objects that are referenced.
+        internal SubInfo(SubInfo o) {
+            code = o.code;
+            nspill = o.nspill;
+            sig_i = o.sig_i;
+            sig_r = o.sig_r;
+            lines = o.lines;
+            dylex = o.dylex;
+            dylex_filter = o.dylex_filter;
+            name = o.name;
+            num_lex_slots = o.num_lex_slots;
+            ltm = o.ltm;
+            special = o.special;
+            phaser = -1; // not in any phaser chains
+            outervar = null; // in no pads
+            unit = o.unit;
+            outer = o.outer;
+            protosub = null;
+            protopad = null; // no compile-time existance!
+            cur_pkg = o.cur_pkg;
+            methodof = o.methodof;
+            body_of = o.body_of;
+            in_class = o.in_class;
+            mo = o.mo;
+            outer_topic_rank = o.outer_topic_rank;
+            outer_topic_key = o.outer_topic_key;
+            self_key = o.self_key;
+            catch_ = o.catch_;
+            control = o.control;
+            used_in_scope = null;
+            nam_str = null;
+            nam_refs = null;
+            param = o.param;
+            children = null;
+            extend = o.extend;
+            rx_compile_cache = null;
+
+            prototype = o.prototype ?? o;
+        }
+
         public SubInfo(string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
                 int nspill) {
@@ -2038,6 +2099,7 @@ noparams:
             fb.ObjRef(outer);
             fb.ObjRef(protosub);
             fb.ObjRef(protopad);
+            fb.ObjRef(prototype);
             fb.ObjRef(cur_pkg);
             fb.ObjRef(methodof);
             fb.ObjRef(body_of);
@@ -2140,6 +2202,7 @@ noparams:
             n.outer = (SubInfo)tb.ObjRef();
             n.protosub = (P6any)tb.ObjRef();
             n.protopad = (Frame)tb.ObjRef();
+            n.prototype = (SubInfo)tb.ObjRef();
             n.cur_pkg = (STable)tb.ObjRef();
             n.methodof = (STable)tb.ObjRef();
             n.body_of = (STable)tb.ObjRef();
@@ -4639,14 +4702,16 @@ saveme:
                 break;
             }
 
-            SubInfo si = new SubInfo(name, StandardTypeProtoC);
+            SubInfo si = (proto != null) ?
+                new SubInfo((SubInfo)proto.GetSlot("info")) :
+                new SubInfo(name, StandardTypeProtoC);
             si.param = new object[] { cands, null };
             return Kernel.MakeSub(si, null);
 ltm:
             List<P6any> lp = new List<P6any>();
             foreach (P6any p in cands)
                 if (p != null) lp.Add(p);
-            return Lexer.MakeDispatcher(name, lp.ToArray());
+            return Lexer.MakeDispatcher(name, proto, lp.ToArray());
         }
 
         [TrueGlobal]

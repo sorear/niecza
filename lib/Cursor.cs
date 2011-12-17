@@ -2010,6 +2010,9 @@ anew:
             case 1:
                 return th.rx.Backtrack(th);
             case 0:
+                if (th.pos.Length == 0)
+                    return Kernel.Die(th, "No value for self argument to LTM dispatcher");
+                th.lex0 = th.pos[0];
                 th.rx = new RxFrame(th.info.name, (Cursor) ((Variable)th.lex0).Fetch(), false);
                 th.rx.PushCutGroup("LTM");
                 th.lex1 = RunDispatch(th, ((Variable)th.lex0).Fetch());
@@ -2033,11 +2036,12 @@ anew:
         }
     }
 
-    public static P6any MakeDispatcher(string name, P6any[] cands) {
-        SubInfo si = new SubInfo(name, StandardProtoC);
+    public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
+        SubInfo si = (proto != null) ?
+            new SubInfo((SubInfo)proto.GetSlot("info")) :
+            new SubInfo(name, StandardProtoC);
+
         si.param = new object[] { cands, null };
-        si.sig_i = new int[3] { SubInfo.SIG_F_POSITIONAL, 0, 0 };
-        si.sig_r = new object[1] { "self" };
         si.ltm = new LADDispatcher();
         return Kernel.MakeSub(si, null);
     }
