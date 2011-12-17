@@ -3003,7 +3003,6 @@ dynamic:
             thandlers["rxsetcapsfrom"] = RxCall(null, "SetCapturesFrom");
             thandlers["rxgetpos"] = RxCall(null, "GetPos");
             thandlers["rxcommitgroup"] = RxCall(null, "CommitGroup");
-            thandlers["run_dispatch"] = Methody(null, typeof(Lexer).GetMethod("RunDispatch"));
             handlers["rawcall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
                 CpsOp[] rst = JScalar.A<CpsOp>(2, z, th.Scan);

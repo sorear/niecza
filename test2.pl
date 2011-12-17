@@ -60,6 +60,23 @@ is $(), 5, '$() gets AST';
 }
 
 {
+    my proto regex foo { x {*} y }
+    my regex foo:sym<+> { <sym> }
+    my regex foo:sym<-> { <sym> }
+
+    is ("x+y" ~~ /<&foo>/), "x+y", "proto regexes can add stuff before and after";
+    #is ~$<foo><dispatch>, "+", "<dispatch> works"; #NIECZA
+
+    my grammar G {
+        proto token bar { c {*} d }
+        token bar:xyz { eee }
+
+        token TOP { ([<bar> | ceee]) .* }
+    }
+    is G.parse("ceeed")[0], 'ceeed', 'LTM works into dispatch nodes';
+}
+
+{
     my class Bt {
         has $!pie;
         method get_pie() { $!pie }

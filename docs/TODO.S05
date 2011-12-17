@@ -22,7 +22,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1178) No bindings to existing variables
 (1186) No || @array temporal-alternation syntax DISCUSS
 (1253) No handling of formal parameters in LTM
-(1258) No {*} and funky proto handling in general
 (1276) Declarativeness of constants is insufficiently general
 (1461) DISCUSS: STD parses EXPR in assertion:variable, why?
 (1507) No support for indirect <::($name)> calls

@@ -1447,6 +1447,9 @@ namespace Niecza {
         // not saved, rarely used
         internal Dictionary<string,SubInfo> rx_compile_cache;
 
+        public int[] edata;
+        public string[] label_names;
+
         // No instance fields past this point
         public class UsedInScopeInfo {
             public string file;
@@ -1515,8 +1518,6 @@ namespace Niecza {
         public const int ON_WARNING = 11;
         // ON_VARLOOKUP is kinda special, it's not used for exceptions
         // but rather for $*FOO and the like; goto = the variable index
-        public int[] edata;
-        public string[] label_names;
 
         [Immutable]
         private static string[] controls = new string[] { "unknown", "next",
@@ -1556,6 +1557,8 @@ namespace Niecza {
         }
 
         public int FindControlEnt(int ip, int ty, string name) {
+            if (edata == null)
+                return -1;
             for (int i = 0; i < edata.Length; i+=5) {
                 if (ip < edata[i] || ip >= edata[i+1])
                     continue;
@@ -2008,6 +2011,8 @@ noparams:
             children = null;
             extend = o.extend;
             rx_compile_cache = null;
+            edata = o.edata;
+            label_names = o.label_names;
 
             prototype = o.prototype ?? o;
         }
@@ -2240,11 +2245,13 @@ noparams:
                 self_key = -1;
             }
 
-            foreach (SubInfo z in children) {
-                if (z.phaser == Kernel.PHASER_CATCH)
-                    catch_ = z;
-                if (z.phaser == Kernel.PHASER_CONTROL)
-                    control = z;
+            if (children != null) {
+                foreach (SubInfo z in children) {
+                    if (z.phaser == Kernel.PHASER_CATCH)
+                        catch_ = z;
+                    if (z.phaser == Kernel.PHASER_CONTROL)
+                        control = z;
+                }
             }
         }
     }
@@ -4706,7 +4713,8 @@ saveme:
                 new SubInfo((SubInfo)proto.GetSlot("info")) :
                 new SubInfo(name, StandardTypeProtoC);
             si.param = new object[] { cands, null };
-            return Kernel.MakeSub(si, null);
+            return Kernel.MakeSub(si, proto == null ? null :
+                    (Frame)proto.GetSlot("outer"));
 ltm:
             List<P6any> lp = new List<P6any>();
             foreach (P6any p in cands)

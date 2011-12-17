@@ -588,6 +588,12 @@ retry:
         return nth;
     }
 
+    public Frame proto_dispatch(Frame th, Variable unused) {
+        Frame nth = th.MakeChild(null, Lexer.StandardProtoSI, Kernel.AnyP);
+        nth.pos = new Variable[] { MakeCursorV() };
+        return nth;
+    }
+
     private static SubInfo ArrayHelperSI = new SubInfo("KERNEL ArrayHelper", ArrayHelperC);
     private static Frame ArrayHelperC(Frame th) {
         int[] cases = (int[]) th.lex2;
@@ -1829,13 +1835,13 @@ anew:
         return ret;
     }
 
-    public static Lexer GetDispatchLexer(Frame fromf, STable kl, SubInfo disp) {
+    public static Lexer GetDispatchLexer(STable kl, SubInfo disp) {
         LexerCache lc = kl.GetLexerCache();
         Lexer ret;
         if (lc.dispatch_nfas.TryGetValue(disp, out ret))
             return ret;
         if (lc.parent != null && lc.parent.mo.name != "Cursor" && lc.parent.mo.name != "Any") {
-            ret = GetDispatchLexer(fromf, lc.parent.mo, disp);
+            ret = GetDispatchLexer(lc.parent.mo, disp);
             foreach (string u in ret.pad.used_methods) {
                 if (lc.repl_methods.Contains(u))
                     goto anew;
@@ -1984,12 +1990,17 @@ anew:
         return uniqfates;
     }
 
-    public static P6any[] RunDispatch(Frame fromf, P6any cursor) {
-        STable kl = cursor.mo;
-        while (fromf.info.param == null ||
-                fromf.info.param[0] == null) fromf = fromf.outer;
+    internal static P6any[] RunDispatch(Frame fromf, Cursor cursor) {
+        if (fromf.info.param == null) {
+            fromf = fromf.caller;
+            while (fromf.info.param == null ||
+                    !(fromf.info.param[0] is P6any[]))
+                fromf = fromf.outer;
+        }
 
-        Lexer l = GetDispatchLexer(fromf, kl, fromf.info);
+        STable kl = cursor.mo;
+
+        Lexer l = GetDispatchLexer(kl, fromf.info);
         P6any[] candidates = (P6any[]) fromf.info.param[0];
 
         Cursor c = (Cursor)cursor;
@@ -2002,7 +2013,8 @@ anew:
         return ret;
     }
 
-    // XXX duplicates logic from RxOp::ProtoRedis and Op::RegexBody
+    internal static SubInfo StandardProtoSI =
+        new SubInfo("KERNEL protoregex", StandardProtoC);
     internal static Frame StandardProtoC(Frame th) {
         switch (th.ip) {
             default:
@@ -2010,12 +2022,10 @@ anew:
             case 1:
                 return th.rx.Backtrack(th);
             case 0:
-                if (th.pos.Length == 0)
-                    return Kernel.Die(th, "No value for self argument to LTM dispatcher");
-                th.lex0 = th.pos[0];
-                th.rx = new RxFrame(th.info.name, (Cursor) ((Variable)th.lex0).Fetch(), false);
+                th.lex0 = (Cursor)th.pos[0].Fetch();
+                th.rx = new RxFrame(th.info.name, (Cursor)th.lex0, false);
                 th.rx.PushCutGroup("LTM");
-                th.lex1 = RunDispatch(th, ((Variable)th.lex0).Fetch());
+                th.lex1 = RunDispatch(th, (Cursor)th.lex0);
                 th.lexi0 = 0;
                 goto case 2;
             case 2:
@@ -2037,12 +2047,15 @@ anew:
     }
 
     public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
-        SubInfo si = (proto != null) ?
-            new SubInfo((SubInfo)proto.GetSlot("info")) :
-            new SubInfo(name, StandardProtoC);
-
-        si.param = new object[] { cands, null };
-        si.ltm = new LADDispatcher();
-        return Kernel.MakeSub(si, null);
+        if (proto != null) {
+            SubInfo si = new SubInfo((SubInfo)proto.GetSlot("info"));
+            si.param = new object[] { cands, null };
+            return Kernel.MakeSub(si, (Frame)proto.GetSlot("outer"));
+        } else {
+            SubInfo si = new SubInfo(name, StandardProtoC);
+            si.param = new object[] { cands, null };
+            si.ltm = new LADDispatcher();
+            return Kernel.MakeSub(si, null);
+        }
     }
 }
