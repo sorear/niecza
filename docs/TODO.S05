@@ -46,7 +46,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (2738) No success value; failed matches return Match
 (2818) In list context, $match[0] will return $match if $match[0] does not
        otherwise exist; useful for improving DWIM ness of lists
-(2851) @<foo> does not seem to work
 (2868) No .values or .kv, .keys ignores numeric captures
 (2895) Undefined: caps, chunks, prematch, postmatch
 (2910) No concept of cursor directionality DUBIOUS

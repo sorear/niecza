@@ -82,11 +82,15 @@ is $(), 5, '$() gets AST';
 {
     my $rxd = / (\d+) <{ "a ** $0" }> /;
     is ("3aaa" ~~ $rxd), "3aaa", '<{}> works';
+
+    "abcd" ~~ / $0=[.] $0=[.] $<x>=[.] $<x>=[.] /;
+    is join('|',@0), 'a|b', 'Context respected on @0';
+    is join('|',@<x>), 'c|d', 'Context respected on @<x>';
 }
 
-is [ 1,2,3 ... 10 ], [1..10];
-is [ 1,2,4 ... 256 ], [map 2 ** *, 0..8];
-is [ 1,1,*+* ...^ *>100 ], [1,1,2,3,5,8,13,21,34,55,89];
+is [ 1,2,3 ... 10 ], [1..10], 'arithmetic sequence';
+is [ 1,2,4 ... 256 ], [map 2 ** *, 0..8], 'geometric sequence';
+is [ 1,1,*+* ...^ *>100 ], [1,1,2,3,5,8,13,21,34,55,89], 'callback sequence';
 
 eval_lives_ok q[
     class F2855::G7136 { ... }

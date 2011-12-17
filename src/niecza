@@ -393,6 +393,9 @@ method circumfix:sigil ($/) {
     make self.docontext($/, ~$<sigil>, $/.ast);
 }
 
+method docontextif($/, $sigil, $op) {
+    $sigil eq '$' ?? $op !! self.docontext($/, $sigil, $op)
+}
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
@@ -418,17 +421,19 @@ method variable($/) {
         $name = substr(~$<special_variable>, 1);
     } elsif $<index> {
         make { capid => $<index>.ast, term =>
-            mkcall($/, '&postcircumfix:<[ ]>',
-                ::Op::Lexical.new(name => '$/'),
-                ::Op::Num.new(value => $<index>.ast))
+            self.docontextif($/, $sigil,
+                mkcall($/, '&postcircumfix:<[ ]>',
+                    ::Op::Lexical.new(name => '$/'),
+                    ::Op::Num.new(value => $<index>.ast)))
         };
         return Nil;
     } elsif $<postcircumfix> {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
-                mkcall($/, '&postcircumfix:<{ }>',
-                    ::Op::Lexical.new(name => '$/'),
-                    @( $<postcircumfix>[0].ast.args))
+                self.docontextif($/, $sigil,
+                    mkcall($/, '&postcircumfix:<{ }>',
+                        ::Op::Lexical.new(name => '$/'),
+                        @( $<postcircumfix>[0].ast.args)))
             };
             return;
         } else {
