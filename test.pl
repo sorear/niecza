@@ -2,7 +2,7 @@
 
 use Test;
 
-plan 1007;
+plan 1006;
 
 ok 1, "one is true";
 ok 2, "two is also true";
@@ -1701,7 +1701,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     ok loopy, "can call functions starting with 'loop'";
 
     my @a = "abc" ~~ /abc/;
-    is +@a, 1, "capture-less matches return 1 item";
+    is +@a, 0, "capture-less matches return no items in list context";
     @a = "abc" ~~ /(a)(b)(c)/;
     is +@a, 3, "capturing matches return catures in list context";
 }
@@ -1774,9 +1774,6 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    "foo" ~~ /\w+/;
-    is $0, "foo", 'Match[0] returns whole match if no parens';
-
     constant %bar = (:a, :b);
     is +[ %bar ], 2, "constant hashes flatten";
 }

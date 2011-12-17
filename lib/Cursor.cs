@@ -900,15 +900,11 @@ public class Cursor : P6any {
             }
         }
 
-        if (str == "0" && caps.Count() == 0)
-            caps.Unshift(Kernel.NewROScalar(this));
-
         return FixupList(caps);
     }
 
     public void UnpackCaps(P6any into) {
         List<VarDeque> posr = new List<VarDeque>();
-        posr.Add(new VarDeque());
         Dictionary<string,VarDeque> namr = new Dictionary<string,VarDeque>();
         CapInfo it = captures;
 
@@ -929,9 +925,6 @@ public class Cursor : P6any {
             }
         }
 
-        if (posr[0].Count() == 0)
-            posr[0].Unshift(Kernel.NewROScalar(this));
-
         VarHash nam = new VarHash();
         Variable[] pos = new Variable[posr.Count];
 
@@ -949,14 +942,8 @@ public class Cursor : P6any {
         foreach (KeyValuePair<string,Variable> kv in caps)
             nw.captures = new CapInfo(nw.captures, new string[] { kv.Key },
                     Kernel.NewMuScalar(kv.Value.Fetch()));
-        VarDeque ks = new VarDeque();
 
-        P6opaque lst = new P6opaque(Kernel.ListMO);
-        lst.slots[0 /*items*/] = ks;
-        lst.slots[1 /*rest*/ ] = new VarDeque();
-
-        ks.Push(Kernel.NewROScalar(nw));
-        return Kernel.NewRWListVar(lst);
+        return Kernel.NewROScalar(nw);
     }
 
     public Variable SimpleWS() {
