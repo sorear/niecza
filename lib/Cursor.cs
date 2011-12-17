@@ -2003,7 +2003,7 @@ anew:
     }
 
     // XXX duplicates logic from RxOp::ProtoRedis and Op::RegexBody
-    private static Frame StandardProtoC(Frame th) {
+    internal static Frame StandardProtoC(Frame th) {
         switch (th.ip) {
             default:
                 return Kernel.Die(th, "Invalid IP");

@@ -444,6 +444,8 @@ namespace Niecza {
         }
 
         public void CgSub(SubInfo sub, bool erase) {
+            if (sub.code != null && sub.nam_str == null)
+                return; // not defined by Perl 6?
             EmitUnit oc = Current;
             if (Config.CGVerbose > 0)
                 Console.WriteLine("generating code for: {0} ({1:X})",
@@ -1278,9 +1280,11 @@ namespace Niecza {
             fb.Int(index);
         }
 
+        // synchronize with NamProcessor.MakeDispatch
         internal void MakeDispatch(Frame into) {
             HashSet<string> names = new HashSet<string>();
             List<P6any> cands = new List<P6any>();
+            P6any proto = null;
             string filter = name + ":";
             string pn = name + ":(!proto)";
 
@@ -1299,12 +1303,15 @@ namespace Niecza {
                 }
                 if (csr.outer == null) break;
                 // don't go above nearest proto
-                if (csr.dylex.ContainsKey(pn)) break;
+                if (csr.dylex.ContainsKey(pn)) {
+                    proto = ((LISub)csr.dylex[pn]).def.protosub;
+                    break;
+                }
                 if (brk) cands.Add(null);
                 f = f.outer;
             }
 
-            Set(into, Kernel.NewROScalar(Kernel.MakeDispatcher(name, null,
+            Set(into, Kernel.NewROScalar(Kernel.MakeDispatcher(name, proto,
                     cands.ToArray())));
         }
     }
@@ -4615,7 +4622,7 @@ saveme:
                     dth.pos, dth.named, false, root);
         }
 
-        private static Frame StandardTypeProtoC(Frame th) {
+        internal static Frame StandardTypeProtoC(Frame th) {
             return TypeDispatcher(th, true);
         }
 

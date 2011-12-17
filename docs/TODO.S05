@@ -55,7 +55,7 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (3923) No hash aliasing
 (3972) No external aliasing
 (3996) No support for multiple Matches
-(4160) CORE does not contain STD, parsefile, unbalanced
+(4160) CORE does not contain STD, parsefile, unbalanced DISCUSS
 (4204) No 'augment slang' functionality
 (4218) No default-control pragmata
 (4237) No transliterations

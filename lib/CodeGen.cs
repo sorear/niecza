@@ -2245,9 +2245,11 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        // synchronize with LIDispatch.MakeDispatch
         internal CpsOp MakeDispatch(string prefix) {
             HashSet<string> names = new HashSet<string>();
             List<CpsOp> cands = new List<CpsOp>();
+            CpsOp proto = CpsOp.Null(Tokens.P6any);
             string filter = prefix + ":";
             string pn = prefix + ":(!proto)";
 
@@ -2264,13 +2266,16 @@ namespace Niecza.CLRBackend {
                 }
                 if (csr.outer == null) break;
                 // don't go above nearest proto
-                if (csr.dylex.ContainsKey(pn)) break;
+                if (csr.dylex.ContainsKey(pn)) {
+                    proto = CpsOp.MethodCall(Tokens.Variable_Fetch, RawAccessLex("scopedlex", pn, null));
+                    break;
+                }
                 if (brk) cands.Add(CpsOp.Null(Tokens.P6any));
             }
 
             return CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
                 CpsOp.MethodCall(Tokens.Kernel_MakeDispatcher,
-                    CpsOp.StringLiteral(prefix), CpsOp.Null(Tokens.P6any),
+                    CpsOp.StringLiteral(prefix), proto,
                     CpsOp.NewArray(Tokens.P6any, cands.ToArray())));
         }
 
@@ -4303,6 +4308,18 @@ dynamic:
                 for (int i = 0; i < s.nam_refs.Length; i++)
                     s.nam_refs[i] = Handle.Unbox(args[i+3]);
                 s.code = RuntimeUnit.JitCompileSub;
+                if (s.protopad != null)
+                    s.protopad.code = s.code;
+                return null;
+            } else if (cmd == "sub_finish_dispatcher") {
+                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+                string  k = (string)args[2];
+                if (k == "regex")
+                    s.code = Lexer.StandardProtoC;
+                else if (k == "multi")
+                    s.code = Kernel.StandardTypeProtoC;
+                else
+                    return new Exception("Unknown dispatcher type " + k);
                 if (s.protopad != null)
                     s.protopad.code = s.code;
                 return null;

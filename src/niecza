@@ -26,6 +26,43 @@ use STD;
 # }
 
 augment class NieczaActions {
+method regex_def($/) {
+    my $ast = $<regex_block>.ast;
+
+    if $*CURLEX<!multi> eq 'proto' {
+        if ($<signature> && $<signature>[0].ast.params != 1) ||
+                !$<regex_block><onlystar> {
+            $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
+        }
+
+        $ast = ::RxOp::ProtoRedis.new(name => $*CURLEX<!name>);
+    }
+
+    my @lift = $ast.oplift;
+    my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
+    $*CURLEX<!sub>.set_ltm($ltm);
+    ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
+    if $*CURLEX<!multi> eq 'proto' {
+        $*CURLEX<!sub>.finish_dispatcher('regex');
+    } else {
+        $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
+            name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
+    }
+    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
+}
+method is_dispatcher($blockoid) {
+    $blockoid.Str ~~ m/ '{' \s* '*' \s* '}' /;
+}
+method finish_method_routine ($/) {
+    if self.is_dispatcher($<blockoid>) {
+        $*CURLEX<!sub>.finish_dispatcher('multi');
+    } else {
+        $*CURLEX<!sub>.finish($<blockoid>.ast);
+    }
+    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
+}
+method routine_def ($/) { self.finish_method_routine($/) }
+method method_def ($/)  { self.finish_method_routine($/) }
 }
 
 CgOp._register_ops: < who sc_root sc_indir temporize _addmethod _invalidate
