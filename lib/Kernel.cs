@@ -5844,9 +5844,13 @@ slow:
                     (Variable)payload).Fetch());
             }
 
+            HashSet<Frame> visited = new HashSet<Frame>();
             for (csr = th; ; csr = csr.DynamicCaller()) {
                 if (csr == null)
                     break; // unhandled exception, Unwind handles
+                if (visited.Contains(csr))
+                    Panic("Frame tree is looooopy");
+                visited.Add(csr);
                 if (type == SubInfo.ON_NEXTDISPATCH) {
                     if (csr.curDisp != null) {
                         unf = csr;
