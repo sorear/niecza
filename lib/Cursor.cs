@@ -836,7 +836,11 @@ public class Cursor : P6any {
         Cursor r = new Cursor(parent.global, parent.save_klass, from, to, ci,
                 null, method);
         th.info.dylex["$*match"].Set(th, Kernel.NewROScalar(r));
-        return r.global.CallAction(th, method, r);
+        if (method == "") {
+            return th;
+        } else {
+            return r.global.CallAction(th, method, r);
+        }
     }
 
     public override bool IsDefined() {
@@ -963,6 +967,27 @@ public class Cursor : P6any {
                 Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
             return Kernel.NewROScalar(At(p));
         }
+    }
+}
+
+public partial class Builtins {
+    public static Variable cursor_allcaps(Variable cv) {
+        Cursor c = (Cursor) cv.Fetch();
+        VarDeque dq = new VarDeque();
+
+        for (CapInfo it = c.captures; it != null; it = it.prev) {
+            if (it.names[0] == null)
+                continue; // special node
+            if (!it.cap.Fetch().Isa(Kernel.MatchMO))
+                continue;
+            foreach (string name in it.names)
+                dq.Unshift(pair(MakeStr(name), it.cap));
+        }
+
+        P6opaque lst = new P6opaque(Kernel.ListMO);
+        lst.slots[0 /*items*/] = dq;
+        lst.slots[1 /*rest*/ ] = new VarDeque();
+        return Kernel.NewRWListVar(lst);
     }
 }
 

@@ -1561,7 +1561,12 @@ my class Match is Cool {
     method flat () { @( self.Capture ) }
     method iterator () { self.flat.iterator }
     method Numeric() { self // nextsame; +(~self) }
-    method keys () { keys %(self) }
+
+    # yeah these could all be more efficient.
+    method kv() { @(self).kv, %(self).kv }
+    method keys() { @(self).keys, %(self).keys }
+    method values() { @(self), %(self).values }
+
     method Capture () { Q:CgOp {
         (letn cap (obj_newblank (obj_llhow (@ {Capture})))
           (cursor_unpackcaps (cast cursor (@ {self})) (l cap))
@@ -1587,7 +1592,7 @@ my class Match is Cool {
     method CURSOR() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
     method cursor() { Q:CgOp { (ns (cursor_unmatch (cast cursor (@ {self})))) } }
     method reduced() { Q:CgOp { (box Str (cursor_reduced (cast cursor (@ {self})))) } }
-    method synthetic(:$cursor!, :$method!, :@captures!, :$from!, :$to!) {
+    method synthetic(:$cursor!, :$method = "", :@captures, :$from!, :$to!) {
         my $*match;
         Q:CgOp {
             (prog
@@ -1599,6 +1604,48 @@ my class Match is Cool {
               {$*match})
         };
     }
+
+    method caps() {
+        my @caps = Q:CgOp { (cursor_allcaps {self}) }.sort({ .value.from });
+
+        my $lpos = self.from;
+        my $lnam = "beginning of match";
+        for @caps {
+            if .value.from < $lpos {
+                warn "Capture {.key} starts at {.value.from} overlaps $lnam at $lpos";
+            }
+            $lpos = .value.to;
+            $lnam = .key;
+        }
+
+        if self.to < $lpos {
+            warn "End of match at {self.to} overlaps $lnam at $lpos";
+        }
+
+        @caps
+    }
+
+    method chunks() {
+        my $lpos = self.from;
+        my @chunks;
+        for self.caps {
+            if .value.from > $lpos {
+                push @chunks, '~' => Match.synthetic(:cursor(self),
+                    :from($lpos), :to(.value.from));
+            }
+            push @chunks, $_;
+            $lpos = .value.to;
+        }
+        if self.to > $lpos {
+            push @chunks, '~' => Match.synthetic(:cursor(self),
+                :from($lpos), :to(self.to));
+        }
+
+        @chunks
+    }
+
+    method postmatch() { substr(self.orig, self.to) }
+    method prematch() { substr(self.orig, 0, self.from) }
 }
 
 my class Regex is Method {
