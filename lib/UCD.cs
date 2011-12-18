@@ -14,6 +14,54 @@ using Niecza.UCD;
 // Tables are identified by names.  Non-property tables never have
 // names not starting with !.
 namespace Niecza.UCD {
+    abstract class Property {
+        public abstract int[] GetRanges(Variable filter);
+
+        protected static bool DoMatch(string value, Variable filter) {
+            Variable r = Kernel.RunInferior(filter.Fetch().InvokeMethod(
+                Kernel.GetInferiorRoot(), "ACCEPTS",
+                new Variable[] { filter, Builtins.MakeStr(value) }, null));
+            return r.Fetch().mo.mro_raw_Bool.Get(r);
+        }
+    }
+
+    class LimitedProperty : Property {
+        int[] data;
+        string[][] values;
+
+        public LimitedProperty(int[] data, string[][] values) {
+            this.data = data;
+            this.values = values;
+        }
+
+        public override int[] GetRanges(Variable filter) {
+            bool[] cfilter = new bool[values.Length];
+            for (int i = 0; i < values.Length; i++) {
+                foreach (string s in values[i]) {
+                    if (DoMatch(s, filter)) {
+                        cfilter[i] = true;
+                        break;
+                    }
+                }
+            }
+
+            List<int> res = new List<int>();
+            for (int i = 0; i < data.Length; i += 2) {
+                if (cfilter[data[i+1]]) {
+                    int upto = (i+2 == data.Length) ? 0x110000 : data[i+2];
+                    if (res.Count > 0 && res[res.Count-1] == data[i]) {
+                        res[res.Count-1] = upto;
+                    } else {
+                        res.Add(data[i]);
+                        res.Add(upto);
+                    }
+                }
+            }
+
+            return res.ToArray();
+        }
+    }
+
     static class DataSet {
         static Dictionary<string,object> cache;
         static byte[] bits;
@@ -25,6 +73,16 @@ namespace Niecza.UCD {
             from += 4;
             return (bits[from-4] << 24) | (bits[from-3] << 16) |
                 (bits[from-2] << 8) | (bits[from-1]);
+        }
+
+        static uint BER(ref int from) {
+            uint buf = 0;
+            while (true) {
+                byte inp = bits[from++];
+                buf = (buf << 7) | (uint)(inp & 127);
+                if ((inp & 128) == 0)
+                    return buf;
+            }
         }
 
         static string AsciiZ(ref int from) {
@@ -69,6 +127,21 @@ namespace Niecza.UCD {
             if (Trace) Console.WriteLine("done.");
         }
 
+        static object InflateBinary(int[] loc) {
+            List<int> vec = new List<int>();
+            int rpos = loc[2];
+            int last = 0;
+            int ntyp = 1;
+            while (rpos < loc[3]) {
+                last += (int)BER(ref rpos);
+                vec.Add(last);
+                vec.Add(ntyp);
+                ntyp = 1 - ntyp;
+            }
+            return new LimitedProperty(vec.ToArray(), new string[][] {
+                    new string[] { "N" }, new string[] { "Y" } });
+        }
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public static object GetTable(string name) {
             if (cache == null)
@@ -87,16 +160,27 @@ namespace Niecza.UCD {
                 throw new NieczaException(name + " does not exist as a UCD table");
 
             switch (bits[loc[0]]) {
+                case (byte)'B':
+                    r = InflateBinary(loc);
+                    break;
                 default:
-                    throw new NieczaException("Unhandled type code " + bits[loc[0]]);
+                    throw new NieczaException("Unhandled type code " + (char)bits[loc[0]]);
             }
+
+            cache[name] = r;
+            return r;
         }
     }
 }
 
 public partial class Builtins {
-    public static Variable ucd_test() {
-        DataSet.GetTable("gc");
-        return null;
+    public static Variable ucd_get_ranges(Variable tbl, Variable sm) {
+        Property p = (Property)DataSet.GetTable(
+                tbl.Fetch().mo.mro_raw_Str.Get(tbl));
+        int[] rranges = p.GetRanges(sm);
+        Variable[] cranges = new Variable[rranges.Length];
+        for (int i = 0; i < rranges.Length; i++)
+            cranges[i] = Builtins.MakeInt(rranges[i]);
+        return Builtins.MakeParcel(cranges);
     }
 }
