@@ -90,9 +90,77 @@ namespace Niecza.UCD {
         int[] codepoints;
         string[] values;
 
-        public StringProperty(int[] codepoints, string[] values) {
+        bool is_na;
+        bool is_dm;
+        Property jsn;
+
+        public StringProperty(string name, int[] codepoints, string[] values) {
             this.codepoints = codepoints;
             this.values = values;
+            this.is_na = (name == "na");
+            this.is_dm = (name == "dm");
+
+            this.jsn = (Property)DataSet.GetTable("JSN");
+        }
+
+        // Hangul decomposition constants
+        const int SBASE  = 0xAC00;
+        const int LBASE  = 0x1100;
+        const int VBASE  = 0x1161;
+        const int TBASE  = 0x11A7;
+        const int SCOUNT = 11172;
+        const int LCOUNT = 19;
+        const int VCOUNT = 21;
+        const int TCOUNT = 28;
+
+        const int SEND   = SBASE + SCOUNT;
+        const int NCOUNT = VCOUNT * TCOUNT;
+
+        string MapValue(int cp, string raw) {
+            if (raw == "\uD800")
+                return "";
+            if (raw == "\uD801")
+                return Utils.Chr(cp);
+            if (is_na && raw.Length != 0 && raw[raw.Length - 1] == '#')
+                return raw.Substring(0, raw.Length - 1) +
+                    string.Format("{0:X4}", cp);
+            if ((is_na || is_dm) && cp >= SBASE && cp < SEND) {
+                int syl_ix = cp - SBASE;
+                int l = LBASE + (syl_ix / NCOUNT);
+                int v = VBASE + (syl_ix % NCOUNT) / TCOUNT;
+                int t = TBASE + (syl_ix % TCOUNT);
+
+                if (is_na) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("HANGUL SYLLABLE ");
+                    sb.Append(jsn.GetValue(l));
+                    sb.Append(jsn.GetValue(v));
+                    if (t != TBASE) sb.Append(jsn.GetValue(t));
+                    return sb.ToString();
+                } else {
+                    char[] res = new char[2];
+                    // No supplementary characters ever need to be used here
+                    if (t == TBASE) {
+                        res[0] = (char)l;
+                        res[1] = (char)v;
+                    } else {
+                        res[0] = (char)(SBASE + (l - LBASE) * NCOUNT + (v - VBASE) * TCOUNT);
+                        res[1] = (char)t;
+                    }
+                    return new string(res);
+                }
+            }
+            return raw;
+        }
+
+        bool IsVariable(int cpl, int cph, string raw) {
+            if (is_na && raw.Length != 0 && raw[raw.Length - 1] == '#')
+                return true; // CJK UNIFIED IDEOGRAPH-#
+            if (raw == "\uD801")
+                return true;
+            if ((is_na || is_dm) && cpl < SEND && cph >= SBASE)
+                return true; // Hangul procedural generation
+            return false;
         }
 
         public override string GetValue(int cp) {
@@ -101,7 +169,7 @@ namespace Niecza.UCD {
 
             while (true) {
                 if ((hix - lix) <= 1) {
-                    return values[lix];
+                    return MapValue(cp, values[lix]);
                 }
                 int mix = (lix + hix) / 2;
                 if (cp >= codepoints[mix]) {
@@ -115,13 +183,26 @@ namespace Niecza.UCD {
         public override int[] GetRanges(Variable filter) {
             List<int> res = new List<int>();
             for (int i = 0; i < values.Length; i ++) {
-                if (DoMatch(values[i], filter)) {
-                    int upto = (i+1 == codepoints.Length) ? 0x110000 : codepoints[i+1];
-                    if (res.Count > 0 && res[res.Count-1] == codepoints[i]) {
-                        res[res.Count-1] = upto;
-                    } else {
-                        res.Add(codepoints[i]);
-                        res.Add(upto);
+                int upto = (i+1 == codepoints.Length) ? 0x110000 : codepoints[i+1];
+                if (IsVariable(codepoints[i], upto, values[i])) {
+                    for (int cp = codepoints[i]; cp < upto; cp++) {
+                        if (DoMatch(MapValue(cp, values[i]), filter)) {
+                            if (res.Count > 0 && res[res.Count-1] == cp) {
+                                res[res.Count-1] = cp+1;
+                            } else {
+                                res.Add(cp);
+                                res.Add(cp+1);
+                            }
+                        }
+                    }
+                } else {
+                    if (DoMatch(MapValue(codepoints[i], values[i]), filter)) {
+                        if (res.Count > 0 && res[res.Count-1] == codepoints[i]) {
+                            res[res.Count-1] = upto;
+                        } else {
+                            res.Add(codepoints[i]);
+                            res.Add(upto);
+                        }
                     }
                 }
             }
@@ -267,7 +348,11 @@ namespace Niecza.UCD {
             List<string[]> names = new List<string[]>();
             int rpos2 = loc[6];
             while (rpos2 < loc[7]) {
-                names.Add(val_aliases[Prod.C(name, AsciiZ(ref rpos2))]);
+                string rname = AsciiZ(ref rpos2);
+                string[] keys;
+                if (!val_aliases.TryGetValue(Prod.C(name, rname), out keys))
+                    keys = new string[] { rname };
+                names.Add(keys);
             }
             int rpos0 = loc[2];
             int rpos1 = loc[4];
@@ -294,34 +379,25 @@ namespace Niecza.UCD {
                 int code = Int(ref rpos1);
                 int len = code >> 24;
                 int cp = code & 0xFFFFF;
+                char[] buf = new char[len];
                 if ((code & (1 << 23)) != 0) {
-                    char[] buf = new char[len];
                     for (int i = 0; i < len; i++)
                         buf[i] = (char)Short(ref rpos2);
                     codes.Add(cp);
-                    if (len == 1 && buf[0] == 0xD800)
-                        strs.Add("");
-                    else if (len == 1 && buf[0] == 0xD801)
-                        strs.Add(Utils.Chr(cp));
-                    else
-                        strs.Add(new string(buf));
+                    strs.Add(new string(buf));
                 } else {
                     int rpost = rpos1;
                     int nextcp = Int(ref rpost) & 0xFFFFF;
                     while (cp < nextcp) {
-                        char b = (char)Short(ref rpos2);
-                        if (b == (char)0xD800)
-                            strs.Add("");
-                        else if (b == (char)0xD801)
-                            strs.Add(Utils.Chr(cp));
-                        else
-                            strs.Add(new string(b,1));
+                        for (int i = 0; i < len; i++)
+                            buf[i] = (char)Short(ref rpos2);
                         codes.Add(cp++);
+                        strs.Add(new string(buf));
                     }
                 }
             }
 
-            return new StringProperty(codes.ToArray(), strs.ToArray());
+            return new StringProperty(name, codes.ToArray(), strs.ToArray());
         }
 
         static object InflateName(string name, int[] loc) {
@@ -352,7 +428,7 @@ namespace Niecza.UCD {
                 cp++;
             }
 
-            return new StringProperty(cps.ToArray(), names.ToArray());
+            return new StringProperty(name, cps.ToArray(), names.ToArray());
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
