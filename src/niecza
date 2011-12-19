@@ -78,7 +78,7 @@ method metachar:sym<{*}> ($/) {
 }
 
 method is_dispatcher($blockoid) {
-    $blockoid.Str ~~ m/ '{' \s* '*' \s* '}' /;
+    $blockoid.Str ~~ m:pos(0) / '{' \s* '*' \s* '}' /;
 }
 method finish_method_routine ($/) {
     if self.is_dispatcher($<blockoid>) {
