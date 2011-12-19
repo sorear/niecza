@@ -1534,13 +1534,7 @@ public partial class Builtins {
         int r = (int)o1.mo.mro_raw_Numeric.Get(v);
         if (r >= 0x110000)
             return Kernel.AnyMO.typeVar; // XXX failure
-        if (r >= 0x10000) {
-            char[] rs = new char[2];
-            rs[0] = (char)(0xD800 + ((r - 0x10000) >> 10));
-            rs[1] = (char)(0xDC00 + (r & 0x3FF));
-            return Kernel.BoxAnyMO(new string(rs), Kernel.StrMO);
-        }
-        return Kernel.BoxAnyMO(new string((char)r, 1), Kernel.StrMO);
+        return Kernel.BoxAnyMO(Utils.Chr(r), Kernel.StrMO);
     }
 
     public static Variable UniCat(Variable v) {

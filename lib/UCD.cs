@@ -146,6 +146,11 @@ namespace Niecza.UCD {
                 (bits[from-2] << 8) | (bits[from-1]);
         }
 
+        static int Short(ref int from) {
+            from += 2;
+            return (bits[from-2] << 8) | (bits[from-1]);
+        }
+
         static uint BER(ref int from) {
             uint buf = 0;
             while (true) {
@@ -278,6 +283,47 @@ namespace Niecza.UCD {
             return new LimitedProperty(data, names.ToArray());
         }
 
+        static object InflateString(string name, int[] loc) {
+            int rpos1 = loc[2];
+            int rpos2 = loc[4];
+
+            List<int> codes = new List<int>();
+            List<string> strs = new List<string>();
+
+            while (rpos1 < loc[3]) {
+                int code = Int(ref rpos1);
+                int len = code >> 24;
+                int cp = code & 0xFFFFF;
+                if ((code & (1 << 23)) != 0) {
+                    char[] buf = new char[len];
+                    for (int i = 0; i < len; i++)
+                        buf[i] = (char)Short(ref rpos2);
+                    codes.Add(cp);
+                    if (len == 1 && buf[0] == 0xD800)
+                        strs.Add("");
+                    else if (len == 1 && buf[0] == 0xD801)
+                        strs.Add(Utils.Chr(cp));
+                    else
+                        strs.Add(new string(buf));
+                } else {
+                    int rpost = rpos1;
+                    int nextcp = Int(ref rpost) & 0xFFFFF;
+                    while (cp < nextcp) {
+                        char b = (char)Short(ref rpos2);
+                        if (b == (char)0xD800)
+                            strs.Add("");
+                        else if (b == (char)0xD801)
+                            strs.Add(Utils.Chr(cp));
+                        else
+                            strs.Add(new string(b,1));
+                        codes.Add(cp++);
+                    }
+                }
+            }
+
+            return new StringProperty(codes.ToArray(), strs.ToArray());
+        }
+
         static object InflateName(string name, int[] loc) {
             InflateTokens();
             List<int> cps = new List<int>();
@@ -340,6 +386,9 @@ namespace Niecza.UCD {
                     break;
                 case (byte)'N':
                     r = InflateName(name, loc);
+                    break;
+                case (byte)'S':
+                    r = InflateString(name, loc);
                     break;
                 default:
                     throw new NieczaException("Unhandled type code " + (char)bits[loc[0]]);

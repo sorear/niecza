@@ -600,6 +600,16 @@ namespace Niecza {
             }
         }
 
+        public static string Chr(int r) {
+            if (r >= 0x10000) {
+                char[] rs = new char[2];
+                rs[0] = (char)(0xD800 + ((r - 0x10000) >> 10));
+                rs[1] = (char)(0xDC00 + (r & 0x3FF));
+                return new string(rs);
+            }
+            return new string((char)r, 1);
+        }
+
         public static string N2S(double n) {
             return n.ToString(CultureInfo.InvariantCulture);
         }
