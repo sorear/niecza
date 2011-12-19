@@ -7,6 +7,44 @@ using System.Runtime.CompilerServices;
 using Niecza.Serialization;
 
 namespace Niecza {
+    // Partially taken from mono's System.Tuple by Zoltan Varga and Marek Safar
+    public static class Prod {
+        public static Prod<T1,T2> C<T1,T2>(T1 v1, T2 v2) { return new Prod<T1,T2>(v1, v2); }
+    }
+    public class Prod<T1,T2> {
+        T1 v1;
+        T2 v2;
+        public Prod(T1 v1, T2 v2) {
+            this.v1 = v1;
+            this.v2 = v2;
+        }
+
+        public override bool Equals (object other) {
+            var t = other as Prod<T1, T2>;
+            if (t == null)
+                return false;
+            if (t.v1 != null || v1 != null) {
+                if (t.v1 == null || v1 == null || !v1.Equals(t.v1))
+                    return false;
+            }
+            if (t.v2 != null || v2 != null) {
+                if (t.v2 == null || v2 == null || !v2.Equals(t.v2))
+                    return false;
+            }
+            return true;
+        }
+
+        public override int GetHashCode() {
+            int h = (v1 == null ? 0 : v1.GetHashCode());
+            h = (h << 5) - h + (v2 == null ? 0 : v2.GetHashCode());
+            return h;
+        }
+
+        public override string ToString() {
+            return string.Format("({0}, {1})", v1, v2);
+        }
+    }
+
     public sealed class VarDeque : IFreeze {
         private Variable[] data;
         private int head;

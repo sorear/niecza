@@ -85,6 +85,7 @@ namespace Niecza.UCD {
         static byte[] bits;
         static Dictionary<string,int[]> directory;
         static Dictionary<string,string> aliases;
+        static Dictionary<Prod<string,string>,string[]> val_aliases;
         static bool Trace;
 
         const int FILES = 4;
@@ -149,6 +150,7 @@ namespace Niecza.UCD {
         static void InflateAliases() {
             int[] loc = directory["!PropertyAlias"];
             aliases = new Dictionary<string, string>();
+            val_aliases = new Dictionary<Prod<string,string>,string[]>();
 
             int rpos = loc[2];
             while (rpos < loc[3]) {
@@ -159,9 +161,26 @@ namespace Niecza.UCD {
                     if (Trace) Console.WriteLine("Alias {0} -> {1}", alias, main);
                 }
             }
+
+            loc = directory["!pva"];
+            rpos = loc[2];
+            List<string> aset = new List<string>();
+            while (rpos < loc[3]) {
+                string tbl = AsciiZ(ref rpos);
+                string canon = AsciiZ(ref rpos);
+                if (canon == "n/a")
+                    canon = AsciiZ(ref rpos);
+                string alias;
+                aset.Add(canon);
+                while ((alias = AsciiZ(ref rpos)).Length != 0)
+                    aset.Add(alias);
+                if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
+                val_aliases[Prod.C(tbl, canon)] = aset.ToArray();
+                aset.Clear();
+            }
         }
 
-        static object InflateBinary(int[] loc) {
+        static object InflateBinary(string name, int[] loc) {
             List<int> vec = new List<int>();
             int rpos = loc[2];
             int last = 0;
@@ -173,14 +192,15 @@ namespace Niecza.UCD {
                 ntyp = 1 - ntyp;
             }
             return new LimitedProperty(vec.ToArray(), new string[][] {
-                    new string[] { "N" }, new string[] { "Y" } });
+                    val_aliases[Prod.C(name,"N")],
+                    val_aliases[Prod.C(name,"Y")] });
         }
 
-        static object InflateEnum(int[] loc) {
+        static object InflateEnum(string name, int[] loc) {
             List<string[]> names = new List<string[]>();
             int rpos2 = loc[6];
             while (rpos2 < loc[7]) {
-                names.Add(new string[] { AsciiZ(ref rpos2) });
+                names.Add(val_aliases[Prod.C(name, AsciiZ(ref rpos2))]);
             }
             int rpos0 = loc[2];
             int rpos1 = loc[4];
@@ -220,10 +240,10 @@ namespace Niecza.UCD {
 
             switch (bits[loc[0]]) {
                 case (byte)'B':
-                    r = InflateBinary(loc);
+                    r = InflateBinary(name, loc);
                     break;
                 case (byte)'E':
-                    r = InflateEnum(loc);
+                    r = InflateEnum(name, loc);
                     break;
                 default:
                     throw new NieczaException("Unhandled type code " + (char)bits[loc[0]]);
