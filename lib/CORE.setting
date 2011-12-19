@@ -456,7 +456,7 @@ my class Cool {
             $res;
         }
     }
-    method capitalize() { self.lc.subst(:g, /\w+/, { ucfirst $0 }) }
+    method capitalize() { self.lc.subst(:g, /\w+/, { ucfirst $/ }) }
 
     method index($substring, $pos?) {
         my $str = ~self;
