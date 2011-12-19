@@ -2,6 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Niecza;
 using Niecza.UCD;
 
@@ -54,6 +55,9 @@ namespace Niecza.UCD {
 
         public override int[] GetRanges(Variable filter) {
             bool[] cfilter = new bool[values.Length];
+            // minor hack to make :BoolProp work - converts to True/False
+            if (filter.Fetch().Isa(Kernel.BoolMO))
+                filter = filter.Fetch().mo.mro_Str.Get(filter);
             for (int i = 0; i < values.Length; i++) {
                 foreach (string s in values[i]) {
                     if (DoMatch(s, filter)) {
@@ -80,12 +84,59 @@ namespace Niecza.UCD {
         }
     }
 
+    // Name properties include na, na1, and Name_Alias.
+    class StringProperty : Property {
+        // KISS for now
+        int[] codepoints;
+        string[] values;
+
+        public StringProperty(int[] codepoints, string[] values) {
+            this.codepoints = codepoints;
+            this.values = values;
+        }
+
+        public override string GetValue(int cp) {
+            int lix = 0;
+            int hix = codepoints.Length;
+
+            while (true) {
+                if ((hix - lix) <= 1) {
+                    return values[lix];
+                }
+                int mix = (lix + hix) / 2;
+                if (cp >= codepoints[mix]) {
+                    lix = mix;
+                } else {
+                    hix = mix;
+                }
+            }
+        }
+
+        public override int[] GetRanges(Variable filter) {
+            List<int> res = new List<int>();
+            for (int i = 0; i < values.Length; i ++) {
+                if (DoMatch(values[i], filter)) {
+                    int upto = (i+1 == codepoints.Length) ? 0x110000 : codepoints[i+1];
+                    if (res.Count > 0 && res[res.Count-1] == codepoints[i]) {
+                        res[res.Count-1] = upto;
+                    } else {
+                        res.Add(codepoints[i]);
+                        res.Add(upto);
+                    }
+                }
+            }
+
+            return res.ToArray();
+        }
+    }
+
     static class DataSet {
         static Dictionary<string,object> cache;
         static byte[] bits;
         static Dictionary<string,int[]> directory;
         static Dictionary<string,string> aliases;
         static Dictionary<Prod<string,string>,string[]> val_aliases;
+        static string[] tokens;
         static bool Trace;
 
         const int FILES = 4;
@@ -158,7 +209,7 @@ namespace Niecza.UCD {
                 string alias;
                 while ((alias = AsciiZ(ref rpos)).Length != 0) {
                     aliases[alias] = main;
-                    if (Trace) Console.WriteLine("Alias {0} -> {1}", alias, main);
+                    //if (Trace) Console.WriteLine("Alias {0} -> {1}", alias, main);
                 }
             }
 
@@ -174,10 +225,21 @@ namespace Niecza.UCD {
                 aset.Add(canon);
                 while ((alias = AsciiZ(ref rpos)).Length != 0)
                     aset.Add(alias);
-                if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
+                //if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
                 val_aliases[Prod.C(tbl, canon)] = aset.ToArray();
                 aset.Clear();
             }
+        }
+
+        static void InflateTokens() {
+            if (tokens != null) return;
+            int[] loc = directory["!name_tokens"];
+            int rpos = loc[2];
+            List<string> tks = new List<string>();
+            while (rpos < loc[3])
+                tks.Add(AsciiZ(ref rpos));
+            tokens = tks.ToArray();
+            if (Trace) Console.WriteLine("Inflated {0} name tokens", tokens.Length);
         }
 
         static object InflateBinary(string name, int[] loc) {
@@ -216,6 +278,37 @@ namespace Niecza.UCD {
             return new LimitedProperty(data, names.ToArray());
         }
 
+        static object InflateName(string name, int[] loc) {
+            InflateTokens();
+            List<int> cps = new List<int>();
+            List<string> names = new List<string>();
+            int cp = 0;
+            int rpos = loc[2];
+            int[] buf = new int[16];
+            StringBuilder nbuf = new StringBuilder();
+            int bcnt = 0;
+            while (rpos < loc[3]) {
+                if (bits[rpos] == 255) {
+                    rpos++;
+                    cp += (int)BER(ref rpos);
+                }
+                byte tcode = bits[rpos++];
+                bcnt = (tcode >> 4);
+                while (bcnt < (tcode & 15)) {
+                    buf[bcnt++] = (int)BER(ref rpos);
+                }
+                nbuf.Length = 0;
+                for (int i = 0; i < bcnt; i++)
+                    nbuf.Append(tokens[buf[i]-1]).Append(' ');
+                if (bcnt != 0) nbuf.Length--;
+                cps.Add(cp);
+                names.Add(nbuf.ToString());
+                cp++;
+            }
+
+            return new StringProperty(cps.ToArray(), names.ToArray());
+        }
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public static object GetTable(string name) {
             if (cache == null)
@@ -244,6 +337,9 @@ namespace Niecza.UCD {
                     break;
                 case (byte)'E':
                     r = InflateEnum(name, loc);
+                    break;
+                case (byte)'N':
+                    r = InflateName(name, loc);
                     break;
                 default:
                     throw new NieczaException("Unhandled type code " + (char)bits[loc[0]]);
