@@ -84,6 +84,7 @@ namespace Niecza.UCD {
         static Dictionary<string,object> cache;
         static byte[] bits;
         static Dictionary<string,int[]> directory;
+        static Dictionary<string,string> aliases;
         static bool Trace;
 
         const int FILES = 4;
@@ -145,6 +146,21 @@ namespace Niecza.UCD {
             if (Trace) Console.WriteLine("done.");
         }
 
+        static void InflateAliases() {
+            int[] loc = directory["!PropertyAlias"];
+            aliases = new Dictionary<string, string>();
+
+            int rpos = loc[2];
+            while (rpos < loc[3]) {
+                string main = AsciiZ(ref rpos);
+                string alias;
+                while ((alias = AsciiZ(ref rpos)).Length != 0) {
+                    aliases[alias] = main;
+                    if (Trace) Console.WriteLine("Alias {0} -> {1}", alias, main);
+                }
+            }
+        }
+
         static object InflateBinary(int[] loc) {
             List<int> vec = new List<int>();
             int rpos = loc[2];
@@ -184,14 +200,19 @@ namespace Niecza.UCD {
         public static object GetTable(string name) {
             if (cache == null)
                 cache = new Dictionary<string,object>();
-            object r;
-            if (cache.TryGetValue(name, out r))
-                return r;
-
             if (bits == null) {
                 bits = File.ReadAllBytes("unidata");
                 InflateDirectory();
+                InflateAliases();
             }
+
+            object r;
+            string a;
+            if (aliases.TryGetValue(name, out a))
+                name = a;
+            if (cache.TryGetValue(name, out r))
+                return r;
+
 
             int[] loc;
             if (!directory.TryGetValue(name, out loc))
