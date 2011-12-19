@@ -1273,6 +1273,9 @@ my class Pair is Enum {
     method Str() {
         $.key ~ "\t" ~ $.value
     }
+    method invert() {
+        $.value => $.key
+    }
 }
 
 # XXX This ought to be more read-only
@@ -1396,6 +1399,7 @@ sub invert(%h) { %h.invert }
 sub keys(%h) { %h.keys }
 sub values(%h) { %h.values }
 
+sub kv($p) { $p.kv }
 
 sub sort(*@bits) { @bits.sort }
 
