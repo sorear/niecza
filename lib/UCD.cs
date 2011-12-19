@@ -16,6 +16,7 @@ using Niecza.UCD;
 namespace Niecza.UCD {
     abstract class Property {
         public abstract int[] GetRanges(Variable filter);
+        public abstract string GetValue(int cp);
 
         protected static bool DoMatch(string value, Variable filter) {
             Variable r = Kernel.RunInferior(filter.Fetch().InvokeMethod(
@@ -32,6 +33,23 @@ namespace Niecza.UCD {
         public LimitedProperty(int[] data, string[][] values) {
             this.data = data;
             this.values = values;
+        }
+
+        public override string GetValue(int cp) {
+            int lix = 0;
+            int hix = data.Length / 2;
+
+            while (true) {
+                if ((hix - lix) <= 1) {
+                    return values[data[lix*2+1]][0];
+                }
+                int mix = (lix + hix) / 2;
+                if (cp >= data[mix*2]) {
+                    lix = mix;
+                } else {
+                    hix = mix;
+                }
+            }
         }
 
         public override int[] GetRanges(Variable filter) {
@@ -142,6 +160,26 @@ namespace Niecza.UCD {
                     new string[] { "N" }, new string[] { "Y" } });
         }
 
+        static object InflateEnum(int[] loc) {
+            List<string[]> names = new List<string[]>();
+            int rpos2 = loc[6];
+            while (rpos2 < loc[7]) {
+                names.Add(new string[] { AsciiZ(ref rpos2) });
+            }
+            int rpos0 = loc[2];
+            int rpos1 = loc[4];
+            int[] data = new int[(loc[5] - loc[4]) * 2];
+            int lix = 0;
+            for (int i = 0; i < data.Length / 2; i++) {
+                lix += (int)BER(ref rpos0);
+                data[2*i] = lix;
+                data[2*i+1] = bits[rpos1++];
+                //if (Trace) Console.WriteLine("inflate: {0} = {1}", data[2*i], names[data[2*i+1]][0]);
+            }
+
+            return new LimitedProperty(data, names.ToArray());
+        }
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public static object GetTable(string name) {
             if (cache == null)
@@ -163,6 +201,9 @@ namespace Niecza.UCD {
                 case (byte)'B':
                     r = InflateBinary(loc);
                     break;
+                case (byte)'E':
+                    r = InflateEnum(loc);
+                    break;
                 default:
                     throw new NieczaException("Unhandled type code " + (char)bits[loc[0]]);
             }
@@ -182,5 +223,12 @@ public partial class Builtins {
         for (int i = 0; i < rranges.Length; i++)
             cranges[i] = Builtins.MakeInt(rranges[i]);
         return Builtins.MakeParcel(cranges);
+    }
+
+    public static Variable ucd_get_value(Variable tbl, Variable ch) {
+        Property p = (Property)DataSet.GetTable(
+                tbl.Fetch().mo.mro_raw_Str.Get(tbl));
+        return MakeStr(p.GetValue(
+                (int) ch.Fetch().mo.mro_raw_Numeric.Get(ch)));
     }
 }
