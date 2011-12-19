@@ -1745,6 +1745,7 @@ my class Range is Cool {
     }
 
     method Str() { self.list.Str }
+    method Numeric() { +self.list }
     method perl() {
         ( $.min.perl,
           ('^' if $.excludes_min),
