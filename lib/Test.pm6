@@ -93,13 +93,15 @@ sub is_deeply($a,$b,$c) is export { is $a.perl, $b.perl, $c }
 sub is(\$got, \$expected, $tag?) is export {
 
     # avoid comparing twice
-    my $equal = (~$got) eq (~$expected);
+    my $sgot  = ~($got // '');
+    my $sexpexted = ~($expected // '');
+    my $equal = $sgot eq $sexpexted;
 
     $*TEST-BUILDER.ok($equal, $tag);
     if !$equal {
         $*TEST-BUILDER.note('   Failed test');
-        $*TEST-BUILDER.note('          got: ' ~ ~$got);
-        $*TEST-BUILDER.note('     expected: ' ~ ~$expected);
+        $*TEST-BUILDER.note("          got: $sgot");
+        $*TEST-BUILDER.note("     expected: $sexpexted");
     }
 }
 sub isnt(Mu $got, Mu $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
