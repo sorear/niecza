@@ -535,15 +535,16 @@ namespace Niecza {
             BigInteger num = BigInteger.Zero;
             BigInteger den = BigInteger.Zero;
 
+            bool frac = false;
             bool neg = false;
 
             foreach (char d in digits) {
                 if (d == '-') neg = true;
                 if (d == '_') continue;
-                if (d == '.') {
-                    if (den != BigInteger.Zero)
-                        throw new Exception("two dots in " + digits);
-                    den = BigInteger.One;
+                if (d == '/') {
+                    if (frac)
+                        throw new Exception("two slashes in " + digits);
+                    frac = true;
                     continue;
                 }
                 int digval;
@@ -554,9 +555,13 @@ namespace Niecza {
 
                 if (digval >= numbase) { throw new Exception("out of range digit in " + digits); }
 
-                num *= numbase;
-                den *= numbase;
-                num += digval;
+                if (frac) {
+                    den *= numbase;
+                    den += digval;
+                } else {
+                    num *= numbase;
+                    num += digval;
+                }
             }
 
             if (neg) num = -num;

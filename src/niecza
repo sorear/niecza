@@ -47,6 +47,91 @@ class RxOp::Endpoint is RxOp {
 }
 
 augment class NieczaActions {
+# can remove XXX comment on from_base
+sub from_base($str, $base) {
+    my $acc = 0;
+    my $punto = -1;
+    for $str.lc.comb -> $ch {
+        next if $ch eq '_';
+        if $ch eq '.' { $punto = 0; next; }
+        $punto++ if $punto >= 0;
+        $acc = $acc * $base + ($ch ge 'a' ?? ord($ch) - 87 !! ord($ch) - 48);
+    }
+    $punto >= 0 ?? $acc / ($base ** $punto) !! $acc
+}
+method integer($/) {
+    $<decint> andthen make $<decint>.ast;
+    $<octint> andthen make $<octint>.ast;
+    $<hexint> andthen make $<hexint>.ast;
+    $<binint> andthen make $<binint>.ast;
+}
+method dec_number ($/) {
+    if $<escale> { make +((~$/).comb(/<-[_]>/).join("")) }
+    else { make from_base($/, 10) }
+}
+method rad_number ($/) {
+    if $<circumfix> {
+        $/.CURSOR.sorry("Runtime base conversions NYI");
+        make 0;
+        return;
+    }
+    my $radix = +$<radix>;
+    my $value = $<int> ?? from_base($<int>, $radix) !! 0;
+    if $<frac> -> $fr {
+        my $shift = $fr.chars - $fr.comb('_');
+        $value += (from_base($fr, $radix) / ($radix ** $shift));
+    }
+    if $<base> {
+        $value = $value * $<base>.ast ** ($<exp> ?? $<exp>.ast !! 0);
+        $value = $value.Num; # exponential notation is always imprecise here
+    }
+    make $value;
+}
+method radint($/) {
+    $<rad_number> && make $<rad_number>.ast;
+    $<integer> && make $<integer>.ast;
+}
+method charname($/) {
+    if $<radint> {
+        if $<radint>.ast !~~ (Int & 0 .. 0x10FFFF) {
+            $/.CURSOR.sorry("Numeric character identifiers must be integers between 0 and 0x10FFFF");
+            make ' ';
+        } else {
+            make chr($<radint>.ast);
+        }
+    } else {
+        my $chr = ' ';
+        $/.CURSOR.trymop({ $chr = $*backend.get_codepoint(~$/) });
+        make $chr;
+    }
+}
+method charnames($/) { make join "", map *.ast, @$<charname> }
+method charspec($/) {
+    if $<charnames> { make $<charnames>.ast }
+    else {
+        my $str = ~$/;
+        if $str ~~ /^\d/ {
+            make chr(+$str);
+        } else {
+            make chr(ord($str) +& 31);
+        }
+    }
+}
+
+method backslash:c ($/) { make $<charspec>.ast; self.post_backslash($/); }
+
+method number($/) {
+    my $child = $<integer> // $<dec_number> // $<rad_number>;
+    if !defined $child {
+        make $/ eq 'NaN' ?? (0e0/0e0) !! Inf;
+    } else {
+        given $child.ast {
+            when Num { make $_ }
+            when Int { make [ 10, ~$_ ] }
+            when Rat { make [ 10, "{.numerator}/{.denominator}" ] }
+        }
+    }
+}
 method cclass_elem:property ($/) {
     my $body = self.thunk_sub($<colonpair>.ast<term>, name => ~$<colonpair>);
     $body.outer.create_static_pad;
