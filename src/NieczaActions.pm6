@@ -203,11 +203,9 @@ method charspec($/) {
 
 # Value :: Op
 method value($ ) { }
-# TODO: Implement the rest of the numeric hierarchy once MMD exists
 method value:number ($/){ make ::Op::Num.new(|node($/), value => $<number>.ast)}
 method value:quote ($/) { make $<quote>.ast }
 
-# make ~$/ is default
 method ident($ ) { }
 method identifier($ ) { }
 method label($/) {
@@ -219,7 +217,7 @@ method label($/) {
 
 # Either String Op
 method morename($/) {
-    make ($<identifier> ?? $<identifier>.ast !! $<EXPR> ?? $<EXPR>.ast !! Any);
+    make ($<identifier> ?? ~$<identifier> !! $<EXPR> ?? $<EXPR>.ast !! Any);
 }
 
 method typename($ ) { }
@@ -228,7 +226,7 @@ method type_constraint($ ) { }
 # { dc: Bool, names: [Either String Op] }
 method name($/) {
     my @names = map *.ast, @$<morename>;
-    unshift @names, $<identifier>.ast if $<identifier>;
+    unshift @names, ~$<identifier> if $<identifier>;
     make { dc => !$<identifier>, names => @names };
 }
 
@@ -946,8 +944,7 @@ method assertion:name ($/) {
                 positionals => [ mklex($/, '$¢'), @$args ]);
         } else {
             $callop = ::Operator::Method.new(name => $pname<name>, :$args,
-                package => $pname<pkg> && $pname<pkg>.xref)\
-                    .with_args($/, mklex($/, '$¢'));
+                package => $pname<pkg>).with_args($/, mklex($/, '$¢'));
         }
 
         my $regex = self.rxembed($/, $callop, True);
@@ -1815,7 +1812,7 @@ method term:name ($/) {
 }
 
 method term:identifier ($/) {
-    my $id  = $<identifier>.ast;
+    my $id  = ~$<identifier>;
     my $sal = $<args> ?? ($<args>.ast // []) !! [];
     # TODO: support zero-D slicels
 
@@ -1910,7 +1907,7 @@ method do_variable_reference($M, $v) {
     if $tw eq '!' {
         my $pclass;
         if $v<pkg> {
-            $pclass = $v<pkg>.xref;
+            $pclass = $v<pkg>;
         } elsif $*CURLEX<!sub>.in_class -> $c {
             $pclass = $c;
         } else {
