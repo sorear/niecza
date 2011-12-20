@@ -1,7 +1,8 @@
 using System;
+using System.Reflection;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using Niecza;
 using Niecza.UCD;
@@ -485,7 +486,10 @@ namespace Niecza.UCD {
             if (cache == null)
                 cache = new Dictionary<string,object>();
             if (bits == null) {
-                bits = File.ReadAllBytes("unidata");
+                Stream unidata = Assembly.GetExecutingAssembly().
+                    GetManifestResourceStream("unidata");
+                bits = new byte[unidata.Length];
+                unidata.Read(bits, 0, bits.Length);
                 InflateDirectory();
                 InflateAliases();
             }

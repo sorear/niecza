@@ -47,12 +47,12 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/ni
 boot/obj/Run.CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 	$(CSC) /target:library /out:boot/obj/Run.CompilerBlob.dll /r:Run.Kernel \
 	    /lib:boot/obj src/CompilerBlob.cs
-obj/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel))
+obj/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
 	$(CSC) /target:exe /out:obj/Run.Kernel.dll /lib:obj /unsafe+ \
-	    $(patsubst %,lib/%,$(cskernel))
-obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel))
+	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
+obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
 	$(CSC) /target:exe /out:obj/Kernel.dll /lib:obj /unsafe+ \
-	    $(patsubst %,lib/%,$(cskernel))
+	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
 
 perl5: obj/Perl5Interpreter.dll obj/p5embed.so
 obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
