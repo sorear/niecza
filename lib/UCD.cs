@@ -125,6 +125,7 @@ namespace Niecza.UCD {
                 } else
                     rt[shrt] = codepoints[i];
             }
+
             return rt;
         }
 
@@ -501,8 +502,16 @@ namespace Niecza.UCD {
             if (cache.TryGetValue(name, out r))
                 return r;
 
-            if (name == "!inverse_name")
-                return cache[name] = (GetTable("na") as StringProperty).MakeInverseMap();
+            if (name == "!inverse_name") {
+                var inv = (GetTable("na") as StringProperty).MakeInverseMap();
+                var na1 = GetTable("na1") as StringProperty;
+                for (int i = 0; i < 32; i++)
+                    inv[StringProperty.Loosen(na1.GetValue(i))] = i;
+                for (int i = 128; i < 160; i++)
+                    inv[StringProperty.Loosen(na1.GetValue(i))] = i;
+
+                return cache[name] = inv;
+            }
 
             int[] loc;
             if (!directory.TryGetValue(name, out loc))
