@@ -2084,6 +2084,13 @@ sub term:« now »() {
 sub times() { Q:CgOp { (times) } }
 sub term:« time »() { Q:CgOp { (now) } }
 sub term:« rand »() { Q:CgOp { (rand) } }
+sub srand($seed?) {
+    if $seed.defined {
+        Q:CgOp { (rnull (srand (cast int (obj_getnum {$seed})))) }
+    } else {
+        Q:CgOp { (rnull (srand_time)) }
+    }
+}
 
 my class IO {
     has $.path; # Str

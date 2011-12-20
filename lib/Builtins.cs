@@ -1627,12 +1627,21 @@ flat_enough:;
     }
 
     [TrueGlobal]
+    private static object rng_lock = new object();
     private static Random rng = new Random();
 
     public static Variable rand() {
         double i;
-        lock (rng) { i = rng.NextDouble(); }
+        lock (rng_lock) { i = rng.NextDouble(); }
         return MakeFloat(i);
+    }
+
+    public static void srand(int seed) {
+        lock (rng_lock) { rng = new Random(seed); }
+    }
+
+    public static void srand_time() {
+        lock (rng_lock) { rng = new Random(); }
     }
 
     public static bool path_any_exists(string path) {
