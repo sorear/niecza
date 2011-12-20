@@ -2388,7 +2388,7 @@ grammar P6 is STD {
             ]
         ]
 
-        { my $t = $<twigil>; $twigil = ($t.[0] // '').Str if @$t; }
+        { my $t = $<twigil>; $twigil = ($t.[0] // '').Str if $t; }
         [ <?{ $twigil eq '.' }>
             [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix>
         ]?
