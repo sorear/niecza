@@ -3731,6 +3731,12 @@ dynamic:
             } else if (cmd == "sub_set_inlined") {
                 ((SubInfo)Handle.Unbox(args[1])).SetInlined();
                 return null;
+            } else if (cmd == "sub_run_BEGIN_CC") {
+                SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
+                Variable v  = si.RunBEGIN();
+                // no really this is a horrible hack... we need a way for
+                // the compiler to directly manipulate MOP values
+                return Niecza.UCD.DataSet.CompileCClass(v);
             } else if (cmd == "sub_run_BEGIN") {
                 SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
                 Variable v  = si.RunBEGIN();
@@ -4366,6 +4372,8 @@ dynamic:
             } else if (cmd == "safemode") {
                 Kernel.SaferMode = true;
                 return null;
+            } else if (cmd == "get_codepoint") {
+                return Niecza.UCD.DataSet.GetCodepoint((string)args[1]);
             } else {
                 ShowCall(args);
                 return new Exception("No handler for downcall " + cmd);

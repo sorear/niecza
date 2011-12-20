@@ -580,6 +580,21 @@ namespace Niecza.UCD {
 
             throw new NieczaException("Unrecognized character name " + name);
         }
+
+        public static object CompileCClass(Variable pair) {
+            P6any pairo = pair.Fetch();
+            Variable tbl = (Variable)pairo.GetSlot("key");
+            Variable sm =  (Variable)pairo.GetSlot("value");
+            Property p = (Property)DataSet.GetTable(
+                    tbl.Fetch().mo.mro_raw_Str.Get(tbl));
+            int[] rranges = p.GetRanges(sm);
+            object[] cranges = new object[rranges.Length * 2];
+            for (int i = 0; i < rranges.Length; i++) {
+                cranges[2*i] = rranges[i];
+                cranges[2*i+1] = ((i & 1) != 0) ? 0 : 0x3FFFFFFF;
+            }
+            return cranges;
+        }
     }
 }
 

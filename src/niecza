@@ -47,6 +47,15 @@ class RxOp::Endpoint is RxOp {
 }
 
 augment class NieczaActions {
+method cclass_elem:property ($/) {
+    my $body = self.thunk_sub($<colonpair>.ast<term>, name => ~$<colonpair>);
+    $body.outer.create_static_pad;
+    make self.void_cc;
+    $/.CURSOR.trymop({
+        make self.cclass_cc(CClass.new(terms => [ $body.run_BEGIN_CC ]));
+    });
+}
+
 method metachar:sym« <( » ($/) {
     make ::RxOp::Endpoint.new(|node($/), :type<from>)
 }

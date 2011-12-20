@@ -4888,6 +4888,8 @@ ltm:
         public static void SetStatus(Frame th, string name, Variable v) {
             th = th.caller;
             while (true) {
+                if (th == null)
+                    return;
                 string n = th.info.name;
                 // Mega-Hack: These functions wrap stuff and should
                 // propagate $/
