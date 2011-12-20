@@ -18,3 +18,5 @@ sub ranges($table, $matcher) is export {
 }
 
 sub value($table, $chr) is export { get_value_num($table, ord $chr) }
+
+sub get_codepoint($name) is export { Q:CgOp { (ucd_get_codepoint {$name}) } }

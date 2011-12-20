@@ -103,6 +103,30 @@ namespace Niecza.UCD {
             this.jsn = (Property)DataSet.GetTable("JSN");
         }
 
+        public static string Loosen(string inp) {
+            StringBuilder o = new StringBuilder();
+            foreach (char ch in inp)
+                if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') ||
+                        (ch >= 'A' && ch <= 'Z'))
+                    o.Append(char.ToUpper(ch));
+            return o.ToString();
+        }
+
+        public Dictionary<string,int> MakeInverseMap() {
+            Dictionary<string,int> rt = new Dictionary<string,int>();
+            for (int i = 0; i < values.Length; i++) {
+                if (values[i] == "" || values[i][values[i].Length-1] == '#')
+                    continue;
+                string shrt = Loosen(values[i]);
+                if (codepoints[i+1] - codepoints[i] != 1 ||
+                        rt.ContainsKey(shrt)) {
+                    //Console.WriteLine("duplicate {0}", values[i]);
+                } else
+                    rt[shrt] = codepoints[i];
+            }
+            return rt;
+        }
+
         // Hangul decomposition constants
         const int SBASE  = 0xAC00;
         const int LBASE  = 0x1100;
@@ -151,6 +175,31 @@ namespace Niecza.UCD {
                 }
             }
             return raw;
+        }
+
+
+        int MatchJSN(int min, int ct, string into, ref int at) {
+            int blen = -1;
+            int best = -1;
+            for (int code = min; code < min+ct; code++) {
+                string name = jsn.GetValue(code);
+                if (name.Length + at <= into.Length &&
+                        into.Substring(at, name.Length) == name &&
+                        name.Length > blen) {
+                    blen = name.Length;
+                    best = code - min;
+                }
+            }
+            at += blen;
+            return best;
+        }
+        public string ParseHangul(string from, int pos) {
+            int l = MatchJSN(LBASE, LCOUNT, from, ref pos);
+            int v = MatchJSN(VBASE, VCOUNT, from, ref pos);
+            int t = MatchJSN(TBASE, TCOUNT, from, ref pos);
+            if (pos != from.Length || l < 0 || v < 0 || t < 0)
+                return null;
+            return Utils.Chr(SBASE + l * NCOUNT + v * TCOUNT + t);
         }
 
         bool IsVariable(int cpl, int cph, string raw) {
@@ -448,6 +497,8 @@ namespace Niecza.UCD {
             if (cache.TryGetValue(name, out r))
                 return r;
 
+            if (name == "!inverse_name")
+                return cache[name] = (GetTable("na") as StringProperty).MakeInverseMap();
 
             int[] loc;
             if (!directory.TryGetValue(name, out loc))
@@ -473,6 +524,58 @@ namespace Niecza.UCD {
             cache[name] = r;
             return r;
         }
+
+        static bool HanCodepoint(string name, string prefix, ref int cp) {
+            if (name.Length < prefix.Length + 4)
+                return false;
+            if (name.Length > prefix.Length + 6)
+                return false;
+            if (name.Substring(0,prefix.Length) != prefix)
+                return false;
+            int ctr = 0;
+            for (int i = prefix.Length; i < name.Length; i++) {
+                ctr <<= 4;
+                if (name[i] >= 'A' && name[i] <= 'F')
+                    ctr += ((int)name[i]) - ((int)'A') + 10;
+                else if (name[i] >= '0' && name[i] <= '9')
+                    ctr += ((int)name[i]) - ((int)'0');
+                else
+                    return false;
+            }
+            cp = ctr;
+            return true;
+        }
+
+        public static string GetCodepoint(string name) {
+            var fmap = (StringProperty) GetTable("na");
+            var imap = (Dictionary<string,int>) GetTable("!inverse_name");
+            string loose = StringProperty.Loosen(name);
+            bool dash = name.IndexOf('-') >= 0;
+
+            if (loose == "HANGULJUNGSEONGOE")
+                return dash ? "\u1180" : "\u116C";
+            if (loose == "TIBETANSUBJOINEDLETTERA")
+                return dash ? "\u0FB0" : "\u0FB8";
+            if (loose == "TIBETANLETTERA")
+                return dash ? "\u0F60" : "\u0F68";
+
+            int codep = 0;
+            if (HanCodepoint(loose, "CJKCOMPATIBILITYIDEOGRAPH", ref codep) ||
+                    HanCodepoint(loose, "CJKUNIFIEDIDEOGRAPH", ref codep)) {
+                if (StringProperty.Loosen(fmap.GetValue(codep)) == loose)
+                    return Utils.Chr(codep);
+            }
+
+            if (loose.Length >= 14 &&
+                    loose.Substring(0,14) == "HANGULSYLLABLE") {
+                return fmap.ParseHangul(loose, 14);
+            }
+
+            if (imap.ContainsKey(loose))
+                return Utils.Chr(imap[loose]);
+
+            throw new NieczaException("Unrecognized character name " + name);
+        }
     }
 }
 
@@ -492,5 +595,10 @@ public partial class Builtins {
                 tbl.Fetch().mo.mro_raw_Str.Get(tbl));
         return MakeStr(p.GetValue(
                 (int) ch.Fetch().mo.mro_raw_Numeric.Get(ch)));
+    }
+
+    public static Variable ucd_get_codepoint(Variable ch) {
+        return MakeStr(DataSet.GetCodepoint(
+            ch.Fetch().mo.mro_raw_Str.Get(ch)));
     }
 }
