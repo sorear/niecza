@@ -1317,7 +1317,7 @@ grammar P6 is STD {
                     {
                         my $sp = $<EXPR><root><statement_prefix>;
                         if $sp and $sp<sym> eq 'do' {
-                           my $s = $<statement_mod_loop>[0]<sym>;
+                           my $s = $<statement_mod_loop><sym>;
                            $¢.obs("do...$s" ,"repeat...$s");
                         }
                     }
@@ -1709,7 +1709,7 @@ grammar P6 is STD {
         :my $outer = $*CURLEX;
         { $*SCOPE ||= 'our'; }
         [
-            [ <longname> { $longname = $<longname>[0]; } ]?
+            [ <longname> { $longname = $<longname>; } ]?
             <.newlex(0, ($*PKGDECL//'') ne 'role')>
             [ :dba('generic role')
                 <?{ ($*PKGDECL//'') eq 'role' }>
@@ -2388,7 +2388,7 @@ grammar P6 is STD {
             ]
         ]
 
-        { my $t = $<twigil>; $twigil = ($t.[0] // '').Str if $t; }
+        { my $t = $<twigil>; $twigil = ($t // '').Str if $t; }
         [ <?{ $twigil eq '.' }>
             [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix>
         ]?
@@ -2685,7 +2685,7 @@ grammar P6 is STD {
         [ '-->' <.ws>
             [
             || <type_constraint>
-            || <longname> <.panic("Typename " ~ $<longname>[0].Str ~ " must be predeclared")>
+            || <longname> <.panic("Typename " ~ $<longname>.Str ~ " must be predeclared")>
             || <.panic: "No type found after -->">
             ]
             <.ws>
@@ -3102,8 +3102,8 @@ grammar P6 is STD {
             | {} <?postfix> <.panic: "Postfix found where infix expected (change whitespace?)">
             ]
             [ <?before '='> <assign_meta_operator($<infix>)>
-                   {$O = $<assign_meta_operator>[0]<O>}
-                   {$sym = $<assign_meta_operator>[0]<sym>}
+                   {$O = $<assign_meta_operator><O>}
+                   {$sym = $<assign_meta_operator><sym>}
             ]?
 
         ]
@@ -3229,8 +3229,8 @@ grammar P6 is STD {
         :my $sym = 'X';
         X <?before \S> {}
         [ <infixish('X')>
-            <.can_meta($<infixish>[0], "cross with")>
-            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $sym ~= $<infixish>[0].Str }
+            <.can_meta($<infixish>, "cross with")>
+            { %subO = %( $<infixish><O> ); %subO<prec>:delete; $sym ~= $<infixish>.Str }
         ]?
         $<sym> = {$sym}
         <O(|%list_infix, |%subO)>
@@ -3241,8 +3241,8 @@ grammar P6 is STD {
         :my $sym = 'Z';
         Z <?before \S> {}
         [ <infixish('Z')>
-            <.can_meta($<infixish>[0], "zip with")>
-            { %subO = %( $<infixish>[0]<O> ); %subO<prec>:delete; $sym ~= $<infixish>[0].Str }
+            <.can_meta($<infixish>, "zip with")>
+            { %subO = %( $<infixish><O> ); %subO<prec>:delete; $sym ~= $<infixish>.Str }
         ]?
         $<sym> = {$sym}
         <O(|%list_infix, |%subO)>
@@ -3643,7 +3643,7 @@ grammar P6 is STD {
         [ \h*
             ('True'|'False'|'Bool::True'|'Bool::False') <?before \s>
             {
-                my $litbool = $0[0].Str;
+                my $litbool = $0.Str;
                 my $true = $litbool ~~ /True/;
                 self.worry("Smartmatch against $litbool always " ~
                     ($true ?? 'matches' !! 'fails') ~
@@ -3812,7 +3812,7 @@ grammar P6 is STD {
             if grep { $^valid eq $name }, <new clone sort subst trans reverse uniq map samecase substr flip fmt pick> {
                 $ok = 1;
             }
-            elsif not $methop.<args>[0] {
+            elsif not $methop.<args> {
                 $ok = 1;
             }
         };
@@ -3903,7 +3903,7 @@ grammar P6 is STD {
                 }
             }
             if %deftrap{$name} {
-                my $al = $<args><arglist>[0];
+                my $al = $<args><arglist>;
                 my $ok = 0;
                 $ok = 1 if $isname;
                 $ok = 1 if $al and $al.from != $al.to;
@@ -5069,7 +5069,7 @@ grammar Regex is STD {
     token quantifier:sym<**> { <sym> :: <normspace>? <quantmod> <normspace>?
         [
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
-        | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
+        | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1.Str } | '*' | <.panic: "Malformed range"> ] ]?
         | <embeddedblock>
         | {} <quantified_atom> <.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, " nowadays")>
         ]
