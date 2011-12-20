@@ -27,7 +27,6 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1507) No support for indirect <::($name)> calls
        Also, nice fossil.
 (1585) <[ z..a ]> not treated as compile error DISCUSS
-(1634) No Unicode properties
 (1679) No <.>
 (1718) No <?same>, <?at($pos)>
 (1733) <?after> is incomplete

@@ -193,7 +193,7 @@ method charspec($/) {
     if $<charnames> { make $<charnames>.ast }
     else {
         my $str = ~$/;
-        if $str ~~ /^\d/ {
+        if do { my $/; $str ~~ /^\d/ } {
             make chr(+$str);
         } else {
             make chr(ord($str) +& 31);
@@ -1166,7 +1166,7 @@ method process_nibble($/, @bits, $prefix?) {
         if $ast !~~ Op && defined($prefix) && $prefix ne "" {
             my $start_nl = !$n.from || "\r\n".index(
                 substr($n.orig, $n.from-1, 1)).defined;
-            $ast = $ast.split(/ ^^ [ <?{ $start_nl }> || <?after <[\r\n]> > ]
+            $ast = $ast.split(/ ^^ [ <?{ $start_nl }> || <?after <[\x0A\x0D]> > ]
                 <before \h>[ $prefix || \h+ ]/).join("");
         }
 
