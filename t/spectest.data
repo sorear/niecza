@@ -322,6 +322,7 @@ S32-num/log.t
 S32-num/pi.t
 S32-num/polar.t
 S32-num/power.t
+S32-num/rand.t
 S32-num/rat.t
 S32-num/rounders.t
 S32-num/sign.t
