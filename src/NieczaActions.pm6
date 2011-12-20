@@ -103,15 +103,16 @@ method category:mod_internal ($ ) { }
 
 method sign($ ) { }
 
-# XXX It's wrong to be converting values into numbers at this stage, because
-# it makes the output dependant on the host perl's numerics capability.
 sub from_base($str, $base) {
     my $acc = 0;
+    my $punto = -1;
     for $str.lc.comb -> $ch {
         next if $ch eq '_';
+        if $ch eq '.' { $punto = 0; next; }
+        $punto++ if $punto >= 0;
         $acc = $acc * $base + ($ch ge 'a' ?? ord($ch) - 87 !! ord($ch) - 48);
     }
-    $acc
+    $punto >= 0 ?? $acc / ($base ** $punto) !! $acc
 }
 
 method decint($/) { make from_base($/, 10) }
@@ -119,10 +120,10 @@ method hexint($/) { make from_base($/, 16) }
 method octint($/) { make from_base($/, 8) }
 method binint($/) { make from_base($/, 2) }
 method integer($/) {
-    $<decint> andthen make [10, ~$<decint>];
-    $<octint> andthen make [8,  ~$<octint>];
-    $<hexint> andthen make [16, ~$<hexint>];
-    $<binint> andthen make [2,  ~$<binint>];
+    $<decint> andthen make $<decint>.ast;
+    $<octint> andthen make $<octint>.ast;
+    $<hexint> andthen make $<hexint>.ast;
+    $<binint> andthen make $<binint>.ast;
 }
 
 method decints($/) { make [ map *.ast, @$<decint> ] }
@@ -133,20 +134,71 @@ method binints($/) { make [ map *.ast, @$<binint> ] }
 method escale ($/) { }
 method dec_number ($/) {
     if $<escale> { make +((~$/).comb(/<-[_]>/).join("")) }
-    else { make [10, ~$/] }
+    else { make from_base($/, 10) }
 }
 
 method alnumint ($/) { }
-method radint ($/) { }
+method radint($/) {
+    $<rad_number> && make $<rad_number>.ast;
+    $<integer> && make $<integer>.ast;
+}
 method rad_number ($/) {
-    # MUST: need to handle base and exp fields as well
-    make [+$<radix>, ~$<coeff>]
+    if $<circumfix> {
+        $/.CURSOR.sorry("Runtime base conversions NYI");
+        make 0;
+        return;
+    }
+    my $radix = +$<radix>;
+    my $value = $<int> ?? from_base($<int>, $radix) !! 0;
+    if $<frac> -> $fr {
+        my $shift = $fr.chars - $fr.comb('_');
+        $value += (from_base($fr, $radix) / ($radix ** $shift));
+    }
+    if $<base> {
+        $value = $value * $<base>.ast ** ($<exp> ?? $<exp>.ast !! 0);
+        $value = $value.Num; # exponential notation is always imprecise here
+    }
+    make $value;
 }
 
 method number($/) {
     my $child = $<integer> // $<dec_number> // $<rad_number>;
-    make (defined($child) ?? $child.ast !!
-        $/ eq 'NaN' ?? (0e0/0e0) !! Inf);
+    if !defined $child {
+        make $/ eq 'NaN' ?? (0e0/0e0) !! Inf;
+    } else {
+        given $child.ast {
+            when Num { make $_ }
+            when Int { make [ 10, ~$_ ] }
+            when Rat { make [ 10, "{.numerator}/{.denominator}" ] }
+        }
+    }
+}
+
+method charname($/) {
+    if $<radint> {
+        if $<radint>.ast !~~ (Int & 0 .. 0x10FFFF) {
+            $/.CURSOR.sorry("Numeric character identifiers must be integers between 0 and 0x10FFFF");
+            make ' ';
+        } else {
+            make chr($<radint>.ast);
+        }
+    } else {
+        my $chr = ' ';
+        $/.CURSOR.trymop({ $chr = $*backend.get_codepoint(~$/) });
+        make $chr;
+    }
+}
+method charnames($/) { make join "", map *.ast, @$<charname> }
+method charspec($/) {
+    if $<charnames> { make $<charnames>.ast }
+    else {
+        my $str = ~$/;
+        if $str ~~ /^\d/ {
+            make chr(+$str);
+        } else {
+            make chr(ord($str) +& 31);
+        }
+    }
 }
 
 # Value :: Op
@@ -422,12 +474,7 @@ method regex_def_2 ($, $/ = $*cursor) {
 method regex_def($/) {
     my $ast = $<regex_block>.ast;
 
-    if $*CURLEX<!multi> eq 'proto' {
-        if ($<signature> && $<signature>[0].ast.params != 1) ||
-                !$<regex_block><onlystar> {
-            $/.CURSOR.sorry('Only {*} protoregexes with no parameters are supported');
-        }
-
+    if $<regex_block><onlystar> {
         $ast = ::RxOp::ProtoRedis.new(name => $*CURLEX<!name>);
     }
 
@@ -435,8 +482,12 @@ method regex_def($/) {
     my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
     $*CURLEX<!sub>.set_ltm($ltm);
     ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
-    $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
-        name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
+    if $<regex_block><onlystar> {
+        $*CURLEX<!sub>.finish_dispatcher('regex');
+    } else {
+        $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
+            name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
+    }
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
 
@@ -601,12 +652,20 @@ method metachar:sym<( )> ($/) {
         self.encapsulate_regex($/, $<nibbler>.ast, passcut => True));
 }
 
-method metachar:sym« <( » ($/) { make ::RxOp::MarkFrom.new }
-method metachar:sym« )> » ($/) { make ::RxOp::MarkTo.new }
+method metachar:sym« <( » ($/) {
+    make ::RxOp::Endpoint.new(|node($/), :type<from>)
+}
+method metachar:sym« )> » ($/) {
+    make ::RxOp::Endpoint.new(|node($/), :type<to>)
+}
 method metachar:sym« << » ($/) { make ::RxOp::ZeroWidth.new(type => '<<') }
 method metachar:sym« >> » ($/) { make ::RxOp::ZeroWidth.new(type => '>>') }
 method metachar:sym< « > ($/) { make ::RxOp::ZeroWidth.new(type => '<<') }
 method metachar:sym< » > ($/) { make ::RxOp::ZeroWidth.new(type => '>>') }
+method metachar:sym<{*}> ($/) {
+    make ::RxOp::ProtoRedis.new(name => '', :!cutltm);
+    return;
+}
 
 method metachar:qw ($/) {
     my $cif = $<circumfix>.ast;
@@ -806,9 +865,12 @@ method cclass_elem:sym<( )> ($/) {
 }
 
 method cclass_elem:property ($/) {
-    # $<colonpair>
-    $/.CURSOR.sorry("Character property database NYI");
+    my $body = self.thunk_sub($<colonpair>.ast<term>, name => ~$<colonpair>);
+    $body.outer.create_static_pad;
     make self.void_cc;
+    $/.CURSOR.trymop({
+        make self.cclass_cc(CClass.new(terms => [ $body.run_BEGIN_CC ]));
+    });
 }
 
 method cclass_elem:quote ($/) {
@@ -854,10 +916,10 @@ method assertion:name ($/) {
         make ::RxOp::Sym.new(igcase => %*RX<i>, igmark => %*RX<a>,
             text => %*RX<sym> // '', endsym => %*RX<endsym>);
     } elsif $name eq 'before' {
-        make ::RxOp::Before.new(zyg => [$<nibbler>[0].ast]);
+        make ::RxOp::Before.new(zyg => [$<nibbler>.ast]);
         return Nil;
     } elsif $name eq 'after' {
-        my @l = $<nibbler>[0].ast.tocclist;
+        my @l = $<nibbler>.ast.tocclist;
         if grep { !defined $_ }, @l {
             $/.CURSOR.sorry("Unsuppored elements in after list");
             make ::RxOp::Sequence.new;
@@ -1059,6 +1121,7 @@ method backslash:misc ($/) { make ($<text> // ~$<litchar>) }
 method backslash:sym<0> ($/) { make "\0" }
 method backslash:a ($/) { make "\a"; self.post_backslash($/) }
 method backslash:b ($/) { make "\b"; self.post_backslash($/) }
+method backslash:c ($/) { make $<charspec>.ast; self.post_backslash($/); }
 method backslash:d ($/) { make $CClass::Digit; self.post_backslash($/) }
 method backslash:e ($/) { make "\e"; self.post_backslash($/) }
 method backslash:f ($/) { make "\f"; self.post_backslash($/) }
@@ -1308,11 +1371,11 @@ method infix_prefix_meta_operator:sym<R> ($/) {
     make $<infixish>.ast.meta_fun($/, '&reverseop', 2);
 }
 method infix_prefix_meta_operator:sym<Z> ($/) {
-    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&zipop', 2) !!
+    make $<infixish> ?? $<infixish>.ast.meta_fun($/, '&zipop', 2) !!
         Operator.funop($/, '&infix:<Z>', 2);
 }
 method infix_prefix_meta_operator:sym<X> ($/) {
-    make $<infixish> ?? $<infixish>[0].ast.meta_fun($/, '&crossop', 2) !!
+    make $<infixish> ?? $<infixish>.ast.meta_fun($/, '&crossop', 2) !!
         Operator.funop($/, '&infix:<X>', 2);
 }
 method infix_prefix_meta_operator:sym<S> ($/) {
@@ -1560,8 +1623,8 @@ method methodop($/) {
             self.do_variable_reference($/, $<variable>.ast));
     }
 
-    $/.ast.args = $<args>[0].ast[0] if $<args>[0];
-    $/.ast.args = $<arglist>[0].ast if $<arglist>[0];
+    $/.ast.args = $<args>.ast[0] if $<args>;
+    $/.ast.args = $<arglist>.ast if $<arglist>;
 }
 
 method dottyopish ($/) { make $<term>.ast }
@@ -1636,7 +1699,7 @@ method colonpair($/) {
         } else {
             $tv = self.do_variable_reference($/,
                 { sigil => ~$<v><sigil>,
-                    twigil => ($<v><twigil> ?? ~$<v><twigil>[0] !! ''),
+                    twigil => ($<v><twigil> ?? ~$<v><twigil> !! ''),
                     name => $<k> });
         }
     }
@@ -1917,7 +1980,7 @@ method docontextif($/, $sigil, $op) {
 }
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
-    my $twigil = $<twigil> ?? $<twigil>[0]<sym> !! '';
+    my $twigil = $<twigil> ?? $<twigil><sym> !! '';
 
     my ($name, $pkg);
     my ($dsosl) = $<desigilname> ?? $<desigilname>.ast !!
@@ -1946,7 +2009,7 @@ method variable($/) {
                     ::Op::Num.new(value => $<index>.ast)))
         };
         return Nil;
-    } elsif $<postcircumfix> {
+    } elsif $<postcircumfix>[0] {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
                 self.docontextif($/, $sigil,
@@ -2016,11 +2079,11 @@ method param_var($/) {
         make { };
         return Nil;
     }
-    my $twigil = $<twigil> ?? ~$<twigil>[0] !! '';
-    my $sigil =  ~$<sigil>;
+    my $twigil = $<twigil> ?? ~$<twigil> !! '';
+    my $sigil = ~$<sigil>;
     my $list = $sigil eq '@';
     my $hash = $sigil eq '%';
-    my $name =   $<name> ?? ~$<name>[0] !! Any;
+    my $name = $<name> ?? ~$<name> !! Any;
 
     my $slot;
     if $twigil eq '' {
@@ -2080,7 +2143,7 @@ method parameter($/) {
         return Nil;
     }
 
-    my $default = $<default_value> ?? $<default_value>[0].ast !! Any;
+    my $default = $<default_value> ?? $<default_value>.ast !! Any;
     $default.set_name("$/ init") if $default;
 
     my $tag = $<quant> ~ ':' ~ $<kind>;
@@ -2305,7 +2368,7 @@ method capture($ ) {}
 method capterm($/) {
     my @args;
     if $<capture> {
-        my $x = $<capture>[0]<EXPR>.ast;
+        my $x = $<capture><EXPR>.ast;
         if $x.^isa(::Op::SimpleParcel) {
             @args = @($x.items);
         } else {
@@ -2935,7 +2998,7 @@ method args($/) {
     }
 
     make $<semiarglist> ?? $<semiarglist>.ast !!
-        $<arglist> ?? [ $<arglist>[0].ast ] !! Any;
+        $<arglist> ?? [ $<arglist>.ast ] !! Any;
 }
 
 method statement($/) {
@@ -2949,7 +3012,7 @@ method statement($/) {
         $<EXPR> ?? $<EXPR>.ast !! ::Op::StatementList.new);
 
     if $<statement_mod_cond> {
-        my ($sym, $exp) = @( $<statement_mod_cond>[0].ast );
+        my ($sym, $exp) = @( $<statement_mod_cond>.ast );
 
         if $sym eq 'if' {
             make ::Op::Conditional.new(|node($/), check => $exp,
@@ -2970,7 +3033,7 @@ method statement($/) {
     }
 
     if $<statement_mod_loop> {
-        my ($sym, $exp) = @( $<statement_mod_loop>[0].ast );
+        my ($sym, $exp) = @( $<statement_mod_loop>.ast );
 
         if $sym eq 'while' {
             make ::Op::WhileLoop.new(|node($/), check => $exp,
@@ -3015,7 +3078,7 @@ method module_name:normal ($/) {
     # name-extension stuff is just ignored on module names for now
     make {
         name => ~$<longname><name>,
-        args => $<arglist> ?? $<arglist>[0].ast !! Any };
+        args => $<arglist> ?? $<arglist>.ast !! Any };
 }
 
 # passes the $cond to the $block if it accepts a parameter, otherwise just
@@ -3037,7 +3100,7 @@ method if_branches($/, *@branches) {
         ::Op::Conditional.new(|node($/), check => $cond,
             true  => self.if_block($/, $cond, $branch<pblock>),
             false => @branches ?? self.if_branches($/, @branches) !!
-                $<else> ?? self.if_block($/, $cond, $<else>[0]) !!
+                $<else> ?? self.if_block($/, $cond, $<else>) !!
                 Any);
     });
 }
@@ -3079,9 +3142,9 @@ method statement_control:repeat ($/) {
 method statement_control:loop ($/) {
     my $body = self.inliney_call($/, $<block>.ast);
     # XXX wrong interpretation
-    my $init = $0 && $0[0]<e1>[0] ?? $0[0]<e1>[0].ast !! Any;
-    my $cond = $0 && $0[0]<e2>[0] ?? $0[0]<e2>[0].ast !! Any;
-    my $step = $0 && $0[0]<e3>[0] ?? $0[0]<e3>[0].ast !! Any;
+    my $init = $0 && $0<e1> ?? $0<e1>.ast !! Any;
+    my $cond = $0 && $0<e2> ?? $0<e2>.ast !! Any;
+    my $step = $0 && $0<e3> ?? $0<e3>.ast !! Any;
 
     make ::Op::GeneralLoop.new(|node($/), :$body, :$init, :$cond, :$step);
 }
@@ -3331,10 +3394,10 @@ method trait_mod:is ($/) {
         $noparm = 'Export tags NYI';
     } elsif $trait eq 'endsym' {
         my $text;
-        if !$<circumfix> || !$<circumfix>[0].ast.^isa(::Op::StringLiteral) {
+        if !$<circumfix> || !$<circumfix>.ast.^isa(::Op::StringLiteral) {
             $/.CURSOR.sorry("Argument to endsym must be a literal string");
         } else {
-            $text = $<circumfix>[0].ast.text;
+            $text = $<circumfix>.ast.text;
         }
         make { endsym => $text };
     } elsif $trait eq 'rawcall' {
@@ -3492,7 +3555,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         if $bindlex && $class eq 'Regex' {
             $symbol = '&' ~ $name;
             my $proto = $symbol;
-            $proto ~~ s/\:.*//;
+            { my $/; $proto ~~ s/\:.*//; }
             $sub.outer.add_dispatcher($proto, |mnode($/))
                 if $multiness ne 'only' && !$sub.outer.has_lexical($proto);
             $symbol ~= ":(!proto)" if $multiness eq 'proto';
@@ -3569,11 +3632,6 @@ method routine_def_2 ($, $/ = $*cursor) {
     self.process_block_traits($/, $<trait>);
 }
 
-method routine_def ($/) {
-    $*CURLEX<!sub>.finish($<blockoid>.ast);
-    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
-}
-
 method method_def_1 ($, $/ = $*cursor) {
     my $type = $<type> ?? ~$<type> !! '';
     if $type ne '' && $*HAS_SELF eq 'partial' {
@@ -3596,10 +3654,19 @@ method method_def_2 ($, $/ = $*cursor) {
     self.process_block_traits($/, $<trait>);
 }
 
-method method_def ($/) {
-    $*CURLEX<!sub>.finish($<blockoid>.ast);
+method is_dispatcher($blockoid) {
+    $blockoid.Str ~~ m:pos(0) / '{' \s* '*' \s* '}' /;
+}
+method finish_method_routine ($/) {
+    if self.is_dispatcher($<blockoid>) {
+        $*CURLEX<!sub>.finish_dispatcher('multi');
+    } else {
+        $*CURLEX<!sub>.finish($<blockoid>.ast);
+    }
     make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
 }
+method routine_def ($/) { self.finish_method_routine($/) }
+method method_def ($/)  { self.finish_method_routine($/) }
 
 method block($/) {
     $*CURLEX<!sub>.finish($<blockoid>.ast);

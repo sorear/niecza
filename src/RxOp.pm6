@@ -558,36 +558,18 @@ class Statement is RxOp {
 }
 
 class ProtoRedis is RxOp {
-    has $.name = die "ProtoRedis.name required"; # Str
-    has $.cutltm = False; # Bool
-
     method code($) {
-        CgOp.letn(
-          "fns", CgOp.run_dispatch(CgOp.callframe,
-            CgOp.fetch(CgOp.scopedlex('self'))),
-          "i",   CgOp.int(0),
-          "ks",  CgOp.null('vvarlist'),
-          CgOp.pushcut('LTM'),
-          CgOp.label('nextfn'),
-          CgOp.cgoto('backtrack',
-            CgOp.compare('>=', CgOp.letvar("i"),
-              CgOp.mrl_count(CgOp.letvar("fns")))),
-          CgOp.rxpushb('LTM', 'nextfn'),
-          CgOp.letvar("ks", CgOp.start_iter(
-            CgOp.subcall(CgOp.mrl_index(CgOp.letvar("i"),
-                CgOp.letvar("fns")), CgOp.rxcall('MakeCursorV')))),
-          CgOp.letvar("i", CgOp.arith('+', CgOp.letvar("i"), CgOp.int(1))),
-          CgOp.label('nextcsr'),
-          CgOp.ncgoto('backtrack', CgOp.iter_hasflat(CgOp.letvar('ks'))),
-          CgOp.rxpushb('SUBRULE', 'nextcsr'),
-          CgOp.rxcall('EndWith', CgOp.cast('cursor',
-              CgOp.fetch(CgOp.vvarlist_shift(CgOp.letvar('ks'))))),
-          CgOp.goto('backtrack'));
+        my $bt = self.label;
+
+        my @code;
+        push @code, CgOp.rxcall("InitCursorList",
+            CgOp.rxlprim('proto_dispatch', CgOp.scopedlex('Any')));
+        push @code, CgOp.label($bt);
+        push @code, CgOp.rxincorpshift(['dispatch'], $bt);
+        @code;
     }
 
-    method lad() {
-        $.cutltm ?? [ 'Imp' ] !! [ 'Dispatcher' ];
-    }
+    method lad() { [ 'Dispatcher' ] }
 }
 
 class Any is RxOp {
@@ -671,4 +653,11 @@ class RxOp::ListPrim is RxOp {
     }
 
     method lad() { $!type eq 'scalar_var' ?? ['Param', $!name] !! ['Imp'] }
+}
+
+class RxOp::Endpoint is RxOp {
+    has Str $.type = die "Endpoint.type required";
+
+    method code($) { CgOp.rxcall('SetEndpoint', CgOp.str($!type)); }
+    method lad() { [ 'Null' ] }
 }
