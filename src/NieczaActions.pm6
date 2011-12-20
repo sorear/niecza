@@ -1156,7 +1156,7 @@ method Str($match?) { "NieczaActions" } #OK not used
 method process_nibble($/, @bits, $prefix?) {
     my @acc;
     for @bits -> $n {
-        my $ast = $n.ast;
+        my $ast = ($n.ast // ~$n);
 
         if $ast ~~ CClass {
             $n.CURSOR.sorry("Cannot use a character class in a string");
