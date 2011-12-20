@@ -1525,7 +1525,8 @@ method LIST($/) {
 }
 
 method POSTFIX($/) {
-    my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
+    # adverbs have undef ast
+    my ($st, $arg) = self.whatever_precheck($<op>.ast // '', $<arg>.ast);
     if $<op><colonpair> {
         if $arg.^isa(::Op::CallLike) {
             make $arg.adverb($<op><colonpair>.ast<term>);
@@ -1683,9 +1684,9 @@ method colonpair($/) {
     if !$<v>.^isa(Match) {
         $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
     } else {
-        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast) ~ ">";
+        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast // ~$<v>) ~ ">";
     }
-    my $tv = $<v>.^isa(Match) ?? $<v>.ast !!
+    my $tv = $<v>.^isa(Match) ?? ($<v>.ast // ~$<v>) !!
         ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');
 
     if $tv ~~ Str {
