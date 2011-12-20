@@ -78,7 +78,7 @@ role sym_categorical[$name,$cat,$sym] {
 role bracket_categorical[$name,$cat,$sym1,$sym2] {
     $*name = $name;
     $*rxm = anon token bracket_categorical () {
-        :my $*GOAL = $sym2;
+        :my $*GOAL := $sym2;
         $sym1 {}:s
         $<name>={$name}
         [ :lang($¢.unbalanced($sym2)) <semilist> ]
