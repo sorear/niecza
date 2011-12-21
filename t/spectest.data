@@ -263,6 +263,7 @@ S06-traits/slurpy-is-rw.t
 S09-autovivification/autoincrement.t
 S09-autovivification/autovivification.t
 S12-attributes/augment-and-initialization.t
+S12-attributes/instance.t
 S12-class/anonymous.t
 S12-class/basic.t
 S12-class/declaration-order.t
