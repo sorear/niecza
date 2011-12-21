@@ -426,8 +426,8 @@ my class Cool {
         $nth := [ @$nth ] if defined $nth;
         my $to = 0;
         my $changes = 0;
-        my $limctr = $global ?? Inf !! defined($x) ??
-            $x.niecza_quantifier_max !! 1;
+        my $limctr = ($global || defined($x) && $x ~~ Whatever) ?? Inf
+                     !! defined($x) ?? $x.niecza_quantifier_max !! 1;
         my @out;
         my $index = 0;
         while $i < chars($str) && $limctr {
