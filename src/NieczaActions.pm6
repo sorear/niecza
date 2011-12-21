@@ -811,6 +811,9 @@ method or_cc($lhs, $rhs) {
 
 method cc_to_rxop($z) {
     say "do_cc $z[1].typename()" if $CCTrace;
+    if $z[0] && $z[1] ~~ ::RxOp::CClassElem {
+        return ::RxOp::CClassElem.new(cc => $z[1].cc.negate);
+    }
     return $z[0] ?? ::RxOp::Sequence.new(zyg => [
         ::RxOp::NotBefore.new(zyg => [$z[1]]), ::RxOp::Any.new]) !! $z[1];
 }

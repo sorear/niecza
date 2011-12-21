@@ -1836,6 +1836,8 @@ public class Lexer {
 
     public static readonly bool LtmTrace =
         Environment.GetEnvironmentVariable("NIECZA_LTM_TRACE") != null;
+    public static readonly bool LtmProf =
+        Environment.GetEnvironmentVariable("NIECZA_LTM_PROF") != null;
 
     public static Lexer GetLexer(Frame fromf, STable kl, LAD[] lads, string title) {
         LexerCache lc = kl.GetLexerCache();
@@ -1981,6 +1983,7 @@ anew:
 
     public int[] Run(string from, int pos) {
         LexerState state = start;
+        int spos = pos;
         // clear out any old fates
         for (int i = fatebuffer[0]; i != 0; ) {
             int j = fatebuffer[2*i];
@@ -2016,11 +2019,14 @@ anew:
 
         int[] uniqfates = new int[usedfates];
 
+        if (LtmProf)
+            Console.WriteLine("Ran {0} from {1} to length {2}", tag, spos,
+                    pos - spos);
         int cursor = 0;
         for (int i = 0; i < usedfates; i++) {
             cursor = fatebuffer[cursor * 2];
             uniqfates[i] = cursor - 1;
-            if (LtmTrace)
+            if (LtmTrace || LtmProf)
                 Console.WriteLine("+ Useful fate: {0}", cursor - 1);
         }
         return uniqfates;
