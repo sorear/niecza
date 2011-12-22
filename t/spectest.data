@@ -231,6 +231,7 @@ S05-substitution/match.t
 S05-substitution/subst.t
 S06-advanced/caller.t
 S06-advanced/recurse.t
+S06-advanced/return.t
 S06-currying/assuming-and-mmd.t
 S06-currying/named.t
 S06-multi/by-trait.t
