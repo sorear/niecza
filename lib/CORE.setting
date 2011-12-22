@@ -417,13 +417,15 @@ my class Cool {
             defined($pos) && defined($continue);
         die ":x may not be used with :global" if defined($x) && $global;
 
+        my $old := CALLER::<$/>;
+        LEAVE OUTER::CALLER::<$/> := $old unless $inplace;
+
         my $str = ~self;
         my $C = Cursor.cursor_start($str);
         my $matcher = $matcher_ ~~ Regex ?? $matcher_ !! /$matcher_/;
         my $i = $pos // $continue // 0;
         if ($i === ?1) {
-            my $o := CALLER::CALLER::<$/>;
-            $i = $o ?? $o.to !! 0;
+            $i = $old ?? $old.to !! 0;
         }
         $nth := [ @$nth ] if defined $nth;
         my $to = 0;
