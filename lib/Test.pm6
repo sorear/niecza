@@ -147,7 +147,8 @@ sub eval_fails_ok($code,$why?,:$expect = <die warn fail>) is export {
 }
 sub diag($str) is export { $*TEST-BUILDER.note($str) }
 sub is_approx(Mu $got, Mu $expected, $desc = '') is export {
-    my $test = ($got - $expected).abs <= 1/100000;
+    my $tol = $expected.abs < 1e-6 ?? 1e-5 !! $expected.abs * 1e-6;
+    my $test = ($got - $expected).abs <= $tol;
     $*TEST-BUILDER.ok(?$test, $desc);
     unless $test {
         $*TEST-BUILDER.note("got:      $got");
