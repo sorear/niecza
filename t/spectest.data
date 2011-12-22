@@ -34,6 +34,7 @@ S02-literals/hash-interpolation.t
 S02-literals/listquote-whitespace.t
 S02-literals/numeric.t
 S02-literals/pair-boolean.t
+S02-literals/pairs.t
 S02-literals/quoting.t
 S02-literals/radix.t
 S02-literals/string-interpolation.t
