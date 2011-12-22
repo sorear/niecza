@@ -611,7 +611,7 @@ namespace Niecza {
         }
 
         public static string N2S(double n) {
-            return n.ToString(CultureInfo.InvariantCulture);
+            return n.ToString("R", CultureInfo.InvariantCulture);
         }
 
         public static double S2N(string n) {
