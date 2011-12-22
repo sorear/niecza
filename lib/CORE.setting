@@ -316,6 +316,7 @@ my class Any is Mu {
 }
 
 my class Cool {
+    method FatRat () { ::Niecza::NumSyntax.str2num(~self, :fatrat) }
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
     method Int() { Q:CgOp { (coerce_to_int {self}) } }
     method Num() { Q:CgOp { (coerce_to_num {self}) } }
@@ -654,7 +655,7 @@ my class Str is Cool {
         )
     } }
     method gist() { defined(self) ?? self !! nextsame }
-    method Numeric() { Q:CgOp { (box Num (str_tonum (obj_getstr {self}))) } }
+    method Numeric () { ::Niecza::NumSyntax.str2num(~self) }
     method perl() {
         self // nextsame;
         my $str = self;
@@ -2069,6 +2070,190 @@ sub eval($str,:$lang="perl6") is return-pass {
 }
 
 sub rungather($ ) { die "Run NYI" }
+
+# a rather strange grammar.  All of its rules are tokens, and some of them
+# will die().
+grammar Niecza::NumSyntax {
+    # this is a high candidate to be rewritten in C#
+    sub from_base(Str $str, Int $base) {
+        my $acc = 0;
+        my $places = 0;
+        my $ch;
+        my $digit;
+        loop (my $ix = 0; $ix < chars($str); ++$ix) {
+            $ch = ord(substr($str,$ix,1));
+            $ch == 0x5F and next;
+            ++$places;
+            0x30 <= $ch <= 0x39 and $digit = $ch - 0x30;
+            0x61 <= $ch <= 0x7A and $digit = $ch - 0x57;
+            0x41 <= $ch <= 0x5A and $digit = $ch - 0x37;
+            die "Digit <{substr($str,$ix,1)}> too large for radix $base"
+                if $digit >= $base;
+            $acc = $acc * $base + $digit;
+        }
+        ($acc, $places);
+    }
+
+    token binint {
+        $0=[ <[ 0..1 ]>+ [ _ <[ 0..1 ]>+ ]* ]
+        { make from_base(~$0, 2)[0] }
+    }
+
+    token octint {
+        $0=[ <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]* ]
+        { make from_base(~$0, 8)[0] }
+    }
+
+    token hexint {
+        $0=[ <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]* ]
+        { make from_base(~$0, 16)[0] }
+    }
+
+    token decint {
+        $0=[ \d+ [ _ \d+ ]* ]
+        <?{ make from_base(~$0, 10); True }>
+    }
+
+    token integer {
+        [
+        | 0 [ b '_'? <binint> { make $<binint>.ast }
+            | o '_'? <octint> { make $<octint>.ast }
+            | x '_'? <hexint> { make $<hexint>.ast }
+            | d '_'? <decint> { make $<decint>.ast[0] }
+            | <decint> { make $<decint>.ast[0] }
+            ]
+        | <decint> { make $<decint>.ast[0] }
+        ]
+    }
+
+    token radint {
+        [
+        | <integer> { make $<integer>.ast }
+        | <?before ':'\d> <rad_number> { make $<rad_number>.ast }
+              <?{ $() ~~ Int }>
+        ]
+    }
+
+    token escale {
+        <[Ee]> $0=[<[+\-]>?] <decint>
+        { make $0 eq '-' ?? -$<decint>.ast[0] !! $<decint>.ast[0] }
+    }
+
+    token dec_number {
+        :dba('decimal number')
+        [
+        | $<coeff> = [              '.' <frac=.decint> ] <escale>?
+        | $<coeff> = [<int=.decint> '.' <frac=.decint> ] <escale>?
+        | $<coeff> = [<int=.decint>                    ] <escale>
+        ]
+        {
+            my $acc = $<int> ?? $<int>.ast[0] !! 0;
+            if $<frac> -> $f {
+                my $subn = 10 ** $f.ast[1];
+                $acc = FatRat.new($acc * $subn + $f.ast[0], $subn);
+            }
+            if $<escale> -> $e {
+                # forces to Num; XXX not exactly rounded!
+                $acc = $acc * 10e0 ** $e.ast;
+            }
+            make $acc;
+        }
+    }
+
+    token alnumint {
+        [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
+    }
+
+    # XXX: accepts _ in radix (STD does not)
+    token rad_number {
+        ':' <radix=.decint> [ '\\' \s* ]?      # XXX optional dot here? **
+        {}           # don't recurse in lexer
+        :s '<' <radixguts($<radix>.ast[0])> '>'
+        { make $<radixguts>.ast }
+    }
+    rule radixguts ($r) {
+        :dba('number in radix notation')
+        [
+        | $<coeff> = [                '.' <frac=.alnumint> ]
+        | $<coeff> = [<int=.alnumint> '.' <frac=.alnumint> ]
+        | $<coeff> = [<int=.alnumint>                      ]
+        ]
+        [
+            '*' <base=.radint>
+               [ '**' <exp=.radint> || { die "Base is missing ** exponent part" } ]
+        ]?
+        # I don't think we need to parse <circumfix> for the runtime case :)
+        {
+            my $acc = $<int> ?? from_base(~$<int>, $r)[0] !! 0;
+            if $<frac> -> $f {
+                my ($fn, $fp) = from_base(~$f, $r);
+                my $subn = $r ** $fp;
+                $acc = FatRat.new($acc * $subn + $fn, $subn);
+            }
+            if $<base> -> $b {
+                # *not* forcing to Num here
+                $acc = $acc * $b.ast ** $<exp>.ast;
+            }
+            make $acc;
+        }
+    }
+
+    token number {
+        [
+        | 'NaN' »      { make NaN }
+        | <integer>    { make $<integer>.ast }
+        | <dec_number> { make $<dec_number>.ast }
+        | <rad_number> { make $<rad_number>.ast }
+        | 'Inf' »      { make Inf }
+        ]
+    }
+
+    token snumber {
+        $<sn>=[<[+\-]>?] <.ws> <number>
+        { make $<sn> eq '-' ?? -$<number>.ast !! $<number>.ast }
+    }
+
+    # <numeric> is used by Str.Numeric conversions such as those done by val()
+    # NOTE: allows whitespace for round-tripping
+    # XXX: allows radix rationals, which strictly speaking it probably shouldn't
+    token numeric {
+        [ || $ { make 0 }
+          || <re=.snumber>? <.ws>
+             [ | <?[+\-]> {}:s <im=.snumber>'\\'?'i'
+                 { make Complex.new($<re> ?? $<re>.ast !! 0, $<im>.ast) }
+               | '/' {} <.ws> <den=.integer>
+                 { die "Parsing $/.orig(), rational parts must be integers"
+                       unless $<re>.ast ~~ Int;
+                   make FatRat.new($<re>.ast, $<den>.ast) }
+               | $ { make $<re>.ast } ] ]
+    }
+
+    method str2num ($str, :$fatrat) {
+        my ($M) = (token {
+            <.ws> [ :lang(Niecza::NumSyntax)
+                <numeric> || { die "Cannot parse number: $str" } ] <.ws>
+            [ $ || { die "Trailing characters after number at $¢.pos()" } ]
+        })(Cursor.cursor_start($str, Any));
+
+        if $fatrat {
+            $M<numeric>.ast.FatRat
+        } else {
+            my $a = $M<numeric>.ast;
+            $a ~~ FatRat ?? $a.numerator / $a.denominator !! $a
+        }
+    }
+
+    method base2num ($str, $base) {
+        my ($M) = (token {
+            <.ws> [ :lang(Niecza::NumSyntax)
+                <radixguts($base)> || {die "Cannot parse :$base: $str" } ] <.ws>
+            [ $ || { die "Trailing characters after number at $¢.pos()" } ]
+        })(Cursor.cursor_start($str, Any));
+
+        my $a = $M<radixguts>.ast;
+        $a ~~ FatRat ?? $a.numerator / $a.denominator !! $a
+    }
+}
 # }}}
 # I/O stuff {{{
 sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
