@@ -596,6 +596,7 @@ my class Numeric is Cool { }
 my class Real is Numeric { }
 my class Integral is Real { }
 my class Num is Real {
+    method new() { 0e0 }
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
@@ -607,6 +608,7 @@ our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
 our constant i  = Num::i;
 my class Int is Integral {
+    method new() { 0 }
     method niecza_quantifier_max() { self }
     method niecza_quantifier_min() { self }
     method Int() { self }
@@ -643,6 +645,7 @@ my class FatRat is Real {
 }
 
 my class Str is Cool {
+    method new() { "" }
     method ACCEPTS(\$t) { defined(self) ?? self eq $t !! $t.^does(self) }
     method chars() { chars(self) }
     method say() { $PROCESS::OUTPUT_USED := 1; Q:CgOp {
