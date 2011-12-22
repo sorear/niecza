@@ -522,12 +522,17 @@ public partial class Builtins {
         }
     }
 
+    public static double RatToFloat(BigInteger num, BigInteger den) {
+        // TODO: avoid overflow
+        return (double) num / (double) den;
+    }
+
     public static Variable MakeFixRat(BigInteger num, BigInteger den) {
         ulong sden;
         SimplifyFrac(ref num, ref den);
         if (den.AsUInt64(out sden) && sden != 0)
             return Kernel.BoxAnyMO<Rat>(new Rat(num, sden), Kernel.RatMO);
-        return MakeFloat((double)num / (double)den);
+        return MakeFloat(RatToFloat(num, den));
     }
 
     public static Variable MakeFatRat(BigInteger num, BigInteger den) {
@@ -754,6 +759,27 @@ public partial class Builtins {
         return result;
     }
 
+    // Unifies the MakeFixRat logic and tries to avoid a huge computation
+    // that will just be rounded away.
+    // Invariant: pow >= 0
+    static Variable RatPow(BigInteger num, BigInteger den, BigInteger pow) {
+        if (den == -BigInteger.One) { den = BigInteger.One; num = -num; }
+
+        if (den == BigInteger.One) {
+            // den won't be getting any bigger
+            return MakeFixRat(big_pow(num, pow), 1);
+        }
+        // den >= 2
+        if (pow >= 64) {
+            // Overflow is inevitable.
+            return MakeFloat(Math.Pow(RatToFloat(num, den), (double)pow));
+        }
+        // we might consider detecting smaller overflows, but the penalty
+        // of $int ** 63 is not _that_ huge.
+
+        return MakeFixRat(big_pow(num, pow), big_pow(den, pow));
+    }
+
     static readonly Func<Variable,Variable,Variable> pow_d = pow;
     public static Variable pow(Variable a1, Variable a2) {
         int r1, r2;
@@ -764,17 +790,17 @@ public partial class Builtins {
         P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
-            Complex v1 = PromoteToComplex(r1, n1);
-            Complex v2 = PromoteToComplex(r2, n2);
-            double r = Math.Sqrt(v1.re * v1.re + v1.im * v1.im);
+            Complex c1 = PromoteToComplex(r1, n1);
+            Complex c2 = PromoteToComplex(r2, n2);
+            double r = Math.Sqrt(c1.re * c1.re + c1.im * c1.im);
             if (r == 0.0) {
                 return MakeComplex(0.0, 0.0);
             }
-            double theta = Math.Atan2(v1.im, v1.re);
+            double theta = Math.Atan2(c1.im, c1.re);
             // Log z = ln r + iθ
             // ($a.log * $b).exp;
-            double lp_re = Math.Log(r)*v2.re - theta*v2.im;
-            double lp_im = theta*v2.re + Math.Log(r)*v2.im;
+            double lp_re = Math.Log(r)*c2.re - theta*c2.im;
+            double lp_im = theta*c2.re + Math.Log(r)*c2.im;
             return MakeComplex(Math.Exp(lp_re) * Math.Cos(lp_im),
                                Math.Exp(lp_re) * Math.Sin(lp_im));
         }
@@ -783,61 +809,30 @@ public partial class Builtins {
             return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
         }
 
-        if (r2 == NR_FIXINT) {
-            int v2 = PromoteToFixInt(r2, n2);
-            if (v2 >= 0) {
-                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
-                    return MakeInt(BigInteger.Pow(PromoteToBigInt(r1, n1), v2));
-                }
-                if (r1 == NR_FATRAT) {
-                    FatRat v1 = PromoteToFatRat(r1, n1);
-                    return MakeFatRat(BigInteger.Pow(v1.num, v2), BigInteger.Pow(v1.den, v2));
-                }
-                if (r1 == NR_FIXRAT) {
-                    Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFixRat(BigInteger.Pow((BigInteger)v1.num, v2), BigInteger.Pow(v1.den, v2));
-                }
-            } else {
-                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
-                    return MakeFixRat(1, BigInteger.Pow(PromoteToBigInt(r1, n1), -v2));
-                }
-                if (r1 == NR_FATRAT) {
-                    FatRat v1 = PromoteToFatRat(r1, n1);
-                    return MakeFatRat(BigInteger.Pow(v1.den, -v2), BigInteger.Pow(v1.num, -v2));
-                }
-                if (r1 == NR_FIXRAT) {
-                    Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFixRat(BigInteger.Pow((BigInteger)v1.den, -v2), BigInteger.Pow(v1.num, -v2));
-                }
+        BigInteger v2 = PromoteToBigInt(r2, n2);
+        if (v2 >= 0) {
+            if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
+                return MakeInt(big_pow(PromoteToBigInt(r1, n1), v2));
             }
-        }
-
-        if (r2 == NR_BIGINT) {
-            BigInteger v2 = PromoteToBigInt(r2, n2);
-            if (v2 >= 0) {
-                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
-                    return MakeInt(big_pow(PromoteToBigInt(r1, n1), v2));
-                }
-                if (r1 == NR_FATRAT) {
-                    FatRat v1 = PromoteToFatRat(r1, n1);
-                    return MakeFatRat(big_pow(v1.num, v2), big_pow(v1.den, v2));
-                }
-                if (r1 == NR_FIXRAT) {
-                    Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFixRat(big_pow((BigInteger)v1.num, v2), big_pow(v1.den, v2));
-                }
-            } else {
-                if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
-                    return MakeFixRat(1, big_pow(PromoteToBigInt(r1, n1), -v2));
-                }
-                if (r1 == NR_FATRAT) {
-                    FatRat v1 = PromoteToFatRat(r1, n1);
-                    return MakeFatRat(big_pow(v1.den, -v2), big_pow(v1.num, -v2));
-                }
-                if (r1 == NR_FIXRAT) {
-                    Rat v1 = PromoteToFixRat(r1, n1);
-                    return MakeFixRat(big_pow((BigInteger)v1.den, -v2), big_pow(v1.num, -v2));
-                }
+            if (r1 == NR_FATRAT) {
+                FatRat v1 = PromoteToFatRat(r1, n1);
+                return MakeFatRat(big_pow(v1.num, v2), big_pow(v1.den, v2));
+            }
+            if (r1 == NR_FIXRAT) {
+                Rat v1 = PromoteToFixRat(r1, n1);
+                return RatPow(v1.num, v1.den, v2);
+            }
+        } else {
+            if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
+                return RatPow(1, PromoteToBigInt(r1, n1), -v2);
+            }
+            if (r1 == NR_FATRAT) {
+                FatRat v1 = PromoteToFatRat(r1, n1);
+                return MakeFatRat(big_pow(v1.den, -v2), big_pow(v1.num, -v2));
+            }
+            if (r1 == NR_FIXRAT) {
+                Rat v1 = PromoteToFixRat(r1, n1);
+                return RatPow(v1.den, v1.num, -v2);
             }
         }
 
