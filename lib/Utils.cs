@@ -610,16 +610,38 @@ namespace Niecza {
             return new string((char)r, 1);
         }
 
+        static NumberFormatInfo p6nfi;
+        static Utils() {
+            p6nfi = new NumberFormatInfo();
+            p6nfi.PositiveInfinitySymbol = "Inf";
+            p6nfi.NegativeInfinitySymbol = "-Inf";
+        }
+
         public static string N2S(double n) {
-            return n.ToString("R", CultureInfo.InvariantCulture);
+            return n.ToString("R", p6nfi);
         }
 
         public static double S2N(string n) {
-            return double.Parse(n, CultureInfo.InvariantCulture);
+            // XXX compatibility
+            if (n.Equals("Infinity")) {
+                return double.PositiveInfinity;
+            }
+            if (n.Equals("-Infinity")) {
+                return double.NegativeInfinity;
+            }
+            return double.Parse(n, p6nfi);
         }
 
         public static bool S2NB(string n, out double o) {
-            return double.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out o);
+            if (n.Equals("Infinity")) {
+                o = double.PositiveInfinity;
+                return true;
+            }
+            if (n.Equals("-Infinity")) {
+                o = double.NegativeInfinity;
+                return true;
+            }
+            return double.TryParse(n, NumberStyles.Float, p6nfi, out o);
         }
 
         public static string StrFlip(string n) {
