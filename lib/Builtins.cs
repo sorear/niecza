@@ -1437,7 +1437,12 @@ public partial class Builtins {
         GetAsRational(v1, out nc, out dc);
         GetAsRational(v2, out ne, out de);
 
-        RatApproxer.Simplest(nc*de-ne*dc,dc*de,nc*de+ne*dc,dc*de,out na,out da);
+        if (ne != 0) {
+            RatApproxer.Simplest(nc*de-ne*dc,dc*de,nc*de+ne*dc,dc*de,out na,out da);
+        } else {
+            na = nc; da = dc;
+        }
+
         SimplifyFrac(ref na, ref da);
 
         // since the user controls the denominator size here, use FatRat freely

@@ -12,6 +12,7 @@ my class Code     { ... }
 my class Match    { ... }
 my class List     { ... }
 my class Array    { ... }
+my class FatRat   { ... }
 my class Junction { ... }
 # }}}
 # Important inlinable definitions {{{
@@ -602,6 +603,7 @@ my class Num is Real {
     our constant e  = 2.71828_18284_59045_235e0;
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
     method Num() { self }
+    method FatRat() { self.Rat(0) }
     method perl() { defined(self) ?? ~self !! self.typename }
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
@@ -614,6 +616,8 @@ my class Int is Integral {
     method niecza_quantifier_min() { self }
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
+    method Rat() { self / 1 }
+    method FatRat() { FatRat.new(self, 1) }
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 my class Rat is Real {
@@ -623,6 +627,7 @@ my class Rat is Real {
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
+    method FatRat() { FatRat.new(self.numerator, self.denominator) }
     method nude() { [ self.numerator, self.denominator ] }
 }
 my class Complex is Numeric {
@@ -638,6 +643,7 @@ my class Complex is Numeric {
 my class FatRat is Real {
     method new($n,$d) { FatRat.succ * $n / $d }
     method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
+    method FatRat() { self }
     method gist() { self // nextsame; self.Str }
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method numerator() { Q:CgOp { (fatrat_nu {self}) } }
