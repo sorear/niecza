@@ -1,17 +1,26 @@
 (This document summarizes features documented in S05 but not in Niecza.
 All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 
+DUBIOUS: this feature is a possible fossil or otherwise makes no sense
+  relative to my current understanding of Perl 6.  Needs discussion,
+  maybe removal.
+DISCUSS: feature seems sane but there is disagreement over what it is
+  or how it needs to work.
+GRAPHEME: feature requires NFG string semantics, or interacts strongly
+  with NFC/NFD issues.
+LOL: feature requires slice context mappings.
+
 (  49) Tiebreaker #5: I still don't know what this means.  (2609 conflicts)
        DISCUSS
 ( 113) Unicode defines a 'Word' to include all Pc as well. DISCUSS
-( 219) Loose matches are mostly not implemented.
-( 226) Also no :samecase, :sameaccent, :samespace.
+( 219) Loose matches are mostly not implemented. GRAPHEME
+( 226) Also no :samecase, :sameaccent, :samespace. GRAPHEME
 ( 346) Need to audit whitespace removal algorithm.
 ( 360) No :sigspace<rule>.
 ( 396) No ms// or ss///; "mm" is parsed
-( 408) No Unicode levels
+( 408) No Unicode levels GRAPHEME
 ( 427) No :Perl5 DISCUSS
-( 497) No :ex/:ov
+( 497) No :ex/:ov LOL
 ( 535) No :rw
 ( 768) No internal smartmatches
 ( 924) $/ is a Cursor inside closures
@@ -29,13 +38,13 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (1585) <[ z..a ]> not treated as compile error DISCUSS
 (1679) No <.>
 (1718) No <?same>, <?at($pos)>
-(1733) <?after> is incomplete
-(1744) No <*...>
+(1733) <?after> is incomplete DISCUSS
+(1744) No <*...> DISCUSS
 (1804) No <~~> DISCUSS
 (1843) No <|g> etc
 (1893) Missing predefined rules include upper, lower, digit, xdigit, print,
        graph, cntrl, punct, alnum, wb, ww, space, blank
-(2246) regex :ratchet syntax doesn't work
+(2246) regex :ratchet syntax doesn't work DISCUSS
 (2342) ::> is defined in terms of brackets, not temporal alternation
 (2380) No <commit> or <cut>
 (2460) $foo ~~ rule { } does not automatically dual-anchor (DISCUSS)
@@ -47,7 +56,7 @@ All line numbers are relative to c4882a67.  Also, deliberate discrepencies.)
 (3750) No array aliasing
 (3923) No hash aliasing
 (3972) No external aliasing
-(3996) No support for multiple Matches
+(3996) No support for multiple Matches LOL
 (4160) CORE does not contain STD, parsefile, unbalanced DISCUSS
 (4204) No 'augment slang' functionality
 (4218) No default-control pragmata
