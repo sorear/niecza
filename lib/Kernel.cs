@@ -3182,7 +3182,7 @@ noparams:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             Rat r = Kernel.UnboxAny<Rat>(o);
-            return r.num.ToString() + "/" + r.den.ToString();
+            return Utils.N2S(((double)r.num) / ((double)r.den));
         }
     }
     class CtxRatBool : ContextHandler<bool> {
@@ -3217,7 +3217,7 @@ noparams:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             FatRat r = Kernel.UnboxAny<FatRat>(o);
-            return r.num.ToString() + "/" + r.den.ToString();
+            return Utils.N2S(((double)r.num) / ((double)r.den));
         }
     }
     class CtxFatRatBool : ContextHandler<bool> {
@@ -3247,7 +3247,7 @@ noparams:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             Complex r = Kernel.UnboxAny<Complex>(o);
-            return Utils.N2S(r.re) + (r.im < 0 ? "" : "+") + Utils.N2S(r.im) + "i";
+            return Utils.N2S(r.re) + (r.im < 0 ? " - " : " + ") + Utils.N2S(Math.Abs(r.im)) + "i";
         }
     }
     class CtxComplexBool : ContextHandler<bool> {
