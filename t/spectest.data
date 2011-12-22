@@ -63,6 +63,7 @@ S02-types/assigning-refs.t
 S02-types/autovivification.t
 S02-types/bool.t
 S02-types/catch_type_cast_mismatch.t
+S02-types/declare.t
 S02-types/fatrat.t
 S02-types/flattening.t
 S02-types/hash.t
