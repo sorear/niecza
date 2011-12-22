@@ -46,6 +46,7 @@ class Builder {
         }
         self!output($not ~ "ok " ~ $!current-test++ ~ $desc);
         if !$bool { self.note(self.blame); }
+        $bool;
     }
 
     method todo($reason, $count) {
