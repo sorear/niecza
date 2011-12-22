@@ -151,7 +151,7 @@ method rad_number ($/) {
     my $radix = +$<radix>;
     my $value = $<int> ?? from_base($<int>, $radix) !! 0;
     if $<frac> -> $fr {
-        my $shift = $fr.chars - $fr.comb('_');
+        my $shift = $fr.chars - $fr.comb(/_/);
         $value += (from_base($fr, $radix) / ($radix ** $shift));
     }
     if $<base> {
