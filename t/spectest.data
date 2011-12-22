@@ -343,6 +343,7 @@ S32-str/index.t
 S32-str/lc.t
 S32-str/lcfirst.t
 S32-str/lines.t
+S32-str/numeric.t
 S32-str/pos.t
 S32-str/rindex.t
 S32-str/sprintf.t
