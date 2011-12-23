@@ -384,8 +384,7 @@ namespace Niecza.UCD {
 
                 if (tbl == "sc" || tbl == "gc") {
                     foreach (string a in aset)
-                        if (a != "Sc")
-                            aliases[StringProperty.Loosen(a)] = canon;
+                        aliases[StringProperty.Loosen(a)] = canon;
                     proxy_aliases[canon] = tbl;
                 }
                 aset.Clear();
