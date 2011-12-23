@@ -509,6 +509,13 @@ namespace Niecza.UCD {
                     inv[StringProperty.Loosen(na1.GetValue(i))] = i;
                 for (int i = 128; i < 160; i++)
                     inv[StringProperty.Loosen(na1.GetValue(i))] = i;
+                // semi-ad-hoc aliases used in spectests
+                // UTS #28 2.5 recommends to add "aliases", but leaves
+                // the specific aliases up to the regex impl ...
+                inv["LF"] = 10;
+                inv["CR"] = 13;
+                inv["FF"] = 12;
+                inv["NEL"] = 0x85;
 
                 return cache[name] = inv;
             }
