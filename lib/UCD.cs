@@ -42,9 +42,13 @@ namespace Niecza.UCD {
 
         public Property Proxify(bool neg, string prefix) {
             string[][] nvalues = new string[values.Length][];
+            prefix = prefix.Substring(prefix.IndexOf('+')+1);
             for (int i = 0; i < nvalues.Length; i++) {
                 //Console.WriteLine("{0}/{1}", values[i][0], prefix);
-                bool ok = values[i][0].Substring(0, prefix.Length) == prefix;
+                bool ok = (prefix.Length <= 1) ?
+                    values[i][0].Substring(0, prefix.Length) == prefix :
+                    StringProperty.Loosen(values[i][0]) ==
+                        StringProperty.Loosen(prefix);
                 nvalues[i] = (neg ? !ok : ok) ? YES : NO;
             }
 
@@ -382,10 +386,11 @@ namespace Niecza.UCD {
                 //if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
                 val_aliases[Prod.C(tbl, canon)] = aset.ToArray();
 
-                if (tbl == "sc" || tbl == "gc") {
+                if (tbl == "sc" || tbl == "gc" || tbl == "blk") {
                     foreach (string a in aset)
-                        aliases[StringProperty.Loosen(a)] = canon;
-                    proxy_aliases[canon] = tbl == "sc" ? "Script" : tbl;
+                        aliases[(tbl == "blk" ? "IN" : "") +
+                            StringProperty.Loosen(a)] = tbl + "+" + canon;
+                    proxy_aliases[tbl+"+"+canon] = tbl == "sc" ? "Script" : tbl;
                 }
                 aset.Clear();
             }
@@ -533,10 +538,10 @@ namespace Niecza.UCD {
 
             if (name == "ASSIGNED")
                 return cache[name] = ((LimitedProperty) GetTable("gc"))
-                    .Proxify(true, "Cn");
+                    .Proxify(true, "+Cn");
             if (name == "ANY")
                 return cache[name] = ((LimitedProperty) GetTable("gc"))
-                    .Proxify(false, "");
+                    .Proxify(false, "+");
             if (name == "ASCII")
                 return cache[name] = new LimitedProperty(
                     new int[] { 0, 1, 128, 0 },

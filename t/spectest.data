@@ -213,6 +213,7 @@ S05-grammar/protoregex.t
 S05-grammar/signatures.t
 S05-interpolation/lexicals.t
 S05-mass/named-chars.t
+S05-mass/properties-block.t
 S05-mass/properties-general.t
 S05-mass/properties-script.t
 S05-mass/recursive.t
