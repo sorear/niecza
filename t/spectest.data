@@ -368,6 +368,7 @@ S32-str/pos.t
 S32-str/rindex.t
 S32-str/sprintf.t
 S32-str/substr.t
+S32-str/trim.t
 S32-str/uc.t
 S32-str/ucfirst.t
 S32-str/words.t
