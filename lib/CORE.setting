@@ -618,7 +618,6 @@ my class Int is Integral {
     method niecza_quantifier_min() { self }
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method Rat() { self / 1 }
     method FatRat() { FatRat.new(self, 1) }
     method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
