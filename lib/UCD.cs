@@ -382,9 +382,10 @@ namespace Niecza.UCD {
                 //if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
                 val_aliases[Prod.C(tbl, canon)] = aset.ToArray();
 
-                if ((tbl == "sc" || tbl == "gc") && canon != "Sc") {
+                if (tbl == "sc" || tbl == "gc") {
                     foreach (string a in aset)
-                        aliases[StringProperty.Loosen(a)] = canon;
+                        if (a != "Sc")
+                            aliases[StringProperty.Loosen(a)] = canon;
                     proxy_aliases[canon] = tbl;
                 }
                 aset.Clear();
