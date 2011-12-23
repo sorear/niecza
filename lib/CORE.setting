@@ -2058,7 +2058,7 @@ sub infix:«~<» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:«~>» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
 sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
-sub postfix:<i> is Niecza::absprec<y=> ($item) { Complex.new(0, $item) }
+sub postfix:<i> is Niecza::absprec<y=> ($item) { $item ~~ Complex ?? $item * i !! Complex.new(0, $item) }
 sub prefix:<sleep> ($x) { die "Asynchronous programming NYI" } #OK
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
 sub infix:<minmax> is equiv<X> (\|$args) { die "minmax NYI" } #OK
