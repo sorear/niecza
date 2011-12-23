@@ -275,6 +275,7 @@ my class Any is Mu {
     method elems() { self.flat.elems }
     method iterator() { self.flat.iterator }
     method join($sep = "") { self.flat.join($sep) }
+    method chrs() { chrs(@(self)) }
 
     method any() { any @(self) }
     method none() { none @(self) }
@@ -560,6 +561,8 @@ my class Cool {
     method ucfirst() { ucfirst(self) }
     method lcfirst() { lcfirst(self) }
     method ord() { ord(self) }
+    method chr() { chr(self) }
+    method ords() { ords(self) }
 }
 
 my class Capture {
@@ -866,6 +869,8 @@ sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
 
 sub ord($x) { Q:CgOp { (ord {$x}) } }
 sub chr($x) { Q:CgOp { (chr {$x}) } }
+sub ords($x) { $x.comb.map({ ord($_) }) }
+sub chrs(*@x) { @x.map({ chr($_ )}).join }
 
 # }}}
 # Flow inspection and control {{{
