@@ -26,6 +26,20 @@ use STD;
 # }
 
 augment class NieczaActions {
+method post_backslash($/) {
+    # XXX confine $/ resetting
+    sub _isupper { $_ ~~ /^<[ A .. Z ]>/ }
+    sub _islower { $_ ~~ /^<[ a .. z ]>/ }
+    if $/.ast.^isa(CClass) {
+        make self.cclass_cc($/.ast);
+    }
+    if _isupper($/) && _islower($<sym>) {
+        if $/.ast.^isa(Str) {
+            make self.string_cc($/.ast);
+        }
+        make self.negate_cc($/.ast);
+    }
+}
 }
 
 # remove run_dispatch
