@@ -360,8 +360,9 @@ namespace Niecza.UCD {
             while (rpos < loc[3]) {
                 string main = AsciiZ(ref rpos);
                 string alias;
+                aliases[StringProperty.Loosen(main)] = main;
                 while ((alias = AsciiZ(ref rpos)).Length != 0) {
-                    aliases[alias] = main;
+                    aliases[StringProperty.Loosen(alias)] = main;
                     //if (Trace) Console.WriteLine("Alias {0} -> {1}", alias, main);
                 }
             }
@@ -381,9 +382,9 @@ namespace Niecza.UCD {
                 //if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
                 val_aliases[Prod.C(tbl, canon)] = aset.ToArray();
 
-                if (tbl == "sc" || tbl == "gc") {
+                if ((tbl == "sc" || tbl == "gc") && canon != "Sc") {
                     foreach (string a in aset)
-                        aliases[a] = canon;
+                        aliases[StringProperty.Loosen(a)] = canon;
                     proxy_aliases[canon] = tbl;
                 }
                 aset.Clear();
@@ -516,6 +517,9 @@ namespace Niecza.UCD {
                 InflateDirectory();
                 InflateAliases();
             }
+
+            if (name != "" && name.Substring(0,1) != "!")
+                name = StringProperty.Loosen(name);
 
             object r;
             string a;
