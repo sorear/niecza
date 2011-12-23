@@ -1,4 +1,3 @@
-integration/advent2009-day10.t
 integration/lexical-array-in-inner-block.t
 integration/method-calls-and-instantiation.t
 integration/no-indirect-new.t
@@ -10,10 +9,12 @@ integration/advent2009-day03.t
 integration/advent2009-day04.t
 integration/advent2009-day06.t
 integration/advent2009-day07.t
+integration/advent2009-day10.t
 integration/advent2009-day13.t
 integration/advent2009-day14.t
 integration/advent2009-day15.t
 integration/advent2009-day16.t
+integration/advent2009-day19.t
 integration/advent2009-day23.t
 integration/advent2010-day04.t
 integration/code-blocks-as-sub-args.t
@@ -24,6 +25,7 @@ integration/pair-in-array.t
 S02-lexical-conventions/begin_end_pod.t
 S02-lexical-conventions/comments.t
 S02-lexical-conventions/minimal-whitespace.t
+S02-lexical-conventions/one-pass-parsing.t
 S02-lexical-conventions/pod-in-multi-line-exprs.t
 S02-lexical-conventions/sub-block-parsing.t
 S02-lexical-conventions/unicode-whitespace.t
