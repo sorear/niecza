@@ -4968,7 +4968,7 @@ grammar Regex is STD {
                                     ]?
     }
 
-    token assertion:sym<:> { <?before ':'<alpha>> <cclass_expr> }
+    token assertion:sym<:> { <?before ':'[<alpha>|'!']> <cclass_expr> }
     token assertion:sym<[> { <?before '['> <cclass_expr> }
     token assertion:sym<+> { <?before '+'> <cclass_expr> }
     token assertion:sym<-> { <?before '-'> <cclass_expr> }
