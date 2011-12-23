@@ -31,6 +31,7 @@ S02-lexical-conventions/unicode.t
 S02-lexical-conventions/unspace.t
 S02-literals/array-interpolation.t
 S02-literals/autoref.t
+S02-literals/char-by-number.t
 S02-literals/hash-interpolation.t
 S02-literals/listquote-whitespace.t
 S02-literals/numeric.t
