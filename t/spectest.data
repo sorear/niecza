@@ -33,6 +33,7 @@ S02-literals/array-interpolation.t
 S02-literals/autoref.t
 S02-literals/char-by-number.t
 S02-literals/hash-interpolation.t
+S02-literals/listquote.t
 S02-literals/listquote-whitespace.t
 S02-literals/numeric.t
 S02-literals/pair-boolean.t
