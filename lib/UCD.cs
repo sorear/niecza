@@ -37,6 +37,20 @@ namespace Niecza.UCD {
             this.values = values;
         }
 
+        public Property Proxify(string prefix) {
+            var va0 = new string[] { "N", "No", "F", "False" };
+            var va1 = new string[] { "Y", "Yes", "T", "True" };
+
+            string[][] nvalues = new string[values.Length][];
+            for (int i = 0; i < nvalues.Length; i++) {
+                nvalues[i] =
+                    values[i][0].Substring(0, prefix.Length) == prefix
+                        ? va1 : va0;
+            }
+
+            return new LimitedProperty(data, nvalues);
+        }
+
         public override string GetValue(int cp) {
             int lix = 0;
             int hix = data.Length / 2;
@@ -267,6 +281,7 @@ namespace Niecza.UCD {
         static byte[] bits;
         static Dictionary<string,int[]> directory;
         static Dictionary<string,string> aliases;
+        static Dictionary<string,string> proxy_aliases;
         static Dictionary<Prod<string,string>,string[]> val_aliases;
         static string[] tokens;
         static bool Trace;
@@ -339,6 +354,7 @@ namespace Niecza.UCD {
             int[] loc = directory["!PropertyAlias"];
             aliases = new Dictionary<string, string>();
             val_aliases = new Dictionary<Prod<string,string>,string[]>();
+            proxy_aliases = new Dictionary<string,string>();
 
             int rpos = loc[2];
             while (rpos < loc[3]) {
@@ -364,6 +380,12 @@ namespace Niecza.UCD {
                     aset.Add(alias);
                 //if (Trace) Console.WriteLine("Alias {0},{1} -> {2}", tbl, canon, Kernel.JoinS(", ", aset));
                 val_aliases[Prod.C(tbl, canon)] = aset.ToArray();
+
+                if (tbl == "sc" || tbl == "gc") {
+                    foreach (string a in aset)
+                        aliases[a] = canon;
+                    proxy_aliases[canon] = tbl;
+                }
                 aset.Clear();
             }
         }
@@ -501,6 +523,9 @@ namespace Niecza.UCD {
                 name = a;
             if (cache.TryGetValue(name, out r))
                 return r;
+
+            if (proxy_aliases.TryGetValue(name, out a))
+                return cache[name] = ((LimitedProperty) GetTable(a)).Proxify(name);
 
             if (name == "!inverse_name") {
                 var inv = (GetTable("na") as StringProperty).MakeInverseMap();
