@@ -370,6 +370,7 @@ namespace Niecza.UCD {
                     //if (Trace) Console.WriteLine("Alias {0} -> {1}", alias, main);
                 }
             }
+            aliases["SCRIPTEXTENSIONS"] = aliases["SCX"] = "scx";
 
             loc = directory["!pva"];
             rpos = loc[2];
