@@ -28,6 +28,7 @@ S02-lexical-conventions/pod-in-multi-line-exprs.t
 S02-lexical-conventions/sub-block-parsing.t
 S02-lexical-conventions/unicode-whitespace.t
 S02-lexical-conventions/unicode.t
+S02-lexical-conventions/unspace.t
 S02-literals/array-interpolation.t
 S02-literals/autoref.t
 S02-literals/hash-interpolation.t
