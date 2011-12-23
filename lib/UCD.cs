@@ -37,15 +37,15 @@ namespace Niecza.UCD {
             this.values = values;
         }
 
-        public Property Proxify(string prefix) {
-            var va0 = new string[] { "N", "No", "F", "False" };
-            var va1 = new string[] { "Y", "Yes", "T", "True" };
+        public static string[] NO  = new string[] { "N", "No", "F", "False" };
+        public static string[] YES = new string[] { "Y", "Yes", "T", "True" };
 
+        public Property Proxify(bool neg, string prefix) {
             string[][] nvalues = new string[values.Length][];
             for (int i = 0; i < nvalues.Length; i++) {
-                nvalues[i] =
-                    values[i][0].Substring(0, prefix.Length) == prefix
-                        ? va1 : va0;
+                //Console.WriteLine("{0}/{1}", values[i][0], prefix);
+                bool ok = values[i][0].Substring(0, prefix.Length) == prefix;
+                nvalues[i] = (neg ? !ok : ok) ? YES : NO;
             }
 
             return new LimitedProperty(data, nvalues);
@@ -385,7 +385,7 @@ namespace Niecza.UCD {
                 if (tbl == "sc" || tbl == "gc") {
                     foreach (string a in aset)
                         aliases[StringProperty.Loosen(a)] = canon;
-                    proxy_aliases[canon] = tbl;
+                    proxy_aliases[canon] = tbl == "sc" ? "Script" : tbl;
                 }
                 aset.Clear();
             }
@@ -529,7 +529,18 @@ namespace Niecza.UCD {
                 return r;
 
             if (proxy_aliases.TryGetValue(name, out a))
-                return cache[name] = ((LimitedProperty) GetTable(a)).Proxify(name);
+                return cache[name] = ((LimitedProperty) GetTable(a)).Proxify(false, name);
+
+            if (name == "ASSIGNED")
+                return cache[name] = ((LimitedProperty) GetTable("gc"))
+                    .Proxify(true, "Cn");
+            if (name == "ANY")
+                return cache[name] = ((LimitedProperty) GetTable("gc"))
+                    .Proxify(false, "");
+            if (name == "ASCII")
+                return cache[name] = new LimitedProperty(
+                    new int[] { 0, 1, 128, 0 },
+                    new string[][] { LimitedProperty.NO, LimitedProperty.YES });
 
             if (name == "!inverse_name") {
                 var inv = (GetTable("na") as StringProperty).MakeInverseMap();
