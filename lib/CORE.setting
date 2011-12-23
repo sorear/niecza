@@ -559,6 +559,7 @@ my class Cool {
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
     method ucfirst() { ucfirst(self) }
     method lcfirst() { lcfirst(self) }
+    method ord() { ord(self) }
 }
 
 my class Capture {
