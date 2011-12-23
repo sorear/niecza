@@ -357,6 +357,7 @@ S32-str/flip.t
 S32-str/index.t
 S32-str/lc.t
 S32-str/lcfirst.t
+S32-str/length.t
 S32-str/lines.t
 S32-str/numeric.t
 S32-str/pos.t
