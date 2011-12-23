@@ -1,3 +1,4 @@
+integration/lazy-bentley-generator.t
 integration/lexical-array-in-inner-block.t
 integration/method-calls-and-instantiation.t
 integration/no-indirect-new.t
@@ -361,6 +362,7 @@ S32-str/lcfirst.t
 S32-str/length.t
 S32-str/lines.t
 S32-str/numeric.t
+S32-str/ords.t
 S32-str/pos.t
 S32-str/rindex.t
 S32-str/sprintf.t
