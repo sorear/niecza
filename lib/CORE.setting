@@ -563,6 +563,9 @@ my class Cool {
     method ord() { ord(self) }
     method chr() { chr(self) }
     method ords() { ords(self) }
+    method trim-leading () { self.subst(/^ \s+/, "") };
+    method trim-trailing() { self.subst(/\s+ $/, "") };
+    method trim         () { self.trim-leading.trim-trailing };
 }
 
 my class Capture {
@@ -849,6 +852,10 @@ sub p5chomp(*@strs) { my $r = 0; $r += .p5chomp for @strs; $r }
 sub flip($string)  { (~$string).flip }
 sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
 sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
+sub trim-leading($string) { $string.trim-leading };
+sub trim-trailing($string) { $string.trim-trailing };
+sub trim($string) { $string.trim };
+
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) is equiv<==> { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
