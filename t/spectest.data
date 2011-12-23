@@ -5,6 +5,7 @@ integration/no-indirect-new.t
 integration/passing-pair-class-to-sub.t
 integration/substr-after-match-in-gather-in-for.t
 integration/99problems-01-to-10.t
+integration/99problems-31-to-40.t
 integration/advent2009-day01.t
 integration/advent2009-day03.t
 integration/advent2009-day04.t
