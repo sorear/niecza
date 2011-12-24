@@ -248,6 +248,7 @@ S05-modifier/ignorecase.t
 S05-substitution/match.t
 S05-substitution/subst.t
 S06-advanced/caller.t
+S06-advanced/callsame.t
 S06-advanced/recurse.t
 S06-advanced/return.t
 S06-currying/assuming-and-mmd.t
@@ -337,7 +338,10 @@ S32-hash/slice.t
 S32-io/dir.t
 S32-io/file-tests.t
 S32-list/first.t
+S32-list/grep.t
+S32-list/map.t
 S32-list/pick.t
+S32-list/roll.t
 S32-num/abs.t
 S32-num/complex.t
 S32-num/exp.t
