@@ -73,7 +73,8 @@ method negate() { _binop(-> $a, $ { 0x3FFF_FFFF +& +^$a }, self, $Empty) }
 
 # the range here is the only part of Other_Alphabetic which is not already
 # contained in M* in Unicode 6.0.0
-our $Word   = CClass.catm(< Me Mn Ms Pc Nd Ll Lt Lu Lm Lo Nl >).plus(CClass.range(9398, 9450));
+our $Word   = CClass.catm(< Me Mn Ms Pc Nd Ll Lt Lu Lm Lo Nl >)\
+    .plus(CClass.range(chr(9398), chr(9450)));
 our $Digit  = CClass.catm(< Nd >);
 our $Space  = CClass.enum( # Unicode :Whitespace property - TODO use db
     "\x0009", "\x000A", "\x000B", "\x000C", "\x000D", "\x0020", "\x0085",

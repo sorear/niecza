@@ -1054,8 +1054,7 @@ public sealed class CC : IFreeze {
             0x000A, MAll, 0x000E, 0, 0x0085, MAll, 0x0086, 0,
             0x2028, MAll, 0x202A, 0 });
 
-    [Immutable] public static readonly CC Word  = new CC(new int[] { 0, MAlNum,
-            '_', MAll, '_'+1, MAlNum });
+    [Immutable] public static readonly CC Word  = new CC(new int[] { 0,263167,9398,1073741823,9451,263167 }); // same as \w
 
     [Immutable] public static readonly CC All   = new CC(MAll);
     [Immutable] public static readonly CC None  = new CC(0);

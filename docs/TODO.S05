@@ -42,8 +42,7 @@ LOL: feature requires slice context mappings.
 (1744) No <*...> DISCUSS
 (1804) No <~~> DISCUSS
 (1843) No <|g> etc
-(1893) Missing predefined rules include upper, lower, digit, xdigit, print,
-       graph, cntrl, punct, alnum, wb, ww, space, blank
+(1893) No <ww> or <wb>
 (2246) regex :ratchet syntax doesn't work DISCUSS
 (2342) ::> is defined in terms of brackets, not temporal alternation
 (2380) No <commit> or <cut>

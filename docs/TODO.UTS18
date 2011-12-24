@@ -33,9 +33,9 @@ aliases; property names are also loose-matched.  Script and General_Category
 support use of their values as pseudo-Boolean properties.  Script_Extensions
 is supported with alias scx.
 
-Property values are NOT loose-matched, but this does not seem to be mandated.
+Compatibility properties are handled following Annex C.
 
-*** Compatibility properties are NOT handled in the recommended way ***
+Property values are NOT loose-matched, but this does not seem to be mandated.
 
 *** not in any documentation I can find: isCased, isCasefolded, isLowercase,
     isUppercase, isTitlecase, isNFC, isNFD, isNFKC, isNFKD, toLowercase,

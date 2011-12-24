@@ -4,7 +4,7 @@ use MONKEY_TYPING;
 
 # Predeclarations of types {{{
 my class Mu       { ... }
-my class Cursor   { ... }
+my grammar Cursor { ... }
 my class Regex    { ... }
 my class Num      { ... }
 my class Str      { ... }
@@ -1535,7 +1535,7 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
 }
 # }}}
 # Regular expression support {{{
-my class Cursor {
+my grammar Cursor is Any {
     method at_key($k) { self.{$k} }
     method at_pos($k) { self.[$k] }
     method suppose($rx) {
@@ -1578,8 +1578,21 @@ my class Cursor {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method CURSOR() { self }
-    token alpha { <+INTERNAL::alpha> } #OK
-    token ident { <+INTERNAL::alpha> \w* } #OK
+    # definitions from UTS18
+    token alpha { <:Alphabetic> }
+    token lower { <:Lowercase> }
+    token upper { <:Uppercase> }
+    token punct { <:Punctuation> }
+    token digit { \d }
+    token xdigit { <:Nd + :Hex_Digit> }
+    token alnum { <:Alphabetic + :Nd> }
+    token space { \s }
+    token blank { \h }
+    token cntrl { <:Control> }
+    token graph { <:ANY - :Whitespace - :Control - :Surrogate - :Unassigned> }
+    token print { <+graph + blank - cntrl> }
+    token word  { \w }
+    token ident { <.alpha> \w* }
 }
 
 my class Match is Cool {
