@@ -330,6 +330,7 @@ S32-array/keys_values.t
 S32-array/kv.t
 S32-array/pop.t
 S32-array/push.t
+S32-array/shift.t    
 S32-array/unshift.t
 S32-hash/delete.t
 S32-hash/delete_adverb.t
@@ -346,6 +347,7 @@ S32-list/pick.t
 S32-list/roll.t
 S32-num/abs.t
 S32-num/complex.t
+S32-num/cool-num.t
 S32-num/exp.t
 S32-num/int.t
 S32-num/log.t
