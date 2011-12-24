@@ -4,7 +4,7 @@ has $.terms;
 
 my $nclass = 0;
 our %Gc = < Lu Ll Lt Lm Lo Mn Ms Me Nd Nl No Zs Zl Zp Cc Cf Cs Co Pc
-    Pd Ps Pc Pi Pf Po Sm Sc Sk So Cn >.map(-> $n { $n => ($nclass++) });
+    Pd Ps Pe Pi Pf Po Sm Sc Sk So Cn >.map(-> $n { $n => ($nclass++) });
 
 our $Empty = CClass.new(terms => [ ]);
 our $Full  = CClass.new(terms => [ 0, 0x3FFF_FFFF ]);
@@ -71,8 +71,10 @@ method plus($other) { _binop(* +| *, self, $other); }
 method minus($other) { _binop({ $^a +& +^$^b }, self, $other); }
 method negate() { _binop(-> $a, $ { 0x3FFF_FFFF +& +^$a }, self, $Empty) }
 
-our $Word   = CClass.catm(< Lu Lt Ll Lm Lo Nd Nl No >).plus('_');
-our $Digit  = CClass.catm(< Nd Nl No >);
+# the range here is the only part of Other_Alphabetic which is not already
+# contained in M* in Unicode 6.0.0
+our $Word   = CClass.catm(< Me Mn Ms Pc Nd Ll Lt Lu Lm Lo Nl >).plus(CClass.range(9398, 9450));
+our $Digit  = CClass.catm(< Nd >);
 our $Space  = CClass.enum( # Unicode :Whitespace property - TODO use db
     "\x0009", "\x000A", "\x000B", "\x000C", "\x000D", "\x0020", "\x0085",
     "\x00A0", "\x1680", "\x180E", "\x2000", "\x2001", "\x2002", "\x2003",
