@@ -1423,7 +1423,7 @@ sub reverse(*@array) {
     @acc;
 }
 
-sub join($tween, *@stuff) { @stuff.join($tween) }
+sub join($tween = "", *@stuff) { @stuff.join($tween) }
 
 sub invert(%h) { %h.invert }
 sub keys(%h) { %h.keys }
