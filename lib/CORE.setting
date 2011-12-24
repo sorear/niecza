@@ -291,6 +291,7 @@ my class Any is Mu {
     method hash() { anon %hash = @(self) }
 
     multi method roll($num = 1) {
+        return { self[floor(self.elems.rand)] } xx * if $num ~~ Whatever;
         return self[floor(self.elems.rand)] if $num == 1;
         return map { self[floor(self.elems.rand)] }, ^$num;
     }
@@ -2497,6 +2498,7 @@ sub acotanh($x) { $x.acotanh }
 sub atan2($y, $x = 1) { $y.atan2($x) }
 
 sub pick($num, *@values) { @values.pick($num) }
+sub roll($num, *@values) { @values.roll($num) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
