@@ -707,6 +707,9 @@ my class Method is Routine { }
 my class Submethod is Routine { }
 my class WhateverCode is Block { }
 
+my class Parameter { }
+my class Signature { }
+
 my class ClassHOW {
     method isa(\$obj, \$type) { Q:CgOp {
         (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))

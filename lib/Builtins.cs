@@ -1827,16 +1827,15 @@ flat_enough:;
         return get_count((SubInfo) fcni.GetSlot("info"));
     }
     public static int get_count(SubInfo si) {
-        int[] sig = si.sig_i;
-        if (sig == null)
+        if (si.sig == null)
             return 1;
         int arity = 0;
-        for (int i = 0; i < sig.Length; i += SubInfo.SIG_I_RECORD) {
-            int fl = sig[i + SubInfo.SIG_I_FLAGS];
-            if ((fl & (SubInfo.SIG_F_SLURPY_CAP | SubInfo.SIG_F_SLURPY_POS |
-                    SubInfo.SIG_F_SLURPY_PCL)) != 0)
+        foreach (Parameter p in si.sig.parms) {
+            int fl = p.flags;
+            if ((fl & (Parameter.SLURPY_CAP | Parameter.SLURPY_POS |
+                    Parameter.SLURPY_PCL)) != 0)
                 return int.MaxValue;
-            if ((fl & SubInfo.SIG_F_POSITIONAL) == 0) continue;
+            if ((fl & Parameter.POSITIONAL) == 0) continue;
             arity++;
         }
         return arity;
@@ -1846,18 +1845,17 @@ flat_enough:;
         if (!fcni.Isa(Kernel.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
         SubInfo si = (SubInfo) fcni.GetSlot("info");
-        int[] sig = si.sig_i;
-        if (sig == null)
+        if (si.sig == null)
             return MakeInt(1);
         int arity = 0;
-        for (int i = 0; i < sig.Length; i += SubInfo.SIG_I_RECORD) {
-            int fl = sig[i + SubInfo.SIG_I_FLAGS];
-            if ((fl & (SubInfo.SIG_F_SLURPY_CAP | SubInfo.SIG_F_SLURPY_POS |
-                    SubInfo.SIG_F_SLURPY_PCL | SubInfo.SIG_F_SLURPY_NAM |
-                    SubInfo.SIG_F_OPTIONAL | SubInfo.SIG_F_DEFOUTER |
-                    SubInfo.SIG_F_HASDEFAULT)) != 0)
+        foreach (Parameter p in si.sig.parms) {
+            int fl = p.flags;
+            if ((fl & (Parameter.SLURPY_CAP | Parameter.SLURPY_POS |
+                    Parameter.SLURPY_PCL | Parameter.SLURPY_NAM |
+                    Parameter.OPTIONAL | Parameter.DEFOUTER |
+                    Parameter.HASDEFAULT)) != 0)
                 continue;
-            if ((fl & SubInfo.SIG_F_POSITIONAL) == 0) continue;
+            if ((fl & Parameter.POSITIONAL) == 0) continue;
             arity++;
         }
         return MakeInt(arity);

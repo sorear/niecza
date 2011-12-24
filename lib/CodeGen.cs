@@ -480,10 +480,6 @@ namespace Niecza.CLRBackend {
             SubInfo.GetField("protopad");
         public static readonly FieldInfo SubInfo_mo =
             SubInfo.GetField("mo");
-        public static readonly FieldInfo SubInfo_sig_i =
-            SubInfo.GetField("sig_i");
-        public static readonly FieldInfo SubInfo_sig_r =
-            SubInfo.GetField("sig_r");
         public static readonly FieldInfo P6opaque_slots =
             P6opaque.GetField("slots");
         public static readonly FieldInfo DMO_typeObject =
@@ -2296,12 +2292,10 @@ namespace Niecza.CLRBackend {
             List<object> let = new List<object>();
             let.Add("letn");
 
-            int[] nsigi = (int[])tgt.sig_i.Clone();
             List<object> bind = new List<object>();
             bind.Add("_inlinebind");
             bind.Add(tgt.name);
-            bind.Add(nsigi);
-            bind.Add(tgt.sig_r);
+            bind.Add(tgt.sig);
             bind.Add(null);
 
             // give unique names to the arguments
@@ -2342,15 +2336,15 @@ namespace Niecza.CLRBackend {
             }
 
             string[] lexicals_fixup =
-                new string[nsigi.Length / SubInfo.SIG_I_RECORD];
+                new string[tgt.sig.parms.Length];
             for (int i = 0; i < lexicals_fixup.Length; i ++) {
-                int slot = nsigi[i * SubInfo.SIG_I_RECORD + SubInfo.SIG_I_SLOT];
+                int slot = tgt.sig.parms[i].slot;
                 if (slot < 0)
                     lexicals_fixup[i] = null;
                 else
                     lexicals_fixup[i] = slot_to_lex[slot];
             }
-            bind[4] = lexicals_fixup;
+            bind[3] = lexicals_fixup;
 
             scope.Add(new object[] {
                 "prog",
@@ -2460,48 +2454,37 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Span(ls, le, FixBool(z[3]), xn, ch);
             };
             handlers["_inlinebind"] = delegate(NamProcessor th, object[] zyg) {
-                CpsOp[] args = JScalar.A<CpsOp>(5, zyg, th.Scan);
-                int[] sig_i = (int[])zyg[2];
-                string[] lexnames = (string[])zyg[4];
-                object[] sig_r = (object[])zyg[3];
+                CpsOp[] args = JScalar.A<CpsOp>(4, zyg, th.Scan);
+                Signature sig = (Signature)zyg[2];
+                string[] lexnames = (string[])zyg[3];
                 string name = (string)zyg[1];
                 EmitUnit eu = EmitUnit.Current;
                 List<CpsOp> ops = new List<CpsOp>();
-                int rix = 0;
                 int aused = 0;
-                for (int i = 0; i < sig_i.Length; i+=SubInfo.SIG_I_RECORD) {
-                    int flags = sig_i[i + SubInfo.SIG_I_FLAGS];
-                    int nname = sig_i[i + SubInfo.SIG_I_NNAMES];
-                    int rbase = rix;
-                    string lex = lexnames[i / SubInfo.SIG_I_RECORD];
-                    rix += (nname+1);
-                    STable type = Kernel.AnyMO;
-                    //SubInfo def = null;
-
-                    if ((flags & SubInfo.SIG_F_HASDEFAULT) != 0)
-                        rix++; //def = (SubInfo) sig_r[rix++];
-                    if ((flags & SubInfo.SIG_F_HASTYPE) != 0)
-                        type = (STable) sig_r[rix++];
+                for (int i = 0; i < sig.parms.Length; i++) {
+                    int flags = sig.parms[i].flags;
+                    string lex = lexnames[i];
+                    STable type = sig.parms[i].type;
 
                     CpsOp get = null;
                     if (aused < args.Length) {
                         get = args[aused++];
-                    } else if ((flags & SubInfo.SIG_F_DEFOUTER) != 0) {
+                    } else if ((flags & Parameter.DEFOUTER) != 0) {
                         get = th.RawAccessLex("outerlex", lex, null);
-                    } else if ((flags & SubInfo.SIG_F_OPTIONAL) != 0) {
+                    } else if ((flags & Parameter.OPTIONAL) != 0) {
                         get = eu.TypeConstantV(type);
                     } else {
                         get = CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
-                            CpsOp.StringLiteral("No value in "+name+" available for parameter "+(string)sig_r[rbase]));
+                            CpsOp.StringLiteral("No value in "+name+" available for parameter "+sig.parms[i].name));
                     }
 
                     if (lex == null) {
                         ops.Add(CpsOp.Sink(get));
-                    } else if ((flags & SubInfo.SIG_F_IS_COPY) != 0) {
+                    } else if ((flags & Parameter.IS_COPY) != 0) {
                         CpsOp init;
-                        if ((flags & SubInfo.SIG_F_IS_HASH) != 0) {
+                        if ((flags & Parameter.IS_HASH) != 0) {
                             init = CpsOp.MethodCall(Tokens.Kernel_CreateHash);
-                        } else if ((flags & SubInfo.SIG_F_IS_LIST) != 0) {
+                        } else if ((flags & Parameter.IS_LIST) != 0) {
                             init = CpsOp.MethodCall(Tokens.Kernel_CreateArray);
                         } else {
                             init = CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
@@ -2512,14 +2495,14 @@ namespace Niecza.CLRBackend {
                             Tokens.Kernel_Assign,
                             th.RawAccessLex("scopedlex", lex, null),
                             get)));
-                    } else if ((flags & SubInfo.SIG_F_RWTRANS) != 0) {
+                    } else if ((flags & Parameter.RWTRANS) != 0) {
                         ops.Add(th.RawAccessLex("scopedlex", lex, get));
                     } else {
                         int mode = 0;
-                        if ((flags & SubInfo.SIG_F_READWRITE) != 0)
+                        if ((flags & Parameter.READWRITE) != 0)
                             mode = Kernel.NBV_RW;
-                        else if ((flags & (SubInfo.SIG_F_IS_LIST |
-                                SubInfo.SIG_F_IS_HASH)) != 0)
+                        else if ((flags & (Parameter.IS_LIST |
+                                Parameter.IS_HASH)) != 0)
                             mode = Kernel.NBV_LIST;
                         ops.Add(th.RawAccessLex("scopedlex", lex,
                             CpsOp.MethodCall(Tokens.Kernel_NewBoundVar,
@@ -4245,36 +4228,32 @@ dynamic:
                 return AddLexical(args, new LISub(body));
             } else if (cmd == "sub_no_signature") {
                 SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
-                tgt.sig_i = null;
-                tgt.sig_r = null;
+                tgt.sig = null;
                 return null;
             } else if (cmd == "set_signature") {
                 SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
                 int ix = 2;
-                List<int> sig_i = new List<int>();
-                List<object> sig_r = new List<object>();
+                List<Parameter> sig = new List<Parameter>();
+                List<string> names = new List<string>();
                 while (ix != args.Length) {
                     int    flags = (int)   args[ix++];
                     string name  = (string)args[ix++];
                     string slot  = (string)args[ix++];
-                    sig_r.Add(name);
-                    int nnames = 0;
+                    names.Clear();
                     while(true) {
                         string a_name = (string)args[ix++];
                         if (a_name == null) break;
-                        nnames++;
-                        sig_r.Add(a_name);
+                        names.Add(a_name);
                     }
                     SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
                     STable  type  = (STable)Handle.Unbox(args[ix++]);
-                    if (deflt != null) sig_r.Add(deflt);
-                    if (type != null) sig_r.Add(type);
-                    sig_i.Add(flags);
-                    sig_i.Add(slot == null ? -1 : tgt.dylex[slot].SigIndex());
-                    sig_i.Add(nnames);
+
+                    sig.Add(new Parameter(flags,
+                        (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
+                        name, (names.Count == 0 ? null : names.ToArray()),
+                        deflt, type ?? Kernel.AnyMO));
                 }
-                tgt.sig_i = sig_i.ToArray();
-                tgt.sig_r = sig_r.ToArray();
+                tgt.sig = new Signature(sig.ToArray());
                 return null;
             } else if (cmd == "sub_contains_phaser") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);

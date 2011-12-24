@@ -64,7 +64,7 @@ namespace Niecza.Serialization {
         internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 8;
+        static readonly int version = 9;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -216,6 +216,8 @@ namespace Niecza.Serialization {
         ReflectObj,
         CC,
         AltInfo,
+        Signature,
+        Parameter,
 
         // types of P6any-reified object
         P6opaque, // eventually let's specialize this
@@ -690,6 +692,10 @@ namespace Niecza.Serialization {
                     return CC.Thaw(this);
                 case SerializationCode.AltInfo:
                     return AltInfo.Thaw(this);
+                case SerializationCode.Signature:
+                    return Signature.Thaw(this);
+                case SerializationCode.Parameter:
+                    return Parameter.Thaw(this);
 
                 case SerializationCode.ReflectObj:
                     return ReflectObj.Thaw(this);

@@ -1394,6 +1394,110 @@ namespace Niecza {
         }
     }
 
+    public class Parameter : P6any, IFixup {
+        public int      flags;
+        public int      slot;
+        public string   name;
+        public string[] names;
+        public SubInfo  def;
+        public STable   type;
+
+        private Parameter() { }
+        public Parameter(int flags, int slot, string name,
+                string[] names, SubInfo def, STable type) {
+            this.mo = Kernel.ParameterMO;
+            this.flags = flags;
+            this.name = name;
+            this.slot = slot;
+            this.names = names;
+            this.def = def;
+            this.type = type;
+        }
+
+        public static Parameter TPos(string name, int slot) {
+            return new Parameter(RWTRANS | POSITIONAL, slot, name,
+                    null, null, Kernel.AnyMO);
+        }
+
+        public static Parameter TNamedOpt(string name, int slot) {
+            return new Parameter(RWTRANS | OPTIONAL, slot, name,
+                    new string[] { name }, null, Kernel.AnyMO);
+        }
+
+        // Value processing
+        public const int HASTYPE    = 1; // else Kernel.AnyMO
+        public const int MULTI_IGNORED = 16384;
+
+        // Value binding
+        public const int READWRITE  = 2;
+        public const int RWTRANS    = 8;
+        public const int BINDLIST   = 16;
+        public const int INVOCANT   = 8192;
+        public const int IS_COPY    = 32768;
+        public const int IS_LIST    = 65536;
+        public const int IS_HASH    = 131072;
+
+        // Value source
+        public const int HASDEFAULT = 32;
+        public const int OPTIONAL   = 64;
+        public const int DEFOUTER   = 4096;
+        public const int POSITIONAL = 128;
+        public const int SLURPY_POS = 256;
+        public const int SLURPY_NAM = 512;
+        public const int SLURPY_CAP = 1024;
+        public const int SLURPY_PCL = 2048;
+
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.Parameter);
+
+            fb.Int(flags);
+            fb.Int(slot);
+            fb.String(name);
+            fb.Strings(names);
+            fb.ObjRef(def);
+            fb.ObjRef(type);
+        }
+
+        internal static Parameter Thaw(ThawBuffer tb) {
+            Parameter n = new Parameter();
+            tb.Register(n);
+            tb.PushFixup(n);
+
+            n.flags = tb.Int();
+            n.slot  = tb.Int();
+            n.name  = tb.String();
+            n.names = tb.Strings();
+            n.def   = (SubInfo)tb.ObjRef();
+            n.type  = (STable)tb.ObjRef();
+
+            return n;
+        }
+
+        void IFixup.Fixup() { mo = Kernel.ParameterMO; }
+    }
+
+    public class Signature : P6any, IFixup {
+        public Parameter[] parms;
+
+        public Signature(params Parameter[] parms) { this.mo = Kernel.SignatureMO; this.parms = parms; }
+        private Signature() { }
+
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.Signature);
+            fb.Refs<Parameter>(parms);
+        }
+
+        internal static Signature Thaw(ThawBuffer tb) {
+            Signature n = new Signature();
+            tb.Register(n);
+            tb.PushFixup(n);
+
+            n.parms = tb.RefsA<Parameter>();
+            return n;
+        }
+        void IFixup.Fixup() { mo = Kernel.SignatureMO; }
+    }
+
     // This stores all the invariant stuff about a Sub, i.e. everything
     // except the outer pointer.  Now distinct from protopads
     //
@@ -1405,8 +1509,7 @@ namespace Niecza {
         // Essential call functions
         public DynBlockDelegate code = RuntimeUnit.JitCompileSub;
         public int nspill;
-        public int[] sig_i;
-        public object[] sig_r;
+        public Signature sig;
 
         // Local metadata
         public int[] lines;
@@ -1474,38 +1577,6 @@ namespace Niecza {
         public const int INLINED = 128;
         public const int CANNOT_INLINE = 256;
         public const int RETURN_PASS = 512;
-
-        public const int SIG_I_RECORD  = 3;
-        public const int SIG_I_FLAGS   = 0;
-        public const int SIG_I_SLOT    = 1;
-        public const int SIG_I_NNAMES  = 2;
-
-        // R records are variable size, but contain canonical name,
-        // usable names (in order), default SubInfo (if present),
-        // type STable (if present)
-
-        // Value processing
-        public const int SIG_F_HASTYPE    = 1; // else Kernel.AnyMO
-        public const int SIG_F_MULTI_IGNORED = 16384;
-
-        // Value binding
-        public const int SIG_F_READWRITE  = 2;
-        public const int SIG_F_RWTRANS    = 8;
-        public const int SIG_F_BINDLIST   = 16;
-        public const int SIG_F_INVOCANT   = 8192;
-        public const int SIG_F_IS_COPY    = 32768;
-        public const int SIG_F_IS_LIST    = 65536;
-        public const int SIG_F_IS_HASH    = 131072;
-
-        // Value source
-        public const int SIG_F_HASDEFAULT = 32;
-        public const int SIG_F_OPTIONAL   = 64;
-        public const int SIG_F_DEFOUTER   = 4096;
-        public const int SIG_F_POSITIONAL = 128;
-        public const int SIG_F_SLURPY_POS = 256;
-        public const int SIG_F_SLURPY_NAM = 512;
-        public const int SIG_F_SLURPY_CAP = 1024;
-        public const int SIG_F_SLURPY_PCL = 2048;
 
         public const uint FILTER_SALT = 0x9e3779b9;
 
@@ -1587,10 +1658,10 @@ namespace Niecza {
             return r;
         }
 
-        private string PName(int rbase) {
-            return ((string)sig_r[rbase]) + " in " + name;
+        private string PName(Parameter p) {
+            return p.name + " in " + name;
         }
-        public unsafe Frame Binder(Frame caller, Frame outer, P6any sub,
+        public Frame Binder(Frame caller, Frame outer, P6any sub,
                 Variable[] pos, VarHash named, bool quiet, DispatchEnt de) {
             Frame th;
             if ((special & RUN_ONCE) != 0) {
@@ -1609,8 +1680,8 @@ namespace Niecza {
             // runloop to not overwrite th, which it would if the top frame
             // stayed 'caller'.
             Kernel.SetTopFrame(th);
-            int[] ibuf = sig_i;
-            if (ibuf == null) return th;
+            if (sig == null) return th;
+            Parameter[] pbuf = sig.parms;
             int posc = 0;
             HashSet<string> namedc = null;
             int jun_pivot = -1;
@@ -1618,34 +1689,27 @@ namespace Niecza {
             int jun_rank = int.MaxValue;
             if (named != null)
                 namedc = new HashSet<string>(named.Keys);
-            if (ibuf.Length == 0) goto noparams;
-            fixed (int* ibase = ibuf) {
-            int* ic = ibase;
-            int* iend = ic + (ibuf.Length - 2);
-            object[] rbuf = sig_r;
-            int rc = 0;
+            int pend = pbuf.Length;
+            if (pend == 0) goto noparams;
+            int pix = 0;
             int obj_src = -1;
             string obj_src_n = null;
 
-            while (ic < iend) {
-                int flags = *(ic++);
-                int slot  = *(ic++);
-                int names = *(ic++);
-                int rbase = rc;
-                rc += (1 + names);
-                if ((flags & SIG_F_HASDEFAULT) != 0) rc++;
-                STable type = Kernel.AnyMO;
+            while (pix != pend) {
+                Parameter param = pbuf[pix++];
+                int flags = param.flags;
+                int slot = param.slot;
+                string[] names = param.names;
+                STable type = param.type;
                 obj_src = -1;
-                if ((flags & SIG_F_HASTYPE) != 0)
-                    type = (STable)rbuf[rc++];
 
                 Variable src = null;
-                if ((flags & SIG_F_SLURPY_PCL) != 0) {
+                if ((flags & Parameter.SLURPY_PCL) != 0) {
                     src = Kernel.BoxAnyMO(pos, Kernel.ParcelMO);
                     posc  = pos.Length;
                     goto gotit;
                 }
-                if ((flags & SIG_F_SLURPY_CAP) != 0) {
+                if ((flags & Parameter.SLURPY_CAP) != 0) {
                     P6any nw = new P6opaque(Kernel.CaptureMO);
                     nw.SetSlot("positionals", pos);
                     nw.SetSlot("named", named);
@@ -1653,7 +1717,7 @@ namespace Niecza {
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
                 }
-                if ((flags & SIG_F_SLURPY_POS) != 0) {
+                if ((flags & Parameter.SLURPY_POS) != 0) {
                     P6any l = new P6opaque(Kernel.ListMO);
                     Kernel.IterToList(l, Kernel.IterFlatten(
                                 Kernel.SlurpyHelper(th, posc)));
@@ -1661,7 +1725,7 @@ namespace Niecza {
                     posc = pos.Length;
                     goto gotit;
                 }
-                if ((flags & SIG_F_SLURPY_NAM) != 0) {
+                if ((flags & Parameter.SLURPY_NAM) != 0) {
                     VarHash nh = new VarHash();
                     if (named != null) {
                         foreach (KeyValuePair<string,Variable> kv in named)
@@ -1673,9 +1737,9 @@ namespace Niecza {
                     src = Kernel.BoxAnyMO(nh, Kernel.HashMO);
                     goto gotit;
                 }
-                if (names != 0 && named != null) {
-                    for (int ni = 1; ni <= names; ni++) {
-                        string n = (string)rbuf[rbase+ni];
+                if (names != null && named != null) {
+                    for (int ni = 0; ni < names.Length; ni++) {
+                        string n = names[ni];
                         if (namedc.Contains(n)) {
                             namedc.Remove(n);
                             src = named[n];
@@ -1685,22 +1749,21 @@ namespace Niecza {
                         }
                     }
                 }
-                if ((flags & SIG_F_POSITIONAL) != 0 && posc != pos.Length) {
+                if ((flags & Parameter.POSITIONAL) != 0 && posc != pos.Length) {
                     obj_src = posc;
                     src = pos[posc++];
                     goto gotit;
                 }
 get_default:
-                if ((flags & SIG_F_HASDEFAULT) != 0) {
+                if ((flags & Parameter.HASDEFAULT) != 0) {
                     Frame thn = Kernel.GetInferiorRoot()
-                        .MakeChild(th, (SubInfo) rbuf[rbase + 1 + names],
-                            Kernel.AnyP);
+                        .MakeChild(th, param.def, Kernel.AnyP);
                     src = Kernel.RunInferior(thn);
                     if (src == null)
-                        throw new Exception("Improper null return from sub default for " + PName(rbase));
+                        throw new Exception("Improper null return from sub default for " + PName(param));
                     goto gotit;
                 }
-                if ((flags & SIG_F_DEFOUTER) != 0) {
+                if ((flags & Parameter.DEFOUTER) != 0) {
                     Frame f = th;
                     if (outer_topic_key < 0) {
                         src = Kernel.AnyMO.typeVar;
@@ -1710,38 +1773,38 @@ get_default:
                     src = (Variable)f.GetDynamic(outer_topic_key);
                     goto gotit;
                 }
-                if ((flags & SIG_F_OPTIONAL) != 0) {
+                if ((flags & Parameter.OPTIONAL) != 0) {
                     // Array is the "default" Positional -masak
-                    if ((flags & SIG_F_IS_LIST) != 0)
+                    if ((flags & Parameter.IS_LIST) != 0)
                         src = Kernel.CreateArray();
-                    else if ((flags & SIG_F_IS_HASH) != 0)
+                    else if ((flags & Parameter.IS_HASH) != 0)
                         src = Kernel.CreateHash();
                     else
                         src = type.initVar;
                     goto gotit;
                 }
                 if (quiet) return null;
-                return Kernel.Die(th, "No value for parameter " + PName(rbase));
+                return Kernel.Die(th, "No value for parameter " + PName(param));
 gotit:
-                if ((flags & SIG_F_RWTRANS) != 0) {
-                } else if ((flags & SIG_F_IS_COPY) != 0) {
-                    if ((flags & SIG_F_IS_HASH) != 0)
+                if ((flags & Parameter.RWTRANS) != 0) {
+                } else if ((flags & Parameter.IS_COPY) != 0) {
+                    if ((flags & Parameter.IS_HASH) != 0)
                         src = Kernel.Assign(Kernel.CreateHash(),
                             Kernel.NewRWListVar(src.Fetch()));
-                    else if ((flags & SIG_F_IS_LIST) != 0)
+                    else if ((flags & Parameter.IS_LIST) != 0)
                         src = Kernel.Assign(Kernel.CreateArray(),
                             Kernel.NewRWListVar(src.Fetch()));
                     else
                         src = Kernel.Assign(Kernel.NewTypedScalar(type), src);
                 } else {
-                    bool islist = ((flags & SIG_F_BINDLIST) != 0);
-                    bool rw     = ((flags & SIG_F_READWRITE) != 0) && !islist;
+                    bool islist = ((flags & Parameter.BINDLIST) != 0);
+                    bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
                     P6any srco  = src.Fetch();
 
                     // XXX: in order for calling methods on Nil to work,
                     // self needs to be ignored here.
                     if (srco == Kernel.NilP && obj_src != -1 &&
-                            (flags & SIG_F_INVOCANT) == 0) {
+                            (flags & Parameter.INVOCANT) == 0) {
                         obj_src = -1;
                         goto get_default;
                     }
@@ -1756,7 +1819,7 @@ gotit:
                             }
                             continue;
                         }
-                        return Kernel.Die(th, "Nominal type check failed in binding " + PName(rbase) + "; got " + srco.mo.name + ", needed " + type.name);
+                        return Kernel.Die(th, "Nominal type check failed in binding " + PName(param) + "; got " + srco.mo.name + ", needed " + type.name);
                     }
 
                     if (rw) {
@@ -1767,7 +1830,7 @@ gotit:
                             goto bound;
                         } else {
                             if (quiet) return null;
-                            return Kernel.Die(th, "Binding " + PName(rbase) + ", cannot bind read-only value to is rw parameter");
+                            return Kernel.Die(th, "Binding " + PName(param) + ", cannot bind read-only value to is rw parameter");
                         }
                     }
                     else {
@@ -1777,7 +1840,7 @@ gotit:
                     }
 bound: ;
                 }
-                if ((flags & SIG_F_INVOCANT) != 0 && self_key >= 0)
+                if ((flags & Parameter.INVOCANT) != 0 && self_key >= 0)
                     th.SetDynamic(self_key, src);
                 switch (slot + 1) {
                     case 0: break;
@@ -1793,7 +1856,6 @@ bound: ;
                     case 10: th.lex9 = src; break;
                     default: th.lexn[slot - 10] = src; break;
                 }
-            }
             }
 noparams:
 
@@ -1870,7 +1932,7 @@ noparams:
         }
 
         internal bool IsInlinable() {
-            if (sig_i == null)
+            if (sig == null)
                 return false;
             if ((special & CANNOT_INLINE) != 0)
                 return false;
@@ -1885,11 +1947,11 @@ noparams:
                           (kv.Key[1] == '?' || kv.Key[1] == '*')))
                     return false;
             }
-            for (int i = 0; i < sig_i.Length; i += SIG_I_RECORD) {
-                int fl = sig_i[i + SIG_I_FLAGS];
-                if ((fl & SIG_F_POSITIONAL) == 0)
+            foreach (Parameter p in sig.parms) {
+                int fl = p.flags;
+                if ((fl & Parameter.POSITIONAL) == 0)
                     return false;
-                if ((fl & SIG_F_HASDEFAULT) != 0)
+                if ((fl & Parameter.HASDEFAULT) != 0)
                     return false;
             }
             return true;
@@ -1912,13 +1974,12 @@ noparams:
         }
 
         internal bool IsTopicalizer() {
-            if (sig_i == null)
+            if (sig == null)
                 return false;
             LexInfo topic;
             dylex.TryGetValue("$_", out topic);
-            for (int i = 0; i < sig_i.Length; i += SIG_I_RECORD) {
-                int slot = sig_i[i + SIG_I_SLOT];
-                if (slot >= 0 && topic != null && topic.SigIndex() == slot)
+            foreach (Parameter p in sig.parms) {
+                if (p.slot >= 0 && topic != null && topic.SigIndex() == p.slot)
                     return true;
             }
             return false;
@@ -1984,8 +2045,7 @@ noparams:
         internal SubInfo(SubInfo o) {
             code = o.code;
             nspill = o.nspill;
-            sig_i = o.sig_i;
-            sig_r = o.sig_r;
+            sig = o.sig;
             lines = o.lines;
             dylex = o.dylex;
             dylex_filter = o.dylex_filter;
@@ -2086,9 +2146,7 @@ noparams:
             fb.String(mn);
             fb.String(tn);
             fb.Int(nspill);
-            fb.Ints(sig_i);
-            if (sig_i != null)
-                fb.Refs(sig_r);
+            fb.ObjRef(sig);
 
             fb.Ints(lines);
             fb.Ints(edata);
@@ -2152,9 +2210,7 @@ noparams:
             }
 
             n.nspill = tb.Int();
-            n.sig_i = tb.Ints();
-            if (n.sig_i != null)
-                n.sig_r = tb.RefsA<object>();
+            n.sig = (Signature)tb.ObjRef();
 
             n.lines = tb.Ints();
             n.edata = tb.Ints();
@@ -4300,6 +4356,10 @@ saveme:
         }
 
         public static Frame Die(Frame caller, string msg) {
+            if (Frame.AllExceptions) {
+                Console.WriteLine("Die: {0}", msg);
+                Console.WriteLine(DescribeBacktrace(caller, null));
+            }
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
                     BoxAnyMO<string>(msg, StrMO));
         }
@@ -4407,6 +4467,8 @@ saveme:
         [CORESaved] public static STable HashMO;
         [CORESaved] public static STable BoolMO;
         [CORESaved] public static STable MuMO;
+        [CORESaved] public static STable ParameterMO;
+        [CORESaved] public static STable SignatureMO;
         [CORESaved] public static P6any StashP;
 
         [CORESaved] public static Variable TrueV;
@@ -4497,47 +4559,37 @@ saveme:
                 this.impl = impl;
                 this.tien = tien;
                 info = (SubInfo) impl.GetSlot("info");
-                int ct = info.sig_i.Length / SubInfo.SIG_I_RECORD;
 
                 pos = new List<MMDParameter>();
                 nam = new Dictionary<string,MMDParameter>();
-                int rix = 0;
 
-                for (int ix = 0; ix < ct; ix++) {
-                    int flags = info.sig_i[ix*SubInfo.SIG_I_RECORD +
-                        SubInfo.SIG_I_FLAGS];
-                    int nnames = info.sig_i[ix*SubInfo.SIG_I_RECORD +
-                        SubInfo.SIG_I_NNAMES];
-                    int rbase = rix;
-                    rix += (nnames + 1);
+                foreach (Parameter pa in info.sig.parms) {
+                    int flags = pa.flags;
                     MMDParameter p = new MMDParameter();
-                    p.required = ((flags & (SubInfo.SIG_F_OPTIONAL | SubInfo.SIG_F_HASDEFAULT)) == 0);
+                    p.required = ((flags & (Parameter.OPTIONAL | Parameter.HASDEFAULT)) == 0);
                     p.constrained = false;
-                    p.type = AnyMO;
-                    if ((flags & SubInfo.SIG_F_HASDEFAULT) != 0) rix++;
-                    if ((flags & SubInfo.SIG_F_HASTYPE) != 0)
-                        p.type = (STable) info.sig_r[rix++];
+                    p.type = pa.type;
 
                     // XXX The long name model does not represent the full
                     // diversity of Perl 6 parameters, instead restricting
                     // them to 'only positional' or '1 name'
-                    if (nnames > 0 && (flags & SubInfo.SIG_F_POSITIONAL) == 0) {
-                        if (nnames == 1) {
-                            nam[(string)info.sig_r[rbase+1]] = p;
+                    if (pa.names != null && (flags & Parameter.POSITIONAL) == 0) {
+                        if (pa.names.Length == 1) {
+                            nam[pa.names[0]] = p;
                         } else {
                             slurpy_nam = true;
                             extra_constraints = true;
                         }
-                    } else if ((flags & SubInfo.SIG_F_SLURPY_PCL) != 0) {
+                    } else if ((flags & Parameter.SLURPY_PCL) != 0) {
                         slurpy_pos = true;
-                    } else if ((flags & SubInfo.SIG_F_SLURPY_CAP) != 0) {
+                    } else if ((flags & Parameter.SLURPY_CAP) != 0) {
                         slurpy_pos = true;
                         slurpy_nam = true;
-                    } else if ((flags & SubInfo.SIG_F_SLURPY_POS) != 0) {
+                    } else if ((flags & Parameter.SLURPY_POS) != 0) {
                         slurpy_pos = true;
-                    } else if ((flags & SubInfo.SIG_F_SLURPY_NAM) != 0) {
+                    } else if ((flags & Parameter.SLURPY_NAM) != 0) {
                         slurpy_nam = true;
-                    } else if ((flags & SubInfo.SIG_F_POSITIONAL) != 0) {
+                    } else if ((flags & Parameter.POSITIONAL) != 0) {
                         pos.Add(p);
                     }
                 }
@@ -4940,24 +4992,13 @@ again:      if (i == prog.Length) {
 
                 SubInfo si = (SubInfo) init.GetSlot("info");
                 VarHash build_args = new VarHash();
-                int ic = 0;
-                int oc = 0;
-                while (ic < si.sig_i.Length) {
-                    int fl = si.sig_i[ic + SubInfo.SIG_I_FLAGS];
-                    int nn = si.sig_i[ic + SubInfo.SIG_I_NNAMES];
-                    ic += SubInfo.SIG_I_RECORD;
-
-                    for (int j = 0; j < nn; j++) {
-                        string name = (string) si.sig_r[oc+j+1];
+                foreach (Parameter pa in si.sig.parms) {
+                    foreach (string name in pa.names ?? new string[0]) {
                         if (args.ContainsKey(name)) {
                             build_args[name] = args[name];
                             args.Remove(name);
                         }
                     }
-
-                    oc += 1 + nn;
-                    if ((fl & SubInfo.SIG_F_HASTYPE) != 0) oc++;
-                    if ((fl & SubInfo.SIG_F_HASDEFAULT) != 0) oc++;
                 }
 
                 return init.Invoke(th, new Variable[] { NewROScalar(n) },
@@ -5197,10 +5238,7 @@ slow:
                 ContextHandler<Variable> cvb, object cvu) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     WrapHandler0cb);
-            si.sig_i = new int[3] {
-                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL,
-                0, 0 };
-            si.sig_r = new object[1] { "self" };
+            si.sig = new Signature(Parameter.TPos("self", 0));
             si.param = new object[] { cvu, cvb };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
@@ -5215,11 +5253,8 @@ slow:
                 IndexHandler cv) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                 WrapHandler1cb);
-            si.sig_i = new int[6] {
-                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
-                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0
-            };
-            si.sig_r = new object[2] { "self", "$key" };
+            si.sig = new Signature(Parameter.TPos("self", 0),
+                    Parameter.TPos("$key", 1));
             si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
@@ -5237,11 +5272,9 @@ slow:
                 PushyHandler cv) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     WrapPushycb);
-            si.sig_i = new int[6] {
-                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
-                SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_SLURPY_PCL, 1, 0
-            };
-            si.sig_r = new object[2] { "self", "$args" };
+            si.sig = new Signature(Parameter.TPos("self", 0),
+                new Parameter(Parameter.RWTRANS | Parameter.SLURPY_PCL, 1, "$args", null, null, null)
+            );
             si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
@@ -5281,29 +5314,18 @@ slow:
                 BindHandler bind) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     DispIndexy);
+            List<Parameter> lp = new List<Parameter>();
+            lp.Add(Parameter.TPos("self", 0));
+            lp.Add(Parameter.TPos("$index", 1));
             if (del != null) {
-                si.sig_i = new int[24] {
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1
-                };
-                si.sig_r = new object[14] { "self", "$index", "exists", "exists", "delete", "delete", "k", "k", "kv", "kv", "p", "p", "BIND_VALUE", "BIND_VALUE" };
-            } else {
-                si.sig_i = new int[18] {
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 0, 0,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_POSITIONAL, 1, 0,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1,
-                    SubInfo.SIG_F_RWTRANS | SubInfo.SIG_F_OPTIONAL, -1, 1
-                };
-                si.sig_r = new object[10] { "self", "$index", "k", "k", "kv", "kv", "p", "p", "BIND_VALUE", "BIND_VALUE" };
+                lp.Add(Parameter.TNamedOpt("exists", -1));
+                lp.Add(Parameter.TNamedOpt("delete", -1));
             }
+            lp.Add(Parameter.TNamedOpt("k", -1));
+            lp.Add(Parameter.TNamedOpt("kv", -1));
+            lp.Add(Parameter.TNamedOpt("p", -1));
+            lp.Add(Parameter.TNamedOpt("BIND_VALUE", -1));
+            si.sig = new Signature(lp.ToArray());
             si.param = new object[] { at, exist, del, bind };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
@@ -5599,6 +5621,9 @@ slow:
         internal static void CreateBasicTypes() {
             CodeMO = new STable("Code"); // forward decl
             MuMO = new STable("Mu");
+            AnyMO = new STable("Any");
+            ParameterMO = new STable("Parameter");
+            SignatureMO = new STable("Signature");
             Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
             Handler_Vonly(MuMO, "Bool", new CtxBoolNativeDefined(),
@@ -5608,7 +5633,6 @@ slow:
             MuMO.FillProtoClass(null, new string[] { });
             MuMO.Invalidate();
 
-            AnyMO = new STable("Any");
             // AnyMO.typeObject is needed very early, while setting up the
             // root $_
             AnyMO.typeObject = new P6opaque(AnyMO, 0);
@@ -5721,6 +5745,10 @@ slow:
             StashMO = new STable("Stash");
             StashMO.FillProtoClass(AnyMO);
             StashP = new P6opaque(StashMO);
+
+            ParameterMO.FillProtoClass(AnyMO);
+
+            SignatureMO.FillProtoClass(AnyMO);
 
             ClassHOWMO = new STable("ClassHOW");
             ClassHOWMO.FillProtoClass(AnyMO);
