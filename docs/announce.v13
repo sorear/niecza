@@ -1,0 +1,149 @@
+    Announce: Niecza Perl 6 v13
+
+This is the thirteenth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.  I'm on winter break now, which means lots
+of time for improvements.  Muahahaha.  A large portion of the improvements
+have been in regular expression support.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Breaking changes]
+
+/ <{ foo }> / is no longer accepted as a synonym for / <?{ foo }> /.
+
+$0 is no longer allowed to mean $/ when there is no capture zero.
+
+$/.ast no longer defaults to ~$/.  Use $() if you want that.
+
+
+
+[Major features]
+
+New-style character class expressions like <:Uppercase & :Greek> are
+now supported.
+
+Unicode property access is now supported!  In addition to the use in
+regexes, there is also a minimal Niecza::UCD module which allows querying
+the properties of characters.  All non-Unihan properties defined in
+Unicode 6.0.0 are available.
+
+Runtime number parsing has been radically extended and now supports the
+full gamut of Perl 6 number syntaxes.
+
+
+
+[Minor features]
+
+Supplementary characters are now generally supported, though StrPos-type
+counting for chars, substr, etc is still in UTF-16 code units.
+
+codes is now available, for when you need to actually count code points
+(be aware that it is O(n)).
+
+The regex infix operators & and && are now supported (currently treated
+as synonyms, but don't rely on this).
+
+&pow is a little bit smarter and needlessly returns NaN in fewer cases
+(Solomon Foster, Stefan O'Rear).
+
+Imported a few tweaks from STD, including a better message for say$_.
+
+\h \v \s \w and \d now use the recommended UTS18[3] definitions.
+
+\n, $$, and ^^ now match any vertical whitespace, including CRLF as
+a single unit.
+
+% is now supported for all quantifiers and %% is available too.
+
+$() @() %() are now supported.
+
+/$var/ now allows $var to be a Regex.  Likewise /<$var>/, /@var/,
+and /<@var>/ have been added.  / <{...}> / now does the right thing.
+
+The implementation of $<foo>=[...] has been considerably simplified
+and depessimized.
+
+/ <.$foo> / assertion syntax is now supported.
+
+/ <foo> / will now call a lexical "my regex foo" if possible.  To minimize
+potential accidents, this applies ONLY to regexes, tokens, and rules;
+despite using the same namespace, a "my sub foo" will not be called.
+
+/ <&foo(...)> / now allows arguments.
+
+@<foo> now correctly contextualizes.
+
+Nontrivial regex protos, like "proto regex foo { "bar" {*} }", are now
+implemented.
+
+<( and )> are now supported.
+
+Added Match methods: kv, keys, values, caps, chunks, prematch, postmatch.
+
+Added \c[] syntax in strings and regexes.
+
+Rat and FatRat now stringify as fractions.
+
+Inf now stringifies as "Inf" rather than leaking C# Infinity.
+
+Added predefined quasi-property rules like <alnum>.
+
+Added Niecza::Benchmark, providing the barest minimum of functionality like
+Perl 5's "Benchmark".
+
+Inf, NaN correctly handled in rounding, Cool.truncate, &kv, Pair.invert,
+&srand, allow :x(*) in subst, .chr, .ord, .chrs, .ords, &chrs, &ords,
+trim methods, &roll, .roll(*), end, min, max, minmax (Solomon Foster)
+
+Added .pick(*), corrected Str and Numeric for Range (Will Coleda)
+
+classify (Moritz Lenz)
+
+
+
+[Selected bug fixes]
+
+Threads.pm6 is working again, now with exception-safe locking.
+
+
+
+[Other]
+
+There is now documentation on how to prepare releases.
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+My current priorities are:
+ 1. Make regexes much more feature-complete, including general Unicode
+    properties and grapheme mode
+ 2. Prototype the debugger
+ 3. 6model convergence work, including roles/native types
+ 4. Figure out how modules and S11 stuff should work in Niecza.  Do it.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-12.zip
+[2] https://github.com/sorear/niecza
+[3] http://www.unicode.org/reports/tr18/
