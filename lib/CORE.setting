@@ -1188,6 +1188,44 @@ my class List is Cool {
         %result.pairs;
     }
 
+    method min($cmp_ = &infix:<cmp>) {
+        my $cmp = $cmp_;
+        if $cmp_.count == 1 {
+            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+        }
+        my $min = self[0];
+        for @(self) {
+            $min = $_ if $cmp($_, $min) < 0;
+        }
+        $min;
+    }
+
+    method max($cmp_ = &infix:<cmp>) {
+        my $cmp = $cmp_;
+        if $cmp_.count == 1 {
+            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+        }
+        my $max = self[0];
+        for @(self) {
+            $max = $_ if $cmp($_, $max) > 0;
+        }
+        $max;
+    }
+
+    method minmax($cmp_ = &infix:<cmp>) {
+        my $cmp = $cmp_;
+        if $cmp_.count == 1 {
+            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+        }
+        my $min = self[0];
+        my $max = self[0];
+        for @(self) {
+            $min = $_ if $cmp($_, $min) < 0;
+            $max = $_ if $cmp($_, $max) > 0;
+        }
+        $min..$max;
+    }
+
     method plan(*@items) {
         Q:CgOp {
             (rnull
@@ -1435,6 +1473,9 @@ sub reverse(*@array) {
 }
 
 sub classify($mapper, *@values) { @values.classify($mapper) }
+sub min(*@args, :&by = &infix:<cmp>) { @args.min(&by) }
+sub max(*@args, :&by = &infix:<cmp>) { @args.max(&by) }
+sub minmax(*@args, :&by = &infix:<cmp>) { @args.minmax(&by) }
 sub end($a) { $a.end }
 sub join($tween = "", *@stuff) { @stuff.join($tween) }
 
@@ -1794,6 +1835,8 @@ my class Range is Cool {
     method bounds() { $.min, $.max }
     method from() { $.min }
     method to() { $.max }
+
+    method minmax($cmp = &infix:<cmp>) { self.iterator.list.minmax($cmp) }
 
     method iterator() {
         &infix:<,>(RangeIter.new(:current($!excludes_min ?? $!min.succ !! $!min),
