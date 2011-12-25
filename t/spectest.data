@@ -326,6 +326,7 @@ S29-context/eval.t
 S29-conversions/hash.t
 S29-conversions/ord_and_chr.t
 S32-array/bool.t
+S32-array/end.t
 S32-array/keys_values.t
 S32-array/kv.t
 S32-array/pop.t
@@ -342,6 +343,7 @@ S32-hash/slice.t
 S32-io/dir.t
 S32-io/file-tests.t
 S32-list/classify.t
+S32-list/end.t
 S32-list/first.t
 S32-list/grep.t
 S32-list/join.t
