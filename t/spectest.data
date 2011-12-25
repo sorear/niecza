@@ -343,6 +343,7 @@ S32-io/dir.t
 S32-io/file-tests.t
 S32-list/first.t
 S32-list/grep.t
+S32-list/join.t
 S32-list/map.t
 S32-list/pick.t
 S32-list/roll.t
