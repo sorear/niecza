@@ -311,7 +311,7 @@ S12-methods/typed-attributes.t
 S12-methods/what.t
 S13-overloading/metaoperators.t
 S13-type-casting/methods.t
-# S16-filehandles/filetest.t # needs refudging
+S16-filehandles/filetest.t
 S16-filehandles/io_in_for_loops.t
 S16-filehandles/io_in_while_loops.t
 S16-filehandles/open.t
