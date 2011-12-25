@@ -1176,6 +1176,7 @@ my class List is Cool {
     }
 
     method reverse() { reverse( @(self) ); }
+    method end() { self.elems - 1 }
 
     method classify(&test) {
         my %result;
@@ -1434,6 +1435,7 @@ sub reverse(*@array) {
 }
 
 sub classify($mapper, *@values) { @values.classify($mapper) }
+sub end($a) { $a.end }
 sub join($tween = "", *@stuff) { @stuff.join($tween) }
 
 sub invert(%h) { %h.invert }
