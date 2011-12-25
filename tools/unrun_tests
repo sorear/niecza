@@ -1,5 +1,5 @@
 #!/bin/bash
 
 comm -2 -3 \
-    <( find t/spec/ -name '*.t' | cut -c8- | sort ) \
+    <( find t/spec -name '*.t' | cut -c8- | sort ) \
     <( sort t/spectest.data )
