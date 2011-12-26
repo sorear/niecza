@@ -6,7 +6,8 @@ class Parameter {
     # eek too many attributes.  It probably makes sense to use a bitfield or
     # two here.
     has $.slot; # Str
-    has Bool $.slurpy = False;
+    has Bool $.slurpypos = False;
+    has Bool $.slurpynam = False;
     has Bool $.slurpycap = False;
     # does not vivify; rw
     has Bool $.rwtrans = False;

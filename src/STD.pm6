@@ -5165,11 +5165,11 @@ method getsig {
             }
             if $a_ {
                 push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
-                    :slurpy, :list);
+                    :slurpypos, :list);
             }
             if $h_ {
                 push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
-                    :slurpy, :hash);
+                    :slurpynam, :hash);
             }
         }
         else {

@@ -1431,7 +1431,6 @@ namespace Niecza {
         // Value binding
         public const int READWRITE  = 2;
         public const int RWTRANS    = 8;
-        public const int BINDLIST   = 16;
         public const int INVOCANT   = 8192;
         public const int IS_COPY    = 32768;
         public const int IS_LIST    = 65536;
@@ -1797,7 +1796,7 @@ gotit:
                     else
                         src = Kernel.Assign(Kernel.NewTypedScalar(type), src);
                 } else {
-                    bool islist = ((flags & Parameter.BINDLIST) != 0);
+                    bool islist = ((flags & (Parameter.IS_HASH | Parameter.IS_LIST)) != 0);
                     bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
                     P6any srco  = src.Fetch();
 

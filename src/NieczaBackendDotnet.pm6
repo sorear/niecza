@@ -115,7 +115,6 @@ class StaticSub {
             if .rwtrans       { $flags +|= 8 }
             if .rw            { $flags +|= 2 }
 
-            if .hash || .list { $flags +|= 16 }
             if .defouter      { $flags +|= 4096 }
             if .invocant      { $flags +|= 8192 }
             if .multi_ignored { $flags +|= 16384 }
@@ -126,7 +125,8 @@ class StaticSub {
             if .mdefault      { $flags +|= 32 }
             if .optional      { $flags +|= 64 }
             if .positional    { $flags +|= 128 }
-            if .slurpy        { $flags +|= (.hash ?? 512 !! 256) }
+            if .slurpynam     { $flags +|= 512 }
+            if .slurpypos     { $flags +|= 256 }
             if .slurpycap     { $flags +|= 1024 }
             if .full_parcel   { $flags +|= 2048 }
 

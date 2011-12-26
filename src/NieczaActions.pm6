@@ -2118,7 +2118,8 @@ method parameter($/) {
     my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
     my $copy = False;
     my $sorry;
-    my $slurpy = False;
+    my $slurpypos = False;
+    my $slurpynam = False;
     my $slurpycap = False;
     my $optional = False;
     my $rwt = False;
@@ -2146,10 +2147,11 @@ method parameter($/) {
 
     my $default = $<default_value> ?? $<default_value>.ast !! Any;
     $default.set_name("$/ init") if $default;
+    my $p = $<param_var> // $<named_param>;
 
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
-    elsif $tag eq '*:*'  { $slurpy = True }
+    elsif $tag eq '*:*'  { ($p.ast<hash> ?? $slurpynam !! $slurpypos) = True }
     elsif $tag eq '|:*'  { $slurpycap = True }
     elsif $tag eq '\\:!' { $rwt = True }
     elsif $tag eq '\\:?' { $rwt = True; $optional = True }
@@ -2162,14 +2164,13 @@ method parameter($/) {
     elsif $tag eq '!:*'  { }
     else                 { $sorry = "Confusing parameters ($tag)" }
     if $sorry { $/.CURSOR.sorry($sorry); }
-    my $p = $<param_var> // $<named_param>;
 
     if defined $p.ast<slot> {
         # TODO: type constraint here
     }
 
     make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
-        :$optional, :$slurpy, :$rw, tclass => $type,
+        :$optional, :$slurpypos, :$slurpynam, :$rw, tclass => $type,
         :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
 }
 
